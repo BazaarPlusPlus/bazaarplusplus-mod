@@ -47,6 +47,7 @@ internal sealed class LiveBuildPanelView : IDisposable
     private Label? _candidateCount;
     private Button? _finalBuildRefreshButton;
     private Label? _buildRefreshStatus;
+    private Label? _buildRefreshDetailStatus;
     private Label? _recommendationStatus;
     private Button? _previousButton;
     private Button? _nextButton;
@@ -130,16 +131,25 @@ internal sealed class LiveBuildPanelView : IDisposable
         _finalBuildRefreshButton!.text = snapshot.FinalBuildRefreshButtonText;
         _finalBuildRefreshButton.tooltip = snapshot.FinalBuildRefreshButtonText;
         _finalBuildRefreshButton.SetEnabled(snapshot.FinalBuildRefreshButtonEnabled);
-        _buildRefreshStatus!.text = StablePanelText.Compact(snapshot.BuildRefreshStatusText, 150);
+        var hasBuildRefreshStatus = !string.IsNullOrWhiteSpace(snapshot.BuildRefreshStatusText);
+        _buildRefreshStatus!.text = StablePanelText.Compact(snapshot.BuildRefreshStatusText, 96);
         _buildRefreshStatus.tooltip = snapshot.BuildRefreshStatusText;
-        _buildRefreshStatus.style.display = string.IsNullOrWhiteSpace(
-            snapshot.BuildRefreshStatusText
-        )
-            ? DisplayStyle.None
-            : DisplayStyle.Flex;
+        _buildRefreshStatus.style.display = hasBuildRefreshStatus
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
         _buildRefreshStatus.style.color = ResolveRefreshStatusColor(
             snapshot.BuildRefreshStatusSeverity
         );
+        _buildRefreshDetailStatus!.text = StablePanelText.Compact(
+            snapshot.BuildRefreshStatusDetailText,
+            260
+        );
+        _buildRefreshDetailStatus.tooltip = snapshot.BuildRefreshStatusDetailText;
+        _buildRefreshDetailStatus.style.display = string.IsNullOrWhiteSpace(
+            snapshot.BuildRefreshStatusDetailText
+        )
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
         _recommendationStatus!.text = StablePanelText.Compact(snapshot.RecommendationStatus, 96);
         _recommendationStatus.tooltip = snapshot.RecommendationStatus;
         _previousButton!.text = LiveBuildPanelText.Previous();
@@ -340,23 +350,70 @@ internal sealed class LiveBuildPanelView : IDisposable
         _candidateCount.style.unityTextAlign = TextAnchor.MiddleCenter;
         rail.Add(_candidateCount);
 
+        var refreshStrip = new VisualElement();
+        refreshStrip.style.marginTop = 12f;
+        refreshStrip.style.height = Sizes.LiveBuildRefreshStripHeight;
+        refreshStrip.style.minHeight = Sizes.LiveBuildRefreshStripHeight;
+        refreshStrip.style.maxHeight = Sizes.LiveBuildRefreshStripHeight;
+        refreshStrip.style.flexDirection = FlexDirection.Row;
+        refreshStrip.style.alignItems = Align.Center;
+        refreshStrip.style.backgroundColor = Colors.HistoryStatusBackground;
+        refreshStrip.style.paddingLeft = 10f;
+        refreshStrip.style.paddingRight = 8f;
+        refreshStrip.style.paddingTop = 6f;
+        refreshStrip.style.paddingBottom = 6f;
+        refreshStrip.style.overflow = Overflow.Hidden;
+        rail.Add(refreshStrip);
+
+        var refreshTextColumn = new VisualElement();
+        refreshTextColumn.style.flexGrow = 1f;
+        refreshTextColumn.style.flexShrink = 1f;
+        refreshTextColumn.style.minWidth = 0f;
+        refreshTextColumn.style.minHeight = 0f;
+        refreshTextColumn.style.justifyContent = Justify.Center;
+        refreshTextColumn.style.overflow = Overflow.Hidden;
+        refreshStrip.Add(refreshTextColumn);
+
+        // Refresh feedback stays in the rail (never a board-row empty text): row copy feeds
+        // geometry callbacks and would re-trigger preview redraws on every status change.
+        _buildRefreshStatus = CreateLabel(14, FontStyle.Normal, Colors.HistoryStatusText);
+        _buildRefreshStatus.style.whiteSpace = WhiteSpace.Normal;
+        _buildRefreshStatus.style.maxHeight = Sizes.StatusHeight;
+        _buildRefreshStatus.style.overflow = Overflow.Hidden;
+        _buildRefreshStatus.style.display = DisplayStyle.None;
+        refreshTextColumn.Add(_buildRefreshStatus);
+
         _finalBuildRefreshButton = CreateButton(
             LiveBuildPanelText.RefreshFinalBuilds(),
             _refreshFinalBuilds
         );
-        _finalBuildRefreshButton.style.marginTop = 12f;
-        _finalBuildRefreshButton.style.height = Sizes.ButtonStandardHeight;
-        rail.Add(_finalBuildRefreshButton);
+        _finalBuildRefreshButton.style.marginLeft = 8f;
+        _finalBuildRefreshButton.style.width = Sizes.LiveBuildRefreshButtonWidth;
+        _finalBuildRefreshButton.style.minWidth = Sizes.LiveBuildRefreshButtonWidth;
+        _finalBuildRefreshButton.style.maxWidth = Sizes.LiveBuildRefreshButtonWidth;
+        _finalBuildRefreshButton.style.height = Sizes.LiveBuildRefreshButtonHeight;
+        _finalBuildRefreshButton.style.minHeight = Sizes.LiveBuildRefreshButtonHeight;
+        _finalBuildRefreshButton.style.maxHeight = Sizes.LiveBuildRefreshButtonHeight;
+        _finalBuildRefreshButton.style.flexGrow = 0f;
+        _finalBuildRefreshButton.style.flexShrink = 0f;
+        refreshStrip.Add(_finalBuildRefreshButton);
 
-        // Refresh feedback gets its own rail label (never a board-row empty text): row copy feeds
-        // the row geometry callbacks and would re-trigger preview redraws on every status change.
-        _buildRefreshStatus = CreateLabel(14, FontStyle.Normal, Colors.HistoryStatusText);
-        _buildRefreshStatus.style.marginTop = 8f;
-        _buildRefreshStatus.style.whiteSpace = WhiteSpace.Normal;
-        _buildRefreshStatus.style.maxHeight = Sizes.LiveBuildRefreshStatusMaxHeight;
-        _buildRefreshStatus.style.overflow = Overflow.Hidden;
-        _buildRefreshStatus.style.display = DisplayStyle.None;
-        rail.Add(_buildRefreshStatus);
+        _buildRefreshDetailStatus = CreateLabel(
+            12,
+            FontStyle.Normal,
+            Colors.HistoryFooterSecondaryText
+        );
+        _buildRefreshDetailStatus.style.marginTop = 8f;
+        _buildRefreshDetailStatus.style.whiteSpace = WhiteSpace.Normal;
+        _buildRefreshDetailStatus.style.maxHeight = Sizes.LiveBuildRefreshDetailMaxHeight;
+        _buildRefreshDetailStatus.style.overflow = Overflow.Hidden;
+        _buildRefreshDetailStatus.style.backgroundColor = Colors.HistoryStatusBackground;
+        _buildRefreshDetailStatus.style.paddingLeft = 12f;
+        _buildRefreshDetailStatus.style.paddingRight = 12f;
+        _buildRefreshDetailStatus.style.paddingTop = 10f;
+        _buildRefreshDetailStatus.style.paddingBottom = 10f;
+        _buildRefreshDetailStatus.style.display = DisplayStyle.None;
+        rail.Add(_buildRefreshDetailStatus);
 
         _recommendationStatus = CreateLabel(16, FontStyle.Normal, Colors.HistoryStatusText);
         _recommendationStatus.style.marginTop = 12f;
@@ -395,12 +452,16 @@ internal sealed class LiveBuildPanelView : IDisposable
         if (row.Board.Cards.Count == 0)
         {
             elements.Empty.text = StablePanelText.Compact(row.EmptyText, 72);
-            elements.Empty.tooltip = row.EmptyText;
+            elements.Empty.tooltip = row.EmptyTooltip;
+            elements.Empty.style.display = string.IsNullOrWhiteSpace(row.EmptyText)
+                ? DisplayStyle.None
+                : DisplayStyle.Flex;
         }
         else
         {
             elements.Empty.text = string.Empty;
             elements.Empty.tooltip = string.Empty;
+            elements.Empty.style.display = DisplayStyle.None;
         }
         ClearDynamic(elements);
 

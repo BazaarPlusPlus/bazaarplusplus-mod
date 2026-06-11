@@ -28,6 +28,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 {
     private const string OverlayPanelId = "LiveBuildPanel";
     private const int OverlaySortingBand = BppOverlaySorting.MainOverlayPanelBand;
+    private const int SupporterAttributionCount = 4;
 
     private static LiveBuildPanel? _instance;
     private readonly LiveCardSnapshotReader _reader = new();
@@ -45,6 +46,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private int _recommendationIndex;
     private bool _buildRefreshInProgress;
     private string _buildRefreshStatusText = string.Empty;
+    private string _buildRefreshStatusDetailText = string.Empty;
     private LiveBuildRefreshSeverity _buildRefreshStatusSeverity;
     private int _buildRefreshOperationVersion;
 
@@ -134,7 +136,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         BppOverlayPanelMutex.CloseOthers(OverlayPanelId, OverlaySortingBand);
         EnsureView();
         _isVisible = true;
-        _supporters = BPPSupporters.SampleMany(2);
+        _supporters = BPPSupporters.SampleMany(SupporterAttributionCount);
         _candidateState.Clear();
         _recommendationIndex = 0;
         // A refresh still in flight keeps its pending status visible; otherwise drop the previous
@@ -260,14 +262,11 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         {
             var summary = _recommendations.GetCorpusSummary();
             SetBuildRefreshStatus(
+                LiveBuildPanelText.FinalBuildRefreshSucceeded(),
+                LiveBuildRefreshSeverity.Success,
                 summary.HasValue
-                    ? LiveBuildPanelText.FinalBuildRefreshSucceeded(
-                        summary.Value.GeneratedAtUtc,
-                        summary.Value.BuildCount,
-                        summary.Value.HeroCount
-                    )
-                    : LiveBuildPanelText.FinalBuildRefreshSucceeded(),
-                LiveBuildRefreshSeverity.Success
+                    ? LiveBuildPanelText.FinalBuildRefreshDetail(summary.Value)
+                    : string.Empty
             );
             BppLog.Info("LiveBuildPanel", "Manual ten-win builds refresh succeeded.");
         }
@@ -298,12 +297,18 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         }
     }
 
-    private void SetBuildRefreshStatus(string statusText, LiveBuildRefreshSeverity severity)
+    private void SetBuildRefreshStatus(
+        string statusText,
+        LiveBuildRefreshSeverity severity,
+        string detailText = ""
+    )
     {
         _buildRefreshStatusText = statusText;
-        _buildRefreshStatusSeverity = string.IsNullOrWhiteSpace(statusText)
-            ? LiveBuildRefreshSeverity.Neutral
-            : severity;
+        _buildRefreshStatusDetailText = detailText;
+        _buildRefreshStatusSeverity =
+            string.IsNullOrWhiteSpace(statusText) && string.IsNullOrWhiteSpace(detailText)
+                ? LiveBuildRefreshSeverity.Neutral
+                : severity;
     }
 
     // Status-only updates redraw the UITK tree without restarting the native preview coroutine:
@@ -401,9 +406,21 @@ internal sealed class LiveBuildPanel : MonoBehaviour
                 : LiveBuildPanelText.RefreshFinalBuilds(),
             FinalBuildRefreshButtonEnabled = !_buildRefreshInProgress,
             BuildRefreshStatusText = _buildRefreshStatusText,
+            BuildRefreshStatusDetailText = ResolveBuildRefreshDetailText(),
             BuildRefreshStatusSeverity = _buildRefreshStatusSeverity,
             Supporters = _supporters,
         };
+    }
+
+    private string ResolveBuildRefreshDetailText()
+    {
+        if (!string.IsNullOrWhiteSpace(_buildRefreshStatusDetailText))
+            return _buildRefreshStatusDetailText;
+
+        var summary = _recommendations.GetCorpusSummary();
+        return summary.HasValue
+            ? LiveBuildPanelText.FinalBuildRefreshDetail(summary.Value)
+            : string.Empty;
     }
 
     private IEnumerable<BppItemBoard> BuildSelectableBoards()

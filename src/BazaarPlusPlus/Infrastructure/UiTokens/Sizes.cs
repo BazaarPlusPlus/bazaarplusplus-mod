@@ -46,7 +46,10 @@ internal static class Sizes
     public const float DetailTextMaxHeight = 42f;
     public const float DetailNoticeMaxHeight = 48f;
     public const float CollectionStatusMaxHeight = 54f;
-    public const float LiveBuildRefreshStatusMaxHeight = 56f;
+    public const float LiveBuildRefreshButtonWidth = 108f;
+    public const float LiveBuildRefreshButtonHeight = ButtonStandardHeight;
+    public const float LiveBuildRefreshStripHeight = 58f;
+    public const float LiveBuildRefreshDetailMaxHeight = 96f;
     public const float LiveBuildRecommendationStatusMaxHeight = 90f;
     public const float LiveBuildRowEmptyMaxHeight = 58f;
     public const float TagFacetChipMaxWidth = 156f;

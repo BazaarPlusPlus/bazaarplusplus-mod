@@ -198,7 +198,12 @@ internal sealed class BuildRecommendationRepository
         var corpus = EnsureCorpus();
         return corpus == null
             ? (TenWinCorpusSummary?)null
-            : new TenWinCorpusSummary(corpus.GeneratedAtUtc, corpus.BuildCount, corpus.HeroCount);
+            : new TenWinCorpusSummary(
+                corpus.GeneratedAtUtc,
+                corpus.BuildCount,
+                corpus.HeroCount,
+                corpus.HeroBuildCounts
+            );
     }
 
     // ---- Corpus loading / cache / remote refresh --------------------------

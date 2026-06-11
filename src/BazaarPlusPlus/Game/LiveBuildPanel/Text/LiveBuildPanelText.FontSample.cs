@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.LiveBuildPanel;
@@ -30,10 +31,16 @@ internal static partial class LiveBuildPanelText
         + FinalBuildRefreshAlreadyRunning()
         + FinalBuildRefreshSucceeded()
         // Fixed sample covering the corpus-summary labels/units plus every digit glyph.
-        + FinalBuildRefreshSucceeded(
-            new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
-            1234567890,
-            1234567890
+        + FinalBuildRefreshDetail(
+            new TenWinCorpusSummary(
+                new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
+                1234567890,
+                1234567890,
+                [
+                    new TenWinHeroBuildCount("Vanessa", 1234567890),
+                    new TenWinHeroBuildCount("Dooley", 987654321),
+                ]
+            )
         )
         + FinalBuildRefreshFailed(Unknown());
 }

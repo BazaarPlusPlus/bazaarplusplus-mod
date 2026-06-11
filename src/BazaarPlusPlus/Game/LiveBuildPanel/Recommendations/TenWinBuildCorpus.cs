@@ -72,6 +72,11 @@ internal sealed class TenWinBuildCorpus
         _heroes = heroes;
         GeneratedAtUtc = generatedAtUtc;
         BuildCount = heroes.Values.Sum(hero => hero.Builds.Count);
+        HeroBuildCounts = heroes
+            .Select(pair => new TenWinHeroBuildCount(pair.Key, pair.Value.Builds.Count))
+            .OrderByDescending(pair => pair.BuildCount)
+            .ThenBy(pair => pair.Hero, StringComparer.Ordinal)
+            .ToArray();
     }
 
     public int HeroCount => _heroes.Count;
@@ -80,6 +85,8 @@ internal sealed class TenWinBuildCorpus
     public DateTimeOffset? GeneratedAtUtc { get; }
 
     public int BuildCount { get; }
+
+    public IReadOnlyList<TenWinHeroBuildCount> HeroBuildCounts { get; }
 
     /// <summary>
     /// Parses the compact payload. Returns <c>null</c> on any structural problem (unparseable JSON,
@@ -505,23 +512,6 @@ internal sealed class TenWinBuildCorpus
 
         public bool IsComplete => Score >= 0;
     }
-}
-
-/// <summary>Provenance summary of a loaded corpus for status/feedback surfaces.</summary>
-internal readonly struct TenWinCorpusSummary
-{
-    public TenWinCorpusSummary(DateTimeOffset? generatedAtUtc, int buildCount, int heroCount)
-    {
-        GeneratedAtUtc = generatedAtUtc;
-        BuildCount = buildCount;
-        HeroCount = heroCount;
-    }
-
-    public DateTimeOffset? GeneratedAtUtc { get; }
-
-    public int BuildCount { get; }
-
-    public int HeroCount { get; }
 }
 
 internal sealed class TenWinHero

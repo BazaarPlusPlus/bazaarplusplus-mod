@@ -1,16 +1,21 @@
+using System.Reflection;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.LiveBuildPanel;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
+using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using BazaarPlusPlus.Localization;
 
 TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground();
+TestSupporterAttributionCountMatchesRailCap();
 TestCandidateToggleUsesTemplateId();
 TestCandidatePruneKeepsSelectableRowsOnly();
 TestRowVmTogglePolicyComesFromBoardType();
 TestSlotChromeGeometryMatchesTenSlotContract();
 TestRefreshFinalBuildsTextsAreAtlasWarmed();
+TestNoRunRowsSuppressEmptyText();
+TestActiveRunRowsSuppressVisibleEmptyTextAndKeepSpecificTooltips();
 
 Console.WriteLine("LiveBuildPanel checks passed.");
 
@@ -29,6 +34,52 @@ static void TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground()
         "Panel mutex band should remain a separate semantic constant even when it shares the card overlay value."
     );
 }
+
+static void TestSupporterAttributionCountMatchesRailCap()
+{
+    RegisterPluginReflectionAssemblyResolution();
+    var assembly = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "BazaarPlusPlus.dll"));
+    var panelType = assembly.GetType("BazaarPlusPlus.Game.LiveBuildPanel.LiveBuildPanel");
+    Assert(
+        panelType != null,
+        $"Plugin assembly should contain LiveBuildPanel: {assembly.FullName}."
+    );
+
+    var field = panelType!.GetField(
+        "SupporterAttributionCount",
+        BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(field != null, "LiveBuildPanel should keep supporter attribution count named.");
+    Assert(
+        (int)field!.GetRawConstantValue()! == 4,
+        "LiveBuildPanel should request four supporters to match the attribution row cap."
+    );
+}
+
+static void RegisterPluginReflectionAssemblyResolution()
+{
+    AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
+    {
+        var name = new AssemblyName(args.Name).Name;
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        foreach (var root in new[] { AppContext.BaseDirectory, MacSteamManagedPath() })
+        {
+            var candidate = Path.Combine(root, $"{name}.dll");
+            if (File.Exists(candidate))
+                return Assembly.LoadFrom(candidate);
+        }
+
+        return null;
+    };
+}
+
+static string MacSteamManagedPath() =>
+    Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        "Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed"
+    );
 
 static void TestCandidateToggleUsesTemplateId()
 {
@@ -114,10 +165,16 @@ static void TestRefreshFinalBuildsTextsAreAtlasWarmed()
             LiveBuildPanelText.RefreshingFinalBuilds(),
             LiveBuildPanelText.FinalBuildRefreshAlreadyRunning(),
             LiveBuildPanelText.FinalBuildRefreshSucceeded(),
-            LiveBuildPanelText.FinalBuildRefreshSucceeded(
-                new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
-                1234567890,
-                1234567890
+            LiveBuildPanelText.FinalBuildRefreshDetail(
+                new TenWinCorpusSummary(
+                    new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero),
+                    1234567890,
+                    1234567890,
+                    [
+                        new TenWinHeroBuildCount("Vanessa", 1234567890),
+                        new TenWinHeroBuildCount("Dooley", 987654321),
+                    ]
+                )
             ),
             LiveBuildPanelText.FinalBuildRefreshFailed(LiveBuildPanelText.Unknown()),
         }
@@ -130,8 +187,93 @@ static void TestRefreshFinalBuildsTextsAreAtlasWarmed()
     }
 }
 
+static void TestNoRunRowsSuppressEmptyText()
+{
+    L.Install(
+        new FixedLanguageProvider("en"),
+        new FixedLocaleModeProvider(BppChineseLocaleMode.Mainland)
+    );
+
+    var rows = RowsById(
+        new LiveBuildPanelSnapshot
+        {
+            Shop = EmptyBoard(BppItemBoardId.LiveShop, BppItemBoardType.SelectableShop),
+            Board = EmptyBoard(BppItemBoardId.LiveBoard, BppItemBoardType.SelectableContainer),
+            Stash = EmptyBoard(BppItemBoardId.LiveStash, BppItemBoardType.SelectableContainer),
+        }
+    );
+
+    foreach (
+        var id in new[]
+        {
+            BppItemBoardId.LiveShop,
+            BppItemBoardId.LiveBoard,
+            BppItemBoardId.LiveStash,
+        }
+    )
+    {
+        Assert(
+            string.IsNullOrEmpty(rows[id].EmptyText),
+            $"{id} no-run empty text should be suppressed."
+        );
+        Assert(
+            string.IsNullOrEmpty(rows[id].EmptyTooltip),
+            $"{id} no-run empty tooltip should be suppressed."
+        );
+    }
+}
+
+static void TestActiveRunRowsSuppressVisibleEmptyTextAndKeepSpecificTooltips()
+{
+    L.Install(
+        new FixedLanguageProvider("en"),
+        new FixedLocaleModeProvider(BppChineseLocaleMode.Mainland)
+    );
+
+    var rows = RowsById(
+        new LiveBuildPanelSnapshot
+        {
+            Hero = EHero.Vanessa,
+            Shop = EmptyBoard(BppItemBoardId.LiveShop, BppItemBoardType.SelectableShop),
+            Board = EmptyBoard(BppItemBoardId.LiveBoard, BppItemBoardType.SelectableContainer),
+            Stash = EmptyBoard(BppItemBoardId.LiveStash, BppItemBoardType.SelectableContainer),
+        }
+    );
+
+    Assert(
+        string.IsNullOrEmpty(rows[BppItemBoardId.LiveShop].EmptyText),
+        "Active empty shop should not render visible empty text."
+    );
+    Assert(
+        string.IsNullOrEmpty(rows[BppItemBoardId.LiveBoard].EmptyText),
+        "Active empty board should not render visible empty text."
+    );
+    Assert(
+        string.IsNullOrEmpty(rows[BppItemBoardId.LiveStash].EmptyText),
+        "Active empty stash should not render visible empty text."
+    );
+    Assert(
+        rows[BppItemBoardId.LiveShop].EmptyTooltip == LiveBuildPanelText.EmptyShop(),
+        "Active empty shop tooltip should preserve the shop-specific detail."
+    );
+    Assert(
+        rows[BppItemBoardId.LiveBoard].EmptyTooltip == LiveBuildPanelText.EmptyBoard(),
+        "Active empty board tooltip should preserve the board-specific detail."
+    );
+    Assert(
+        rows[BppItemBoardId.LiveStash].EmptyTooltip == LiveBuildPanelText.EmptyStash(),
+        "Active empty stash tooltip should preserve the stash-specific detail."
+    );
+}
+
 static BppItemBoard Board(BppItemBoardId id, BppItemBoardType type, Guid templateId) =>
     new(id, type, [new BppItemBoardCard { TemplateId = templateId, Size = ECardSize.Small }]);
+
+static BppItemBoard EmptyBoard(BppItemBoardId id, BppItemBoardType type) =>
+    new(id, type, Array.Empty<BppItemBoardCard>());
+
+static Dictionary<BppItemBoardId, LiveItemBoardRowVm> RowsById(LiveBuildPanelSnapshot snapshot) =>
+    snapshot.Rows.ToDictionary(row => row.Board.Id);
 
 static void Assert(bool condition, string message)
 {

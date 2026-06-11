@@ -3,6 +3,8 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
+using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.LiveBuildPanel;
@@ -64,32 +66,25 @@ internal static partial class LiveBuildPanelText
 
     public static string FinalBuildRefreshSucceeded() => L.Resolve(FinalBuildRefreshSucceededText);
 
-    // Success feedback with corpus provenance: analyzer emission time (shown in the player's
-    // local clock) and corpus size, e.g. "十胜阵容已更新。数据时间 2026-06-07 19:19 · 3606 套阵容 · 7 位英雄".
-    public static string FinalBuildRefreshSucceeded(
-        DateTimeOffset? generatedAtUtc,
-        int buildCount,
-        int heroCount
-    )
+    public static string FinalBuildRefreshDetail(TenWinCorpusSummary summary)
     {
         var parts = new List<string>();
-        if (generatedAtUtc.HasValue)
+        if (summary.GeneratedAtUtc.HasValue)
         {
-            var localTime = generatedAtUtc
-                .Value.ToLocalTime()
+            var localTime = summary
+                .GeneratedAtUtc.Value.ToLocalTime()
                 .ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
             parts.Add($"{L.Resolve(CorpusDataTimeLabelText)} {localTime}");
         }
 
-        if (buildCount > 0)
-            parts.Add($"{buildCount} {L.Resolve(CorpusBuildCountUnitText)}");
-        if (heroCount > 0)
-            parts.Add($"{heroCount} {L.Resolve(CorpusHeroCountUnitText)}");
-
-        var summary = string.Join(" · ", parts);
-        return summary.Length == 0
-            ? FinalBuildRefreshSucceeded()
-            : $"{FinalBuildRefreshSucceeded()} {summary}";
+        parts.Add($"{summary.BuildCount} {L.Resolve(CorpusBuildCountUnitText)}");
+        parts.Add($"{summary.HeroCount} {L.Resolve(CorpusHeroCountUnitText)}");
+        parts.AddRange(
+            summary
+                .HeroBuildCounts.Where(count => !string.IsNullOrWhiteSpace(count.Hero))
+                .Select(count => $"{count.Hero} {count.BuildCount}")
+        );
+        return string.Join(" · ", parts);
     }
 
     public static string FinalBuildRefreshFailed(string details) =>

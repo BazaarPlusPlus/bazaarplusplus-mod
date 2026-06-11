@@ -25,6 +25,14 @@
       Link="LiveBuildCandidateState.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildPanelSnapshot.cs"
+      Link="LiveBuildPanelSnapshot.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildRefreshSeverity.cs"
+      Link="LiveBuildRefreshSeverity.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveItemBoardRowVm.cs"
       Link="LiveItemBoardRowVm.cs"
     />
@@ -47,6 +55,14 @@
     <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Text/LiveBuildPanelText.Status.cs"
       Link="Text/LiveBuildPanelText.Status.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/TenWinCorpusSummary.cs"
+      Link="Recommendations/TenWinCorpusSummary.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/Supporters/BPPSupporterSample.cs"
+      Link="Supporters/BPPSupporterSample.cs"
     />
     <Compile Include="../../src/BazaarPlusPlus.Localization/L.cs" Link="L.cs" />
     <Compile
@@ -109,6 +125,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/BazaarPlusPlus/BazaarPlusPlus.csproj" />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>

@@ -34,10 +34,14 @@ internal sealed class LiveBuildPanelSnapshot
 
     public string BuildRefreshStatusText { get; init; } = string.Empty;
 
+    public string BuildRefreshStatusDetailText { get; init; } = string.Empty;
+
     public LiveBuildRefreshSeverity BuildRefreshStatusSeverity { get; init; }
 
     public IReadOnlyList<BPPSupporterSample> Supporters { get; init; } =
         Array.Empty<BPPSupporterSample>();
+
+    public bool HasActiveRun => Hero != null;
 
     public LiveItemBoardRowVm[] Rows =>
         [
@@ -45,17 +49,20 @@ internal sealed class LiveBuildPanelSnapshot
             new LiveItemBoardRowVm(
                 Shop,
                 LiveBuildPanelText.ShopRow(),
-                LiveBuildPanelText.EmptyShop()
+                string.Empty,
+                HasActiveRun ? LiveBuildPanelText.EmptyShop() : string.Empty
             ),
             new LiveItemBoardRowVm(
                 Board,
                 LiveBuildPanelText.BoardRow(),
-                LiveBuildPanelText.EmptyBoard()
+                string.Empty,
+                HasActiveRun ? LiveBuildPanelText.EmptyBoard() : string.Empty
             ),
             new LiveItemBoardRowVm(
                 Stash,
                 LiveBuildPanelText.StashRow(),
-                LiveBuildPanelText.EmptyStash()
+                string.Empty,
+                HasActiveRun ? LiveBuildPanelText.EmptyStash() : string.Empty
             ),
         ];
 }

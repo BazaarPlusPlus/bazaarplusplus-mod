@@ -38,6 +38,7 @@ internal static class TenWinBuildTests
         TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh();
         TestColdStartFallsBackToEmbeddedThenRemote();
         TestEmbeddedSeedResourceIsBundledAndParses();
+        TestCorpusSummaryIncludesPerHeroBuildCounts();
 
         Console.WriteLine("LiveBuild recommendation checks passed.");
     }
@@ -653,6 +654,40 @@ internal static class TenWinBuildTests
         Assert(buildCount > 0, "The bundled seed should count at least one build.");
     }
 
+    private static void TestCorpusSummaryIncludesPerHeroBuildCounts()
+    {
+        WithCorpus(
+            TwoHeroSummaryPayload(),
+            (repositoryType, repository) =>
+            {
+                var getSummary = repositoryType.GetMethod("GetCorpusSummary");
+                Assert(getSummary != null, "Repository should expose corpus summary.");
+                var summary = getSummary!.Invoke(repository, null);
+                Assert(summary != null, "Loaded corpus summary should not be null.");
+
+                Assert((int)Prop(summary!, "HeroCount")! == 2, "Summary should count both heroes.");
+                Assert(
+                    (int)Prop(summary!, "BuildCount")! == 3,
+                    "Summary should count all build rows across heroes."
+                );
+
+                var heroCounts = ((IEnumerable)Prop(summary!, "HeroBuildCounts")!)
+                    .Cast<object>()
+                    .Select(row => ((string)Prop(row, "Hero")!, (int)Prop(row, "BuildCount")!))
+                    .ToList();
+                Assert(heroCounts.Count == 2, "Summary should expose both hero count rows.");
+                Assert(
+                    heroCounts[0] == ("Vanessa", 2),
+                    "Hero count rows should sort by descending build count."
+                );
+                Assert(
+                    heroCounts[1] == ("Dooley", 1),
+                    "Hero count rows should preserve exact hero names and counts."
+                );
+            }
+        );
+    }
+
     // ---- Payload builders -------------------------------------------------
 
     private static string MainRecallPayload(string hero) =>
@@ -676,6 +711,28 @@ internal static class TenWinBuildTests
             cardIndex: "[[0,[0]]]"
         );
 
+    private static string TwoHeroSummaryPayload()
+    {
+        var dooleyBuild = Build("[0]", "[[0,0,1,0,1]]", 111);
+        var vanessaBuildA = Build("[0]", "[[0,0,1,0,1]]", 222);
+        var vanessaBuildB = Build("[1]", "[[1,1,1,0,1]]", 333);
+
+        return PayloadWithHeroes(
+            cards: $"[\"{GuidA}\",\"{GuidB}\"]",
+            enchantments: "[null]",
+            heroes: $$"""
+                "Dooley": {
+                  "builds": [{{dooleyBuild}}],
+                  "card_index": [[0,[0]]]
+                },
+                "Vanessa": {
+                  "builds": [{{vanessaBuildA}},{{vanessaBuildB}}],
+                  "card_index": [[0,[0]],[1,[1]]]
+                }
+            """
+        );
+    }
+
     private static string Build(
         string cardRefs,
         string layout,
@@ -690,6 +747,18 @@ internal static class TenWinBuildTests
         string builds,
         string cardIndex
     ) =>
+        PayloadWithHeroes(
+            cards,
+            enchantments,
+            $$"""
+                "{{hero}}": {
+                  "builds": {{builds}},
+                  "card_index": {{cardIndex}}
+                }
+            """
+        );
+
+    private static string PayloadWithHeroes(string cards, string enchantments, string heroes) =>
         $$"""
             {
               "schema_version": 2,
@@ -704,10 +773,7 @@ internal static class TenWinBuildTests
               },
               "selection_reasons": ["core", "coverage"],
               "heroes": {
-                "{{hero}}": {
-                  "builds": {{builds}},
-                  "card_index": {{cardIndex}}
-                }
+                {{heroes}}
               }
             }
             """;
