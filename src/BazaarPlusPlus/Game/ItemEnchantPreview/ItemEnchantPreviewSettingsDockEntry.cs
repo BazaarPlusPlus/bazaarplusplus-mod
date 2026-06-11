@@ -8,7 +8,7 @@ namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
 internal sealed class ItemEnchantPreviewSettingsDockEntry : PreviewVisibilityModeDockEntry
 {
-    public override int Order => 3;
+    public override int Order => BppSettingsDockOrder.EnchantPreview;
 
     protected override string Key => "EnchantPreview";
 

@@ -6,7 +6,7 @@ namespace BazaarPlusPlus.Game.NameOverride;
 
 internal sealed class NameOverrideSettingsDockEntry : ISettingsDockEntry
 {
-    public int Order => 1;
+    public int Order => BppSettingsDockOrder.NameOverride;
 
     public BppSettingsDockDefinition Build(IBppConfig config) =>
         new(

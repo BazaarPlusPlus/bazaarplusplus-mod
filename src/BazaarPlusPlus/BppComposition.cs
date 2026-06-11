@@ -95,6 +95,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_combatStatusBarModule);
 
         _settingsDockRegistry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
+        _settingsDockRegistry.Register(new HotkeyTutorialSettingsDockEntry());
         _settingsDockRegistry.Register(new ChineseLocaleModeSettingsDockEntry(_eventBus));
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());

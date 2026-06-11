@@ -6,7 +6,7 @@ namespace BazaarPlusPlus.Game.CardArtReplacement;
 
 internal sealed class PackageCardArtReplacementSettingsDockEntry : ISettingsDockEntry
 {
-    public int Order => 4;
+    public int Order => BppSettingsDockOrder.PackageCardArtReplacement;
 
     public BppSettingsDockDefinition Build(IBppConfig config) =>
         new(

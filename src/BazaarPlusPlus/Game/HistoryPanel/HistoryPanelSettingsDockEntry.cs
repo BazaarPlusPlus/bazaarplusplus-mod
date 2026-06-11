@@ -6,7 +6,7 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed class HistoryPanelSettingsDockEntry : ISettingsDockEntry
 {
-    public int Order => 0;
+    public int Order => BppSettingsDockOrder.GameHistory;
 
     public BppSettingsDockDefinition Build(IBppConfig config) =>
         new(

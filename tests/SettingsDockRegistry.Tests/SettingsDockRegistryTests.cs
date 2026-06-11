@@ -1,5 +1,12 @@
 using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Game.CardArtReplacement;
+using BazaarPlusPlus.Game.CombatStatusBar;
+using BazaarPlusPlus.Game.HistoryPanel;
+using BazaarPlusPlus.Game.ItemEnchantPreview;
+using BazaarPlusPlus.Game.LegendaryPosition;
+using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Localization;
 using BepInEx.Configuration;
@@ -88,7 +95,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void PackageCardArtReplacementDockEntry_uses_order_four_and_toggles_config()
+    public void PackageCardArtReplacementDockEntry_uses_named_order_and_toggles_config()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -104,7 +111,7 @@ public class SettingsDockRegistryTests
 
             var definition = entry.Build(config);
 
-            Assert.Equal(4, entry.Order);
+            Assert.Equal(BppSettingsDockOrder.PackageCardArtReplacement, entry.Order);
             Assert.Equal("PackageCardArtReplacement", definition.Key);
             Assert.Equal("Package Swap", definition.ResolveLabel("en"));
             Assert.Equal("掉包快递", definition.ResolveLabel("zh-CN"));
@@ -130,6 +137,100 @@ public class SettingsDockRegistryTests
         {
             if (File.Exists(configPath))
                 File.Delete(configPath);
+        }
+    }
+
+    [Theory]
+    [InlineData("zh-CN", "https://bazaarplusplus.com/tutorial")]
+    [InlineData("zh-Hant", "https://bazaarplusplus.com/tutorial")]
+    [InlineData("en", "https://bazaarplusplus.com/tutorial?lang=en")]
+    [InlineData("de-DE", "https://bazaarplusplus.com/tutorial?lang=en")]
+    [InlineData("", "https://bazaarplusplus.com/tutorial?lang=en")]
+    public void HotkeyTutorialLinks_resolves_tutorial_url_by_language(
+        string languageCode,
+        string expected
+    )
+    {
+        var result = HotkeyTutorialLinks.ResolveTutorialUrl(languageCode);
+
+        Assert.Equal(expected, result);
+        Assert.DoesNotContain("lang=en?lang=en", result);
+    }
+
+    [Fact]
+    public void HotkeyTutorialDockEntry_builds_action_definition()
+    {
+        L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+        var entry = new HotkeyTutorialSettingsDockEntry();
+
+        var definition = entry.Build(config: null!);
+
+        Assert.Equal(BppSettingsDockOrder.HotkeyTutorial, entry.Order);
+        Assert.Equal("HotkeyTutorial", definition.Key);
+        Assert.Equal("快捷键教程", definition.ResolveLabel("zh-CN"));
+        Assert.Equal("Hotkey Tutorial", definition.ResolveLabel("en"));
+        Assert.Equal("打开", definition.ResolveStatus("zh-CN"));
+        Assert.Equal("OPEN", definition.ResolveStatus("en"));
+        Assert.True(definition.IsActive());
+        Assert.True(definition.CollapseAfterActivate);
+    }
+
+    [Fact]
+    public void SettingsDockEntries_use_named_order_constants()
+    {
+        Assert.Equal(BppSettingsDockOrder.GameHistory, new HistoryPanelSettingsDockEntry().Order);
+        Assert.Equal(BppSettingsDockOrder.NameOverride, new NameOverrideSettingsDockEntry().Order);
+        Assert.Equal(
+            BppSettingsDockOrder.LegendaryPosition,
+            new LegendaryPositionSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.EnchantPreview,
+            new ItemEnchantPreviewSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.PackageCardArtReplacement,
+            new PackageCardArtReplacementSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.CombatStatusBar,
+            new CombatStatusBarSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.ChineseLocaleMode,
+            new ChineseLocaleModeSettingsDockEntry(new InMemoryBppEventBus()).Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.HotkeyTutorial,
+            new HotkeyTutorialSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.BazaarDbUpload,
+            new BazaarDbSnapshotUploadSettingsDockEntry().Order
+        );
+    }
+
+    [Fact]
+    public void SettingsDockCatalog_sorts_tutorial_between_chinese_locale_and_bazaar_db()
+    {
+        L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+        var registry = new SettingsDockEntryRegistry();
+        registry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
+        registry.Register(new HotkeyTutorialSettingsDockEntry());
+        registry.Register(new ChineseLocaleModeSettingsDockEntry(new InMemoryBppEventBus()));
+
+        try
+        {
+            BppSettingsDockCatalog.Install(new BppConfig(), registry);
+
+            Assert.Equal(
+                new[] { "ChineseLocaleMode", "HotkeyTutorial", "BazaarDbUpload" },
+                BppSettingsDockCatalog.Definitions.Select(d => d.Key)
+            );
+        }
+        finally
+        {
+            BppSettingsDockCatalog.Reset();
         }
     }
 

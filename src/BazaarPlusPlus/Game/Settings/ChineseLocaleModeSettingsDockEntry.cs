@@ -16,7 +16,7 @@ internal sealed class ChineseLocaleModeSettingsDockEntry : ISettingsDockEntry
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
     }
 
-    public int Order => 6;
+    public int Order => BppSettingsDockOrder.ChineseLocaleMode;
 
     public BppSettingsDockDefinition Build(IBppConfig config)
     {

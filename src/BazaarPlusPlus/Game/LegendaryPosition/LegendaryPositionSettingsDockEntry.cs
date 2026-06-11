@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.Game.LegendaryPosition;
 
 internal sealed class LegendaryPositionSettingsDockEntry : ISettingsDockEntry
 {
-    public int Order => 2;
+    public int Order => BppSettingsDockOrder.LegendaryPosition;
 
     public BppSettingsDockDefinition Build(IBppConfig config) =>
         new(
