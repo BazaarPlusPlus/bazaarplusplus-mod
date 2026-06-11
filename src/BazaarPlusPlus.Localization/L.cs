@@ -14,6 +14,12 @@ internal static class L
         _mode = mode ?? throw new ArgumentNullException(nameof(mode));
     }
 
+    internal static void Reset()
+    {
+        _language = null;
+        _mode = null;
+    }
+
     internal static string Resolve(LocalizedTextSet set)
     {
         return set.Resolve(Language.CurrentLanguageCode, Mode.CurrentMode);

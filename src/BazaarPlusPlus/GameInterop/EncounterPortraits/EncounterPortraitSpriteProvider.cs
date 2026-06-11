@@ -46,7 +46,7 @@ internal static class EncounterPortraitSpriteProvider
         var shouldCacheResult = false;
         try
         {
-            var staticData = BppStaticDataAccess.TryGet();
+            var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
             var template = BppStaticDataAccess.GetCardTemplate(staticData, sourceTemplateId);
             if (
                 template == null

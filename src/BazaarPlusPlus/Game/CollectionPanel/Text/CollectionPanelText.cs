@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
@@ -241,7 +242,7 @@ internal static class CollectionPanelText
         return $"{count} cards";
     }
 
-    private static string Resolve(LocalizedTextSet set) => L.Resolve(set);
+    private static string Resolve(LocalizedTextSet set) => LocalizedTextHelpers.Resolve(set);
 
     private static string FormatSimple(
         string english,
@@ -250,17 +251,11 @@ internal static class CollectionPanelText
         string chineseHongKong
     )
     {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-        {
-            return ChineseScriptConverter.Convert(
-                chineseMainland,
-                chineseTaiwan,
-                chineseHongKong,
-                L.CurrentMode
-            );
-        }
-
-        return english;
+        return LocalizedTextHelpers.FormatSimple(
+            english,
+            chineseMainland,
+            chineseTaiwan,
+            chineseHongKong
+        );
     }
 }

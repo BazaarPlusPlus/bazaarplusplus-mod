@@ -2,6 +2,7 @@
 #nullable enable
 using System;
 using System.Collections;
+using System.Reflection;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -36,6 +37,10 @@ internal static class BppKeybindSettingsAwakePatch
         EnchantPreviewObjectName,
         UpgradePreviewObjectName,
     ];
+    private static readonly FieldInfo? KeybindObjectsField = AccessTools.Field(
+        typeof(OptionsDialogController),
+        "_keybindObjects"
+    );
 
     [HarmonyPostfix]
     private static void Postfix(OptionsDialogController __instance)
@@ -107,10 +112,14 @@ internal static class BppKeybindSettingsAwakePatch
         controller.Initialize(definition.ActionId, nativeController);
     }
 
+    internal static Transform? FindRowContainer(OptionsDialogController instance)
+    {
+        return GetTemplateRow(instance)?.parent;
+    }
+
     private static Transform? GetTemplateRow(OptionsDialogController instance)
     {
-        var field = AccessTools.Field(typeof(OptionsDialogController), "_keybindObjects");
-        var keybindRows = field?.GetValue(instance) as RectTransform[];
+        var keybindRows = KeybindObjectsField?.GetValue(instance) as RectTransform[];
         if (keybindRows == null)
             return null;
 
@@ -291,22 +300,11 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
 
     private static bool HasInstalledRows(OptionsDialogController controller)
     {
-        var foundEnchant = false;
-        var foundUpgrade = false;
-        foreach (var candidate in controller.GetComponentsInChildren<Transform>(true))
-        {
-            if (candidate == null)
-                continue;
+        var container = BppKeybindSettingsAwakePatch.FindRowContainer(controller);
+        if (container == null)
+            return false;
 
-            if (candidate.name == BppKeybindSettingsAwakePatch.EnchantPreviewObjectName)
-                foundEnchant = true;
-            else if (candidate.name == BppKeybindSettingsAwakePatch.UpgradePreviewObjectName)
-                foundUpgrade = true;
-
-            if (foundEnchant && foundUpgrade)
-                return true;
-        }
-
-        return false;
+        return container.Find(BppKeybindSettingsAwakePatch.EnchantPreviewObjectName) != null
+            && container.Find(BppKeybindSettingsAwakePatch.UpgradePreviewObjectName) != null;
     }
 }

@@ -244,20 +244,8 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         sb.Append($"-preset {_preset} ");
         sb.Append($"-crf {_crf} ");
         sb.Append("-movflags +faststart ");
-        sb.Append(QuoteArg(_outputFilePath));
+        sb.Append(VideoProcessHelpers.QuoteArg(_outputFilePath));
         return sb.ToString();
-    }
-
-    private static string QuoteArg(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return "\"\"";
-
-        if (!value.Contains(' ') && !value.Contains('"'))
-            return value;
-
-        var escaped = value.Replace("\"", "\\\"");
-        return $"\"{escaped}\"";
     }
 
     private void WriterLoop()

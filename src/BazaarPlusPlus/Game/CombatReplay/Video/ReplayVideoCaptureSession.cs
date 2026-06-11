@@ -427,7 +427,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
     }
 
-    // In-place vertical flip identical to ReplayVideoFrameTransforms.FlipVerticalRgba32,
+    // In-place vertical flip identical to Rgba32FrameTransforms.FlipVerticalRgba32,
     // but reusing the per-session _flipRowBuffer field instead of allocating a fresh
     // row-sized scratch buffer on every frame. Invoked only from OnReadbackComplete on
     // the Unity main thread, so the shared field needs no synchronization.

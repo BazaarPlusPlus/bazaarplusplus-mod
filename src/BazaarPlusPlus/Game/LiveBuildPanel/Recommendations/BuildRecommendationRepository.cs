@@ -39,15 +39,15 @@ internal sealed class BuildRecommendationRepository
         userAgentSuffix: "TenWinBuildRepository",
         timeout: TimeSpan.FromSeconds(10)
     );
-    private static readonly object SyncRoot = new();
-    private static TenWinBuildCorpus? _corpus;
-    private static bool _attemptedLoad;
-    private static string? _cacheFilePath;
-    private static Func<DateTime> _utcNow = () => DateTime.UtcNow;
-    private static Func<string, string> _downloadJson = DownloadJson;
-    private static Func<string?> _loadEmbeddedJson = LoadEmbeddedTenWinJson;
-    private static Action<Action> _queueBackgroundRefresh = QueueBackgroundRefresh;
-    private static bool _backgroundRefreshInProgress;
+    private readonly object _syncRoot = new();
+    private TenWinBuildCorpus? _corpus;
+    private bool _attemptedLoad;
+    private string? _cacheFilePath;
+    private Func<DateTime> _utcNow = () => DateTime.UtcNow;
+    private Func<string, Task<string>> _downloadJsonAsync = DownloadJsonAsync;
+    private Func<string?> _loadEmbeddedJson = LoadEmbeddedTenWinJson;
+    private Action<Func<Task>> _queueBackgroundRefresh = QueueBackgroundRefresh;
+    private bool _backgroundRefreshInProgress;
 
     public IReadOnlyList<BuildRecommendation> FindRecommendations(
         string? hero,
@@ -150,7 +150,7 @@ internal sealed class BuildRecommendationRepository
     {
         try
         {
-            var staticData = BppStaticDataAccess.TryGet();
+            var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
             var template = BppStaticDataAccess.GetCardTemplate(staticData, templateId);
             return template?.Size switch
             {
@@ -203,16 +203,16 @@ internal sealed class BuildRecommendationRepository
 
     // ---- Corpus loading / cache / remote refresh --------------------------
 
-    internal static TenWinBuildCorpus? EnsureCorpus()
+    private TenWinBuildCorpus? EnsureCorpus()
     {
         EnsureLoaded();
         return _corpus;
     }
 
-    private static void EnsureLoaded()
+    private void EnsureLoaded()
     {
         var shouldRefreshInBackground = false;
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
             if (_attemptedLoad)
                 return;
@@ -225,7 +225,7 @@ internal sealed class BuildRecommendationRepository
             TryQueueRefreshFromRemote("cache_stale_or_missing");
     }
 
-    private static TenWinBuildCorpus? LoadCorpus(out bool shouldRefreshInBackground)
+    private TenWinBuildCorpus? LoadCorpus(out bool shouldRefreshInBackground)
     {
         shouldRefreshInBackground = false;
 
@@ -287,28 +287,29 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    internal static bool TryRefreshFinalBuildsFromRemote(out string? error)
+    internal async Task<(bool Succeeded, string? Error)> TryRefreshFinalBuildsFromRemoteAsync()
     {
-        if (!TryLoadRemote(out var remoteCorpus, out error) || remoteCorpus == null)
-            return false;
+        var (remoteCorpus, error) = await LoadRemoteAsync().ConfigureAwait(false);
+        if (remoteCorpus == null)
+            return (false, error);
 
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
             _corpus = remoteCorpus;
             _attemptedLoad = true;
         }
 
-        return true;
+        return (true, null);
     }
 
-    private static void TryQueueRefreshFromRemote(string reason)
+    private void TryQueueRefreshFromRemote(string reason)
     {
         if (!TryBeginBackgroundRefresh())
             return;
 
         try
         {
-            _queueBackgroundRefresh(() => RefreshFromRemoteInBackground(reason));
+            _queueBackgroundRefresh(() => RefreshFromRemoteInBackgroundAsync(reason));
             BppLog.Info(
                 "BuildRecommendationRepository",
                 $"Queued background ten-win builds refresh reason={reason}."
@@ -324,9 +325,9 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    private static bool TryBeginBackgroundRefresh()
+    private bool TryBeginBackgroundRefresh()
     {
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
             if (_backgroundRefreshInProgress)
                 return false;
@@ -336,21 +337,22 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    private static void EndBackgroundRefresh()
+    private void EndBackgroundRefresh()
     {
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
             _backgroundRefreshInProgress = false;
         }
     }
 
-    private static void RefreshFromRemoteInBackground(string reason)
+    private async Task RefreshFromRemoteInBackgroundAsync(string reason)
     {
         try
         {
-            if (TryLoadRemote(out var remoteCorpus, out var error) && remoteCorpus != null)
+            var (remoteCorpus, error) = await LoadRemoteAsync().ConfigureAwait(false);
+            if (remoteCorpus != null)
             {
-                lock (SyncRoot)
+                lock (_syncRoot)
                 {
                     _corpus = remoteCorpus;
                     _attemptedLoad = true;
@@ -374,7 +376,7 @@ internal sealed class BuildRecommendationRepository
             // re-arm the one-shot load so a later query retries (and can re-queue) the fetch.
             // Doing both under one lock avoids a window where a racing query re-arms the load
             // while the refresh is still marked in-progress and so suppresses its own re-queue.
-            lock (SyncRoot)
+            lock (_syncRoot)
             {
                 _backgroundRefreshInProgress = false;
                 if (_corpus == null)
@@ -383,7 +385,7 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    private static bool TryLoadCache(bool allowExpired, out TenWinBuildCorpus? corpus)
+    private bool TryLoadCache(bool allowExpired, out TenWinBuildCorpus? corpus)
     {
         corpus = null;
 
@@ -420,42 +422,32 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    private static bool TryLoadRemote(out TenWinBuildCorpus? corpus, out string? error)
+    private async Task<(TenWinBuildCorpus? Corpus, string? Error)> LoadRemoteAsync()
     {
-        corpus = null;
-        error = null;
-
         try
         {
-            var json = _downloadJson(TenWinBuildsRemoteUrl);
+            var json = await _downloadJsonAsync(TenWinBuildsRemoteUrl).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(json))
-            {
-                error = "empty_response";
-                return false;
-            }
+                return (null, "empty_response");
 
-            corpus = DeserializeCorpus(json, "remote");
+            var corpus = DeserializeCorpus(json, "remote");
             if (corpus == null)
-            {
-                error = "invalid_response";
-                return false;
-            }
+                return (null, "invalid_response");
 
             TryWriteCache(json);
             BppLog.Info(
                 "BuildRecommendationRepository",
                 $"Loaded ten-win builds from remote url={TenWinBuildsRemoteUrl}"
             );
-            return true;
+            return (corpus, null);
         }
         catch (Exception ex)
         {
-            error = ex.Message;
             BppLog.Warn(
                 "BuildRecommendationRepository",
                 $"Failed to refresh ten-win builds from {TenWinBuildsRemoteUrl}: {ex.Message}"
             );
-            return false;
+            return (null, ex.Message);
         }
     }
 
@@ -473,7 +465,7 @@ internal sealed class BuildRecommendationRepository
         return corpus;
     }
 
-    private static void TryWriteCache(string json)
+    private void TryWriteCache(string json)
     {
         try
         {
@@ -494,7 +486,7 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    private static string ResolveCacheFilePath()
+    private string ResolveCacheFilePath()
     {
         return _cacheFilePath ?? BuildDefaultTenWinCacheFilePath(BepInEx.Paths.GameRootPath);
     }
@@ -504,52 +496,52 @@ internal sealed class BuildRecommendationRepository
         return Path.Combine(gameRootPath, "BazaarPlusPlusV4", TenWinBuildsCacheFileName);
     }
 
-    private static string DownloadJson(string url)
+    private static Task<string> DownloadJsonAsync(string url)
     {
-        return TenWinHttpClient.GetStringAsync(url).GetAwaiter().GetResult();
+        return TenWinHttpClient.GetStringAsync(url);
     }
 
-    private static void QueueBackgroundRefresh(Action refresh)
+    private static void QueueBackgroundRefresh(Func<Task> refresh)
     {
         _ = Task.Run(refresh);
     }
 
     // ---- Test hooks -------------------------------------------------------
 
-    private static void ConfigureTenWinRemoteForTests(
+    private void ConfigureTenWinRemoteForTests(
         string cacheFilePath,
         Func<DateTime> utcNow,
-        Func<string, string> downloadJson
+        Func<string, Task<string>> downloadJsonAsync
     )
     {
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
             _corpus = null;
             _attemptedLoad = false;
             _backgroundRefreshInProgress = false;
             _cacheFilePath = cacheFilePath;
             _utcNow = utcNow;
-            _downloadJson = downloadJson;
+            _downloadJsonAsync = downloadJsonAsync;
             _loadEmbeddedJson = () => null;
             _queueBackgroundRefresh = QueueBackgroundRefresh;
         }
     }
 
-    private static void ConfigureTenWinRemoteForTests(
+    private void ConfigureTenWinRemoteForTests(
         string cacheFilePath,
         Func<DateTime> utcNow,
-        Func<string, string> downloadJson,
-        Action<Action> queueBackgroundRefresh
+        Func<string, Task<string>> downloadJsonAsync,
+        Action<Func<Task>> queueBackgroundRefresh
     )
     {
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
             _corpus = null;
             _attemptedLoad = false;
             _backgroundRefreshInProgress = false;
             _cacheFilePath = cacheFilePath;
             _utcNow = utcNow;
-            _downloadJson = downloadJson;
+            _downloadJsonAsync = downloadJsonAsync;
             _loadEmbeddedJson = () => null;
             _queueBackgroundRefresh = queueBackgroundRefresh ?? QueueBackgroundRefresh;
         }
@@ -557,9 +549,9 @@ internal sealed class BuildRecommendationRepository
 
     private static string? ReadEmbeddedSeedForTests() => LoadEmbeddedTenWinJson();
 
-    private static void SetEmbeddedJsonForTests(Func<string?> loadEmbeddedJson)
+    private void SetEmbeddedJsonForTests(Func<string?> loadEmbeddedJson)
     {
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
             _corpus = null;
             _attemptedLoad = false;
@@ -567,16 +559,16 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    private static void ResetTenWinRemoteForTests()
+    private void ResetTenWinRemoteForTests()
     {
-        lock (SyncRoot)
+        lock (_syncRoot)
         {
             _corpus = null;
             _attemptedLoad = false;
             _backgroundRefreshInProgress = false;
             _cacheFilePath = null;
             _utcNow = () => DateTime.UtcNow;
-            _downloadJson = DownloadJson;
+            _downloadJsonAsync = DownloadJsonAsync;
             _loadEmbeddedJson = LoadEmbeddedTenWinJson;
             _queueBackgroundRefresh = QueueBackgroundRefresh;
         }

@@ -1,9 +1,9 @@
 #nullable enable
 using System;
 
-namespace BazaarPlusPlus.Game.CombatReplay.Video;
+namespace BazaarPlusPlus.Infrastructure;
 
-internal static class ReplayVideoFrameTransforms
+internal static class Rgba32FrameTransforms
 {
     public static void FlipVerticalRgba32(byte[] buffer, int width, int height)
     {

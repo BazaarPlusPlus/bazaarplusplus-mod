@@ -38,9 +38,6 @@ internal sealed class ScreenshotService
                 capturedAtLocal
             );
             var filePath = Path.Combine(_directoryPath, relativePath);
-            var directoryPath = Path.GetDirectoryName(filePath);
-            if (!string.IsNullOrWhiteSpace(directoryPath))
-                Directory.CreateDirectory(directoryPath);
 
             var result = new ScreenshotCaptureResult
             {
@@ -163,7 +160,7 @@ internal sealed class ScreenshotService
             var pixels = new byte[width * height * 4];
             request.GetData<byte>().CopyTo(pixels);
             if (!SystemInfo.graphicsUVStartsAtTop)
-                FlipVerticalRgba32(pixels, width, height);
+                Rgba32FrameTransforms.FlipVerticalRgba32(pixels, width, height);
 
             _ = Task.Run(() =>
             {
@@ -195,43 +192,14 @@ internal sealed class ScreenshotService
         int height
     )
     {
-        var directory = Path.GetDirectoryName(filePath);
-        if (!string.IsNullOrWhiteSpace(directory))
-            Directory.CreateDirectory(directory);
-
-        var tempPath = $"{filePath}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            using (var image = Image.LoadPixelData<Rgba32>(pixels, width, height))
+        AtomicFileWriter.Write(
+            filePath,
+            tempPath =>
             {
+                using var image = Image.LoadPixelData<Rgba32>(pixels, width, height);
                 image.SaveAsPng(tempPath);
             }
-
-            if (File.Exists(filePath))
-                File.Replace(tempPath, filePath, null, ignoreMetadataErrors: true);
-            else
-                File.Move(tempPath, filePath);
-        }
-        finally
-        {
-            if (File.Exists(tempPath))
-                File.Delete(tempPath);
-        }
-    }
-
-    private static void FlipVerticalRgba32(byte[] buffer, int width, int height)
-    {
-        var stride = width * 4;
-        var rowBuffer = new byte[stride];
-        for (var row = 0; row < height / 2; row++)
-        {
-            var topOffset = row * stride;
-            var bottomOffset = (height - 1 - row) * stride;
-
-            Buffer.BlockCopy(buffer, topOffset, rowBuffer, 0, stride);
-            Buffer.BlockCopy(buffer, bottomOffset, buffer, topOffset, stride);
-            Buffer.BlockCopy(rowBuffer, 0, buffer, bottomOffset, stride);
-        }
+        );
     }
 
     private static void ReleaseRenderTexture(RenderTexture? renderTexture)

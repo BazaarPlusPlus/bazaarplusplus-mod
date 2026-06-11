@@ -21,7 +21,10 @@
       Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewSpec.cs"
       Link="NativeCardPreviewSpec.cs"
     />
-    <Compile Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoard.cs" Link="BppItemBoard.cs" />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoard.cs"
+      Link="BppItemBoard.cs"
+    />
     <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardCard.cs"
       Link="BppItemBoardCard.cs"
@@ -41,6 +44,10 @@
     <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSpan.cs"
       Link="BppItemBoardSpan.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/Cards/CardSizeSpan.cs"
+      Link="CardSizeSpan.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardType.cs"

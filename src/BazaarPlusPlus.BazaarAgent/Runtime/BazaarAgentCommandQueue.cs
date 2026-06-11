@@ -62,15 +62,15 @@ public sealed class BazaarAgentPendingCommand<TCommand>
     {
         if (Interlocked.CompareExchange(ref _claimed, ClaimExecution, ClaimNone) != ClaimNone)
             return false;
+        var timer = Interlocked.Exchange(ref _timer, null);
         try
         {
-            _timer?.Dispose();
+            timer?.Dispose();
         }
         catch
         {
             // Best-effort cleanup; the claim already excludes the timeout callback.
         }
-        _timer = null;
         return true;
     }
 
@@ -78,15 +78,15 @@ public sealed class BazaarAgentPendingCommand<TCommand>
     {
         if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
             return;
+        var timer = Interlocked.Exchange(ref _timer, null);
         try
         {
-            _timer?.Dispose();
+            timer?.Dispose();
         }
         catch
         {
             // Best-effort cleanup; completion is already published and the timer is collectible.
         }
-        _timer = null;
         _tcs.TrySetResult(response);
     }
 }

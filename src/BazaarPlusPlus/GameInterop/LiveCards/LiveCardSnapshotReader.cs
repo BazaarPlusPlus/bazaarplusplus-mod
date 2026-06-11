@@ -9,6 +9,7 @@ using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
+using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
@@ -120,13 +121,7 @@ internal sealed class LiveCardSnapshotReader
 
     private static bool CanFitSocket(ECardSize size, EContainerSocketId socketId)
     {
-        var span = size switch
-        {
-            ECardSize.Small => 1,
-            ECardSize.Medium => 2,
-            ECardSize.Large => 3,
-            _ => 1,
-        };
+        var span = CardSizeSpan.Resolve(size);
         return (int)socketId >= 0 && (int)socketId + span <= SocketedContainer.SocketCount;
     }
 }

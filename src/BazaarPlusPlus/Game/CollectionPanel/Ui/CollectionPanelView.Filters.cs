@@ -26,7 +26,7 @@ internal sealed partial class CollectionPanelView
         for (var i = 0; i < heroes.Count; i++)
         {
             var hero = heroes[i];
-            var chip = CreateHeroChipButton(hero, () => _toggleHero(hero));
+            var chip = CreateHeroChipButton(hero, () => _commands.ToggleHero(hero));
             chip.style.marginRight =
                 i % Sizes.HeroChipsPerRow == Sizes.HeroChipsPerRow - 1 ? 0f : UiSpacing.Sm;
             _heroChips[hero] = chip;
@@ -46,7 +46,7 @@ internal sealed partial class CollectionPanelView
         {
             var chip = CreateChipButton(
                 CollectionPanelText.Tier(tier),
-                () => _toggleTier(tier),
+                () => _commands.ToggleTier(tier),
                 true
             );
             chip.style.marginLeft = index > 0 ? UiSpacing.Sm : 0f;
@@ -92,7 +92,7 @@ internal sealed partial class CollectionPanelView
         {
             var chip = CreateChipButton(
                 CollectionPanelText.Size(size),
-                () => _toggleSize(size),
+                () => _commands.ToggleSize(size),
                 true
             );
             chip.style.marginLeft = index > 0 ? UiSpacing.Sm : 0f;
@@ -138,7 +138,7 @@ internal sealed partial class CollectionPanelView
             foreach (var tag in tags)
             {
                 var captured = tag;
-                var chip = CreateTagFacetChipButton(() => _toggleTag(captured));
+                var chip = CreateTagFacetChipButton(() => _commands.ToggleTag(captured));
                 ApplyTagChipContent(chip, NativeTagTypography.Resolve(captured));
                 _tagChips[captured] = chip;
                 _tagChipOrder.Add(captured);
@@ -165,7 +165,7 @@ internal sealed partial class CollectionPanelView
                 }
 
                 var captured = keyword;
-                var chip = CreateTagFacetChipButton(() => _toggleKeyword(captured));
+                var chip = CreateTagFacetChipButton(() => _commands.ToggleKeyword(captured));
                 ApplyTagChipContent(chip, NativeTagTypography.Resolve(captured));
                 _keywordChips[captured] = chip;
                 _keywordChipOrder.Add(captured);
@@ -250,7 +250,10 @@ internal sealed partial class CollectionPanelView
             }
 
             var source = sources[i];
-            var chip = CreateSourceChipButton(source, () => _toggleSource(source.SourceKey));
+            var chip = CreateSourceChipButton(
+                source,
+                () => _commands.ToggleSource(source.SourceKey)
+            );
             chip.style.marginRight =
                 i % Sizes.SourceChipsPerRow == Sizes.SourceChipsPerRow - 1 ? 0f : UiSpacing.Sm;
             _sourceChips[source.SourceKey] = chip;

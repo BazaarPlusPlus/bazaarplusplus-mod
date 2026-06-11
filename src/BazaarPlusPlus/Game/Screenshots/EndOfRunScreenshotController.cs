@@ -437,13 +437,14 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private EndOfRunScreenController? FindActiveEndOfRunScreenController()
     {
-        // Reuse the cached controller while it is still alive and active, avoiding the
-        // per-frame FindObjectsOfType scan/allocation once the end-of-run screen resolves.
-        // Unity's overloaded equality treats destroyed objects as null, so this also
-        // re-scans automatically after the controller is torn down.
+        // Keep the cached controller while it is alive — even when inactive — so an
+        // inactive-but-alive end-of-run screen does not trigger a FindObjectsOfType
+        // scan every frame; an inactive cached controller reports as "no active
+        // controller". Unity's overloaded equality treats destroyed objects as null,
+        // so the scan resumes automatically after the controller is torn down.
         var cached = _cachedEndOfRunScreenController;
-        if (cached != null && cached.gameObject.activeInHierarchy)
-            return cached;
+        if (cached != null)
+            return cached.gameObject.activeInHierarchy ? cached : null;
 
         _cachedEndOfRunScreenController = ScanForActiveEndOfRunScreenController();
         return _cachedEndOfRunScreenController;

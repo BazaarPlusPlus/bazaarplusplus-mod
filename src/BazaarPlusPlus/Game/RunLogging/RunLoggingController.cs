@@ -15,6 +15,7 @@ namespace BazaarPlusPlus.Game.RunLogging;
 internal sealed class RunLoggingController : MonoBehaviour
 {
     private IBppServices? _services;
+    private IPvpBattleCatalog? _battleCatalog;
     private IRunLogStore? _store;
     private RunLogSessionManager? _sessionManager;
     private RunLogCaptureService? _captureService;
@@ -30,21 +31,19 @@ internal sealed class RunLoggingController : MonoBehaviour
         // Wait for Initialize() — core logic moved to InitializeCore
     }
 
-    public void Initialize(IBppServices services)
+    public void Initialize(IBppServices services, IPvpBattleCatalog battleCatalog)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
+        _battleCatalog = battleCatalog ?? throw new ArgumentNullException(nameof(battleCatalog));
         InitializeCore();
     }
 
     private void InitializeCore()
     {
         var services = _services!;
+        var battleCatalog = _battleCatalog!;
         var sqliteStore = new RunLogStore(services.Paths);
         var uploadStore = new RunSyncStateStore(services.Paths);
-        var battleCatalog = new PvpBattleCatalog(
-            services.Paths.RunLogDatabasePath
-                ?? throw new InvalidOperationException("Run log database path is not initialized.")
-        );
         _store = new QueuedRunLogStore(
             new ReplicatedRunLogStore(sqliteStore, uploadStore),
             new RunLogStoreLoggerBridge()

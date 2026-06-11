@@ -3,7 +3,6 @@
 using System;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.TempoNet.Models;
-using BazaarPlusPlus.Game.CardArtReplacement;
 using BazaarPlusPlus.GameInterop.CardArtReplacement;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -35,28 +34,16 @@ internal static class ItemVisualsArtReplacePatch
     {
         try
         {
-            var services = BppPatchHost.Services;
-            if (!PackageCardArtReplacementPolicy.IsEnabled(services.Config))
-                return;
-
             if (__instance == null || __instance.gameObject == null)
                 return;
 
             if (!CardArtInjector.TryResolveCard(__instance, out var card) || card == null)
                 return;
 
-            if (!CardArtInjector.IsPackageCard(card))
+            if (!PackageCardArtPatchGate.TryGetReplacementTexture(card, out var texture))
                 return;
 
-            var feature = CardArtReplacementFeature.Current;
-            UnityEngine.Texture2D? texture = null;
-            var hasTexture =
-                feature != null && feature.TryGetTexture(card.TemplateId, out texture, out _);
-
-            if (!hasTexture || texture == null)
-                return;
-
-            CardArtInjector.Apply(__instance, texture);
+            CardArtInjector.Apply(__instance, texture!);
         }
         catch (Exception ex)
         {

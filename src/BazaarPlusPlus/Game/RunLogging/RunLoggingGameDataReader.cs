@@ -18,6 +18,8 @@ internal static class RunLoggingGameDataReader
     public static void Install(IRunContext runContext) =>
         _runContext = runContext ?? throw new ArgumentNullException(nameof(runContext));
 
+    public static void Reset() => _runContext = null;
+
     private static IRunContext RunContext =>
         _runContext
         ?? throw new InvalidOperationException(

@@ -11,6 +11,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Tooltips;
 using BazaarGameShared.Domain.Values;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.Tooltips;
 
@@ -66,8 +67,12 @@ public static class ItemEnchantPreviewRenderer
         {
             return RenderWithCardTooltipData(previewCard, localized).TrimEnd();
         }
-        catch
+        catch (Exception ex)
         {
+            BppLog.Debug(
+                "ItemEnchantPreview",
+                $"RenderWithCardTooltipData failed, falling back to TooltipBuilder: {ex}"
+            );
             try
             {
                 var builder = TooltipBuilder.Create(
@@ -81,8 +86,12 @@ public static class ItemEnchantPreviewRenderer
 
                 return RenderTooltipBuilder(builder).TrimEnd();
             }
-            catch
+            catch (Exception innerEx)
             {
+                BppLog.Debug(
+                    "ItemEnchantPreview",
+                    $"TooltipBuilder fallback failed, returning raw localized text: {innerEx}"
+                );
                 return localized;
             }
         }
@@ -144,8 +153,12 @@ public static class ItemEnchantPreviewRenderer
         {
             return content.GetLocalizedText();
         }
-        catch
+        catch (Exception ex)
         {
+            BppLog.Debug(
+                "ItemEnchantPreview",
+                $"GetLocalizedText failed, falling back to raw text: {ex}"
+            );
             return content.Text ?? string.Empty;
         }
     }

@@ -7,9 +7,9 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.Game.LiveBuildPanel.Preview;
+using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.Game.LiveBuildPanel.Ui;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
@@ -70,7 +70,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
             _instance = null;
 
         // Invalidate any in-flight manual refresh so its continuation never touches the
-        // destroyed view (the shared corpus update itself is allowed to finish in the background).
+        // destroyed view (the repository corpus update itself is allowed to finish in the background).
         _buildRefreshOperationVersion++;
         BppOverlayPanelMutex.Unregister(OverlayPanelId);
         StopRender();
@@ -243,7 +243,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         BuildRecommendationRefreshResult result;
         try
         {
-            result = await _refreshService.RefreshAsync(CancellationToken.None);
+            result = await _refreshService.RefreshAsync(_recommendations, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -251,7 +251,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         }
 
         // Stale continuation guard: a destroyed panel bumped the version; the corpus update (if
-        // any) already landed in the shared repository and must not touch this UI.
+        // any) already landed in the repository and must not touch this UI.
         if (operationVersion != _buildRefreshOperationVersion)
             return;
 

@@ -15,16 +15,20 @@ namespace BazaarPlusPlus.Game.RunLogging.Upload;
 internal sealed class RunBundleUploadStore : SqliteStoreBase
 {
     private readonly CombatReplayPayloadStore _payloadStore;
-    private readonly PvpBattleCatalog _battleCatalog;
+    private readonly IPvpBattleCatalog _battleCatalog;
 
-    public RunBundleUploadStore(string databasePath, string replayRootPath)
+    public RunBundleUploadStore(
+        string databasePath,
+        string replayRootPath,
+        IPvpBattleCatalog battleCatalog
+    )
         : base(databasePath)
     {
         if (string.IsNullOrWhiteSpace(replayRootPath))
             throw new ArgumentException("Replay root path is required.", nameof(replayRootPath));
 
         _payloadStore = new CombatReplayPayloadStore(replayRootPath);
-        _battleCatalog = new PvpBattleCatalog(databasePath);
+        _battleCatalog = battleCatalog ?? throw new ArgumentNullException(nameof(battleCatalog));
     }
 
     public IReadOnlyList<string> GetPendingCompletedRunIds(int limit)
@@ -38,7 +42,7 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
                 ON r.run_id = s.run_id
             WHERE s.dirty = 1
               AND r.completed = 1
-              AND r.game_mode = 'Ranked'
+              AND r.game_mode = '{RunLogSchema.GameModeRanked}'
             ORDER BY s.retry_count ASC,
                      s.last_attempt_at_utc ASC,
                      s.run_id ASC
@@ -65,7 +69,7 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
                 ON r.run_id = s.run_id
             WHERE s.dirty = 1
               AND r.completed = 1
-              AND r.game_mode = 'Ranked'
+              AND r.game_mode = '{RunLogSchema.GameModeRanked}'
             LIMIT 1;
             """;
         return command.ExecuteScalar() != null;
@@ -181,7 +185,8 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
             battleProjections.Add(
                 BuildBattleProjection(
                     manifest,
-                    runEnded && string.Equals(manifest.BattleId, finalBattleId, StringComparison.Ordinal)
+                    runEnded
+                        && string.Equals(manifest.BattleId, finalBattleId, StringComparison.Ordinal)
                 )
             );
             artifactBattles.Add(BuildArtifactBattle(manifest, payload));

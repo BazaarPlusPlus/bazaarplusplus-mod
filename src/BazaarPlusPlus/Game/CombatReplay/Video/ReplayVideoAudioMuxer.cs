@@ -158,7 +158,7 @@ internal sealed class ReplayVideoAudioMuxer
         int audioBitrateKbps = 192
     )
     {
-        var usableWavPaths = GetExistingWavPaths(wavPaths);
+        var usableWavPaths = VideoProcessHelpers.GetExistingWavPaths(wavPaths);
         if (usableWavPaths.Count == 0)
         {
             return PromoteAndReport(
@@ -414,9 +414,9 @@ internal sealed class ReplayVideoAudioMuxer
         var bitrate = audioBitrateKbps > 0 ? audioBitrateKbps : 192;
         var sb = new StringBuilder();
         sb.Append("-hide_banner -loglevel warning -nostdin -y ");
-        sb.Append("-i ").Append(QuoteArg(silentVideoTempPath)).Append(' ');
+        sb.Append("-i ").Append(VideoProcessHelpers.QuoteArg(silentVideoTempPath)).Append(' ');
         for (var i = 0; i < wavPaths.Count; i++)
-            sb.Append("-i ").Append(QuoteArg(wavPaths[i])).Append(' ');
+            sb.Append("-i ").Append(VideoProcessHelpers.QuoteArg(wavPaths[i])).Append(' ');
 
         if (wavPaths.Count == 1)
         {
@@ -438,7 +438,7 @@ internal sealed class ReplayVideoAudioMuxer
         sb.Append("-ac 2 -ar 48000 ");
         sb.Append($"-b:a {bitrate}k ");
         sb.Append("-shortest -movflags +faststart ");
-        sb.Append(QuoteArg(finalPath));
+        sb.Append(VideoProcessHelpers.QuoteArg(finalPath));
         return sb.ToString();
     }
 
@@ -813,21 +813,6 @@ internal sealed class ReplayVideoAudioMuxer
         return builder.Length == 0 ? "audio" : builder.ToString();
     }
 
-    private static List<string> GetExistingWavPaths(IReadOnlyList<string>? wavPaths)
-    {
-        var existing = new List<string>();
-        if (wavPaths == null)
-            return existing;
-
-        foreach (var wavPath in wavPaths)
-        {
-            if (!string.IsNullOrWhiteSpace(wavPath) && File.Exists(wavPath))
-                existing.Add(wavPath);
-        }
-
-        return existing;
-    }
-
     private static void ForceKill(Process process)
     {
         try
@@ -842,19 +827,5 @@ internal sealed class ReplayVideoAudioMuxer
         {
             // ignore
         }
-    }
-
-    // Copied verbatim from FfmpegRawVideoEncoder.QuoteArg (private there) so quoting stays identical:
-    // quote only when the value contains a space or a double quote.
-    private static string QuoteArg(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return "\"\"";
-
-        if (!value.Contains(' ') && !value.Contains('"'))
-            return value;
-
-        var escaped = value.Replace("\"", "\\\"");
-        return $"\"{escaped}\"";
     }
 }

@@ -340,7 +340,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         // WavStreamWriter writes a 44-byte header on open, so a tap that captured
         // zero PCM still leaves a present-but-empty WAV. Muxing that with -shortest
         // yields a zero-duration output and would destroy the good silent video.
-        var usableWavPaths = GetExistingWavPaths(wavPaths);
+        var usableWavPaths = VideoProcessHelpers.GetExistingWavPaths(wavPaths);
         if (usableWavPaths.Count == 0)
         {
             // No usable audio track: promote the silent video to the final path now
@@ -445,21 +445,6 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
 
         foreach (var wavPath in wavPaths)
             DeleteWavBestEffort(wavPath);
-    }
-
-    private static List<string> GetExistingWavPaths(IReadOnlyList<string>? wavPaths)
-    {
-        var existing = new List<string>();
-        if (wavPaths == null)
-            return existing;
-
-        foreach (var wavPath in wavPaths)
-        {
-            if (!string.IsNullOrWhiteSpace(wavPath) && File.Exists(wavPath))
-                existing.Add(wavPath);
-        }
-
-        return existing;
     }
 
     private void BeginRecording(ReplayVideoCaptureRequest request, IBppServices services)

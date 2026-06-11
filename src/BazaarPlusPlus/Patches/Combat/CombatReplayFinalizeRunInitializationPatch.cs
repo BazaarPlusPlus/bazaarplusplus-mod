@@ -1,6 +1,5 @@
 #nullable enable
 using System.Threading.Tasks;
-using BazaarPlusPlus.Game.CombatReplay;
 using HarmonyLib;
 using TheBazaar;
 
@@ -12,14 +11,8 @@ internal static class CombatReplayFinalizeRunInitializationPatch
     [HarmonyPrefix]
     private static bool Prefix(ref Task __result)
     {
-        var runtime = CombatReplayRuntime.Instance;
-        if (
-            runtime?.IsReplayStartInProgress != true
-            && runtime?.IsSavedReplayPlaybackActive != true
-        )
-        {
+        if (!CombatReplayPatchGuard.IsReplayStartOrPlaybackActive)
             return true;
-        }
 
         __result = Task.CompletedTask;
         return false;

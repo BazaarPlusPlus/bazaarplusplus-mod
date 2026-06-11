@@ -32,7 +32,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
     private int _started;
 
     public int Port { get; }
-    public bool IsRunning { get; private set; }
+    public bool IsRunning => Volatile.Read(ref _started) == 1;
 
     public BazaarAgentHttpServer(
         int port,
@@ -61,15 +61,12 @@ public sealed class BazaarAgentHttpServer : IDisposable
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
         _ = Task.Run(() => AcceptLoop(token));
-
-        IsRunning = true;
     }
 
     public void Stop()
     {
         if (Interlocked.Exchange(ref _started, 0) == 0)
             return;
-        IsRunning = false;
         try
         {
             _cts?.Cancel();
@@ -115,7 +112,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
             {
                 if (!token.IsCancellationRequested)
                 {
-                    IsRunning = false;
                     Interlocked.Exchange(ref _started, 0);
                     _logger.Warning($"Listener accept loop stopped: {FormatException(ex)}");
                 }

@@ -48,6 +48,9 @@ internal sealed partial class CombatStatusBar
     private static readonly Color UnpausedPressedColorActive = new(0.56f, 0.41f, 0.15f, 1f);
     private static readonly Color OutlineColorIdle = new(0.48f, 0.52f, 0.58f, 0.24f);
     private static readonly Color OutlineColorActive = new(0.96f, 0.72f, 0.34f, 0.40f);
+    private static readonly Color SpeedDotHalfColor = new(0.46f, 0.30f, 0.16f, 0.98f);
+    private static readonly Color SpeedDotTwoThirdsColor = new(0.58f, 0.44f, 0.24f, 0.98f);
+    private static readonly Color SpeedDotFullColor = new(0.42f, 0.78f, 0.36f, 0.98f);
 
     private static Sprite? _roundedSprite;
     private static Font? _uiFont;
@@ -85,6 +88,14 @@ internal sealed partial class CombatStatusBar
     private string? _renderedTimeLabel;
     private string? _renderedTimeText;
     private string? _renderedPauseButtonText;
+
+    private bool _hasAppliedVisualColors;
+    private float _appliedVisualBlend;
+    private float _appliedSpeedMultiplier;
+    private bool _appliedPauseState;
+    private bool _appliedPauseInteractable;
+    private float _speedDotMultiplier = float.NaN;
+    private int _speedDotPercent;
 
     private void EnsureUi()
     {
@@ -223,6 +234,8 @@ internal sealed partial class CombatStatusBar
         _renderedTimeLabel = null;
         _renderedTimeText = null;
         _renderedPauseButtonText = null;
+        // EnsureUi rebuilds elements with placeholder colors, so force a full repaint.
+        _hasAppliedVisualColors = false;
     }
 
     private void SetUiVisible(bool visible)
@@ -241,6 +254,53 @@ internal sealed partial class CombatStatusBar
         if (!shouldDraw)
             return;
 
+        var pauseInteractable = CanToggleCombatPause();
+        if (
+            !_hasAppliedVisualColors
+            || _appliedVisualBlend != _visualBlend
+            || _appliedSpeedMultiplier != CombatSpeedMultiplier
+            || _appliedPauseState != IsCombatPaused
+            || _appliedPauseInteractable != pauseInteractable
+        )
+        {
+            ApplyVisualColors(pauseInteractable);
+            _hasAppliedVisualColors = true;
+            _appliedVisualBlend = _visualBlend;
+            _appliedSpeedMultiplier = CombatSpeedMultiplier;
+            _appliedPauseState = IsCombatPaused;
+            _appliedPauseInteractable = pauseInteractable;
+        }
+
+        var timeLabel = GetDisplayedTimeLabel();
+        if (!string.Equals(_renderedTimeLabel, timeLabel, StringComparison.Ordinal))
+        {
+            _renderedTimeLabel = timeLabel;
+            SetLabel(_timeLabel, timeLabel);
+        }
+
+        var timeText = GetDisplayedTimeText();
+        if (
+            _timeValue != null
+            && !string.Equals(_renderedTimeText, timeText, StringComparison.Ordinal)
+        )
+        {
+            _renderedTimeText = timeText;
+            _timeValue.text = timeText;
+        }
+
+        var pauseButtonText = IsCombatPaused ? ">" : "||";
+        if (
+            _pauseButtonText != null
+            && !string.Equals(_renderedPauseButtonText, pauseButtonText, StringComparison.Ordinal)
+        )
+        {
+            _renderedPauseButtonText = pauseButtonText;
+            _pauseButtonText.text = pauseButtonText;
+        }
+    }
+
+    private void ApplyVisualColors(bool pauseInteractable)
+    {
         var barColor = Color.Lerp(BarColorIdle, BarColorActive, _visualBlend);
         var glowColor = Color.Lerp(GlowColorIdle, GlowColorActive, _visualBlend);
         var segmentColor = Color.Lerp(SegmentColorIdle, SegmentColorActive, _visualBlend);
@@ -264,23 +324,6 @@ internal sealed partial class CombatStatusBar
         SetTextColor(_speedLabel, labelColor);
         SetTextColor(_pauseLabel, labelColor);
         SetTextColor(_timeValue, valueColor);
-
-        var timeLabel = GetDisplayedTimeLabel();
-        if (!string.Equals(_renderedTimeLabel, timeLabel, StringComparison.Ordinal))
-        {
-            _renderedTimeLabel = timeLabel;
-            SetLabel(_timeLabel, timeLabel);
-        }
-
-        var timeText = GetDisplayedTimeText();
-        if (
-            _timeValue != null
-            && !string.Equals(_renderedTimeText, timeText, StringComparison.Ordinal)
-        )
-        {
-            _renderedTimeText = timeText;
-            _timeValue.text = timeText;
-        }
 
         var speedButtonColor = Color.Lerp(
             SpeedButtonColorIdle,
@@ -321,7 +364,6 @@ internal sealed partial class CombatStatusBar
         );
         RefreshSpeedDot();
 
-        var pauseInteractable = CanToggleCombatPause();
         var pauseBaseColor = IsCombatPaused
             ? Color.Lerp(PausedBaseColorIdle, PausedBaseColorActive, _visualBlend)
             : Color.Lerp(UnpausedBaseColorIdle, UnpausedBaseColorActive, _visualBlend);
@@ -339,15 +381,6 @@ internal sealed partial class CombatStatusBar
             pauseBaseColor,
             valueColor
         );
-        var pauseButtonText = IsCombatPaused ? ">" : "||";
-        if (
-            _pauseButtonText != null
-            && !string.Equals(_renderedPauseButtonText, pauseButtonText, StringComparison.Ordinal)
-        )
-        {
-            _renderedPauseButtonText = pauseButtonText;
-            _pauseButtonText.text = pauseButtonText;
-        }
     }
 
     private void CreateSpeedContent(RectTransform parent)
@@ -402,14 +435,19 @@ internal sealed partial class CombatStatusBar
         if (_speedDot == null)
             return;
 
-        var color = Mathf.RoundToInt(CombatSpeedMultiplier * 100f) switch
+        var multiplier = CombatSpeedMultiplier;
+        if (multiplier != _speedDotMultiplier)
         {
-            50 => new Color(0.46f, 0.30f, 0.16f, 0.98f),
-            67 => new Color(0.58f, 0.44f, 0.24f, 0.98f),
-            _ => new Color(0.42f, 0.78f, 0.36f, 0.98f),
-        };
+            _speedDotMultiplier = multiplier;
+            _speedDotPercent = Mathf.RoundToInt(multiplier * 100f);
+        }
 
-        _speedDot.color = color;
+        _speedDot.color = _speedDotPercent switch
+        {
+            50 => SpeedDotHalfColor,
+            67 => SpeedDotTwoThirdsColor,
+            _ => SpeedDotFullColor,
+        };
     }
 
     private void CreatePauseContent(RectTransform parent)

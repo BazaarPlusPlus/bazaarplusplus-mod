@@ -2,6 +2,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Data.Sqlite;
+using static BazaarPlusPlus.Tests.Shared.ScreenshotUploadTestHelpers;
 
 var schemaType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
 var storeType = RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadStore");
@@ -123,7 +124,7 @@ try
     var maxUploadImageBytes = GetStaticInt(uploadLimitsType, "MaxUploadImageBytes");
     var originalPngRecord = tryBuildSnapshot!.Invoke(
         store,
-        ["shot-A", "acct-1", CancellationToken.None]
+        ["shot-A", "acct-1", null, CancellationToken.None]
     );
     Assert(
         originalPngRecord != null,
@@ -171,7 +172,7 @@ try
     ]);
     var pngRecord = tryBuildSnapshot!.Invoke(
         fakeStore,
-        ["shot-A", "acct-1", CancellationToken.None]
+        ["shot-A", "acct-1", null, CancellationToken.None]
     );
     Assert(pngRecord != null, "A 2 MiB prepared PNG should build an upload record.");
     var pngImage = GetProperty(GetProperty(pngRecord!, "Payload")!, "Image")!;
@@ -198,7 +199,7 @@ try
     ]);
     var jpegRecord = tryBuildSnapshot.Invoke(
         jpegStore,
-        ["shot-B", "acct-1", CancellationToken.None]
+        ["shot-B", "acct-1", null, CancellationToken.None]
     );
     Assert(jpegRecord != null, "A prepared JPEG should build an upload record.");
     var jpegImage = GetProperty(GetProperty(jpegRecord!, "Payload")!, "Image")!;
@@ -217,7 +218,7 @@ try
     ]);
     var nullRecord = tryBuildSnapshot.Invoke(
         nullStore,
-        ["shot-too-large", "acct-1", CancellationToken.None]
+        ["shot-too-large", "acct-1", null, CancellationToken.None]
     );
     Assert(nullRecord == null, "A null prepared image should not build an upload record.");
     Assert(
@@ -357,22 +358,6 @@ static void WriteScreenshotFile(string screenshotsDir, string screenshotId, byte
     File.WriteAllBytes(path, bytes);
 }
 
-static object CreateUploadImage(
-    Type uploadImageType,
-    byte[] bytes,
-    string contentType,
-    string sourcePath
-)
-{
-    var image =
-        Activator.CreateInstance(uploadImageType)
-        ?? throw new InvalidOperationException("Upload image should be constructible.");
-    SetProperty(image, "Bytes", bytes);
-    SetProperty(image, "ContentType", contentType);
-    SetProperty(image, "SourcePath", sourcePath);
-    return image;
-}
-
 static Delegate CreatePrepareSnapshotImageDelegate(Type delegateType)
 {
     var invoke =
@@ -409,14 +394,6 @@ static object? GetProperty(object instance, string name)
         ?.GetValue(instance);
 }
 
-static void SetProperty(object instance, string name, object? value)
-{
-    instance
-        .GetType()
-        .GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-        ?.SetValue(instance, value);
-}
-
 static long CountRows(SqliteConnection connection, string tableName)
 {
     using var command = connection.CreateCommand();
@@ -438,19 +415,6 @@ static long GetInt64(SqliteConnection connection, string sql, string id)
     command.CommandText = sql;
     command.Parameters.AddWithValue("$id", id);
     return (long)(command.ExecuteScalar() ?? throw new InvalidOperationException(sql));
-}
-
-static Type RequireType(string fullName)
-{
-    return Type.GetType($"{fullName}, BazaarPlusPlus.Storage")
-        ?? Type.GetType($"{fullName}, BazaarPlusPlus")
-        ?? throw new InvalidOperationException($"Type not found: {fullName}");
-}
-
-static void Assert(bool condition, string message)
-{
-    if (!condition)
-        throw new InvalidOperationException(message);
 }
 
 internal static class FakePreparedImage

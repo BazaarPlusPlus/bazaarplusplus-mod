@@ -1,6 +1,7 @@
 #nullable enable
 
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.GameInterop.Cards;
 
 namespace BazaarPlusPlus.GameInterop.ItemBoardPreview;
 
@@ -11,12 +12,6 @@ internal static class BppItemBoardSpan
         if (explicitSpan > 0)
             return explicitSpan;
 
-        return size switch
-        {
-            ECardSize.Small => 1,
-            ECardSize.Medium => 2,
-            ECardSize.Large => 3,
-            _ => 1,
-        };
+        return CardSizeSpan.Resolve(size);
     }
 }

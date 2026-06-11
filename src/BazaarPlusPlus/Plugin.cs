@@ -54,7 +54,11 @@ public class Plugin : BaseUnityPlugin
             // CombatReplayRuntime is constructed before composition.Start() because RunLifecycle
             // and several features take a reference through CombatReplayModule. Not a mountable.
             var combatReplayRuntime = gameObject.AddComponent<CombatReplayRuntime>();
-            combatReplayRuntime.Initialize(services, _composition.RunLifecycle);
+            combatReplayRuntime.Initialize(
+                services,
+                _composition.RunLifecycle,
+                _composition.PvpBattleCatalog
+            );
             _composition.AttachCombatReplayRuntime(combatReplayRuntime);
 
             _composition.Start();
@@ -89,6 +93,7 @@ public class Plugin : BaseUnityPlugin
         }
         finally
         {
+            UninstallStaticUtilities();
             BppLog.Flush();
             BppPatchHost.Reset();
         }
@@ -109,6 +114,15 @@ public class Plugin : BaseUnityPlugin
         BppSettingsDockCatalog.Install(services.Config, settingsDockRegistry);
         BppHotkeyService.Install(services.Config);
         RunLoggingGameDataReader.Install(services.RunContext);
+    }
+
+    private static void UninstallStaticUtilities()
+    {
+        LegendaryPositionDisplayFormatter.Reset();
+        L.Reset();
+        BppSettingsDockCatalog.Reset();
+        BppHotkeyService.Reset();
+        RunLoggingGameDataReader.Reset();
     }
 
     private void BuildOnlineServices()
@@ -145,6 +159,7 @@ public class Plugin : BaseUnityPlugin
         _composition = null;
         DisposeOnlineServices();
         UnpatchHarmony();
+        UninstallStaticUtilities();
     }
 
     private void DisposeOnlineServices()

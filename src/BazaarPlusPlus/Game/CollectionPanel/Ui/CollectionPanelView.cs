@@ -69,19 +69,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private const string TagChipLabelName = "bpp-tag-chip-label";
 
     private readonly Transform _parent;
-    private readonly Action _close;
-    private readonly Action<ECardType> _setActiveType;
-    private readonly Action<EHero> _toggleHero;
-    private readonly Action<ETier> _toggleTier;
-    private readonly Action _toggleDayFilter;
-    private readonly Action<ECardSize> _toggleSize;
-    private readonly Action<ECardTag> _toggleTag;
-    private readonly Action<EHiddenTag> _toggleKeyword;
-    private readonly Action _toggleTagMatchMode;
-    private readonly Action _toggleKeywordMatchMode;
-    private readonly Action<string> _toggleSource;
-    private readonly Action _togglePackages;
-    private readonly Action<CollectionSortPriority> _setSortPriority;
+    private readonly ICollectionPanelCommands _commands;
 
     private GameObject? _rootObject;
     private UIDocument? _document;
@@ -157,42 +145,10 @@ internal sealed partial class CollectionPanelView : IDisposable
 
     public event Action<Rect>? GridViewportBoundsChanged;
 
-    public CollectionPanelView(
-        Transform parent,
-        Action close,
-        Action<ECardType> setActiveType,
-        Action<EHero> toggleHero,
-        Action<ETier> toggleTier,
-        Action toggleDayFilter,
-        Action<ECardSize> toggleSize,
-        Action<ECardTag> toggleTag,
-        Action<EHiddenTag> toggleKeyword,
-        Action toggleTagMatchMode,
-        Action toggleKeywordMatchMode,
-        Action<string> toggleSource,
-        Action togglePackages,
-        Action<CollectionSortPriority> setSortPriority
-    )
+    public CollectionPanelView(Transform parent, ICollectionPanelCommands commands)
     {
         _parent = parent ?? throw new ArgumentNullException(nameof(parent));
-        _close = close ?? throw new ArgumentNullException(nameof(close));
-        _setActiveType = setActiveType ?? throw new ArgumentNullException(nameof(setActiveType));
-        _toggleHero = toggleHero ?? throw new ArgumentNullException(nameof(toggleHero));
-        _toggleTier = toggleTier ?? throw new ArgumentNullException(nameof(toggleTier));
-        _toggleDayFilter =
-            toggleDayFilter ?? throw new ArgumentNullException(nameof(toggleDayFilter));
-        _toggleSize = toggleSize ?? throw new ArgumentNullException(nameof(toggleSize));
-        _toggleTag = toggleTag ?? throw new ArgumentNullException(nameof(toggleTag));
-        _toggleKeyword = toggleKeyword ?? throw new ArgumentNullException(nameof(toggleKeyword));
-        _toggleTagMatchMode =
-            toggleTagMatchMode ?? throw new ArgumentNullException(nameof(toggleTagMatchMode));
-        _toggleKeywordMatchMode =
-            toggleKeywordMatchMode
-            ?? throw new ArgumentNullException(nameof(toggleKeywordMatchMode));
-        _toggleSource = toggleSource ?? throw new ArgumentNullException(nameof(toggleSource));
-        _togglePackages = togglePackages ?? throw new ArgumentNullException(nameof(togglePackages));
-        _setSortPriority =
-            setSortPriority ?? throw new ArgumentNullException(nameof(setSortPriority));
+        _commands = commands ?? throw new ArgumentNullException(nameof(commands));
     }
 
     public void EnsureCreated()

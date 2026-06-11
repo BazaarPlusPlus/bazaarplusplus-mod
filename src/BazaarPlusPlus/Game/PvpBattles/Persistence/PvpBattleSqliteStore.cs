@@ -1,28 +1,18 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using BazaarPlusPlus.Storage;
 using BazaarPlusPlus.Storage.RunLog;
 using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Converters;
-using Newtonsoft.Json.Serialization;
 
 namespace BazaarPlusPlus.Game.PvpBattles.Persistence;
 
 internal sealed class PvpBattleSqliteStore : SqliteStoreBase
 {
-    private static readonly JsonSerializerSettings SerializerSettings = new()
-    {
-        ContractResolver = new DefaultContractResolver
-        {
-            NamingStrategy = new SnakeCaseNamingStrategy(),
-        },
-        Converters = new List<JsonConverter> { new StringEnumConverter() },
-        NullValueHandling = NullValueHandling.Ignore,
-        Formatting = Formatting.None,
-        DateFormatString = "yyyy-MM-dd'T'HH:mm:ss.fffK",
-    };
+    private static readonly JsonSerializerSettings SerializerSettings =
+        SerializerSettingsFactory.CreateSerializerSettings(includeStringEnumConverter: true);
 
     // Shared column list + battle/snapshot join used by every manifest read. Callers append only
     // their WHERE/ORDER/LIMIT clauses. Column order is fixed because ReadManifest depends on it.

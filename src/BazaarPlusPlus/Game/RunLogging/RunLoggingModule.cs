@@ -404,11 +404,15 @@ internal sealed class RunLoggingModule
 
     private static bool IsCompletedTransition(RunLifecycleChanged change)
     {
-        return string.Equals(change.Reason, "Run ended", StringComparison.Ordinal);
+        return string.Equals(change.Reason, RunLifecycleReasons.RunEnded, StringComparison.Ordinal);
     }
 
     private static bool IsInterruptedTransition(RunLifecycleChanged change)
     {
-        return string.Equals(change.Reason, "Run interrupted", StringComparison.Ordinal);
+        return string.Equals(
+            change.Reason,
+            RunLifecycleReasons.RunInterrupted,
+            StringComparison.Ordinal
+        );
     }
 }

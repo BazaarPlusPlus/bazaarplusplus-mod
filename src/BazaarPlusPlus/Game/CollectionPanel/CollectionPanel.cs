@@ -77,6 +77,16 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private IBppServices _services = null!;
     private IReadOnlyList<CollectionCardVm> _catalogCards = Array.Empty<CollectionCardVm>();
+    private CollectionFacetAvailabilitySnapshot _facetAvailability =
+        CollectionFacetAvailabilitySnapshot.Empty;
+
+    // Last AvailableSourcesFor projection. The source catalog is immutable after its one-time
+    // load, so the roster only varies with (kind, selected hero).
+    private (
+        CollectionSourceKind Kind,
+        EHero? Hero,
+        IReadOnlyList<CollectionSourceOptionViewModel> Sources
+    )? _availableSourcesCache;
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
     private bool _isVisible;
     private bool _initialized;
@@ -479,114 +489,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (_view != null)
             return;
 
-        _view = new CollectionPanelView(
-            transform,
-            close: Close,
-            setActiveType: type =>
-            {
-                if (!_filter.SelectActiveType(type))
-                    return;
-                PruneInvisibleSourceSelections();
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-                _view?.ResetControlsScroll();
-            },
-            toggleHero: hero =>
-            {
-                _filter.ToggleHero(hero);
-                _heroPreferenceStore.Save(hero);
-                PruneInvisibleSourceSelections();
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-                _view?.ResetControlsScroll();
-            },
-            toggleTier: tier =>
-            {
-                if (!_filter.Tiers.Remove(tier))
-                    _filter.Tiers.Add(tier);
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-                _view?.ResetControlsScroll();
-            },
-            toggleDayFilter: () =>
-            {
-                // Toggle whether the day participates in filtering. On uses the current run day
-                // (or OutOfRunDay out of run); off clears the day filter entirely.
-                _filter.SelectedRunDay = _filter.SelectedRunDay is null
-                    ? _currentRunDay ?? DayTierSchedule.OutOfRunDay
-                    : (int?)null;
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-            },
-            toggleSize: size =>
-            {
-                if (!_filter.Sizes.Remove(size))
-                    _filter.Sizes.Add(size);
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-            },
-            toggleTag: tag =>
-            {
-                if (!_filter.Tags.Remove(tag))
-                    _filter.Tags.Add(tag);
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-            },
-            toggleKeyword: keyword =>
-            {
-                if (!_filter.Keywords.Remove(keyword))
-                    _filter.Keywords.Add(keyword);
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-            },
-            toggleTagMatchMode: () =>
-            {
-                _filter.TagMatchMode = ToggleMatchMode(_filter.TagMatchMode);
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-            },
-            toggleKeywordMatchMode: () =>
-            {
-                _filter.KeywordMatchMode = ToggleMatchMode(_filter.KeywordMatchMode);
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-            },
-            toggleSource: sourceKey =>
-            {
-                _filter.ToggleSource(_filter.ActiveType, sourceKey);
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-            },
-            togglePackages: () =>
-            {
-                if (!_filter.SelectPackagesOnly())
-                    return;
-
-                PruneInvisibleSourceSelections();
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-            },
-            setSortPriority: priority =>
-            {
-                if (_filter.SortPriority == priority)
-                    return;
-                _filter.SortPriority = priority;
-                _scrollY = 0f;
-                ApplyFilters();
-                RefreshView();
-            }
-        );
+        _view = new CollectionPanelView(transform, new PanelCommands(this));
 
         _view.GridViewportBoundsChanged += bounds =>
         {
@@ -612,6 +515,127 @@ internal sealed class CollectionPanel : MonoBehaviour
         mode == CollectionFacetMatchMode.All
             ? CollectionFacetMatchMode.Any
             : CollectionFacetMatchMode.All;
+
+    private sealed class PanelCommands(CollectionPanel panel) : ICollectionPanelCommands
+    {
+        public void Close() => panel.Close();
+
+        public void SetActiveType(ECardType type)
+        {
+            if (!panel._filter.SelectActiveType(type))
+                return;
+            panel.PruneInvisibleSourceSelections();
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+            panel._view?.ResetControlsScroll();
+        }
+
+        public void ToggleHero(EHero hero)
+        {
+            panel._filter.ToggleHero(hero);
+            panel._heroPreferenceStore.Save(hero);
+            panel.PruneInvisibleSourceSelections();
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+            panel._view?.ResetControlsScroll();
+        }
+
+        public void ToggleTier(ETier tier)
+        {
+            if (!panel._filter.Tiers.Remove(tier))
+                panel._filter.Tiers.Add(tier);
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+            panel._view?.ResetControlsScroll();
+        }
+
+        public void ToggleRunDayFilter()
+        {
+            // Toggle whether the day participates in filtering. On uses the current run day
+            // (or OutOfRunDay out of run); off clears the day filter entirely.
+            panel._filter.SelectedRunDay = panel._filter.SelectedRunDay is null
+                ? panel._currentRunDay ?? DayTierSchedule.OutOfRunDay
+                : (int?)null;
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+        }
+
+        public void ToggleSize(ECardSize size)
+        {
+            if (!panel._filter.Sizes.Remove(size))
+                panel._filter.Sizes.Add(size);
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+        }
+
+        public void ToggleTag(ECardTag tag)
+        {
+            if (!panel._filter.Tags.Remove(tag))
+                panel._filter.Tags.Add(tag);
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+        }
+
+        public void ToggleKeyword(EHiddenTag keyword)
+        {
+            if (!panel._filter.Keywords.Remove(keyword))
+                panel._filter.Keywords.Add(keyword);
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+        }
+
+        public void ToggleTagMatchMode()
+        {
+            panel._filter.TagMatchMode = ToggleMatchMode(panel._filter.TagMatchMode);
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+        }
+
+        public void ToggleKeywordMatchMode()
+        {
+            panel._filter.KeywordMatchMode = ToggleMatchMode(panel._filter.KeywordMatchMode);
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+        }
+
+        public void ToggleSource(string sourceKey)
+        {
+            panel._filter.ToggleSource(panel._filter.ActiveType, sourceKey);
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+        }
+
+        public void TogglePackagesOnly()
+        {
+            if (!panel._filter.SelectPackagesOnly())
+                return;
+
+            panel.PruneInvisibleSourceSelections();
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+        }
+
+        public void SetSortPriority(CollectionSortPriority priority)
+        {
+            if (panel._filter.SortPriority == priority)
+                return;
+            panel._filter.SortPriority = priority;
+            panel._scrollY = 0f;
+            panel.ApplyFilters();
+            panel.RefreshView();
+        }
+    }
 
     private void StartPanelLoad()
     {
@@ -649,7 +673,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (_catalog.TryGetCached(out var cached))
         {
             catalogResult = cached;
-            _catalogCards = cached.Cards;
+            SetCatalogCards(cached.Cards);
             ClearStatus();
         }
         else
@@ -707,13 +731,13 @@ internal sealed class CollectionPanel : MonoBehaviour
                     }
 
                     catalogResult = _catalog.Commit(buildSession);
-                    _catalogCards = catalogResult.Cards;
+                    SetCatalogCards(catalogResult.Cards);
                     ClearStatus();
                 }
             }
             else
             {
-                _catalogCards = Array.Empty<CollectionCardVm>();
+                SetCatalogCards(Array.Empty<CollectionCardVm>());
                 SetStatus(CollectionPanelText.CatalogUnavailable());
                 diagnostics.AddValue("unavailableReason", unavailableReason);
             }
@@ -830,11 +854,8 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
 
         var profile = CollectionTabProfile.For(_filter.ActiveType);
-        var availableTags = CollectionFacetAvailability.TagsFor(_catalogCards, ECardType.Item);
-        var availableKeywords = CollectionFacetAvailability.KeywordsFor(
-            _catalogCards,
-            _filter.ActiveType
-        );
+        var availableTags = _facetAvailability.ItemTags;
+        var availableKeywords = _facetAvailability.KeywordsFor(_filter.ActiveType);
         var model = new CollectionPanelViewModel
         {
             Title = CollectionPanelText.Title(),
@@ -845,11 +866,13 @@ internal sealed class CollectionPanel : MonoBehaviour
             IsLoading = _isLoadingCatalog,
             ActiveType = _filter.ActiveType,
             TabProfile = profile,
-            SelectedHeroes = new HashSet<EHero>(_filter.Heroes),
-            SelectedTiers = new HashSet<ETier>(_filter.Tiers),
-            SelectedSizes = new HashSet<ECardSize>(_filter.Sizes),
-            SelectedTags = new HashSet<ECardTag>(_filter.Tags),
-            SelectedKeywords = new HashSet<EHiddenTag>(_filter.Keywords),
+            // The view only does Contains lookups on these inside the synchronous Refresh and
+            // never retains the model, so the live filter sets are shared instead of copied.
+            SelectedHeroes = _filter.Heroes,
+            SelectedTiers = _filter.Tiers,
+            SelectedSizes = _filter.Sizes,
+            SelectedTags = _filter.Tags,
+            SelectedKeywords = _filter.Keywords,
             TagMatchMode = _filter.TagMatchMode,
             KeywordMatchMode = _filter.KeywordMatchMode,
             SelectedSourceKey = _filter.PackagesOnly ? null : _filter.SelectedSourceKey,
@@ -879,16 +902,12 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void TrimUnavailableFacetSelections()
     {
         var profile = CollectionTabProfile.For(_filter.ActiveType);
+        // ShowTagFilter is true only for the Item profile, so ItemTags matches what
+        // TagsFor(_catalogCards, _filter.ActiveType) would compute here.
         if (profile.ShowTagFilter)
-            TrimSet(
-                _filter.Tags,
-                CollectionFacetAvailability.TagsFor(_catalogCards, _filter.ActiveType)
-            );
+            TrimSet(_filter.Tags, _facetAvailability.ItemTags);
         if (profile.ShowKeywordFilter)
-            TrimSet(
-                _filter.Keywords,
-                CollectionFacetAvailability.KeywordsFor(_catalogCards, _filter.ActiveType)
-            );
+            TrimSet(_filter.Keywords, _facetAvailability.KeywordsFor(_filter.ActiveType));
     }
 
     private static void TrimSet<T>(HashSet<T> selected, IReadOnlyList<T> available)
@@ -902,9 +921,15 @@ internal sealed class CollectionPanel : MonoBehaviour
     private IReadOnlyList<CollectionSourceOptionViewModel> AvailableSourcesFor(ECardType activeType)
     {
         var kind = CollectionTabProfile.For(activeType).SourceKind;
-        var roster = CollectionSourceRoster.Build(
-            CollectionSourceCatalog.For(kind, _filter.SelectedHero)
-        );
+        var selectedHero = _filter.SelectedHero;
+        if (
+            _availableSourcesCache is { } cached
+            && cached.Kind == kind
+            && cached.Hero == selectedHero
+        )
+            return cached.Sources;
+
+        var roster = CollectionSourceRoster.Build(CollectionSourceCatalog.For(kind, selectedHero));
         var result = new List<CollectionSourceOptionViewModel>(roster.Count);
         foreach (var item in roster)
         {
@@ -920,6 +945,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 }
             );
         }
+        _availableSourcesCache = (kind, selectedHero, result);
         return result;
     }
 
@@ -996,9 +1022,17 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void InvalidateCatalog(string reason)
     {
-        _catalogCards = Array.Empty<CollectionCardVm>();
+        SetCatalogCards(Array.Empty<CollectionCardVm>());
         _offerPoolCache.Clear();
         _catalog.InvalidateCache(reason);
+    }
+
+    // Facet availability is a pure projection of the immutable catalog, so it is recomputed
+    // only here — at the points where the catalog itself changes — never per RefreshView.
+    private void SetCatalogCards(IReadOnlyList<CollectionCardVm> cards)
+    {
+        _catalogCards = cards;
+        _facetAvailability = CollectionFacetAvailability.SnapshotFor(cards);
     }
 
     private static string GetSceneToken(Scene scene) =>

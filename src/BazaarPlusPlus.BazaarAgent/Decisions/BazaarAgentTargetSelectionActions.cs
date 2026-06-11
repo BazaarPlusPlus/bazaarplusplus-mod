@@ -164,7 +164,7 @@ public static class BazaarAgentTargetSelectionActions
         {
             if (string.IsNullOrEmpty(c.TemplateId))
                 continue;
-            int size = ParseCardSize(c.Size);
+            int size = BazaarAgentCardSize.Parse(c.Size, fallback: 1);
             sink.Add(
                 new OwnedCardRef(
                     InstanceId: c.InstanceId,
@@ -176,13 +176,4 @@ public static class BazaarAgentTargetSelectionActions
             );
         }
     }
-
-    private static int ParseCardSize(string? size) =>
-        size switch
-        {
-            "Small" => 1,
-            "Medium" => 2,
-            "Large" => 3,
-            _ => 1,
-        };
 }

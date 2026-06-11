@@ -19,6 +19,10 @@ internal sealed partial class HistoryPanelRepository
 
     private readonly string _databasePath;
 
+    // Write paths may run on thread-pool continuations (ghost sync); the ensure
+    // work is idempotent, so a duplicate first-time run is harmless.
+    private volatile bool _schemaEnsured;
+
     public HistoryPanelRepository(string databasePath)
     {
         if (string.IsNullOrWhiteSpace(databasePath))
@@ -489,10 +493,7 @@ internal sealed partial class HistoryPanelRepository
                 "$loserCombatantId",
                 (object?)battle.LoserCombatantId ?? DBNull.Value
             );
-            insertCommand.Parameters.AddWithValue(
-                "$isFinalBattle",
-                battle.IsFinalBattle ? 1 : 0
-            );
+            insertCommand.Parameters.AddWithValue("$isFinalBattle", battle.IsFinalBattle ? 1 : 0);
             insertCommand.Parameters.AddWithValue(
                 "$replayAvailable",
                 battle.ReplayAvailable ? 1 : 0
@@ -648,7 +649,7 @@ internal sealed partial class HistoryPanelRepository
         using var pragma = connection.CreateCommand();
         pragma.CommandText = "PRAGMA foreign_keys = ON;";
         pragma.ExecuteNonQuery();
-        if (ensureSchema)
+        if (ensureSchema && !_schemaEnsured)
         {
             RunLogSchema.EnsureInitialized(connection);
             EnsureColumnExists(
@@ -657,6 +658,7 @@ internal sealed partial class HistoryPanelRepository
                 "is_final_battle",
                 "INTEGER NOT NULL DEFAULT 0"
             );
+            _schemaEnsured = true;
         }
         return connection;
     }

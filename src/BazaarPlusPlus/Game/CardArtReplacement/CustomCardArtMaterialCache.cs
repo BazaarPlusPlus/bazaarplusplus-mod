@@ -12,9 +12,12 @@ internal sealed class CustomCardArtMaterialCache : IDisposable
 {
     private const string LogCategory = "CardArtReplacement";
 
-    private readonly Dictionary<Guid, Material> _materialsByTemplateId = new();
+    private readonly Dictionary<
+        (Guid templateId, int baseMaterialInstanceId),
+        Material
+    > _materialsByKey = new();
 
-    public int CachedCount => _materialsByTemplateId.Count;
+    public int CachedCount => _materialsByKey.Count;
 
     public bool TryGetMaterial(
         Guid templateId,
@@ -27,10 +30,8 @@ internal sealed class CustomCardArtMaterialCache : IDisposable
         if (templateId == Guid.Empty || baseMaterial == null || texture == null)
             return false;
 
-        if (
-            _materialsByTemplateId.TryGetValue(templateId, out material)
-            && !ReferenceEquals(material, null)
-        )
+        var key = (templateId, baseMaterial.GetInstanceID());
+        if (_materialsByKey.TryGetValue(key, out material) && !ReferenceEquals(material, null))
             return true;
 
         try
@@ -46,7 +47,7 @@ internal sealed class CustomCardArtMaterialCache : IDisposable
                 return false;
             }
 
-            _materialsByTemplateId[templateId] = material;
+            _materialsByKey[key] = material;
             return true;
         }
         catch (Exception ex)
@@ -64,12 +65,12 @@ internal sealed class CustomCardArtMaterialCache : IDisposable
 
     public void Dispose()
     {
-        foreach (var material in _materialsByTemplateId.Values)
+        foreach (var material in _materialsByKey.Values)
         {
             if (material != null)
                 Object.Destroy(material);
         }
 
-        _materialsByTemplateId.Clear();
+        _materialsByKey.Clear();
     }
 }

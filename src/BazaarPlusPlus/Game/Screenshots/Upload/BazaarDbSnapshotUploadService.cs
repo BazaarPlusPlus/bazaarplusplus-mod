@@ -3,6 +3,7 @@ using System;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
@@ -34,19 +35,25 @@ internal sealed class BazaarDbSnapshotUploadService
     }
 
     public Task UploadPendingAsync(CancellationToken cancellationToken) =>
-        UploadPendingAsync(_playerAccountIdResolver()?.Trim(), cancellationToken);
+        UploadPendingAsync(
+            _playerAccountIdResolver()?.Trim(),
+            TryResolvePlayerName(),
+            cancellationToken
+        );
 
     public Task UploadPendingInBackgroundAsync(CancellationToken cancellationToken)
     {
         var playerAccountId = _playerAccountIdResolver()?.Trim();
+        var playerName = TryResolvePlayerName();
         return Task.Run(
-            () => UploadPendingAsync(playerAccountId, cancellationToken),
+            () => UploadPendingAsync(playerAccountId, playerName, cancellationToken),
             cancellationToken
         );
     }
 
     private async Task UploadPendingAsync(
         string? playerAccountId,
+        string? playerName,
         CancellationToken cancellationToken
     )
     {
@@ -99,6 +106,7 @@ internal sealed class BazaarDbSnapshotUploadService
                 var snapshot = _store.TryBuildSnapshot(
                     snapshotId,
                     playerAccountId,
+                    playerName,
                     cancellationToken
                 );
                 if (snapshot == null)
@@ -139,5 +147,18 @@ internal sealed class BazaarDbSnapshotUploadService
     private static bool IsTransientBuildFailure(string reason)
     {
         return string.Equals(reason, "image_prepare_timeout", StringComparison.Ordinal);
+    }
+
+    private static string? TryResolvePlayerName()
+    {
+        try
+        {
+            return BppClientCacheBridge.TryGetProfileDisplayUsername()
+                ?? BppClientCacheBridge.TryGetProfileUsername();
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

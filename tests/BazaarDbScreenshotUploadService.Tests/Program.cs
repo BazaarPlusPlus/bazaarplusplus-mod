@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using Microsoft.Data.Sqlite;
+using static BazaarPlusPlus.Tests.Shared.ScreenshotUploadTestHelpers;
 
 var serviceType = RequireType(
     "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadService"
@@ -77,7 +78,7 @@ try
     var tryBuildSnapshot = storeType.GetMethod("TryBuildSnapshot")!;
     var preflightRecord = tryBuildSnapshot.Invoke(
         store,
-        ["shot-1", "acct-9", CancellationToken.None]
+        ["shot-1", "acct-9", null, CancellationToken.None]
     );
     Assert(
         preflightRecord != null,
@@ -550,30 +551,6 @@ static string? GetStoreBuildFailure(Type storeType, object store)
             ?.GetValue(store);
 }
 
-static object CreateUploadImage(
-    Type uploadImageType,
-    byte[] bytes,
-    string contentType,
-    string sourcePath
-)
-{
-    var image =
-        Activator.CreateInstance(uploadImageType)
-        ?? throw new InvalidOperationException("Upload image should be constructible.");
-    SetProperty(image, "Bytes", bytes);
-    SetProperty(image, "ContentType", contentType);
-    SetProperty(image, "SourcePath", sourcePath);
-    return image;
-}
-
-static void SetProperty(object instance, string name, object? value)
-{
-    instance
-        .GetType()
-        .GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-        ?.SetValue(instance, value);
-}
-
 static Delegate CreatePrepareSnapshotImageDelegate(Type delegateType)
 {
     var invoke =
@@ -592,23 +569,10 @@ static Delegate CreatePrepareSnapshotImageDelegate(Type delegateType)
     return Expression.Lambda(delegateType, body, parameters).Compile();
 }
 
-static Type RequireType(string fullName)
-{
-    return Type.GetType($"{fullName}, BazaarPlusPlus.Storage")
-        ?? Type.GetType($"{fullName}, BazaarPlusPlus")
-        ?? throw new InvalidOperationException($"Type not found: {fullName}");
-}
-
 static Type RequireModApiType(string fullName)
 {
     return Type.GetType($"{fullName}, BazaarPlusPlus.ModApi")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
-}
-
-static void Assert(bool condition, string message)
-{
-    if (!condition)
-        throw new InvalidOperationException(message);
 }
 
 internal sealed class RecordingHandler : HttpMessageHandler

@@ -7,6 +7,7 @@ using BazaarPlusPlus.Game.CombatReplay.Bootstrap;
 using BazaarPlusPlus.Game.CombatReplay.PlaybackUi;
 using BazaarPlusPlus.Game.CombatReplay.Warmup;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
@@ -28,8 +29,24 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private bool _returnToMenuAfterReplay;
     private bool _bootstrappedReplayActive;
-    private bool _isReplayStartInProgress;
-    private bool _savedReplayPlaybackActive;
+
+    // Joint progress of a saved-replay playback session. "Start in progress" and "playback
+    // session active" overlap by design (the session is live for the whole start), so the
+    // states encode their combinations rather than one-hot flags:
+    //   Idle                -> no session, no start in flight
+    //   StartInProgress     -> StartReplayAsync running, playback session live
+    //   SavedPlaybackActive -> start finished, playback session live until ReplayState exits
+    //   StartFailureCleanup -> playback session cleared but StartReplayAsync is still
+    //                          unwinding (failure publish + bootstrap rollback)
+    private enum SavedReplayProgress
+    {
+        Idle,
+        StartInProgress,
+        SavedPlaybackActive,
+        StartFailureCleanup,
+    }
+
+    private SavedReplayProgress _savedReplayProgress;
 
     // Latched while a replay exit is in flight but ReplayState has not actually been left yet
     // (the bootstrapped exit path keeps CurrentState == ReplayState for the whole async
@@ -65,11 +82,17 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     public string? ActiveBattleId => _playbackPublisher?.ActiveSessionBattleId;
 
     public bool IsReplayPlaybackActive =>
-        _savedReplayPlaybackActive || AppState.CurrentState is ReplayState;
+        IsSavedReplayPlaybackActive || AppState.CurrentState is ReplayState;
 
-    public bool IsSavedReplayPlaybackActive => _savedReplayPlaybackActive;
+    public bool IsSavedReplayPlaybackActive =>
+        _savedReplayProgress
+            is SavedReplayProgress.StartInProgress
+                or SavedReplayProgress.SavedPlaybackActive;
 
-    public bool IsReplayStartInProgress => _isReplayStartInProgress;
+    public bool IsReplayStartInProgress =>
+        _savedReplayProgress
+            is SavedReplayProgress.StartInProgress
+                or SavedReplayProgress.StartFailureCleanup;
 
     public bool HasPendingPersistence => _persistence?.HasPendingPersistence == true;
 
@@ -78,12 +101,16 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         Instance = this;
     }
 
-    public void Initialize(IBppServices services, RunLifecycleModule runLifecycle)
+    public void Initialize(
+        IBppServices services,
+        RunLifecycleModule runLifecycle,
+        IPvpBattleCatalog battleCatalog
+    )
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _runLifecycle = runLifecycle ?? throw new ArgumentNullException(nameof(runLifecycle));
 
-        _persistence = new ReplayPersistenceOrchestrator(_services);
+        _persistence = new ReplayPersistenceOrchestrator(_services, battleCatalog);
         _playbackPublisher = new ReplayPlaybackPublisher(_services);
         _portraitController = new OpponentPortraitController(Destroy);
         _captureService = new CombatReplayCaptureService();
@@ -130,7 +157,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public bool CanReplaySavedCombats(out string reason)
     {
-        if (_isReplayStartInProgress)
+        if (IsReplayStartInProgress)
         {
             reason = "A saved replay is already starting.";
             return false;
@@ -233,7 +260,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
         var sequence = controller.LoadReplay(payload);
         PlaybackUiState.InitializedBoardUiControllers.Clear();
-        _savedReplayPlaybackActive = true;
+        _savedReplayProgress = SavedReplayProgress.SavedPlaybackActive;
         _ = StartReplayAsync(
             manifest,
             sequence,
@@ -267,7 +294,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
         var sequence = loader.Load(payload);
         PlaybackUiState.InitializedBoardUiControllers.Clear();
-        _savedReplayPlaybackActive = true;
+        _savedReplayProgress = SavedReplayProgress.SavedPlaybackActive;
         _ = StartReplayAsync(
             manifest,
             sequence,
@@ -293,7 +320,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        if (_isReplayStartInProgress)
+        if (IsReplayStartInProgress)
         {
             reason = "Replay playback is still starting.";
             return false;
@@ -333,7 +360,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     )
     {
         var attemptedBootstrapFromLobby = false;
-        _isReplayStartInProgress = true;
+        _savedReplayProgress = SavedReplayProgress.StartInProgress;
         _playbackPublisher!.BeginSession(battleId, manifest, source, recordVideo);
         try
         {
@@ -363,7 +390,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         {
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
-            _savedReplayPlaybackActive = false;
+            _savedReplayProgress = SavedReplayProgress.StartFailureCleanup;
             _portraitController!.Cleanup();
             _portraitController.RestoreSelectedHeroOverride();
             BppLog.Error("CombatReplayRuntime", $"Failed to start replay {battleId}: {ex}");
@@ -375,7 +402,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
         finally
         {
-            _isReplayStartInProgress = false;
+            _savedReplayProgress = _savedReplayProgress switch
+            {
+                SavedReplayProgress.StartInProgress => SavedReplayProgress.SavedPlaybackActive,
+                SavedReplayProgress.StartFailureCleanup => SavedReplayProgress.Idle,
+                _ => _savedReplayProgress,
+            };
         }
     }
 
@@ -388,7 +420,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return;
 
         _portraitController?.RestoreSelectedHeroOverride();
-        _savedReplayPlaybackActive = false;
+        _savedReplayProgress = _savedReplayProgress switch
+        {
+            SavedReplayProgress.StartInProgress => SavedReplayProgress.StartFailureCleanup,
+            SavedReplayProgress.SavedPlaybackActive => SavedReplayProgress.Idle,
+            _ => _savedReplayProgress,
+        };
         _playbackPublisher?.PublishEnded("state-exit", failed: false);
         _portraitController?.Cleanup();
         PlaybackUiState.InitializedBoardUiControllers.Clear();
@@ -430,7 +467,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (instance.IsReplayExitSuppressionActive && AppState.CurrentState is ReplayState)
             return true;
 
-        if (!instance._savedReplayPlaybackActive || !instance._bootstrappedReplayActive)
+        if (!instance.IsSavedReplayPlaybackActive || !instance._bootstrappedReplayActive)
             return false;
 
         instance.ExitBootstrappedSavedReplayToMenu();
@@ -441,8 +478,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         _returnToMenuAfterReplay = false;
         _bootstrappedReplayActive = false;
-        _savedReplayPlaybackActive = false;
-        _isReplayStartInProgress = false;
+        _savedReplayProgress = SavedReplayProgress.Idle;
         // Covers the native continue-click path too (it never goes through TryContinueReplay);
         // Update() clears the latch once ReplayState is actually gone.
         LatchReplayExitInProgress();
