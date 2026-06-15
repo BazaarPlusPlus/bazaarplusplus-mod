@@ -53,22 +53,22 @@ internal static class CollectionKeywordWhitelist
     };
 
     public static bool IsReferenceKeyword(EHiddenTag tag) =>
-        tag is
-            EHiddenTag.QuestReference
-            or EHiddenTag.FlyingReference
-            or EHiddenTag.HasteReference
-            or EHiddenTag.CooldownReference
-            or EHiddenTag.SlowReference
-            or EHiddenTag.FreezeReference
-            or EHiddenTag.DamageReference
-            or EHiddenTag.ShieldReference
-            or EHiddenTag.HealReference
-            or EHiddenTag.HealthReference
-            or EHiddenTag.BurnReference
-            or EHiddenTag.PoisonReference
-            or EHiddenTag.RegenReference
-            or EHiddenTag.CritReference
-            or EHiddenTag.AmmoReference
-            or EHiddenTag.RageReference
-            or EHiddenTag.EconomyReference;
+        tag
+            is EHiddenTag.QuestReference
+                or EHiddenTag.FlyingReference
+                or EHiddenTag.HasteReference
+                or EHiddenTag.CooldownReference
+                or EHiddenTag.SlowReference
+                or EHiddenTag.FreezeReference
+                or EHiddenTag.DamageReference
+                or EHiddenTag.ShieldReference
+                or EHiddenTag.HealReference
+                or EHiddenTag.HealthReference
+                or EHiddenTag.BurnReference
+                or EHiddenTag.PoisonReference
+                or EHiddenTag.RegenReference
+                or EHiddenTag.CritReference
+                or EHiddenTag.AmmoReference
+                or EHiddenTag.RageReference
+                or EHiddenTag.EconomyReference;
 }

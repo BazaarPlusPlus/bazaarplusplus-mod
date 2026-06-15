@@ -71,7 +71,6 @@ public sealed class RunProjection
 
     [JsonProperty("final_player_position")]
     public int? FinalPlayerPosition { get; set; }
-
 }
 
 public sealed class BattleProjection

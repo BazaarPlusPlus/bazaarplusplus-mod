@@ -377,7 +377,8 @@ public class CoreLayeringTests
             .ToList();
         var oldNamespaceHits = sourceFiles
             .Where(file =>
-                File.ReadAllText(file).Contains(oldRecommendationsNamespace, StringComparison.Ordinal)
+                File.ReadAllText(file)
+                    .Contains(oldRecommendationsNamespace, StringComparison.Ordinal)
             )
             .Select(file => Path.GetRelativePath(mainSource, file).Replace('\\', '/'))
             .ToList();
@@ -404,12 +405,15 @@ public class CoreLayeringTests
             .Where(file => !IsAllowedRecommendationConsumer(file))
             .SelectMany(file =>
                 File.ReadLines(file)
-                    .Select((line, index) => new
-                    {
-                        File = Path.GetRelativePath(mainSource, file).Replace('\\', '/'),
-                        Line = index + 1,
-                        Text = line.Trim(),
-                    })
+                    .Select(
+                        (line, index) =>
+                            new
+                            {
+                                File = Path.GetRelativePath(mainSource, file).Replace('\\', '/'),
+                                Line = index + 1,
+                                Text = line.Trim(),
+                            }
+                    )
             )
             .Where(hit =>
                 hit.Text.StartsWith(
@@ -786,14 +790,8 @@ public class CoreLayeringTests
             )
         );
 
-        Assert.DoesNotContain(
-            string.Concat("Legacy", "HeroSkinPool", "PrefsKeyPrefix"),
-            source
-        );
-        Assert.DoesNotContain(
-            string.Concat("BPP.Random", "HeroSkinPool", ".Selected"),
-            source
-        );
+        Assert.DoesNotContain(string.Concat("Legacy", "HeroSkinPool", "PrefsKeyPrefix"), source);
+        Assert.DoesNotContain(string.Concat("BPP.Random", "HeroSkinPool", ".Selected"), source);
         Assert.DoesNotContain(string.Concat("BuildLegacy", "HeroSkin", "PrefsKey"), source);
     }
 
@@ -806,7 +804,13 @@ public class CoreLayeringTests
             Path.Combine(mainSource, "Game", "Screenshots", "EndOfRunScreenshotController.cs")
         );
         var recorderSource = File.ReadAllText(
-            Path.Combine(mainSource, "Game", "CombatReplay", "Video", "CombatReplayVideoRecorder.cs")
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CombatReplay",
+                "Video",
+                "CombatReplayVideoRecorder.cs"
+            )
         );
         var chromeSuppressionSource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "OverlayPanels", "BppUiChromeSuppression.cs")
@@ -835,7 +839,10 @@ public class CoreLayeringTests
             "BppSettingsDockController.BeginScreenshotSuppression",
             chromeSuppressionSource
         );
-        Assert.Contains("CombatStatusBarFeature.BeginScreenshotSuppression", chromeSuppressionSource);
+        Assert.Contains(
+            "CombatStatusBarFeature.BeginScreenshotSuppression",
+            chromeSuppressionSource
+        );
     }
 
     [Fact]
@@ -846,15 +853,27 @@ public class CoreLayeringTests
         var pvpBattlesDir = Path.Combine(mainSource, "Game", "PvpBattles");
 
         Assert.True(Directory.Exists(pvpBattlesDir), $"Could not locate '{pvpBattlesDir}'.");
-        Assert.False(Directory.Exists(Path.Combine(mainSource, "Game", "CombatReplay", "PvpBattles")));
-        Assert.False(Directory.Exists(Path.Combine(mainSource, "Game", "HistoryPanel", "PvpBattles")));
-        Assert.False(Directory.Exists(Path.Combine(mainSource, "Game", "RunLogging", "PvpBattles")));
+        Assert.False(
+            Directory.Exists(Path.Combine(mainSource, "Game", "CombatReplay", "PvpBattles"))
+        );
+        Assert.False(
+            Directory.Exists(Path.Combine(mainSource, "Game", "HistoryPanel", "PvpBattles"))
+        );
+        Assert.False(
+            Directory.Exists(Path.Combine(mainSource, "Game", "RunLogging", "PvpBattles"))
+        );
 
         var combatReplaySource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "CombatReplay", "CombatReplayCaptureService.cs")
         );
         var historyProjectionSource = File.ReadAllText(
-            Path.Combine(mainSource, "Game", "HistoryPanel", "Data", "HistoryBattlePreviewProjection.cs")
+            Path.Combine(
+                mainSource,
+                "Game",
+                "HistoryPanel",
+                "Data",
+                "HistoryBattlePreviewProjection.cs"
+            )
         );
         var runLoggingSource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "RunLogging", "RunLoggingModule.cs")

@@ -59,14 +59,7 @@ static string[] ResolveDependencyDirectories()
             {
                 AppContext.BaseDirectory,
                 Path.Combine(gameRoot, "TheBazaar_Data", "Managed"),
-                Path.Combine(
-                    gameRoot,
-                    "TheBazaar.app",
-                    "Contents",
-                    "Resources",
-                    "Data",
-                    "Managed"
-                ),
+                Path.Combine(gameRoot, "TheBazaar.app", "Contents", "Resources", "Data", "Managed"),
                 Path.Combine(gameRoot, "BepInEx", "core"),
                 Path.Combine(gameRoot, "BepInEx", "plugins"),
             }

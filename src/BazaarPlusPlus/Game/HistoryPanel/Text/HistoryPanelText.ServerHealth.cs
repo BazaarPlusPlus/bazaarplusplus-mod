@@ -41,7 +41,6 @@ internal static partial class HistoryPanelText
         "連通性檢測進行中。"
     );
 
-
     private static readonly LocalizedTextSet DatabasePrefixText = new(
         "DB",
         "数据库",

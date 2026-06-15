@@ -184,7 +184,11 @@ internal static class NativeTagTypography
 
         var baseDisplay = Resolve(baseTag);
         var label = ReferenceLabel(tag, baseDisplay.Label);
-        referenceDisplay = new NativeTagDisplay(label, baseDisplay.AccentColor, baseDisplay.IconName);
+        referenceDisplay = new NativeTagDisplay(
+            label,
+            baseDisplay.AccentColor,
+            baseDisplay.IconName
+        );
         return true;
     }
 

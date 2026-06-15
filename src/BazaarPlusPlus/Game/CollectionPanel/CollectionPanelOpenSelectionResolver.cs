@@ -46,7 +46,8 @@ internal static class CollectionPanelOpenSelectionResolver
     private static CollectionPanelSelectionState ResolveOutOfRunSelection(EHero? rememberedHero)
     {
         var hero =
-            rememberedHero.HasValue && CollectionPanelHeroPreference.IsSupportedHero(rememberedHero.Value)
+            rememberedHero.HasValue
+            && CollectionPanelHeroPreference.IsSupportedHero(rememberedHero.Value)
                 ? rememberedHero.Value
                 : CollectionPanelSelectionState.DefaultHero;
 

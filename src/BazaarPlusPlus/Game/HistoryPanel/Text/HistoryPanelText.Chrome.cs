@@ -54,7 +54,6 @@ internal static partial class HistoryPanelText
 
     private static readonly LocalizedTextSet WorkingText = new("Working...", "处理中...");
 
-
     internal static string Title() => Resolve(TitleText);
 
     internal static string Subtitle() => Resolve(SubtitleText);

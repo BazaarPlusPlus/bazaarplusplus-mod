@@ -37,10 +37,7 @@ internal static class RunBundleClientTests
                 Status = "completed",
                 EndedAtUtc = "2026-06-04T00:30:00.000Z",
             },
-            BattleProjections =
-            [
-                new BattleProjection { BattleId = "battle-1", RunId = "run-1" },
-            ],
+            BattleProjections = [new BattleProjection { BattleId = "battle-1", RunId = "run-1" }],
         };
 
         var result = await uploadClient.UploadRunBundleAsync(

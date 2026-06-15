@@ -159,7 +159,10 @@
     AfterTargets="CopyHostToInstallerSource"
     Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)') and '$(BuildProductionPackage)' == 'true'"
   >
-    <Message Text="[BazaarAgentHost] Rebuilding production installer package with BazaarAgent" Importance="high" />
+    <Message
+      Text="[BazaarAgentHost] Rebuilding production installer package with BazaarAgent"
+      Importance="high"
+    />
     <ZipDirectory
       SourceDirectory="$(BPPInstallerSourcePath)/SourceForBuild/macos"
       DestinationFile="$(BPPInstallerSourcePath)/BepInExSource/macos/BepInEx.zip"

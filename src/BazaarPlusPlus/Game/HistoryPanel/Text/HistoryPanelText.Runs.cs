@@ -26,7 +26,6 @@ internal static partial class HistoryPanelText
         "还没有找到 runs。"
     );
 
-
     private static readonly LocalizedTextSet SelectRunFirstText = new(
         "Select a run first.",
         "请先选择一个 run。"
@@ -227,7 +226,6 @@ internal static partial class HistoryPanelText
     {
         return FormatSimple("Run log repository is unavailable.", "Run log 仓库不可用。");
     }
-
 
     internal static string DeleteRunConfirm(string shortRunId)
     {
