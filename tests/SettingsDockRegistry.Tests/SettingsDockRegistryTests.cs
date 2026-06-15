@@ -8,6 +8,7 @@ using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Localization;
 using BepInEx.Configuration;
 using Xunit;
@@ -140,6 +141,52 @@ public class SettingsDockRegistryTests
         }
     }
 
+    [Fact]
+    public void FixedSupporterListDockEntry_uses_stream_mode_key_and_toggles_config()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-fixed-supporters-settings-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var entry = new FixedSupporterListSettingsDockEntry();
+
+            var definition = entry.Build(config);
+
+            Assert.Equal(BppSettingsDockOrder.FixedSupporterList, entry.Order);
+            Assert.Equal("StreamMode", definition.Key);
+            Assert.Equal("Stream Mode", definition.ResolveLabel("en"));
+            Assert.Equal("直播模式", definition.ResolveLabel("zh-CN"));
+            Assert.False(definition.IsActive());
+            Assert.Equal("OFF", definition.ResolveStatus("en"));
+
+            definition.Activate();
+
+            Assert.True(config.UseFixedSupporterListConfig!.Value);
+            Assert.True(definition.IsActive());
+            Assert.Equal("ON", definition.ResolveStatus("en"));
+            Assert.False(definition.CollapseAfterActivate);
+
+            configFile.Save();
+
+            var reloadedConfigFile = new ConfigFile(configPath, saveOnInit: false);
+            var reloadedConfig = new BppConfig();
+            reloadedConfig.Initialize(reloadedConfigFile);
+
+            Assert.True(reloadedConfig.UseFixedSupporterListConfig!.Value);
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
     [Theory]
     [InlineData("zh-CN", "https://bazaarplusplus.com/tutorial")]
     [InlineData("zh-Hant", "https://bazaarplusplus.com/tutorial")]
@@ -203,6 +250,10 @@ public class SettingsDockRegistryTests
         Assert.Equal(
             BppSettingsDockOrder.HotkeyTutorial,
             new HotkeyTutorialSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.FixedSupporterList,
+            new FixedSupporterListSettingsDockEntry().Order
         );
         Assert.Equal(
             BppSettingsDockOrder.BazaarDbUpload,

@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Http;
 using Newtonsoft.Json;
@@ -43,16 +44,38 @@ internal static class BPPSupporterCatalog
     private static DateTime _cacheExpiresAtUtc = DateTime.MinValue;
     private static Task? _refreshTask;
     private static bool _attemptedDiskCacheLoad;
+    private static IBppConfig? _config;
+
+    public static void Install(IBppConfig config)
+    {
+        _config = config ?? throw new ArgumentNullException(nameof(config));
+    }
+
+    public static void Reset()
+    {
+        _config = null;
+    }
 
     public static IReadOnlyList<BPPSupporterEntry> GetCurrentEntries()
     {
+        if (IsFixedListEnabled())
+            return BPPSupporterFixedList.Entries;
+
         EnsureRefreshScheduled();
         lock (SyncRoot)
         {
             TryLoadDiskCacheUnderLock();
-            return _cachedEntries?.Count > 0 ? _cachedEntries : FallbackEntries;
+            return BPPSupporterListSourcePolicy.ResolveEntries(
+                useFixedList: false,
+                _cachedEntries,
+                FallbackEntries
+            );
         }
     }
+
+    private static bool IsFixedListEnabled() =>
+        _config?.UseFixedSupporterListConfig?.Value
+        ?? BPPSupporterListSourcePolicy.DefaultUseFixedList;
 
     private static void EnsureRefreshScheduled()
     {

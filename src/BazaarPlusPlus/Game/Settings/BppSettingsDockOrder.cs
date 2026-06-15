@@ -13,4 +13,5 @@ internal static class BppSettingsDockOrder
     internal const int ChineseLocaleMode = 6;
     internal const int HotkeyTutorial = 7;
     internal const int BazaarDbUpload = 8;
+    internal const int FixedSupporterList = 9;
 }

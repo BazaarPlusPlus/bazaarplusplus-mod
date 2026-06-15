@@ -22,6 +22,7 @@ using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.Encounter;
@@ -95,6 +96,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_combatStatusBarModule);
 
         _settingsDockRegistry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
+        _settingsDockRegistry.Register(new FixedSupporterListSettingsDockEntry());
         _settingsDockRegistry.Register(new HotkeyTutorialSettingsDockEntry());
         _settingsDockRegistry.Register(new ChineseLocaleModeSettingsDockEntry(_eventBus));
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());

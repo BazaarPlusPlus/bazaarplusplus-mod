@@ -32,6 +32,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnablePackageCardArtReplacementConfig { get; private set; }
 
+    public ConfigEntry<bool>? UseFixedSupporterListConfig { get; private set; }
+
     public void Initialize(ConfigFile config)
     {
         EnableNameOverrideConfig = config.Bind(
@@ -94,6 +96,12 @@ internal sealed class BppConfig : IBppConfig
             "EnablePackageArtReplacement",
             false,
             "Whether BazaarPlusPlus should replace package card art with bundled custom package art."
+        );
+        UseFixedSupporterListConfig = config.Bind(
+            "Supporters",
+            "UseFixedSupporterList",
+            false,
+            "Whether supporter attribution should use the bundled fixed supporter list instead of the remote supporter list."
         );
     }
 }

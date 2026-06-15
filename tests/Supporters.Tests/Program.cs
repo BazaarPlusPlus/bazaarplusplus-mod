@@ -9,6 +9,8 @@ TestSampleManyReturnsDistinctSupporters();
 TestSampleManyRotatesThroughEverySupporterBeforeRepeating();
 TestSampleManyDispersesLongNamesAcrossAttributionWindows();
 TestSampleManyLongNameDispersalKeepsFullRotation();
+TestFixedSupporterListSourceIgnoresRemoteEntries();
+TestDefaultSupporterListSourceUsesRemoteEntriesBeforeFallback();
 TestSupportedByPrefixAndSuffix();
 TestSponsorActionText();
 TestSponsorLinks();
@@ -204,6 +206,50 @@ static void TestSampleManyLongNameDispersalKeepsFullRotation()
         entries.Length,
         names.Distinct(StringComparer.OrdinalIgnoreCase).Count(),
         "Long-name dispersal should keep the shuffled-bag rotation contract intact."
+    );
+}
+
+static void TestFixedSupporterListSourceIgnoresRemoteEntries()
+{
+    var remote = new[] { Entry("Remote Supporter", 4) };
+    var fallback = new[] { Entry("Fallback Supporter", 2) };
+
+    var entries = BPPSupporterListSourcePolicy.ResolveEntries(
+        useFixedList: true,
+        currentEntries: remote,
+        fallbackEntries: fallback
+    );
+
+    AssertTrue(
+        ReferenceEquals(entries, BPPSupporterFixedList.Entries),
+        "Fixed supporter list mode should return the bundled fixed list."
+    );
+    AssertFalse(
+        entries.Any(entry => entry.Name == "Remote Supporter"),
+        "Fixed supporter list mode should ignore remote/cache entries."
+    );
+    AssertFalse(
+        entries.Any(entry => entry.Name == "Fallback Supporter"),
+        "Fixed supporter list mode should ignore fallback entries."
+    );
+}
+
+static void TestDefaultSupporterListSourceUsesRemoteEntriesBeforeFallback()
+{
+    var remote = new[] { Entry("Remote Supporter", 4) };
+    var fallback = new[] { Entry("Fallback Supporter", 2) };
+
+    var entries = BPPSupporterListSourcePolicy.ResolveEntries(
+        useFixedList: false,
+        currentEntries: remote,
+        fallbackEntries: fallback
+    );
+
+    AssertEqual(1, entries.Count, "Remote/cache entries should win in default mode.");
+    AssertEqual(
+        "Remote Supporter",
+        entries[0].Name,
+        "Default mode should preserve remote entries."
     );
 }
 

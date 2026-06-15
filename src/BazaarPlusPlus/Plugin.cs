@@ -9,6 +9,7 @@ using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
@@ -112,6 +113,7 @@ public class Plugin : BaseUnityPlugin
         LegendaryPositionDisplayFormatter.Install(services.Config);
         L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config));
         BppSettingsDockCatalog.Install(services.Config, settingsDockRegistry);
+        BPPSupporterCatalog.Install(services.Config);
         BppHotkeyService.Install(services.Config);
         RunLoggingGameDataReader.Install(services.RunContext);
     }
@@ -121,6 +123,7 @@ public class Plugin : BaseUnityPlugin
         LegendaryPositionDisplayFormatter.Reset();
         L.Reset();
         BppSettingsDockCatalog.Reset();
+        BPPSupporterCatalog.Reset();
         BppHotkeyService.Reset();
         RunLoggingGameDataReader.Reset();
     }
