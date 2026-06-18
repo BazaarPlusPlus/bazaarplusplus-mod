@@ -5,6 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);IDE0005</NoWarn>
     <RestoreAdditionalProjectSources>
       https://api.nuget.org/v3/index.json;
       https://nuget.bepinex.dev/v3/index.json;
@@ -45,6 +46,22 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\CollectionDealerCardExplain.cs"
       Link="CollectionDealerCardExplain.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\CollectionDealerExplainResolver.cs"
+      Link="CollectionDealerExplainResolver.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\DayTierSchedule.cs"
+      Link="DayTierSchedule.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardFacetRanks.cs"
+      Link="CollectionCardFacetRanks.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardVm.cs"
+      Link="CollectionCardVm.cs"
     />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>

@@ -1,5 +1,6 @@
 using BazaarPlusPlus.Game.CollectionPanel.DealerModel;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 
 Check.Section("state enum");
 Check.Equal(
@@ -72,7 +73,72 @@ Check.True(explain.LooseEligible, "Explain DTO should carry loose eligibility.")
 Check.True(!explain.NativeEligible, "Explain DTO should carry native eligibility.");
 Check.Equal(0.8f, sourceContext.NativeAssumption, "Source context should carry native assumption.");
 
+Check.Section("phase A resolver");
+var bronzeId = Guid.Parse("00000000-0000-0000-0000-0000000000b1");
+var goldId = Guid.Parse("00000000-0000-0000-0000-0000000000c1");
+var day3Explains = CollectionDealerExplainResolver.Resolve(
+    MerchantContext(day: 3),
+    new[] { Card(bronzeId, ETier.Bronze), Card(goldId, ETier.Gold) }
+);
+Check.True(day3Explains[bronzeId].DayGatePass, "Day 3 should pass Bronze day gate.");
+Check.True(!day3Explains[goldId].DayGatePass, "Day 3 should fail Gold day gate.");
+Check.True(day3Explains[bronzeId].NativeEligible, "Day 3 Bronze should be native eligible.");
+Check.True(day3Explains[bronzeId].LooseEligible, "Day 3 Bronze should be loose eligible.");
+Check.True(!day3Explains[goldId].LooseEligible, "Day 3 Gold should not be loose eligible.");
+
+var specialistExplains = CollectionDealerExplainResolver.Resolve(
+    MerchantContext(day: 2, suppressDayGate: true, pinnedTier: ETier.Gold),
+    new[] { Card(bronzeId, ETier.Bronze), Card(goldId, ETier.Gold) }
+);
+Check.True(specialistExplains[goldId].DayGatePass, "Tier specialist should suppress day gate.");
+Check.True(specialistExplains[goldId].LooseEligible, "Pinned Gold should allow Gold loosely.");
+Check.True(!specialistExplains[goldId].NativeEligible, "Tier specialist should not be native.");
+Check.True(specialistExplains[bronzeId].LooseEligible, "Pinned Gold should allow Bronze loosely.");
+Check.True(
+    specialistExplains[goldId].Notes.Contains("tier-specialist-loose"),
+    "Tier specialist notes should explain loose eligibility."
+);
+
+var missingWeightsExplains = CollectionDealerExplainResolver.Resolve(
+    MerchantContext(day: 3, estimateEnabled: true),
+    new[] { Card(bronzeId, ETier.Bronze) }
+);
+Check.Equal(
+    CollectionDealerProbabilityState.WeightsMissing,
+    missingWeightsExplains[bronzeId].State,
+    "Estimate-enabled merchant without hint should report missing weights."
+);
+
+Check.Equal(2, day3Explains.Count, "Resolver should return one explain per offered card.");
+Check.True(day3Explains.ContainsKey(bronzeId), "Resolver key should be the real Bronze VM id.");
+Check.True(day3Explains.ContainsKey(goldId), "Resolver key should be the real Gold VM id.");
+Check.True(!day3Explains.ContainsKey(Guid.Empty), "Resolver should not synthesize placeholder ids.");
+
 Check.Finish();
+
+static CollectionCardVm Card(Guid id, ETier tier, ECardType type = ECardType.Item) =>
+    new()
+    {
+        Id = id,
+        Type = type,
+        StartingTier = tier,
+    };
+
+static CollectionDealerSourceContext MerchantContext(
+    int day,
+    bool suppressDayGate = false,
+    ETier? pinnedTier = null,
+    bool estimateEnabled = false
+) =>
+    new()
+    {
+        SourceKey = "Goldie",
+        Kind = CollectionDealerSourceKind.Merchant,
+        Day = day,
+        SuppressDayGate = suppressDayGate,
+        PinnedTier = pinnedTier,
+        EstimateEnabled = estimateEnabled,
+    };
 
 internal static class Check
 {
