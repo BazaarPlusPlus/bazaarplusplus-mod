@@ -16,20 +16,25 @@ internal static class DealerProbabilityCore
         IRng rng
     )
     {
+        var current = BuildPool(shop, state, pool);
+        if (current.Count == 0)
+        {
+            return Array.Empty<Guid>();
+        }
+
+        if (current.All(candidate => candidate.Type == ECardType.Skill))
+        {
+            return Array.Empty<Guid>();
+        }
+
         if (
             shop.CardIdFilters.Count > 0
             && shop.CardIdFilters.Count == shop.NumberCardsToSpawn
         )
         {
-            return shop.CardIdFilters.ToArray();
+            return current.Select(candidate => candidate.Id).ToArray();
         }
 
-        if (pool.Count > 0 && pool.All(candidate => candidate.Type == ECardType.Skill))
-        {
-            return Array.Empty<Guid>();
-        }
-
-        var current = BuildPool(shop, state, pool);
         if (current.Count < shop.NumberCardsToSpawn)
         {
             return Array.Empty<Guid>();
@@ -44,11 +49,11 @@ internal static class DealerProbabilityCore
                 return Array.Empty<Guid>();
             }
 
-            var selectedTier = SelectRandomTier(shop.TierWeights, rng);
             var useNative =
                 shop.ItemTierFilters.Count == 0
                 && !nativeMissLatched
                 && rng.NextDouble() < shop.NativeItemTierProbability;
+            var selectedTier = SelectRandomTier(shop.TierWeights, rng);
 
             DealerCandidate picked;
             if (useNative)
@@ -154,7 +159,11 @@ internal static class DealerProbabilityCore
     {
         var roll = rng.NextDouble();
         var cumulative = 0.0;
-        foreach (var (tier, weight) in weights.OrderBy(pair => TierRank(pair.Key)))
+        foreach (
+            var (tier, weight) in weights
+                .OrderBy(pair => pair.Value)
+                .ThenBy(pair => TierRank(pair.Key))
+        )
         {
             cumulative += weight;
             if (roll <= cumulative)

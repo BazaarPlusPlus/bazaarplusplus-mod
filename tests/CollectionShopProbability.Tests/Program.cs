@@ -153,9 +153,9 @@ var fixedDeal = DealerProbabilityCore.SimulateOneDeal(
     new SeededRng(1)
 );
 Check.Values(
-    new[] { t1, t2 },
+    new[] { t2 },
     fixedDeal.ToArray(),
-    "Fixed direct deal should return exact filters before skill exclusion."
+    "Fixed direct deal should use the post-skill-exclusion fixed pool."
 );
 
 var bronzeForcedShop = Shop(
@@ -289,6 +289,52 @@ Check.Equal(
         new SeededRng(17)
     ).Count,
     "Pure skill pools should return empty because trainer simulation is out of scope."
+);
+Check.Equal(
+    0,
+    DealerProbabilityCore.SimulateOneDeal(
+        Shop(spawn: 1, filters: new[] { t1 }),
+        Player(day: 3),
+        new[]
+        {
+            Candidate(t1, ETier.Bronze, ECardType.Skill),
+            Candidate(t2, ETier.Bronze, ECardType.Item),
+        },
+        new SeededRng(171)
+    ).Count,
+    "Pure skill boundary should apply after CardIdFilters narrow a mixed pool."
+);
+
+var nativeGateBeforeTierDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(
+        spawn: 1,
+        nativeProbability: 0.5f,
+        weights: new Dictionary<ETier, double> { [ETier.Gold] = 1 }
+    ),
+    Player(day: 3),
+    new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Gold) },
+    new ScriptedRng(doubles: new[] { 0.2, 0.75 }, ints: new[] { 0 })
+);
+Check.Values(
+    new[] { t2 },
+    nativeGateBeforeTierDeal.ToArray(),
+    "Native gate should consume RNG before tier selection each slot."
+);
+
+var probabilityOrderedTierDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(
+        spawn: 1,
+        nativeProbability: 0,
+        weights: new Dictionary<ETier, double> { [ETier.Bronze] = 0.9, [ETier.Gold] = 0.1 }
+    ),
+    Player(day: 3),
+    new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Gold) },
+    new ScriptedRng(doubles: new[] { 0.9, 0.05 }, ints: new[] { 1 })
+);
+Check.Values(
+    new[] { t2 },
+    probabilityOrderedTierDeal.ToArray(),
+    "Tier selection should accumulate weights ordered by probability value."
 );
 
 var deterministicShop = Shop(
@@ -431,6 +477,11 @@ Check.Equal(
     "Verified fixed direct deals should enter Fixed state."
 );
 Check.Equal(
+    CollectionDealerProbabilityState.Estimate,
+    verifiedFixedExplains[goldId].State,
+    "Verified fixed direct deals should only mark cards inside the fixed filter as Fixed."
+);
+Check.Equal(
     true,
     verifiedFixedExplains[bronzeId].FixedDealVerified,
     "Verified fixed direct deals should carry FixedDealVerified."
@@ -438,7 +489,12 @@ Check.Equal(
 Check.True(
     CollectionDealerExplainResolver.EstimateForCard(verifiedFixedContext, bronzeId, estimateCards)
         is null,
-    "Fixed direct deals should not produce estimate buckets."
+    "Fixed direct cards should not produce estimate buckets."
+);
+Check.True(
+    CollectionDealerExplainResolver.EstimateForCard(verifiedFixedContext, goldId, estimateCards)
+        is not null,
+    "Fixed hints should not suppress estimate buckets for cards outside the fixed filter."
 );
 
 Check.Finish();
@@ -576,5 +632,37 @@ internal static class Check
 
         Console.Error.WriteLine($"{_failures} check(s) failed.");
         Environment.Exit(1);
+    }
+}
+
+internal sealed class ScriptedRng : IRng
+{
+    private readonly Queue<double> _doubles;
+    private readonly Queue<int> _ints;
+
+    public ScriptedRng(IEnumerable<double> doubles, IEnumerable<int> ints)
+    {
+        _doubles = new Queue<double>(doubles);
+        _ints = new Queue<int>(ints);
+    }
+
+    public double NextDouble()
+    {
+        if (_doubles.Count == 0)
+        {
+            throw new InvalidOperationException("No scripted doubles remain.");
+        }
+
+        return _doubles.Dequeue();
+    }
+
+    public int NextInt(int exclusiveMax)
+    {
+        if (_ints.Count == 0)
+        {
+            throw new InvalidOperationException("No scripted ints remain.");
+        }
+
+        return Math.Min(_ints.Dequeue(), exclusiveMax - 1);
     }
 }
