@@ -22,10 +22,7 @@ internal static class DealerProbabilityCore
             return Array.Empty<Guid>();
         }
 
-        if (
-            shop.CardIdFilters.Count > 0
-            && shop.CardIdFilters.Count == shop.NumberCardsToSpawn
-        )
+        if (shop.CardIdFilters.Count > 0 && shop.CardIdFilters.Count == shop.NumberCardsToSpawn)
         {
             return shop.CardIdFilters.ToArray();
         }
@@ -77,7 +74,9 @@ internal static class DealerProbabilityCore
                         ? shop.ItemTierFilters[rng.NextInt(shop.ItemTierFilters.Count)]
                         : selectedTier;
                 var narrowed = current
-                    .Where(candidate => LooseTierRank(candidate.StartingTier) <= TierRank(looseTier))
+                    .Where(candidate =>
+                        LooseTierRank(candidate.StartingTier) <= TierRank(looseTier)
+                    )
                     .ToList();
                 if (narrowed.Count > 0)
                 {
@@ -166,13 +165,20 @@ internal static class DealerProbabilityCore
 
     private static ETier SelectRandomTier(IReadOnlyDictionary<ETier, double> weights, IRng rng)
     {
-        var roll = rng.NextDouble();
+        var orderedWeights = weights
+            .Where(pair => pair.Value > 0)
+            .OrderBy(pair => pair.Value)
+            .ThenBy(pair => TierRank(pair.Key))
+            .ToArray();
+        var total = orderedWeights.Sum(pair => pair.Value);
+        if (total <= 0)
+        {
+            return ETier.Bronze;
+        }
+
+        var roll = rng.NextDouble() * total;
         var cumulative = 0.0;
-        foreach (
-            var (tier, weight) in weights
-                .OrderBy(pair => pair.Value)
-                .ThenBy(pair => TierRank(pair.Key))
-        )
+        foreach (var (tier, weight) in orderedWeights)
         {
             cumulative += weight;
             if (roll <= cumulative)
@@ -181,7 +187,7 @@ internal static class DealerProbabilityCore
             }
         }
 
-        return ETier.Bronze;
+        return orderedWeights[orderedWeights.Length - 1].Key;
     }
 
     private static int TierRank(ETier tier) => CollectionCardFacetRanks.TierRank(tier);

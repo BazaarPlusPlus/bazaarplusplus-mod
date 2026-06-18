@@ -1,6 +1,6 @@
-using BazaarPlusPlus.Game.CollectionPanel.DealerModel;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.Game.CollectionPanel.DealerModel;
 
 Check.Section("state enum");
 Check.Equal(
@@ -36,12 +36,7 @@ var day3Weights = DealerTierWeightReference.ForDay(3);
 Check.True(day3Weights.ContainsKey(ETier.Bronze), "Day 3 should include Bronze.");
 Check.True(day3Weights.ContainsKey(ETier.Silver), "Day 3 should include Silver.");
 Check.True(!day3Weights.ContainsKey(ETier.Diamond), "Day 3 should not include Diamond.");
-Check.About(
-    1.0,
-    day3Weights.Values.Sum(),
-    0.05,
-    "Day 3 weights should sum to roughly 1."
-);
+Check.About(1.0, day3Weights.Values.Sum(), 0.05, "Day 3 weights should sum to roughly 1.");
 
 Check.Section("explain DTOs");
 var sourceContext = new CollectionDealerSourceContext
@@ -75,6 +70,7 @@ Check.Equal(0.8f, sourceContext.NativeAssumption, "Source context should carry n
 
 Check.Section("phase A resolver");
 var bronzeId = Guid.Parse("00000000-0000-0000-0000-0000000000b1");
+var silverId = Guid.Parse("00000000-0000-0000-0000-0000000000b2");
 var goldId = Guid.Parse("00000000-0000-0000-0000-0000000000c1");
 var day3Explains = CollectionDealerExplainResolver.Resolve(
     MerchantContext(day: 3),
@@ -112,7 +108,10 @@ Check.Equal(
 Check.Equal(2, day3Explains.Count, "Resolver should return one explain per offered card.");
 Check.True(day3Explains.ContainsKey(bronzeId), "Resolver key should be the real Bronze VM id.");
 Check.True(day3Explains.ContainsKey(goldId), "Resolver key should be the real Gold VM id.");
-Check.True(!day3Explains.ContainsKey(Guid.Empty), "Resolver should not synthesize placeholder ids.");
+Check.True(
+    !day3Explains.ContainsKey(Guid.Empty),
+    "Resolver should not synthesize placeholder ids."
+);
 
 Check.Section("seeded rng");
 IRng firstRng = new SeededRng(20260615);
@@ -122,6 +121,10 @@ Check.Equal(firstRng.NextDouble(), secondRng.NextDouble(), "Same seed should mat
 Check.Equal(firstRng.NextInt(7), secondRng.NextInt(7), "Same seed should match bounded int.");
 var bounded = new SeededRng(9).NextInt(3);
 Check.True(bounded >= 0 && bounded < 3, "NextInt should respect exclusive upper bound.");
+Check.Throws<InvalidOperationException>(
+    () => new ScriptedRng(doubles: Array.Empty<double>(), ints: new[] { 3 }).NextInt(3),
+    "ScriptedRng should reject scripted ints outside the requested bound."
+);
 
 Check.Section("simulation DTOs");
 var shopDefinition = new DealerShopDefinition();
@@ -242,7 +245,12 @@ Check.True(
         t1,
         filteredShop,
         Player(day: 3),
-        new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver), Candidate(t3, ETier.Bronze) },
+        new[]
+        {
+            Candidate(t1, ETier.Bronze),
+            Candidate(t2, ETier.Silver),
+            Candidate(t3, ETier.Bronze),
+        },
         trials: 200,
         seed: 12
     ) > 0,
@@ -254,7 +262,12 @@ Check.Equal(
         t3,
         filteredShop,
         Player(day: 3),
-        new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver), Candidate(t3, ETier.Bronze) },
+        new[]
+        {
+            Candidate(t1, ETier.Bronze),
+            Candidate(t2, ETier.Silver),
+            Candidate(t3, ETier.Bronze),
+        },
         trials: 200,
         seed: 12
     ),
@@ -289,7 +302,12 @@ Check.True(
         t1,
         tierFilterShop,
         Player(day: 3),
-        new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver), Candidate(t3, ETier.Gold) },
+        new[]
+        {
+            Candidate(t1, ETier.Bronze),
+            Candidate(t2, ETier.Silver),
+            Candidate(t3, ETier.Gold),
+        },
         trials: 200,
         seed: 14
     ) > 0,
@@ -335,26 +353,30 @@ Check.Equal(
 );
 Check.Equal(
     0,
-    DealerProbabilityCore.SimulateOneDeal(
-        Shop(spawn: 1),
-        Player(day: 3),
-        new[] { Candidate(t1, ETier.Bronze, ECardType.Skill) },
-        new SeededRng(17)
-    ).Count,
+    DealerProbabilityCore
+        .SimulateOneDeal(
+            Shop(spawn: 1),
+            Player(day: 3),
+            new[] { Candidate(t1, ETier.Bronze, ECardType.Skill) },
+            new SeededRng(17)
+        )
+        .Count,
     "Pure skill pools should return empty because trainer simulation is out of scope."
 );
 Check.Equal(
     0,
-    DealerProbabilityCore.SimulateOneDeal(
-        Shop(spawn: 2, filters: new[] { t1 }),
-        Player(day: 3),
-        new[]
-        {
-            Candidate(t1, ETier.Bronze, ECardType.Skill),
-            Candidate(t2, ETier.Bronze, ECardType.Item),
-        },
-        new SeededRng(171)
-    ).Count,
+    DealerProbabilityCore
+        .SimulateOneDeal(
+            Shop(spawn: 2, filters: new[] { t1 }),
+            Player(day: 3),
+            new[]
+            {
+                Candidate(t1, ETier.Bronze, ECardType.Skill),
+                Candidate(t2, ETier.Bronze, ECardType.Item),
+            },
+            new SeededRng(171)
+        )
+        .Count,
     "Pure skill boundary should apply after CardIdFilters narrow a mixed pool."
 );
 
@@ -388,6 +410,38 @@ Check.Values(
     new[] { t2 },
     probabilityOrderedTierDeal.ToArray(),
     "Tier selection should accumulate weights ordered by probability value."
+);
+
+var normalizedTierDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(
+        spawn: 1,
+        nativeProbability: 0,
+        weights: new Dictionary<ETier, double> { [ETier.Bronze] = 0.2, [ETier.Gold] = 0.3 }
+    ),
+    Player(day: 3),
+    new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Gold) },
+    new ScriptedRng(doubles: new[] { 0.9, 0.9 }, ints: new[] { 1 })
+);
+Check.Values(
+    new[] { t2 },
+    normalizedTierDeal.ToArray(),
+    "Tier selection should normalize rounded weights before accumulating."
+);
+
+var nonPositiveWeightsDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(
+        spawn: 1,
+        nativeProbability: 0,
+        weights: new Dictionary<ETier, double> { [ETier.Bronze] = 0, [ETier.Gold] = -0.1 }
+    ),
+    Player(day: 3),
+    new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Gold) },
+    new ScriptedRng(doubles: new[] { 0.9, 0.9 }, ints: new[] { 0 })
+);
+Check.Values(
+    new[] { t1 },
+    nonPositiveWeightsDeal.ToArray(),
+    "Tier selection should fall back deterministically when weights are non-positive."
 );
 
 var deterministicShop = Shop(
@@ -469,6 +523,84 @@ Check.Equal(
     "Deferred estimate bucket should carry reference authority."
 );
 
+var nonFixedFilterHint = new DealerShopHint
+{
+    NumberCardsToSpawn = 1,
+    CardIdFilters = new[] { bronzeId, silverId },
+    Verified = true,
+};
+var nonFixedFilterContext = MerchantContext(
+    day: 3,
+    estimateEnabled: true,
+    hint: nonFixedFilterHint
+);
+var nonFixedFilterCards = new[]
+{
+    Card(bronzeId, ETier.Bronze),
+    Card(silverId, ETier.Silver),
+    Card(goldId, ETier.Gold),
+};
+var nonFixedFilterExplains = CollectionDealerExplainResolver.Resolve(
+    nonFixedFilterContext,
+    nonFixedFilterCards
+);
+Check.Equal(
+    CollectionDealerProbabilityState.Estimate,
+    nonFixedFilterExplains[bronzeId].State,
+    "Non-fixed CardIdFilters should keep matching cards in Estimate state."
+);
+Check.Equal(
+    CollectionDealerProbabilityState.NotInPool,
+    nonFixedFilterExplains[goldId].State,
+    "Non-fixed CardIdFilters should mark outside cards as NotInPool."
+);
+Check.True(
+    !nonFixedFilterExplains[goldId].InPool,
+    "Cards outside a non-fixed CardIdFilters list should not be in pool."
+);
+Check.True(
+    CollectionDealerExplainResolver.EstimateForCard(
+        nonFixedFilterContext,
+        goldId,
+        nonFixedFilterCards
+    )
+        is null,
+    "Cards outside a non-fixed CardIdFilters list should not produce estimate buckets."
+);
+
+var day5GoldEstimateContext = MerchantContext(day: 5, estimateEnabled: true, hint: estimateHint);
+var day5GoldExplains = CollectionDealerExplainResolver.Resolve(
+    day5GoldEstimateContext,
+    new[] { Card(goldId, ETier.Gold) }
+);
+Check.True(
+    day5GoldExplains[goldId].DayGatePass,
+    "Verified estimate eligibility should use day 5 reference weights that include Gold."
+);
+Check.True(
+    day5GoldExplains[goldId].LooseEligible,
+    "Verified estimate loose eligibility should allow Gold on day 5 reference weights."
+);
+Check.True(
+    day5GoldExplains[goldId].NativeEligible,
+    "Verified estimate native eligibility should allow Gold on day 5 reference weights."
+);
+
+var legendaryEstimateId = Guid.Parse("00000000-0000-0000-0000-0000000000d1");
+var day8LegendaryEstimateContext = MerchantContext(
+    day: 8,
+    estimateEnabled: true,
+    hint: estimateHint
+);
+var day8LegendaryExplains = CollectionDealerExplainResolver.Resolve(
+    day8LegendaryEstimateContext,
+    new[] { Card(legendaryEstimateId, ETier.Legendary) }
+);
+Check.True(
+    !day8LegendaryExplains[legendaryEstimateId].NativeEligible,
+    "Verified estimate native eligibility should not treat Legendary as native."
+);
+
 var trainerContext = new CollectionDealerSourceContext
 {
     SourceKey = "Trainer",
@@ -484,7 +616,8 @@ Check.Equal(
     "Trainer sources should never enter Estimate state."
 );
 Check.True(
-    CollectionDealerExplainResolver.EstimateForCard(trainerContext, bronzeId, estimateCards) is null,
+    CollectionDealerExplainResolver.EstimateForCard(trainerContext, bronzeId, estimateCards)
+        is null,
     "Trainer sources should not produce estimate buckets."
 );
 
@@ -515,11 +648,7 @@ var verifiedFixedHint = new DealerShopHint
     CardIdFilters = new[] { bronzeId },
     Verified = true,
 };
-var verifiedFixedContext = MerchantContext(
-    day: 3,
-    estimateEnabled: true,
-    hint: verifiedFixedHint
-);
+var verifiedFixedContext = MerchantContext(day: 3, estimateEnabled: true, hint: verifiedFixedHint);
 var verifiedFixedExplains = CollectionDealerExplainResolver.Resolve(
     verifiedFixedContext,
     estimateCards
@@ -679,6 +808,32 @@ internal static class Check
         );
     }
 
+    public static void Throws<TException>(Action action, string message)
+        where TException : Exception
+    {
+        try
+        {
+            action();
+        }
+        catch (TException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _failures++;
+            Console.Error.WriteLine(
+                $"FAIL: {message} ExpectedException={typeof(TException).Name} ActualException={ex.GetType().Name}"
+            );
+            return;
+        }
+
+        _failures++;
+        Console.Error.WriteLine(
+            $"FAIL: {message} ExpectedException={typeof(TException).Name} ActualException=<none>"
+        );
+    }
+
     public static void Finish()
     {
         if (_failures == 0)
@@ -720,6 +875,14 @@ internal sealed class ScriptedRng : IRng
             throw new InvalidOperationException("No scripted ints remain.");
         }
 
-        return Math.Min(_ints.Dequeue(), exclusiveMax - 1);
+        var next = _ints.Dequeue();
+        if (next < 0 || next >= exclusiveMax)
+        {
+            throw new InvalidOperationException(
+                $"Scripted int {next} is outside [0, {exclusiveMax})."
+            );
+        }
+
+        return next;
     }
 }
