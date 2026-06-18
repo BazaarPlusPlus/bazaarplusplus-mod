@@ -38,6 +38,14 @@
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\DealerTierWeightReference.cs"
       Link="DealerTierWeightReference.cs"
     />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\CollectionDealerSourceContext.cs"
+      Link="CollectionDealerSourceContext.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\CollectionDealerCardExplain.cs"
+      Link="CollectionDealerCardExplain.cs"
+    />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>

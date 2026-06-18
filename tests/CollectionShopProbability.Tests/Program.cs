@@ -42,6 +42,36 @@ Check.About(
     "Day 3 weights should sum to roughly 1."
 );
 
+Check.Section("explain DTOs");
+var sourceContext = new CollectionDealerSourceContext
+{
+    SourceKey = "Goldie",
+    Kind = CollectionDealerSourceKind.Merchant,
+    Hero = EHero.Vanessa,
+    Day = 3,
+    SuppressDayGate = true,
+    PinnedTier = ETier.Gold,
+    EstimateEnabled = false,
+    NativeAssumption = 0.8f,
+};
+var explain = new CollectionDealerCardExplain
+{
+    State = CollectionDealerProbabilityState.Explain,
+    InPool = true,
+    NativeEligible = false,
+    LooseEligible = true,
+    DayGatePass = true,
+    Notes = new[] { "tier-specialist" },
+};
+Check.Equal(
+    CollectionDealerProbabilityState.Explain,
+    explain.State,
+    "Explain DTO should carry state."
+);
+Check.True(explain.LooseEligible, "Explain DTO should carry loose eligibility.");
+Check.True(!explain.NativeEligible, "Explain DTO should carry native eligibility.");
+Check.Equal(0.8f, sourceContext.NativeAssumption, "Source context should carry native assumption.");
+
 Check.Finish();
 
 internal static class Check
