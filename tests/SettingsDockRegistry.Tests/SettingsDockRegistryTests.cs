@@ -1,6 +1,7 @@
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Game.CardArtReplacement;
+using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
@@ -187,6 +188,61 @@ public class SettingsDockRegistryTests
         }
     }
 
+    [Fact]
+    public void CollectionShopProbabilityDockEntry_uses_localized_label_and_toggles_overlay_config()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-collection-shop-probability-settings-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var entry = new CollectionShopProbabilitySettingsDockEntry();
+
+            var definition = entry.Build(config);
+
+            Assert.Equal(BppSettingsDockOrder.CollectionShopProbability, entry.Order);
+            Assert.Equal("CollectionShopProbability", definition.Key);
+            Assert.Equal("Shop Pool", definition.ResolveLabel("en"));
+            Assert.Equal("商店池", definition.ResolveLabel("zh-CN"));
+            Assert.False(config.EnableCollectionShopProbabilityConfig!.Value);
+            Assert.False(config.EnableCollectionShopProbabilityEstimateConfig!.Value);
+            Assert.Equal(0.8f, config.CollectionShopProbabilityNativeAssumptionConfig!.Value);
+            Assert.False(definition.IsActive());
+            Assert.Equal("OFF", definition.ResolveStatus("en"));
+
+            definition.Activate();
+
+            Assert.True(config.EnableCollectionShopProbabilityConfig!.Value);
+            Assert.True(definition.IsActive());
+            Assert.Equal("ON", definition.ResolveStatus("en"));
+            Assert.False(config.EnableCollectionShopProbabilityEstimateConfig!.Value);
+            Assert.False(definition.CollapseAfterActivate);
+
+            configFile.Save();
+
+            var reloadedConfigFile = new ConfigFile(configPath, saveOnInit: false);
+            var reloadedConfig = new BppConfig();
+            reloadedConfig.Initialize(reloadedConfigFile);
+
+            Assert.True(reloadedConfig.EnableCollectionShopProbabilityConfig!.Value);
+            Assert.False(reloadedConfig.EnableCollectionShopProbabilityEstimateConfig!.Value);
+            Assert.Equal(
+                0.8f,
+                reloadedConfig.CollectionShopProbabilityNativeAssumptionConfig!.Value
+            );
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
     [Theory]
     [InlineData("zh-CN", "https://bazaarplusplus.com/tutorial")]
     [InlineData("zh-Hant", "https://bazaarplusplus.com/tutorial")]
@@ -254,6 +310,10 @@ public class SettingsDockRegistryTests
         Assert.Equal(
             BppSettingsDockOrder.FixedSupporterList,
             new FixedSupporterListSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.CollectionShopProbability,
+            new CollectionShopProbabilitySettingsDockEntry().Order
         );
         Assert.Equal(
             BppSettingsDockOrder.BazaarDbUpload,
