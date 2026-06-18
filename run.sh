@@ -26,8 +26,12 @@ esac
 echo -e "${CYAN}== Building on ${GREEN}${PLATFORM}${CYAN} ==${RESET}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+GAME_ROOT="${BPP_GAME_ROOT:-$GAME_ROOT}"
+MANAGED="${BPP_MANAGED_PATH:-$MANAGED}"
 INSTALLER_SQLITE="$SCRIPT_DIR/../bazaarplusplus-installer/src-tauri/resources/SourceForBuild/macos/BepInEx/plugins/libe_sqlite3.dylib"
 GAME_SQLITE="$GAME_ROOT/BepInEx/plugins/libe_sqlite3.dylib"
+TRAMPOLINE_REPAIR_SCRIPT="$SCRIPT_DIR/scripts/repair-macos-trampoline.sh"
+TRAMPOLINE_STUB="${BPP_TRAMPOLINE_STUB:-$SCRIPT_DIR/../bazaarplusplus-installer/src-tauri/resources/Trampoline/macos/bpp_launcher}"
 
 clear_macos_sqlite_quarantine() {
     [[ "$PLATFORM" == "macOS" ]] || return 0
@@ -48,11 +52,20 @@ print_bazaaragent_mode() {
     fi
 }
 
+repair_macos_trampoline() {
+    [[ "$PLATFORM" == "macOS" ]] || return 0
+
+    BPP_GAME_ROOT="$GAME_ROOT" \
+        BPP_TRAMPOLINE_STUB="$TRAMPOLINE_STUB" \
+        bash "$TRAMPOLINE_REPAIR_SCRIPT"
+}
+
 build() {
     local bazaaragent="${1:-false}"
     local args=(-verbosity detailed)
 
     print_bazaaragent_mode "$bazaaragent"
+    repair_macos_trampoline
     # The host is its own plugin project that references the main plugin + the pure core,
     # so building it builds and deploys all three. A default build builds only the main
     # plugin, whose build actively scrubs both host dlls from the plugins folder.
@@ -74,6 +87,7 @@ build_all() {
 
     print_bazaaragent_mode "$bazaaragent"
     clear_macos_sqlite_quarantine
+    repair_macos_trampoline
     if [[ "$bazaaragent" == "true" ]]; then
         dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
     else
