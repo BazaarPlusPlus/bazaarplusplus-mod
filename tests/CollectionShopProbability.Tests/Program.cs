@@ -114,6 +114,15 @@ Check.True(day3Explains.ContainsKey(bronzeId), "Resolver key should be the real 
 Check.True(day3Explains.ContainsKey(goldId), "Resolver key should be the real Gold VM id.");
 Check.True(!day3Explains.ContainsKey(Guid.Empty), "Resolver should not synthesize placeholder ids.");
 
+Check.Section("seeded rng");
+IRng firstRng = new SeededRng(20260615);
+IRng secondRng = new SeededRng(20260615);
+Check.Equal(firstRng.NextDouble(), secondRng.NextDouble(), "Same seed should match first double.");
+Check.Equal(firstRng.NextDouble(), secondRng.NextDouble(), "Same seed should match second double.");
+Check.Equal(firstRng.NextInt(7), secondRng.NextInt(7), "Same seed should match bounded int.");
+var bounded = new SeededRng(9).NextInt(3);
+Check.True(bounded >= 0 && bounded < 3, "NextInt should respect exclusive upper bound.");
+
 Check.Finish();
 
 static CollectionCardVm Card(Guid id, ETier tier, ECardType type = ECardType.Item) =>

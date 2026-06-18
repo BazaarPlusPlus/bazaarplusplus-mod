@@ -51,6 +51,11 @@
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\CollectionDealerExplainResolver.cs"
       Link="CollectionDealerExplainResolver.cs"
     />
+    <Compile Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\IRng.cs" Link="IRng.cs" />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\SeededRng.cs"
+      Link="SeededRng.cs"
+    />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\DayTierSchedule.cs"
       Link="DayTierSchedule.cs"
