@@ -19,5 +19,5 @@ internal sealed class CollectionDealerSourceContext
     public ETier? PinnedTier { get; init; }
     public bool EstimateEnabled { get; init; }
     public float NativeAssumption { get; init; } = 0.8f;
-    public object? Hint { get; init; }
+    public DealerShopHint? Hint { get; init; }
 }

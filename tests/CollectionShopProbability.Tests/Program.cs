@@ -343,6 +343,104 @@ Check.True(
     "All-loose day 3 Bronze/Silver pool should favor Bronze over Silver."
 );
 
+Check.Section("resolver estimates");
+var estimateHint = new DealerShopHint { NumberCardsToSpawn = 1, Verified = true };
+var estimateContext = MerchantContext(day: 3, estimateEnabled: true, hint: estimateHint);
+var estimateCards = new[] { Card(bronzeId, ETier.Bronze), Card(goldId, ETier.Silver) };
+var estimateExplains = CollectionDealerExplainResolver.Resolve(estimateContext, estimateCards);
+Check.Equal(
+    CollectionDealerProbabilityState.Estimate,
+    estimateExplains[bronzeId].State,
+    "Verified merchant hints should put non-fixed estimate-enabled cards in Estimate state."
+);
+Check.True(
+    estimateExplains[bronzeId].Estimate is null,
+    "Resolve should defer Monte Carlo bucket construction."
+);
+var estimateBucket = CollectionDealerExplainResolver.EstimateForCard(
+    estimateContext,
+    bronzeId,
+    estimateCards
+);
+Check.True(estimateBucket is not null, "EstimateForCard should return a deferred bucket.");
+Check.True(estimateBucket!.ReferenceOnly, "Deferred estimate bucket should remain reference-only.");
+Check.Equal(
+    EstimateAuthority.Reference,
+    estimateBucket.Authority,
+    "Deferred estimate bucket should carry reference authority."
+);
+
+var trainerContext = new CollectionDealerSourceContext
+{
+    SourceKey = "Trainer",
+    Kind = CollectionDealerSourceKind.Trainer,
+    Day = 3,
+    EstimateEnabled = true,
+    Hint = estimateHint,
+};
+var trainerExplains = CollectionDealerExplainResolver.Resolve(trainerContext, estimateCards);
+Check.Equal(
+    CollectionDealerProbabilityState.Explain,
+    trainerExplains[bronzeId].State,
+    "Trainer sources should never enter Estimate state."
+);
+Check.True(
+    CollectionDealerExplainResolver.EstimateForCard(trainerContext, bronzeId, estimateCards) is null,
+    "Trainer sources should not produce estimate buckets."
+);
+
+var unverifiedFixedHint = new DealerShopHint
+{
+    NumberCardsToSpawn = 1,
+    CardIdFilters = new[] { bronzeId },
+    Verified = false,
+};
+var unverifiedFixedContext = MerchantContext(
+    day: 3,
+    estimateEnabled: true,
+    hint: unverifiedFixedHint
+);
+var unverifiedFixedExplains = CollectionDealerExplainResolver.Resolve(
+    unverifiedFixedContext,
+    estimateCards
+);
+Check.Equal(
+    CollectionDealerProbabilityState.WeightsMissing,
+    unverifiedFixedExplains[bronzeId].State,
+    "Unverified fixed hints should stay WeightsMissing rather than Fixed."
+);
+
+var verifiedFixedHint = new DealerShopHint
+{
+    NumberCardsToSpawn = 1,
+    CardIdFilters = new[] { bronzeId },
+    Verified = true,
+};
+var verifiedFixedContext = MerchantContext(
+    day: 3,
+    estimateEnabled: true,
+    hint: verifiedFixedHint
+);
+var verifiedFixedExplains = CollectionDealerExplainResolver.Resolve(
+    verifiedFixedContext,
+    estimateCards
+);
+Check.Equal(
+    CollectionDealerProbabilityState.Fixed,
+    verifiedFixedExplains[bronzeId].State,
+    "Verified fixed direct deals should enter Fixed state."
+);
+Check.Equal(
+    true,
+    verifiedFixedExplains[bronzeId].FixedDealVerified,
+    "Verified fixed direct deals should carry FixedDealVerified."
+);
+Check.True(
+    CollectionDealerExplainResolver.EstimateForCard(verifiedFixedContext, bronzeId, estimateCards)
+        is null,
+    "Fixed direct deals should not produce estimate buckets."
+);
+
 Check.Finish();
 
 static CollectionCardVm Card(Guid id, ETier tier, ECardType type = ECardType.Item) =>
@@ -357,7 +455,8 @@ static CollectionDealerSourceContext MerchantContext(
     int day,
     bool suppressDayGate = false,
     ETier? pinnedTier = null,
-    bool estimateEnabled = false
+    bool estimateEnabled = false,
+    DealerShopHint? hint = null
 ) =>
     new()
     {
@@ -367,6 +466,7 @@ static CollectionDealerSourceContext MerchantContext(
         SuppressDayGate = suppressDayGate,
         PinnedTier = pinnedTier,
         EstimateEnabled = estimateEnabled,
+        Hint = hint,
     };
 
 static DealerCandidate Candidate(Guid id, ETier tier, ECardType type = ECardType.Item) =>
