@@ -44,7 +44,7 @@ internal static class DealerProbabilityCore
         {
             if (current.Count == 0)
             {
-                return Array.Empty<Guid>();
+                return dealt;
             }
 
             var useNative =

@@ -95,6 +95,20 @@ Check.True(
     "Tier specialist notes should explain loose eligibility."
 );
 
+var specialistLegendaryId = Guid.Parse("00000000-0000-0000-0000-0000000000d2");
+var specialistLegendaryExplains = CollectionDealerExplainResolver.Resolve(
+    MerchantContext(day: 2, suppressDayGate: true, pinnedTier: ETier.Diamond),
+    new[] { Card(specialistLegendaryId, ETier.Legendary) }
+);
+Check.True(
+    specialistLegendaryExplains[specialistLegendaryId].LooseEligible,
+    "Pinned Diamond specialist should loosely allow Legendary-start cards as Diamond."
+);
+Check.True(
+    !specialistLegendaryExplains[specialistLegendaryId].NativeEligible,
+    "Pinned Diamond specialist should not make Legendary-start cards native eligible."
+);
+
 var missingWeightsExplains = CollectionDealerExplainResolver.Resolve(
     MerchantContext(day: 3, estimateEnabled: true),
     new[] { Card(bronzeId, ETier.Bronze) }
@@ -237,6 +251,22 @@ Check.Equal(
         seed: 11
     ),
     "Loose path should destructively narrow to cards at or below the selected tier."
+);
+
+var destructiveNarrowingStarvationDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(
+        spawn: 2,
+        nativeProbability: 0,
+        weights: new Dictionary<ETier, double> { [ETier.Bronze] = 1 }
+    ),
+    Player(day: 3),
+    new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Gold) },
+    new ScriptedRng(doubles: new[] { 0.5, 0.5 }, ints: new[] { 0 })
+);
+Check.Values(
+    new[] { t1 },
+    destructiveNarrowingStarvationDeal.ToArray(),
+    "Loose destructive narrowing should keep already dealt cards when later slots starve."
 );
 
 var filteredShop = Shop(spawn: 1, filters: new[] { t1, t2 }, nativeProbability: 0);

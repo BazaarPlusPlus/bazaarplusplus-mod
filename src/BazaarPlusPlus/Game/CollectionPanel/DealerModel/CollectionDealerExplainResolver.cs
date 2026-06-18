@@ -153,8 +153,7 @@ internal static class CollectionDealerExplainResolver
             ctx.SuppressDayGate || DayTierSchedule.AllowsStartingTier(startingTier, ctx.Day);
         var looseEligible =
             ctx.SuppressDayGate && ctx.PinnedTier.HasValue
-                ? CollectionCardFacetRanks.TierRank(startingTier)
-                    <= CollectionCardFacetRanks.TierRank(ctx.PinnedTier.Value)
+                ? LooseTierRank(startingTier) <= TierRank(ctx.PinnedTier.Value)
                 : dayGatePass;
         var nativeEligible =
             !ctx.SuppressDayGate
