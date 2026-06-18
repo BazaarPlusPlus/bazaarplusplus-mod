@@ -16,13 +16,8 @@ internal static class DealerProbabilityCore
         IRng rng
     )
     {
-        var current = BuildPool(shop, state, pool);
+        var current = BuildFilteredPool(shop, state, pool);
         if (current.Count == 0)
-        {
-            return Array.Empty<Guid>();
-        }
-
-        if (current.All(candidate => candidate.Type == ECardType.Skill))
         {
             return Array.Empty<Guid>();
         }
@@ -32,7 +27,13 @@ internal static class DealerProbabilityCore
             && shop.CardIdFilters.Count == shop.NumberCardsToSpawn
         )
         {
-            return current.Select(candidate => candidate.Id).ToArray();
+            return shop.CardIdFilters.ToArray();
+        }
+
+        current = ApplyRerollExclusion(shop, state, current);
+        if (current.All(candidate => candidate.Type == ECardType.Skill))
+        {
+            return Array.Empty<Guid>();
         }
 
         if (current.Count < shop.NumberCardsToSpawn)
@@ -120,7 +121,7 @@ internal static class DealerProbabilityCore
         return appearances / (double)trials;
     }
 
-    private static List<DealerCandidate> BuildPool(
+    private static List<DealerCandidate> BuildFilteredPool(
         DealerShopDefinition shop,
         DealerPlayerState state,
         IReadOnlyList<DealerCandidate> pool
@@ -139,7 +140,15 @@ internal static class DealerProbabilityCore
             filtered = filtered.Where(candidate => !skillIds.Contains(candidate.Id));
         }
 
-        var current = filtered.ToList();
+        return filtered.ToList();
+    }
+
+    private static List<DealerCandidate> ApplyRerollExclusion(
+        DealerShopDefinition shop,
+        DealerPlayerState state,
+        List<DealerCandidate> current
+    )
+    {
         if (!shop.RerollRepeats && state.RerollExclusionIds.Count > 0)
         {
             var rerollIds = state.RerollExclusionIds.ToHashSet();

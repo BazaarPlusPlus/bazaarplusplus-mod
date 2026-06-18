@@ -153,9 +153,45 @@ var fixedDeal = DealerProbabilityCore.SimulateOneDeal(
     new SeededRng(1)
 );
 Check.Values(
-    new[] { t2 },
+    new[] { t1, t2 },
     fixedDeal.ToArray(),
-    "Fixed direct deal should use the post-skill-exclusion fixed pool."
+    "Fixed direct deal should return exact filters when post-skill-exclusion pool is nonempty."
+);
+
+var skillExcludedFixedDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(spawn: 1, filters: new[] { t1 }),
+    Player(day: 3, skills: new[] { t1 }),
+    new[] { Candidate(t1, ETier.Bronze) },
+    new SeededRng(101)
+);
+Check.Equal(
+    0,
+    skillExcludedFixedDeal.Count,
+    "Fixed direct deal should return empty when skill exclusion empties the filtered pool."
+);
+
+var fixedDealWithReversedPool = DealerProbabilityCore.SimulateOneDeal(
+    Shop(spawn: 2, filters: new[] { t1, t2 }),
+    Player(day: 3),
+    new[] { Candidate(t2, ETier.Silver), Candidate(t1, ETier.Bronze) },
+    new SeededRng(102)
+);
+Check.Values(
+    new[] { t1, t2 },
+    fixedDealWithReversedPool.ToArray(),
+    "Fixed direct deal should return exact CardIdFilters order, not filtered pool order."
+);
+
+var fixedSkillDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(spawn: 1, filters: new[] { t1 }),
+    Player(day: 3),
+    new[] { Candidate(t1, ETier.Bronze, ECardType.Skill) },
+    new SeededRng(103)
+);
+Check.Values(
+    new[] { t1 },
+    fixedSkillDeal.ToArray(),
+    "Fixed direct deal should run before the pure-skill boundary."
 );
 
 var bronzeForcedShop = Shop(
@@ -293,7 +329,7 @@ Check.Equal(
 Check.Equal(
     0,
     DealerProbabilityCore.SimulateOneDeal(
-        Shop(spawn: 1, filters: new[] { t1 }),
+        Shop(spawn: 2, filters: new[] { t1 }),
         Player(day: 3),
         new[]
         {
