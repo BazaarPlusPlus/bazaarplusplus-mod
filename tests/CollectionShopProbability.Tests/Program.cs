@@ -123,6 +123,25 @@ Check.Equal(firstRng.NextInt(7), secondRng.NextInt(7), "Same seed should match b
 var bounded = new SeededRng(9).NextInt(3);
 Check.True(bounded >= 0 && bounded < 3, "NextInt should respect exclusive upper bound.");
 
+Check.Section("simulation DTOs");
+var shopDefinition = new DealerShopDefinition();
+Check.Equal(3, shopDefinition.NumberCardsToSpawn, "Shop definition should default to 3 spawns.");
+Check.Equal(
+    "old-bazaar-card-dealer",
+    shopDefinition.Model,
+    "Shop definition should default to old dealer model."
+);
+var playerState = new DealerPlayerState();
+Check.True(playerState.PlayerSkillCardIds is not null, "Player skill ids should default non-null.");
+var candidate = new DealerCandidate
+{
+    Id = bronzeId,
+    Type = ECardType.Item,
+    Size = ECardSize.Small,
+    StartingTier = ETier.Bronze,
+};
+Check.Equal(bronzeId, candidate.Id, "Candidate should carry id.");
+
 Check.Finish();
 
 static CollectionCardVm Card(Guid id, ETier tier, ECardType type = ECardType.Item) =>

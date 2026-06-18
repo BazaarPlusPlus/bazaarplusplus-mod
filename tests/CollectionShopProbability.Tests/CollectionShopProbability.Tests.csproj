@@ -57,6 +57,18 @@
       Link="SeededRng.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\DealerShopDefinition.cs"
+      Link="DealerShopDefinition.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\DealerPlayerState.cs"
+      Link="DealerPlayerState.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\DealerCandidate.cs"
+      Link="DealerCandidate.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\DayTierSchedule.cs"
       Link="DayTierSchedule.cs"
     />
