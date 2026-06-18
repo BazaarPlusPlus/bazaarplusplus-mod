@@ -77,7 +77,7 @@ internal static class DealerProbabilityCore
                         ? shop.ItemTierFilters[rng.NextInt(shop.ItemTierFilters.Count)]
                         : selectedTier;
                 var narrowed = current
-                    .Where(candidate => TierRank(candidate.StartingTier) <= TierRank(looseTier))
+                    .Where(candidate => LooseTierRank(candidate.StartingTier) <= TierRank(looseTier))
                     .ToList();
                 if (narrowed.Count > 0)
                 {
@@ -185,4 +185,7 @@ internal static class DealerProbabilityCore
     }
 
     private static int TierRank(ETier tier) => CollectionCardFacetRanks.TierRank(tier);
+
+    private static int LooseTierRank(ETier tier) =>
+        TierRank(tier == ETier.Legendary ? ETier.Diamond : tier);
 }

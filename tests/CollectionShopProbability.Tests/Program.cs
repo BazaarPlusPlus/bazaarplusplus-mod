@@ -146,6 +146,7 @@ Check.Section("dealer probability core");
 var t1 = Guid.Parse("10000000-0000-0000-0000-000000000001");
 var t2 = Guid.Parse("10000000-0000-0000-0000-000000000002");
 var t3 = Guid.Parse("10000000-0000-0000-0000-000000000003");
+var legendaryStartId = Guid.Parse("10000000-0000-0000-0000-000000000004");
 var fixedDeal = DealerProbabilityCore.SimulateOneDeal(
     Shop(spawn: 2, filters: new[] { t1, t2 }),
     Player(day: 3, skills: new[] { t1 }),
@@ -293,6 +294,22 @@ Check.True(
         seed: 14
     ) > 0,
     "ItemTierFilters should disable native and allow loose cards at or below the filter tier."
+);
+
+var legendaryLooseDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(
+        spawn: 1,
+        nativeProbability: 0,
+        weights: new Dictionary<ETier, double> { [ETier.Diamond] = 1 }
+    ),
+    Player(day: 8),
+    new[] { Candidate(t1, ETier.Diamond), Candidate(legendaryStartId, ETier.Legendary) },
+    new ScriptedRng(doubles: new[] { 0.5, 0.5 }, ints: new[] { 1 })
+);
+Check.Values(
+    new[] { legendaryStartId },
+    legendaryLooseDeal.ToArray(),
+    "Loose Diamond rolls should treat Legendary-start cards as Diamond-reachable."
 );
 
 var rerollDeal = DealerProbabilityCore.SimulateOneDeal(
@@ -513,9 +530,13 @@ Check.Equal(
     "Verified fixed direct deals should enter Fixed state."
 );
 Check.Equal(
-    CollectionDealerProbabilityState.Estimate,
+    CollectionDealerProbabilityState.NotInPool,
     verifiedFixedExplains[goldId].State,
-    "Verified fixed direct deals should only mark cards inside the fixed filter as Fixed."
+    "Verified fixed direct deals should treat cards outside the fixed filter as not produced."
+);
+Check.True(
+    !verifiedFixedExplains[goldId].InPool,
+    "Cards outside a verified fixed direct filter should not be in pool."
 );
 Check.Equal(
     true,
@@ -529,8 +550,8 @@ Check.True(
 );
 Check.True(
     CollectionDealerExplainResolver.EstimateForCard(verifiedFixedContext, goldId, estimateCards)
-        is not null,
-    "Fixed hints should not suppress estimate buckets for cards outside the fixed filter."
+        is null,
+    "Cards outside a verified fixed direct filter should not produce estimate buckets."
 );
 
 Check.Finish();

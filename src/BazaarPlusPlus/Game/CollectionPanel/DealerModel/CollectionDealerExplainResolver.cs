@@ -34,6 +34,7 @@ internal static class CollectionDealerExplainResolver
             || ctx.Kind != CollectionDealerSourceKind.Merchant
             || ctx.Hint is not { Verified: true } hint
             || IsFixedCard(hint, targetId)
+            || IsOutsideFixedDirectDeal(hint, targetId)
             || offeredCards.All(card => card.Id != targetId)
         )
         {
@@ -98,7 +99,7 @@ internal static class CollectionDealerExplainResolver
         return new CollectionDealerCardExplain
         {
             State = state,
-            InPool = true,
+            InPool = state != CollectionDealerProbabilityState.NotInPool,
             NativeEligible = nativeEligible,
             LooseEligible = looseEligible,
             DayGatePass = dayGatePass,
@@ -123,9 +124,14 @@ internal static class CollectionDealerExplainResolver
             return CollectionDealerProbabilityState.WeightsMissing;
         }
 
-        return IsFixedDirectDeal(hint) && IsFixedCard(hint, cardId)
-            ? CollectionDealerProbabilityState.Fixed
-            : CollectionDealerProbabilityState.Estimate;
+        if (IsFixedDirectDeal(hint))
+        {
+            return IsFixedCard(hint, cardId)
+                ? CollectionDealerProbabilityState.Fixed
+                : CollectionDealerProbabilityState.NotInPool;
+        }
+
+        return CollectionDealerProbabilityState.Estimate;
     }
 
     private static bool IsFixedDirectDeal(DealerShopHint hint) =>
@@ -133,6 +139,9 @@ internal static class CollectionDealerExplainResolver
 
     private static bool IsFixedCard(DealerShopHint hint, Guid cardId) =>
         IsFixedDirectDeal(hint) && hint.CardIdFilters.Contains(cardId);
+
+    private static bool IsOutsideFixedDirectDeal(DealerShopHint hint, Guid cardId) =>
+        IsFixedDirectDeal(hint) && !hint.CardIdFilters.Contains(cardId);
 
     private static EstimateBucket ToBucket(double frequency)
     {
