@@ -34,12 +34,6 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? UseFixedSupporterListConfig { get; private set; }
 
-    public ConfigEntry<bool>? EnableCollectionShopProbabilityConfig { get; private set; }
-
-    public ConfigEntry<bool>? EnableCollectionShopProbabilityEstimateConfig { get; private set; }
-
-    public ConfigEntry<float>? CollectionShopProbabilityNativeAssumptionConfig { get; private set; }
-
     public void Initialize(ConfigFile config)
     {
         EnableNameOverrideConfig = config.Bind(
@@ -108,24 +102,6 @@ internal sealed class BppConfig : IBppConfig
             "UseFixedSupporterList",
             false,
             "Whether supporter attribution should use the bundled fixed supporter list instead of the remote supporter list."
-        );
-        EnableCollectionShopProbabilityConfig = config.Bind(
-            "CollectionPanel",
-            "EnableShopProbabilityOverlay",
-            false,
-            "Whether the Collection panel should show shop probability eligibility badges for selected merchants and trainers."
-        );
-        EnableCollectionShopProbabilityEstimateConfig = config.Bind(
-            "CollectionPanel",
-            "EnableShopProbabilityEstimate",
-            false,
-            "Whether the Collection panel may compute old-bazaar-card-dealer reference probability estimates on hover. Estimates are non-authoritative and not live game odds."
-        );
-        CollectionShopProbabilityNativeAssumptionConfig = config.Bind(
-            "CollectionPanel",
-            "ShopProbabilityNativeAssumption",
-            0.8f,
-            "Reference-model assumption for native-tier picks, clamped to [0,1] when used."
         );
     }
 }

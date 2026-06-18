@@ -7,7 +7,6 @@ using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.DealerModel;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
@@ -47,9 +46,6 @@ internal sealed class CollectionGridVirtualizer
         Guid,
         IReadOnlyList<CollectionSourceOfferMatch>
     > _sourceMatchesByCardId = new Dictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>();
-    private IReadOnlyDictionary<Guid, CollectionDealerCardExplain> _explainByCardId =
-        new Dictionary<Guid, CollectionDealerCardExplain>();
-    private Func<Guid, EstimateBucket?>? _shopProbabilityEstimator;
     private CollectionGridLayout _layout = CollectionGridLayout.Empty;
     private float _viewportWidth;
     private float _viewportHeight;
@@ -95,17 +91,14 @@ internal sealed class CollectionGridVirtualizer
         IReadOnlyDictionary<
             Guid,
             IReadOnlyList<CollectionSourceOfferMatch>
-        >? sourceMatchesByCardId = null,
-        IReadOnlyDictionary<Guid, CollectionDealerCardExplain>? explainByCardId = null
+        >? sourceMatchesByCardId = null
     )
     {
-        DispatchHoverOut();
         BumpGeneration();
         _visible = visible ?? Array.Empty<CollectionCardVm>();
         _sourceMatchesByCardId =
             sourceMatchesByCardId
             ?? new Dictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>();
-        _explainByCardId = explainByCardId ?? new Dictionary<Guid, CollectionDealerCardExplain>();
         _gap = CollectionGridConstants.GridGap;
         _layout = CollectionGridLayout.Build(_visible, activeType);
         RecomputePixelization();
@@ -116,11 +109,6 @@ internal sealed class CollectionGridVirtualizer
             BppBuild.IsDebug && _visible.Count > 0
                 ? new FirstWindowBindDiagnostics(_generation)
                 : null;
-    }
-
-    public void SetShopProbabilityEstimator(Func<Guid, EstimateBucket?>? estimator)
-    {
-        _shopProbabilityEstimator = estimator;
     }
 
     public void SetViewport(float width, float height)
@@ -231,9 +219,6 @@ internal sealed class CollectionGridVirtualizer
         RecycleAll();
         _slots?.Clear();
         _visible = Array.Empty<CollectionCardVm>();
-        _sourceMatchesByCardId = new Dictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>();
-        _explainByCardId = new Dictionary<Guid, CollectionDealerCardExplain>();
-        _shopProbabilityEstimator = null;
         _hoverPollIndex = -1;
         _hoverDispatched = false;
         _firstWindowDiagnostics = null;
@@ -332,14 +317,6 @@ internal sealed class CollectionGridVirtualizer
         if (_realized.TryGetValue(idx, out var cell) && cell.SetUpTask.IsCompletedSuccessfully)
         {
             cell.HoverRelay?.OnPointerEnter(null!);
-            if (_explainByCardId.TryGetValue(cell.Vm.Id, out var explain))
-            {
-                var bucket =
-                    explain.State == CollectionDealerProbabilityState.Estimate
-                        ? _shopProbabilityEstimator?.Invoke(cell.Vm.Id)
-                        : null;
-                CollectionShopProbabilityDrawer.Show(cell.Card.gameObject, explain, bucket);
-            }
             _hoverDispatched = true;
         }
     }
@@ -349,9 +326,6 @@ internal sealed class CollectionGridVirtualizer
         // Hide the display-case highlight on every hover-out path (outside the viewport, in a
         // gutter, off the grid, or moving to a new cell).
         _slots?.SetHover(null);
-        if (_hoverPollIndex >= 0 && _realized.TryGetValue(_hoverPollIndex, out var hoveredCell))
-            CollectionShopProbabilityDrawer.Hide(hoveredCell.Card.gameObject);
-
         if (_hoverPollIndex < 0 || !_hoverDispatched)
         {
             _hoverPollIndex = -1;
@@ -386,9 +360,6 @@ internal sealed class CollectionGridVirtualizer
         hover.Bind(card);
         _sourceMatchesByCardId.TryGetValue(vm.Id, out var sourceMatches);
         CollectionSourceAttributionBadge.Bind(card.gameObject, sourceMatches);
-        _explainByCardId.TryGetValue(vm.Id, out var explain);
-        CollectionShopProbabilityBadge.Bind(card.gameObject, explain);
-        CollectionShopProbabilityDrawer.Hide(card.gameObject);
 
         if (!CollectionGridConstants.UsePolledHover)
             EnsureHitTarget(card.gameObject);
@@ -565,7 +536,6 @@ internal sealed class CollectionGridVirtualizer
 
     private void RecycleCell(RealizedCell cell)
     {
-        CollectionShopProbabilityDrawer.Hide(cell.Card.gameObject);
         cell.HoverRelay?.Clear();
         if (cell.SetUpTask is { IsCompleted: false })
         {

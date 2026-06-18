@@ -27,10 +27,4 @@ internal interface IBppConfig
     ConfigEntry<bool>? EnablePackageCardArtReplacementConfig { get; }
 
     ConfigEntry<bool>? UseFixedSupporterListConfig { get; }
-
-    ConfigEntry<bool>? EnableCollectionShopProbabilityConfig { get; }
-
-    ConfigEntry<bool>? EnableCollectionShopProbabilityEstimateConfig { get; }
-
-    ConfigEntry<float>? CollectionShopProbabilityNativeAssumptionConfig { get; }
 }

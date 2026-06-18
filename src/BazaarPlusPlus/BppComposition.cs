@@ -97,7 +97,6 @@ internal sealed class BppComposition : IDisposable
 
         _settingsDockRegistry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
         _settingsDockRegistry.Register(new FixedSupporterListSettingsDockEntry());
-        _settingsDockRegistry.Register(new CollectionShopProbabilitySettingsDockEntry());
         _settingsDockRegistry.Register(new HotkeyTutorialSettingsDockEntry());
         _settingsDockRegistry.Register(new ChineseLocaleModeSettingsDockEntry(_eventBus));
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());

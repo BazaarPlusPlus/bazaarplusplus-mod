@@ -2,14 +2,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.DealerModel;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
@@ -65,7 +63,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     private readonly CollectionCatalog _catalog = new();
     private readonly CollectionFilterState _filter = new();
     private readonly CollectionSourceOfferPoolCache _offerPoolCache = new();
-    private readonly CollectionShopProbabilityCache _shopProbabilityCache = new();
     private readonly ICollectionPanelHeroPreferenceStore _heroPreferenceStore =
         new CollectionPanelHeroPreferenceStore();
 
@@ -140,12 +137,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         _instance.InvalidateCatalog("locale-change");
         if (_instance._isVisible)
             _instance.StartPanelLoad();
-    }
-
-    internal static void NotifyShopProbabilityToggled()
-    {
-        if (_instance?._isVisible == true)
-            _instance.ApplyFilters();
     }
 
     internal static void OpenFromDockButton()
@@ -796,7 +787,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (_virtualizer == null)
             return;
 
-        _virtualizer.SetShopProbabilityEstimator(null);
         _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
         _view?.ResetScroll();
         _scrollY = 0f;
@@ -808,7 +798,6 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         if (_catalogCards.Count == 0)
         {
-            _virtualizer.SetShopProbabilityEstimator(null);
             _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
         }
         else
@@ -821,10 +810,9 @@ internal sealed class CollectionPanel : MonoBehaviour
                 Guid,
                 IReadOnlyList<CollectionSourceOfferMatch>
             >? offerMatchesByCardId = null;
-            CollectionSourceOfferPoolResult? offerPoolResult = null;
             if (sourceEntry != null)
             {
-                offerPoolResult = _offerPoolCache.GetOrResolve(
+                var offerPoolResult = _offerPoolCache.GetOrResolve(
                     sourceEntry,
                     _filter.SelectedHero,
                     _catalogCards
@@ -855,133 +843,9 @@ internal sealed class CollectionPanel : MonoBehaviour
                         && sourceEntry!.SuppressDayGate,
                 }
             );
-
-            var explainByCardId = BuildShopProbabilityExplain(
-                sourceEntry,
-                offerPoolResult,
-                offeredCardIds,
-                out var estimator
-            );
-            _virtualizer.SetShopProbabilityEstimator(estimator);
-            _virtualizer.SetVisible(
-                ordered,
-                _filter.ActiveType,
-                offerMatchesByCardId,
-                explainByCardId
-            );
+            _virtualizer.SetVisible(ordered, _filter.ActiveType, offerMatchesByCardId);
         }
         ResetVisibleScroll();
-    }
-
-    private IReadOnlyDictionary<Guid, CollectionDealerCardExplain>? BuildShopProbabilityExplain(
-        CollectionSourceEntry? sourceEntry,
-        CollectionSourceOfferPoolResult? offerPoolResult,
-        IReadOnlyCollection<Guid>? offeredCardIds,
-        out Func<Guid, EstimateBucket?>? estimator
-    )
-    {
-        estimator = null;
-        if (
-            sourceEntry == null
-            || offerPoolResult == null
-            || offeredCardIds == null
-            || !IsShopProbabilityOverlayEnabled()
-        )
-        {
-            return null;
-        }
-
-        var offeredSet = offeredCardIds as ISet<Guid> ?? new HashSet<Guid>(offeredCardIds);
-        var offeredCards = _catalogCards.Where(card => offeredSet.Contains(card.Id)).ToArray();
-        if (offeredCards.Length == 0)
-            return null;
-
-        var estimateOn = IsShopProbabilityEstimateEnabled();
-        var nativeAssumption = ReadNativeAssumption();
-        var ctx = new CollectionDealerSourceContext
-        {
-            SourceKey = sourceEntry.SourceKey,
-            Kind =
-                sourceEntry.Kind == CollectionSourceKind.Trainer
-                    ? CollectionDealerSourceKind.Trainer
-                    : CollectionDealerSourceKind.Merchant,
-            Hero = _filter.SelectedHero,
-            Day = _currentRunDay ?? DayTierSchedule.OutOfRunDay,
-            SuppressDayGate = sourceEntry.SuppressDayGate,
-            PinnedTier =
-                sourceEntry.OfferSegments.Count > 0
-                    ? sourceEntry.OfferSegments[0].Rule.StartingTier?.Tier
-                    : null,
-            EstimateEnabled = estimateOn,
-            NativeAssumption = nativeAssumption,
-            Hint = null,
-        };
-        var cacheKey = BuildShopProbabilityCacheKey(
-            sourceEntry,
-            offerPoolResult,
-            ctx,
-            offeredCards
-        );
-        var explainByCardId = _shopProbabilityCache.GetOrResolve(
-            cacheKey,
-            () => CollectionDealerExplainResolver.Resolve(ctx, offeredCards)
-        );
-        if (estimateOn)
-            estimator = id =>
-                CollectionDealerExplainResolver.EstimateForCard(ctx, id, offeredCards);
-        return explainByCardId;
-    }
-
-    private bool IsShopProbabilityOverlayEnabled() =>
-        _config.EnableCollectionShopProbabilityConfig?.Value ?? false;
-
-    private bool IsShopProbabilityEstimateEnabled() =>
-        IsShopProbabilityOverlayEnabled()
-        && (_config.EnableCollectionShopProbabilityEstimateConfig?.Value ?? false);
-
-    private float ReadNativeAssumption()
-    {
-        var value = _config.CollectionShopProbabilityNativeAssumptionConfig?.Value ?? 0.8f;
-        if (float.IsNaN(value) || float.IsInfinity(value))
-            return 0.8f;
-        if (value < 0f)
-            return 0f;
-        return value > 1f ? 1f : value;
-    }
-
-    private string BuildShopProbabilityCacheKey(
-        CollectionSourceEntry sourceEntry,
-        CollectionSourceOfferPoolResult offerPoolResult,
-        CollectionDealerSourceContext ctx,
-        IReadOnlyList<CollectionCardVm> offeredCards
-    )
-    {
-        return string.Join(
-            "|",
-            _offerPoolCache.BuildKey(sourceEntry, _filter.SelectedHero),
-            ctx.Kind,
-            ctx.Day,
-            ctx.SuppressDayGate ? "suppress-day" : "day-gated",
-            ctx.PinnedTier?.ToString() ?? "no-pinned-tier",
-            ctx.EstimateEnabled ? "estimate" : "explain",
-            ctx.NativeAssumption.ToString(
-                "0.###",
-                System.Globalization.CultureInfo.InvariantCulture
-            ),
-            offerPoolResult.OfferedCardIds.Count,
-            BuildOfferedCardsFingerprint(offeredCards)
-        );
-    }
-
-    private static string BuildOfferedCardsFingerprint(IReadOnlyList<CollectionCardVm> offeredCards)
-    {
-        return string.Join(
-            "-",
-            offeredCards
-                .Select(card => card.Id)
-                .OrderBy(id => id)
-                .Select(id => id.ToString("N").Substring(0, 12))
-        );
     }
 
     private void RefreshView()
@@ -1160,7 +1024,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         SetCatalogCards(Array.Empty<CollectionCardVm>());
         _offerPoolCache.Clear();
-        _shopProbabilityCache.Clear();
         _catalog.InvalidateCache(reason);
     }
 
