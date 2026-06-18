@@ -69,6 +69,10 @@
       Link="DealerCandidate.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\DealerModel\DealerProbabilityCore.cs"
+      Link="DealerProbabilityCore.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\DayTierSchedule.cs"
       Link="DayTierSchedule.cs"
     />

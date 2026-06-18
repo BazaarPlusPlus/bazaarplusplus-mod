@@ -4,7 +4,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 
 Check.Section("state enum");
 Check.Equal(
-    0,
+    0.0,
     (int)CollectionDealerProbabilityState.NotInPool,
     "NotInPool should be the default zero state."
 );
@@ -142,6 +142,207 @@ var candidate = new DealerCandidate
 };
 Check.Equal(bronzeId, candidate.Id, "Candidate should carry id.");
 
+Check.Section("dealer probability core");
+var t1 = Guid.Parse("10000000-0000-0000-0000-000000000001");
+var t2 = Guid.Parse("10000000-0000-0000-0000-000000000002");
+var t3 = Guid.Parse("10000000-0000-0000-0000-000000000003");
+var fixedDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(spawn: 2, filters: new[] { t1, t2 }),
+    Player(day: 3, skills: new[] { t1 }),
+    new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver) },
+    new SeededRng(1)
+);
+Check.Values(
+    new[] { t1, t2 },
+    fixedDeal.ToArray(),
+    "Fixed direct deal should return exact filters before skill exclusion."
+);
+
+var bronzeForcedShop = Shop(
+    spawn: 1,
+    nativeProbability: 1,
+    weights: new Dictionary<ETier, double> { [ETier.Bronze] = 1 }
+);
+Check.Equal(
+    0.0,
+    DealerProbabilityCore.AppearanceFrequency(
+        t2,
+        bronzeForcedShop,
+        Player(day: 3),
+        new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Gold) },
+        trials: 200,
+        seed: 10
+    ),
+    "Native path should only deal cards whose starting tier equals the rolled tier."
+);
+
+var silverLooseShop = Shop(
+    spawn: 1,
+    nativeProbability: 0,
+    weights: new Dictionary<ETier, double> { [ETier.Silver] = 1 }
+);
+Check.Equal(
+    0.0,
+    DealerProbabilityCore.AppearanceFrequency(
+        t3,
+        silverLooseShop,
+        Player(day: 3),
+        new[]
+        {
+            Candidate(t1, ETier.Bronze),
+            Candidate(t2, ETier.Silver),
+            Candidate(t3, ETier.Gold),
+        },
+        trials: 200,
+        seed: 11
+    ),
+    "Loose path should destructively narrow to cards at or below the selected tier."
+);
+
+var filteredShop = Shop(spawn: 1, filters: new[] { t1, t2 }, nativeProbability: 0);
+Check.True(
+    DealerProbabilityCore.AppearanceFrequency(
+        t1,
+        filteredShop,
+        Player(day: 3),
+        new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver), Candidate(t3, ETier.Bronze) },
+        trials: 200,
+        seed: 12
+    ) > 0,
+    "Non-fixed CardIdFilters should keep matching cards reachable."
+);
+Check.Equal(
+    0.0,
+    DealerProbabilityCore.AppearanceFrequency(
+        t3,
+        filteredShop,
+        Player(day: 3),
+        new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver), Candidate(t3, ETier.Bronze) },
+        trials: 200,
+        seed: 12
+    ),
+    "Non-fixed CardIdFilters should exclude cards outside the filter."
+);
+
+var nativeMissShop = Shop(
+    spawn: 1,
+    nativeProbability: 1,
+    weights: new Dictionary<ETier, double> { [ETier.Gold] = 1 }
+);
+Check.True(
+    DealerProbabilityCore.AppearanceFrequency(
+        t1,
+        nativeMissShop,
+        Player(day: 3),
+        new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver) },
+        trials: 200,
+        seed: 13
+    ) > 0,
+    "Native miss should latch into loose retry instead of returning no deal."
+);
+
+var tierFilterShop = Shop(
+    spawn: 1,
+    nativeProbability: 1,
+    weights: new Dictionary<ETier, double> { [ETier.Diamond] = 1 },
+    tierFilters: new[] { ETier.Silver }
+);
+Check.True(
+    DealerProbabilityCore.AppearanceFrequency(
+        t1,
+        tierFilterShop,
+        Player(day: 3),
+        new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver), Candidate(t3, ETier.Gold) },
+        trials: 200,
+        seed: 14
+    ) > 0,
+    "ItemTierFilters should disable native and allow loose cards at or below the filter tier."
+);
+
+var rerollDeal = DealerProbabilityCore.SimulateOneDeal(
+    Shop(spawn: 2, rerollRepeats: false),
+    Player(day: 3, rerollExclusions: new[] { t1, t2 }),
+    new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver) },
+    new SeededRng(15)
+);
+Check.True(rerollDeal.Contains(t1), "Reroll exclusion should clear when it would starve spawn.");
+Check.Equal(2, rerollDeal.Count, "Reroll starvation fallback should still deal spawn count.");
+
+Check.Equal(
+    0,
+    DealerProbabilityCore.AppearanceFrequency(
+        t1,
+        Shop(spawn: 1, nativeProbability: 0),
+        Player(day: 3, skills: new[] { t1 }),
+        new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Bronze) },
+        trials: 200,
+        seed: 16
+    ),
+    "Player skill-equipped cards should never be dealt."
+);
+Check.Equal(
+    0,
+    DealerProbabilityCore.SimulateOneDeal(
+        Shop(spawn: 1),
+        Player(day: 3),
+        new[] { Candidate(t1, ETier.Bronze, ECardType.Skill) },
+        new SeededRng(17)
+    ).Count,
+    "Pure skill pools should return empty because trainer simulation is out of scope."
+);
+
+var deterministicShop = Shop(
+    spawn: 1,
+    nativeProbability: 0,
+    weights: DealerTierWeightReference.ForDay(3)
+);
+var deterministicPool = new[] { Candidate(t1, ETier.Bronze), Candidate(t2, ETier.Silver) };
+var deterministicRngA = new SeededRng(18);
+var sequenceA = Enumerable
+    .Range(0, 8)
+    .Select(_ =>
+        DealerProbabilityCore.SimulateOneDeal(
+            deterministicShop,
+            Player(day: 3),
+            deterministicPool,
+            deterministicRngA
+        )[0]
+    )
+    .ToArray();
+var deterministicRngB = new SeededRng(18);
+var sequenceB = Enumerable
+    .Range(0, 8)
+    .Select(_ =>
+        DealerProbabilityCore.SimulateOneDeal(
+            deterministicShop,
+            Player(day: 3),
+            deterministicPool,
+            deterministicRngB
+        )[0]
+    )
+    .ToArray();
+Check.Values(sequenceA, sequenceB, "Same seed should produce identical simulated deals.");
+var bronzeFrequency = DealerProbabilityCore.AppearanceFrequency(
+    t1,
+    deterministicShop,
+    Player(day: 3),
+    deterministicPool,
+    trials: 4000,
+    seed: 19
+);
+var silverFrequency = DealerProbabilityCore.AppearanceFrequency(
+    t2,
+    deterministicShop,
+    Player(day: 3),
+    deterministicPool,
+    trials: 4000,
+    seed: 19
+);
+Check.True(
+    bronzeFrequency > silverFrequency,
+    "All-loose day 3 Bronze/Silver pool should favor Bronze over Silver."
+);
+
 Check.Finish();
 
 static CollectionCardVm Card(Guid id, ETier tier, ECardType type = ECardType.Item) =>
@@ -166,6 +367,46 @@ static CollectionDealerSourceContext MerchantContext(
         SuppressDayGate = suppressDayGate,
         PinnedTier = pinnedTier,
         EstimateEnabled = estimateEnabled,
+    };
+
+static DealerCandidate Candidate(Guid id, ETier tier, ECardType type = ECardType.Item) =>
+    new()
+    {
+        Id = id,
+        Type = type,
+        Size = ECardSize.Small,
+        StartingTier = tier,
+    };
+
+static DealerShopDefinition Shop(
+    int spawn,
+    IReadOnlyList<Guid>? filters = null,
+    float nativeProbability = 0.8f,
+    IReadOnlyDictionary<ETier, double>? weights = null,
+    IReadOnlyList<ETier>? tierFilters = null,
+    bool rerollRepeats = true
+) =>
+    new()
+    {
+        SourceKey = "Goldie",
+        NumberCardsToSpawn = spawn,
+        CardIdFilters = filters ?? Array.Empty<Guid>(),
+        ItemTierFilters = tierFilters ?? Array.Empty<ETier>(),
+        RerollRepeats = rerollRepeats,
+        NativeItemTierProbability = nativeProbability,
+        TierWeights = weights ?? new Dictionary<ETier, double> { [ETier.Bronze] = 1 },
+    };
+
+static DealerPlayerState Player(
+    int day,
+    IReadOnlyCollection<Guid>? skills = null,
+    IReadOnlyCollection<Guid>? rerollExclusions = null
+) =>
+    new()
+    {
+        Day = day,
+        PlayerSkillCardIds = skills ?? Array.Empty<Guid>(),
+        RerollExclusionIds = rerollExclusions ?? Array.Empty<Guid>(),
     };
 
 internal static class Check
@@ -209,6 +450,19 @@ internal static class Check
         _failures++;
         Console.Error.WriteLine(
             $"FAIL: {message} Expected~={expected} Actual={actual} Tolerance={tolerance}"
+        );
+    }
+
+    public static void Values<T>(IReadOnlyList<T> expected, IReadOnlyList<T> actual, string message)
+    {
+        if (expected.Count == actual.Count && expected.SequenceEqual(actual))
+        {
+            return;
+        }
+
+        _failures++;
+        Console.Error.WriteLine(
+            $"FAIL: {message} Expected=[{string.Join(", ", expected)}] Actual=[{string.Join(", ", actual)}]"
         );
     }
 
