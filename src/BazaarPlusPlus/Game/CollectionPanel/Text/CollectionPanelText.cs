@@ -137,10 +137,10 @@ internal static class CollectionPanelText
         "來源篩選基於類型推導，具體以遊戲內實際為準。"
     );
     private static readonly LocalizedTextSet ShopProbabilityToggleLabelText = new(
-        "Shop Odds",
-        "商店概率",
-        "商店機率",
-        "商店機率"
+        "Shop Pool",
+        "商店池",
+        "商店池",
+        "商店池"
     );
     private static readonly LocalizedTextSet ShopProbabilityBadgeFixedText = new(
         "Fixed",

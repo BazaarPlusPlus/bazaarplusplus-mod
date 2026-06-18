@@ -99,6 +99,7 @@ internal sealed class CollectionGridVirtualizer
         IReadOnlyDictionary<Guid, CollectionDealerCardExplain>? explainByCardId = null
     )
     {
+        DispatchHoverOut();
         BumpGeneration();
         _visible = visible ?? Array.Empty<CollectionCardVm>();
         _sourceMatchesByCardId =

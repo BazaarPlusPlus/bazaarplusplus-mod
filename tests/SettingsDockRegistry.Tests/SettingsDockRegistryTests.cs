@@ -207,8 +207,8 @@ public class SettingsDockRegistryTests
 
             Assert.Equal(BppSettingsDockOrder.CollectionShopProbability, entry.Order);
             Assert.Equal("CollectionShopProbability", definition.Key);
-            Assert.Equal("Shop Odds", definition.ResolveLabel("en"));
-            Assert.Equal("商店概率", definition.ResolveLabel("zh-CN"));
+            Assert.Equal("Shop Pool", definition.ResolveLabel("en"));
+            Assert.Equal("商店池", definition.ResolveLabel("zh-CN"));
             Assert.False(config.EnableCollectionShopProbabilityConfig!.Value);
             Assert.False(config.EnableCollectionShopProbabilityEstimateConfig!.Value);
             Assert.Equal(0.8f, config.CollectionShopProbabilityNativeAssumptionConfig!.Value);
