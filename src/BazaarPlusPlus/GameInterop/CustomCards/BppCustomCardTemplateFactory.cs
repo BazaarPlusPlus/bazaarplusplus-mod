@@ -12,25 +12,31 @@ namespace BazaarPlusPlus.GameInterop.CustomCards;
 
 internal static class BppCustomCardTemplateFactory
 {
-    public static TCardBase Build(BppCustomCardDescriptor descriptor)
+    public static TCardBase Build(BppCustomCardDescriptor descriptor) => Build(descriptor, null);
+
+    public static TCardBase Build(BppCustomCardDescriptor descriptor, string? artKey)
     {
         if (descriptor == null)
             throw new ArgumentNullException(nameof(descriptor));
 
+        var resolvedArtKey = artKey ?? string.Empty;
         return descriptor.Type == ECardType.Skill
             ? ApplySharedFields(
                 new TCardSkill { StartingTier = descriptor.StartingTier },
-                descriptor
+                descriptor,
+                resolvedArtKey
             )
             : ApplySharedFields(
                 new TCardItem { Type = ECardType.Item, StartingTier = descriptor.StartingTier },
-                descriptor
+                descriptor,
+                resolvedArtKey
             );
     }
 
     private static TCardBase ApplySharedFields(
         TCardItem template,
-        BppCustomCardDescriptor descriptor
+        BppCustomCardDescriptor descriptor,
+        string artKey
     ) =>
         template with
         {
@@ -38,13 +44,14 @@ internal static class BppCustomCardTemplateFactory
             Version = "bpp-custom",
             InternalName = descriptor.InternalName,
             Size = descriptor.Size,
-            ArtKey = string.Empty,
+            ArtKey = artKey,
             Localization = BuildLocalization(descriptor),
         };
 
     private static TCardBase ApplySharedFields(
         TCardSkill template,
-        BppCustomCardDescriptor descriptor
+        BppCustomCardDescriptor descriptor,
+        string artKey
     ) =>
         template with
         {
@@ -52,7 +59,7 @@ internal static class BppCustomCardTemplateFactory
             Version = "bpp-custom",
             InternalName = descriptor.InternalName,
             Size = descriptor.Size,
-            ArtKey = string.Empty,
+            ArtKey = artKey,
             Localization = BuildLocalization(descriptor),
         };
 

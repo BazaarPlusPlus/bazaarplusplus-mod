@@ -133,6 +133,21 @@ public sealed class BppCustomCardTests : IDisposable
     }
 
     [Fact]
+    public void Template_factory_uses_donor_art_key_when_provided()
+    {
+        var descriptor = Descriptor(new Guid("5351d91d-2b5c-5f44-8349-bbf334a9bbc5"));
+        const string donorArtKey = "Addressables/CardArt/Donor.asset";
+
+        var template = Assert.IsType<TCardItem>(
+            BppCustomCardTemplateFactory.Build(descriptor, donorArtKey)
+        );
+
+        Assert.Equal(donorArtKey, template.ArtKey);
+        var passiveTooltip = Assert.Single(template.Localization.Tooltips);
+        Assert.Equal(ETooltipType.Passive, passiveTooltip.TooltipType);
+    }
+
+    [Fact]
     public void Collection_projection_builds_filterable_non_package_vms_from_registry()
     {
         var registry = new BppCustomCardRegistry(_ => false);
