@@ -18,12 +18,12 @@ using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
-using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Tooltips;
+using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.ModApi.Clients;
@@ -106,9 +106,7 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
         _settingsDockRegistry.Register(new PackageCardArtReplacementSettingsDockEntry());
 
-        _mountables.Register(
-            new ComponentMount<BazaarDbSnapshotUploadController>((c, s) => c.Initialize(s))
-        );
+        _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
         _mountables.Register(new CollectionPanelMount());
         _mountables.Register(
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
@@ -129,9 +127,6 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(new LiveBuildPanelMount());
         _mountables.Register(
             new ComponentMount<RunLoggingController>((c, s) => c.Initialize(s, PvpBattleCatalog))
-        );
-        _mountables.Register(
-            new ComponentMount<RunUploadController>((c, s) => c.Initialize(s, PvpBattleCatalog))
         );
         _mountables.Register(
             new ComponentMount<TooltipModifierRefreshController>(

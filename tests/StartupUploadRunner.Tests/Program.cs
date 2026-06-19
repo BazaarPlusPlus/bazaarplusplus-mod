@@ -4,6 +4,9 @@ using System.Threading.Tasks;
 
 var runnerType = RequireType("BazaarPlusPlus.Game.Upload.StartupUploadAttemptRunner");
 var gateType = RequireType("BazaarPlusPlus.Game.Upload.StartupUploadAttemptGate");
+RequireType("BazaarPlusPlus.Game.Upload.IUploadFeed");
+RequireType("BazaarPlusPlus.Game.RunLogging.Upload.RunBundleUploadFeed");
+RequireType("BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadFeed");
 
 var runner = Activator.CreateInstance(
     runnerType,
