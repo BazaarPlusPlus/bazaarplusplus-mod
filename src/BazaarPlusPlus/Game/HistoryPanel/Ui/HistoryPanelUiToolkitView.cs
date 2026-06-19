@@ -23,6 +23,18 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private readonly Action<int> _selectBattle;
     private readonly Action<HistorySectionMode> _setSectionMode;
     private readonly Action<GhostBattleFilter> _setGhostFilter;
+    private readonly Action<string> _setRunHero;
+    private readonly Action _toggleGhostDayMin10;
+    private static readonly string[] HeroRoster =
+    {
+        "Vanessa",
+        "Pygmalien",
+        "Dooley",
+        "Mak",
+        "Jules",
+        "Karnok",
+        "Stelle",
+    };
 
     private GameObject? _rootObject;
     private UIDocument? _document;
@@ -39,10 +51,16 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Label? _statusLabel;
     private VisualElement? _runsSection;
     private VisualElement? _battlesSection;
+    private VisualElement? _filterSlot;
+    private VisualElement? _runsFilterRow;
     private VisualElement? _ghostFilterRow;
+    private Button[] _heroChips = Array.Empty<Button>();
     private Button? _ghostAllButton;
     private Button? _ghostWonButton;
     private Button? _ghostLostButton;
+    private Button? _ghostDayButton;
+    private ScrollView? _railScrollView;
+    private HistorySectionMode? _lastSectionMode;
     private ListView? _runsList;
     private ListView? _battleList;
     private Label? _battlesTitle;
@@ -52,7 +70,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Label? _previewStatusLabel;
     private Label? _previewDebugLabel;
     private VisualElement? _previewContainer;
-    private Label? _detailTitle;
     private Label? _resultPill;
     private Label? _dayPill;
     private Label? _opponentName;
@@ -78,7 +95,9 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         Action<int> selectRun,
         Action<int> selectBattle,
         Action<HistorySectionMode> setSectionMode,
-        Action<GhostBattleFilter> setGhostFilter
+        Action<GhostBattleFilter> setGhostFilter,
+        Action<string> setRunHero,
+        Action toggleGhostDayMin10
     )
     {
         _parent = parent ?? throw new ArgumentNullException(nameof(parent));
@@ -93,6 +112,9 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _selectBattle = selectBattle ?? throw new ArgumentNullException(nameof(selectBattle));
         _setSectionMode = setSectionMode ?? throw new ArgumentNullException(nameof(setSectionMode));
         _setGhostFilter = setGhostFilter ?? throw new ArgumentNullException(nameof(setGhostFilter));
+        _setRunHero = setRunHero ?? throw new ArgumentNullException(nameof(setRunHero));
+        _toggleGhostDayMin10 =
+            toggleGhostDayMin10 ?? throw new ArgumentNullException(nameof(toggleGhostDayMin10));
     }
 
     public void EnsureCreated()
@@ -206,7 +228,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _runsBattleSubtitle!.text = model.RunsBattleSubtitle;
         _runsBattleSubtitle.style.display = DisplayStyle.None;
         var hasSelection = model.HasSelectedBattle;
-        _detailTitle!.style.display = hasSelection ? DisplayStyle.Flex : DisplayStyle.None;
         ConfigureResultPill(_resultPill!, model.DetailResultText, model.DetailResultSeverity);
         ConfigurePill(
             _dayPill!,
@@ -246,8 +267,19 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 
         RefreshTabButton(_runsTabButton!, model.SectionMode == HistorySectionMode.Runs);
         RefreshTabButton(_ghostTabButton!, model.SectionMode == HistorySectionMode.Ghost);
+        _runsFilterRow!.style.display =
+            model.SectionMode == HistorySectionMode.Runs ? DisplayStyle.Flex : DisplayStyle.None;
         _ghostFilterRow!.style.display =
             model.SectionMode == HistorySectionMode.Ghost ? DisplayStyle.Flex : DisplayStyle.None;
+        for (var i = 0; i < _heroChips.Length && i < HeroRoster.Length; i++)
+        {
+            var heroName = HeroRoster[i];
+            RefreshHeroChip(
+                _heroChips[i],
+                heroName,
+                string.Equals(model.SelectedRunHero, heroName, StringComparison.OrdinalIgnoreCase)
+            );
+        }
         RefreshGhostFilterButton(
             _ghostAllButton!,
             model.GhostBattleFilter == GhostBattleFilter.All
@@ -260,6 +292,12 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
             _ghostLostButton!,
             model.GhostBattleFilter == GhostBattleFilter.ILost
         );
+        _ghostDayButton!.text = HistoryPanelText.FilterDayMin10();
+        _ghostDayButton.tooltip = HistoryPanelText.FilterDayMin10();
+        RefreshGhostFilterButton(_ghostDayButton, model.GhostDayMin10);
+        if (_lastSectionMode.HasValue && _lastSectionMode.Value != model.SectionMode)
+            _railScrollView!.scrollOffset = Vector2.zero;
+        _lastSectionMode = model.SectionMode;
 
         _replayButton!.text = model.ReplayButtonText;
         _replayButton.tooltip = model.ReplayButtonText;

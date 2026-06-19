@@ -126,6 +126,18 @@ internal sealed partial class HistoryPanelUiToolkitView
         );
     }
 
+    private static void RefreshHeroChip(Button button, string heroName, bool selected)
+    {
+        var heroStyle = GetHeroBadgeStyle(heroName);
+        button.text = heroStyle.ShortCode;
+        button.tooltip = heroName;
+        StyleButton(
+            button,
+            selected ? heroStyle.Background : Colors.GhostFilterBackground,
+            selected ? heroStyle.Text : Colors.White
+        );
+    }
+
     private static void RefreshDeleteButton(Button button, string text, bool enabled)
     {
         var isConfirmState = string.Equals(

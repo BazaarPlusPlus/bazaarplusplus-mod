@@ -29,6 +29,16 @@ internal sealed partial class HistoryPanel
         _coordinator?.SetGhostBattleFilter(filter);
     }
 
+    private void SetRunHero(string hero)
+    {
+        _coordinator?.SetRunHeroFilter(hero);
+    }
+
+    private void ToggleGhostDayMin10()
+    {
+        _coordinator?.ToggleGhostDayMin10();
+    }
+
     private void SelectRun(int index)
     {
         _coordinator?.SelectRun(index);

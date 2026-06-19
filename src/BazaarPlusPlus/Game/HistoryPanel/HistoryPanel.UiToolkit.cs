@@ -29,7 +29,9 @@ internal sealed partial class HistoryPanel
                 SelectRun,
                 SelectBattle,
                 SetSectionMode,
-                SetGhostBattleFilter
+                SetGhostBattleFilter,
+                SetRunHero,
+                ToggleGhostDayMin10
             );
             _uiView.PreviewContainerBoundsChanged += OnPreviewContainerBoundsChanged;
 
@@ -86,6 +88,8 @@ internal sealed partial class HistoryPanel
         var canReplaySelectedBattle = CanReplaySelectedBattle(out var replayUnavailableReason);
         var canRecordSelectedBattle = CanRecordSelectedBattle(out _);
         var canDeleteSelectedRun = CanDeleteSelectedRun(out _);
+        var filteredRuns = FilteredRuns;
+        var visibleRuns = filteredRuns.ToList();
         var visibleBattles =
             _sectionMode == HistorySectionMode.Ghost
                 ? FilteredGhostBattles.ToList()
@@ -150,7 +154,7 @@ internal sealed partial class HistoryPanel
             CountChipText =
                 _sectionMode == HistorySectionMode.Ghost
                     ? HistoryPanelText.CountGhost(FilteredGhostBattles.Count)
-                    : HistoryPanelText.CountRuns(_runs.Count),
+                    : HistoryPanelText.CountRuns(filteredRuns.Count),
             BattleChipText =
                 _sectionMode == HistorySectionMode.Ghost
                     ? HistoryPanelText.CountBattles(FilteredGhostBattles.Count)
@@ -161,9 +165,11 @@ internal sealed partial class HistoryPanel
             ServerHealthButtonEnabled = serverHealthDisplay.ButtonEnabled,
             SectionMode = _sectionMode,
             GhostBattleFilter = _ghostBattleFilter,
+            SelectedRunHero = _state.SelectedRunHero,
+            GhostDayMin10 = _state.GhostDayMin10,
             StatusMessage = _statusMessage,
             StatusSeverity = statusSeverity,
-            Runs = _runs,
+            Runs = visibleRuns,
             VisibleBattles = visibleBattles,
             SelectedRunIndex = _selectedRunIndex,
             SelectedBattleIndex =
@@ -233,6 +239,10 @@ internal sealed class HistoryPanelUiToolkitModel
     public HistorySectionMode SectionMode { get; set; }
 
     public GhostBattleFilter GhostBattleFilter { get; set; }
+
+    public string? SelectedRunHero { get; set; }
+
+    public bool GhostDayMin10 { get; set; }
 
     public string? StatusMessage { get; set; }
 
