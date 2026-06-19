@@ -980,11 +980,7 @@ var availableFacetCards = new[]
         type: ECardType.Skill,
         hiddenTags: new[] { EHiddenTag.Quest }
     ),
-    Card(
-        "Potion Reference",
-        ETier.Bronze,
-        hiddenTags: new[] { EHiddenTag.PotionReference }
-    ),
+    Card("Potion Reference", ETier.Bronze, hiddenTags: new[] { EHiddenTag.PotionReference }),
 };
 AssertValues(
     CollectionFacetAvailability
