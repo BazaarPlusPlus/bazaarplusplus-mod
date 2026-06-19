@@ -1,10 +1,12 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Tooltips;
 
 namespace BazaarPlusPlus.GameInterop.CustomCards;
 
@@ -37,17 +39,7 @@ internal static class BppCustomCardTemplateFactory
             InternalName = descriptor.InternalName,
             Size = descriptor.Size,
             ArtKey = string.Empty,
-            Localization = new TCardLocalization
-            {
-                Title = new TLocalizableText
-                {
-                    Text = BppCustomCardText.ResolveOrEnglish(descriptor.Title),
-                },
-                Description = new TLocalizableText
-                {
-                    Text = BppCustomCardText.ResolveOrEnglish(descriptor.Description),
-                },
-            },
+            Localization = BuildLocalization(descriptor),
         };
 
     private static TCardBase ApplySharedFields(
@@ -61,16 +53,26 @@ internal static class BppCustomCardTemplateFactory
             InternalName = descriptor.InternalName,
             Size = descriptor.Size,
             ArtKey = string.Empty,
-            Localization = new TCardLocalization
+            Localization = BuildLocalization(descriptor),
+        };
+
+    private static TCardLocalization BuildLocalization(BppCustomCardDescriptor descriptor)
+    {
+        var title = BppCustomCardText.ResolveOrEnglish(descriptor.Title);
+        var description = BppCustomCardText.ResolveOrEnglish(descriptor.Description);
+
+        return new TCardLocalization
+        {
+            Title = new TLocalizableText { Text = title },
+            Description = new TLocalizableText { Text = description },
+            Tooltips = new List<TTooltip>
             {
-                Title = new TLocalizableText
+                new()
                 {
-                    Text = BppCustomCardText.ResolveOrEnglish(descriptor.Title),
-                },
-                Description = new TLocalizableText
-                {
-                    Text = BppCustomCardText.ResolveOrEnglish(descriptor.Description),
+                    TooltipType = ETooltipType.Passive,
+                    Content = new TLocalizableText { Text = description },
                 },
             },
         };
+    }
 }
