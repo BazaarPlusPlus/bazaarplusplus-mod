@@ -7,6 +7,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.GameInterop.CustomCards;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
@@ -25,8 +26,10 @@ internal sealed class CollectionPanelViewModel
     public string CountText { get; set; } = string.Empty;
     public string? StatusMessage { get; set; }
     public bool IsLoading { get; set; }
+    public CollectionTabKind ActiveTab { get; set; } = CollectionTabKind.Items;
     public ECardType ActiveType { get; set; } = ECardType.Item;
-    public CollectionTabProfile TabProfile { get; set; } = CollectionTabProfile.For(ECardType.Item);
+    public CollectionTabProfile TabProfile { get; set; } =
+        CollectionTabProfile.For(CollectionTabKind.Items);
     public HashSet<EHero> SelectedHeroes { get; set; } = new();
     public HashSet<ETier> SelectedTiers { get; set; } = new();
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
@@ -82,6 +85,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _disclaimerLabel;
     private Button? _itemTabButton;
     private Button? _skillTabButton;
+    private Button? _achievementTabButton;
     private Button? _closeButton;
     private Button? _packageToggleButton;
     private Button? _dayToggleButton;
@@ -106,6 +110,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private VisualElement? _tagFilterSection;
     private VisualElement? _keywordFilterSection;
     private VisualElement? _sourceFilterSection;
+    private VisualElement? _heroFilterSection;
+    private VisualElement? _tierFilterSection;
     private ScrollView? _controlsScrollView;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
@@ -181,6 +187,7 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.Subtitle()
                 + CollectionPanelText.ItemsTab()
                 + CollectionPanelText.SkillsTab()
+                + CollectionPanelText.AchievementsTab()
                 + CollectionPanelText.Close()
                 + CollectionPanelText.PackagesToggle()
                 + CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any)
@@ -195,6 +202,7 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.NoMatches()
                 + CollectionPanelText.SourceDisclaimer()
                 + CollectionPanelText.DayHeader()
+                + BppCustomCardRegistry.Current?.FontAtlasSample()
                 + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#\\",
             Sizes.FontButton,
             FontStyle.Normal
@@ -317,11 +325,9 @@ internal sealed partial class CollectionPanelView : IDisposable
             UpdateLoadingLabelText();
         }
 
-        RefreshTabButton(
-            _itemTabButton!,
-            model.ActiveType == ECardType.Item && !model.PackagesOnly
-        );
-        RefreshTabButton(_skillTabButton!, model.ActiveType == ECardType.Skill);
+        RefreshTabButton(_itemTabButton!, model.ActiveTab == CollectionTabKind.Items);
+        RefreshTabButton(_skillTabButton!, model.ActiveTab == CollectionTabKind.Skills);
+        RefreshTabButton(_achievementTabButton!, model.ActiveTab == CollectionTabKind.Achievements);
         RefreshChromeTexts();
 
         KeywordIconSpriteProvider.BeginResolvePass();
@@ -382,7 +388,12 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_packageToggleButton != null)
             RefreshPackageToggle(model.PackagesOnly);
         if (_dayToggleButton != null)
+        {
             RefreshDayToggle(model.DayFilterValue, model.DayFilterActive);
+            _dayToggleButton.style.display = model.TabProfile.ShowDayFilter
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+        }
         if (_sortQualityButton != null)
             RefreshChip(_sortQualityButton, model.SortPriority == CollectionSortPriority.Quality);
         if (_sortSizeButton != null)
@@ -390,7 +401,17 @@ internal sealed partial class CollectionPanelView : IDisposable
 
         // Size/tags only narrow Items. On Skills, let Quality fill the row and let source filters
         // move up naturally instead of reserving dead space.
-        var showSizeChips = model.TabProfile.ShowSizeFilter;
+        var showHeroChips = model.TabProfile.ShowHeroFilter;
+        if (_heroFilterSection != null)
+            _heroFilterSection.style.display = showHeroChips
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+        var showTierChips = model.TabProfile.ShowTierFilter;
+        if (_tierFilterSection != null)
+            _tierFilterSection.style.display = showTierChips
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+        var showSizeChips = showTierChips && model.TabProfile.ShowSizeFilter;
         if (_sizeChipRow != null)
         {
             _sizeChipRow.style.display = showSizeChips ? DisplayStyle.Flex : DisplayStyle.None;
@@ -411,7 +432,9 @@ internal sealed partial class CollectionPanelView : IDisposable
                 : DisplayStyle.None;
         if (_sourceFilterSection != null)
             _sourceFilterSection.style.display =
-                model.AvailableSources.Count > 0 ? DisplayStyle.Flex : DisplayStyle.None;
+                model.TabProfile.ShowSourceFilter && model.AvailableSources.Count > 0
+                    ? DisplayStyle.Flex
+                    : DisplayStyle.None;
         if (_sourceFilterLabel != null)
             _sourceFilterLabel.text = CollectionPanelText.SourceHeader(model.ActiveType);
         if (_tierFilterLabel != null)
@@ -449,6 +472,8 @@ internal sealed partial class CollectionPanelView : IDisposable
             _itemTabButton.text = CollectionPanelText.ItemsTab();
         if (_skillTabButton != null)
             _skillTabButton.text = CollectionPanelText.SkillsTab();
+        if (_achievementTabButton != null)
+            _achievementTabButton.text = CollectionPanelText.AchievementsTab();
         if (_sortLabel != null)
             _sortLabel.text = CollectionPanelText.SortHeader();
         if (_sortQualityButton != null)

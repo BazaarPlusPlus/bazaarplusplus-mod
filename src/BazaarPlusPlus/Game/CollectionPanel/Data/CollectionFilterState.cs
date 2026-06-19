@@ -21,7 +21,15 @@ internal enum CollectionFacetMatchMode
 // this and produces an ordered visible set.
 internal sealed class CollectionFilterState
 {
-    public ECardType ActiveType { get; set; } = ECardType.Item;
+    public CollectionTabKind ActiveTab { get; private set; } = CollectionTabKind.Items;
+
+    public ECardType ActiveType
+    {
+        get => ActiveTab.CardType();
+        set =>
+            ActiveTab =
+                value == ECardType.Skill ? CollectionTabKind.Skills : CollectionTabKind.Items;
+    }
     public HashSet<EHero> Heroes { get; } = new();
     public HashSet<ETier> Tiers { get; } = new();
     public HashSet<ECardTag> Tags { get; } = new();
@@ -33,7 +41,21 @@ internal sealed class CollectionFilterState
     // shown and applied.
     public HashSet<ECardSize> Sizes { get; } = new();
     public string? SelectedSourceKey { get; set; }
-    public bool PackagesOnly { get; set; }
+    public bool PackagesOnly
+    {
+        get => ActiveTab.IsPackageOnly();
+        set
+        {
+            if (value)
+            {
+                ActiveTab = CollectionTabKind.Packages;
+            }
+            else if (ActiveTab == CollectionTabKind.Packages)
+            {
+                ActiveTab = CollectionTabKind.Items;
+            }
+        }
+    }
 
     // User-selected run "Day" filter; null means no day filtering. Starts enabled so the panel
     // binds it to Data.Run.Day on open; outside a run, OutOfRunDay keeps the toggle visibly active
@@ -56,25 +78,31 @@ internal sealed class CollectionFilterState
     public string? GetSelectedSourceKey(ECardType activeType) =>
         activeType == ActiveType ? SelectedSourceKey : null;
 
+    public bool SelectTab(CollectionTabKind tab)
+    {
+        if (ActiveTab == tab)
+            return false;
+
+        ActiveTab = tab;
+        if (tab == CollectionTabKind.Achievements)
+        {
+            Heroes.Clear();
+            Sizes.Clear();
+            Tags.Clear();
+            Keywords.Clear();
+            SelectedSourceKey = null;
+        }
+        return true;
+    }
+
     public bool SelectActiveType(ECardType activeType)
     {
-        if (ActiveType == activeType && !PackagesOnly)
-            return false;
-
-        ActiveType = activeType;
-        PackagesOnly = false;
-        return true;
+        return SelectTab(
+            activeType == ECardType.Skill ? CollectionTabKind.Skills : CollectionTabKind.Items
+        );
     }
 
-    public bool SelectPackagesOnly()
-    {
-        if (ActiveType == ECardType.Item && PackagesOnly)
-            return false;
-
-        ActiveType = ECardType.Item;
-        PackagesOnly = true;
-        return true;
-    }
+    public bool SelectPackagesOnly() => SelectTab(CollectionTabKind.Packages);
 
     public void ApplySelection(CollectionPanelSelectionState selection)
     {
@@ -86,13 +114,12 @@ internal sealed class CollectionFilterState
 
         if (selection.SelectedSourceKind == CollectionSourceKind.Trainer)
         {
-            ActiveType = ECardType.Skill;
-            PackagesOnly = false;
+            ActiveTab = CollectionTabKind.Skills;
             SelectedSourceKey = selection.SelectedSourceKey;
             return;
         }
 
-        ActiveType = ECardType.Item;
+        ActiveTab = CollectionTabKind.Items;
         SelectedSourceKey = selection.SelectedSourceKey;
     }
 
@@ -101,7 +128,7 @@ internal sealed class CollectionFilterState
         return new CollectionPanelSelectionState(
             SelectedHero,
             SelectedSourceKey,
-            CollectionTabProfile.For(ActiveType).SourceKind
+            CollectionTabProfile.For(ActiveTab).SourceKind ?? CollectionSourceKind.Merchant
         );
     }
 
@@ -117,14 +144,15 @@ internal sealed class CollectionFilterState
         Heroes.Add(hero);
     }
 
-    public void ToggleSource(ECardType activeType, string sourceKey)
+    public void ToggleSource(CollectionTabKind activeTab, string sourceKey)
     {
         if (string.IsNullOrWhiteSpace(sourceKey))
             return;
 
-        ActiveType = activeType;
-        if (ActiveType == ECardType.Skill)
-            PackagesOnly = false;
+        if (activeTab == CollectionTabKind.Achievements)
+            return;
+
+        ActiveTab = activeTab;
 
         SelectedSourceKey = string.Equals(
             SelectedSourceKey,

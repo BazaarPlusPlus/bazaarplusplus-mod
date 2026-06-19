@@ -25,6 +25,10 @@
       Link="CollectionCardVm.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTabKind.cs"
+      Link="CollectionTabKind.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionGridConstants.cs"
       Link="CollectionGridConstants.cs"
     />

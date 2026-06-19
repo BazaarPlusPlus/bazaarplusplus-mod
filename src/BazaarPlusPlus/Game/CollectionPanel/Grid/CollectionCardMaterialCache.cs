@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using BazaarPlusPlus.GameInterop.CardArtReplacement;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using UnityEngine;
@@ -52,6 +53,25 @@ internal sealed class CollectionCardMaterialCache
         if (shaderOverride != null)
             material.shader = shaderOverride;
         material.name = $"CollectionPanelMaterial[{artKey}]";
+        _materials[artKey] = material;
+        return material;
+    }
+
+    public Material? GetOrCreate(string artKey, Texture2D texture, Shader? shader)
+    {
+        if (string.IsNullOrEmpty(artKey) || texture == null || shader == null)
+            return null;
+
+        if (_materials.TryGetValue(artKey, out var cached) && cached != null)
+            return cached;
+
+        var material = new Material(shader) { name = $"CollectionPanelMaterial[{artKey}]" };
+        if (!CardArtInjector.Apply(material, texture))
+        {
+            Object.Destroy(material);
+            return null;
+        }
+
         _materials[artKey] = material;
         return material;
     }

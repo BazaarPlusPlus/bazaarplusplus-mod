@@ -57,6 +57,10 @@
       Link="CollectionTabProfile.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTabKind.cs"
+      Link="CollectionTabKind.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardFacetRanks.cs"
       Link="CollectionCardFacetRanks.cs"
     />

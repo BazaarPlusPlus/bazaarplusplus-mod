@@ -8,6 +8,7 @@ using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.CustomCards;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
@@ -23,42 +24,69 @@ internal sealed class CollectionCardFactory
 {
     private readonly CollectionCardPool _pool;
     private readonly Transform _parent;
+    private readonly Func<object?> _staticDataProvider;
+    private readonly Func<object?, Guid, TCardBase?> _templateResolver;
     private int _instanceCounter;
 
     public CollectionCardFactory(CollectionCardPool pool, Transform parent)
+        : this(
+            pool,
+            parent,
+            BppStaticDataAccess.TryGetReadyManagerObject,
+            BppStaticDataAccess.GetCardTemplate
+        ) { }
+
+    internal CollectionCardFactory(
+        CollectionCardPool pool,
+        Transform parent,
+        Func<object?> staticDataProvider,
+        Func<object?, Guid, TCardBase?> templateResolver
+    )
     {
         _pool = pool;
         _parent = parent;
+        _staticDataProvider =
+            staticDataProvider ?? throw new ArgumentNullException(nameof(staticDataProvider));
+        _templateResolver =
+            templateResolver ?? throw new ArgumentNullException(nameof(templateResolver));
     }
 
     public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
 
-    public CollectionCardBinding? TryBind(CollectionCardVm vm)
+    public CollectionCardBindResult TryBind(CollectionCardVm vm)
     {
         if (vm == null)
-            return null;
+            return CollectionCardBindResult.HardMiss();
 
-        var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
+        if (BppCustomCardRegistry.Current?.TryGet(vm.Id, out var descriptor) == true)
+            return Bind(vm, BppCustomCardTemplateFactory.Build(descriptor!));
+
+        var staticData = _staticDataProvider();
         if (staticData == null)
-            return null;
+            return CollectionCardBindResult.NotReady();
 
-        var template = BppStaticDataAccess.GetCardTemplate(staticData, vm.Id);
+        var template = _templateResolver(staticData, vm.Id);
         if (template == null)
         {
             BppLog.Warn(
                 "CollectionCardFactory",
                 $"Template lookup failed for id={vm.Id} ({vm.InternalName})."
             );
-            return null;
+            return CollectionCardBindResult.HardMiss();
         }
 
+        return Bind(vm, template);
+    }
+
+    private CollectionCardBindResult Bind(CollectionCardVm vm, TCardBase template)
+    {
         var kind =
             vm.Type == ECardType.Skill
                 ? NativeCardPreviewKind.ForSkill()
                 : NativeCardPreviewKind.ForItem(vm.Size);
         var card = _pool.Take(kind, _parent);
         if (card == null)
-            return null;
+            return CollectionCardBindResult.NotReady();
 
         var instance = BuildSyntheticInstance(vm);
         var setUpTask = NativeCardPreviewRuntime.InvokeSetUpSafe(
@@ -67,7 +95,7 @@ internal sealed class CollectionCardFactory
             instance,
             "CollectionCardFactory"
         );
-        return new CollectionCardBinding(card, kind, setUpTask);
+        return CollectionCardBindResult.Bound(new CollectionCardBinding(card, kind, setUpTask));
     }
 
     public void Return(Component? card, NativeCardPreviewKind kind) => _pool.Return(card, kind);
@@ -114,4 +142,35 @@ internal readonly struct CollectionCardBinding
     public Component Card { get; }
     public NativeCardPreviewKind Kind { get; }
     public Task SetUpTask { get; }
+}
+
+internal enum CollectionCardBindStatus
+{
+    Bound,
+    HardMiss,
+    NotReady,
+}
+
+internal readonly struct CollectionCardBindResult
+{
+    private CollectionCardBindResult(
+        CollectionCardBindStatus status,
+        CollectionCardBinding? binding
+    )
+    {
+        Status = status;
+        Binding = binding;
+    }
+
+    public CollectionCardBindStatus Status { get; }
+    public CollectionCardBinding? Binding { get; }
+
+    public static CollectionCardBindResult Bound(CollectionCardBinding binding) =>
+        new(CollectionCardBindStatus.Bound, binding);
+
+    public static CollectionCardBindResult HardMiss() =>
+        new(CollectionCardBindStatus.HardMiss, null);
+
+    public static CollectionCardBindResult NotReady() =>
+        new(CollectionCardBindStatus.NotReady, null);
 }

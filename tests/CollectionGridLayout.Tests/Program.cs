@@ -4,7 +4,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Grid;
 
 // --- Skill grid: SkillColumns-wide square array, ceil(count / SkillColumns) shelves ---
 var skills = Make(ECardType.Skill, 19, _ => ECardSize.Medium);
-var skillLayout = CollectionGridLayout.Build(skills, ECardType.Skill);
+var skillLayout = CollectionGridLayout.Build(skills, CollectionTabKind.Skills);
 
 AssertEqual(19, skillLayout.Count, "Skill layout keeps every card.");
 AssertEqual(7, skillLayout.Columns, "Skill grid is 7 columns.");
@@ -22,7 +22,7 @@ AssertShelf(skillLayout.ShelfAt(2), 14, 18, "Skill shelf 2 covers the tail 14..1
 
 // --- Item grid: span-aware shelf packing (small 1, medium 2, large 3; all 2 units tall) ---
 var trio = new[] { Item(ECardSize.Small), Item(ECardSize.Small), Item(ECardSize.Medium) };
-var trioLayout = CollectionGridLayout.Build(trio, ECardType.Item);
+var trioLayout = CollectionGridLayout.Build(trio, CollectionTabKind.Items);
 
 AssertEqual(1, trioLayout.ShelfCount, "[S,S,M] fits one shelf (1+1+2 = 4 <= 10 units).");
 AssertEqual(2, trioLayout.ShelfHeightUnits, "Item shelves are two units tall.");
@@ -40,7 +40,7 @@ var wrap = new[]
     Item(ECardSize.Medium),
     Item(ECardSize.Large),
 };
-var wrapLayout = CollectionGridLayout.Build(wrap, ECardType.Item);
+var wrapLayout = CollectionGridLayout.Build(wrap, CollectionTabKind.Items);
 AssertEqual(2, wrapLayout.ShelfCount, "Large wraps onto a second shelf.");
 AssertCell(wrapLayout.CellAt(3), 6, 0, 2, "Fourth medium ends the first shelf at col6.");
 AssertCell(wrapLayout.CellAt(4), 0, 1, 3, "Large wraps to col0 / shelf1 spanning 3.");
@@ -50,14 +50,14 @@ AssertShelf(wrapLayout.ShelfAt(1), 4, 4, "Item shelf 1 holds the wrapped large."
 // Exact fit: three larges (3 * 3 = 9 <= 10) share a shelf; a fourth wraps.
 var twoLarge = CollectionGridLayout.Build(
     new[] { Item(ECardSize.Large), Item(ECardSize.Large) },
-    ECardType.Item
+    CollectionTabKind.Items
 );
 AssertEqual(1, twoLarge.ShelfCount, "Two larges share one shelf (6 <= 10).");
 AssertCell(twoLarge.CellAt(1), 3, 0, 3, "Second large sits at col3.");
 
 var threeLarge = CollectionGridLayout.Build(
     new[] { Item(ECardSize.Large), Item(ECardSize.Large), Item(ECardSize.Large) },
-    ECardType.Item
+    CollectionTabKind.Items
 );
 AssertEqual(1, threeLarge.ShelfCount, "Three larges share one shelf (9 <= 10).");
 AssertCell(threeLarge.CellAt(2), 6, 0, 3, "Third large sits at col6.");
@@ -70,7 +70,7 @@ var fourLarge = CollectionGridLayout.Build(
         Item(ECardSize.Large),
         Item(ECardSize.Large),
     },
-    ECardType.Item
+    CollectionTabKind.Items
 );
 AssertEqual(2, fourLarge.ShelfCount, "Fourth large wraps (9 + 3 > 10).");
 AssertCell(fourLarge.CellAt(3), 0, 1, 3, "Fourth large wraps to col0 / shelf1.");
@@ -185,7 +185,10 @@ AssertValues(
 );
 
 // --- Degenerate: empty visible set ---
-var empty = CollectionGridLayout.Build(System.Array.Empty<CollectionCardVm>(), ECardType.Item);
+var empty = CollectionGridLayout.Build(
+    System.Array.Empty<CollectionCardVm>(),
+    CollectionTabKind.Items
+);
 AssertEqual(0, empty.Count, "Empty layout has no cells.");
 AssertEqual(0, empty.ShelfCount, "Empty layout has no shelves.");
 AssertApprox(0f, empty.ContentHeight(100f, 10f), "Empty layout is zero tall.");

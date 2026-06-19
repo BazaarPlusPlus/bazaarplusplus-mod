@@ -25,7 +25,7 @@ internal static class CollectionFilterEngine
                 ? null
                 : context.OfferedCardIds as HashSet<Guid>
                     ?? new HashSet<Guid>(context.OfferedCardIds);
-        var profile = CollectionTabProfile.For(filter.ActiveType);
+        var profile = CollectionTabProfile.For(filter.ActiveTab);
         var heroFilterCount = context.ApplyHeroFilter ? filter.Heroes.Count : 0;
         var tierFilterCount = filter.Tiers.Count;
         var tagFilterCount = profile.ShowTagFilter ? filter.Tags.Count : 0;

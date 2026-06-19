@@ -13,6 +13,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.GameInterop.CustomCards;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
@@ -521,9 +522,9 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         public void Close() => panel.Close();
 
-        public void SetActiveType(ECardType type)
+        public void SetActiveTab(CollectionTabKind tab)
         {
-            if (!panel._filter.SelectActiveType(type))
+            if (!panel._filter.SelectTab(tab))
                 return;
             panel.PruneInvisibleSourceSelections();
             panel._scrollY = 0f;
@@ -610,18 +611,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         public void ToggleSource(string sourceKey)
         {
-            panel._filter.ToggleSource(panel._filter.ActiveType, sourceKey);
-            panel._scrollY = 0f;
-            panel.ApplyFilters();
-            panel.RefreshView();
-        }
-
-        public void TogglePackagesOnly()
-        {
-            if (!panel._filter.SelectPackagesOnly())
-                return;
-
-            panel.PruneInvisibleSourceSelections();
+            panel._filter.ToggleSource(panel._filter.ActiveTab, sourceKey);
             panel._scrollY = 0f;
             panel.ApplyFilters();
             panel.RefreshView();
@@ -788,7 +778,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (_virtualizer == null)
             return;
 
-        _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
+        _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveTab);
         _view?.ResetScroll();
         _scrollY = 0f;
     }
@@ -797,9 +787,25 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         if (_virtualizer == null)
             return;
+        if (_filter.ActiveTab == CollectionTabKind.Achievements)
+        {
+            ClearStatus();
+            var achievementCards = BppCustomCardCollectionProjection.BuildVms(
+                BppCustomCardRegistry.Current
+            );
+            var ordered = CollectionFilterEngine.Apply(
+                achievementCards,
+                _filter,
+                new CollectionFilterContext { ApplyHeroFilter = false, SuppressDayGate = true }
+            );
+            _virtualizer.SetVisible(ordered, CollectionTabKind.Achievements);
+            ResetVisibleScroll();
+            return;
+        }
+
         if (_catalogCards.Count == 0)
         {
-            _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveType);
+            _virtualizer.SetVisible(Array.Empty<CollectionCardVm>(), _filter.ActiveTab);
         }
         else
         {
@@ -813,7 +819,7 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _offerPoolCache
             );
             AdoptNormalization(query.Normalization);
-            _virtualizer.SetVisible(query.Cards, _filter.ActiveType, query.OfferMatchesByCardId);
+            _virtualizer.SetVisible(query.Cards, _filter.ActiveTab, query.OfferMatchesByCardId);
         }
         ResetVisibleScroll();
     }
@@ -839,7 +845,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (_view == null || _virtualizer == null)
             return;
 
-        var profile = CollectionTabProfile.For(_filter.ActiveType);
+        var profile = CollectionTabProfile.For(_filter.ActiveTab);
         var availableTags = _facetAvailability.ItemTags;
         var availableKeywords = _facetAvailability.KeywordsFor(_filter.ActiveType);
         var model = new CollectionPanelViewModel
@@ -850,6 +856,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             CountText = CollectionPanelText.MatchCount(_virtualizer.VisibleCount),
             StatusMessage = _statusVisible ? _statusMessage : null,
             IsLoading = _isLoadingCatalog,
+            ActiveTab = _filter.ActiveTab,
             ActiveType = _filter.ActiveType,
             TabProfile = profile,
             // The view only does Contains lookups on these inside the synchronous Refresh and
@@ -861,9 +868,13 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedKeywords = _filter.Keywords,
             TagMatchMode = _filter.TagMatchMode,
             KeywordMatchMode = _filter.KeywordMatchMode,
-            SelectedSourceKey = _filter.PackagesOnly ? null : _filter.SelectedSourceKey,
+            SelectedSourceKey =
+                profile.ShowSourceFilter && !_filter.PackagesOnly
+                    ? _filter.SelectedSourceKey
+                    : null,
             PackagesOnly = _filter.PackagesOnly,
-            SourceSelectorEnabled = !_isLoadingCatalog && !_filter.PackagesOnly,
+            SourceSelectorEnabled =
+                profile.ShowSourceFilter && !_isLoadingCatalog && !_filter.PackagesOnly,
             SortPriority = _filter.SortPriority,
             DayFilterActive = _filter.SelectedRunDay != null,
             DayFilterValue = _currentRunDay ?? DayTierSchedule.OutOfRunDay,
@@ -872,7 +883,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             AvailableSizes = SizeOrder,
             AvailableTags = availableTags,
             AvailableKeywords = availableKeywords,
-            AvailableSources = AvailableSourcesFor(_filter.ActiveType),
+            AvailableSources = AvailableSourcesFor(_filter.ActiveTab),
             ContentHeight = _virtualizer.ContentHeight,
         };
         // Record whether this render has native typography; while it does not, Update polls for
@@ -885,9 +896,15 @@ internal sealed class CollectionPanel : MonoBehaviour
         _view.Refresh(model);
     }
 
-    private IReadOnlyList<CollectionSourceOptionViewModel> AvailableSourcesFor(ECardType activeType)
+    private IReadOnlyList<CollectionSourceOptionViewModel> AvailableSourcesFor(
+        CollectionTabKind activeTab
+    )
     {
-        var kind = CollectionTabProfile.For(activeType).SourceKind;
+        var sourceKind = CollectionTabProfile.For(activeTab).SourceKind;
+        if (!sourceKind.HasValue)
+            return Array.Empty<CollectionSourceOptionViewModel>();
+
+        var kind = sourceKind.Value;
         var selectedHero = _filter.SelectedHero;
         if (
             _availableSourcesCache is { } cached
@@ -919,10 +936,11 @@ internal sealed class CollectionPanel : MonoBehaviour
     private bool PruneInvisibleSourceSelections()
     {
         var selectedHero = _filter.SelectedHero;
-        var visibleSources = SourceKeysFor(
-            CollectionTabProfile.For(_filter.ActiveType).SourceKind,
-            selectedHero
-        );
+        var sourceKind = CollectionTabProfile.For(_filter.ActiveTab).SourceKind;
+        if (!sourceKind.HasValue)
+            return _filter.ClearSelectedSource();
+
+        var visibleSources = SourceKeysFor(sourceKind.Value, selectedHero);
         return _filter.PruneSelectedSource(visibleSources);
     }
 

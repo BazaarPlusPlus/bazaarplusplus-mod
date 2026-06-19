@@ -4,6 +4,7 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.Achievements;
 using BazaarPlusPlus.Game.CardArtReplacement;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CombatReplay;
@@ -25,6 +26,7 @@ using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.CustomCards;
 using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Storage.Paths;
@@ -90,6 +92,9 @@ internal sealed class BppComposition : IDisposable
         _combatReplayModule = new CombatReplayModule(_eventBus);
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
 
+        BppCustomCardRegistry.Current = new BppCustomCardRegistry();
+        RegisterAchievementCards(BppCustomCardRegistry.Current);
+
         _featureRegistry.Register(new CardArtReplacementFeature(_paths));
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
@@ -154,10 +159,19 @@ internal sealed class BppComposition : IDisposable
 
     public void Start() => _featureRegistry.Start();
 
+    private static void RegisterAchievementCards(BppCustomCardRegistry registry)
+    {
+        var catalog = AchievementCardCatalog.LoadEmbedded();
+        var mapper = new AchievementCardDescriptorMapper();
+        foreach (var card in catalog.Cards)
+            registry.Register(mapper.Map(card));
+    }
+
     public void Dispose()
     {
         BazaarAgentGameBridge.Current = null;
         BazaarAgentGameBridge.CurrentRecorder = null;
         _featureRegistry.Stop();
+        BppCustomCardRegistry.Current = null;
     }
 }

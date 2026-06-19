@@ -37,6 +37,7 @@ internal sealed class CollectionGridVirtualizer
     private readonly CollectionGridOverlay _overlay;
     private readonly CollectionCardFactory _factory;
     private readonly Dictionary<int, RealizedCell> _realized = new();
+    private readonly HashSet<Guid> _failedBindGuids = new();
     private readonly List<int> _recycleScratch = new();
     private readonly List<CollectionGridRect> _slotRects = new();
     private readonly CollectionGridSlotLayer? _slots;
@@ -87,7 +88,7 @@ internal sealed class CollectionGridVirtualizer
     // recycles everything currently realized. Caller is expected to also reset scrollY to 0.
     public void SetVisible(
         IReadOnlyList<CollectionCardVm> visible,
-        ECardType activeType,
+        CollectionTabKind activeTab,
         IReadOnlyDictionary<
             Guid,
             IReadOnlyList<CollectionSourceOfferMatch>
@@ -100,7 +101,7 @@ internal sealed class CollectionGridVirtualizer
             sourceMatchesByCardId
             ?? new Dictionary<Guid, IReadOnlyList<CollectionSourceOfferMatch>>();
         _gap = CollectionGridConstants.GridGap;
-        _layout = CollectionGridLayout.Build(_visible, activeType);
+        _layout = CollectionGridLayout.Build(_visible, activeTab);
         RecomputePixelization();
         RecycleAll();
         _slots?.Clear();
@@ -341,10 +342,16 @@ internal sealed class CollectionGridVirtualizer
     private void TryRealize(int index)
     {
         var vm = _visible[index];
+        if (_failedBindGuids.Contains(vm.Id))
+            return;
+
         var bindStartedAt = _firstWindowDiagnostics?.StartBind(index) ?? 0L;
-        var binding = _factory.TryBind(vm);
+        var bindResult = _factory.TryBind(vm);
+        var binding = bindResult.Binding;
         _firstWindowDiagnostics?.RecordBind(index, bindStartedAt, binding);
-        if (binding == null)
+        if (bindResult.Status == CollectionCardBindStatus.HardMiss)
+            _failedBindGuids.Add(vm.Id);
+        if (!binding.HasValue)
             return;
         var card = binding.Value.Card;
         var rect = card.transform as RectTransform;
@@ -558,7 +565,11 @@ internal sealed class CollectionGridVirtualizer
         _realized.Clear();
     }
 
-    private void BumpGeneration() => _generation++;
+    private void BumpGeneration()
+    {
+        _generation++;
+        _failedBindGuids.Clear();
+    }
 
     // Derive the per-viewport base unit and display-case origin. The grid width is shared across
     // tabs first, then the active tab's column count maps that envelope to a unit size; once the

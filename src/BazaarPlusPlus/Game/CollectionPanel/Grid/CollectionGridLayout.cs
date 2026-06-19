@@ -59,9 +59,10 @@ internal sealed class CollectionGridLayout
 
     public static CollectionGridLayout Build(
         IReadOnlyList<CollectionCardVm> visible,
-        ECardType activeType
+        CollectionTabKind activeTab
     )
     {
+        var activeType = activeTab.CardType();
         if (visible == null || visible.Count == 0)
             return new CollectionGridLayout(
                 EmptyCells,

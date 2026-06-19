@@ -91,7 +91,11 @@ public sealed class CardArtReplacementTests : IDisposable
             )
             .ToArray();
 
-        Assert.Equal(120, resources.Length);
+        Assert.Equal(121, resources.Length);
+        Assert.Contains(
+            "BazaarPlusPlus.Resources.CustomCardArt.5351d91d-2b5c-5f44-8349-bbf334a9bbc5.jpg",
+            resources
+        );
         foreach (var resource in resources)
         {
             var fileName = resource.Substring("BazaarPlusPlus.Resources.CustomCardArt.".Length);

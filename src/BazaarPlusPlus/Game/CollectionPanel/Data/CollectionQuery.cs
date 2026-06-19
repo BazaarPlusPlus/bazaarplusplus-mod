@@ -118,7 +118,7 @@ internal static class CollectionQuery
                 OfferedCardIds = offeredCardIds,
                 ApplyHeroFilter =
                     !filter.PackagesOnly
-                    && (!hasSelectedSource || filter.ActiveType == ECardType.Skill),
+                    && (!hasSelectedSource || filter.ActiveTab == CollectionTabKind.Skills),
                 SuppressDayGate =
                     !filter.PackagesOnly
                     && offeredCardIds != null
@@ -138,7 +138,7 @@ internal static class CollectionQuery
         CollectionFacetAvailabilitySnapshot facetAvailability
     )
     {
-        var profile = CollectionTabProfile.For(filter.ActiveType);
+        var profile = CollectionTabProfile.For(filter.ActiveTab);
         if (!profile.ShowTagFilter || filter.Tags.Count == 0)
             return null;
         return RetainedSet(filter.Tags, facetAvailability.ItemTags);
@@ -149,7 +149,7 @@ internal static class CollectionQuery
         CollectionFacetAvailabilitySnapshot facetAvailability
     )
     {
-        var profile = CollectionTabProfile.For(filter.ActiveType);
+        var profile = CollectionTabProfile.For(filter.ActiveTab);
         if (!profile.ShowKeywordFilter || filter.Keywords.Count == 0)
             return null;
         return RetainedSet(filter.Keywords, facetAvailability.KeywordsFor(filter.ActiveType));
@@ -209,8 +209,8 @@ internal static class CollectionQuery
         if (!sourceCatalog.TryGetBySourceKey(sourceKey!, out var entry) || entry == null)
             return SourceResolution.Clear;
 
-        var expectedKind = CollectionTabProfile.For(filter.ActiveType).SourceKind;
-        if (entry.Kind != expectedKind)
+        var expectedKind = CollectionTabProfile.For(filter.ActiveTab).SourceKind;
+        if (!expectedKind.HasValue || entry.Kind != expectedKind.Value)
             return SourceResolution.Clear;
 
         var selectedHero = filter.SelectedHero;

@@ -182,25 +182,25 @@ AssertEqual(
 );
 
 var sourceState = new CollectionFilterState();
-sourceState.ToggleSource(ECardType.Item, "merchant:aila");
+sourceState.ToggleSource(CollectionTabKind.Items, "merchant:aila");
 AssertEqual(
     "merchant:aila",
     sourceState.SelectedSourceKey,
     "Item source selection should store the merchant source key."
 );
-sourceState.ToggleSource(ECardType.Item, "merchant:helt");
+sourceState.ToggleSource(CollectionTabKind.Items, "merchant:helt");
 AssertEqual(
     "merchant:helt",
     sourceState.SelectedSourceKey,
     "Selecting another item source should replace the prior merchant source."
 );
-sourceState.ToggleSource(ECardType.Item, "merchant:helt");
+sourceState.ToggleSource(CollectionTabKind.Items, "merchant:helt");
 AssertEqual(
     null,
     sourceState.SelectedSourceKey,
     "Selecting the active item source again should clear it."
 );
-sourceState.ToggleSource(ECardType.Skill, "trainer:juliette");
+sourceState.ToggleSource(CollectionTabKind.Skills, "trainer:juliette");
 AssertEqual(
     "trainer:juliette",
     sourceState.SelectedSourceKey,
@@ -212,7 +212,7 @@ AssertEqual(
     "Toggling a Skill source should set Skill active."
 );
 sourceState.PackagesOnly = true;
-sourceState.ToggleSource(ECardType.Skill, "trainer:scout");
+sourceState.ToggleSource(CollectionTabKind.Skills, "trainer:scout");
 AssertFalse(
     sourceState.PackagesOnly,
     "Skill source selection should clear stale package-only mode."

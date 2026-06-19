@@ -33,6 +33,10 @@ internal static class CardPreviewItemArtReplacePatch
             if (instance == null || instance.gameObject == null)
                 return;
 
+            var marker = instance.GetComponent<CollectionPanelOwnedMarker>();
+            if (marker != null && TryApplyBppCustomCardMaterial(instance, marker))
+                return;
+
             if (
                 !PackageCardArtPatchGate.TryGetReplacementPreviewMaterial(
                     instance._cardData,
@@ -50,5 +54,54 @@ internal static class CardPreviewItemArtReplacePatch
         {
             BppLog.Warn(LogCategory, $"Preview postfix failed: {ex.Message}");
         }
+    }
+
+    private static bool TryApplyBppCustomCardMaterial(
+        CardPreviewItem instance,
+        CollectionPanelOwnedMarker marker
+    )
+    {
+        if (
+            !PackageCardArtPatchGate.TryGetBppCustomCardTexture(instance._cardData, out var texture)
+            || texture == null
+        )
+            return false;
+
+        if (instance._cardMaterialShader == null || instance._cardImage == null)
+            return false;
+
+        var materialCache = CollectionCardCacheHost.MaterialCache;
+        if (materialCache == null)
+            return false;
+
+        var artKey = $"bpp-custom:{instance._cardData.Id}";
+        if (!string.Equals(marker.CurrentArtKey, artKey, StringComparison.Ordinal))
+        {
+            ReleaseCurrentArtKey(marker);
+            materialCache.Acquire(artKey);
+        }
+
+        var material = materialCache.GetOrCreate(artKey, texture, instance._cardMaterialShader);
+        if (material == null)
+        {
+            if (string.IsNullOrEmpty(marker.CurrentArtKey))
+                materialCache.Release(artKey);
+            return false;
+        }
+
+        marker.CurrentArtKey = artKey;
+        instance._cardMaterial = material;
+        instance._cardImage.material = material;
+        return true;
+    }
+
+    private static void ReleaseCurrentArtKey(CollectionPanelOwnedMarker marker)
+    {
+        if (string.IsNullOrEmpty(marker.CurrentArtKey))
+            return;
+
+        CollectionCardCacheHost.ArtCache?.Release(marker.CurrentArtKey!);
+        CollectionCardCacheHost.MaterialCache?.Release(marker.CurrentArtKey!);
+        marker.CurrentArtKey = null;
     }
 }

@@ -77,13 +77,19 @@ internal sealed partial class CollectionPanelView
 
         _itemTabButton = CreateButton(
             CollectionPanelText.ItemsTab(),
-            () => _commands.SetActiveType(ECardType.Item),
+            () => _commands.SetActiveTab(CollectionTabKind.Items),
             Sizes.RunsTabWidth,
             Sizes.ButtonStandardHeight
         );
         _skillTabButton = CreateButton(
             CollectionPanelText.SkillsTab(),
-            () => _commands.SetActiveType(ECardType.Skill),
+            () => _commands.SetActiveTab(CollectionTabKind.Skills),
+            Sizes.RunsTabWidth,
+            Sizes.ButtonStandardHeight
+        );
+        _achievementTabButton = CreateButton(
+            CollectionPanelText.AchievementsTab(),
+            () => _commands.SetActiveTab(CollectionTabKind.Achievements),
             Sizes.RunsTabWidth,
             Sizes.ButtonStandardHeight
         );
@@ -93,6 +99,8 @@ internal sealed partial class CollectionPanelView
         primaryControlsRow.Add(_packageToggleButton);
         _skillTabButton.style.marginLeft = UiSpacing.Md;
         primaryControlsRow.Add(_skillTabButton);
+        _achievementTabButton.style.marginLeft = UiSpacing.Md;
+        primaryControlsRow.Add(_achievementTabButton);
 
         primaryControlsRow.Add(CreateOperationSpacer());
 
@@ -139,7 +147,7 @@ internal sealed partial class CollectionPanelView
         rail.Add(controlsScroll);
 
         // Hero filter.
-        CreateFilterSection(
+        _heroFilterSection = CreateFilterSection(
             controlsScroll,
             CollectionPanelText.HeroHeader(),
             UiSpacing.Xl,
@@ -151,7 +159,7 @@ internal sealed partial class CollectionPanelView
         _heroChipRow.RegisterCallback<GeometryChangedEvent>(OnHeroChipRowGeometryChanged);
 
         // Size + tier filter. On Skills, Refresh hides Size and lets Quality fill the row.
-        CreateFilterSection(
+        _tierFilterSection = CreateFilterSection(
             controlsScroll,
             CollectionPanelText.TierSizeHeader(),
             UiSpacing.Lg,
@@ -383,7 +391,7 @@ internal sealed partial class CollectionPanelView
     {
         var button = CreateButton(
             CollectionPanelText.PackagesToggle(),
-            _commands.TogglePackagesOnly,
+            () => _commands.SetActiveTab(CollectionTabKind.Packages),
             Sizes.RunsTabWidth,
             Sizes.ButtonStandardHeight
         );

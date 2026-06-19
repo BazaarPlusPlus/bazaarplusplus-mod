@@ -11,7 +11,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
 internal interface ICollectionPanelCommands
 {
     void Close();
-    void SetActiveType(ECardType type);
+    void SetActiveTab(CollectionTabKind tab);
     void ToggleHero(EHero hero);
     void ToggleTier(ETier tier);
     void ToggleRunDayFilter();
@@ -21,6 +21,5 @@ internal interface ICollectionPanelCommands
     void ToggleTagMatchMode();
     void ToggleKeywordMatchMode();
     void ToggleSource(string sourceKey);
-    void TogglePackagesOnly();
     void SetSortPriority(CollectionSortPriority priority);
 }

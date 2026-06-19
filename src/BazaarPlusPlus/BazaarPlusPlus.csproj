@@ -21,6 +21,7 @@
   <!-- Embedded resources -->
   <ItemGroup>
     <EmbeddedResource Include="Data\BuildRecommendations\tenwin_builds.json" />
+    <EmbeddedResource Include="Data\AchievementCards\achievement-cards.json" />
     <EmbeddedResource Include="Data\CollectionSources\collection-sources.json" />
     <EmbeddedResource Include="Resources\DockButtons\bpp-settings-icon.png" />
     <EmbeddedResource Include="Resources\DockButtons\collection-panel-icon.png" />

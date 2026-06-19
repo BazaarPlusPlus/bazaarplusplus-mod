@@ -27,6 +27,12 @@ internal static class CollectionPanelText
 
     private static readonly LocalizedTextSet ItemsTabText = new("Items", "物品", "物品", "物品");
     private static readonly LocalizedTextSet SkillsTabText = new("Skills", "技能", "技能", "技能");
+    private static readonly LocalizedTextSet AchievementsTabText = new(
+        "Achievements",
+        "成就",
+        "成就",
+        "成就"
+    );
     private static readonly LocalizedTextSet CloseText = new("Close", "关闭", "關閉", "關閉");
 
     private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄", "英雄");
@@ -141,6 +147,8 @@ internal static class CollectionPanelText
     internal static string ItemsTab() => Resolve(ItemsTabText);
 
     internal static string SkillsTab() => Resolve(SkillsTabText);
+
+    internal static string AchievementsTab() => Resolve(AchievementsTabText);
 
     internal static string Close() => Resolve(CloseText);
 
