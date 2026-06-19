@@ -50,6 +50,7 @@ internal static class CollectionKeywordWhitelist
         EHiddenTag.AmmoReference,
         EHiddenTag.RageReference,
         EHiddenTag.EconomyReference,
+        EHiddenTag.PotionReference,
     };
 
     public static bool IsReferenceKeyword(EHiddenTag tag) =>
@@ -70,5 +71,6 @@ internal static class CollectionKeywordWhitelist
                 or EHiddenTag.CritReference
                 or EHiddenTag.AmmoReference
                 or EHiddenTag.RageReference
-                or EHiddenTag.EconomyReference;
+                or EHiddenTag.EconomyReference
+                or EHiddenTag.PotionReference;
 }

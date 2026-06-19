@@ -525,6 +525,27 @@ AssertSequence(
     "All tag mode requires every selected item tag on the same card."
 );
 
+var potionReferenceItem = Card(
+    "Potion Reference Item",
+    ETier.Bronze,
+    hiddenTags: new[] { EHiddenTag.PotionReference }
+);
+var potionReferenceFilter = new CollectionFilterState();
+potionReferenceFilter.Keywords.Add(EHiddenTag.PotionReference);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { potionItem, potionReferenceItem }, potionReferenceFilter),
+    new[] { potionReferenceItem.Id },
+    "PotionReference should behave as its own hidden-tag keyword, separate from the Potion item tag."
+);
+
+var potionTagOnlyFilter = new CollectionFilterState();
+potionTagOnlyFilter.Tags.Add(ECardTag.Potion);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { potionItem, potionReferenceItem }, potionTagOnlyFilter),
+    new[] { potionItem.Id },
+    "Potion tag filtering should not match PotionReference-only cards."
+);
+
 var damageItem = Card(
     "Damage Item",
     ETier.Bronze,
@@ -822,6 +843,7 @@ AssertValues(
         nameof(EHiddenTag.AmmoReference),
         nameof(EHiddenTag.RageReference),
         nameof(EHiddenTag.EconomyReference),
+        nameof(EHiddenTag.PotionReference),
     },
     "Keyword whitelist should match the curated CollectionPanel keyword list."
 );
@@ -836,7 +858,6 @@ foreach (
         EHiddenTag.ChilledReference,
         EHiddenTag.HeatedReference,
         EHiddenTag.JoyReference,
-        EHiddenTag.PotionReference,
         EHiddenTag.TechReference,
         EHiddenTag.TempoReference,
     }
@@ -853,12 +874,22 @@ foreach (
         EHiddenTag.AmmoReference,
         EHiddenTag.RageReference,
         EHiddenTag.EconomyReference,
+        EHiddenTag.PotionReference,
     }
 )
     AssertTrue(
         CollectionKeywordWhitelist.Ordered.Contains(referenceKeyword),
         $"Keyword whitelist should include curated reference tag {referenceKeyword}."
     );
+
+AssertTrue(
+    CollectionKeywordWhitelist.IsReferenceKeyword(EHiddenTag.PotionReference),
+    "PotionReference should start the keyword reference subsection like other reference keywords."
+);
+AssertFalse(
+    CollectionKeywordWhitelist.IsReferenceKeyword(EHiddenTag.Poison),
+    "Base gameplay keywords should not be classified as reference keywords."
+);
 
 AssertTrue(
     ReferenceTagBaseResolver.TryResolve(EHiddenTag.PotionReference, out var potionReferenceBase),
@@ -949,6 +980,11 @@ var availableFacetCards = new[]
         type: ECardType.Skill,
         hiddenTags: new[] { EHiddenTag.Quest }
     ),
+    Card(
+        "Potion Reference",
+        ETier.Bronze,
+        hiddenTags: new[] { EHiddenTag.PotionReference }
+    ),
 };
 AssertValues(
     CollectionFacetAvailability
@@ -963,7 +999,12 @@ AssertValues(
         .KeywordsFor(availableFacetCards, ECardType.Item)
         .Select(tag => tag.ToString())
         .ToArray(),
-    new[] { nameof(EHiddenTag.Damage), nameof(EHiddenTag.DamageReference) },
+    new[]
+    {
+        nameof(EHiddenTag.Damage),
+        nameof(EHiddenTag.DamageReference),
+        nameof(EHiddenTag.PotionReference),
+    },
     "Available item keywords should include non-package catalog keywords and curated references from the same facet."
 );
 AssertValues(
