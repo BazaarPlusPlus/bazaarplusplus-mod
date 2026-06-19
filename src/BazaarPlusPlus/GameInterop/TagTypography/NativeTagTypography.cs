@@ -179,10 +179,17 @@ internal static class NativeTagTypography
     )
     {
         referenceDisplay = default;
-        if (!TryGetReferenceBaseTag(tag, out var baseTag))
+        if (!ReferenceTagBaseResolver.TryResolve(tag, out var referenceBase))
             return false;
 
-        var baseDisplay = Resolve(baseTag);
+        NativeTagDisplay baseDisplay;
+        if (referenceBase.HiddenTag.HasValue)
+            baseDisplay = Resolve(referenceBase.HiddenTag.Value);
+        else if (referenceBase.CardTag.HasValue)
+            baseDisplay = Resolve(referenceBase.CardTag.Value);
+        else
+            return false;
+
         var label = ReferenceLabel(tag, baseDisplay.Label);
         referenceDisplay = new NativeTagDisplay(
             label,
@@ -190,36 +197,6 @@ internal static class NativeTagTypography
             baseDisplay.IconName
         );
         return true;
-    }
-
-    private static bool TryGetReferenceBaseTag(EHiddenTag tag, out EHiddenTag baseTag)
-    {
-        baseTag = tag switch
-        {
-            EHiddenTag.DamageReference => EHiddenTag.Damage,
-            EHiddenTag.HealReference => EHiddenTag.Heal,
-            EHiddenTag.BurnReference => EHiddenTag.Burn,
-            EHiddenTag.PoisonReference => EHiddenTag.Poison,
-            EHiddenTag.JoyReference => EHiddenTag.Joy,
-            EHiddenTag.ShieldReference => EHiddenTag.Shield,
-            EHiddenTag.RegenReference => EHiddenTag.Regen,
-            EHiddenTag.HealthReference => EHiddenTag.Health,
-            EHiddenTag.FreezeReference => EHiddenTag.Freeze,
-            EHiddenTag.HasteReference => EHiddenTag.Haste,
-            EHiddenTag.SlowReference => EHiddenTag.Slow,
-            EHiddenTag.EconomyReference => EHiddenTag.Income,
-            EHiddenTag.CooldownReference => EHiddenTag.Cooldown,
-            EHiddenTag.AmmoReference => EHiddenTag.Ammo,
-            EHiddenTag.CritReference => EHiddenTag.Crit,
-            EHiddenTag.QuestReference => EHiddenTag.Quest,
-            EHiddenTag.FlyingReference => EHiddenTag.Flying,
-            EHiddenTag.RageReference => EHiddenTag.Rage,
-            EHiddenTag.HeatedReference => EHiddenTag.Heated,
-            EHiddenTag.ChilledReference => EHiddenTag.Chilled,
-            EHiddenTag.TempoReference => EHiddenTag.Tempo,
-            _ => tag,
-        };
-        return baseTag != tag;
     }
 
     private static string ReferenceLabel(EHiddenTag tag, string baseLabel)

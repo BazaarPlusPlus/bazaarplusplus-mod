@@ -120,6 +120,10 @@
       Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\PackageIdentity.cs"
       Link="PackageIdentity.cs"
     />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\TagTypography\ReferenceTagBaseResolver.cs"
+      Link="ReferenceTagBaseResolver.cs"
+    />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>

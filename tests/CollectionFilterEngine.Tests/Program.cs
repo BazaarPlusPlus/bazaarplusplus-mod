@@ -3,6 +3,7 @@ using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
+using BazaarPlusPlus.GameInterop.TagTypography;
 
 var heroState = new CollectionFilterState();
 heroState.ToggleHero(EHero.Vanessa);
@@ -858,6 +859,41 @@ foreach (
         CollectionKeywordWhitelist.Ordered.Contains(referenceKeyword),
         $"Keyword whitelist should include curated reference tag {referenceKeyword}."
     );
+
+AssertTrue(
+    ReferenceTagBaseResolver.TryResolve(EHiddenTag.PotionReference, out var potionReferenceBase),
+    "PotionReference should resolve to a base display tag."
+);
+AssertEqual(
+    (ECardTag?)ECardTag.Potion,
+    potionReferenceBase.CardTag,
+    "PotionReference should render through the Potion card-tag display."
+);
+AssertEqual(
+    (EHiddenTag?)null,
+    potionReferenceBase.HiddenTag,
+    "PotionReference should not claim a hidden-tag base because no EHiddenTag.Potion exists."
+);
+
+AssertTrue(
+    ReferenceTagBaseResolver.TryResolve(EHiddenTag.PoisonReference, out var poisonReferenceBase),
+    "Existing hidden-tag references should still resolve."
+);
+AssertEqual(
+    (EHiddenTag?)EHiddenTag.Poison,
+    poisonReferenceBase.HiddenTag,
+    "PoisonReference should keep its Poison hidden-tag display base."
+);
+AssertEqual(
+    (ECardTag?)null,
+    poisonReferenceBase.CardTag,
+    "PoisonReference should not claim a card-tag display base."
+);
+
+AssertFalse(
+    ReferenceTagBaseResolver.TryResolve(EHiddenTag.Poison, out _),
+    "Non-reference hidden tags should not resolve through the reference base resolver."
+);
 foreach (
     var bazaarDbKeyword in new[]
     {
