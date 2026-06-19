@@ -8,6 +8,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;

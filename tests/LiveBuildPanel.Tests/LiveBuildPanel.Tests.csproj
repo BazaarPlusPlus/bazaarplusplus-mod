@@ -57,8 +57,8 @@
       Link="Text/LiveBuildPanelText.Status.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/TenWinCorpusSummary.cs"
-      Link="Recommendations/TenWinCorpusSummary.cs"
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/TenWinCorpusSummary.cs"
+      Link="Data/TenWinCorpusSummary.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/Supporters/BPPSupporterSample.cs"

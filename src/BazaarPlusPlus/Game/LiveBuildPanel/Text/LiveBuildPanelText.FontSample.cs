@@ -1,7 +1,7 @@
 #nullable enable
 
 using System;
-using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
+using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.LiveBuildPanel;
