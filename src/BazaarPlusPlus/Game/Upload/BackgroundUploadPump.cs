@@ -94,8 +94,14 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
         }
 
         var descriptor = _feed?.Descriptor;
-        _activation?.Disposable?.Dispose();
+        var activation = _activation;
         _activation = null;
+        Action? disposeActivation =
+            activation?.Disposable == null ? null : activation.Disposable.Dispose;
+        if (_startupRunner != null)
+            _startupRunner.ObservePendingTaskOnShutdown(disposeActivation);
+        else
+            disposeActivation?.Invoke();
 
         if (
             descriptor.HasValue
