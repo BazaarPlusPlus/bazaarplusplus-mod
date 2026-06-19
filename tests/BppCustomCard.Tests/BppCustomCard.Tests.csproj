@@ -58,8 +58,20 @@
       Link="BppCustomCardCollectionProjection.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardClassification.cs"
+      Link="CollectionCardClassification.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardClassifier.cs"
+      Link="CollectionCardClassifier.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardVm.cs"
       Link="CollectionCardVm.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\BppCustomCardMaterialDonorResolver.cs"
+      Link="BppCustomCardMaterialDonorResolver.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionCardFactory.cs"
@@ -72,6 +84,10 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionPanelOwnedMarker.cs"
       Link="CollectionPanelOwnedMarker.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\PackageIdentity.cs"
+      Link="PackageIdentity.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\GameInterop\CardPreview\NativeCardPreviewKind.cs"
