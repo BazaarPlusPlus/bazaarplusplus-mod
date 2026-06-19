@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.OverlayPanels;
@@ -38,7 +39,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private HistoryPanelCoordinator? _coordinator;
     private HistoryPanelDataService _dataService = null!;
     private HistoryPanelReplayService _replayService = null!;
-    private HistoryPanelPreviewSource? _previewSource;
     private BppItemBoardPreview? _battleBoardPreview;
     private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
@@ -133,7 +133,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _runtime = dependencies.Runtime;
         _dataService = dependencies.DataService;
         _replayService = dependencies.ReplayService;
-        _previewSource = new HistoryPanelPreviewSource(_runtime);
         _coordinator = new HistoryPanelCoordinator(
             _state,
             dependencies,
@@ -309,19 +308,78 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         }
 
         EnsurePreviewRenderer();
-        if (_battleBoardPreview == null || _previewSource == null)
+        if (_battleBoardPreview == null)
             return;
 
-        var previewData = _previewSource.Build(
-            _previewSelectionMode,
-            _sectionMode,
-            ActiveSelectedBattle,
-            SelectedRun,
-            _battles
-        );
+        var previewData = BuildSelectedBattlePreviewData();
         _previewCoroutine = StartCoroutine(
             _battleBoardPreview.Render(previewData.Board, OnPreviewPhase)
         );
+    }
+
+    private HistoryBattlePreviewData BuildSelectedBattlePreviewData()
+    {
+        var activeSelectedBattle = ActiveSelectedBattle;
+        if (_previewSelectionMode == PreviewSelectionMode.Battle && activeSelectedBattle != null)
+        {
+            var signature = $"battle:{activeSelectedBattle.BattleId}";
+            return _sectionMode == HistorySectionMode.Ghost
+                ? ResolveGhostPreviewData(activeSelectedBattle, signature)
+                : HistoryBattlePreviewProjection.BuildOpponent(
+                    activeSelectedBattle.Snapshots,
+                    signature
+                );
+        }
+
+        var runPreviewBattle = PickRunPreviewBattle(_battles);
+        if (runPreviewBattle != null)
+        {
+            return HistoryBattlePreviewProjection.BuildPlayer(
+                runPreviewBattle.Snapshots,
+                $"run:{SelectedRun?.RunId}:{runPreviewBattle.BattleId}"
+            );
+        }
+
+        return HistoryBattlePreviewData.Empty;
+    }
+
+    // Ghost replay payload snapshots stay in the uploader's original perspective.
+    // For the local "against me" view, our board is stored on the opponent side.
+    private HistoryBattlePreviewData ResolveGhostPreviewData(
+        HistoryBattleRecord battle,
+        string signature
+    )
+    {
+        if (battle.Source != HistoryBattleSource.Ghost)
+            return HistoryBattlePreviewProjection.BuildOpponent(battle.Snapshots, signature);
+
+        var replayDirectoryPath = _runtime?.CombatReplayDirectoryPath;
+        if (string.IsNullOrWhiteSpace(replayDirectoryPath))
+            return HistoryBattlePreviewProjection.BuildEmpty(signature);
+
+        var ghostPayloadStore = new GhostBattlePayloadStore(
+            GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
+        );
+        var ghostPayload = ghostPayloadStore.Load(battle.BattleId);
+        var snapshots = ghostPayload?.BattleManifest?.Snapshots;
+        if (snapshots == null)
+            return HistoryBattlePreviewProjection.BuildEmpty(signature);
+
+        return HistoryBattlePreviewProjection.BuildOpponent(snapshots, signature);
+    }
+
+    private static HistoryBattleRecord? PickRunPreviewBattle(
+        IReadOnlyList<HistoryBattleRecord> runBattles
+    )
+    {
+        if (runBattles.Count == 0)
+            return null;
+
+        return runBattles
+            .OrderByDescending(battle => battle.Day ?? int.MinValue)
+            .ThenByDescending(battle => battle.Hour ?? int.MinValue)
+            .ThenByDescending(battle => battle.RecordedAtUtc)
+            .FirstOrDefault();
     }
 
     private void OnPreviewPhase(ItemBoardPreviewPhase phase)

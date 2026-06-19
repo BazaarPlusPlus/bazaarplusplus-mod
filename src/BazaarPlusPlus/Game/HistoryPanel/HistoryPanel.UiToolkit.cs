@@ -93,6 +93,23 @@ internal sealed partial class HistoryPanel
 
         var selectedBattle = ActiveSelectedBattle;
         var hasSelectedBattle = selectedBattle != null;
+        var selectedRun = SelectedRun;
+        var now = Time.unscaledTime;
+        var databaseChip =
+            _coordinator?.ResolveDatabaseChip()
+            ?? HistoryPanelDecisions.ResolveDatabaseChip(false, false);
+        var buttons = HistoryPanelButtonModel.Build(
+            _replayActionInProgress,
+            canReplaySelectedBattle,
+            replayUnavailableReason,
+            _coordinator?.GetReplayActionLabel(selectedBattle) ?? HistoryPanelText.Replay(),
+            _runtime?.IsInGameRun == true,
+            canRecordSelectedBattle,
+            _sectionMode == HistorySectionMode.Runs
+                && selectedRun != null
+                && _coordinator?.IsDeleteRunConfirmationActive(selectedRun.RunId, now) == true,
+            canDeleteSelectedRun
+        );
 
         var detailResultText = hasSelectedBattle
             ? HistoryPanelFormatter.FormatBattleResult(selectedBattle!)
@@ -124,7 +141,6 @@ internal sealed partial class HistoryPanel
             : HistoryPanelServerHealthFormatter.Idle();
 
         var statusSeverity = _state.StatusSeverity;
-        var databaseChipSeverity = ResolveDatabaseChipSeverity();
 
         return new HistoryPanelUiToolkitModel
         {
@@ -139,8 +155,8 @@ internal sealed partial class HistoryPanel
                 _sectionMode == HistorySectionMode.Ghost
                     ? HistoryPanelText.CountBattles(FilteredGhostBattles.Count)
                     : HistoryPanelText.CountBattles(_battles.Count),
-            DatabaseChipText = HistoryPanelText.DatabaseChip(GetDatabaseChipText()),
-            DatabaseChipSeverity = databaseChipSeverity,
+            DatabaseChipText = databaseChip.Text,
+            DatabaseChipSeverity = databaseChip.Severity,
             ServerHealthButtonText = serverHealthDisplay.ButtonText,
             ServerHealthButtonEnabled = serverHealthDisplay.ButtonEnabled,
             SectionMode = _sectionMode,
@@ -155,25 +171,15 @@ internal sealed partial class HistoryPanel
                     ? _selectedGhostBattleIndex
                     : _selectedBattleIndex,
             RunsBattleSubtitle =
-                SelectedRun == null
+                selectedRun == null
                     ? HistoryPanelText.SelectRunSubtitle()
-                    : $"{SelectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(SelectedRun.FinalDay)}",
-            ReplayButtonText = _replayActionInProgress
-                ? HistoryPanelText.Working()
-                : GetReplayButtonLabel(
-                    ActiveSelectedBattle,
-                    canReplaySelectedBattle,
-                    replayUnavailableReason
-                ),
-            ReplayButtonEnabled = canReplaySelectedBattle && !_replayActionInProgress,
-            RecordAndReplayButtonText = HistoryPanelText.RecordAndReplay(),
-            RecordAndReplayButtonEnabled = canRecordSelectedBattle && !_replayActionInProgress,
-            DeleteButtonText = GetDeleteRunButtonLabel(
-                _sectionMode == HistorySectionMode.Runs
-                    && SelectedRun != null
-                    && IsDeleteRunConfirmationActive(SelectedRun.RunId)
-            ),
-            DeleteButtonEnabled = canDeleteSelectedRun,
+                    : $"{selectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(selectedRun.FinalDay)}",
+            ReplayButtonText = buttons.ReplayButtonText,
+            ReplayButtonEnabled = buttons.ReplayButtonEnabled,
+            RecordAndReplayButtonText = buttons.RecordAndReplayButtonText,
+            RecordAndReplayButtonEnabled = buttons.RecordAndReplayButtonEnabled,
+            DeleteButtonText = buttons.DeleteButtonText,
+            DeleteButtonEnabled = buttons.DeleteButtonEnabled,
             HasSelectedBattle = hasSelectedBattle,
             DetailResultText = detailResultText,
             DetailResultSeverity = detailResultSeverity,
@@ -184,37 +190,6 @@ internal sealed partial class HistoryPanel
             DetailPlaceholderText = detailPlaceholderText,
             GhostOpponentEliminatedNoticeText = ghostOpponentEliminatedNoticeText,
         };
-    }
-
-    private static string GetDeleteRunButtonLabel(bool confirming)
-    {
-        return confirming ? HistoryPanelText.DeleteConfirm() : HistoryPanelText.Delete();
-    }
-
-    private string GetReplayButtonLabel(
-        HistoryBattleRecord? battle,
-        bool canReplaySelectedBattle,
-        string replayUnavailableReason
-    )
-    {
-        if (canReplaySelectedBattle)
-            return _replayService.GetReplayActionLabel(battle);
-
-        if (_runtime?.IsInGameRun == true)
-            return HistoryPanelText.ReplayDisabledInRun();
-
-        return string.IsNullOrWhiteSpace(replayUnavailableReason)
-            ? _replayService.GetReplayActionLabel(battle)
-            : HistoryPanelText.ReplayUnavailable();
-    }
-
-    // Connected -> Success(green); Missing (fresh install, File.Exists=false) -> Neutral, NOT an
-    // error; Unavailable (repository uninitialized) -> Failure. Reads each flag once.
-    private StatusSeverity ResolveDatabaseChipSeverity()
-    {
-        if (!_dataService.IsAvailable)
-            return StatusSeverity.Failure;
-        return _dataService.DatabaseExists ? StatusSeverity.Success : StatusSeverity.Neutral;
     }
 
     private static StatusSeverity ResolveBattleResultSeverity(HistoryBattleRecord? battle)
