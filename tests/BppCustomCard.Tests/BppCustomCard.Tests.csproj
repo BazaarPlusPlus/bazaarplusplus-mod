@@ -117,10 +117,7 @@
       Include="..\..\src\BazaarPlusPlus\GameInterop\StaticCards\BppStaticDataAccess.cs"
       Link="BppStaticDataAccess.cs"
     />
-    <Compile
-      Include="..\..\src\BazaarPlusPlus\Infrastructure\BppLog.cs"
-      Link="BppLog.cs"
-    />
+    <Compile Include="..\..\src\BazaarPlusPlus\Infrastructure\BppLog.cs" Link="BppLog.cs" />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Infrastructure\LogRepeatSuppressor.cs"
       Link="LogRepeatSuppressor.cs"
