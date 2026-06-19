@@ -71,10 +71,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     public void Tick(float now)
     {
-        if (
-            string.IsNullOrWhiteSpace(_state.DeleteRunConfirmationRunId)
-            || now < _state.DeleteRunConfirmationUntil
-        )
+        if (!_state.DeleteRunConfirmation.HasExpired(now))
             return;
 
         var shouldClearStatus = _state.ShouldClearStatusWhenDeleteConfirmationExpires();
@@ -263,45 +260,14 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     public bool CanDeleteSelectedRun(HistoryRunRecord? selectedRun, out string reason)
     {
-        if (_state.SectionMode == HistorySectionMode.Ghost)
-        {
-            reason = HistoryPanelText.GhostDeleteUnavailable();
-            return false;
-        }
-
-        if (selectedRun == null)
-        {
-            reason = HistoryPanelText.SelectRunToDelete();
-            return false;
-        }
-
-        if (string.Equals(selectedRun.RawStatus, "active", StringComparison.OrdinalIgnoreCase))
-        {
-            reason = HistoryPanelText.ActiveRunDeleteUnavailable();
-            return false;
-        }
-
-        if (
-            _runtime.IsInGameRun
-            && string.Equals(
-                _runtime.CurrentServerRunId,
-                selectedRun.RunId,
-                StringComparison.Ordinal
-            )
-        )
-        {
-            reason = HistoryPanelText.CurrentGameplayRunDeleteUnavailable();
-            return false;
-        }
-
-        if (!_dataService.IsAvailable)
-        {
-            reason = HistoryPanelText.RunLogRepositoryUnavailable();
-            return false;
-        }
-
-        reason = string.Empty;
-        return true;
+        return HistoryPanelDecisions.CanDeleteRun(
+            _state.SectionMode,
+            selectedRun,
+            _runtime.IsInGameRun,
+            _runtime.CurrentServerRunId,
+            _dataService.IsAvailable,
+            out reason
+        );
     }
 
     public async Task TryReplaySelectedBattleAsync(
@@ -417,10 +383,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
-        if (!IsDeleteRunConfirmationActive(run.RunId))
+        var now = Time.unscaledTime;
+        if (!IsDeleteRunConfirmationActive(run.RunId, now))
         {
-            _state.DeleteRunConfirmationRunId = run.RunId;
-            _state.DeleteRunConfirmationUntil = Time.unscaledTime + 5f;
+            _state.DeleteRunConfirmation = new DeleteConfirmation(run.RunId, now + 5f);
             SetStatusMessage(
                 HistoryPanelText.DeleteRunConfirm(HistoryPanelFormatter.ShortenRunId(run.RunId)),
                 isDeleteConfirmation: true
@@ -456,14 +422,17 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _requestUiRefresh();
     }
 
-    public string GetDatabaseChipText()
+    public HistoryPanelDatabaseChip ResolveDatabaseChip()
     {
-        if (!_dataService.IsAvailable)
-            return HistoryPanelText.DatabaseUnavailable();
+        return HistoryPanelDecisions.ResolveDatabaseChip(
+            _dataService.IsAvailable,
+            _dataService.DatabaseExists
+        );
+    }
 
-        return _dataService.DatabaseExists
-            ? HistoryPanelText.DatabaseConnected()
-            : HistoryPanelText.DatabaseMissing();
+    public string GetReplayActionLabel(HistoryBattleRecord? battle)
+    {
+        return _replayService.GetReplayActionLabel(battle);
     }
 
     public async Task TryCheckServerHealthAsync()
@@ -635,11 +604,9 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         return _state.FilteredGhostBattles;
     }
 
-    public bool IsDeleteRunConfirmationActive(string runId)
+    public bool IsDeleteRunConfirmationActive(string runId, float now)
     {
-        return !string.IsNullOrWhiteSpace(runId)
-            && string.Equals(_state.DeleteRunConfirmationRunId, runId, StringComparison.Ordinal)
-            && Time.unscaledTime < _state.DeleteRunConfirmationUntil;
+        return _state.DeleteRunConfirmation.IsActiveFor(runId, now);
     }
 
     private void LoadBattlesForSelectedRun()
@@ -670,8 +637,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     private void ClearDeleteRunConfirmation()
     {
-        _state.DeleteRunConfirmationRunId = null;
-        _state.DeleteRunConfirmationUntil = 0f;
+        _state.DeleteRunConfirmation = default;
         _state.DeleteRunConfirmationStatusActive = false;
     }
 

@@ -93,20 +93,4 @@ internal sealed partial class HistoryPanel
         if (_coordinator != null)
             _ = _coordinator.TryCheckServerHealthAsync();
     }
-
-    private void ClearDeleteRunConfirmation()
-    {
-        _state.DeleteRunConfirmationRunId = null;
-        _state.DeleteRunConfirmationUntil = 0f;
-    }
-
-    private bool IsDeleteRunConfirmationActive(string runId)
-    {
-        return _coordinator?.IsDeleteRunConfirmationActive(runId) == true;
-    }
-
-    private string GetDatabaseChipText()
-    {
-        return _coordinator?.GetDatabaseChipText() ?? HistoryPanelText.DatabaseUnavailable();
-    }
 }
