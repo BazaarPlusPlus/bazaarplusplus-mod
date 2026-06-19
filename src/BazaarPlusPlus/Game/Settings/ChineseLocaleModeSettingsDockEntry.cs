@@ -44,14 +44,16 @@ internal sealed class ChineseLocaleModeSettingsDockEntry : ISettingsDockEntry
 
     private BppChineseLocaleMode ReadChineseLocaleMode()
     {
-        return Config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland;
+        return ChineseScriptConverter.NormalizeMode(
+            Config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland
+        );
     }
 
     private void CycleChineseLocaleMode()
     {
         var config = Config.ChineseLocaleModeConfig;
         if (config != null)
-            config.Value = ChineseScriptConverter.GetNextMode(config.Value);
+            config.Value = ChineseScriptConverter.GetNextMode(ReadChineseLocaleMode());
 
         _eventBus.Publish(new ChineseLocaleModeChanged());
     }

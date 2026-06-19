@@ -450,53 +450,46 @@ internal static class ChineseScriptConverter
 
     internal static BppChineseLocaleMode GetNextMode(BppChineseLocaleMode mode)
     {
-        return mode switch
+        return NormalizeMode(mode) switch
         {
             BppChineseLocaleMode.Mainland => BppChineseLocaleMode.Taiwan,
-            BppChineseLocaleMode.Taiwan => BppChineseLocaleMode.HongKong,
             _ => BppChineseLocaleMode.Mainland,
         };
     }
 
-    internal static string Convert(
-        string mainland,
-        string? taiwan,
-        string? hongKong,
-        BppChineseLocaleMode mode
-    )
+    internal static BppChineseLocaleMode NormalizeMode(BppChineseLocaleMode mode)
+    {
+        return mode == BppChineseLocaleMode.Mainland
+            ? BppChineseLocaleMode.Mainland
+            : BppChineseLocaleMode.Taiwan;
+    }
+
+    internal static string Convert(string mainland, string? traditional, BppChineseLocaleMode mode)
     {
         if (string.IsNullOrEmpty(mainland))
             return mainland;
 
-        if (mode == BppChineseLocaleMode.Mainland)
+        var normalizedMode = NormalizeMode(mode);
+        if (normalizedMode == BppChineseLocaleMode.Mainland)
             return mainland;
 
-        var direct = mode switch
-        {
-            BppChineseLocaleMode.Taiwan => taiwan,
-            BppChineseLocaleMode.HongKong => hongKong,
-            _ => mainland,
-        };
-
-        if (!string.IsNullOrWhiteSpace(direct))
-            return direct;
+        if (!string.IsNullOrWhiteSpace(traditional))
+            return traditional;
 
         var converted = ConvertToTraditional(mainland);
-        return mode switch
+        return normalizedMode switch
         {
             BppChineseLocaleMode.Taiwan => ApplyTraditionalChineseTerms(converted),
-            BppChineseLocaleMode.HongKong => ApplyTraditionalChineseTerms(converted),
             _ => mainland,
         };
     }
 
     internal static string ResolveModeStatus(BppChineseLocaleMode mode)
     {
-        return mode switch
+        return NormalizeMode(mode) switch
         {
             BppChineseLocaleMode.Mainland => "CN",
-            BppChineseLocaleMode.Taiwan => "TW",
-            _ => "HK",
+            _ => "TW",
         };
     }
 
@@ -513,8 +506,7 @@ internal static class ChineseScriptConverter
         return buffer.ToString();
     }
 
-    // Taiwan and HongKong term replacements are currently intentionally identical;
-    // split into separate methods here when regional vocabulary diverges.
+    // Shared Traditional Chinese fallback terms for the single TW mode.
     private static string ApplyTraditionalChineseTerms(string text)
     {
         return text.Replace("數據庫", "資料庫", StringComparison.Ordinal)

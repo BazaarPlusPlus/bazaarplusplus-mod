@@ -142,6 +142,86 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
+    public void ChineseLocaleModeConfig_migrates_legacy_hong_kong_to_taiwan()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-chinese-locale-settings-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            File.WriteAllText(
+                configPath,
+                """
+                [Localization]
+
+                ChineseLocaleMode = HongKong
+                """
+            );
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+
+            config.Initialize(configFile);
+
+            Assert.Equal(BppChineseLocaleMode.Taiwan, config.ChineseLocaleModeConfig!.Value);
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
+    public void ChineseLocaleModeDockEntry_cycles_between_cn_and_tw_only()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-chinese-locale-dock-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var definition = new ChineseLocaleModeSettingsDockEntry(
+                new InMemoryBppEventBus()
+            ).Build(config);
+
+            Assert.Equal("CN", definition.ResolveStatus("en"));
+            Assert.False(definition.IsActive());
+
+            definition.Activate();
+
+            Assert.Equal(BppChineseLocaleMode.Taiwan, config.ChineseLocaleModeConfig!.Value);
+            Assert.Equal("TW", definition.ResolveStatus("en"));
+            Assert.True(definition.IsActive());
+
+            definition.Activate();
+
+            Assert.Equal(BppChineseLocaleMode.Mainland, config.ChineseLocaleModeConfig!.Value);
+            Assert.Equal("CN", definition.ResolveStatus("en"));
+            Assert.False(definition.IsActive());
+
+            config.ChineseLocaleModeConfig.Value = (BppChineseLocaleMode)2;
+
+            Assert.Equal("TW", definition.ResolveStatus("en"));
+            Assert.True(definition.IsActive());
+
+            definition.Activate();
+
+            Assert.Equal(BppChineseLocaleMode.Mainland, config.ChineseLocaleModeConfig.Value);
+            Assert.Equal("CN", definition.ResolveStatus("en"));
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
     public void FixedSupporterListDockEntry_uses_stream_mode_key_and_toggles_config()
     {
         var configPath = Path.Combine(

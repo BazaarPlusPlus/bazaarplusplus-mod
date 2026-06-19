@@ -31,7 +31,6 @@ internal sealed class BuildRecommendationRepository
     private static readonly LocalizedTextSet FinalBuildLabel = new(
         "Ten-Win Build",
         "十胜阵容",
-        "十勝陣容",
         "十勝陣容"
     );
     private static readonly TimeSpan TenWinBuildsCacheDuration = TimeSpan.FromHours(20);

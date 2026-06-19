@@ -24,8 +24,7 @@ internal static class BppCustomCardText
         var builder = new StringBuilder();
         Append(builder, set.English);
         Append(builder, set.ChineseMainland);
-        Append(builder, set.ChineseTaiwan);
-        Append(builder, set.ChineseHongKong);
+        Append(builder, set.ChineseTraditional);
         Append(builder, set.German);
         Append(builder, set.Portuguese);
         Append(builder, set.Korean);
@@ -36,8 +35,7 @@ internal static class BppCustomCardText
     public static bool HasRequiredText(LocalizedTextSet set) =>
         !string.IsNullOrWhiteSpace(set.English)
         && !string.IsNullOrWhiteSpace(set.ChineseMainland)
-        && !string.IsNullOrWhiteSpace(set.ChineseTaiwan)
-        && !string.IsNullOrWhiteSpace(set.ChineseHongKong);
+        && !string.IsNullOrWhiteSpace(set.ChineseTraditional);
 
     private static void Append(StringBuilder builder, string? value)
     {

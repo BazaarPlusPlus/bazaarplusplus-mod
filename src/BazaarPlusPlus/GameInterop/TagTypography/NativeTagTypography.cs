@@ -24,17 +24,11 @@ namespace BazaarPlusPlus.GameInterop.TagTypography;
 /// </summary>
 internal static class NativeTagTypography
 {
-    private static readonly LocalizedTextSet ReferenceSuffixText = new(
-        " Related",
-        "相关",
-        "相關",
-        "相關"
-    );
+    private static readonly LocalizedTextSet ReferenceSuffixText = new(" Related", "相关", "相關");
 
     private static readonly LocalizedTextSet EconomyReferenceBaseText = new(
         "Economy",
         "经济",
-        "經濟",
         "經濟"
     );
 
@@ -52,7 +46,7 @@ internal static class NativeTagTypography
     // reference a natural invalidation key) plus the mod-side language code. Results resolved
     // while typography is null are NOT cached, so the table self-heals once the game's async
     // typography registration completes. The BPP Chinese script mode is deliberately NOT part
-    // of the key: tag labels show the game's native zh-CN text as-is in Taiwan/HongKong modes
+    // of the key: tag labels show the game's native zh-CN text as-is in Taiwan mode
     // (per-character conversion of game vocabulary was judged worse than the script mismatch).
     private static readonly Dictionary<string, NativeTagDisplay> Cache = new(
         StringComparer.Ordinal

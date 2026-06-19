@@ -79,6 +79,35 @@ public sealed class BppCustomCardTests : IDisposable
     }
 
     [Fact]
+    public void Chinese_locale_modes_cycle_between_mainland_and_taiwan_only()
+    {
+        Assert.Equal(
+            BppChineseLocaleMode.Taiwan,
+            ChineseScriptConverter.GetNextMode(BppChineseLocaleMode.Mainland)
+        );
+        Assert.Equal(
+            BppChineseLocaleMode.Mainland,
+            ChineseScriptConverter.GetNextMode(BppChineseLocaleMode.Taiwan)
+        );
+        Assert.Equal("CN", ChineseScriptConverter.ResolveModeStatus(BppChineseLocaleMode.Mainland));
+        Assert.Equal("TW", ChineseScriptConverter.ResolveModeStatus(BppChineseLocaleMode.Taiwan));
+    }
+
+    [Fact]
+    public void Legacy_hong_kong_mode_value_resolves_as_taiwan()
+    {
+        var text = new LocalizedTextSet("Database", "数据库", "資料庫");
+        var legacyHongKongValue = (BppChineseLocaleMode)2;
+
+        Assert.Equal(
+            BppChineseLocaleMode.Taiwan,
+            ChineseScriptConverter.NormalizeMode(legacyHongKongValue)
+        );
+        Assert.Equal("TW", ChineseScriptConverter.ResolveModeStatus(legacyHongKongValue));
+        Assert.Equal("資料庫", text.Resolve("zh-Hant", legacyHongKongValue));
+    }
+
+    [Fact]
     public void Template_factory_builds_native_item_template_for_tooltip_and_frame_setup()
     {
         var descriptor = Descriptor(new Guid("5351d91d-2b5c-5f44-8349-bbf334a9bbc5"));
@@ -239,11 +268,10 @@ public sealed class BppCustomCardTests : IDisposable
             Type = ECardType.Item,
             Size = ECardSize.Medium,
             StartingTier = ETier.Legendary,
-            Title = new LocalizedTextSet("Cosmic Ray", "宇宙射线", "宇宙射線", "宇宙射線"),
+            Title = new LocalizedTextSet("Cosmic Ray", "宇宙射线", "宇宙射線"),
             Description = new LocalizedTextSet(
                 "Deal 9999+ damage in a single hit",
                 "单次伤害达到 9999",
-                "單次傷害達到 9999",
                 "單次傷害達到 9999"
             ),
             HasBundledArt = true,
@@ -261,9 +289,8 @@ public sealed class BppCustomCardTests : IDisposable
             AchievementId = internalName,
             TemplateId = templateId,
             InternalName = internalName,
-            Title = new LocalizedTextSet(internalName, internalName, internalName, internalName),
+            Title = new LocalizedTextSet(internalName, internalName, internalName),
             Description = new LocalizedTextSet(
-                $"{internalName} description",
                 $"{internalName} description",
                 $"{internalName} description",
                 $"{internalName} description"

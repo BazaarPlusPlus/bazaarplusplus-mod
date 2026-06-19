@@ -10,8 +10,8 @@ internal sealed class AchievementCardDefinition
     public string AchievementId { get; init; } = string.Empty;
     public Guid TemplateId { get; init; }
     public string InternalName { get; init; } = string.Empty;
-    public LocalizedTextSet Title { get; init; } = new("", "", "", "");
-    public LocalizedTextSet Description { get; init; } = new("", "", "", "");
+    public LocalizedTextSet Title { get; init; } = new("", "", "");
+    public LocalizedTextSet Description { get; init; } = new("", "", "");
     public string Category { get; init; } = string.Empty;
     public string RuleKind { get; init; } = string.Empty;
     public int Target { get; init; }

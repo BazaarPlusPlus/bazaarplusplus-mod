@@ -123,7 +123,7 @@ internal sealed class AchievementCardCatalog
         var english = RequiredText(dto.En, $"{path}.en");
         var zhHans = RequiredText(dto.ZhHans, $"{path}.zhHans");
         var zhHant = RequiredText(dto.ZhHant, $"{path}.zhHant");
-        return new LocalizedTextSet(english, zhHans, zhHant, zhHant);
+        return new LocalizedTextSet(english, zhHans, zhHant);
     }
 
     private static T ParseEnum<T>(string? value, string path)

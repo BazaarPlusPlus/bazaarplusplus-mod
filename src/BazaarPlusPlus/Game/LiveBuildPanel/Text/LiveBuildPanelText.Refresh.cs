@@ -14,43 +14,36 @@ internal static partial class LiveBuildPanelText
     private static readonly LocalizedTextSet CorpusCardTitleText = new(
         "Ten-Win Build Data",
         "十胜阵容数据",
-        "十勝陣容資料",
         "十勝陣容資料"
     );
     private static readonly LocalizedTextSet RefreshFinalBuildsText = new(
         "Pull Builds",
         "拉取阵容",
-        "拉取陣容",
         "拉取陣容"
     );
     private static readonly LocalizedTextSet WorkingText = new("Working...", "处理中...");
     private static readonly LocalizedTextSet RefreshingFinalBuildsText = new(
         "Pulling ten-win builds...",
         "正在拉取十胜阵容...",
-        "正在拉取十勝陣容...",
         "正在拉取十勝陣容..."
     );
     private static readonly LocalizedTextSet CorpusEmptyText = new(
         "No build data yet. Pull to load.",
         "尚未加载阵容数据，点击拉取。",
-        "尚未載入陣容資料，點擊拉取。",
         "尚未載入陣容資料，點擊拉取。"
     );
     private static readonly LocalizedTextSet CorpusDataTimeLabelText = new(
         "data",
         "数据时间",
-        "資料時間",
         "資料時間"
     );
     private static readonly LocalizedTextSet CorpusBuildCountUnitText = new(
         "builds",
         "套阵容",
-        "套陣容",
         "套陣容"
     );
     private static readonly LocalizedTextSet CorpusHeroCountUnitText = new(
         "heroes",
-        "位英雄",
         "位英雄",
         "位英雄"
     );
@@ -102,7 +95,6 @@ internal static partial class LiveBuildPanelText
             new LocalizedTextSet(
                 $"Couldn't pull ten-win builds: {details}",
                 $"拉取十胜阵容失败：{details}",
-                $"拉取十勝陣容失敗：{details}",
                 $"拉取十勝陣容失敗：{details}"
             )
         );

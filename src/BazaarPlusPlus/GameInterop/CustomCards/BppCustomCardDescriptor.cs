@@ -11,8 +11,8 @@ internal sealed record BppCustomCardDescriptor
     public ECardType Type { get; init; } = ECardType.Item;
     public ECardSize Size { get; init; } = ECardSize.Medium;
     public ETier StartingTier { get; init; } = ETier.Bronze;
-    public LocalizedTextSet Title { get; init; } = new("", "", "", "");
-    public LocalizedTextSet Description { get; init; } = new("", "", "", "");
+    public LocalizedTextSet Title { get; init; } = new("", "", "");
+    public LocalizedTextSet Description { get; init; } = new("", "", "");
     public bool HasBundledArt { get; init; }
     public string InternalName { get; init; } = string.Empty;
     public int SortKey { get; init; }

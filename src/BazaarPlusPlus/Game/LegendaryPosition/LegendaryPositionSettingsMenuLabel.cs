@@ -9,7 +9,6 @@ internal static class LegendaryPositionSettingsMenuLabel
     private static readonly LocalizedTextSet Labels = new(
         "Legendary Position",
         "传奇名次",
-        "傳奇名次",
         "傳奇名次"
     );
 

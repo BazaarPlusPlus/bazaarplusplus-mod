@@ -8,18 +8,8 @@ namespace BazaarPlusPlus.Game.LiveBuildPanel;
 
 internal static partial class LiveBuildPanelText
 {
-    private static readonly LocalizedTextSet CandidateCountText = new(
-        "Candidates",
-        "候选",
-        "候選",
-        "候選"
-    );
-    private static readonly LocalizedTextSet TenWinLabelText = new(
-        "10-win",
-        "十胜",
-        "十勝",
-        "十勝"
-    );
+    private static readonly LocalizedTextSet CandidateCountText = new("Candidates", "候选", "候選");
+    private static readonly LocalizedTextSet TenWinLabelText = new("10-win", "十胜", "十勝");
 
     public static string CandidateCount(int count) => $"{L.Resolve(CandidateCountText)} {count}";
 

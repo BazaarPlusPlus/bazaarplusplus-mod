@@ -76,7 +76,10 @@ internal sealed class BppConfig : IBppConfig
             "Localization",
             "ChineseLocaleMode",
             BppChineseLocaleMode.Mainland,
-            "Chinese locale variant for BazaarPlusPlus UI when the game language is Chinese. Cycles between Mainland, Taiwan, and HongKong."
+            "Chinese locale variant for BazaarPlusPlus UI when the game language is Chinese. Cycles between Mainland and Taiwan."
+        );
+        ChineseLocaleModeConfig.Value = ChineseScriptConverter.NormalizeMode(
+            ChineseLocaleModeConfig.Value
         );
         LegendaryPositionDisplayModeConfig = config.Bind(
             "LegendaryPositionDisplay",

@@ -15,5 +15,7 @@ internal sealed class ChineseLocaleModeProvider : ILocaleModeProvider
     }
 
     public BppChineseLocaleMode CurrentMode =>
-        _config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland;
+        ChineseScriptConverter.NormalizeMode(
+            _config.ChineseLocaleModeConfig?.Value ?? BppChineseLocaleMode.Mainland
+        );
 }
