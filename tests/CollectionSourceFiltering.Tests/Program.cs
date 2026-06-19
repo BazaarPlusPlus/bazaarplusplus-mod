@@ -338,6 +338,35 @@ AssertEqual(
     currentCatalog.SelectMany(entry => entry.SourceTemplateIds).Distinct().Count(),
     "Current source template ids should be unique across source entries."
 );
+var eli = currentCatalog.Single(entry =>
+    entry.Kind == CollectionSourceKind.Merchant
+    && string.Equals(entry.Name, "Eli", StringComparison.Ordinal)
+);
+var potionTaggedCard = CatalogCard(
+    Guid.Parse("eeee1111-0000-0000-0000-000000000001"),
+    ECardType.Item,
+    [EHero.Mak],
+    tags: [ECardTag.Potion]
+);
+var potionReferenceCard = CatalogCard(
+    Guid.Parse("eeee1111-0000-0000-0000-000000000002"),
+    ECardType.Item,
+    [EHero.Mak],
+    hiddenTags: [EHiddenTag.PotionReference]
+);
+var nonPotionCard = CatalogCard(
+    Guid.Parse("eeee1111-0000-0000-0000-000000000003"),
+    ECardType.Item,
+    [EHero.Mak],
+    tags: [ECardTag.Tool]
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(eli, EHero.Mak, new[] { potionTaggedCard, potionReferenceCard, nonPotionCard })
+        .OfferedCardIds,
+    new[] { potionTaggedCard.Id, potionReferenceCard.Id },
+    "Eli should include both Potion-tagged cards and PotionReference cards."
+);
 foreach (var source in currentCatalog)
 {
     AssertTrue(source.PortraitTemplateId != Guid.Empty, $"{source.SourceKey} needs a portrait id.");

@@ -327,6 +327,16 @@
               "Potion"
             ]
           }
+        },
+        {
+          "key": "reference",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "hiddenTagsAny": [
+              "PotionReference"
+            ]
+          }
         }
       ]
     },
