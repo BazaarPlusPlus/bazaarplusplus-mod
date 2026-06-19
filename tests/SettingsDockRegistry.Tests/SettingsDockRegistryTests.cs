@@ -262,12 +262,13 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void SettingsDockCatalog_sorts_tutorial_between_chinese_locale_and_bazaar_db()
+    public void SettingsDockCatalog_sorts_stream_mode_immediately_above_hotkey_tutorial()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
         var registry = new SettingsDockEntryRegistry();
         registry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
         registry.Register(new HotkeyTutorialSettingsDockEntry());
+        registry.Register(new FixedSupporterListSettingsDockEntry());
         registry.Register(new ChineseLocaleModeSettingsDockEntry(new InMemoryBppEventBus()));
 
         try
@@ -275,7 +276,7 @@ public class SettingsDockRegistryTests
             BppSettingsDockCatalog.Install(new BppConfig(), registry);
 
             Assert.Equal(
-                new[] { "ChineseLocaleMode", "HotkeyTutorial", "BazaarDbUpload" },
+                new[] { "ChineseLocaleMode", "StreamMode", "HotkeyTutorial", "BazaarDbUpload" },
                 BppSettingsDockCatalog.Definitions.Select(d => d.Key)
             );
         }
