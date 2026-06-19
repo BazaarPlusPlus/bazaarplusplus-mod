@@ -26,6 +26,7 @@ internal sealed class CollectionCardFactory
     private readonly Transform _parent;
     private readonly Func<object?> _staticDataProvider;
     private readonly Func<object?, Guid, TCardBase?> _templateResolver;
+    private readonly Func<BppCustomCardDescriptor, TCardBase> _customTemplateBuilder;
     private int _instanceCounter;
 
     public CollectionCardFactory(CollectionCardPool pool, Transform parent)
@@ -33,14 +34,16 @@ internal sealed class CollectionCardFactory
             pool,
             parent,
             BppStaticDataAccess.TryGetReadyManagerObject,
-            BppStaticDataAccess.GetCardTemplate
+            BppStaticDataAccess.GetCardTemplate,
+            BppCustomCardTemplateFactory.Build
         ) { }
 
     internal CollectionCardFactory(
         CollectionCardPool pool,
         Transform parent,
         Func<object?> staticDataProvider,
-        Func<object?, Guid, TCardBase?> templateResolver
+        Func<object?, Guid, TCardBase?> templateResolver,
+        Func<BppCustomCardDescriptor, TCardBase>? customTemplateBuilder = null
     )
     {
         _pool = pool;
@@ -49,6 +52,7 @@ internal sealed class CollectionCardFactory
             staticDataProvider ?? throw new ArgumentNullException(nameof(staticDataProvider));
         _templateResolver =
             templateResolver ?? throw new ArgumentNullException(nameof(templateResolver));
+        _customTemplateBuilder = customTemplateBuilder ?? BppCustomCardTemplateFactory.Build;
     }
 
     public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
@@ -59,7 +63,23 @@ internal sealed class CollectionCardFactory
             return CollectionCardBindResult.HardMiss();
 
         if (BppCustomCardRegistry.Current?.TryGet(vm.Id, out var descriptor) == true)
-            return Bind(vm, BppCustomCardTemplateFactory.Build(descriptor!));
+        {
+            TCardBase customTemplate;
+            try
+            {
+                customTemplate = _customTemplateBuilder(descriptor!);
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "CollectionCardFactory",
+                    $"Custom template build failed for id={vm.Id} ({vm.InternalName}): {ex.Message}"
+                );
+                return CollectionCardBindResult.HardMiss();
+            }
+
+            return Bind(vm, customTemplate);
+        }
 
         var staticData = _staticDataProvider();
         if (staticData == null)

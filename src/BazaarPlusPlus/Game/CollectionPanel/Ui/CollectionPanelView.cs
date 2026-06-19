@@ -199,6 +199,7 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.SortHeader()
                 + CollectionPanelText.SortQuality()
                 + CollectionPanelText.SortSize()
+                + CollectionPanelText.TierHeader()
                 + CollectionPanelText.NoMatches()
                 + CollectionPanelText.SourceDisclaimer()
                 + CollectionPanelText.DayHeader()
@@ -440,7 +441,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_tierFilterLabel != null)
             _tierFilterLabel.text = showSizeChips
                 ? CollectionPanelText.TierSizeHeader()
-                : CollectionPanelText.SortQuality();
+                : CollectionPanelText.TierHeader();
         if (_tagFilterLabel != null)
             _tagFilterLabel.text = CollectionPanelText.TagHeader();
         if (_keywordFilterLabel != null)

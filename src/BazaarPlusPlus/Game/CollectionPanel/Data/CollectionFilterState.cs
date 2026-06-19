@@ -87,6 +87,7 @@ internal sealed class CollectionFilterState
         if (tab == CollectionTabKind.Achievements)
         {
             Heroes.Clear();
+            Tiers.Clear();
             Sizes.Clear();
             Tags.Clear();
             Keywords.Clear();

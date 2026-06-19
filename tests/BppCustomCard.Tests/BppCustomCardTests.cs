@@ -154,6 +154,35 @@ public sealed class BppCustomCardTests : IDisposable
     }
 
     [Fact]
+    public void Card_factory_hard_misses_when_custom_template_builder_throws()
+    {
+        var descriptor = Descriptor(Guid.NewGuid());
+        var registry = new BppCustomCardRegistry(_ => false);
+        registry.Register(descriptor);
+        BppCustomCardRegistry.Current = registry;
+        var vm = new CollectionCardVm
+        {
+            Id = descriptor.Id,
+            Type = ECardType.Item,
+            Size = ECardSize.Medium,
+            StartingTier = ETier.Bronze,
+            InternalName = "BrokenCustomCard",
+        };
+        var factory = new CollectionCardFactory(
+            null!,
+            null!,
+            staticDataProvider: () => throw new InvalidOperationException("not called"),
+            templateResolver: (_, _) => throw new InvalidOperationException("not called"),
+            customTemplateBuilder: _ => throw new InvalidOperationException("bad custom")
+        );
+
+        var result = factory.TryBind(vm);
+
+        Assert.Equal(CollectionCardBindStatus.HardMiss, result.Status);
+        Assert.Null(result.Binding);
+    }
+
+    [Fact]
     public void Embedded_catalog_contains_cosmic_ray_and_bundled_art_resource()
     {
         var catalog = AchievementCardCatalog.LoadEmbedded();
@@ -163,6 +192,44 @@ public sealed class BppCustomCardTests : IDisposable
 
         Assert.Equal("CosmicRay", descriptor.InternalName);
         Assert.True(descriptor.HasBundledArt);
+    }
+
+    [Fact]
+    public void Achievement_registration_disables_achievements_when_catalog_loading_fails()
+    {
+        var registry = new BppCustomCardRegistry(_ => false);
+
+        AchievementCardRegistrar.Register(
+            registry,
+            loadCatalog: () => throw new InvalidOperationException("bad catalog")
+        );
+
+        Assert.Empty(registry.GetAll());
+    }
+
+    [Fact]
+    public void Achievement_registration_preserves_registry_when_later_card_registration_fails()
+    {
+        var existing = Descriptor(Guid.NewGuid());
+        var stagedId = Guid.NewGuid();
+        var registry = new BppCustomCardRegistry(_ => false);
+        registry.Register(existing);
+
+        AchievementCardRegistrar.Register(
+            registry,
+            loadCatalog: () =>
+                new AchievementCardCatalog(
+                    new[]
+                    {
+                        AchievementDefinition(stagedId, "FirstAchievement", 10),
+                        AchievementDefinition(stagedId, "DuplicateAchievement", 20),
+                    }
+                )
+        );
+
+        var descriptor = Assert.Single(registry.GetAll());
+        Assert.Same(existing, descriptor);
+        Assert.False(registry.IsBppCard(stagedId));
     }
 
     private static BppCustomCardDescriptor Descriptor(Guid id) =>
@@ -182,6 +249,32 @@ public sealed class BppCustomCardTests : IDisposable
             HasBundledArt = true,
             InternalName = "CosmicRay",
             SortKey = 10,
+        };
+
+    private static AchievementCardDefinition AchievementDefinition(
+        Guid templateId,
+        string internalName,
+        int sortKey
+    ) =>
+        new()
+        {
+            AchievementId = internalName,
+            TemplateId = templateId,
+            InternalName = internalName,
+            Title = new LocalizedTextSet(internalName, internalName, internalName, internalName),
+            Description = new LocalizedTextSet(
+                $"{internalName} description",
+                $"{internalName} description",
+                $"{internalName} description",
+                $"{internalName} description"
+            ),
+            Category = "test",
+            RuleKind = "test",
+            Target = 1,
+            DisplayTier = ETier.Legendary,
+            DisplaySize = ECardSize.Medium,
+            SortKey = sortKey,
+            HiddenUntilUnlocked = false,
         };
 
     private const string EmbeddedCosmicRayJson = """
