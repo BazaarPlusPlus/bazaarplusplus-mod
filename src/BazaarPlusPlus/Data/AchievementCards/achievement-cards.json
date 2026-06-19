@@ -11,9 +11,9 @@
         "zhHant": "宇宙射線"
       },
       "description": {
-        "en": "Deal 9999+ damage in a single hit",
-        "zhHans": "单次伤害达到 9999",
-        "zhHant": "單次傷害達到 9999"
+        "en": "One strike plunges three thousand feet, as if the Milky Way came crashing from the ninth heaven — deal 9999+ damage in a single hit",
+        "zhHans": "一击直下三千尺，疑是银河落九天——单次伤害突破 9999",
+        "zhHant": "一擊直下三千尺，疑是銀河落九天——單次傷害突破 9999"
       },
       "category": "combat",
       "ruleKind": "combat_single_damage",
@@ -22,6 +22,29 @@
       "displayTier": "Legendary",
       "displaySize": "Medium",
       "sortKey": 10,
+      "hiddenUntilUnlocked": false
+    },
+    {
+      "achievementId": "storm_traveler",
+      "templateId": "ff35bbaa-3545-5fef-b469-79a4f4592326",
+      "internalName": "StormTraveler",
+      "title": {
+        "en": "Storm Traveler",
+        "zhHans": "风暴旅人",
+        "zhHant": "風暴旅人"
+      },
+      "description": {
+        "en": "A hundred battles in the yellow sand have worn his golden armor through; alone he stands against the gale till the sun sinks low — outlast an entire sandstorm",
+        "zhHans": "黄沙百战穿金甲，独立狂风到日斜——熬过整场沙尘暴",
+        "zhHant": "黃沙百戰穿金甲，獨立狂風到日斜——熬過整場沙塵暴"
+      },
+      "category": "survival",
+      "ruleKind": "sandstorm_survived",
+      "ruleParams": {},
+      "target": 1,
+      "displayTier": "Legendary",
+      "displaySize": "Medium",
+      "sortKey": 20,
       "hiddenUntilUnlocked": false
     }
   ]
