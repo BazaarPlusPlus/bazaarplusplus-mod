@@ -44,3 +44,5 @@ tools
 .claude
 .superpowers/
 *.lscache
+.agents/
+skills-lock.json
