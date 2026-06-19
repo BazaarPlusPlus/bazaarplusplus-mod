@@ -98,8 +98,14 @@ Assert(
     coordinatorStateType.GetProperty("ReplayActionInProgress")!.SetValue(state, true);
     coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.SetValue(state, true);
 
+    var dataService =
+        Activator.CreateInstance(dataServiceType, new object?[] { null, null })
+        ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
     var dependencies =
-        Activator.CreateInstance(coordinatorDependenciesType, null, null, null, null)
+        Activator.CreateInstance(
+            coordinatorDependenciesType,
+            new object?[] { null, dataService, null, null }
+        )
         ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
     var coordinator =
         Activator.CreateInstance(
@@ -136,8 +142,14 @@ Assert(
     coordinatorStateType.GetProperty("ReplayActionInProgress")!.SetValue(state, true);
     coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.SetValue(state, true);
 
+    var dataService =
+        Activator.CreateInstance(dataServiceType, new object?[] { null, null })
+        ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
     var dependencies =
-        Activator.CreateInstance(coordinatorDependenciesType, null, null, null, null)
+        Activator.CreateInstance(
+            coordinatorDependenciesType,
+            new object?[] { null, dataService, null, null }
+        )
         ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
     var coordinator =
         Activator.CreateInstance(

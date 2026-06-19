@@ -32,6 +32,8 @@ internal sealed class HistoryPanelState
 
     public List<HistoryBattleRecord> GhostBattles { get; } = new();
 
+    public List<HistoryRunRecord> FilteredRuns { get; } = new();
+
     public List<HistoryBattleRecord> FilteredGhostBattles { get; } = new();
 
     public int SelectedRunIndex { get; set; }
@@ -41,6 +43,10 @@ internal sealed class HistoryPanelState
     public int SelectedGhostBattleIndex { get; set; }
 
     public GhostBattleFilter GhostBattleFilter { get; set; } = GhostBattleFilter.All;
+
+    public string? SelectedRunHero { get; set; }
+
+    public bool GhostDayMin10 { get; set; }
 
     public string? StatusMessage { get; set; }
 
@@ -62,6 +68,8 @@ internal sealed class HistoryPanelState
 
     public bool FilteredGhostBattlesDirty { get; set; } = true;
 
+    public bool FilteredRunsDirty { get; set; } = true;
+
     public bool IsVisible { get; set; }
 
     public bool ShouldClearStatusWhenDeleteConfirmationExpires()
@@ -69,7 +77,8 @@ internal sealed class HistoryPanelState
         return DeleteRunConfirmationStatusActive;
     }
 
-    public HistoryRunRecord? GetSelectedRun() => SafeIndex(Runs, SelectedRunIndex);
+    public HistoryRunRecord? GetSelectedRun(IReadOnlyList<HistoryRunRecord> filteredRuns) =>
+        SafeIndex(filteredRuns, SelectedRunIndex);
 
     public HistoryBattleRecord? GetSelectedBattle() => SafeIndex(Battles, SelectedBattleIndex);
 

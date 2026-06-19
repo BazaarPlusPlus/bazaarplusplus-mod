@@ -49,7 +49,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     public static bool IsVisible { get; private set; }
 
-    private HistoryRunRecord? SelectedRun => _state.GetSelectedRun();
+    private HistoryRunRecord? SelectedRun => _state.GetSelectedRun(FilteredRuns);
 
     private HistoryBattleRecord? SelectedBattle => _state.GetSelectedBattle();
 
@@ -60,6 +60,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _sectionMode == HistorySectionMode.Ghost ? SelectedGhostBattle : SelectedBattle;
 
     private IReadOnlyList<HistoryBattleRecord> FilteredGhostBattles => GetFilteredGhostBattles();
+
+    private IReadOnlyList<HistoryRunRecord> FilteredRuns => GetFilteredRuns();
 
     private List<HistoryRunRecord> _runs => _state.Runs;
 
@@ -505,6 +507,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private IReadOnlyList<HistoryBattleRecord> GetFilteredGhostBattles()
     {
         return _coordinator?.GetFilteredGhostBattles() ?? _filteredGhostBattles;
+    }
+
+    private IReadOnlyList<HistoryRunRecord> GetFilteredRuns()
+    {
+        return _coordinator?.GetFilteredRuns() ?? _state.FilteredRuns;
     }
 
     private static string GetSceneToken(Scene scene)

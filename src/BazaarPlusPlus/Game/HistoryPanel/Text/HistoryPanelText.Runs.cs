@@ -40,6 +40,8 @@ internal static partial class HistoryPanelText
 
     private static readonly LocalizedTextSet ILostFilterText = new("I Lost", "我输了");
 
+    private static readonly LocalizedTextSet FilterDayMin10Text = new("≥10d", "≥10天", "≥10天");
+
     private static readonly LocalizedTextSet UnrankedText = new("Normal", "普通对局", "普通對局");
 
     private static readonly LocalizedTextSet UnknownRunText = new("Unknown Run", "未知 Run");
@@ -67,6 +69,8 @@ internal static partial class HistoryPanelText
     internal static string FilterIWon() => Resolve(IWonFilterText);
 
     internal static string FilterILost() => Resolve(ILostFilterText);
+
+    internal static string FilterDayMin10() => Resolve(FilterDayMin10Text);
 
     internal static string Unranked() => Resolve(UnrankedText);
 

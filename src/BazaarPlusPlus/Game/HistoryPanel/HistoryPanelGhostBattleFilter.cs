@@ -24,6 +24,14 @@ internal static class HistoryPanelGhostBattleFilter
         };
     }
 
+    public static bool Matches(GhostBattleFilter filter, bool dayMin10, HistoryBattleRecord battle)
+    {
+        if (!Matches(filter, battle))
+            return false;
+
+        return !dayMin10 || (battle.Day.HasValue && battle.Day.Value >= 10);
+    }
+
     public static HistoryPanelGhostBattleOutcome ResolveOutcomeForCompatibility(
         HistoryBattleRecord battle
     )

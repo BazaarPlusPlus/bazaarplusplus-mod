@@ -96,6 +96,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.Runs.Clear();
         _state.Battles.Clear();
         _state.GhostBattles.Clear();
+        InvalidateFilteredRuns();
         InvalidateFilteredGhostBattles();
 
         if (_state.SectionMode == HistorySectionMode.Ghost)
@@ -120,11 +121,8 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         }
 
         _state.Runs.AddRange(runs);
-        _state.SelectedRunIndex = Mathf.Clamp(
-            _state.SelectedRunIndex,
-            0,
-            Mathf.Max(0, _state.Runs.Count - 1)
-        );
+        InvalidateFilteredRuns();
+        _state.SelectedRunIndex = ClampIndex(_state.SelectedRunIndex, GetFilteredRuns().Count);
         LoadBattlesForSelectedRun();
         _state.PreviewSelectionMode = PreviewSelectionMode.Run;
         SetStatusMessage(statusMessage);
@@ -162,10 +160,9 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         _state.GhostBattles.AddRange(battles);
         InvalidateFilteredGhostBattles();
-        _state.SelectedGhostBattleIndex = Mathf.Clamp(
+        _state.SelectedGhostBattleIndex = ClampIndex(
             _state.SelectedGhostBattleIndex,
-            0,
-            Mathf.Max(0, GetFilteredGhostBattles().Count - 1)
+            GetFilteredGhostBattles().Count
         );
         _state.PreviewSelectionMode = PreviewSelectionMode.Battle;
         SetStatusMessage(statusMessage);
@@ -194,10 +191,51 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         _state.GhostBattleFilter = filter;
         InvalidateFilteredGhostBattles();
-        _state.SelectedGhostBattleIndex = Mathf.Clamp(
+        _state.SelectedGhostBattleIndex = ClampIndex(
             _state.SelectedGhostBattleIndex,
-            0,
-            Mathf.Max(0, GetFilteredGhostBattles().Count - 1)
+            GetFilteredGhostBattles().Count
+        );
+        _state.PreviewSelectionMode = PreviewSelectionMode.Battle;
+        _requestUiRefresh();
+        _requestPreviewRefresh();
+    }
+
+    public void SetRunHeroFilter(string hero)
+    {
+        var selectedHero = string.IsNullOrEmpty(hero) ? null : hero;
+        _state.SelectedRunHero =
+            selectedHero != null
+            && !string.Equals(
+                _state.SelectedRunHero,
+                selectedHero,
+                StringComparison.OrdinalIgnoreCase
+            )
+                ? selectedHero
+                : null;
+        InvalidateFilteredRuns();
+        _state.SelectedRunIndex = 0;
+        ClearDeleteRunConfirmation();
+        LoadBattlesForSelectedRun();
+        _state.PreviewSelectionMode = PreviewSelectionMode.Run;
+        _requestUiRefresh();
+        _requestPreviewRefresh();
+    }
+
+    public void ToggleGhostDayMin10()
+    {
+        SetGhostDayMin10(!_state.GhostDayMin10);
+    }
+
+    public void SetGhostDayMin10(bool value)
+    {
+        if (_state.GhostDayMin10 == value)
+            return;
+
+        _state.GhostDayMin10 = value;
+        InvalidateFilteredGhostBattles();
+        _state.SelectedGhostBattleIndex = ClampIndex(
+            _state.SelectedGhostBattleIndex,
+            GetFilteredGhostBattles().Count
         );
         _state.PreviewSelectionMode = PreviewSelectionMode.Battle;
         _requestUiRefresh();
@@ -206,7 +244,8 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     public void SelectRun(int index)
     {
-        if (index < 0 || index >= _state.Runs.Count)
+        var filteredRuns = GetFilteredRuns();
+        if (index < 0 || index >= filteredRuns.Count)
             return;
 
         if (_state.SelectedRunIndex != index)
@@ -596,12 +635,34 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.FilteredGhostBattles.Clear();
         foreach (var battle in _state.GhostBattles)
         {
-            if (HistoryPanelGhostBattleFilter.Matches(_state.GhostBattleFilter, battle))
+            if (
+                HistoryPanelGhostBattleFilter.Matches(
+                    _state.GhostBattleFilter,
+                    _state.GhostDayMin10,
+                    battle
+                )
+            )
                 _state.FilteredGhostBattles.Add(battle);
         }
 
         _state.FilteredGhostBattlesDirty = false;
         return _state.FilteredGhostBattles;
+    }
+
+    public IReadOnlyList<HistoryRunRecord> GetFilteredRuns()
+    {
+        if (!_state.FilteredRunsDirty)
+            return _state.FilteredRuns;
+
+        _state.FilteredRuns.Clear();
+        foreach (var run in _state.Runs)
+        {
+            if (HistoryPanelRunHeroFilter.Matches(_state.SelectedRunHero, run))
+                _state.FilteredRuns.Add(run);
+        }
+
+        _state.FilteredRunsDirty = false;
+        return _state.FilteredRuns;
     }
 
     public bool IsDeleteRunConfirmationActive(string runId, float now)
@@ -630,9 +691,23 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     private HistoryRunRecord? GetSelectedRun()
     {
-        return _state.Runs.Count == 0
-            ? null
-            : _state.Runs[Mathf.Clamp(_state.SelectedRunIndex, 0, _state.Runs.Count - 1)];
+        var filteredRuns = GetFilteredRuns();
+        if (filteredRuns.Count == 0)
+            return null;
+
+        _state.SelectedRunIndex = ClampIndex(_state.SelectedRunIndex, filteredRuns.Count);
+        return _state.GetSelectedRun(filteredRuns);
+    }
+
+    private static int ClampIndex(int index, int count)
+    {
+        if (count <= 0)
+            return 0;
+
+        if (index < 0)
+            return 0;
+
+        return index >= count ? count - 1 : index;
     }
 
     private void ClearDeleteRunConfirmation()
@@ -672,6 +747,11 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     private void InvalidateFilteredGhostBattles()
     {
         _state.FilteredGhostBattlesDirty = true;
+    }
+
+    private void InvalidateFilteredRuns()
+    {
+        _state.FilteredRunsDirty = true;
     }
 
     // Kept as a thin alias on the coordinator so external test reflection that targets
