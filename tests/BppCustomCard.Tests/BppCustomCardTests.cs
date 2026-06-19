@@ -219,14 +219,45 @@ public sealed class BppCustomCardTests : IDisposable
         var factory = new CollectionCardFactory(
             null!,
             null!,
-            staticDataProvider: () => throw new InvalidOperationException("not called"),
+            staticDataProvider: () => new object(),
             templateResolver: (_, _) => throw new InvalidOperationException("not called"),
-            customTemplateBuilder: _ => throw new InvalidOperationException("bad custom")
+            customTemplateBuilder: (_, _) => throw new InvalidOperationException("bad custom"),
+            customMaterialDonorResolver: new TestDonorResolver("Addressables/CardArt/Donor.asset")
         );
 
         var result = factory.TryBind(vm);
 
         Assert.Equal(CollectionCardBindStatus.HardMiss, result.Status);
+        Assert.Null(result.Binding);
+    }
+
+    [Fact]
+    public void Card_factory_reports_not_ready_until_donor_art_resolves()
+    {
+        var descriptor = Descriptor(Guid.NewGuid());
+        var registry = new BppCustomCardRegistry(_ => false);
+        registry.Register(descriptor);
+        BppCustomCardRegistry.Current = registry;
+        var vm = new CollectionCardVm
+        {
+            Id = descriptor.Id,
+            Type = ECardType.Item,
+            Size = ECardSize.Medium,
+            StartingTier = ETier.Bronze,
+            InternalName = "CustomCardWaitingForDonor",
+        };
+        var factory = new CollectionCardFactory(
+            null!,
+            null!,
+            staticDataProvider: () => new object(),
+            templateResolver: (_, _) => throw new InvalidOperationException("not called"),
+            customTemplateBuilder: (_, _) => throw new InvalidOperationException("not called"),
+            customMaterialDonorResolver: new TestDonorResolver(null)
+        );
+
+        var result = factory.TryBind(vm);
+
+        Assert.Equal(CollectionCardBindStatus.NotReady, result.Status);
         Assert.Null(result.Binding);
     }
 
@@ -297,6 +328,15 @@ public sealed class BppCustomCardTests : IDisposable
             InternalName = "CosmicRay",
             SortKey = 10,
         };
+
+    private sealed class TestDonorResolver : BppCustomCardMaterialDonorResolver
+    {
+        private readonly string? _artKey;
+
+        public TestDonorResolver(string? artKey) => _artKey = artKey;
+
+        public override string? Resolve(object? staticData, ECardSize size) => _artKey;
+    }
 
     private static AchievementCardDefinition AchievementDefinition(
         Guid templateId,

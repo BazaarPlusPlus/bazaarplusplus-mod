@@ -26,7 +26,8 @@ internal sealed class CollectionCardFactory
     private readonly Transform _parent;
     private readonly Func<object?> _staticDataProvider;
     private readonly Func<object?, Guid, TCardBase?> _templateResolver;
-    private readonly Func<BppCustomCardDescriptor, TCardBase> _customTemplateBuilder;
+    private readonly Func<BppCustomCardDescriptor, string?, TCardBase> _customTemplateBuilder;
+    private readonly BppCustomCardMaterialDonorResolver _customMaterialDonorResolver;
     private int _instanceCounter;
 
     public CollectionCardFactory(CollectionCardPool pool, Transform parent)
@@ -35,7 +36,8 @@ internal sealed class CollectionCardFactory
             parent,
             BppStaticDataAccess.TryGetReadyManagerObject,
             BppStaticDataAccess.GetCardTemplate,
-            BppCustomCardTemplateFactory.Build
+            BppCustomCardTemplateFactory.Build,
+            new BppCustomCardMaterialDonorResolver()
         ) { }
 
     internal CollectionCardFactory(
@@ -43,7 +45,8 @@ internal sealed class CollectionCardFactory
         Transform parent,
         Func<object?> staticDataProvider,
         Func<object?, Guid, TCardBase?> templateResolver,
-        Func<BppCustomCardDescriptor, TCardBase>? customTemplateBuilder = null
+        Func<BppCustomCardDescriptor, string?, TCardBase>? customTemplateBuilder = null,
+        BppCustomCardMaterialDonorResolver? customMaterialDonorResolver = null
     )
     {
         _pool = pool;
@@ -53,6 +56,8 @@ internal sealed class CollectionCardFactory
         _templateResolver =
             templateResolver ?? throw new ArgumentNullException(nameof(templateResolver));
         _customTemplateBuilder = customTemplateBuilder ?? BppCustomCardTemplateFactory.Build;
+        _customMaterialDonorResolver =
+            customMaterialDonorResolver ?? new BppCustomCardMaterialDonorResolver();
     }
 
     public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
@@ -64,10 +69,29 @@ internal sealed class CollectionCardFactory
 
         if (BppCustomCardRegistry.Current?.TryGet(vm.Id, out var descriptor) == true)
         {
+            // Achievements are display-only; without bundled art there is nothing to draw and a
+            // donor key would leak the donor card's illustration. Require bundled art.
+            if (BppCustomCardRegistry.Current?.HasBundledArt(vm.Id) != true)
+            {
+                BppLog.Warn(
+                    "CollectionCardFactory",
+                    $"Custom card {vm.Id} ({vm.InternalName}) has no bundled art; skipping."
+                );
+                return CollectionCardBindResult.HardMiss();
+            }
+
+            var staticData = _staticDataProvider();
+            if (staticData == null)
+                return CollectionCardBindResult.NotReady();
+
+            var donorArtKey = _customMaterialDonorResolver.Resolve(staticData, descriptor!.Size);
+            if (string.IsNullOrEmpty(donorArtKey))
+                return CollectionCardBindResult.NotReady(); // donor scan in flight; retried next frame
+
             TCardBase customTemplate;
             try
             {
-                customTemplate = _customTemplateBuilder(descriptor!);
+                customTemplate = _customTemplateBuilder(descriptor, donorArtKey);
             }
             catch (Exception ex)
             {
@@ -81,11 +105,11 @@ internal sealed class CollectionCardFactory
             return Bind(vm, customTemplate);
         }
 
-        var staticData = _staticDataProvider();
-        if (staticData == null)
+        var nativeStaticData = _staticDataProvider();
+        if (nativeStaticData == null)
             return CollectionCardBindResult.NotReady();
 
-        var template = _templateResolver(staticData, vm.Id);
+        var template = _templateResolver(nativeStaticData, vm.Id);
         if (template == null)
         {
             BppLog.Warn(
