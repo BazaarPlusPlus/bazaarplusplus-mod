@@ -222,7 +222,9 @@ public sealed class BppCustomCardTests : IDisposable
             staticDataProvider: () => new object(),
             templateResolver: (_, _) => throw new InvalidOperationException("not called"),
             customTemplateBuilder: (_, _) => throw new InvalidOperationException("bad custom"),
-            customMaterialDonorResolver: new TestDonorResolver("Addressables/CardArt/Donor.asset")
+            customMaterialDonorResolver: new TestDonorResolver(
+                BppCustomCardMaterialDonorResult.Ready("Addressables/CardArt/Donor.asset")
+            )
         );
 
         var result = factory.TryBind(vm);
@@ -252,12 +254,90 @@ public sealed class BppCustomCardTests : IDisposable
             staticDataProvider: () => new object(),
             templateResolver: (_, _) => throw new InvalidOperationException("not called"),
             customTemplateBuilder: (_, _) => throw new InvalidOperationException("not called"),
-            customMaterialDonorResolver: new TestDonorResolver(null)
+            customMaterialDonorResolver: new TestDonorResolver(
+                BppCustomCardMaterialDonorResult.Pending()
+            )
         );
 
         var result = factory.TryBind(vm);
 
         Assert.Equal(CollectionCardBindStatus.NotReady, result.Status);
+        Assert.Null(result.Binding);
+    }
+
+    [Fact]
+    public void Card_factory_hard_misses_when_donor_art_is_unavailable()
+    {
+        var descriptor = Descriptor(Guid.NewGuid());
+        var registry = new BppCustomCardRegistry(_ => false);
+        registry.Register(descriptor);
+        BppCustomCardRegistry.Current = registry;
+        var vm = new CollectionCardVm
+        {
+            Id = descriptor.Id,
+            Type = ECardType.Item,
+            Size = ECardSize.Medium,
+            StartingTier = ETier.Bronze,
+            InternalName = "CustomCardWithoutDonor",
+        };
+        var templateResolverCalls = 0;
+        var customTemplateBuilderCalls = 0;
+        var factory = new CollectionCardFactory(
+            null!,
+            null!,
+            staticDataProvider: () => new object(),
+            templateResolver: (_, _) =>
+            {
+                templateResolverCalls++;
+                throw new InvalidOperationException("not called");
+            },
+            customTemplateBuilder: (_, _) =>
+            {
+                customTemplateBuilderCalls++;
+                throw new InvalidOperationException("not called");
+            },
+            customMaterialDonorResolver: new TestDonorResolver(
+                BppCustomCardMaterialDonorResult.Unavailable()
+            )
+        );
+
+        var result = factory.TryBind(vm);
+
+        Assert.Equal(CollectionCardBindStatus.HardMiss, result.Status);
+        Assert.Null(result.Binding);
+        Assert.Equal(0, templateResolverCalls);
+        Assert.Equal(0, customTemplateBuilderCalls);
+    }
+
+    [Fact]
+    public void Card_factory_hard_misses_custom_cards_without_bundled_art()
+    {
+        var descriptor = Descriptor(Guid.NewGuid(), hasBundledArt: false);
+        var registry = new BppCustomCardRegistry(_ => false);
+        registry.Register(descriptor);
+        BppCustomCardRegistry.Current = registry;
+        var vm = new CollectionCardVm
+        {
+            Id = descriptor.Id,
+            Type = ECardType.Item,
+            Size = ECardSize.Medium,
+            StartingTier = ETier.Bronze,
+            InternalName = "CustomCardWithoutArt",
+        };
+        var factory = new CollectionCardFactory(
+            null!,
+            null!,
+            staticDataProvider: () => throw new InvalidOperationException("not called"),
+            templateResolver: (_, _) => throw new InvalidOperationException("not called"),
+            customTemplateBuilder: (_, _) => throw new InvalidOperationException("not called"),
+            customMaterialDonorResolver: new TestDonorResolver(
+                BppCustomCardMaterialDonorResult.Pending()
+            )
+        );
+
+        var result = factory.TryBind(vm);
+
+        Assert.Equal(CollectionCardBindStatus.HardMiss, result.Status);
         Assert.Null(result.Binding);
     }
 
@@ -311,7 +391,7 @@ public sealed class BppCustomCardTests : IDisposable
         Assert.False(registry.IsBppCard(stagedId));
     }
 
-    private static BppCustomCardDescriptor Descriptor(Guid id) =>
+    private static BppCustomCardDescriptor Descriptor(Guid id, bool hasBundledArt = true) =>
         new()
         {
             Id = id,
@@ -324,18 +404,19 @@ public sealed class BppCustomCardTests : IDisposable
                 "单次伤害达到 9999",
                 "單次傷害達到 9999"
             ),
-            HasBundledArt = true,
+            HasBundledArt = hasBundledArt,
             InternalName = "CosmicRay",
             SortKey = 10,
         };
 
     private sealed class TestDonorResolver : BppCustomCardMaterialDonorResolver
     {
-        private readonly string? _artKey;
+        private readonly BppCustomCardMaterialDonorResult _result;
 
-        public TestDonorResolver(string? artKey) => _artKey = artKey;
+        public TestDonorResolver(BppCustomCardMaterialDonorResult result) => _result = result;
 
-        public override string? Resolve(object? staticData, ECardSize size) => _artKey;
+        public override BppCustomCardMaterialDonorResult Resolve(object? staticData, ECardSize size) =>
+            _result;
     }
 
     private static AchievementCardDefinition AchievementDefinition(

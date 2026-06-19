@@ -14,19 +14,19 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // Resolves a deterministic donor ArtKey from native static data, by card size, so the
 // collection LoadArt prefix can materialize an *authored* base material for a synthetic
 // achievement card. The full-table card-map read runs on a worker thread (mirrors
-// CollectionCatalog.cs:70); Resolve returns null until the scan completes, which the
+// CollectionCatalog.cs:70); Resolve returns Pending until the scan completes, which the
 // factory maps to NotReady (retried next frame).
 internal class BppCustomCardMaterialDonorResolver
 {
     private readonly object _gate = new();
     private object? _source;
-    private readonly Dictionary<ECardSize, string?> _resolved = new();
+    private readonly Dictionary<ECardSize, BppCustomCardMaterialDonorResult> _resolved = new();
     private readonly HashSet<ECardSize> _inFlight = new();
 
-    public virtual string? Resolve(object? staticData, ECardSize size)
+    public virtual BppCustomCardMaterialDonorResult Resolve(object? staticData, ECardSize size)
     {
         if (staticData == null)
-            return null;
+            return BppCustomCardMaterialDonorResult.Pending();
 
         lock (_gate)
         {
@@ -39,7 +39,7 @@ internal class BppCustomCardMaterialDonorResolver
             if (_resolved.TryGetValue(size, out var done))
                 return done;
             if (!_inFlight.Add(size))
-                return null; // scan already running
+                return BppCustomCardMaterialDonorResult.Pending(); // scan already running
         }
 
         var captured = staticData;
@@ -63,13 +63,15 @@ internal class BppCustomCardMaterialDonorResolver
                 {
                     if (ReferenceEquals(_source, captured))
                     {
-                        _resolved[size] = key;
+                        _resolved[size] = string.IsNullOrEmpty(key)
+                            ? BppCustomCardMaterialDonorResult.Unavailable()
+                            : BppCustomCardMaterialDonorResult.Ready(key);
                         _inFlight.Remove(size);
                     }
                 }
             }
         });
-        return null;
+        return BppCustomCardMaterialDonorResult.Pending();
     }
 
     private static string? ScanForDonor(object source, ECardSize size)
@@ -97,4 +99,40 @@ internal class BppCustomCardMaterialDonorResolver
         // permanently unrenderable. The card-art material is keyed on ArtKey, not size.
         return Pick(items.Where(t => t.Size == size)) ?? Pick(items);
     }
+}
+
+internal enum BppCustomCardMaterialDonorStatus
+{
+    Pending,
+    Ready,
+    Unavailable,
+}
+
+internal readonly struct BppCustomCardMaterialDonorResult
+{
+    private BppCustomCardMaterialDonorResult(
+        BppCustomCardMaterialDonorStatus status,
+        string? artKey
+    )
+    {
+        Status = status;
+        ArtKey = artKey;
+    }
+
+    public BppCustomCardMaterialDonorStatus Status { get; }
+    public string? ArtKey { get; }
+
+    public static BppCustomCardMaterialDonorResult Pending() =>
+        new(BppCustomCardMaterialDonorStatus.Pending, null);
+
+    public static BppCustomCardMaterialDonorResult Ready(string artKey) =>
+        string.IsNullOrEmpty(artKey)
+            ? Unavailable()
+            : new BppCustomCardMaterialDonorResult(
+                BppCustomCardMaterialDonorStatus.Ready,
+                artKey
+            );
+
+    public static BppCustomCardMaterialDonorResult Unavailable() =>
+        new(BppCustomCardMaterialDonorStatus.Unavailable, null);
 }

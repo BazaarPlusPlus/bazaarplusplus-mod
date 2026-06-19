@@ -84,14 +84,25 @@ internal sealed class CollectionCardFactory
             if (staticData == null)
                 return CollectionCardBindResult.NotReady();
 
-            var donorArtKey = _customMaterialDonorResolver.Resolve(staticData, descriptor!.Size);
-            if (string.IsNullOrEmpty(donorArtKey))
+            var donor = _customMaterialDonorResolver.Resolve(staticData, descriptor!.Size);
+            if (donor.Status == BppCustomCardMaterialDonorStatus.Pending)
                 return CollectionCardBindResult.NotReady(); // donor scan in flight; retried next frame
+            if (
+                donor.Status != BppCustomCardMaterialDonorStatus.Ready
+                || string.IsNullOrEmpty(donor.ArtKey)
+            )
+            {
+                BppLog.Warn(
+                    "CollectionCardFactory",
+                    $"Custom card {vm.Id} ({vm.InternalName}) has no donor art; skipping."
+                );
+                return CollectionCardBindResult.HardMiss();
+            }
 
             TCardBase customTemplate;
             try
             {
-                customTemplate = _customTemplateBuilder(descriptor, donorArtKey);
+                customTemplate = _customTemplateBuilder(descriptor, donor.ArtKey);
             }
             catch (Exception ex)
             {
