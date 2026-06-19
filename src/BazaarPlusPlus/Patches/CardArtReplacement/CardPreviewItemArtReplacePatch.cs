@@ -63,9 +63,11 @@ internal static class CardPreviewItemArtReplacePatch
         // Base material is the authored donor material the LoadArt prefix already cloned onto
         // _cardMaterial (the donor ArtKey lives on the synthetic template). Clone it and swap
         // _BaseMap to the achievement art via the shared package clone cache. Do NOT touch
-        // marker.CurrentArtKey: it holds the donor key, owned and released by the prefix /
-        // destroy patch. Do NOT clear enchantment keywords here — that is exactly what made
-        // the bare path strobe.
+        // marker.CurrentArtKey: it holds the donor key, acquired once by the LoadArt prefix
+        // and released once by the destroy patch. The cloned achievement material is owned
+        // by CustomCardArtMaterialCache (feature-lifecycle disposed), not the collection LRU,
+        // so it cannot be evicted while assigned to a live card. Do NOT clear enchantment
+        // keywords here — that is exactly what made the bare path strobe.
         if (instance._cardMaterial == null || instance._cardImage == null)
             return false;
 
