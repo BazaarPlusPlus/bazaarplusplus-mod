@@ -24,6 +24,10 @@ public sealed class BppCustomCardTests : IDisposable
             new Guid("5351d91d-2b5c-5f44-8349-bbf334a9bbc5"),
             BppCustomCardIds.ForAchievement("cosmic_ray")
         );
+        Assert.Equal(
+            new Guid("ff35bbaa-3545-5fef-b469-79a4f4592326"),
+            BppCustomCardIds.ForAchievement("storm_traveler")
+        );
     }
 
     [Fact]
@@ -342,15 +346,26 @@ public sealed class BppCustomCardTests : IDisposable
     }
 
     [Fact]
-    public void Embedded_catalog_contains_cosmic_ray_and_bundled_art_resource()
+    public void Embedded_catalog_contains_achievement_cards_and_bundled_art_resources()
     {
         var catalog = AchievementCardCatalog.LoadEmbedded();
         var mapper = new AchievementCardDescriptorMapper();
 
-        var descriptor = mapper.Map(Assert.Single(catalog.Cards));
-
-        Assert.Equal("CosmicRay", descriptor.InternalName);
-        Assert.True(descriptor.HasBundledArt);
+        Assert.Collection(
+            catalog.Cards,
+            card =>
+            {
+                var descriptor = mapper.Map(card);
+                Assert.Equal("CosmicRay", descriptor.InternalName);
+                Assert.True(descriptor.HasBundledArt);
+            },
+            card =>
+            {
+                var descriptor = mapper.Map(card);
+                Assert.Equal("StormTraveler", descriptor.InternalName);
+                Assert.True(descriptor.HasBundledArt);
+            }
+        );
     }
 
     [Fact]
