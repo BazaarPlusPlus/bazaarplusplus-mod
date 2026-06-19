@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BazaarPlusPlus.GameInterop.CardArtReplacement;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
+using TheBazaar.Utilities.Shaders;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -66,6 +67,9 @@ internal sealed class CollectionCardMaterialCache
             return cached;
 
         var material = new Material(shader) { name = $"CollectionPanelMaterial[{artKey}]" };
+        material.SetFloat(CardArtShaderVariables.PremiumShaderId, 0f);
+        material.DisableKeyword(CardArtShaderVariables.PremiumShaderKeyword);
+        CardArtShaderVariables.ClearEnchantmentKeywords(ref material);
         if (!CardArtInjector.Apply(material, texture))
         {
             Object.Destroy(material);

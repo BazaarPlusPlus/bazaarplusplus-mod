@@ -62,6 +62,14 @@ internal sealed class BppCustomCardRegistry
     public IReadOnlyList<BppCustomCardDescriptor> GetAll() =>
         _byId.Values.OrderBy(card => card.SortKey).ThenBy(card => card.InternalName).ToArray();
 
+    internal BppCustomCardRegistry Copy()
+    {
+        var copy = new BppCustomCardRegistry(_collidesWithNativeCard);
+        foreach (var pair in _byId)
+            copy._byId.Add(pair.Key, pair.Value);
+        return copy;
+    }
+
     public string FontAtlasSample()
     {
         var builder = new System.Text.StringBuilder();

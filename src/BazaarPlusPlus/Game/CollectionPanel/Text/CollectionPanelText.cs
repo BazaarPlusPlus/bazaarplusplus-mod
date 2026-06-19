@@ -43,6 +43,12 @@ internal static class CollectionPanelText
         "尺寸 / 品質",
         "尺寸 / 品質"
     );
+    private static readonly LocalizedTextSet TierHeaderText = new(
+        "Quality",
+        "品质",
+        "品質",
+        "品質"
+    );
     private static readonly LocalizedTextSet TagHeaderText = new("Types", "类型", "類型", "類型");
     private static readonly LocalizedTextSet KeywordHeaderText = new(
         "Tags",
@@ -157,6 +163,8 @@ internal static class CollectionPanelText
     internal static string DayHeader() => Resolve(DayHeaderText);
 
     internal static string TierSizeHeader() => Resolve(TierSizeHeaderText);
+
+    internal static string TierHeader() => Resolve(TierHeaderText);
 
     internal static string TagHeader() => Resolve(TagHeaderText);
 

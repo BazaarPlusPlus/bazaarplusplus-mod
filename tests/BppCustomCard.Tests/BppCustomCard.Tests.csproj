@@ -21,6 +21,8 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="BepInEx.Core" Version="5.*" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
@@ -34,15 +36,150 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\BazaarPlusPlus\BazaarPlusPlus.csproj" />
+    <Compile Include="..\..\src\BazaarPlusPlus\Core\Runtime\BppBuild.cs" Link="BppBuild.cs" />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\Achievements\AchievementCardCatalog.cs"
+      Link="AchievementCardCatalog.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\Achievements\AchievementCardDefinition.cs"
+      Link="AchievementCardDefinition.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\Achievements\AchievementCardDescriptorMapper.cs"
+      Link="AchievementCardDescriptorMapper.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\Achievements\AchievementCardRegistrar.cs"
+      Link="AchievementCardRegistrar.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\BppCustomCardCollectionProjection.cs"
+      Link="BppCustomCardCollectionProjection.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardVm.cs"
+      Link="CollectionCardVm.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionCardFactory.cs"
+      Link="CollectionCardFactory.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionCardPool.cs"
+      Link="CollectionCardPool.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionPanelOwnedMarker.cs"
+      Link="CollectionPanelOwnedMarker.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CardPreview\NativeCardPreviewKind.cs"
+      Link="NativeCardPreviewKind.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CardPreview\NativeCardPreviewPrefabResolver.cs"
+      Link="NativeCardPreviewPrefabResolver.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CardPreview\NativeCardPreviewReflection.cs"
+      Link="NativeCardPreviewReflection.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CardPreview\NativeCardPreviewRuntime.cs"
+      Link="NativeCardPreviewRuntime.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CardPreview\NativeCardPreviewSocketTemplate.cs"
+      Link="NativeCardPreviewSocketTemplate.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CustomCards\BppCustomCardDescriptor.cs"
+      Link="BppCustomCardDescriptor.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CustomCards\BppCustomCardIds.cs"
+      Link="BppCustomCardIds.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CustomCards\BppCustomCardRegistry.cs"
+      Link="BppCustomCardRegistry.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CustomCards\BppCustomCardTemplateFactory.cs"
+      Link="BppCustomCardTemplateFactory.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\CustomCards\BppCustomCardText.cs"
+      Link="BppCustomCardText.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\StaticCards\BppStaticDataAccess.cs"
+      Link="BppStaticDataAccess.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Infrastructure\BppLog.cs"
+      Link="BppLog.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Infrastructure\LogRepeatSuppressor.cs"
+      Link="LogRepeatSuppressor.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus.Localization\BppChineseLocaleMode.cs"
+      Link="BppChineseLocaleMode.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus.Localization\ChineseScriptConverter.cs"
+      Link="ChineseScriptConverter.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus.Localization\ILanguageProvider.cs"
+      Link="ILanguageProvider.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus.Localization\ILocaleModeProvider.cs"
+      Link="ILocaleModeProvider.cs"
+    />
+    <Compile Include="..\..\src\BazaarPlusPlus.Localization\L.cs" Link="L.cs" />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus.Localization\LanguageCodeMatcher.cs"
+      Link="LanguageCodeMatcher.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus.Localization\LocalizedTextSet.cs"
+      Link="LocalizedTextSet.cs"
+    />
+    <EmbeddedResource Include="..\..\src\BazaarPlusPlus\Data\AchievementCards\achievement-cards.json" />
+    <EmbeddedResource Include="..\..\src\BazaarPlusPlus\Resources\CustomCardArt\*.jpg">
+      <LogicalName>BazaarPlusPlus.Resources.CustomCardArt.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(ManagedPath)/Assembly-CSharp.dll</HintPath>
+    </Reference>
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>
+    <Reference Include="TheBazaarRuntime">
+      <HintPath>$(ManagedPath)/TheBazaarRuntime.dll</HintPath>
+    </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.UIModule">
+      <HintPath>$(ManagedPath)/UnityEngine.UIModule.dll</HintPath>
     </Reference>
     <None Include="$(ManagedPath)/UnityEngine.CoreModule.dll" Link="UnityEngine.CoreModule.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <Target Name="CopyBepInExPackageRuntimeForTests" AfterTargets="SkipBepinRefs">
+    <ItemGroup>
+      <ReferenceCopyLocalPaths
+        Include="@(ReferencePath)"
+        Condition="'%(ReferencePath.NuGetPackageId)' == 'BepInEx.BaseLib' Or '%(ReferencePath.NuGetPackageId)' == 'HarmonyX'"
+      />
+    </ItemGroup>
+  </Target>
 </Project>

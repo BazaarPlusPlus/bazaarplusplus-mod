@@ -93,7 +93,7 @@ internal sealed class BppComposition : IDisposable
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
 
         BppCustomCardRegistry.Current = new BppCustomCardRegistry();
-        RegisterAchievementCards(BppCustomCardRegistry.Current);
+        AchievementCardRegistrar.Register(BppCustomCardRegistry.Current);
 
         _featureRegistry.Register(new CardArtReplacementFeature(_paths));
         _featureRegistry.Register(_runLifecycle);
@@ -158,14 +158,6 @@ internal sealed class BppComposition : IDisposable
     public void AttachOnlineClient(ModOnlineClient? client) => _onlineClientRef = client;
 
     public void Start() => _featureRegistry.Start();
-
-    private static void RegisterAchievementCards(BppCustomCardRegistry registry)
-    {
-        var catalog = AchievementCardCatalog.LoadEmbedded();
-        var mapper = new AchievementCardDescriptorMapper();
-        foreach (var card in catalog.Cards)
-            registry.Register(mapper.Map(card));
-    }
 
     public void Dispose()
     {

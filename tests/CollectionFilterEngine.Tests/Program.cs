@@ -267,6 +267,54 @@ AssertFalse(
     "Selecting Skills from package mode should clear package-only mode."
 );
 
+var achievementTabState = new CollectionFilterState();
+achievementTabState.Heroes.Add(EHero.Vanessa);
+achievementTabState.Tiers.Add(ETier.Bronze);
+achievementTabState.Sizes.Add(ECardSize.Small);
+achievementTabState.Tags.Add(ECardTag.Weapon);
+achievementTabState.Keywords.Add(EHiddenTag.Damage);
+achievementTabState.SelectedSourceKey = "merchant:stale";
+AssertTrue(
+    achievementTabState.SelectTab(CollectionTabKind.Achievements),
+    "Selecting Achievements from Items should report a tab change."
+);
+AssertEqual(
+    0,
+    achievementTabState.Tiers.Count,
+    "Selecting Achievements should clear stale tier filters."
+);
+AssertEqual(
+    0,
+    achievementTabState.Heroes.Count,
+    "Selecting Achievements should clear stale hero filters."
+);
+AssertEqual(
+    0,
+    achievementTabState.Sizes.Count,
+    "Selecting Achievements should clear stale size filters."
+);
+AssertEqual(
+    0,
+    achievementTabState.Tags.Count,
+    "Selecting Achievements should clear stale tag filters."
+);
+AssertEqual(
+    0,
+    achievementTabState.Keywords.Count,
+    "Selecting Achievements should clear stale keyword filters."
+);
+AssertEqual(
+    null,
+    achievementTabState.SelectedSourceKey,
+    "Selecting Achievements should clear stale source filters."
+);
+achievementTabState.Tiers.Add(ETier.Legendary);
+AssertValues(
+    achievementTabState.Tiers.ToArray(),
+    new[] { ETier.Legendary },
+    "Achievement tier filtering should remain available after entering the tab."
+);
+
 sourceState.ActiveType = ECardType.Item;
 sourceState.SelectedSourceKey = "merchant:hidden";
 AssertTrue(
