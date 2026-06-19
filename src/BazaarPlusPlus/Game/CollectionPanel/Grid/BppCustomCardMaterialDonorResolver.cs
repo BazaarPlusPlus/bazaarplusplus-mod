@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,6 +7,7 @@ using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.GameInterop.StaticCards;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
@@ -43,13 +45,27 @@ internal class BppCustomCardMaterialDonorResolver
         var captured = staticData;
         _ = Task.Run(() =>
         {
-            var key = ScanForDonor(captured, size);
-            lock (_gate)
+            string? key = null;
+            try
             {
-                if (ReferenceEquals(_source, captured))
+                key = ScanForDonor(captured, size);
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    nameof(BppCustomCardMaterialDonorResolver),
+                    $"Donor scan failed for size={size}: {ex.Message}"
+                );
+            }
+            finally
+            {
+                lock (_gate)
                 {
-                    _resolved[size] = key;
-                    _inFlight.Remove(size);
+                    if (ReferenceEquals(_source, captured))
+                    {
+                        _resolved[size] = key;
+                        _inFlight.Remove(size);
+                    }
                 }
             }
         });
