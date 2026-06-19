@@ -50,16 +50,21 @@ internal static class PackageCardArtPatchGate
             && material != null;
     }
 
-    public static bool TryGetBppCustomCardTexture(TCardBase? template, out Texture2D? texture)
+    public static bool TryGetBppCustomCardPreviewMaterial(
+        TCardBase? template,
+        Material? baseMaterial,
+        out Material? material
+    )
     {
-        texture = null;
-
-        if (template == null || BppCustomCardRegistry.Current?.HasBundledArt(template.Id) != true)
+        material = null;
+        if (template == null || baseMaterial == null)
+            return false;
+        if (BppCustomCardRegistry.Current?.HasBundledArt(template.Id) != true)
             return false;
 
         var feature = CardArtReplacementFeature.Current;
         return feature != null
-            && feature.TryGetTexture(template.Id, out texture, out _)
-            && texture != null;
+            && feature.TryGetPreviewMaterial(template.Id, baseMaterial, out material, out _)
+            && material != null;
     }
 }

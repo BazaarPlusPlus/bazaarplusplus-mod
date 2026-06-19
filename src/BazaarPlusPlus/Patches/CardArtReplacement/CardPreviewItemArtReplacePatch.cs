@@ -33,8 +33,10 @@ internal static class CardPreviewItemArtReplacePatch
             if (instance == null || instance.gameObject == null)
                 return;
 
-            var marker = instance.GetComponent<CollectionPanelOwnedMarker>();
-            if (marker != null && TryApplyBppCustomCardMaterial(instance, marker))
+            if (
+                instance.GetComponent<CollectionPanelOwnedMarker>() != null
+                && TryApplyBppCustomCardMaterial(instance)
+            )
                 return;
 
             if (
@@ -56,52 +58,29 @@ internal static class CardPreviewItemArtReplacePatch
         }
     }
 
-    private static bool TryApplyBppCustomCardMaterial(
-        CardPreviewItem instance,
-        CollectionPanelOwnedMarker marker
-    )
+    private static bool TryApplyBppCustomCardMaterial(CardPreviewItem instance)
     {
+        // Base material is the authored donor material the LoadArt prefix already cloned onto
+        // _cardMaterial (the donor ArtKey lives on the synthetic template). Clone it and swap
+        // _BaseMap to the achievement art via the shared package clone cache. Do NOT touch
+        // marker.CurrentArtKey: it holds the donor key, owned and released by the prefix /
+        // destroy patch. Do NOT clear enchantment keywords here — that is exactly what made
+        // the bare path strobe.
+        if (instance._cardMaterial == null || instance._cardImage == null)
+            return false;
+
         if (
-            !PackageCardArtPatchGate.TryGetBppCustomCardTexture(instance._cardData, out var texture)
-            || texture == null
+            !PackageCardArtPatchGate.TryGetBppCustomCardPreviewMaterial(
+                instance._cardData,
+                instance._cardMaterial,
+                out var material
+            )
+            || material == null
         )
             return false;
 
-        if (instance._cardMaterialShader == null || instance._cardImage == null)
-            return false;
-
-        var materialCache = CollectionCardCacheHost.MaterialCache;
-        if (materialCache == null)
-            return false;
-
-        var artKey = $"bpp-custom:{instance._cardData.Id}";
-        if (!string.Equals(marker.CurrentArtKey, artKey, StringComparison.Ordinal))
-        {
-            ReleaseCurrentArtKey(marker);
-            materialCache.Acquire(artKey);
-        }
-
-        var material = materialCache.GetOrCreate(artKey, texture, instance._cardMaterialShader);
-        if (material == null)
-        {
-            if (string.IsNullOrEmpty(marker.CurrentArtKey))
-                materialCache.Release(artKey);
-            return false;
-        }
-
-        marker.CurrentArtKey = artKey;
         instance._cardMaterial = material;
         instance._cardImage.material = material;
         return true;
-    }
-
-    private static void ReleaseCurrentArtKey(CollectionPanelOwnedMarker marker)
-    {
-        if (string.IsNullOrEmpty(marker.CurrentArtKey))
-            return;
-
-        CollectionCardCacheHost.ArtCache?.Release(marker.CurrentArtKey!);
-        CollectionCardCacheHost.MaterialCache?.Release(marker.CurrentArtKey!);
-        marker.CurrentArtKey = null;
     }
 }
