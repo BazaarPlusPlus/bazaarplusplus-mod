@@ -1,5 +1,6 @@
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.Achievements;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
@@ -126,6 +127,9 @@ public sealed class BppCustomCardTests : IDisposable
         Assert.Empty(template.HiddenTags);
         Assert.Equal("Cosmic Ray", template.Localization.Title.Text);
         Assert.Equal("Deal 9999+ damage in a single hit", template.Localization.Description?.Text);
+        var passiveTooltip = Assert.Single(template.Localization.Tooltips);
+        Assert.Equal(ETooltipType.Passive, passiveTooltip.TooltipType);
+        Assert.Equal("Deal 9999+ damage in a single hit", passiveTooltip.Content.Text);
     }
 
     [Fact]
