@@ -63,6 +63,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     private readonly CollectionCatalog _catalog = new();
     private readonly CollectionFilterState _filter = new();
     private readonly CollectionSourceOfferPoolCache _offerPoolCache = new();
+    private readonly ICollectionSourceCatalog _sourceCatalog = new StaticCollectionSourceCatalog();
     private readonly ICollectionPanelHeroPreferenceStore _heroPreferenceStore =
         new CollectionPanelHeroPreferenceStore();
 
@@ -802,50 +803,35 @@ internal sealed class CollectionPanel : MonoBehaviour
         }
         else
         {
-            TrimUnavailableFacetSelections();
-            var sourceEntry = _filter.PackagesOnly ? null : ResolveSelectedSourceEntry();
-            var hasSelectedSource = sourceEntry != null;
-            IReadOnlyCollection<Guid>? offeredCardIds = null;
-            IReadOnlyDictionary<
-                Guid,
-                IReadOnlyList<CollectionSourceOfferMatch>
-            >? offerMatchesByCardId = null;
-            if (sourceEntry != null)
-            {
-                var offerPoolResult = _offerPoolCache.GetOrResolve(
-                    sourceEntry,
-                    _filter.SelectedHero,
-                    _catalogCards
-                );
-                if (offerPoolResult.Status == CollectionSourceOfferPoolStatus.Ready)
-                {
-                    offeredCardIds = offerPoolResult.OfferedCardIds;
-                    offerMatchesByCardId = offerPoolResult.OfferMatchesByCardId;
-                }
-            }
-
             if (!_isLoadingCatalog)
                 ClearStatus();
-            var ordered = CollectionFilterEngine.Apply(
+            var query = CollectionQuery.Run(
                 _catalogCards,
                 _filter,
-                new CollectionFilterContext
-                {
-                    OfferedCardIds = offeredCardIds,
-                    ApplyHeroFilter =
-                        !_filter.PackagesOnly
-                        && (!hasSelectedSource || _filter.ActiveType == ECardType.Skill),
-                    // A source whose offer rule pins a starting tier deals that tier on any
-                    // day; only exempt once its pool is actually narrowing the result.
-                    SuppressDayGate =
-                        !_filter.PackagesOnly
-                        && offeredCardIds != null
-                        && sourceEntry!.SuppressDayGate,
-                }
+                _facetAvailability,
+                _sourceCatalog,
+                _offerPoolCache
             );
-            _virtualizer.SetVisible(ordered, _filter.ActiveType, offerMatchesByCardId);
+            AdoptNormalization(query.Normalization);
+            _virtualizer.SetVisible(query.Cards, _filter.ActiveType, query.OfferMatchesByCardId);
         }
         ResetVisibleScroll();
+    }
+
+    private void AdoptNormalization(CollectionFilterNormalization normalization)
+    {
+        if (normalization.ClearSelectedSource)
+            _filter.ClearSelectedSource();
+        if (normalization.RetainedTags != null)
+        {
+            _filter.Tags.Clear();
+            _filter.Tags.UnionWith(normalization.RetainedTags);
+        }
+        if (normalization.RetainedKeywords != null)
+        {
+            _filter.Keywords.Clear();
+            _filter.Keywords.UnionWith(normalization.RetainedKeywords);
+        }
     }
 
     private void RefreshView()
@@ -899,25 +885,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         _view.Refresh(model);
     }
 
-    private void TrimUnavailableFacetSelections()
-    {
-        var profile = CollectionTabProfile.For(_filter.ActiveType);
-        // ShowTagFilter is true only for the Item profile, so ItemTags matches what
-        // TagsFor(_catalogCards, _filter.ActiveType) would compute here.
-        if (profile.ShowTagFilter)
-            TrimSet(_filter.Tags, _facetAvailability.ItemTags);
-        if (profile.ShowKeywordFilter)
-            TrimSet(_filter.Keywords, _facetAvailability.KeywordsFor(_filter.ActiveType));
-    }
-
-    private static void TrimSet<T>(HashSet<T> selected, IReadOnlyList<T> available)
-    {
-        if (selected.Count == 0)
-            return;
-        var allowed = available as HashSet<T> ?? new HashSet<T>(available);
-        selected.RemoveWhere(value => !allowed.Contains(value));
-    }
-
     private IReadOnlyList<CollectionSourceOptionViewModel> AvailableSourcesFor(ECardType activeType)
     {
         var kind = CollectionTabProfile.For(activeType).SourceKind;
@@ -968,35 +935,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         foreach (var entry in CollectionSourceCatalog.For(kind, selectedHero))
             keys.Add(entry.SourceKey);
         return keys;
-    }
-
-    private CollectionSourceEntry? ResolveSelectedSourceEntry()
-    {
-        var sourceKey = _filter.SelectedSourceKey;
-        if (string.IsNullOrWhiteSpace(sourceKey))
-            return null;
-
-        if (!CollectionSourceCatalog.TryGetBySourceKey(sourceKey!, out var entry) || entry == null)
-        {
-            _filter.ClearSelectedSource();
-            return null;
-        }
-
-        var expectedKind = CollectionTabProfile.For(_filter.ActiveType).SourceKind;
-        if (entry.Kind != expectedKind)
-        {
-            _filter.ClearSelectedSource();
-            return null;
-        }
-
-        var selectedHero = _filter.SelectedHero;
-        if (selectedHero.HasValue && !entry.AppliesToHero(selectedHero.Value))
-        {
-            _filter.ClearSelectedSource();
-            return null;
-        }
-
-        return entry;
     }
 
     private void ResetVisibleScroll()

@@ -939,6 +939,233 @@ AssertValues(
     "Available skill keywords should be computed independently from item keywords."
 );
 
+var queryCatalogCards = new[]
+{
+    Card(
+        "Query Damage Weapon",
+        ETier.Bronze,
+        tags: new[] { ECardTag.Weapon },
+        hiddenTags: new[] { EHiddenTag.Damage },
+        heroes: new[] { EHero.Vanessa }
+    ),
+    Card(
+        "Query Shield Tool",
+        ETier.Bronze,
+        tags: new[] { ECardTag.Tool },
+        hiddenTags: new[] { EHiddenTag.Shield },
+        heroes: new[] { EHero.Dooley }
+    ),
+};
+var queryAvailability = new CollectionFacetAvailabilitySnapshot(
+    new[] { ECardTag.Weapon },
+    new[] { EHiddenTag.Damage },
+    Array.Empty<EHiddenTag>()
+);
+var querySource = Source(
+    "merchant:query:vanessa",
+    CollectionSourceKind.Merchant,
+    availableHeroes: new[] { EHero.Vanessa }
+);
+var queryCatalog = new DictionarySourceCatalog(querySource);
+var queryResolver = new FakeOfferPoolResolver(
+    new Dictionary<string, CollectionSourceOfferPoolResult>
+    {
+        [querySource.SourceKey] = CollectionSourceOfferPoolResult.Ready(
+            new[] { queryCatalogCards[0].Id },
+            null
+        ),
+    }
+);
+var queryFilter = new CollectionFilterState { SelectedSourceKey = querySource.SourceKey };
+queryFilter.Heroes.Add(EHero.Vanessa);
+queryFilter.Tags.Add(ECardTag.Weapon);
+queryFilter.Tags.Add(ECardTag.Tool);
+queryFilter.Keywords.Add(EHiddenTag.Damage);
+queryFilter.Keywords.Add(EHiddenTag.Shield);
+var queryResult = CollectionQuery.Run(
+    queryCatalogCards,
+    queryFilter,
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertSequence(
+    queryResult.Cards,
+    new[] { queryCatalogCards[0].Id },
+    "CollectionQuery should return filter-engine ordered cards using resolved source offer pools."
+);
+AssertTrue(
+    queryResult.OfferMatchesByCardId != null,
+    "CollectionQuery should expose ready offer matches for the grid when a source resolves."
+);
+AssertFalse(
+    queryResult.Normalization.ClearSelectedSource,
+    "A valid source selection should not request source clearing."
+);
+AssertValues(
+    queryResult.Normalization.RetainedTags!.ToArray(),
+    new[] { ECardTag.Weapon },
+    "CollectionQuery should return retained item tags when unavailable selected tags are trimmed."
+);
+AssertValues(
+    queryResult.Normalization.RetainedKeywords!.ToArray(),
+    new[] { EHiddenTag.Damage },
+    "CollectionQuery should return retained keywords when unavailable selected keywords are trimmed."
+);
+AssertValues(
+    queryFilter.Tags.ToArray(),
+    new[] { ECardTag.Weapon, ECardTag.Tool },
+    "CollectionQuery should not mutate selected tags."
+);
+AssertValues(
+    queryFilter.Keywords.ToArray(),
+    new[] { EHiddenTag.Damage, EHiddenTag.Shield },
+    "CollectionQuery should not mutate selected keywords."
+);
+AssertEqual(
+    querySource.SourceKey,
+    queryFilter.SelectedSourceKey,
+    "CollectionQuery should not mutate the selected source key."
+);
+AssertEqual(
+    1,
+    queryResolver.ResolveCount,
+    "CollectionQuery should resolve a valid selected source once."
+);
+
+var unknownSourceFilter = new CollectionFilterState { SelectedSourceKey = "merchant:missing" };
+var unknownSourceResult = CollectionQuery.Run(
+    queryCatalogCards,
+    unknownSourceFilter,
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertTrue(
+    unknownSourceResult.Normalization.ClearSelectedSource,
+    "CollectionQuery should request clearing an unknown selected source."
+);
+AssertEqual(
+    "merchant:missing",
+    unknownSourceFilter.SelectedSourceKey,
+    "CollectionQuery should not directly clear unknown selected source keys."
+);
+
+var wrongKindFilter = new CollectionFilterState
+{
+    ActiveType = ECardType.Skill,
+    SelectedSourceKey = querySource.SourceKey,
+};
+var wrongKindResult = CollectionQuery.Run(
+    queryCatalogCards,
+    wrongKindFilter,
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertTrue(
+    wrongKindResult.Normalization.ClearSelectedSource,
+    "CollectionQuery should request clearing source selections whose kind does not match the active tab."
+);
+AssertEqual(
+    querySource.SourceKey,
+    wrongKindFilter.SelectedSourceKey,
+    "CollectionQuery should not directly clear wrong-kind source selections."
+);
+
+var heroMismatchFilter = new CollectionFilterState { SelectedSourceKey = querySource.SourceKey };
+heroMismatchFilter.Heroes.Add(EHero.Dooley);
+var heroMismatchResult = CollectionQuery.Run(
+    queryCatalogCards,
+    heroMismatchFilter,
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertTrue(
+    heroMismatchResult.Normalization.ClearSelectedSource,
+    "CollectionQuery should request clearing selected sources that do not apply to the selected hero."
+);
+AssertEqual(
+    querySource.SourceKey,
+    heroMismatchFilter.SelectedSourceKey,
+    "CollectionQuery should not directly clear hero-mismatched source selections."
+);
+
+var packagesOnlyQueryFilter = new CollectionFilterState
+{
+    PackagesOnly = true,
+    SelectedSourceKey = querySource.SourceKey,
+};
+packagesOnlyQueryFilter.Tags.Add(ECardTag.Tool);
+packagesOnlyQueryFilter.Keywords.Add(EHiddenTag.Shield);
+var packagesOnlyQueryResult = CollectionQuery.Run(
+    queryCatalogCards,
+    packagesOnlyQueryFilter,
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertFalse(
+    packagesOnlyQueryResult.Normalization.ClearSelectedSource,
+    "PackagesOnly should leave source-key normalization to mode transitions/prune, not CollectionQuery."
+);
+
+var tagGateOffFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
+tagGateOffFilter.Tags.Add(ECardTag.Tool);
+var tagGateOffResult = CollectionQuery.Run(
+    queryCatalogCards,
+    tagGateOffFilter,
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertEqual(
+    null,
+    tagGateOffResult.Normalization.RetainedTags,
+    "CollectionQuery should use null retained tags when the profile gate is off."
+);
+
+var noSelectedFacetFilter = new CollectionFilterState();
+var noSelectedFacetResult = CollectionQuery.Run(
+    queryCatalogCards,
+    noSelectedFacetFilter,
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertEqual(
+    null,
+    noSelectedFacetResult.Normalization.RetainedTags,
+    "CollectionQuery should use null retained tags when no tags are selected."
+);
+AssertEqual(
+    null,
+    noSelectedFacetResult.Normalization.RetainedKeywords,
+    "CollectionQuery should use null retained keywords when no keywords are selected."
+);
+
+var emptyTrimFilter = new CollectionFilterState();
+emptyTrimFilter.Tags.Add(ECardTag.Tool);
+emptyTrimFilter.Keywords.Add(EHiddenTag.Shield);
+var emptyTrimResult = CollectionQuery.Run(
+    queryCatalogCards,
+    emptyTrimFilter,
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertEqual(
+    0,
+    emptyTrimResult.Normalization.RetainedTags!.Count,
+    "CollectionQuery should return an empty non-null retained tag set when trimming clears every selected tag."
+);
+AssertEqual(
+    0,
+    emptyTrimResult.Normalization.RetainedKeywords!.Count,
+    "CollectionQuery should return an empty non-null retained keyword set when trimming clears every selected keyword."
+);
+
 var vanessaExclusiveSkill = Card(
     "Vanessa Exclusive Skill",
     ETier.Bronze,
@@ -1315,6 +1542,51 @@ static CollectionCardVm Card(
         Heroes = heroes ?? Array.Empty<EHero>(),
     };
 
+static CollectionSourceEntry Source(
+    string sourceKey,
+    CollectionSourceKind kind,
+    IReadOnlyList<EHero>? availableHeroes = null,
+    bool suppressDayGate = false
+) =>
+    new(
+        sourceKey,
+        kind,
+        sourceKey,
+        availableHeroes ?? Array.Empty<EHero>(),
+        string.Empty,
+        Guid.NewGuid(),
+        Array.Empty<Guid>(),
+        suppressDayGate
+            ? new[] { FixedTierSegment() }
+            : Array.Empty<CollectionSourceOfferSegment>(),
+        "test",
+        0,
+        0
+    );
+
+static CollectionSourceOfferSegment FixedTierSegment() =>
+    new(
+        "fixed",
+        CollectionSourceOfferSegmentKind.Normal,
+        string.Empty,
+        new CollectionSourceOfferRule(
+            CollectionSourceHeroMode.AllHeroes,
+            null,
+            new CollectionSourceStartingTierRule(
+                CollectionSourceStartingTierMode.Exact,
+                ETier.Gold
+            ),
+            Array.Empty<ECardSize>(),
+            Array.Empty<ECardTag>(),
+            Array.Empty<ECardTag>(),
+            Array.Empty<EHiddenTag>(),
+            false,
+            Array.Empty<EEnchantmentType>(),
+            Array.Empty<ECardTag>(),
+            Array.Empty<EHiddenTag>()
+        )
+    );
+
 static void AssertSequence(
     IReadOnlyList<CollectionCardVm> actual,
     IReadOnlyList<Guid> expected,
@@ -1355,3 +1627,45 @@ static void AssertTrue(bool condition, string message)
 }
 
 static void AssertFalse(bool condition, string message) => AssertTrue(!condition, message);
+
+internal sealed class DictionarySourceCatalog : ICollectionSourceCatalog
+{
+    private readonly Dictionary<string, CollectionSourceEntry> _entries = new(
+        StringComparer.Ordinal
+    );
+
+    public DictionarySourceCatalog(params CollectionSourceEntry[] entries)
+    {
+        foreach (var entry in entries)
+            _entries[entry.SourceKey] = entry;
+    }
+
+    public bool TryGetBySourceKey(string sourceKey, out CollectionSourceEntry? entry) =>
+        _entries.TryGetValue(sourceKey, out entry);
+}
+
+internal sealed class FakeOfferPoolResolver : ICollectionOfferPoolResolver
+{
+    private readonly IReadOnlyDictionary<string, CollectionSourceOfferPoolResult> _results;
+
+    public FakeOfferPoolResolver(
+        IReadOnlyDictionary<string, CollectionSourceOfferPoolResult> results
+    )
+    {
+        _results = results;
+    }
+
+    public int ResolveCount { get; private set; }
+
+    public CollectionSourceOfferPoolResult GetOrResolve(
+        CollectionSourceEntry source,
+        EHero? selectedHero,
+        IReadOnlyList<CollectionCardVm> catalogCards
+    )
+    {
+        ResolveCount++;
+        return _results.TryGetValue(source.SourceKey, out var result)
+            ? result
+            : CollectionSourceOfferPoolResult.NoneSelected();
+    }
+}

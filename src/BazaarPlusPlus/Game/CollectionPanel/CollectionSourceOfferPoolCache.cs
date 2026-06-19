@@ -7,7 +7,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Sources;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
-internal sealed class CollectionSourceOfferPoolCache
+internal sealed class CollectionSourceOfferPoolCache : ICollectionOfferPoolResolver
 {
     private readonly Dictionary<string, CollectionSourceOfferPoolResult> _cache = new(
         StringComparer.Ordinal
