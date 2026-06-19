@@ -10,6 +10,15 @@ using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
+internal readonly struct MuxResolution
+{
+    public bool Dispatched { get; init; }
+
+    public Task? Task { get; init; }
+
+    public ReplayVideoAudioMuxer.MuxResult? Synchronous { get; init; }
+}
+
 /// <summary>
 /// Second-pass muxer: combines the silent first-pass video with the captured audio WAV into the
 /// final MP4 using <c>ffmpeg -c:v copy -c:a aac</c>. Runs entirely off the main thread and never
@@ -30,16 +39,6 @@ internal sealed class ReplayVideoAudioMuxer
     private static readonly Dictionary<string, bool> s_aacProbeCache = new(
         StringComparer.OrdinalIgnoreCase
     );
-
-    private readonly string _ffmpegExecutable;
-
-    public ReplayVideoAudioMuxer(string ffmpegExecutable)
-    {
-        if (string.IsNullOrWhiteSpace(ffmpegExecutable))
-            throw new ArgumentException("FFmpeg executable is required.", nameof(ffmpegExecutable));
-
-        _ffmpegExecutable = ffmpegExecutable;
-    }
 
     internal enum MuxStatus
     {
@@ -72,25 +71,11 @@ internal sealed class ReplayVideoAudioMuxer
     /// coupling this muxer to the MonoBehaviour. The callback is best-effort and its exceptions are
     /// swallowed (logged at Debug).
     /// </summary>
-    public Task DispatchAsync(
+    private Task DispatchAsync(
         string silentVideoTempPath,
-        string? wavPath,
+        IReadOnlyList<string> wavPaths,
         string finalPath,
-        Action<MuxResult>? onCompleted = null,
-        int audioBitrateKbps = 192
-    ) =>
-        DispatchAsync(
-            silentVideoTempPath,
-            string.IsNullOrWhiteSpace(wavPath) ? null : new[] { wavPath },
-            finalPath,
-            onCompleted,
-            audioBitrateKbps
-        );
-
-    public Task DispatchAsync(
-        string silentVideoTempPath,
-        IReadOnlyList<string>? wavPaths,
-        string finalPath,
+        string ffmpegExecutable,
         Action<MuxResult>? onCompleted = null,
         int audioBitrateKbps = 192
     )
@@ -100,11 +85,17 @@ internal sealed class ReplayVideoAudioMuxer
             MuxResult result;
             try
             {
-                result = MuxOrPromote(silentVideoTempPath, wavPaths, finalPath, audioBitrateKbps);
+                result = Mux(
+                    ffmpegExecutable,
+                    silentVideoTempPath,
+                    wavPaths,
+                    finalPath,
+                    audioBitrateKbps
+                );
             }
             catch (Exception ex)
             {
-                // MuxOrPromote is defensive, but never let a background task crash unobserved.
+                // Mux is defensive, but never let a background task crash unobserved.
                 BppLog.Error(
                     LogComponent,
                     $"Unexpected failure while muxing replay audio for '{finalPath}'.",
@@ -133,57 +124,76 @@ internal sealed class ReplayVideoAudioMuxer
         return task;
     }
 
-    /// <summary>
-    /// Resolves the final file from the silent video plus an optional WAV. When the WAV is missing
-    /// or the resolved ffmpeg lacks an AAC encoder, promotes the silent video directly (no ffmpeg
-    /// invocation). Otherwise runs <see cref="Mux"/>. Background thread only.
-    /// </summary>
-    public MuxResult MuxOrPromote(
-        string silentVideoTempPath,
-        string? wavPath,
+    internal MuxResolution Resolve(
+        ReplayVideoCaptureStatus status,
+        string tempVideoPath,
         string finalPath,
-        int audioBitrateKbps = 192
-    ) =>
-        MuxOrPromote(
-            silentVideoTempPath,
-            string.IsNullOrWhiteSpace(wavPath) ? null : new[] { wavPath },
-            finalPath,
-            audioBitrateKbps
-        );
-
-    public MuxResult MuxOrPromote(
-        string silentVideoTempPath,
-        IReadOnlyList<string>? wavPaths,
-        string finalPath,
-        int audioBitrateKbps = 192
+        IReadOnlyList<string> usableWavPaths,
+        string? ffmpegExecutable,
+        Action<MuxResult> onResolved
     )
     {
-        var usableWavPaths = VideoProcessHelpers.GetExistingWavPaths(wavPaths);
-        if (usableWavPaths.Count == 0)
+        if (onResolved == null)
+            throw new ArgumentNullException(nameof(onResolved));
+
+        if (status != ReplayVideoCaptureStatus.Completed)
         {
-            return PromoteAndReport(
-                silentVideoTempPath,
-                wavPaths,
-                finalPath,
-                MuxStatus.FellBackToSilent,
-                reason: "no audio WAV available",
-                warn: false
-            );
+            var result = DeleteTempAndReport(tempVideoPath, usableWavPaths, finalPath);
+            onResolved(result);
+            return new MuxResolution { Synchronous = result };
         }
 
-        if (!HasAacEncoder(_ffmpegExecutable))
+        var existingWavPaths = VideoProcessHelpers.GetExistingWavPaths(usableWavPaths);
+        if (existingWavPaths.Count == 0)
         {
-            return PromoteAndReport(
-                silentVideoTempPath,
+            var result = PromoteAndReport(
+                tempVideoPath,
                 usableWavPaths,
                 finalPath,
                 MuxStatus.FellBackToSilent,
-                reason: "ffmpeg has no AAC encoder",
-                warn: true
+                "no audio WAV available",
+                warn: false
             );
+            onResolved(result);
+            return new MuxResolution { Synchronous = result };
         }
 
-        return Mux(silentVideoTempPath, usableWavPaths, finalPath, audioBitrateKbps);
+        if (string.IsNullOrWhiteSpace(ffmpegExecutable))
+        {
+            var result = PromoteAndReport(
+                tempVideoPath,
+                existingWavPaths,
+                finalPath,
+                MuxStatus.FellBackToSilent,
+                "ffmpeg unavailable",
+                warn: true
+            );
+            onResolved(result);
+            return new MuxResolution { Synchronous = result };
+        }
+
+        if (!HasAacEncoder(ffmpegExecutable))
+        {
+            var result = PromoteAndReport(
+                tempVideoPath,
+                existingWavPaths,
+                finalPath,
+                MuxStatus.FellBackToSilent,
+                "ffmpeg has no AAC encoder",
+                warn: true
+            );
+            onResolved(result);
+            return new MuxResolution { Synchronous = result };
+        }
+
+        var task = DispatchAsync(
+            tempVideoPath,
+            existingWavPaths,
+            finalPath,
+            ffmpegExecutable,
+            onResolved
+        );
+        return new MuxResolution { Dispatched = true, Task = task };
     }
 
     /// <summary>
@@ -191,14 +201,8 @@ internal sealed class ReplayVideoAudioMuxer
     /// deleted (best-effort) and the final file is reported. On any failure the silent video is
     /// promoted to the final path so the recording is preserved.
     /// </summary>
-    public MuxResult Mux(
-        string silentVideoTempPath,
-        string wavPath,
-        string finalPath,
-        int audioBitrateKbps = 192
-    ) => Mux(silentVideoTempPath, new[] { wavPath }, finalPath, audioBitrateKbps);
-
-    public MuxResult Mux(
+    internal MuxResult Mux(
+        string ffmpegExecutable,
         string silentVideoTempPath,
         IReadOnlyList<string> wavPaths,
         string finalPath,
@@ -214,7 +218,7 @@ internal sealed class ReplayVideoAudioMuxer
         {
             var startInfo = new ProcessStartInfo
             {
-                FileName = _ffmpegExecutable,
+                FileName = ffmpegExecutable,
                 Arguments = arguments,
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -336,6 +340,34 @@ internal sealed class ReplayVideoAudioMuxer
         }
     }
 
+    private MuxResult DeleteTempAndReport(
+        string tempVideoPath,
+        IReadOnlyList<string>? wavPaths,
+        string finalPath
+    )
+    {
+        try
+        {
+            if (File.Exists(tempVideoPath))
+                File.Delete(tempVideoPath);
+            TryDelete(wavPaths);
+            return new MuxResult(
+                MuxStatus.Failed,
+                finalPath,
+                FfmpegRawVideoEncoder.TryGetFileSize(finalPath),
+                "capture did not complete"
+            );
+        }
+        catch (Exception ex)
+        {
+            BppLog.Debug(
+                LogComponent,
+                $"Failed to delete temp recording '{tempVideoPath}': {ex.Message}"
+            );
+            return new MuxResult(MuxStatus.Failed, finalPath, 0, ex.Message);
+        }
+    }
+
     private MuxResult PromoteAndReport(
         string silentVideoTempPath,
         IReadOnlyList<string>? wavPaths,
@@ -393,13 +425,6 @@ internal sealed class ReplayVideoAudioMuxer
             return new MuxResult(MuxStatus.Failed, finalPath, 0, ex.Message);
         }
     }
-
-    private static string BuildArguments(
-        string silentVideoTempPath,
-        string wavPath,
-        string finalPath,
-        int audioBitrateKbps
-    ) => BuildArguments(silentVideoTempPath, new[] { wavPath }, finalPath, audioBitrateKbps);
 
     private static string BuildArguments(
         string silentVideoTempPath,

@@ -37,6 +37,202 @@ var buildArtifactBattleMethod = uploadStoreType.GetMethod(
     "BuildArtifactBattle",
     BindingFlags.NonPublic | BindingFlags.Static
 );
+var audioTapStopperType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Audio.ReplayAudioTapStopper"
+);
+var muxerType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer");
+var muxResolutionType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.MuxResolution");
+var muxResultType =
+    muxerType.GetNestedType("MuxResult", BindingFlags.NonPublic)
+    ?? throw new InvalidOperationException("ReplayVideoAudioMuxer.MuxResult should exist.");
+var replayVideoCaptureStatusType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureStatus"
+);
+
+Assert(
+    (bool)InvokeStatic(audioTapStopperType, "IsUsable", new object?[] { false, "present.wav" })!
+        == false,
+    "ReplayAudioTapStopper.IsUsable should reject taps that captured no samples."
+);
+var usableWavRoot = Path.Combine(
+    Path.GetTempPath(),
+    "bpp-audio-tap-stopper-tests",
+    Guid.NewGuid().ToString("N")
+);
+Directory.CreateDirectory(usableWavRoot);
+try
+{
+    var presentWavPath = Path.Combine(usableWavRoot, "present.wav");
+    File.WriteAllBytes(presentWavPath, [1]);
+    Assert(
+        (bool)
+            InvokeStatic(audioTapStopperType, "IsUsable", new object?[] { true, presentWavPath })!,
+        "ReplayAudioTapStopper.IsUsable should accept captured taps with an existing WAV."
+    );
+    Assert(
+        (bool)
+            InvokeStatic(
+                audioTapStopperType,
+                "IsUsable",
+                new object?[] { true, Path.Combine(usableWavRoot, "missing.wav") }
+            )! == false,
+        "ReplayAudioTapStopper.IsUsable should reject missing WAV files."
+    );
+}
+finally
+{
+    Directory.Delete(usableWavRoot, recursive: true);
+}
+
+var resolveHarness = new MuxResolveHarness(muxResultType);
+var onResolved = resolveHarness.CreateOnResolvedDelegate(
+    typeof(Action<>).MakeGenericType(muxResultType)
+);
+Assert(
+    muxerType.GetConstructor(Type.EmptyTypes) != null,
+    "ReplayVideoAudioMuxer should not require an ffmpeg executable at construction."
+);
+Assert(
+    muxerType
+        .GetMethods(BindingFlags.Public | BindingFlags.Instance)
+        .All(method =>
+            method.Name != "MuxOrPromote"
+            && (
+                method.Name != "DispatchAsync"
+                || method
+                    .GetParameters()
+                    .All(parameter => parameter.ParameterType != typeof(string))
+            )
+        ),
+    "ReplayVideoAudioMuxer should remove the old public single-WAV dispatch and MuxOrPromote surfaces."
+);
+Assert(
+    muxerType
+        .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+        .All(field => field.Name != "_ffmpegExecutable"),
+    "ReplayVideoAudioMuxer should not store a constructor-resolved ffmpeg executable."
+);
+var muxer =
+    Activator.CreateInstance(muxerType)
+    ?? throw new InvalidOperationException("ReplayVideoAudioMuxer should be constructible.");
+var failedStatus = Enum.Parse(replayVideoCaptureStatusType, "Failed");
+var completedStatus = Enum.Parse(replayVideoCaptureStatusType, "Completed");
+var muxResolveRoot = Path.Combine(
+    Path.GetTempPath(),
+    "bpp-mux-resolve-tests",
+    Guid.NewGuid().ToString("N")
+);
+Directory.CreateDirectory(muxResolveRoot);
+try
+{
+    var failedTempPath = Path.Combine(muxResolveRoot, "failed.recording.mp4");
+    var failedFinalPath = Path.Combine(muxResolveRoot, "failed.mp4");
+    File.WriteAllBytes(failedTempPath, [1, 2, 3]);
+    var failedResolution = InvokeResolve(
+        muxerType,
+        muxer,
+        failedStatus,
+        failedTempPath,
+        failedFinalPath,
+        Array.Empty<string>(),
+        ffmpegExecutable: null,
+        onResolved
+    );
+    AssertResolutionSynchronous(muxResolutionType, failedResolution, "not-completed resolution");
+    Assert(
+        resolveHarness.Results.Count == 1,
+        "Resolve should invoke the callback for not-completed recordings."
+    );
+    Assert(!File.Exists(failedTempPath), "Not-completed Resolve should delete the temp recording.");
+
+    resolveHarness.Results.Clear();
+    var noAudioTempPath = Path.Combine(muxResolveRoot, "no-audio.recording.mp4");
+    var noAudioFinalPath = Path.Combine(muxResolveRoot, "no-audio.mp4");
+    File.WriteAllBytes(noAudioTempPath, [4, 5, 6, 7]);
+    var noAudioResolution = InvokeResolve(
+        muxerType,
+        muxer,
+        completedStatus,
+        noAudioTempPath,
+        noAudioFinalPath,
+        Array.Empty<string>(),
+        ffmpegExecutable: "/should/not/be/used",
+        onResolved
+    );
+    AssertResolutionSynchronous(muxResolutionType, noAudioResolution, "no-audio resolution");
+    Assert(
+        resolveHarness.Results.Count == 1,
+        "Resolve should invoke the callback when promoting a completed recording with no audio."
+    );
+    Assert(
+        File.Exists(noAudioFinalPath) && !File.Exists(noAudioTempPath),
+        "No-audio Resolve should promote the silent temp to the final path synchronously."
+    );
+
+    resolveHarness.Results.Clear();
+    var noFfmpegTempPath = Path.Combine(muxResolveRoot, "no-ffmpeg.recording.mp4");
+    var noFfmpegFinalPath = Path.Combine(muxResolveRoot, "no-ffmpeg.mp4");
+    var wavPath = Path.Combine(muxResolveRoot, "no-ffmpeg.wav");
+    File.WriteAllBytes(noFfmpegTempPath, [8, 9, 10, 11]);
+    File.WriteAllBytes(wavPath, [1]);
+    var noFfmpegResolution = InvokeResolve(
+        muxerType,
+        muxer,
+        completedStatus,
+        noFfmpegTempPath,
+        noFfmpegFinalPath,
+        new[] { wavPath },
+        ffmpegExecutable: null,
+        onResolved
+    );
+    AssertResolutionSynchronous(muxResolutionType, noFfmpegResolution, "no-ffmpeg resolution");
+    Assert(
+        resolveHarness.Results.Count == 1,
+        "Resolve should invoke the callback when promoting because ffmpeg was not resolved."
+    );
+    Assert(
+        File.Exists(noFfmpegFinalPath) && !File.Exists(noFfmpegTempPath) && !File.Exists(wavPath),
+        "No-ffmpeg Resolve should promote silent video and delete the usable WAV."
+    );
+
+    resolveHarness.Results.Clear();
+    var dispatchTempPath = Path.Combine(muxResolveRoot, "dispatch.recording.mp4");
+    var dispatchFinalPath = Path.Combine(muxResolveRoot, "dispatch.mp4");
+    var dispatchWavPath = Path.Combine(muxResolveRoot, "dispatch.wav");
+    File.WriteAllBytes(dispatchTempPath, [12, 13, 14, 15]);
+    File.WriteAllBytes(dispatchWavPath, [1]);
+    var dispatchResolution = InvokeResolve(
+        muxerType,
+        muxer,
+        completedStatus,
+        dispatchTempPath,
+        dispatchFinalPath,
+        new[] { dispatchWavPath },
+        ffmpegExecutable: Path.Combine(muxResolveRoot, "missing-ffmpeg"),
+        onResolved
+    );
+    Assert(
+        (bool)GetProperty(muxResolutionType, dispatchResolution, "Dispatched")!,
+        "Resolve should dispatch when completed video, usable audio, and resolved ffmpeg are present."
+    );
+    var dispatchTask = GetProperty(muxResolutionType, dispatchResolution, "Task") as Task;
+    Assert(
+        dispatchTask != null
+            && GetProperty(muxResolutionType, dispatchResolution, "Synchronous") == null,
+        "Dispatched Resolve should expose only the pending Task."
+    );
+    if (dispatchTask == null)
+        throw new InvalidOperationException("Dispatch task assertion failed.");
+    Assert(dispatchTask.Wait(TimeSpan.FromSeconds(5)), "Dispatched mux task should complete.");
+    Assert(
+        resolveHarness.Results.Count == 1,
+        "Resolve should invoke the callback from the dispatched mux completion path."
+    );
+}
+finally
+{
+    Directory.Delete(muxResolveRoot, recursive: true);
+}
 
 Assert(
     Type.GetType("BazaarPlusPlus.Game.CombatReplay.CombatReplayRecord, BazaarPlusPlus") == null,
@@ -1172,6 +1368,62 @@ static object? Invoke(Type type, object instance, string methodName, object?[] a
     return method!.Invoke(instance, args);
 }
 
+static object? InvokeStatic(Type type, string methodName, object?[] args)
+{
+    var method = type.GetMethod(
+        methodName,
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(method != null, $"Static method not found: {type.FullName}.{methodName}");
+    return method!.Invoke(null, args);
+}
+
+static object InvokeResolve(
+    Type muxerType,
+    object muxer,
+    object status,
+    string tempVideoPath,
+    string finalPath,
+    IReadOnlyList<string> usableWavPaths,
+    string? ffmpegExecutable,
+    Delegate onResolved
+)
+{
+    var method = muxerType.GetMethod(
+        "Resolve",
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+    );
+    Assert(method != null, "ReplayVideoAudioMuxer should expose Resolve.");
+    return method!.Invoke(
+            muxer,
+            new object?[]
+            {
+                status,
+                tempVideoPath,
+                finalPath,
+                usableWavPaths,
+                ffmpegExecutable,
+                onResolved,
+            }
+        ) ?? throw new InvalidOperationException("Resolve should return a MuxResolution.");
+}
+
+static void AssertResolutionSynchronous(Type muxResolutionType, object resolution, string label)
+{
+    Assert(
+        !(bool)GetProperty(muxResolutionType, resolution, "Dispatched")!,
+        $"{label} should not dispatch."
+    );
+    Assert(
+        GetProperty(muxResolutionType, resolution, "Task") == null,
+        $"{label} should have no task."
+    );
+    Assert(
+        GetProperty(muxResolutionType, resolution, "Synchronous") != null,
+        $"{label} should expose a synchronous mux result."
+    );
+}
+
 static bool TryDequeuePersistenceResult(Type queueType, object queue, out object? result)
 {
     var method = queueType.GetMethod(
@@ -1620,5 +1872,27 @@ file sealed class QueuePersistenceHarness
             Expression.Convert(parameter, typeof(object))
         );
         return Expression.Lambda(delegateType, body, parameter).Compile();
+    }
+}
+
+file sealed class MuxResolveHarness(Type muxResultType)
+{
+    public List<object> Results { get; } = new();
+
+    public Delegate CreateOnResolvedDelegate(Type delegateType)
+    {
+        var parameter = Expression.Parameter(muxResultType, "result");
+        var body = Expression.Call(
+            Expression.Constant(this),
+            GetType().GetMethod(nameof(OnResolved), BindingFlags.Public | BindingFlags.Instance)
+                ?? throw new InvalidOperationException("OnResolved method not found."),
+            Expression.Convert(parameter, typeof(object))
+        );
+        return Expression.Lambda(delegateType, body, parameter).Compile();
+    }
+
+    public void OnResolved(object result)
+    {
+        Results.Add(result);
     }
 }
