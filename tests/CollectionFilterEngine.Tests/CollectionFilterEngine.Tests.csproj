@@ -41,6 +41,10 @@
       Link="CollectionFilterEngine.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionQuery.cs"
+      Link="CollectionQuery.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionFilterContext.cs"
       Link="CollectionFilterContext.cs"
     />
@@ -75,6 +79,18 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceEnums.cs"
       Link="CollectionSourceEnums.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceEntry.cs"
+      Link="CollectionSourceEntry.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceOfferRule.cs"
+      Link="CollectionSourceOfferRule.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceOfferPoolResult.cs"
+      Link="CollectionSourceOfferPoolResult.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardClassifier.cs"
