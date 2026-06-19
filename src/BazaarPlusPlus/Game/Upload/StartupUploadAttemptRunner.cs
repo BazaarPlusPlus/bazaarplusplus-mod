@@ -41,6 +41,35 @@ internal sealed class StartupUploadAttemptRunner
 
     public bool HasPendingTask => _task != null;
 
+    public void ObservePendingTaskOnShutdown(Action? afterObserved = null)
+    {
+        var task = _task;
+        _task = null;
+        if (task == null)
+        {
+            RunShutdownCleanup(afterObserved);
+            return;
+        }
+
+        if (task.IsCompleted)
+        {
+            ObserveTaskCompletion(task);
+            RunShutdownCleanup(afterObserved);
+            return;
+        }
+
+        task.ContinueWith(
+            completed =>
+            {
+                ObserveTaskCompletion(completed);
+                RunShutdownCleanup(afterObserved);
+            },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default
+        );
+    }
+
     public void Tick(
         StartupUploadAttemptGate gate,
         float currentTimeSeconds,
@@ -59,19 +88,8 @@ internal sealed class StartupUploadAttemptRunner
             if (!_task.IsCompleted)
                 return;
 
-            try
-            {
-                _task.GetAwaiter().GetResult();
-            }
-            catch (OperationCanceledException) { }
-            catch (Exception ex)
-            {
-                BppLog.Error(_logScope, $"{_failureMessage}: {ex}");
-            }
-            finally
-            {
-                _task = null;
-            }
+            ObserveTaskCompletion(_task);
+            _task = null;
 
             return;
         }
@@ -96,5 +114,33 @@ internal sealed class StartupUploadAttemptRunner
         _waitingForRunExitLogged = false;
         BppLog.Info(_logScope, _startMessage);
         _task = startAsync(cancellationToken);
+    }
+
+    private void ObserveTaskCompletion(Task task)
+    {
+        try
+        {
+            task.GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            BppLog.Error(_logScope, $"{_failureMessage}: {ex}");
+        }
+    }
+
+    private void RunShutdownCleanup(Action? cleanup)
+    {
+        if (cleanup == null)
+            return;
+
+        try
+        {
+            cleanup();
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error(_logScope, $"Startup upload cleanup failed: {ex}");
+        }
     }
 }

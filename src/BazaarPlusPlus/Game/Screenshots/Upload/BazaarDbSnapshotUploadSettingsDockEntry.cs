@@ -1,6 +1,8 @@
 #nullable enable
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.Upload;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
@@ -15,7 +17,7 @@ internal sealed class BazaarDbSnapshotUploadSettingsDockEntry : ISettingsDockEnt
             new SettingsMenuToggleBridge(
                 () => ReadEnabled(config),
                 enabled => WriteEnabled(config, enabled),
-                BazaarDbSnapshotUploadController.OnEnabledChanged
+                OnEnabledChanged
             )
         );
 
@@ -27,5 +29,17 @@ internal sealed class BazaarDbSnapshotUploadSettingsDockEntry : ISettingsDockEnt
         var entry = config.BazaarDbUploadEnabled;
         if (entry != null)
             entry.Value = enabled;
+    }
+
+    private static void OnEnabledChanged(bool enabled)
+    {
+        if (!enabled)
+            return;
+
+        BppLog.Info(
+            BazaarDbSnapshotUploadFeed.BazaarDbSnapshotScope,
+            "BazaarDB screenshot upload toggle armed an immediate attempt."
+        );
+        BackgroundUploadPump.ArmImmediate(BazaarDbSnapshotUploadFeed.BazaarDbSnapshotScope);
     }
 }
