@@ -7,6 +7,7 @@ internal static class Sizes
     public const float OperationRailWidthPercent = 32f;
     public const float OperationRailMinWidth = 360f;
     public const float OperationRailMaxWidth = 680f;
+    public const float LiveBuildRailWidthPercent = 25f;
     public const float HistorySelectorRowHeightPercent = 67f;
     public const float HistorySelectorRowMinHeight = 270f;
     public const float RunsColumnWidthPercent = 52f;

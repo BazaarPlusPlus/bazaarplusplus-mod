@@ -313,10 +313,10 @@ internal sealed class LiveBuildPanelView : IDisposable
         panel.style.minHeight = 0f;
         panel.style.flexDirection = FlexDirection.Row;
         panel.style.backgroundColor = Colors.HistoryPanelBackground;
-        panel.style.paddingLeft = 34f;
-        panel.style.paddingRight = 34f;
-        panel.style.paddingTop = 28f;
-        panel.style.paddingBottom = 28f;
+        panel.style.paddingLeft = UiSpacing.PanelPadding;
+        panel.style.paddingRight = UiSpacing.PanelPadding;
+        panel.style.paddingTop = UiSpacing.PanelPadding;
+        panel.style.paddingBottom = UiSpacing.PanelPadding;
         root.Add(panel);
 
         var boardArea = new VisualElement();
@@ -358,7 +358,7 @@ internal sealed class LiveBuildPanelView : IDisposable
         parent.Add(row);
 
         var labelColumn = new VisualElement();
-        labelColumn.style.width = 160f;
+        labelColumn.style.width = 144f;
         labelColumn.style.flexShrink = 0f;
         labelColumn.style.paddingLeft = 14f;
         labelColumn.style.paddingRight = 12f;
@@ -366,7 +366,7 @@ internal sealed class LiveBuildPanelView : IDisposable
         labelColumn.style.overflow = Overflow.Hidden;
         row.Add(labelColumn);
 
-        var title = CreateLabel(18, FontStyle.Bold, Colors.HistorySectionTitleText);
+        var title = CreateLabel(16, FontStyle.Bold, Colors.HistorySectionTitleText);
         title.style.whiteSpace = WhiteSpace.NoWrap;
         title.style.overflow = Overflow.Hidden;
         labelColumn.Add(title);
@@ -423,10 +423,16 @@ internal sealed class LiveBuildPanelView : IDisposable
 
     private void BuildRail(VisualElement parent)
     {
+        // Match the house info-rail sizing (HistoryPanel / CollectionPanel use the OperationRail
+        // tokens) so the right column lines up across panels; LiveBuild runs a slightly narrower
+        // 25% basis to suit its more compact content.
         var rail = new VisualElement();
-        rail.style.width = 330f;
+        rail.style.flexGrow = 0f;
         rail.style.flexShrink = 0f;
-        rail.style.marginLeft = 24f;
+        rail.style.flexBasis = Length.Percent(Sizes.LiveBuildRailWidthPercent);
+        rail.style.minWidth = Sizes.OperationRailMinWidth;
+        rail.style.maxWidth = Sizes.OperationRailMaxWidth;
+        rail.style.marginLeft = UiSpacing.ColumnGap;
         rail.style.minHeight = 0f;
         rail.style.overflow = Overflow.Hidden;
         rail.style.flexDirection = FlexDirection.Column;
@@ -590,8 +596,8 @@ internal sealed class LiveBuildPanelView : IDisposable
         );
         _finalBuildRefreshButton.style.marginTop = 12f;
         _finalBuildRefreshButton.style.width = Length.Percent(100f);
-        _finalBuildRefreshButton.style.height = Sizes.ButtonStandardHeight;
-        _finalBuildRefreshButton.style.minHeight = Sizes.ButtonStandardHeight;
+        _finalBuildRefreshButton.style.height = Sizes.ButtonCompactHeight;
+        _finalBuildRefreshButton.style.minHeight = Sizes.ButtonCompactHeight;
         _finalBuildRefreshButton.style.flexShrink = 0f;
         StyleButton(
             _finalBuildRefreshButton,
