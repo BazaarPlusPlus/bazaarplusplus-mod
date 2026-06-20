@@ -188,6 +188,26 @@ internal sealed partial class HistoryPanelUiToolkitView
 
         BuildFilterSlot(rail);
 
+        // ── Connectivity probe: its own fixed row, pinned directly under the filters ──
+        // Lives above the scrolling body so this one-shot "is my data path healthy?" tool is
+        // always reachable without scrolling. It still probes the remote /health endpoint and
+        // reports its result into the footer status banner below.
+        var serverHealthRow = new VisualElement();
+        serverHealthRow.style.flexDirection = FlexDirection.Row;
+        serverHealthRow.style.flexShrink = 0f;
+        serverHealthRow.style.alignItems = Align.Center;
+        serverHealthRow.style.marginTop = UiSpacing.Xl;
+        rail.Add(serverHealthRow);
+
+        _checkServerHealthButton = CreateButton(
+            HistoryPanelText.CheckServerHealth(),
+            _checkServerHealth,
+            Sizes.ServerHealthButtonWidth,
+            Sizes.ButtonStandardHeight
+        );
+        StyleButton(_checkServerHealthButton, Colors.ReplayBackground, Colors.ReplayText);
+        serverHealthRow.Add(_checkServerHealthButton);
+
         // ── Flexible body. railBody (plain element, flexGrow=1) reliably fills the
         //    rail's vertical slack — unlike a ScrollView contentContainer, which
         //    collapses to content height (see CollectionPanelView.Tree.cs:283-315).
@@ -303,7 +323,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         _railScrollView.contentContainer.style.flexDirection = FlexDirection.Column;
         railBody.Add(_railScrollView);
 
-        // ── Overview: read-only chips + one-shot tools ───────────────────────
+        // ── Overview: read-only chips ────────────────────────────────────────
         var overviewGroup = new VisualElement();
         overviewGroup.style.flexDirection = FlexDirection.Column;
         overviewGroup.style.flexShrink = 0f;
@@ -326,19 +346,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         statsChipRow.Add(_countChip);
         statsChipRow.Add(_battleChip);
         statsChipRow.Add(_databaseChip);
-
-        // The server health probe lives on the same overview row as the DB chip: both answer "is
-        // my data path healthy", but they stay separate signals — the chip reads the local run-log
-        // DB, the button probes the remote /health endpoint and reports into the status banner.
-        _checkServerHealthButton = CreateButton(
-            HistoryPanelText.CheckServerHealth(),
-            _checkServerHealth,
-            Sizes.ServerHealthButtonWidth,
-            Sizes.ButtonStandardHeight
-        );
-        StyleButton(_checkServerHealthButton, Colors.ReplayBackground, Colors.ReplayText);
-        _checkServerHealthButton.style.marginLeft = UiSpacing.Sm;
-        statsChipRow.Add(_checkServerHealthButton);
 
         // ── Fixed footer: status banner directly above its actions ───────────
         _statusLabel = CreateLabel(Sizes.FontCorner, FontStyle.Normal, Colors.HistoryStatusText);
