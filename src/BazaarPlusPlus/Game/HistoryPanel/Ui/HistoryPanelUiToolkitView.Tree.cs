@@ -188,16 +188,33 @@ internal sealed partial class HistoryPanelUiToolkitView
 
         BuildFilterSlot(rail);
 
-        // ── Connectivity probe: its own fixed row, pinned directly under the filters ──
-        // Lives above the scrolling body so this one-shot "is my data path healthy?" tool is
-        // always reachable without scrolling. It still probes the remote /health endpoint and
-        // reports its result into the footer status banner below.
-        var serverHealthRow = new VisualElement();
-        serverHealthRow.style.flexDirection = FlexDirection.Row;
-        serverHealthRow.style.flexShrink = 0f;
-        serverHealthRow.style.alignItems = Align.Center;
-        serverHealthRow.style.marginTop = UiSpacing.Xl;
-        rail.Add(serverHealthRow);
+        // ── Overview: read-only chips + the connectivity probe, as one fixed row ─────
+        // Pinned directly under the filters so the run/battle counts, DB status, and the
+        // one-shot "is my data path healthy?" probe stay visible without scrolling. The probe
+        // still hits the remote /health endpoint and reports its result into the footer banner.
+        var overviewGroup = new VisualElement();
+        overviewGroup.style.flexDirection = FlexDirection.Column;
+        overviewGroup.style.flexShrink = 0f;
+        overviewGroup.style.marginTop = UiSpacing.Xl;
+        rail.Add(overviewGroup);
+
+        var statsChipRow = new VisualElement();
+        statsChipRow.style.flexDirection = FlexDirection.Row;
+        statsChipRow.style.flexWrap = Wrap.Wrap;
+        statsChipRow.style.alignItems = Align.Center;
+        overviewGroup.Add(statsChipRow);
+
+        _countChip = CreateChip();
+        _countChip.style.minWidth = Sizes.ChipMinWidth;
+        _battleChip = CreateChip();
+        _battleChip.style.minWidth = Sizes.ChipMinWidth;
+        _battleChip.style.marginLeft = UiSpacing.Sm;
+        _databaseChip = CreateChip();
+        _databaseChip.style.minWidth = Sizes.ChipMinWidth;
+        _databaseChip.style.marginLeft = UiSpacing.Sm;
+        statsChipRow.Add(_countChip);
+        statsChipRow.Add(_battleChip);
+        statsChipRow.Add(_databaseChip);
 
         _checkServerHealthButton = CreateButton(
             HistoryPanelText.CheckServerHealth(),
@@ -206,7 +223,8 @@ internal sealed partial class HistoryPanelUiToolkitView
             Sizes.ButtonStandardHeight
         );
         StyleButton(_checkServerHealthButton, Colors.ReplayBackground, Colors.ReplayText);
-        serverHealthRow.Add(_checkServerHealthButton);
+        _checkServerHealthButton.style.marginLeft = UiSpacing.Sm;
+        statsChipRow.Add(_checkServerHealthButton);
 
         // ── Flexible body. railBody (plain element, flexGrow=1) reliably fills the
         //    rail's vertical slack — unlike a ScrollView contentContainer, which
@@ -310,42 +328,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         );
         _ghostOpponentEliminatedNotice.style.display = DisplayStyle.None;
         selectedDetailCard.Add(_ghostOpponentEliminatedNotice);
-
-        // Secondary groups live in a ScrollView so only they scroll on short screens.
-        _railScrollView = new ScrollView(ScrollViewMode.Vertical);
-        _railScrollView.style.flexGrow = 1f;
-        _railScrollView.style.flexShrink = 1f;
-        _railScrollView.style.minHeight = 0f;
-        _railScrollView.style.marginTop = UiSpacing.Xl;
-        _railScrollView.horizontalScrollerVisibility = ScrollerVisibility.Hidden;
-        _railScrollView.verticalScrollerVisibility = ScrollerVisibility.Auto;
-        _railScrollView.mouseWheelScrollSize = 120f; // match CollectionPanel grid scroll feel
-        _railScrollView.contentContainer.style.flexDirection = FlexDirection.Column;
-        railBody.Add(_railScrollView);
-
-        // ── Overview: read-only chips ────────────────────────────────────────
-        var overviewGroup = new VisualElement();
-        overviewGroup.style.flexDirection = FlexDirection.Column;
-        overviewGroup.style.flexShrink = 0f;
-        _railScrollView.Add(overviewGroup);
-
-        var statsChipRow = new VisualElement();
-        statsChipRow.style.flexDirection = FlexDirection.Row;
-        statsChipRow.style.flexWrap = Wrap.Wrap;
-        statsChipRow.style.alignItems = Align.Center;
-        overviewGroup.Add(statsChipRow);
-
-        _countChip = CreateChip();
-        _countChip.style.minWidth = Sizes.ChipMinWidth;
-        _battleChip = CreateChip();
-        _battleChip.style.minWidth = Sizes.ChipMinWidth;
-        _battleChip.style.marginLeft = UiSpacing.Sm;
-        _databaseChip = CreateChip();
-        _databaseChip.style.minWidth = Sizes.ChipMinWidth;
-        _databaseChip.style.marginLeft = UiSpacing.Sm;
-        statsChipRow.Add(_countChip);
-        statsChipRow.Add(_battleChip);
-        statsChipRow.Add(_databaseChip);
 
         // ── Fixed footer: status banner directly above its actions ───────────
         _statusLabel = CreateLabel(Sizes.FontCorner, FontStyle.Normal, Colors.HistoryStatusText);

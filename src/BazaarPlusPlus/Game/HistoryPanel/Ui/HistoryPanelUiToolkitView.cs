@@ -59,8 +59,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Button? _ghostWonButton;
     private Button? _ghostLostButton;
     private Button? _ghostDayButton;
-    private ScrollView? _railScrollView;
-    private HistorySectionMode? _lastSectionMode;
     private ListView? _runsList;
     private ListView? _battleList;
     private Label? _battlesTitle;
@@ -295,9 +293,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _ghostDayButton!.text = HistoryPanelText.FilterDayMin10();
         _ghostDayButton.tooltip = HistoryPanelText.FilterDayMin10();
         RefreshGhostFilterButton(_ghostDayButton, model.GhostDayMin10);
-        if (_lastSectionMode.HasValue && _lastSectionMode.Value != model.SectionMode)
-            _railScrollView!.scrollOffset = Vector2.zero;
-        _lastSectionMode = model.SectionMode;
 
         _replayButton!.text = model.ReplayButtonText;
         _replayButton.tooltip = model.ReplayButtonText;
