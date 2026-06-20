@@ -2,29 +2,6 @@
   "schemaVersion": 1,
   "cards": [
     {
-      "achievementId": "cosmic_ray",
-      "templateId": "5351d91d-2b5c-5f44-8349-bbf334a9bbc5",
-      "internalName": "CosmicRay",
-      "title": {
-        "en": "Cosmic Ray",
-        "zhHans": "宇宙射线",
-        "zhHant": "宇宙射線"
-      },
-      "description": {
-        "en": "One strike plunges three thousand feet, as if the Milky Way came crashing from the ninth heaven — deal 9999+ damage in a single hit",
-        "zhHans": "一击直下三千尺，疑是银河落九天——单次伤害突破 9999",
-        "zhHant": "一擊直下三千尺，疑是銀河落九天——單次傷害突破 9999"
-      },
-      "category": "combat",
-      "ruleKind": "combat_single_damage",
-      "ruleParams": {},
-      "target": 9999,
-      "displayTier": "Legendary",
-      "displaySize": "Medium",
-      "sortKey": 10,
-      "hiddenUntilUnlocked": false
-    },
-    {
       "achievementId": "storm_traveler",
       "templateId": "ff35bbaa-3545-5fef-b469-79a4f4592326",
       "internalName": "StormTraveler",

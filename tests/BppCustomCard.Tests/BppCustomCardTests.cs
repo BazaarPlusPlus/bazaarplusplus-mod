@@ -21,10 +21,6 @@ public sealed class BppCustomCardTests : IDisposable
     public void Uuid_v5_achievement_ids_match_the_frozen_catalog_value()
     {
         Assert.Equal(
-            new Guid("5351d91d-2b5c-5f44-8349-bbf334a9bbc5"),
-            BppCustomCardIds.ForAchievement("cosmic_ray")
-        );
-        Assert.Equal(
             new Guid("ff35bbaa-3545-5fef-b469-79a4f4592326"),
             BppCustomCardIds.ForAchievement("storm_traveler")
         );
@@ -52,17 +48,17 @@ public sealed class BppCustomCardTests : IDisposable
     [Fact]
     public void Descriptor_mapper_projects_achievement_catalog_rows_to_custom_cards()
     {
-        var catalog = AchievementCardCatalog.Build(EmbeddedCosmicRayJson);
+        var catalog = AchievementCardCatalog.Build(EmbeddedStormTravelerJson);
         var mapper = new AchievementCardDescriptorMapper(_ => true);
 
         var descriptor = mapper.Map(catalog[0]);
 
-        Assert.Equal(new Guid("5351d91d-2b5c-5f44-8349-bbf334a9bbc5"), descriptor.Id);
+        Assert.Equal(new Guid("ff35bbaa-3545-5fef-b469-79a4f4592326"), descriptor.Id);
         Assert.Equal(ECardType.Item, descriptor.Type);
         Assert.Equal(ECardSize.Medium, descriptor.Size);
         Assert.Equal(ETier.Legendary, descriptor.StartingTier);
         Assert.True(descriptor.HasBundledArt);
-        Assert.Equal("CosmicRay", descriptor.InternalName);
+        Assert.Equal("StormTraveler", descriptor.InternalName);
     }
 
     [Fact]
@@ -70,15 +66,15 @@ public sealed class BppCustomCardTests : IDisposable
     {
         Assert.Throws<InvalidOperationException>(() =>
             AchievementCardCatalog.Build(
-                EmbeddedCosmicRayJson.Replace(
-                    "5351d91d-2b5c-5f44-8349-bbf334a9bbc5",
+                EmbeddedStormTravelerJson.Replace(
+                    "ff35bbaa-3545-5fef-b469-79a4f4592326",
                     "00000000-0000-5000-8000-000000000000"
                 )
             )
         );
         Assert.Throws<InvalidOperationException>(() =>
             AchievementCardCatalog.Build(
-                EmbeddedCosmicRayJson.Replace("\"zhHant\": \"宇宙射線\"", "\"zhHant\": \"\"")
+                EmbeddedStormTravelerJson.Replace("\"zhHant\": \"風暴旅人\"", "\"zhHant\": \"\"")
             )
         );
     }
@@ -115,7 +111,7 @@ public sealed class BppCustomCardTests : IDisposable
     [Fact]
     public void Template_factory_builds_native_item_template_for_tooltip_and_frame_setup()
     {
-        var descriptor = Descriptor(new Guid("5351d91d-2b5c-5f44-8349-bbf334a9bbc5"));
+        var descriptor = Descriptor(new Guid("ff35bbaa-3545-5fef-b469-79a4f4592326"));
 
         var template = Assert.IsType<TCardItem>(BppCustomCardTemplateFactory.Build(descriptor));
 
@@ -129,17 +125,17 @@ public sealed class BppCustomCardTests : IDisposable
         Assert.NotNull(template.Tags);
         Assert.NotNull(template.HiddenTags);
         Assert.Empty(template.HiddenTags);
-        Assert.Equal("Cosmic Ray", template.Localization.Title.Text);
-        Assert.Equal("Deal 9999+ damage in a single hit", template.Localization.Description?.Text);
+        Assert.Equal("Storm Traveler", template.Localization.Title.Text);
+        Assert.Equal("Outlast an entire sandstorm", template.Localization.Description?.Text);
         var passiveTooltip = Assert.Single(template.Localization.Tooltips);
         Assert.Equal(ETooltipType.Passive, passiveTooltip.TooltipType);
-        Assert.Equal("Deal 9999+ damage in a single hit", passiveTooltip.Content.Text);
+        Assert.Equal("Outlast an entire sandstorm", passiveTooltip.Content.Text);
     }
 
     [Fact]
     public void Template_factory_uses_donor_art_key_when_provided()
     {
-        var descriptor = Descriptor(new Guid("5351d91d-2b5c-5f44-8349-bbf334a9bbc5"));
+        var descriptor = Descriptor(new Guid("ff35bbaa-3545-5fef-b469-79a4f4592326"));
         const string donorArtKey = "Addressables/CardArt/Donor.asset";
 
         var template = Assert.IsType<TCardItem>(
@@ -165,7 +161,7 @@ public sealed class BppCustomCardTests : IDisposable
         Assert.Equal(ECardType.Item, vm.Type);
         Assert.Equal(ECardSize.Medium, vm.Size);
         Assert.Equal(ETier.Legendary, vm.StartingTier);
-        Assert.Equal("Cosmic Ray", vm.DisplayName);
+        Assert.Equal("Storm Traveler", vm.DisplayName);
         Assert.Equal("bpp-custom", vm.ArtKey);
         Assert.False(vm.IsPackage);
     }
@@ -351,21 +347,10 @@ public sealed class BppCustomCardTests : IDisposable
         var catalog = AchievementCardCatalog.LoadEmbedded();
         var mapper = new AchievementCardDescriptorMapper();
 
-        Assert.Collection(
-            catalog.Cards,
-            card =>
-            {
-                var descriptor = mapper.Map(card);
-                Assert.Equal("CosmicRay", descriptor.InternalName);
-                Assert.True(descriptor.HasBundledArt);
-            },
-            card =>
-            {
-                var descriptor = mapper.Map(card);
-                Assert.Equal("StormTraveler", descriptor.InternalName);
-                Assert.True(descriptor.HasBundledArt);
-            }
-        );
+        var descriptor = mapper.Map(Assert.Single(catalog.Cards));
+
+        Assert.Equal("StormTraveler", descriptor.InternalName);
+        Assert.True(descriptor.HasBundledArt);
     }
 
     [Fact]
@@ -413,15 +398,15 @@ public sealed class BppCustomCardTests : IDisposable
             Type = ECardType.Item,
             Size = ECardSize.Medium,
             StartingTier = ETier.Legendary,
-            Title = new LocalizedTextSet("Cosmic Ray", "宇宙射线", "宇宙射線"),
+            Title = new LocalizedTextSet("Storm Traveler", "风暴旅人", "風暴旅人"),
             Description = new LocalizedTextSet(
-                "Deal 9999+ damage in a single hit",
-                "单次伤害达到 9999",
-                "單次傷害達到 9999"
+                "Outlast an entire sandstorm",
+                "熬过整场沙尘暴",
+                "熬過整場沙塵暴"
             ),
             HasBundledArt = hasBundledArt,
-            InternalName = "CosmicRay",
-            SortKey = 10,
+            InternalName = "StormTraveler",
+            SortKey = 20,
         };
 
     private sealed class TestDonorResolver : BppCustomCardMaterialDonorResolver
@@ -459,31 +444,31 @@ public sealed class BppCustomCardTests : IDisposable
             HiddenUntilUnlocked = false,
         };
 
-    private const string EmbeddedCosmicRayJson = """
+    private const string EmbeddedStormTravelerJson = """
         {
           "schemaVersion": 1,
           "cards": [
             {
-              "achievementId": "cosmic_ray",
-              "templateId": "5351d91d-2b5c-5f44-8349-bbf334a9bbc5",
-              "internalName": "CosmicRay",
+              "achievementId": "storm_traveler",
+              "templateId": "ff35bbaa-3545-5fef-b469-79a4f4592326",
+              "internalName": "StormTraveler",
               "title": {
-                "en": "Cosmic Ray",
-                "zhHans": "宇宙射线",
-                "zhHant": "宇宙射線"
+                "en": "Storm Traveler",
+                "zhHans": "风暴旅人",
+                "zhHant": "風暴旅人"
               },
               "description": {
-                "en": "Deal 9999+ damage in a single hit",
-                "zhHans": "单次伤害达到 9999",
-                "zhHant": "單次傷害達到 9999"
+                "en": "Outlast an entire sandstorm",
+                "zhHans": "熬过整场沙尘暴",
+                "zhHant": "熬過整場沙塵暴"
               },
-              "category": "combat",
-              "ruleKind": "combat_single_damage",
+              "category": "survival",
+              "ruleKind": "sandstorm_survived",
               "ruleParams": {},
-              "target": 9999,
+              "target": 1,
               "displayTier": "Legendary",
               "displaySize": "Medium",
-              "sortKey": 10,
+              "sortKey": 20,
               "hiddenUntilUnlocked": false
             }
           ]
