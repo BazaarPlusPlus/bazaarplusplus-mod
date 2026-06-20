@@ -355,7 +355,8 @@ internal sealed class LiveBuildPanel : MonoBehaviour
             _liveSnapshot.StashItems
         );
         var recommendation = _matches.Count > 0 ? _matches[_recommendationIndex] : null;
-        var corpusStatus = ResolveCorpusStatus();
+        var nowUtc = DateTimeOffset.UtcNow;
+        var corpus = ResolveCorpusStatus();
         var finalBuild =
             recommendation?.Board
             ?? new BppItemBoard(
@@ -380,20 +381,35 @@ internal sealed class LiveBuildPanel : MonoBehaviour
                 ? LiveBuildPanelText.Working()
                 : LiveBuildPanelText.RefreshFinalBuilds(),
             FinalBuildRefreshButtonEnabled = !_buildRefreshInProgress,
-            CorpusStatusText = corpusStatus.Text,
-            CorpusStatusTooltip = corpusStatus.Tooltip,
-            CorpusStatusSeverity = corpusStatus.Severity,
+            CorpusState = corpus.State,
+            CorpusSummary = corpus.Summary,
+            CorpusFreshnessText = corpus.Summary.HasValue
+                ? LiveBuildPanelText.CorpusFreshnessLine(corpus.Summary.Value, nowUtc)
+                : string.Empty,
+            CorpusFreshnessTooltip = corpus.Tooltip,
+            CorpusFreshnessSeverity = ResolveFreshnessSeverity(corpus.Summary, nowUtc),
+            CorpusStatusText = corpus.Text,
+            CorpusStatusTooltip = corpus.Tooltip,
+            CorpusStatusSeverity = corpus.Severity,
             Supporters = _supporters,
         };
     }
 
-    // The corpus card body is one state-multiplexed line set: pending > failure > empty-corpus
-    // guidance > summary. Success has no standalone copy — the refreshed summary line itself is
-    // the evidence, tinted by the success severity until the next state change.
-    private (string Text, string Tooltip, LiveBuildRefreshSeverity Severity) ResolveCorpusStatus()
+    // The corpus card multiplexes four states into one fixed-height box: pending > failure > empty
+    // > summary. Only the summary state fills the per-hero dashboard; the others render a single
+    // status line. The post-pull success cue rides the freshness tint, not a "✓" prefix.
+    private (
+        LiveBuildCorpusState State,
+        TenWinCorpusSummary? Summary,
+        string Text,
+        string Tooltip,
+        LiveBuildRefreshSeverity Severity
+    ) ResolveCorpusStatus()
     {
         if (_buildRefreshInProgress)
             return (
+                LiveBuildCorpusState.Pending,
+                null,
                 LiveBuildPanelText.RefreshingFinalBuilds(),
                 string.Empty,
                 LiveBuildRefreshSeverity.Pending
@@ -406,6 +422,8 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 
         if (!string.IsNullOrWhiteSpace(_buildRefreshError))
             return (
+                LiveBuildCorpusState.Failure,
+                summary,
                 LiveBuildPanelText.FinalBuildRefreshFailed(_buildRefreshError),
                 tooltip,
                 LiveBuildRefreshSeverity.Failure
@@ -413,15 +431,40 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 
         if (!summary.HasValue)
             return (
+                LiveBuildCorpusState.Empty,
+                null,
                 LiveBuildPanelText.CorpusEmpty(),
                 string.Empty,
                 LiveBuildRefreshSeverity.Neutral
             );
 
-        var line = LiveBuildPanelText.CorpusSummaryLine(summary.Value);
-        return _buildRefreshSucceeded
-            ? ($"✓ {line}", tooltip, LiveBuildRefreshSeverity.Success)
-            : (line, tooltip, LiveBuildRefreshSeverity.Neutral);
+        return (
+            LiveBuildCorpusState.Summary,
+            summary,
+            string.Empty,
+            tooltip,
+            LiveBuildRefreshSeverity.Neutral
+        );
+    }
+
+    // Freshness tint for the corpus dashboard, reusing the refresh-severity palette: a just-pulled
+    // or <=24h corpus reads green (Success), <=7d blue (Pending), older/unknown warm (Failure).
+    private LiveBuildRefreshSeverity ResolveFreshnessSeverity(
+        TenWinCorpusSummary? summary,
+        DateTimeOffset nowUtc
+    )
+    {
+        if (_buildRefreshSucceeded)
+            return LiveBuildRefreshSeverity.Success;
+        if (summary?.GeneratedAtUtc is not { } generatedAt)
+            return LiveBuildRefreshSeverity.Failure;
+
+        var age = nowUtc - generatedAt;
+        if (age <= TimeSpan.FromHours(24))
+            return LiveBuildRefreshSeverity.Success;
+        if (age <= TimeSpan.FromDays(7))
+            return LiveBuildRefreshSeverity.Pending;
+        return LiveBuildRefreshSeverity.Failure;
     }
 
     private IEnumerable<BppItemBoard> BuildSelectableBoards()

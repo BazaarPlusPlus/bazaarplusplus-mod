@@ -29,6 +29,10 @@
       Link="LiveBuildPanelSnapshot.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildCorpusState.cs"
+      Link="LiveBuildCorpusState.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildRefreshSeverity.cs"
       Link="LiveBuildRefreshSeverity.cs"
     />

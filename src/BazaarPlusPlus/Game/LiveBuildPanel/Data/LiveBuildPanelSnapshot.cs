@@ -38,6 +38,16 @@ internal sealed class LiveBuildPanelSnapshot
 
     public LiveBuildRefreshSeverity CorpusStatusSeverity { get; init; }
 
+    public LiveBuildCorpusState CorpusState { get; init; }
+
+    public TenWinCorpusSummary? CorpusSummary { get; init; }
+
+    public string CorpusFreshnessText { get; init; } = string.Empty;
+
+    public string CorpusFreshnessTooltip { get; init; } = string.Empty;
+
+    public LiveBuildRefreshSeverity CorpusFreshnessSeverity { get; init; }
+
     public IReadOnlyList<BPPSupporterSample> Supporters { get; init; } =
         Array.Empty<BPPSupporterSample>();
 

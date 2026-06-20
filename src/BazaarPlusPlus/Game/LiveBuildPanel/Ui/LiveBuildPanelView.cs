@@ -2,10 +2,12 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
@@ -48,6 +50,9 @@ internal sealed class LiveBuildPanelView : IDisposable
     private Label? _corpusCardTitle;
     private Button? _finalBuildRefreshButton;
     private Label? _corpusStatus;
+    private VisualElement? _corpusDashboard;
+    private Label? _corpusFreshness;
+    private VisualElement? _heroStrip;
     private Label? _resultCardTitle;
     private Label? _recommendationStatus;
     private Button? _previousButton;
@@ -133,11 +138,7 @@ internal sealed class LiveBuildPanelView : IDisposable
         _finalBuildRefreshButton!.text = snapshot.FinalBuildRefreshButtonText;
         _finalBuildRefreshButton.tooltip = snapshot.FinalBuildRefreshButtonText;
         _finalBuildRefreshButton.SetEnabled(snapshot.FinalBuildRefreshButtonEnabled);
-        _corpusStatus!.text = StablePanelText.Compact(snapshot.CorpusStatusText, 96);
-        _corpusStatus.tooltip = string.IsNullOrWhiteSpace(snapshot.CorpusStatusTooltip)
-            ? snapshot.CorpusStatusText
-            : snapshot.CorpusStatusTooltip;
-        _corpusStatus.style.color = ResolveRefreshStatusColor(snapshot.CorpusStatusSeverity);
+        RefreshCorpusCard(snapshot);
         _resultCardTitle!.text = LiveBuildPanelText.ResultCardTitle();
         _recommendationStatus!.text = StablePanelText.Compact(snapshot.RecommendationStatus, 96);
         _recommendationStatus.tooltip = snapshot.RecommendationStatus;
@@ -151,6 +152,75 @@ internal sealed class LiveBuildPanelView : IDisposable
         var candidates = new HashSet<Guid>(snapshot.CandidateTemplateIds);
         foreach (var row in snapshot.Rows)
             RefreshRow(row, candidates);
+    }
+
+    // The corpus card swaps between the per-hero dashboard (summary) and a single status line
+    // (pending/failure/empty) by toggling display only — the card is fixed-height, so no reflow.
+    private void RefreshCorpusCard(LiveBuildPanelSnapshot snapshot)
+    {
+        var isSummary = snapshot.CorpusState == LiveBuildCorpusState.Summary;
+        _corpusDashboard!.style.display = isSummary ? DisplayStyle.Flex : DisplayStyle.None;
+        _corpusStatus!.style.display = isSummary ? DisplayStyle.None : DisplayStyle.Flex;
+
+        if (isSummary)
+        {
+            _corpusFreshness!.text = snapshot.CorpusFreshnessText;
+            _corpusFreshness.tooltip = snapshot.CorpusFreshnessTooltip;
+            _corpusFreshness.style.color = ResolveRefreshStatusColor(
+                snapshot.CorpusFreshnessSeverity
+            );
+            RebuildHeroStrip(snapshot.CorpusSummary);
+            return;
+        }
+
+        _corpusStatus.text = StablePanelText.Compact(snapshot.CorpusStatusText, 96);
+        _corpusStatus.tooltip = string.IsNullOrWhiteSpace(snapshot.CorpusStatusTooltip)
+            ? snapshot.CorpusStatusText
+            : snapshot.CorpusStatusTooltip;
+        _corpusStatus.style.color = ResolveRefreshStatusColor(snapshot.CorpusStatusSeverity);
+    }
+
+    private void RebuildHeroStrip(TenWinCorpusSummary? summary)
+    {
+        _heroStrip!.Clear();
+        if (summary is not { } value)
+            return;
+
+        foreach (var entry in value.HeroBuildCounts)
+            _heroStrip.Add(BuildHeroTile(entry));
+    }
+
+    private static VisualElement BuildHeroTile(TenWinHeroBuildCount entry)
+    {
+        var badge = HeroVisual.Resolve(entry.Hero);
+        var count = entry.BuildCount.ToString("N0", CultureInfo.CurrentCulture);
+
+        var tile = new VisualElement();
+        tile.style.flexGrow = 1f;
+        tile.style.flexBasis = 0f;
+        tile.style.minWidth = 0f;
+        tile.style.alignItems = Align.Center;
+        tile.style.overflow = Overflow.Hidden;
+        tile.tooltip = $"{entry.Hero} {count}";
+
+        var countLabel = CreateLabel(14, FontStyle.Bold, Colors.HistoryProgressText);
+        countLabel.text = count;
+        countLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+        countLabel.style.whiteSpace = WhiteSpace.NoWrap;
+        tile.Add(countLabel);
+
+        var chip = CreateLabel(11, FontStyle.Bold, badge.Text);
+        chip.text = badge.ShortCode;
+        chip.style.marginTop = 2f;
+        chip.style.height = 18f;
+        chip.style.backgroundColor = badge.Background;
+        chip.style.unityTextAlign = TextAnchor.MiddleCenter;
+        chip.style.whiteSpace = WhiteSpace.NoWrap;
+        UiStyle.HorizontalPadding(chip.style, 3f);
+        UiStyle.Radius(chip.style, Radii.InfoChip);
+        tile.Add(chip);
+
+        return tile;
     }
 
     public void Dispose()
@@ -387,6 +457,23 @@ internal sealed class LiveBuildPanelView : IDisposable
             Colors.ButtonSelectedText
         );
         corpusHeader.Add(_finalBuildRefreshButton);
+
+        _corpusDashboard = new VisualElement();
+        _corpusDashboard.style.marginTop = 8f;
+        _corpusDashboard.style.flexDirection = FlexDirection.Column;
+        _corpusDashboard.style.overflow = Overflow.Hidden;
+        corpusCard.Add(_corpusDashboard);
+
+        _corpusFreshness = CreateLabel(12, FontStyle.Normal, Colors.HistoryFooterSecondaryText);
+        _corpusFreshness.style.whiteSpace = WhiteSpace.NoWrap;
+        _corpusFreshness.style.overflow = Overflow.Hidden;
+        _corpusDashboard.Add(_corpusFreshness);
+
+        _heroStrip = new VisualElement();
+        _heroStrip.style.flexDirection = FlexDirection.Row;
+        _heroStrip.style.marginTop = 8f;
+        _heroStrip.style.overflow = Overflow.Hidden;
+        _corpusDashboard.Add(_heroStrip);
 
         _corpusStatus = CreateLabel(13, FontStyle.Normal, Colors.HistoryStatusText);
         _corpusStatus.style.marginTop = 8f;

@@ -175,7 +175,8 @@ static void TestRefreshFinalBuildsTextsAreAtlasWarmed()
             LiveBuildPanelText.RefreshingFinalBuilds(),
             LiveBuildPanelText.CorpusEmpty(),
             "✓",
-            LiveBuildPanelText.CorpusSummaryLine(sampleSummary),
+            "VAN",
+            "更新于",
             LiveBuildPanelText.CorpusSummaryTooltip(sampleSummary),
             LiveBuildPanelText.FinalBuildRefreshFailed(LiveBuildPanelText.Unknown()),
         }
@@ -186,6 +187,20 @@ static void TestRefreshFinalBuildsTextsAreAtlasWarmed()
             $"FontAtlasSample must include refresh copy '{text}' for CJK glyph warm-up."
         );
     }
+
+    var twoHoursOld = new TenWinCorpusSummary(
+        new DateTimeOffset(2034, 5, 16, 5, 28, 9, TimeSpan.Zero),
+        1240,
+        7
+    );
+    var freshness = LiveBuildPanelText.CorpusFreshnessLine(
+        twoHoursOld,
+        new DateTimeOffset(2034, 5, 16, 7, 28, 9, TimeSpan.Zero)
+    );
+    Assert(
+        freshness.Contains("2 小时前", StringComparison.Ordinal),
+        $"zh-CN freshness line should bucket a 2h-old corpus as '2 小时前', got '{freshness}'."
+    );
 }
 
 static void TestNoRunRowsSuppressEmptyText()
