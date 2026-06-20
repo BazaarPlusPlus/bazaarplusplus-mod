@@ -220,14 +220,8 @@ internal sealed class LiveBuildPanelView : IDisposable
         row.style.minHeight = 0f;
         row.style.marginBottom = 12f;
         row.style.backgroundColor = Colors.HistoryPreviewBackground;
-        row.style.borderBottomColor = Colors.HistoryListFrameBorder;
-        row.style.borderTopColor = Colors.HistoryListFrameBorder;
-        row.style.borderLeftColor = Colors.HistoryListFrameBorder;
-        row.style.borderRightColor = Colors.HistoryListFrameBorder;
-        row.style.borderBottomWidth = 1f;
-        row.style.borderTopWidth = 1f;
-        row.style.borderLeftWidth = 1f;
-        row.style.borderRightWidth = 1f;
+        UiStyle.Border(row.style, Borders.Thin, Colors.HistoryListFrameBorder);
+        UiStyle.Radius(row.style, Radii.Row);
         row.style.flexDirection = FlexDirection.Row;
         row.style.overflow = Overflow.Hidden;
         parent.Add(row);
@@ -322,8 +316,7 @@ internal sealed class LiveBuildPanelView : IDisposable
 
         _closeButton = CreateButton(LiveBuildPanelText.Close(), _close);
         _closeButton.style.width = 86f;
-        _closeButton.style.backgroundColor = Colors.CloseBackground;
-        _closeButton.style.color = Colors.CloseText;
+        StyleButton(_closeButton, Colors.CloseBackground, Colors.CloseText);
         titleRow.Add(_closeButton);
 
         _subtitle = BPPSupporterAttributionRow.Create();
@@ -332,11 +325,14 @@ internal sealed class LiveBuildPanelView : IDisposable
 
         _candidateCount = CreateLabel(16, FontStyle.Bold, Colors.HistoryChipText);
         _candidateCount.style.marginTop = 22f;
-        _candidateCount.style.height = 34f;
+        UiStyle.FixedHeight(_candidateCount.style, Sizes.ChipHeight);
         _candidateCount.style.whiteSpace = WhiteSpace.NoWrap;
         _candidateCount.style.overflow = Overflow.Hidden;
         _candidateCount.style.backgroundColor = Colors.HistoryChipBackground;
         _candidateCount.style.unityTextAlign = TextAnchor.MiddleCenter;
+        UiStyle.HorizontalPadding(_candidateCount.style, 12f);
+        UiStyle.Border(_candidateCount.style, Borders.Thin, Colors.HistoryStatusBorder);
+        UiStyle.Radius(_candidateCount.style, Radii.Md);
         rail.Add(_candidateCount);
 
         // Corpus card: pull action + corpus state in one block. Fixed height on purpose — the
@@ -355,6 +351,8 @@ internal sealed class LiveBuildPanelView : IDisposable
         corpusCard.style.paddingTop = 10f;
         corpusCard.style.paddingBottom = 10f;
         corpusCard.style.overflow = Overflow.Hidden;
+        UiStyle.Border(corpusCard.style, Borders.Thin, Colors.HistoryStatusBorder);
+        UiStyle.Radius(corpusCard.style, Radii.Md);
         rail.Add(corpusCard);
 
         var corpusHeader = new VisualElement();
@@ -383,6 +381,11 @@ internal sealed class LiveBuildPanelView : IDisposable
         _finalBuildRefreshButton.style.maxHeight = Sizes.LiveBuildRefreshButtonHeight;
         _finalBuildRefreshButton.style.flexGrow = 0f;
         _finalBuildRefreshButton.style.flexShrink = 0f;
+        StyleButton(
+            _finalBuildRefreshButton,
+            Colors.ButtonSelectedBackground,
+            Colors.ButtonSelectedText
+        );
         corpusHeader.Add(_finalBuildRefreshButton);
 
         _corpusStatus = CreateLabel(13, FontStyle.Normal, Colors.HistoryStatusText);
@@ -402,6 +405,8 @@ internal sealed class LiveBuildPanelView : IDisposable
         resultCard.style.paddingTop = 10f;
         resultCard.style.paddingBottom = 10f;
         resultCard.style.overflow = Overflow.Hidden;
+        UiStyle.Border(resultCard.style, Borders.Thin, Colors.HistoryStatusBorder);
+        UiStyle.Radius(resultCard.style, Radii.Md);
         rail.Add(resultCard);
 
         _resultCardTitle = CreateLabel(15, FontStyle.Bold, Colors.HistorySectionTitleText);
@@ -641,14 +646,8 @@ internal sealed class LiveBuildPanelView : IDisposable
         button.style.overflow = Overflow.Hidden;
         button.style.backgroundColor = Colors.HistoryButtonBackground;
         button.style.color = Colors.White;
-        button.style.borderBottomColor = Colors.HistoryButtonBorder;
-        button.style.borderTopColor = Colors.HistoryButtonBorder;
-        button.style.borderLeftColor = Colors.HistoryButtonBorder;
-        button.style.borderRightColor = Colors.HistoryButtonBorder;
-        button.style.borderBottomWidth = 1f;
-        button.style.borderTopWidth = 1f;
-        button.style.borderLeftWidth = 1f;
-        button.style.borderRightWidth = 1f;
+        UiStyle.Border(button.style, Borders.Thin, Colors.HistoryButtonBorder);
+        UiStyle.Radius(button.style, Radii.Md);
         var textElement = button.Q<TextElement>();
         if (textElement != null)
         {
@@ -662,5 +661,12 @@ internal sealed class LiveBuildPanelView : IDisposable
         }
         button.tooltip = text;
         return button;
+    }
+
+    private static void StyleButton(Button button, Color background, Color textColor)
+    {
+        button.style.backgroundColor = background;
+        button.style.color = textColor;
+        UiStyle.BorderColor(button.style, Colors.ButtonBorderFor(background));
     }
 }
