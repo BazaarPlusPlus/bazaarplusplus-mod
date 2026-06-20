@@ -44,6 +44,8 @@ internal sealed class CollectionPanelViewModel
 
     // Day filter icon: DayFilterValue is the number shown (current run day, or OutOfRunDay);
     // DayFilterActive highlights it when the day participates in filtering.
+    public bool DayFilterVisible { get; set; } = true;
+    public bool DayFilterEnabled { get; set; } = true;
     public bool DayFilterActive { get; set; }
     public int DayFilterValue { get; set; }
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
@@ -391,9 +393,11 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_dayToggleButton != null)
         {
             RefreshDayToggle(model.DayFilterValue, model.DayFilterActive);
-            _dayToggleButton.style.display = model.TabProfile.ShowDayFilter
+            _dayToggleButton.style.display = model.DayFilterVisible
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
+            _dayToggleButton.SetEnabled(model.DayFilterEnabled);
+            _dayToggleButton.style.opacity = model.DayFilterEnabled ? 1f : 0.58f;
         }
         if (_sortQualityButton != null)
             RefreshChip(_sortQualityButton, model.SortPriority == CollectionSortPriority.Quality);

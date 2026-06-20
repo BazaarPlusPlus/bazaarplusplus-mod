@@ -848,6 +848,10 @@ internal sealed class CollectionPanel : MonoBehaviour
         var profile = CollectionTabProfile.For(_filter.ActiveTab);
         var availableTags = _facetAvailability.ItemTags;
         var availableKeywords = _facetAvailability.KeywordsFor(_filter.ActiveType);
+        var dayFilterPresentation = CollectionDayFilterPresentation.For(
+            profile,
+            _filter.SelectedRunDay != null
+        );
         var model = new CollectionPanelViewModel
         {
             Title = CollectionPanelText.Title(),
@@ -876,7 +880,9 @@ internal sealed class CollectionPanel : MonoBehaviour
             SourceSelectorEnabled =
                 profile.ShowSourceFilter && !_isLoadingCatalog && !_filter.PackagesOnly,
             SortPriority = _filter.SortPriority,
-            DayFilterActive = _filter.SelectedRunDay != null,
+            DayFilterVisible = dayFilterPresentation.IsVisible,
+            DayFilterEnabled = dayFilterPresentation.IsEnabled,
+            DayFilterActive = dayFilterPresentation.IsActive,
             DayFilterValue = _currentRunDay ?? DayTierSchedule.OutOfRunDay,
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,

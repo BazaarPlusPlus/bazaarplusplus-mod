@@ -1,10 +1,12 @@
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 
 TestEmbeddedFontExtractionWritesResourceBytes();
 TestEmbeddedFontExtractionFailsForMissingResource();
 TestTmpFontPolicyDetectsCjkText();
 TestStablePanelTextCompactionKeepsStableSlots();
+TestCollectionSortButtonWidthIsCompact();
 
 Console.WriteLine("UiFoundation checks passed.");
 
@@ -123,6 +125,22 @@ static void TestStablePanelTextCompactionKeepsStableSlots()
     Assert(
         StablePanelText.Compact(unbroken, 48).Length == 48,
         "Unbroken text should also be clamped."
+    );
+}
+
+static void TestCollectionSortButtonWidthIsCompact()
+{
+    Assert(
+        Sizes.CollectionSortButtonWidth == 60f,
+        "CollectionPanel sort buttons should use the compact 60pt token."
+    );
+    Assert(
+        Sizes.CollectionSortButtonWidth < Sizes.RunsTabWidth,
+        "CollectionPanel sort buttons should be narrower than top-level tab buttons."
+    );
+    Assert(
+        Sizes.CollectionSortButtonWidth >= Sizes.InfoChipMinWidth,
+        "CollectionPanel sort buttons should not shrink below the existing compact chip floor."
     );
 }
 

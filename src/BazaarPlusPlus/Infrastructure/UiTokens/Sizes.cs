@@ -33,6 +33,7 @@ internal static class Sizes
     public const float ButtonCompactHeight = 24f;
     public const float ButtonFooterHeight = 36f;
     public const float RunsTabWidth = 72f;
+    public const float CollectionSortButtonWidth = 60f;
     public const float GhostAllButtonWidth = 70f;
     public const float GhostFilterButtonWidth = 78f;
     public const float ServerHealthButtonWidth = 108f;

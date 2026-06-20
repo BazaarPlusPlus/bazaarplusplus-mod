@@ -314,6 +314,30 @@ AssertValues(
     new[] { ETier.Legendary },
     "Achievement tier filtering should remain available after entering the tab."
 );
+var achievementDayPresentation = CollectionDayFilterPresentation.For(
+    CollectionTabProfile.For(CollectionTabKind.Achievements),
+    isSelected: true
+);
+AssertTrue(
+    achievementDayPresentation.IsVisible,
+    "Achievements should keep the day pill visible so the top control row stays stable."
+);
+AssertFalse(
+    achievementDayPresentation.IsEnabled,
+    "Achievements should keep the day pill inert because the tab suppresses day filtering."
+);
+AssertFalse(
+    achievementDayPresentation.IsActive,
+    "Achievements should not highlight the day pill when day filtering is suppressed."
+);
+var itemDayPresentation = CollectionDayFilterPresentation.For(
+    CollectionTabProfile.For(CollectionTabKind.Items),
+    isSelected: true
+);
+AssertTrue(
+    itemDayPresentation.IsVisible && itemDayPresentation.IsEnabled && itemDayPresentation.IsActive,
+    "Normal item tabs should still show an enabled, highlighted day pill when selected."
+);
 
 sourceState.ActiveType = ECardType.Item;
 sourceState.SelectedSourceKey = "merchant:hidden";

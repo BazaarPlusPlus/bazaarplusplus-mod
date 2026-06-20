@@ -286,7 +286,12 @@ internal sealed partial class CollectionPanelView
 
     private static Button CreateInlineSortButton(string text, Action onClick)
     {
-        var button = CreateButton(text, onClick, Sizes.RunsTabWidth, Sizes.ButtonStandardHeight);
+        var button = CreateButton(
+            text,
+            onClick,
+            Sizes.CollectionSortButtonWidth,
+            Sizes.ButtonStandardHeight
+        );
         button.style.flexShrink = 0f;
         StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
         return button;
