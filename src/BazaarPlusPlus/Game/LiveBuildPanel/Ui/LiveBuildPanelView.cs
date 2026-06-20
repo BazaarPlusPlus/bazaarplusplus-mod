@@ -592,8 +592,9 @@ internal sealed class LiveBuildPanelView : IDisposable
         );
         _finalBuildRefreshButton.style.marginTop = 16f;
         _finalBuildRefreshButton.style.width = Length.Percent(100f);
-        _finalBuildRefreshButton.style.height = Sizes.ButtonCompactHeight;
-        _finalBuildRefreshButton.style.minHeight = Sizes.ButtonCompactHeight;
+        // flexGrow 0 is load-bearing: a Button in this column rail otherwise stretches vertically
+        // to fill the free space. Keep the default button height so it matches Previous/Next.
+        _finalBuildRefreshButton.style.flexGrow = 0f;
         _finalBuildRefreshButton.style.flexShrink = 0f;
         StyleButton(
             _finalBuildRefreshButton,
