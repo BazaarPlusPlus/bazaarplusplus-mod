@@ -46,7 +46,6 @@ internal sealed class LiveBuildPanelView : IDisposable
     private VisualElement? _root;
     private Label? _title;
     private VisualElement? _subtitle;
-    private Label? _candidateCount;
     private Label? _corpusCardTitle;
     private Button? _finalBuildRefreshButton;
     private Label? _corpusStatus;
@@ -54,7 +53,13 @@ internal sealed class LiveBuildPanelView : IDisposable
     private Label? _corpusFreshness;
     private VisualElement? _heroStrip;
     private Label? _resultCardTitle;
-    private Label? _recommendationStatus;
+    private Label? _matchesPager;
+    private VisualElement? _matchesStats;
+    private Label? _matchesGuidance;
+    private Label? _rateValue;
+    private Label? _sampleValue;
+    private Label? _finalDayValue;
+    private Label? _matchedValue;
     private Button? _previousButton;
     private Button? _nextButton;
     private Button? _closeButton;
@@ -130,18 +135,13 @@ internal sealed class LiveBuildPanelView : IDisposable
             snapshot.Supporters,
             LiveBuildPanelText.Subtitle()
         );
-        _candidateCount!.text = LiveBuildPanelText.CandidateCount(
-            snapshot.CandidateTemplateIds.Count
-        );
-        _candidateCount.tooltip = _candidateCount.text;
         _corpusCardTitle!.text = LiveBuildPanelText.CorpusCardTitle();
         _finalBuildRefreshButton!.text = snapshot.FinalBuildRefreshButtonText;
         _finalBuildRefreshButton.tooltip = snapshot.FinalBuildRefreshButtonText;
         _finalBuildRefreshButton.SetEnabled(snapshot.FinalBuildRefreshButtonEnabled);
         RefreshCorpusCard(snapshot);
         _resultCardTitle!.text = LiveBuildPanelText.ResultCardTitle();
-        _recommendationStatus!.text = StablePanelText.Compact(snapshot.RecommendationStatus, 96);
-        _recommendationStatus.tooltip = snapshot.RecommendationStatus;
+        RefreshMatchesCard(snapshot);
         _previousButton!.text = LiveBuildPanelText.Previous();
         _previousButton.tooltip = LiveBuildPanelText.Previous();
         _nextButton!.text = LiveBuildPanelText.Next();
@@ -187,7 +187,12 @@ internal sealed class LiveBuildPanelView : IDisposable
             return;
 
         foreach (var entry in value.HeroBuildCounts)
+        {
+            if (!HeroVisual.IsPlayableHero(entry.Hero))
+                continue;
+
             _heroStrip.Add(BuildHeroTile(entry));
+        }
     }
 
     private static VisualElement BuildHeroTile(TenWinHeroBuildCount entry)
@@ -221,6 +226,62 @@ internal sealed class LiveBuildPanelView : IDisposable
         tile.Add(chip);
 
         return tile;
+    }
+
+    // The Matches card swaps between the per-recommendation stat rows (has recommendation) and a
+    // single guidance line (no run / no candidates / no matching build) by toggling display only.
+    private void RefreshMatchesCard(LiveBuildPanelSnapshot snapshot)
+    {
+        var hasRecommendation = snapshot.MatchesState == LiveBuildMatchesState.HasRecommendation;
+        _matchesStats!.style.display = hasRecommendation ? DisplayStyle.Flex : DisplayStyle.None;
+        _matchesPager!.style.display = hasRecommendation ? DisplayStyle.Flex : DisplayStyle.None;
+        _matchesGuidance!.style.display = hasRecommendation ? DisplayStyle.None : DisplayStyle.Flex;
+
+        if (hasRecommendation)
+        {
+            _matchesPager.text = LiveBuildPanelText.RecommendationCount(
+                snapshot.RecommendationIndex,
+                snapshot.RecommendationCount
+            );
+            _rateValue!.text = LiveBuildPanelText.MatchRateValue(snapshot.MatchTenWinRateBps);
+            _sampleValue!.text = LiveBuildPanelText.MatchSampleValue(snapshot.MatchTenWinRunCount);
+            _finalDayValue!.text = LiveBuildPanelText.MatchFinalDayValue(snapshot.MatchP75FinalDay);
+            _matchedValue!.text = LiveBuildPanelText.MatchMatchedValue(
+                snapshot.MatchMatchedCardCount,
+                snapshot.CandidateTemplateIds.Count
+            );
+            return;
+        }
+
+        _matchesGuidance.text = StablePanelText.Compact(snapshot.MatchesGuidance, 96);
+        _matchesGuidance.tooltip = snapshot.MatchesGuidance;
+    }
+
+    private static Label AddStatRow(VisualElement parent, string label)
+    {
+        var row = new VisualElement();
+        row.style.flexDirection = FlexDirection.Row;
+        row.style.alignItems = Align.Center;
+        row.style.marginBottom = 4f;
+
+        var labelElement = CreateLabel(13, FontStyle.Normal, Colors.HistoryFooterSecondaryText);
+        labelElement.text = label;
+        labelElement.style.flexGrow = 1f;
+        labelElement.style.flexShrink = 1f;
+        labelElement.style.minWidth = 0f;
+        labelElement.style.whiteSpace = WhiteSpace.NoWrap;
+        labelElement.style.overflow = Overflow.Hidden;
+        row.Add(labelElement);
+
+        var value = CreateLabel(13, FontStyle.Bold, Colors.HistoryProgressText);
+        value.style.flexShrink = 0f;
+        value.style.marginLeft = 8f;
+        value.style.unityTextAlign = TextAnchor.MiddleRight;
+        value.style.whiteSpace = WhiteSpace.NoWrap;
+        row.Add(value);
+
+        parent.Add(row);
+        return value;
     }
 
     public void Dispose()
@@ -390,28 +451,14 @@ internal sealed class LiveBuildPanelView : IDisposable
         titleRow.Add(_closeButton);
 
         _subtitle = BPPSupporterAttributionRow.Create();
-        _subtitle.style.marginTop = 8f;
+        _subtitle.style.marginTop = 10f;
         rail.Add(_subtitle);
 
-        _candidateCount = CreateLabel(16, FontStyle.Bold, Colors.HistoryChipText);
-        _candidateCount.style.marginTop = 22f;
-        UiStyle.FixedHeight(_candidateCount.style, Sizes.ChipHeight);
-        _candidateCount.style.whiteSpace = WhiteSpace.NoWrap;
-        _candidateCount.style.overflow = Overflow.Hidden;
-        _candidateCount.style.backgroundColor = Colors.HistoryChipBackground;
-        _candidateCount.style.unityTextAlign = TextAnchor.MiddleCenter;
-        UiStyle.HorizontalPadding(_candidateCount.style, 12f);
-        UiStyle.Border(_candidateCount.style, Borders.Thin, Colors.HistoryStatusBorder);
-        UiStyle.Radius(_candidateCount.style, Radii.Md);
-        rail.Add(_candidateCount);
-
-        // Corpus card: pull action + corpus state in one block. Fixed height on purpose — the
-        // body swaps copy in place (pending/failure/guidance/summary) instead of showing/hiding
-        // sibling boxes, so the rail never reflows on status changes. Refresh feedback stays in
-        // the rail (never a board-row empty text): row copy feeds geometry callbacks and would
-        // re-trigger preview redraws on every status change.
+        // Corpus card: read-only ten-win coverage (freshness + per-hero tiles). The pull action
+        // moved to the rail footer. Fixed height on purpose — the body swaps the dashboard vs a
+        // single status line (pending/failure/empty) in place, so the rail never reflows.
         var corpusCard = new VisualElement();
-        corpusCard.style.marginTop = 12f;
+        corpusCard.style.marginTop = 14f;
         corpusCard.style.height = Sizes.LiveBuildCorpusCardHeight;
         corpusCard.style.minHeight = Sizes.LiveBuildCorpusCardHeight;
         corpusCard.style.maxHeight = Sizes.LiveBuildCorpusCardHeight;
@@ -437,26 +484,6 @@ internal sealed class LiveBuildPanelView : IDisposable
         _corpusCardTitle.style.whiteSpace = WhiteSpace.NoWrap;
         _corpusCardTitle.style.overflow = Overflow.Hidden;
         corpusHeader.Add(_corpusCardTitle);
-
-        _finalBuildRefreshButton = CreateButton(
-            LiveBuildPanelText.RefreshFinalBuilds(),
-            _refreshFinalBuilds
-        );
-        _finalBuildRefreshButton.style.marginLeft = 8f;
-        _finalBuildRefreshButton.style.width = Sizes.LiveBuildRefreshButtonWidth;
-        _finalBuildRefreshButton.style.minWidth = Sizes.LiveBuildRefreshButtonWidth;
-        _finalBuildRefreshButton.style.maxWidth = Sizes.LiveBuildRefreshButtonWidth;
-        _finalBuildRefreshButton.style.height = Sizes.LiveBuildRefreshButtonHeight;
-        _finalBuildRefreshButton.style.minHeight = Sizes.LiveBuildRefreshButtonHeight;
-        _finalBuildRefreshButton.style.maxHeight = Sizes.LiveBuildRefreshButtonHeight;
-        _finalBuildRefreshButton.style.flexGrow = 0f;
-        _finalBuildRefreshButton.style.flexShrink = 0f;
-        StyleButton(
-            _finalBuildRefreshButton,
-            Colors.ButtonSelectedBackground,
-            Colors.ButtonSelectedText
-        );
-        corpusHeader.Add(_finalBuildRefreshButton);
 
         _corpusDashboard = new VisualElement();
         _corpusDashboard.style.marginTop = 8f;
@@ -496,17 +523,46 @@ internal sealed class LiveBuildPanelView : IDisposable
         UiStyle.Radius(resultCard.style, Radii.Md);
         rail.Add(resultCard);
 
+        var resultHeader = new VisualElement();
+        resultHeader.style.flexDirection = FlexDirection.Row;
+        resultHeader.style.alignItems = Align.Center;
+        resultCard.Add(resultHeader);
+
         _resultCardTitle = CreateLabel(15, FontStyle.Bold, Colors.HistorySectionTitleText);
+        _resultCardTitle.style.flexGrow = 1f;
+        _resultCardTitle.style.flexShrink = 1f;
+        _resultCardTitle.style.minWidth = 0f;
         _resultCardTitle.style.whiteSpace = WhiteSpace.NoWrap;
         _resultCardTitle.style.overflow = Overflow.Hidden;
-        resultCard.Add(_resultCardTitle);
+        resultHeader.Add(_resultCardTitle);
 
-        _recommendationStatus = CreateLabel(15, FontStyle.Normal, Colors.HistoryStatusText);
-        _recommendationStatus.style.marginTop = 8f;
-        _recommendationStatus.style.whiteSpace = WhiteSpace.Normal;
-        _recommendationStatus.style.maxHeight = Sizes.LiveBuildRecommendationStatusMaxHeight;
-        _recommendationStatus.style.overflow = Overflow.Hidden;
-        resultCard.Add(_recommendationStatus);
+        _matchesPager = CreateLabel(12, FontStyle.Bold, Colors.HistoryChipText);
+        _matchesPager.style.flexShrink = 0f;
+        _matchesPager.style.height = Sizes.InfoChipHeight;
+        _matchesPager.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _matchesPager.style.backgroundColor = Colors.HistoryChipBackground;
+        UiStyle.HorizontalPadding(_matchesPager.style, 8f);
+        UiStyle.Radius(_matchesPager.style, Radii.InfoChip);
+        resultHeader.Add(_matchesPager);
+
+        _matchesStats = new VisualElement();
+        _matchesStats.style.marginTop = 8f;
+        _matchesStats.style.flexDirection = FlexDirection.Column;
+        _matchesStats.style.overflow = Overflow.Hidden;
+        resultCard.Add(_matchesStats);
+
+        _rateValue = AddStatRow(_matchesStats, LiveBuildPanelText.MatchRateLabel());
+        _rateValue.style.color = Colors.StatusCompletedText;
+        _sampleValue = AddStatRow(_matchesStats, LiveBuildPanelText.MatchSampleLabel());
+        _finalDayValue = AddStatRow(_matchesStats, LiveBuildPanelText.MatchFinalDayLabel());
+        _matchedValue = AddStatRow(_matchesStats, LiveBuildPanelText.MatchMatchedLabel());
+
+        _matchesGuidance = CreateLabel(14, FontStyle.Normal, Colors.HistoryStatusText);
+        _matchesGuidance.style.marginTop = 8f;
+        _matchesGuidance.style.whiteSpace = WhiteSpace.Normal;
+        _matchesGuidance.style.maxHeight = Sizes.LiveBuildRecommendationStatusMaxHeight;
+        _matchesGuidance.style.overflow = Overflow.Hidden;
+        resultCard.Add(_matchesGuidance);
 
         var nav = new VisualElement();
         nav.style.flexDirection = FlexDirection.Row;
@@ -521,6 +577,28 @@ internal sealed class LiveBuildPanelView : IDisposable
         _nextButton.style.flexGrow = 1f;
         _nextButton.style.marginLeft = 8f;
         nav.Add(_nextButton);
+
+        // Spacer pushes the low-frequency pull action to the rail bottom, out of the top hot zone.
+        var footerSpacer = new VisualElement();
+        footerSpacer.style.flexGrow = 1f;
+        footerSpacer.style.minHeight = 8f;
+        rail.Add(footerSpacer);
+
+        _finalBuildRefreshButton = CreateButton(
+            LiveBuildPanelText.RefreshFinalBuilds(),
+            _refreshFinalBuilds
+        );
+        _finalBuildRefreshButton.style.marginTop = 12f;
+        _finalBuildRefreshButton.style.width = Length.Percent(100f);
+        _finalBuildRefreshButton.style.height = Sizes.ButtonStandardHeight;
+        _finalBuildRefreshButton.style.minHeight = Sizes.ButtonStandardHeight;
+        _finalBuildRefreshButton.style.flexShrink = 0f;
+        StyleButton(
+            _finalBuildRefreshButton,
+            Colors.HistoryStatusBackground,
+            Colors.HistoryStatusText
+        );
+        rail.Add(_finalBuildRefreshButton);
     }
 
     private void RefreshRow(LiveItemBoardRowVm row, HashSet<Guid> candidates)

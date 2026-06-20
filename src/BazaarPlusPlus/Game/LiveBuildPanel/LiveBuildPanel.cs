@@ -28,7 +28,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 {
     private const string OverlayPanelId = "LiveBuildPanel";
     private const int OverlaySortingBand = BppOverlaySorting.MainOverlayPanelBand;
-    private const int SupporterAttributionCount = 4;
+    private const int SupporterAttributionCount = 2;
 
     private static LiveBuildPanel? _instance;
     private readonly LiveCardSnapshotReader _reader = new();
@@ -357,6 +357,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         var recommendation = _matches.Count > 0 ? _matches[_recommendationIndex] : null;
         var nowUtc = DateTimeOffset.UtcNow;
         var corpus = ResolveCorpusStatus();
+        var matches = ResolveMatches(recommendation);
         var finalBuild =
             recommendation?.Board
             ?? new BppItemBoard(
@@ -374,7 +375,12 @@ internal sealed class LiveBuildPanel : MonoBehaviour
             Board = board,
             Stash = stash,
             CandidateTemplateIds = _candidateState.TemplateIds,
-            RecommendationStatus = ResolveRecommendationStatus(recommendation),
+            MatchesState = matches.State,
+            MatchesGuidance = matches.Guidance,
+            MatchTenWinRateBps = matches.Recommendation?.TenWinRateBps,
+            MatchTenWinRunCount = matches.Recommendation?.TenWinRunCount ?? 0,
+            MatchP75FinalDay = matches.Recommendation?.P75TenWinFinalDay,
+            MatchMatchedCardCount = matches.Recommendation?.MatchedCardCount ?? 0,
             RecommendationIndex = _recommendationIndex,
             RecommendationCount = _matches.Count,
             FinalBuildRefreshButtonText = _buildRefreshInProgress
@@ -514,21 +520,24 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         };
     }
 
-    private string ResolveRecommendationStatus(BuildRecommendation? recommendation)
+    private (
+        LiveBuildMatchesState State,
+        string Guidance,
+        BuildRecommendation? Recommendation
+    ) ResolveMatches(BuildRecommendation? recommendation)
     {
         if (_liveSnapshot.Hero == null)
-            return LiveBuildPanelText.NoRun();
+            return (LiveBuildMatchesState.NoRun, LiveBuildPanelText.NoRun(), null);
         if (!_candidateState.HasCandidates)
-            return LiveBuildPanelText.NoCandidates();
+            return (LiveBuildMatchesState.NoCandidates, LiveBuildPanelText.NoCandidates(), null);
         if (recommendation == null)
-            return LiveBuildPanelText.NoRecommendation();
-
-        return $"{LiveBuildPanelText.RecommendationCount(_recommendationIndex, _matches.Count)} · "
-            + LiveBuildPanelText.RecommendationEvidence(
-                recommendation.TenWinRunCount,
-                recommendation.TenWinRateBps,
-                recommendation.P75TenWinFinalDay
+            return (
+                LiveBuildMatchesState.NoRecommendation,
+                LiveBuildPanelText.NoRecommendation(),
+                null
             );
+
+        return (LiveBuildMatchesState.HasRecommendation, string.Empty, recommendation);
     }
 
     private void StopRender()

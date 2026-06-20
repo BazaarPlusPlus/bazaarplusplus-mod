@@ -17,9 +17,9 @@ internal static partial class LiveBuildPanelText
         "十勝陣容資料"
     );
     private static readonly LocalizedTextSet RefreshFinalBuildsText = new(
-        "Pull Builds",
-        "拉取阵容",
-        "拉取陣容"
+        "Pull latest builds",
+        "拉取最新阵容",
+        "拉取最新陣容"
     );
     private static readonly LocalizedTextSet WorkingText = new("Working...", "处理中...");
     private static readonly LocalizedTextSet RefreshingFinalBuildsText = new(

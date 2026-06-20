@@ -51,6 +51,21 @@ internal static class HeroVisual
         };
     }
 
+    // The seven playable heroes. The corpus also keys a "Common" pool (and may carry other
+    // non-playable keys); callers filter on this so only real heroes surface.
+    internal static bool IsPlayableHero(string? heroName) =>
+        heroName?.Trim() switch
+        {
+            "Vanessa"
+            or "Pygmalien"
+            or "Dooley"
+            or "Mak"
+            or "Jules"
+            or "Karnok"
+            or "Stelle" => true,
+            _ => false,
+        };
+
     // Dooley sits on a knife-edge: luminance 0.622 (just over the 0.62 cutoff) -> dark text. Keep
     // the channel weights and the > 0.62f threshold byte-for-byte or his badge text color flips.
     private static HeroBadgeStyle Build(string shortCode, Color background)

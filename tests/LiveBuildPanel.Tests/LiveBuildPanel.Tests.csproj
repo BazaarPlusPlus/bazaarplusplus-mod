@@ -33,6 +33,10 @@
       Link="LiveBuildCorpusState.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildMatchesState.cs"
+      Link="LiveBuildMatchesState.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildRefreshSeverity.cs"
       Link="LiveBuildRefreshSeverity.cs"
     />

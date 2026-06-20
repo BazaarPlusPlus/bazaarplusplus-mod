@@ -50,5 +50,10 @@ internal static partial class LiveBuildPanelText
         // Relative-time freshness buckets (latin + CJK) and the thousands separator.
         + "updated m h d w ago — 1,234"
         + "更新于 更新於 分钟前 分鐘前 小时前 小時前 天前 周前 週前 更新时间未知 更新時間未知"
+        // Matches card stat labels.
+        + MatchRateLabel()
+        + MatchSampleLabel()
+        + MatchFinalDayLabel()
+        + MatchMatchedLabel()
         + FinalBuildRefreshFailed(Unknown());
 }

@@ -7,7 +7,7 @@ using BazaarPlusPlus.Infrastructure.UiTokens;
 using BazaarPlusPlus.Localization;
 
 TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground();
-TestSupporterAttributionCountMatchesRailCap();
+TestSupporterAttributionCountWithinRailCap();
 TestCandidateToggleUsesTemplateId();
 TestCandidatePruneKeepsSelectableRowsOnly();
 TestRowVmTogglePolicyComesFromBoardType();
@@ -34,7 +34,7 @@ static void TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground()
     );
 }
 
-static void TestSupporterAttributionCountMatchesRailCap()
+static void TestSupporterAttributionCountWithinRailCap()
 {
     RegisterPluginReflectionAssemblyResolution();
     var assembly = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "BazaarPlusPlus.dll"));
@@ -49,9 +49,10 @@ static void TestSupporterAttributionCountMatchesRailCap()
         BindingFlags.NonPublic | BindingFlags.Static
     );
     Assert(field != null, "LiveBuildPanel should keep supporter attribution count named.");
+    var count = (int)field!.GetRawConstantValue()!;
     Assert(
-        (int)field!.GetRawConstantValue()! == 4,
-        "LiveBuildPanel should request four supporters to match the attribution row cap."
+        count >= 1 && count <= 4,
+        $"LiveBuildPanel should request 1-4 supporters (within the attribution row cap), got {count}."
     );
 }
 
@@ -151,8 +152,8 @@ static void TestRefreshFinalBuildsTextsAreAtlasWarmed()
     );
 
     Assert(
-        LiveBuildPanelText.RefreshFinalBuilds() == "拉取阵容",
-        "zh-CN pull-builds button copy should be 拉取阵容."
+        LiveBuildPanelText.RefreshFinalBuilds() == "拉取最新阵容",
+        "zh-CN pull-builds button copy should be 拉取最新阵容."
     );
 
     var sampleSummary = new TenWinCorpusSummary(

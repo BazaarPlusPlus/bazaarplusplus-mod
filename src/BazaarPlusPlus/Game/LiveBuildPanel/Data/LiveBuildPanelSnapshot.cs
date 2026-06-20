@@ -22,7 +22,17 @@ internal sealed class LiveBuildPanelSnapshot
 
     public IReadOnlyCollection<Guid> CandidateTemplateIds { get; init; } = Array.Empty<Guid>();
 
-    public string RecommendationStatus { get; init; } = string.Empty;
+    public LiveBuildMatchesState MatchesState { get; init; }
+
+    public string MatchesGuidance { get; init; } = string.Empty;
+
+    public int? MatchTenWinRateBps { get; init; }
+
+    public int MatchTenWinRunCount { get; init; }
+
+    public int? MatchP75FinalDay { get; init; }
+
+    public int MatchMatchedCardCount { get; init; }
 
     public int RecommendationIndex { get; init; }
 
