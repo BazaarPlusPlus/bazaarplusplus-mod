@@ -584,17 +584,13 @@ internal sealed class LiveBuildPanelView : IDisposable
         _nextButton.style.marginLeft = 8f;
         nav.Add(_nextButton);
 
-        // Spacer pushes the low-frequency pull action to the rail bottom, out of the top hot zone.
-        var footerSpacer = new VisualElement();
-        footerSpacer.style.flexGrow = 1f;
-        footerSpacer.style.minHeight = 8f;
-        rail.Add(footerSpacer);
-
+        // The low-frequency pull action sits just below the result card — out of the top hot zone
+        // without stranding it at the rail bottom behind a large empty gap.
         _finalBuildRefreshButton = CreateButton(
             LiveBuildPanelText.RefreshFinalBuilds(),
             _refreshFinalBuilds
         );
-        _finalBuildRefreshButton.style.marginTop = 12f;
+        _finalBuildRefreshButton.style.marginTop = 16f;
         _finalBuildRefreshButton.style.width = Length.Percent(100f);
         _finalBuildRefreshButton.style.height = Sizes.ButtonCompactHeight;
         _finalBuildRefreshButton.style.minHeight = Sizes.ButtonCompactHeight;
