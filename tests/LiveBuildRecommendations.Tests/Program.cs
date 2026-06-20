@@ -35,6 +35,7 @@ internal static class TenWinBuildTests
         TestStaleCacheUsesStaleAndQueuesBackgroundRefresh();
         TestManualRefreshBypassesFreshCache();
         TestRefreshServiceWrapsManualRefreshOutcome();
+        TestRefreshServiceLimitsToOnePullPerSession();
         TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh();
         TestColdStartFallsBackToEmbeddedThenRemote();
         TestEmbeddedSeedResourceIsBundledAndParses();
@@ -511,6 +512,66 @@ internal static class TenWinBuildTests
             Reset(repository);
             TryDelete(cachePath);
         }
+    }
+
+    private static void TestRefreshServiceLimitsToOnePullPerSession()
+    {
+        var repositoryType = GetRepositoryType();
+        var repository = NewRepository(repositoryType);
+        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
+        var cachePath = TempCachePath();
+
+        var serviceType = repositoryType.Assembly.GetType(
+            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildRecommendationRefreshService"
+        );
+        Assert(serviceType != null, "BuildRecommendationRefreshService should exist.");
+        var service =
+            Activator.CreateInstance(serviceType!)
+            ?? throw new InvalidOperationException("Refresh service should be constructible.");
+        var refreshAsync = serviceType!.GetMethod("RefreshAsync")!;
+
+        try
+        {
+            // The first manual pull of the session really downloads and succeeds.
+            Configure(repository, cachePath, now, _ => ScorePayload("CacheHero", 333));
+            var first = InvokeRefreshService(refreshAsync, service, repository);
+            Assert(GetResultSucceeded(first), "The first session pull should really succeed.");
+
+            // The download would now throw, but the once-per-session limit short-circuits to a
+            // synthetic success without touching the repository again.
+            Configure(
+                repository,
+                cachePath,
+                now,
+                _ => throw new InvalidOperationException("must-not-redownload")
+            );
+            var second = InvokeRefreshService(refreshAsync, service, repository);
+            Assert(
+                GetResultSucceeded(second),
+                "A second session pull should fake-succeed without re-downloading."
+            );
+            Assert(
+                GetResultError(second) == null,
+                "A rate-limited pull should not carry an error."
+            );
+        }
+        finally
+        {
+            Reset(repository);
+            TryDelete(cachePath);
+        }
+    }
+
+    private static object InvokeRefreshService(
+        MethodInfo refreshAsync,
+        object service,
+        object repository
+    )
+    {
+        var task = (System.Threading.Tasks.Task)
+            refreshAsync.Invoke(service, [repository, System.Threading.CancellationToken.None])!;
+        task.GetAwaiter().GetResult();
+        return task.GetType().GetProperty("Result")!.GetValue(task)!;
     }
 
     private static object RunRefreshService(Type repositoryType, object repository)

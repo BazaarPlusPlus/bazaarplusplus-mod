@@ -152,8 +152,8 @@ static void TestRefreshFinalBuildsTextsAreAtlasWarmed()
     );
 
     Assert(
-        LiveBuildPanelText.RefreshFinalBuilds() == "拉取最新阵容",
-        "zh-CN pull-builds button copy should be 拉取最新阵容."
+        LiveBuildPanelText.RefreshFinalBuilds() == "拉取阵容",
+        "zh-CN pull-builds button copy should be 拉取阵容."
     );
 
     var sampleSummary = new TenWinCorpusSummary(

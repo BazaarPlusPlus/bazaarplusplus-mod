@@ -50,7 +50,7 @@ internal static class Sizes
     public const float CollectionStatusMaxHeight = 54f;
     public const float LiveBuildRefreshButtonWidth = 108f;
     public const float LiveBuildRefreshButtonHeight = ButtonStandardHeight;
-    public const float LiveBuildCorpusCardHeight = 124f;
+    public const float LiveBuildCorpusCardHeight = 132f;
     public const float LiveBuildCorpusStatusMaxHeight = 44f;
     public const float LiveBuildRecommendationStatusMaxHeight = 90f;
     public const float LiveBuildRowEmptyMaxHeight = 58f;

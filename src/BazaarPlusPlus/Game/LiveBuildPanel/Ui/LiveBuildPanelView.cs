@@ -460,9 +460,9 @@ internal sealed class LiveBuildPanelView : IDisposable
         _subtitle.style.marginTop = 10f;
         rail.Add(_subtitle);
 
-        // Corpus card: read-only ten-win coverage (freshness + per-hero tiles). The pull action
-        // moved to the rail footer. Fixed height on purpose — the body swaps the dashboard vs a
-        // single status line (pending/failure/empty) in place, so the rail never reflows.
+        // Corpus card: ten-win coverage (freshness + per-hero tiles) with the pull action in its
+        // header, next to the data it refreshes. Fixed height on purpose — the body swaps the
+        // dashboard vs a single status line (pending/failure/empty) in place, so the rail never reflows.
         var corpusCard = new VisualElement();
         corpusCard.style.marginTop = 14f;
         corpusCard.style.height = Sizes.LiveBuildCorpusCardHeight;
@@ -490,6 +490,17 @@ internal sealed class LiveBuildPanelView : IDisposable
         _corpusCardTitle.style.whiteSpace = WhiteSpace.NoWrap;
         _corpusCardTitle.style.overflow = Overflow.Hidden;
         corpusHeader.Add(_corpusCardTitle);
+
+        _finalBuildRefreshButton = CreateButton(
+            LiveBuildPanelText.RefreshFinalBuilds(),
+            _refreshFinalBuilds
+        );
+        _finalBuildRefreshButton.style.marginLeft = 8f;
+        UiStyle.FixedWidth(_finalBuildRefreshButton.style, Sizes.LiveBuildRefreshButtonWidth);
+        UiStyle.FixedHeight(_finalBuildRefreshButton.style, Sizes.LiveBuildRefreshButtonHeight);
+        _finalBuildRefreshButton.style.flexGrow = 0f;
+        _finalBuildRefreshButton.style.flexShrink = 0f;
+        corpusHeader.Add(_finalBuildRefreshButton);
 
         _corpusDashboard = new VisualElement();
         _corpusDashboard.style.marginTop = 8f;
@@ -583,25 +594,6 @@ internal sealed class LiveBuildPanelView : IDisposable
         _nextButton.style.flexGrow = 1f;
         _nextButton.style.marginLeft = 8f;
         nav.Add(_nextButton);
-
-        // The low-frequency pull action sits just below the result card — out of the top hot zone
-        // without stranding it at the rail bottom behind a large empty gap.
-        _finalBuildRefreshButton = CreateButton(
-            LiveBuildPanelText.RefreshFinalBuilds(),
-            _refreshFinalBuilds
-        );
-        _finalBuildRefreshButton.style.marginTop = 16f;
-        _finalBuildRefreshButton.style.width = Length.Percent(100f);
-        // flexGrow 0 is load-bearing: a Button in this column rail otherwise stretches vertically
-        // to fill the free space. Keep the default button height so it matches Previous/Next.
-        _finalBuildRefreshButton.style.flexGrow = 0f;
-        _finalBuildRefreshButton.style.flexShrink = 0f;
-        StyleButton(
-            _finalBuildRefreshButton,
-            Colors.HistoryStatusBackground,
-            Colors.HistoryStatusText
-        );
-        rail.Add(_finalBuildRefreshButton);
     }
 
     private void RefreshRow(LiveItemBoardRowVm row, HashSet<Guid> candidates)

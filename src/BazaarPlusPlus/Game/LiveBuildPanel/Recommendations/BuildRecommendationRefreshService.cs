@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarPlusPlus.Infrastructure;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,17 +14,35 @@ namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 /// </summary>
 internal sealed class BuildRecommendationRefreshService
 {
+    // A manual pull really hits the server only once per session: the ten-win corpus regenerates
+    // only every few hours server-side, so any later pull in the same session reports a synthetic
+    // success (a no-op "fake update") instead of re-downloading. A failed pull does not consume the
+    // allowance, so the user can retry.
+    private bool _hasSuccessfullyPulled;
+
     public async Task<BuildRecommendationRefreshResult> RefreshAsync(
         BuildRecommendationRepository repository,
         CancellationToken cancellationToken
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        if (_hasSuccessfullyPulled)
+        {
+            BppLog.Info(
+                "BuildRecommendationRefreshService",
+                "Ten-win builds already pulled this session; returning synthetic success."
+            );
+            return BuildRecommendationRefreshResult.Success();
+        }
+
         try
         {
             var (succeeded, error) = await repository
                 .TryRefreshFinalBuildsFromRemoteAsync()
                 .ConfigureAwait(false);
+            if (succeeded)
+                _hasSuccessfullyPulled = true;
             return succeeded
                 ? BuildRecommendationRefreshResult.Success()
                 : BuildRecommendationRefreshResult.Failure(error);
