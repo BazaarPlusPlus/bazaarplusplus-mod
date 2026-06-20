@@ -338,6 +338,24 @@ AssertTrue(
     itemDayPresentation.IsVisible && itemDayPresentation.IsEnabled && itemDayPresentation.IsActive,
     "Normal item tabs should still show an enabled, highlighted day pill when selected."
 );
+var achievementHeroPresentation = CollectionHeroFilterPresentation.For(
+    CollectionTabProfile.For(CollectionTabKind.Achievements)
+);
+AssertTrue(
+    achievementHeroPresentation.IsVisible,
+    "Achievements should keep the hero row visible as a stable placeholder for future filters."
+);
+AssertFalse(
+    achievementHeroPresentation.IsEnabled,
+    "Achievements should keep the hero row inert until achievements support hero filtering."
+);
+var itemHeroPresentation = CollectionHeroFilterPresentation.For(
+    CollectionTabProfile.For(CollectionTabKind.Items)
+);
+AssertTrue(
+    itemHeroPresentation.IsVisible && itemHeroPresentation.IsEnabled,
+    "Normal item tabs should still show an enabled hero row."
+);
 
 sourceState.ActiveType = ECardType.Item;
 sourceState.SelectedSourceKey = "merchant:hidden";

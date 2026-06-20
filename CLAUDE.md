@@ -100,7 +100,6 @@ All six projects live under `src/<AssemblyName>/`, each in its own directory so 
 - When the user says a problem has failed repeatedly, stop spelunking implementation/decompiled source and first write a doc capturing background, the current problem, candidate approaches, and the verification method
 - Run an independent red-team review of a large refactor/design plan before implementing, and revise from it; keep such a review strictly review-only — surface weaknesses/risks/bad assumptions with `file:line` evidence and apply no patches
 - After revising a design (or receiving a review), send the revised plan back for confirmation before implementing.
-- When refactoring for cleanliness, take the breaking change for the cleanest end-state and bump the major version rather than preserving back-compat shims
 - When replacing a subsystem or migrating to a prototype, remove the old implementation entirely and ship only the new version in-place — do not leave the old path as a fallback or stand up a merged build chain that runs both
 - Do not build standalone probe/diagnostic scaffolding to validate a hypothesis — add a temporary probe on the main path (the user builds + reloads to verify), or drop it and record it as a to-verify item in the design doc, then ship
 - When CJK text renders as tofu boxes, route the text to a CJK-capable font; do not "fix" it by editing the copy

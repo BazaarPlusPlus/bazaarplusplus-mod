@@ -57,6 +57,10 @@
       Link="CollectionHeroScope.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionHeroFilterPresentation.cs"
+      Link="CollectionHeroFilterPresentation.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTabProfile.cs"
       Link="CollectionTabProfile.cs"
     />

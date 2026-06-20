@@ -852,6 +852,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             profile,
             _filter.SelectedRunDay != null
         );
+        var heroFilterPresentation = CollectionHeroFilterPresentation.For(profile);
         var model = new CollectionPanelViewModel
         {
             Title = CollectionPanelText.Title(),
@@ -863,6 +864,8 @@ internal sealed class CollectionPanel : MonoBehaviour
             ActiveTab = _filter.ActiveTab,
             ActiveType = _filter.ActiveType,
             TabProfile = profile,
+            HeroFilterVisible = heroFilterPresentation.IsVisible,
+            HeroFilterEnabled = heroFilterPresentation.IsEnabled,
             // The view only does Contains lookups on these inside the synchronous Refresh and
             // never retains the model, so the live filter sets are shared instead of copied.
             SelectedHeroes = _filter.Heroes,

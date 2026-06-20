@@ -30,6 +30,8 @@ internal sealed class CollectionPanelViewModel
     public ECardType ActiveType { get; set; } = ECardType.Item;
     public CollectionTabProfile TabProfile { get; set; } =
         CollectionTabProfile.For(CollectionTabKind.Items);
+    public bool HeroFilterVisible { get; set; } = true;
+    public bool HeroFilterEnabled { get; set; } = true;
     public HashSet<EHero> SelectedHeroes { get; set; } = new();
     public HashSet<ETier> SelectedTiers { get; set; } = new();
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
@@ -406,11 +408,15 @@ internal sealed partial class CollectionPanelView : IDisposable
 
         // Size/tags only narrow Items. On Skills, let Quality fill the row and let source filters
         // move up naturally instead of reserving dead space.
-        var showHeroChips = model.TabProfile.ShowHeroFilter;
         if (_heroFilterSection != null)
+        {
+            var showHeroChips = model.HeroFilterVisible;
             _heroFilterSection.style.display = showHeroChips
                 ? DisplayStyle.Flex
                 : DisplayStyle.None;
+            _heroFilterSection.SetEnabled(model.HeroFilterEnabled);
+            _heroFilterSection.style.opacity = model.HeroFilterEnabled ? 1f : 0.58f;
+        }
         var showTierChips = model.TabProfile.ShowTierFilter;
         if (_tierFilterSection != null)
             _tierFilterSection.style.display = showTierChips
