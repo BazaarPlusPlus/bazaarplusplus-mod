@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -437,7 +438,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         {
             var heroName = HeroRoster[i];
             var heroChip = CreateButton(
-                GetHeroBadgeStyle(heroName).ShortCode,
+                HeroVisual.Resolve(heroName).ShortCode,
                 () => _setRunHero(heroName),
                 0f,
                 Sizes.ButtonCompactHeight,

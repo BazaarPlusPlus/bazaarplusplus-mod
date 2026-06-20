@@ -1,6 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
@@ -169,9 +170,9 @@ internal sealed partial class HistoryPanelUiToolkitView
 
         ConfigurePill(
             refs.HeroPill,
-            GetHeroBadgeStyle(run.Hero).ShortCode,
-            GetHeroBadgeStyle(run.Hero).Background,
-            GetHeroBadgeStyle(run.Hero).Text,
+            HeroVisual.Resolve(run.Hero).ShortCode,
+            HeroVisual.Resolve(run.Hero).Background,
+            HeroVisual.Resolve(run.Hero).Text,
             true
         );
 

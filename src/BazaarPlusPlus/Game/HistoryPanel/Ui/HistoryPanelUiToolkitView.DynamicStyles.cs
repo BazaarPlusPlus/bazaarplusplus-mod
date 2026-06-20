@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -64,7 +65,7 @@ internal sealed partial class HistoryPanelUiToolkitView
             return;
         }
 
-        var heroStyle = GetHeroBadgeStyle(hero);
+        var heroStyle = HeroVisual.Resolve(hero);
         ConfigurePill(pill, heroStyle.ShortCode, heroStyle.Background, heroStyle.Text, true);
     }
 
@@ -128,7 +129,7 @@ internal sealed partial class HistoryPanelUiToolkitView
 
     private static void RefreshHeroChip(Button button, string heroName, bool selected)
     {
-        var heroStyle = GetHeroBadgeStyle(heroName);
+        var heroStyle = HeroVisual.Resolve(heroName);
         button.text = heroStyle.ShortCode;
         button.tooltip = heroName;
         StyleButton(

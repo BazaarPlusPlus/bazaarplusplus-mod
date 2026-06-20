@@ -349,6 +349,40 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Hero_badge_styling_is_centralized_in_GameInterop()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+
+        var resolver = Path.Combine(mainSource, "GameInterop", "Heroes", "HeroVisual.cs");
+        Assert.True(
+            File.Exists(resolver),
+            $"The shared hero badge resolver must live at '{resolver}'."
+        );
+
+        // No feature may re-hand-roll the hero name -> short-code/color mapping. It had already
+        // drifted before centralization (HistoryPanel read Colors.Hero* tokens while RandomHeroPool
+        // inlined raw RGB literals); everyone now consumes GameInterop.Heroes.HeroVisual instead.
+        var resolverFull = Path.GetFullPath(resolver);
+        var offenders = EnumerateSourceFiles(mainSource)
+            .Where(file =>
+                !string.Equals(Path.GetFullPath(file), resolverFull, StringComparison.Ordinal)
+            )
+            .Where(file =>
+                File.ReadAllText(file).Contains("struct HeroBadgeStyle", StringComparison.Ordinal)
+            )
+            .Select(file => Path.GetRelativePath(mainSource, file).Replace('\\', '/'))
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "Hero badge styling must resolve through GameInterop.Heroes.HeroVisual, not a "
+                + "per-feature HeroBadgeStyle copy. Offending files:\n"
+                + string.Join("\n", offenders)
+        );
+    }
+
+    [Fact]
     public void LiveBuildPanel_owns_build_recommendations()
     {
         var repoRoot = RepoRoot();

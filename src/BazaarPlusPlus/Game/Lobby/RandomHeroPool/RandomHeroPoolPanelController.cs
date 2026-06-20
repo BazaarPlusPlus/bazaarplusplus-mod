@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.Lobby;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
@@ -564,7 +565,7 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         labelRect.anchorMax = Vector2.one;
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
-        label.text = GetHeroBadgeStyle(heroAvailability.HeroId).ShortCode;
+        label.text = HeroVisual.Resolve(heroAvailability.HeroId).ShortCode;
         LobbyPanelLayout.ApplyTextStyle(label, label.text);
 
         _heroEntryViews[heroAvailability.HeroId] = new HeroPoolEntryView(
@@ -616,7 +617,7 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         bool isSelected
     )
     {
-        var style = GetHeroBadgeStyle(entryView.HeroId);
+        var style = HeroVisual.Resolve(entryView.HeroId);
         if (!isUnlocked)
         {
             entryView.Button.interactable = false;
@@ -685,39 +686,6 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
     private static float CalculatePanelHeight(int rows) =>
         LobbyPanelLayout.CalculatePanelHeight(rows, EntryHeight, EntryVerticalSpacing);
 
-    private static HeroBadgeStyle GetHeroBadgeStyle(string? heroName)
-    {
-        if (string.IsNullOrWhiteSpace(heroName))
-            return new HeroBadgeStyle("UNK", new Color(0.20f, 0.29f, 0.38f, 0.95f), Color.white);
-
-        return heroName.Trim() switch
-        {
-            "Vanessa" => BuildHeroBadgeStyle("VAN", 192, 33, 33),
-            "Pygmalien" => BuildHeroBadgeStyle("PYG", 39, 103, 192),
-            "Dooley" => BuildHeroBadgeStyle("DOO", 225, 154, 8),
-            "Mak" => BuildHeroBadgeStyle("MAK", 190, 230, 91),
-            "Jules" => BuildHeroBadgeStyle("JUL", 180, 52, 236),
-            "Karnok" => BuildHeroBadgeStyle("KAR", 59, 136, 156),
-            "Stelle" => BuildHeroBadgeStyle("STE", 255, 235, 24),
-            _ => BuildHeroBadgeStyle(
-                heroName.Length <= 3
-                    ? heroName.ToUpperInvariant()
-                    : heroName[..3].ToUpperInvariant(),
-                57,
-                73,
-                97
-            ),
-        };
-    }
-
-    private static HeroBadgeStyle BuildHeroBadgeStyle(string shortCode, int r, int g, int b)
-    {
-        var background = new Color(r / 255f, g / 255f, b / 255f, 0.98f);
-        var luminance = (0.299f * background.r) + (0.587f * background.g) + (0.114f * background.b);
-        var text = luminance > 0.62f ? new Color(0.10f, 0.12f, 0.15f, 1f) : Color.white;
-        return new HeroBadgeStyle(shortCode, background, text);
-    }
-
     private readonly struct HeroAvailability
     {
         public HeroAvailability(string heroId, bool isUnlocked)
@@ -774,19 +742,4 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
         public TextMeshProUGUI Label { get; }
     }
 
-    private readonly struct HeroBadgeStyle
-    {
-        public HeroBadgeStyle(string shortCode, Color background, Color text)
-        {
-            ShortCode = shortCode;
-            Background = background;
-            Text = text;
-        }
-
-        public string ShortCode { get; }
-
-        public Color Background { get; }
-
-        public Color Text { get; }
-    }
 }
