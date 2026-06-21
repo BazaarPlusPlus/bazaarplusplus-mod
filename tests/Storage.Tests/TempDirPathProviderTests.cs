@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarPlusPlus.Storage.Paths;
 using BazaarPlusPlus.Storage.RunLog;
+using Microsoft.Data.Sqlite;
 
 internal static class TempDirPathProviderTests
 {
@@ -126,6 +127,7 @@ internal static class TempDirPathProviderTests
         }
         finally
         {
+            SqliteConnection.ClearAllPools();
             if (Directory.Exists(tempRoot))
                 Directory.Delete(tempRoot, recursive: true);
         }
