@@ -84,6 +84,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
                 ServerTimeUtc = UtcNow(),
                 StateName = BazaarAgentRunStateName.Unknown,
                 CanStartOrContinueRun = canStartEarly,
+                IsClientBusy = ReadClientBusy(),
                 ActionCooldownRemainingSeconds = actionCooldownRemainingSeconds,
                 ReplayPhase = replayPhase,
                 ReplayBattleId = replayBattleId,
@@ -207,7 +208,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             IsInRun = isInRun,
             HasActiveRun = hasActiveRun,
             CanStartOrContinueRun = canStartOrContinueRun,
-            IsClientBusy = AppState.IsWaitingForServerResponse || AppState.BlockInput,
+            IsClientBusy = ReadClientBusy(),
             RunId = runId,
             StateName = stateName,
             PlayerHero = run?.Player?.Hero.ToString(),
@@ -998,9 +999,16 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             SchemaVersion = BazaarAgentSchema.Version,
             ServerTimeUtc = UtcNow(),
             StateName = BazaarAgentRunStateName.Unknown,
+            IsClientBusy = ReadClientBusy(),
             ActionCooldownRemainingSeconds = cooldown,
             AvailableActions = new[] { WaitOption() },
         };
+
+    // Client-busy = waiting on a server round-trip OR input blocked by a transition/animation.
+    // Read in every construction path (full, lobby, degenerate) so isClientBusy is honest at the
+    // hero-select/transition windows too, not just mid-run.
+    private static bool ReadClientBusy() =>
+        AppState.IsWaitingForServerResponse || AppState.BlockInput;
 
     private static string UtcNow() =>
         DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture);
