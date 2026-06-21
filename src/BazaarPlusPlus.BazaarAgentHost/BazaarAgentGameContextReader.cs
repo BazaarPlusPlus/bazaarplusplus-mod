@@ -12,6 +12,7 @@ using BazaarGameShared.Domain.Runs;
 using BazaarPlusPlus.BazaarAgent;
 using BazaarPlusPlus.GameInterop;
 using TheBazaar;
+using TheBazaar.AppFramework;
 
 namespace BazaarPlusPlus.BazaarAgentHost;
 
@@ -160,6 +161,11 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         ISet<string>? interactionFilter =
             interactionFilterList.Count > 0 ? new HashSet<string>(interactionFilterList) : null;
 
+        // End-of-run advance: the end screen exposes no StateOps. Mirror the native button's guard
+        // (SceneLoader not transitioning) — EndOfRunScreenController.ReturnToMenuClicked.
+        var sceneLoader = Services.Get<SceneLoader>();
+        bool endScreenInteractable = sceneLoader != null && !sceneLoader.IsTransitioning;
+
         // Available actions
         var actions = BuildActions(
             stateName,
@@ -177,7 +183,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             run,
             occupiedHand,
             occupiedStash,
-            targeting.PedestalEligibleInstanceIds
+            targeting.PedestalEligibleInstanceIds,
+            endScreenInteractable
         );
 
         if (interactionFilter is not null)
@@ -200,7 +207,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             IsInRun = isInRun,
             HasActiveRun = hasActiveRun,
             CanStartOrContinueRun = canStartOrContinueRun,
-            IsClientBusy = false, // TODO v2: track HttpGameClient busy state
+            IsClientBusy = AppState.IsWaitingForServerResponse || AppState.BlockInput,
             RunId = runId,
             StateName = stateName,
             PlayerHero = run?.Player?.Hero.ToString(),
@@ -538,7 +545,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         Run? run,
         HashSet<int> occupiedHand,
         HashSet<int> occupiedStash,
-        HashSet<string> pedestalEligibleIds
+        HashSet<string> pedestalEligibleIds,
+        bool endScreenInteractable
     )
     {
         var actions = new List<BazaarAgentDecisionOption>();
@@ -769,6 +777,27 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
                     }
                 );
             }
+        }
+
+        // 10. ReturnToMenu — end-of-run states expose no StateOps; this advances the end screen
+        // back to hero-select (the dispatcher calls RunManager.LoadMainMenu). Guarded to mirror the
+        // native button: only while the scene loader is not transitioning.
+        if (
+            (
+                stateName == BazaarAgentRunStateName.EndRunVictory
+                || stateName == BazaarAgentRunStateName.EndRunDefeat
+            )
+            && endScreenInteractable
+        )
+        {
+            actions.Add(
+                new BazaarAgentDecisionOption
+                {
+                    ActionKind = BazaarAgentActionKind.ReturnToMenu,
+                    Group = BazaarAgentActionGroup.Flow,
+                    DisplayKey = "ReturnToMenu",
+                }
+            );
         }
 
         return actions;
