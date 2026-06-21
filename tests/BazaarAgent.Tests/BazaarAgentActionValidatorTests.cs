@@ -443,4 +443,41 @@ public class BazaarAgentActionValidatorTests
         Assert.Equal(BazaarAgentValidationCode.Invalid, result.Code);
         Assert.Equal(400, result.HttpStatus);
     }
+
+    // ── ReturnToMenu (end-of-run advance) ─────────────────────────────────────
+
+    [Fact]
+    public void ReturnToMenu_InAvailableActions_Passes()
+    {
+        var snap = MakeSnap(1, SimpleOption(BazaarAgentActionKind.ReturnToMenu));
+        var action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.ReturnToMenu };
+        var result = BazaarAgentActionValidator.Validate(snap, action, 0);
+        Assert.Equal(BazaarAgentValidationCode.Ok, result.Code);
+    }
+
+    [Fact]
+    public void ReturnToMenu_NotInAvailableActions_RejectsStaleOrUnavailable()
+    {
+        var snap = MakeSnap(4, SimpleOption(BazaarAgentActionKind.Wait));
+        var action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.ReturnToMenu };
+        var result = BazaarAgentActionValidator.Validate(snap, action, 0);
+        Assert.Equal(BazaarAgentValidationCode.StaleOrUnavailable, result.Code);
+        Assert.Equal(409, result.HttpStatus);
+        Assert.NotNull(result.Extra);
+        Assert.Equal(4UL, result.Extra["currentTickId"]);
+    }
+
+    [Fact]
+    public void ReturnToMenu_NonWait_SubjectToCooldown()
+    {
+        var snap = MakeSnap(1, SimpleOption(BazaarAgentActionKind.ReturnToMenu));
+        var action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.ReturnToMenu };
+        var result = BazaarAgentActionValidator.Validate(
+            snap,
+            action,
+            cooldownRemainingSeconds: 0.5
+        );
+        Assert.Equal(BazaarAgentValidationCode.Cooldown, result.Code);
+        Assert.Equal(429, result.HttpStatus);
+    }
 }
