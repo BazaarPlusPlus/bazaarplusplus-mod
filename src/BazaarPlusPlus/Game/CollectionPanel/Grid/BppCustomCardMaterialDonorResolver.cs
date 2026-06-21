@@ -128,10 +128,7 @@ internal readonly struct BppCustomCardMaterialDonorResult
     public static BppCustomCardMaterialDonorResult Ready(string artKey) =>
         string.IsNullOrEmpty(artKey)
             ? Unavailable()
-            : new BppCustomCardMaterialDonorResult(
-                BppCustomCardMaterialDonorStatus.Ready,
-                artKey
-            );
+            : new BppCustomCardMaterialDonorResult(BppCustomCardMaterialDonorStatus.Ready, artKey);
 
     public static BppCustomCardMaterialDonorResult Unavailable() =>
         new(BppCustomCardMaterialDonorStatus.Unavailable, null);

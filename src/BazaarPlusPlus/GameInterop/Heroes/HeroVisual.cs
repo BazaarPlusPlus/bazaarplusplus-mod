@@ -56,13 +56,8 @@ internal static class HeroVisual
     internal static bool IsPlayableHero(string? heroName) =>
         heroName?.Trim() switch
         {
-            "Vanessa"
-            or "Pygmalien"
-            or "Dooley"
-            or "Mak"
-            or "Jules"
-            or "Karnok"
-            or "Stelle" => true,
+            "Vanessa" or "Pygmalien" or "Dooley" or "Mak" or "Jules" or "Karnok" or "Stelle" =>
+                true,
             _ => false,
         };
 

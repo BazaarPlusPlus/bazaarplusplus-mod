@@ -15,7 +15,8 @@
     </RestoreAdditionalProjectSources>
     <NoWarn>CS0436</NoWarn>
     <BuildProductionPackage Condition="'$(BuildProductionPackage)' == ''"
-      >false</BuildProductionPackage>
+      >false</BuildProductionPackage
+    >
   </PropertyGroup>
 
   <!-- Embedded resources -->
@@ -49,7 +50,8 @@
     <!-- Host platform's FFmpeg zip, used by the Debug copy-to-game step -->
     <HostFfmpegZip
       Condition="$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))"
-      >$(WindowsFfmpegZip)</HostFfmpegZip>
+      >$(WindowsFfmpegZip)</HostFfmpegZip
+    >
     <HostFfmpegZip Condition="'$(HostFfmpegZip)' == ''">$(MacFfmpegZip)</HostFfmpegZip>
   </PropertyGroup>
   <!-- Candidate install paths for common Steam locations -->

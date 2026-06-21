@@ -786,8 +786,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             (
                 stateName == BazaarAgentRunStateName.EndRunVictory
                 || stateName == BazaarAgentRunStateName.EndRunDefeat
-            )
-            && endScreenInteractable
+            ) && endScreenInteractable
         )
         {
             actions.Add(

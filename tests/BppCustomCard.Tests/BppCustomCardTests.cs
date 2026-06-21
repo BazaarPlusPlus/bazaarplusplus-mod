@@ -415,8 +415,10 @@ public sealed class BppCustomCardTests : IDisposable
 
         public TestDonorResolver(BppCustomCardMaterialDonorResult result) => _result = result;
 
-        public override BppCustomCardMaterialDonorResult Resolve(object? staticData, ECardSize size) =>
-            _result;
+        public override BppCustomCardMaterialDonorResult Resolve(
+            object? staticData,
+            ECardSize size
+        ) => _result;
     }
 
     private static AchievementCardDefinition AchievementDefinition(

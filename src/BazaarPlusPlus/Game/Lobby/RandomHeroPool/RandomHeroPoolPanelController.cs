@@ -741,5 +741,4 @@ internal sealed class RandomHeroPoolPanelController : MonoBehaviour
 
         public TextMeshProUGUI Label { get; }
     }
-
 }

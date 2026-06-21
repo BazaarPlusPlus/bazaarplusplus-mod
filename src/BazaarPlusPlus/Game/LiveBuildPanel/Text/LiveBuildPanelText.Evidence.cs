@@ -53,5 +53,6 @@ internal static partial class LiveBuildPanelText
     public static string MatchFinalDayValue(int? p75FinalDay) =>
         p75FinalDay.HasValue ? $"D{p75FinalDay.Value}" : L.Resolve(MissingValueText);
 
-    public static string MatchMatchedValue(int matched, int candidates) => $"{matched} / {candidates}";
+    public static string MatchMatchedValue(int matched, int candidates) =>
+        $"{matched} / {candidates}";
 }

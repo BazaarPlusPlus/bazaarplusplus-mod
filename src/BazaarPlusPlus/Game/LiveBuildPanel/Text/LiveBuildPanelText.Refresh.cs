@@ -102,13 +102,21 @@ internal static partial class LiveBuildPanelText
         {
             var days = (int)delta.TotalDays;
             return L.Resolve(
-                new LocalizedTextSet($"updated {days}d ago", $"更新于 {days} 天前", $"更新於 {days} 天前")
+                new LocalizedTextSet(
+                    $"updated {days}d ago",
+                    $"更新于 {days} 天前",
+                    $"更新於 {days} 天前"
+                )
             );
         }
 
         var weeks = (int)(delta.TotalDays / 7);
         return L.Resolve(
-            new LocalizedTextSet($"updated {weeks}w ago", $"更新于 {weeks} 周前", $"更新於 {weeks} 週前")
+            new LocalizedTextSet(
+                $"updated {weeks}w ago",
+                $"更新于 {weeks} 周前",
+                $"更新於 {weeks} 週前"
+            )
         );
     }
 

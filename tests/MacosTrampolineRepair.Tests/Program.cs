@@ -40,7 +40,11 @@ try
     Directory.CreateDirectory(fakeBin);
 
     RunShell($"chmod +x {Quote(exe)} {Quote(orig)} {Quote(script)} {Quote(stub)}");
-    WriteTool(fakeBin, "dotnet", $"#!/bin/sh\nprintf '%s\\n' \"$@\" > {Quote(dotnetRecord)}\nexit 0\n");
+    WriteTool(
+        fakeBin,
+        "dotnet",
+        $"#!/bin/sh\nprintf '%s\\n' \"$@\" > {Quote(dotnetRecord)}\nexit 0\n"
+    );
     WriteTool(fakeBin, "defaults", "#!/bin/sh\nprintf '%s\\n' 'The Bazaar'\n");
     WriteTool(
         fakeBin,
