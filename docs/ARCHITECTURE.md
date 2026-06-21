@@ -113,6 +113,13 @@ The host listens only on loopback. The default port is fixed at `127.0.0.1:47900
 - `POST /v1/replay/record`
 - `POST /v1/replay/continue`
 
+The action set (`POST /v1/actions`) adds `ReturnToMenu` (schema `2.1.0`): emitted only in
+`EndRunVictory`/`EndRunDefeat` while the scene loader is not transitioning, it advances the
+end-of-run screen back to hero-select via `RunManager.LoadMainMenu()` — the same call the native
+"return to menu" button makes — closing the unattended `run → next run` loop. `isClientBusy` now
+reflects the real client state (`AppState.IsWaitingForServerResponse || AppState.BlockInput`) instead
+of a constant `false`.
+
 Those routes are dispatched in `BazaarAgentHttpServer.HandleContextAsync()` (`src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs:132-160`). Replay record accepts a raw binary GhostBattlePayload msgpack+gzip body and optional battle id from header/query before queueing a start command; replay continue queues an explicit continue command (`src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs:245-276`).
 
 ## Decision Records
