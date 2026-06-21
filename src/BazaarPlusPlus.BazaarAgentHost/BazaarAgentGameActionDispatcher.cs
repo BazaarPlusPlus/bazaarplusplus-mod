@@ -10,6 +10,7 @@ using BazaarPlusPlus.BazaarAgent;
 using BazaarPlusPlus.GameInterop;
 using HarmonyLib;
 using TheBazaar;
+using TheBazaar.AppFramework;
 
 namespace BazaarPlusPlus.BazaarAgentHost;
 
@@ -132,6 +133,20 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
 
             case BazaarAgentActionKind.ExitState:
                 return InvokeAppStateCommand("ExitStateCommand");
+
+            case BazaarAgentActionKind.ReturnToMenu:
+            {
+                var sceneLoader = Services.Get<SceneLoader>();
+                if (sceneLoader is null)
+                    return new(false, "SceneLoader unavailable");
+                if (sceneLoader.IsTransitioning)
+                    return new(false, "scene transitioning");
+                var runManager = Services.Get<RunManager>();
+                if (runManager is null)
+                    return new(false, "RunManager unavailable");
+                runManager.LoadMainMenu();
+                return new(true, null);
+            }
 
             default:
                 return new(false, $"unhandled ActionKind: {action.ActionKind}");

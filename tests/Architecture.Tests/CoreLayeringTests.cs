@@ -647,6 +647,40 @@ public class CoreLayeringTests
         );
     }
 
+    // End-of-run states expose no StateOps; the agent advances them with the ReturnToMenu action,
+    // which must drive RunManager.LoadMainMenu() — the method the native end-of-run "return to menu"
+    // button calls (EndOfRunScreenController.ReturnToMenuClicked). It must NEVER use the heavier
+    // RunManager.ReturnToMainMenu() (deletes the session; that path belongs to the in-run pause menu).
+    [Fact]
+    public void BazaarAgentHost_advances_end_of_run_only_via_LoadMainMenu_in_the_dispatcher()
+    {
+        var repoRoot = RepoRoot();
+        var hostDir = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost");
+
+        var loadMainMenuCallers = new List<string>();
+        var wrongPathViolations = new List<string>();
+        foreach (var file in EnumerateSourceFiles(hostDir))
+        {
+            var relative = Path.GetRelativePath(hostDir, file).Replace('\\', '/');
+            var text = File.ReadAllText(file);
+            if (text.Contains("LoadMainMenu(", StringComparison.Ordinal))
+                loadMainMenuCallers.Add(relative);
+            if (text.Contains("ReturnToMainMenu", StringComparison.Ordinal))
+                wrongPathViolations.Add($"{relative}: ReturnToMainMenu (session-deleting path)");
+        }
+
+        Assert.Equal(
+            new[] { "BazaarAgentGameActionDispatcher.cs" },
+            loadMainMenuCallers.Distinct().OrderBy(x => x, StringComparer.Ordinal).ToArray()
+        );
+        Assert.True(
+            wrongPathViolations.Count == 0,
+            "End-of-run advance must use RunManager.LoadMainMenu(), never ReturnToMainMenu(). "
+                + "Offending code:\n"
+                + string.Join("\n", wrongPathViolations)
+        );
+    }
+
     private static IEnumerable<string> EnumerateSourceFiles(string root) =>
         Directory
             .EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
