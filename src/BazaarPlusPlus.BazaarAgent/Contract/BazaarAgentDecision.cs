@@ -8,7 +8,7 @@ namespace BazaarPlusPlus.BazaarAgent;
 
 public static class BazaarAgentSchema
 {
-    public const string Version = "2.1.0";
+    public const string Version = "2.2.0";
 }
 
 public enum BazaarAgentActionKind
@@ -25,6 +25,7 @@ public enum BazaarAgentActionKind
     Reroll,
     ExitState,
     ReturnToMenu,
+    Continue,
 }
 
 public enum BazaarAgentActionGroup

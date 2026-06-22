@@ -480,4 +480,25 @@ public class BazaarAgentActionValidatorTests
         Assert.Equal(BazaarAgentValidationCode.Cooldown, result.Code);
         Assert.Equal(429, result.HttpStatus);
     }
+
+    // ── Continue (replay advance) ─────────────────────────────────────────────
+
+    [Fact]
+    public void Continue_InAvailableActions_Passes()
+    {
+        var snap = MakeSnap(1, SimpleOption(BazaarAgentActionKind.Continue));
+        var action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Continue };
+        var result = BazaarAgentActionValidator.Validate(snap, action, 0);
+        Assert.Equal(BazaarAgentValidationCode.Ok, result.Code);
+    }
+
+    [Fact]
+    public void Continue_NotInAvailableActions_RejectsStale()
+    {
+        var snap = MakeSnap(1, SimpleOption(BazaarAgentActionKind.Wait));
+        var action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Continue };
+        var result = BazaarAgentActionValidator.Validate(snap, action, 0);
+        Assert.Equal(BazaarAgentValidationCode.StaleOrUnavailable, result.Code);
+        Assert.Equal(409, result.HttpStatus);
+    }
 }

@@ -73,7 +73,7 @@ public class BazaarAgentHttpServerTests
         Assert.Equal("\"42\"", res.Headers.ETag?.ToString());
         Assert.Equal("application/json", res.Content.Headers.ContentType?.MediaType);
         var body = await res.Content.ReadAsStringAsync();
-        Assert.Contains("\"schemaVersion\":\"2.1.0\"", body);
+        Assert.Contains("\"schemaVersion\":\"2.2.0\"", body);
         Assert.Contains("\"tickId\":42", body);
         Assert.Contains("\"stateName\":\"Choice\"", body);
         Assert.DoesNotContain("\"isEnabled\"", body);
