@@ -170,6 +170,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         // Available actions
         var actions = BuildActions(
             stateName,
+            replayPhase,
             isInRun,
             canHandleOp,
             canReroll,
@@ -532,6 +533,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 
     private static IReadOnlyList<BazaarAgentDecisionOption> BuildActions(
         BazaarAgentRunStateName stateName,
+        BazaarAgentReplayPhase replayPhase,
         bool isInRun,
         Func<StateOps, bool> canHandleOp,
         bool canReroll,
@@ -554,6 +556,21 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 
         // 1. Wait (always first)
         actions.Add(WaitOption());
+
+        // 1b. Continue — replay finished and awaiting the continue button. Surface it as a generic
+        // Flow advance so the replay-agnostic agent can proceed; the dispatcher routes Continue to
+        // CombatReplayRuntime.TryContinueReplay (ADR-0008). No card, no target.
+        if (replayPhase == BazaarAgentReplayPhase.FinishedAwaitingContinue)
+        {
+            actions.Add(
+                new BazaarAgentDecisionOption
+                {
+                    ActionKind = BazaarAgentActionKind.Continue,
+                    Group = BazaarAgentActionGroup.Flow,
+                    DisplayKey = "Continue",
+                }
+            );
+        }
 
         // 2. StartOrContinueRun
         if (canStartOrContinueRun)
