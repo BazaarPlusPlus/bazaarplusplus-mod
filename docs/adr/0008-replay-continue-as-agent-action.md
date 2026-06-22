@@ -29,10 +29,9 @@ Decision: the context reader emits a generic **`Continue`** Flow action whenever
 
 ## Testing
 
-- **Mod (`tests/BazaarAgent.Tests/`):**
-  - Validator: a `Continue` present in `availableActions` validates `Ok`; absent → `StaleOrUnavailable` (409).
-  - Context reader: `replayPhase == FinishedAwaitingContinue` ⇒ a `Continue`/`Flow` option is emitted; any other phase ⇒ none.
-  - Dispatcher: `Continue` invokes `CurrentRecorder.TryContinueReplay()` (fake recorder); `Accepted` ⇒ `Executed=true`; `Rejected`/`Unavailable`/null recorder ⇒ `Executed=false` with a reason.
+- **Mod core (`tests/BazaarAgent.Tests/`, pure):**
+  - Validator: a `Continue` present in `availableActions` validates `Ok`; absent → `StaleOrUnavailable` (409). (Also pins that the enum addition is recognized.)
+- **Mod host (`BazaarPlusPlus.BazaarAgentHost`, game-coupled — not unit-testable):** the context-reader emit and the dispatcher route read live Unity statics (`AppState.CurrentState`, `BazaarAgentGameBridge.CurrentRecorder`) and are not reachable from the pure-core test project. They are verified by `dotnet build` (compile) plus the live checklist below — the same boundary every other Host adapter sits behind.
 - **Agent (`bazaarplusplus-agent`):** one test that a `Replay`-state context carrying a `Flow` `Continue` action makes the safe policy choose `Continue` (not `SellItem`) — pinning the cross-repo assumption.
 - **Live:** finish a battle → the replay's `finishedAwaitingContinue` auto-advances via the agent's `Continue` → the run proceeds to the next state.
 
