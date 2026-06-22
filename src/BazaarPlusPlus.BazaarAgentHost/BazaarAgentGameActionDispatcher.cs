@@ -148,6 +148,17 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
                 return new(true, null);
             }
 
+            case BazaarAgentActionKind.Continue:
+            {
+                var recorder = BazaarAgentGameBridge.CurrentRecorder;
+                if (recorder is null)
+                    return new(false, "replay recorder unavailable");
+                var result = recorder.TryContinueReplay();
+                return result.Status == BppReplayControlStatus.Accepted
+                    ? new(true, null)
+                    : new(false, result.FailureReason ?? result.Status.ToString());
+            }
+
             default:
                 return new(false, $"unhandled ActionKind: {action.ActionKind}");
         }
