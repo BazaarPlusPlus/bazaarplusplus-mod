@@ -36,7 +36,8 @@ public readonly struct BazaarDbLinkResult
 
     public bool Succeeded => Outcome == BazaarDbLinkOutcome.Linked;
 
-    public static BazaarDbLinkResult Linked() => new(BazaarDbLinkOutcome.Linked, 200, null);
+    public static BazaarDbLinkResult Linked(int statusCode) =>
+        new(BazaarDbLinkOutcome.Linked, statusCode, null);
 
     public static BazaarDbLinkResult From(BazaarDbLinkOutcome o, int? status, string? error) =>
         new(o, status, error);
@@ -82,7 +83,7 @@ public sealed class BazaarDbLinkClient
                 .ConfigureAwait(false);
 
             if (result.IsSuccess)
-                return BazaarDbLinkResult.Linked();
+                return BazaarDbLinkResult.Linked(result.StatusCode);
 
             return Classify(result.StatusCode, result.FailureBody!);
         }
@@ -113,12 +114,21 @@ public sealed class BazaarDbLinkClient
                 statusCode,
                 detail
             );
-        if (error != null && error.StartsWith("Missing", StringComparison.OrdinalIgnoreCase))
+        if (IsMissingFieldError(error))
             return BazaarDbLinkResult.From(BazaarDbLinkOutcome.MissingFields, statusCode, detail);
         if (statusCode >= 500)
             return BazaarDbLinkResult.From(BazaarDbLinkOutcome.ServerError, statusCode, detail);
 
         return BazaarDbLinkResult.From(BazaarDbLinkOutcome.InvalidOrExpired, statusCode, detail);
+    }
+
+    private static bool IsMissingFieldError(string? error)
+    {
+        if (error == null)
+            return false;
+
+        return error.StartsWith("Missing", StringComparison.Ordinal)
+            || error.StartsWith("missing_", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? ExtractErrorCode(string body)

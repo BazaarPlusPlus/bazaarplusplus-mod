@@ -12,10 +12,15 @@ internal static class BazaarDbLinkClientTests
     public static void Run()
     {
         LinkedResponsePostsCasePreservedCodeAndSnakeCaseAccountId();
+        NonOkSuccessResponsePreservesStatusCode();
         InvalidOrExpiredErrorClassifiesAsInvalidOrExpired();
         AlreadyLinkedErrorClassifiesAsAlreadyLinked();
+        MissingFieldTokenClassifiesAsMissingFields();
         ServerErrorClassifiesAsServerError();
         EmptyCodeReturnsMissingFieldsWithoutHttpCall();
+        CancellationRethrows();
+        TransportExceptionMapsToTransportOutcome();
+        DefaultRedeemEndpointPostsToFixedBazaarDbUri();
         Console.WriteLine("BazaarDbLinkClientTests passed.");
     }
 
@@ -52,6 +57,16 @@ internal static class BazaarDbLinkClientTests
         Assert(json["accountId"] == null, "DTO should not emit camelCase accountId.");
     }
 
+    private static void NonOkSuccessResponsePreservesStatusCode()
+    {
+        var result = RedeemWithResponse(HttpStatusCode.Accepted, string.Empty);
+        Assert(result.Outcome == BazaarDbLinkOutcome.Linked, "202 response should link profile.");
+        Assert(
+            result.StatusCode == 202,
+            "Linked result should preserve the actual success status."
+        );
+    }
+
     private static void InvalidOrExpiredErrorClassifiesAsInvalidOrExpired()
     {
         var result = RedeemWithResponse(
@@ -70,6 +85,15 @@ internal static class BazaarDbLinkClientTests
         Assert(
             result.Outcome == BazaarDbLinkOutcome.AlreadyLinked,
             "already_linked should classify as AlreadyLinked."
+        );
+    }
+
+    private static void MissingFieldTokenClassifiesAsMissingFields()
+    {
+        var result = RedeemWithResponse(HttpStatusCode.BadRequest, "{\"error\":\"missing_field\"}");
+        Assert(
+            result.Outcome == BazaarDbLinkOutcome.MissingFields,
+            "missing_field token should classify as MissingFields."
         );
     }
 
@@ -103,6 +127,70 @@ internal static class BazaarDbLinkClientTests
             "Empty code should classify as MissingFields."
         );
         Assert(handler.Requests.Count == 0, "Empty code should not send an HTTP request.");
+    }
+
+    private static void CancellationRethrows()
+    {
+        var handler = new RecordingHandler(_ => throw new OperationCanceledException("cancelled"));
+        var client = new BazaarDbLinkClient(
+            new HttpClient(handler),
+            new Uri("https://example.invalid/api/profile/link/redeem")
+        );
+
+        try
+        {
+            client.RedeemAsync("AbcD23", "acct-1", CancellationToken.None).GetAwaiter().GetResult();
+            throw new InvalidOperationException("Cancellation should be rethrown.");
+        }
+        catch (OperationCanceledException)
+        {
+            Assert(
+                handler.Requests.Count == 1,
+                "Cancellation should occur after one HTTP attempt."
+            );
+        }
+    }
+
+    private static void TransportExceptionMapsToTransportOutcome()
+    {
+        var handler = new RecordingHandler(_ => throw new HttpRequestException("DNS exploded"));
+        var client = new BazaarDbLinkClient(
+            new HttpClient(handler),
+            new Uri("https://example.invalid/api/profile/link/redeem")
+        );
+
+        var result = client
+            .RedeemAsync("AbcD23", "acct-1", CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+
+        Assert(
+            result.Outcome == BazaarDbLinkOutcome.Transport,
+            "Transport exception should classify as Transport."
+        );
+        Assert(result.StatusCode == null, "Transport exception should not have an HTTP status.");
+        Assert(
+            result.Error == "DNS exploded",
+            "Transport exception should preserve truncated message."
+        );
+    }
+
+    private static void DefaultRedeemEndpointPostsToFixedBazaarDbUri()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var client = new BazaarDbLinkClient(
+            new HttpClient(handler),
+            new Uri(BazaarDbLinkClient.DefaultRedeemEndpoint)
+        );
+
+        client.RedeemAsync("AbcD23", "acct-1", CancellationToken.None).GetAwaiter().GetResult();
+
+        Assert(handler.Requests.Count == 1, "Default endpoint test should send one POST.");
+        Assert(
+            handler.Requests[0].RequestUri?.ToString()
+                == "https://bazaardb.gg/api/profile/link/redeem",
+            "Default endpoint should post to the fixed BazaarDB redeem URI."
+        );
     }
 
     private static BazaarDbLinkResult RedeemWithResponse(HttpStatusCode statusCode, string body)
