@@ -470,6 +470,10 @@ internal sealed partial class HistoryPanelUiToolkitView
         _accountCodeField.maxLength = 10;
         _accountCodeField.isDelayed = true;
         _accountCodeField.selectAllOnFocus = true;
+        ConfigureTextEditionPlaceholder(
+            _accountCodeField,
+            HistoryPanelText.AccountLink.Placeholder()
+        );
         _accountCodeField.style.flexGrow = 1f;
         _accountCodeField.style.flexShrink = 1f;
         _accountCodeField.style.minWidth = 0f;
@@ -534,6 +538,26 @@ internal sealed partial class HistoryPanelUiToolkitView
         UiStyle.Radius(_accountBanner.style, Radii.Md);
         UiStyle.Border(_accountBanner.style, Borders.Thin, Colors.HistoryStatusBorder);
         _accountCard.Add(_accountBanner);
+    }
+
+    private static void ConfigureTextEditionPlaceholder(TextField textField, string placeholder)
+    {
+        var textEdition = textField.textEdition;
+        SetTextEditionProperty(textEdition, "placeholder", placeholder);
+        SetTextEditionProperty(textEdition, "hidePlaceholderOnFocus", true);
+    }
+
+    private static void SetTextEditionProperty(object textEdition, string propertyName, object value)
+    {
+        var property = textEdition
+            .GetType()
+            .GetProperty(
+                propertyName,
+                System.Reflection.BindingFlags.Instance
+                    | System.Reflection.BindingFlags.Public
+                    | System.Reflection.BindingFlags.NonPublic
+            );
+        property?.SetValue(textEdition, value);
     }
 
     private void BuildFilterSlot(VisualElement rail)
