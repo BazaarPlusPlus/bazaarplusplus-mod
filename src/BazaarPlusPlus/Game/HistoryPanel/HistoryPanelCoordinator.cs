@@ -608,10 +608,13 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         catch (OperationCanceledException)
         {
             if (!_session.IsCurrent(sessionVersion))
-                return;
+                return; // panel closed / re-opened mid-flight: discard silently.
 
+            // Still the active session, so this is the HttpClient self-timeout, not a user cancel
+            // (a real session cancel bumps the version above). Surface it as a transport failure
+            // instead of silently clearing the banner.
             _state.AccountLinkInProgress = false;
-            SetAccountLinkBanner(null, StatusSeverity.Neutral);
+            SetAccountLinkBanner(HistoryPanelText.AccountLink.Offline(), StatusSeverity.Failure);
             _requestUiRefresh();
             return;
         }
@@ -639,46 +642,45 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
-        switch (result.Outcome)
+        // Only a confirmed 200 link persists the local hint and collapses to the badge. 409 means the
+        // game account is already linked to a DIFFERENT BazaarDB user (contract), and every error
+        // outcome must leave the form open with a failure banner. See OutcomeConfirmsLink.
+        if (OutcomeConfirmsLink(result.Outcome))
         {
-            case BazaarDbLinkOutcome.Linked:
-                _state.LocalLinkedHint = true;
-                _state.AccountLinkExpanded = false;
-                _accountLinkStore.SaveHint(accountId, _state.CachedDisplayName);
-                SetAccountLinkBanner(
-                    HistoryPanelText.AccountLink.LinkedAs(_state.CachedDisplayName ?? string.Empty),
-                    StatusSeverity.Success
-                );
-                BppLog.Info("HistoryPanel", $"BazaarDB link redeemed account={accountId}");
-                break;
-            case BazaarDbLinkOutcome.AlreadyLinked:
-                SetAccountLinkBanner(
-                    HistoryPanelText.AccountLink.AlreadyLinked(),
-                    StatusSeverity.Failure
-                );
-                break;
-            case BazaarDbLinkOutcome.InvalidOrExpired:
-            case BazaarDbLinkOutcome.MissingFields:
-                SetAccountLinkBanner(
-                    HistoryPanelText.AccountLink.InvalidOrExpired(),
-                    StatusSeverity.Failure
-                );
-                break;
-            case BazaarDbLinkOutcome.ServerError:
-                SetAccountLinkBanner(
-                    HistoryPanelText.AccountLink.ServerBusy(),
-                    StatusSeverity.Failure
-                );
-                break;
-            default:
-                SetAccountLinkBanner(
-                    HistoryPanelText.AccountLink.Offline(),
-                    StatusSeverity.Failure
-                );
-                break;
+            _state.LocalLinkedHint = true;
+            _state.AccountLinkExpanded = false;
+            _accountLinkStore.SaveHint(accountId, _state.CachedDisplayName);
+            BppLog.Info("HistoryPanel", $"BazaarDB link redeemed account={accountId}");
         }
+
+        SetAccountLinkBanner(
+            RedeemBannerMessage(result.Outcome, _state.CachedDisplayName),
+            RedeemBannerSeverity(result.Outcome)
+        );
         _requestUiRefresh();
     }
+
+    // Contract rule, isolated for testability: ONLY a successful 200 redeem confirms the link, so it
+    // is the only outcome that may persist the local linked hint. 409/AlreadyLinked (a different
+    // BazaarDB user) and every error outcome must return false.
+    internal static bool OutcomeConfirmsLink(BazaarDbLinkOutcome outcome) =>
+        outcome == BazaarDbLinkOutcome.Linked;
+
+    private static StatusSeverity RedeemBannerSeverity(BazaarDbLinkOutcome outcome) =>
+        OutcomeConfirmsLink(outcome) ? StatusSeverity.Success : StatusSeverity.Failure;
+
+    private static string RedeemBannerMessage(BazaarDbLinkOutcome outcome, string? displayName) =>
+        outcome switch
+        {
+            BazaarDbLinkOutcome.Linked => HistoryPanelText.AccountLink.LinkedAs(
+                displayName ?? string.Empty
+            ),
+            BazaarDbLinkOutcome.AlreadyLinked => HistoryPanelText.AccountLink.AlreadyLinked(),
+            BazaarDbLinkOutcome.InvalidOrExpired or BazaarDbLinkOutcome.MissingFields =>
+                HistoryPanelText.AccountLink.InvalidOrExpired(),
+            BazaarDbLinkOutcome.ServerError => HistoryPanelText.AccountLink.ServerBusy(),
+            _ => HistoryPanelText.AccountLink.Offline(),
+        };
 
     public void ToggleAccountLinkExpanded()
     {

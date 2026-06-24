@@ -15,7 +15,9 @@ internal static class BazaarDbLinkClientTests
         NonOkSuccessResponsePreservesStatusCode();
         InvalidOrExpiredErrorClassifiesAsInvalidOrExpired();
         AlreadyLinkedErrorClassifiesAsAlreadyLinked();
+        ConflictStatusWithoutTokenClassifiesAsAlreadyLinked();
         MissingFieldTokenClassifiesAsMissingFields();
+        MissingFieldServerSentenceClassifiesAsMissingFields();
         ServerErrorClassifiesAsServerError();
         EmptyCodeReturnsMissingFieldsWithoutHttpCall();
         CancellationRethrows();
@@ -89,12 +91,37 @@ internal static class BazaarDbLinkClientTests
         );
     }
 
+    private static void ConflictStatusWithoutTokenClassifiesAsAlreadyLinked()
+    {
+        // Locks the status==409 shortcut so a missing/garbled error body still maps to the contract's
+        // permanent "already linked to a different user" failure rather than a retryable outcome.
+        var result = RedeemWithResponse(HttpStatusCode.Conflict, string.Empty);
+        Assert(
+            result.Outcome == BazaarDbLinkOutcome.AlreadyLinked,
+            "409 without an error token should still classify as AlreadyLinked."
+        );
+    }
+
     private static void MissingFieldTokenClassifiesAsMissingFields()
     {
         var result = RedeemWithResponse(HttpStatusCode.BadRequest, "{\"error\":\"missing_field\"}");
         Assert(
             result.Outcome == BazaarDbLinkOutcome.MissingFields,
             "missing_field token should classify as MissingFields."
+        );
+    }
+
+    private static void MissingFieldServerSentenceClassifiesAsMissingFields()
+    {
+        // The documented server token is the human sentence "Missing code or account_id", matched by
+        // prefix in the client. Guards against the StartsWith branch being dropped.
+        var result = RedeemWithResponse(
+            HttpStatusCode.BadRequest,
+            "{\"error\":\"Missing code or account_id\"}"
+        );
+        Assert(
+            result.Outcome == BazaarDbLinkOutcome.MissingFields,
+            "Documented 'Missing code or account_id' sentence should classify as MissingFields."
         );
     }
 

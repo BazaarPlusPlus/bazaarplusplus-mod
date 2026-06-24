@@ -233,6 +233,9 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _accountTitle!.text = model.AccountTitleText;
         _accountIdentity!.text = StablePanelText.Compact(model.AccountIdentityText, 96);
         _accountIdentity.tooltip = model.AccountIdentityText;
+        _accountIdentity.style.display = model.IsBazaarDbLinked
+            ? DisplayStyle.None
+            : DisplayStyle.Flex;
         _accountWhy!.text = StablePanelText.Compact(model.AccountWhyText, 112);
         _accountWhy.tooltip = model.AccountWhyText;
         _accountWhy.style.display = model.IsBazaarDbLinked ? DisplayStyle.None : DisplayStyle.Flex;
