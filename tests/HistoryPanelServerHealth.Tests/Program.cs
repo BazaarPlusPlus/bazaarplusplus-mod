@@ -86,6 +86,14 @@ Assert(
     "LinkedAs should resolve before interpolating the game display name."
 );
 Assert(
+    InvokeStatic(accountLinkType, "LinkedAs", "") as string == "Linked to BazaarDB",
+    "LinkedAs should use fallback copy when the game display name is blank."
+);
+Assert(
+    InvokeStatic(accountLinkType, "Identity", "") as string == "This account",
+    "Identity should use fallback copy when the game display name is blank."
+);
+Assert(
     InvokeStatic(accountLinkType, "InvalidOrExpired") as string
         == "Code invalid or expired - generate a new one",
     "Invalid code text should use repo-compatible ASCII punctuation."

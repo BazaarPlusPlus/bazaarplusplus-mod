@@ -26,6 +26,12 @@ internal static partial class HistoryPanelText
             "當前帳號：@{0}"
         );
 
+        private static readonly LocalizedTextSet IdentityFallbackText = new(
+            "This account",
+            "当前账号",
+            "當前帳號"
+        );
+
         private static readonly LocalizedTextSet SignedOutText = new(
             "Sign in to The Bazaar to link",
             "登录《The Bazaar》后即可绑定",
@@ -56,6 +62,12 @@ internal static partial class HistoryPanelText
             "Linked as @{0}",
             "已绑定：@{0}",
             "已綁定：@{0}"
+        );
+
+        private static readonly LocalizedTextSet LinkedFallbackText = new(
+            "Linked to BazaarDB",
+            "已绑定 BazaarDB",
+            "已綁定 BazaarDB"
         );
 
         private static readonly LocalizedTextSet RelinkText = new(
@@ -104,7 +116,10 @@ internal static partial class HistoryPanelText
 
         internal static string Why() => Resolve(WhyText);
 
-        internal static string Identity(string name) => string.Format(Resolve(IdentityText), name);
+        internal static string Identity(string name) =>
+            string.IsNullOrWhiteSpace(name)
+                ? Resolve(IdentityFallbackText)
+                : string.Format(Resolve(IdentityText), name);
 
         internal static string SignedOut() => Resolve(SignedOutText);
 
@@ -116,7 +131,10 @@ internal static partial class HistoryPanelText
 
         internal static string Linking() => Resolve(LinkingText);
 
-        internal static string LinkedAs(string name) => string.Format(Resolve(LinkedAsText), name);
+        internal static string LinkedAs(string name) =>
+            string.IsNullOrWhiteSpace(name)
+                ? Resolve(LinkedFallbackText)
+                : string.Format(Resolve(LinkedAsText), name);
 
         internal static string Relink() => Resolve(RelinkText);
 
