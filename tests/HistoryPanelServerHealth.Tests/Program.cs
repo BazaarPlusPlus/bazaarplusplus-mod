@@ -71,6 +71,61 @@ Assert(
     "FontAtlasSample cache should vary by Chinese locale mode, not only language code."
 );
 
+var accountLinkType =
+    textType.GetNestedType("AccountLink", BindingFlags.NonPublic | BindingFlags.Public)
+    ?? throw new InvalidOperationException("HistoryPanelText.AccountLink should exist.");
+
+languageProvider.CurrentLanguageCode = string.Empty;
+modeProvider.CurrentMode = BppChineseLocaleMode.Mainland;
+Assert(
+    InvokeStatic(accountLinkType, "Title") as string == "Link BazaarDB account",
+    "Account link title should resolve in English."
+);
+Assert(
+    InvokeStatic(accountLinkType, "LinkedAs", "Player One") as string == "Linked as @Player One",
+    "LinkedAs should resolve before interpolating the game display name."
+);
+Assert(
+    InvokeStatic(accountLinkType, "InvalidOrExpired") as string
+        == "Code invalid or expired - generate a new one",
+    "Invalid code text should use repo-compatible ASCII punctuation."
+);
+
+languageProvider.CurrentLanguageCode = "zh-CN";
+modeProvider.CurrentMode = BppChineseLocaleMode.Mainland;
+Assert(
+    InvokeStatic(accountLinkType, "Identity", "玩家") as string == "当前账号：@玩家",
+    "Identity should resolve simplified Chinese before interpolation."
+);
+Assert(
+    InvokeStatic(accountLinkType, "Offline") as string == "无法连接 BazaarDB，请检查网络",
+    "Offline error should resolve simplified Chinese."
+);
+
+modeProvider.CurrentMode = BppChineseLocaleMode.Taiwan;
+Assert(
+    InvokeStatic(accountLinkType, "Relink") as string == "重新綁定",
+    "Relink should resolve traditional Chinese when Taiwan mode is active."
+);
+Assert(
+    InvokeStatic(accountLinkType, "ServerBusy") as string == "BazaarDB 暫時無法使用，請稍後重試",
+    "ServerBusy should resolve traditional Chinese when Taiwan mode is active."
+);
+
+var storeType = RequireType(
+    "BazaarPlusPlus.Game.HistoryPanel.AccountLink.BazaarDbAccountLinkStore"
+);
+Assert(
+    InvokeStatic(storeType, "BuildPrefsKey", "player@example.com") as string
+        == "BPP.HistoryPanel.BazaarDbLinkedName.player%40example.com",
+    "Account link store should escape account-scoped PlayerPrefs keys."
+);
+Assert(
+    InvokeStatic(storeType, "BuildPrefsKey", "   ") as string
+        == "BPP.HistoryPanel.BazaarDbLinkedName.anonymous",
+    "Account link store should use anonymous scope for blank account ids."
+);
+
 Console.WriteLine("HistoryPanelServerHealth checks passed.");
 
 static Type RequireType(string fullName)
