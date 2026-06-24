@@ -383,6 +383,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         actions.Add(_deleteButton);
     }
 
+    private const int LinkCodeLength = 10;
+
     private void BuildAccountLinkCard(VisualElement rail)
     {
         _accountCard = new VisualElement();
@@ -390,9 +392,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         _accountCard.style.flexShrink = 0f;
         _accountCard.style.marginTop = UiSpacing.Xl;
         _accountCard.style.backgroundColor = Colors.HistoryFooterBackground;
-        UiStyle.Radius(_accountCard.style, Radii.Md);
-        UiStyle.Border(_accountCard.style, Borders.Thin, Colors.HistoryListFrameBorder);
-        UiStyle.Padding(_accountCard.style, UiSpacing.Lg);
+        UiStyle.Radius(_accountCard.style, Radii.Panel);
+        UiStyle.Border(_accountCard.style, Borders.Accent, Colors.HistoryTitleText);
+        UiStyle.Padding(_accountCard.style, UiSpacing.Xl);
         rail.Add(_accountCard);
 
         var titleRow = new VisualElement();
@@ -401,7 +403,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         titleRow.style.minWidth = 0f;
         _accountCard.Add(titleRow);
 
-        _accountTitle = CreateLabel(Sizes.FontBody, FontStyle.Bold, Colors.White);
+        _accountTitle = CreateLabel(Sizes.FontBody, FontStyle.Bold, Colors.HistoryTitleText);
         _accountTitle.style.flexGrow = 1f;
         _accountTitle.style.flexShrink = 1f;
         _accountTitle.style.minWidth = 0f;
@@ -428,15 +430,15 @@ internal sealed partial class HistoryPanelUiToolkitView
         );
         titleRow.Add(_accountRelinkButton);
 
-        _accountIdentity = CreateLabel(
+        _accountSignedOut = CreateLabel(
             Sizes.FontSmall,
             FontStyle.Normal,
             Colors.HistoryFooterSecondaryText
         );
-        _accountIdentity.style.whiteSpace = WhiteSpace.NoWrap;
-        _accountIdentity.style.overflow = Overflow.Hidden;
-        _accountIdentity.style.marginTop = UiSpacing.Xs;
-        _accountCard.Add(_accountIdentity);
+        _accountSignedOut.style.whiteSpace = WhiteSpace.NoWrap;
+        _accountSignedOut.style.overflow = Overflow.Hidden;
+        _accountSignedOut.style.marginTop = UiSpacing.Xs;
+        _accountCard.Add(_accountSignedOut);
 
         _accountWhy = CreateLabel(
             Sizes.FontSmall,
@@ -461,55 +463,58 @@ internal sealed partial class HistoryPanelUiToolkitView
         UiStyle.Border(_accountLinkedBadge.style, Borders.Thin, Colors.BattleRowWinAccent);
         _accountCard.Add(_accountLinkedBadge);
 
-        _accountFormRow = new VisualElement();
-        _accountFormRow.style.flexDirection = FlexDirection.Row;
-        _accountFormRow.style.alignItems = Align.Center;
-        _accountFormRow.style.marginTop = UiSpacing.Sm;
-        _accountCard.Add(_accountFormRow);
+        _accountCodeRow = new VisualElement();
+        _accountCodeRow.style.flexDirection = FlexDirection.Row;
+        _accountCodeRow.style.alignItems = Align.Center;
+        _accountCodeRow.style.marginTop = UiSpacing.Lg;
+        _accountCard.Add(_accountCodeRow);
 
-        _accountCodeField = new TextField();
-        _accountCodeField.maxLength = 10;
-        _accountCodeField.isDelayed = true;
-        _accountCodeField.selectAllOnFocus = true;
-        ConfigureTextEditionPlaceholder(
-            _accountCodeField,
-            HistoryPanelText.AccountLink.Placeholder()
-        );
-        _accountCodeField.style.flexGrow = 1f;
-        _accountCodeField.style.flexShrink = 1f;
-        _accountCodeField.style.minWidth = 0f;
-        _accountCodeField.style.height = Sizes.ButtonStandardHeight;
-        _accountCodeField.style.unityFont = GetUiFont();
-        _accountCodeField.RegisterValueChangedCallback(evt =>
+        // Segmented 10-cell code input — the focal point. Each cell holds one character; typing
+        // auto-advances, Backspace clears then steps back, and pasting a full code fills every cell.
+        _accountCodeCells = new TextField[LinkCodeLength];
+        for (var i = 0; i < LinkCodeLength; i++)
         {
-            var trimmed = evt.newValue?.Trim() ?? string.Empty;
-            if (!string.Equals(trimmed, evt.newValue, System.StringComparison.Ordinal))
-                _accountCodeField!.SetValueWithoutNotify(trimmed);
-        });
-        _accountCodeField.RegisterCallback<KeyDownEvent>(evt =>
-        {
-            if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter)
-                return;
-
-            evt.StopPropagation();
-            SubmitAccountLink();
-        });
-        _accountFormRow.Add(_accountCodeField);
+            var index = i;
+            var cell = new TextField();
+            cell.maxLength = LinkCodeLength; // allow a full paste in one cell; redistributed below
+            cell.isDelayed = false;
+            cell.selectAllOnFocus = true;
+            cell.style.flexGrow = 1f;
+            cell.style.flexShrink = 1f;
+            cell.style.minWidth = 0f;
+            cell.style.height = Sizes.ButtonFooterHeight;
+            cell.style.marginLeft = index == 0 ? 0f : UiSpacing.Xxs;
+            // The visible single box is the cell's own Radius/Border on the de-chromed root.
+            UiStyle.Radius(cell.style, Radii.Row);
+            UiStyle.Border(cell.style, Borders.Thin, Colors.HistoryListFrameBorder);
+            // Centering + font must reach the inner 'unity-text-input' element (the game's USS
+            // overrides the inherited cascade), and the inner chrome must be stripped. Defer to
+            // AttachToPanelEvent so cell.Q(...) resolves a non-null inner element.
+            cell.RegisterCallback<AttachToPanelEvent>(_ =>
+                StyleCodeCell(cell, GetUiFont(), Sizes.FontButton, Colors.White)
+            );
+            cell.RegisterValueChangedCallback(evt => OnCodeCellChanged(index, evt.newValue));
+            cell.RegisterCallback<KeyDownEvent>(evt => OnCodeCellKeyDown(index, evt));
+            _accountCodeCells[index] = cell;
+            _accountCodeRow.Add(cell);
+        }
 
         _accountLinkButton = CreateButton(
             HistoryPanelText.AccountLink.Button(),
             SubmitAccountLink,
             0f,
-            Sizes.ButtonStandardHeight,
+            Sizes.ButtonFooterHeight,
             fixedWidth: false
         );
+        // Full-width primary CTA. flexGrow stays 0 so it does not stretch vertically as a column
+        // child (the button-in-column flex trap); width 100% makes it span the card instead.
         _accountLinkButton.style.flexGrow = 0f;
         _accountLinkButton.style.flexShrink = 0f;
         _accountLinkButton.style.flexBasis = StyleKeyword.Auto;
-        _accountLinkButton.style.minWidth = Sizes.ServerHealthButtonWidth * 0.5f;
-        _accountLinkButton.style.marginLeft = UiSpacing.Sm;
+        _accountLinkButton.style.width = Length.Percent(100f);
+        _accountLinkButton.style.marginTop = UiSpacing.Lg;
         StyleButton(_accountLinkButton, Colors.ReplayBackground, Colors.ReplayText);
-        _accountFormRow.Add(_accountLinkButton);
+        _accountCard.Add(_accountLinkButton);
 
         _accountHint = CreateLabel(
             Sizes.FontCorner,
@@ -541,88 +546,142 @@ internal sealed partial class HistoryPanelUiToolkitView
         _accountCard.Add(_accountBanner);
     }
 
-    private static void ConfigureTextEditionPlaceholder(TextField textField, string placeholder)
+    private void OnCodeCellChanged(int index, string? newValue)
     {
-        var textEdition = textField.textEdition;
-        SetTextEditionProperty(textEdition, "placeholder", placeholder);
-        SetTextEditionProperty(textEdition, "hidePlaceholderOnFocus", true);
-    }
-
-    private static void SetTextEditionProperty(
-        object textEdition,
-        string propertyName,
-        object value
-    )
-    {
-        var property = FindTextEditionProperty(textEdition, propertyName);
-        if (property == null)
-        {
-            BppLog.Debug(
-                "HistoryPanel",
-                $"TextField textEdition property '{propertyName}' was not found."
-            );
+        if (_suppressCellNotify || _accountCodeCells == null)
             return;
-        }
 
-        if (!property.CanWrite || property.SetMethod == null)
-        {
-            BppLog.Debug(
-                "HistoryPanel",
-                $"TextField textEdition property '{property.Name}' is not writable."
-            );
-            return;
-        }
-
+        // Strip whitespace only — the redeem alphabet is case-sensitive, so never transform case.
+        var text = StripWhitespace(newValue);
+        _suppressCellNotify = true;
         try
         {
-            property.SetValue(textEdition, value);
+            if (text.Length <= 1)
+            {
+                _accountCodeCells[index].SetValueWithoutNotify(text);
+                if (text.Length == 1 && index < LinkCodeLength - 1)
+                    _accountCodeCells[index + 1].Focus();
+            }
+            else
+            {
+                DistributeCode(text, index);
+            }
         }
-        catch (System.ArgumentException ex)
+        finally
         {
-            BppLog.Warn(
-                "HistoryPanel",
-                $"Failed to set TextField textEdition property '{property.Name}': {ex.Message}"
-            );
+            _suppressCellNotify = false;
         }
-        catch (System.Reflection.TargetException ex)
+
+        UpdateAccountCodeFeedback();
+    }
+
+    private void OnCodeCellKeyDown(int index, KeyDownEvent evt)
+    {
+        if (_accountCodeCells == null)
+            return;
+
+        if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
         {
-            BppLog.Warn(
-                "HistoryPanel",
-                $"Failed to set TextField textEdition property '{property.Name}': {ex.Message}"
-            );
+            evt.StopPropagation();
+            SubmitAccountLink();
+            return;
         }
-        catch (System.Reflection.TargetInvocationException ex)
+
+        if (evt.keyCode == KeyCode.Backspace)
         {
-            BppLog.Warn(
-                "HistoryPanel",
-                $"Failed to set TextField textEdition property '{property.Name}': {ex.Message}"
-            );
+            // Own Backspace fully: native TextField deletion would eat the char before we can step
+            // back on an empty cell, forcing a second press. One press clears the current char; on an
+            // already-empty cell it steps back and clears the previous cell.
+            evt.StopPropagation();
+            _suppressCellNotify = true;
+            try
+            {
+                if (!string.IsNullOrEmpty(_accountCodeCells[index].value))
+                {
+                    _accountCodeCells[index].SetValueWithoutNotify(string.Empty);
+                }
+                else if (index > 0)
+                {
+                    _accountCodeCells[index - 1].SetValueWithoutNotify(string.Empty);
+                    _accountCodeCells[index - 1].Focus();
+                }
+            }
+            finally
+            {
+                _suppressCellNotify = false;
+            }
+
+            UpdateAccountCodeFeedback();
+        }
+        else if (evt.keyCode == KeyCode.LeftArrow && index > 0)
+        {
+            evt.StopPropagation();
+            _accountCodeCells[index - 1].Focus();
+        }
+        else if (evt.keyCode == KeyCode.RightArrow && index < LinkCodeLength - 1)
+        {
+            evt.StopPropagation();
+            _accountCodeCells[index + 1].Focus();
         }
     }
 
-    private static System.Reflection.PropertyInfo? FindTextEditionProperty(
-        object textEdition,
-        string propertyName
-    )
+    // Spreads a multi-character value (a paste, or fast typing) across the cells from startIndex, one
+    // character per cell, then focuses the next empty cell. Letter case is preserved.
+    private void DistributeCode(string text, int startIndex)
     {
-        var suffix = "." + propertyName;
-        var properties = textEdition
-            .GetType()
-            .GetProperties(
-                System.Reflection.BindingFlags.Instance
-                    | System.Reflection.BindingFlags.Public
-                    | System.Reflection.BindingFlags.NonPublic
-            );
-        foreach (var property in properties)
+        if (_accountCodeCells == null)
+            return;
+
+        var writeIndex = startIndex;
+        foreach (var ch in text)
         {
-            if (
-                string.Equals(property.Name, propertyName, System.StringComparison.Ordinal)
-                || property.Name.EndsWith(suffix, System.StringComparison.Ordinal)
-            )
-                return property;
+            if (writeIndex >= LinkCodeLength)
+                break;
+
+            _accountCodeCells[writeIndex].SetValueWithoutNotify(ch.ToString());
+            writeIndex++;
         }
 
-        return null;
+        var focusIndex = writeIndex < LinkCodeLength ? writeIndex : LinkCodeLength - 1;
+        _accountCodeCells[focusIndex].Focus();
+    }
+
+    private void ClearCodeCells()
+    {
+        if (_accountCodeCells == null)
+            return;
+
+        _suppressCellNotify = true;
+        foreach (var cell in _accountCodeCells)
+            cell.SetValueWithoutNotify(string.Empty);
+        _suppressCellNotify = false;
+    }
+
+    private string CombinedAccountCode()
+    {
+        if (_accountCodeCells == null)
+            return string.Empty;
+
+        var code = string.Empty;
+        foreach (var cell in _accountCodeCells)
+            code += cell.value ?? string.Empty;
+
+        return code.Trim();
+    }
+
+    private static string StripWhitespace(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return string.Empty;
+
+        var result = string.Empty;
+        foreach (var ch in value)
+        {
+            if (!char.IsWhiteSpace(ch))
+                result += ch;
+        }
+
+        return result;
     }
 
     private void BuildFilterSlot(VisualElement rail)

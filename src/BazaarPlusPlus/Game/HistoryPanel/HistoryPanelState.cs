@@ -70,8 +70,6 @@ internal sealed class HistoryPanelState
 
     public string? CachedAccountId { get; set; }
 
-    public string? CachedDisplayName { get; set; }
-
     public bool LocalLinkedHint { get; set; }
 
     public bool AccountLinkExpanded { get; set; }

@@ -649,12 +649,12 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         {
             _state.LocalLinkedHint = true;
             _state.AccountLinkExpanded = false;
-            _accountLinkStore.SaveHint(accountId, _state.CachedDisplayName);
+            _accountLinkStore.SaveHint(accountId);
             BppLog.Info("HistoryPanel", $"BazaarDB link redeemed account={accountId}");
         }
 
         SetAccountLinkBanner(
-            RedeemBannerMessage(result.Outcome, _state.CachedDisplayName),
+            RedeemBannerMessage(result.Outcome),
             RedeemBannerSeverity(result.Outcome)
         );
         _requestUiRefresh();
@@ -669,12 +669,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     private static StatusSeverity RedeemBannerSeverity(BazaarDbLinkOutcome outcome) =>
         OutcomeConfirmsLink(outcome) ? StatusSeverity.Success : StatusSeverity.Failure;
 
-    private static string RedeemBannerMessage(BazaarDbLinkOutcome outcome, string? displayName) =>
+    private static string RedeemBannerMessage(BazaarDbLinkOutcome outcome) =>
         outcome switch
         {
-            BazaarDbLinkOutcome.Linked => HistoryPanelText.AccountLink.LinkedAs(
-                displayName ?? string.Empty
-            ),
+            BazaarDbLinkOutcome.Linked => HistoryPanelText.AccountLink.Linked(),
             BazaarDbLinkOutcome.AlreadyLinked => HistoryPanelText.AccountLink.AlreadyLinked(),
             BazaarDbLinkOutcome.InvalidOrExpired or BazaarDbLinkOutcome.MissingFields =>
                 HistoryPanelText.AccountLink.InvalidOrExpired(),
@@ -870,10 +868,8 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     private string? RefreshAccountLinkIdentityFromGame(bool clearBanner = true)
     {
         var accountId = NormalizeAccountId(BppClientCacheBridge.TryGetProfileAccountId());
-        var displayName = NormalizeDisplayName(BppClientCacheBridge.TryGetProfileDisplayUsername());
 
         _state.CachedAccountId = accountId;
-        _state.CachedDisplayName = displayName;
         if (clearBanner)
             SetAccountLinkBanner(null, StatusSeverity.Neutral);
         if (string.IsNullOrWhiteSpace(accountId))
@@ -883,13 +879,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return null;
         }
 
-        if (_accountLinkStore.TryLoadHint(accountId, out var storedDisplayName))
+        if (_accountLinkStore.IsLinked(accountId))
         {
             _state.LocalLinkedHint = true;
             _state.AccountLinkExpanded = false;
-            var normalizedStoredDisplayName = NormalizeDisplayName(storedDisplayName);
-            if (!string.IsNullOrWhiteSpace(normalizedStoredDisplayName))
-                _state.CachedDisplayName = normalizedStoredDisplayName;
             return accountId;
         }
 
@@ -927,12 +920,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     private static string? NormalizeAccountId(string? accountId)
     {
         var normalized = accountId?.Trim();
-        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
-    }
-
-    private static string? NormalizeDisplayName(string? displayName)
-    {
-        var normalized = displayName?.Trim();
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 

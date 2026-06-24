@@ -20,28 +20,10 @@ internal static partial class HistoryPanelText
             "綁定後在 bazaardb.gg 查看你的對局與戰績"
         );
 
-        private static readonly LocalizedTextSet IdentityText = new(
-            "This account: @{0}",
-            "当前账号：@{0}",
-            "當前帳號：@{0}"
-        );
-
-        private static readonly LocalizedTextSet IdentityFallbackText = new(
-            "This account",
-            "当前账号",
-            "當前帳號"
-        );
-
         private static readonly LocalizedTextSet SignedOutText = new(
             "Sign in to The Bazaar to link",
             "登录《The Bazaar》后即可绑定",
             "登入《The Bazaar》後即可綁定"
-        );
-
-        private static readonly LocalizedTextSet PlaceholderText = new(
-            "Paste your link code",
-            "粘贴绑定码",
-            "貼上綁定碼"
         );
 
         private static readonly LocalizedTextSet HintText = new(
@@ -50,7 +32,11 @@ internal static partial class HistoryPanelText
             "前往 bazaardb.gg 取得綁定碼 · 10 分鐘有效 · 區分大小寫"
         );
 
-        private static readonly LocalizedTextSet ButtonText = new("Link", "绑定", "綁定");
+        private static readonly LocalizedTextSet ButtonText = new(
+            "Link account",
+            "绑定账号",
+            "綁定帳號"
+        );
 
         private static readonly LocalizedTextSet LinkingText = new(
             "Linking...",
@@ -58,13 +44,7 @@ internal static partial class HistoryPanelText
             "綁定中..."
         );
 
-        private static readonly LocalizedTextSet LinkedAsText = new(
-            "Linked as @{0}",
-            "已绑定：@{0}",
-            "已綁定：@{0}"
-        );
-
-        private static readonly LocalizedTextSet LinkedFallbackText = new(
+        private static readonly LocalizedTextSet LinkedText = new(
             "Linked to BazaarDB",
             "已绑定 BazaarDB",
             "已綁定 BazaarDB"
@@ -116,14 +96,7 @@ internal static partial class HistoryPanelText
 
         internal static string Why() => Resolve(WhyText);
 
-        internal static string Identity(string name) =>
-            string.IsNullOrWhiteSpace(name)
-                ? Resolve(IdentityFallbackText)
-                : string.Format(Resolve(IdentityText), name);
-
         internal static string SignedOut() => Resolve(SignedOutText);
-
-        internal static string Placeholder() => Resolve(PlaceholderText);
 
         internal static string Hint() => Resolve(HintText);
 
@@ -131,10 +104,7 @@ internal static partial class HistoryPanelText
 
         internal static string Linking() => Resolve(LinkingText);
 
-        internal static string LinkedAs(string name) =>
-            string.IsNullOrWhiteSpace(name)
-                ? Resolve(LinkedFallbackText)
-                : string.Format(Resolve(LinkedAsText), name);
+        internal static string Linked() => Resolve(LinkedText);
 
         internal static string Relink() => Resolve(RelinkText);
 

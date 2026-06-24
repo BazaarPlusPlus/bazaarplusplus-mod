@@ -147,7 +147,6 @@ internal sealed partial class HistoryPanel
             : HistoryPanelServerHealthFormatter.Idle();
         var isBazaarDbLinked = _state.LocalLinkedHint && !_state.AccountLinkExpanded;
         var hasAccount = !string.IsNullOrWhiteSpace(_state.CachedAccountId);
-        var displayName = _state.CachedDisplayName ?? string.Empty;
 
         var statusSeverity = _state.StatusSeverity;
 
@@ -168,14 +167,14 @@ internal sealed partial class HistoryPanel
             DatabaseChipSeverity = databaseChip.Severity,
             ServerHealthButtonText = serverHealthDisplay.ButtonText,
             ServerHealthButtonEnabled = serverHealthDisplay.ButtonEnabled,
+            AccountCardVisible = _dependencies?.IsBazaarDbDataSharingEnabled?.Invoke() ?? false,
             IsBazaarDbLinked = isBazaarDbLinked,
             AccountTitleText = HistoryPanelText.AccountLink.Title(),
             AccountWhyText = HistoryPanelText.AccountLink.Why(),
             AccountHintText = HistoryPanelText.AccountLink.Hint(),
-            AccountLinkedBadgeText = HistoryPanelText.AccountLink.LinkedAs(displayName),
-            AccountIdentityText = hasAccount
-                ? HistoryPanelText.AccountLink.Identity(displayName)
-                : HistoryPanelText.AccountLink.SignedOut(),
+            AccountLinkedBadgeText = HistoryPanelText.AccountLink.Linked(),
+            AccountSignedOutText = HistoryPanelText.AccountLink.SignedOut(),
+            AccountSignedOutVisible = !hasAccount,
             AccountLinkButtonText = _state.AccountLinkInProgress
                 ? HistoryPanelText.AccountLink.Linking()
                 : HistoryPanelText.AccountLink.Button(),
@@ -183,7 +182,7 @@ internal sealed partial class HistoryPanel
             AccountLinkInputEnabled = !_state.AccountLinkInProgress && hasAccount,
             AccountLinkBannerText = _state.AccountLinkBannerMessage,
             AccountLinkBannerSeverity = _state.AccountLinkBannerSeverity,
-            AccountLinkFormVisible = !isBazaarDbLinked,
+            AccountLinkFormVisible = hasAccount && !isBazaarDbLinked,
             AccountRelinkButtonText = HistoryPanelText.AccountLink.Relink(),
             SectionMode = _sectionMode,
             GhostBattleFilter = _ghostBattleFilter,
@@ -258,6 +257,8 @@ internal sealed class HistoryPanelUiToolkitModel
 
     public bool ServerHealthButtonEnabled { get; set; }
 
+    public bool AccountCardVisible { get; set; }
+
     public bool IsBazaarDbLinked { get; set; }
 
     public string AccountTitleText { get; set; } = string.Empty;
@@ -268,7 +269,9 @@ internal sealed class HistoryPanelUiToolkitModel
 
     public string AccountLinkedBadgeText { get; set; } = string.Empty;
 
-    public string AccountIdentityText { get; set; } = string.Empty;
+    public string AccountSignedOutText { get; set; } = string.Empty;
+
+    public bool AccountSignedOutVisible { get; set; }
 
     public string AccountLinkButtonText { get; set; } = string.Empty;
 

@@ -9,23 +9,17 @@ internal sealed class BazaarDbAccountLinkStore
     private const string AnonymousAccountScope = "anonymous";
     private const string PrefsKeyPrefix = "BPP.HistoryPanel.BazaarDbLinkedName";
 
-    public void SaveHint(string accountId, string? displayName)
+    public void SaveHint(string accountId)
     {
-        PlayerPrefs.SetString(BuildPrefsKey(accountId), NormalizeDisplayName(displayName));
+        // Presence-only hint: there is no read-back / unlink endpoint, and the card no longer shows a
+        // display name, so we only remember THAT this account linked.
+        PlayerPrefs.SetString(BuildPrefsKey(accountId), "1");
         PlayerPrefs.Save();
     }
 
-    public bool TryLoadHint(string accountId, out string? displayName)
+    public bool IsLinked(string accountId)
     {
-        var key = BuildPrefsKey(accountId);
-        if (!PlayerPrefs.HasKey(key))
-        {
-            displayName = null;
-            return false;
-        }
-
-        displayName = PlayerPrefs.GetString(key, string.Empty);
-        return true;
+        return PlayerPrefs.HasKey(BuildPrefsKey(accountId));
     }
 
     public void Clear(string accountId)
@@ -40,10 +34,5 @@ internal sealed class BazaarDbAccountLinkStore
             ? AnonymousAccountScope
             : Uri.EscapeDataString(accountId);
         return $"{PrefsKeyPrefix}.{scope}";
-    }
-
-    private static string NormalizeDisplayName(string? displayName)
-    {
-        return string.IsNullOrWhiteSpace(displayName) ? string.Empty : displayName;
     }
 }

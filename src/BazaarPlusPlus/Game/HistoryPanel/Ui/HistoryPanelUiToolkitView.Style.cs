@@ -179,6 +179,68 @@ internal sealed partial class HistoryPanelUiToolkitView
 
     private static Font GetUiFont() => BppUiFont.Default;
 
+    // Styles one segmented code cell so it reads as a single clean box with a centered glyph in the
+    // mod UI font. The game's USS gives the inner 'unity-text-input' explicit font/align/chrome that
+    // beats the inherited cascade, so de-chrome the root AND re-apply the text props on the queried
+    // inner element (which then re-inherits to its 'unity-text-element' child). Call after the field
+    // is attached so Q(...) resolves a non-null inner element.
+    private static void StyleCodeCell(TextField cell, Font font, int fontSize, Color textColor)
+    {
+        cell.style.marginLeft = 0f;
+        cell.style.marginRight = 0f;
+        cell.style.marginTop = 0f;
+        cell.style.marginBottom = 0f;
+        cell.style.paddingLeft = 0f;
+        cell.style.paddingRight = 0f;
+        cell.style.paddingTop = 0f;
+        cell.style.paddingBottom = 0f;
+
+        cell.style.unityFont = font;
+        cell.style.unityFontDefinition = FontDefinition.FromFont(font);
+        cell.style.unityTextAlign = TextAnchor.MiddleCenter;
+        cell.style.fontSize = fontSize;
+        cell.style.color = textColor;
+
+        var input = cell.Q(TextField.textInputUssName);
+        if (input == null)
+            return;
+
+        input.style.flexGrow = 1f; // fill the cell so centered text is centered within the box
+        input.style.backgroundColor = Color.clear;
+        input.style.borderLeftWidth = 0f;
+        input.style.borderRightWidth = 0f;
+        input.style.borderTopWidth = 0f;
+        input.style.borderBottomWidth = 0f;
+        input.style.marginLeft = 0f;
+        input.style.marginRight = 0f;
+        input.style.marginTop = 0f;
+        input.style.marginBottom = 0f;
+        input.style.paddingLeft = 0f;
+        input.style.paddingRight = 0f;
+        input.style.paddingTop = 0f;
+        input.style.paddingBottom = 0f;
+
+        input.style.unityFont = font;
+        input.style.unityFontDefinition = FontDefinition.FromFont(font);
+        input.style.unityTextAlign = TextAnchor.MiddleCenter;
+        input.style.fontSize = fontSize;
+        input.style.color = textColor;
+
+        // The glyphs render in the inner TextElement, which carries an explicit alignment from the
+        // game USS that beats the inherited value — set alignment directly there and let it fill the
+        // input so MiddleCenter centers vertically as well as horizontally.
+        var glyphs = input.Q<TextElement>();
+        if (glyphs == null)
+            return;
+
+        glyphs.style.flexGrow = 1f;
+        glyphs.style.unityFont = font;
+        glyphs.style.unityFontDefinition = FontDefinition.FromFont(font);
+        glyphs.style.unityTextAlign = TextAnchor.MiddleCenter;
+        glyphs.style.fontSize = fontSize;
+        glyphs.style.color = textColor;
+    }
+
     private static VisualElement CreateSpacer()
     {
         var spacer = new VisualElement();

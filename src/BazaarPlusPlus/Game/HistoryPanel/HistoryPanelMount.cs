@@ -56,7 +56,14 @@ internal sealed class HistoryPanelMount : IBppMountable
             return;
         }
 
-        panel.Configure(HistoryPanelFactory.Create(runtime, onlineClient, _accountLinkClient()));
+        panel.Configure(
+            HistoryPanelFactory.Create(
+                runtime,
+                onlineClient,
+                _accountLinkClient(),
+                () => services.Config.BazaarDbUploadEnabled?.Value ?? false
+            )
+        );
 
         _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(_ =>
             HistoryPanel.RefreshLocalization()

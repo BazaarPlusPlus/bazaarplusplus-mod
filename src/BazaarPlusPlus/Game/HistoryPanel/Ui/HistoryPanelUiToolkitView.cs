@@ -50,15 +50,17 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Button? _checkServerHealthButton;
     private VisualElement? _accountCard;
     private Label? _accountTitle;
-    private Label? _accountIdentity;
+    private Label? _accountSignedOut;
     private Label? _accountWhy;
-    private VisualElement? _accountFormRow;
-    private TextField? _accountCodeField;
+    private VisualElement? _accountCodeRow;
+    private TextField[]? _accountCodeCells;
     private Button? _accountLinkButton;
     private Label? _accountHint;
     private Label? _accountBanner;
     private Label? _accountLinkedBadge;
     private Button? _accountRelinkButton;
+    private bool _linkSubmitAllowedByModel;
+    private bool _suppressCellNotify;
     private Button? _runsTabButton;
     private Button? _ghostTabButton;
     private Label? _statusLabel;
@@ -230,28 +232,40 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         );
         _checkServerHealthButton!.text = model.ServerHealthButtonText;
         _checkServerHealthButton.SetEnabled(model.ServerHealthButtonEnabled);
+        var accountFormVisible = model.AccountLinkFormVisible;
+
+        // The whole card only appears when BazaarDB data-sharing (数据共建) is enabled — linking is
+        // only meaningful when the player is contributing data under their account id.
+        _accountCard!.style.display = model.AccountCardVisible
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
         _accountTitle!.text = model.AccountTitleText;
-        _accountIdentity!.text = StablePanelText.Compact(model.AccountIdentityText, 96);
-        _accountIdentity.tooltip = model.AccountIdentityText;
-        _accountIdentity.style.display = model.IsBazaarDbLinked
-            ? DisplayStyle.None
-            : DisplayStyle.Flex;
+        _accountSignedOut!.text = StablePanelText.Compact(model.AccountSignedOutText, 96);
+        _accountSignedOut.tooltip = model.AccountSignedOutText;
+        _accountSignedOut.style.display = model.AccountSignedOutVisible
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
         _accountWhy!.text = StablePanelText.Compact(model.AccountWhyText, 112);
         _accountWhy.tooltip = model.AccountWhyText;
-        _accountWhy.style.display = model.IsBazaarDbLinked ? DisplayStyle.None : DisplayStyle.Flex;
-        _accountFormRow!.style.display = model.AccountLinkFormVisible
-            ? DisplayStyle.Flex
-            : DisplayStyle.None;
-        _accountCodeField!.SetEnabled(model.AccountLinkInputEnabled);
-        _accountCodeField.tooltip = model.AccountHintText;
+        _accountWhy.style.display = accountFormVisible ? DisplayStyle.Flex : DisplayStyle.None;
+        _accountCodeRow!.style.display = accountFormVisible ? DisplayStyle.Flex : DisplayStyle.None;
+        if (_accountCodeCells != null)
+        {
+            foreach (var cell in _accountCodeCells)
+                cell.SetEnabled(model.AccountLinkInputEnabled);
+        }
+        if (!accountFormVisible || !model.AccountCardVisible)
+            ClearCodeCells();
         _accountLinkButton!.text = model.AccountLinkButtonText;
         _accountLinkButton.tooltip = model.AccountLinkButtonText;
-        _accountLinkButton.SetEnabled(model.AccountLinkButtonEnabled);
-        _accountHint!.text = StablePanelText.Compact(model.AccountHintText, 120);
-        _accountHint.tooltip = model.AccountHintText;
-        _accountHint.style.display = model.AccountLinkFormVisible
+        _accountLinkButton.style.display = accountFormVisible
             ? DisplayStyle.Flex
             : DisplayStyle.None;
+        _linkSubmitAllowedByModel = model.AccountLinkButtonEnabled;
+        UpdateAccountCodeFeedback();
+        _accountHint!.text = StablePanelText.Compact(model.AccountHintText, 120);
+        _accountHint.tooltip = model.AccountHintText;
+        _accountHint.style.display = accountFormVisible ? DisplayStyle.Flex : DisplayStyle.None;
         _accountLinkedBadge!.text = StablePanelText.Compact(model.AccountLinkedBadgeText, 96);
         _accountLinkedBadge.tooltip = model.AccountLinkedBadgeText;
         _accountLinkedBadge.style.display = model.IsBazaarDbLinked
@@ -395,8 +409,20 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 
     private void SubmitAccountLink()
     {
-        var code = _accountCodeField?.value?.Trim() ?? string.Empty;
+        var code = CombinedAccountCode();
+        if (code.Length != LinkCodeLength)
+            return;
+
         _linkBazaarDbAccount(code);
+    }
+
+    // The redeem code is always exactly LinkCodeLength characters, so the Link button is enabled and
+    // submit is allowed only once every segment cell is filled. Driven from Refresh (model side) and
+    // from each cell's value-changed callback (user side).
+    private void UpdateAccountCodeFeedback()
+    {
+        var complete = CombinedAccountCode().Length == LinkCodeLength;
+        _accountLinkButton?.SetEnabled(_linkSubmitAllowedByModel && complete);
     }
 
     public void SetPreviewStatus(string? message, bool visible)

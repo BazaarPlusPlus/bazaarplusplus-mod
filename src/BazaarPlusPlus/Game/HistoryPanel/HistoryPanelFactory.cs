@@ -16,7 +16,8 @@ internal static class HistoryPanelFactory
     public static HistoryPanelDependencies Create(
         IHistoryPanelRuntime runtime,
         ModOnlineClient onlineClient,
-        BazaarDbLinkClient? accountLinkClient
+        BazaarDbLinkClient? accountLinkClient,
+        Func<bool>? isBazaarDbDataSharingEnabled = null
     )
     {
         if (runtime == null)
@@ -44,7 +45,8 @@ internal static class HistoryPanelFactory
             replayService,
             ghostSyncService,
             serverHealthProbe,
-            accountLinkClient
+            accountLinkClient,
+            isBazaarDbDataSharingEnabled
         );
     }
 

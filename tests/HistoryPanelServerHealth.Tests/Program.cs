@@ -82,16 +82,8 @@ Assert(
     "Account link title should resolve in English."
 );
 Assert(
-    InvokeStatic(accountLinkType, "LinkedAs", "Player One") as string == "Linked as @Player One",
-    "LinkedAs should resolve before interpolating the game display name."
-);
-Assert(
-    InvokeStatic(accountLinkType, "LinkedAs", "") as string == "Linked to BazaarDB",
-    "LinkedAs should use fallback copy when the game display name is blank."
-);
-Assert(
-    InvokeStatic(accountLinkType, "Identity", "") as string == "This account",
-    "Identity should use fallback copy when the game display name is blank."
+    InvokeStatic(accountLinkType, "Linked") as string == "Linked to BazaarDB",
+    "Linked badge should be name-less in English."
 );
 Assert(
     InvokeStatic(accountLinkType, "InvalidOrExpired") as string
@@ -102,8 +94,8 @@ Assert(
 languageProvider.CurrentLanguageCode = "zh-CN";
 modeProvider.CurrentMode = BppChineseLocaleMode.Mainland;
 Assert(
-    InvokeStatic(accountLinkType, "Identity", "玩家") as string == "当前账号：@玩家",
-    "Identity should resolve simplified Chinese before interpolation."
+    InvokeStatic(accountLinkType, "Linked") as string == "已绑定 BazaarDB",
+    "Linked badge should resolve simplified Chinese, name-less."
 );
 Assert(
     InvokeStatic(accountLinkType, "Offline") as string == "无法连接 BazaarDB，请检查网络",
