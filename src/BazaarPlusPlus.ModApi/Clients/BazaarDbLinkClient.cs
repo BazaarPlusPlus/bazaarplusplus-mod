@@ -48,7 +48,7 @@ public readonly struct BazaarDbLinkResult
 /// Code is trimmed only (case-sensitive alphabet). 409 means already linked to a different
 /// BazaarDB user and is permanent.
 /// </summary>
-public sealed class BazaarDbLinkClient
+public sealed class BazaarDbLinkClient : IDisposable
 {
     public const string DefaultRedeemEndpoint = "https://bazaardb.gg/api/profile/link/redeem";
 
@@ -59,6 +59,11 @@ public sealed class BazaarDbLinkClient
     {
         _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
         _redeemEndpoint = redeemEndpoint ?? throw new ArgumentNullException(nameof(redeemEndpoint));
+    }
+
+    public void Dispose()
+    {
+        _httpClient.Dispose();
     }
 
     public async Task<BazaarDbLinkResult> RedeemAsync(

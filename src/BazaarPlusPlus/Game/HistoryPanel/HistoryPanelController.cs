@@ -103,4 +103,15 @@ internal sealed partial class HistoryPanel
         if (_coordinator != null)
             _ = _coordinator.TryCheckServerHealthAsync();
     }
+
+    private void SubmitAccountLinkCode(string? code)
+    {
+        if (_coordinator != null)
+            _ = _coordinator.TryRedeemBazaarDbAccountAsync(code);
+    }
+
+    private void ToggleAccountLinkExpanded()
+    {
+        _coordinator?.ToggleAccountLinkExpanded();
+    }
 }

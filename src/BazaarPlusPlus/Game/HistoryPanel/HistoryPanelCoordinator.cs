@@ -2,8 +2,10 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Game.HistoryPanel.AccountLink;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Clients;
 using UnityEngine;
@@ -17,6 +19,8 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     private readonly HistoryPanelDataService _dataService;
     private readonly HistoryPanelReplayService _replayService;
     private readonly IHistoryPanelServerHealthProbe? _serverHealthProbe;
+    private readonly BazaarDbLinkClient? _linkClient;
+    private readonly BazaarDbAccountLinkStore _accountLinkStore = new();
     private readonly Action _requestUiRefresh;
     private readonly Action _requestPreviewRefresh;
     private readonly Action<bool> _requestVisibilityChange;
@@ -37,6 +41,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _dataService = dependencies.DataService;
         _replayService = dependencies.ReplayService;
         _serverHealthProbe = dependencies.ServerHealthProbe;
+        _linkClient = dependencies.AccountLinkClient;
         _requestUiRefresh =
             requestUiRefresh ?? throw new ArgumentNullException(nameof(requestUiRefresh));
         _requestPreviewRefresh =
@@ -54,6 +59,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     public void OnPanelShown()
     {
         _session.Begin();
+        CacheAccountLinkIdentity();
         _state.ReplayActionInProgress = false;
         _state.IsVisible = true;
         RefreshSectionOnEntry();
@@ -65,6 +71,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.GhostSyncInProgress = false;
         _state.ReplayActionInProgress = false;
         _state.ServerHealthProbeInProgress = false;
+        _state.AccountLinkInProgress = false;
         ClearDeleteRunConfirmation();
         _session.End();
     }
@@ -553,6 +560,133 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _requestUiRefresh();
     }
 
+    public async Task TryRedeemBazaarDbAccountAsync(string? code)
+    {
+        if (_state.AccountLinkInProgress)
+        {
+            SetAccountLinkBanner(
+                HistoryPanelText.AccountLink.AlreadyRunning(),
+                StatusSeverity.Neutral
+            );
+            _requestUiRefresh();
+            return;
+        }
+
+        var accountId = NormalizeAccountId(
+            _state.CachedAccountId ?? BppClientCacheBridge.TryGetProfileAccountId()
+        );
+        _state.CachedAccountId = accountId;
+        var trimmedCode = code?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(accountId))
+        {
+            SetAccountLinkBanner(HistoryPanelText.AccountLink.SignedOut(), StatusSeverity.Failure);
+            _requestUiRefresh();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(trimmedCode))
+        {
+            SetAccountLinkBanner(HistoryPanelText.AccountLink.EmptyCode(), StatusSeverity.Failure);
+            _requestUiRefresh();
+            return;
+        }
+
+        if (_linkClient == null)
+        {
+            SetAccountLinkBanner(HistoryPanelText.AccountLink.Offline(), StatusSeverity.Failure);
+            _requestUiRefresh();
+            return;
+        }
+
+        _state.AccountLinkInProgress = true;
+        SetAccountLinkBanner(HistoryPanelText.AccountLink.Linking(), StatusSeverity.Pending);
+        _requestUiRefresh();
+
+        var sessionVersion = _session.Version;
+        BazaarDbLinkResult result;
+        try
+        {
+            result = await _linkClient.RedeemAsync(trimmedCode, accountId, _session.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            if (!_session.IsCurrent(sessionVersion))
+                return;
+
+            _state.AccountLinkInProgress = false;
+            SetAccountLinkBanner(null, StatusSeverity.Neutral);
+            _requestUiRefresh();
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (!_session.IsCurrent(sessionVersion))
+                return;
+
+            _state.AccountLinkInProgress = false;
+            SetAccountLinkBanner(HistoryPanelText.AccountLink.Offline(), StatusSeverity.Failure);
+            BppLog.Error("HistoryPanel", "Failed to redeem BazaarDB link code", ex);
+            _requestUiRefresh();
+            return;
+        }
+
+        if (!_session.IsCurrent(sessionVersion))
+            return;
+
+        _state.AccountLinkInProgress = false;
+        switch (result.Outcome)
+        {
+            case BazaarDbLinkOutcome.Linked:
+                _state.LocalLinkedHint = true;
+                _state.AccountLinkExpanded = false;
+                _accountLinkStore.SaveHint(accountId, _state.CachedDisplayName);
+                SetAccountLinkBanner(
+                    HistoryPanelText.AccountLink.LinkedAs(_state.CachedDisplayName ?? string.Empty),
+                    StatusSeverity.Success
+                );
+                BppLog.Info("HistoryPanel", $"BazaarDB link redeemed account={accountId}");
+                break;
+            case BazaarDbLinkOutcome.AlreadyLinked:
+                SetAccountLinkBanner(
+                    HistoryPanelText.AccountLink.AlreadyLinked(),
+                    StatusSeverity.Failure
+                );
+                break;
+            case BazaarDbLinkOutcome.InvalidOrExpired:
+            case BazaarDbLinkOutcome.MissingFields:
+                SetAccountLinkBanner(
+                    HistoryPanelText.AccountLink.InvalidOrExpired(),
+                    StatusSeverity.Failure
+                );
+                break;
+            case BazaarDbLinkOutcome.ServerError:
+                SetAccountLinkBanner(
+                    HistoryPanelText.AccountLink.ServerBusy(),
+                    StatusSeverity.Failure
+                );
+                break;
+            default:
+                SetAccountLinkBanner(
+                    HistoryPanelText.AccountLink.Offline(),
+                    StatusSeverity.Failure
+                );
+                break;
+        }
+        _requestUiRefresh();
+    }
+
+    public void ToggleAccountLinkExpanded()
+    {
+        var accountId = NormalizeAccountId(_state.CachedAccountId);
+        if (!string.IsNullOrWhiteSpace(accountId))
+            _accountLinkStore.Clear(accountId);
+
+        _state.LocalLinkedHint = false;
+        _state.AccountLinkExpanded = true;
+        SetAccountLinkBanner(null, StatusSeverity.Neutral);
+        _requestUiRefresh();
+    }
+
     public async Task TrySyncGhostBattlesAsync()
     {
         if (_state.GhostSyncInProgress)
@@ -726,6 +860,43 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             SetStatusMessage(null);
     }
 
+    private void CacheAccountLinkIdentity()
+    {
+        var accountId = NormalizeAccountId(BppClientCacheBridge.TryGetProfileAccountId());
+        var displayName = NormalizeDisplayName(BppClientCacheBridge.TryGetProfileDisplayUsername());
+
+        _state.CachedAccountId = accountId;
+        _state.CachedDisplayName = displayName;
+        SetAccountLinkBanner(null, StatusSeverity.Neutral);
+        if (string.IsNullOrWhiteSpace(accountId))
+        {
+            _state.LocalLinkedHint = false;
+            _state.AccountLinkExpanded = true;
+            return;
+        }
+
+        if (_accountLinkStore.TryLoadHint(accountId, out var storedDisplayName))
+        {
+            _state.LocalLinkedHint = true;
+            _state.AccountLinkExpanded = false;
+            var normalizedStoredDisplayName = NormalizeDisplayName(storedDisplayName);
+            if (!string.IsNullOrWhiteSpace(normalizedStoredDisplayName))
+                _state.CachedDisplayName = normalizedStoredDisplayName;
+            return;
+        }
+
+        _state.LocalLinkedHint = false;
+        _state.AccountLinkExpanded = true;
+    }
+
+    private void SetAccountLinkBanner(string? message, StatusSeverity severity)
+    {
+        _state.AccountLinkBannerMessage = message;
+        _state.AccountLinkBannerSeverity = string.IsNullOrWhiteSpace(message)
+            ? StatusSeverity.Neutral
+            : severity;
+    }
+
     private void SetStatusMessage(
         string? statusMessage,
         StatusSeverity severity = StatusSeverity.Neutral,
@@ -742,6 +913,18 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             string.IsNullOrWhiteSpace(statusMessage) ? StatusSeverity.Neutral
             : isDeleteConfirmation ? StatusSeverity.Confirm
             : severity;
+    }
+
+    private static string? NormalizeAccountId(string? accountId)
+    {
+        var normalized = accountId?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
+    }
+
+    private static string? NormalizeDisplayName(string? displayName)
+    {
+        var normalized = displayName?.Trim();
+        return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
 
     private void InvalidateFilteredGhostBattles()

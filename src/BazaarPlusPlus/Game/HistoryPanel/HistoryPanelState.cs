@@ -66,6 +66,20 @@ internal sealed class HistoryPanelState
 
     public bool ServerHealthProbeInProgress { get; set; }
 
+    public bool AccountLinkInProgress { get; set; }
+
+    public string? CachedAccountId { get; set; }
+
+    public string? CachedDisplayName { get; set; }
+
+    public bool LocalLinkedHint { get; set; }
+
+    public bool AccountLinkExpanded { get; set; }
+
+    public string? AccountLinkBannerMessage { get; set; }
+
+    public StatusSeverity AccountLinkBannerSeverity { get; set; }
+
     public bool FilteredGhostBattlesDirty { get; set; } = true;
 
     public bool FilteredRunsDirty { get; set; } = true;

@@ -186,6 +186,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         _subtitle.style.flexShrink = 0f;
         rail.Add(_subtitle); // VIS-2: no extra marginTop; component owns its Sm(6)
 
+        BuildAccountLinkCard(rail);
+
         BuildFilterSlot(rail);
 
         // ── Overview: read-only chips + the connectivity probe, as one fixed row ─────
@@ -378,6 +380,160 @@ internal sealed partial class HistoryPanelUiToolkitView
 
         _deleteButton.style.marginTop = UiSpacing.Md;
         actions.Add(_deleteButton);
+    }
+
+    private void BuildAccountLinkCard(VisualElement rail)
+    {
+        _accountCard = new VisualElement();
+        _accountCard.style.flexDirection = FlexDirection.Column;
+        _accountCard.style.flexShrink = 0f;
+        _accountCard.style.marginTop = UiSpacing.Xl;
+        _accountCard.style.backgroundColor = Colors.HistoryFooterBackground;
+        UiStyle.Radius(_accountCard.style, Radii.Md);
+        UiStyle.Border(_accountCard.style, Borders.Thin, Colors.HistoryListFrameBorder);
+        UiStyle.Padding(_accountCard.style, UiSpacing.Lg);
+        rail.Add(_accountCard);
+
+        var titleRow = new VisualElement();
+        titleRow.style.flexDirection = FlexDirection.Row;
+        titleRow.style.alignItems = Align.Center;
+        titleRow.style.minWidth = 0f;
+        _accountCard.Add(titleRow);
+
+        _accountTitle = CreateLabel(Sizes.FontBody, FontStyle.Bold, Colors.White);
+        _accountTitle.style.flexGrow = 1f;
+        _accountTitle.style.flexShrink = 1f;
+        _accountTitle.style.minWidth = 0f;
+        _accountTitle.style.whiteSpace = WhiteSpace.NoWrap;
+        _accountTitle.style.overflow = Overflow.Hidden;
+        titleRow.Add(_accountTitle);
+
+        _accountRelinkButton = CreateButton(
+            HistoryPanelText.AccountLink.Relink(),
+            _relinkBazaarDbAccount,
+            0f,
+            Sizes.ButtonCompactHeight,
+            fixedWidth: false
+        );
+        _accountRelinkButton.style.flexGrow = 0f;
+        _accountRelinkButton.style.flexShrink = 0f;
+        _accountRelinkButton.style.flexBasis = StyleKeyword.Auto;
+        _accountRelinkButton.style.minWidth = Sizes.InlinePillMinWidth;
+        _accountRelinkButton.style.marginLeft = UiSpacing.Sm;
+        StyleButton(
+            _accountRelinkButton,
+            Colors.HistoryButtonBackground,
+            Colors.HistoryFooterSecondaryText
+        );
+        titleRow.Add(_accountRelinkButton);
+
+        _accountIdentity = CreateLabel(
+            Sizes.FontSmall,
+            FontStyle.Normal,
+            Colors.HistoryFooterSecondaryText
+        );
+        _accountIdentity.style.whiteSpace = WhiteSpace.NoWrap;
+        _accountIdentity.style.overflow = Overflow.Hidden;
+        _accountIdentity.style.marginTop = UiSpacing.Xs;
+        _accountCard.Add(_accountIdentity);
+
+        _accountWhy = CreateLabel(
+            Sizes.FontSmall,
+            FontStyle.Normal,
+            Colors.HistoryFooterSecondaryText
+        );
+        _accountWhy.style.whiteSpace = WhiteSpace.Normal;
+        _accountWhy.style.maxHeight = Sizes.DetailTextMaxHeight;
+        _accountWhy.style.overflow = Overflow.Hidden;
+        _accountWhy.style.marginTop = UiSpacing.Xxs;
+        _accountCard.Add(_accountWhy);
+
+        _accountLinkedBadge = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.White);
+        _accountLinkedBadge.style.whiteSpace = WhiteSpace.NoWrap;
+        _accountLinkedBadge.style.overflow = Overflow.Hidden;
+        _accountLinkedBadge.style.marginTop = UiSpacing.Sm;
+        _accountLinkedBadge.style.height = Sizes.ChipHeight;
+        UiStyle.HorizontalPadding(_accountLinkedBadge.style, UiSpacing.Md);
+        _accountLinkedBadge.style.unityTextAlign = TextAnchor.MiddleCenter;
+        _accountLinkedBadge.style.backgroundColor = Colors.StatusCompletedBackground;
+        UiStyle.Radius(_accountLinkedBadge.style, Radii.Md);
+        UiStyle.Border(_accountLinkedBadge.style, Borders.Thin, Colors.BattleRowWinAccent);
+        _accountCard.Add(_accountLinkedBadge);
+
+        _accountFormRow = new VisualElement();
+        _accountFormRow.style.flexDirection = FlexDirection.Row;
+        _accountFormRow.style.alignItems = Align.Center;
+        _accountFormRow.style.marginTop = UiSpacing.Sm;
+        _accountCard.Add(_accountFormRow);
+
+        _accountCodeField = new TextField();
+        _accountCodeField.maxLength = 10;
+        _accountCodeField.isDelayed = true;
+        _accountCodeField.selectAllOnFocus = true;
+        _accountCodeField.style.flexGrow = 1f;
+        _accountCodeField.style.flexShrink = 1f;
+        _accountCodeField.style.minWidth = 0f;
+        _accountCodeField.style.height = Sizes.ButtonStandardHeight;
+        _accountCodeField.style.unityFont = GetUiFont();
+        _accountCodeField.RegisterValueChangedCallback(evt =>
+        {
+            var trimmed = evt.newValue?.Trim() ?? string.Empty;
+            if (!string.Equals(trimmed, evt.newValue, System.StringComparison.Ordinal))
+                _accountCodeField!.SetValueWithoutNotify(trimmed);
+        });
+        _accountCodeField.RegisterCallback<KeyDownEvent>(evt =>
+        {
+            if (evt.keyCode != KeyCode.Return && evt.keyCode != KeyCode.KeypadEnter)
+                return;
+
+            evt.StopPropagation();
+            SubmitAccountLink();
+        });
+        _accountFormRow.Add(_accountCodeField);
+
+        _accountLinkButton = CreateButton(
+            HistoryPanelText.AccountLink.Button(),
+            SubmitAccountLink,
+            0f,
+            Sizes.ButtonStandardHeight,
+            fixedWidth: false
+        );
+        _accountLinkButton.style.flexGrow = 0f;
+        _accountLinkButton.style.flexShrink = 0f;
+        _accountLinkButton.style.flexBasis = StyleKeyword.Auto;
+        _accountLinkButton.style.minWidth = Sizes.ServerHealthButtonWidth * 0.5f;
+        _accountLinkButton.style.marginLeft = UiSpacing.Sm;
+        StyleButton(_accountLinkButton, Colors.ReplayBackground, Colors.ReplayText);
+        _accountFormRow.Add(_accountLinkButton);
+
+        _accountHint = CreateLabel(
+            Sizes.FontCorner,
+            FontStyle.Normal,
+            Colors.HistoryFooterSecondaryText
+        );
+        _accountHint.style.whiteSpace = WhiteSpace.Normal;
+        _accountHint.style.maxHeight = Sizes.DetailTextMaxHeight;
+        _accountHint.style.overflow = Overflow.Hidden;
+        _accountHint.style.marginTop = UiSpacing.Xs;
+        _accountCard.Add(_accountHint);
+
+        _accountBanner = CreateLabel(Sizes.FontCorner, FontStyle.Normal, Colors.HistoryStatusText);
+        _accountBanner.style.display = DisplayStyle.None;
+        _accountBanner.style.flexGrow = 0f;
+        _accountBanner.style.flexShrink = 0f;
+        _accountBanner.style.whiteSpace = WhiteSpace.Normal;
+        _accountBanner.style.minHeight = Sizes.StatusHeight;
+        _accountBanner.style.maxHeight = Sizes.PanelStatusMaxHeight;
+        _accountBanner.style.overflow = Overflow.Hidden;
+        _accountBanner.style.width = Length.Percent(100f);
+        _accountBanner.style.marginTop = UiSpacing.Sm;
+        _accountBanner.style.alignSelf = Align.Stretch;
+        UiStyle.Padding(_accountBanner.style, UiSpacing.Xl, UiSpacing.Sm);
+        _accountBanner.style.unityTextAlign = TextAnchor.MiddleLeft;
+        _accountBanner.style.backgroundColor = Colors.HistoryStatusBackground;
+        UiStyle.Radius(_accountBanner.style, Radii.Md);
+        UiStyle.Border(_accountBanner.style, Borders.Thin, Colors.HistoryStatusBorder);
+        _accountCard.Add(_accountBanner);
     }
 
     private void BuildFilterSlot(VisualElement rail)

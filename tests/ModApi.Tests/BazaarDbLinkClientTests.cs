@@ -21,6 +21,7 @@ internal static class BazaarDbLinkClientTests
         CancellationRethrows();
         TransportExceptionMapsToTransportOutcome();
         DefaultRedeemEndpointPostsToFixedBazaarDbUri();
+        LinkClientDisposesOwnedHttpClient();
         Console.WriteLine("BazaarDbLinkClientTests passed.");
     }
 
@@ -213,6 +214,24 @@ internal static class BazaarDbLinkClientTests
         return result;
     }
 
+    private static void LinkClientDisposesOwnedHttpClient()
+    {
+        var handler = new DisposeTrackingHandler();
+        var client = new BazaarDbLinkClient(
+            new HttpClient(handler),
+            new Uri("https://example.invalid/api/profile/link/redeem")
+        );
+
+        Assert(
+            client is IDisposable,
+            "Link client should implement IDisposable because it owns its HttpClient."
+        );
+
+        ((IDisposable)client).Dispose();
+
+        Assert(handler.Disposed, "Disposing the link client should dispose its HttpClient.");
+    }
+
     private static void Assert(bool condition, string message)
     {
         if (!condition)
@@ -246,6 +265,25 @@ internal static class BazaarDbLinkClientTests
             );
             ContentTypes.Add(request.Content?.Headers.ContentType?.MediaType);
             return Task.FromResult(_responder(request));
+        }
+    }
+
+    private sealed class DisposeTrackingHandler : HttpMessageHandler
+    {
+        public bool Disposed { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        )
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            Disposed = true;
+            base.Dispose(disposing);
         }
     }
 }

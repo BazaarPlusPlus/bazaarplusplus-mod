@@ -13,15 +13,18 @@ internal sealed class HistoryPanelMount : IBppMountable
 {
     private readonly Func<CombatReplayRuntime?> _combatReplayRuntime;
     private readonly Func<ModOnlineClient?> _onlineClient;
+    private readonly Func<BazaarDbLinkClient?> _accountLinkClient;
     private IDisposable? _localeChangedSubscription;
 
     public HistoryPanelMount(
         Func<CombatReplayRuntime?> combatReplayRuntime,
-        Func<ModOnlineClient?> onlineClient
+        Func<ModOnlineClient?> onlineClient,
+        Func<BazaarDbLinkClient?> accountLinkClient
     )
     {
         _combatReplayRuntime = combatReplayRuntime;
         _onlineClient = onlineClient;
+        _accountLinkClient = accountLinkClient;
     }
 
     public void Mount(GameObject host, IBppServices services)
@@ -53,7 +56,7 @@ internal sealed class HistoryPanelMount : IBppMountable
             return;
         }
 
-        panel.Configure(HistoryPanelFactory.Create(runtime, onlineClient));
+        panel.Configure(HistoryPanelFactory.Create(runtime, onlineClient, _accountLinkClient()));
 
         _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(_ =>
             HistoryPanel.RefreshLocalization()

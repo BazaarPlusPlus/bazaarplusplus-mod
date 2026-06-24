@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
+using BazaarPlusPlus.ModApi.Clients;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 
@@ -21,12 +22,23 @@ internal sealed class HistoryPanelDependencies
         GhostBattleSyncService? ghostSyncService,
         IHistoryPanelServerHealthProbe? serverHealthProbe
     )
+        : this(runtime, dataService, replayService, ghostSyncService, serverHealthProbe, null) { }
+
+    public HistoryPanelDependencies(
+        IHistoryPanelRuntime runtime,
+        HistoryPanelDataService dataService,
+        HistoryPanelReplayService replayService,
+        GhostBattleSyncService? ghostSyncService,
+        IHistoryPanelServerHealthProbe? serverHealthProbe,
+        BazaarDbLinkClient? accountLinkClient
+    )
     {
         Runtime = runtime;
         DataService = dataService;
         ReplayService = replayService;
         GhostSyncService = ghostSyncService;
         ServerHealthProbe = serverHealthProbe;
+        AccountLinkClient = accountLinkClient;
     }
 
     public IHistoryPanelRuntime Runtime { get; }
@@ -38,4 +50,6 @@ internal sealed class HistoryPanelDependencies
     public GhostBattleSyncService? GhostSyncService { get; }
 
     public IHistoryPanelServerHealthProbe? ServerHealthProbe { get; }
+
+    public BazaarDbLinkClient? AccountLinkClient { get; }
 }

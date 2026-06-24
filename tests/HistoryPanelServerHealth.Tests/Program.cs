@@ -134,6 +134,37 @@ Assert(
     "Account link store should use anonymous scope for blank account ids."
 );
 
+var stateType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelState");
+RequireProperty(stateType, "AccountLinkInProgress");
+RequireProperty(stateType, "CachedAccountId");
+RequireProperty(stateType, "CachedDisplayName");
+RequireProperty(stateType, "LocalLinkedHint");
+RequireProperty(stateType, "AccountLinkExpanded");
+RequireProperty(stateType, "AccountLinkBannerMessage");
+RequireProperty(stateType, "AccountLinkBannerSeverity");
+
+var dependenciesType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelDependencies");
+RequireProperty(dependenciesType, "AccountLinkClient");
+
+var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
+RequireInstanceMethod(coordinatorType, "TryRedeemBazaarDbAccountAsync");
+RequireInstanceMethod(coordinatorType, "ToggleAccountLinkExpanded");
+
+var modelType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelUiToolkitModel");
+RequireProperty(modelType, "IsBazaarDbLinked");
+RequireProperty(modelType, "AccountTitleText");
+RequireProperty(modelType, "AccountWhyText");
+RequireProperty(modelType, "AccountHintText");
+RequireProperty(modelType, "AccountLinkedBadgeText");
+RequireProperty(modelType, "AccountIdentityText");
+RequireProperty(modelType, "AccountLinkButtonText");
+RequireProperty(modelType, "AccountLinkButtonEnabled");
+RequireProperty(modelType, "AccountLinkInputEnabled");
+RequireProperty(modelType, "AccountLinkBannerText");
+RequireProperty(modelType, "AccountLinkBannerSeverity");
+RequireProperty(modelType, "AccountLinkFormVisible");
+RequireProperty(modelType, "AccountRelinkButtonText");
+
 Console.WriteLine("HistoryPanelServerHealth checks passed.");
 
 static Type RequireType(string fullName)
@@ -194,6 +225,22 @@ static PropertyInfo GetProperty(object target, string propertyName)
 {
     return target.GetType().GetProperty(propertyName)
         ?? throw new InvalidOperationException($"{propertyName} should exist.");
+}
+
+static PropertyInfo RequireProperty(Type type, string propertyName)
+{
+    return type.GetProperty(
+            propertyName,
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+        ) ?? throw new InvalidOperationException($"{type.FullName}.{propertyName} should exist.");
+}
+
+static MethodInfo RequireInstanceMethod(Type type, string methodName)
+{
+    return type.GetMethod(
+            methodName,
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
+        ) ?? throw new InvalidOperationException($"{type.FullName}.{methodName} should exist.");
 }
 
 static void Assert(bool condition, string message)

@@ -19,6 +19,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private readonly Action _recordAndReplay;
     private readonly Action _delete;
     private readonly Action _checkServerHealth;
+    private readonly Action<string> _linkBazaarDbAccount;
+    private readonly Action _relinkBazaarDbAccount;
     private readonly Action<int> _selectRun;
     private readonly Action<int> _selectBattle;
     private readonly Action<HistorySectionMode> _setSectionMode;
@@ -46,6 +48,17 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Label? _battleChip;
     private Label? _databaseChip;
     private Button? _checkServerHealthButton;
+    private VisualElement? _accountCard;
+    private Label? _accountTitle;
+    private Label? _accountIdentity;
+    private Label? _accountWhy;
+    private VisualElement? _accountFormRow;
+    private TextField? _accountCodeField;
+    private Button? _accountLinkButton;
+    private Label? _accountHint;
+    private Label? _accountBanner;
+    private Label? _accountLinkedBadge;
+    private Button? _accountRelinkButton;
     private Button? _runsTabButton;
     private Button? _ghostTabButton;
     private Label? _statusLabel;
@@ -90,6 +103,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         Action recordAndReplay,
         Action delete,
         Action checkServerHealth,
+        Action<string> linkBazaarDbAccount,
+        Action relinkBazaarDbAccount,
         Action<int> selectRun,
         Action<int> selectBattle,
         Action<HistorySectionMode> setSectionMode,
@@ -106,6 +121,10 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _delete = delete ?? throw new ArgumentNullException(nameof(delete));
         _checkServerHealth =
             checkServerHealth ?? throw new ArgumentNullException(nameof(checkServerHealth));
+        _linkBazaarDbAccount =
+            linkBazaarDbAccount ?? throw new ArgumentNullException(nameof(linkBazaarDbAccount));
+        _relinkBazaarDbAccount =
+            relinkBazaarDbAccount ?? throw new ArgumentNullException(nameof(relinkBazaarDbAccount));
         _selectRun = selectRun ?? throw new ArgumentNullException(nameof(selectRun));
         _selectBattle = selectBattle ?? throw new ArgumentNullException(nameof(selectBattle));
         _setSectionMode = setSectionMode ?? throw new ArgumentNullException(nameof(setSectionMode));
@@ -211,6 +230,42 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         );
         _checkServerHealthButton!.text = model.ServerHealthButtonText;
         _checkServerHealthButton.SetEnabled(model.ServerHealthButtonEnabled);
+        _accountTitle!.text = model.AccountTitleText;
+        _accountIdentity!.text = StablePanelText.Compact(model.AccountIdentityText, 96);
+        _accountIdentity.tooltip = model.AccountIdentityText;
+        _accountWhy!.text = StablePanelText.Compact(model.AccountWhyText, 112);
+        _accountWhy.tooltip = model.AccountWhyText;
+        _accountWhy.style.display = model.IsBazaarDbLinked ? DisplayStyle.None : DisplayStyle.Flex;
+        _accountFormRow!.style.display = model.AccountLinkFormVisible
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
+        _accountCodeField!.SetEnabled(model.AccountLinkInputEnabled);
+        _accountCodeField.tooltip = model.AccountHintText;
+        _accountLinkButton!.text = model.AccountLinkButtonText;
+        _accountLinkButton.tooltip = model.AccountLinkButtonText;
+        _accountLinkButton.SetEnabled(model.AccountLinkButtonEnabled);
+        _accountHint!.text = StablePanelText.Compact(model.AccountHintText, 120);
+        _accountHint.tooltip = model.AccountHintText;
+        _accountHint.style.display = model.AccountLinkFormVisible
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
+        _accountLinkedBadge!.text = StablePanelText.Compact(model.AccountLinkedBadgeText, 96);
+        _accountLinkedBadge.tooltip = model.AccountLinkedBadgeText;
+        _accountLinkedBadge.style.display = model.IsBazaarDbLinked
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
+        _accountRelinkButton!.text = model.AccountRelinkButtonText;
+        _accountRelinkButton.tooltip = model.AccountRelinkButtonText;
+        _accountRelinkButton.style.display = model.IsBazaarDbLinked
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
+        _accountBanner!.text = StablePanelText.Compact(model.AccountLinkBannerText, 120);
+        _accountBanner.tooltip = model.AccountLinkBannerText ?? string.Empty;
+        _accountBanner.style.display =
+            !model.IsBazaarDbLinked && !string.IsNullOrWhiteSpace(model.AccountLinkBannerText)
+                ? DisplayStyle.Flex
+                : DisplayStyle.None;
+        ApplyStatusSeverity(_accountBanner, model.AccountLinkBannerSeverity);
         _statusLabel!.text = StablePanelText.Compact(model.StatusMessage, 180);
         _statusLabel.tooltip = model.StatusMessage ?? string.Empty;
         _statusLabel.style.display = string.IsNullOrWhiteSpace(model.StatusMessage)
@@ -333,6 +388,12 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _previewImage.image = texture;
         _previewImage.style.display = texture == null ? DisplayStyle.None : DisplayStyle.Flex;
         _previewImage.MarkDirtyRepaint();
+    }
+
+    private void SubmitAccountLink()
+    {
+        var code = _accountCodeField?.value?.Trim() ?? string.Empty;
+        _linkBazaarDbAccount(code);
     }
 
     public void SetPreviewStatus(string? message, bool visible)

@@ -30,6 +30,7 @@ public class Plugin : BaseUnityPlugin
     private readonly Harmony _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
     private BppComposition? _composition;
     private ModOnlineClient? _onlineClient;
+    private BazaarDbLinkClient? _bazaarDbLinkClient;
     private bool _patchesApplied;
 
     protected virtual void Awake()
@@ -66,6 +67,7 @@ public class Plugin : BaseUnityPlugin
 
             BuildOnlineServices();
             _composition.AttachOnlineClient(_onlineClient);
+            _composition.AttachAccountLinkClient(_bazaarDbLinkClient);
 
             BppLog.Info("Plugin", "Attaching runtime components");
             _composition.Mountables.MountAll(gameObject, services);
@@ -143,6 +145,14 @@ public class Plugin : BaseUnityPlugin
             timeout: TimeSpan.FromSeconds(Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds))
         );
         _onlineClient = new ModOnlineClient(httpClient, routes);
+        var linkHttpClient = BppHttpClientFactory.Create(
+            productVersion: BppPluginVersion.Current,
+            userAgentSuffix: "BazaarDbLink"
+        );
+        _bazaarDbLinkClient = new BazaarDbLinkClient(
+            linkHttpClient,
+            new Uri(BazaarDbLinkClient.DefaultRedeemEndpoint)
+        );
         BppLog.Info("Plugin", "Online client ready.");
     }
 
@@ -167,6 +177,8 @@ public class Plugin : BaseUnityPlugin
 
     private void DisposeOnlineServices()
     {
+        _bazaarDbLinkClient?.Dispose();
+        _bazaarDbLinkClient = null;
         _onlineClient?.Dispose();
         _onlineClient = null;
     }

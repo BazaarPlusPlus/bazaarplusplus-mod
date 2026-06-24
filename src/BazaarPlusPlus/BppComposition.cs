@@ -52,6 +52,7 @@ internal sealed class BppComposition : IDisposable
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
     private ModOnlineClient? _onlineClientRef;
+    private BazaarDbLinkClient? _accountLinkClientRef;
     private PvpBattleCatalog? _pvpBattleCatalog;
 
     public IBppServices Services => _services;
@@ -66,6 +67,7 @@ internal sealed class BppComposition : IDisposable
     public BppMountableRegistry Mountables => _mountables;
     public SettingsDockEntryRegistry SettingsDockRegistry => _settingsDockRegistry;
     public ModOnlineClient? OnlineClient => _onlineClientRef;
+    public BazaarDbLinkClient? AccountLinkClient => _accountLinkClientRef;
 
     public BppComposition(ManualLogSource logger, ConfigFile configFile)
     {
@@ -126,7 +128,8 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(
             new HistoryPanelMount(
                 combatReplayRuntime: () => _combatReplayModule.Runtime,
-                onlineClient: () => _onlineClientRef
+                onlineClient: () => _onlineClientRef,
+                accountLinkClient: () => _accountLinkClientRef
             )
         );
         _mountables.Register(new LiveBuildPanelMount());
@@ -156,6 +159,9 @@ internal sealed class BppComposition : IDisposable
         _combatReplayModule.AttachRuntime(runtime);
 
     public void AttachOnlineClient(ModOnlineClient? client) => _onlineClientRef = client;
+
+    public void AttachAccountLinkClient(BazaarDbLinkClient? client) =>
+        _accountLinkClientRef = client;
 
     public void Start() => _featureRegistry.Start();
 
