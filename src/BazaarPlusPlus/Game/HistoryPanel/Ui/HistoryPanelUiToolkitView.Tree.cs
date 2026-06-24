@@ -2,6 +2,7 @@
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.GameInterop.Heroes;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -549,15 +550,42 @@ internal sealed partial class HistoryPanelUiToolkitView
 
     private static void SetTextEditionProperty(object textEdition, string propertyName, object value)
     {
-        var property = textEdition
+        var property = FindTextEditionProperty(textEdition, propertyName);
+        if (property == null)
+        {
+            BppLog.Warn(
+                "HistoryPanel",
+                $"TextField textEdition property '{propertyName}' was not found."
+            );
+            return;
+        }
+
+        property.SetValue(textEdition, value);
+    }
+
+    private static System.Reflection.PropertyInfo? FindTextEditionProperty(
+        object textEdition,
+        string propertyName
+    )
+    {
+        var suffix = "." + propertyName;
+        var properties = textEdition
             .GetType()
-            .GetProperty(
-                propertyName,
+            .GetProperties(
                 System.Reflection.BindingFlags.Instance
                     | System.Reflection.BindingFlags.Public
                     | System.Reflection.BindingFlags.NonPublic
             );
-        property?.SetValue(textEdition, value);
+        foreach (var property in properties)
+        {
+            if (
+                string.Equals(property.Name, propertyName, System.StringComparison.Ordinal)
+                || property.Name.EndsWith(suffix, System.StringComparison.Ordinal)
+            )
+                return property;
+        }
+
+        return null;
     }
 
     private void BuildFilterSlot(VisualElement rail)
