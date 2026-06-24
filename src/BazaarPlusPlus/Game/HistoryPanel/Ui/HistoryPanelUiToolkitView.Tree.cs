@@ -548,19 +548,56 @@ internal sealed partial class HistoryPanelUiToolkitView
         SetTextEditionProperty(textEdition, "hidePlaceholderOnFocus", true);
     }
 
-    private static void SetTextEditionProperty(object textEdition, string propertyName, object value)
+    private static void SetTextEditionProperty(
+        object textEdition,
+        string propertyName,
+        object value
+    )
     {
         var property = FindTextEditionProperty(textEdition, propertyName);
         if (property == null)
         {
-            BppLog.Warn(
+            BppLog.Debug(
                 "HistoryPanel",
                 $"TextField textEdition property '{propertyName}' was not found."
             );
             return;
         }
 
-        property.SetValue(textEdition, value);
+        if (!property.CanWrite || property.SetMethod == null)
+        {
+            BppLog.Debug(
+                "HistoryPanel",
+                $"TextField textEdition property '{property.Name}' is not writable."
+            );
+            return;
+        }
+
+        try
+        {
+            property.SetValue(textEdition, value);
+        }
+        catch (System.ArgumentException ex)
+        {
+            BppLog.Warn(
+                "HistoryPanel",
+                $"Failed to set TextField textEdition property '{property.Name}': {ex.Message}"
+            );
+        }
+        catch (System.Reflection.TargetException ex)
+        {
+            BppLog.Warn(
+                "HistoryPanel",
+                $"Failed to set TextField textEdition property '{property.Name}': {ex.Message}"
+            );
+        }
+        catch (System.Reflection.TargetInvocationException ex)
+        {
+            BppLog.Warn(
+                "HistoryPanel",
+                $"Failed to set TextField textEdition property '{property.Name}': {ex.Message}"
+            );
+        }
     }
 
     private static System.Reflection.PropertyInfo? FindTextEditionProperty(
