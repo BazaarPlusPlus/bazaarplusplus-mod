@@ -1,0 +1,28 @@
+docs/drafts/2026-06-30-achievement-system-deletion-plan.md
+  s_c6de33e47380f8::t_5b8e42fa7ad66c 295-312
+  s_3f98451f0fd817::t_6d52d364d6ef4e 1-294
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "96bfd73e1dc3baf3215b018a6481b65fc15e1011",
+  "prompts": {},
+  "sessions": {
+    "s_3f98451f0fd817": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f1784-47f0-7533-9904-b001ea4ee6d1",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    },
+    "s_c6de33e47380f8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f178a-7e4a-7e72-8f93-a30b744bc210",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  }
+}
