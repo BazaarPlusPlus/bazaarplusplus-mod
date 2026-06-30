@@ -88,9 +88,6 @@ internal sealed partial class CollectionPanelView
             Sizes.ButtonStandardHeight
         );
         primaryControlsRow.Add(_itemTabButton);
-        _packageToggleButton = CreatePackageTabButton();
-        _packageToggleButton.style.marginLeft = UiSpacing.Md;
-        primaryControlsRow.Add(_packageToggleButton);
         _skillTabButton.style.marginLeft = UiSpacing.Md;
         primaryControlsRow.Add(_skillTabButton);
 
@@ -170,7 +167,7 @@ internal sealed partial class CollectionPanelView
         _tierChipRow.style.justifyContent = Justify.FlexStart;
 
         // Keyword filter (EHiddenTag gameplay keywords). This is the common secondary filter for
-        // Items, Packages, and Skills, so keep it directly below Quality.
+        // Items and Skills, so keep it directly below Quality.
         _keywordFilterSection = CreateFilterSection(
             controlsScroll,
             CollectionPanelText.KeywordHeader(),
@@ -184,7 +181,7 @@ internal sealed partial class CollectionPanelView
         _keywordChipRow.style.flexWrap = Wrap.Wrap;
         _keywordChipRow.style.justifyContent = Justify.FlexStart;
 
-        // Tag filter (player-facing item categories). Items/Packages show this below gameplay
+        // Tag filter (player-facing item categories). Items show this below gameplay
         // keywords; Skills hide it and source filters move up naturally.
         _tagFilterSection = CreateFilterSection(
             controlsScroll,
@@ -382,18 +379,6 @@ internal sealed partial class CollectionPanelView
         divider.style.backgroundColor = Colors.HistoryButtonBorder;
         divider.style.opacity = 0.72f;
         return divider;
-    }
-
-    private Button CreatePackageTabButton()
-    {
-        var button = CreateButton(
-            CollectionPanelText.PackagesToggle(),
-            () => _commands.SetActiveTab(CollectionTabKind.Packages),
-            Sizes.RunsTabWidth,
-            Sizes.ButtonStandardHeight
-        );
-        StyleButton(button, Colors.RunsTabBackground, Colors.White);
-        return button;
     }
 
     // Compact day-number "icon": shows the effective day (current run day, or OutOfRunDay) and

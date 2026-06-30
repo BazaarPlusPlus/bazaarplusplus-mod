@@ -793,14 +793,6 @@ internal sealed partial class CollectionPanelView
             _ => Colors.HistoryChipText,
         };
 
-    private void RefreshPackageToggle(bool selected)
-    {
-        if (_packageToggleButton == null)
-            return;
-
-        RefreshTabButton(_packageToggleButton, selected);
-    }
-
     private static void RefreshMatchModeButton(
         Button? button,
         CollectionFacetMatchMode mode,

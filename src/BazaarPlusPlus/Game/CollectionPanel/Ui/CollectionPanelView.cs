@@ -89,7 +89,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _itemTabButton;
     private Button? _skillTabButton;
     private Button? _closeButton;
-    private Button? _packageToggleButton;
     private Button? _dayToggleButton;
     private Label? _sortLabel;
     private Button? _sortQualityButton;
@@ -190,7 +189,6 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.ItemsTab()
                 + CollectionPanelText.SkillsTab()
                 + CollectionPanelText.Close()
-                + CollectionPanelText.PackagesToggle()
                 + CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any)
                 + CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.All)
                 + CollectionPanelText.TagMatchModeTooltip(CollectionFacetMatchMode.Any)
@@ -385,8 +383,6 @@ internal sealed partial class CollectionPanelView : IDisposable
             pair.Value.SetEnabled(model.SourceSelectorEnabled);
             pair.Value.style.opacity = model.SourceSelectorEnabled ? 1f : 0.58f;
         }
-        if (_packageToggleButton != null)
-            RefreshPackageToggle(model.PackagesOnly);
         if (_dayToggleButton != null)
         {
             RefreshDayToggle(model.DayFilterValue, model.DayFilterActive);
@@ -486,11 +482,6 @@ internal sealed partial class CollectionPanelView : IDisposable
             _sortSizeButton.text = CollectionPanelText.SortSize();
         if (_dayToggleButton != null)
             _dayToggleButton.tooltip = CollectionPanelText.DayHeader();
-        if (_packageToggleButton != null)
-        {
-            _packageToggleButton.text = CollectionPanelText.PackagesToggle();
-            _packageToggleButton.tooltip = CollectionPanelText.PackagesToggleTooltip();
-        }
         if (_heroFilterLabel != null)
             _heroFilterLabel.text = CollectionPanelText.HeroHeader();
         if (_tierFilterLabel != null)

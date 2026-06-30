@@ -69,12 +69,6 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet SortSizeText = new("Size", "尺寸", "尺寸");
     private static readonly LocalizedTextSet MerchantHeaderText = new("Merchant", "商人", "商人");
     private static readonly LocalizedTextSet TrainerHeaderText = new("Trainer", "训练师", "訓練師");
-    private static readonly LocalizedTextSet PackagesToggleText = new("Packages", "包裹", "包裹");
-    private static readonly LocalizedTextSet PackagesToggleTooltipText = new(
-        "Show only package cards.",
-        "只显示包裹卡。",
-        "只顯示包裹卡。"
-    );
 
     private static readonly LocalizedTextSet CatalogLoadingText = new(
         "Loading card data...",
@@ -144,10 +138,6 @@ internal static class CollectionPanelText
 
     internal static string SourceHeader(ECardType activeType) =>
         activeType == ECardType.Skill ? Resolve(TrainerHeaderText) : Resolve(MerchantHeaderText);
-
-    internal static string PackagesToggle() => Resolve(PackagesToggleText);
-
-    internal static string PackagesToggleTooltip() => Resolve(PackagesToggleTooltipText);
 
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 
