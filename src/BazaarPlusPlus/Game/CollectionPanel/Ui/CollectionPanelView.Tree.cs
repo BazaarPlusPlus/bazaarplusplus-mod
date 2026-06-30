@@ -87,20 +87,12 @@ internal sealed partial class CollectionPanelView
             Sizes.RunsTabWidth,
             Sizes.ButtonStandardHeight
         );
-        _achievementTabButton = CreateButton(
-            CollectionPanelText.AchievementsTab(),
-            () => _commands.SetActiveTab(CollectionTabKind.Achievements),
-            Sizes.RunsTabWidth,
-            Sizes.ButtonStandardHeight
-        );
         primaryControlsRow.Add(_itemTabButton);
         _packageToggleButton = CreatePackageTabButton();
         _packageToggleButton.style.marginLeft = UiSpacing.Md;
         primaryControlsRow.Add(_packageToggleButton);
         _skillTabButton.style.marginLeft = UiSpacing.Md;
         primaryControlsRow.Add(_skillTabButton);
-        _achievementTabButton.style.marginLeft = UiSpacing.Md;
-        primaryControlsRow.Add(_achievementTabButton);
 
         primaryControlsRow.Add(CreateOperationSpacer());
 

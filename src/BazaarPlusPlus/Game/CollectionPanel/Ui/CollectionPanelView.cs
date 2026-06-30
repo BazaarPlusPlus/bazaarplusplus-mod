@@ -89,7 +89,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _disclaimerLabel;
     private Button? _itemTabButton;
     private Button? _skillTabButton;
-    private Button? _achievementTabButton;
     private Button? _closeButton;
     private Button? _packageToggleButton;
     private Button? _dayToggleButton;
@@ -191,7 +190,6 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.Subtitle()
                 + CollectionPanelText.ItemsTab()
                 + CollectionPanelText.SkillsTab()
-                + CollectionPanelText.AchievementsTab()
                 + CollectionPanelText.Close()
                 + CollectionPanelText.PackagesToggle()
                 + CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any)
@@ -332,7 +330,6 @@ internal sealed partial class CollectionPanelView : IDisposable
 
         RefreshTabButton(_itemTabButton!, model.ActiveTab == CollectionTabKind.Items);
         RefreshTabButton(_skillTabButton!, model.ActiveTab == CollectionTabKind.Skills);
-        RefreshTabButton(_achievementTabButton!, model.ActiveTab == CollectionTabKind.Achievements);
         RefreshChromeTexts();
 
         KeywordIconSpriteProvider.BeginResolvePass();
@@ -483,8 +480,6 @@ internal sealed partial class CollectionPanelView : IDisposable
             _itemTabButton.text = CollectionPanelText.ItemsTab();
         if (_skillTabButton != null)
             _skillTabButton.text = CollectionPanelText.SkillsTab();
-        if (_achievementTabButton != null)
-            _achievementTabButton.text = CollectionPanelText.AchievementsTab();
         if (_sortLabel != null)
             _sortLabel.text = CollectionPanelText.SortHeader();
         if (_sortQualityButton != null)
