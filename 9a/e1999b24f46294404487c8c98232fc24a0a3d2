@@ -1,0 +1,21 @@
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs
+  s_9b0c4f6c34d999::t_e460097e160027 11-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9ae1999b24f46294404487c8c98232fc24a0a3d2",
+  "prompts": {},
+  "sessions": {
+    "s_9b0c4f6c34d999": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f17d1-815a-76f3-a032-25754370118d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
