@@ -54,10 +54,6 @@
       Link="AchievementCardRegistrar.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\BppCustomCardCollectionProjection.cs"
-      Link="BppCustomCardCollectionProjection.cs"
-    />
-    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardClassification.cs"
       Link="CollectionCardClassification.cs"
     />

@@ -8,7 +8,6 @@ internal enum CollectionTabKind
     Items,
     Packages,
     Skills,
-    Achievements,
 }
 
 internal static class CollectionTabKindExtensions

@@ -63,17 +63,6 @@ internal readonly struct CollectionTabProfile
                 showKeywordFilter: true,
                 showDayFilter: true
             ),
-            CollectionTabKind.Achievements => new CollectionTabProfile(
-                CollectionTabKind.Achievements,
-                ECardType.Item,
-                sourceKind: null,
-                showHeroFilter: false,
-                showTierFilter: true,
-                showSizeFilter: false,
-                showTagFilter: false,
-                showKeywordFilter: false,
-                showDayFilter: false
-            ),
             CollectionTabKind.Packages => new CollectionTabProfile(
                 CollectionTabKind.Packages,
                 ECardType.Item,

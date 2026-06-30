@@ -148,25 +148,6 @@ public sealed class BppCustomCardTests : IDisposable
     }
 
     [Fact]
-    public void Collection_projection_builds_filterable_non_package_vms_from_registry()
-    {
-        var registry = new BppCustomCardRegistry(_ => false);
-        var descriptor = Descriptor(Guid.NewGuid());
-        registry.Register(descriptor);
-
-        var vms = BppCustomCardCollectionProjection.BuildVms(registry);
-
-        var vm = Assert.Single(vms);
-        Assert.Equal(descriptor.Id, vm.Id);
-        Assert.Equal(ECardType.Item, vm.Type);
-        Assert.Equal(ECardSize.Medium, vm.Size);
-        Assert.Equal(ETier.Legendary, vm.StartingTier);
-        Assert.Equal("Storm Traveler", vm.DisplayName);
-        Assert.Equal("bpp-custom", vm.ArtKey);
-        Assert.False(vm.IsPackage);
-    }
-
-    [Fact]
     public void Card_factory_distinguishes_static_data_not_ready_from_hard_template_misses()
     {
         var vm = new CollectionCardVm

@@ -267,69 +267,6 @@ AssertFalse(
     "Selecting Skills from package mode should clear package-only mode."
 );
 
-var achievementTabState = new CollectionFilterState();
-achievementTabState.Heroes.Add(EHero.Vanessa);
-achievementTabState.Tiers.Add(ETier.Bronze);
-achievementTabState.Sizes.Add(ECardSize.Small);
-achievementTabState.Tags.Add(ECardTag.Weapon);
-achievementTabState.Keywords.Add(EHiddenTag.Damage);
-achievementTabState.SelectedSourceKey = "merchant:stale";
-AssertTrue(
-    achievementTabState.SelectTab(CollectionTabKind.Achievements),
-    "Selecting Achievements from Items should report a tab change."
-);
-AssertEqual(
-    0,
-    achievementTabState.Tiers.Count,
-    "Selecting Achievements should clear stale tier filters."
-);
-AssertEqual(
-    0,
-    achievementTabState.Heroes.Count,
-    "Selecting Achievements should clear stale hero filters."
-);
-AssertEqual(
-    0,
-    achievementTabState.Sizes.Count,
-    "Selecting Achievements should clear stale size filters."
-);
-AssertEqual(
-    0,
-    achievementTabState.Tags.Count,
-    "Selecting Achievements should clear stale tag filters."
-);
-AssertEqual(
-    0,
-    achievementTabState.Keywords.Count,
-    "Selecting Achievements should clear stale keyword filters."
-);
-AssertEqual(
-    null,
-    achievementTabState.SelectedSourceKey,
-    "Selecting Achievements should clear stale source filters."
-);
-achievementTabState.Tiers.Add(ETier.Legendary);
-AssertValues(
-    achievementTabState.Tiers.ToArray(),
-    new[] { ETier.Legendary },
-    "Achievement tier filtering should remain available after entering the tab."
-);
-var achievementDayPresentation = CollectionDayFilterPresentation.For(
-    CollectionTabProfile.For(CollectionTabKind.Achievements),
-    isSelected: true
-);
-AssertTrue(
-    achievementDayPresentation.IsVisible,
-    "Achievements should keep the day pill visible so the top control row stays stable."
-);
-AssertFalse(
-    achievementDayPresentation.IsEnabled,
-    "Achievements should keep the day pill inert because the tab suppresses day filtering."
-);
-AssertFalse(
-    achievementDayPresentation.IsActive,
-    "Achievements should not highlight the day pill when day filtering is suppressed."
-);
 var itemDayPresentation = CollectionDayFilterPresentation.For(
     CollectionTabProfile.For(CollectionTabKind.Items),
     isSelected: true
@@ -337,17 +274,6 @@ var itemDayPresentation = CollectionDayFilterPresentation.For(
 AssertTrue(
     itemDayPresentation.IsVisible && itemDayPresentation.IsEnabled && itemDayPresentation.IsActive,
     "Normal item tabs should still show an enabled, highlighted day pill when selected."
-);
-var achievementHeroPresentation = CollectionHeroFilterPresentation.For(
-    CollectionTabProfile.For(CollectionTabKind.Achievements)
-);
-AssertTrue(
-    achievementHeroPresentation.IsVisible,
-    "Achievements should keep the hero row visible as a stable placeholder for future filters."
-);
-AssertFalse(
-    achievementHeroPresentation.IsEnabled,
-    "Achievements should keep the hero row inert until achievements support hero filtering."
 );
 var itemHeroPresentation = CollectionHeroFilterPresentation.For(
     CollectionTabProfile.For(CollectionTabKind.Items)

@@ -84,15 +84,6 @@ internal sealed class CollectionFilterState
             return false;
 
         ActiveTab = tab;
-        if (tab == CollectionTabKind.Achievements)
-        {
-            Heroes.Clear();
-            Tiers.Clear();
-            Sizes.Clear();
-            Tags.Clear();
-            Keywords.Clear();
-            SelectedSourceKey = null;
-        }
         return true;
     }
 
@@ -148,9 +139,6 @@ internal sealed class CollectionFilterState
     public void ToggleSource(CollectionTabKind activeTab, string sourceKey)
     {
         if (string.IsNullOrWhiteSpace(sourceKey))
-            return;
-
-        if (activeTab == CollectionTabKind.Achievements)
             return;
 
         ActiveTab = activeTab;

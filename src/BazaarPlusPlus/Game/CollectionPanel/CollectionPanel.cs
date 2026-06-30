@@ -13,7 +13,6 @@ using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
-using BazaarPlusPlus.GameInterop.CustomCards;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
@@ -787,21 +786,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         if (_virtualizer == null)
             return;
-        if (_filter.ActiveTab == CollectionTabKind.Achievements)
-        {
-            ClearStatus();
-            var achievementCards = BppCustomCardCollectionProjection.BuildVms(
-                BppCustomCardRegistry.Current
-            );
-            var ordered = CollectionFilterEngine.Apply(
-                achievementCards,
-                _filter,
-                new CollectionFilterContext { ApplyHeroFilter = false, SuppressDayGate = true }
-            );
-            _virtualizer.SetVisible(ordered, CollectionTabKind.Achievements);
-            ResetVisibleScroll();
-            return;
-        }
 
         if (_catalogCards.Count == 0)
         {
