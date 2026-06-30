@@ -1,0 +1,21 @@
+tests/BppCustomCard.Tests/BppCustomCardTests.cs
+  s_c6de33e47380f8::t_6c3104772f3846 70,94
+tests/CardArtReplacement.Tests/CardArtReplacementTests.cs
+  s_c6de33e47380f8::t_418da8f48759d2 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "b2a66a77acae931cea0d7dc2a4bc4a347c6a5643",
+  "prompts": {},
+  "sessions": {
+    "s_c6de33e47380f8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f178a-7e4a-7e72-8f93-a30b744bc210",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
