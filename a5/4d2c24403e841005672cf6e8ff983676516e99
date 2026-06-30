@@ -1,0 +1,28 @@
+src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionQuery.cs
+  s_9b0c4f6c34d999::t_3c3bf872d4e762 120,122
+src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs
+  s_9b0c4f6c34d999::t_3c3bf872d4e762 862-863
+src/BazaarPlusPlus/Game/CollectionPanel/Ui/ICollectionPanelCommands.cs
+  s_9b0c4f6c34d999::t_3c3bf872d4e762 8-9
+tests/CollectionFilterEngine.Tests/Program.cs
+  s_9b0c4f6c34d999::t_067d45fb69fb02 218
+  s_9b0c4f6c34d999::t_a47a868320eae4 222,227,230-231,290-295,297-299,1413
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a54d2c24403e841005672cf6e8ff983676516e99",
+  "prompts": {},
+  "sessions": {
+    "s_9b0c4f6c34d999": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f17d1-815a-76f3-a032-25754370118d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
