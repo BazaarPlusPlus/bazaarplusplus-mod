@@ -1,0 +1,22 @@
+docs/drafts/2026-06-30-remove-package-art-and-tab-plan.md
+  s_eed8e0defbf900::t_5851f35e2544ca 312-313
+  s_eed8e0defbf900::t_573b2279bc0fcb 1-311,314-489
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "be0a287fd0ffeb6dab2a80ebc1de217071de29e0",
+  "prompts": {},
+  "sessions": {
+    "s_eed8e0defbf900": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f17c2-cbc3-7013-8381-806672129c34",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
