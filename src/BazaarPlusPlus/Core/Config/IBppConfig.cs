@@ -24,7 +24,5 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? BazaarDbUploadEnabled { get; }
 
-    ConfigEntry<bool>? EnablePackageCardArtReplacementConfig { get; }
-
     ConfigEntry<bool>? UseFixedSupporterListConfig { get; }
 }

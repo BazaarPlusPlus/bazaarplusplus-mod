@@ -434,6 +434,5 @@ sealed class TempPathProvider : IPathProvider
     public string? CombatReplayDirectoryPath => null;
     public string? ScreenshotsDirectoryPath => null;
     public string? CombatReplayVideoDirectoryPath => null;
-    public string? CustomCardArtDirectoryPath => null;
     public string? PluginsDirectoryPath => null;
 }
