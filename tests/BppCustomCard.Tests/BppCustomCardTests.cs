@@ -1,7 +1,6 @@
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Tooltips;
-using BazaarPlusPlus.Game.Achievements;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.GameInterop.CustomCards;
@@ -15,15 +14,6 @@ public sealed class BppCustomCardTests : IDisposable
     public void Dispose()
     {
         BppCustomCardRegistry.Current = null;
-    }
-
-    [Fact]
-    public void Uuid_v5_achievement_ids_match_the_frozen_catalog_value()
-    {
-        Assert.Equal(
-            new Guid("ff35bbaa-3545-5fef-b469-79a4f4592326"),
-            BppCustomCardIds.ForAchievement("storm_traveler")
-        );
     }
 
     [Fact]
@@ -43,40 +33,6 @@ public sealed class BppCustomCardTests : IDisposable
         Assert.True(registry.TryGet(descriptor.Id, out var actual));
         Assert.Same(descriptor, actual);
         Assert.Throws<InvalidOperationException>(() => registry.Register(descriptor));
-    }
-
-    [Fact]
-    public void Descriptor_mapper_projects_achievement_catalog_rows_to_custom_cards()
-    {
-        var catalog = AchievementCardCatalog.Build(EmbeddedStormTravelerJson);
-        var mapper = new AchievementCardDescriptorMapper(_ => true);
-
-        var descriptor = mapper.Map(catalog[0]);
-
-        Assert.Equal(new Guid("ff35bbaa-3545-5fef-b469-79a4f4592326"), descriptor.Id);
-        Assert.Equal(ECardType.Item, descriptor.Type);
-        Assert.Equal(ECardSize.Medium, descriptor.Size);
-        Assert.Equal(ETier.Legendary, descriptor.StartingTier);
-        Assert.True(descriptor.HasBundledArt);
-        Assert.Equal("StormTraveler", descriptor.InternalName);
-    }
-
-    [Fact]
-    public void Catalog_rejects_uuid_drift_and_missing_traditional_chinese_text()
-    {
-        Assert.Throws<InvalidOperationException>(() =>
-            AchievementCardCatalog.Build(
-                EmbeddedStormTravelerJson.Replace(
-                    "ff35bbaa-3545-5fef-b469-79a4f4592326",
-                    "00000000-0000-5000-8000-000000000000"
-                )
-            )
-        );
-        Assert.Throws<InvalidOperationException>(() =>
-            AchievementCardCatalog.Build(
-                EmbeddedStormTravelerJson.Replace("\"zhHant\": \"風暴旅人\"", "\"zhHant\": \"\"")
-            )
-        );
     }
 
     [Fact]
@@ -111,7 +67,7 @@ public sealed class BppCustomCardTests : IDisposable
     [Fact]
     public void Template_factory_builds_native_item_template_for_tooltip_and_frame_setup()
     {
-        var descriptor = Descriptor(new Guid("ff35bbaa-3545-5fef-b469-79a4f4592326"));
+        var descriptor = Descriptor(Guid.NewGuid());
 
         var template = Assert.IsType<TCardItem>(BppCustomCardTemplateFactory.Build(descriptor));
 
@@ -135,7 +91,7 @@ public sealed class BppCustomCardTests : IDisposable
     [Fact]
     public void Template_factory_uses_donor_art_key_when_provided()
     {
-        var descriptor = Descriptor(new Guid("ff35bbaa-3545-5fef-b469-79a4f4592326"));
+        var descriptor = Descriptor(Guid.NewGuid());
         const string donorArtKey = "Addressables/CardArt/Donor.asset";
 
         var template = Assert.IsType<TCardItem>(
@@ -322,56 +278,6 @@ public sealed class BppCustomCardTests : IDisposable
         Assert.Null(result.Binding);
     }
 
-    [Fact]
-    public void Embedded_catalog_contains_achievement_cards_and_bundled_art_resources()
-    {
-        var catalog = AchievementCardCatalog.LoadEmbedded();
-        var mapper = new AchievementCardDescriptorMapper();
-
-        var descriptor = mapper.Map(Assert.Single(catalog.Cards));
-
-        Assert.Equal("StormTraveler", descriptor.InternalName);
-        Assert.True(descriptor.HasBundledArt);
-    }
-
-    [Fact]
-    public void Achievement_registration_disables_achievements_when_catalog_loading_fails()
-    {
-        var registry = new BppCustomCardRegistry(_ => false);
-
-        AchievementCardRegistrar.Register(
-            registry,
-            loadCatalog: () => throw new InvalidOperationException("bad catalog")
-        );
-
-        Assert.Empty(registry.GetAll());
-    }
-
-    [Fact]
-    public void Achievement_registration_preserves_registry_when_later_card_registration_fails()
-    {
-        var existing = Descriptor(Guid.NewGuid());
-        var stagedId = Guid.NewGuid();
-        var registry = new BppCustomCardRegistry(_ => false);
-        registry.Register(existing);
-
-        AchievementCardRegistrar.Register(
-            registry,
-            loadCatalog: () =>
-                new AchievementCardCatalog(
-                    new[]
-                    {
-                        AchievementDefinition(stagedId, "FirstAchievement", 10),
-                        AchievementDefinition(stagedId, "DuplicateAchievement", 20),
-                    }
-                )
-        );
-
-        var descriptor = Assert.Single(registry.GetAll());
-        Assert.Same(existing, descriptor);
-        Assert.False(registry.IsBppCard(stagedId));
-    }
-
     private static BppCustomCardDescriptor Descriptor(Guid id, bool hasBundledArt = true) =>
         new()
         {
@@ -401,60 +307,4 @@ public sealed class BppCustomCardTests : IDisposable
             ECardSize size
         ) => _result;
     }
-
-    private static AchievementCardDefinition AchievementDefinition(
-        Guid templateId,
-        string internalName,
-        int sortKey
-    ) =>
-        new()
-        {
-            AchievementId = internalName,
-            TemplateId = templateId,
-            InternalName = internalName,
-            Title = new LocalizedTextSet(internalName, internalName, internalName),
-            Description = new LocalizedTextSet(
-                $"{internalName} description",
-                $"{internalName} description",
-                $"{internalName} description"
-            ),
-            Category = "test",
-            RuleKind = "test",
-            Target = 1,
-            DisplayTier = ETier.Legendary,
-            DisplaySize = ECardSize.Medium,
-            SortKey = sortKey,
-            HiddenUntilUnlocked = false,
-        };
-
-    private const string EmbeddedStormTravelerJson = """
-        {
-          "schemaVersion": 1,
-          "cards": [
-            {
-              "achievementId": "storm_traveler",
-              "templateId": "ff35bbaa-3545-5fef-b469-79a4f4592326",
-              "internalName": "StormTraveler",
-              "title": {
-                "en": "Storm Traveler",
-                "zhHans": "风暴旅人",
-                "zhHant": "風暴旅人"
-              },
-              "description": {
-                "en": "Outlast an entire sandstorm",
-                "zhHans": "熬过整场沙尘暴",
-                "zhHant": "熬過整場沙塵暴"
-              },
-              "category": "survival",
-              "ruleKind": "sandstorm_survived",
-              "ruleParams": {},
-              "target": 1,
-              "displayTier": "Legendary",
-              "displaySize": "Medium",
-              "sortKey": 20,
-              "hiddenUntilUnlocked": false
-            }
-          ]
-        }
-        """;
 }

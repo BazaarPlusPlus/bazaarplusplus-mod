@@ -38,22 +38,6 @@
   <ItemGroup>
     <Compile Include="..\..\src\BazaarPlusPlus\Core\Runtime\BppBuild.cs" Link="BppBuild.cs" />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\Achievements\AchievementCardCatalog.cs"
-      Link="AchievementCardCatalog.cs"
-    />
-    <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\Achievements\AchievementCardDefinition.cs"
-      Link="AchievementCardDefinition.cs"
-    />
-    <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\Achievements\AchievementCardDescriptorMapper.cs"
-      Link="AchievementCardDescriptorMapper.cs"
-    />
-    <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\Achievements\AchievementCardRegistrar.cs"
-      Link="AchievementCardRegistrar.cs"
-    />
-    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardClassification.cs"
       Link="CollectionCardClassification.cs"
     />
@@ -159,7 +143,6 @@
       Include="..\..\src\BazaarPlusPlus.Localization\LocalizedTextSet.cs"
       Link="LocalizedTextSet.cs"
     />
-    <EmbeddedResource Include="..\..\src\BazaarPlusPlus\Data\AchievementCards\achievement-cards.json" />
     <EmbeddedResource Include="..\..\src\BazaarPlusPlus\Resources\CustomCardArt\*.jpg">
       <LogicalName>BazaarPlusPlus.Resources.CustomCardArt.%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
