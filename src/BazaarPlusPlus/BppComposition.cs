@@ -100,6 +100,7 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new HotkeyTutorialSettingsDockEntry());
         _settingsDockRegistry.Register(new ChineseLocaleModeSettingsDockEntry(_eventBus));
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
+        _settingsDockRegistry.Register(new EndOfRunScreenshotSettingsDockEntry());
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());
         _settingsDockRegistry.Register(new LegendaryPositionSettingsDockEntry());

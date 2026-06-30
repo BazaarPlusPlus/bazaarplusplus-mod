@@ -5,6 +5,7 @@ using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
@@ -175,6 +176,44 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
+    public void EndOfRunScreenshotDockEntry_defaults_on_and_toggles_config()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-end-of-run-screenshot-settings-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var entry = new EndOfRunScreenshotSettingsDockEntry();
+
+            var definition = entry.Build(config);
+
+            Assert.Equal(BppSettingsDockOrder.EndOfRunScreenshot, entry.Order);
+            Assert.Equal("EndOfRunScreenshot", definition.Key);
+            Assert.Equal("End-of-run Screenshot", definition.ResolveLabel("en"));
+            Assert.Equal("终局截图", definition.ResolveLabel("zh-CN"));
+            Assert.True(definition.IsActive());
+            Assert.Equal("ON", definition.ResolveStatus("en"));
+
+            definition.Activate();
+
+            Assert.False(config.EndOfRunScreenshotEnabledConfig!.Value);
+            Assert.False(definition.IsActive());
+            Assert.Equal("OFF", definition.ResolveStatus("en"));
+            Assert.False(definition.CollapseAfterActivate);
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
     public void FixedSupporterListDockEntry_uses_stream_mode_key_and_toggles_config()
     {
         var configPath = Path.Combine(
@@ -277,6 +316,10 @@ public class SettingsDockRegistryTests
             new ChineseLocaleModeSettingsDockEntry(new InMemoryBppEventBus()).Order
         );
         Assert.Equal(
+            BppSettingsDockOrder.EndOfRunScreenshot,
+            new EndOfRunScreenshotSettingsDockEntry().Order
+        );
+        Assert.Equal(
             BppSettingsDockOrder.HotkeyTutorial,
             new HotkeyTutorialSettingsDockEntry().Order
         );
@@ -298,6 +341,7 @@ public class SettingsDockRegistryTests
         registry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
         registry.Register(new HotkeyTutorialSettingsDockEntry());
         registry.Register(new FixedSupporterListSettingsDockEntry());
+        registry.Register(new EndOfRunScreenshotSettingsDockEntry());
         registry.Register(new ChineseLocaleModeSettingsDockEntry(new InMemoryBppEventBus()));
 
         try
@@ -305,7 +349,14 @@ public class SettingsDockRegistryTests
             BppSettingsDockCatalog.Install(new BppConfig(), registry);
 
             Assert.Equal(
-                new[] { "ChineseLocaleMode", "StreamMode", "HotkeyTutorial", "BazaarDbUpload" },
+                new[]
+                {
+                    "ChineseLocaleMode",
+                    "StreamMode",
+                    "HotkeyTutorial",
+                    "EndOfRunScreenshot",
+                    "BazaarDbUpload",
+                },
                 BppSettingsDockCatalog.Definitions.Select(d => d.Key)
             );
         }

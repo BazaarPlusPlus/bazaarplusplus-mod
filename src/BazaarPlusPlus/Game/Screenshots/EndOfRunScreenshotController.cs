@@ -165,12 +165,12 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private bool ShouldBlockMouseInput()
     {
-        return _gate.IsAttemptInFlight();
+        return IsEndOfRunScreenshotEnabled() && _gate.IsAttemptInFlight();
     }
 
     private bool ShouldBlockContinueUntilFirstCaptureInternal(EndOfRunScreenController controller)
     {
-        if (_screenshotService == null)
+        if (!IsEndOfRunScreenshotEnabled() || _screenshotService == null)
             return false;
 
         TrackEndOfRunEntry(controller);
@@ -198,7 +198,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     {
         if (
             _screenshotService == null
-            || !_gate.ShouldCaptureOnContinue(isInteractionBlocked, Time.unscaledTime)
+            || !_gate.ShouldCaptureOnContinue(
+                IsEndOfRunScreenshotEnabled(),
+                isInteractionBlocked,
+                Time.unscaledTime
+            )
         )
             return false;
 
@@ -388,6 +392,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         return _bufferedHeroName;
     }
 
+    private bool IsEndOfRunScreenshotEnabled()
+    {
+        return _services?.Config.EndOfRunScreenshotEnabledConfig?.Value ?? true;
+    }
+
     private void ResetBufferedRunContext()
     {
         _bufferedRunId = null;
@@ -469,7 +478,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void SyncEndOfRunMouseBlocker()
     {
-        if (_screenshotService == null)
+        if (!IsEndOfRunScreenshotEnabled() || _screenshotService == null)
         {
             _mouseBlocker.Detach();
             return;

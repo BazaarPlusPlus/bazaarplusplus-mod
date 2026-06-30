@@ -8,10 +8,15 @@ internal sealed class EndOfRunScreenshotGate
     private bool _allowNextContinuePassthrough;
     private float _retryAvailableAtSeconds;
 
-    public bool ShouldCaptureOnContinue(bool isInteractionBlocked, float nowSeconds)
+    public bool ShouldCaptureOnContinue(
+        bool isCaptureEnabled,
+        bool isInteractionBlocked,
+        float nowSeconds
+    )
     {
         if (
-            isInteractionBlocked
+            !isCaptureEnabled
+            || isInteractionBlocked
             || _capturedForCurrentRun
             || _attemptInFlight
             || nowSeconds < _retryAvailableAtSeconds
