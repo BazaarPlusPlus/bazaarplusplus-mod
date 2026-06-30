@@ -2,6 +2,8 @@
 
 Date: 2026-06-30
 
+> Status update, 2026-06-30: The achievement deletion plan's "keep package art" assumptions were valid for that task only and are now superseded by `docs/drafts/2026-06-30-remove-package-art-and-tab-plan.md`. Current code no longer retains package custom-art replacement, the Package Swap setting, or the Packages tab; treat references to `CardArtReplacement`, `CustomCardArt`, and retained package-art resources below as historical task context.
+
 ## Goal
 
 Remove the current BazaarPlusPlus achievement system completely from the mod:

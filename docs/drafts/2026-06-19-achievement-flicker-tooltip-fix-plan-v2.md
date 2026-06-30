@@ -1,5 +1,7 @@
 # Achievement Card Flicker And Tooltip Body Fix Implementation Plan
 
+> Status update, 2026-06-30: Superseded for implementation follow-up. The achievement system was deleted by `docs/drafts/2026-06-30-achievement-system-deletion-plan.md`, and the package custom-art replacement / Packages tab deletion is tracked by `docs/drafts/2026-06-30-remove-package-art-and-tab-plan.md`. Treat the `CardArtReplacement`/`CustomCardArt` references below as historical context only, not active implementation guidance.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make Achievements cards render with stable native card materials (no strobe) and show both title and body text in the native tooltip.

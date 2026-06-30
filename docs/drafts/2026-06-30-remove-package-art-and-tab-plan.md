@@ -406,6 +406,19 @@ Expected result:
 - Historical or explicitly superseded draft references are either absent from
   current docs or clearly marked stale.
 
+#### Implementation result
+
+- Updated `docs/ARCHITECTURE.md` to describe the current CollectionPanel model
+  as Items/Skills only, with package cards excluded from normal results by
+  `CollectionFilterEngine.Apply()`.
+- Updated `docs/ARCHITECTURE.md` runtime data wording so
+  `BepInExPathProvider.Initialize()` no longer claims ownership of a custom
+  card-art directory.
+- Marked active, non-archived achievement/custom-card drafts that still discuss
+  retained package art as superseded for implementation follow-up.
+- Left `docs/MEMORY.md`, `docs/INDEX.md`, and archived historical plans
+  untouched; stale curated-memory references remain for consolidation.
+
 ### Commit 5: Final Search And Test Cleanup
 
 Purpose: catch residual code references, stale tests, and build-system drift.

@@ -1,5 +1,7 @@
 # 自制卡面基座 + 成就系统 · 完整方案（本地一期）
 
+> Status update, 2026-06-30: Superseded for implementation follow-up. The achievement system was deleted by `docs/drafts/2026-06-30-achievement-system-deletion-plan.md`, and the package custom-art replacement / Packages tab deletion is tracked by `docs/drafts/2026-06-30-remove-package-art-and-tab-plan.md`. Treat the package-art reuse assumptions and `CustomCardArt`/`CardArtReplacement` paths below as historical context only, not active design.
+
 Status: drafted 2026-06-19, decisions locked. 经 11-agent workflow（understand×5 → design×2 → judge → red-team×3）
 对抗复核 + 本人独立读 decompiled/源码复核全部 load-bearing 链路（渲染、美术、tooltip、tier 筛选、本地化签名、GUID）。
 取代 `docs/plans/achievement-ui-local-mvp.md` 与 `achievement-service-design.md` 的**渲染/seam 章节**；两旧文档仍是
