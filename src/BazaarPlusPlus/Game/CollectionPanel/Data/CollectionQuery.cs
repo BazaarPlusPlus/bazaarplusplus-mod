@@ -117,12 +117,9 @@ internal static class CollectionQuery
             {
                 OfferedCardIds = offeredCardIds,
                 ApplyHeroFilter =
-                    !filter.PackagesOnly
-                    && (!hasSelectedSource || filter.ActiveTab == CollectionTabKind.Skills),
+                    !hasSelectedSource || filter.ActiveTab == CollectionTabKind.Skills,
                 SuppressDayGate =
-                    !filter.PackagesOnly
-                    && offeredCardIds != null
-                    && sourceResolution.Source!.SuppressDayGate,
+                    offeredCardIds != null && sourceResolution.Source!.SuppressDayGate,
             }
         );
         var normalization = new CollectionFilterNormalization(
@@ -180,7 +177,6 @@ internal static class CollectionQuery
         {
             ActiveType = source.ActiveType,
             SelectedSourceKey = source.SelectedSourceKey,
-            PackagesOnly = source.PackagesOnly,
             SelectedRunDay = source.SelectedRunDay,
             SortPriority = source.SortPriority,
             TagMatchMode = source.TagMatchMode,
@@ -199,9 +195,6 @@ internal static class CollectionQuery
         ICollectionSourceCatalog sourceCatalog
     )
     {
-        if (filter.PackagesOnly)
-            return SourceResolution.Unselected;
-
         var sourceKey = filter.SelectedSourceKey;
         if (string.IsNullOrWhiteSpace(sourceKey))
             return SourceResolution.Unselected;

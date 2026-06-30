@@ -305,9 +305,9 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void ApplyOpenSelection(CollectionPanelSelectionState selection)
     {
         _filter.ApplySelection(selection);
-        // The Day toggle's on/off persists across opens (like the package toggle); when it is on,
-        // re-pin it to the freshly-read day. _currentRunDay was just captured in
-        // ResolveOpenSelection, which always runs before this.
+        // The Day toggle's on/off persists across opens; when it is on, re-pin it to the
+        // freshly-read day. _currentRunDay was just captured in ResolveOpenSelection, which always
+        // runs before this.
         if (_filter.SelectedRunDay != null)
             _filter.SelectedRunDay = _currentRunDay ?? DayTierSchedule.OutOfRunDay;
         PruneInvisibleSourceSelections();
@@ -859,13 +859,8 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedKeywords = _filter.Keywords,
             TagMatchMode = _filter.TagMatchMode,
             KeywordMatchMode = _filter.KeywordMatchMode,
-            SelectedSourceKey =
-                profile.ShowSourceFilter && !_filter.PackagesOnly
-                    ? _filter.SelectedSourceKey
-                    : null,
-            PackagesOnly = _filter.PackagesOnly,
-            SourceSelectorEnabled =
-                profile.ShowSourceFilter && !_isLoadingCatalog && !_filter.PackagesOnly,
+            SelectedSourceKey = profile.ShowSourceFilter ? _filter.SelectedSourceKey : null,
+            SourceSelectorEnabled = profile.ShowSourceFilter && !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,
             DayFilterVisible = dayFilterPresentation.IsVisible,
             DayFilterEnabled = dayFilterPresentation.IsEnabled,

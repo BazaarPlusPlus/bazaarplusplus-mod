@@ -212,59 +212,23 @@ AssertEqual(
     sourceState.ActiveType,
     "Toggling a Skill source should set Skill active."
 );
-sourceState.PackagesOnly = true;
-sourceState.ToggleSource(CollectionTabKind.Skills, "trainer:scout");
-AssertFalse(
-    sourceState.PackagesOnly,
-    "Skill source selection should clear stale package-only mode."
-);
-
 var topLevelModeState = new CollectionFilterState { ActiveType = ECardType.Skill };
 AssertTrue(
-    topLevelModeState.SelectPackagesOnly(),
-    "Selecting the Package tab from Skills should report a mode change."
-);
-AssertEqual(
-    ECardType.Item,
-    topLevelModeState.ActiveType,
-    "Selecting the Package tab should route through the Item card type."
-);
-AssertTrue(
-    topLevelModeState.PackagesOnly,
-    "Selecting the Package tab should enable package-only mode."
-);
-AssertFalse(
-    topLevelModeState.SelectPackagesOnly(),
-    "Selecting the already active Package tab should be a no-op."
-);
-AssertTrue(
     topLevelModeState.SelectActiveType(ECardType.Item),
-    "Selecting Items from package mode should report a mode change."
-);
-AssertFalse(
-    topLevelModeState.PackagesOnly,
-    "Selecting Items from package mode should clear package-only mode."
-);
-AssertFalse(
-    topLevelModeState.SelectActiveType(ECardType.Item),
-    "Selecting the already active normal Items tab should be a no-op."
-);
-AssertTrue(
-    topLevelModeState.SelectPackagesOnly(),
-    "Selecting Packages from Items should report a mode change."
+    "Selecting Items from Skills should report a mode change."
 );
 AssertTrue(
     topLevelModeState.SelectActiveType(ECardType.Skill),
-    "Selecting Skills from package mode should report a mode change."
+    "Selecting Skills from Items should report a mode change."
 );
 AssertEqual(
     ECardType.Skill,
     topLevelModeState.ActiveType,
-    "Selecting Skills from package mode should activate Skills."
+    "Selecting Skills should activate the Skill card type."
 );
 AssertFalse(
-    topLevelModeState.PackagesOnly,
-    "Selecting Skills from package mode should clear package-only mode."
+    topLevelModeState.SelectActiveType(ECardType.Skill),
+    "Selecting the already active Skills tab should be a no-op."
 );
 
 var itemDayPresentation = CollectionDayFilterPresentation.For(
@@ -323,43 +287,16 @@ var defaultPackageResult = CollectionFilterEngine.Apply(
 );
 AssertSequence(defaultPackageResult, new[] { normal.Id }, "Packages are excluded by default.");
 
-var packagesOnlyFilter = new CollectionFilterState { PackagesOnly = true };
-var packagesOnlyResult = CollectionFilterEngine.Apply(
-    new[] { package, normal },
-    packagesOnlyFilter
-);
+var matchingPackageFilter = new CollectionFilterState { SelectedRunDay = 1 };
+matchingPackageFilter.Heroes.Add(EHero.Dooley);
+matchingPackageFilter.Tiers.Add(ETier.Bronze);
+matchingPackageFilter.Sizes.Add(ECardSize.Medium);
+matchingPackageFilter.Tags.Add(ECardTag.Tool);
+matchingPackageFilter.Keywords.Add(EHiddenTag.Shield);
 AssertSequence(
-    packagesOnlyResult,
-    new[] { package.Id },
-    "PackagesOnly shows package cards as an exclusive package view."
-);
-var packagesOnlyWithSourceResult = CollectionFilterEngine.Apply(
-    new[] { package, bronzePackage, normal },
-    new CollectionFilterState { PackagesOnly = true },
-    new CollectionFilterContext
-    {
-        OfferedCardIds = new[] { normal.Id },
-        ApplyHeroFilter = true,
-        SuppressDayGate = true,
-    }
-);
-AssertSequence(
-    packagesOnlyWithSourceResult,
-    new[] { bronzePackage.Id, package.Id },
-    "PackagesOnly ignores source offer pools and context gates."
-);
-var packagesOnlyWithFacets = new CollectionFilterState { PackagesOnly = true, SelectedRunDay = 1 };
-packagesOnlyWithFacets.Heroes.Add(EHero.Vanessa);
-packagesOnlyWithFacets.Tiers.Add(ETier.Bronze);
-packagesOnlyWithFacets.Sizes.Add(ECardSize.Small);
-packagesOnlyWithFacets.Tags.Add(ECardTag.Weapon);
-packagesOnlyWithFacets.Keywords.Add(EHiddenTag.Damage);
-packagesOnlyWithFacets.TagMatchMode = CollectionFacetMatchMode.All;
-packagesOnlyWithFacets.KeywordMatchMode = CollectionFacetMatchMode.All;
-AssertSequence(
-    CollectionFilterEngine.Apply(new[] { package, bronzePackage, normal }, packagesOnlyWithFacets),
-    new[] { bronzePackage.Id, package.Id },
-    "PackagesOnly ignores hero, tier, size, tag, keyword, match mode, and day facets."
+    CollectionFilterEngine.Apply(new[] { bronzePackage, normal }, matchingPackageFilter),
+    Array.Empty<Guid>(),
+    "Package cards stay hidden from CollectionPanel even when their facets match."
 );
 
 var bronzeLarge = Card("A Bronze Large", ETier.Bronze, size: ECardSize.Large);
@@ -1181,25 +1118,6 @@ AssertEqual(
     "CollectionQuery should not directly clear hero-mismatched source selections."
 );
 
-var packagesOnlyQueryFilter = new CollectionFilterState
-{
-    PackagesOnly = true,
-    SelectedSourceKey = querySource.SourceKey,
-};
-packagesOnlyQueryFilter.Tags.Add(ECardTag.Tool);
-packagesOnlyQueryFilter.Keywords.Add(EHiddenTag.Shield);
-var packagesOnlyQueryResult = CollectionQuery.Run(
-    queryCatalogCards,
-    packagesOnlyQueryFilter,
-    queryAvailability,
-    queryCatalog,
-    queryResolver
-);
-AssertFalse(
-    packagesOnlyQueryResult.Normalization.ClearSelectedSource,
-    "PackagesOnly should leave source-key normalization to mode transitions/prune, not CollectionQuery."
-);
-
 var tagGateOffFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
 tagGateOffFilter.Tags.Add(ECardTag.Tool);
 var tagGateOffResult = CollectionQuery.Run(
@@ -1492,7 +1410,7 @@ var hiddenTagPackageTemplate = new TCardItem
 };
 AssertTrue(
     CollectionCardClassifier.Classify(hiddenTagPackageTemplate).IsPackage,
-    "HiddenTag.Package marks package templates for the exclusive package view."
+    "HiddenTag.Package marks package templates as hidden from CollectionPanel."
 );
 var packageNameWithoutTagTemplate = new TCardItem
 {

@@ -39,12 +39,6 @@ internal static class CollectionFilterEngine
         {
             if (card.Type != filter.ActiveType)
                 continue;
-            if (filter.PackagesOnly)
-            {
-                if (card.IsPackage)
-                    result.Add(card);
-                continue;
-            }
             if (card.IsPackage)
                 continue;
             if (offerPoolSet != null && !offerPoolSet.Contains(card.Id))

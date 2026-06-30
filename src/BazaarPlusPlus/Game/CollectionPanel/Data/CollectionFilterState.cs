@@ -41,21 +41,6 @@ internal sealed class CollectionFilterState
     // shown and applied.
     public HashSet<ECardSize> Sizes { get; } = new();
     public string? SelectedSourceKey { get; set; }
-    public bool PackagesOnly
-    {
-        get => ActiveTab.IsPackageOnly();
-        set
-        {
-            if (value)
-            {
-                ActiveTab = CollectionTabKind.Packages;
-            }
-            else if (ActiveTab == CollectionTabKind.Packages)
-            {
-                ActiveTab = CollectionTabKind.Items;
-            }
-        }
-    }
 
     // User-selected run "Day" filter; null means no day filtering. Starts enabled so the panel
     // binds it to Data.Run.Day on open; outside a run, OutOfRunDay keeps the toggle visibly active
@@ -93,8 +78,6 @@ internal sealed class CollectionFilterState
             activeType == ECardType.Skill ? CollectionTabKind.Skills : CollectionTabKind.Items
         );
     }
-
-    public bool SelectPackagesOnly() => SelectTab(CollectionTabKind.Packages);
 
     public void ApplySelection(CollectionPanelSelectionState selection)
     {

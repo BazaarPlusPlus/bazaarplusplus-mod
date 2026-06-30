@@ -63,17 +63,6 @@ internal readonly struct CollectionTabProfile
                 showKeywordFilter: true,
                 showDayFilter: true
             ),
-            CollectionTabKind.Packages => new CollectionTabProfile(
-                CollectionTabKind.Packages,
-                ECardType.Item,
-                CollectionSourceKind.Merchant,
-                showHeroFilter: true,
-                showTierFilter: true,
-                showSizeFilter: true,
-                showTagFilter: true,
-                showKeywordFilter: true,
-                showDayFilter: true
-            ),
             _ => new CollectionTabProfile(
                 CollectionTabKind.Items,
                 ECardType.Item,

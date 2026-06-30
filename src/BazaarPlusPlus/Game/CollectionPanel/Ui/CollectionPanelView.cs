@@ -39,7 +39,6 @@ internal sealed class CollectionPanelViewModel
     public CollectionFacetMatchMode TagMatchMode { get; set; } = CollectionFacetMatchMode.Any;
     public CollectionFacetMatchMode KeywordMatchMode { get; set; } = CollectionFacetMatchMode.Any;
     public string? SelectedSourceKey { get; set; }
-    public bool PackagesOnly { get; set; }
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
