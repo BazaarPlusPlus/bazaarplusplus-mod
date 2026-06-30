@@ -1,0 +1,41 @@
+src/BazaarPlusPlus/Core/Config/BppConfig.cs
+  s_c9a0de94bd4e91::t_a1121b3871809d 19-20,63-67
+src/BazaarPlusPlus/Game/Screenshots/EndOfRunScreenshotController.cs
+  s_c9a0de94bd4e91::t_efa9214ffe8367 168,173,201-205,395-399,481
+src/BazaarPlusPlus/Game/Screenshots/EndOfRunScreenshotSettingsMenuLabel.cs
+  s_c9a0de94bd4e91::t_a1121b3871809d 1-18
+tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs
+  s_c9a0de94bd4e91::t_b26922b48046d6 352-359
+  s_c9a0de94bd4e91::t_7320c1579951d7 8,178-215,318-321,344
+src/BazaarPlusPlus/Core/Config/IBppConfig.cs
+  s_c9a0de94bd4e91::t_a1121b3871809d 17-18
+tests/EndOfRunScreenshotGate.Tests/Program.cs
+  s_c9a0de94bd4e91::t_bd74150f71cf4c 15-36,41-47,52-58,65-71,76-82,94-100,121-127,132-138,279
+  s_c9a0de94bd4e91::t_1f24295d34ecc1 293-295
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs
+  s_c9a0de94bd4e91::t_a1121b3871809d 15-16
+src/BazaarPlusPlus/Game/Screenshots/EndOfRunScreenshotGate.cs
+  s_c9a0de94bd4e91::t_a1121b3871809d 11-15,18-19
+src/BazaarPlusPlus/Game/Screenshots/EndOfRunScreenshotSettingsDockEntry.cs
+  s_c9a0de94bd4e91::t_a1121b3871809d 1-30
+src/BazaarPlusPlus/BppComposition.cs
+  s_c9a0de94bd4e91::t_a1121b3871809d 103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9d7de89d4b0736977b4773ab6c8df487d57fb94e",
+  "prompts": {},
+  "sessions": {
+    "s_c9a0de94bd4e91": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f183d-3141-7322-ada7-2b64825482ff",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
