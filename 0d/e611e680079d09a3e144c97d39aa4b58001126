@@ -1,0 +1,19 @@
+src/BazaarPlusPlus/Game/CollectionPanel/Grid/CollectionCardFactory.cs
+  s_c6de33e47380f8::t_0e51f9b84457fc 35,42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "0de611e680079d09a3e144c97d39aa4b58001126",
+  "prompts": {},
+  "sessions": {
+    "s_c6de33e47380f8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f178a-7e4a-7e72-8f93-a30b744bc210",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  }
+}
