@@ -1,0 +1,21 @@
+src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.Tree.cs
+  s_9b0c4f6c34d999::t_34bc0f3f649c91 170,184
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "fb940a9672048ca7e9c6da5c191a88df02c2559a",
+  "prompts": {},
+  "sessions": {
+    "s_9b0c4f6c34d999": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f17d1-815a-76f3-a032-25754370118d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
