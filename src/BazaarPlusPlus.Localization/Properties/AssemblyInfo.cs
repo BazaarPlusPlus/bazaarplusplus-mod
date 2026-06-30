@@ -1,7 +1,6 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("BazaarPlusPlus")]
-[assembly: InternalsVisibleTo("BppCustomCard.Tests")]
 [assembly: InternalsVisibleTo("CombatStatusBarState.Tests")]
 [assembly: InternalsVisibleTo("Supporters.Tests")]
 [assembly: InternalsVisibleTo("UiFoundation.Tests")]

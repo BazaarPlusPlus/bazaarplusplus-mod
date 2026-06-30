@@ -7,7 +7,6 @@ using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Supporters.Ui;
-using BazaarPlusPlus.GameInterop.CustomCards;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
@@ -205,7 +204,6 @@ internal sealed partial class CollectionPanelView : IDisposable
                 + CollectionPanelText.NoMatches()
                 + CollectionPanelText.SourceDisclaimer()
                 + CollectionPanelText.DayHeader()
-                + BppCustomCardRegistry.Current?.FontAtlasSample()
                 + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#\\",
             Sizes.FontButton,
             FontStyle.Normal

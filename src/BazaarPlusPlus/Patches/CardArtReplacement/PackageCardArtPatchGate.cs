@@ -4,7 +4,6 @@ using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards;
 using BazaarPlusPlus.Game.CardArtReplacement;
 using BazaarPlusPlus.GameInterop.CardArtReplacement;
-using BazaarPlusPlus.GameInterop.CustomCards;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Patches.CardArtReplacement;
@@ -42,24 +41,6 @@ internal static class PackageCardArtPatchGate
             return false;
 
         if (baseMaterial == null)
-            return false;
-
-        var feature = CardArtReplacementFeature.Current;
-        return feature != null
-            && feature.TryGetPreviewMaterial(template.Id, baseMaterial, out material, out _)
-            && material != null;
-    }
-
-    public static bool TryGetBppCustomCardPreviewMaterial(
-        TCardBase? template,
-        Material? baseMaterial,
-        out Material? material
-    )
-    {
-        material = null;
-        if (template == null || baseMaterial == null)
-            return false;
-        if (BppCustomCardRegistry.Current?.HasBundledArt(template.Id) != true)
             return false;
 
         var feature = CardArtReplacementFeature.Current;

@@ -34,12 +34,6 @@ internal static class CardPreviewItemArtReplacePatch
                 return;
 
             if (
-                instance.GetComponent<CollectionPanelOwnedMarker>() != null
-                && TryApplyBppCustomCardMaterial(instance)
-            )
-                return;
-
-            if (
                 !PackageCardArtPatchGate.TryGetReplacementPreviewMaterial(
                     instance._cardData,
                     instance._cardMaterial,
@@ -56,33 +50,5 @@ internal static class CardPreviewItemArtReplacePatch
         {
             BppLog.Warn(LogCategory, $"Preview postfix failed: {ex.Message}");
         }
-    }
-
-    private static bool TryApplyBppCustomCardMaterial(CardPreviewItem instance)
-    {
-        // Base material is the authored donor material the LoadArt prefix already cloned onto
-        // _cardMaterial (the donor ArtKey lives on the synthetic template). Clone it and swap
-        // _BaseMap to the achievement art via the shared package clone cache. Do NOT touch
-        // marker.CurrentArtKey: it holds the donor key, acquired once by the LoadArt prefix
-        // and released once by the destroy patch. The cloned achievement material is owned
-        // by CustomCardArtMaterialCache (feature-lifecycle disposed), not the collection LRU,
-        // so it cannot be evicted while assigned to a live card. Do NOT clear enchantment
-        // keywords here — that is exactly what made the bare path strobe.
-        if (instance._cardMaterial == null || instance._cardImage == null)
-            return false;
-
-        if (
-            !PackageCardArtPatchGate.TryGetBppCustomCardPreviewMaterial(
-                instance._cardData,
-                instance._cardMaterial,
-                out var material
-            )
-            || material == null
-        )
-            return false;
-
-        instance._cardMaterial = material;
-        instance._cardImage.material = material;
-        return true;
     }
 }
