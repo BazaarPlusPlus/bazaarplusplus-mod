@@ -1,0 +1,19 @@
+tests/CardArtReplacement.Tests/CardArtReplacementTests.cs
+  s_c6de33e47380f8::t_418da8f48759d2 94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "a61cc5ee2352e19746d10ef0894054a923b848b3",
+  "prompts": {},
+  "sessions": {
+    "s_c6de33e47380f8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f178a-7e4a-7e72-8f93-a30b744bc210",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  }
+}
