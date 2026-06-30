@@ -1,0 +1,21 @@
+src/BazaarPlusPlus/BazaarPlusPlus.csproj
+  s_9b0c4f6c34d999::t_3e49a96dd56d22 18,48
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "e4859a2fba58a3b2fc40d9880054beb0c646b4dd",
+  "prompts": {},
+  "sessions": {
+    "s_9b0c4f6c34d999": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f17d1-815a-76f3-a032-25754370118d",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
