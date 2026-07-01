@@ -13,6 +13,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
@@ -70,11 +71,12 @@ internal sealed class CollectionPanel : MonoBehaviour
     private IBppConfig _config = null!;
     private CollectionPanelView? _view;
     private CollectionGridOverlay? _overlay;
-    private CollectionCardPool? _pool;
+    private NativeCardPreviewPool? _pool;
     private CollectionCardFactory? _factory;
     private CollectionGridVirtualizer? _virtualizer;
     private CollectionCardArtCache? _artCache;
     private CollectionCardMaterialCache? _materialCache;
+    private CollectionCardCacheSession? _cacheSession;
 
     private IBppServices _services = null!;
     private IReadOnlyList<CollectionCardVm> _catalogCards = Array.Empty<CollectionCardVm>();
@@ -467,22 +469,83 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void DisposeUnityRuntime()
     {
         CancelPanelLoad();
-        _virtualizer?.Dispose();
+        var virtualizer = _virtualizer;
+        var overlay = _overlay;
+        var pool = _pool;
+        var artCache = _artCache;
+        var materialCache = _materialCache;
+        var cacheSession = _cacheSession;
+
+        virtualizer?.Dispose();
+        overlay?.SetAlpha(0f);
+        overlay?.SetVisible(false);
+
         _virtualizer = null;
-        // Destroy card GameObjects first so their patched OnDestroy can null _cardMaterial
-        // and Release art-cache refcounts BEFORE we tear the caches down.
-        _pool?.DestroyAll();
         _pool = null;
         _factory = null;
-        _overlay?.Dispose();
         _overlay = null;
         _view?.Dispose();
         _view = null;
-        CollectionCardCacheHost.Uninstall(_artCache, _materialCache);
-        _materialCache?.DisposeAll();
         _materialCache = null;
-        _artCache?.DisposeAll();
         _artCache = null;
+        _cacheSession = null;
+
+        var pendingBinds = virtualizer?.WhenPendingBindsSettled ?? Task.CompletedTask;
+        if (pendingBinds.IsCompleted)
+        {
+            DestroyCollectionRuntimeObjects(overlay, pool, cacheSession, artCache, materialCache);
+            return;
+        }
+
+        _ = DestroyCollectionRuntimeObjectsWhenReadyAsync(
+            pendingBinds,
+            overlay,
+            pool,
+            cacheSession,
+            artCache,
+            materialCache
+        );
+    }
+
+    private static async Task DestroyCollectionRuntimeObjectsWhenReadyAsync(
+        Task pendingBinds,
+        CollectionGridOverlay? overlay,
+        NativeCardPreviewPool? pool,
+        CollectionCardCacheSession? cacheSession,
+        CollectionCardArtCache? artCache,
+        CollectionCardMaterialCache? materialCache
+    )
+    {
+        try
+        {
+            await pendingBinds;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(
+                "CollectionPanel",
+                $"Deferred collection runtime cleanup continued after pending bind wait failed: {ex.Message}"
+            );
+        }
+
+        DestroyCollectionRuntimeObjects(overlay, pool, cacheSession, artCache, materialCache);
+    }
+
+    private static void DestroyCollectionRuntimeObjects(
+        CollectionGridOverlay? overlay,
+        NativeCardPreviewPool? pool,
+        CollectionCardCacheSession? cacheSession,
+        CollectionCardArtCache? artCache,
+        CollectionCardMaterialCache? materialCache
+    )
+    {
+        // Destroy card GameObjects first so their patched OnDestroy can null _cardMaterial
+        // and Release art-cache refcounts BEFORE we tear the caches down.
+        pool?.DestroyAll();
+        overlay?.Dispose();
+        CollectionCardCacheHost.Uninstall(cacheSession);
+        materialCache?.DisposeAll();
+        artCache?.DisposeAll();
     }
 
     private void EnsureView()
@@ -505,10 +568,15 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         _artCache = new CollectionCardArtCache();
         _materialCache = new CollectionCardMaterialCache();
-        CollectionCardCacheHost.Install(_artCache, _materialCache);
+        _cacheSession = CollectionCardCacheHost.Install(_artCache, _materialCache);
 
-        _pool = new CollectionCardPool(CollectionGridOverlay.DefaultLayer);
-        _factory = new CollectionCardFactory(_pool, _overlay.BoardRoot!);
+        _pool = new NativeCardPreviewPool(
+            CollectionGridOverlay.DefaultLayer,
+            requireSockets: false,
+            "CollectionCardPool"
+        );
+        var nativeFactory = new NativeCardPreviewFactory(_pool, "CollectionCardFactory");
+        _factory = new CollectionCardFactory(nativeFactory, _overlay.BoardRoot!, _cacheSession);
         _virtualizer = new CollectionGridVirtualizer(_overlay, _factory);
     }
 

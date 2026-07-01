@@ -106,7 +106,8 @@ internal sealed class NativeCardPreviewPool
         NativeCardPreviewKind kind,
         Transform parent,
         Func<Task<Component?>> instantiateAsync,
-        CancellationToken token = default
+        CancellationToken token = default,
+        Action<Component>? prepareBeforeActivate = null
     )
     {
         if (parent == null)
@@ -152,6 +153,7 @@ internal sealed class NativeCardPreviewPool
         if (card == null)
             return null;
 
+        prepareBeforeActivate?.Invoke(card);
         card.transform.localScale = Vector3.one;
         card.transform.localRotation = Quaternion.identity;
         card.gameObject.SetActive(true);

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Runtime;
@@ -37,8 +38,11 @@ internal sealed class CollectionGridVirtualizer
     private readonly CollectionGridOverlay _overlay;
     private readonly CollectionCardFactory _factory;
     private readonly Dictionary<int, RealizedCell> _realized = new();
+    private readonly Dictionary<int, PendingBind> _pendingBinds = new();
+    private readonly PendingBindTracker _pendingBindTracker = new();
     private readonly HashSet<Guid> _failedBindGuids = new();
     private readonly List<int> _recycleScratch = new();
+    private readonly List<int> _pendingRecycleScratch = new();
     private readonly List<CollectionGridRect> _slotRects = new();
     private readonly CollectionGridSlotLayer? _slots;
 
@@ -83,6 +87,8 @@ internal sealed class CollectionGridVirtualizer
             ? 0f
             : 2f * CollectionGridConstants.GridOuterPadding + _layout.ContentHeight(_unit, _gap);
     public int VisibleCount => _visible.Count;
+    public bool HasPendingBinds => _pendingBindTracker.HasPendingBinds;
+    public Task WhenPendingBindsSettled => _pendingBindTracker.WhenSettled;
 
     // SetVisible swaps in a new ordered visible set (typically after filter change) and
     // recycles everything currently realized. Caller is expected to also reset scrollY to 0.
@@ -134,6 +140,8 @@ internal sealed class CollectionGridVirtualizer
         {
             if (_realized.Count > 0)
                 RecycleAll();
+            if (_pendingBinds.Count > 0)
+                CancelPendingBinds();
             _slots?.Clear();
             return;
         }
@@ -181,13 +189,21 @@ internal sealed class CollectionGridVirtualizer
             _realized.Remove(index);
             RecycleCell(cell);
         }
+        _pendingRecycleScratch.Clear();
+        foreach (var pair in _pendingBinds)
+        {
+            if (pair.Key < firstIdx || pair.Key > lastIdx)
+                _pendingRecycleScratch.Add(pair.Key);
+        }
+        foreach (var index in _pendingRecycleScratch)
+            CancelPendingBind(index);
 
         // 2) Realize newly-visible cells, rate-limited by wall-clock budget for cold binds.
         var tickStart = Time.realtimeSinceStartup;
         var coldBudgetSeconds = CollectionGridConstants.ColdBindBudgetMs * 0.001f;
         for (var idx = firstIdx; idx <= lastIdx; idx++)
         {
-            if (_realized.ContainsKey(idx))
+            if (_realized.ContainsKey(idx) || _pendingBinds.ContainsKey(idx))
                 continue;
             if (Time.realtimeSinceStartup - tickStart > coldBudgetSeconds)
                 break;
@@ -344,21 +360,92 @@ internal sealed class CollectionGridVirtualizer
         var vm = _visible[index];
         if (_failedBindGuids.Contains(vm.Id))
             return;
+        if (_realized.ContainsKey(index) || _pendingBinds.ContainsKey(index))
+            return;
 
         var bindStartedAt = _firstWindowDiagnostics?.StartBind(index) ?? 0L;
-        var bindResult = _factory.TryBind(vm);
-        var binding = bindResult.Binding;
-        _firstWindowDiagnostics?.RecordBind(index, bindStartedAt, binding);
-        if (bindResult.Status == CollectionCardBindStatus.HardMiss)
-            _failedBindGuids.Add(vm.Id);
-        if (!binding.HasValue)
-            return;
-        var card = binding.Value.Card;
+        var cancellation = new CancellationTokenSource();
+        var pending = new PendingBind(
+            index,
+            vm,
+            _generation,
+            bindStartedAt,
+            cancellation,
+            _pendingBindTracker.Register()
+        );
+        _pendingBinds[index] = pending;
+        _ = BindAndRealizeAsync(pending);
+    }
+
+    private async Task BindAndRealizeAsync(PendingBind pending)
+    {
+        try
+        {
+            CollectionCardBindResult bindResult;
+            try
+            {
+                bindResult = await _factory.BindAsync(pending.Vm, pending.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "CollectionGridVirtualizer",
+                    $"Async bind for {pending.Vm.Id} failed: {ex.Message}"
+                );
+                bindResult = CollectionCardBindResult.NotReady();
+            }
+
+            var binding = bindResult.Binding;
+            var staleOrCanceled =
+                pending.IsCanceled
+                || pending.Generation != _generation
+                || _visible.Count <= pending.Index
+                || !ReferenceEquals(_visible[pending.Index], pending.Vm);
+            if (staleOrCanceled)
+            {
+                if (binding.HasValue)
+                    _factory.Return(binding.Value.Card, binding.Value.Kind);
+                return;
+            }
+
+            _firstWindowDiagnostics?.RecordBind(pending.Index, pending.BindStartedAt, binding);
+            if (bindResult.Status == CollectionCardBindStatus.HardMiss)
+                _failedBindGuids.Add(pending.Vm.Id);
+            if (!binding.HasValue)
+                return;
+
+            if (!TryAdoptBinding(pending.Index, pending.Vm, binding.Value))
+                _factory.Return(binding.Value.Card, binding.Value.Kind);
+        }
+        finally
+        {
+            if (
+                _pendingBinds.TryGetValue(pending.Index, out var current)
+                && ReferenceEquals(current, pending)
+            )
+                _pendingBinds.Remove(pending.Index);
+            pending.Dispose();
+        }
+    }
+
+    private bool TryAdoptBinding(
+        int index,
+        CollectionCardVm vm,
+        CollectionCardBinding binding
+    )
+    {
+        if (_realized.ContainsKey(index))
+            return false;
+
+        var card = binding.Card;
         var rect = card.transform as RectTransform;
         if (rect == null)
         {
-            _factory.Return(card, binding.Value.Kind);
-            return;
+            return false;
         }
 
         var hover = card.gameObject.GetComponent<CollectionCardHoverRelay>();
@@ -374,9 +461,9 @@ internal sealed class CollectionGridVirtualizer
         var cell = new RealizedCell(
             index,
             vm,
-            binding.Value.Card,
-            binding.Value.Kind,
-            binding.Value.SetUpTask,
+            binding.Card,
+            binding.Kind,
+            binding.SetUpTask,
             ++_perCellGeneration,
             hover,
             rect
@@ -385,6 +472,7 @@ internal sealed class CollectionGridVirtualizer
         Reposition(index, cell);
         ApplyCellScale(index, cell);
         _ = ShowWhenReady(cell, _generation);
+        return true;
     }
 
     // Scale the native card to fit its span cell, centered, never stretched. The cell is shrunk
@@ -565,9 +653,25 @@ internal sealed class CollectionGridVirtualizer
         _realized.Clear();
     }
 
+    private void CancelPendingBind(int index)
+    {
+        if (!_pendingBinds.Remove(index, out var pending))
+            return;
+
+        pending.Cancel();
+    }
+
+    private void CancelPendingBinds()
+    {
+        foreach (var pair in _pendingBinds)
+            pair.Value.Cancel();
+        _pendingBinds.Clear();
+    }
+
     private void BumpGeneration()
     {
         _generation++;
+        CancelPendingBinds();
         _failedBindGuids.Clear();
     }
 
@@ -628,6 +732,129 @@ internal sealed class CollectionGridVirtualizer
         // (the CanvasGroup alpha was zeroed on Take).
         public bool FadeActive { get; set; }
         public float FadeAlpha { get; set; }
+    }
+
+    private sealed class PendingBind
+    {
+        private readonly CancellationTokenSource _cancellation;
+
+        public PendingBind(
+            int index,
+            CollectionCardVm vm,
+            int generation,
+            long bindStartedAt,
+            CancellationTokenSource cancellation,
+            PendingBindTracker.PendingBindOperation operation
+        )
+        {
+            Index = index;
+            Vm = vm;
+            Generation = generation;
+            BindStartedAt = bindStartedAt;
+            _cancellation = cancellation;
+            Operation = operation;
+            Token = cancellation.Token;
+        }
+
+        public int Index { get; }
+        public CollectionCardVm Vm { get; }
+        public int Generation { get; }
+        public long BindStartedAt { get; }
+        public CancellationToken Token { get; }
+        public bool IsCanceled => Volatile.Read(ref _canceled) != 0;
+        private PendingBindTracker.PendingBindOperation Operation { get; }
+        private int _canceled;
+
+        public void Cancel()
+        {
+            Interlocked.Exchange(ref _canceled, 1);
+            try
+            {
+                _cancellation.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Completion can race with scroll-window cancellation.
+            }
+        }
+
+        public void Dispose()
+        {
+            _cancellation.Dispose();
+            Operation.Complete();
+        }
+    }
+
+    private sealed class PendingBindTracker
+    {
+        private readonly object _syncRoot = new();
+        private TaskCompletionSource<bool>? _settled;
+        private int _pendingCount;
+
+        public bool HasPendingBinds
+        {
+            get
+            {
+                lock (_syncRoot)
+                    return _pendingCount > 0;
+            }
+        }
+
+        public Task WhenSettled
+        {
+            get
+            {
+                lock (_syncRoot)
+                    return _pendingCount == 0 ? Task.CompletedTask : _settled!.Task;
+            }
+        }
+
+        public PendingBindOperation Register()
+        {
+            lock (_syncRoot)
+            {
+                if (_pendingCount == 0)
+                    _settled = new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    );
+                _pendingCount++;
+            }
+
+            return new PendingBindOperation(this);
+        }
+
+        private void Complete()
+        {
+            TaskCompletionSource<bool>? settled = null;
+            lock (_syncRoot)
+            {
+                if (_pendingCount <= 0)
+                    return;
+
+                _pendingCount--;
+                if (_pendingCount == 0)
+                    settled = _settled;
+            }
+
+            settled?.TrySetResult(true);
+        }
+
+        public sealed class PendingBindOperation
+        {
+            private readonly PendingBindTracker _tracker;
+            private int _completed;
+
+            public PendingBindOperation(PendingBindTracker tracker)
+            {
+                _tracker = tracker;
+            }
+
+            public void Complete()
+            {
+                if (Interlocked.Exchange(ref _completed, 1) == 0)
+                    _tracker.Complete();
+            }
+        }
     }
 
     private sealed class FirstWindowBindDiagnostics

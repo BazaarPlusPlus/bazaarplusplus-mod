@@ -37,7 +37,11 @@ internal sealed class CollectionCardArtCache
 
     // Returns null on load failure; the caller proceeds without a material assignment, which
     // matches the game's own behaviour for invalid art keys (blank face, frame still drawn).
-    public async Task<CardAssetDataSO?> Get(string artKey)
+    public Task<CardAssetDataSO?> Get(string artKey) => GetCore(artKey, acquireRef: false);
+
+    public Task<CardAssetDataSO?> Acquire(string artKey) => GetCore(artKey, acquireRef: true);
+
+    private async Task<CardAssetDataSO?> GetCore(string artKey, bool acquireRef)
     {
         if (string.IsNullOrEmpty(artKey))
             return null;
@@ -48,6 +52,8 @@ internal sealed class CollectionCardArtCache
         if (_entries.TryGetValue(artKey, out var existing))
         {
             Touch(artKey);
+            if (acquireRef)
+                existing.RefCount++;
             return existing.Asset;
         }
 
@@ -97,12 +103,14 @@ internal sealed class CollectionCardArtCache
                 // best-effort
             }
             Touch(artKey);
+            if (acquireRef)
+                raced.RefCount++;
             return raced.Asset;
         }
 
         var node = _lru.AddFirst(artKey);
         _nodeMap[artKey] = node;
-        _entries[artKey] = new CacheEntry(handle, handle.Result);
+        _entries[artKey] = new CacheEntry(handle, handle.Result, acquireRef ? 1 : 0);
         Evict();
         return handle.Result;
     }
@@ -199,11 +207,15 @@ internal sealed class CollectionCardArtCache
 
     private sealed class CacheEntry
     {
-        public CacheEntry(AsyncOperationHandle<CardAssetDataSO> handle, CardAssetDataSO asset)
+        public CacheEntry(
+            AsyncOperationHandle<CardAssetDataSO> handle,
+            CardAssetDataSO asset,
+            int refCount
+        )
         {
             Handle = handle;
             Asset = asset;
-            RefCount = 0;
+            RefCount = Math.Max(0, refCount);
         }
 
         public AsyncOperationHandle<CardAssetDataSO> Handle { get; }

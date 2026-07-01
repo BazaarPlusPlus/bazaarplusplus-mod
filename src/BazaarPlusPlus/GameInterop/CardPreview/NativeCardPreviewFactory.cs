@@ -86,13 +86,14 @@ internal sealed class NativeCardPreviewFactory
         NativeCardPreviewSpec? spec,
         Transform parent,
         int instanceIndex,
-        CancellationToken token = default
+        CancellationToken token = default,
+        Action<Component>? prepareBeforeActivate = null
     )
     {
         if (parent == null || !TryResolveTemplate(spec, out var template) || spec == null)
             return Task.FromResult<NativeCardPreviewHandle?>(null);
 
-        return CreateAsync(template, spec, parent, instanceIndex, token);
+        return CreateAsync(template, spec, parent, instanceIndex, token, prepareBeforeActivate);
     }
 
     public async Task<NativeCardPreviewHandle?> CreateAsync(
@@ -100,7 +101,8 @@ internal sealed class NativeCardPreviewFactory
         NativeCardPreviewSpec spec,
         Transform parent,
         int instanceIndex,
-        CancellationToken token = default
+        CancellationToken token = default,
+        Action<Component>? prepareBeforeActivate = null
     )
     {
         if (template == null || spec == null || parent == null)
@@ -120,7 +122,8 @@ internal sealed class NativeCardPreviewFactory
             kind,
             parent,
             () => _assetLoader.InstantiateReadyCardAsync(instance, parent, token),
-            token
+            token,
+            prepareBeforeActivate
         );
         if (!lease.HasValue)
             return null;

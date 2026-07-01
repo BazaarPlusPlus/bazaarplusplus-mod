@@ -43,6 +43,8 @@ internal sealed class NativeCardPreviewAssetLoader
         {
             token.ThrowIfCancellationRequested();
 
+            // Native AssetLoader checks cancellation after instantiation, so let it finish and
+            // keep cleanup inside our return/destroy ownership path.
             var gameObject = await assetLoader.InstantiateUICardAsync(
                 instance,
                 parent,

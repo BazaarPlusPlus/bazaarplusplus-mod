@@ -1,61 +1,74 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
-using BazaarGameShared.Domain.Cards.Item;
-using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
-// Resolves a CollectionCardVm into a live, SetUp-ready CardPreviewBase instance vended from
-// the pool. Both the Item and Skill branches eventually call CardPreviewBase.SetUp via
-// reflection so the mod compiles against any DLL surface where the method exists; the
-// instance argument is constructed locally (filling InstanceId / TemplateVersion / Attributes)
-// to avoid the NPE paths inside the game's CardPreviewBase.SetUp.
+// Resolves a CollectionCardVm into a live, AssetLoader-created CardPreviewBase instance.
+// NativeCardPreviewFactory owns the first SetUp call; the pre-activation prepare callback
+// adds collection-specific marker and fade components so canceled cards remain marked if
+// they are returned to the native preview pool before handle adoption.
 internal sealed class CollectionCardFactory
 {
-    private readonly CollectionCardPool _pool;
+    private readonly NativeCardPreviewFactory _nativeFactory;
     private readonly Transform _parent;
+    private readonly CollectionCardCacheSession _cacheSession;
     private readonly Func<object?> _staticDataProvider;
     private readonly Func<object?, Guid, TCardBase?> _templateResolver;
+    private readonly Dictionary<Component, NativeCardPreviewHandle> _activeHandles = new();
     private int _instanceCounter;
 
-    public CollectionCardFactory(CollectionCardPool pool, Transform parent)
+    public CollectionCardFactory(
+        NativeCardPreviewFactory nativeFactory,
+        Transform parent,
+        CollectionCardCacheSession cacheSession
+    )
         : this(
-            pool,
+            nativeFactory,
             parent,
+            cacheSession,
             BppStaticDataAccess.TryGetReadyManagerObject,
             BppStaticDataAccess.GetCardTemplate
         ) { }
 
     internal CollectionCardFactory(
-        CollectionCardPool pool,
+        NativeCardPreviewFactory nativeFactory,
         Transform parent,
+        CollectionCardCacheSession cacheSession,
         Func<object?> staticDataProvider,
         Func<object?, Guid, TCardBase?> templateResolver
     )
     {
-        _pool = pool;
+        _nativeFactory = nativeFactory ?? throw new ArgumentNullException(nameof(nativeFactory));
         _parent = parent;
+        _cacheSession = cacheSession ?? throw new ArgumentNullException(nameof(cacheSession));
         _staticDataProvider =
             staticDataProvider ?? throw new ArgumentNullException(nameof(staticDataProvider));
         _templateResolver =
             templateResolver ?? throw new ArgumentNullException(nameof(templateResolver));
     }
 
-    public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
+    public bool ReflectionReady => _nativeFactory.ReflectionReady;
 
-    public CollectionCardBindResult TryBind(CollectionCardVm vm)
+    public async Task<CollectionCardBindResult> BindAsync(
+        CollectionCardVm vm,
+        CancellationToken token = default
+    )
     {
         if (vm == null)
             return CollectionCardBindResult.HardMiss();
+
+        token.ThrowIfCancellationRequested();
 
         var nativeStaticData = _staticDataProvider();
         if (nativeStaticData == null)
@@ -71,56 +84,71 @@ internal sealed class CollectionCardFactory
             return CollectionCardBindResult.HardMiss();
         }
 
-        return Bind(vm, template);
+        return await BindAsync(vm, template, token);
     }
 
-    private CollectionCardBindResult Bind(CollectionCardVm vm, TCardBase template)
+    private async Task<CollectionCardBindResult> BindAsync(
+        CollectionCardVm vm,
+        TCardBase template,
+        CancellationToken token
+    )
     {
-        var kind =
-            vm.Type == ECardType.Skill
-                ? NativeCardPreviewKind.ForSkill()
-                : NativeCardPreviewKind.ForItem(vm.Size);
-        var card = _pool.Take(kind, _parent);
-        if (card == null)
+        var spec = BuildSpec(vm);
+        var handle = await _nativeFactory.CreateAsync(
+            template,
+            spec,
+            _parent,
+            ++_instanceCounter,
+            token,
+            PrepareCollectionCardForBind
+        );
+        if (handle == null)
             return CollectionCardBindResult.NotReady();
 
-        var instance = BuildSyntheticInstance(vm);
-        var setUpTask = NativeCardPreviewRuntime.InvokeSetUpSafe(
-            card,
-            template,
-            instance,
-            "CollectionCardFactory"
+        PrepareCollectionCardForBind(handle.Card);
+        _activeHandles[handle.Card] = handle;
+        return CollectionCardBindResult.Bound(
+            new CollectionCardBinding(handle.Card, handle.Kind, Task.CompletedTask)
         );
-        return CollectionCardBindResult.Bound(new CollectionCardBinding(card, kind, setUpTask));
     }
 
-    public void Return(Component? card, NativeCardPreviewKind kind) => _pool.Return(card, kind);
-
-    private TCardInstance BuildSyntheticInstance(CollectionCardVm vm)
+    public void Return(Component? card, NativeCardPreviewKind kind)
     {
-        var attributes = new Dictionary<ECardAttributeType, int>();
-        var id = $"bpp-collection-{++_instanceCounter}";
+        if (card == null)
+            return;
 
-        if (vm.Type == ECardType.Skill)
+        if (_activeHandles.Remove(card, out var handle))
         {
-            return new TCardInstanceSkill
-            {
-                TemplateId = vm.Id,
-                TemplateVersion = string.Empty,
-                InstanceId = id,
-                Tier = vm.StartingTier,
-                Attributes = attributes,
-            };
+            _nativeFactory.Return(handle);
+            return;
         }
 
-        return new TCardInstanceItem
+        BppLog.Debug(
+            "CollectionCardFactory",
+            $"Return skipped for untracked collection card kind={kind}."
+        );
+    }
+
+    private static NativeCardPreviewSpec BuildSpec(CollectionCardVm vm) =>
+        new()
         {
             TemplateId = vm.Id,
-            TemplateVersion = string.Empty,
-            InstanceId = id,
             Tier = vm.StartingTier,
-            Attributes = attributes,
+            DisplaySpan = vm.Type == ECardType.Skill ? 1 : CardSizeSpan.Resolve(vm.Size),
+            InstanceIdPrefix = "bpp-collection",
         };
+
+    private void PrepareCollectionCardForBind(Component card)
+    {
+        var marker = card.gameObject.GetComponent<CollectionPanelOwnedMarker>();
+        if (marker == null)
+            marker = card.gameObject.AddComponent<CollectionPanelOwnedMarker>();
+        marker.CacheOwner = _cacheSession;
+
+        var canvasGroup = card.gameObject.GetComponent<CanvasGroup>();
+        if (canvasGroup == null)
+            canvasGroup = card.gameObject.AddComponent<CanvasGroup>();
+        canvasGroup.alpha = 0f;
     }
 }
 
