@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -98,6 +100,64 @@ internal sealed class NativeCardPreviewPool
         NativeCardPreviewReflection.ApplyLayerRecursive(card.gameObject, _layer);
         NativeCardPreviewRuntime.Resize(card, _logComponent);
         return card;
+    }
+
+    public async Task<NativeCardPreviewLease?> TakeAsync(
+        NativeCardPreviewKind kind,
+        Transform parent,
+        Func<Task<Component?>> instantiateAsync,
+        CancellationToken token = default
+    )
+    {
+        if (parent == null)
+            return null;
+
+        if (!_pool.TryGetValue(kind, out var queue))
+        {
+            queue = new Queue<Component>();
+            _pool[kind] = queue;
+        }
+
+        Component? card = null;
+        var alreadySetUp = false;
+        while (queue.Count > 0)
+        {
+            var candidate = queue.Dequeue();
+            if (candidate != null)
+            {
+                card = candidate;
+                break;
+            }
+        }
+
+        if (card == null)
+        {
+            card = await instantiateAsync();
+            alreadySetUp = card != null;
+            if (card != null)
+                card.name = $"BppNativeCardPreview_{kind}";
+        }
+        else
+        {
+            card.transform.SetParent(parent, worldPositionStays: false);
+        }
+
+        if (token.IsCancellationRequested)
+        {
+            if (card != null)
+                Return(card, kind);
+            token.ThrowIfCancellationRequested();
+        }
+
+        if (card == null)
+            return null;
+
+        card.transform.localScale = Vector3.one;
+        card.transform.localRotation = Quaternion.identity;
+        card.gameObject.SetActive(true);
+        NativeCardPreviewReflection.ApplyLayerRecursive(card.gameObject, _layer);
+        NativeCardPreviewRuntime.Resize(card, _logComponent);
+        return new NativeCardPreviewLease(card, kind, alreadySetUp);
     }
 
     public void Return(NativeCardPreviewHandle? handle)
