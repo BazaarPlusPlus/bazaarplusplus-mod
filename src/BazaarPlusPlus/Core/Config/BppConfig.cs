@@ -22,6 +22,12 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; private set; }
 
+    public ConfigEntry<string>? ToggleCollectionPanelHotkeyPathConfig { get; private set; }
+
+    public ConfigEntry<string>? ToggleLiveBuildPanelHotkeyPathConfig { get; private set; }
+
+    public ConfigEntry<string>? ToggleHistoryPanelHotkeyPathConfig { get; private set; }
+
     public ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; private set; }
 
     public ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig
@@ -77,6 +83,24 @@ internal sealed class BppConfig : IBppConfig
             "UpgradePreview",
             "<Keyboard>/shift",
             "Binding path for upgrade preview tooltip mode."
+        );
+        ToggleCollectionPanelHotkeyPathConfig = config.Bind(
+            "Hotkeys",
+            "ToggleCollectionPanel",
+            "<Keyboard>/tab",
+            "Binding path for toggling the card collection panel."
+        );
+        ToggleLiveBuildPanelHotkeyPathConfig = config.Bind(
+            "Hotkeys",
+            "ToggleLiveBuildPanel",
+            "<Keyboard>/capsLock",
+            "Binding path for toggling the final build panel."
+        );
+        ToggleHistoryPanelHotkeyPathConfig = config.Bind(
+            "Hotkeys",
+            "ToggleHistoryPanel",
+            "<Keyboard>/f8",
+            "Binding path for toggling the game history panel."
         );
         ChineseLocaleModeConfig = config.Bind(
             "Localization",

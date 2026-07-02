@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.Game.LiveBuildPanel.Preview;
 using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
@@ -92,10 +93,10 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 
         var keyboard = Keyboard.current;
         if (
-            keyboard?.capsLockKey.wasPressedThisFrame == true
-            && keyboard.ctrlKey.isPressed == false
-            && keyboard.altKey.isPressed == false
-            && keyboard.shiftKey.isPressed == false
+            BppHotkeyService.WasToggleHotkeyPressedThisFrame(
+                BppHotkeyActionId.ToggleLiveBuildPanel,
+                keyboard
+            )
         )
         {
             Toggle();

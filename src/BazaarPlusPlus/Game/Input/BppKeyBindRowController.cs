@@ -15,6 +15,8 @@ internal sealed class BppKeyBindRowController : MonoBehaviour
 {
     private static BppKeyBindRowController? _activeController;
 
+    internal static bool IsRebindCaptureActive => _activeController != null;
+
     private readonly List<GameObject> _displayObjects = [];
     private readonly List<GameObject> _editObjects = [];
 

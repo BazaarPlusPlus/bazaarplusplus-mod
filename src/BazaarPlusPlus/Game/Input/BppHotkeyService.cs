@@ -72,6 +72,9 @@ internal static class BppHotkeyService
         {
             [BppHotkeyActionId.HoldEnchantPreview] = CtrlAliasPath,
             [BppHotkeyActionId.HoldUpgradePreview] = ShiftAliasPath,
+            [BppHotkeyActionId.ToggleCollectionPanel] = KeyboardPrefix + "tab",
+            [BppHotkeyActionId.ToggleLiveBuildPanel] = KeyboardPrefix + "capsLock",
+            [BppHotkeyActionId.ToggleHistoryPanel] = KeyboardPrefix + "f8",
         };
 
     private static readonly Dictionary<
@@ -132,6 +135,37 @@ internal static class BppHotkeyService
         return action.WasPressedThisFrame();
     }
 
+    // Toggle-style hotkeys fire on a plain press: while the user is capturing a rebind
+    // no toggle may fire, and unless the binding itself is a modifier key, a held
+    // Ctrl/Alt/Shift suppresses the press (preserves the legacy plain-Tab semantics).
+    internal static bool WasToggleHotkeyPressedThisFrame(
+        BppHotkeyActionId actionId,
+        Keyboard? keyboard = null
+    )
+    {
+        if (BppKeyBindRowController.IsRebindCaptureActive)
+            return false;
+
+        var path = GetBindingPath(actionId);
+        if (!WasPressedThisFrame(path))
+            return false;
+
+        if (IsModifierBindingPath(path))
+            return true;
+
+        keyboard ??= Keyboard.current;
+        return !KeyBindings.Modifiers.IsCtrlPressed(keyboard)
+            && !KeyBindings.Modifiers.IsAltPressed(keyboard)
+            && !KeyBindings.Modifiers.IsShiftPressed(keyboard);
+    }
+
+    private static bool IsModifierBindingPath(string normalizedPath)
+    {
+        return normalizedPath.Contains("ctrl", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Contains("shift", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Contains("alt", StringComparison.OrdinalIgnoreCase);
+    }
+
     // normalizedPath must already be normalized (GetBindingPath output).
     private static bool IsPressed(
         string normalizedPath,
@@ -188,16 +222,24 @@ internal static class BppHotkeyService
         if (BindingDisplayAliases.TryGetValue(normalized, out var alias))
             return alias;
 
+        if (string.IsNullOrWhiteSpace(normalized))
+            return normalized;
+
+        // Native rows resolve the live control (OS keyboard-layout name); match that
+        // instead of the static US-layout name from a control-less ToHumanReadableString.
+        var action = GetOrCreateAction(normalized);
+        if (action.controls.Count > 0)
+        {
+            var displayName = action.controls[0].displayName;
+            if (!string.IsNullOrWhiteSpace(displayName))
+                return displayName;
+        }
+
         var display = InputControlPath.ToHumanReadableString(
             normalized,
             InputControlPath.HumanReadableStringOptions.OmitDevice
         );
-        if (string.IsNullOrWhiteSpace(display))
-            return normalized;
-
-        return normalized.StartsWith(MousePrefix, StringComparison.OrdinalIgnoreCase)
-            ? $"{display}"
-            : display;
+        return string.IsNullOrWhiteSpace(display) ? normalized : display;
     }
 
     internal static bool UsesDefault(BppHotkeyActionId actionId)
@@ -231,8 +273,11 @@ internal static class BppHotkeyService
 
         if (TryGetConflictingAction(actionId, normalized, out var conflictingAction))
         {
-            errorMessage =
-                $"{BppKeybindLabelResolver.ResolveActionLabel(actionId, PlayerPreferences.Data.LanguageCode)} conflicts with {BppKeybindLabelResolver.ResolveActionLabel(conflictingAction, PlayerPreferences.Data.LanguageCode)}";
+            errorMessage = BppKeybindLabelResolver.ResolveConflictWarning(
+                actionId,
+                conflictingAction,
+                PlayerPreferences.Data.LanguageCode
+            );
             return false;
         }
 
@@ -482,6 +527,9 @@ internal static class BppHotkeyService
         {
             BppHotkeyActionId.HoldEnchantPreview => Config.EnchantPreviewHotkeyPathConfig,
             BppHotkeyActionId.HoldUpgradePreview => Config.UpgradePreviewHotkeyPathConfig,
+            BppHotkeyActionId.ToggleCollectionPanel => Config.ToggleCollectionPanelHotkeyPathConfig,
+            BppHotkeyActionId.ToggleLiveBuildPanel => Config.ToggleLiveBuildPanelHotkeyPathConfig,
+            BppHotkeyActionId.ToggleHistoryPanel => Config.ToggleHistoryPanelHotkeyPathConfig,
             _ => null,
         };
     }

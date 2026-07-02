@@ -216,6 +216,32 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
             _root.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
     }
 
+    internal bool IsTextInputFocused()
+    {
+        // UITK may focus the TextField itself or its inner text element depending on
+        // Unity version — treat any element inside a TextField as "typing".
+        var focused = _root?.focusController?.focusedElement as VisualElement;
+        if (focused == null)
+            return false;
+
+        var textField = focused as TextField ?? focused.GetFirstAncestorOfType<TextField>();
+        return textField != null && IsVisibleAndEnabled(textField);
+    }
+
+    private bool IsVisibleAndEnabled(VisualElement element)
+    {
+        for (var current = element; current != null; current = current.parent)
+        {
+            if (current.style.display.value == DisplayStyle.None || !current.enabledInHierarchy)
+                return false;
+
+            if (current == _root)
+                return true;
+        }
+
+        return false;
+    }
+
     public void Refresh(HistoryPanelUiToolkitModel model)
     {
         if (_root == null || _runsList == null || _battleList == null)
