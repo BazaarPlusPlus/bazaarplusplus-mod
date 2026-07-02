@@ -108,6 +108,7 @@ All six projects live under `src/<AssemblyName>/`, each in its own directory so 
 - On completion, follow the settled wrap-up: review your own diff, commit, merge the working branch to `master`, push, then delete branches already merged; do not commit before reviewing or when not asked
 - Keep commits scoped: when `./run.sh format`/csharpier reformats files outside your change.
 - A long-running automation task must self-heal — auto-relaunch the game process on crash/exit and continue until the goal is met, rather than stopping on the first failure
+- Never build mod file-write paths from `Application.dataPath` — on macOS its parent is the `.app` bundle root, and unsealed writes there break `codesign` re-signing and the trampoline repair (blocking `./run.sh build` after every game update). Anchor writes on `BepInEx.Paths.GameRootPath` / the `<GameRoot>/BazaarPlusPlusV4/` data dir, which BepInEx special-cases on macOS to the directory containing the `.app`
 
 # Rules Hygiene
 
