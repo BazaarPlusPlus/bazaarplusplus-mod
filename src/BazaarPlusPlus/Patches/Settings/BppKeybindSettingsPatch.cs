@@ -14,28 +14,27 @@ namespace BazaarPlusPlus.Patches.Settings;
 [HarmonyPatch(typeof(OptionsDialogController), "Awake")]
 internal static class BppKeybindSettingsAwakePatch
 {
-    private const string EnchantPreviewEnglishLabel = "Show Enchant Preview";
-    private const string UpgradePreviewEnglishLabel = "Show Upgrade Preview";
     internal const string EnchantPreviewObjectName = "BPP_Keybind_EnchantPreview";
     internal const string UpgradePreviewObjectName = "BPP_Keybind_UpgradePreview";
+    internal const string ToggleCollectionPanelObjectName = "BPP_Keybind_ToggleCollectionPanel";
+    internal const string ToggleLiveBuildPanelObjectName = "BPP_Keybind_ToggleLiveBuildPanel";
+    internal const string ToggleHistoryPanelObjectName = "BPP_Keybind_ToggleHistoryPanel";
 
     private static readonly BppKeybindDefinition[] Definitions =
     [
-        new(
-            EnchantPreviewObjectName,
-            BppHotkeyActionId.HoldEnchantPreview,
-            EnchantPreviewEnglishLabel
-        ),
-        new(
-            UpgradePreviewObjectName,
-            BppHotkeyActionId.HoldUpgradePreview,
-            UpgradePreviewEnglishLabel
-        ),
+        new(EnchantPreviewObjectName, BppHotkeyActionId.HoldEnchantPreview),
+        new(UpgradePreviewObjectName, BppHotkeyActionId.HoldUpgradePreview),
+        new(ToggleCollectionPanelObjectName, BppHotkeyActionId.ToggleCollectionPanel),
+        new(ToggleLiveBuildPanelObjectName, BppHotkeyActionId.ToggleLiveBuildPanel),
+        new(ToggleHistoryPanelObjectName, BppHotkeyActionId.ToggleHistoryPanel),
     ];
-    private static readonly string[] DefinitionObjectNames =
+    internal static readonly string[] DefinitionObjectNames =
     [
         EnchantPreviewObjectName,
         UpgradePreviewObjectName,
+        ToggleCollectionPanelObjectName,
+        ToggleLiveBuildPanelObjectName,
+        ToggleHistoryPanelObjectName,
     ];
     private static readonly FieldInfo? KeybindObjectsField = AccessTools.Field(
         typeof(OptionsDialogController),
@@ -156,20 +155,14 @@ internal static class BppKeybindSettingsAwakePatch
 
     private sealed class BppKeybindDefinition
     {
-        internal BppKeybindDefinition(
-            string objectName,
-            BppHotkeyActionId actionId,
-            string englishLabel
-        )
+        internal BppKeybindDefinition(string objectName, BppHotkeyActionId actionId)
         {
             ObjectName = objectName;
             ActionId = actionId;
-            EnglishLabel = englishLabel;
         }
 
         internal string ObjectName { get; }
         internal BppHotkeyActionId ActionId { get; }
-        internal string EnglishLabel { get; }
     }
 }
 
@@ -294,7 +287,12 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
         if (container == null)
             return false;
 
-        return container.Find(BppKeybindSettingsAwakePatch.EnchantPreviewObjectName) != null
-            && container.Find(BppKeybindSettingsAwakePatch.UpgradePreviewObjectName) != null;
+        foreach (var objectName in BppKeybindSettingsAwakePatch.DefinitionObjectNames)
+        {
+            if (container.Find(objectName) == null)
+                return false;
+        }
+
+        return true;
     }
 }
