@@ -11,13 +11,12 @@
   <ItemGroup>
     <PackageReference Include="NETStandard.Library" Version="2.0.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <!-- MessagePack: compile-only reference; the game provides the runtime DLL (game ships v3.1.4).
-         Keep this pinned to the game runtime until a runtime DLL replacement is validated in-game. -->
+    <!-- MessagePack: compile-only reference. Do not bundle a replacement; the plugin runtime
+         deliberately loads the game's MessagePack.dll. -->
     <PackageReference
       Include="MessagePack"
-      Version="3.1.4"
+      Version="3.1.7"
       ExcludeAssets="runtime"
-      NoWarn="NU1903"
     />
   </ItemGroup>
 </Project>

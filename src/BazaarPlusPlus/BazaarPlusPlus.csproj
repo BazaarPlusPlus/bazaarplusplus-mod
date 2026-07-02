@@ -33,10 +33,11 @@
     <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
     <BPPInstallerSourcePath>$(ProjectRoot)/../../../bazaarplusplus-installer/src-tauri/resources</BPPInstallerSourcePath>
     <HostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant())</HostArchitecture>
-    <MacSqliteRuntimeRid>osx-x64</MacSqliteRuntimeRid>
-    <FixedMacSqliteNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/libe_sqlite3.dylib</FixedMacSqliteNativeFile>
+    <MacSqliteRuntimeRid>osx-arm64</MacSqliteRuntimeRid>
+    <WindowsSqliteRuntimeRid>win-x64</WindowsSqliteRuntimeRid>
+    <FixedMacSqliteNativeFile>$(PkgSourceGear_sqlite3)/runtimes/$(MacSqliteRuntimeRid)/native/libe_sqlite3.dylib</FixedMacSqliteNativeFile>
     <FixedMacAudioTapNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/libBppMacAudio.dylib</FixedMacAudioTapNativeFile>
-    <FixedWindowsSqliteNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/e_sqlite3.dll</FixedWindowsSqliteNativeFile>
+    <FixedWindowsSqliteNativeFile>$(PkgSourceGear_sqlite3)/runtimes/$(WindowsSqliteRuntimeRid)/native/e_sqlite3.dll</FixedWindowsSqliteNativeFile>
     <!-- FFmpeg binary source (repackaged zips: a single ffmpeg(.exe) at the zip root) -->
     <WindowsFfmpegZip>$(BPPInstallerSourcePath)/FfmpegSource/windows/ffmpeg.zip</WindowsFfmpegZip>
     <MacFfmpegZip>$(BPPInstallerSourcePath)/FfmpegSource/macos/ffmpeg.zip</MacFfmpegZip>
@@ -94,7 +95,13 @@
       PrivateAssets="all"
       ExcludeAssets="runtime"
     />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.28" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+    <PackageReference
+      Include="SourceGear.sqlite3"
+      Version="3.50.4.5"
+      GeneratePathProperty="true"
+    />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
@@ -352,6 +359,18 @@
       DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
       SkipUnchangedFiles="true"
       Condition="'@(PluginManagedRuntimeFiles)' != ''"
+    />
+    <Copy
+      SourceFiles="@(MacSqliteNativeFile)"
+      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins"
+      SkipUnchangedFiles="true"
+      Condition="'@(MacSqliteNativeFile)' != ''"
+    />
+    <Copy
+      SourceFiles="@(WindowsSqliteNativeFile)"
+      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
+      SkipUnchangedFiles="true"
+      Condition="'@(WindowsSqliteNativeFile)' != ''"
     />
     <Message
       Text="[BazaarPlusPlus] Successfully copied Release artifacts to installer source folder."
