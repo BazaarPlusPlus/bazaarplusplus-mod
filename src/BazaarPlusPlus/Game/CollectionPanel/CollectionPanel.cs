@@ -11,6 +11,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
+using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.CardPreview;
@@ -347,7 +348,12 @@ internal sealed class CollectionPanel : MonoBehaviour
         }
 
         var keyboard = Keyboard.current;
-        if (keyboard != null && IsPlainTabPressed(keyboard))
+        if (
+            BppHotkeyService.WasToggleHotkeyPressedThisFrame(
+                BppHotkeyActionId.ToggleCollectionPanel,
+                keyboard
+            )
+        )
         {
             ToggleFromHotkey();
             return;
@@ -426,12 +432,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         _overlay?.SetAlpha(0f);
         _overlay?.SetVisible(false);
     }
-
-    private static bool IsPlainTabPressed(Keyboard keyboard) =>
-        keyboard.tabKey.wasPressedThisFrame
-        && keyboard.ctrlKey.isPressed == false
-        && keyboard.altKey.isPressed == false
-        && keyboard.shiftKey.isPressed == false;
 
     private void ToggleFromHotkey()
     {

@@ -181,12 +181,15 @@ public class CoreLayeringTests
         var collectionPanelSource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "CollectionPanel", "CollectionPanel.cs")
         );
+        const string oldCollectionPanelHotkeyPathIdentifier =
+            @"(?<![A-Za-z0-9_])CollectionPanelHotkeyPathConfig(?![A-Za-z0-9_])";
 
         Assert.DoesNotContain("CollectionPanelSettingsDockEntry", compositionSource);
-        Assert.DoesNotContain("CollectionPanelHotkeyPathConfig", configSource);
-        Assert.DoesNotContain("CollectionPanelHotkeyPathConfig", configInterfaceSource);
+        Assert.DoesNotMatch(oldCollectionPanelHotkeyPathIdentifier, configSource);
+        Assert.DoesNotMatch(oldCollectionPanelHotkeyPathIdentifier, configInterfaceSource);
         Assert.DoesNotContain("WasPressedThisFrame(togglePath", collectionPanelSource);
-        Assert.Contains("keyboard.tabKey.wasPressedThisFrame", collectionPanelSource);
+        Assert.Contains("BppHotkeyService.WasToggleHotkeyPressedThisFrame", collectionPanelSource);
+        Assert.Contains("BppHotkeyActionId.ToggleCollectionPanel", collectionPanelSource);
     }
 
     [Fact]
