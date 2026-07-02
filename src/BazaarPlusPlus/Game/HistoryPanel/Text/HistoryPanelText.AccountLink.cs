@@ -50,11 +50,21 @@ internal static partial class HistoryPanelText
             "已綁定 BazaarDB"
         );
 
+        private static readonly LocalizedTextSet NotLinkedText = new(
+            "BazaarDB not linked",
+            "BazaarDB 未绑定",
+            "BazaarDB 未綁定"
+        );
+
         private static readonly LocalizedTextSet RelinkText = new(
             "Re-link",
             "重新绑定",
             "重新綁定"
         );
+
+        private static readonly LocalizedTextSet RowBindText = new("Link…", "绑定…", "綁定…");
+
+        private static readonly LocalizedTextSet CollapseText = new("Hide", "收起", "收起");
 
         private static readonly LocalizedTextSet EmptyCodeText = new(
             "Enter your link code",
@@ -106,7 +116,13 @@ internal static partial class HistoryPanelText
 
         internal static string Linked() => Resolve(LinkedText);
 
+        internal static string NotLinked() => Resolve(NotLinkedText);
+
         internal static string Relink() => Resolve(RelinkText);
+
+        internal static string RowBind() => Resolve(RowBindText);
+
+        internal static string Collapse() => Resolve(CollapseText);
 
         internal static string EmptyCode() => Resolve(EmptyCodeText);
 

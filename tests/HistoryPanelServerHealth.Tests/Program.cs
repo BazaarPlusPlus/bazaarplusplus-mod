@@ -83,7 +83,19 @@ Assert(
 );
 Assert(
     InvokeStatic(accountLinkType, "Linked") as string == "Linked to BazaarDB",
-    "Linked badge should be name-less in English."
+    "Linked row text should be name-less in English."
+);
+Assert(
+    InvokeStatic(accountLinkType, "NotLinked") as string == "BazaarDB not linked",
+    "Not linked row text should resolve in English."
+);
+Assert(
+    InvokeStatic(accountLinkType, "RowBind") as string == "Link…",
+    "Collapsed row bind action should resolve in English."
+);
+Assert(
+    InvokeStatic(accountLinkType, "Collapse") as string == "Hide",
+    "Collapse action should resolve in English."
 );
 Assert(
     InvokeStatic(accountLinkType, "InvalidOrExpired") as string
@@ -95,7 +107,19 @@ languageProvider.CurrentLanguageCode = "zh-CN";
 modeProvider.CurrentMode = BppChineseLocaleMode.Mainland;
 Assert(
     InvokeStatic(accountLinkType, "Linked") as string == "已绑定 BazaarDB",
-    "Linked badge should resolve simplified Chinese, name-less."
+    "Linked row text should resolve simplified Chinese, name-less."
+);
+Assert(
+    InvokeStatic(accountLinkType, "NotLinked") as string == "BazaarDB 未绑定",
+    "Not linked row text should resolve simplified Chinese."
+);
+Assert(
+    InvokeStatic(accountLinkType, "RowBind") as string == "绑定…",
+    "Collapsed row bind action should resolve simplified Chinese."
+);
+Assert(
+    InvokeStatic(accountLinkType, "Collapse") as string == "收起",
+    "Collapse action should resolve simplified Chinese."
 );
 Assert(
     InvokeStatic(accountLinkType, "Offline") as string == "无法连接 BazaarDB，请检查网络",
@@ -106,6 +130,18 @@ modeProvider.CurrentMode = BppChineseLocaleMode.Taiwan;
 Assert(
     InvokeStatic(accountLinkType, "Relink") as string == "重新綁定",
     "Relink should resolve traditional Chinese when Taiwan mode is active."
+);
+Assert(
+    InvokeStatic(accountLinkType, "NotLinked") as string == "BazaarDB 未綁定",
+    "Not linked row text should resolve traditional Chinese when Taiwan mode is active."
+);
+Assert(
+    InvokeStatic(accountLinkType, "RowBind") as string == "綁定…",
+    "Collapsed row bind action should resolve traditional Chinese when Taiwan mode is active."
+);
+Assert(
+    InvokeStatic(accountLinkType, "Collapse") as string == "收起",
+    "Collapse action should resolve traditional Chinese when Taiwan mode is active."
 );
 Assert(
     InvokeStatic(accountLinkType, "ServerBusy") as string == "BazaarDB 暫時無法使用，請稍後重試",
@@ -148,8 +184,11 @@ foreach (
 )
 {
     Assert(
-        !(bool)
-            InvokeStatic(coordinatorType, "OutcomeConfirmsLink", Enum.Parse(outcomeType, failing)),
+        !(bool)InvokeStatic(
+            coordinatorType,
+            "OutcomeConfirmsLink",
+            Enum.Parse(outcomeType, failing)
+        ),
         $"{failing} must not confirm the link (contract: 409 is a different user; errors never link)."
     );
 }
