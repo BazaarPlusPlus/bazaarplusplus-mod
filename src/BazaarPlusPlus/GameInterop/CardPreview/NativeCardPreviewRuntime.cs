@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
+using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
@@ -71,7 +73,8 @@ internal static class NativeCardPreviewRuntime
         Component card,
         TCardBase template,
         TCardInstance instance,
-        string logComponent
+        string logComponent,
+        CancellationToken token = default
     )
     {
         var method = NativeCardPreviewReflection.SetUpMethod;
@@ -80,9 +83,19 @@ internal static class NativeCardPreviewRuntime
 
         try
         {
-            var raw = method.Invoke(card, new object[] { template, false, instance });
+            var raw = method.Invoke(card, new object[] { template, false, instance, token });
             if (raw is Task task)
                 await task;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (TargetInvocationException ex)
+            when (ex.InnerException is OperationCanceledException)
+        {
+            ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
+            throw;
         }
         catch (TargetInvocationException ex)
         {

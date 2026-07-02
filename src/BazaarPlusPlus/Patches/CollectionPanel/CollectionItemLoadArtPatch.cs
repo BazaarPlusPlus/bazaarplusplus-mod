@@ -6,6 +6,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.UI;
+using Object = UnityEngine.Object;
 
 namespace BazaarPlusPlus.Patches.CollectionPanel;
 
@@ -25,22 +26,23 @@ internal static class CollectionItemLoadArtPatch
         if (marker == null)
             return true;
 
-        var artCache = CollectionCardCacheHost.ArtCache;
-        var materialCache = CollectionCardCacheHost.MaterialCache;
-        if (artCache == null || materialCache == null)
+        var cacheSession = marker.CacheOwner ?? CollectionCardCacheHost.ActiveSession;
+        if (cacheSession == null)
             return true;
 
-        __result = LoadArtFromCache(__instance, marker, artCache, materialCache);
+        __result = LoadArtFromCache(__instance, marker, cacheSession);
         return false;
     }
 
     private static async Task LoadArtFromCache(
         CardPreviewItem instance,
         CollectionPanelOwnedMarker marker,
-        CollectionCardArtCache artCache,
-        CollectionCardMaterialCache materialCache
+        CollectionCardCacheSession cacheSession
     )
     {
+        string? acquiredArtKey = null;
+        var acquiredNewArtRef = false;
+        var committedNewArtRef = false;
         try
         {
             var card = instance._cardData;
@@ -53,53 +55,79 @@ internal static class CollectionItemLoadArtPatch
                 || string.Equals(artKey, "Invalid", StringComparison.Ordinal)
             )
             {
-                ReleaseCurrentArtKey(marker, artCache, materialCache);
-                marker.CurrentArtKey = null;
+                ClearCachedMaterialAssignment(instance, marker);
                 return;
             }
 
-            // Release the prior assignment first so refcounts stay accurate when the card is
-            // rebound to a different artKey through the pool.
-            var changedArtKey = !string.Equals(
-                marker.CurrentArtKey,
-                artKey,
-                StringComparison.Ordinal
-            );
-            if (changedArtKey)
-            {
-                ReleaseCurrentArtKey(marker, artCache, materialCache);
-                artCache.AddRef(artKey);
-                materialCache.Acquire(artKey);
-                marker.CurrentArtKey = artKey;
-            }
+            var hasCurrentRef =
+                marker.CacheOwner != null
+                && string.Equals(marker.CurrentArtKey, artKey, StringComparison.Ordinal);
+            var needsNewRef = !hasCurrentRef;
 
-            var assetData = await artCache.Get(artKey);
+            var assetData = needsNewRef
+                ? await cacheSession.ArtCache.Acquire(artKey)
+                : await cacheSession.ArtCache.Get(artKey);
+            acquiredNewArtRef = needsNewRef && assetData != null;
+            acquiredArtKey = acquiredNewArtRef ? artKey : null;
             if (instance == null)
+            {
+                if (acquiredNewArtRef)
+                {
+                    cacheSession.ArtCache.Release(artKey);
+                    acquiredNewArtRef = false;
+                }
                 return;
+            }
             if (assetData == null || assetData.cardMaterial == null)
             {
-                if (changedArtKey)
-                    ReleaseCurrentArtKey(marker, artCache, materialCache);
+                if (acquiredNewArtRef)
+                {
+                    cacheSession.ArtCache.Release(artKey);
+                    acquiredNewArtRef = false;
+                }
+                if (needsNewRef)
+                    ClearCachedMaterialAssignment(instance, marker);
                 return;
             }
 
-            var material = materialCache.GetOrCreate(
+            var material = cacheSession.MaterialCache.GetOrCreate(
                 artKey,
                 assetData,
                 instance._cardMaterialShader
             );
             if (material == null)
             {
-                if (changedArtKey)
-                    ReleaseCurrentArtKey(marker, artCache, materialCache);
+                if (acquiredNewArtRef)
+                {
+                    cacheSession.ArtCache.Release(artKey);
+                    acquiredNewArtRef = false;
+                }
+                if (needsNewRef)
+                    ClearCachedMaterialAssignment(instance, marker);
                 return;
             }
 
-            // Shared material across cards: do NOT destroy the previous _cardMaterial — it is
-            // either the same shared instance or another shared instance still in use by
-            // someone else. The OnDestroy patch nulls _cardMaterial before the game's
-            // OnDestroy gets a chance to destroy it (see CollectionCardPreviewDestroyPatch).
+            if (needsNewRef)
+            {
+                cacheSession.MaterialCache.Acquire(artKey);
+                marker.ReleaseCurrentArtKey();
+                marker.CacheOwner = cacheSession;
+                marker.CurrentArtKey = artKey;
+                committedNewArtRef = true;
+                acquiredNewArtRef = false;
+            }
+
+            if (
+                !marker.CardMaterialOwnedByCache
+                && instance._cardMaterial != null
+                && !ReferenceEquals(instance._cardMaterial, material)
+            )
+            {
+                Object.Destroy(instance._cardMaterial);
+            }
+
             instance._cardMaterial = material;
+            marker.CardMaterialOwnedByCache = true;
             if (instance._cardImage != null)
                 instance._cardImage.material = material;
 
@@ -107,21 +135,27 @@ internal static class CollectionItemLoadArtPatch
         }
         catch (Exception ex)
         {
+            if (acquiredNewArtRef && !committedNewArtRef && !string.IsNullOrEmpty(acquiredArtKey))
+                cacheSession.ArtCache.Release(acquiredArtKey!);
             BppLog.Warn("CollectionItemLoadArtPatch", $"Cached LoadArt failed: {ex.Message}");
         }
     }
 
-    private static void ReleaseCurrentArtKey(
-        CollectionPanelOwnedMarker marker,
-        CollectionCardArtCache artCache,
-        CollectionCardMaterialCache materialCache
+    private static void ClearCachedMaterialAssignment(
+        CardPreviewItem instance,
+        CollectionPanelOwnedMarker marker
     )
     {
-        if (!string.IsNullOrEmpty(marker.CurrentArtKey))
+        if (!marker.CardMaterialOwnedByCache && instance._cardMaterial != null)
         {
-            artCache.Release(marker.CurrentArtKey!);
-            materialCache.Release(marker.CurrentArtKey!);
-            marker.CurrentArtKey = null;
+            Object.Destroy(instance._cardMaterial);
         }
+
+        instance._cardMaterial = null!;
+        if (instance._cardImage != null)
+            instance._cardImage.material = null;
+        marker.CardMaterialOwnedByCache = false;
+
+        marker.ReleaseCurrentArtKey();
     }
 }

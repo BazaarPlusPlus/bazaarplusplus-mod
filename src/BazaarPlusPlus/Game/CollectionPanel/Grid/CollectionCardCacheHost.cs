@@ -8,22 +8,38 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // panel exists and after it tears down.
 internal static class CollectionCardCacheHost
 {
-    public static CollectionCardArtCache? ArtCache { get; private set; }
-    public static CollectionCardMaterialCache? MaterialCache { get; private set; }
+    public static CollectionCardCacheSession? ActiveSession { get; private set; }
+    public static CollectionCardArtCache? ArtCache => ActiveSession?.ArtCache;
+    public static CollectionCardMaterialCache? MaterialCache => ActiveSession?.MaterialCache;
 
-    public static void Install(CollectionCardArtCache art, CollectionCardMaterialCache material)
+    public static CollectionCardCacheSession Install(
+        CollectionCardArtCache art,
+        CollectionCardMaterialCache material
+    )
     {
-        ArtCache = art;
-        MaterialCache = material;
+        var session = new CollectionCardCacheSession(art, material);
+        ActiveSession = session;
+        return session;
     }
 
-    public static void Uninstall(CollectionCardArtCache? art, CollectionCardMaterialCache? material)
+    public static void Uninstall(CollectionCardCacheSession? session)
     {
-        // Compare by reference: a previous Install may have been superseded by a newer panel
-        // instance after a scene change. We only clear if the caller is still the active one.
-        if (art != null && ReferenceEquals(ArtCache, art))
-            ArtCache = null;
-        if (material != null && ReferenceEquals(MaterialCache, material))
-            MaterialCache = null;
+        if (session != null && ReferenceEquals(ActiveSession, session))
+            ActiveSession = null;
     }
+}
+
+internal sealed class CollectionCardCacheSession
+{
+    public CollectionCardCacheSession(
+        CollectionCardArtCache artCache,
+        CollectionCardMaterialCache materialCache
+    )
+    {
+        ArtCache = artCache;
+        MaterialCache = materialCache;
+    }
+
+    public CollectionCardArtCache ArtCache { get; }
+    public CollectionCardMaterialCache MaterialCache { get; }
 }

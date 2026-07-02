@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
@@ -16,6 +17,7 @@ namespace BazaarPlusPlus.GameInterop.CardPreview;
 internal sealed class NativeCardPreviewFactory
 {
     private readonly NativeCardPreviewPool _pool;
+    private readonly NativeCardPreviewAssetLoader _assetLoader;
     private readonly string _logComponent;
 
     public NativeCardPreviewFactory(NativeCardPreviewPool pool, string logComponent)
@@ -24,11 +26,10 @@ internal sealed class NativeCardPreviewFactory
         _logComponent = string.IsNullOrWhiteSpace(logComponent)
             ? "NativeCardPreviewFactory"
             : logComponent;
+        _assetLoader = new NativeCardPreviewAssetLoader(_logComponent);
     }
 
     public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
-
-    public bool EnsureReady(bool requireSkill = false) => _pool.TryEnsurePrefabRefs(requireSkill);
 
     public bool TryResolveSpan(NativeCardPreviewSpec? spec, out int span)
     {
@@ -40,13 +41,30 @@ internal sealed class NativeCardPreviewFactory
         return true;
     }
 
-    public NativeCardPreviewHandle? TryCreate(
+    public Task<NativeCardPreviewHandle?> CreateAsync(
         NativeCardPreviewSpec? spec,
         Transform parent,
-        int instanceIndex
+        int instanceIndex,
+        CancellationToken token = default,
+        Action<Component>? prepareBeforeActivate = null
     )
     {
         if (parent == null || !TryResolveTemplate(spec, out var template) || spec == null)
+            return Task.FromResult<NativeCardPreviewHandle?>(null);
+
+        return CreateAsync(template, spec, parent, instanceIndex, token, prepareBeforeActivate);
+    }
+
+    public async Task<NativeCardPreviewHandle?> CreateAsync(
+        TCardBase template,
+        NativeCardPreviewSpec spec,
+        Transform parent,
+        int instanceIndex,
+        CancellationToken token = default,
+        Action<Component>? prepareBeforeActivate = null
+    )
+    {
+        if (template == null || spec == null || parent == null)
             return null;
 
         if (!TryResolveKind(template, out var kind))
@@ -58,25 +76,51 @@ internal sealed class NativeCardPreviewFactory
             return null;
         }
 
-        var card = _pool.Take(kind, parent);
-        if (card == null)
+        var instance = BuildSyntheticInstance(spec, kind, instanceIndex);
+        var lease = await _pool.TakeAsync(
+            kind,
+            parent,
+            () => _assetLoader.InstantiateReadyCardAsync(instance, parent, token),
+            token,
+            prepareBeforeActivate
+        );
+        if (!lease.HasValue)
             return null;
 
-        var rect = card.transform as RectTransform ?? card.GetComponent<RectTransform>();
-        if (rect == null)
+        var leased = lease.Value;
+        var card = leased.Card;
+        var ownsCard = true;
+        try
         {
-            _pool.Return(card, kind);
+            if (!leased.AlreadySetUp)
+            {
+                await NativeCardPreviewRuntime.InvokeSetUpSafe(
+                    card,
+                    template,
+                    instance,
+                    _logComponent,
+                    token
+                );
+            }
+
+            token.ThrowIfCancellationRequested();
+
+            var rect = card.transform as RectTransform ?? card.GetComponent<RectTransform>();
+            if (rect == null)
+                return null;
+
+            ownsCard = false;
+            return new NativeCardPreviewHandle(card, rect, kind, Task.CompletedTask, spec);
+        }
+        catch (OperationCanceledException)
+        {
             return null;
         }
-
-        var instance = BuildSyntheticInstance(spec, kind, instanceIndex);
-        var setUpTask = NativeCardPreviewRuntime.InvokeSetUpSafe(
-            card,
-            template,
-            instance,
-            _logComponent
-        );
-        return new NativeCardPreviewHandle(card, rect, kind, setUpTask, spec);
+        finally
+        {
+            if (ownsCard)
+                _pool.Return(card, kind);
+        }
     }
 
     public void Show(NativeCardPreviewHandle? handle, bool show = true)

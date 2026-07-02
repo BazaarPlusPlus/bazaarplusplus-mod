@@ -239,6 +239,278 @@ public class CoreLayeringTests
             )
         );
 
+        static int Find(string source, string value, int startIndex = 0) =>
+            source.IndexOf(value, startIndex, StringComparison.Ordinal);
+
+        var pendingBindsFieldIndex = Find(
+            virtualizerSource,
+            "private readonly Dictionary<int, PendingBind> _pendingBinds = new();"
+        );
+        var pendingBindTrackerFieldIndex = Find(
+            virtualizerSource,
+            "private readonly PendingBindTracker _pendingBindTracker = new();"
+        );
+        var hasPendingBindsIndex = Find(
+            virtualizerSource,
+            "public bool HasPendingBinds => _pendingBindTracker.HasPendingBinds;"
+        );
+        var whenPendingBindsSettledIndex = Find(
+            virtualizerSource,
+            "public Task WhenPendingBindsSettled => _pendingBindTracker.WhenSettled;"
+        );
+        var tryRealizeIndex = Find(virtualizerSource, "private void TryRealize(int index)");
+        var pendingCreateIndex = Find(
+            virtualizerSource,
+            "var pending = new PendingBind(",
+            tryRealizeIndex
+        );
+        var pendingRegisterIndex = Find(
+            virtualizerSource,
+            "_pendingBindTracker.Register()",
+            pendingCreateIndex
+        );
+        var pendingTrackIndex = Find(
+            virtualizerSource,
+            "_pendingBinds[index] = pending;",
+            pendingCreateIndex
+        );
+        var pendingStartIndex = Find(
+            virtualizerSource,
+            "_ = BindAndRealizeAsync(pending);",
+            pendingTrackIndex
+        );
+        var bindAndRealizeIndex = Find(
+            virtualizerSource,
+            "private async Task BindAndRealizeAsync(PendingBind pending)"
+        );
+        var bindAsyncIndex = Find(
+            virtualizerSource,
+            "bindResult = await _factory.BindAsync(pending.Vm, pending.Token);",
+            bindAndRealizeIndex
+        );
+        var staleOrCanceledIndex = Find(
+            virtualizerSource,
+            "var staleOrCanceled =",
+            bindAsyncIndex
+        );
+        var canceledCheckIndex = Find(
+            virtualizerSource,
+            "pending.IsCanceled",
+            staleOrCanceledIndex
+        );
+        var staleGenerationIndex = Find(
+            virtualizerSource,
+            "pending.Generation != _generation",
+            staleOrCanceledIndex
+        );
+        var staleReturnIndex = Find(
+            virtualizerSource,
+            "_factory.Return(binding.Value.Card, binding.Value.Kind);",
+            staleOrCanceledIndex
+        );
+        var removePendingIndex = Find(
+            virtualizerSource,
+            "_pendingBinds.Remove(pending.Index);",
+            staleReturnIndex
+        );
+        var pendingDisposeIndex = Find(virtualizerSource, "pending.Dispose();", removePendingIndex);
+        var pendingTrackerIndex = Find(
+            virtualizerSource,
+            "private sealed class PendingBindTracker"
+        );
+        var trackerHasPendingBindsIndex = Find(
+            virtualizerSource,
+            "public bool HasPendingBinds",
+            pendingTrackerIndex
+        );
+        var trackerWhenSettledIndex = Find(
+            virtualizerSource,
+            "public Task WhenSettled",
+            trackerHasPendingBindsIndex
+        );
+        var trackerRegisterIndex = Find(
+            virtualizerSource,
+            "public PendingBindOperation Register()",
+            trackerWhenSettledIndex
+        );
+
+        Assert.True(
+            pendingBindsFieldIndex >= 0,
+            "CollectionGridVirtualizer should track in-flight async binds by visible index."
+        );
+        Assert.True(
+            pendingBindTrackerFieldIndex > pendingBindsFieldIndex,
+            "CollectionGridVirtualizer should keep a pending-bind tracker next to the pending bind map."
+        );
+        Assert.True(
+            hasPendingBindsIndex > pendingBindTrackerFieldIndex,
+            "CollectionGridVirtualizer should expose whether async binds are pending."
+        );
+        Assert.True(
+            whenPendingBindsSettledIndex > hasPendingBindsIndex,
+            "CollectionGridVirtualizer should expose a task that completes when pending async binds settle."
+        );
+        Assert.True(tryRealizeIndex >= 0, "CollectionGridVirtualizer.TryRealize should exist.");
+        Assert.True(
+            pendingCreateIndex > tryRealizeIndex,
+            "TryRealize should create a PendingBind before starting async card realization."
+        );
+        Assert.True(
+            pendingRegisterIndex > pendingCreateIndex,
+            "TryRealize should register each pending bind with PendingBindTracker."
+        );
+        Assert.True(
+            pendingTrackIndex > pendingCreateIndex,
+            "TryRealize should add new pending binds to _pendingBinds before awaiting completion."
+        );
+        Assert.True(
+            pendingStartIndex > pendingTrackIndex,
+            "TryRealize should start BindAndRealizeAsync for the tracked pending bind."
+        );
+        Assert.True(
+            bindAndRealizeIndex >= 0,
+            "CollectionGridVirtualizer.BindAndRealizeAsync should exist."
+        );
+        Assert.True(
+            bindAsyncIndex > bindAndRealizeIndex,
+            "BindAndRealizeAsync should await CollectionCardFactory.BindAsync with the pending VM and cancellation token."
+        );
+        Assert.True(
+            canceledCheckIndex > staleOrCanceledIndex,
+            "BindAndRealizeAsync should treat canceled pending binds as stale completions."
+        );
+        Assert.True(
+            staleGenerationIndex > staleOrCanceledIndex,
+            "BindAndRealizeAsync should treat generation changes as stale completions."
+        );
+        Assert.True(
+            staleReturnIndex > staleOrCanceledIndex,
+            "Stale or canceled async bind completions should return created native cards to the factory."
+        );
+        Assert.True(
+            removePendingIndex > staleReturnIndex,
+            "BindAndRealizeAsync should remove completed pending binds from _pendingBinds."
+        );
+        Assert.True(
+            pendingDisposeIndex > removePendingIndex,
+            "BindAndRealizeAsync should dispose pending bind operations so PendingBindTracker can settle."
+        );
+        Assert.True(
+            trackerHasPendingBindsIndex > pendingTrackerIndex,
+            "PendingBindTracker should expose HasPendingBinds."
+        );
+        Assert.True(
+            trackerWhenSettledIndex > trackerHasPendingBindsIndex,
+            "PendingBindTracker should expose a settled task for tests and callers."
+        );
+        Assert.True(
+            trackerRegisterIndex > trackerWhenSettledIndex,
+            "PendingBindTracker should register operations that are completed when pending binds are disposed."
+        );
+
+        var pendingRecycleScratchIndex = Find(virtualizerSource, "_pendingRecycleScratch.Clear()");
+        var pendingOutOfWindowIndex = Find(
+            virtualizerSource,
+            "if (pair.Key < firstIdx || pair.Key > lastIdx)",
+            pendingRecycleScratchIndex
+        );
+        var cancelScrolledPendingIndex = Find(
+            virtualizerSource,
+            "CancelPendingBind(index);",
+            pendingOutOfWindowIndex
+        );
+        var cancelPendingBindIndex = Find(
+            virtualizerSource,
+            "private void CancelPendingBind(int index)"
+        );
+        var removeScrolledPendingIndex = Find(
+            virtualizerSource,
+            "if (!_pendingBinds.Remove(index, out var pending))",
+            cancelPendingBindIndex
+        );
+        var cancelScrolledOperationIndex = Find(
+            virtualizerSource,
+            "pending.Cancel();",
+            removeScrolledPendingIndex
+        );
+        var cancelPendingBindsIndex = Find(virtualizerSource, "private void CancelPendingBinds()");
+        var cancelAllIterationIndex = Find(
+            virtualizerSource,
+            "foreach (var pair in _pendingBinds)",
+            cancelPendingBindsIndex
+        );
+        var cancelAllOperationIndex = Find(
+            virtualizerSource,
+            "pair.Value.Cancel();",
+            cancelAllIterationIndex
+        );
+        var clearAllPendingIndex = Find(
+            virtualizerSource,
+            "_pendingBinds.Clear();",
+            cancelAllOperationIndex
+        );
+        var bumpGenerationIndex = Find(virtualizerSource, "private void BumpGeneration()");
+        var bumpGenerationCancelIndex = Find(
+            virtualizerSource,
+            "CancelPendingBinds();",
+            bumpGenerationIndex
+        );
+        var disposeIndex = Find(virtualizerSource, "public void Dispose()");
+        var disposeBumpGenerationIndex = Find(
+            virtualizerSource,
+            "BumpGeneration();",
+            disposeIndex
+        );
+
+        Assert.True(
+            pendingRecycleScratchIndex >= 0,
+            "Tick should inspect pending binds that may have scrolled out of the visible window."
+        );
+        Assert.True(
+            pendingOutOfWindowIndex > pendingRecycleScratchIndex,
+            "Tick should identify pending binds outside the current visible index window."
+        );
+        Assert.True(
+            cancelScrolledPendingIndex > pendingOutOfWindowIndex,
+            "Pending binds that scroll out of the visible window should be canceled by index."
+        );
+        Assert.True(
+            cancelPendingBindIndex >= 0,
+            "CollectionGridVirtualizer.CancelPendingBind should exist."
+        );
+        Assert.True(
+            removeScrolledPendingIndex > cancelPendingBindIndex,
+            "CancelPendingBind should remove the pending bind from _pendingBinds."
+        );
+        Assert.True(
+            cancelScrolledOperationIndex > removeScrolledPendingIndex,
+            "CancelPendingBind should cancel the removed pending operation."
+        );
+        Assert.True(
+            cancelPendingBindsIndex >= 0,
+            "CollectionGridVirtualizer.CancelPendingBinds should exist."
+        );
+        Assert.True(
+            cancelAllIterationIndex > cancelPendingBindsIndex,
+            "CancelPendingBinds should visit every pending bind."
+        );
+        Assert.True(
+            cancelAllOperationIndex > cancelAllIterationIndex,
+            "CancelPendingBinds should cancel every pending operation."
+        );
+        Assert.True(
+            clearAllPendingIndex > cancelAllOperationIndex,
+            "CancelPendingBinds should clear the pending bind map after cancellation."
+        );
+        Assert.True(
+            bumpGenerationCancelIndex > bumpGenerationIndex,
+            "BumpGeneration should cancel pending binds on filter/tab generation changes."
+        );
+        Assert.True(
+            disposeBumpGenerationIndex > disposeIndex,
+            "Dispose should bump the generation so pending async binds are canceled."
+        );
+
         var showWhenReadyIndex = virtualizerSource.IndexOf(
             "private async Task ShowWhenReady",
             StringComparison.Ordinal
@@ -265,6 +537,127 @@ public class CoreLayeringTests
         Assert.True(
             generationMismatchIndex > pendingReturnIndex,
             "Pending-return cells must be returned to the pool even when Dispose changed the generation."
+        );
+    }
+
+    [Fact]
+    public void CollectionGridVirtualizer_measures_native_visual_bounds_for_card_layout()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var virtualizerSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CollectionPanel",
+                "Grid",
+                "CollectionGridVirtualizer.cs"
+            )
+        );
+
+        static int Find(string source, string value, int startIndex = 0) =>
+            source.IndexOf(value, startIndex, StringComparison.Ordinal);
+
+        var applyCellScaleIndex = Find(virtualizerSource, "private void ApplyCellScale");
+        var repositionIndex = Find(virtualizerSource, "private void Reposition", applyCellScaleIndex);
+        var scaleBoundsIndex = Find(
+            virtualizerSource,
+            "var visualBounds = ResolveNativeVisualBounds(rect);",
+            applyCellScaleIndex
+        );
+        var natWIndex = Find(virtualizerSource, "var natW = visualBounds.Width;", scaleBoundsIndex);
+        var natHIndex = Find(virtualizerSource, "var natH = visualBounds.Height;", natWIndex);
+        var legacyRootSizeIndex = Find(
+            virtualizerSource,
+            "var sizeDelta = rect.sizeDelta;",
+            applyCellScaleIndex
+        );
+        var frameLookupIndex = Find(
+            virtualizerSource,
+            "FindDescendant(root, \"FrameContainer\")"
+        );
+        var rawImageBoundsIndex = Find(
+            virtualizerSource,
+            "TryMeasureRawImageBounds(root, out var imageBounds)",
+            frameLookupIndex
+        );
+        var aspectFallbackCallIndex = Find(
+            virtualizerSource,
+            "TryResolveAspectRatioFallbackBounds(root, out var aspectBounds)",
+            rawImageBoundsIndex
+        );
+        var aspectFallbackMethodIndex = Find(
+            virtualizerSource,
+            "GetComponent<AspectRatioFitter>()"
+        );
+        var fallbackHeightIndex = Find(
+            virtualizerSource,
+            "FallbackNativeCardHeight",
+            aspectFallbackMethodIndex
+        );
+        var centerOffsetIndex = Find(
+            virtualizerSource,
+            "targetCenter.x - visualBounds.Center.x * rect.localScale.x",
+            repositionIndex
+        );
+
+        Assert.True(applyCellScaleIndex >= 0, "CollectionGridVirtualizer.ApplyCellScale should exist.");
+        Assert.True(
+            scaleBoundsIndex > applyCellScaleIndex,
+            "ApplyCellScale should measure native visual bounds instead of trusting the root RectTransform size."
+        );
+        Assert.True(
+            natWIndex > scaleBoundsIndex && natHIndex > natWIndex,
+            "ApplyCellScale should derive native width/height from the measured visual bounds."
+        );
+        Assert.True(
+            legacyRootSizeIndex < 0 || legacyRootSizeIndex > repositionIndex,
+            "ApplyCellScale must not use root rect.sizeDelta directly; native item roots can be zero-sized."
+        );
+        Assert.True(
+            frameLookupIndex > repositionIndex,
+            "Native visual bounds should prefer the CardPreviewBase FrameContainer subtree."
+        );
+        Assert.True(
+            rawImageBoundsIndex > frameLookupIndex,
+            "Native visual bounds should fall back to RawImage bounds when FrameContainer is not a RectTransform subtree."
+        );
+        Assert.True(
+            aspectFallbackCallIndex > rawImageBoundsIndex
+                && aspectFallbackMethodIndex >= 0
+                && fallbackHeightIndex > aspectFallbackMethodIndex,
+            "Native visual bounds should synthesize a stable item root size from AspectRatioFitter when native item RectTransforms report zero size."
+        );
+        Assert.True(
+            centerOffsetIndex > repositionIndex,
+            "Reposition should align the measured native visual center, not just the root pivot."
+        );
+
+        var showWhenReadyIndex = Find(virtualizerSource, "private async Task ShowWhenReady");
+        var nativeShowIndex = Find(virtualizerSource, "NativeCardPreviewRuntime.Show(", showWhenReadyIndex);
+        var showScaleIndex = Find(
+            virtualizerSource,
+            "ApplyCellScale(cell.Index, cell);",
+            nativeShowIndex
+        );
+        var showRepositionIndex = Find(
+            virtualizerSource,
+            "Reposition(cell.Index, cell);",
+            showScaleIndex
+        );
+        var fadeStartIndex = Find(virtualizerSource, "cell.FadeActive = true;", showRepositionIndex);
+
+        Assert.True(
+            showScaleIndex > nativeShowIndex,
+            "ShowWhenReady should reapply scale after Show(true) reactivates native frame/image objects."
+        );
+        Assert.True(
+            showRepositionIndex > showScaleIndex,
+            "ShowWhenReady should reposition after the post-Show(true) scale pass."
+        );
+        Assert.True(
+            fadeStartIndex > showRepositionIndex,
+            "ShowWhenReady should finish native layout before handing the card to the fade-in path."
         );
     }
 

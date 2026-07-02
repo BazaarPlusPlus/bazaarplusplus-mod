@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Runtime;
@@ -34,11 +35,16 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // no-op because the generation has moved), and the realized cells are recycled.
 internal sealed class CollectionGridVirtualizer
 {
+    private const float FallbackNativeCardHeight = 200f;
+
     private readonly CollectionGridOverlay _overlay;
     private readonly CollectionCardFactory _factory;
     private readonly Dictionary<int, RealizedCell> _realized = new();
+    private readonly Dictionary<int, PendingBind> _pendingBinds = new();
+    private readonly PendingBindTracker _pendingBindTracker = new();
     private readonly HashSet<Guid> _failedBindGuids = new();
     private readonly List<int> _recycleScratch = new();
+    private readonly List<int> _pendingRecycleScratch = new();
     private readonly List<CollectionGridRect> _slotRects = new();
     private readonly CollectionGridSlotLayer? _slots;
 
@@ -83,6 +89,8 @@ internal sealed class CollectionGridVirtualizer
             ? 0f
             : 2f * CollectionGridConstants.GridOuterPadding + _layout.ContentHeight(_unit, _gap);
     public int VisibleCount => _visible.Count;
+    public bool HasPendingBinds => _pendingBindTracker.HasPendingBinds;
+    public Task WhenPendingBindsSettled => _pendingBindTracker.WhenSettled;
 
     // SetVisible swaps in a new ordered visible set (typically after filter change) and
     // recycles everything currently realized. Caller is expected to also reset scrollY to 0.
@@ -134,6 +142,8 @@ internal sealed class CollectionGridVirtualizer
         {
             if (_realized.Count > 0)
                 RecycleAll();
+            if (_pendingBinds.Count > 0)
+                CancelPendingBinds();
             _slots?.Clear();
             return;
         }
@@ -181,13 +191,21 @@ internal sealed class CollectionGridVirtualizer
             _realized.Remove(index);
             RecycleCell(cell);
         }
+        _pendingRecycleScratch.Clear();
+        foreach (var pair in _pendingBinds)
+        {
+            if (pair.Key < firstIdx || pair.Key > lastIdx)
+                _pendingRecycleScratch.Add(pair.Key);
+        }
+        foreach (var index in _pendingRecycleScratch)
+            CancelPendingBind(index);
 
         // 2) Realize newly-visible cells, rate-limited by wall-clock budget for cold binds.
         var tickStart = Time.realtimeSinceStartup;
         var coldBudgetSeconds = CollectionGridConstants.ColdBindBudgetMs * 0.001f;
         for (var idx = firstIdx; idx <= lastIdx; idx++)
         {
-            if (_realized.ContainsKey(idx))
+            if (_realized.ContainsKey(idx) || _pendingBinds.ContainsKey(idx))
                 continue;
             if (Time.realtimeSinceStartup - tickStart > coldBudgetSeconds)
                 break;
@@ -205,9 +223,9 @@ internal sealed class CollectionGridVirtualizer
             _lastScrollY = _scrollY;
             foreach (var pair in _realized)
             {
-                Reposition(pair.Key, pair.Value);
                 if (_scaleDirty)
                     ApplyCellScale(pair.Key, pair.Value);
+                Reposition(pair.Key, pair.Value);
             }
             _scaleDirty = false;
             SyncSlots(firstIdx, lastIdx);
@@ -344,21 +362,92 @@ internal sealed class CollectionGridVirtualizer
         var vm = _visible[index];
         if (_failedBindGuids.Contains(vm.Id))
             return;
+        if (_realized.ContainsKey(index) || _pendingBinds.ContainsKey(index))
+            return;
 
         var bindStartedAt = _firstWindowDiagnostics?.StartBind(index) ?? 0L;
-        var bindResult = _factory.TryBind(vm);
-        var binding = bindResult.Binding;
-        _firstWindowDiagnostics?.RecordBind(index, bindStartedAt, binding);
-        if (bindResult.Status == CollectionCardBindStatus.HardMiss)
-            _failedBindGuids.Add(vm.Id);
-        if (!binding.HasValue)
-            return;
-        var card = binding.Value.Card;
+        var cancellation = new CancellationTokenSource();
+        var pending = new PendingBind(
+            index,
+            vm,
+            _generation,
+            bindStartedAt,
+            cancellation,
+            _pendingBindTracker.Register()
+        );
+        _pendingBinds[index] = pending;
+        _ = BindAndRealizeAsync(pending);
+    }
+
+    private async Task BindAndRealizeAsync(PendingBind pending)
+    {
+        try
+        {
+            CollectionCardBindResult bindResult;
+            try
+            {
+                bindResult = await _factory.BindAsync(pending.Vm, pending.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                BppLog.Warn(
+                    "CollectionGridVirtualizer",
+                    $"Async bind for {pending.Vm.Id} failed: {ex.Message}"
+                );
+                bindResult = CollectionCardBindResult.NotReady();
+            }
+
+            var binding = bindResult.Binding;
+            var staleOrCanceled =
+                pending.IsCanceled
+                || pending.Generation != _generation
+                || _visible.Count <= pending.Index
+                || !ReferenceEquals(_visible[pending.Index], pending.Vm);
+            if (staleOrCanceled)
+            {
+                if (binding.HasValue)
+                    _factory.Return(binding.Value.Card, binding.Value.Kind);
+                return;
+            }
+
+            _firstWindowDiagnostics?.RecordBind(pending.Index, pending.BindStartedAt, binding);
+            if (bindResult.Status == CollectionCardBindStatus.HardMiss)
+                _failedBindGuids.Add(pending.Vm.Id);
+            if (!binding.HasValue)
+                return;
+
+            if (!TryAdoptBinding(pending.Index, pending.Vm, binding.Value))
+                _factory.Return(binding.Value.Card, binding.Value.Kind);
+        }
+        finally
+        {
+            if (
+                _pendingBinds.TryGetValue(pending.Index, out var current)
+                && ReferenceEquals(current, pending)
+            )
+                _pendingBinds.Remove(pending.Index);
+            pending.Dispose();
+        }
+    }
+
+    private bool TryAdoptBinding(
+        int index,
+        CollectionCardVm vm,
+        CollectionCardBinding binding
+    )
+    {
+        if (_realized.ContainsKey(index))
+            return false;
+
+        var card = binding.Card;
         var rect = card.transform as RectTransform;
         if (rect == null)
         {
-            _factory.Return(card, binding.Value.Kind);
-            return;
+            return false;
         }
 
         var hover = card.gameObject.GetComponent<CollectionCardHoverRelay>();
@@ -374,17 +463,18 @@ internal sealed class CollectionGridVirtualizer
         var cell = new RealizedCell(
             index,
             vm,
-            binding.Value.Card,
-            binding.Value.Kind,
-            binding.Value.SetUpTask,
+            binding.Card,
+            binding.Kind,
+            binding.SetUpTask,
             ++_perCellGeneration,
             hover,
             rect
         );
         _realized[index] = cell;
-        Reposition(index, cell);
         ApplyCellScale(index, cell);
+        Reposition(index, cell);
         _ = ShowWhenReady(cell, _generation);
+        return true;
     }
 
     // Scale the native card to fit its span cell, centered, never stretched. The cell is shrunk
@@ -394,11 +484,12 @@ internal sealed class CollectionGridVirtualizer
         var rect = cell.CachedRect;
         if (rect == null)
             return;
+        PrepareGridRect(rect);
         var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
         var inset = CollectionGridConstants.CellContentInset;
-        var sizeDelta = rect.sizeDelta;
-        var natW = Mathf.Max(1f, sizeDelta.x);
-        var natH = Mathf.Max(1f, sizeDelta.y);
+        var visualBounds = ResolveNativeVisualBounds(rect);
+        var natW = visualBounds.Width;
+        var natH = visualBounds.Height;
 
         // Scale to the cell HEIGHT so every card in a shelf renders the same height. Native item
         // cards share one prefab height and a shelf shares one cell height, so a height-based
@@ -422,16 +513,268 @@ internal sealed class CollectionGridVirtualizer
         var rect = cell.CachedRect;
         if (rect == null)
             return;
+        PrepareGridRect(rect);
         var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
         var screenTop = cellRect.Y - _scrollY;
-        // Board pivot is top-left, so y goes negative. Place card pivot at cell center.
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(
+        var visualBounds = ResolveNativeVisualBounds(rect);
+        var targetCenter = new Vector2(
             cellRect.X + cellRect.Width * 0.5f,
             -(screenTop + cellRect.Height * 0.5f)
         );
+
+        // Board pivot is top-left, so y goes negative. Place the measured native visual
+        // center in the cell center; item-card root RectTransforms can report a zero rect.
+        rect.anchoredPosition = new Vector2(
+            targetCenter.x - visualBounds.Center.x * rect.localScale.x,
+            targetCenter.y - visualBounds.Center.y * rect.localScale.y
+        );
+    }
+
+    private static void PrepareGridRect(RectTransform rect)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+    }
+
+    private static NativeVisualBounds ResolveNativeVisualBounds(RectTransform root)
+    {
+        var frame = FindDescendant(root, "FrameContainer");
+        if (frame != null && TryMeasureSubtreeBounds(root, frame, out var frameBounds))
+            return frameBounds;
+        if (TryMeasureRawImageBounds(root, out var imageBounds))
+            return imageBounds;
+        if (TryResolveAspectRatioFallbackBounds(root, out var aspectBounds))
+            return aspectBounds;
+
+        var rootRect = root.rect;
+        if (IsUsableNativeSize(rootRect.width, rootRect.height))
+        {
+            return new NativeVisualBounds(
+                Mathf.Max(1f, Mathf.Abs(rootRect.width)),
+                Mathf.Max(1f, Mathf.Abs(rootRect.height)),
+                rootRect.center
+            );
+        }
+
+        var sizeDelta = root.sizeDelta;
+        if (IsUsableNativeSize(sizeDelta.x, sizeDelta.y))
+        {
+            return new NativeVisualBounds(
+                Mathf.Max(1f, Mathf.Abs(sizeDelta.x)),
+                Mathf.Max(1f, Mathf.Abs(sizeDelta.y)),
+                Vector2.zero
+            );
+        }
+
+        return new NativeVisualBounds(1f, 1f, Vector2.zero);
+    }
+
+    private static bool TryResolveAspectRatioFallbackBounds(
+        RectTransform root,
+        out NativeVisualBounds bounds
+    )
+    {
+        var fitter = root.GetComponent<AspectRatioFitter>();
+        if (
+            fitter == null
+            || fitter.aspectRatio <= 0.01f
+            || float.IsNaN(fitter.aspectRatio)
+            || float.IsInfinity(fitter.aspectRatio)
+        )
+        {
+            bounds = default;
+            return false;
+        }
+
+        var width = Mathf.Max(1f, FallbackNativeCardHeight * fitter.aspectRatio);
+        var height = FallbackNativeCardHeight;
+        root.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+        root.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
+        var rect = root.rect;
+        bounds = new NativeVisualBounds(width, height, rect.center);
+        return true;
+    }
+
+    private static bool TryMeasureRawImageBounds(
+        RectTransform root,
+        out NativeVisualBounds bounds
+    )
+    {
+        var corners = new Vector3[4];
+        var minX = float.PositiveInfinity;
+        var minY = float.PositiveInfinity;
+        var maxX = float.NegativeInfinity;
+        var maxY = float.NegativeInfinity;
+        var found = false;
+
+        foreach (var image in root.GetComponentsInChildren<RawImage>(true))
+        {
+            if (image == null || image.rectTransform == null)
+                continue;
+            AccumulateSingleRectBounds(
+                root,
+                image.rectTransform,
+                corners,
+                ref minX,
+                ref minY,
+                ref maxX,
+                ref maxY,
+                ref found
+            );
+        }
+
+        if (!found || !IsUsableNativeSize(maxX - minX, maxY - minY))
+        {
+            bounds = default;
+            return false;
+        }
+
+        bounds = new NativeVisualBounds(
+            Mathf.Max(1f, maxX - minX),
+            Mathf.Max(1f, maxY - minY),
+            new Vector2((minX + maxX) * 0.5f, (minY + maxY) * 0.5f)
+        );
+        return true;
+    }
+
+    private static bool TryMeasureSubtreeBounds(
+        RectTransform root,
+        Transform subtree,
+        out NativeVisualBounds bounds
+    )
+    {
+        var corners = new Vector3[4];
+        var minX = float.PositiveInfinity;
+        var minY = float.PositiveInfinity;
+        var maxX = float.NegativeInfinity;
+        var maxY = float.NegativeInfinity;
+        var found = false;
+
+        AccumulateRectBounds(
+            root,
+            subtree,
+            corners,
+            ref minX,
+            ref minY,
+            ref maxX,
+            ref maxY,
+            ref found
+        );
+        if (!found || !IsUsableNativeSize(maxX - minX, maxY - minY))
+        {
+            bounds = default;
+            return false;
+        }
+
+        bounds = new NativeVisualBounds(
+            Mathf.Max(1f, maxX - minX),
+            Mathf.Max(1f, maxY - minY),
+            new Vector2((minX + maxX) * 0.5f, (minY + maxY) * 0.5f)
+        );
+        return true;
+    }
+
+    private static void AccumulateSingleRectBounds(
+        RectTransform root,
+        RectTransform current,
+        Vector3[] corners,
+        ref float minX,
+        ref float minY,
+        ref float maxX,
+        ref float maxY,
+        ref bool found
+    )
+    {
+        var rect = current.rect;
+        if (!IsUsableNativeSize(rect.width, rect.height))
+            return;
+
+        current.GetWorldCorners(corners);
+        for (var i = 0; i < corners.Length; i++)
+        {
+            var local = root.InverseTransformPoint(corners[i]);
+            minX = Mathf.Min(minX, local.x);
+            minY = Mathf.Min(minY, local.y);
+            maxX = Mathf.Max(maxX, local.x);
+            maxY = Mathf.Max(maxY, local.y);
+        }
+        found = true;
+    }
+
+    private static void AccumulateRectBounds(
+        RectTransform root,
+        Transform current,
+        Vector3[] corners,
+        ref float minX,
+        ref float minY,
+        ref float maxX,
+        ref float maxY,
+        ref bool found
+    )
+    {
+        if (current is RectTransform currentRect)
+            AccumulateSingleRectBounds(
+                root,
+                currentRect,
+                corners,
+                ref minX,
+                ref minY,
+                ref maxX,
+                ref maxY,
+                ref found
+            );
+
+        foreach (Transform child in current)
+        {
+            AccumulateRectBounds(
+                root,
+                child,
+                corners,
+                ref minX,
+                ref minY,
+                ref maxX,
+                ref maxY,
+                ref found
+            );
+        }
+    }
+
+    private static Transform? FindDescendant(Transform root, string name)
+    {
+        foreach (Transform child in root)
+        {
+            if (child.name == name)
+                return child;
+
+            var descendant = FindDescendant(child, name);
+            if (descendant != null)
+                return descendant;
+        }
+
+        return null;
+    }
+
+    private static bool IsUsableNativeSize(float width, float height) =>
+        width > 0.01f
+        && height > 0.01f
+        && !float.IsNaN(width)
+        && !float.IsNaN(height)
+        && !float.IsInfinity(width)
+        && !float.IsInfinity(height);
+
+    private readonly struct NativeVisualBounds
+    {
+        public NativeVisualBounds(float width, float height, Vector2 center)
+        {
+            Width = width;
+            Height = height;
+            Center = center;
+        }
+
+        public float Width { get; }
+        public float Height { get; }
+        public Vector2 Center { get; }
     }
 
     // Push the visible window's board-local cell rects to the slot layer. Driven by the layout
@@ -501,6 +844,8 @@ internal sealed class CollectionGridVirtualizer
                 show: true,
                 logComponent: "CollectionGridVirtualizer"
             );
+            ApplyCellScale(cell.Index, cell);
+            Reposition(cell.Index, cell);
             // Show(true) re-activates _cardImage / _frameContainer; the CanvasGroup at the
             // root was zeroed on Take, so the card still renders transparent. Hand the cell
             // off to TickFades to ramp it up.
@@ -565,9 +910,25 @@ internal sealed class CollectionGridVirtualizer
         _realized.Clear();
     }
 
+    private void CancelPendingBind(int index)
+    {
+        if (!_pendingBinds.Remove(index, out var pending))
+            return;
+
+        pending.Cancel();
+    }
+
+    private void CancelPendingBinds()
+    {
+        foreach (var pair in _pendingBinds)
+            pair.Value.Cancel();
+        _pendingBinds.Clear();
+    }
+
     private void BumpGeneration()
     {
         _generation++;
+        CancelPendingBinds();
         _failedBindGuids.Clear();
     }
 
@@ -628,6 +989,129 @@ internal sealed class CollectionGridVirtualizer
         // (the CanvasGroup alpha was zeroed on Take).
         public bool FadeActive { get; set; }
         public float FadeAlpha { get; set; }
+    }
+
+    private sealed class PendingBind
+    {
+        private readonly CancellationTokenSource _cancellation;
+
+        public PendingBind(
+            int index,
+            CollectionCardVm vm,
+            int generation,
+            long bindStartedAt,
+            CancellationTokenSource cancellation,
+            PendingBindTracker.PendingBindOperation operation
+        )
+        {
+            Index = index;
+            Vm = vm;
+            Generation = generation;
+            BindStartedAt = bindStartedAt;
+            _cancellation = cancellation;
+            Operation = operation;
+            Token = cancellation.Token;
+        }
+
+        public int Index { get; }
+        public CollectionCardVm Vm { get; }
+        public int Generation { get; }
+        public long BindStartedAt { get; }
+        public CancellationToken Token { get; }
+        public bool IsCanceled => Volatile.Read(ref _canceled) != 0;
+        private PendingBindTracker.PendingBindOperation Operation { get; }
+        private int _canceled;
+
+        public void Cancel()
+        {
+            Interlocked.Exchange(ref _canceled, 1);
+            try
+            {
+                _cancellation.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Completion can race with scroll-window cancellation.
+            }
+        }
+
+        public void Dispose()
+        {
+            _cancellation.Dispose();
+            Operation.Complete();
+        }
+    }
+
+    private sealed class PendingBindTracker
+    {
+        private readonly object _syncRoot = new();
+        private TaskCompletionSource<bool>? _settled;
+        private int _pendingCount;
+
+        public bool HasPendingBinds
+        {
+            get
+            {
+                lock (_syncRoot)
+                    return _pendingCount > 0;
+            }
+        }
+
+        public Task WhenSettled
+        {
+            get
+            {
+                lock (_syncRoot)
+                    return _pendingCount == 0 ? Task.CompletedTask : _settled!.Task;
+            }
+        }
+
+        public PendingBindOperation Register()
+        {
+            lock (_syncRoot)
+            {
+                if (_pendingCount == 0)
+                    _settled = new TaskCompletionSource<bool>(
+                        TaskCreationOptions.RunContinuationsAsynchronously
+                    );
+                _pendingCount++;
+            }
+
+            return new PendingBindOperation(this);
+        }
+
+        private void Complete()
+        {
+            TaskCompletionSource<bool>? settled = null;
+            lock (_syncRoot)
+            {
+                if (_pendingCount <= 0)
+                    return;
+
+                _pendingCount--;
+                if (_pendingCount == 0)
+                    settled = _settled;
+            }
+
+            settled?.TrySetResult(true);
+        }
+
+        public sealed class PendingBindOperation
+        {
+            private readonly PendingBindTracker _tracker;
+            private int _completed;
+
+            public PendingBindOperation(PendingBindTracker tracker)
+            {
+                _tracker = tracker;
+            }
+
+            public void Complete()
+            {
+                if (Interlocked.Exchange(ref _completed, 1) == 0)
+                    _tracker.Complete();
+            }
+        }
     }
 
     private sealed class FirstWindowBindDiagnostics
