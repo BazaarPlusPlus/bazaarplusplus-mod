@@ -18,7 +18,6 @@ internal static class OptionsDialogLanguageRefreshPatch
         {
             BppSettingsDockController.RefreshAll();
             BppKeybindSettingsAwakePatch.RefreshLanguage(__instance);
-            NativeKeybindLabelAwakePatch.TryUpdateLabels(__instance);
             HistoryPanel.RefreshLocalization();
         }
         catch (Exception ex)

@@ -196,11 +196,7 @@ internal static class BppKeybindSettingsGameplayOpenPatch
         BppKeybindSettingsPatchSupport.RunRefresh(
             __instance,
             "Failed to refresh keybind rows after gameplay menu opened",
-            instance =>
-            {
-                BppKeybindSettingsAwakePatch.EnsureKeybindRows(instance);
-                NativeKeybindLabelAwakePatch.TryUpdateLabels(instance);
-            }
+            instance => BppKeybindSettingsAwakePatch.EnsureKeybindRows(instance)
         );
     }
 }
@@ -232,7 +228,6 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
 
     private OptionsDialogController? _controller;
     private Coroutine? _refreshCoroutine;
-    private bool _nativeLabelsUpdated;
 
     internal static BppKeybindSettingsRefreshDriver Attach(OptionsDialogController controller)
     {
@@ -248,7 +243,6 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
         if (_refreshCoroutine != null)
             StopCoroutine(_refreshCoroutine);
 
-        _nativeLabelsUpdated = false;
         _refreshCoroutine = StartCoroutine(RefreshRoutine());
     }
 
@@ -272,10 +266,6 @@ internal sealed class BppKeybindSettingsRefreshDriver : MonoBehaviour
             {
                 BppKeybindSettingsAwakePatch.EnsureKeybindRows(_controller);
                 BppKeybindSettingsAwakePatch.RefreshLanguage(_controller);
-                if (!_nativeLabelsUpdated)
-                    _nativeLabelsUpdated = NativeKeybindLabelAwakePatch.TryUpdateLabels(
-                        _controller
-                    );
 
                 if (HasInstalledRows(_controller))
                 {
