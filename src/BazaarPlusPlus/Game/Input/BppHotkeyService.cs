@@ -188,16 +188,24 @@ internal static class BppHotkeyService
         if (BindingDisplayAliases.TryGetValue(normalized, out var alias))
             return alias;
 
+        if (string.IsNullOrWhiteSpace(normalized))
+            return normalized;
+
+        // Native rows resolve the live control (OS keyboard-layout name); match that
+        // instead of the static US-layout name from a control-less ToHumanReadableString.
+        var action = GetOrCreateAction(normalized);
+        if (action.controls.Count > 0)
+        {
+            var displayName = action.controls[0].displayName;
+            if (!string.IsNullOrWhiteSpace(displayName))
+                return displayName;
+        }
+
         var display = InputControlPath.ToHumanReadableString(
             normalized,
             InputControlPath.HumanReadableStringOptions.OmitDevice
         );
-        if (string.IsNullOrWhiteSpace(display))
-            return normalized;
-
-        return normalized.StartsWith(MousePrefix, StringComparison.OrdinalIgnoreCase)
-            ? $"{display}"
-            : display;
+        return string.IsNullOrWhiteSpace(display) ? normalized : display;
     }
 
     internal static bool UsesDefault(BppHotkeyActionId actionId)
