@@ -1,0 +1,27 @@
+src/BazaarPlusPlus.ModApi/BazaarPlusPlus.ModApi.csproj
+  s_7d20414d956743::t_a22e37c1b8a9dc 14-15
+  s_7d20414d956743::t_28d089fad9570f 18
+src/BazaarPlusPlus/BazaarPlusPlus.csproj
+  s_7d20414d956743::t_ec674e71f12a0a 36
+  s_7d20414d956743::t_aaa0e3c716acac 37-38,40,98-104,363-373
+src/BazaarPlusPlus.Storage/BazaarPlusPlus.Storage.csproj
+  s_7d20414d956743::t_66b5b09b7af1a7 14-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "10c51db09659fadde7d45c37baf19df4f6a118d8",
+  "prompts": {},
+  "sessions": {
+    "s_7d20414d956743": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f2213-919b-7d31-b06f-35d0221d8b18",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
