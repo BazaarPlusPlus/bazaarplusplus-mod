@@ -60,12 +60,12 @@ var sourceTexts = sourceFiles.Select(path => new SourceFile(path, File.ReadAllTe
 RequireAbsent(
     sourceTexts,
     [
-        "NativeCardPreviewPrefabResolver",
-        "MonsterBoardTooltip",
-        "_smallItemReference",
-        "_mediumItemReference",
-        "_largeItemReference",
-        "_skillReference",
+        string.Concat("NativeCardPreview", "PrefabResolver"),
+        string.Concat("Monster", "BoardTooltip"),
+        string.Concat("_smallItem", "Reference"),
+        string.Concat("_mediumItem", "Reference"),
+        string.Concat("_largeItem", "Reference"),
+        string.Concat("_skill", "Reference"),
     ]
 );
 

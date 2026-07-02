@@ -31,8 +31,6 @@ internal sealed class NativeCardPreviewFactory
 
     public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
 
-    public bool EnsureReady(bool requireSkill = false) => _pool.TryEnsurePrefabRefs(requireSkill);
-
     public bool TryResolveSpan(NativeCardPreviewSpec? spec, out int span)
     {
         span = 1;
@@ -41,45 +39,6 @@ internal sealed class NativeCardPreviewFactory
 
         span = CardSizeSpan.Resolve(template.Size);
         return true;
-    }
-
-    public NativeCardPreviewHandle? TryCreate(
-        NativeCardPreviewSpec? spec,
-        Transform parent,
-        int instanceIndex
-    )
-    {
-        if (parent == null || !TryResolveTemplate(spec, out var template) || spec == null)
-            return null;
-
-        if (!TryResolveKind(template, out var kind))
-        {
-            BppLog.Warn(
-                _logComponent,
-                $"Unsupported card preview type={template.Type} size={template.Size} template={template.Id}."
-            );
-            return null;
-        }
-
-        var card = _pool.Take(kind, parent);
-        if (card == null)
-            return null;
-
-        var rect = card.transform as RectTransform ?? card.GetComponent<RectTransform>();
-        if (rect == null)
-        {
-            _pool.Return(card, kind);
-            return null;
-        }
-
-        var instance = BuildSyntheticInstance(spec, kind, instanceIndex);
-        var setUpTask = NativeCardPreviewRuntime.InvokeSetUpSafe(
-            card,
-            template,
-            instance,
-            _logComponent
-        );
-        return new NativeCardPreviewHandle(card, rect, kind, setUpTask, spec);
     }
 
     public Task<NativeCardPreviewHandle?> CreateAsync(
