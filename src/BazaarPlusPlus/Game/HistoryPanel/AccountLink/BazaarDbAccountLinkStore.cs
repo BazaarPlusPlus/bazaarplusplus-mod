@@ -22,12 +22,6 @@ internal sealed class BazaarDbAccountLinkStore
         return PlayerPrefs.HasKey(BuildPrefsKey(accountId));
     }
 
-    public void Clear(string accountId)
-    {
-        PlayerPrefs.DeleteKey(BuildPrefsKey(accountId));
-        PlayerPrefs.Save();
-    }
-
     internal static string BuildPrefsKey(string? accountId)
     {
         var scope = string.IsNullOrWhiteSpace(accountId)

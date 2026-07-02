@@ -391,11 +391,44 @@ internal sealed partial class HistoryPanelUiToolkitView
         _accountCard.style.flexDirection = FlexDirection.Column;
         _accountCard.style.flexShrink = 0f;
         _accountCard.style.marginTop = UiSpacing.Xl;
-        _accountCard.style.backgroundColor = Colors.HistoryFooterBackground;
-        UiStyle.Radius(_accountCard.style, Radii.Panel);
-        UiStyle.Border(_accountCard.style, Borders.Accent, Colors.HistoryTitleText);
-        UiStyle.Padding(_accountCard.style, UiSpacing.Xl);
         rail.Add(_accountCard);
+
+        _accountCollapsedRow = new VisualElement();
+        _accountCollapsedRow.style.flexDirection = FlexDirection.Row;
+        _accountCollapsedRow.style.alignItems = Align.Center;
+        _accountCollapsedRow.style.minWidth = 0f;
+        _accountCard.Add(_accountCollapsedRow);
+
+        _accountRowStatus = CreateLabel(
+            Sizes.FontSmall,
+            FontStyle.Normal,
+            Colors.HistoryFooterSecondaryText
+        );
+        _accountRowStatus.style.flexGrow = 1f;
+        _accountRowStatus.style.flexShrink = 1f;
+        _accountRowStatus.style.minWidth = 0f;
+        _accountRowStatus.style.whiteSpace = WhiteSpace.NoWrap;
+        _accountRowStatus.style.overflow = Overflow.Hidden;
+        _accountCollapsedRow.Add(_accountRowStatus);
+
+        _accountRowAction = CreateButton(
+            HistoryPanelText.AccountLink.RowBind(),
+            _toggleAccountLinkForm,
+            0f,
+            Sizes.ButtonCompactHeight,
+            fixedWidth: false
+        );
+        _accountRowAction.style.flexGrow = 0f;
+        _accountRowAction.style.flexShrink = 0f;
+        _accountRowAction.style.flexBasis = StyleKeyword.Auto;
+        _accountRowAction.style.minWidth = Sizes.InlinePillMinWidth;
+        _accountRowAction.style.marginLeft = UiSpacing.Sm;
+        StyleButton(
+            _accountRowAction,
+            Colors.HistoryButtonBackground,
+            Colors.HistoryFooterSecondaryText
+        );
+        _accountCollapsedRow.Add(_accountRowAction);
 
         var titleRow = new VisualElement();
         titleRow.style.flexDirection = FlexDirection.Row;
@@ -411,34 +444,24 @@ internal sealed partial class HistoryPanelUiToolkitView
         _accountTitle.style.overflow = Overflow.Hidden;
         titleRow.Add(_accountTitle);
 
-        _accountRelinkButton = CreateButton(
-            HistoryPanelText.AccountLink.Relink(),
-            _relinkBazaarDbAccount,
+        _accountCollapseButton = CreateButton(
+            HistoryPanelText.AccountLink.Collapse(),
+            _toggleAccountLinkForm,
             0f,
             Sizes.ButtonCompactHeight,
             fixedWidth: false
         );
-        _accountRelinkButton.style.flexGrow = 0f;
-        _accountRelinkButton.style.flexShrink = 0f;
-        _accountRelinkButton.style.flexBasis = StyleKeyword.Auto;
-        _accountRelinkButton.style.minWidth = Sizes.InlinePillMinWidth;
-        _accountRelinkButton.style.marginLeft = UiSpacing.Sm;
+        _accountCollapseButton.style.flexGrow = 0f;
+        _accountCollapseButton.style.flexShrink = 0f;
+        _accountCollapseButton.style.flexBasis = StyleKeyword.Auto;
+        _accountCollapseButton.style.minWidth = Sizes.InlinePillMinWidth;
+        _accountCollapseButton.style.marginLeft = UiSpacing.Sm;
         StyleButton(
-            _accountRelinkButton,
+            _accountCollapseButton,
             Colors.HistoryButtonBackground,
             Colors.HistoryFooterSecondaryText
         );
-        titleRow.Add(_accountRelinkButton);
-
-        _accountSignedOut = CreateLabel(
-            Sizes.FontSmall,
-            FontStyle.Normal,
-            Colors.HistoryFooterSecondaryText
-        );
-        _accountSignedOut.style.whiteSpace = WhiteSpace.NoWrap;
-        _accountSignedOut.style.overflow = Overflow.Hidden;
-        _accountSignedOut.style.marginTop = UiSpacing.Xs;
-        _accountCard.Add(_accountSignedOut);
+        titleRow.Add(_accountCollapseButton);
 
         _accountWhy = CreateLabel(
             Sizes.FontSmall,
@@ -450,18 +473,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         _accountWhy.style.overflow = Overflow.Hidden;
         _accountWhy.style.marginTop = UiSpacing.Xxs;
         _accountCard.Add(_accountWhy);
-
-        _accountLinkedBadge = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.White);
-        _accountLinkedBadge.style.whiteSpace = WhiteSpace.NoWrap;
-        _accountLinkedBadge.style.overflow = Overflow.Hidden;
-        _accountLinkedBadge.style.marginTop = UiSpacing.Sm;
-        _accountLinkedBadge.style.height = Sizes.ChipHeight;
-        UiStyle.HorizontalPadding(_accountLinkedBadge.style, UiSpacing.Md);
-        _accountLinkedBadge.style.unityTextAlign = TextAnchor.MiddleCenter;
-        _accountLinkedBadge.style.backgroundColor = Colors.StatusCompletedBackground;
-        UiStyle.Radius(_accountLinkedBadge.style, Radii.Md);
-        UiStyle.Border(_accountLinkedBadge.style, Borders.Thin, Colors.BattleRowWinAccent);
-        _accountCard.Add(_accountLinkedBadge);
 
         _accountCodeRow = new VisualElement();
         _accountCodeRow.style.flexDirection = FlexDirection.Row;

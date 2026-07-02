@@ -249,6 +249,28 @@ internal sealed partial class HistoryPanelUiToolkitView
         }
     }
 
+    private void ApplyAccountCardChrome(bool expanded)
+    {
+        if (_accountCard == null)
+            return;
+
+        var s = _accountCard.style;
+        if (expanded)
+        {
+            s.backgroundColor = Colors.HistoryFooterBackground;
+            UiStyle.Radius(s, Radii.Panel);
+            UiStyle.Border(s, Borders.Accent, Colors.HistoryTitleText);
+            UiStyle.Padding(s, UiSpacing.Xl);
+        }
+        else
+        {
+            s.backgroundColor = Colors.HistorySectionBackground;
+            UiStyle.Radius(s, Radii.Md);
+            UiStyle.Border(s, 0f, Colors.HistorySectionBackground);
+            UiStyle.Padding(s, UiSpacing.Md);
+        }
+    }
+
     // Selected-battle result pill: same Win/Loss/Eliminated/Neutral accent language as the battle
     // list rows (ApplyBattleRowState). Caller uses CreateDetailPill so font size is FontSmall, not
     // the FontTiny CreateInlinePill default.
