@@ -110,8 +110,8 @@ internal sealed partial class HistoryPanel
             _ = _coordinator.TryRedeemBazaarDbAccountAsync(code);
     }
 
-    private void ToggleAccountLinkExpanded()
+    private void ToggleAccountLinkForm()
     {
-        _coordinator?.ToggleAccountLinkExpanded();
+        _coordinator?.ToggleAccountLinkForm();
     }
 }

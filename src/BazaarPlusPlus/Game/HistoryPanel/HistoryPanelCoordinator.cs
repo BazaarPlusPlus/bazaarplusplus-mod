@@ -59,6 +59,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     public void OnPanelShown()
     {
         _session.Begin();
+        _state.AccountLinkExpanded = false;
         RefreshAccountLinkIdentityFromGame();
         _state.ReplayActionInProgress = false;
         _state.IsVisible = true;
@@ -642,7 +643,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
-        // Only a confirmed 200 link persists the local hint and collapses to the badge. 409 means the
+        // Only a confirmed 200 link persists the local hint and collapses to the status row. 409 means the
         // game account is already linked to a DIFFERENT BazaarDB user (contract), and every error
         // outcome must leave the form open with a failure banner. See OutcomeConfirmsLink.
         if (OutcomeConfirmsLink(result.Outcome))
@@ -680,15 +681,27 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             _ => HistoryPanelText.AccountLink.Offline(),
         };
 
-    public void ToggleAccountLinkExpanded()
+    public void ToggleAccountLinkForm()
     {
-        var accountId = RefreshAccountLinkIdentityFromGame();
-        if (!string.IsNullOrWhiteSpace(accountId))
-            _accountLinkStore.Clear(accountId);
+        if (_state.AccountLinkInProgress)
+            return;
 
-        _state.LocalLinkedHint = false;
+        if (_state.AccountLinkExpanded)
+        {
+            _state.AccountLinkExpanded = false;
+            SetAccountLinkBanner(null, StatusSeverity.Neutral);
+            _requestUiRefresh();
+            return;
+        }
+
+        var accountId = RefreshAccountLinkIdentityFromGame();
+        if (string.IsNullOrWhiteSpace(accountId))
+        {
+            _requestUiRefresh();
+            return;
+        }
+
         _state.AccountLinkExpanded = true;
-        SetAccountLinkBanner(null, StatusSeverity.Neutral);
         _requestUiRefresh();
     }
 
@@ -875,19 +888,11 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (string.IsNullOrWhiteSpace(accountId))
         {
             _state.LocalLinkedHint = false;
-            _state.AccountLinkExpanded = true;
+            _state.AccountLinkExpanded = false;
             return null;
         }
 
-        if (_accountLinkStore.IsLinked(accountId))
-        {
-            _state.LocalLinkedHint = true;
-            _state.AccountLinkExpanded = false;
-            return accountId;
-        }
-
-        _state.LocalLinkedHint = false;
-        _state.AccountLinkExpanded = true;
+        _state.LocalLinkedHint = _accountLinkStore.IsLinked(accountId);
         return accountId;
     }
 

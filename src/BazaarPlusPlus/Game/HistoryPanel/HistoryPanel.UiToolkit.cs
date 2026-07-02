@@ -27,7 +27,7 @@ internal sealed partial class HistoryPanel
                 TryDeleteSelectedRun,
                 TryCheckServerHealth,
                 SubmitAccountLinkCode,
-                ToggleAccountLinkExpanded,
+                ToggleAccountLinkForm,
                 SelectRun,
                 SelectBattle,
                 SetSectionMode,

@@ -72,6 +72,7 @@ internal sealed class HistoryPanelState
 
     public bool LocalLinkedHint { get; set; }
 
+    // Pure UI disclosure flag; panels open with account linking collapsed by default.
     public bool AccountLinkExpanded { get; set; }
 
     public string? AccountLinkBannerMessage { get; set; }
