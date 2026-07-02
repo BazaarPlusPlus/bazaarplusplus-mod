@@ -60,6 +60,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     {
         _session.Begin();
         _state.AccountLinkExpanded = false;
+        // Begin() cancelled any in-flight redeem (its continuations bail on !IsCurrent without
+        // resetting state), and re-entrant opens skip OnPanelHidden — reset here or the toggle
+        // guard leaves the account-link row permanently inert.
+        _state.AccountLinkInProgress = false;
         RefreshAccountLinkIdentityFromGame();
         _state.ReplayActionInProgress = false;
         _state.IsVisible = true;
