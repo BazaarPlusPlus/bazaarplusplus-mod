@@ -12,6 +12,13 @@ internal static class ItemBoardSocketLayout
     public const float NativeSocketPitchPixels = 240f;
     public const float FrameHeightOverSocket = 1.03704f;
 
+    // Medium-card frame anatomy (bundle dump): the tier frame renders 1.05787x wider than
+    // the 1.04-aspect card body. Per slot of span that is the widest frame of the three
+    // sizes (small 1.04452x on 0.52; large's 1.41548x is decorative flourish), so medium
+    // binds any "frame borders must not cross" fit.
+    public const float NativeMediumFrameWidthOverRoot = 1.05787f;
+    public const float NativeMediumBodyAspect = 1.04f;
+
     private const float HorizontalPaddingFraction = 0f;
 
     // Native Tooltip_MonsterBoard_P sockets are width-0 point pins on a 240px x-pitch;

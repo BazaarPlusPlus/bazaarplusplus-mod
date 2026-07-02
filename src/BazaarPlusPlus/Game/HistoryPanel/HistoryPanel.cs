@@ -426,6 +426,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
                 LayoutMode = ItemBoardPreviewLayoutMode.SlotGrid,
                 ShowHover = true,
                 LogComponent = "HistoryPanelPreview",
+                // The ~2:1 preview container always lands in the board-cap regime, where the
+                // default ratio reproduces the native board's frame interleaving; this panel
+                // reads that as overlap, so it opts into full frame-border separation.
+                SlotGridMaxHeightRatio =
+                    ItemBoardPreviewOptions.FrameSeparationSlotGridMaxHeightRatio,
             }
         );
         if (_hasPreviewContainerBounds)

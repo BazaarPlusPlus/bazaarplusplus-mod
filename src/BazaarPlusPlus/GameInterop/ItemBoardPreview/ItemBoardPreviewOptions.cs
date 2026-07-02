@@ -15,6 +15,21 @@ internal sealed class ItemBoardPreviewOptions
         * (ItemBoardSocketLayout.NativeBoardWidth / (float)ItemBoardSocketLayout.SocketCount)
         / ItemBoardSocketLayout.NativeBoardHeight;
 
+    // Stricter preset than the default (which reproduces the native board's designed ~4.9%
+    // card-body touch, where frame borders visibly interleave): scale so the widest
+    // frame-per-span (medium) exactly fills its two slots — silver borders never cross,
+    // small cards get a slight gap. Large's decorative side flourish still overhangs by
+    // native design. Consumers opt in per surface; ≈ 0.81692.
+    public const float FrameSeparationSlotGridMaxHeightRatio =
+        2f
+        * (ItemBoardSocketLayout.NativeBoardWidth / (float)ItemBoardSocketLayout.SocketCount)
+        * ItemBoardSocketLayout.FrameHeightOverSocket
+        / (
+            ItemBoardSocketLayout.NativeMediumFrameWidthOverRoot
+            * ItemBoardSocketLayout.NativeMediumBodyAspect
+            * ItemBoardSocketLayout.NativeBoardHeight
+        );
+
     public int Layer { get; init; } = 30;
 
     public int SortingOrder { get; init; } = BppOverlaySorting.NativeCardPreview;
