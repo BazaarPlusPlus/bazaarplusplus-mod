@@ -69,6 +69,11 @@ internal sealed partial class HistoryPanel
         _uiView?.SetVisible(visible);
     }
 
+    private bool IsTextInputFocused()
+    {
+        return _uiView?.IsTextInputFocused() == true;
+    }
+
     private void RefreshUi()
     {
         _uiView?.Refresh(BuildUiModel());

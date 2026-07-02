@@ -22,7 +22,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 
 internal sealed partial class HistoryPanel : MonoBehaviour
 {
-    private const string ToggleHistoryPanelBindingPath = "<Keyboard>/f8";
     private const string OverlayPanelId = "HistoryPanel";
     private const int OverlaySortingBand = BppOverlaySorting.MainOverlayPanelBand;
     private static readonly HashSet<string> UiDiagnosticScenes = new(StringComparer.Ordinal)
@@ -178,7 +177,10 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (IsVisible)
             _coordinator?.Tick(Time.unscaledTime);
 
-        if (BppHotkeyService.WasPressedThisFrame(ToggleHistoryPanelBindingPath))
+        if (
+            BppHotkeyService.WasToggleHotkeyPressedThisFrame(BppHotkeyActionId.ToggleHistoryPanel)
+            && (!IsVisible || !IsTextInputFocused())
+        )
         {
             ToggleFromHotkey();
             return;
