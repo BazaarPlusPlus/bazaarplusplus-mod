@@ -24,6 +24,33 @@ internal static class BppKeybindLabelResolver
         "Mostra anteprima upgrade"
     );
 
+    private static readonly LocalizedTextSet ToggleCollectionPanelLabel = new(
+        "Toggle Card Collection",
+        "开关卡牌图鉴",
+        "Kartensammlung umschalten",
+        "Alternar colecao de cartas",
+        "카드 도감 열기/닫기",
+        "Mostra/nascondi collezione carte"
+    );
+
+    private static readonly LocalizedTextSet ToggleLiveBuildPanelLabel = new(
+        "Toggle Final Build",
+        "开关终局阵容",
+        "Endaufstellung umschalten",
+        "Alternar build final",
+        "최종 빌드 열기/닫기",
+        "Mostra/nascondi build finale"
+    );
+
+    private static readonly LocalizedTextSet ToggleHistoryPanelLabel = new(
+        "Toggle Game History",
+        "开关对局历史",
+        "Spielverlauf umschalten",
+        "Alternar historico de partidas",
+        "게임 전적 열기/닫기",
+        "Mostra/nascondi cronologia partite"
+    );
+
     private static readonly LocalizedTextSet RebindPrompt = new(
         "Press a key or mouse button",
         "按下一个键或鼠标按钮",
@@ -60,6 +87,18 @@ internal static class BppKeybindLabelResolver
                 L.CurrentMode
             ),
             BppHotkeyActionId.HoldUpgradePreview => UpgradePreviewLabel.Resolve(
+                languageCode,
+                L.CurrentMode
+            ),
+            BppHotkeyActionId.ToggleCollectionPanel => ToggleCollectionPanelLabel.Resolve(
+                languageCode,
+                L.CurrentMode
+            ),
+            BppHotkeyActionId.ToggleLiveBuildPanel => ToggleLiveBuildPanelLabel.Resolve(
+                languageCode,
+                L.CurrentMode
+            ),
+            BppHotkeyActionId.ToggleHistoryPanel => ToggleHistoryPanelLabel.Resolve(
                 languageCode,
                 L.CurrentMode
             ),
