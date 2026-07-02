@@ -676,7 +676,8 @@ public class CoreLayeringTests
 
         Assert.DoesNotContain("LiveBuildPanelSettingsDockEntry", compositionSource);
         Assert.DoesNotContain("OpenFromDockEntry", liveBuildPanelSource);
-        Assert.Contains("keyboard?.capsLockKey.wasPressedThisFrame", liveBuildPanelSource);
+        Assert.Contains("BppHotkeyService.WasToggleHotkeyPressedThisFrame", liveBuildPanelSource);
+        Assert.Contains("BppHotkeyActionId.ToggleLiveBuildPanel", liveBuildPanelSource);
     }
 
     [Fact]
