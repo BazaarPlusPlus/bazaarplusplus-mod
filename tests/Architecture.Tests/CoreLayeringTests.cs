@@ -541,6 +541,127 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void CollectionGridVirtualizer_measures_native_visual_bounds_for_card_layout()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var virtualizerSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CollectionPanel",
+                "Grid",
+                "CollectionGridVirtualizer.cs"
+            )
+        );
+
+        static int Find(string source, string value, int startIndex = 0) =>
+            source.IndexOf(value, startIndex, StringComparison.Ordinal);
+
+        var applyCellScaleIndex = Find(virtualizerSource, "private void ApplyCellScale");
+        var repositionIndex = Find(virtualizerSource, "private void Reposition", applyCellScaleIndex);
+        var scaleBoundsIndex = Find(
+            virtualizerSource,
+            "var visualBounds = ResolveNativeVisualBounds(rect);",
+            applyCellScaleIndex
+        );
+        var natWIndex = Find(virtualizerSource, "var natW = visualBounds.Width;", scaleBoundsIndex);
+        var natHIndex = Find(virtualizerSource, "var natH = visualBounds.Height;", natWIndex);
+        var legacyRootSizeIndex = Find(
+            virtualizerSource,
+            "var sizeDelta = rect.sizeDelta;",
+            applyCellScaleIndex
+        );
+        var frameLookupIndex = Find(
+            virtualizerSource,
+            "FindDescendant(root, \"FrameContainer\")"
+        );
+        var rawImageBoundsIndex = Find(
+            virtualizerSource,
+            "TryMeasureRawImageBounds(root, out var imageBounds)",
+            frameLookupIndex
+        );
+        var aspectFallbackCallIndex = Find(
+            virtualizerSource,
+            "TryResolveAspectRatioFallbackBounds(root, out var aspectBounds)",
+            rawImageBoundsIndex
+        );
+        var aspectFallbackMethodIndex = Find(
+            virtualizerSource,
+            "GetComponent<AspectRatioFitter>()"
+        );
+        var fallbackHeightIndex = Find(
+            virtualizerSource,
+            "FallbackNativeCardHeight",
+            aspectFallbackMethodIndex
+        );
+        var centerOffsetIndex = Find(
+            virtualizerSource,
+            "targetCenter.x - visualBounds.Center.x * rect.localScale.x",
+            repositionIndex
+        );
+
+        Assert.True(applyCellScaleIndex >= 0, "CollectionGridVirtualizer.ApplyCellScale should exist.");
+        Assert.True(
+            scaleBoundsIndex > applyCellScaleIndex,
+            "ApplyCellScale should measure native visual bounds instead of trusting the root RectTransform size."
+        );
+        Assert.True(
+            natWIndex > scaleBoundsIndex && natHIndex > natWIndex,
+            "ApplyCellScale should derive native width/height from the measured visual bounds."
+        );
+        Assert.True(
+            legacyRootSizeIndex < 0 || legacyRootSizeIndex > repositionIndex,
+            "ApplyCellScale must not use root rect.sizeDelta directly; native item roots can be zero-sized."
+        );
+        Assert.True(
+            frameLookupIndex > repositionIndex,
+            "Native visual bounds should prefer the CardPreviewBase FrameContainer subtree."
+        );
+        Assert.True(
+            rawImageBoundsIndex > frameLookupIndex,
+            "Native visual bounds should fall back to RawImage bounds when FrameContainer is not a RectTransform subtree."
+        );
+        Assert.True(
+            aspectFallbackCallIndex > rawImageBoundsIndex
+                && aspectFallbackMethodIndex >= 0
+                && fallbackHeightIndex > aspectFallbackMethodIndex,
+            "Native visual bounds should synthesize a stable item root size from AspectRatioFitter when native item RectTransforms report zero size."
+        );
+        Assert.True(
+            centerOffsetIndex > repositionIndex,
+            "Reposition should align the measured native visual center, not just the root pivot."
+        );
+
+        var showWhenReadyIndex = Find(virtualizerSource, "private async Task ShowWhenReady");
+        var nativeShowIndex = Find(virtualizerSource, "NativeCardPreviewRuntime.Show(", showWhenReadyIndex);
+        var showScaleIndex = Find(
+            virtualizerSource,
+            "ApplyCellScale(cell.Index, cell);",
+            nativeShowIndex
+        );
+        var showRepositionIndex = Find(
+            virtualizerSource,
+            "Reposition(cell.Index, cell);",
+            showScaleIndex
+        );
+        var fadeStartIndex = Find(virtualizerSource, "cell.FadeActive = true;", showRepositionIndex);
+
+        Assert.True(
+            showScaleIndex > nativeShowIndex,
+            "ShowWhenReady should reapply scale after Show(true) reactivates native frame/image objects."
+        );
+        Assert.True(
+            showRepositionIndex > showScaleIndex,
+            "ShowWhenReady should reposition after the post-Show(true) scale pass."
+        );
+        Assert.True(
+            fadeStartIndex > showRepositionIndex,
+            "ShowWhenReady should finish native layout before handing the card to the fade-in path."
+        );
+    }
+
+    [Fact]
     public void LiveBuildPanel_opens_from_caps_not_settings_dock()
     {
         var repoRoot = RepoRoot();
