@@ -224,7 +224,22 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         if (focused == null)
             return false;
 
-        return focused is TextField || focused.GetFirstAncestorOfType<TextField>() != null;
+        var textField = focused as TextField ?? focused.GetFirstAncestorOfType<TextField>();
+        return textField != null && IsVisibleAndEnabled(textField);
+    }
+
+    private bool IsVisibleAndEnabled(VisualElement element)
+    {
+        for (var current = element; current != null; current = current.parent)
+        {
+            if (current.style.display.value == DisplayStyle.None || !current.enabledInHierarchy)
+                return false;
+
+            if (current == _root)
+                return true;
+        }
+
+        return false;
     }
 
     public void Refresh(HistoryPanelUiToolkitModel model)
