@@ -20,6 +20,12 @@ internal interface IBppConfig
 
     ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; }
 
+    ConfigEntry<string>? ToggleCollectionPanelHotkeyPathConfig { get; }
+
+    ConfigEntry<string>? ToggleLiveBuildPanelHotkeyPathConfig { get; }
+
+    ConfigEntry<string>? ToggleHistoryPanelHotkeyPathConfig { get; }
+
     ConfigEntry<BppChineseLocaleMode>? ChineseLocaleModeConfig { get; }
 
     ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig { get; }

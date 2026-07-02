@@ -72,6 +72,9 @@ internal static class BppHotkeyService
         {
             [BppHotkeyActionId.HoldEnchantPreview] = CtrlAliasPath,
             [BppHotkeyActionId.HoldUpgradePreview] = ShiftAliasPath,
+            [BppHotkeyActionId.ToggleCollectionPanel] = KeyboardPrefix + "tab",
+            [BppHotkeyActionId.ToggleLiveBuildPanel] = KeyboardPrefix + "capsLock",
+            [BppHotkeyActionId.ToggleHistoryPanel] = KeyboardPrefix + "f8",
         };
 
     private static readonly Dictionary<
@@ -130,6 +133,37 @@ internal static class BppHotkeyService
         }
 
         return action.WasPressedThisFrame();
+    }
+
+    // Toggle-style hotkeys fire on a plain press: while the user is capturing a rebind
+    // no toggle may fire, and unless the binding itself is a modifier key, a held
+    // Ctrl/Alt/Shift suppresses the press (preserves the legacy plain-Tab semantics).
+    internal static bool WasToggleHotkeyPressedThisFrame(
+        BppHotkeyActionId actionId,
+        Keyboard? keyboard = null
+    )
+    {
+        if (BppKeyBindRowController.IsRebindCaptureActive)
+            return false;
+
+        var path = GetBindingPath(actionId);
+        if (!WasPressedThisFrame(path))
+            return false;
+
+        if (IsModifierBindingPath(path))
+            return true;
+
+        keyboard ??= Keyboard.current;
+        return !KeyBindings.Modifiers.IsCtrlPressed(keyboard)
+            && !KeyBindings.Modifiers.IsAltPressed(keyboard)
+            && !KeyBindings.Modifiers.IsShiftPressed(keyboard);
+    }
+
+    private static bool IsModifierBindingPath(string normalizedPath)
+    {
+        return normalizedPath.Contains("ctrl", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Contains("shift", StringComparison.OrdinalIgnoreCase)
+            || normalizedPath.Contains("alt", StringComparison.OrdinalIgnoreCase);
     }
 
     // normalizedPath must already be normalized (GetBindingPath output).
@@ -493,6 +527,10 @@ internal static class BppHotkeyService
         {
             BppHotkeyActionId.HoldEnchantPreview => Config.EnchantPreviewHotkeyPathConfig,
             BppHotkeyActionId.HoldUpgradePreview => Config.UpgradePreviewHotkeyPathConfig,
+            BppHotkeyActionId.ToggleCollectionPanel =>
+                Config.ToggleCollectionPanelHotkeyPathConfig,
+            BppHotkeyActionId.ToggleLiveBuildPanel => Config.ToggleLiveBuildPanelHotkeyPathConfig,
+            BppHotkeyActionId.ToggleHistoryPanel => Config.ToggleHistoryPanelHotkeyPathConfig,
             _ => null,
         };
     }
