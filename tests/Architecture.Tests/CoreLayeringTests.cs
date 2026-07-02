@@ -544,6 +544,128 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void ItemBoardPreview_uses_native_socket_proportions_for_slot_grid_defaults()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var socketLayoutSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "ItemBoardPreview", "ItemBoardSocketLayout.cs")
+        );
+        var optionsSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "GameInterop",
+                "ItemBoardPreview",
+                "ItemBoardPreviewOptions.cs"
+            )
+        );
+
+        Assert.Contains("public const float NativeSocketHeightPixels = 484f;", socketLayoutSource);
+        Assert.Contains("public const float NativeSocketPitchPixels = 240f;", socketLayoutSource);
+        Assert.Contains("public const float FrameHeightOverSocket = 1.03704f;", socketLayoutSource);
+        Assert.Contains(
+            "FallbackSocketHeightPixels = NativeSocketHeightPixels",
+            socketLayoutSource
+        );
+        Assert.Contains("FallbackSocketWidthPixels = NativeSocketPitchPixels", socketLayoutSource);
+
+        Assert.Contains("DefaultSlotGridMaxHeightRatio", optionsSource);
+        Assert.Contains("ItemBoardSocketLayout.NativeSocketHeightPixels", optionsSource);
+        Assert.Contains("ItemBoardSocketLayout.FrameHeightOverSocket", optionsSource);
+        Assert.Contains("ItemBoardSocketLayout.NativeSocketPitchPixels", optionsSource);
+        Assert.Contains("ItemBoardSocketLayout.NativeBoardHeight", optionsSource);
+        Assert.Contains(
+            "SlotGridMaxHeightRatio { get; init; } = DefaultSlotGridMaxHeightRatio",
+            optionsSource
+        );
+        Assert.DoesNotContain("SlotGridMaxHeightRatio { get; init; } = 0.96f", optionsSource);
+    }
+
+    [Fact]
+    public void CollectionGridVirtualizer_clamps_item_cards_by_body_width_not_frame_width()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var virtualizerSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CollectionPanel",
+                "Grid",
+                "CollectionGridVirtualizer.cs"
+            )
+        );
+        var badgeSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CollectionPanel",
+                "Grid",
+                "CollectionSourceAttributionBadge.cs"
+            )
+        );
+
+        static int Find(string source, string value, int startIndex = 0) =>
+            source.IndexOf(value, startIndex, StringComparison.Ordinal);
+
+        var applyCellScaleIndex = Find(virtualizerSource, "private void ApplyCellScale");
+        var bodyWidthIndex = Find(
+            applyCellScaleIndex >= 0 ? virtualizerSource : string.Empty,
+            "var bodyW ="
+        );
+        var fitterIndex = Find(
+            virtualizerSource,
+            "rect.GetComponent<AspectRatioFitter>()",
+            applyCellScaleIndex
+        );
+        var frameHeightIndex = Find(
+            virtualizerSource,
+            "ItemBoardSocketLayout.FrameHeightOverSocket",
+            applyCellScaleIndex
+        );
+        var clampBodyWidthIndex = Find(
+            virtualizerSource,
+            "bodyW * scale > maxWidth",
+            applyCellScaleIndex
+        );
+        var fallbackClampIndex = Find(virtualizerSource, "bodyW = natW;", applyCellScaleIndex);
+        var oldClampIndex = Find(virtualizerSource, "natW * scale > maxWidth", applyCellScaleIndex);
+
+        Assert.Contains("const float FallbackNativeCardHeight = 484f;", virtualizerSource);
+        Assert.True(
+            applyCellScaleIndex >= 0,
+            "CollectionGridVirtualizer.ApplyCellScale should exist."
+        );
+        Assert.True(
+            bodyWidthIndex > applyCellScaleIndex,
+            "ApplyCellScale should derive the width clamp basis separately from measured frame width."
+        );
+        Assert.True(
+            fitterIndex > applyCellScaleIndex && fitterIndex < bodyWidthIndex,
+            "ApplyCellScale should use the root AspectRatioFitter for item-card body width."
+        );
+        Assert.True(
+            frameHeightIndex > fitterIndex && frameHeightIndex < bodyWidthIndex,
+            "Item body width should divide measured frame height by the native frame-over-socket factor."
+        );
+        Assert.True(
+            clampBodyWidthIndex > bodyWidthIndex,
+            "The collection width clamp should compare body width, not frame-subtree width."
+        );
+        Assert.True(
+            fallbackClampIndex > bodyWidthIndex,
+            "Cards without a usable AspectRatioFitter should fall back to the measured visual width."
+        );
+        Assert.True(
+            oldClampIndex < 0,
+            "The old frame-width clamp shrinks Large item cards because their frame art overhangs the body."
+        );
+
+        Assert.Contains("BadgeRootHeightScale", badgeSource);
+        Assert.Contains("CollectionGridVirtualizer.FallbackNativeCardHeight / 200f", badgeSource);
+    }
+
+    [Fact]
     public void CollectionGridVirtualizer_measures_native_visual_bounds_for_card_layout()
     {
         var repoRoot = RepoRoot();

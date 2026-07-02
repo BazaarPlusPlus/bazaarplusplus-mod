@@ -13,6 +13,8 @@ internal static class CollectionSourceAttributionBadge
 {
     private const string BadgeName = "BppCollectionSourceAttributionBadge";
     private const string LabelName = "BppCollectionSourceAttributionLabel";
+    private const float BadgeRootHeightScale =
+        CollectionGridVirtualizer.FallbackNativeCardHeight / 200f;
 
     public static void Bind(
         GameObject host,
@@ -45,8 +47,11 @@ internal static class CollectionSourceAttributionBadge
         rect.anchorMin = new Vector2(1f, 1f);
         rect.anchorMax = new Vector2(1f, 1f);
         rect.pivot = new Vector2(1f, 1f);
-        rect.anchoredPosition = new Vector2(-10f, -12f);
-        rect.sizeDelta = new Vector2(132f, 28f);
+        rect.anchoredPosition = new Vector2(
+            -10f * BadgeRootHeightScale,
+            -12f * BadgeRootHeightScale
+        );
+        rect.sizeDelta = new Vector2(132f * BadgeRootHeightScale, 28f * BadgeRootHeightScale);
         rect.localScale = Vector3.one;
 
         var image = badge.GetComponent<Image>();
@@ -58,13 +63,13 @@ internal static class CollectionSourceAttributionBadge
         var labelRect = labelObject.GetComponent<RectTransform>();
         labelRect.anchorMin = Vector2.zero;
         labelRect.anchorMax = Vector2.one;
-        labelRect.offsetMin = new Vector2(6f, 0f);
-        labelRect.offsetMax = new Vector2(-6f, 0f);
+        labelRect.offsetMin = new Vector2(6f * BadgeRootHeightScale, 0f);
+        labelRect.offsetMax = new Vector2(-6f * BadgeRootHeightScale, 0f);
         labelRect.localScale = Vector3.one;
 
         var label = labelObject.GetComponent<Text>();
         label.font = BppUiFont.Default;
-        label.fontSize = 12;
+        label.fontSize = Mathf.RoundToInt(12f * BadgeRootHeightScale);
         label.fontStyle = FontStyle.Bold;
         label.alignment = TextAnchor.MiddleCenter;
         label.color = Colors.HistoryTitleText;

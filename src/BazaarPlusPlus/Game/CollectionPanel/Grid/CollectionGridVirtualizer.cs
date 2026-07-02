@@ -10,6 +10,7 @@ using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.UI;
@@ -35,7 +36,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // no-op because the generation has moved), and the realized cells are recycled.
 internal sealed class CollectionGridVirtualizer
 {
-    private const float FallbackNativeCardHeight = 200f;
+    internal const float FallbackNativeCardHeight = 484f;
 
     private readonly CollectionGridOverlay _overlay;
     private readonly CollectionCardFactory _factory;
@@ -491,18 +492,26 @@ internal sealed class CollectionGridVirtualizer
         var natW = visualBounds.Width;
         var natH = visualBounds.Height;
 
-        // Scale to the cell HEIGHT so every card in a shelf renders the same height. Native item
-        // cards share one prefab height and a shelf shares one cell height, so a height-based
-        // scale aligns small/medium/large tops and bottoms — the old min(w,h) fit left the
-        // narrow small cards width-limited and therefore slightly shorter. Clamp so a card never
-        // grows past its cell width + one gutter (prevents overlapping the neighbour); because
-        // that bound is exactly span*(unit+gap), the clamped scale is identical across spans, so
-        // the uniform height survives even when a card is width-limited.
+        // Scale to the cell HEIGHT so every card in a shelf renders the same height. Clamp item
+        // cards by body width, not FrameContainer width: Large frame art has native side
+        // flourishes that overhang the 3:2 body and should not make only Large cards shorter.
         var targetH = Mathf.Max(1f, cellRect.Height * (1f - 2f * inset));
         var scale = targetH / natH;
         var maxWidth = cellRect.Width + _gap;
-        if (natW * scale > maxWidth)
-            scale = maxWidth / natW;
+        var fitter = rect.GetComponent<AspectRatioFitter>();
+        var bodyH = natH / ItemBoardSocketLayout.FrameHeightOverSocket;
+        var bodyW = natW;
+        if (
+            fitter != null
+            && fitter.aspectRatio > 0.01f
+            && !float.IsNaN(fitter.aspectRatio)
+            && !float.IsInfinity(fitter.aspectRatio)
+        )
+        {
+            bodyW = fitter.aspectRatio * bodyH;
+        }
+        if (bodyW * scale > maxWidth)
+            scale = maxWidth / bodyW;
         if (scale <= 0f || float.IsNaN(scale) || float.IsInfinity(scale))
             scale = 1f;
         rect.localScale = new Vector3(scale, scale, 1f);

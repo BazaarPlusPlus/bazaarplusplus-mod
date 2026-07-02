@@ -8,10 +8,16 @@ internal static class ItemBoardSocketLayout
     public const int SocketCount = ItemBoardSlotGridGeometry.SocketCount;
     public const int NativeBoardWidth = 2600;
     public const int NativeBoardHeight = 600;
+    public const float NativeSocketHeightPixels = 484f;
+    public const float NativeSocketPitchPixels = 240f;
+    public const float FrameHeightOverSocket = 1.03704f;
 
     private const float HorizontalPaddingFraction = 0f;
-    private const float FallbackSocketWidthPixels = 240f;
-    private const float FallbackSocketHeightPixels = 320f;
+
+    // Native Tooltip_MonsterBoard_P sockets are width-0 point pins on a 240px x-pitch;
+    // the native card root stretches to the socket height, which controls gem proportions.
+    private const float FallbackSocketWidthPixels = NativeSocketPitchPixels;
+    private const float FallbackSocketHeightPixels = NativeSocketHeightPixels;
 
     public static RectTransform[] BuildSockets(RectTransform parent, int layer, string objectPrefix)
     {

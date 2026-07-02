@@ -66,6 +66,10 @@
       Link="ItemBoardPreviewOptionsForwarder.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardSocketLayout.cs"
+      Link="ItemBoardSocketLayout.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSignatureGate.cs"
       Link="ItemBoardPreviewSignatureGate.cs"
     />
@@ -91,6 +95,9 @@
   <ItemGroup>
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
