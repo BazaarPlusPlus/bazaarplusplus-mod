@@ -527,8 +527,7 @@ internal static class BppHotkeyService
         {
             BppHotkeyActionId.HoldEnchantPreview => Config.EnchantPreviewHotkeyPathConfig,
             BppHotkeyActionId.HoldUpgradePreview => Config.UpgradePreviewHotkeyPathConfig,
-            BppHotkeyActionId.ToggleCollectionPanel =>
-                Config.ToggleCollectionPanelHotkeyPathConfig,
+            BppHotkeyActionId.ToggleCollectionPanel => Config.ToggleCollectionPanelHotkeyPathConfig,
             BppHotkeyActionId.ToggleLiveBuildPanel => Config.ToggleLiveBuildPanelHotkeyPathConfig,
             BppHotkeyActionId.ToggleHistoryPanel => Config.ToggleHistoryPanelHotkeyPathConfig,
             _ => null,
