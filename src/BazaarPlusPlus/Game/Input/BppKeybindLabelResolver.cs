@@ -42,6 +42,15 @@ internal static class BppKeybindLabelResolver
         "Tasto non supportato"
     );
 
+    private static readonly LocalizedTextSet ConflictWarningFormat = new(
+        "{0} conflicts with {1}",
+        "{0} 与 {1} 冲突",
+        "{0} steht in Konflikt mit {1}",
+        "{0} conflita com {1}",
+        "{0}이(가) {1}과(와) 충돌합니다",
+        "{0} in conflitto con {1}"
+    );
+
     internal static string ResolveActionLabel(BppHotkeyActionId actionId, string languageCode)
     {
         return actionId switch
@@ -66,5 +75,18 @@ internal static class BppKeybindLabelResolver
     internal static string ResolveUnsupportedKey(string languageCode)
     {
         return UnsupportedKey.Resolve(languageCode, L.CurrentMode);
+    }
+
+    internal static string ResolveConflictWarning(
+        BppHotkeyActionId actionId,
+        BppHotkeyActionId conflictingActionId,
+        string languageCode
+    )
+    {
+        return string.Format(
+            ConflictWarningFormat.Resolve(languageCode, L.CurrentMode),
+            ResolveActionLabel(actionId, languageCode),
+            ResolveActionLabel(conflictingActionId, languageCode)
+        );
     }
 }

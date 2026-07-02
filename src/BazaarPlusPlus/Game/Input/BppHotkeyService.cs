@@ -231,8 +231,11 @@ internal static class BppHotkeyService
 
         if (TryGetConflictingAction(actionId, normalized, out var conflictingAction))
         {
-            errorMessage =
-                $"{BppKeybindLabelResolver.ResolveActionLabel(actionId, PlayerPreferences.Data.LanguageCode)} conflicts with {BppKeybindLabelResolver.ResolveActionLabel(conflictingAction, PlayerPreferences.Data.LanguageCode)}";
+            errorMessage = BppKeybindLabelResolver.ResolveConflictWarning(
+                actionId,
+                conflictingAction,
+                PlayerPreferences.Data.LanguageCode
+            );
             return false;
         }
 
