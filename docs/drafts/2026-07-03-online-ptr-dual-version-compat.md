@@ -117,12 +117,12 @@ PTR 是不同的卡池/平衡/服务器，数据混入会污染 V4 服务端、a
 - **Steam 分支守卫**：`decompile*` 命令前读 acf 的 `MountedConfig.BetaKey`，分支与目标树不匹配即拒绝；`BPP_SKIP_BRANCH_CHECK=1` 越过。acf 通过**从 `MANAGED`（DLL 实际来源）向上逐级查找**定位（评审发现：早期版本从 `GAME_ROOT` 推导，与可独立覆盖的 `BPP_MANAGED_PATH` 解耦，守卫会验证错对象；现已修正，且顺带支持二级 Steam 库）。裸拷贝的 Managed 目录（上方无 acf）会 fail-closed 并提示跳过开关。
 - `decompiled-vptr/` 已生成（PTR build 1.0.11358 全 6 DLL），已被 .gitignore 覆盖。
 
-待实施：
-1. **`./run.sh snapshot-managed`**：把当前 Managed + 分支/buildid 归档到 `game-libs/<channel>-<buildid>/Managed/`（gitignored）。因 F1，这是保留"另一版本程序集"的唯一途径。现在先归档 PTR；下次切回 online 立即归档 online。
-2. **Release 构建钉 online 程序集（红队 MAJOR，必做）**：当前 `./run.sh all --prod` 在 PTR 分支下会把**按 PTR 程序集编译的 DLL** 直接拷进 installer resources 发给 online 用户（`run.sh` 的 build/all 无分支守卫；`BazaarPlusPlus.csproj:282-342` Release 自动拷贝）。整改：Release/BuildAll 路径强制 `require_steam_branch public` **或**显式 `-p:ManagedPath=game-libs/online-<buildid>/Managed` 钉快照，二者缺一即拒绝打包。**在切回 online 分支并归档之前，本机不可产出正式 Release。**
-3. **双版本编译矩阵**：`./run.sh build-matrix` 对 `game-libs/online-*/Managed` 与 `ptr-*/Managed` 各编译一次，保证单一源码树对两套程序集持续可编译。
-4. **双树兼容性测试 `PtrCompatibility.Tests`**：沿用 exe-runner 源码文本断言模式（先例 `NativeCardPreviewCompatibility.Tests`——该模式是"签名守卫"而非覆盖率作秀，与 workspace 规则的紧张关系以此先例为准并在测试头注释说明）。断言两树的 seam 前提：两树都有 1 参 `ReceiveOrQueue(INetMessage)`；online 树有 `CosmeticsListManager.OnRandomizeToggleChanged`、PTR 树有 `CosmeticsPanelController.OnRandomizeToggleChanged`；PTR 树有 `Config.ServerOption` 而 online 树无；PTR 树聚合递归走 `Receive`（B1 附加分析的前提）。**可复现性约束（红队 MAJOR）**：两树都是 gitignored 本地产物，此测试是**本机专属门禁**（CI/新 checkout 不可用）——树缺失时必须 **skip-and-pass 并打印提示**（不得像现有先例那样硬抛，否则 online 分支下 `./run.sh test` 恒红）；TFM 用 net10.0（对齐 `RandomHeroPoolPatchCompatibility.Tests`；本机 net8.0 测试项目环境性失败）。
-5. **流程与收敛触发器**：每次 PTR 更新 → `decompile-all-ptr` + 兼容性测试；每次回 public 分支 → `decompile-all`（整树刷新，见 F3 staleness）+ `snapshot-managed`。**收敛信号**：若刷新后的 online 树令"`CosmeticsListManager.OnRandomizeToggleChanged` 存在"断言失败 = PTR 改动已并入 online → 触发 PR4（重指目标 + 恢复功能 + 退役 PTR skip）。责任人：你（单人项目），信号载体就是这条测试失败。
+已实施（PR3，2026-07-03）：
+1. **`./run.sh snapshot-managed`**：把当前 Managed + 分支/buildid 归档到 `game-libs/<channel>-<buildid>/Managed/`（gitignored）。因 F1，这是保留"另一版本程序集"的唯一途径。PTR 快照 `ptr-23993765` 已归档；**下次切回 online 立即再跑一次归档 online**。
+2. **Release 构建钉 online 程序集（红队 MAJOR）**：`build_all` 现在优先取 `BPP_RELEASE_MANAGED` 显式钉定，其次自动选 `game-libs/online-*/Managed` 最新快照并打印，两者皆无时 `require_steam_branch public`——在 PTR 分支且无 online 快照时拒绝打包（已实测拒绝路径）。
+3. **`./run.sh build-matrix`**：对 `game-libs/*/Managed` 每个快照以 **`-c CompatCheck`** 配置编译（Debug 的 plugins 拷贝与 Release 的 installer 拷贝条件都只认 Debug/Release，CompatCheck 天然无部署副作用，不必改动 load-bearing 的 csproj）。已实测对 ptr 快照通过。
+4. **`tests/PtrCompatibility.Tests`**（exe-runner，net10.0，无项目引用）：断言两树 seam 前提——两树都有 1 参 `ReceiveOrQueue(INetMessage)`；online 树**无**私有 `Receive(INetMessage,bool)` 而 PTR 树有（NetMessageDispatchSeam 的形态键）；两树各自的聚合递归路径（online 走 `ReceiveOrQueue(message2)`、PTR 走 `Receive(message2,...)`）；Cosmetics 双侧布局；`Config.ServerOption` PTR 独有（resolver 探针前提）。**本机专属门禁**：树缺失 skip-and-pass 打印提示（已实测），CI/新 checkout 天然跳过。该模式是"签名守卫"，先例 `NativeCardPreviewCompatibility.Tests`。
+5. **流程与收敛触发器**：每次 PTR 更新 → `decompile-all-ptr` + `snapshot-managed` + PtrCompatibility.Tests；每次回 public 分支 → `decompile-all`（整树刷新，见 F3 staleness）+ `snapshot-managed` + **执行 PR2 注明的一次性回填 UPDATE**。**收敛信号**：刷新后的 online 树令"`CosmeticsListManager.OnRandomizeToggleChanged` 存在"断言失败 = PTR 改动已并入 online → 触发 PR4（重指目标 + 恢复功能 + 退役 PTR skip）；"online 树无私有 Receive"断言失败 = online 采纳 PTR 分发形态 → seam 自动路由到新目标，上线前跑一次捕获验证。
 
 ## 5. 实施顺序（PR 切分）
 

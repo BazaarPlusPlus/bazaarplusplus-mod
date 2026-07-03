@@ -46,3 +46,4 @@ tools
 *.lscache
 .agents/
 skills-lock.json
+game-libs/
