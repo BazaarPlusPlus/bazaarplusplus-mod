@@ -1,0 +1,40 @@
+src/BazaarPlusPlus/Core/Config/SubtitlePosition.cs
+  s_991bab25ac6587::t_13ac3a93ea8879 1-9
+tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs
+  s_991bab25ac6587::t_d0e696badf411a 303,354-357,361-364,374,378-379
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesSettingsDockEntry.cs
+  s_991bab25ac6587::t_32e54cab1956e7 64-66,72-75,78,88,90-99,123-125,131-134,137,147,149-158,176-177,179-184,198-199,201-206,226-228,232,234
+src/BazaarPlusPlus/Core/Config/SubtitleLanguageMode.cs
+  s_991bab25ac6587::t_da2f339b1f6f01 1-9
+src/BazaarPlusPlus/Core/Config/BppConfig.cs
+  s_991bab25ac6587::t_a2f464cf06558f 19-20,22-26
+  s_991bab25ac6587::t_5079020132e38c 21
+  s_991bab25ac6587::t_8745c6e181c4a2 79-108
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceLineDisplay.cs
+  s_991bab25ac6587::t_d5b60cc4d5aafa 5
+  s_991bab25ac6587::t_35655755979d09 402-403
+  s_991bab25ac6587::t_c47a967cffb4e6 358-364
+  s_991bab25ac6587::t_e0e4edc4a29757 421-422
+  s_991bab25ac6587::t_ec591f8958b7f8 495,499,506-509,512,518-532
+  s_991bab25ac6587::t_4d34dd7bdbb7ab 533-534
+src/BazaarPlusPlus/Core/Config/IBppConfig.cs
+  s_991bab25ac6587::t_c9e52c2ac808ef 17-24
+src/BazaarPlusPlus/Game/VoiceSubtitles/Settings/VoiceLineSettings.cs
+  s_991bab25ac6587::t_911b05a8500656 3-4,8-12,19-22,27-28,40,42-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "1830fe0b02f1798b34540a4fe9b8591e693c0aba",
+  "prompts": {},
+  "sessions": {
+    "s_991bab25ac6587": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7c0c8720-c50d-41a4-b2ba-ce254d4ed6fb",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  }
+}
