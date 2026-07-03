@@ -48,6 +48,7 @@ internal sealed class BuildRecommendationRepository
     private Func<string?> _loadEmbeddedJson = LoadEmbeddedTenWinJson;
     private Action<Func<Task>> _queueBackgroundRefresh = QueueBackgroundRefresh;
     private bool _backgroundRefreshInProgress;
+    private Task? _warmUpTask;
 
     public IReadOnlyList<BuildRecommendation> FindRecommendations(
         string? hero,
@@ -214,16 +215,87 @@ internal sealed class BuildRecommendationRepository
         return _corpus;
     }
 
-    private void EnsureLoaded()
+    /// <summary>
+    /// Starts loading the ten-win build corpus on a background thread so the first panel open
+    /// does not block the Unity main thread on file I/O and JSON parsing. Idempotent.
+    /// Call from the panel's Awake() / Initialize() as early as possible.
+    /// </summary>
+    public void BeginCorpusLoad()
     {
-        var shouldRefreshInBackground = false;
         lock (_syncRoot)
         {
-            if (_attemptedLoad)
+            if (_attemptedLoad || _warmUpTask != null)
                 return;
 
-            _attemptedLoad = true;
-            _corpus = LoadCorpus(out shouldRefreshInBackground);
+            _warmUpTask = Task.Run(LoadCorpusInBackground);
+        }
+        BppLog.Debug("BuildRecommendationRepository", "Corpus warm-up task started.");
+    }
+
+    private void LoadCorpusInBackground()
+    {
+        TenWinBuildCorpus? corpus;
+        bool shouldRefreshInBackground;
+        try
+        {
+            corpus = LoadCorpus(out shouldRefreshInBackground);
+        }
+        catch (Exception ex)
+        {
+            // This runs in a never-awaited Task: an unhandled throw would fault _warmUpTask and,
+            // because both load guards short-circuit on "_warmUpTask != null", silently brick the
+            // corpus for the whole session. Clear the marker so EnsureLoaded's synchronous fallback
+            // (or a later cold-start re-arm) can still recover.
+            lock (_syncRoot)
+            {
+                _warmUpTask = null;
+            }
+            BppLog.Warn("BuildRecommendationRepository", $"Corpus warm-up failed: {ex.Message}");
+            return;
+        }
+
+        lock (_syncRoot)
+        {
+            if (!_attemptedLoad)
+            {
+                _corpus = corpus;
+                _attemptedLoad = true;
+            }
+        }
+
+        BppLog.Info(
+            "BuildRecommendationRepository",
+            $"Corpus warm-up complete: {(corpus != null ? $"{corpus.BuildCount} builds" : "no corpus")}."
+        );
+
+        if (shouldRefreshInBackground)
+            TryQueueRefreshFromRemote("cache_stale_or_missing");
+    }
+
+    private void EnsureLoaded()
+    {
+        lock (_syncRoot)
+        {
+            // Warm-up task running or already finished — either way, don't block.
+            if (_attemptedLoad || _warmUpTask != null)
+                return;
+        }
+
+        // BeginCorpusLoad() was never called (unexpected path). Load synchronously as a
+        // last-resort fallback — log a warning so it shows up during testing.
+        BppLog.Warn(
+            "BuildRecommendationRepository",
+            "EnsureLoaded reached synchronous fallback; BeginCorpusLoad was not called."
+        );
+
+        var corpus = LoadCorpus(out var shouldRefreshInBackground);
+        lock (_syncRoot)
+        {
+            if (!_attemptedLoad)
+            {
+                _corpus = corpus;
+                _attemptedLoad = true;
+            }
         }
 
         if (shouldRefreshInBackground)
@@ -385,7 +457,12 @@ internal sealed class BuildRecommendationRepository
             {
                 _backgroundRefreshInProgress = false;
                 if (_corpus == null)
+                {
                     _attemptedLoad = false;
+                    // Clear the warm-up marker too; otherwise both load guards keep short-circuiting
+                    // on "_warmUpTask != null" and this re-arm can never actually retry the load.
+                    _warmUpTask = null;
+                }
             }
         }
     }
@@ -524,6 +601,7 @@ internal sealed class BuildRecommendationRepository
             _corpus = null;
             _attemptedLoad = false;
             _backgroundRefreshInProgress = false;
+            _warmUpTask = null;
             _cacheFilePath = cacheFilePath;
             _utcNow = utcNow;
             _downloadJsonAsync = downloadJsonAsync;
@@ -544,6 +622,7 @@ internal sealed class BuildRecommendationRepository
             _corpus = null;
             _attemptedLoad = false;
             _backgroundRefreshInProgress = false;
+            _warmUpTask = null;
             _cacheFilePath = cacheFilePath;
             _utcNow = utcNow;
             _downloadJsonAsync = downloadJsonAsync;
@@ -560,6 +639,7 @@ internal sealed class BuildRecommendationRepository
         {
             _corpus = null;
             _attemptedLoad = false;
+            _warmUpTask = null;
             _loadEmbeddedJson = loadEmbeddedJson ?? (() => null);
         }
     }
@@ -571,6 +651,7 @@ internal sealed class BuildRecommendationRepository
             _corpus = null;
             _attemptedLoad = false;
             _backgroundRefreshInProgress = false;
+            _warmUpTask = null;
             _cacheFilePath = null;
             _utcNow = () => DateTime.UtcNow;
             _downloadJsonAsync = DownloadJsonAsync;

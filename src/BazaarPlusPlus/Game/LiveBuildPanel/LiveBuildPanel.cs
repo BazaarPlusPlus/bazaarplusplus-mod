@@ -64,6 +64,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
                 () => _instance?.Close()
             )
         );
+        _recommendations.BeginCorpusLoad();
     }
 
     private void OnDestroy()
