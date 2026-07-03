@@ -1,0 +1,21 @@
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceLineDisplay.cs
+  s_f53904f06e7a0b::t_8d5b1f03d2c199 15,68-74,76,191,281-284,332-365,379-382,396-397,482-488,492,501,509-511,527-544
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "64170b74ce8740569cf685e2b6944e292d7cbcb2",
+  "prompts": {},
+  "sessions": {
+    "s_f53904f06e7a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6da2abfe-d661-4038-8dad-cfe6c9bd5544",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
