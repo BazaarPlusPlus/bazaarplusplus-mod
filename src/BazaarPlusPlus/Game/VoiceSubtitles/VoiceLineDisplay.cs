@@ -73,17 +73,18 @@ internal static class VoiceLineDisplay
             stage = "resolve-font";
             _subtitleFont = ResolveSubtitleFont(versionLabel);
 
+            // Always use the split renderer: English in the game's own font, Chinese in a SEPARATE
+            // system CJK font. Never route Chinese through the game's font asset — the subtitle shares
+            // that asset with the game's own UI (shop text, etc.), so rendering new CJK glyphs into its
+            // shared dynamic atlas corrupts the game's own text into tofu. English is Latin and already
+            // present in that atlas, so it adds nothing. (The combined single-label path is intentionally
+            // not used for this reason.)
             stage = "add-subtitle-renderer";
             _labelRoot = labelObject;
-            if (FontDiagnostics.HasChineseCoverage(_subtitleFont))
-                _combinedLabel = labelObject.AddComponent<TextMeshProUGUI>();
-            else
-            {
-                _englishLabel = CreateEnglishLabel(labelObject.transform);
-                _chineseUiLabel = CreateChineseUiLabel(labelObject.transform);
-            }
+            _englishLabel = CreateEnglishLabel(labelObject.transform);
+            _chineseUiLabel = CreateChineseUiLabel(labelObject.transform);
 
-            if (_combinedLabel == null && (_englishLabel == null || _chineseUiLabel == null))
+            if (_englishLabel == null && _chineseUiLabel == null)
             {
                 UnityEngine.Object.Destroy(labelObject);
                 return;
