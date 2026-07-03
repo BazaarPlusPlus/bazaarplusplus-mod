@@ -1,0 +1,25 @@
+src/BazaarPlusPlus/Infrastructure/Fonts/BppTmpFont.cs
+  s_f1273dac08ecfa::t_baf32887bdf667 96-100
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceLineDisplay.cs
+  s_f1273dac08ecfa::t_e18fb4ed703481 211-215
+  s_f1273dac08ecfa::t_f20566d68d2c2d 6
+  s_f1273dac08ecfa::t_caaa71b70803b4 68-72,74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "d48f4cf5a8ef84429ad9126a91c8b33843194cd3",
+  "prompts": {},
+  "sessions": {
+    "s_f1273dac08ecfa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "157c35ee-6b54-49b5-82e3-37f66e722da5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
