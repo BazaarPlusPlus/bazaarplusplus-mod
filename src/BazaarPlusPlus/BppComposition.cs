@@ -49,6 +49,7 @@ internal sealed class BppComposition : IDisposable
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
+    private readonly VoiceSubtitlesModule _voiceSubtitlesModule;
     private ModOnlineClient? _onlineClientRef;
     private BazaarDbLinkClient? _accountLinkClientRef;
     private PvpBattleCatalog? _pvpBattleCatalog;
@@ -94,10 +95,12 @@ internal sealed class BppComposition : IDisposable
         _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);
         _combatReplayModule = new CombatReplayModule(_eventBus);
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
+        _voiceSubtitlesModule = new VoiceSubtitlesModule();
 
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
         _featureRegistry.Register(_combatStatusBarModule);
+        _featureRegistry.Register(_voiceSubtitlesModule);
 
         _settingsDockRegistry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
         _settingsDockRegistry.Register(new FixedSupporterListSettingsDockEntry());
@@ -131,6 +134,8 @@ internal sealed class BppComposition : IDisposable
             )
         );
         _mountables.Register(new LiveBuildPanelMount());
+        _mountables.Register(new ComponentMount<VoiceLineDisplayDispatcher>());
+        _mountables.Register(new ComponentMount<VersionLabelScanner>());
         _mountables.Register(
             new ComponentMount<RunLoggingController>((c, s) => c.Initialize(s, PvpBattleCatalog))
         );
