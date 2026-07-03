@@ -10,6 +10,7 @@ internal sealed class VoiceSubtitlesModule : IBppFeature
 
     public void Start()
     {
+        VoiceLineCatalog.Reset();
         VoiceLineDisplay.Reset();
         VoiceLineVoObserverBridge.Reset();
         _repository.BeginLoad();
@@ -19,5 +20,6 @@ internal sealed class VoiceSubtitlesModule : IBppFeature
     {
         VoiceLineVoObserverBridge.Reset();
         VoiceLineDisplay.Reset();
+        VoiceLineCatalog.Reset();
     }
 }

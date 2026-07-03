@@ -1,6 +1,9 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.Game.VoiceSubtitles;
@@ -73,7 +76,59 @@ internal sealed class VoiceLinesDocument
             );
         }
 
-        return lines.ToArray();
+        var result = lines.ToArray();
+        if (document.Count != result.Length)
+            throw new InvalidOperationException(
+                $"Voice line JSON '{sourceName}' count mismatch: count={document.Count} lines={result.Length}."
+            );
+
+        var actualContentHash = ComputeContentHash(result);
+        if (
+            string.IsNullOrWhiteSpace(document.ContentHash)
+            || !string.Equals(
+                document.ContentHash,
+                actualContentHash,
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
+        {
+            throw new InvalidOperationException(
+                $"Voice line JSON '{sourceName}' contentHash mismatch: "
+                    + $"expected={document.ContentHash ?? "<missing>"} actual={actualContentHash}."
+            );
+        }
+
+        return result;
+    }
+
+    internal static string ComputeContentHash(IReadOnlyList<VoiceLine> lines)
+    {
+        var canonical = new StringBuilder();
+        for (var i = 0; i < lines.Count; i++)
+        {
+            if (i > 0)
+                canonical.Append('\x1e');
+
+            var line = lines[i];
+            var centis = (long)Math.Round(line.DurationSeconds * 100.0);
+            canonical
+                .Append(line.Stem)
+                .Append('\x1f')
+                .Append(line.English)
+                .Append('\x1f')
+                .Append(line.Chinese)
+                .Append('\x1f')
+                .Append(centis.ToString(CultureInfo.InvariantCulture));
+        }
+
+        using var sha256 = SHA256.Create();
+        var bytes = new UTF8Encoding(false).GetBytes(canonical.ToString());
+        var hash = sha256.ComputeHash(bytes);
+        var hex = new StringBuilder(hash.Length * 2);
+        foreach (var value in hash)
+            hex.Append(value.ToString("x2", CultureInfo.InvariantCulture));
+
+        return "sha256:" + hex;
     }
 
     internal sealed class VoiceLineEntry
