@@ -15,6 +15,7 @@ internal static class VoiceLineDisplay
     private static TextMeshProUGUI? _combinedLabel;
     private static TextMeshProUGUI? _englishLabel;
     private static Text? _chineseUiLabel;
+    private static TMP_FontAsset? _subtitleFont;
     private static VoiceLineOverlayLifetime? _lifetime;
     private static bool _mountedFromVersionLabel;
     private static int _nextDisplayId;
@@ -63,9 +64,18 @@ internal static class VoiceLineDisplay
             _sourceLabel = versionLabel;
             FontDiagnostics.LogOnce(versionLabel, "mount");
 
+            // Resolve an independent subtitle font instead of cloning the version label's font.
+            // The mod swaps the main-menu version label to LXGW (per-label), so cloning it makes the
+            // subtitle's render path + font flip between scenes (LXGW/combined on the main menu vs the
+            // game font/split in-run) — the source of the intermittent English rendering. TMP's global
+            // default font asset is scene-stable and untouched by the mod, so it keeps rendering
+            // deterministic across scenes (position/parent still come from the scanned version label).
+            stage = "resolve-font";
+            _subtitleFont = ResolveSubtitleFont(versionLabel.font);
+
             stage = "add-subtitle-renderer";
             _labelRoot = labelObject;
-            if (FontDiagnostics.HasChineseCoverage(versionLabel.font))
+            if (FontDiagnostics.HasChineseCoverage(_subtitleFont))
                 _combinedLabel = labelObject.AddComponent<TextMeshProUGUI>();
             else
             {
@@ -191,11 +201,18 @@ internal static class VoiceLineDisplay
         _combinedLabel = null;
         _englishLabel = null;
         _chineseUiLabel = null;
+        _subtitleFont = null;
         _lifetime = null;
         _mountedFromVersionLabel = false;
         _sourceRect = null;
         _sourceLabel = null;
     }
+
+    // Scene-stable TMP font for the subtitle. Prefers TMP's global default font asset (untouched by the
+    // mod's per-label LXGW swap) so the render path/metrics do not change between scenes; falls back to
+    // the version label's font only if no global default is configured.
+    private static TMP_FontAsset? ResolveSubtitleFont(TMP_FontAsset? fallback) =>
+        TMP_Settings.defaultFontAsset != null ? TMP_Settings.defaultFontAsset : fallback;
 
     private static void ShowRaw(
         DisplayText text,
@@ -335,10 +352,9 @@ internal static class VoiceLineDisplay
         VoiceLineSettings settings
     )
     {
-        if (source.font != null)
-            target.font = source.font;
-        if (source.fontSharedMaterial != null)
-            target.fontSharedMaterial = source.fontSharedMaterial;
+        var font = _subtitleFont ?? source.font;
+        if (font != null)
+            target.font = font;
 
         target.fontStyle = source.fontStyle;
         target.characterSpacing = source.characterSpacing;
@@ -354,8 +370,11 @@ internal static class VoiceLineDisplay
             SubtitlePosition.TopCenter => TextAlignmentOptions.Top,
             _ => TextAlignmentOptions.TopLeft,
         };
-        target.textWrappingMode = TextWrappingModes.NoWrap;
-        target.overflowMode = TextOverflowModes.Ellipsis;
+        // Wrap + Overflow (was NoWrap + Ellipsis): a scaled English line must wrap within the box
+        // instead of being ellipsis-truncated to "…" (or, on vertical overflow, collapsing the whole
+        // string to a leading ellipsis). Overflow keeps every line rendered even past the fixed box.
+        target.textWrappingMode = TextWrappingModes.Normal;
+        target.overflowMode = TextOverflowModes.Overflow;
         target.richText = true;
         target.raycastTarget = false;
         target.fontSize = Math.Max(source.fontSize, 16f);
@@ -376,10 +395,9 @@ internal static class VoiceLineDisplay
 
         if (english != null)
         {
-            if (source.font != null)
-                english.font = source.font;
-            if (source.fontSharedMaterial != null)
-                english.fontSharedMaterial = source.fontSharedMaterial;
+            var englishFont = _subtitleFont ?? source.font;
+            if (englishFont != null)
+                english.font = englishFont;
 
             english.fontStyle = source.fontStyle;
             english.characterSpacing = source.characterSpacing;
@@ -393,8 +411,11 @@ internal static class VoiceLineDisplay
                 SubtitlePosition.TopCenter => TextAlignmentOptions.Top,
                 _ => TextAlignmentOptions.TopLeft,
             };
-            english.textWrappingMode = TextWrappingModes.NoWrap;
-            english.overflowMode = TextOverflowModes.Ellipsis;
+            // Wrap + Overflow (was NoWrap + Ellipsis): a scaled English line wraps within the box width
+            // instead of truncating to "…". ApplyText positions the Chinese line below the English
+            // block's measured height so wrapped English never overlaps it.
+            english.textWrappingMode = TextWrappingModes.Normal;
+            english.overflowMode = TextOverflowModes.Overflow;
             english.richText = false;
             english.raycastTarget = false;
             english.fontSize = englishFontSize;
@@ -486,10 +507,19 @@ internal static class VoiceLineDisplay
             return;
         }
 
+        var englishBlockHeight = Math.Abs(_secondLineOffset);
         if (_englishLabel != null)
         {
             _englishLabel.text = text.English;
-            _englishLabel.gameObject.SetActive(!string.IsNullOrEmpty(text.English));
+            var hasEnglish = !string.IsNullOrEmpty(text.English);
+            _englishLabel.gameObject.SetActive(hasEnglish);
+            if (hasEnglish)
+            {
+                // Measure the wrapped English height so a multi-line English line pushes the Chinese
+                // line down instead of overlapping it (the split layout no longer assumes one line each).
+                _englishLabel.ForceMeshUpdate();
+                englishBlockHeight = Math.Max(englishBlockHeight, _englishLabel.preferredHeight);
+            }
         }
 
         if (_chineseUiLabel != null)
@@ -498,7 +528,7 @@ internal static class VoiceLineDisplay
             _chineseUiLabel.gameObject.SetActive(!string.IsNullOrEmpty(text.Chinese));
             ConfigureLineRect(
                 _chineseUiLabel.rectTransform,
-                string.IsNullOrEmpty(text.English) ? 0f : _secondLineOffset,
+                string.IsNullOrEmpty(text.English) ? 0f : -englishBlockHeight,
                 Math.Abs(_secondLineOffset)
             );
         }
