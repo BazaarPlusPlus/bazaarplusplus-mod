@@ -66,12 +66,14 @@ internal sealed class BppComposition : IDisposable
     public ModOnlineClient? OnlineClient => _onlineClientRef;
     public BazaarDbLinkClient? AccountLinkClient => _accountLinkClientRef;
 
-    public BppComposition(ManualLogSource logger, ConfigFile configFile)
+    public BppComposition(ManualLogSource logger, ConfigFile configFile, IGameBuildInfo gameBuild)
     {
         if (logger == null)
             throw new ArgumentNullException(nameof(logger));
         if (configFile == null)
             throw new ArgumentNullException(nameof(configFile));
+        if (gameBuild == null)
+            throw new ArgumentNullException(nameof(gameBuild));
 
         _config.Initialize(configFile);
         _paths.Initialize();
@@ -84,6 +86,7 @@ internal sealed class BppComposition : IDisposable
             _runContext,
             _gameStateProbe,
             _encounterStateProbe,
+            gameBuild,
             logger
         );
 

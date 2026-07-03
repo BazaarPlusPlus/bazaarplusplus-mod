@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Threading;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
 using UnityEngine;
 
@@ -30,6 +31,14 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
         _feed = feed ?? throw new ArgumentNullException(nameof(feed));
 
         var descriptor = _feed.Descriptor;
+        if (services.GameBuild.Channel == GameBuildChannel.Ptr)
+        {
+            // Session gate: no upload feed arms on the PTR build. The durable defense
+            // is the build_channel row filter in the upload stores — it keeps
+            // PTR-recorded rows out of uploads even after switching back to online.
+            BppLog.Info(descriptor.LogScope, "Uploads disabled on the PTR game build.");
+            return;
+        }
         var activation = _feed.Activate(_services);
         if (activation == null)
             return;

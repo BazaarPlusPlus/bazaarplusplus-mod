@@ -32,4 +32,8 @@ public sealed class RunScreenshotRecord
     public int? PlayerPosition { get; set; }
 
     public int? VictoriesAtCapture { get; set; }
+
+    // Game build channel the screenshot was captured on ("Online" / "Ptr" / "Unknown");
+    // rows tagged "Ptr" are permanently excluded from server uploads.
+    public string? BuildChannel { get; set; }
 }

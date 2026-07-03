@@ -364,7 +364,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         if (capture == null || _screenshotStore == null)
             return Task.CompletedTask;
 
-        var record = RunScreenshotMetadataReader.CreateRecord(capture, isPrimary);
+        var record = RunScreenshotMetadataReader.CreateRecord(
+            capture,
+            isPrimary,
+            _services?.GameBuild.Channel.ToString()
+        );
         var screenshotStore = _screenshotStore;
 
         return Task.Run(() =>

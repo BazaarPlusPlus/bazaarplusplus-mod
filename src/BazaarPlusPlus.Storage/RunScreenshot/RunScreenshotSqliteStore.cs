@@ -36,7 +36,8 @@ public sealed class RunScreenshotSqliteStore : SqliteStoreBase
                 player_rank,
                 player_rating,
                 player_position,
-                victories_at_capture
+                victories_at_capture,
+                build_channel
             ) VALUES (
                 $screenshotId,
                 $runId,
@@ -51,7 +52,8 @@ public sealed class RunScreenshotSqliteStore : SqliteStoreBase
                 $playerRank,
                 $playerRating,
                 $playerPosition,
-                $victoriesAtCapture
+                $victoriesAtCapture,
+                $buildChannel
             );
             """;
         command.Parameters.AddWithValue("$screenshotId", record.ScreenshotId);
@@ -68,6 +70,10 @@ public sealed class RunScreenshotSqliteStore : SqliteStoreBase
         AddNullableInt32(command, "$playerRating", record.PlayerRating);
         AddNullableInt32(command, "$playerPosition", record.PlayerPosition);
         AddNullableInt32(command, "$victoriesAtCapture", record.VictoriesAtCapture);
+        command.Parameters.AddWithValue(
+            "$buildChannel",
+            (object?)record.BuildChannel ?? DBNull.Value
+        );
         command.ExecuteNonQuery();
     }
 

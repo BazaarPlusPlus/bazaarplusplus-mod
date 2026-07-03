@@ -42,11 +42,16 @@ public class Plugin : BaseUnityPlugin
 
             var configFile = CreatePluginConfigFile();
 
-            _composition = new BppComposition(Logger, configFile);
+            var gameBuild = GameBuildInfoResolver.Resolve();
+            _composition = new BppComposition(Logger, configFile, gameBuild);
 
             var services = _composition.Services;
             BppLog.Install(services.Logger);
             BppPatchHost.Install(services);
+
+            BppLog.Info("Plugin", $"Game build: '{gameBuild.RawVersion}' → {gameBuild.Channel}");
+            if (gameBuild.DetectionWarning != null)
+                BppLog.Warn("Plugin", gameBuild.DetectionWarning);
 
             InstallStaticUtilities(services, _composition.SettingsDockRegistry);
 
@@ -151,7 +156,7 @@ public class Plugin : BaseUnityPlugin
         BppSettingsDockCatalog.Install(services.Config, settingsDockRegistry);
         BPPSupporterCatalog.Install(services.Config);
         BppHotkeyService.Install(services.Config);
-        RunLoggingGameDataReader.Install(services.RunContext);
+        RunLoggingGameDataReader.Install(services.RunContext, services.GameBuild);
     }
 
     private static void UninstallStaticUtilities()
