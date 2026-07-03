@@ -69,10 +69,6 @@
       Link="NameOverride.SettingsMenuLabel.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\HistoryPanel\HistoryPanelAccessPolicy.cs"
-      Link="HistoryPanelAccessPolicy.cs"
-    />
-    <Compile
       Include="..\..\src\BazaarPlusPlus\Core\GameState\IGameStateProbe.cs"
       Link="IGameStateProbe.cs"
     />

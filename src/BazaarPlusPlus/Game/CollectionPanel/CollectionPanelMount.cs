@@ -2,6 +2,7 @@
 using System;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 
@@ -12,15 +13,29 @@ namespace BazaarPlusPlus.Game.CollectionPanel;
 // in order to regenerate when the user cycles BPP's Chinese variant.
 internal sealed class CollectionPanelMount : IBppMountable
 {
+    private readonly Func<OverlayPanelHost?> _overlayHost;
     private IDisposable? _localeChangedSubscription;
+
+    public CollectionPanelMount(Func<OverlayPanelHost?> overlayHost)
+    {
+        _overlayHost = overlayHost;
+    }
 
     public void Mount(GameObject host, IBppServices services)
     {
         if (services == null)
             throw new ArgumentNullException(nameof(services));
 
+        var overlayHost = _overlayHost();
+        if (overlayHost == null)
+        {
+            BppLog.Warn("CollectionPanelMount", "Overlay panel host unavailable; skipping mount.");
+            return;
+        }
+
         var panel = host.AddComponent<CollectionPanel>();
         panel.Initialize(services);
+        panel.AttachToOverlayHost(overlayHost);
 
         _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(_ =>
             CollectionPanel.NotifyLocaleChanged()

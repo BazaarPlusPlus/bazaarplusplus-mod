@@ -15,6 +15,16 @@ An encounter that upgrades or enchants one of the player's existing items, rathe
 The on-demand, pull-based read of the player's *current* run/encounter state (`IEncounterStateProbe.GetEncounterIds()`, `GetChoicePedestal()`, `GetTargetingState()`). The project's chosen way to expose "where is the player in the run right now" — as status queries, not a recorded timeline.
 _Avoid_: encounter tracker, run timeline (deliberately not built — see [ADR-0001](docs/adr/0001-encounter-status-probe-not-timeline-tracker.md))
 
+## Overlay panels
+
+**Main Overlay Panel**:
+A full-screen mod overlay — Collection Panel, History Review, or Live Build Panel. At most one is open at a time; the Overlay Panel Host enforces the exclusivity.
+_Avoid_: popup, window
+
+**Overlay Panel Host**:
+The single module that owns main-overlay-panel lifecycle: mutual exclusion, scene-change policy, combat gating, hotkey and escape routing, and the per-frame tick. Panels register content callbacks with the host instead of re-implementing the lifecycle.
+_Avoid_: panel mutex (the deleted `BppOverlayPanelMutex` predecessor)
+
 ## Collection sources
 
 **Collection Source Catalog**:

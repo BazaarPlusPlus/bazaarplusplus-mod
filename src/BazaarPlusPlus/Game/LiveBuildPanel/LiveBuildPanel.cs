@@ -17,18 +17,14 @@ using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.LiveCards;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.UiTokens;
-using TheBazaar;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 
 namespace BazaarPlusPlus.Game.LiveBuildPanel;
 
 internal sealed class LiveBuildPanel : MonoBehaviour
 {
     private const string OverlayPanelId = "LiveBuildPanel";
-    private const int OverlaySortingBand = BppOverlaySorting.MainOverlayPanelBand;
     private const int SupporterAttributionCount = 2;
 
     private static LiveBuildPanel? _instance;
@@ -42,7 +38,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private LiveCardSnapshotSet _liveSnapshot = LiveCardSnapshotSet.Empty;
     private IReadOnlyList<BuildRecommendation> _matches = Array.Empty<BuildRecommendation>();
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
-    private string _lastSceneToken = string.Empty;
+    private IOverlayPanelHandle? _overlayHandle;
     private bool _isVisible;
     private int _recommendationIndex;
     private bool _buildRefreshInProgress;
@@ -55,16 +51,23 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private void Awake()
     {
         _instance = this;
-        _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
-        BppOverlayPanelMutex.Register(
-            new BppOverlayPanelRegistration(
+        _recommendations.BeginCorpusLoad();
+    }
+
+    internal void AttachToOverlayHost(OverlayPanelHost overlayHost)
+    {
+        if (_overlayHandle != null)
+            return;
+
+        _overlayHandle = overlayHost.Register(
+            new OverlayPanelRegistration(
                 OverlayPanelId,
-                OverlaySortingBand,
-                () => _instance?._isVisible == true,
-                () => _instance?.Close()
+                BppHotkeyActionId.ToggleLiveBuildPanel,
+                onOpen: Open,
+                onClose: Close,
+                tick: Tick
             )
         );
-        _recommendations.BeginCorpusLoad();
     }
 
     private void OnDestroy()
@@ -75,66 +78,28 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         // Invalidate any in-flight manual refresh so its continuation never touches the
         // destroyed view (the repository corpus update itself is allowed to finish in the background).
         _buildRefreshOperationVersion++;
-        BppOverlayPanelMutex.Unregister(OverlayPanelId);
+        _overlayHandle?.Dispose();
+        _overlayHandle = null;
         StopRender();
         _previewRenderer.Dispose();
         _view?.Dispose();
         _view = null;
     }
 
-    private void Update()
+    // Lifecycle (scene change, combat gate, hotkey, escape) is owned by the Overlay Panel Host;
+    // this tick only carries the panel's own per-frame content work.
+    private void Tick(float dt, bool isVisible)
     {
-        DetectSceneChange();
-
-        if (_isVisible && TheBazaar.Data.IsInCombat)
-        {
-            Close();
+        if (!isVisible)
             return;
-        }
-
-        var keyboard = Keyboard.current;
-        if (
-            BppHotkeyService.WasToggleHotkeyPressedThisFrame(
-                BppHotkeyActionId.ToggleLiveBuildPanel,
-                keyboard
-            )
-        )
-        {
-            Toggle();
-            return;
-        }
-
-        if (!_isVisible)
-            return;
-
-        if (keyboard?.escapeKey.wasPressedThisFrame == true)
-        {
-            Close();
-            return;
-        }
 
         var mouse = Mouse.current;
         if (mouse != null)
             _previewRenderer.PollHover(mouse.position.ReadValue());
     }
 
-    private void Toggle()
-    {
-        if (_isVisible)
-            Close();
-        else
-            Open();
-    }
-
     private void Open()
     {
-        if (TheBazaar.Data.IsInCombat)
-        {
-            BppLog.Info("LiveBuildPanel", "Open suppressed: combat is active.");
-            return;
-        }
-
-        BppOverlayPanelMutex.CloseOthers(OverlayPanelId, OverlaySortingBand);
         EnsureView();
         _isVisible = true;
         _supporters = BPPSupporters.SampleMany(SupporterAttributionCount);
@@ -551,17 +516,6 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         _renderCoroutine = null;
     }
 
-    private void DetectSceneChange()
-    {
-        var token = GetSceneToken(SceneManager.GetActiveScene());
-        if (string.Equals(token, _lastSceneToken, StringComparison.Ordinal))
-            return;
-
-        _lastSceneToken = token;
-        if (_isVisible)
-            Close();
-    }
-
     private static string BuildSignature(
         BppItemBoardId id,
         IReadOnlyList<BppItemBoardCard> cards
@@ -576,7 +530,4 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         var wrapped = index % count;
         return wrapped < 0 ? wrapped + count : wrapped;
     }
-
-    private static string GetSceneToken(Scene scene) =>
-        $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
 }

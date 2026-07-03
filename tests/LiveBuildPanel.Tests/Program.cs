@@ -28,10 +28,6 @@ static void TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground()
         BppOverlaySorting.NativeCardPreview < BppOverlaySorting.PanelForeground,
         "Foreground markers must render above native cards."
     );
-    Assert(
-        BppOverlaySorting.MainOverlayPanelBand == BppOverlaySorting.NativeCardPreview,
-        "Panel mutex band should remain a separate semantic constant even when it shares the card overlay value."
-    );
 }
 
 static void TestSupporterAttributionCountWithinRailCap()
