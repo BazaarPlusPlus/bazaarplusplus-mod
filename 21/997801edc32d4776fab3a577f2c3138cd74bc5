@@ -1,0 +1,32 @@
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesModule.cs
+  s_b160f8aa8fb5f5::t_7863311dc640a6 13,23
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceLinesDocument.cs
+  s_b160f8aa8fb5f5::t_73db18fc0921a5 4-6,79-131
+tests/VoiceSubtitles.Tests/VoiceSubtitlesTests.cs
+  s_b160f8aa8fb5f5::t_5ca24db1a63711 2-3,10-12,32-37,39-50,52-67,69-105,110-111,117-129,134-135,141-146,173-183,192-272,312-315,317-319
+  s_b160f8aa8fb5f5::t_dd4dfc8f20e525 112-116,136-140,311,316
+  s_b160f8aa8fb5f5::t_2dfd69764d4671 38,51,68,184-187
+  s_b160f8aa8fb5f5::t_775c3dc9a201b6 106-109,130-133,188-191,287-294,297-303
+  s_b160f8aa8fb5f5::t_809f1bb83f7490 320
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceLinesRepository.cs
+  s_b160f8aa8fb5f5::t_868eccda0f7c4c 4,7-10,16-18,21-36,40-48,53-54,58-83,89-265,267-341,347-389
+  s_b160f8aa8fb5f5::t_2dfd69764d4671 84-88,266
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "21997801edc32d4776fab3a577f2c3138cd74bc5",
+  "prompts": {},
+  "sessions": {
+    "s_b160f8aa8fb5f5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f28d7-c5bd-7191-a973-4663b6c18c90",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
