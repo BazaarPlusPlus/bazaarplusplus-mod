@@ -1,6 +1,5 @@
 using System.Reflection;
 using BazaarPlusPlus.Game.CombatStatusBar;
-using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.Settings;
@@ -364,16 +363,6 @@ public sealed class CombatStatusBarStateTests : IDisposable
     {
         LocalizationTestHost.Install(languageCode);
         var result = EnchantPreviewSettingsMenuLabel.Resolve(languageCode);
-
-        Assert.Equal(expected, result);
-    }
-
-    [Theory]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    public void HistoryPanelAccessPolicy_RequiresLobbyState(bool isInGameRun, bool expected)
-    {
-        var result = HistoryPanelAccessPolicy.CanOpen(isInGameRun);
 
         Assert.Equal(expected, result);
     }

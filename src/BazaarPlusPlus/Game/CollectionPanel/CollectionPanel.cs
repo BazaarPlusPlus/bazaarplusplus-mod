@@ -17,10 +17,8 @@ using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
@@ -28,7 +26,6 @@ internal sealed class CollectionPanel : MonoBehaviour
 {
     private const float CatalogBuildFrameBudgetMs = 4f;
     private const string OverlayPanelId = "CollectionPanel";
-    private const int OverlaySortingBand = BppOverlaySorting.MainOverlayPanelBand;
 
     private static CollectionPanel? _instance;
     public static bool IsVisible => _instance != null && _instance._isVisible;
@@ -92,9 +89,9 @@ internal sealed class CollectionPanel : MonoBehaviour
         IReadOnlyList<CollectionSourceOptionViewModel> Sources
     )? _availableSourcesCache;
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
+    private IOverlayPanelHandle? _overlayHandle;
     private bool _isVisible;
     private bool _initialized;
-    private string _lastSceneToken = string.Empty;
     private bool _statusVisible;
     private string? _statusMessage;
     private bool _viewportBoundsDirty;
@@ -123,14 +120,24 @@ internal sealed class CollectionPanel : MonoBehaviour
         _instance = this;
         _services = services;
         _config = services.Config;
-        _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
-        BppOverlayPanelMutex.Register(
-            new BppOverlayPanelRegistration(
+    }
+
+    internal void AttachToOverlayHost(OverlayPanelHost overlayHost)
+    {
+        if (_overlayHandle != null)
+            return;
+
+        _overlayHandle = overlayHost.Register(
+            new OverlayPanelRegistration(
                 OverlayPanelId,
-                OverlaySortingBand,
-                () => _instance?._isVisible == true,
-                () => _instance?.Close()
+                BppHotkeyActionId.ToggleCollectionPanel,
+                onOpen: Open,
+                onClose: Close,
+                tick: Tick
             )
+            {
+                OnSceneChanged = DisposeUnityRuntime,
+            }
         );
     }
 
@@ -145,16 +152,16 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     internal static void OpenFromDockButton()
     {
-        if (_instance == null)
+        if (_instance?._overlayHandle == null)
         {
             BppLog.Warn("CollectionPanel", "Dock button requested before CollectionPanel mounted.");
             return;
         }
-        _instance.Open(_instance.ResolveOpenSelection());
-    }
 
-    internal static CollectionPanelSelectionState GetCurrentSelectionState() =>
-        _instance?._filter.ToSelectionState() ?? CollectionPanelSelectionState.Default;
+        var outcome = _instance._overlayHandle.RequestOpen();
+        if (outcome == OverlayRequestOutcome.SuppressedByCombat)
+            BppLog.Info("CollectionPanel", "Open suppressed: combat is active.");
+    }
 
     private void Open() => Open(ResolveOpenSelection());
 
@@ -262,14 +269,6 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void Open(CollectionPanelSelectionState selection)
     {
-        if (TheBazaar.Data.IsInCombat)
-        {
-            BppLog.Info("CollectionPanel", "Open suppressed: combat is active.");
-            return;
-        }
-
-        BppOverlayPanelMutex.CloseOthers(OverlayPanelId, OverlaySortingBand);
-
         ApplyOpenSelection(selection);
         // Temporary main-path probe: EnsureView() is heavy one-time UITK construction (visual
         // tree + CJK glyph raster + cold OTF extract) that runs on the click frame BEFORE the
@@ -330,36 +329,17 @@ internal sealed class CollectionPanel : MonoBehaviour
         _view?.SetVisible(false);
     }
 
-    private void Update()
+    // Lifecycle (scene change, combat gate, hotkey, escape) is owned by the Overlay Panel Host;
+    // this tick carries the panel's own per-frame content work, including closed-state work
+    // (fade-out completion, catalog warmup, deferred native cleanup).
+    private void Tick(float dt, bool isVisible)
     {
-        DetectSceneChange();
-
         // Opportunistically warm the card catalog off-thread once static data is ready, so the
         // first panel open does not pay the full-table card read (JsonGameDataManager.GetCardMap
         // -> ReadAllCards) on the main thread. The catalog kicks a single shared Task per
         // static-data source; the first open then awaits it instead of blocking.
         if (!_catalog.HasCardMapLoadStarted)
             _catalog.BeginCardMapLoad(out _);
-
-        if (_isVisible && TheBazaar.Data.IsInCombat)
-        {
-            Close();
-            return;
-        }
-
-        var keyboard = Keyboard.current;
-        if (
-            BppHotkeyService.WasToggleHotkeyPressedThisFrame(
-                BppHotkeyActionId.ToggleCollectionPanel,
-                keyboard
-            )
-        )
-        {
-            ToggleFromHotkey();
-            return;
-        }
-
-        var dt = Time.unscaledDeltaTime;
 
         // Drive the panel fade every frame regardless of _isVisible so a Close mid-frame
         // can finish its fade-out animation before we tear runtime down.
@@ -377,12 +357,6 @@ internal sealed class CollectionPanel : MonoBehaviour
                 _overlay?.SetVisible(false);
                 _virtualizer?.Dispose();
             }
-            return;
-        }
-
-        if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame)
-        {
-            Close();
             return;
         }
 
@@ -433,30 +407,12 @@ internal sealed class CollectionPanel : MonoBehaviour
         _overlay?.SetVisible(false);
     }
 
-    private void ToggleFromHotkey()
-    {
-        if (_isVisible)
-            Close();
-        else
-            Open();
-    }
-
-    private void DetectSceneChange()
-    {
-        var token = GetSceneToken(SceneManager.GetActiveScene());
-        if (string.Equals(token, _lastSceneToken, StringComparison.Ordinal))
-            return;
-        _lastSceneToken = token;
-        if (_isVisible)
-            Close();
-        DisposeUnityRuntime();
-    }
-
     private void OnDestroy()
     {
         if (ReferenceEquals(_instance, this))
             _instance = null;
-        BppOverlayPanelMutex.Unregister(OverlayPanelId);
+        _overlayHandle?.Dispose();
+        _overlayHandle = null;
         DisposeRuntime();
     }
 
@@ -1046,7 +1002,4 @@ internal sealed class CollectionPanel : MonoBehaviour
         _catalogCards = cards;
         _facetAvailability = CollectionFacetAvailability.SnapshotFor(cards);
     }
-
-    private static string GetSceneToken(Scene scene) =>
-        $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
 }

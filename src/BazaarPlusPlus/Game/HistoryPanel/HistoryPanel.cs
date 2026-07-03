@@ -11,7 +11,6 @@ using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
-using TheBazaar;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -23,7 +22,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed partial class HistoryPanel : MonoBehaviour
 {
     private const string OverlayPanelId = "HistoryPanel";
-    private const int OverlaySortingBand = BppOverlaySorting.MainOverlayPanelBand;
     private static readonly HashSet<string> UiDiagnosticScenes = new(StringComparer.Ordinal)
     {
         "CollectionUIScene",
@@ -42,6 +40,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private IHistoryPanelRuntime? _runtime;
     private Coroutine? _previewCoroutine;
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
+    private IOverlayPanelHandle? _overlayHandle;
     private string _lastSceneToken = string.Empty;
     private bool _initialized;
     private bool _uiFontPrewarmedForScene;
@@ -145,8 +144,10 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void OnDisable()
     {
+        // Route through the host so its open-panel state cannot desync; the unconditional
+        // hide below also covers the not-open case (matching the historical force-hide).
+        _overlayHandle?.RequestClose();
         IsVisible = false;
-        _coordinator?.OnPanelHidden();
         StopPreviewRender();
         _battleBoardPreview?.Hide();
         SetUiVisible(false);
@@ -157,91 +158,50 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (ReferenceEquals(Instance, this))
             Instance = null;
 
-        BppOverlayPanelMutex.Unregister(OverlayPanelId);
+        _overlayHandle?.Dispose();
+        _overlayHandle = null;
         _coordinator?.Dispose();
         DisposePreviewRenderer();
         _dependencies = null;
         DisposeUi();
     }
 
-    private void Update()
+    // Lifecycle (scene change, combat gate, hotkey, escape) is owned by the Overlay Panel Host;
+    // this tick only carries the panel's own per-frame content work.
+    private void Tick(float dt, bool isVisible)
     {
-        DetectSceneChange();
-
-        if (IsVisible && TheBazaar.Data.IsInCombat)
-        {
-            SetHistoryVisible(false);
-            return;
-        }
-
-        if (IsVisible)
-            _coordinator?.Tick(Time.unscaledTime);
-
-        if (
-            BppHotkeyService.WasToggleHotkeyPressedThisFrame(BppHotkeyActionId.ToggleHistoryPanel)
-            && (!IsVisible || !IsTextInputFocused())
-        )
-        {
-            ToggleFromHotkey();
-            return;
-        }
-
-        var keyboard = Keyboard.current;
-        if (keyboard == null)
+        if (!isVisible)
             return;
 
-        if (!IsVisible)
-            return;
-
-        if (keyboard.escapeKey.wasPressedThisFrame)
-        {
-            SetHistoryVisible(false);
-            return;
-        }
-
+        _coordinator?.Tick(Time.unscaledTime);
         PollPreviewHover();
     }
 
     private void SetHistoryVisible(bool visible)
     {
-        var wasVisible = IsVisible;
-        if (visible && !wasVisible)
-            BppOverlayPanelMutex.CloseOthers(OverlayPanelId, OverlaySortingBand);
-
         if (visible)
-            EnsureUi();
-
-        if (visible && !wasVisible)
-            _supporters = BPPSupporters.SampleMany(4);
-
-        IsVisible = visible;
-        if (visible)
-            _coordinator?.OnPanelShown();
+            _overlayHandle?.RequestOpen();
         else
-        {
-            _coordinator?.OnPanelHidden();
-            DisposePreviewRenderer();
-        }
+            _overlayHandle?.RequestClose();
+    }
 
-        SetUiVisible(visible);
+    private void OnOverlayOpen()
+    {
+        EnsureUi();
+        _supporters = BPPSupporters.SampleMany(4);
+        IsVisible = true;
+        _coordinator?.OnPanelShown();
+        SetUiVisible(true);
         RefreshUi();
     }
 
-    internal void ToggleFromHotkey()
+    private void OnOverlayClose()
     {
-        EnsureInitialized("ToggleFromHotkey");
-
-        if (!CanOpenHistoryReview())
-            return;
-
-        try
-        {
-            SetHistoryVisible(!IsVisible);
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("HistoryPanel", "ToggleFromHotkey failed", ex);
-        }
+        IsVisible = false;
+        _coordinator?.OnPanelHidden();
+        DisposePreviewRenderer();
+        SetUiVisible(false);
+        RefreshUi();
     }
 
     internal static void OpenFromDockEntry()
@@ -272,18 +232,14 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         EnsureInitialized("OpenFromDockEntry");
 
-        if (!CanOpenHistoryReview())
-        {
-            BppLog.Warn(
-                "HistoryPanel",
-                "Ignored History Review open request because combat is active."
-            );
-            return;
-        }
-
         try
         {
-            SetHistoryVisible(true);
+            var outcome = _overlayHandle?.RequestOpen();
+            if (outcome == OverlayRequestOutcome.SuppressedByCombat)
+                BppLog.Warn(
+                    "HistoryPanel",
+                    "Ignored History Review open request because combat is active."
+                );
         }
         catch (Exception ex)
         {
@@ -294,11 +250,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private void RefreshLocalizationInternal()
     {
         RefreshUi();
-    }
-
-    private bool CanOpenHistoryReview()
-    {
-        return HistoryPanelAccessPolicy.CanOpen(TheBazaar.Data.IsInCombat);
     }
 
     private void RefreshSelectedBattlePreview()
@@ -484,30 +435,40 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _initialized = true;
         Instance = this;
         _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
-        BppOverlayPanelMutex.Register(
-            new BppOverlayPanelRegistration(
-                OverlayPanelId,
-                OverlaySortingBand,
-                () => IsVisible,
-                () => Instance?.SetHistoryVisible(false)
-            )
-        );
         PrewarmUiFontState($"init:{source}");
     }
 
-    private void DetectSceneChange()
+    internal void AttachToOverlayHost(OverlayPanelHost overlayHost)
     {
-        var currentSceneToken = GetSceneToken(SceneManager.GetActiveScene());
-        if (string.Equals(currentSceneToken, _lastSceneToken, StringComparison.Ordinal))
+        if (_overlayHandle != null)
             return;
 
-        _lastSceneToken = currentSceneToken;
+        _overlayHandle = overlayHost.Register(
+            new OverlayPanelRegistration(
+                OverlayPanelId,
+                BppHotkeyActionId.ToggleHistoryPanel,
+                onOpen: OnOverlayOpen,
+                onClose: OnOverlayClose,
+                tick: Tick
+            )
+            {
+                // Historical behavior: the panel stays open across non-combat scene changes.
+                SceneChangeClose = SceneChangeClosePolicy.OnlyWhenInCombat,
+                // Swallow the toggle entirely (open AND close) while the search box has focus.
+                HotkeyGuard = () => !IsVisible || !IsTextInputFocused(),
+                OnSceneChanged = OnOverlaySceneChanged,
+            }
+        );
+    }
+
+    private void OnOverlaySceneChanged()
+    {
+        _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
         _uiFontPrewarmedForScene = false;
         PrewarmUiFontState("scene-change");
         LogEventSystemDiagnostics(SceneManager.GetActiveScene());
-        if (IsVisible && TheBazaar.Data.IsInCombat)
-            SetHistoryVisible(false);
-
+        // The preview renderer is scene-bound; it is lazily recreated by the next
+        // RefreshSelectedBattlePreview when the panel stays open (non-combat scene change).
         DisposePreviewRenderer();
     }
 

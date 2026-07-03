@@ -3,6 +3,7 @@ using System;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Clients;
 using UnityEngine;
@@ -14,17 +15,20 @@ internal sealed class HistoryPanelMount : IBppMountable
     private readonly Func<CombatReplayRuntime?> _combatReplayRuntime;
     private readonly Func<ModOnlineClient?> _onlineClient;
     private readonly Func<BazaarDbLinkClient?> _accountLinkClient;
+    private readonly Func<OverlayPanelHost?> _overlayHost;
     private IDisposable? _localeChangedSubscription;
 
     public HistoryPanelMount(
         Func<CombatReplayRuntime?> combatReplayRuntime,
         Func<ModOnlineClient?> onlineClient,
-        Func<BazaarDbLinkClient?> accountLinkClient
+        Func<BazaarDbLinkClient?> accountLinkClient,
+        Func<OverlayPanelHost?> overlayHost
     )
     {
         _combatReplayRuntime = combatReplayRuntime;
         _onlineClient = onlineClient;
         _accountLinkClient = accountLinkClient;
+        _overlayHost = overlayHost;
     }
 
     public void Mount(GameObject host, IBppServices services)
@@ -33,6 +37,13 @@ internal sealed class HistoryPanelMount : IBppMountable
         if (combatReplayRuntime == null)
         {
             BppLog.Warn("HistoryPanelMount", "CombatReplayRuntime unavailable; skipping mount.");
+            return;
+        }
+
+        var overlayHost = _overlayHost();
+        if (overlayHost == null)
+        {
+            BppLog.Warn("HistoryPanelMount", "Overlay panel host unavailable; skipping mount.");
             return;
         }
 
@@ -64,6 +75,9 @@ internal sealed class HistoryPanelMount : IBppMountable
                 () => services.Config.BazaarDbUploadEnabled?.Value ?? false
             )
         );
+        // Register with the host only once fully configured; an unconfigured panel (skip paths
+        // above) must stay invisible to overlay lifecycle routing.
+        panel.AttachToOverlayHost(overlayHost);
 
         _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(_ =>
             HistoryPanel.RefreshLocalization()

@@ -14,6 +14,7 @@ using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.LiveBuildPanel;
 using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
@@ -119,7 +120,11 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
 
         _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
-        _mountables.Register(new CollectionPanelMount());
+        // The overlay host must mount before every Main Overlay Panel mount below: panels
+        // register their lifecycle with it through the accessor.
+        var overlayPanelHostMount = new OverlayPanelHostMount();
+        _mountables.Register(overlayPanelHostMount);
+        _mountables.Register(new CollectionPanelMount(() => overlayPanelHostMount.Host));
         _mountables.Register(
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
         );
@@ -134,10 +139,11 @@ internal sealed class BppComposition : IDisposable
             new HistoryPanelMount(
                 combatReplayRuntime: () => _combatReplayModule.Runtime,
                 onlineClient: () => _onlineClientRef,
-                accountLinkClient: () => _accountLinkClientRef
+                accountLinkClient: () => _accountLinkClientRef,
+                overlayHost: () => overlayPanelHostMount.Host
             )
         );
-        _mountables.Register(new LiveBuildPanelMount());
+        _mountables.Register(new LiveBuildPanelMount(() => overlayPanelHostMount.Host));
         _mountables.Register(new ComponentMount<VoiceLineDisplayDispatcher>());
         _mountables.Register(new ComponentMount<VersionLabelScanner>());
         _mountables.Register(

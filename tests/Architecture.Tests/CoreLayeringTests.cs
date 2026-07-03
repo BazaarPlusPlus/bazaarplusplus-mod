@@ -181,6 +181,9 @@ public class CoreLayeringTests
         var collectionPanelSource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "CollectionPanel", "CollectionPanel.cs")
         );
+        var overlayHostSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "OverlayPanels", "OverlayPanelHost.cs")
+        );
         const string oldCollectionPanelHotkeyPathIdentifier =
             @"(?<![A-Za-z0-9_])CollectionPanelHotkeyPathConfig(?![A-Za-z0-9_])";
 
@@ -188,8 +191,9 @@ public class CoreLayeringTests
         Assert.DoesNotMatch(oldCollectionPanelHotkeyPathIdentifier, configSource);
         Assert.DoesNotMatch(oldCollectionPanelHotkeyPathIdentifier, configInterfaceSource);
         Assert.DoesNotContain("WasPressedThisFrame(togglePath", collectionPanelSource);
-        Assert.Contains("BppHotkeyService.WasToggleHotkeyPressedThisFrame", collectionPanelSource);
+        // The toggle hotkey is registered by the panel but polled centrally by the overlay host.
         Assert.Contains("BppHotkeyActionId.ToggleCollectionPanel", collectionPanelSource);
+        Assert.Contains("BppHotkeyService.WasToggleHotkeyPressedThisFrame", overlayHostSource);
     }
 
     [Fact]
@@ -291,11 +295,7 @@ public class CoreLayeringTests
             "bindResult = await _factory.BindAsync(pending.Vm, pending.Token);",
             bindAndRealizeIndex
         );
-        var staleOrCanceledIndex = Find(
-            virtualizerSource,
-            "var staleOrCanceled =",
-            bindAsyncIndex
-        );
+        var staleOrCanceledIndex = Find(virtualizerSource, "var staleOrCanceled =", bindAsyncIndex);
         var canceledCheckIndex = Find(
             virtualizerSource,
             "pending.IsCanceled",
@@ -459,11 +459,7 @@ public class CoreLayeringTests
             bumpGenerationIndex
         );
         var disposeIndex = Find(virtualizerSource, "public void Dispose()");
-        var disposeBumpGenerationIndex = Find(
-            virtualizerSource,
-            "BumpGeneration();",
-            disposeIndex
-        );
+        var disposeBumpGenerationIndex = Find(virtualizerSource, "BumpGeneration();", disposeIndex);
 
         Assert.True(
             pendingRecycleScratchIndex >= 0,
@@ -684,7 +680,11 @@ public class CoreLayeringTests
             source.IndexOf(value, startIndex, StringComparison.Ordinal);
 
         var applyCellScaleIndex = Find(virtualizerSource, "private void ApplyCellScale");
-        var repositionIndex = Find(virtualizerSource, "private void Reposition", applyCellScaleIndex);
+        var repositionIndex = Find(
+            virtualizerSource,
+            "private void Reposition",
+            applyCellScaleIndex
+        );
         var scaleBoundsIndex = Find(
             virtualizerSource,
             "var visualBounds = ResolveNativeVisualBounds(rect);",
@@ -697,10 +697,7 @@ public class CoreLayeringTests
             "var sizeDelta = rect.sizeDelta;",
             applyCellScaleIndex
         );
-        var frameLookupIndex = Find(
-            virtualizerSource,
-            "FindDescendant(root, \"FrameContainer\")"
-        );
+        var frameLookupIndex = Find(virtualizerSource, "FindDescendant(root, \"FrameContainer\")");
         var rawImageBoundsIndex = Find(
             virtualizerSource,
             "TryMeasureRawImageBounds(root, out var imageBounds)",
@@ -726,7 +723,10 @@ public class CoreLayeringTests
             repositionIndex
         );
 
-        Assert.True(applyCellScaleIndex >= 0, "CollectionGridVirtualizer.ApplyCellScale should exist.");
+        Assert.True(
+            applyCellScaleIndex >= 0,
+            "CollectionGridVirtualizer.ApplyCellScale should exist."
+        );
         Assert.True(
             scaleBoundsIndex > applyCellScaleIndex,
             "ApplyCellScale should measure native visual bounds instead of trusting the root RectTransform size."
@@ -759,7 +759,11 @@ public class CoreLayeringTests
         );
 
         var showWhenReadyIndex = Find(virtualizerSource, "private async Task ShowWhenReady");
-        var nativeShowIndex = Find(virtualizerSource, "NativeCardPreviewRuntime.Show(", showWhenReadyIndex);
+        var nativeShowIndex = Find(
+            virtualizerSource,
+            "NativeCardPreviewRuntime.Show(",
+            showWhenReadyIndex
+        );
         var showScaleIndex = Find(
             virtualizerSource,
             "ApplyCellScale(cell.Index, cell);",
@@ -770,7 +774,11 @@ public class CoreLayeringTests
             "Reposition(cell.Index, cell);",
             showScaleIndex
         );
-        var fadeStartIndex = Find(virtualizerSource, "cell.FadeActive = true;", showRepositionIndex);
+        var fadeStartIndex = Find(
+            virtualizerSource,
+            "cell.FadeActive = true;",
+            showRepositionIndex
+        );
 
         Assert.True(
             showScaleIndex > nativeShowIndex,
@@ -795,11 +803,15 @@ public class CoreLayeringTests
         var liveBuildPanelSource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "LiveBuildPanel", "LiveBuildPanel.cs")
         );
+        var overlayHostSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "OverlayPanels", "OverlayPanelHost.cs")
+        );
 
         Assert.DoesNotContain("LiveBuildPanelSettingsDockEntry", compositionSource);
         Assert.DoesNotContain("OpenFromDockEntry", liveBuildPanelSource);
-        Assert.Contains("BppHotkeyService.WasToggleHotkeyPressedThisFrame", liveBuildPanelSource);
+        // The toggle hotkey is registered by the panel but polled centrally by the overlay host.
         Assert.Contains("BppHotkeyActionId.ToggleLiveBuildPanel", liveBuildPanelSource);
+        Assert.Contains("BppHotkeyService.WasToggleHotkeyPressedThisFrame", overlayHostSource);
     }
 
     [Fact]
