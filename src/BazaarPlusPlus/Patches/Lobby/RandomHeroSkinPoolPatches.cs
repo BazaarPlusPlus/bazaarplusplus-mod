@@ -38,6 +38,34 @@ internal static class RandomHeroSkinPoolRefreshViewPatch
 [HarmonyPatch(typeof(CosmeticsListManager), "OnRandomizeToggleChanged")]
 internal static class RandomHeroSkinPoolTogglePatch
 {
+    // PTR removed this method (the randomize toggle moved to CosmeticsPanelController),
+    // so probe before patching and skip cleanly instead of aborting with
+    // "Undefined target method". Prepare must not throw: a throwing Prepare is a hard
+    // patch-class failure, not a skip.
+    [HarmonyPrepare]
+    private static bool Prepare()
+    {
+        try
+        {
+            if (
+                AccessTools.DeclaredMethod(typeof(CosmeticsListManager), "OnRandomizeToggleChanged")
+                != null
+            )
+                return true;
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn("RandomHeroSkinPool", $"Toggle patch target probe failed: {ex}");
+            return false;
+        }
+
+        BppLog.Warn(
+            "RandomHeroSkinPool",
+            "CosmeticsListManager.OnRandomizeToggleChanged not found (PTR build); random skin pool toggle disabled."
+        );
+        return false;
+    }
+
     [HarmonyPostfix]
     private static void Postfix(CosmeticsListManager __instance)
     {
