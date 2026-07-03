@@ -4,12 +4,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
-using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
-using BazaarPlusPlus.Infrastructure;
 using FMOD.Studio;
 using FMODUnity;
 using HarmonyLib;
+using VoiceSubtitlesLog = BazaarPlusPlus.GameInterop.VoiceSubtitles.VoiceSubtitlesInteropLog;
 
 namespace BazaarPlusPlus.Patches.VoiceSubtitles;
 

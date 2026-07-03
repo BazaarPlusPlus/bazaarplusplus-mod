@@ -1023,6 +1023,84 @@ public class CoreLayeringTests
         );
     }
 
+    [Fact]
+    public void VoiceSubtitles_game_layer_does_not_reference_fmod_or_vo_player()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var voiceSubtitlesDir = Path.Combine(mainSource, "Game", "VoiceSubtitles");
+        Assert.True(
+            Directory.Exists(voiceSubtitlesDir),
+            $"Could not locate VoiceSubtitles directory at '{voiceSubtitlesDir}'."
+        );
+
+        var forbiddenTokens = new[]
+        {
+            "using FMOD",
+            "using FMODUnity",
+            "VOPlayer",
+            "EventInstance",
+            "EVENT_CALLBACK",
+            "PLAYBACK_STATE",
+            "SoundManager",
+            "EventReference",
+            "CardAudio.AudioHookType",
+        };
+        var violations = new List<string>();
+
+        foreach (
+            var file in Directory.EnumerateFiles(
+                voiceSubtitlesDir,
+                "*.cs",
+                SearchOption.AllDirectories
+            )
+        )
+        {
+            var relative = Path.GetRelativePath(mainSource, file).Replace('\\', '/');
+            var lineNumber = 0;
+            foreach (var rawLine in File.ReadLines(file))
+            {
+                lineNumber++;
+                foreach (var token in forbiddenTokens)
+                {
+                    if (rawLine.Contains(token, StringComparison.Ordinal))
+                        violations.Add($"{relative}:{lineNumber}: {token}");
+                }
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "VoiceSubtitles Game code must stay FMOD/VOPlayer-free; keep native VO coupling in "
+                + "GameInterop/VoiceSubtitles or Patches/VoiceSubtitles. Offending references:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
+    [Fact]
+    public void VoiceSubtitles_playvo_transpiler_uses_constant_guard_for_stopped_mask()
+    {
+        var repoRoot = RepoRoot();
+        var patchPath = Path.Combine(
+            MainSourceRoot(repoRoot),
+            "Patches",
+            "VoiceSubtitles",
+            "VOPlayerPatches.cs"
+        );
+        Assert.True(File.Exists(patchPath), $"Could not locate VOPlayer patch at '{patchPath}'.");
+
+        var source = File.ReadAllText(patchPath);
+        var guardIndex = source.IndexOf("LoadsConstant", StringComparison.Ordinal);
+        Assert.True(guardIndex >= 0, "VOPlayer.PlayVO transpiler must use LoadsConstant.");
+        var beforeGuard = source[..guardIndex];
+
+        Assert.Contains("private const int StoppedCallbackMask = 0x20;", source);
+        Assert.Contains("codes[i - 1].LoadsConstant(StoppedCallbackMask)", source);
+        Assert.Contains("expected=1", source);
+        Assert.DoesNotContain("opcode == OpCodes.Ldc_I4", source);
+        Assert.DoesNotContain("OpCodes.Ldc_I4,", beforeGuard);
+    }
+
     private readonly record struct PreviewBoundaryRule(
         string Directory,
         string DisallowedNamespace,

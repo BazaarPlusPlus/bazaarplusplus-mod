@@ -4,12 +4,12 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
-using BazaarPlusPlus.Game.VoiceSubtitles;
 using FMOD;
 using FMOD.Studio;
 using FMODUnity;
 using TheBazaar.AppFramework;
 using UnityEngine;
+using VoiceSubtitlesLog = BazaarPlusPlus.GameInterop.VoiceSubtitles.VoiceSubtitlesInteropLog;
 
 namespace BazaarPlusPlus.GameInterop.VoiceSubtitles;
 
@@ -19,6 +19,12 @@ internal static class VoiceLineVoObserverBridge
     private static int _nextAttemptId;
     private static VoiceAttemptContext _pendingContext = VoiceAttemptContext.Unknown;
     private static VoiceAttemptContext _activeContext = VoiceAttemptContext.Unknown;
+    private static VoiceSubtitleObserverCallbacks _callbacks = VoiceSubtitleObserverCallbacks.Empty;
+
+    internal static void Configure(VoiceSubtitleObserverCallbacks callbacks)
+    {
+        _callbacks = callbacks ?? VoiceSubtitleObserverCallbacks.Empty;
+    }
 
     internal static void Install(VOPlayer? player)
     {
@@ -173,7 +179,7 @@ internal static class VoiceLineVoObserverBridge
         var hookName = context.HookName;
         var lookupText =
             $"{soundName ?? string.Empty} {context.EventPath ?? string.Empty} {context.EventReferenceText ?? string.Empty}";
-        var resolution = VoiceLineCatalog.ResolveDetailed(lookupText, sourceLabel, hookName);
+        var resolution = ResolveLine(lookupText, sourceLabel, hookName);
         var line = resolution.Line;
         var durationSeconds =
             soundDurationSeconds > 0f ? soundDurationSeconds
@@ -204,12 +210,10 @@ internal static class VoiceLineVoObserverBridge
             return;
         }
 
-        if (!VoiceSubtitlesGate.IsEnabled())
+        if (!IsEnabled())
             return;
 
-        VoiceLineDisplay.QueueShow(
-            CreateCue(line, player ?? context.Player, durationSeconds, context.AttemptId)
-        );
+        QueueShow(CreateCue(line, player ?? context.Player, durationSeconds, context.AttemptId));
         VoiceSubtitlesLog.Info(
             "VO subtitle resolved "
                 + $"attempt={context.AttemptId} "
@@ -260,7 +264,7 @@ internal static class VoiceLineVoObserverBridge
         var hookName = context.HookName;
         var lookupText =
             $"{context.EventPath ?? string.Empty} {context.EventReferenceText ?? string.Empty} {eventReferenceText}";
-        var resolution = VoiceLineCatalog.ResolveDetailed(lookupText, sourceLabel, hookName);
+        var resolution = ResolveLine(lookupText, sourceLabel, hookName);
         var line = resolution.Line;
         var contextMatchesCallback = ContextMatchesCallback(context, eventReferenceText);
 
@@ -306,14 +310,12 @@ internal static class VoiceLineVoObserverBridge
             return;
         }
 
-        if (!VoiceSubtitlesGate.IsEnabled())
+        if (!IsEnabled())
             return;
 
         var durationSeconds =
             context.DurationSeconds > 0f ? context.DurationSeconds : line.DurationSeconds;
-        VoiceLineDisplay.QueueShow(
-            CreateCue(line, context.Player, durationSeconds, context.AttemptId)
-        );
+        QueueShow(CreateCue(line, context.Player, durationSeconds, context.AttemptId));
         VoiceSubtitlesLog.Info(
             "VO subtitle resolved from debug callback "
                 + $"attempt={context.AttemptId} "
@@ -324,8 +326,8 @@ internal static class VoiceLineVoObserverBridge
         );
     }
 
-    private static VoiceSubtitleCue CreateCue(
-        VoiceLine line,
+    private static VoiceSubtitlePlaybackCue CreateCue(
+        VoiceSubtitleLine line,
         VOPlayer? player,
         float durationSeconds,
         int attemptId
@@ -343,7 +345,7 @@ internal static class VoiceLineVoObserverBridge
             playbackStateText = () => player.GetVOPlaybackState().ToString();
         }
 
-        return new VoiceSubtitleCue(
+        return new VoiceSubtitlePlaybackCue(
             line,
             durationSeconds,
             attemptId,
@@ -411,9 +413,53 @@ internal static class VoiceLineVoObserverBridge
             || contextText!.IndexOf(callbackText, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
-    private static bool HasResolvedLine(VoiceLineResolution resolution)
+    private static VoiceSubtitleLookupResult ResolveLine(
+        string lookupText,
+        string sourceLabel,
+        string hookName
+    )
     {
-        return !string.IsNullOrEmpty(resolution.Line.Stem);
+        try
+        {
+            return _callbacks.ResolveLine(
+                new VoiceSubtitleLookupRequest(lookupText, sourceLabel, hookName)
+            );
+        }
+        catch (Exception ex)
+        {
+            VoiceSubtitlesLog.Warn($"Voice subtitle lookup failed: {ex.Message}");
+            return VoiceSubtitleLookupResult.Empty;
+        }
+    }
+
+    private static bool IsEnabled()
+    {
+        try
+        {
+            return _callbacks.IsEnabled();
+        }
+        catch (Exception ex)
+        {
+            VoiceSubtitlesLog.Warn($"Voice subtitle enabled check failed: {ex.Message}");
+            return false;
+        }
+    }
+
+    private static void QueueShow(VoiceSubtitlePlaybackCue cue)
+    {
+        try
+        {
+            _callbacks.QueueShow(cue);
+        }
+        catch (Exception ex)
+        {
+            VoiceSubtitlesLog.Warn($"Voice subtitle queue failed: {ex.Message}");
+        }
+    }
+
+    private static bool HasResolvedLine(VoiceSubtitleLookupResult resolution)
+    {
+        return resolution.HasLine && !string.IsNullOrEmpty(resolution.Line.Stem);
     }
 
     internal readonly struct VoiceAttemptContext

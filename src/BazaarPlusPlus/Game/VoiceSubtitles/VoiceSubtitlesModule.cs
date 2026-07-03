@@ -12,14 +12,48 @@ internal sealed class VoiceSubtitlesModule : IBppFeature
     {
         VoiceLineCatalog.Reset();
         VoiceLineDisplay.Reset();
-        VoiceLineVoObserverBridge.Reset();
+        VoiceLineVoObserverBridge.Configure(
+            new VoiceSubtitleObserverCallbacks(ResolveLine, VoiceSubtitlesGate.IsEnabled, QueueShow)
+        );
         _repository.BeginLoad();
     }
 
     public void Stop()
     {
-        VoiceLineVoObserverBridge.Reset();
+        VoiceLineVoObserverBridge.Configure(VoiceSubtitleObserverCallbacks.Empty);
         VoiceLineDisplay.Reset();
         VoiceLineCatalog.Reset();
+    }
+
+    private static VoiceSubtitleLookupResult ResolveLine(VoiceSubtitleLookupRequest request)
+    {
+        var resolution = VoiceLineCatalog.ResolveDetailed(
+            request.LookupText,
+            request.SourceLabel,
+            request.HookName
+        );
+        var line = resolution.Line;
+        return new VoiceSubtitleLookupResult(
+            new VoiceSubtitleLine(line.Stem, line.English, line.Chinese, line.DurationSeconds),
+            hasLine: !string.IsNullOrEmpty(line.Stem),
+            resolution.Strategy,
+            resolution.MatchedToken,
+            resolution.CatalogName,
+            resolution.CandidateCount
+        );
+    }
+
+    private static void QueueShow(VoiceSubtitlePlaybackCue cue)
+    {
+        var line = cue.Line;
+        VoiceLineDisplay.QueueShow(
+            new VoiceSubtitleCue(
+                new VoiceLine(line.Stem, line.English, line.Chinese, line.DurationSeconds),
+                cue.EventDurationSeconds,
+                cue.AttemptId,
+                cue.IsPlaybackStoppedOrStopping,
+                cue.PlaybackStateText
+            )
+        );
     }
 }
