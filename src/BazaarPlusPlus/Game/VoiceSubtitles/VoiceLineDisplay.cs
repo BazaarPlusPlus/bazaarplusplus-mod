@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.VoiceSubtitles.Settings;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,9 +12,9 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 internal static class VoiceLineDisplay
 {
     private static GameObject? _labelRoot;
+    private static TextMeshProUGUI? _combinedLabel;
     private static TextMeshProUGUI? _englishLabel;
     private static Text? _chineseUiLabel;
-    private static TMP_FontAsset? _subtitleFont;
     private static VoiceLineOverlayLifetime? _lifetime;
     private static bool _mountedFromVersionLabel;
     private static int _nextDisplayId;
@@ -64,26 +63,17 @@ internal static class VoiceLineDisplay
             _sourceLabel = versionLabel;
             FontDiagnostics.LogOnce(versionLabel, "mount");
 
-            // Use the game's own font. The mod swaps the main-menu version label to LXGW (per-label),
-            // so if that label happens to be the mount source we must recover its pre-swap (original
-            // game) font rather than render in LXGW; in-run labels are never swapped, so their current
-            // font already is the game font. This keeps the subtitle in the game's font consistently
-            // across scenes (position/parent still come from the scanned version label).
-            stage = "resolve-font";
-            _subtitleFont = ResolveSubtitleFont(versionLabel);
-
-            // Always use the split renderer: English in the game's own font, Chinese in a SEPARATE
-            // system CJK font. Never route Chinese through the game's font asset — the subtitle shares
-            // that asset with the game's own UI (shop text, etc.), so rendering new CJK glyphs into its
-            // shared dynamic atlas corrupts the game's own text into tofu. English is Latin and already
-            // present in that atlas, so it adds nothing. (The combined single-label path is intentionally
-            // not used for this reason.)
             stage = "add-subtitle-renderer";
             _labelRoot = labelObject;
-            _englishLabel = CreateEnglishLabel(labelObject.transform);
-            _chineseUiLabel = CreateChineseUiLabel(labelObject.transform);
+            if (FontDiagnostics.HasChineseCoverage(versionLabel.font))
+                _combinedLabel = labelObject.AddComponent<TextMeshProUGUI>();
+            else
+            {
+                _englishLabel = CreateEnglishLabel(labelObject.transform);
+                _chineseUiLabel = CreateChineseUiLabel(labelObject.transform);
+            }
 
-            if (_englishLabel == null && _chineseUiLabel == null)
+            if (_combinedLabel == null && (_englishLabel == null || _chineseUiLabel == null))
             {
                 UnityEngine.Object.Destroy(labelObject);
                 return;
@@ -198,20 +188,14 @@ internal static class VoiceLineDisplay
             UnityEngine.Object.Destroy(_labelRoot);
 
         _labelRoot = null;
+        _combinedLabel = null;
         _englishLabel = null;
         _chineseUiLabel = null;
-        _subtitleFont = null;
         _lifetime = null;
         _mountedFromVersionLabel = false;
         _sourceRect = null;
         _sourceLabel = null;
     }
-
-    // The game's own font for the subtitle: the version label's pre-swap original font when the mod
-    // swapped it to LXGW, otherwise the label's current font (which is already the game font on
-    // never-swapped in-run labels). Never renders in LXGW.
-    private static TMP_FontAsset? ResolveSubtitleFont(TextMeshProUGUI versionLabel) =>
-        BppTmpFont.TryGetOriginalFont(versionLabel) ?? versionLabel.font;
 
     private static void ShowRaw(
         DisplayText text,
@@ -294,7 +278,10 @@ internal static class VoiceLineDisplay
         {
             var settings = VoiceLineSettings.Current;
             ConfigureRect(_sourceRect, CurrentRectTransform!, settings.Position);
-            ConfigureSplitText(_sourceLabel, _englishLabel, _chineseUiLabel, settings);
+            if (_combinedLabel != null)
+                ConfigureCombinedText(_sourceLabel, _combinedLabel, settings);
+            else
+                ConfigureSplitText(_sourceLabel, _englishLabel, _chineseUiLabel, settings);
             return true;
         }
         catch (Exception ex)
@@ -342,6 +329,40 @@ internal static class VoiceLineDisplay
         );
     }
 
+    private static void ConfigureCombinedText(
+        TextMeshProUGUI source,
+        TextMeshProUGUI target,
+        VoiceLineSettings settings
+    )
+    {
+        if (source.font != null)
+            target.font = source.font;
+        if (source.fontSharedMaterial != null)
+            target.fontSharedMaterial = source.fontSharedMaterial;
+
+        target.fontStyle = source.fontStyle;
+        target.characterSpacing = source.characterSpacing;
+        target.wordSpacing = source.wordSpacing;
+        target.paragraphSpacing = source.paragraphSpacing;
+        target.enableAutoSizing = source.enableAutoSizing;
+        target.fontSizeMin = source.fontSizeMin;
+        target.fontSizeMax = source.fontSizeMax;
+        target.text = string.Empty;
+        target.alignment = settings.Position switch
+        {
+            SubtitlePosition.TopRight => TextAlignmentOptions.TopRight,
+            SubtitlePosition.TopCenter => TextAlignmentOptions.Top,
+            _ => TextAlignmentOptions.TopLeft,
+        };
+        target.textWrappingMode = TextWrappingModes.NoWrap;
+        target.overflowMode = TextOverflowModes.Ellipsis;
+        target.richText = true;
+        target.raycastTarget = false;
+        target.fontSize = Math.Max(source.fontSize, 16f);
+        target.lineSpacing = 8f;
+        target.color = new Color(1f, 0.96f, 0.84f, 0.96f);
+    }
+
     private static void ConfigureSplitText(
         TextMeshProUGUI source,
         TextMeshProUGUI? english,
@@ -355,9 +376,10 @@ internal static class VoiceLineDisplay
 
         if (english != null)
         {
-            var englishFont = _subtitleFont ?? source.font;
-            if (englishFont != null)
-                english.font = englishFont;
+            if (source.font != null)
+                english.font = source.font;
+            if (source.fontSharedMaterial != null)
+                english.fontSharedMaterial = source.fontSharedMaterial;
 
             english.fontStyle = source.fontStyle;
             english.characterSpacing = source.characterSpacing;
@@ -371,11 +393,8 @@ internal static class VoiceLineDisplay
                 SubtitlePosition.TopCenter => TextAlignmentOptions.Top,
                 _ => TextAlignmentOptions.TopLeft,
             };
-            // Wrap + Overflow (was NoWrap + Ellipsis): a scaled English line wraps within the box width
-            // instead of truncating to "…". ApplyText positions the Chinese line below the English
-            // block's measured height so wrapped English never overlaps it.
-            english.textWrappingMode = TextWrappingModes.Normal;
-            english.overflowMode = TextOverflowModes.Overflow;
+            english.textWrappingMode = TextWrappingModes.NoWrap;
+            english.overflowMode = TextOverflowModes.Ellipsis;
             english.richText = false;
             english.raycastTarget = false;
             english.fontSize = englishFontSize;
@@ -460,19 +479,17 @@ internal static class VoiceLineDisplay
 
     private static void ApplyText(DisplayText text)
     {
-        var englishBlockHeight = Math.Abs(_secondLineOffset);
+        if (_combinedLabel != null)
+        {
+            _combinedLabel.text = BuildCombinedText(text);
+            _combinedLabel.gameObject.SetActive(!text.IsEmpty);
+            return;
+        }
+
         if (_englishLabel != null)
         {
             _englishLabel.text = text.English;
-            var hasEnglish = !string.IsNullOrEmpty(text.English);
-            _englishLabel.gameObject.SetActive(hasEnglish);
-            if (hasEnglish)
-            {
-                // Measure the wrapped English height so a multi-line English line pushes the Chinese
-                // line down instead of overlapping it (the split layout no longer assumes one line each).
-                _englishLabel.ForceMeshUpdate();
-                englishBlockHeight = Math.Max(englishBlockHeight, _englishLabel.preferredHeight);
-            }
+            _englishLabel.gameObject.SetActive(!string.IsNullOrEmpty(text.English));
         }
 
         if (_chineseUiLabel != null)
@@ -481,7 +498,7 @@ internal static class VoiceLineDisplay
             _chineseUiLabel.gameObject.SetActive(!string.IsNullOrEmpty(text.Chinese));
             ConfigureLineRect(
                 _chineseUiLabel.rectTransform,
-                string.IsNullOrEmpty(text.English) ? 0f : -englishBlockHeight,
+                string.IsNullOrEmpty(text.English) ? 0f : _secondLineOffset,
                 Math.Abs(_secondLineOffset)
             );
         }
@@ -489,6 +506,9 @@ internal static class VoiceLineDisplay
 
     private static string RendererDescription()
     {
+        if (_combinedLabel != null)
+            return $"combined=TextMeshProUGUI font={FontDiagnostics.DescribeFont(_combinedLabel.font)}";
+
         return "english=TextMeshProUGUI "
             + $"font={FontDiagnostics.DescribeFont(_englishLabel?.font)} "
             + $"chinese={ChineseRendererDescription()}";
@@ -504,6 +524,24 @@ internal static class VoiceLineDisplay
         }
 
         return "<none>";
+    }
+
+    private static string BuildCombinedText(DisplayText text)
+    {
+        var settings = VoiceLineSettings.Current;
+
+        if (string.IsNullOrEmpty(text.English))
+            return BuildSizedLine(text.Chinese, settings.ChineseFontScale);
+        if (string.IsNullOrEmpty(text.Chinese))
+            return BuildSizedLine(text.English, settings.EnglishFontScale);
+
+        return $"{BuildSizedLine(text.English, settings.EnglishFontScale)}\n{BuildSizedLine(text.Chinese, settings.ChineseFontScale)}";
+    }
+
+    private static string BuildSizedLine(string value, float scale)
+    {
+        var percent = (int)Math.Round(scale * 100f);
+        return $"<size={percent}%>{value}</size>";
     }
 
     private static string DescribeVersionLabel(TextMeshProUGUI? label)
