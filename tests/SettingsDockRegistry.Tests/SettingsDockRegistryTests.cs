@@ -10,7 +10,6 @@ using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.VoiceSubtitles;
-using BazaarPlusPlus.Game.VoiceSubtitles.Settings;
 using BazaarPlusPlus.Localization;
 using BepInEx.Configuration;
 using Xunit;
@@ -301,17 +300,15 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void VoiceSubtitlesDockEntries_register_master_and_bazaarline_cfg_rows()
+    public void VoiceSubtitlesDockEntries_register_master_and_setting_rows()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
             $"bpp-voice-subtitles-dock-{Guid.NewGuid():N}.cfg"
         );
-        var settingsPath = Path.Combine(Path.GetTempPath(), $"BazaarLine-{Guid.NewGuid():N}.cfg");
         try
         {
             L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
-            VoiceLineSettings.ConfigureForTests(settingsPath, legacySettingsPath: null);
             var configFile = new ConfigFile(configPath, saveOnInit: false);
             var config = new BppConfig();
             config.Initialize(configFile);
@@ -346,25 +343,25 @@ public class SettingsDockRegistryTests
         }
         finally
         {
-            VoiceLineSettings.ResetForTests();
             if (File.Exists(configPath))
                 File.Delete(configPath);
-            if (File.Exists(settingsPath))
-                File.Delete(settingsPath);
         }
     }
 
     [Fact]
     public void VoiceSubtitlesDockEntry_cycles_off_grid_chinese_scale_to_next_ladder_value()
     {
-        var settingsPath = Path.Combine(Path.GetTempPath(), $"BazaarLine-{Guid.NewGuid():N}.cfg");
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-voice-subtitles-scale-{Guid.NewGuid():N}.cfg"
+        );
         try
         {
             L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
-            VoiceLineSettings.ConfigureForTests(settingsPath, legacySettingsPath: null);
-            var definition = new VoiceSubtitlesChineseFontScaleSettingsDockEntry().Build(
-                config: null!
-            );
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var definition = new VoiceSubtitlesChineseFontScaleSettingsDockEntry().Build(config);
 
             Assert.Equal("Chinese Size", definition.ResolveLabel("en"));
             Assert.Equal("1.1x", definition.ResolveStatus("en"));
@@ -374,13 +371,12 @@ public class SettingsDockRegistryTests
 
             Assert.Equal("1.25x", definition.ResolveStatus("en"));
             Assert.True(definition.IsActive());
-            Assert.Contains("chineseFontScale=1.25", File.ReadAllText(settingsPath));
+            Assert.Equal(1.25f, config.VoiceSubtitlesChineseFontScaleConfig!.Value, precision: 2);
         }
         finally
         {
-            VoiceLineSettings.ResetForTests();
-            if (File.Exists(settingsPath))
-                File.Delete(settingsPath);
+            if (File.Exists(configPath))
+                File.Delete(configPath);
         }
     }
 

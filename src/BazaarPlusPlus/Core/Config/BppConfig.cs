@@ -16,6 +16,14 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; private set; }
 
+    public ConfigEntry<SubtitlePosition>? VoiceSubtitlesPositionConfig { get; private set; }
+
+    public ConfigEntry<SubtitleLanguageMode>? VoiceSubtitlesLanguageModeConfig { get; private set; }
+
+    public ConfigEntry<float>? VoiceSubtitlesEnglishFontScaleConfig { get; private set; }
+
+    public ConfigEntry<float>? VoiceSubtitlesChineseFontScaleConfig { get; private set; }
+
     public ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; private set; }
 
     public ConfigEntry<bool>? EndOfRunScreenshotEnabledConfig { get; private set; }
@@ -67,6 +75,36 @@ internal sealed class BppConfig : IBppConfig
             "Enabled",
             false,
             "Whether to show bilingual voice-over subtitles."
+        );
+        VoiceSubtitlesPositionConfig = config.Bind(
+            "VoiceSubtitles",
+            "Position",
+            SubtitlePosition.TopLeft,
+            "Where voice-over subtitles are anchored on screen."
+        );
+        VoiceSubtitlesLanguageModeConfig = config.Bind(
+            "VoiceSubtitles",
+            "Language",
+            SubtitleLanguageMode.Both,
+            "Which languages to show for voice-over subtitles: Both, ChineseOnly, or EnglishOnly."
+        );
+        VoiceSubtitlesEnglishFontScaleConfig = config.Bind(
+            "VoiceSubtitles",
+            "EnglishFontScale",
+            1.0f,
+            new ConfigDescription(
+                "Font scale for the English subtitle line.",
+                new AcceptableValueRange<float>(1.0f, 2.5f)
+            )
+        );
+        VoiceSubtitlesChineseFontScaleConfig = config.Bind(
+            "VoiceSubtitles",
+            "ChineseFontScale",
+            1.1f,
+            new ConfigDescription(
+                "Font scale for the Chinese subtitle line.",
+                new AcceptableValueRange<float>(1.0f, 2.5f)
+            )
         );
         CombatStatusBarSpeedMultiplierConfig = config.Bind(
             "CombatStatusBar",

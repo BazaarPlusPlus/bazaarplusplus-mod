@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.VoiceSubtitles.Settings;
 using TMPro;
 using UnityEngine;
@@ -354,8 +355,13 @@ internal static class VoiceLineDisplay
             SubtitlePosition.TopCenter => TextAlignmentOptions.Top,
             _ => TextAlignmentOptions.TopLeft,
         };
-        target.textWrappingMode = TextWrappingModes.NoWrap;
-        target.overflowMode = TextOverflowModes.Ellipsis;
+        // Wrap long lines within the box width and never clip vertically: with a
+        // fixed box height but font scale up to 2.5x, NoWrap + Ellipsis makes TMP's
+        // GenerateTextMesh hit the m_characterCount = 0 branch (no ellipsis-insertion
+        // candidate on an overflowing line) and drop the entire block. Overflow is not
+        // in that truncation switch, so the text always renders.
+        target.textWrappingMode = TextWrappingModes.Normal;
+        target.overflowMode = TextOverflowModes.Overflow;
         target.richText = true;
         target.raycastTarget = false;
         target.fontSize = Math.Max(source.fontSize, 16f);
@@ -393,8 +399,8 @@ internal static class VoiceLineDisplay
                 SubtitlePosition.TopCenter => TextAlignmentOptions.Top,
                 _ => TextAlignmentOptions.TopLeft,
             };
-            english.textWrappingMode = TextWrappingModes.NoWrap;
-            english.overflowMode = TextOverflowModes.Ellipsis;
+            english.textWrappingMode = TextWrappingModes.Normal;
+            english.overflowMode = TextOverflowModes.Overflow;
             english.richText = false;
             english.raycastTarget = false;
             english.fontSize = englishFontSize;
@@ -412,8 +418,8 @@ internal static class VoiceLineDisplay
                 SubtitlePosition.TopCenter => TextAnchor.UpperCenter,
                 _ => TextAnchor.UpperLeft,
             };
-            chineseUi.horizontalOverflow = HorizontalWrapMode.Overflow;
-            chineseUi.verticalOverflow = VerticalWrapMode.Truncate;
+            chineseUi.horizontalOverflow = HorizontalWrapMode.Wrap;
+            chineseUi.verticalOverflow = VerticalWrapMode.Overflow;
             chineseUi.supportRichText = false;
             chineseUi.raycastTarget = false;
             chineseUi.fontSize = Math.Max((int)Math.Round(chineseFontSize), 16);
@@ -486,22 +492,44 @@ internal static class VoiceLineDisplay
             return;
         }
 
+        var hasEnglish = !string.IsNullOrEmpty(text.English);
         if (_englishLabel != null)
         {
             _englishLabel.text = text.English;
-            _englishLabel.gameObject.SetActive(!string.IsNullOrEmpty(text.English));
+            _englishLabel.gameObject.SetActive(hasEnglish);
         }
 
         if (_chineseUiLabel != null)
         {
             _chineseUiLabel.text = text.Chinese;
             _chineseUiLabel.gameObject.SetActive(!string.IsNullOrEmpty(text.Chinese));
+            // English now wraps to a variable number of lines, so push the Chinese row
+            // below the English row's measured height instead of a fixed single-line
+            // offset (which would overlap the later English lines at larger scales).
+            var chineseOffset = hasEnglish ? -MeasureEnglishHeight(text.English) : 0f;
             ConfigureLineRect(
                 _chineseUiLabel.rectTransform,
-                string.IsNullOrEmpty(text.English) ? 0f : _secondLineOffset,
+                chineseOffset,
                 Math.Abs(_secondLineOffset)
             );
         }
+    }
+
+    private static float MeasureEnglishHeight(string englishText)
+    {
+        var minimum = Math.Abs(_secondLineOffset);
+        if (_englishLabel == null || string.IsNullOrEmpty(englishText))
+            return minimum;
+
+        // Measure wrapped English height at the label's current width so the Chinese
+        // row clears every English line. GetPreferredValues honours the label's
+        // font/scale/wrapping without needing an active layout pass.
+        var width = CurrentRectTransform != null ? CurrentRectTransform.rect.width : 760f;
+        if (width < 1f)
+            width = 760f;
+
+        var measured = _englishLabel.GetPreferredValues(englishText, width, 0f).y;
+        return Math.Max(measured, minimum);
     }
 
     private static string RendererDescription()

@@ -14,6 +14,14 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; }
 
+    ConfigEntry<SubtitlePosition>? VoiceSubtitlesPositionConfig { get; }
+
+    ConfigEntry<SubtitleLanguageMode>? VoiceSubtitlesLanguageModeConfig { get; }
+
+    ConfigEntry<float>? VoiceSubtitlesEnglishFontScaleConfig { get; }
+
+    ConfigEntry<float>? VoiceSubtitlesChineseFontScaleConfig { get; }
+
     ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; }
 
     ConfigEntry<bool>? EndOfRunScreenshotEnabledConfig { get; }
