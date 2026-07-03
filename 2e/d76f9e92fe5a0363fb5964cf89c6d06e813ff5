@@ -1,0 +1,53 @@
+docs/drafts/2026-07-03-bazaarline-voicesubtitles-integration-plan.md
+  s_f1273dac08ecfa::t_bc60ab61a946bb 19-20,23-24
+  s_f1273dac08ecfa::t_4297645c30e08d 95
+  s_f1273dac08ecfa::t_a00b312cf06f52 1-2,6-17,21-22,25,49-58,61-65,71-74,76-82,85,91,110-112,117-119,121-125,127,147-149
+  s_f1273dac08ecfa::t_8772b5cbb40bd0 47
+  s_f1273dac08ecfa::t_30cd52af083bee 161-212
+  s_f1273dac08ecfa::t_0e5740728ebc55 116
+  s_f1273dac08ecfa::t_0e0af63be05dac 90
+  s_f1273dac08ecfa::t_1729b8fff362ec 31-32,35-39
+  s_f1273dac08ecfa::t_21efa92522f07e 3,5
+  s_f1273dac08ecfa::t_12d80071e0b78b 92-94,96-98,107,109
+  s_f1273dac08ecfa::t_5a15337af58f40 99-105
+  s_f1273dac08ecfa::t_2a50fb93bfbf22 86-89
+  s_f1273dac08ecfa::t_971609985c84d5 150-153,155-160
+  s_f1273dac08ecfa::t_2defb7262d0be2 45
+  s_f1273dac08ecfa::t_2d9e10aa9971dc 59-60
+  s_f1273dac08ecfa::t_d00a5de383d6bb 75
+  s_f1273dac08ecfa::t_065d8c8f7a1268 154
+  s_f1273dac08ecfa::t_bbfe1af72ee944 83-84
+  s_f1273dac08ecfa::t_7db86dc27f7588 4
+  s_f1273dac08ecfa::t_f302be5f5281c5 113-115
+  s_f1273dac08ecfa::t_80bde78e886937 108
+  s_f1273dac08ecfa::t_0b56ce39498a78 68
+  s_f1273dac08ecfa::t_738098c55d2e4a 26-30,33-34,40-44,46,48
+  s_f1273dac08ecfa::t_dfae63613312d4 130
+  s_f1273dac08ecfa::t_63b172cc7dba6d 129
+  s_f1273dac08ecfa::t_f3830b1444d7b2 120
+  s_f1273dac08ecfa::t_8be392d386c43c 126,128,131-146
+  s_f1273dac08ecfa::t_7748f2b48958eb 70
+  s_f1273dac08ecfa::t_434afdbe6b23bf 66-67,69
+  s_f1273dac08ecfa::t_0fb0d6fbfa4258 106
+  s_f1273dac08ecfa::t_8e0dd96baf9e4b 18
+src/BazaarPlusPlus/Data/VoiceSubtitles/voice-lines.json
+  s_f1273dac08ecfa::t_4b8bd5e836c190 1-30200
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "2ed76f9e92fe5a0363fb5964cf89c6d06e813ff5",
+  "prompts": {},
+  "sessions": {
+    "s_f1273dac08ecfa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "157c35ee-6b54-49b5-82e3-37f66e722da5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
