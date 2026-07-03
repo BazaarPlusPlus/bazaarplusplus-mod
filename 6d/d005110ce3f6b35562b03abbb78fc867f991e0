@@ -1,0 +1,22 @@
+docs/drafts/2026-07-03-bazaarline-voicesubtitles-integration-plan.md
+  s_f1273dac08ecfa::t_7268f03abbd541 156-157
+  s_f1273dac08ecfa::t_26db5b8d1f1711 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "6dd005110ce3f6b35562b03abbb78fc867f991e0",
+  "prompts": {},
+  "sessions": {
+    "s_f1273dac08ecfa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "157c35ee-6b54-49b5-82e3-37f66e722da5",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
