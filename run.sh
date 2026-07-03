@@ -76,6 +76,26 @@ build() {
     fi
 }
 
+# The Release half of BuildAll copies the DLL into the installer resources that ship
+# to ONLINE users, but online/PTR share one install directory — a Release built while
+# the PTR branch is installed would ship a PTR-assembly build. Pin Release builds to
+# an online Managed snapshot (game-libs/online-*/Managed, newest) when one exists;
+# otherwise require the installed branch to actually be public.
+resolve_release_managed() {
+    local pinned="${BPP_RELEASE_MANAGED:-}"
+    if [[ -n "$pinned" ]]; then
+        echo "$pinned"
+        return
+    fi
+    local snaps=("$SCRIPT_DIR"/game-libs/online-*/Managed)
+    local last=""
+    local snap
+    for snap in "${snaps[@]}"; do
+        [[ -d "$snap" ]] && last="$snap"
+    done
+    echo "$last"
+}
+
 build_all() {
     local prod="${1:-false}"
     local bazaaragent="${2:-false}"
@@ -83,6 +103,15 @@ build_all() {
 
     if [[ "$prod" == "true" ]]; then
         args+=(-p:BuildProductionPackage=true)
+    fi
+
+    local release_managed
+    release_managed=$(resolve_release_managed)
+    if [[ -n "$release_managed" ]]; then
+        echo -e "${CYAN}== Release pinned to ${GREEN}${release_managed}${CYAN} ==${RESET}"
+        args+=("-p:ManagedPath=$release_managed")
+    else
+        require_steam_branch public
     fi
 
     print_bazaaragent_mode "$bazaaragent"
@@ -156,17 +185,22 @@ check_ilspy() {
 # Guard so PTR bits never overwrite ./decompiled (online reference) and vice versa.
 # The appmanifest is located by walking up from MANAGED — the directory the DLLs
 # are actually read from — so an overridden BPP_MANAGED_PATH is guarded too.
-installed_steam_branch() {
-    local dir="$MANAGED" acf=""
+locate_appmanifest() {
+    local dir="$MANAGED"
     local _i
     for _i in 1 2 3 4 5 6 7 8 9 10; do
         dir="$(dirname "$dir")"
         if [[ -f "$dir/appmanifest_1617400.acf" ]]; then
-            acf="$dir/appmanifest_1617400.acf"
-            break
+            echo "$dir/appmanifest_1617400.acf"
+            return
         fi
         [[ "$dir" == "/" || "$dir" == "." ]] && break
     done
+}
+
+installed_steam_branch() {
+    local acf
+    acf=$(locate_appmanifest)
     [[ -n "$acf" ]] || { echo "unknown"; return; }
     local key
     key=$(awk '/"MountedConfig"/,/^\t\}/' "$acf" | awk -F '"' '/"BetaKey"/ {print $4}')
@@ -206,6 +240,61 @@ decompile_all() {
     done
 }
 
+# Archive the currently installed Managed dir keyed by branch + buildid. Because the
+# two branches overwrite each other in place, this is the only way to keep both
+# assembly sets available (Release pinning + build-matrix consume these snapshots).
+snapshot_managed() {
+    local acf branch buildid channel dest
+    acf=$(locate_appmanifest)
+    if [[ -z "$acf" ]]; then
+        echo -e "${RED}Could not find appmanifest_1617400.acf above the Managed path.${RESET}" >&2
+        exit 1
+    fi
+    branch=$(installed_steam_branch)
+    channel="online"
+    [[ "$branch" == "public_test_realm" ]] && channel="ptr"
+    if [[ "$branch" != "public" && "$branch" != "public_test_realm" ]]; then
+        echo -e "${RED}Installed branch '$branch' is neither public nor public_test_realm; refusing to snapshot.${RESET}" >&2
+        exit 1
+    fi
+    buildid=$(awk -F '"' '/"buildid"/ {print $4; exit}' "$acf")
+    dest="$SCRIPT_DIR/game-libs/$channel-$buildid/Managed"
+    if [[ -d "$dest" ]]; then
+        echo "Snapshot already exists: $dest"
+        return
+    fi
+    mkdir -p "$dest"
+    cp -R "$MANAGED/." "$dest/"
+    echo -e "${GREEN}Archived $channel (buildid $buildid) Managed -> $dest${RESET}"
+}
+
+# Compile the single source tree against every archived Managed snapshot. Uses the
+# CompatCheck configuration so neither the Debug plugins-copy nor the Release
+# installer-copy post-build steps fire.
+build_matrix() {
+    local snaps=("$SCRIPT_DIR"/game-libs/*/Managed)
+    local found=0 failed=()
+    local snap
+    for snap in "${snaps[@]}"; do
+        [[ -d "$snap" ]] || continue
+        found=1
+        echo -e "${CYAN}== Matrix build against ${GREEN}${snap}${CYAN} ==${RESET}"
+        if ! dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -c CompatCheck -p:ManagedPath="$snap"; then
+            failed+=("$snap")
+        fi
+    done
+    if ((found == 0)); then
+        echo -e "${RED}No snapshots under game-libs/. Run './run.sh snapshot-managed' on each branch first.${RESET}" >&2
+        exit 1
+    fi
+    if ((${#failed[@]} > 0)); then
+        echo -e "${RED}Matrix build failed against:${RESET}" >&2
+        printf '  %s\n' "${failed[@]}" >&2
+        exit 1
+    fi
+    echo -e "${GREEN}Matrix build passed for all snapshots.${RESET}"
+}
+
 usage() {
     cat <<EOF
 Usage:
@@ -217,6 +306,8 @@ Usage:
   $0 decompile-all
   $0 decompile-ptr [DllName]
   $0 decompile-all-ptr
+  $0 snapshot-managed
+  $0 build-matrix
 
 Options:
   --with-bazaaragent  Build and copy the optional BazaarAgent assemblies.
@@ -264,6 +355,8 @@ case "${1:-}" in
         require_steam_branch public_test_realm
         BPP_DECOMPILE_OUT=./decompiled-vptr decompile_all
         ;;
+    snapshot-managed) snapshot_managed ;;
+    build-matrix) build_matrix ;;
     *)
         usage
         exit 1
