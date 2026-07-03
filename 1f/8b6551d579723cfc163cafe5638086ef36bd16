@@ -1,0 +1,40 @@
+src/BazaarPlusPlus/GameInterop/VoiceSubtitles/VoiceSubtitlesInteropLog.cs
+  s_b160f8aa8fb5f5::t_1b7d405eb657fa 1-48
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesModule.cs
+  s_b160f8aa8fb5f5::t_007e7d2c19819f 15-17,23,27-58
+src/BazaarPlusPlus/GameInterop/VoiceSubtitles/VoiceSubtitlesInteropModule.cs
+  s_b160f8aa8fb5f5::t_4eb5c9e458d6eb 1-17
+src/BazaarPlusPlus/BppComposition.cs
+  s_b160f8aa8fb5f5::t_56f1da0f449e30 29,54,101,106
+src/BazaarPlusPlus/GameInterop/VoiceSubtitles/VoiceLineVoObserverBridge.cs
+  s_b160f8aa8fb5f5::t_f3d8aac8a97066 12
+  s_b160f8aa8fb5f5::t_4c91dfe5b606e7 267,313,318
+  s_b160f8aa8fb5f5::t_887b6036083887 329-330,348,416-460,462
+  s_b160f8aa8fb5f5::t_00e70deedee0d2 182,213,216
+  s_b160f8aa8fb5f5::t_50af78b3897788 22-27
+src/BazaarPlusPlus/Patches/VoiceSubtitles/VOPlayerPatches.cs
+  s_b160f8aa8fb5f5::t_f3d8aac8a97066 11
+tests/Architecture.Tests/CoreLayeringTests.cs
+  s_b160f8aa8fb5f5::t_6fda5bc94883a7 1026-1092,1096-1103
+  s_b160f8aa8fb5f5::t_eba0d3d34ae1a3 1093-1095
+src/BazaarPlusPlus/GameInterop/VoiceSubtitles/VoiceSubtitleObserverCallbacks.cs
+  s_b160f8aa8fb5f5::t_72f6edf3ac146b 1-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "1f8b6551d579723cfc163cafe5638086ef36bd16",
+  "prompts": {},
+  "sessions": {
+    "s_b160f8aa8fb5f5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f28d7-c5bd-7191-a973-4663b6c18c90",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
