@@ -93,6 +93,11 @@ internal static class BppTmpFont
         }
     }
 
+    // The label's pre-swap (original game) font, if this label was ever swapped to the embedded CJK
+    // font. Lets callers recover the game's own font instead of the LXGW replacement.
+    public static TMP_FontAsset? TryGetOriginalFont(TMP_Text? text) =>
+        text != null && OriginalFonts.TryGetValue(text, out var snapshot) ? snapshot.Font : null;
+
     private static void CaptureOriginal(TMP_Text text)
     {
         if (OriginalFonts.TryGetValue(text, out _))

@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.VoiceSubtitles.Settings;
+using BazaarPlusPlus.Infrastructure.Fonts;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -64,14 +65,13 @@ internal static class VoiceLineDisplay
             _sourceLabel = versionLabel;
             FontDiagnostics.LogOnce(versionLabel, "mount");
 
-            // Resolve an independent subtitle font instead of cloning the version label's font.
-            // The mod swaps the main-menu version label to LXGW (per-label), so cloning it makes the
-            // subtitle's render path + font flip between scenes (LXGW/combined on the main menu vs the
-            // game font/split in-run) — the source of the intermittent English rendering. TMP's global
-            // default font asset is scene-stable and untouched by the mod, so it keeps rendering
-            // deterministic across scenes (position/parent still come from the scanned version label).
+            // Use the game's own font. The mod swaps the main-menu version label to LXGW (per-label),
+            // so if that label happens to be the mount source we must recover its pre-swap (original
+            // game) font rather than render in LXGW; in-run labels are never swapped, so their current
+            // font already is the game font. This keeps the subtitle in the game's font consistently
+            // across scenes (position/parent still come from the scanned version label).
             stage = "resolve-font";
-            _subtitleFont = ResolveSubtitleFont(versionLabel.font);
+            _subtitleFont = ResolveSubtitleFont(versionLabel);
 
             stage = "add-subtitle-renderer";
             _labelRoot = labelObject;
@@ -208,11 +208,11 @@ internal static class VoiceLineDisplay
         _sourceLabel = null;
     }
 
-    // Scene-stable TMP font for the subtitle. Prefers TMP's global default font asset (untouched by the
-    // mod's per-label LXGW swap) so the render path/metrics do not change between scenes; falls back to
-    // the version label's font only if no global default is configured.
-    private static TMP_FontAsset? ResolveSubtitleFont(TMP_FontAsset? fallback) =>
-        TMP_Settings.defaultFontAsset != null ? TMP_Settings.defaultFontAsset : fallback;
+    // The game's own font for the subtitle: the version label's pre-swap original font when the mod
+    // swapped it to LXGW, otherwise the label's current font (which is already the game font on
+    // never-swapped in-run labels). Never renders in LXGW.
+    private static TMP_FontAsset? ResolveSubtitleFont(TextMeshProUGUI versionLabel) =>
+        BppTmpFont.TryGetOriginalFont(versionLabel) ?? versionLabel.font;
 
     private static void ShowRaw(
         DisplayText text,
