@@ -145,6 +145,93 @@ public sealed class VoiceSubtitlesTests
     }
 
     [Fact]
+    public void VoiceLineSettings_saves_key_value_config_without_reload_on_read()
+    {
+        var settingsType = GetRequiredType(
+            "BazaarPlusPlus.Game.VoiceSubtitles.Settings.VoiceLineSettings"
+        );
+        var positionType = GetRequiredType(
+            "BazaarPlusPlus.Game.VoiceSubtitles.Settings.SubtitlePosition"
+        );
+        var configure = GetRequiredStaticMethod(settingsType, "ConfigureForTests");
+        var reset = GetRequiredStaticMethod(settingsType, "ResetForTests");
+        var setPosition = GetRequiredStaticMethod(settingsType, "SetPosition");
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"BazaarLine-{Guid.NewGuid():N}.cfg");
+
+        try
+        {
+            configure.Invoke(null, [settingsPath, null]);
+
+            setPosition.Invoke(null, [Enum.Parse(positionType, "TopRight")]);
+
+            var current = GetStaticPropertyValue(settingsType, "Current");
+            Assert.Equal("TopRight", GetEnumName(current, "Position"));
+            Assert.Contains("position=top-right", File.ReadAllText(settingsPath));
+
+            File.WriteAllText(settingsPath, "position=top-center\n", new UTF8Encoding(false));
+
+            current = GetStaticPropertyValue(settingsType, "Current");
+            Assert.Equal("TopRight", GetEnumName(current, "Position"));
+
+            reset.Invoke(null, null);
+            configure.Invoke(null, [settingsPath, null]);
+
+            current = GetStaticPropertyValue(settingsType, "Current");
+            Assert.Equal("TopCenter", GetEnumName(current, "Position"));
+        }
+        finally
+        {
+            reset.Invoke(null, null);
+            if (File.Exists(settingsPath))
+                File.Delete(settingsPath);
+        }
+    }
+
+    [Fact]
+    public void VoiceLineSettings_migrates_legacy_plugin_config_to_bepinex_config()
+    {
+        var settingsType = GetRequiredType(
+            "BazaarPlusPlus.Game.VoiceSubtitles.Settings.VoiceLineSettings"
+        );
+        var configure = GetRequiredStaticMethod(settingsType, "ConfigureForTests");
+        var reset = GetRequiredStaticMethod(settingsType, "ResetForTests");
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"bpp-voice-settings-{Guid.NewGuid():N}");
+        var settingsPath = Path.Combine(tempRoot, "config", "BazaarLine.cfg");
+        var legacyPath = Path.Combine(tempRoot, "plugins", "BazaarLine", "settings.cfg");
+
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(legacyPath)!);
+            File.WriteAllText(
+                legacyPath,
+                """
+                position=top-center
+                language=english
+                englishFontScale=1.75
+                chineseFontScale=1.25
+                """,
+                new UTF8Encoding(false)
+            );
+
+            configure.Invoke(null, [settingsPath, legacyPath]);
+
+            var current = GetStaticPropertyValue(settingsType, "Current");
+
+            Assert.True(File.Exists(settingsPath));
+            Assert.Equal("TopCenter", GetEnumName(current, "Position"));
+            Assert.Equal("EnglishOnly", GetEnumName(current, "LanguageMode"));
+            Assert.Equal(1.75f, GetSingle(current, "EnglishFontScale"), precision: 2);
+            Assert.Equal(1.25f, GetSingle(current, "ChineseFontScale"), precision: 2);
+        }
+        finally
+        {
+            reset.Invoke(null, null);
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Catalog_resolves_exact_stem_from_embedded_seed()
     {
         var repositoryType = GetRequiredType(
@@ -301,6 +388,27 @@ public sealed class VoiceSubtitlesTests
             return field.GetValue(instance);
 
         throw new InvalidOperationException($"Missing property or field {type.FullName}.{name}");
+    }
+
+    private static object GetStaticPropertyValue(Type type, string name)
+    {
+        var property =
+            type.GetProperty(
+                name,
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )
+            ?? throw new InvalidOperationException(
+                $"Missing static property {type.FullName}.{name}"
+            );
+        return property.GetValue(null)
+            ?? throw new InvalidOperationException(
+                $"Static property {type.FullName}.{name} is null"
+            );
+    }
+
+    private static string GetEnumName(object instance, string name)
+    {
+        return Assert.IsAssignableFrom<Enum>(GetPropertyValue(instance, name)).ToString();
     }
 
     private static string GetString(object instance, string name)

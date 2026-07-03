@@ -10,6 +10,7 @@ using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.VoiceSubtitles;
+using BazaarPlusPlus.Game.VoiceSubtitles.Settings;
 using BazaarPlusPlus.Localization;
 using BepInEx.Configuration;
 using Xunit;
@@ -299,6 +300,90 @@ public class SettingsDockRegistryTests
         }
     }
 
+    [Fact]
+    public void VoiceSubtitlesDockEntries_register_master_and_bazaarline_cfg_rows()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-voice-subtitles-dock-{Guid.NewGuid():N}.cfg"
+        );
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"BazaarLine-{Guid.NewGuid():N}.cfg");
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            VoiceLineSettings.ConfigureForTests(settingsPath, legacySettingsPath: null);
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var registry = new SettingsDockEntryRegistry();
+
+            VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
+
+            var definitions = registry.MaterializeWithOrder(config);
+
+            Assert.Equal(
+                new[]
+                {
+                    "VoiceSubtitles",
+                    "VoiceSubtitlesPosition",
+                    "VoiceSubtitlesLanguage",
+                    "VoiceSubtitlesEnglishFontScale",
+                    "VoiceSubtitlesChineseFontScale",
+                },
+                definitions.Select(d => d.Definition.Key)
+            );
+            Assert.Equal(
+                new[]
+                {
+                    BppSettingsDockOrder.VoiceSubtitles,
+                    BppSettingsDockOrder.VoiceSubtitlesPosition,
+                    BppSettingsDockOrder.VoiceSubtitlesLanguage,
+                    BppSettingsDockOrder.VoiceSubtitlesEnglishFontScale,
+                    BppSettingsDockOrder.VoiceSubtitlesChineseFontScale,
+                },
+                definitions.Select(d => d.Order)
+            );
+        }
+        finally
+        {
+            VoiceLineSettings.ResetForTests();
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+            if (File.Exists(settingsPath))
+                File.Delete(settingsPath);
+        }
+    }
+
+    [Fact]
+    public void VoiceSubtitlesDockEntry_cycles_off_grid_chinese_scale_to_next_ladder_value()
+    {
+        var settingsPath = Path.Combine(Path.GetTempPath(), $"BazaarLine-{Guid.NewGuid():N}.cfg");
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            VoiceLineSettings.ConfigureForTests(settingsPath, legacySettingsPath: null);
+            var definition = new VoiceSubtitlesChineseFontScaleSettingsDockEntry().Build(
+                config: null!
+            );
+
+            Assert.Equal("Chinese Size", definition.ResolveLabel("en"));
+            Assert.Equal("1.1x", definition.ResolveStatus("en"));
+            Assert.False(definition.IsActive());
+
+            definition.Activate();
+
+            Assert.Equal("1.25x", definition.ResolveStatus("en"));
+            Assert.True(definition.IsActive());
+            Assert.Contains("chineseFontScale=1.25", File.ReadAllText(settingsPath));
+        }
+        finally
+        {
+            VoiceLineSettings.ResetForTests();
+            if (File.Exists(settingsPath))
+                File.Delete(settingsPath);
+        }
+    }
+
     [Theory]
     [InlineData("zh-CN", "https://bazaarplusplus.com/tutorial")]
     [InlineData("zh-Hant", "https://bazaarplusplus.com/tutorial")]
@@ -372,6 +457,22 @@ public class SettingsDockRegistryTests
             new VoiceSubtitlesSettingsDockEntry().Order
         );
         Assert.Equal(
+            BppSettingsDockOrder.VoiceSubtitlesPosition,
+            new VoiceSubtitlesPositionSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.VoiceSubtitlesLanguage,
+            new VoiceSubtitlesLanguageSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.VoiceSubtitlesEnglishFontScale,
+            new VoiceSubtitlesEnglishFontScaleSettingsDockEntry().Order
+        );
+        Assert.Equal(
+            BppSettingsDockOrder.VoiceSubtitlesChineseFontScale,
+            new VoiceSubtitlesChineseFontScaleSettingsDockEntry().Order
+        );
+        Assert.Equal(
             BppSettingsDockOrder.BazaarDbUpload,
             new BazaarDbSnapshotUploadSettingsDockEntry().Order
         );
@@ -385,7 +486,7 @@ public class SettingsDockRegistryTests
         registry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
         registry.Register(new HotkeyTutorialSettingsDockEntry());
         registry.Register(new FixedSupporterListSettingsDockEntry());
-        registry.Register(new VoiceSubtitlesSettingsDockEntry());
+        VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
         registry.Register(new EndOfRunScreenshotSettingsDockEntry());
         registry.Register(new ChineseLocaleModeSettingsDockEntry(new InMemoryBppEventBus()));
 
@@ -399,6 +500,10 @@ public class SettingsDockRegistryTests
                     "ChineseLocaleMode",
                     "StreamMode",
                     "VoiceSubtitles",
+                    "VoiceSubtitlesPosition",
+                    "VoiceSubtitlesLanguage",
+                    "VoiceSubtitlesEnglishFontScale",
+                    "VoiceSubtitlesChineseFontScale",
                     "HotkeyTutorial",
                     "EndOfRunScreenshot",
                     "BazaarDbUpload",

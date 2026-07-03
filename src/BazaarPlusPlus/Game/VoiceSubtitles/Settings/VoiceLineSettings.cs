@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Reflection;
+using System.Text;
 using BazaarPlusPlus.Game.VoiceSubtitles;
 using BepInEx;
 
@@ -26,51 +26,143 @@ internal enum SubtitleLanguageMode
 
 internal sealed class VoiceLineSettings
 {
-    private const string SettingsFileName = "settings.cfg";
+    private const string SettingsFileName = "BazaarLine.cfg";
+    private const string LegacySettingsFileName = "settings.cfg";
+    private const float DefaultEnglishFontScale = 1f;
+    private const float DefaultChineseFontScale = 1.1f;
+    private const float MinimumFontScale = 1f;
+    private const float MaximumFontScale = 2.5f;
+    private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
     private static readonly object Sync = new();
     private static VoiceLineSettings _current = new();
-    private static DateTime _lastWriteTimeUtc = DateTime.MinValue;
     private static bool _loadedOnce;
+    private static string? _settingsPathOverride;
+    private static string? _legacySettingsPathOverride;
+    private static bool _hasPathOverrides;
 
-    public SubtitlePosition Position { get; private set; } = SubtitlePosition.TopLeft;
-    public SubtitleLanguageMode LanguageMode { get; private set; } = SubtitleLanguageMode.Both;
-    public float EnglishFontScale { get; private set; } = 1f;
-    public float ChineseFontScale { get; private set; } = 1.1f;
+    private VoiceLineSettings(
+        SubtitlePosition position = SubtitlePosition.TopLeft,
+        SubtitleLanguageMode languageMode = SubtitleLanguageMode.Both,
+        float englishFontScale = DefaultEnglishFontScale,
+        float chineseFontScale = DefaultChineseFontScale
+    )
+    {
+        Position = position;
+        LanguageMode = languageMode;
+        EnglishFontScale = NormalizeScale(englishFontScale);
+        ChineseFontScale = NormalizeScale(chineseFontScale);
+    }
+
+    public SubtitlePosition Position { get; }
+    public SubtitleLanguageMode LanguageMode { get; }
+    public float EnglishFontScale { get; }
+    public float ChineseFontScale { get; }
 
     public static VoiceLineSettings Current
     {
         get
         {
-            ReloadIfChanged();
-            return _current;
+            lock (Sync)
+            {
+                EnsureLoadedLocked();
+                return _current;
+            }
         }
     }
 
-    public static void ReloadIfChanged()
+    internal static void SetPosition(SubtitlePosition position)
+    {
+        Save(current => current.WithPosition(position));
+    }
+
+    internal static void SetLanguageMode(SubtitleLanguageMode mode)
+    {
+        Save(current => current.WithLanguageMode(mode));
+    }
+
+    internal static void SetEnglishFontScale(float scale)
+    {
+        Save(current => current.WithEnglishFontScale(scale));
+    }
+
+    internal static void SetChineseFontScale(float scale)
+    {
+        Save(current => current.WithChineseFontScale(scale));
+    }
+
+    internal static void Save()
     {
         lock (Sync)
         {
-            var path = SettingsPath;
-            var writeTime = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
-
-            if (_loadedOnce && writeTime == _lastWriteTimeUtc)
-                return;
-
-            _current = Load(path);
-            _lastWriteTimeUtc = writeTime;
-            _loadedOnce = true;
+            EnsureLoadedLocked();
+            WriteSettingsBestEffort(SettingsPath, _current);
         }
     }
 
-    private static string SettingsPath
+    internal static void ConfigureForTests(string settingsPath, string? legacySettingsPath)
     {
-        get
+        lock (Sync)
         {
-            var assemblyPath = Assembly.GetExecutingAssembly().Location;
-            var pluginDir = Path.GetDirectoryName(assemblyPath) ?? Paths.PluginPath;
-            return Path.Combine(pluginDir, "BazaarLine", SettingsFileName);
+            _settingsPathOverride = settingsPath;
+            _legacySettingsPathOverride = legacySettingsPath;
+            _hasPathOverrides = true;
+            _current = new VoiceLineSettings();
+            _loadedOnce = false;
         }
     }
+
+    internal static void ResetForTests()
+    {
+        lock (Sync)
+        {
+            _settingsPathOverride = null;
+            _legacySettingsPathOverride = null;
+            _hasPathOverrides = false;
+            _current = new VoiceLineSettings();
+            _loadedOnce = false;
+        }
+    }
+
+    private static string SettingsPath =>
+        _settingsPathOverride ?? Path.Combine(Paths.ConfigPath, SettingsFileName);
+
+    private static string? LegacySettingsPath =>
+        _hasPathOverrides ? _legacySettingsPathOverride
+        : string.IsNullOrWhiteSpace(Paths.PluginPath) ? null
+        : Path.Combine(Paths.PluginPath, "BazaarLine", LegacySettingsFileName);
+
+    private static void EnsureLoadedLocked()
+    {
+        if (_loadedOnce)
+            return;
+
+        var path = SettingsPath;
+        MigrateLegacySettingsBestEffort(path, LegacySettingsPath);
+        _current = Load(path);
+        _loadedOnce = true;
+    }
+
+    private static void Save(Func<VoiceLineSettings, VoiceLineSettings> update)
+    {
+        lock (Sync)
+        {
+            EnsureLoadedLocked();
+            _current = update(_current);
+            WriteSettingsBestEffort(SettingsPath, _current);
+        }
+    }
+
+    private VoiceLineSettings WithPosition(SubtitlePosition position) =>
+        new(position, LanguageMode, EnglishFontScale, ChineseFontScale);
+
+    private VoiceLineSettings WithLanguageMode(SubtitleLanguageMode mode) =>
+        new(Position, mode, EnglishFontScale, ChineseFontScale);
+
+    private VoiceLineSettings WithEnglishFontScale(float scale) =>
+        new(Position, LanguageMode, scale, ChineseFontScale);
+
+    private VoiceLineSettings WithChineseFontScale(float scale) =>
+        new(Position, LanguageMode, EnglishFontScale, scale);
 
     private static VoiceLineSettings Load(string path)
     {
@@ -93,32 +185,81 @@ internal sealed class VoiceLineSettings
                 values[line[..separator].Trim()] = line[(separator + 1)..].Trim();
             }
 
-            return new VoiceLineSettings
-            {
-                Position = ParsePosition(
+            return new VoiceLineSettings(
+                position: ParsePosition(
                     values.TryGetValue("position", out var position) ? position : null
                 ),
-                LanguageMode = ParseLanguageMode(
+                languageMode: ParseLanguageMode(
                     values.TryGetValue("language", out var language) ? language : null
                 ),
-                EnglishFontScale = ParseScale(
+                englishFontScale: ParseScale(
                     values.TryGetValue("englishFontScale", out var englishScale)
                         ? englishScale
                         : null,
-                    1f
+                    DefaultEnglishFontScale
                 ),
-                ChineseFontScale = ParseScale(
+                chineseFontScale: ParseScale(
                     values.TryGetValue("chineseFontScale", out var chineseScale)
                         ? chineseScale
                         : null,
-                    1.1f
-                ),
-            };
+                    DefaultChineseFontScale
+                )
+            );
         }
         catch (Exception ex)
         {
             VoiceSubtitlesLog.Warn($"Failed to load subtitle settings: {ex.Message}");
             return new VoiceLineSettings();
+        }
+    }
+
+    private static void MigrateLegacySettingsBestEffort(string settingsPath, string? legacyPath)
+    {
+        if (
+            string.IsNullOrWhiteSpace(legacyPath)
+            || File.Exists(settingsPath)
+            || !File.Exists(legacyPath)
+        )
+            return;
+
+        try
+        {
+            var settingsDirectory = Path.GetDirectoryName(settingsPath);
+            if (!string.IsNullOrEmpty(settingsDirectory))
+                Directory.CreateDirectory(settingsDirectory);
+
+            File.Copy(legacyPath, settingsPath, overwrite: false);
+            VoiceSubtitlesLog.Info($"Migrated legacy subtitle settings to {settingsPath}.");
+        }
+        catch (Exception ex)
+        {
+            VoiceSubtitlesLog.Warn($"Failed to migrate legacy subtitle settings: {ex.Message}");
+        }
+    }
+
+    private static void WriteSettingsBestEffort(string path, VoiceLineSettings settings)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+                Directory.CreateDirectory(directory);
+
+            File.WriteAllLines(
+                path,
+                new[]
+                {
+                    "position=" + FormatPosition(settings.Position),
+                    "language=" + FormatLanguageMode(settings.LanguageMode),
+                    "englishFontScale=" + FormatScale(settings.EnglishFontScale),
+                    "chineseFontScale=" + FormatScale(settings.ChineseFontScale),
+                },
+                Utf8NoBom
+            );
+        }
+        catch (Exception ex)
+        {
+            VoiceSubtitlesLog.Warn($"Failed to save subtitle settings: {ex.Message}");
         }
     }
 
@@ -132,6 +273,16 @@ internal sealed class VoiceLineSettings
         };
     }
 
+    private static string FormatPosition(SubtitlePosition position)
+    {
+        return position switch
+        {
+            SubtitlePosition.TopRight => "top-right",
+            SubtitlePosition.TopCenter => "top-center",
+            _ => "top-left",
+        };
+    }
+
     private static SubtitleLanguageMode ParseLanguageMode(string? value)
     {
         return value?.Trim().ToLowerInvariant() switch
@@ -139,6 +290,16 @@ internal sealed class VoiceLineSettings
             "chinese" => SubtitleLanguageMode.ChineseOnly,
             "english" => SubtitleLanguageMode.EnglishOnly,
             _ => SubtitleLanguageMode.Both,
+        };
+    }
+
+    private static string FormatLanguageMode(SubtitleLanguageMode mode)
+    {
+        return mode switch
+        {
+            SubtitleLanguageMode.ChineseOnly => "chinese",
+            SubtitleLanguageMode.EnglishOnly => "english",
+            _ => "both",
         };
     }
 
@@ -154,9 +315,19 @@ internal sealed class VoiceLineSettings
             )
         )
         {
-            return Math.Min(2.5f, Math.Max(1f, parsed));
+            return NormalizeScale(parsed);
         }
 
         return fallback;
+    }
+
+    private static float NormalizeScale(float value)
+    {
+        return Math.Min(MaximumFontScale, Math.Max(MinimumFontScale, value));
+    }
+
+    private static string FormatScale(float value)
+    {
+        return NormalizeScale(value).ToString("0.###", CultureInfo.InvariantCulture);
     }
 }
