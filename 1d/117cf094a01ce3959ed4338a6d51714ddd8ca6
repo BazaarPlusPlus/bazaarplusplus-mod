@@ -1,0 +1,32 @@
+tests/PtrCompatibility.Tests/Program.cs
+  s_9b5a71252463f6::t_52191db0c35948 1-171
+docs/drafts/2026-07-03-online-ptr-dual-version-compat.md
+  s_9b5a71252463f6::t_3f241f91cf7a36 120-125
+run.sh
+  s_9b5a71252463f6::t_e839e5d5f7bde7 188-189,194-195,199-203
+  s_9b5a71252463f6::t_b137ae353f71cf 309-310
+  s_9b5a71252463f6::t_ac1f82aed936db 358-359
+  s_9b5a71252463f6::t_1a43fce98939f2 79-98,108-114
+  s_9b5a71252463f6::t_e59d832e9d5223 115,243-297
+  s_9b5a71252463f6::t_85fe560c02d5b8 116
+tests/PtrCompatibility.Tests/PtrCompatibility.Tests.csproj
+  s_9b5a71252463f6::t_0d8f2bcc33cbe9 1-8
+.gitignore
+  s_9b5a71252463f6::t_cd82826c90f4fe 49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "1d117cf094a01ce3959ed4338a6d51714ddd8ca6",
+  "prompts": {},
+  "sessions": {
+    "s_9b5a71252463f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9223b3ee-6187-4278-8611-91fd22d365f5",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  }
+}
