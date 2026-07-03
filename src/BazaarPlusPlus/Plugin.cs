@@ -85,20 +85,54 @@ public class Plugin : BaseUnityPlugin
 
     protected virtual void OnDestroy()
     {
+        RunTeardownSteps();
+        RunTeardownStep("flush logs", BppLog.Flush);
+        BppPatchHost.Reset();
+    }
+
+    // Every step runs in isolation and Harmony is unpatched first: a throw in any single
+    // step must never strand the "patches applied but static utilities uninstalled"
+    // zombie state (patched game code rebuilding UI from reset catalogs).
+    private void RunTeardownSteps()
+    {
+        RunTeardownStep("unpatch Harmony", UnpatchHarmony);
+        RunTeardownStep(
+            "unmount components",
+            () => _composition?.Mountables.UnmountAll(gameObject)
+        );
+        RunTeardownStep(
+            "destroy CombatReplayRuntime",
+            DestroyComponentIfPresent<CombatReplayRuntime>
+        );
+        RunTeardownStep(
+            "dispose composition",
+            () =>
+            {
+                _composition?.Dispose();
+                _composition = null;
+            }
+        );
+        RunTeardownStep("dispose online services", DisposeOnlineServices);
+        RunTeardownStep("uninstall static utilities", UninstallStaticUtilities);
+    }
+
+    private static void RunTeardownStep(string name, Action step)
+    {
         try
         {
-            _composition?.Mountables.UnmountAll(gameObject);
-            DestroyComponentIfPresent<CombatReplayRuntime>();
-            _composition?.Dispose();
-            _composition = null;
-            DisposeOnlineServices();
-            UnpatchHarmony();
+            step();
         }
-        finally
+        catch (Exception ex)
         {
-            UninstallStaticUtilities();
-            BppLog.Flush();
-            BppPatchHost.Reset();
+            try
+            {
+                BppLog.Error("Plugin", $"Teardown step failed: {name}", ex);
+            }
+            catch
+            {
+                // Logging must never break teardown isolation (the log listener may
+                // already be disposed during application quit).
+            }
         }
     }
 
@@ -165,20 +199,40 @@ public class Plugin : BaseUnityPlugin
     private void ApplyHarmonyPatches()
     {
         BppLog.Info("Plugin", "Applying Harmony patches");
-        _harmony.PatchAll();
+        // Patch classes are applied one by one instead of PatchAll(): PatchAll aborts at
+        // the first failing class, leaving earlier classes applied and later ones not —
+        // one broken game target (e.g. after a game update or on the PTR branch) must
+        // degrade only its own feature, never the whole plugin. The flag is set before
+        // the loop so a partial application is always unpatched during teardown.
         _patchesApplied = true;
+        var failedClasses = 0;
+        // GetTypesFromAssembly (not Assembly.GetTypes) tolerates types that fail to load;
+        // CreateClassProcessor(type).Patch() is a no-op for non-patch types, so this
+        // covers exactly PatchAll's discovery set.
+        foreach (var type in AccessTools.GetTypesFromAssembly(typeof(Plugin).Assembly))
+        {
+            try
+            {
+                _harmony.CreateClassProcessor(type).Patch();
+            }
+            catch (Exception ex)
+            {
+                failedClasses++;
+                BppLog.Error("Plugin", $"Harmony patch class failed: {type.FullName}", ex);
+            }
+        }
+
+        if (failedClasses > 0)
+            BppLog.Warn(
+                "Plugin",
+                $"{failedClasses} Harmony patch class(es) failed to apply; the affected features are degraded, everything else continues."
+            );
         BppLog.Info("Plugin", "Harmony patches applied");
     }
 
     private void CleanupFailedInitialization()
     {
-        _composition?.Mountables.UnmountAll(gameObject);
-        DestroyComponentIfPresent<CombatReplayRuntime>();
-        _composition?.Dispose();
-        _composition = null;
-        DisposeOnlineServices();
-        UnpatchHarmony();
-        UninstallStaticUtilities();
+        RunTeardownSteps();
     }
 
     private void DisposeOnlineServices()

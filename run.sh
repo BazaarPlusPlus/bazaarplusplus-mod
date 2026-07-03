@@ -151,10 +151,50 @@ check_ilspy() {
     fi
 }
 
+# Steam beta branches ("public_test_realm" = PTR) replace the single install
+# in place, so the Managed dir silently changes identity on branch switch.
+# Guard so PTR bits never overwrite ./decompiled (online reference) and vice versa.
+# The appmanifest is located by walking up from MANAGED — the directory the DLLs
+# are actually read from — so an overridden BPP_MANAGED_PATH is guarded too.
+installed_steam_branch() {
+    local dir="$MANAGED" acf=""
+    local _i
+    for _i in 1 2 3 4 5 6 7 8 9 10; do
+        dir="$(dirname "$dir")"
+        if [[ -f "$dir/appmanifest_1617400.acf" ]]; then
+            acf="$dir/appmanifest_1617400.acf"
+            break
+        fi
+        [[ "$dir" == "/" || "$dir" == "." ]] && break
+    done
+    [[ -n "$acf" ]] || { echo "unknown"; return; }
+    local key
+    key=$(awk '/"MountedConfig"/,/^\t\}/' "$acf" | awk -F '"' '/"BetaKey"/ {print $4}')
+    echo "${key:-public}"
+}
+
+require_steam_branch() {
+    local expected="$1"
+    [[ "${BPP_SKIP_BRANCH_CHECK:-}" == "1" ]] && return 0
+    local branch
+    branch=$(installed_steam_branch)
+    if [[ "$branch" == "unknown" ]]; then
+        echo -e "${RED}Could not find appmanifest_1617400.acf above the Managed path to verify the Steam branch.${RESET}" >&2
+        echo -e "${RED}Decompiling a bare copied Managed dir? Set BPP_SKIP_BRANCH_CHECK=1 to override.${RESET}" >&2
+        exit 1
+    fi
+    if [[ "$branch" != "$expected" ]]; then
+        echo -e "${RED}Installed Steam branch is '$branch', expected '$expected'.${RESET}" >&2
+        echo -e "${RED}Switch The Bazaar's beta branch in Steam first, or set BPP_SKIP_BRANCH_CHECK=1 to override.${RESET}" >&2
+        exit 1
+    fi
+}
+
 decompile() {
     check_ilspy
     local dll="${2:-Assembly-CSharp}"
-    local out="./decompiled/$dll"
+    local out_root="${BPP_DECOMPILE_OUT:-./decompiled}"
+    local out="$out_root/$dll"
     echo "Decompiling $dll to $out..."
     DOTNET_ROLL_FORWARD=Major ilspycmd -p -o "$out" "$MANAGED/$dll.dll"
     echo "Done: $out"
@@ -175,6 +215,8 @@ Usage:
   $0 format
   $0 decompile [DllName]
   $0 decompile-all
+  $0 decompile-ptr [DllName]
+  $0 decompile-all-ptr
 
 Options:
   --with-bazaaragent  Build and copy the optional BazaarAgent assemblies.
@@ -206,8 +248,22 @@ case "${1:-}" in
         ;;
     test)       test_all ;;
     format)     format ;;
-    decompile)  decompile "$@" ;;
-    decompile-all) decompile_all ;;
+    decompile)
+        require_steam_branch public
+        decompile "$@"
+        ;;
+    decompile-all)
+        require_steam_branch public
+        decompile_all
+        ;;
+    decompile-ptr)
+        require_steam_branch public_test_realm
+        BPP_DECOMPILE_OUT=./decompiled-vptr decompile "$@"
+        ;;
+    decompile-all-ptr)
+        require_steam_branch public_test_realm
+        BPP_DECOMPILE_OUT=./decompiled-vptr decompile_all
+        ;;
     *)
         usage
         exit 1
