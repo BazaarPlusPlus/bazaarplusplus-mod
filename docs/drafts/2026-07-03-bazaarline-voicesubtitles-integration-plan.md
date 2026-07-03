@@ -2,7 +2,7 @@
 
 状态: **FINAL — 交接执行版(已过 8-seam 调研 + 设计 + 两轮独立红队/review,全部 must-fix 已折回并按真实代码核验)**。日期 2026-07-03。
 源: `/Users/yxinyu/codes/bpp/BazaarLine`(独立 BepInEx 插件 `BazaarVoiceLine`, ~2381 LOC,源在 `src/BazaarVoiceLine/`)。
-**in-run 挂载锚点已由用户确认存在**(VO 场景里有可挂的版本 label)——保留 scanner 即可,不再是阻塞项。**唯一未决 provisioning 项**:`bazaarline-installer.bazaarplusplus.com` 的 R2 桶尚未在任何仓库配置中出现,发布端点需先搭好再上传(见「数据产物与交接」)。种子已生成并入库,mod 端可先靠 embedded 种子跑通。
+**in-run 挂载锚点已由用户确认存在**(VO 场景里有可挂的版本 label)——保留 scanner 即可,不再是阻塞项。**远端拉取端点已上线并验证**:`voice-lines.json` 已发布到 R2 桶 `bazaarline-installer`、key `data/voice-lines.json`,公网 `https://bazaarline-installer.bazaarplusplus.com/data/voice-lines.json` 返回 200 + 黄金 hash(见「数据产物与交接」)。**无遗留阻塞项**;PR4 的远端逻辑可端到端验证。
 
 ## 目标
 
@@ -153,7 +153,8 @@ BazaarLine `Plugin.cs`、`MyPluginInfo/BepInPlugin`、`src/BazaarVoiceLine/Patch
 
 - **转换/发布脚本**:见文末**附录**(全文,已入库)。源 = BazaarLine `src/BazaarVoiceLine/Data/voice-lines.csv`。已实现 schemaVersion 1 + 上面定死的 contentHash 规范化;可重跑,contentHash 稳定(不含 `generatedAt`)。本机另有一份 `tools/voice-subtitles/build_voice_lines.py`(`tools/` 被 `.gitignore` 忽略,故正本在附录)。
 - **已生成种子**:`src/BazaarPlusPlus/Data/VoiceSubtitles/voice-lines.json`(5032 行,0 丢弃,~954KB,`sha256:0bb0ce57…`)。PR2 直接把它标 `<EmbeddedResource>` 即可。
-- **⚠️ 未决 provisioning(唯一挡在"能远端更新"前的项)**:拉取源 `https://bazaarline-installer.bazaarplusplus.com/data/voice-lines.json` 的 R2 桶 + 自定义域**尚未在任何仓库配置中出现**,需先在 Cloudflare 侧搭好(建桶 + 绑自定义域),再用该站部署方式(`wrangler r2 object put …` 或 Pages)把 `voice-lines.json` 传上去。**在此之前**:mod 端靠 embedded 种子完全可跑(远端拉取是刷新,非硬依赖);PR4 的远端逻辑可先写好、指向该 URL,待端点就绪即生效。上传时用**同一套** contentHash 规范(脚本已保证)。
+- **✅ 远端端点已上线并验证**(2026-07-03):`voice-lines.json` 已发布到 R2 桶 `bazaarline-installer` / key `data/voice-lines.json`,公网 `https://bazaarline-installer.bazaarplusplus.com/data/voice-lines.json` 返回 `200` + `content-type: application/json; charset=utf-8` + `cache-control: public, max-age=300, stale-while-revalidate=3600`,body `count=5032`、`contentHash` 匹配黄金值。mod 端靠 embedded 种子亦可离线跑通(远端是刷新,非硬依赖)。
+  - **重新发布**:改数据后跑附录脚本重生成 → 再传同一 bucket/key。**注意**本机 `wrangler` 的 OAuth token **无 R2 scope**(只有 workers/kv/d1),`wrangler r2 object put` 会失败;用 R2 S3 凭据上传(`bazaarplusplus-analyzers/.env` 里的 `BPP_CF_ACCOUNT_ID`/`BPP_R2_ACCESS_KEY_ID`/`BPP_R2_SECRET_ACCESS_KEY`,S3 endpoint `https://<account>.r2.cloudflarestorage.com`,boto3 `put_object`,content-type/cache-control 同上),或给 wrangler 补 R2 scope。
 
 ## 交接给实现 Agent 的执行顺序
 
