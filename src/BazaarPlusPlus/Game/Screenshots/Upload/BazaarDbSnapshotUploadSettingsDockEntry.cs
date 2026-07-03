@@ -29,6 +29,9 @@ internal sealed class BazaarDbSnapshotUploadSettingsDockEntry : ISettingsDockEnt
         var entry = config.BazaarDbUploadEnabled;
         if (entry != null)
             entry.Value = enabled;
+
+        if (enabled)
+            EndOfRunScreenshotSettingsPolicy.ForceEnabled(config);
     }
 
     private static void OnEnabledChanged(bool enabled)

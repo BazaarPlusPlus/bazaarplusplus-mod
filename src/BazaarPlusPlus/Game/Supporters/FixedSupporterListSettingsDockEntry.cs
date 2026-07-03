@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.Supporters;
@@ -27,5 +28,8 @@ internal sealed class FixedSupporterListSettingsDockEntry : ISettingsDockEntry
         var entry = config.UseFixedSupporterListConfig;
         if (entry != null)
             entry.Value = enabled;
+
+        if (enabled)
+            EndOfRunScreenshotSettingsPolicy.ForceEnabled(config);
     }
 }

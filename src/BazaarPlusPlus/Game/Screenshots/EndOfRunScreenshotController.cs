@@ -398,7 +398,9 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private bool IsEndOfRunScreenshotEnabled()
     {
-        return _services?.Config.EndOfRunScreenshotEnabledConfig?.Value ?? true;
+        return _services != null
+            ? EndOfRunScreenshotSettingsPolicy.IsEnabledOrForced(_services.Config)
+            : true;
     }
 
     private void ResetBufferedRunContext()

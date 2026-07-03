@@ -214,6 +214,93 @@ public class SettingsDockRegistryTests
         }
     }
 
+    [Theory]
+    [InlineData("BazaarDbUpload")]
+    [InlineData("StreamMode")]
+    public void EnablingUploadOrStreamMode_forcesEndOfRunScreenshotOn(string dependencyKey)
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-screenshot-dependency-settings-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            config.EndOfRunScreenshotEnabledConfig!.Value = false;
+
+            var screenshotDefinition = new EndOfRunScreenshotSettingsDockEntry().Build(config);
+            var dependencyDefinition =
+                dependencyKey == "BazaarDbUpload"
+                    ? new BazaarDbSnapshotUploadSettingsDockEntry().Build(config)
+                    : new FixedSupporterListSettingsDockEntry().Build(config);
+
+            Assert.False(screenshotDefinition.IsActive());
+            Assert.Equal("OFF", screenshotDefinition.ResolveStatus("en"));
+
+            dependencyDefinition.Activate();
+
+            Assert.True(config.EndOfRunScreenshotEnabledConfig.Value);
+            Assert.True(screenshotDefinition.IsActive());
+            Assert.Equal("ON", screenshotDefinition.ResolveStatus("en"));
+
+            dependencyDefinition.Activate();
+
+            Assert.True(config.EndOfRunScreenshotEnabledConfig.Value);
+            Assert.True(screenshotDefinition.IsActive());
+            Assert.Equal("ON", screenshotDefinition.ResolveStatus("en"));
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Theory]
+    [InlineData("BazaarDbUpload")]
+    [InlineData("StreamMode")]
+    public void EndOfRunScreenshotDockEntry_doesNotTurnOffWhileUploadOrStreamModeIsOn(
+        string dependencyKey
+    )
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-screenshot-forced-on-settings-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            config.EndOfRunScreenshotEnabledConfig!.Value = true;
+
+            if (dependencyKey == "BazaarDbUpload")
+                config.BazaarDbUploadEnabled!.Value = true;
+            else
+                config.UseFixedSupporterListConfig!.Value = true;
+
+            var screenshotDefinition = new EndOfRunScreenshotSettingsDockEntry().Build(config);
+
+            Assert.True(screenshotDefinition.IsActive());
+            Assert.Equal("ON", screenshotDefinition.ResolveStatus("en"));
+
+            screenshotDefinition.Activate();
+
+            Assert.True(config.EndOfRunScreenshotEnabledConfig.Value);
+            Assert.True(screenshotDefinition.IsActive());
+            Assert.Equal("ON", screenshotDefinition.ResolveStatus("en"));
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
     [Fact]
     public void FixedSupporterListDockEntry_uses_stream_mode_key_and_toggles_config()
     {

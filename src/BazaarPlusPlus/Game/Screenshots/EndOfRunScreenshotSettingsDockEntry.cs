@@ -12,14 +12,25 @@ internal sealed class EndOfRunScreenshotSettingsDockEntry : ISettingsDockEntry
         new(
             "EndOfRunScreenshot",
             EndOfRunScreenshotSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                () => ReadEnabled(config),
-                enabled => WriteEnabled(config, enabled)
-            )
+            _ => EndOfRunScreenshotSettingsPolicy.IsEnabledOrForced(config) ? "ON" : "OFF",
+            () => EndOfRunScreenshotSettingsPolicy.IsEnabledOrForced(config),
+            () => ToggleEnabled(config),
+            collapseAfterActivate: false
         );
 
     private static bool ReadEnabled(IBppConfig config) =>
         config.EndOfRunScreenshotEnabledConfig?.Value ?? true;
+
+    private static void ToggleEnabled(IBppConfig config)
+    {
+        if (EndOfRunScreenshotSettingsPolicy.IsForcedOn(config))
+        {
+            EndOfRunScreenshotSettingsPolicy.ForceEnabled(config);
+            return;
+        }
+
+        WriteEnabled(config, !ReadEnabled(config));
+    }
 
     private static void WriteEnabled(IBppConfig config, bool enabled)
     {
