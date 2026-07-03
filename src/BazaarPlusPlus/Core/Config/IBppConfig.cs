@@ -12,6 +12,8 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? EnableCombatStatusBarConfig { get; }
 
+    ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; }
+
     ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; }
 
     ConfigEntry<bool>? EndOfRunScreenshotEnabledConfig { get; }

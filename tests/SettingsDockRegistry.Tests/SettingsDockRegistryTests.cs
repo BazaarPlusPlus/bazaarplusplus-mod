@@ -9,6 +9,7 @@ using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.Localization;
 using BepInEx.Configuration;
 using Xunit;
@@ -259,6 +260,45 @@ public class SettingsDockRegistryTests
         }
     }
 
+    [Fact]
+    public void VoiceSubtitlesDockEntry_defaults_off_and_toggles_config()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-voice-subtitles-settings-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var entry = new VoiceSubtitlesSettingsDockEntry();
+
+            var definition = entry.Build(config);
+
+            Assert.Equal(BppSettingsDockOrder.VoiceSubtitles, entry.Order);
+            Assert.Equal("VoiceSubtitles", definition.Key);
+            Assert.Equal("Voice Subtitles", definition.ResolveLabel("en"));
+            Assert.Equal("语音字幕", definition.ResolveLabel("zh-CN"));
+            Assert.False(config.EnableVoiceSubtitlesConfig!.Value);
+            Assert.False(definition.IsActive());
+            Assert.Equal("OFF", definition.ResolveStatus("en"));
+
+            definition.Activate();
+
+            Assert.True(config.EnableVoiceSubtitlesConfig.Value);
+            Assert.True(definition.IsActive());
+            Assert.Equal("ON", definition.ResolveStatus("en"));
+            Assert.False(definition.CollapseAfterActivate);
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
     [Theory]
     [InlineData("zh-CN", "https://bazaarplusplus.com/tutorial")]
     [InlineData("zh-Hant", "https://bazaarplusplus.com/tutorial")]
@@ -328,6 +368,10 @@ public class SettingsDockRegistryTests
             new FixedSupporterListSettingsDockEntry().Order
         );
         Assert.Equal(
+            BppSettingsDockOrder.VoiceSubtitles,
+            new VoiceSubtitlesSettingsDockEntry().Order
+        );
+        Assert.Equal(
             BppSettingsDockOrder.BazaarDbUpload,
             new BazaarDbSnapshotUploadSettingsDockEntry().Order
         );
@@ -341,6 +385,7 @@ public class SettingsDockRegistryTests
         registry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
         registry.Register(new HotkeyTutorialSettingsDockEntry());
         registry.Register(new FixedSupporterListSettingsDockEntry());
+        registry.Register(new VoiceSubtitlesSettingsDockEntry());
         registry.Register(new EndOfRunScreenshotSettingsDockEntry());
         registry.Register(new ChineseLocaleModeSettingsDockEntry(new InMemoryBppEventBus()));
 
@@ -353,6 +398,7 @@ public class SettingsDockRegistryTests
                 {
                     "ChineseLocaleMode",
                     "StreamMode",
+                    "VoiceSubtitles",
                     "HotkeyTutorial",
                     "EndOfRunScreenshot",
                     "BazaarDbUpload",

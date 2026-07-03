@@ -14,6 +14,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
 
+    public ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; private set; }
+
     public ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; private set; }
 
     public ConfigEntry<bool>? EndOfRunScreenshotEnabledConfig { get; private set; }
@@ -59,6 +61,12 @@ internal sealed class BppConfig : IBppConfig
             "Enabled",
             false,
             "Whether to show the combat status bar with elapsed time, speed controls, and pause controls"
+        );
+        EnableVoiceSubtitlesConfig = config.Bind(
+            "VoiceSubtitles",
+            "Enabled",
+            false,
+            "Whether to show bilingual voice-over subtitles."
         );
         CombatStatusBarSpeedMultiplierConfig = config.Bind(
             "CombatStatusBar",

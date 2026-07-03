@@ -23,6 +23,7 @@ using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Game.Upload;
+using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.ModApi.Clients;
@@ -100,6 +101,7 @@ internal sealed class BppComposition : IDisposable
 
         _settingsDockRegistry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
         _settingsDockRegistry.Register(new FixedSupporterListSettingsDockEntry());
+        _settingsDockRegistry.Register(new VoiceSubtitlesSettingsDockEntry());
         _settingsDockRegistry.Register(new HotkeyTutorialSettingsDockEntry());
         _settingsDockRegistry.Register(new ChineseLocaleModeSettingsDockEntry(_eventBus));
         _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());

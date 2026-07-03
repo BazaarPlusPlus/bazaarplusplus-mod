@@ -11,7 +11,8 @@ internal static class BppSettingsDockOrder
     internal const int CombatStatusBar = 4;
     internal const int ChineseLocaleMode = 5;
     internal const int FixedSupporterList = 6;
-    internal const int HotkeyTutorial = 7;
-    internal const int EndOfRunScreenshot = 8;
-    internal const int BazaarDbUpload = 9;
+    internal const int VoiceSubtitles = 7;
+    internal const int HotkeyTutorial = 8;
+    internal const int EndOfRunScreenshot = 9;
+    internal const int BazaarDbUpload = 10;
 }
