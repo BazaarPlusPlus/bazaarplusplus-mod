@@ -1,0 +1,28 @@
+src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildPanel.cs
+  s_bbb82a74dc91f8::t_d7de6d669965bd 67
+src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/BuildRecommendationRepository.cs
+  s_bbb82a74dc91f8::t_568de29fb7c96f 51
+  s_bbb82a74dc91f8::t_23b1ba1181e3b9 460,462-465
+  s_bbb82a74dc91f8::t_471995cd7778ee 253
+  s_bbb82a74dc91f8::t_da10019a4ad455 604
+  s_bbb82a74dc91f8::t_fffde80eb65d77 625
+  s_bbb82a74dc91f8::t_f97158ad0d2b34 642
+  s_bbb82a74dc91f8::t_08e3ebf8b524d0 654
+  s_bbb82a74dc91f8::t_11a6ada17f3378 218-252,254-274,279-280,282,284-298
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "316e6b12c444c843ec4f78a535701a3dd45ab5b1",
+  "prompts": {},
+  "sessions": {
+    "s_bbb82a74dc91f8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0c35fab1-f9f2-402d-b598-4847686cccfe",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  }
+}
