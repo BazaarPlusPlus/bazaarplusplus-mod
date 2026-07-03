@@ -1,0 +1,37 @@
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesGate.cs
+  s_b160f8aa8fb5f5::t_485fed09fabfcb 1-12
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesSettingsDockEntry.cs
+  s_b160f8aa8fb5f5::t_485fed09fabfcb 1-30
+tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs
+  s_b160f8aa8fb5f5::t_71cda55fe1648a 388
+  s_b160f8aa8fb5f5::t_6d54d30f8935af 12,263-301,370-373,401
+src/BazaarPlusPlus/Core/Config/IBppConfig.cs
+  s_b160f8aa8fb5f5::t_485fed09fabfcb 15-16
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesSettingsMenuLabel.cs
+  s_b160f8aa8fb5f5::t_485fed09fabfcb 1-14
+src/BazaarPlusPlus/Core/Config/BppConfig.cs
+  s_b160f8aa8fb5f5::t_485fed09fabfcb 17-18,65-69
+  s_b160f8aa8fb5f5::t_d700325f20514f 70
+src/BazaarPlusPlus/BppComposition.cs
+  s_b160f8aa8fb5f5::t_485fed09fabfcb 26,104
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs
+  s_b160f8aa8fb5f5::t_485fed09fabfcb 14-17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "7e97f9e49649f4134f0ccde4581eede5aa401b6a",
+  "prompts": {},
+  "sessions": {
+    "s_b160f8aa8fb5f5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f28d7-c5bd-7191-a973-4663b6c18c90",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
