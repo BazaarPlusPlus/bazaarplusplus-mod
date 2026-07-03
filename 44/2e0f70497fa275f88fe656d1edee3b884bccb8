@@ -1,0 +1,44 @@
+src/BazaarPlusPlus/Patches/NetMessageDispatchSeam.cs
+  s_9b5a71252463f6::t_41abbfdc2e20d8 1-42
+src/BazaarPlusPlus/Plugin.cs
+  s_9b5a71252463f6::t_0b8b361115a383 127-135
+  s_9b5a71252463f6::t_73556e66f14385 87-119,123,125,202-206,208-229,235
+src/BazaarPlusPlus/Patches/Lobby/RandomHeroSkinPoolPatches.cs
+  s_9b5a71252463f6::t_73556e66f14385 41-68
+src/BazaarPlusPlus/Patches/Combat/CombatReplayCapturePatch.cs
+  s_9b5a71252463f6::t_9251da054101f0 3,11,14-15,17,19-21
+docs/drafts/2026-07-03-online-ptr-dual-version-compat.md
+  s_9b5a71252463f6::t_7259226742810e 49-52
+  s_9b5a71252463f6::t_f7805cf923c682 60-62
+  s_9b5a71252463f6::t_eb183068147b50 129
+  s_9b5a71252463f6::t_2d81eccec91d43 117
+  s_9b5a71252463f6::t_73934a9577e5bf 46-48
+  s_9b5a71252463f6::t_39c36b4934c74a 53-55,57-59
+  s_9b5a71252463f6::t_3a2e2023770482 63-65,114-116
+  s_9b5a71252463f6::t_6134e8a24f6af6 118-120,126-128
+  s_9b5a71252463f6::t_c05edb92279ef0 130-132
+  s_9b5a71252463f6::t_1e34bce386680a 1-45,56,66-113,121-125,133-161
+run.sh
+  s_9b5a71252463f6::t_6d1d920dbe0ce0 181,184-185
+  s_9b5a71252463f6::t_73556e66f14385 154-156,159,171-180,186-192,196-197,218-219,251-266
+  s_9b5a71252463f6::t_5475eb84a00281 182-183
+  s_9b5a71252463f6::t_f836f47b4234f9 157-158,160-170
+src/BazaarPlusPlus/Patches/RunLogging/RunInitializedPatch.cs
+  s_9b5a71252463f6::t_487f4acf8b5298 3,11,14-15,17,19-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.9",
+  "base_commit_sha": "442e0f70497fa275f88fe656d1edee3b884bccb8",
+  "prompts": {},
+  "sessions": {
+    "s_9b5a71252463f6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9223b3ee-6187-4278-8611-91fd22d365f5",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  }
+}
