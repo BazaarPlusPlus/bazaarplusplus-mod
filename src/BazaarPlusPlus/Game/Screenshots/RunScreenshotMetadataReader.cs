@@ -9,7 +9,8 @@ internal static class RunScreenshotMetadataReader
 {
     public static RunScreenshotRecord CreateRecord(
         ScreenshotCaptureResult capture,
-        bool isPrimary = false
+        bool isPrimary = false,
+        string? buildChannel = null
     )
     {
         BppClientCacheBridge.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
@@ -34,6 +35,7 @@ internal static class RunScreenshotMetadataReader
             PlayerRating = playerRating,
             PlayerPosition = playerPosition,
             VictoriesAtCapture = Data.Run == null ? null : unchecked((int)Data.Run.Victories),
+            BuildChannel = buildChannel,
         };
     }
 }

@@ -18,6 +18,7 @@ internal sealed class BppRuntimeServices : IBppServices
         IRunContext runContext,
         IGameStateProbe gameStateProbe,
         IEncounterStateProbe encounterState,
+        IGameBuildInfo gameBuild,
         ManualLogSource logger
     )
     {
@@ -27,6 +28,7 @@ internal sealed class BppRuntimeServices : IBppServices
         RunContext = runContext ?? throw new ArgumentNullException(nameof(runContext));
         GameStateProbe = gameStateProbe ?? throw new ArgumentNullException(nameof(gameStateProbe));
         EncounterState = encounterState ?? throw new ArgumentNullException(nameof(encounterState));
+        GameBuild = gameBuild ?? throw new ArgumentNullException(nameof(gameBuild));
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -36,5 +38,6 @@ internal sealed class BppRuntimeServices : IBppServices
     public IRunContext RunContext { get; }
     public IGameStateProbe GameStateProbe { get; }
     public IEncounterStateProbe EncounterState { get; }
+    public IGameBuildInfo GameBuild { get; }
     public ManualLogSource Logger { get; }
 }

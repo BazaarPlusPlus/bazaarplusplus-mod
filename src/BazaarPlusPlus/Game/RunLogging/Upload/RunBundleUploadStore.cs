@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
@@ -43,6 +44,7 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
             WHERE s.dirty = 1
               AND r.completed = 1
               AND r.game_mode = '{RunLogSchema.GameModeRanked}'
+              AND (r.build_channel IS NULL OR r.build_channel <> '{nameof(GameBuildChannel.Ptr)}')
             ORDER BY s.retry_count ASC,
                      s.last_attempt_at_utc ASC,
                      s.run_id ASC
@@ -70,6 +72,7 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
             WHERE s.dirty = 1
               AND r.completed = 1
               AND r.game_mode = '{RunLogSchema.GameModeRanked}'
+              AND (r.build_channel IS NULL OR r.build_channel <> '{nameof(GameBuildChannel.Ptr)}')
             LIMIT 1;
             """;
         return command.ExecuteScalar() != null;

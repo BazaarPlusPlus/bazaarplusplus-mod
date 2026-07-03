@@ -5,6 +5,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarPlusPlus.Core.RunContext;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Storage.RunLog;
 using TheBazaar;
@@ -14,11 +15,21 @@ namespace BazaarPlusPlus.Game.RunLogging;
 internal static class RunLoggingGameDataReader
 {
     private static IRunContext? _runContext;
+    private static string? _buildChannel;
 
-    public static void Install(IRunContext runContext) =>
+    public static void Install(IRunContext runContext, IGameBuildInfo gameBuild)
+    {
         _runContext = runContext ?? throw new ArgumentNullException(nameof(runContext));
+        _buildChannel = (
+            gameBuild ?? throw new ArgumentNullException(nameof(gameBuild))
+        ).Channel.ToString();
+    }
 
-    public static void Reset() => _runContext = null;
+    public static void Reset()
+    {
+        _runContext = null;
+        _buildChannel = null;
+    }
 
     private static IRunContext RunContext =>
         _runContext
@@ -47,6 +58,7 @@ internal static class RunLoggingGameDataReader
             PlayerRating = GetCurrentPlayerRating(),
             Day = (int?)Data.Run.Day,
             Hour = GetCurrentRunHour(),
+            BuildChannel = _buildChannel,
         };
         return true;
     }

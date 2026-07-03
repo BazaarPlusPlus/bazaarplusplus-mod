@@ -76,7 +76,7 @@ The Bazaar 当前同时存在 online（public 分支）与 PTR（`public_test_re
 - `GameInterop/GameBuildInfoResolver.cs`：在 `BppComposition` 构造期解析一次。实现注意：进 `IBppServices` 意味着同时改 `IBppServices.cs`、`BppRuntimeServices` 的定位参数构造器（`BppRuntimeServices.cs:13-30`）和 `BppComposition.cs:80-88` 调用点，resolver 须在 `:80` 之前构造完成；patch 经 `BppPatchHost`（`Plugin.cs:49` 先于 `:53` 安装）可达。
   - **主判据**：`Application.version` 含 `-ptr` token（`IndexOf("-ptr", OrdinalIgnoreCase)`）。mod 已有读该 API 的先例（`MainMenuVersionLabelUpdater.cs:20`）。
   - **旁证探针**：`AccessTools.Inner(typeof(TheBazaar.Config), "ServerOption") != null`（PTR 独有嵌套类；online `decompiled/TheBazaar/Config.cs` 无，PTR 有）。
-  - 两者不一致 → log Warning、以版本串为准；版本串不可读 → `Unknown`，按 Online 行为处理并告警（保证 online 永不因识别失败而变行为）。
+  - 两者不一致 → **判 Ptr** 并高声告警（评审修订：把 PTR 误判成 Online 会静默污染生产数据且无告警；把 Online 误判成 Ptr 只是暂停上传，analyzers 的 staleness 告警会很快暴露——失败方向选可被监控发现的那边）；版本串不可读 → 信探针并告警；两个信号都失效 → `Unknown`，策略门按 Online 行为处理并告警。
   - **两个待取证假设**（§6 验证项，L4 接线前必须确认）：(a) chainloader-Awake 时点 `Application.version` 可读（先例在场景内读取，Awake 时点未经证明）；(b) online 版本串确实无 `-ptr` 形状 token。两者用同一根启动日志线在**两个分支上各确认一次**即闭环。
   - 不采用 Steam acf `BetaKey`（反映订阅而非运行中的二进制，跨平台路径脆弱）；不采用 `Config.NetURL`（`SetupCommandArgs` 前为 null，有时序竞态）。
 - 启动时打一行 `BppLog.Info("Plugin", $"Game build: {RawVersion} → {Channel}")`，以后所有 PTR 排障从这行开始。
@@ -127,7 +127,7 @@ PTR 是不同的卡池/平衡/服务器，数据混入会污染 V4 服务端、a
 ## 5. 实施顺序（PR 切分）
 
 1. **PR1（核心，恢复 PTR；本次会话已实现，待双版本测试）**：L0 `NetMessageDispatchSeam` 形态路由 + L1 逐类 patch/flag/拆卸对称（含 teardown 日志调用自身的异常防护）+ B2 `Prepare()` 跳过 + run.sh（decompile-ptr / MANAGED 推导的分支守卫）。预期效果：PTR 三症状全消，RandomHeroSkinPool 单功能降级留日志。
-2. **PR2**：L2 `IGameBuildInfo` + L4 行级 channel 标记（schema additive 列）+ 策略门接线 + 启动日志。
+2. **PR2（已实现，2026-07-03）**：L2 `IGameBuildInfo`（`Core/Runtime/IGameBuildInfo.cs` + `GameInterop/GameBuildInfoResolver.cs`，入 `IBppServices.GameBuild`）+ L4 行级标记（`runs`/`run_screenshots` 新增 `build_channel` 列，schema v17，`EnsureInitialized` 内 ALTER 补列；录制时打标）+ 上传双闸（`BackgroundUploadPump.Initialize` PTR 直接不激活 feed；run bundle 与 BazaarDB 快照共 5 处枚举 SQL 排除 `build_channel='Ptr'` 行）+ 启动日志。按用户拍板：**只禁上传**，ghost 拉取/十胜推荐/图鉴等全部保留。注：PR1→PR2 之间在 PTR 上录的行无标记（NULL 按可上传处理），但 run bundle 枚举本就只挑 Ranked——实测该窗口只有 1 条 Unranked 行，无污染风险；**切回 online 前的一次性回填**（评审 CONFIRMED：截图路径没有 Ranked 门，窗口期的 NULL 截图行会漏传 BazaarDB）：`UPDATE runs SET build_channel='Ptr' WHERE started_at_utc >= '<PTR安装日>' AND build_channel IS NULL;` + `UPDATE run_screenshots SET build_channel='Ptr' WHERE captured_at_utc >= '<PTR安装日>' AND build_channel IS NULL;`（2026-07-03 16:55 实测：窗口内 1 条 Unranked run、0 条截图、0 条 pending 上传——当前无泄漏，但会话仍在进行）。
 3. **PR3**：L5 的 snapshot-managed / Release 钉定 / build-matrix / PtrCompatibility.Tests。
 4. **PR4（收敛触发或按需）**：RandomHeroSkinPool 完整 PTR 适配（新挂点 `CosmeticsPanelController`、`__instance` 适配、B3 行为验证）。
 
