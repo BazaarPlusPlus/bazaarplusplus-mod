@@ -13,7 +13,6 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 internal static class VoiceLineDisplay
 {
     private static GameObject? _labelRoot;
-    private static TextMeshProUGUI? _combinedLabel;
     private static TextMeshProUGUI? _englishLabel;
     private static Text? _chineseUiLabel;
     private static TMP_FontAsset? _subtitleFont;
@@ -199,7 +198,6 @@ internal static class VoiceLineDisplay
             UnityEngine.Object.Destroy(_labelRoot);
 
         _labelRoot = null;
-        _combinedLabel = null;
         _englishLabel = null;
         _chineseUiLabel = null;
         _subtitleFont = null;
@@ -296,10 +294,7 @@ internal static class VoiceLineDisplay
         {
             var settings = VoiceLineSettings.Current;
             ConfigureRect(_sourceRect, CurrentRectTransform!, settings.Position);
-            if (_combinedLabel != null)
-                ConfigureCombinedText(_sourceLabel, _combinedLabel, settings);
-            else
-                ConfigureSplitText(_sourceLabel, _englishLabel, _chineseUiLabel, settings);
+            ConfigureSplitText(_sourceLabel, _englishLabel, _chineseUiLabel, settings);
             return true;
         }
         catch (Exception ex)
@@ -345,42 +340,6 @@ internal static class VoiceLineDisplay
             Math.Max(source.sizeDelta.x, 760f),
             Math.Max(source.sizeDelta.y * 2.8f, 64f)
         );
-    }
-
-    private static void ConfigureCombinedText(
-        TextMeshProUGUI source,
-        TextMeshProUGUI target,
-        VoiceLineSettings settings
-    )
-    {
-        var font = _subtitleFont ?? source.font;
-        if (font != null)
-            target.font = font;
-
-        target.fontStyle = source.fontStyle;
-        target.characterSpacing = source.characterSpacing;
-        target.wordSpacing = source.wordSpacing;
-        target.paragraphSpacing = source.paragraphSpacing;
-        target.enableAutoSizing = source.enableAutoSizing;
-        target.fontSizeMin = source.fontSizeMin;
-        target.fontSizeMax = source.fontSizeMax;
-        target.text = string.Empty;
-        target.alignment = settings.Position switch
-        {
-            SubtitlePosition.TopRight => TextAlignmentOptions.TopRight,
-            SubtitlePosition.TopCenter => TextAlignmentOptions.Top,
-            _ => TextAlignmentOptions.TopLeft,
-        };
-        // Wrap + Overflow (was NoWrap + Ellipsis): a scaled English line must wrap within the box
-        // instead of being ellipsis-truncated to "…" (or, on vertical overflow, collapsing the whole
-        // string to a leading ellipsis). Overflow keeps every line rendered even past the fixed box.
-        target.textWrappingMode = TextWrappingModes.Normal;
-        target.overflowMode = TextOverflowModes.Overflow;
-        target.richText = true;
-        target.raycastTarget = false;
-        target.fontSize = Math.Max(source.fontSize, 16f);
-        target.lineSpacing = 8f;
-        target.color = new Color(1f, 0.96f, 0.84f, 0.96f);
     }
 
     private static void ConfigureSplitText(
@@ -501,13 +460,6 @@ internal static class VoiceLineDisplay
 
     private static void ApplyText(DisplayText text)
     {
-        if (_combinedLabel != null)
-        {
-            _combinedLabel.text = BuildCombinedText(text);
-            _combinedLabel.gameObject.SetActive(!text.IsEmpty);
-            return;
-        }
-
         var englishBlockHeight = Math.Abs(_secondLineOffset);
         if (_englishLabel != null)
         {
@@ -537,9 +489,6 @@ internal static class VoiceLineDisplay
 
     private static string RendererDescription()
     {
-        if (_combinedLabel != null)
-            return $"combined=TextMeshProUGUI font={FontDiagnostics.DescribeFont(_combinedLabel.font)}";
-
         return "english=TextMeshProUGUI "
             + $"font={FontDiagnostics.DescribeFont(_englishLabel?.font)} "
             + $"chinese={ChineseRendererDescription()}";
@@ -555,24 +504,6 @@ internal static class VoiceLineDisplay
         }
 
         return "<none>";
-    }
-
-    private static string BuildCombinedText(DisplayText text)
-    {
-        var settings = VoiceLineSettings.Current;
-
-        if (string.IsNullOrEmpty(text.English))
-            return BuildSizedLine(text.Chinese, settings.ChineseFontScale);
-        if (string.IsNullOrEmpty(text.Chinese))
-            return BuildSizedLine(text.English, settings.EnglishFontScale);
-
-        return $"{BuildSizedLine(text.English, settings.EnglishFontScale)}\n{BuildSizedLine(text.Chinese, settings.ChineseFontScale)}";
-    }
-
-    private static string BuildSizedLine(string value, float scale)
-    {
-        var percent = (int)Math.Round(scale * 100f);
-        return $"<size={percent}%>{value}</size>";
     }
 
     private static string DescribeVersionLabel(TextMeshProUGUI? label)
