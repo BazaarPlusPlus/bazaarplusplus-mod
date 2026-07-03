@@ -1,0 +1,39 @@
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs
+  s_b160f8aa8fb5f5::t_2cc853b6218860 15-21
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesSettingsDockEntry.cs
+  s_b160f8aa8fb5f5::t_7ee74ffc65269c 57
+  s_b160f8aa8fb5f5::t_2db22d9a1543a8 2-3,6-7,25-36,47-56,58-237
+src/BazaarPlusPlus/BppComposition.cs
+  s_b160f8aa8fb5f5::t_f58928cb70f981 107
+tests/VoiceSubtitles.Tests/VoiceSubtitlesTests.cs
+  s_b160f8aa8fb5f5::t_da8e4a8902e029 147-158,160-233,393-395,400-403,407-412
+  s_b160f8aa8fb5f5::t_7ee74ffc65269c 159,396-399,404-406
+  s_b160f8aa8fb5f5::t_9ccf31263d13ce 413
+src/BazaarPlusPlus/Game/VoiceSubtitles/Settings/VoiceLineSettings.cs
+  s_b160f8aa8fb5f5::t_651432a1037625 7,29-35,39-40,43-59,65-69,73-74,76-79,81-84,86,88-89,91-93,97-100,102-107,109-112,114-119,121-122,126-129,133-134,136-147,149-151,188-189,192,195,199,201,205-207,216-265,276-285,296-305,318,323-332
+  s_b160f8aa8fb5f5::t_46c43e8b75b8df 75,80,85,90,155-165
+  s_b160f8aa8fb5f5::t_f72d9d2258d06b 41,108,120
+  s_b160f8aa8fb5f5::t_7ee74ffc65269c 130-132
+  s_b160f8aa8fb5f5::t_a4181fc19835c3 87,166
+tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs
+  s_b160f8aa8fb5f5::t_39bc81a05ae3ac 13,303-309,311-359,361-386,459-474,489,503-506
+  s_b160f8aa8fb5f5::t_7ee74ffc65269c 310,360
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "e7969047e2c18e94d77ee60fc6d093be385db357",
+  "prompts": {},
+  "sessions": {
+    "s_b160f8aa8fb5f5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f28d7-c5bd-7191-a973-4663b6c18c90",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
