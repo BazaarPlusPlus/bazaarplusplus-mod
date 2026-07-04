@@ -1,0 +1,32 @@
+src/BazaarPlusPlus/Game/CollectionPanel/Sources/CollectionSourceOfferPoolResolver.cs
+  s_741548fcfd6a90::t_3585f25134f378 178-180,194-216
+  s_741548fcfd6a90::t_d4afddb44b3ec1 217
+src/BazaarPlusPlus/Data/CollectionSources/collection-sources.json
+  s_741548fcfd6a90::t_fb29f2dbcebeac 610-611,613-638,788-811
+  s_741548fcfd6a90::t_6a0225ec32eae0 612
+tests/CollectionSourceFiltering.Tests/Program.cs
+  s_741548fcfd6a90::t_0ec8a665737cf1 568-569
+  s_741548fcfd6a90::t_2f2266a32f584c 461
+  s_741548fcfd6a90::t_bffbd4c2f95e44 299,301,304,306,388-460,462-496
+  s_741548fcfd6a90::t_7ad7294859c0d5 497,987-1038
+src/BazaarPlusPlus/Game/CollectionPanel/Sources/CollectionSourceEnums.cs
+  s_741548fcfd6a90::t_7960610eb3fb09 17
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "7ddfb8ff1b1bcb59558642756c08722cfa5a4496",
+  "prompts": {},
+  "sessions": {
+    "s_741548fcfd6a90": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f2bd8-fb4e-7f43-bbcd-8e26235138e4",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
