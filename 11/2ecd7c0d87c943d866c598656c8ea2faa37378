@@ -1,0 +1,31 @@
+tests/VoiceSubtitles.Tests/VoiceSubtitlesTests.cs
+  s_2cacb16357e051::t_5a131b528ba3ec 100-109,306-311,342-346
+  s_2cacb16357e051::t_d3a30074551a4d 99
+src/BazaarPlusPlus/Game/VoiceSubtitles/Settings/VoiceLineSettings.cs
+  s_2cacb16357e051::t_ee0818ac7c100d 16
+tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs
+  s_2cacb16357e051::t_d6b4f2794365fa 446,461,467,469-470,477
+  s_2cacb16357e051::t_6c002808fd5837 53-60,462-466,468
+src/BazaarPlusPlus/Core/Config/BppConfig.cs
+  s_2cacb16357e051::t_f149e06dd5225e 103
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesSettingsDockEntry.cs
+  s_2cacb16357e051::t_699437d04d1436 194,196
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "112ecd7c0d87c943d866c598656c8ea2faa37378",
+  "prompts": {},
+  "sessions": {
+    "s_2cacb16357e051": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f2bc5-05d5-7732-909e-75014b0969a8",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
