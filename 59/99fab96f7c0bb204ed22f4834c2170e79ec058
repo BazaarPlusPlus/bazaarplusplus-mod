@@ -1,0 +1,28 @@
+Directory.Build.props
+  h_518331e5a07dc9 3
+docs/drafts/2026-07-04-private-pitchfork-stickybeans-source-plan.md
+  s_854e487acfa280::t_605cbd1af6fe2d 1-521
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "5999fab96f7c0bb204ed22f4834c2170e79ec058",
+  "prompts": {},
+  "humans": {
+    "h_518331e5a07dc9": {
+      "author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_854e487acfa280": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f2bc2-46ca-7c93-a6c5-f421d73b1e3b",
+        "model": "unknown"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
