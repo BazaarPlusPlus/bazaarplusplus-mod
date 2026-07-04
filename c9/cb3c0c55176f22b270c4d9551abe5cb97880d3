@@ -1,0 +1,23 @@
+tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs
+  s_2cacb16357e051::t_e6f35d08b74546 581,607
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs
+  s_2cacb16357e051::t_69c7e3c79b887e 19-20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "c9cb3c0c55176f22b270c4d9551abe5cb97880d3",
+  "prompts": {},
+  "sessions": {
+    "s_2cacb16357e051": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f2bc5-05d5-7732-909e-75014b0969a8",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
