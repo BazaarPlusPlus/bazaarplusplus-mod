@@ -100,7 +100,7 @@ internal sealed class BppConfig : IBppConfig
         VoiceSubtitlesChineseFontScaleConfig = config.Bind(
             "VoiceSubtitles",
             "ChineseFontScale",
-            1.1f,
+            1.0f,
             new ConfigDescription(
                 "Font scale for the Chinese subtitle line.",
                 new AcceptableValueRange<float>(1.0f, 2.5f)

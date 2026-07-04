@@ -191,9 +191,9 @@ internal sealed class VoiceSubtitlesChineseFontScaleSettingsDockEntry
 
     protected override string Key => "VoiceSubtitlesChineseFontScale";
 
-    protected override LocalizedTextSet Label => new("Chinese Size", "中文字幕号", "中文字幕號");
+    protected override LocalizedTextSet Label => new("Chinese Size", "中文字号", "中文字號");
 
-    protected override float DefaultScale => 1.1f;
+    protected override float DefaultScale => 1f;
 
     protected override float ReadScale(IBppConfig config) =>
         config.VoiceSubtitlesChineseFontScaleConfig?.Value ?? DefaultScale;

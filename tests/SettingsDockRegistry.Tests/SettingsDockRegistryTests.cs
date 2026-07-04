@@ -50,7 +50,14 @@ public class SettingsDockRegistryTests
 
     private sealed class TestLocaleModeProvider : ILocaleModeProvider
     {
-        public BppChineseLocaleMode CurrentMode => BppChineseLocaleMode.Mainland;
+        private readonly BppChineseLocaleMode _mode;
+
+        public TestLocaleModeProvider(BppChineseLocaleMode mode = BppChineseLocaleMode.Mainland)
+        {
+            _mode = mode;
+        }
+
+        public BppChineseLocaleMode CurrentMode => _mode;
     }
 
     [Fact]
@@ -436,7 +443,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void VoiceSubtitlesDockEntry_cycles_off_grid_chinese_scale_to_next_ladder_value()
+    public void VoiceSubtitlesDockEntry_defaults_chinese_scale_to_one_and_cycles_to_next_ladder_value()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -451,14 +458,23 @@ public class SettingsDockRegistryTests
             var definition = new VoiceSubtitlesChineseFontScaleSettingsDockEntry().Build(config);
 
             Assert.Equal("Chinese Size", definition.ResolveLabel("en"));
-            Assert.Equal("1.1x", definition.ResolveStatus("en"));
+            Assert.Equal("中文字号", definition.ResolveLabel("zh-CN"));
+
+            L.Install(
+                new TestLanguageProvider(),
+                new TestLocaleModeProvider(BppChineseLocaleMode.Taiwan)
+            );
+            Assert.Equal("中文字號", definition.ResolveLabel("zh-Hant"));
+
+            Assert.Equal(1.0f, config.VoiceSubtitlesChineseFontScaleConfig!.Value, precision: 2);
+            Assert.Equal("1x", definition.ResolveStatus("en"));
             Assert.False(definition.IsActive());
 
             definition.Activate();
 
             Assert.Equal("1.25x", definition.ResolveStatus("en"));
             Assert.True(definition.IsActive());
-            Assert.Equal(1.25f, config.VoiceSubtitlesChineseFontScaleConfig!.Value, precision: 2);
+            Assert.Equal(1.25f, config.VoiceSubtitlesChineseFontScaleConfig.Value, precision: 2);
         }
         finally
         {

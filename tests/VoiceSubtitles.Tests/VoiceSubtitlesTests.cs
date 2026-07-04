@@ -97,6 +97,17 @@ public sealed class VoiceSubtitlesTests
     }
 
     [Fact]
+    public void Runtime_settings_default_chinese_font_scale_matches_english()
+    {
+        var settingsType = GetRequiredType(
+            "BazaarPlusPlus.Game.VoiceSubtitles.Settings.VoiceLineSettings"
+        );
+
+        Assert.Equal(1.0f, GetStaticSingle(settingsType, "DefaultEnglishFontScale"), precision: 2);
+        Assert.Equal(1.0f, GetStaticSingle(settingsType, "DefaultChineseFontScale"), precision: 2);
+    }
+
+    [Fact]
     public void Fresh_cache_loads_without_remote_refresh()
     {
         WithRepositoryCache(
@@ -292,6 +303,12 @@ public sealed class VoiceSubtitlesTests
             ) ?? throw new InvalidOperationException($"Missing method {type.FullName}.{name}");
     }
 
+    private static FieldInfo GetRequiredStaticField(Type type, string name)
+    {
+        return type.GetField(name, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException($"Missing field {type.FullName}.{name}");
+    }
+
     private static object? GetPropertyValue(object instance, string name)
     {
         var type = instance.GetType();
@@ -321,5 +338,10 @@ public sealed class VoiceSubtitlesTests
     private static float GetSingle(object instance, string name)
     {
         return Assert.IsType<float>(GetPropertyValue(instance, name));
+    }
+
+    private static float GetStaticSingle(Type type, string name)
+    {
+        return Assert.IsType<float>(GetRequiredStaticField(type, name).GetValue(null));
     }
 }
