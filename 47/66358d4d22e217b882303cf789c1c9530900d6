@@ -1,0 +1,24 @@
+tests/Architecture.Tests/CoreLayeringTests.cs
+  s_f99ce891f5a353::t_a0e54982dd7a9a 235-273
+  s_f99ce891f5a353::t_3ccfe906201314 234
+src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs
+  s_f99ce891f5a353::t_61b59d012da4d3 332-346,561
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "4766358d4d22e217b882303cf789c1c9530900d6",
+  "prompts": {},
+  "sessions": {
+    "s_f99ce891f5a353": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f2bbb-b739-77d2-a672-cb24a3439e4f",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
