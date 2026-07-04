@@ -296,14 +296,14 @@ var currentCatalogPath = Path.Combine(
 var currentCatalogJson = File.ReadAllText(currentCatalogPath);
 var currentCatalog = CollectionSourceCatalog.Build(currentCatalogJson);
 AssertEqual(
-    69,
+    71,
     currentCatalog.Count,
-    "Current source catalog should preserve the 69 known sources after removing Zurphin's Safari."
+    "Current source catalog should include the 71 known sources after adding Private Pitchfork and Stickybeans."
 );
 AssertEqual(
-    47,
+    49,
     currentCatalog.Count(entry => entry.Kind == CollectionSourceKind.Merchant),
-    "Current source catalog should preserve the 47 known merchants."
+    "Current source catalog should include the 49 known merchants."
 );
 AssertEqual(
     22,
@@ -385,6 +385,116 @@ AssertSet(
     new[] { testerDooleyTech.Id, testerStelleTech.Id },
     "The Tester should offer only Dooley/Stelle Tech items, independent of the selected UI hero."
 );
+var privatePitchfork = currentCatalog.Single(entry =>
+    entry.Kind == CollectionSourceKind.Merchant
+    && string.Equals(entry.Name, "Private Pitchfork", StringComparison.Ordinal)
+);
+AssertEqual(
+    Guid.Parse("15b88e74-024e-40a3-a811-aa5810e68ca2"),
+    privatePitchfork.PortraitTemplateId,
+    "Private Pitchfork should use the live merchant template id as its portrait id."
+);
+AssertValues(
+    privatePitchfork.SourceTemplateIds.ToArray(),
+    new[] { Guid.Parse("15b88e74-024e-40a3-a811-aa5810e68ca2") },
+    "Private Pitchfork should index its live merchant template id."
+);
+var pitchforkNeutralItem = CatalogCard(
+    Guid.Parse("eeee1111-0000-0000-0000-000000000001"),
+    ECardType.Item,
+    [EHero.Common],
+    tags: [ECardTag.Tool]
+);
+var pitchforkNeutralLoot = CatalogCard(
+    Guid.Parse("eeee1111-0000-0000-0000-000000000002"),
+    ECardType.Item,
+    [EHero.Common],
+    tags: [ECardTag.Loot]
+);
+var pitchforkHeroItem = CatalogCard(
+    Guid.Parse("eeee1111-0000-0000-0000-000000000003"),
+    ECardType.Item,
+    [EHero.Vanessa],
+    tags: [ECardTag.Tool]
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(
+            privatePitchfork,
+            EHero.Vanessa,
+            new[] { pitchforkNeutralItem, pitchforkNeutralLoot, pitchforkHeroItem }
+        )
+        .OfferedCardIds,
+    new[] { pitchforkNeutralItem.Id },
+    "Private Pitchfork should offer neutral non-Loot items only."
+);
+
+var stickybeans = currentCatalog.Single(entry =>
+    entry.Kind == CollectionSourceKind.Merchant
+    && string.Equals(entry.Name, "Stickybeans", StringComparison.Ordinal)
+);
+AssertEqual(
+    Guid.Parse("d0276b47-be8a-4bbc-ab55-9f92b352480a"),
+    stickybeans.PortraitTemplateId,
+    "Stickybeans should use the live merchant template id as its portrait id."
+);
+AssertValues(
+    stickybeans.AvailableHeroes.ToArray(),
+    new[]
+    {
+        EHero.Vanessa,
+        EHero.Dooley,
+        EHero.Pygmalien,
+        EHero.Karnok,
+        EHero.Mak,
+        EHero.Stelle,
+        EHero.Jules,
+    },
+    "Stickybeans should be visible for concrete heroes and hidden for Common."
+);
+var stickybeansCommon = CatalogCard(
+    Guid.Parse("eeee2222-0000-0000-0000-000000000001"),
+    ECardType.Item,
+    [EHero.Common]
+);
+var stickybeansVanessa = CatalogCard(
+    Guid.Parse("eeee2222-0000-0000-0000-000000000002"),
+    ECardType.Item,
+    [EHero.Vanessa]
+);
+var stickybeansDooley = CatalogCard(
+    Guid.Parse("eeee2222-0000-0000-0000-000000000003"),
+    ECardType.Item,
+    [EHero.Dooley]
+);
+var stickybeansSharedOther = CatalogCard(
+    Guid.Parse("eeee2222-0000-0000-0000-000000000004"),
+    ECardType.Item,
+    [EHero.Dooley, EHero.Stelle]
+);
+var stickybeansSharedSelected = CatalogCard(
+    Guid.Parse("eeee2222-0000-0000-0000-000000000005"),
+    ECardType.Item,
+    [EHero.Vanessa, EHero.Dooley]
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(
+            stickybeans,
+            EHero.Vanessa,
+            new[]
+            {
+                stickybeansCommon,
+                stickybeansVanessa,
+                stickybeansDooley,
+                stickybeansSharedOther,
+                stickybeansSharedSelected,
+            }
+        )
+        .OfferedCardIds,
+    new[] { stickybeansDooley.Id, stickybeansSharedOther.Id },
+    "Stickybeans should offer non-Common items that do not include the selected UI hero."
+);
 AssertEqual(
     currentCatalog.Count,
     currentCatalog.Select(entry => entry.SourceKey).Distinct(StringComparer.Ordinal).Count(),
@@ -455,8 +565,8 @@ AssertNondecreasing(
 );
 AssertValues(
     FirstGroupLayerCounts(vanessaMerchantRoster, 4),
-    new[] { 3, 5, 6, 6 },
-    "The visible Vanessa merchant roster should preserve the locked 3/5/6/6 top layers."
+    new[] { 3, 6, 6, 7 },
+    "The visible Vanessa merchant roster should preserve the locked 3/6/6/7 top layers."
 );
 AssertValues(
     vanessaMerchantRoster.Where(item => item.BreakAfter).Select(item => item.Entry.Group).ToArray(),
@@ -872,6 +982,58 @@ AssertSet(
     fixedHeroTrainerResult.OfferedCardIds,
     new[] { fixedHeroTrainerCards[0].Id },
     "FixedHero trainer rules should teach only skills exclusive to the fixed hero."
+);
+
+var otherHeroesEntry = BuildSingleEntry(
+    "Other Heroes",
+    CollectionSourceKind.Merchant,
+    """{ "heroMode": "OtherHeroes" }"""
+);
+var otherHeroCards = new[]
+{
+    CatalogCard(Guid.Parse("eeeeeeee-0000-0000-0000-000000000001"), ECardType.Item, [EHero.Common]),
+    CatalogCard(
+        Guid.Parse("eeeeeeee-0000-0000-0000-000000000002"),
+        ECardType.Item,
+        [EHero.Vanessa]
+    ),
+    CatalogCard(Guid.Parse("eeeeeeee-0000-0000-0000-000000000003"), ECardType.Item, [EHero.Dooley]),
+    CatalogCard(
+        Guid.Parse("eeeeeeee-0000-0000-0000-000000000004"),
+        ECardType.Item,
+        [EHero.Dooley, EHero.Stelle]
+    ),
+    CatalogCard(
+        Guid.Parse("eeeeeeee-0000-0000-0000-000000000005"),
+        ECardType.Item,
+        [EHero.Vanessa, EHero.Dooley]
+    ),
+};
+var otherHeroesForVanessa = CollectionSourceOfferPoolResolver.Resolve(
+    otherHeroesEntry,
+    EHero.Vanessa,
+    otherHeroCards
+);
+AssertSet(
+    otherHeroesForVanessa.OfferedCardIds,
+    new[] { otherHeroCards[2].Id, otherHeroCards[3].Id },
+    "OtherHeroes rules should exclude Common cards and cards that include the selected UI hero."
+);
+var otherHeroesWithoutSelectedHero = CollectionSourceOfferPoolResolver.Resolve(
+    otherHeroesEntry,
+    selectedHero: null,
+    otherHeroCards
+);
+AssertSet(
+    otherHeroesWithoutSelectedHero.OfferedCardIds,
+    new[]
+    {
+        otherHeroCards[1].Id,
+        otherHeroCards[2].Id,
+        otherHeroCards[3].Id,
+        otherHeroCards[4].Id,
+    },
+    "OtherHeroes rules should include all non-Common hero cards when no UI hero is selected."
 );
 
 var allHeroEntry = BuildSingleEntry(

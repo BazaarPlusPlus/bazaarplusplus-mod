@@ -610,6 +610,35 @@
     {
       "kind": "Merchant",
       "group": "other-hero",
+      "order": 7,
+      "name": "Stickybeans",
+      "availableHeroes": [
+        "Vanessa",
+        "Dooley",
+        "Pygmalien",
+        "Karnok",
+        "Mak",
+        "Stelle",
+        "Jules"
+      ],
+      "description": "Sells items from other Heroes",
+      "portraitTemplateId": "d0276b47-be8a-4bbc-ab55-9f92b352480a",
+      "sourceTemplateIds": [
+        "d0276b47-be8a-4bbc-ab55-9f92b352480a"
+      ],
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "OtherHeroes"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "Merchant",
+      "group": "other-hero",
       "order": 3,
       "name": "Karnok",
       "availableHeroes": [
@@ -752,6 +781,30 @@
               "mode": "AtMost",
               "tier": "Diamond"
             }
+          }
+        }
+      ]
+    },
+    {
+      "kind": "Merchant",
+      "group": "tier-specialist",
+      "order": 5,
+      "name": "Private Pitchfork",
+      "availableHeroes": [],
+      "description": "Sells Neutral items",
+      "portraitTemplateId": "15b88e74-024e-40a3-a811-aa5810e68ca2",
+      "sourceTemplateIds": [
+        "15b88e74-024e-40a3-a811-aa5810e68ca2"
+      ],
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "NeutralOnly",
+            "tagsNone": [
+              "Loot"
+            ]
           }
         }
       ]
