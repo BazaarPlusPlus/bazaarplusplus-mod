@@ -328,6 +328,63 @@ AssertTrue(
     ),
     "Aimbot should be visible for Stelle after the v4 source-catalog migration."
 );
+var theTester = currentCatalog.Single(entry =>
+    entry.Kind == CollectionSourceKind.Merchant
+    && string.Equals(entry.Name, "The Tester", StringComparison.Ordinal)
+);
+AssertValues(
+    theTester.AvailableHeroes.ToArray(),
+    new[] { EHero.Dooley, EHero.Stelle },
+    "The Tester should only be visible for Dooley and Stelle."
+);
+var testerDooleyTech = CatalogCard(
+    Guid.Parse("dddd1111-0000-0000-0000-000000000001"),
+    ECardType.Item,
+    [EHero.Dooley],
+    tags: [ECardTag.Tech]
+);
+var testerStelleTech = CatalogCard(
+    Guid.Parse("dddd1111-0000-0000-0000-000000000002"),
+    ECardType.Item,
+    [EHero.Stelle],
+    tags: [ECardTag.Tech]
+);
+var testerVanessaTech = CatalogCard(
+    Guid.Parse("dddd1111-0000-0000-0000-000000000003"),
+    ECardType.Item,
+    [EHero.Vanessa],
+    tags: [ECardTag.Tech]
+);
+var testerCommonTech = CatalogCard(
+    Guid.Parse("dddd1111-0000-0000-0000-000000000004"),
+    ECardType.Item,
+    [EHero.Common],
+    tags: [ECardTag.Tech]
+);
+var testerDooleyTool = CatalogCard(
+    Guid.Parse("dddd1111-0000-0000-0000-000000000005"),
+    ECardType.Item,
+    [EHero.Dooley],
+    tags: [ECardTag.Tool]
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(
+            theTester,
+            EHero.Vanessa,
+            new[]
+            {
+                testerDooleyTech,
+                testerStelleTech,
+                testerVanessaTech,
+                testerCommonTech,
+                testerDooleyTool,
+            }
+        )
+        .OfferedCardIds,
+    new[] { testerDooleyTech.Id, testerStelleTech.Id },
+    "The Tester should offer only Dooley/Stelle Tech items, independent of the selected UI hero."
+);
 AssertEqual(
     currentCatalog.Count,
     currentCatalog.Select(entry => entry.SourceKey).Distinct(StringComparer.Ordinal).Count(),

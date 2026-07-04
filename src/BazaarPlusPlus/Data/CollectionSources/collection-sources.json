@@ -1215,20 +1215,31 @@
       "name": "The Tester",
       "availableHeroes": [
         "Dooley",
-        "Stelle",
-        "Vanessa"
+        "Stelle"
       ],
-      "description": "Sells Tech items from any Hero",
+      "description": "Sells Dooley and Stelle Tech items",
       "portraitTemplateId": "41cdf4ee-7790-4da1-96f8-a46d3391a0d9",
       "sourceTemplateIds": [
         "41cdf4ee-7790-4da1-96f8-a46d3391a0d9"
       ],
       "offerSegments": [
         {
-          "key": "normal",
+          "key": "dooley",
           "kind": "Normal",
           "rule": {
-            "heroMode": "AllHeroes",
+            "heroMode": "FixedHero",
+            "hero": "Dooley",
+            "tagsAny": [
+              "Tech"
+            ]
+          }
+        },
+        {
+          "key": "stelle",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "Stelle",
             "tagsAny": [
               "Tech"
             ]
