@@ -16,7 +16,7 @@ internal static class BppSettingsDockOrder
     internal const int VoiceSubtitlesLanguage = 9;
     internal const int VoiceSubtitlesEnglishFontScale = 10;
     internal const int VoiceSubtitlesChineseFontScale = 11;
-    internal const int HotkeyTutorial = 12;
-    internal const int EndOfRunScreenshot = 13;
+    internal const int EndOfRunScreenshot = 12;
+    internal const int HotkeyTutorial = 13;
     internal const int BazaarDbUpload = 14;
 }

@@ -578,7 +578,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void SettingsDockCatalog_sorts_stream_mode_immediately_above_hotkey_tutorial()
+    public void SettingsDockCatalog_sorts_hotkey_tutorial_below_end_of_run_screenshot()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
         var registry = new SettingsDockEntryRegistry();
@@ -603,8 +603,8 @@ public class SettingsDockRegistryTests
                     "VoiceSubtitlesLanguage",
                     "VoiceSubtitlesEnglishFontScale",
                     "VoiceSubtitlesChineseFontScale",
-                    "HotkeyTutorial",
                     "EndOfRunScreenshot",
+                    "HotkeyTutorial",
                     "BazaarDbUpload",
                 },
                 BppSettingsDockCatalog.Definitions.Select(d => d.Key)
