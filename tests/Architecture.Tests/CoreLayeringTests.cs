@@ -232,6 +232,46 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void CollectionPanel_close_button_routes_through_overlay_host()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var collectionPanelSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "CollectionPanel.cs")
+        );
+
+        var commandsIndex = collectionPanelSource.IndexOf(
+            "private sealed class PanelCommands",
+            StringComparison.Ordinal
+        );
+        var closeCommandIndex = collectionPanelSource.IndexOf(
+            "public void Close()",
+            commandsIndex,
+            StringComparison.Ordinal
+        );
+        var nextCommandIndex = collectionPanelSource.IndexOf(
+            "public void SetActiveTab",
+            closeCommandIndex,
+            StringComparison.Ordinal
+        );
+
+        Assert.True(commandsIndex >= 0, "CollectionPanel.PanelCommands should exist.");
+        Assert.True(closeCommandIndex > commandsIndex, "PanelCommands.Close() should exist.");
+        Assert.True(
+            nextCommandIndex > closeCommandIndex,
+            "PanelCommands.Close() should appear before SetActiveTab()."
+        );
+
+        var closeCommandSource = collectionPanelSource.Substring(
+            closeCommandIndex,
+            nextCommandIndex - closeCommandIndex
+        );
+
+        Assert.DoesNotContain("panel.Close()", closeCommandSource);
+        Assert.Contains("RequestClose", closeCommandSource);
+    }
+
+    [Fact]
     public void CollectionGridVirtualizer_pending_returns_are_completed_after_generation_changes()
     {
         var repoRoot = RepoRoot();

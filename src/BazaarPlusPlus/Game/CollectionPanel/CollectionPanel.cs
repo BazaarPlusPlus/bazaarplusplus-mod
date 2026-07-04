@@ -329,6 +329,21 @@ internal sealed class CollectionPanel : MonoBehaviour
         _view?.SetVisible(false);
     }
 
+    private void RequestCloseFromUi()
+    {
+        if (_overlayHandle == null)
+        {
+            Close();
+            return;
+        }
+
+        // The visible close button is a lifecycle request, not just a local hide. If this
+        // bypasses the host, the dock button's later RequestOpen() sees the panel as still open.
+        var outcome = _overlayHandle.RequestClose();
+        if (outcome == OverlayRequestOutcome.AlreadyInState && _isVisible)
+            Close();
+    }
+
     // Lifecycle (scene change, combat gate, hotkey, escape) is owned by the Overlay Panel Host;
     // this tick carries the panel's own per-frame content work, including closed-state work
     // (fade-out completion, catalog warmup, deferred native cleanup).
@@ -543,7 +558,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private sealed class PanelCommands(CollectionPanel panel) : ICollectionPanelCommands
     {
-        public void Close() => panel.Close();
+        public void Close() => panel.RequestCloseFromUi();
 
         public void SetActiveTab(CollectionTabKind tab)
         {
