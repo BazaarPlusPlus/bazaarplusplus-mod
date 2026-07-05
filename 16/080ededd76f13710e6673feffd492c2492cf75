@@ -1,0 +1,21 @@
+docs/drafts/2026-07-06-voice-subtitles-performance-plan.md
+  s_f729d89052e3ca::t_b238be99f8e9d4 1-253
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "16080ededd76f13710e6673feffd492c2492cf75",
+  "prompts": {},
+  "sessions": {
+    "s_f729d89052e3ca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c9f6269b-7842-482a-89b7-ae04d585cb7f",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
