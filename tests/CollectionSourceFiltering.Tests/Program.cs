@@ -371,7 +371,7 @@ AssertSet(
     CollectionSourceOfferPoolResolver
         .Resolve(
             theTester,
-            EHero.Vanessa,
+            EHero.Dooley,
             new[]
             {
                 testerDooleyTech,
@@ -382,8 +382,26 @@ AssertSet(
             }
         )
         .OfferedCardIds,
-    new[] { testerDooleyTech.Id, testerStelleTech.Id },
-    "The Tester should offer only Dooley/Stelle Tech items, independent of the selected UI hero."
+    new[] { testerDooleyTech.Id },
+    "The Tester should offer only Dooley Tech items when Dooley is selected."
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(
+            theTester,
+            EHero.Stelle,
+            new[]
+            {
+                testerDooleyTech,
+                testerStelleTech,
+                testerVanessaTech,
+                testerCommonTech,
+                testerDooleyTool,
+            }
+        )
+        .OfferedCardIds,
+    new[] { testerStelleTech.Id },
+    "The Tester should offer only Stelle Tech items when Stelle is selected."
 );
 var privatePitchfork = currentCatalog.Single(entry =>
     entry.Kind == CollectionSourceKind.Merchant
