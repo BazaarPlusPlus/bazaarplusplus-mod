@@ -50,6 +50,7 @@ internal sealed class NativeCardPreviewHoverRelay
             return false;
 
         _hovered = true;
+        NativeCardPreviewHoverTracker.NotifyHover(_card);
         return true;
     }
 
@@ -58,8 +59,10 @@ internal sealed class NativeCardPreviewHoverRelay
         if (_card == null || !_hovered)
             return;
 
-        InvokeSafe(_card, OnHoverOutMethod, "OnHoverOut");
+        var invoked = InvokeSafe(_card, OnHoverOutMethod, "OnHoverOut");
         _hovered = false;
+        if (invoked)
+            NativeCardPreviewHoverTracker.NotifyHoverOut(_card);
     }
 
     private bool InvokeSafe(Component target, MethodInfo? method, string label)

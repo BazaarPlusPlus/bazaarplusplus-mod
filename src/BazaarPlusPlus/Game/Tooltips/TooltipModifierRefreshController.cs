@@ -4,7 +4,9 @@ using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
+using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
@@ -97,6 +99,9 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         if (tooltipParent.HasAnyLockedTooltipControllers())
             return;
 
+        if (TryRefreshHoveredPreviewTooltip(tooltipParent))
+            return;
+
         if (!TryResolveRefreshTarget(tooltipParent, out var target))
             return;
 
@@ -114,6 +119,52 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             encounterState,
             refreshedTooltipData
         );
+    }
+
+    private static bool TryRefreshHoveredPreviewTooltip(TooltipParentComponent tooltipParent)
+    {
+        var cardPreview = NativeCardPreviewHoverTracker.Current;
+        if (cardPreview == null)
+            return false;
+
+        if (
+            !NativeCardPreviewReflection.TryGetTooltipData(cardPreview, out var currentTooltipData)
+            || !NativeCardPreviewReflection.TryGetClientCard(cardPreview, out var clientCard)
+        )
+            return false;
+
+        var primaryController = Traverse
+            .Create(tooltipParent)
+            .Property("CardTooltipController")
+            .GetValue<CardTooltipController>();
+        if (
+            primaryController?.CurrentTooltipData == null
+            || !ReferenceEquals(primaryController.CurrentTooltipData, currentTooltipData)
+        )
+            return false;
+
+        if (!NativeCardPreviewReflection.CanInvokeOnHover(cardPreview))
+            return false;
+
+        var refreshedTooltipData = CardTooltipDataFactory.Create(clientCard, currentTooltipData);
+        if (ReferenceEquals(refreshedTooltipData, currentTooltipData))
+            return false;
+
+        if (!NativeCardPreviewReflection.TrySetTooltipData(cardPreview, refreshedTooltipData))
+            return false;
+
+        tooltipParent.HideCardTooltipController();
+        if (!NativeCardPreviewReflection.TryInvokeOnHover(cardPreview))
+        {
+            NativeCardPreviewReflection.TrySetTooltipData(cardPreview, currentTooltipData);
+            return false;
+        }
+
+        BppLog.Debug(
+            "TooltipPreview",
+            $"ResolverMatched previewCard={DescribeCard(clientCard)} refresh=preview"
+        );
+        return true;
     }
 
     private static bool TryResolveRefreshTarget(
@@ -160,5 +211,16 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
 
         target = default;
         return false;
+    }
+
+    private static string DescribeCard(Card? card)
+    {
+        if (card == null)
+            return "null";
+
+        var templateName = card.Template?.InternalName;
+        return !string.IsNullOrWhiteSpace(templateName)
+            ? templateName
+            : $"{card.TemplateId}:{card.InstanceId}";
     }
 }
