@@ -709,6 +709,27 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _requestUiRefresh();
     }
 
+    public void MarkAccountLinkedManually()
+    {
+        if (_state.AccountLinkInProgress)
+            return;
+
+        var accountId = RefreshAccountLinkIdentityFromGame(clearBanner: false);
+        if (string.IsNullOrWhiteSpace(accountId))
+        {
+            SetAccountLinkBanner(HistoryPanelText.AccountLink.SignedOut(), StatusSeverity.Failure);
+            _requestUiRefresh();
+            return;
+        }
+
+        _state.LocalLinkedHint = true;
+        _state.AccountLinkExpanded = false;
+        _accountLinkStore.SaveHint(accountId);
+        SetAccountLinkBanner(null, StatusSeverity.Neutral);
+        BppLog.Info("HistoryPanel", $"BazaarDB link marked manually account={accountId}");
+        _requestUiRefresh();
+    }
+
     public async Task TrySyncGhostBattlesAsync()
     {
         if (_state.GhostSyncInProgress)

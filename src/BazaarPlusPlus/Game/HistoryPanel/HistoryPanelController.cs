@@ -114,4 +114,9 @@ internal sealed partial class HistoryPanel
     {
         _coordinator?.ToggleAccountLinkForm();
     }
+
+    private void MarkAccountLinkedManually()
+    {
+        _coordinator?.MarkAccountLinkedManually();
+    }
 }

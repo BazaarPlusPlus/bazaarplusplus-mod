@@ -50,7 +50,7 @@ internal sealed class HistoryPanelDependencies
         GhostBattleSyncService? ghostSyncService,
         IHistoryPanelServerHealthProbe? serverHealthProbe,
         BazaarDbLinkClient? accountLinkClient,
-        Func<bool>? isBazaarDbDataSharingEnabled
+        Func<bool>? isBazaarDbAccountLinkAvailable
     )
     {
         Runtime = runtime;
@@ -59,7 +59,7 @@ internal sealed class HistoryPanelDependencies
         GhostSyncService = ghostSyncService;
         ServerHealthProbe = serverHealthProbe;
         AccountLinkClient = accountLinkClient;
-        IsBazaarDbDataSharingEnabled = isBazaarDbDataSharingEnabled;
+        IsBazaarDbAccountLinkAvailable = isBazaarDbAccountLinkAvailable;
     }
 
     public IHistoryPanelRuntime Runtime { get; }
@@ -74,5 +74,5 @@ internal sealed class HistoryPanelDependencies
 
     public BazaarDbLinkClient? AccountLinkClient { get; }
 
-    public Func<bool>? IsBazaarDbDataSharingEnabled { get; }
+    public Func<bool>? IsBazaarDbAccountLinkAvailable { get; }
 }

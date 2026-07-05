@@ -21,6 +21,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private readonly Action _checkServerHealth;
     private readonly Action<string> _linkBazaarDbAccount;
     private readonly Action _toggleAccountLinkForm;
+    private readonly Action _markAccountLinkedManually;
     private readonly Action<int> _selectRun;
     private readonly Action<int> _selectBattle;
     private readonly Action<HistorySectionMode> _setSectionMode;
@@ -57,6 +58,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private VisualElement? _accountCodeRow;
     private TextField[]? _accountCodeCells;
     private Button? _accountLinkButton;
+    private Button? _accountAlreadyLinkedButton;
     private Label? _accountHint;
     private Label? _accountBanner;
     private Button? _accountCollapseButton;
@@ -108,6 +110,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         Action checkServerHealth,
         Action<string> linkBazaarDbAccount,
         Action toggleAccountLinkForm,
+        Action markAccountLinkedManually,
         Action<int> selectRun,
         Action<int> selectBattle,
         Action<HistorySectionMode> setSectionMode,
@@ -128,6 +131,9 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
             linkBazaarDbAccount ?? throw new ArgumentNullException(nameof(linkBazaarDbAccount));
         _toggleAccountLinkForm =
             toggleAccountLinkForm ?? throw new ArgumentNullException(nameof(toggleAccountLinkForm));
+        _markAccountLinkedManually =
+            markAccountLinkedManually
+            ?? throw new ArgumentNullException(nameof(markAccountLinkedManually));
         _selectRun = selectRun ?? throw new ArgumentNullException(nameof(selectRun));
         _selectBattle = selectBattle ?? throw new ArgumentNullException(nameof(selectBattle));
         _setSectionMode = setSectionMode ?? throw new ArgumentNullException(nameof(setSectionMode));
@@ -261,8 +267,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _checkServerHealthButton.SetEnabled(model.ServerHealthButtonEnabled);
         var accountFormVisible = model.AccountLinkFormVisible;
 
-        // The whole card only appears when BazaarDB data-sharing (数据共建) is enabled — linking is
-        // only meaningful when the player is contributing data under their account id.
+        // The whole card only appears when BazaarDB data-sharing (数据共建) is enabled and the
+        // current build is eligible for BazaarDB account linking.
         _accountCard!.style.display = model.AccountCardVisible
             ? DisplayStyle.Flex
             : DisplayStyle.None;
@@ -305,6 +311,12 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
             : DisplayStyle.None;
         _linkSubmitAllowedByModel = model.AccountLinkButtonEnabled;
         UpdateAccountCodeFeedback();
+        _accountAlreadyLinkedButton!.text = model.AccountAlreadyLinkedButtonText;
+        _accountAlreadyLinkedButton.tooltip = model.AccountAlreadyLinkedButtonText;
+        _accountAlreadyLinkedButton.style.display = model.AccountAlreadyLinkedButtonVisible
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
+        _accountAlreadyLinkedButton.SetEnabled(model.AccountLinkInputEnabled);
         _accountHint!.text = StablePanelText.Compact(model.AccountHintText, 120);
         _accountHint.tooltip = model.AccountHintText;
         _accountHint.style.display = accountFormVisible ? DisplayStyle.Flex : DisplayStyle.None;

@@ -527,6 +527,25 @@ internal sealed partial class HistoryPanelUiToolkitView
         StyleButton(_accountLinkButton, Colors.ReplayBackground, Colors.ReplayText);
         _accountCard.Add(_accountLinkButton);
 
+        _accountAlreadyLinkedButton = CreateButton(
+            HistoryPanelText.AccountLink.AlreadyLinkedElsewhereButton(),
+            () => _markAccountLinkedManually(),
+            0f,
+            Sizes.ButtonCompactHeight,
+            fixedWidth: false
+        );
+        _accountAlreadyLinkedButton.style.flexGrow = 0f;
+        _accountAlreadyLinkedButton.style.flexShrink = 0f;
+        _accountAlreadyLinkedButton.style.flexBasis = StyleKeyword.Auto;
+        _accountAlreadyLinkedButton.style.width = Length.Percent(100f);
+        _accountAlreadyLinkedButton.style.marginTop = UiSpacing.Xs;
+        StyleButton(
+            _accountAlreadyLinkedButton,
+            Colors.HistoryButtonBackground,
+            Colors.HistoryFooterSecondaryText
+        );
+        _accountCard.Add(_accountAlreadyLinkedButton);
+
         _accountHint = CreateLabel(
             Sizes.FontCorner,
             FontStyle.Normal,

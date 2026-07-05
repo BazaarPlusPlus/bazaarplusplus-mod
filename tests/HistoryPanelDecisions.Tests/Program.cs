@@ -6,9 +6,11 @@ var confirmationType = RequireType("BazaarPlusPlus.Game.HistoryPanel.DeleteConfi
 var decisionsType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelDecisions");
 var buttonModelType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelButtonModel");
 var runType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Data.HistoryRunRecord");
+var gameBuildChannelType = RequireType("BazaarPlusPlus.Core.Runtime.GameBuildChannel");
 
 TestDeleteConfirmationFiveSecondArm();
 TestCanDeleteRunDecisionArms();
+TestAccountLinkCardAvailabilityGate();
 TestDatabaseChipTextAndSeverity();
 TestButtonModelReplayRecordDeleteParity();
 
@@ -116,6 +118,14 @@ void TestDatabaseChipTextAndSeverity()
     AssertChip(false, false, "DB Unavailable", "Failure");
     AssertChip(true, false, "DB Missing", "Neutral");
     AssertChip(true, true, "DB Connected", "Success");
+}
+
+void TestAccountLinkCardAvailabilityGate()
+{
+    AssertAccountLinkCardAvailable(true, "Online", true);
+    AssertAccountLinkCardAvailable(true, "Unknown", true);
+    AssertAccountLinkCardAvailable(true, "Ptr", false);
+    AssertAccountLinkCardAvailable(false, "Online", false);
 }
 
 void TestButtonModelReplayRecordDeleteParity()
@@ -235,6 +245,20 @@ void AssertChip(bool isAvailable, bool databaseExists, string expectedText, stri
     Assert(
         GetEnumName(chip, "Severity") == expectedSeverity,
         $"Database chip severity {expectedSeverity}."
+    );
+}
+
+void AssertAccountLinkCardAvailable(bool dataSharingEnabled, string channel, bool expectedAvailable)
+{
+    var result = InvokeStatic(
+        decisionsType,
+        "IsAccountLinkCardAvailable",
+        dataSharingEnabled,
+        Enum.Parse(gameBuildChannelType, channel)
+    );
+    Assert(
+        result is bool available && available == expectedAvailable,
+        $"Account link card availability sharing={dataSharingEnabled} channel={channel}."
     );
 }
 

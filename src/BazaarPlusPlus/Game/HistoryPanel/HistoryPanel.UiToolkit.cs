@@ -28,6 +28,7 @@ internal sealed partial class HistoryPanel
                 TryCheckServerHealth,
                 SubmitAccountLinkCode,
                 ToggleAccountLinkForm,
+                MarkAccountLinkedManually,
                 SelectRun,
                 SelectBattle,
                 SetSectionMode,
@@ -173,7 +174,7 @@ internal sealed partial class HistoryPanel
             DatabaseChipSeverity = databaseChip.Severity,
             ServerHealthButtonText = serverHealthDisplay.ButtonText,
             ServerHealthButtonEnabled = serverHealthDisplay.ButtonEnabled,
-            AccountCardVisible = _dependencies?.IsBazaarDbDataSharingEnabled?.Invoke() ?? false,
+            AccountCardVisible = _dependencies?.IsBazaarDbAccountLinkAvailable?.Invoke() ?? false,
             IsBazaarDbLinked = isBazaarDbLinked,
             AccountTitleText = HistoryPanelText.AccountLink.Title(),
             AccountWhyText = HistoryPanelText.AccountLink.Why(),
@@ -190,6 +191,10 @@ internal sealed partial class HistoryPanel
             AccountLinkButtonText = _state.AccountLinkInProgress
                 ? HistoryPanelText.AccountLink.Linking()
                 : HistoryPanelText.AccountLink.Button(),
+            AccountAlreadyLinkedButtonText =
+                HistoryPanelText.AccountLink.AlreadyLinkedElsewhereButton(),
+            AccountAlreadyLinkedButtonVisible =
+                accountFormVisible && !isBazaarDbLinked && !_state.AccountLinkInProgress,
             AccountLinkButtonEnabled = !_state.AccountLinkInProgress && hasAccount,
             AccountLinkInputEnabled = !_state.AccountLinkInProgress && hasAccount,
             AccountLinkBannerText = _state.AccountLinkBannerMessage,
@@ -287,6 +292,10 @@ internal sealed class HistoryPanelUiToolkitModel
     public string AccountLinkCollapseText { get; set; } = string.Empty;
 
     public string AccountLinkButtonText { get; set; } = string.Empty;
+
+    public string AccountAlreadyLinkedButtonText { get; set; } = string.Empty;
+
+    public bool AccountAlreadyLinkedButtonVisible { get; set; }
 
     public bool AccountLinkButtonEnabled { get; set; }
 

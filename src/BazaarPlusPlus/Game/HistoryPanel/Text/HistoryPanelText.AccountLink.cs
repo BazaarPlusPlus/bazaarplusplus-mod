@@ -38,6 +38,12 @@ internal static partial class HistoryPanelText
             "綁定帳號"
         );
 
+        private static readonly LocalizedTextSet AlreadyLinkedElsewhereButtonText = new(
+            "I already linked",
+            "我已绑定",
+            "我已綁定"
+        );
+
         private static readonly LocalizedTextSet LinkingText = new(
             "Linking...",
             "绑定中...",
@@ -111,6 +117,9 @@ internal static partial class HistoryPanelText
         internal static string Hint() => Resolve(HintText);
 
         internal static string Button() => Resolve(ButtonText);
+
+        internal static string AlreadyLinkedElsewhereButton() =>
+            Resolve(AlreadyLinkedElsewhereButtonText);
 
         internal static string Linking() => Resolve(LinkingText);
 

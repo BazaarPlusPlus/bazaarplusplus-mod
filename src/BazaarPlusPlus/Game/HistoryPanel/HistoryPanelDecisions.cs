@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -86,4 +87,12 @@ internal static class HistoryPanelDecisions
                 StatusSeverity.Neutral
             );
     }
+
+    // Account-link card gate: data sharing must be on AND the build must not be PTR.
+    // Unknown is treated like Online by policy (see IGameBuildInfo) so a channel
+    // detection failure can never hide the card on a production build.
+    internal static bool IsAccountLinkCardAvailable(
+        bool dataSharingEnabled,
+        GameBuildChannel channel
+    ) => dataSharingEnabled && channel != GameBuildChannel.Ptr;
 }

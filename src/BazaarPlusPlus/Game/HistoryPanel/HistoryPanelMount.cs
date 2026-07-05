@@ -72,7 +72,11 @@ internal sealed class HistoryPanelMount : IBppMountable
                 runtime,
                 onlineClient,
                 _accountLinkClient(),
-                () => services.Config.BazaarDbUploadEnabled?.Value ?? false
+                () =>
+                    HistoryPanelDecisions.IsAccountLinkCardAvailable(
+                        services.Config.BazaarDbUploadEnabled?.Value ?? false,
+                        services.GameBuild.Channel
+                    )
             )
         );
         // Register with the host only once fully configured; an unconfigured panel (skip paths

@@ -98,6 +98,10 @@ Assert(
     "Collapse action should resolve in English."
 );
 Assert(
+    InvokeStatic(accountLinkType, "AlreadyLinkedElsewhereButton") as string == "I already linked",
+    "Manual already-linked action should resolve in English."
+);
+Assert(
     InvokeStatic(accountLinkType, "InvalidOrExpired") as string
         == "Code invalid or expired - generate a new one",
     "Invalid code text should use repo-compatible ASCII punctuation."
@@ -122,6 +126,10 @@ Assert(
     "Collapse action should resolve simplified Chinese."
 );
 Assert(
+    InvokeStatic(accountLinkType, "AlreadyLinkedElsewhereButton") as string == "我已绑定",
+    "Manual already-linked action should resolve simplified Chinese."
+);
+Assert(
     InvokeStatic(accountLinkType, "Offline") as string == "无法连接 BazaarDB，请检查网络",
     "Offline error should resolve simplified Chinese."
 );
@@ -142,6 +150,10 @@ Assert(
 Assert(
     InvokeStatic(accountLinkType, "Collapse") as string == "收起",
     "Collapse action should resolve traditional Chinese when Taiwan mode is active."
+);
+Assert(
+    InvokeStatic(accountLinkType, "AlreadyLinkedElsewhereButton") as string == "我已綁定",
+    "Manual already-linked action should resolve traditional Chinese when Taiwan mode is active."
 );
 Assert(
     InvokeStatic(accountLinkType, "ServerBusy") as string == "BazaarDB 暫時無法使用，請稍後重試",
