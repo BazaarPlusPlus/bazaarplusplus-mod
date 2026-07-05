@@ -1,0 +1,54 @@
+tests/VoiceSubtitles.Tests/VoiceSubtitlesTests.cs
+  s_79aa4d49084aac::t_c0b22e81511a72 460,511
+  s_79aa4d49084aac::t_29ab58874410f1 184-205,214-276,278-292,309,317-318,419-459,510
+  s_79aa4d49084aac::t_aab1bc340485ed 277,293-308,310-316,507-509
+  s_79aa4d49084aac::t_bd100b99121f32 206-213,485-488
+src/BazaarPlusPlus/GameInterop/VoiceSubtitles/VoiceSubtitlesInteropLog.cs
+  s_79aa4d49084aac::t_cd953b12cf903d 4,14-15,18
+  s_79aa4d49084aac::t_77ca4e8d555d2d 19
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceLineCatalog.cs
+  s_79aa4d49084aac::t_412975a6b97012 5,12,84-85,104-105,108,111,119,151,164,166-169,178,180-192,200-201,204-207,211,220-221,231,233-261,266-273,275,278-279,296-298,300,303,305,307,311,316,318,327,335,338,342,345,352,354-485,487-546
+  s_79aa4d49084aac::t_bd100b99121f32 170-175,339-340
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceLineOverlayLifetime.cs
+  s_79aa4d49084aac::t_eee72071c26684 19-23,27,46-57,83-94,97
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesLog.cs
+  s_79aa4d49084aac::t_1a9b37d0a2a7a8 15
+  s_79aa4d49084aac::t_83fce0dfd896f0 4,14
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceLineDisplay.cs
+  s_79aa4d49084aac::t_21706fb1dee726 4,25,118-126,135-148,158,163-164,166,174,216-228
+src/BazaarPlusPlus/GameInterop/VoiceSubtitles/VoiceLineVoObserverBridge.cs
+  s_79aa4d49084aac::t_bd100b99121f32 251
+  s_79aa4d49084aac::t_b7f7ee0adb931b 48-61,133,139-140,142,144,146
+  s_79aa4d49084aac::t_1eb282f18dba8a 163-165,167-168,170-171,197,199-200,202-204,206-208,212-223,225,228-245
+  s_79aa4d49084aac::t_0ae3b7b3bdebfc 266-268,283-298,303-307,309-310,313-320,324-335,337,342-352
+  s_79aa4d49084aac::t_9c0e59524156d9 371-372,419-420,463
+  s_79aa4d49084aac::t_3fe5296648965a 5,20-21
+  s_79aa4d49084aac::t_3c9416efaaf00d 493,504,516,527,546
+  s_79aa4d49084aac::t_b1996ef1bf1968 250,253,255,257
+src/BazaarPlusPlus/Game/VoiceSubtitles/VersionLabelScanner.cs
+  s_79aa4d49084aac::t_0545ac94f377f1 15,36,73-79,85
+  s_79aa4d49084aac::t_acc522594acab6 26-29
+  s_79aa4d49084aac::t_8317f73afe7b4f 30
+  s_79aa4d49084aac::t_bd100b99121f32 12-13,16-17
+  s_79aa4d49084aac::t_a400b07ac5abd5 25,34-35,37-41,43,45-72,80-84,86
+src/BazaarPlusPlus/Patches/VoiceSubtitles/VOPlayerPatches.cs
+  s_79aa4d49084aac::t_8dda332c698b51 44-46,117-119
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "315982f0df774a657497375c414405988b947193",
+  "prompts": {},
+  "sessions": {
+    "s_79aa4d49084aac": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3340-a3b1-7693-a6e9-647060c1795f",
+        "model": "gpt-5.5"
+      },
+      "human_author": null
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
