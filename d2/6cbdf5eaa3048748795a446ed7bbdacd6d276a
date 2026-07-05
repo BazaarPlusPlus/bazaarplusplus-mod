@@ -1,0 +1,21 @@
+docs/drafts/2026-07-06-bazaardb-manual-linked-button-and-online-gate-plan.md
+  s_89c66be04d8b59::t_8faca63b733a2c 1-250
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "d26cbdf5eaa3048748795a446ed7bbdacd6d276a",
+  "prompts": {},
+  "sessions": {
+    "s_89c66be04d8b59": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f336a-392e-73e2-9706-66a191c8e5d2",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
