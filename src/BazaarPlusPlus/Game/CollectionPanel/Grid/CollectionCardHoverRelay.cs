@@ -35,21 +35,24 @@ internal sealed class CollectionCardHoverRelay
     {
         if (_card == null)
             return;
-        InvokeSafe(_card, OnHoverMethod, "OnHover");
+        if (InvokeSafe(_card, OnHoverMethod, "OnHover"))
+            NativeCardPreviewHoverTracker.NotifyHover(_card);
     }
 
     public void OnPointerExit(PointerEventData _)
     {
         if (_card == null)
             return;
-        InvokeSafe(_card, OnHoverOutMethod, "OnHoverOut");
+        if (InvokeSafe(_card, OnHoverOutMethod, "OnHoverOut"))
+            NativeCardPreviewHoverTracker.NotifyHoverOut(_card);
     }
 
     public void TryInvokeHoverOut()
     {
         if (_card == null)
             return;
-        InvokeSafe(_card, OnHoverOutMethod, "OnHoverOut");
+        if (InvokeSafe(_card, OnHoverOutMethod, "OnHoverOut"))
+            NativeCardPreviewHoverTracker.NotifyHoverOut(_card);
     }
 
     private static MethodInfo? ResolveHoverMethod(string name)
@@ -57,13 +60,14 @@ internal sealed class CollectionCardHoverRelay
         return NativeCardPreviewReflection.ResolvePublicInstanceMethod(name);
     }
 
-    private static void InvokeSafe(Component target, MethodInfo? method, string label)
+    private static bool InvokeSafe(Component target, MethodInfo? method, string label)
     {
         if (target == null || method == null)
-            return;
+            return false;
         try
         {
             method.Invoke(target, Array.Empty<object>());
+            return true;
         }
         catch (TargetInvocationException ex)
         {
@@ -71,10 +75,12 @@ internal sealed class CollectionCardHoverRelay
                 "CollectionCardHoverRelay",
                 $"{label} threw: {ex.InnerException?.Message ?? ex.Message}"
             );
+            return false;
         }
         catch (Exception ex)
         {
             BppLog.Debug("CollectionCardHoverRelay", $"{label} invocation failed: {ex.Message}");
+            return false;
         }
     }
 }
