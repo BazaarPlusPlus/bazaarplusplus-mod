@@ -2,13 +2,13 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using FMOD;
 using FMOD.Studio;
 using FMODUnity;
 using TheBazaar.AppFramework;
-using UnityEngine;
 using VoiceSubtitlesLog = BazaarPlusPlus.GameInterop.VoiceSubtitles.VoiceSubtitlesInteropLog;
 
 namespace BazaarPlusPlus.GameInterop.VoiceSubtitles;
@@ -17,8 +17,8 @@ internal static class VoiceLineVoObserverBridge
 {
     private static readonly HashSet<int> InstalledPlayers = new();
     private static int _nextAttemptId;
-    private static VoiceAttemptContext _pendingContext = VoiceAttemptContext.Unknown;
-    private static VoiceAttemptContext _activeContext = VoiceAttemptContext.Unknown;
+    private static volatile VoiceAttemptContext _pendingContext = VoiceAttemptContext.Unknown;
+    private static volatile VoiceAttemptContext _activeContext = VoiceAttemptContext.Unknown;
     private static VoiceSubtitleObserverCallbacks _callbacks = VoiceSubtitleObserverCallbacks.Empty;
 
     internal static void Configure(VoiceSubtitleObserverCallbacks callbacks)
@@ -45,17 +45,20 @@ internal static class VoiceLineVoObserverBridge
     internal static void BeginVoiceAttempt(VoiceAttemptContext context)
     {
         _pendingContext = context;
-        VoiceSubtitlesLog.Info(
-            "VO attempt begin "
-                + $"attempt={context.AttemptId} "
-                + $"origin={context.Origin} "
-                + $"player={VoiceSubtitlesLog.ObjectId(context.Player)} "
-                + $"source={context.SourceLabel} "
-                + $"hook={context.HookName} "
-                + $"eventRef={VoiceSubtitlesLog.Field(context.EventReferenceText)} "
-                + $"path={VoiceSubtitlesLog.Field(context.EventPath)} "
-                + $"eventDuration={context.DurationSeconds:F3}s"
-        );
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            VoiceSubtitlesLog.Debug(
+                "VO attempt begin "
+                    + $"attempt={context.AttemptId} "
+                    + $"origin={context.Origin} "
+                    + $"player={VoiceSubtitlesLog.ObjectId(context.Player)} "
+                    + $"source={context.SourceLabel} "
+                    + $"hook={context.HookName} "
+                    + $"eventRef={VoiceSubtitlesLog.Field(context.EventReferenceText)} "
+                    + $"path={VoiceSubtitlesLog.Field(context.EventPath)} "
+                    + $"eventDuration={context.DurationSeconds:F3}s"
+            );
+        }
     }
 
     internal static VoiceAttemptContext CreateVoiceAttempt(
@@ -127,19 +130,20 @@ internal static class VoiceLineVoObserverBridge
             eventReferenceText,
             eventPath,
             durationSeconds,
-            Time.unscaledTime
+            Stopwatch.GetTimestamp()
         );
     }
 
     internal static void ClearVoiceAttempt(string reason)
     {
-        if (_pendingContext.IsKnown)
+        var context = _pendingContext;
+        if (context.IsKnown && VoiceSubtitlesLog.Verbose)
         {
-            VoiceSubtitlesLog.Info(
+            VoiceSubtitlesLog.Debug(
                 "VO attempt clear "
-                    + $"attempt={_pendingContext.AttemptId} "
+                    + $"attempt={context.AttemptId} "
                     + $"reason={reason} "
-                    + $"age={AgeSeconds(_pendingContext):F3}s"
+                    + $"age={AgeSeconds(context):F3}s"
             );
         }
 
@@ -156,11 +160,15 @@ internal static class VoiceLineVoObserverBridge
 
     internal static void OnVoSoundPlayed(VOPlayer? player, IntPtr soundPtr)
     {
+        if (!IsSubtitleObservationEnabled())
+            return;
+
         var context = _activeContext;
-        if (!context.IsKnown && _pendingContext.IsKnown)
+        var pendingContext = _pendingContext;
+        if (!context.IsKnown && pendingContext.IsKnown)
         {
-            _activeContext = _pendingContext;
-            context = _activeContext;
+            _activeContext = pendingContext;
+            context = pendingContext;
         }
 
         if (!context.IsKnown)
@@ -186,60 +194,67 @@ internal static class VoiceLineVoObserverBridge
             : context.DurationSeconds > 0f ? context.DurationSeconds
             : line.DurationSeconds;
 
-        VoiceSubtitlesLog.Info(
-            "VO sound played "
-                + $"attempt={context.AttemptId} "
-                + $"player={VoiceSubtitlesLog.ObjectId(player)} "
-                + $"contextPlayer={VoiceSubtitlesLog.ObjectId(context.Player)} "
-                + $"source={sourceLabel} "
-                + $"hook={hookName} "
-                + $"sound={VoiceSubtitlesLog.Field(soundName)} "
-                + $"soundDuration={soundDurationSeconds:F3}s "
-                + $"contextPath={VoiceSubtitlesLog.Field(context.EventPath)}"
-        );
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            VoiceSubtitlesLog.Debug(
+                "VO sound played "
+                    + $"attempt={context.AttemptId} "
+                    + $"player={VoiceSubtitlesLog.ObjectId(player)} "
+                    + $"contextPlayer={VoiceSubtitlesLog.ObjectId(context.Player)} "
+                    + $"source={sourceLabel} "
+                    + $"hook={hookName} "
+                    + $"sound={VoiceSubtitlesLog.Field(soundName)} "
+                    + $"soundDuration={soundDurationSeconds:F3}s "
+                    + $"contextPath={VoiceSubtitlesLog.Field(context.EventPath)}"
+            );
+        }
 
         if (!HasResolvedLine(resolution))
         {
-            VoiceSubtitlesLog.Info(
-                "VO subtitle skipped because no voice line matched "
-                    + $"attempt={context.AttemptId} "
-                    + $"strategy={resolution.Strategy} "
-                    + $"hook={hookName} "
-                    + $"sound={VoiceSubtitlesLog.Field(soundName)}"
-            );
+            if (VoiceSubtitlesLog.Verbose)
+            {
+                VoiceSubtitlesLog.Debug(
+                    "VO subtitle skipped because no voice line matched "
+                        + $"attempt={context.AttemptId} "
+                        + $"strategy={resolution.Strategy} "
+                        + $"hook={hookName} "
+                        + $"sound={VoiceSubtitlesLog.Field(soundName)}"
+                );
+            }
             return;
         }
 
-        if (!IsEnabled())
-            return;
-
         QueueShow(CreateCue(line, player ?? context.Player, durationSeconds, context.AttemptId));
-        VoiceSubtitlesLog.Info(
-            "VO subtitle resolved "
-                + $"attempt={context.AttemptId} "
-                + $"strategy={resolution.Strategy} "
-                + $"catalog={resolution.CatalogName} "
-                + $"matched={VoiceSubtitlesLog.Field(resolution.MatchedToken)} "
-                + $"candidates={resolution.CandidateCount} "
-                + $"stem={line.Stem} "
-                + $"soundDuration={soundDurationSeconds:F3}s "
-                + $"eventDuration={context.DurationSeconds:F3}s "
-                + $"lineDuration={line.DurationSeconds:F3}s "
-                + $"displayDuration={durationSeconds:F3}s "
-                + $"english={VoiceSubtitlesLog.Field(line.English)} "
-                + $"chinese={VoiceSubtitlesLog.Field(line.Chinese)}"
-        );
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            VoiceSubtitlesLog.Debug(
+                "VO subtitle resolved "
+                    + $"attempt={context.AttemptId} "
+                    + $"strategy={resolution.Strategy} "
+                    + $"catalog={resolution.CatalogName} "
+                    + $"matched={VoiceSubtitlesLog.Field(resolution.MatchedToken)} "
+                    + $"candidates={resolution.CandidateCount} "
+                    + $"stem={line.Stem} "
+                    + $"soundDuration={soundDurationSeconds:F3}s "
+                    + $"eventDuration={context.DurationSeconds:F3}s "
+                    + $"lineDuration={line.DurationSeconds:F3}s "
+                    + $"displayDuration={durationSeconds:F3}s "
+                    + $"english={VoiceSubtitlesLog.Field(line.English)} "
+                    + $"chinese={VoiceSubtitlesLog.Field(line.Chinese)}"
+            );
+        }
     }
 
     internal static void OnVoPlaybackStopped(VOPlayer? player)
     {
-        if (_activeContext.IsKnown)
+        var context = _activeContext;
+        if (context.IsKnown && VoiceSubtitlesLog.Verbose && IsSubtitleObservationEnabled())
         {
-            VoiceSubtitlesLog.Info(
+            VoiceSubtitlesLog.Debug(
                 "VO playback stopped "
-                    + $"attempt={_activeContext.AttemptId} "
+                    + $"attempt={context.AttemptId} "
                     + $"player={VoiceSubtitlesLog.ObjectId(player)} "
-                    + $"age={AgeSeconds(_activeContext):F3}s"
+                    + $"age={AgeSeconds(context):F3}s"
             );
         }
 
@@ -248,6 +263,9 @@ internal static class VoiceLineVoObserverBridge
 
     private static void OnVoDebugPrint(string eventReferenceText)
     {
+        if (!IsSubtitleObservationEnabled())
+            return;
+
         var context = _pendingContext;
         if (!context.IsKnown)
         {
@@ -262,68 +280,76 @@ internal static class VoiceLineVoObserverBridge
 
         var sourceLabel = context.SourceLabel == "Unknown" ? "Hero" : context.SourceLabel;
         var hookName = context.HookName;
-        var lookupText =
-            $"{context.EventPath ?? string.Empty} {context.EventReferenceText ?? string.Empty} {eventReferenceText}";
-        var resolution = ResolveLine(lookupText, sourceLabel, hookName);
-        var line = resolution.Line;
-        var contextMatchesCallback = ContextMatchesCallback(context, eventReferenceText);
-
-        VoiceSubtitlesLog.Info(
-            "VO debug callback deferred "
-                + $"attempt={context.AttemptId} "
-                + $"origin={context.Origin} "
-                + $"age={AgeSeconds(context):F3}s "
-                + $"source={sourceLabel} "
-                + $"hook={hookName} "
-                + $"contextMatchesCallback={contextMatchesCallback} "
-                + $"callbackEvent={VoiceSubtitlesLog.Field(eventReferenceText)} "
-                + $"contextEventRef={VoiceSubtitlesLog.Field(context.EventReferenceText)} "
-                + $"contextPath={VoiceSubtitlesLog.Field(context.EventPath)}"
-        );
-
-        VoiceSubtitlesLog.Info(
-            "VO debug category resolution "
-                + $"attempt={context.AttemptId} "
-                + $"strategy={resolution.Strategy} "
-                + $"catalog={resolution.CatalogName} "
-                + $"matched={VoiceSubtitlesLog.Field(resolution.MatchedToken)} "
-                + $"candidates={resolution.CandidateCount} "
-                + $"stem={line.Stem} "
-                + $"eventDuration={context.DurationSeconds:F3}s "
-                + $"lineDuration={line.DurationSeconds:F3}s "
-                + $"english={VoiceSubtitlesLog.Field(line.English)} "
-                + $"chinese={VoiceSubtitlesLog.Field(line.Chinese)}"
-        );
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            var contextMatchesCallback = ContextMatchesCallback(context, eventReferenceText);
+            VoiceSubtitlesLog.Debug(
+                "VO debug callback deferred "
+                    + $"attempt={context.AttemptId} "
+                    + $"origin={context.Origin} "
+                    + $"age={AgeSeconds(context):F3}s "
+                    + $"source={sourceLabel} "
+                    + $"hook={hookName} "
+                    + $"contextMatchesCallback={contextMatchesCallback} "
+                    + $"callbackEvent={VoiceSubtitlesLog.Field(eventReferenceText)} "
+                    + $"contextEventRef={VoiceSubtitlesLog.Field(context.EventReferenceText)} "
+                    + $"contextPath={VoiceSubtitlesLog.Field(context.EventPath)}"
+            );
+        }
 
         if (string.Equals(context.Origin, "PlayVO", StringComparison.Ordinal))
             return;
 
-        if (!HasResolvedLine(resolution))
+        var lookupText =
+            $"{context.EventPath ?? string.Empty} {context.EventReferenceText ?? string.Empty} {eventReferenceText}";
+        var resolution = ResolveLine(lookupText, sourceLabel, hookName);
+        var line = resolution.Line;
+        if (VoiceSubtitlesLog.Verbose)
         {
-            VoiceSubtitlesLog.Info(
-                "VO subtitle skipped because no voice line matched "
+            VoiceSubtitlesLog.Debug(
+                "VO debug category resolution "
                     + $"attempt={context.AttemptId} "
-                    + $"origin={context.Origin} "
                     + $"strategy={resolution.Strategy} "
-                    + $"hook={hookName}"
+                    + $"catalog={resolution.CatalogName} "
+                    + $"matched={VoiceSubtitlesLog.Field(resolution.MatchedToken)} "
+                    + $"candidates={resolution.CandidateCount} "
+                    + $"stem={line.Stem} "
+                    + $"eventDuration={context.DurationSeconds:F3}s "
+                    + $"lineDuration={line.DurationSeconds:F3}s "
+                    + $"english={VoiceSubtitlesLog.Field(line.English)} "
+                    + $"chinese={VoiceSubtitlesLog.Field(line.Chinese)}"
             );
-            return;
         }
 
-        if (!IsEnabled())
+        if (!HasResolvedLine(resolution))
+        {
+            if (VoiceSubtitlesLog.Verbose)
+            {
+                VoiceSubtitlesLog.Debug(
+                    "VO subtitle skipped because no voice line matched "
+                        + $"attempt={context.AttemptId} "
+                        + $"origin={context.Origin} "
+                        + $"strategy={resolution.Strategy} "
+                        + $"hook={hookName}"
+                );
+            }
             return;
+        }
 
         var durationSeconds =
             context.DurationSeconds > 0f ? context.DurationSeconds : line.DurationSeconds;
         QueueShow(CreateCue(line, context.Player, durationSeconds, context.AttemptId));
-        VoiceSubtitlesLog.Info(
-            "VO subtitle resolved from debug callback "
-                + $"attempt={context.AttemptId} "
-                + $"origin={context.Origin} "
-                + $"strategy={resolution.Strategy} "
-                + $"stem={line.Stem} "
-                + $"displayDuration={durationSeconds:F3}s"
-        );
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            VoiceSubtitlesLog.Debug(
+                "VO subtitle resolved from debug callback "
+                    + $"attempt={context.AttemptId} "
+                    + $"origin={context.Origin} "
+                    + $"strategy={resolution.Strategy} "
+                    + $"stem={line.Stem} "
+                    + $"displayDuration={durationSeconds:F3}s"
+            );
+        }
     }
 
     private static VoiceSubtitlePlaybackCue CreateCue(
@@ -342,7 +368,8 @@ internal static class VoiceLineVoObserverBridge
                 var state = player.GetVOPlaybackState();
                 return state == PLAYBACK_STATE.STOPPED || state == PLAYBACK_STATE.STOPPING;
             };
-            playbackStateText = () => player.GetVOPlaybackState().ToString();
+            if (VoiceSubtitlesLog.Verbose)
+                playbackStateText = () => player.GetVOPlaybackState().ToString();
         }
 
         return new VoiceSubtitlePlaybackCue(
@@ -389,7 +416,8 @@ internal static class VoiceLineVoObserverBridge
         if (!context.IsKnown)
             return 0f;
 
-        return Mathf.Max(0f, Time.unscaledTime - context.CreatedAtSeconds);
+        var elapsedTicks = Stopwatch.GetTimestamp() - context.CreatedAtTimestamp;
+        return Math.Max(0f, (float)(elapsedTicks / (double)Stopwatch.Frequency));
     }
 
     private static bool ContextMatchesCallback(
@@ -432,7 +460,7 @@ internal static class VoiceLineVoObserverBridge
         }
     }
 
-    private static bool IsEnabled()
+    internal static bool IsSubtitleObservationEnabled()
     {
         try
         {
@@ -462,7 +490,7 @@ internal static class VoiceLineVoObserverBridge
         return resolution.HasLine && !string.IsNullOrEmpty(resolution.Line.Stem);
     }
 
-    internal readonly struct VoiceAttemptContext
+    internal sealed class VoiceAttemptContext
     {
         public static readonly VoiceAttemptContext Unknown = new(
             0,
@@ -473,7 +501,7 @@ internal static class VoiceLineVoObserverBridge
             null,
             null,
             0f,
-            0f
+            0L
         );
 
         public VoiceAttemptContext(
@@ -485,7 +513,7 @@ internal static class VoiceLineVoObserverBridge
             string? eventReferenceText,
             string? eventPath,
             float durationSeconds,
-            float createdAtSeconds
+            long createdAtTimestamp
         )
         {
             AttemptId = attemptId;
@@ -496,7 +524,7 @@ internal static class VoiceLineVoObserverBridge
             EventReferenceText = eventReferenceText;
             EventPath = eventPath;
             DurationSeconds = durationSeconds;
-            CreatedAtSeconds = createdAtSeconds;
+            CreatedAtTimestamp = createdAtTimestamp;
         }
 
         public int AttemptId { get; }
@@ -515,7 +543,7 @@ internal static class VoiceLineVoObserverBridge
 
         public float DurationSeconds { get; }
 
-        public float CreatedAtSeconds { get; }
+        public long CreatedAtTimestamp { get; }
 
         public bool IsKnown => AttemptId > 0;
     }

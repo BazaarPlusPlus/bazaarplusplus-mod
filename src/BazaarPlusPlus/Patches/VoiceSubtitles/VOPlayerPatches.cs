@@ -41,6 +41,9 @@ internal static class VOPlayerPlayVOPatch
         CardAudio.AudioHookType audioHookType
     )
     {
+        if (!VoiceLineVoObserverBridge.IsSubtitleObservationEnabled())
+            return;
+
         VoiceLineVoObserverBridge.BeginVoiceAttempt(
             VoiceLineVoObserverBridge.CreateVoiceAttempt(__instance, isHero, audioHookType)
         );
@@ -111,6 +114,9 @@ internal static class VOPlayerPlayTutorialVOPatch
     [HarmonyPrefix]
     private static void Prefix(VOPlayer __instance, EventReference eventRef)
     {
+        if (!VoiceLineVoObserverBridge.IsSubtitleObservationEnabled())
+            return;
+
         VoiceLineVoObserverBridge.BeginVoiceAttempt(
             VoiceLineVoObserverBridge.CreateVoiceAttempt(
                 __instance,

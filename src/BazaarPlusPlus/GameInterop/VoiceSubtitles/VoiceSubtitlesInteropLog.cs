@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Runtime.CompilerServices;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.GameInterop.VoiceSubtitles;
@@ -10,7 +11,11 @@ internal static class VoiceSubtitlesInteropLog
     private const string Component = "VoiceSubtitles";
     private const int MaxFieldLength = 260;
 
+    internal static bool Verbose => BppBuild.IsDebug;
+
     internal static void Info(string message) => BppLog.Info(Component, message);
+
+    internal static void Debug(string message) => BppLog.Debug(Component, message);
 
     internal static void Warn(string message) => BppLog.Warn(Component, message);
 

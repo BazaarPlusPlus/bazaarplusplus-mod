@@ -9,7 +9,12 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 internal sealed class VersionLabelScanner : MonoBehaviour
 {
     private const float ScanIntervalSeconds = 0.75f;
+    private const float BackoffScanIntervalSeconds = 5f;
+    private const int FullScanMissesBeforeBackoff = 3;
     private float _nextScanAt;
+    private float _nextFullScanAt;
+    private int _consecutiveFullScanMisses;
+    private string? _cachedVersionLabelPath;
 
     private void Update()
     {
@@ -17,12 +22,68 @@ internal sealed class VersionLabelScanner : MonoBehaviour
             return;
 
         _nextScanAt = Time.unscaledTime + ScanIntervalSeconds;
+        if (!VoiceSubtitlesGate.IsEnabled())
+        {
+            ResetBackoff();
+            return;
+        }
+
         if (VoiceLineDisplay.IsMountedFromVersionLabel)
             return;
 
-        var versionLabel = FindVisibleVersionLabel();
+        var versionLabel = FindCachedVersionLabel();
+        var usedFullScan = false;
+        if (versionLabel == null && Time.unscaledTime >= _nextFullScanAt)
+        {
+            usedFullScan = true;
+            versionLabel = FindVisibleVersionLabel();
+        }
+
         if (versionLabel != null)
+        {
             VoiceLineDisplay.MountFromVersionLabel(versionLabel);
+            if (VoiceLineDisplay.IsMountedFromVersionLabel)
+            {
+                _cachedVersionLabelPath = BuildPath(versionLabel.transform);
+                ResetBackoff();
+            }
+            return;
+        }
+
+        if (usedFullScan)
+            RecordFullScanMiss();
+    }
+
+    private TextMeshProUGUI? FindCachedVersionLabel()
+    {
+        if (string.IsNullOrWhiteSpace(_cachedVersionLabelPath))
+            return null;
+
+        var cachedObject = GameObject.Find(_cachedVersionLabelPath!);
+        if (cachedObject == null)
+            return null;
+
+        var label = cachedObject.GetComponent<TextMeshProUGUI>();
+        return IsUsableVersionLabel(label) ? label : null;
+    }
+
+    private void RecordFullScanMiss()
+    {
+        _consecutiveFullScanMisses++;
+        _nextFullScanAt =
+            Time.unscaledTime
+            + (
+                _consecutiveFullScanMisses >= FullScanMissesBeforeBackoff
+                    ? BackoffScanIntervalSeconds
+                    : ScanIntervalSeconds
+            );
+    }
+
+    private void ResetBackoff()
+    {
+        _consecutiveFullScanMisses = 0;
+        _nextFullScanAt = 0f;
+        _nextScanAt = Time.unscaledTime + ScanIntervalSeconds;
     }
 
     private static TextMeshProUGUI? FindVisibleVersionLabel()

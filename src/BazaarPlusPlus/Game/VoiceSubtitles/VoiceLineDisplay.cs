@@ -1,7 +1,7 @@
 #nullable enable
 
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.VoiceSubtitles.Settings;
 using TMPro;
@@ -22,8 +22,7 @@ internal static class VoiceLineDisplay
     private static float _secondLineOffset = -28f;
     private static RectTransform? _sourceRect;
     private static TextMeshProUGUI? _sourceLabel;
-    private static readonly object QueueSync = new();
-    private static readonly Queue<VoiceSubtitleCue> QueuedShows = new();
+    private static readonly ConcurrentQueue<VoiceSubtitleCue> QueuedShows = new();
 
     public static bool IsMountedFromVersionLabel =>
         _mountedFromVersionLabel && CurrentLabelObject != null;
@@ -116,12 +115,15 @@ internal static class VoiceLineDisplay
         var text = BuildDisplayText(line);
         if (text.IsEmpty)
         {
-            VoiceSubtitlesLog.Info(
-                "Subtitle show skipped because resolved text is empty "
-                    + $"display={displayId} "
-                    + $"attempt={cue.AttemptId} "
-                    + $"stem={line.Stem}"
-            );
+            if (VoiceSubtitlesLog.Verbose)
+            {
+                VoiceSubtitlesLog.Debug(
+                    "Subtitle show skipped because resolved text is empty "
+                        + $"display={displayId} "
+                        + $"attempt={cue.AttemptId} "
+                        + $"stem={line.Stem}"
+                );
+            }
             return;
         }
 
@@ -130,17 +132,20 @@ internal static class VoiceLineDisplay
                 ? cue.EventDurationSeconds + 0.15f
                 : Math.Max(1f, line.DurationSeconds + 0.15f);
 
-        VoiceSubtitlesLog.Info(
-            "Subtitle show request "
-                + $"display={displayId} "
-                + $"attempt={cue.AttemptId} "
-                + $"stem={line.Stem} "
-                + $"eventDuration={cue.EventDurationSeconds:F3}s "
-                + $"lineDuration={line.DurationSeconds:F3}s "
-                + $"lifetime={fallbackDuration:F3}s "
-                + $"english={VoiceSubtitlesLog.Field(text.English)} "
-                + $"chinese={VoiceSubtitlesLog.Field(text.Chinese)}"
-        );
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            VoiceSubtitlesLog.Debug(
+                "Subtitle show request "
+                    + $"display={displayId} "
+                    + $"attempt={cue.AttemptId} "
+                    + $"stem={line.Stem} "
+                    + $"eventDuration={cue.EventDurationSeconds:F3}s "
+                    + $"lineDuration={line.DurationSeconds:F3}s "
+                    + $"lifetime={fallbackDuration:F3}s "
+                    + $"english={VoiceSubtitlesLog.Field(text.English)} "
+                    + $"chinese={VoiceSubtitlesLog.Field(text.Chinese)}"
+            );
+        }
 
         ShowRaw(text, cue, fallbackDuration, displayId, line.Stem);
     }
@@ -150,37 +155,23 @@ internal static class VoiceLineDisplay
         if (!VoiceSubtitlesGate.IsEnabled())
             return;
 
-        lock (QueueSync)
-        {
-            QueuedShows.Enqueue(cue);
-        }
+        QueuedShows.Enqueue(cue);
     }
 
     public static void ProcessQueuedShows()
     {
-        while (true)
-        {
-            VoiceSubtitleCue queued;
-            lock (QueueSync)
-            {
-                if (QueuedShows.Count == 0)
-                    return;
+        if (QueuedShows.IsEmpty)
+            return;
 
-                queued = QueuedShows.Dequeue();
-            }
-
+        while (QueuedShows.TryDequeue(out var queued))
             Show(queued);
-        }
     }
 
     public static void Reset()
     {
         DestroyCurrentLabel();
         _nextDisplayId = 0;
-        lock (QueueSync)
-        {
-            QueuedShows.Clear();
-        }
+        while (QueuedShows.TryDequeue(out _)) { }
     }
 
     private static void DestroyCurrentLabel()
@@ -222,16 +213,19 @@ internal static class VoiceLineDisplay
         TryApplySettingsToLabel("show");
         ApplyText(text);
         labelObject.SetActive(true);
-        VoiceSubtitlesLog.Info(
-            "Subtitle label updated "
-                + $"display={displayId} "
-                + $"attempt={cue.AttemptId} "
-                + $"stem={stem} "
-                + $"mountedFromVersionLabel={IsMountedFromVersionLabel} "
-                + $"activeBefore={activeBefore} "
-                + $"renderer={RendererDescription()} "
-                + $"duration={durationSeconds:F3}s"
-        );
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            VoiceSubtitlesLog.Debug(
+                "Subtitle label updated "
+                    + $"display={displayId} "
+                    + $"attempt={cue.AttemptId} "
+                    + $"stem={stem} "
+                    + $"mountedFromVersionLabel={IsMountedFromVersionLabel} "
+                    + $"activeBefore={activeBefore} "
+                    + $"renderer={RendererDescription()} "
+                    + $"duration={durationSeconds:F3}s"
+            );
+        }
         _lifetime.ShowUntilVoiceStops(
             cue.IsPlaybackStoppedOrStopping,
             cue.PlaybackStateText,
