@@ -16,9 +16,15 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
     private int _attemptId;
     private string _stem = "<none>";
 
+    private void Awake()
+    {
+        enabled = false;
+    }
+
     public void Initialize(GameObject labelObject)
     {
         _labelObject = labelObject;
+        enabled = false;
     }
 
     public void ShowUntilVoiceStops(
@@ -37,14 +43,18 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
         _displayId = displayId;
         _attemptId = attemptId;
         _stem = stem;
-        VoiceSubtitlesLog.Info(
-            "Subtitle lifetime start "
-                + $"display={_displayId} "
-                + $"attempt={_attemptId} "
-                + $"stem={_stem} "
-                + $"fallbackDuration={Mathf.Max(0.2f, fallbackDurationSeconds):F3}s "
-                + $"playbackState={PlaybackStateText()}"
-        );
+        enabled = true;
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            VoiceSubtitlesLog.Debug(
+                "Subtitle lifetime start "
+                    + $"display={_displayId} "
+                    + $"attempt={_attemptId} "
+                    + $"stem={_stem} "
+                    + $"fallbackDuration={Mathf.Max(0.2f, fallbackDurationSeconds):F3}s "
+                    + $"playbackState={PlaybackStateText()}"
+            );
+        }
     }
 
     private void Update()
@@ -56,31 +66,57 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
         {
             if (IsPlaybackStoppedOrStopping())
             {
-                Hide($"playback-{PlaybackStateText()}");
+                HidePlaybackStopped();
                 return;
             }
         }
 
         if (Time.unscaledTime >= _hideAt)
-            Hide("fallback-timeout");
+            HideFallbackTimeout();
     }
 
-    private void Hide(string reason)
+    private void HidePlaybackStopped()
     {
-        var elapsedSeconds = Mathf.Max(0f, Time.unscaledTime - _shownAt);
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            Hide("playback-" + PlaybackStateText());
+            return;
+        }
+
+        Hide();
+    }
+
+    private void HideFallbackTimeout()
+    {
+        if (VoiceSubtitlesLog.Verbose)
+        {
+            Hide("fallback-timeout");
+            return;
+        }
+
+        Hide();
+    }
+
+    private void Hide(string? reason = null)
+    {
         if (_labelObject != null)
             _labelObject.SetActive(false);
-        VoiceSubtitlesLog.Info(
-            "Subtitle hidden "
-                + $"display={_displayId} "
-                + $"attempt={_attemptId} "
-                + $"stem={_stem} "
-                + $"reason={reason} "
-                + $"elapsed={elapsedSeconds:F3}s "
-                + $"playbackState={PlaybackStateText()}"
-        );
+        if (VoiceSubtitlesLog.Verbose && reason != null)
+        {
+            var elapsedSeconds = Mathf.Max(0f, Time.unscaledTime - _shownAt);
+            VoiceSubtitlesLog.Debug(
+                "Subtitle hidden "
+                    + $"display={_displayId} "
+                    + $"attempt={_attemptId} "
+                    + $"stem={_stem} "
+                    + $"reason={reason} "
+                    + $"elapsed={elapsedSeconds:F3}s "
+                    + $"playbackState={PlaybackStateText()}"
+            );
+        }
         _isPlaybackStoppedOrStopping = null;
         _playbackStateText = null;
+        enabled = false;
     }
 
     private bool IsPlaybackStoppedOrStopping()

@@ -181,6 +181,141 @@ public sealed class VoiceSubtitlesTests
         Assert.Equal("embedded-test", GetString(resolution, "CatalogName"));
     }
 
+    [Fact]
+    public void Catalog_resolves_file_extension_suffix_like_bare_stem()
+    {
+        var catalogType = GetRequiredType("BazaarPlusPlus.Game.VoiceSubtitles.VoiceLineCatalog");
+        var resolveDetailed = GetRequiredStaticMethod(catalogType, "ResolveDetailed");
+
+        try
+        {
+            ReplaceCatalog(
+                catalogType,
+                "suffix-test",
+                ("001_VanessaPvPDefeat1", "Defeat does not defeat me.", "失败不会打败我。", 2.15f)
+            );
+
+            var bare = Resolve(catalogType, "001_VanessaPvPDefeat1", "Hero", "Tutorial");
+            var withExtension = Resolve(
+                catalogType,
+                "event:/VO/Vanessa/001-VanessaPvPDefeat1.wav",
+                "Hero",
+                "Tutorial"
+            );
+
+            Assert.Equal(
+                GetString(GetPropertyValue(bare, "Line")!, "Stem"),
+                GetString(GetPropertyValue(withExtension, "Line")!, "Stem")
+            );
+            Assert.Equal(
+                "001_VanessaPvPDefeat1",
+                GetString(GetPropertyValue(withExtension, "Line")!, "Stem")
+            );
+            Assert.Equal("event-stem", GetString(withExtension, "Strategy"));
+        }
+        finally
+        {
+            ResetCatalog(catalogType);
+        }
+    }
+
+    [Fact]
+    public void Catalog_resolves_unique_character_hook_fallback()
+    {
+        var catalogType = GetRequiredType("BazaarPlusPlus.Game.VoiceSubtitles.VoiceLineCatalog");
+
+        try
+        {
+            ReplaceCatalog(
+                catalogType,
+                "hook-test",
+                ("001_VanessaPvPDefeat1", "Defeat does not defeat me.", "失败不会打败我。", 2.15f),
+                ("002_VanessaIdle1", "Still sailing.", "继续航行。", 1.5f)
+            );
+
+            var resolution = Resolve(
+                catalogType,
+                "event:/VO/Vanessa/UnmappedCategory",
+                "Hero",
+                "OnPvPVictoryDefeat"
+            );
+            var line = GetPropertyValue(resolution, "Line");
+
+            Assert.Equal("001_VanessaPvPDefeat1", GetString(line!, "Stem"));
+            Assert.Equal("character-hook-unique", GetString(resolution, "Strategy"));
+            Assert.Equal("Vanessa:PvPDefeat", GetString(resolution, "MatchedToken"));
+            Assert.Equal(1, GetInt32(resolution, "CandidateCount"));
+        }
+        finally
+        {
+            ResetCatalog(catalogType);
+        }
+    }
+
+    [Fact]
+    public void Catalog_reports_ambiguous_character_hook_fallback()
+    {
+        var catalogType = GetRequiredType("BazaarPlusPlus.Game.VoiceSubtitles.VoiceLineCatalog");
+
+        try
+        {
+            ReplaceCatalog(
+                catalogType,
+                "hook-ambiguous-test",
+                ("001_VanessaPvPDefeat1", "Defeat does not defeat me.", "失败不会打败我。", 2.15f),
+                ("002_VanessaPvPDefeat2", "The sea remembers.", "海会记住。", 1.75f)
+            );
+
+            var resolution = Resolve(
+                catalogType,
+                "event:/VO/Vanessa/UnmappedCategory",
+                "Hero",
+                "OnPvPVictoryDefeat"
+            );
+            var line = GetPropertyValue(resolution, "Line");
+
+            Assert.True(string.IsNullOrEmpty(GetNullableString(line!, "Stem")));
+            Assert.Equal("character-hook-ambiguous", GetString(resolution, "Strategy"));
+            Assert.Equal("Vanessa:PvPDefeat", GetString(resolution, "MatchedToken"));
+            Assert.Equal(2, GetInt32(resolution, "CandidateCount"));
+        }
+        finally
+        {
+            ResetCatalog(catalogType);
+        }
+    }
+
+    [Fact]
+    public void Catalog_reset_swaps_to_empty_snapshot()
+    {
+        var catalogType = GetRequiredType("BazaarPlusPlus.Game.VoiceSubtitles.VoiceLineCatalog");
+
+        try
+        {
+            ReplaceCatalog(
+                catalogType,
+                "reset-test",
+                ("999_CustomResetLine1", "Reset line.", "重置台词。", 1.25f)
+            );
+            ResetCatalog(catalogType);
+
+            var resolution = Resolve(
+                catalogType,
+                "event:/VO/Vanessa/999_CustomResetLine1",
+                "Hero",
+                "Tutorial"
+            );
+            var line = GetPropertyValue(resolution, "Line");
+
+            Assert.True(string.IsNullOrEmpty(GetNullableString(line!, "Stem")));
+            Assert.Equal("unresolved", GetString(resolution, "Strategy"));
+        }
+        finally
+        {
+            ResetCatalog(catalogType);
+        }
+    }
+
     private static void WithRepositoryCache(
         TimeSpan cacheAge,
         Action<Type, object, string, Func<bool>, List<Func<Task>>> run
@@ -281,6 +416,48 @@ public sealed class VoiceSubtitlesTests
         return "sha256:" + Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
+    private static void ReplaceCatalog(
+        Type catalogType,
+        string catalogName,
+        params (string Stem, string English, string Chinese, float DurationSeconds)[] lines
+    )
+    {
+        var voiceLineType = GetRequiredType("BazaarPlusPlus.Game.VoiceSubtitles.VoiceLine");
+        var voiceLineArray = Array.CreateInstance(voiceLineType, lines.Length);
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line =
+                Activator.CreateInstance(
+                    voiceLineType,
+                    lines[i].Stem,
+                    lines[i].English,
+                    lines[i].Chinese,
+                    lines[i].DurationSeconds
+                ) ?? throw new InvalidOperationException("Could not create VoiceLine.");
+            voiceLineArray.SetValue(line, i);
+        }
+
+        GetRequiredStaticMethod(catalogType, "ReplaceCatalog")
+            .Invoke(null, new object[] { voiceLineArray, catalogName });
+    }
+
+    private static object Resolve(
+        Type catalogType,
+        string lookupText,
+        string sourceLabel,
+        string hookName
+    )
+    {
+        var resolution = GetRequiredStaticMethod(catalogType, "ResolveDetailed")
+            .Invoke(null, new object[] { lookupText, sourceLabel, hookName });
+        return resolution ?? throw new InvalidOperationException("ResolveDetailed returned null.");
+    }
+
+    private static void ResetCatalog(Type catalogType)
+    {
+        GetRequiredStaticMethod(catalogType, "Reset").Invoke(null, null);
+    }
+
     private static Type GetRequiredType(string name)
     {
         return Assembly.Load("BazaarPlusPlus").GetType(name)
@@ -305,8 +482,10 @@ public sealed class VoiceSubtitlesTests
 
     private static FieldInfo GetRequiredStaticField(Type type, string name)
     {
-        return type.GetField(name, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException($"Missing field {type.FullName}.{name}");
+        return type.GetField(
+                name,
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException($"Missing field {type.FullName}.{name}");
     }
 
     private static object? GetPropertyValue(object instance, string name)
@@ -323,6 +502,11 @@ public sealed class VoiceSubtitlesTests
     private static string GetString(object instance, string name)
     {
         return Assert.IsType<string>(GetPropertyValue(instance, name));
+    }
+
+    private static string? GetNullableString(object instance, string name)
+    {
+        return GetPropertyValue(instance, name) as string;
     }
 
     private static bool GetBool(object instance, string name)

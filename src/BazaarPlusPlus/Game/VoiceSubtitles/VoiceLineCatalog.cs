@@ -1,16 +1,15 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Text;
+using System.Threading;
 
 namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
 internal static class VoiceLineCatalog
 {
     private static readonly object SyncRoot = new();
-    private static VoiceLine[] _catalogLines = Array.Empty<VoiceLine>();
-    private static string _catalogName = "empty";
+    private static CatalogSnapshot _snapshot = CatalogSnapshot.Empty;
 
     private static readonly IReadOnlyDictionary<string, string> CharacterAliases = new Dictionary<
         string,
@@ -82,6 +81,8 @@ internal static class VoiceLineCatalog
         ),
     };
 
+    private static readonly Entry[] SampleEntries = CreateEntries(SampleLines);
+
     private static readonly IReadOnlyDictionary<string, string> HookTokens = new Dictionary<
         string,
         string
@@ -100,14 +101,14 @@ internal static class VoiceLineCatalog
         ["OnUpgrade"] = "Upgrade",
     };
 
+    private static readonly CharacterProbe[] CharacterProbes = CreateCharacterProbes();
+
     internal static void ReplaceCatalog(VoiceLine[] lines, string catalogName)
     {
-        var nextLines = lines ?? Array.Empty<VoiceLine>();
-        var nextName = string.IsNullOrWhiteSpace(catalogName) ? "unknown" : catalogName;
         lock (SyncRoot)
         {
-            _catalogLines = nextLines.ToArray();
-            _catalogName = nextName;
+            var snapshot = CatalogSnapshot.Create(lines, catalogName);
+            Volatile.Write(ref _snapshot, snapshot);
         }
     }
 
@@ -115,8 +116,7 @@ internal static class VoiceLineCatalog
     {
         lock (SyncRoot)
         {
-            _catalogLines = Array.Empty<VoiceLine>();
-            _catalogName = "empty";
+            Volatile.Write(ref _snapshot, CatalogSnapshot.Empty);
         }
     }
 
@@ -148,7 +148,7 @@ internal static class VoiceLineCatalog
                     tokenFromHook,
                     hookName
                 );
-                if (!string.IsNullOrEmpty(characterResolution.Line.Stem))
+                if (characterResolution.CandidateCount > 0)
                     return characterResolution;
             }
         }
@@ -161,16 +161,35 @@ internal static class VoiceLineCatalog
         var normalizedTokens = ExtractLookupTokens(eventReferenceText);
         var catalog = SnapshotCatalog();
 
-        foreach (var line in catalog.Lines)
+        foreach (var token in normalizedTokens)
         {
-            if (MatchesExactStem(eventReferenceText, normalizedTokens, line.Stem))
-                return new VoiceLineResolution(line, "event-stem", line.Stem, catalog.Name);
+            if (token.Length < 8)
+                continue;
+
+            if (catalog.ExactByNormalizedStem.TryGetValue(token, out var exactLine))
+                return new VoiceLineResolution(
+                    exactLine,
+                    "event-stem",
+                    exactLine.Stem,
+                    catalog.Name
+                );
         }
 
-        foreach (var line in SampleLines)
+        foreach (var entry in catalog.Entries)
         {
-            if (MatchesExactStem(eventReferenceText, normalizedTokens, line.Stem))
-                return new VoiceLineResolution(line, "event-stem", line.Stem, "sample");
+            if (MatchesExactStem(eventReferenceText, normalizedTokens, entry))
+                return new VoiceLineResolution(
+                    entry.Line,
+                    "event-stem",
+                    entry.Line.Stem,
+                    catalog.Name
+                );
+        }
+
+        foreach (var entry in SampleEntries)
+        {
+            if (MatchesExactStem(eventReferenceText, normalizedTokens, entry))
+                return new VoiceLineResolution(entry.Line, "event-stem", entry.Line.Stem, "sample");
         }
 
         return default;
@@ -178,15 +197,18 @@ internal static class VoiceLineCatalog
 
     private static bool MatchesExactStem(
         string lookupText,
-        IReadOnlyList<string> normalizedLookupTokens,
-        string stem
+        string[] normalizedLookupTokens,
+        Entry entry
     )
     {
+        var stem = entry.Line.Stem;
+        if (string.IsNullOrEmpty(stem))
+            return false;
+
         if (lookupText.IndexOf(stem, StringComparison.OrdinalIgnoreCase) >= 0)
             return true;
 
-        var normalizedStem = NormalizeVoiceStem(stem);
-        if (normalizedStem.Length < 8)
+        if (entry.NormalizedStem.Length < 8)
             return false;
 
         foreach (var token in normalizedLookupTokens)
@@ -195,8 +217,8 @@ internal static class VoiceLineCatalog
                 continue;
 
             if (
-                token.Equals(normalizedStem, StringComparison.OrdinalIgnoreCase)
-                || token.IndexOf(normalizedStem, StringComparison.OrdinalIgnoreCase) >= 0
+                token.Equals(entry.NormalizedStem, StringComparison.OrdinalIgnoreCase)
+                || token.IndexOf(entry.NormalizedStem, StringComparison.OrdinalIgnoreCase) >= 0
             )
             {
                 return true;
@@ -206,28 +228,55 @@ internal static class VoiceLineCatalog
         return false;
     }
 
-    private static IReadOnlyList<string> ExtractLookupTokens(string lookupText)
+    private static string[] ExtractLookupTokens(string lookupText)
     {
-        return lookupText
-            .Split(
-                new[] { ' ', '/', '\\', '\t', '\r', '\n' },
-                StringSplitOptions.RemoveEmptyEntries
-            )
-            .Select(NormalizeVoiceStem)
-            .Where(token => token.Length > 0)
-            .ToArray();
+        if (string.IsNullOrEmpty(lookupText))
+            return Array.Empty<string>();
+
+        List<string>? tokens = null;
+        var tokenStart = -1;
+        for (var i = 0; i <= lookupText.Length; i++)
+        {
+            var isSeparator = i == lookupText.Length || IsLookupSeparator(lookupText[i]);
+            if (!isSeparator)
+            {
+                if (tokenStart < 0)
+                    tokenStart = i;
+                continue;
+            }
+
+            if (tokenStart < 0)
+                continue;
+
+            var token = NormalizeVoiceStem(lookupText, tokenStart, i - tokenStart);
+            if (token.Length > 0)
+            {
+                tokens ??= new List<string>();
+                tokens.Add(token);
+            }
+
+            tokenStart = -1;
+        }
+
+        return tokens == null ? Array.Empty<string>() : tokens.ToArray();
     }
 
     private static string NormalizeVoiceStem(string value)
     {
-        var start = 0;
-        while (start < value.Length && char.IsDigit(value[start]))
+        return NormalizeVoiceStem(value, 0, value.Length);
+    }
+
+    private static string NormalizeVoiceStem(string value, int offset, int length)
+    {
+        var start = offset;
+        var end = Math.Min(value.Length, offset + length);
+        while (start < end && char.IsDigit(value[start]))
             start++;
-        if (start < value.Length && value[start] == '_')
+        if (start < end && value[start] == '_')
             start++;
 
-        var builder = new StringBuilder(value.Length - start);
-        for (var i = start; i < value.Length; i++)
+        var builder = new StringBuilder(Math.Max(0, end - start));
+        for (var i = start; i < end; i++)
         {
             var c = value[i];
             if (char.IsLetterOrDigit(c))
@@ -244,32 +293,29 @@ internal static class VoiceLineCatalog
     )
     {
         var catalog = SnapshotCatalog();
-        var candidates = catalog
-            .Lines.Where(line =>
-                IsCharacterLine(line.Stem, characterName)
-                && line.Stem.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0
-            )
-            .ToArray();
+        var matchedToken = CharacterHookKey(characterName, token);
+        if (!catalog.CharacterHookFallback.TryGetValue(matchedToken, out var bucket))
+            return default;
 
-        if (candidates.Length == 1)
+        if (bucket.Count == 1)
         {
             return new VoiceLineResolution(
-                candidates[0],
+                bucket.SingleLine,
                 "character-hook-unique",
-                $"{characterName}:{token}",
+                matchedToken,
                 catalog.Name,
-                candidates.Length
+                bucket.Count
             );
         }
 
-        if (candidates.Length > 1)
+        if (bucket.Count > 1)
         {
             return new VoiceLineResolution(
                 default,
                 "character-hook-ambiguous",
-                $"{characterName}:{token}",
+                matchedToken,
                 catalog.Name,
-                candidates.Length
+                bucket.Count
             );
         }
 
@@ -278,8 +324,7 @@ internal static class VoiceLineCatalog
 
     private static bool IsCharacterLine(string stem, string characterName)
     {
-        return stem.IndexOf($"_{characterName}", StringComparison.OrdinalIgnoreCase) >= 0
-            || stem.IndexOf($"{characterName}", StringComparison.OrdinalIgnoreCase) >= 0;
+        return stem.IndexOf(characterName, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private static string? ResolveCharacterName(string? eventReferenceText)
@@ -287,28 +332,218 @@ internal static class VoiceLineCatalog
         if (string.IsNullOrWhiteSpace(eventReferenceText))
             return null;
 
-        foreach (var pair in CharacterAliases)
+        foreach (var probe in CharacterProbes)
         {
-            var alias = pair.Key;
             if (
-                eventReferenceText!.IndexOf($"/{alias}/", StringComparison.OrdinalIgnoreCase) >= 0
-                || eventReferenceText.IndexOf($"VO_{alias}_", StringComparison.OrdinalIgnoreCase)
+                eventReferenceText.IndexOf(probe.PathSegment, StringComparison.OrdinalIgnoreCase)
                     >= 0
-                || eventReferenceText.IndexOf($"_{alias}_", StringComparison.OrdinalIgnoreCase) >= 0
+                || eventReferenceText.IndexOf(probe.VoPrefix, StringComparison.OrdinalIgnoreCase)
+                    >= 0
+                || eventReferenceText.IndexOf(probe.Infix, StringComparison.OrdinalIgnoreCase) >= 0
             )
             {
-                return pair.Value;
+                return probe.Canonical;
             }
         }
 
         return null;
     }
 
-    private static (VoiceLine[] Lines, string Name) SnapshotCatalog()
+    private static CatalogSnapshot SnapshotCatalog()
     {
-        lock (SyncRoot)
+        return Volatile.Read(ref _snapshot);
+    }
+
+    private static Entry[] CreateEntries(VoiceLine[]? lines)
+    {
+        var source = lines ?? Array.Empty<VoiceLine>();
+        var entries = new Entry[source.Length];
+        for (var i = 0; i < source.Length; i++)
         {
-            return (_catalogLines, _catalogName);
+            var line = source[i];
+            entries[i] = new Entry(line, NormalizeVoiceStem(line.Stem ?? string.Empty));
+        }
+
+        return entries;
+    }
+
+    private static CharacterProbe[] CreateCharacterProbes()
+    {
+        var probes = new CharacterProbe[CharacterAliases.Count];
+        var index = 0;
+        foreach (var pair in CharacterAliases)
+        {
+            var alias = pair.Key;
+            probes[index++] = new CharacterProbe(
+                "/" + alias + "/",
+                "VO_" + alias + "_",
+                "_" + alias + "_",
+                pair.Value
+            );
+        }
+
+        return probes;
+    }
+
+    private static bool IsLookupSeparator(char value)
+    {
+        return value == ' '
+            || value == '/'
+            || value == '\\'
+            || value == '\t'
+            || value == '\r'
+            || value == '\n';
+    }
+
+    private static string CharacterHookKey(string characterName, string token)
+    {
+        return characterName + ":" + token;
+    }
+
+    private readonly struct Entry
+    {
+        public Entry(VoiceLine line, string normalizedStem)
+        {
+            Line = line;
+            NormalizedStem = normalizedStem;
+        }
+
+        public VoiceLine Line { get; }
+
+        public string NormalizedStem { get; }
+    }
+
+    private readonly struct CharacterHookBucket
+    {
+        public CharacterHookBucket(int count, VoiceLine singleLine)
+        {
+            Count = count;
+            SingleLine = singleLine;
+        }
+
+        public int Count { get; }
+
+        public VoiceLine SingleLine { get; }
+
+        public CharacterHookBucket Add(VoiceLine line)
+        {
+            return Count == 0
+                ? new CharacterHookBucket(1, line)
+                : new CharacterHookBucket(Count + 1, default);
+        }
+    }
+
+    private readonly struct CharacterProbe
+    {
+        public CharacterProbe(string pathSegment, string voPrefix, string infix, string canonical)
+        {
+            PathSegment = pathSegment;
+            VoPrefix = voPrefix;
+            Infix = infix;
+            Canonical = canonical;
+        }
+
+        public string PathSegment { get; }
+
+        public string VoPrefix { get; }
+
+        public string Infix { get; }
+
+        public string Canonical { get; }
+    }
+
+    private sealed class CatalogSnapshot
+    {
+        public static readonly CatalogSnapshot Empty = new(
+            Array.Empty<Entry>(),
+            new Dictionary<string, VoiceLine>(StringComparer.OrdinalIgnoreCase),
+            new Dictionary<string, CharacterHookBucket>(StringComparer.OrdinalIgnoreCase),
+            "empty"
+        );
+
+        private CatalogSnapshot(
+            Entry[] entries,
+            Dictionary<string, VoiceLine> exactByNormalizedStem,
+            Dictionary<string, CharacterHookBucket> characterHookFallback,
+            string name
+        )
+        {
+            Entries = entries;
+            ExactByNormalizedStem = exactByNormalizedStem;
+            CharacterHookFallback = characterHookFallback;
+            Name = name;
+        }
+
+        public Entry[] Entries { get; }
+
+        public Dictionary<string, VoiceLine> ExactByNormalizedStem { get; }
+
+        public Dictionary<string, CharacterHookBucket> CharacterHookFallback { get; }
+
+        public string Name { get; }
+
+        public static CatalogSnapshot Create(VoiceLine[]? lines, string catalogName)
+        {
+            var entries = CreateEntries(lines);
+            var exactByNormalizedStem = new Dictionary<string, VoiceLine>(
+                StringComparer.OrdinalIgnoreCase
+            );
+            for (var i = 0; i < entries.Length; i++)
+            {
+                var normalizedStem = entries[i].NormalizedStem;
+                if (normalizedStem.Length < 8)
+                    continue;
+                if (!exactByNormalizedStem.ContainsKey(normalizedStem))
+                    exactByNormalizedStem.Add(normalizedStem, entries[i].Line);
+            }
+
+            return new CatalogSnapshot(
+                entries,
+                exactByNormalizedStem,
+                BuildCharacterHookFallbackIndex(entries),
+                string.IsNullOrWhiteSpace(catalogName) ? "unknown" : catalogName
+            );
+        }
+
+        private static Dictionary<string, CharacterHookBucket> BuildCharacterHookFallbackIndex(
+            Entry[] entries
+        )
+        {
+            var buckets = new Dictionary<string, CharacterHookBucket>(
+                StringComparer.OrdinalIgnoreCase
+            );
+
+            foreach (var entry in entries)
+            {
+                var stem = entry.Line.Stem;
+                if (string.IsNullOrEmpty(stem))
+                    continue;
+
+                HashSet<string>? seenKeys = null;
+                foreach (var characterAlias in CharacterAliases)
+                {
+                    var character = characterAlias.Value;
+                    if (!IsCharacterLine(stem, character))
+                        continue;
+
+                    foreach (var hookToken in HookTokens)
+                    {
+                        var token = hookToken.Value;
+                        if (stem.IndexOf(token, StringComparison.OrdinalIgnoreCase) < 0)
+                            continue;
+
+                        var key = CharacterHookKey(character, token);
+                        seenKeys ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        if (!seenKeys.Add(key))
+                            continue;
+
+                        buckets.TryGetValue(key, out var bucket);
+                        buckets[key] = bucket.Add(entry.Line);
+                    }
+                }
+            }
+
+            return buckets;
         }
     }
 }
