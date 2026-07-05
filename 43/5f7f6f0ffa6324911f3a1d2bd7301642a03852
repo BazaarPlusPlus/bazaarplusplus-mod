@@ -1,0 +1,23 @@
+tests/CollectionSourceFiltering.Tests/Program.cs
+  s_854e487acfa280::t_1b9d2da1224a71 374,385-404
+src/BazaarPlusPlus/Data/CollectionSources/collection-sources.json
+  s_854e487acfa280::t_f95dc2186285d5 1273,1280,1283
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "435f7f6f0ffa6324911f3a1d2bd7301642a03852",
+  "prompts": {},
+  "sessions": {
+    "s_854e487acfa280": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f2bc2-46ca-7c93-a6c5-f421d73b1e3b",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
