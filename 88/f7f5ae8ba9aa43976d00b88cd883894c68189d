@@ -1,0 +1,47 @@
+src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelController.cs
+  s_970a97ba86892f::t_34a26f6aa95f24 117-121
+src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelDecisions.cs
+  s_970a97ba86892f::t_f6c02bb22c4dda 3,90-97
+src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelMount.cs
+  s_970a97ba86892f::t_2adf9b82da9ba2 75-79
+tests/HistoryPanelDecisions.Tests/Program.cs
+  s_970a97ba86892f::t_2c90a63e12db33 9,13,123-130,252-263
+  s_970a97ba86892f::t_f7425d3fd7ccdc 251
+  s_970a97ba86892f::t_86660432be47f8 264
+src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelFactory.cs
+  s_970a97ba86892f::t_6ac943875c5c8b 20,49
+src/BazaarPlusPlus/Game/HistoryPanel/Text/HistoryPanelText.AccountLink.cs
+  s_970a97ba86892f::t_3309a24f21e81a 41-46,121-122
+  s_970a97ba86892f::t_d2399bece588f6 123
+src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelCoordinator.cs
+  s_970a97ba86892f::t_fe559f5a57a5ce 712-732
+src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Tree.cs
+  s_970a97ba86892f::t_ef21edcbf49a07 530-548
+tests/HistoryPanelServerHealth.Tests/Program.cs
+  s_970a97ba86892f::t_9f2b18d197247a 100-103,128-131,154-157
+src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelDependencies.cs
+  s_970a97ba86892f::t_5e2bc79bf0e87d 53,62,77
+src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanel.UiToolkit.cs
+  s_970a97ba86892f::t_62f797cb2bd6da 31,177,194-197,296-298
+  s_970a97ba86892f::t_9e1460468565a3 299
+src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs
+  s_970a97ba86892f::t_0a89e4517a8e2f 24,61,113,134-136,270-271,314-319
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "88f7f5ae8ba9aa43976d00b88cd883894c68189d",
+  "prompts": {},
+  "sessions": {
+    "s_970a97ba86892f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3373-0052-78c2-b404-b5ea7eb15c49",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
