@@ -2,6 +2,7 @@
 #nullable enable
 using System;
 using System.IO;
+using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.HistoryPanel;
@@ -12,6 +13,7 @@ using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Localization;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
@@ -153,6 +155,9 @@ public class Plugin : BaseUnityPlugin
     {
         LegendaryPositionDisplayFormatter.Install(services.Config);
         L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config));
+        BppUiFont.Install(() =>
+            services.Config.UiFontKindConfig?.Value ?? BppConfig.DefaultUiFontKind
+        );
         BppSettingsDockCatalog.Install(services.Config, settingsDockRegistry);
         BPPSupporterCatalog.Install(services.Config);
         BppHotkeyService.Install(services.Config);
@@ -163,6 +168,7 @@ public class Plugin : BaseUnityPlugin
     {
         LegendaryPositionDisplayFormatter.Reset();
         L.Reset();
+        BppUiFont.Reset();
         BppSettingsDockCatalog.Reset();
         BPPSupporterCatalog.Reset();
         BppHotkeyService.Reset();

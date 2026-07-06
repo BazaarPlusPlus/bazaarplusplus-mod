@@ -1456,6 +1456,33 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Ui_font_selection_install_keeps_tmp_font_on_lxgw()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var uiFontSource = File.ReadAllText(
+            Path.Combine(mainSource, "Infrastructure", "Fonts", "BppUiFont.cs")
+        );
+        var tmpFontSource = File.ReadAllText(
+            Path.Combine(mainSource, "Infrastructure", "Fonts", "BppTmpFont.cs")
+        );
+        var pluginSource = File.ReadAllText(Path.Combine(mainSource, "Plugin.cs"));
+
+        Assert.Contains(
+            "public static void Install(Func<BppUiFontKind> kindProvider)",
+            uiFontSource
+        );
+        Assert.Contains("public static Font LxgwWenKai", uiFontSource);
+        Assert.Contains("Resources.GetBuiltinResource<Font>(SansSerifResourceName)", uiFontSource);
+        Assert.Contains("LegacyRuntime.ttf", uiFontSource);
+        Assert.Contains("BppUiFont.Install(", pluginSource);
+        Assert.Contains("services.Config.UiFontKindConfig?.Value", pluginSource);
+        Assert.Contains("BppConfig.DefaultUiFontKind", pluginSource);
+        Assert.Contains("BppUiFont.LxgwWenKai", tmpFontSource);
+        Assert.DoesNotContain("BppUiFont.Default", tmpFontSource);
+    }
+
+    [Fact]
     public void RandomHeroSkinPool_has_no_legacy_playerprefs_migration()
     {
         var repoRoot = RepoRoot();

@@ -184,6 +184,109 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
+    public void UiFontDockEntry_defaults_to_lxgw_wenkai_and_is_inactive()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-ui-font-dock-default-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var entry = new UiFontSettingsDockEntry();
+
+            var definition = entry.Build(config);
+
+            Assert.Equal(BppSettingsDockOrder.UiFont, entry.Order);
+            Assert.Equal("UiFont", definition.Key);
+            Assert.Equal(BppConfig.DefaultUiFontKind, config.UiFontKindConfig!.Value);
+            Assert.Equal("UI Font", definition.ResolveLabel("en"));
+            Assert.Equal("界面字体", definition.ResolveLabel("zh-CN"));
+            Assert.Equal("KAI", definition.ResolveStatus("en"));
+            Assert.Equal("楷体", definition.ResolveStatus("zh-CN"));
+            Assert.False(definition.IsActive());
+            Assert.False(definition.CollapseAfterActivate);
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
+    public void UiFontDockEntry_cycles_between_lxgw_wenkai_and_sans_serif()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-ui-font-dock-cycle-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var definition = new UiFontSettingsDockEntry().Build(config);
+
+            definition.Activate();
+
+            Assert.Equal(BppUiFontKind.SansSerif, config.UiFontKindConfig!.Value);
+            Assert.Equal("SANS", definition.ResolveStatus("en"));
+            Assert.Equal("黑体", definition.ResolveStatus("zh-CN"));
+            Assert.True(definition.IsActive());
+
+            definition.Activate();
+
+            Assert.Equal(BppUiFontKind.LxgwWenKai, config.UiFontKindConfig.Value);
+            Assert.Equal("KAI", definition.ResolveStatus("en"));
+            Assert.Equal("楷体", definition.ResolveStatus("zh-CN"));
+            Assert.False(definition.IsActive());
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
+    public void UiFontDockEntry_treats_unknown_value_as_default_then_cycles_to_sans_serif()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-ui-font-dock-invalid-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var definition = new UiFontSettingsDockEntry().Build(config);
+
+            config.UiFontKindConfig!.Value = (BppUiFontKind)99;
+
+            Assert.Equal("KAI", definition.ResolveStatus("en"));
+            Assert.False(definition.IsActive());
+
+            definition.Activate();
+
+            Assert.Equal(BppUiFontKind.SansSerif, config.UiFontKindConfig.Value);
+            Assert.Equal("SANS", definition.ResolveStatus("en"));
+            Assert.True(definition.IsActive());
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
     public void EndOfRunScreenshotDockEntry_defaults_on_and_toggles_config()
     {
         var configPath = Path.Combine(
@@ -539,6 +642,7 @@ public class SettingsDockRegistryTests
             BppSettingsDockOrder.ChineseLocaleMode,
             new ChineseLocaleModeSettingsDockEntry(new InMemoryBppEventBus()).Order
         );
+        Assert.Equal(BppSettingsDockOrder.UiFont, new UiFontSettingsDockEntry().Order);
         Assert.Equal(
             BppSettingsDockOrder.EndOfRunScreenshot,
             new EndOfRunScreenshotSettingsDockEntry().Order
@@ -578,7 +682,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void SettingsDockCatalog_sorts_hotkey_tutorial_below_end_of_run_screenshot()
+    public void SettingsDockCatalog_sorts_ui_font_adjacent_to_chinese_locale_and_hotkey_below_screenshot()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
         var registry = new SettingsDockEntryRegistry();
@@ -587,6 +691,7 @@ public class SettingsDockRegistryTests
         registry.Register(new FixedSupporterListSettingsDockEntry());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
         registry.Register(new EndOfRunScreenshotSettingsDockEntry());
+        registry.Register(new UiFontSettingsDockEntry());
         registry.Register(new ChineseLocaleModeSettingsDockEntry(new InMemoryBppEventBus()));
 
         try
@@ -597,6 +702,7 @@ public class SettingsDockRegistryTests
                 new[]
                 {
                     "ChineseLocaleMode",
+                    "UiFont",
                     "StreamMode",
                     "VoiceSubtitles",
                     "VoiceSubtitlesPosition",

@@ -7,6 +7,7 @@ namespace BazaarPlusPlus.Core.Config;
 internal sealed class BppConfig : IBppConfig
 {
     internal const PreviewVisibilityMode DefaultEnchantPreviewMode = PreviewVisibilityMode.Always;
+    internal const BppUiFontKind DefaultUiFontKind = BppUiFontKind.LxgwWenKai;
 
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
 
@@ -25,6 +26,8 @@ internal sealed class BppConfig : IBppConfig
     public ConfigEntry<float>? VoiceSubtitlesChineseFontScaleConfig { get; private set; }
 
     public ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; private set; }
+
+    public ConfigEntry<BppUiFontKind>? UiFontKindConfig { get; private set; }
 
     public ConfigEntry<bool>? EndOfRunScreenshotEnabledConfig { get; private set; }
 
@@ -111,6 +114,12 @@ internal sealed class BppConfig : IBppConfig
             "SpeedMultiplier",
             1.0f,
             "Default combat playback speed multiplier. The speed buttons cycle between 0.50, 0.67, and 1.00."
+        );
+        UiFontKindConfig = config.Bind(
+            "Appearance",
+            "UiFont",
+            DefaultUiFontKind,
+            "Font for BazaarPlusPlus panels (history, collection, live build, supporters). LxgwWenKai = embedded kai-style font. SansSerif = Unity built-in sans with OS fallback for CJK. Panels already opened this session fully apply after a game restart."
         );
         EndOfRunScreenshotEnabledConfig = config.Bind(
             "Screenshots",

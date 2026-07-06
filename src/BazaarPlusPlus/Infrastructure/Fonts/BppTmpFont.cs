@@ -51,7 +51,7 @@ internal static class BppTmpFont
         try
         {
             var fontAsset = TMP_FontAsset.CreateFontAsset(
-                BppUiFont.Default,
+                BppUiFont.LxgwWenKai,
                 SamplingPointSize,
                 AtlasPadding,
                 GlyphRenderMode.SDFAA,
