@@ -1,0 +1,60 @@
+src/BazaarPlusPlus/Infrastructure/Fonts/BppUiFont.cs
+  s_58eecc881bd4e5::t_a1ba2057a636ed 5,17,19-21,23-35,45-57,71-83,85
+  s_e3ffb7c140ba00::t_a623fec61461d8 84,86
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs
+  s_58eecc881bd4e5::t_825d0db91d6515 13-22
+src/BazaarPlusPlus/Core/Config/IBppConfig.cs
+  s_58eecc881bd4e5::t_15d7e297708406 27-28
+src/BazaarPlusPlus/Game/Settings/UiFontSettingsDockEntry.cs
+  s_58eecc881bd4e5::t_01440e7d875035 51-54
+  s_58eecc881bd4e5::t_825d0db91d6515 1-50,55-56
+src/BazaarPlusPlus/Plugin.cs
+  s_58eecc881bd4e5::t_b08b8a2cff2122 5,16,171
+  s_58eecc881bd4e5::t_1bc5a7dccda7ba 158-160
+src/BazaarPlusPlus/Infrastructure/Fonts/BppTmpFont.cs
+  s_58eecc881bd4e5::t_d3f87bd05e5aee 54
+src/BazaarPlusPlus/Core/Config/BppUiFontKind.cs
+  s_58eecc881bd4e5::t_57ff031394f623 1-8
+tests/SettingsDockRegistry.Tests/BppConfigTests.cs
+  s_58eecc881bd4e5::t_3706a79ce61230 1-70
+tests/Architecture.Tests/CoreLayeringTests.cs
+  s_58eecc881bd4e5::t_e2163a456ecfc3 1459-1475,1481,1483-1484
+  s_58eecc881bd4e5::t_285d1748b626b5 1476-1477
+  s_58eecc881bd4e5::t_122655a45bff35 1478-1480
+  s_58eecc881bd4e5::t_736be52092b4e8 1482
+  s_58eecc881bd4e5::t_9eb687d9be80e3 1458
+src/BazaarPlusPlus/Core/Config/BppConfig.cs
+  s_58eecc881bd4e5::t_6999fb4542551c 10,30-31,118-122
+  s_e3ffb7c140ba00::t_510f8804452cea 123
+tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs
+  s_58eecc881bd4e5::t_b33208dde83a3e 186-256,645,694,705
+  s_58eecc881bd4e5::t_1f91956e2f7bd5 257-288,685
+src/BazaarPlusPlus/BppComposition.cs
+  s_58eecc881bd4e5::t_825d0db91d6515 115
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "78b5ba256348fc36d998a8b7cb8c0acf0b63b72d",
+  "prompts": {},
+  "sessions": {
+    "s_58eecc881bd4e5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f37bd-d70c-7e22-9c4a-59618088959e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    },
+    "s_e3ffb7c140ba00": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3724-41e0-7041-9df6-e84870d265a5",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
