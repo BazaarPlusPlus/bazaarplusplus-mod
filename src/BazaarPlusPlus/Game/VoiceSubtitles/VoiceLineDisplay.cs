@@ -23,7 +23,7 @@ internal static class VoiceLineDisplay
     private static RectTransform? _sourceRect;
     private static TextMeshProUGUI? _sourceLabel;
     private static readonly object QueueSync = new();
-    private static readonly Queue<VoiceSubtitleCue> QueuedShows = new();
+    private static readonly Queue<PendingDisplayCommand> QueuedCommands = new();
 
     public static bool IsMountedFromVersionLabel =>
         _mountedFromVersionLabel && CurrentLabelObject != null;
@@ -152,7 +152,15 @@ internal static class VoiceLineDisplay
 
         lock (QueueSync)
         {
-            QueuedShows.Enqueue(cue);
+            QueuedCommands.Enqueue(PendingDisplayCommand.Show(cue));
+        }
+    }
+
+    public static void QueueHideCurrent(string reason)
+    {
+        lock (QueueSync)
+        {
+            QueuedCommands.Enqueue(PendingDisplayCommand.Hide(reason));
         }
     }
 
@@ -160,16 +168,19 @@ internal static class VoiceLineDisplay
     {
         while (true)
         {
-            VoiceSubtitleCue queued;
+            PendingDisplayCommand queued;
             lock (QueueSync)
             {
-                if (QueuedShows.Count == 0)
+                if (QueuedCommands.Count == 0)
                     return;
 
-                queued = QueuedShows.Dequeue();
+                queued = QueuedCommands.Dequeue();
             }
 
-            Show(queued);
+            if (queued.Kind == PendingDisplayCommandKind.Hide)
+                HideCurrent(queued.Reason);
+            else
+                Show(queued.Cue);
         }
     }
 
@@ -179,8 +190,16 @@ internal static class VoiceLineDisplay
         _nextDisplayId = 0;
         lock (QueueSync)
         {
-            QueuedShows.Clear();
+            QueuedCommands.Clear();
         }
+    }
+
+    private static void HideCurrent(string reason)
+    {
+        if (_lifetime == null)
+            return;
+
+        _lifetime.Cancel(reason);
     }
 
     private static void DestroyCurrentLabel()
@@ -609,5 +628,45 @@ internal static class VoiceLineDisplay
 
         public bool IsEmpty =>
             string.IsNullOrWhiteSpace(English) && string.IsNullOrWhiteSpace(Chinese);
+    }
+
+    private enum PendingDisplayCommandKind
+    {
+        Hide,
+        Show,
+    }
+
+    private readonly struct PendingDisplayCommand
+    {
+        private PendingDisplayCommand(
+            PendingDisplayCommandKind kind,
+            VoiceSubtitleCue cue,
+            string reason
+        )
+        {
+            Kind = kind;
+            Cue = cue;
+            Reason = reason ?? string.Empty;
+        }
+
+        public PendingDisplayCommandKind Kind { get; }
+
+        public VoiceSubtitleCue Cue { get; }
+
+        public string Reason { get; }
+
+        public static PendingDisplayCommand Hide(string reason)
+        {
+            return new PendingDisplayCommand(
+                PendingDisplayCommandKind.Hide,
+                default,
+                reason
+            );
+        }
+
+        public static PendingDisplayCommand Show(VoiceSubtitleCue cue)
+        {
+            return new PendingDisplayCommand(PendingDisplayCommandKind.Show, cue, string.Empty);
+        }
     }
 }

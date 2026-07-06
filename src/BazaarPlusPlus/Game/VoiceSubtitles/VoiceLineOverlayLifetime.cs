@@ -7,10 +7,14 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
 internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
 {
+    private const float MinFallbackDurationSeconds = 0.2f;
+    private const float PlaybackStopGraceSeconds = 4f;
+
     private GameObject? _labelObject;
     private Func<bool>? _isPlaybackStoppedOrStopping;
     private Func<string>? _playbackStateText;
-    private float _hideAt;
+    private float _softHideAt;
+    private float _forceHideAt;
     private float _shownAt;
     private int _displayId;
     private int _attemptId;
@@ -32,8 +36,12 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
     {
         _isPlaybackStoppedOrStopping = isPlaybackStoppedOrStopping;
         _playbackStateText = playbackStateText;
+        var fallbackDuration = Mathf.Max(MinFallbackDurationSeconds, fallbackDurationSeconds);
         _shownAt = Time.unscaledTime;
-        _hideAt = _shownAt + Mathf.Max(0.2f, fallbackDurationSeconds);
+        _softHideAt = _shownAt + fallbackDuration;
+        _forceHideAt =
+            _softHideAt
+            + (_isPlaybackStoppedOrStopping != null ? PlaybackStopGraceSeconds : 0f);
         _displayId = displayId;
         _attemptId = attemptId;
         _stem = stem;
@@ -42,9 +50,21 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
                 + $"display={_displayId} "
                 + $"attempt={_attemptId} "
                 + $"stem={_stem} "
-                + $"fallbackDuration={Mathf.Max(0.2f, fallbackDurationSeconds):F3}s "
+                + $"fallbackDuration={fallbackDuration:F3}s "
+                + $"stopGrace={(_isPlaybackStoppedOrStopping != null ? PlaybackStopGraceSeconds : 0f):F3}s "
                 + $"playbackState={PlaybackStateText()}"
         );
+    }
+
+    public void Cancel(string reason)
+    {
+        if (_labelObject != null && _labelObject.activeSelf)
+            Hide(reason);
+        else
+        {
+            _isPlaybackStoppedOrStopping = null;
+            _playbackStateText = null;
+        }
     }
 
     private void Update()
@@ -61,7 +81,10 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
             }
         }
 
-        if (Time.unscaledTime >= _hideAt)
+        if (Time.unscaledTime < _softHideAt)
+            return;
+
+        if (_isPlaybackStoppedOrStopping == null || Time.unscaledTime >= _forceHideAt)
             Hide("fallback-timeout");
     }
 

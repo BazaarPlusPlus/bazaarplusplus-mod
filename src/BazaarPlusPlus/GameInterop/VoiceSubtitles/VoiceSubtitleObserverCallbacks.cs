@@ -8,18 +8,22 @@ internal sealed class VoiceSubtitleObserverCallbacks
     public static readonly VoiceSubtitleObserverCallbacks Empty = new(
         _ => VoiceSubtitleLookupResult.Empty,
         () => false,
+        _ => { },
         _ => { }
     );
 
     public VoiceSubtitleObserverCallbacks(
         Func<VoiceSubtitleLookupRequest, VoiceSubtitleLookupResult> resolveLine,
         Func<bool> isEnabled,
-        Action<VoiceSubtitlePlaybackCue> queueShow
+        Action<VoiceSubtitlePlaybackCue> queueShow,
+        Action<string> queueHideCurrent
     )
     {
         ResolveLine = resolveLine ?? throw new ArgumentNullException(nameof(resolveLine));
         IsEnabled = isEnabled ?? throw new ArgumentNullException(nameof(isEnabled));
         QueueShow = queueShow ?? throw new ArgumentNullException(nameof(queueShow));
+        QueueHideCurrent =
+            queueHideCurrent ?? throw new ArgumentNullException(nameof(queueHideCurrent));
     }
 
     public Func<VoiceSubtitleLookupRequest, VoiceSubtitleLookupResult> ResolveLine { get; }
@@ -27,6 +31,8 @@ internal sealed class VoiceSubtitleObserverCallbacks
     public Func<bool> IsEnabled { get; }
 
     public Action<VoiceSubtitlePlaybackCue> QueueShow { get; }
+
+    public Action<string> QueueHideCurrent { get; }
 }
 
 internal readonly struct VoiceSubtitleLookupRequest

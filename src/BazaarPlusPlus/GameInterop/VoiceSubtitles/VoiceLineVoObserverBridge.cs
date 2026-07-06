@@ -198,6 +198,10 @@ internal static class VoiceLineVoObserverBridge
                 + $"contextPath={VoiceSubtitlesLog.Field(context.EventPath)}"
         );
 
+        var enabled = IsEnabled();
+        if (enabled)
+            QueueHideCurrent($"superseded-by-voice-attempt-{context.AttemptId}");
+
         if (!HasResolvedLine(resolution))
         {
             VoiceSubtitlesLog.Info(
@@ -210,7 +214,7 @@ internal static class VoiceLineVoObserverBridge
             return;
         }
 
-        if (!IsEnabled())
+        if (!enabled)
             return;
 
         QueueShow(CreateCue(line, player ?? context.Player, durationSeconds, context.AttemptId));
@@ -298,6 +302,10 @@ internal static class VoiceLineVoObserverBridge
         if (string.Equals(context.Origin, "PlayVO", StringComparison.Ordinal))
             return;
 
+        var enabled = IsEnabled();
+        if (enabled)
+            QueueHideCurrent($"superseded-by-voice-attempt-{context.AttemptId}");
+
         if (!HasResolvedLine(resolution))
         {
             VoiceSubtitlesLog.Info(
@@ -310,7 +318,7 @@ internal static class VoiceLineVoObserverBridge
             return;
         }
 
-        if (!IsEnabled())
+        if (!enabled)
             return;
 
         var durationSeconds =
@@ -454,6 +462,18 @@ internal static class VoiceLineVoObserverBridge
         catch (Exception ex)
         {
             VoiceSubtitlesLog.Warn($"Voice subtitle queue failed: {ex.Message}");
+        }
+    }
+
+    private static void QueueHideCurrent(string reason)
+    {
+        try
+        {
+            _callbacks.QueueHideCurrent(reason);
+        }
+        catch (Exception ex)
+        {
+            VoiceSubtitlesLog.Warn($"Voice subtitle hide queue failed: {ex.Message}");
         }
     }
 

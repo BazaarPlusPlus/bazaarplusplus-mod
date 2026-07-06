@@ -13,7 +13,12 @@ internal sealed class VoiceSubtitlesModule : IBppFeature
         VoiceLineCatalog.Reset();
         VoiceLineDisplay.Reset();
         VoiceLineVoObserverBridge.Configure(
-            new VoiceSubtitleObserverCallbacks(ResolveLine, VoiceSubtitlesGate.IsEnabled, QueueShow)
+            new VoiceSubtitleObserverCallbacks(
+                ResolveLine,
+                VoiceSubtitlesGate.IsEnabled,
+                QueueShow,
+                QueueHideCurrent
+            )
         );
         _repository.BeginLoad();
     }
@@ -55,5 +60,10 @@ internal sealed class VoiceSubtitlesModule : IBppFeature
                 cue.PlaybackStateText
             )
         );
+    }
+
+    private static void QueueHideCurrent(string reason)
+    {
+        VoiceLineDisplay.QueueHideCurrent(reason);
     }
 }
