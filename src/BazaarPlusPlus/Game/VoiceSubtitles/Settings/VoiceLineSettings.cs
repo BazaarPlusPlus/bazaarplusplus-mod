@@ -12,8 +12,9 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles.Settings;
 // entries, which are handed the IBppConfig instance.
 internal sealed class VoiceLineSettings
 {
-    private const float DefaultEnglishFontScale = 1f;
-    private const float DefaultChineseFontScale = 1f;
+    private const SubtitlePosition DefaultPosition = BppConfig.DefaultVoiceSubtitlesPosition;
+    private const float DefaultEnglishFontScale = BppConfig.DefaultVoiceSubtitlesEnglishFontScale;
+    private const float DefaultChineseFontScale = BppConfig.DefaultVoiceSubtitlesChineseFontScale;
 
     private VoiceLineSettings(
         SubtitlePosition position,
@@ -39,7 +40,7 @@ internal sealed class VoiceLineSettings
         {
             var config = BppPatchHost.Services.Config;
             return new VoiceLineSettings(
-                config.VoiceSubtitlesPositionConfig?.Value ?? SubtitlePosition.TopLeft,
+                config.VoiceSubtitlesPositionConfig?.Value ?? DefaultPosition,
                 config.VoiceSubtitlesLanguageModeConfig?.Value ?? SubtitleLanguageMode.Both,
                 config.VoiceSubtitlesEnglishFontScaleConfig?.Value ?? DefaultEnglishFontScale,
                 config.VoiceSubtitlesChineseFontScaleConfig?.Value ?? DefaultChineseFontScale

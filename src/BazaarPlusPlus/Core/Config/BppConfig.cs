@@ -8,6 +8,9 @@ internal sealed class BppConfig : IBppConfig
 {
     internal const PreviewVisibilityMode DefaultEnchantPreviewMode = PreviewVisibilityMode.Always;
     internal const BppUiFontKind DefaultUiFontKind = BppUiFontKind.LxgwWenKai;
+    internal const SubtitlePosition DefaultVoiceSubtitlesPosition = SubtitlePosition.TopCenter;
+    internal const float DefaultVoiceSubtitlesEnglishFontScale = 1f;
+    internal const float DefaultVoiceSubtitlesChineseFontScale = 1.25f;
 
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
 
@@ -76,13 +79,13 @@ internal sealed class BppConfig : IBppConfig
         EnableVoiceSubtitlesConfig = config.Bind(
             "VoiceSubtitles",
             "Enabled",
-            false,
+            true,
             "Whether to show bilingual voice-over subtitles."
         );
         VoiceSubtitlesPositionConfig = config.Bind(
             "VoiceSubtitles",
             "Position",
-            SubtitlePosition.TopLeft,
+            DefaultVoiceSubtitlesPosition,
             "Where voice-over subtitles are anchored on screen."
         );
         VoiceSubtitlesLanguageModeConfig = config.Bind(
@@ -94,7 +97,7 @@ internal sealed class BppConfig : IBppConfig
         VoiceSubtitlesEnglishFontScaleConfig = config.Bind(
             "VoiceSubtitles",
             "EnglishFontScale",
-            1.0f,
+            DefaultVoiceSubtitlesEnglishFontScale,
             new ConfigDescription(
                 "Font scale for the English subtitle line.",
                 new AcceptableValueRange<float>(1.0f, 2.5f)
@@ -103,7 +106,7 @@ internal sealed class BppConfig : IBppConfig
         VoiceSubtitlesChineseFontScaleConfig = config.Bind(
             "VoiceSubtitles",
             "ChineseFontScale",
-            1.0f,
+            DefaultVoiceSubtitlesChineseFontScale,
             new ConfigDescription(
                 "Font scale for the Chinese subtitle line.",
                 new AcceptableValueRange<float>(1.0f, 2.5f)

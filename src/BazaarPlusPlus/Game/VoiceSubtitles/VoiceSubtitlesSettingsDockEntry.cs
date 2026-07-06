@@ -46,6 +46,7 @@ internal sealed class VoiceSubtitlesSettingsDockEntry : ISettingsDockEntry
 
 internal sealed class VoiceSubtitlesPositionSettingsDockEntry : ISettingsDockEntry
 {
+    private const SubtitlePosition DefaultPosition = BppConfig.DefaultVoiceSubtitlesPosition;
     private static readonly LocalizedTextSet Label = new(
         "Subtitle Position",
         "字幕位置",
@@ -62,7 +63,7 @@ internal sealed class VoiceSubtitlesPositionSettingsDockEntry : ISettingsDockEnt
             "VoiceSubtitlesPosition",
             ResolveLabel,
             languageCode => ResolveStatus(config, languageCode),
-            () => ReadPosition(config) != SubtitlePosition.TopLeft,
+            () => ReadPosition(config) != DefaultPosition,
             () => CyclePosition(config),
             collapseAfterActivate: false
         );
@@ -70,7 +71,7 @@ internal sealed class VoiceSubtitlesPositionSettingsDockEntry : ISettingsDockEnt
     private static string ResolveLabel(string languageCode) => Resolve(Label, languageCode);
 
     private static SubtitlePosition ReadPosition(IBppConfig config) =>
-        config.VoiceSubtitlesPositionConfig?.Value ?? SubtitlePosition.TopLeft;
+        config.VoiceSubtitlesPositionConfig?.Value ?? DefaultPosition;
 
     private static string ResolveStatus(IBppConfig config, string languageCode)
     {
@@ -171,7 +172,7 @@ internal sealed class VoiceSubtitlesEnglishFontScaleSettingsDockEntry
 
     protected override LocalizedTextSet Label => new("English Size", "英文字号", "英文字號");
 
-    protected override float DefaultScale => 1f;
+    protected override float DefaultScale => BppConfig.DefaultVoiceSubtitlesEnglishFontScale;
 
     protected override float ReadScale(IBppConfig config) =>
         config.VoiceSubtitlesEnglishFontScaleConfig?.Value ?? DefaultScale;
@@ -193,7 +194,7 @@ internal sealed class VoiceSubtitlesChineseFontScaleSettingsDockEntry
 
     protected override LocalizedTextSet Label => new("Chinese Size", "中文字号", "中文字號");
 
-    protected override float DefaultScale => 1f;
+    protected override float DefaultScale => BppConfig.DefaultVoiceSubtitlesChineseFontScale;
 
     protected override float ReadScale(IBppConfig config) =>
         config.VoiceSubtitlesChineseFontScaleConfig?.Value ?? DefaultScale;

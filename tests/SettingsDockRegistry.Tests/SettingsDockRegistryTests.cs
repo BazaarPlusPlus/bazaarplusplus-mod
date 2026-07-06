@@ -546,7 +546,33 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void VoiceSubtitlesDockEntry_defaults_chinese_scale_to_one_and_cycles_to_next_ladder_value()
+    public void VoiceSubtitlesPositionDockEntry_defaults_to_top_center()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-voice-subtitles-position-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var definition = new VoiceSubtitlesPositionSettingsDockEntry().Build(config);
+
+            Assert.Equal(SubtitlePosition.TopCenter, config.VoiceSubtitlesPositionConfig!.Value);
+            Assert.Equal("Top Center", definition.ResolveStatus("en"));
+            Assert.False(definition.IsActive());
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
+    public void VoiceSubtitlesDockEntry_defaults_chinese_scale_to_one_twenty_five_and_cycles_to_next_ladder_value()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -569,15 +595,15 @@ public class SettingsDockRegistryTests
             );
             Assert.Equal("中文字號", definition.ResolveLabel("zh-Hant"));
 
-            Assert.Equal(1.0f, config.VoiceSubtitlesChineseFontScaleConfig!.Value, precision: 2);
-            Assert.Equal("1x", definition.ResolveStatus("en"));
+            Assert.Equal(1.25f, config.VoiceSubtitlesChineseFontScaleConfig!.Value, precision: 2);
+            Assert.Equal("1.25x", definition.ResolveStatus("en"));
             Assert.False(definition.IsActive());
 
             definition.Activate();
 
-            Assert.Equal("1.25x", definition.ResolveStatus("en"));
+            Assert.Equal("1.5x", definition.ResolveStatus("en"));
             Assert.True(definition.IsActive());
-            Assert.Equal(1.25f, config.VoiceSubtitlesChineseFontScaleConfig.Value, precision: 2);
+            Assert.Equal(1.5f, config.VoiceSubtitlesChineseFontScaleConfig.Value, precision: 2);
         }
         finally
         {

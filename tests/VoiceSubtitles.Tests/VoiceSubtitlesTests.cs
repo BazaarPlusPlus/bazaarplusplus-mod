@@ -98,14 +98,17 @@ public sealed class VoiceSubtitlesTests
     }
 
     [Fact]
-    public void Runtime_settings_default_chinese_font_scale_matches_english()
+    public void Runtime_settings_defaults_use_center_position_and_larger_chinese_font_scale()
     {
         var settingsType = GetRequiredType(
             "BazaarPlusPlus.Game.VoiceSubtitles.Settings.VoiceLineSettings"
         );
 
+        var defaultPosition = GetRequiredStaticField(settingsType, "DefaultPosition").GetValue(null);
+
+        Assert.Equal("TopCenter", defaultPosition?.ToString());
         Assert.Equal(1.0f, GetStaticSingle(settingsType, "DefaultEnglishFontScale"), precision: 2);
-        Assert.Equal(1.0f, GetStaticSingle(settingsType, "DefaultChineseFontScale"), precision: 2);
+        Assert.Equal(1.25f, GetStaticSingle(settingsType, "DefaultChineseFontScale"), precision: 2);
     }
 
     [Fact]
