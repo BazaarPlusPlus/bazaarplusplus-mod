@@ -1,0 +1,21 @@
+changelog.md
+  s_67f6500fc87acc::t_b5187fdc3f1c02 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "85c015f157b6cf12e5224498bc76fcb499314e7e",
+  "prompts": {},
+  "sessions": {
+    "s_67f6500fc87acc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3809-438e-7c10-8415-2fc50cd219dd",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
