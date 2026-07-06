@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Text;
@@ -8,6 +9,7 @@ using System.Threading.Tasks;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Http;
 using BepInEx;
+using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
@@ -16,9 +18,9 @@ internal sealed class VoiceLinesRepository
     private const string VoiceLinesRemoteUrl =
         "https://bazaarline-installer.bazaarplusplus.com/data/voice-lines.json";
     private const string VoiceLinesCacheFileName = "voice-lines.json";
+    private const string VoiceLinesCacheMetadataFileName = "voice-lines.meta.json";
     private const string EmbeddedResourceName =
         "BazaarPlusPlus.Data.VoiceSubtitles.voice-lines.json";
-    private static readonly TimeSpan VoiceLinesCacheDuration = TimeSpan.FromHours(20);
     private static readonly HttpClient VoiceLinesHttpClient = BppHttpClientFactory.Create(
         productVersion: BppPluginVersion.Current,
         userAgentSuffix: "VoiceSubtitlesRepository",
@@ -31,7 +33,8 @@ internal sealed class VoiceLinesRepository
     private Task? _warmUpTask;
     private string? _cacheFilePath;
     private Func<DateTime> _utcNow = () => DateTime.UtcNow;
-    private Func<string, Task<string>> _downloadJsonAsync = DownloadJsonAsync;
+    private Func<VoiceLinesRemoteRequest, Task<VoiceLinesRemoteResponse>> _downloadAsync =
+        DownloadAsync;
     private Func<string?> _loadEmbeddedJson = LoadEmbeddedSeedJson;
     private Action<Func<Task>> _queueBackgroundRefresh = QueueBackgroundRefresh;
 
@@ -96,16 +99,10 @@ internal sealed class VoiceLinesRepository
     {
         shouldRefreshInBackground = false;
 
-        if (TryLoadCache(allowExpired: false, out var freshLines))
-            return freshLines;
-
-        if (TryLoadCache(allowExpired: true, out var staleLines))
+        if (TryLoadCache(out var cachedLines))
         {
             shouldRefreshInBackground = true;
-            VoiceSubtitlesLog.Info(
-                "Using expired voice subtitle cache; remote refresh was queued in the background."
-            );
-            return staleLines;
+            return cachedLines;
         }
 
         shouldRefreshInBackground = true;
@@ -137,7 +134,7 @@ internal sealed class VoiceLinesRepository
         }
     }
 
-    private bool TryLoadCache(bool allowExpired, out LoadedVoiceLines? loaded)
+    private bool TryLoadCache(out LoadedVoiceLines? loaded)
     {
         loaded = null;
 
@@ -147,20 +144,12 @@ internal sealed class VoiceLinesRepository
             if (!File.Exists(cacheFilePath))
                 return false;
 
-            var lastWriteUtc = File.GetLastWriteTimeUtc(cacheFilePath);
-            var expiresAtUtc = lastWriteUtc.Add(VoiceLinesCacheDuration);
-            if (!allowExpired && _utcNow() >= expiresAtUtc)
-                return false;
-
             var json = File.ReadAllText(cacheFilePath, new UTF8Encoding(false));
             loaded = DeserializeVoiceLines(json, "cache");
             if (loaded == null)
                 return false;
 
-            VoiceSubtitlesLog.Info(
-                $"Loaded voice subtitles from cache path={cacheFilePath} "
-                    + $"expired={_utcNow() >= expiresAtUtc} expiresAtUtc={expiresAtUtc:O}"
-            );
+            VoiceSubtitlesLog.Info($"Loaded voice subtitles from cache path={cacheFilePath}");
             return true;
         }
         catch (Exception ex)
@@ -172,30 +161,51 @@ internal sealed class VoiceLinesRepository
         }
     }
 
-    private async Task<(LoadedVoiceLines? Loaded, string? Error)> LoadRemoteAsync()
+    private async Task<(LoadedVoiceLines? Loaded, string? Error, bool NotModified)> LoadRemoteAsync()
     {
+        var metadata = HasValidCacheForConditionalRefresh() ? TryReadCacheMetadata() : null;
         try
         {
-            var json = await _downloadJsonAsync(VoiceLinesRemoteUrl).ConfigureAwait(false);
+            var response = await _downloadAsync(
+                    new VoiceLinesRemoteRequest(
+                        VoiceLinesRemoteUrl,
+                        metadata?.ETag,
+                        metadata?.LastModified
+                    )
+                )
+                .ConfigureAwait(false);
+            if (response.StatusCode == HttpStatusCode.NotModified)
+            {
+                TryWriteCacheMetadata(metadata, response);
+                VoiceSubtitlesLog.Info(
+                    $"Voice subtitles remote returned 304 Not Modified url={VoiceLinesRemoteUrl}"
+                );
+                return (null, null, notModified: true);
+            }
+
+            if (response.StatusCode != HttpStatusCode.OK)
+                return (null, $"http_{(int)response.StatusCode}", notModified: false);
+
+            var json = response.Body;
             if (string.IsNullOrWhiteSpace(json))
-                return (null, "empty_response");
+                return (null, "empty_response", notModified: false);
 
             var loaded = DeserializeVoiceLines(json, "remote");
             if (loaded == null)
-                return (null, "invalid_response");
+                return (null, "invalid_response", notModified: false);
 
-            TryWriteCache(json);
+            TryWriteCache(json, loaded.Value.ContentHash, metadata, response);
             VoiceSubtitlesLog.Info(
                 $"Loaded voice subtitles from remote url={VoiceLinesRemoteUrl} count={loaded.Value.Lines.Length}"
             );
-            return (loaded, null);
+            return (loaded, null, notModified: false);
         }
         catch (Exception ex)
         {
             VoiceSubtitlesLog.Warn(
                 $"Failed to refresh voice subtitles from {VoiceLinesRemoteUrl}: {ex.Message}"
             );
-            return (null, ex.Message);
+            return (null, ex.Message, notModified: false);
         }
     }
 
@@ -204,7 +214,7 @@ internal sealed class VoiceLinesRepository
         try
         {
             var lines = VoiceLinesDocument.Parse(json, source);
-            return new LoadedVoiceLines(lines, source);
+            return new LoadedVoiceLines(lines, source, VoiceLinesDocument.ComputeContentHash(lines));
         }
         catch (Exception ex)
         {
@@ -258,7 +268,15 @@ internal sealed class VoiceLinesRepository
     {
         try
         {
-            var (loaded, error) = await LoadRemoteAsync().ConfigureAwait(false);
+            var (loaded, error, notModified) = await LoadRemoteAsync().ConfigureAwait(false);
+            if (notModified)
+            {
+                VoiceSubtitlesLog.Info(
+                    $"Background voice subtitles refresh found no changes reason={reason}."
+                );
+                return;
+            }
+
             if (loaded != null)
             {
                 lock (_syncRoot)
@@ -292,7 +310,12 @@ internal sealed class VoiceLinesRepository
         }
     }
 
-    private void TryWriteCache(string json)
+    private void TryWriteCache(
+        string json,
+        string contentHash,
+        VoiceLinesCacheMetadata? currentMetadata,
+        VoiceLinesRemoteResponse remoteResponse
+    )
     {
         try
         {
@@ -303,6 +326,15 @@ internal sealed class VoiceLinesRepository
 
             File.WriteAllText(cacheFilePath, json, new UTF8Encoding(false));
             File.SetLastWriteTimeUtc(cacheFilePath, _utcNow());
+            TryWriteCacheMetadata(
+                new VoiceLinesCacheMetadata
+                {
+                    ETag = currentMetadata?.ETag,
+                    LastModified = currentMetadata?.LastModified,
+                    ContentHash = contentHash,
+                },
+                remoteResponse
+            );
         }
         catch (Exception ex)
         {
@@ -312,9 +344,88 @@ internal sealed class VoiceLinesRepository
         }
     }
 
+    private bool HasValidCacheForConditionalRefresh()
+    {
+        try
+        {
+            var cacheFilePath = ResolveCacheFilePath();
+            if (!File.Exists(cacheFilePath))
+                return false;
+
+            var json = File.ReadAllText(cacheFilePath, new UTF8Encoding(false));
+            return DeserializeVoiceLines(json, "cache-conditional") != null;
+        }
+        catch (Exception ex)
+        {
+            VoiceSubtitlesLog.Warn(
+                $"Failed to validate voice subtitles cache before conditional refresh {ResolveCacheFilePath()}: {ex.Message}"
+            );
+            return false;
+        }
+    }
+
+    private VoiceLinesCacheMetadata? TryReadCacheMetadata()
+    {
+        try
+        {
+            var metadataPath = ResolveCacheMetadataFilePath();
+            if (!File.Exists(metadataPath))
+                return null;
+
+            var json = File.ReadAllText(metadataPath, new UTF8Encoding(false));
+            return JsonConvert.DeserializeObject<VoiceLinesCacheMetadata>(json);
+        }
+        catch (Exception ex)
+        {
+            VoiceSubtitlesLog.Warn(
+                $"Failed to read voice subtitles cache metadata {ResolveCacheMetadataFilePath()}: {ex.Message}"
+            );
+            return null;
+        }
+    }
+
+    private void TryWriteCacheMetadata(
+        VoiceLinesCacheMetadata? currentMetadata,
+        VoiceLinesRemoteResponse remoteResponse
+    )
+    {
+        try
+        {
+            var metadataPath = ResolveCacheMetadataFilePath();
+            var metadataDirectory = Path.GetDirectoryName(metadataPath);
+            if (!string.IsNullOrWhiteSpace(metadataDirectory))
+                Directory.CreateDirectory(metadataDirectory);
+
+            var metadata = new VoiceLinesCacheMetadata
+            {
+                ETag = remoteResponse.ETag ?? currentMetadata?.ETag,
+                LastModified = remoteResponse.LastModified ?? currentMetadata?.LastModified,
+                ContentHash = currentMetadata?.ContentHash,
+                CheckedAtUtc = _utcNow().ToString("O"),
+            };
+            var json = JsonConvert.SerializeObject(metadata, Formatting.Indented);
+            File.WriteAllText(metadataPath, json, new UTF8Encoding(false));
+        }
+        catch (Exception ex)
+        {
+            VoiceSubtitlesLog.Warn(
+                $"Failed to write voice subtitles cache metadata {ResolveCacheMetadataFilePath()}: {ex.Message}"
+            );
+        }
+    }
+
     private string ResolveCacheFilePath()
     {
         return _cacheFilePath ?? BuildDefaultVoiceLinesCacheFilePath(Paths.GameRootPath);
+    }
+
+    private string ResolveCacheMetadataFilePath()
+    {
+        var cacheFilePath = ResolveCacheFilePath();
+        return Path.Combine(
+            Path.GetDirectoryName(cacheFilePath) ?? string.Empty,
+            VoiceLinesCacheMetadataFileName
+        );
     }
 
     private static string BuildDefaultVoiceLinesCacheFilePath(string gameRootPath)
@@ -322,9 +433,26 @@ internal sealed class VoiceLinesRepository
         return Path.Combine(gameRootPath, "BazaarPlusPlusV4", VoiceLinesCacheFileName);
     }
 
-    private static Task<string> DownloadJsonAsync(string url)
+    private static async Task<VoiceLinesRemoteResponse> DownloadAsync(VoiceLinesRemoteRequest request)
     {
-        return VoiceLinesHttpClient.GetStringAsync(url);
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Get, request.Url);
+        if (!string.IsNullOrWhiteSpace(request.ETag))
+            httpRequest.Headers.TryAddWithoutValidation("If-None-Match", request.ETag);
+        else if (!string.IsNullOrWhiteSpace(request.LastModified))
+            httpRequest.Headers.TryAddWithoutValidation("If-Modified-Since", request.LastModified);
+
+        using var response = await VoiceLinesHttpClient.SendAsync(httpRequest).ConfigureAwait(false);
+        var body =
+            response.StatusCode == HttpStatusCode.NotModified
+                ? null
+                : await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+        return new VoiceLinesRemoteResponse(
+            response.StatusCode,
+            body,
+            response.Headers.ETag?.ToString(),
+            response.Content.Headers.LastModified?.ToString("R")
+                ?? response.Headers.Date?.ToString("R")
+        );
     }
 
     private static void QueueBackgroundRefresh(Func<Task> refresh)
@@ -358,7 +486,11 @@ internal sealed class VoiceLinesRepository
     private void ConfigureVoiceLinesRemoteForTests(
         string cacheFilePath,
         Func<DateTime> utcNow,
-        Func<string, Task<string>> downloadJsonAsync,
+        Func<
+            string?,
+            string?,
+            Task<(HttpStatusCode StatusCode, string? Body, string? ETag, string? LastModified)>
+        > downloadAsync,
         Action<Func<Task>> queueBackgroundRefresh
     )
     {
@@ -370,22 +502,100 @@ internal sealed class VoiceLinesRepository
             _warmUpTask = null;
             _cacheFilePath = cacheFilePath;
             _utcNow = utcNow;
-            _downloadJsonAsync = downloadJsonAsync;
+            _downloadAsync = async request =>
+            {
+                var response = await downloadAsync(request.ETag, request.LastModified)
+                    .ConfigureAwait(false);
+                return new VoiceLinesRemoteResponse(
+                    response.StatusCode,
+                    response.Body,
+                    response.ETag,
+                    response.LastModified
+                );
+            };
             _loadEmbeddedJson = LoadEmbeddedSeedJson;
             _queueBackgroundRefresh = queueBackgroundRefresh ?? QueueBackgroundRefresh;
         }
     }
 
+    private Task<(LoadedVoiceLines? Loaded, string? Error, bool NotModified)> LoadRemoteForTests()
+    {
+        return LoadRemoteAsync();
+    }
+
+    private string BuildCacheMetadataFilePathForTests()
+    {
+        return ResolveCacheMetadataFilePath();
+    }
+
     private readonly struct LoadedVoiceLines
     {
-        public LoadedVoiceLines(VoiceLine[] lines, string catalogName)
+        public LoadedVoiceLines(VoiceLine[] lines, string catalogName, string contentHash)
         {
             Lines = lines;
             CatalogName = catalogName;
+            ContentHash = contentHash;
         }
 
         public VoiceLine[] Lines { get; }
 
         public string CatalogName { get; }
+
+        public string ContentHash { get; }
+    }
+
+    private sealed class VoiceLinesCacheMetadata
+    {
+        [JsonProperty("etag")]
+        public string? ETag { get; set; }
+
+        [JsonProperty("lastModified")]
+        public string? LastModified { get; set; }
+
+        [JsonProperty("contentHash")]
+        public string? ContentHash { get; set; }
+
+        [JsonProperty("checkedAtUtc")]
+        public string? CheckedAtUtc { get; set; }
+    }
+
+    private readonly struct VoiceLinesRemoteRequest
+    {
+        public VoiceLinesRemoteRequest(string url, string? eTag, string? lastModified)
+        {
+            Url = url;
+            ETag = eTag;
+            LastModified = lastModified;
+        }
+
+        public string Url { get; }
+
+        public string? ETag { get; }
+
+        public string? LastModified { get; }
+    }
+
+    private readonly struct VoiceLinesRemoteResponse
+    {
+        public VoiceLinesRemoteResponse(
+            HttpStatusCode statusCode,
+            string? body,
+            string? eTag,
+            string? lastModified
+        )
+        {
+            StatusCode = statusCode;
+            Body = body;
+            ETag = eTag;
+            LastModified = lastModified;
+        }
+
+        public HttpStatusCode StatusCode { get; }
+
+        public string? Body { get; }
+
+        public string? ETag { get; }
+
+        public string? LastModified { get; }
     }
 }

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using Xunit;
@@ -108,34 +109,9 @@ public sealed class VoiceSubtitlesTests
     }
 
     [Fact]
-    public void Fresh_cache_loads_without_remote_refresh()
+    public void Cache_loads_and_requests_background_refresh()
     {
         WithRepositoryCache(
-            cacheAge: TimeSpan.FromHours(1),
-            (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
-            {
-                var loadForTests = GetRequiredInstanceMethod(
-                    repositoryType,
-                    "LoadVoiceLinesForTests"
-                );
-
-                var result = loadForTests.Invoke(repository, null);
-                Assert.NotNull(result);
-
-                Assert.Equal(5032, GetInt32(result!, "Item1"));
-                Assert.Equal("cache", GetString(result!, "Item2"));
-                Assert.False(GetBool(result!, "Item3"));
-                Assert.False(downloadCalled());
-                Assert.Empty(queuedRefreshes);
-            }
-        );
-    }
-
-    [Fact]
-    public void Stale_cache_loads_and_requests_background_refresh()
-    {
-        WithRepositoryCache(
-            cacheAge: TimeSpan.FromHours(21),
             (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
             {
                 var loadForTests = GetRequiredInstanceMethod(
@@ -151,6 +127,84 @@ public sealed class VoiceSubtitlesTests
                 Assert.True(GetBool(result!, "Item3"));
                 Assert.False(downloadCalled());
                 Assert.Empty(queuedRefreshes);
+            }
+        );
+    }
+
+    [Fact]
+    public void Remote_not_modified_uses_conditional_headers_without_rewriting_cache()
+    {
+        WithRepositoryCache(
+            (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
+            {
+                var buildMetadataPath = GetRequiredInstanceMethod(
+                    repositoryType,
+                    "BuildCacheMetadataFilePathForTests"
+                );
+                var loadRemote = GetRequiredInstanceMethod(repositoryType, "LoadRemoteForTests");
+                var metadataPath = Assert.IsType<string>(buildMetadataPath.Invoke(repository, null));
+                var originalCacheJson = File.ReadAllText(cachePath, new UTF8Encoding(false));
+                File.WriteAllText(
+                    metadataPath,
+                    "{\"etag\":\"\\\"etag-a\\\"\",\"lastModified\":\"Fri, 03 Jul 2026 16:31:36 GMT\",\"contentHash\":\""
+                        + GoldenContentHash
+                        + "\",\"checkedAtUtc\":\"2026-07-01T00:00:00.0000000Z\"}",
+                    new UTF8Encoding(false)
+                );
+
+                var resultTask = Assert.IsAssignableFrom<Task>(loadRemote.Invoke(repository, null));
+                resultTask.GetAwaiter().GetResult();
+                var result = GetTaskResult(resultTask);
+
+                Assert.True(downloadCalled());
+                Assert.True(GetBool(result!, "Item3"));
+                Assert.Equal(originalCacheJson, File.ReadAllText(cachePath, new UTF8Encoding(false)));
+                Assert.Contains("etag-a", File.ReadAllText(metadataPath, new UTF8Encoding(false)));
+            }
+        );
+    }
+
+    [Fact]
+    public void Remote_ok_writes_cache_and_metadata()
+    {
+        WithRepositoryCache(
+            (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
+            {
+                var buildMetadataPath = GetRequiredInstanceMethod(
+                    repositoryType,
+                    "BuildCacheMetadataFilePathForTests"
+                );
+                var loadRemote = GetRequiredInstanceMethod(repositoryType, "LoadRemoteForTests");
+                var metadataPath = Assert.IsType<string>(buildMetadataPath.Invoke(repository, null));
+                var remoteJson = BuildVoiceLinesJson(
+                    count: 1,
+                    contentHash: ContentHashFor(("stem", "English", "中文", 1.25)),
+                    ("stem", "English", "中文", 1.25)
+                );
+                ConfigureDownloadForTests(
+                    repositoryType,
+                    repository,
+                    cachePath,
+                    (etag, lastModified) =>
+                        Task.FromResult(
+                            (
+                                HttpStatusCode.OK,
+                                (string?)remoteJson,
+                                (string?)"\"etag-b\"",
+                                (string?)"Mon, 06 Jul 2026 09:33:04 GMT"
+                            )
+                        )
+                );
+
+                var resultTask = Assert.IsAssignableFrom<Task>(loadRemote.Invoke(repository, null));
+                resultTask.GetAwaiter().GetResult();
+                var result = GetTaskResult(resultTask);
+
+                Assert.False(GetBool(result!, "Item3"));
+                Assert.Equal(remoteJson, File.ReadAllText(cachePath, new UTF8Encoding(false)));
+                var metadataJson = File.ReadAllText(metadataPath, new UTF8Encoding(false));
+                Assert.Contains("etag-b", metadataJson);
+                Assert.Contains(ContentHashFor(("stem", "English", "中文", 1.25)), metadataJson);
             }
         );
     }
@@ -317,7 +371,6 @@ public sealed class VoiceSubtitlesTests
     }
 
     private static void WithRepositoryCache(
-        TimeSpan cacheAge,
         Action<Type, object, string, Func<bool>, List<Func<Task>>> run
     )
     {
@@ -331,10 +384,6 @@ public sealed class VoiceSubtitlesTests
             repositoryType,
             "ReadEmbeddedSeedJsonForTests"
         );
-        var configure = GetRequiredInstanceMethod(
-            repositoryType,
-            "ConfigureVoiceLinesRemoteForTests"
-        );
         var embeddedJson = Assert.IsType<string>(readEmbeddedJson.Invoke(null, null));
         var now = new DateTime(2026, 7, 3, 12, 0, 0, DateTimeKind.Utc);
         var cachePath = Path.Combine(Path.GetTempPath(), $"voice-lines-{Guid.NewGuid():N}.json");
@@ -344,18 +393,27 @@ public sealed class VoiceSubtitlesTests
         try
         {
             File.WriteAllText(cachePath, embeddedJson, new UTF8Encoding(false));
-            File.SetLastWriteTimeUtc(cachePath, now.Subtract(cacheAge));
 
-            Func<DateTime> utcNow = () => now;
-            Func<string, Task<string>> downloadJsonAsync = _ =>
-            {
-                downloadCalled = true;
-                return Task.FromResult(embeddedJson);
-            };
-            Action<Func<Task>> queueBackgroundRefresh = refresh => queuedRefreshes.Add(refresh);
-            configure.Invoke(
+            ConfigureDownloadForTests(
+                repositoryType,
                 repository,
-                [cachePath, utcNow, downloadJsonAsync, queueBackgroundRefresh]
+                cachePath,
+                (etag, lastModified) =>
+                {
+                    downloadCalled = true;
+                    Assert.Equal("\"etag-a\"", etag);
+                    Assert.Equal("Fri, 03 Jul 2026 16:31:36 GMT", lastModified);
+                    return Task.FromResult(
+                        (
+                            HttpStatusCode.NotModified,
+                            (string?)null,
+                            (string?)"\"etag-a\"",
+                            (string?)"Fri, 03 Jul 2026 16:31:36 GMT"
+                        )
+                    );
+                },
+                now,
+                queuedRefreshes
             );
 
             run(repositoryType, repository, cachePath, () => downloadCalled, queuedRefreshes);
@@ -364,7 +422,35 @@ public sealed class VoiceSubtitlesTests
         {
             if (File.Exists(cachePath))
                 File.Delete(cachePath);
+            var metadataPath = Path.Combine(
+                Path.GetDirectoryName(cachePath) ?? string.Empty,
+                "voice-lines.meta.json"
+            );
+            if (File.Exists(metadataPath))
+                File.Delete(metadataPath);
         }
+    }
+
+    private static void ConfigureDownloadForTests(
+        Type repositoryType,
+        object repository,
+        string cachePath,
+        Func<
+            string?,
+            string?,
+            Task<(HttpStatusCode StatusCode, string? Body, string? ETag, string? LastModified)>
+        > downloadAsync,
+        DateTime? now = null,
+        List<Func<Task>>? queuedRefreshes = null
+    )
+    {
+        var configure = GetRequiredInstanceMethod(
+            repositoryType,
+            "ConfigureVoiceLinesRemoteForTests"
+        );
+        Func<DateTime> utcNow = () => now ?? new DateTime(2026, 7, 3, 12, 0, 0, DateTimeKind.Utc);
+        Action<Func<Task>> queueBackgroundRefresh = refresh => queuedRefreshes?.Add(refresh);
+        configure.Invoke(repository, [cachePath, utcNow, downloadAsync, queueBackgroundRefresh]);
     }
 
     private static string BuildVoiceLinesJson(
@@ -497,6 +583,12 @@ public sealed class VoiceSubtitlesTests
             return field.GetValue(instance);
 
         throw new InvalidOperationException($"Missing property or field {type.FullName}.{name}");
+    }
+
+    private static object? GetTaskResult(Task task)
+    {
+        var resultProperty = task.GetType().GetProperty("Result");
+        return resultProperty?.GetValue(task);
     }
 
     private static string GetString(object instance, string name)
