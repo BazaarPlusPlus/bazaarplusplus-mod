@@ -1,0 +1,31 @@
+docs/drafts/2026-07-06-choice-timeline-run-bundle-plan.md
+  s_359f35220adfb8::t_56896ebcd6585c 1-137
+docs/drafts/2026-07-06-ui-font-selection-plan.md
+  s_eca75cfc87e399::t_70d73d17845bd8 1-143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.5",
+  "base_commit_sha": "59b2af3b74eaf8c8c576a105289b7c7a6333e8bd",
+  "prompts": {},
+  "sessions": {
+    "s_359f35220adfb8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4cfefc3c-225a-4cf7-9b06-13e6502d0905",
+        "model": "unknown"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    },
+    "s_eca75cfc87e399": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "10bfa097-7b3f-4866-af8b-2c51e58657bd",
+        "model": "unknown"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
