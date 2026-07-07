@@ -458,7 +458,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void VoiceSubtitlesDockEntry_defaults_off_and_toggles_config()
+    public void VoiceSubtitlesDockEntry_cycles_subtitle_mode_through_off_both_chinese_english()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -476,17 +476,51 @@ public class SettingsDockRegistryTests
 
             Assert.Equal(BppSettingsDockOrder.VoiceSubtitles, entry.Order);
             Assert.Equal("VoiceSubtitles", definition.Key);
-            Assert.Equal("Voice Subtitles", definition.ResolveLabel("en"));
-            Assert.Equal("语音字幕", definition.ResolveLabel("zh-CN"));
+            Assert.Equal("Subtitle Mode", definition.ResolveLabel("en"));
+            Assert.Equal("字幕模式", definition.ResolveLabel("zh-CN"));
             Assert.False(config.EnableVoiceSubtitlesConfig!.Value);
+            Assert.Equal(SubtitleLanguageMode.Both, config.VoiceSubtitlesLanguageModeConfig!.Value);
             Assert.False(definition.IsActive());
             Assert.Equal("OFF", definition.ResolveStatus("en"));
+            Assert.Equal("关闭", definition.ResolveStatus("zh-CN"));
 
             definition.Activate();
 
             Assert.True(config.EnableVoiceSubtitlesConfig.Value);
+            Assert.Equal(SubtitleLanguageMode.Both, config.VoiceSubtitlesLanguageModeConfig.Value);
             Assert.True(definition.IsActive());
-            Assert.Equal("ON", definition.ResolveStatus("en"));
+            Assert.Equal("BOTH", definition.ResolveStatus("en"));
+            Assert.Equal("双语", definition.ResolveStatus("zh-CN"));
+
+            definition.Activate();
+
+            Assert.True(config.EnableVoiceSubtitlesConfig.Value);
+            Assert.Equal(
+                SubtitleLanguageMode.ChineseOnly,
+                config.VoiceSubtitlesLanguageModeConfig.Value
+            );
+            Assert.True(definition.IsActive());
+            Assert.Equal("ZH", definition.ResolveStatus("en"));
+            Assert.Equal("中文", definition.ResolveStatus("zh-CN"));
+
+            definition.Activate();
+
+            Assert.True(config.EnableVoiceSubtitlesConfig.Value);
+            Assert.Equal(
+                SubtitleLanguageMode.EnglishOnly,
+                config.VoiceSubtitlesLanguageModeConfig.Value
+            );
+            Assert.True(definition.IsActive());
+            Assert.Equal("EN", definition.ResolveStatus("en"));
+            Assert.Equal("英文", definition.ResolveStatus("zh-CN"));
+
+            definition.Activate();
+
+            Assert.False(config.EnableVoiceSubtitlesConfig.Value);
+            Assert.Equal(SubtitleLanguageMode.Both, config.VoiceSubtitlesLanguageModeConfig.Value);
+            Assert.False(definition.IsActive());
+            Assert.Equal("OFF", definition.ResolveStatus("en"));
+            Assert.Equal("关闭", definition.ResolveStatus("zh-CN"));
             Assert.False(definition.CollapseAfterActivate);
         }
         finally
@@ -520,7 +554,6 @@ public class SettingsDockRegistryTests
                 {
                     "VoiceSubtitles",
                     "VoiceSubtitlesPosition",
-                    "VoiceSubtitlesLanguage",
                     "VoiceSubtitlesEnglishFontScale",
                     "VoiceSubtitlesChineseFontScale",
                 },
@@ -531,7 +564,6 @@ public class SettingsDockRegistryTests
                 {
                     BppSettingsDockOrder.VoiceSubtitles,
                     BppSettingsDockOrder.VoiceSubtitlesPosition,
-                    BppSettingsDockOrder.VoiceSubtitlesLanguage,
                     BppSettingsDockOrder.VoiceSubtitlesEnglishFontScale,
                     BppSettingsDockOrder.VoiceSubtitlesChineseFontScale,
                 },
@@ -664,10 +696,6 @@ public class SettingsDockRegistryTests
             new VoiceSubtitlesPositionSettingsDockEntry().Order
         );
         Assert.Equal(
-            BppSettingsDockOrder.VoiceSubtitlesLanguage,
-            new VoiceSubtitlesLanguageSettingsDockEntry().Order
-        );
-        Assert.Equal(
             BppSettingsDockOrder.VoiceSubtitlesEnglishFontScale,
             new VoiceSubtitlesEnglishFontScaleSettingsDockEntry().Order
         );
@@ -706,7 +734,6 @@ public class SettingsDockRegistryTests
                     "StreamMode",
                     "VoiceSubtitles",
                     "VoiceSubtitlesPosition",
-                    "VoiceSubtitlesLanguage",
                     "VoiceSubtitlesEnglishFontScale",
                     "VoiceSubtitlesChineseFontScale",
                     "EndOfRunScreenshot",

@@ -9,16 +9,21 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
 internal sealed class VoiceSubtitlesSettingsDockEntry : ISettingsDockEntry
 {
+    private static readonly LocalizedTextSet Off = new("OFF", "关闭", "關閉");
+    private static readonly LocalizedTextSet Both = new("BOTH", "双语", "雙語");
+    private static readonly LocalizedTextSet Chinese = new("ZH", "中文", "中文");
+    private static readonly LocalizedTextSet English = new("EN", "英文", "英文");
+
     public int Order => BppSettingsDockOrder.VoiceSubtitles;
 
     public BppSettingsDockDefinition Build(IBppConfig config) =>
         new(
             "VoiceSubtitles",
             VoiceSubtitlesSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                () => ReadEnabled(config),
-                enabled => WriteEnabled(config, enabled)
-            )
+            languageCode => ResolveStatus(config, languageCode),
+            () => ReadMode(config) != SubtitleMode.Off,
+            () => CycleMode(config),
+            collapseAfterActivate: false
         );
 
     internal static void RegisterAll(SettingsDockEntryRegistry registry)
@@ -28,19 +33,71 @@ internal sealed class VoiceSubtitlesSettingsDockEntry : ISettingsDockEntry
 
         registry.Register(new VoiceSubtitlesSettingsDockEntry());
         registry.Register(new VoiceSubtitlesPositionSettingsDockEntry());
-        registry.Register(new VoiceSubtitlesLanguageSettingsDockEntry());
         registry.Register(new VoiceSubtitlesEnglishFontScaleSettingsDockEntry());
         registry.Register(new VoiceSubtitlesChineseFontScaleSettingsDockEntry());
     }
 
-    private static bool ReadEnabled(IBppConfig config) =>
-        config.EnableVoiceSubtitlesConfig?.Value ?? false;
-
-    private static void WriteEnabled(IBppConfig config, bool enabled)
+    private static SubtitleMode ReadMode(IBppConfig config)
     {
-        var entry = config.EnableVoiceSubtitlesConfig;
-        if (entry != null)
-            entry.Value = enabled;
+        if (config.EnableVoiceSubtitlesConfig?.Value != true)
+            return SubtitleMode.Off;
+
+        return (config.VoiceSubtitlesLanguageModeConfig?.Value ?? SubtitleLanguageMode.Both) switch
+        {
+            SubtitleLanguageMode.ChineseOnly => SubtitleMode.Chinese,
+            SubtitleLanguageMode.EnglishOnly => SubtitleMode.English,
+            _ => SubtitleMode.Both,
+        };
+    }
+
+    private static string ResolveStatus(IBppConfig config, string languageCode)
+    {
+        var text = ReadMode(config) switch
+        {
+            SubtitleMode.Both => Both,
+            SubtitleMode.Chinese => Chinese,
+            SubtitleMode.English => English,
+            _ => Off,
+        };
+        return text.Resolve(languageCode, L.CurrentMode);
+    }
+
+    private static void CycleMode(IBppConfig config)
+    {
+        var next = ReadMode(config) switch
+        {
+            SubtitleMode.Off => SubtitleMode.Both,
+            SubtitleMode.Both => SubtitleMode.Chinese,
+            SubtitleMode.Chinese => SubtitleMode.English,
+            _ => SubtitleMode.Off,
+        };
+        WriteMode(config, next);
+    }
+
+    private static void WriteMode(IBppConfig config, SubtitleMode mode)
+    {
+        var enabledEntry = config.EnableVoiceSubtitlesConfig;
+        if (enabledEntry != null)
+            enabledEntry.Value = mode != SubtitleMode.Off;
+
+        var languageEntry = config.VoiceSubtitlesLanguageModeConfig;
+        if (languageEntry != null)
+        {
+            languageEntry.Value = mode switch
+            {
+                SubtitleMode.Chinese => SubtitleLanguageMode.ChineseOnly,
+                SubtitleMode.English => SubtitleLanguageMode.EnglishOnly,
+                _ => SubtitleLanguageMode.Both,
+            };
+        }
+    }
+
+    private enum SubtitleMode
+    {
+        Off,
+        Both,
+        Chinese,
+        English,
     }
 }
 
@@ -96,65 +153,6 @@ internal sealed class VoiceSubtitlesPositionSettingsDockEntry : ISettingsDockEnt
             SubtitlePosition.TopLeft => SubtitlePosition.TopRight,
             SubtitlePosition.TopRight => SubtitlePosition.TopCenter,
             _ => SubtitlePosition.TopLeft,
-        };
-    }
-
-    private static string Resolve(LocalizedTextSet text, string languageCode) =>
-        text.Resolve(languageCode, L.CurrentMode);
-}
-
-internal sealed class VoiceSubtitlesLanguageSettingsDockEntry : ISettingsDockEntry
-{
-    private static readonly LocalizedTextSet Label = new(
-        "Subtitle Language",
-        "字幕语言",
-        "字幕語言"
-    );
-    private static readonly LocalizedTextSet Both = new("Both", "双语", "雙語");
-    private static readonly LocalizedTextSet Chinese = new("Chinese", "中文", "中文");
-    private static readonly LocalizedTextSet English = new("English", "英文", "英文");
-
-    public int Order => BppSettingsDockOrder.VoiceSubtitlesLanguage;
-
-    public BppSettingsDockDefinition Build(IBppConfig config) =>
-        new(
-            "VoiceSubtitlesLanguage",
-            ResolveLabel,
-            languageCode => ResolveStatus(config, languageCode),
-            () => ReadLanguageMode(config) != SubtitleLanguageMode.Both,
-            () => CycleLanguageMode(config),
-            collapseAfterActivate: false
-        );
-
-    private static string ResolveLabel(string languageCode) => Resolve(Label, languageCode);
-
-    private static SubtitleLanguageMode ReadLanguageMode(IBppConfig config) =>
-        config.VoiceSubtitlesLanguageModeConfig?.Value ?? SubtitleLanguageMode.Both;
-
-    private static string ResolveStatus(IBppConfig config, string languageCode)
-    {
-        return Resolve(
-            ReadLanguageMode(config) switch
-            {
-                SubtitleLanguageMode.ChineseOnly => Chinese,
-                SubtitleLanguageMode.EnglishOnly => English,
-                _ => Both,
-            },
-            languageCode
-        );
-    }
-
-    private static void CycleLanguageMode(IBppConfig config)
-    {
-        var entry = config.VoiceSubtitlesLanguageModeConfig;
-        if (entry == null)
-            return;
-
-        entry.Value = entry.Value switch
-        {
-            SubtitleLanguageMode.Both => SubtitleLanguageMode.ChineseOnly,
-            SubtitleLanguageMode.ChineseOnly => SubtitleLanguageMode.EnglishOnly,
-            _ => SubtitleLanguageMode.Both,
         };
     }
 

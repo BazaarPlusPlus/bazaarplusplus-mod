@@ -85,7 +85,7 @@ internal sealed class BppConfig : IBppConfig
             "VoiceSubtitles",
             "Enabled",
             false,
-            "Whether to show bilingual voice-over subtitles."
+            "Whether Subtitle Mode enables voice-over subtitles. The in-game dock writes this together with VoiceSubtitles.Language."
         );
         VoiceSubtitlesPositionConfig = config.Bind(
             "VoiceSubtitles",
@@ -97,7 +97,7 @@ internal sealed class BppConfig : IBppConfig
             "VoiceSubtitles",
             "Language",
             SubtitleLanguageMode.Both,
-            "Which languages to show for voice-over subtitles: Both, ChineseOnly, or EnglishOnly."
+            "Language used by Subtitle Mode when voice-over subtitles are enabled: Both, ChineseOnly, or EnglishOnly."
         );
         VoiceSubtitlesEnglishFontScaleConfig = config.Bind(
             "VoiceSubtitles",

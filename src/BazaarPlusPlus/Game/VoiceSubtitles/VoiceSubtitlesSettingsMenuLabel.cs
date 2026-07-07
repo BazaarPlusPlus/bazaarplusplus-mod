@@ -5,11 +5,7 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
 internal static class VoiceSubtitlesSettingsMenuLabel
 {
-    private static readonly LocalizedTextSet Labels = new(
-        "Voice Subtitles",
-        "语音字幕",
-        "語音字幕"
-    );
+    private static readonly LocalizedTextSet Labels = new("Subtitle Mode", "字幕模式", "字幕模式");
 
     internal static string Resolve(string languageCode)
     {
