@@ -1,0 +1,21 @@
+docs/drafts/2026-07-07-event-preview-toggle-plan.md
+  s_e3bbc541bb2a0b::t_416eb95c0a003a 1-195
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "583444b6e9df66616b738a2b9a085573d7fb760f",
+  "prompts": {},
+  "sessions": {
+    "s_e3bbc541bb2a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4d79d4f-630e-4261-9c76-f09d47ebe619",
+        "model": "unknown"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
