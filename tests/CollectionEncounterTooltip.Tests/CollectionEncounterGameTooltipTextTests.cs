@@ -211,13 +211,15 @@ public sealed class CollectionEncounterGameTooltipTextTests
 
         Assert.Contains("Possible outcomes:", text);
         Assert.Contains("<color=#FFD37E>40%</color>", text);
-        Assert.Contains("- A Routine Job: Gain 2 XP", text);
+        // Sub-entries use a hanging indent so soft-wrapped lines stay aligned.
+        Assert.Contains("<indent=2.2em>- A Routine Job: Gain 2 XP</indent>", text);
         // Embedded newlines flatten so sub-entries stay one line each.
-        Assert.Contains("- Generous Tip: Gain 10 Gold and 1 XP", text);
+        Assert.Contains("<indent=2.2em>- Generous Tip: Gain 10 Gold and 1 XP</indent>", text);
         Assert.Contains("Fight a monster (10 possible)", text);
-        // Prerequisite-unmet groups render dimmed without a percentage.
+        // Prerequisite-unmet groups render dimmed without a percentage; their own
+        // text already carries the condition.
         Assert.Contains(
-            "<size=85%><color=#8F8268>· Clear the Way: (if you have Powder Keg) Gain 5 Gold (requires cards you don't own)</color></size>",
+            "<size=85%><color=#8F8268>· <indent=1em>Clear the Way: (if you have Powder Keg) Gain 5 Gold</indent></color></size>",
             text
         );
     }

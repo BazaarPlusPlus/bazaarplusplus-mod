@@ -100,6 +100,21 @@ internal static class CollectionEncounterEventDetailResolver
                 }
                 if (!CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
                     continue;
+                if (IsSkillTemplate(template))
+                {
+                    var skillName = CollectionLocalizationResolver.ResolveTitle(template)
+                        ?? template.InternalName;
+                    details.Add(
+                        new CollectionEncounterChoiceDetail(
+                            template.Id,
+                            CollectionPanelText.OutcomeGainSkill(skillName),
+                            resultText: string.Empty,
+                            rewardFilter: null,
+                            isSourceMatch: false
+                        )
+                    );
+                    continue;
+                }
                 AddChoiceDetail(details, template, isEligible: true);
             }
 
@@ -135,6 +150,10 @@ internal static class CollectionEncounterEventDetailResolver
                 return false;
         return true;
     }
+
+    private static bool IsSkillTemplate(TCardBase template) =>
+        string.Equals(template.GetType().Name, "TCardSkill", StringComparison.Ordinal)
+        || string.Equals(template.Type.ToString(), "Skill", StringComparison.Ordinal);
 
     private static bool IsEncounterCombatTemplate(TCardBase template) =>
         string.Equals(template.GetType().Name, "TCardEncounterCombat", StringComparison.Ordinal)

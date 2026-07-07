@@ -97,20 +97,24 @@ internal static class CollectionEncounterGameTooltipText
                 foreach (var detail in outcome.Details)
                 {
                     var result = ChoiceResultText(detail, dayTierCeiling);
-                    block.Append("\n   - ");
+                    // Hanging indent keeps soft-wrapped lines aligned with the dash.
+                    block.Append("\n<indent=2.2em>- ");
                     block.Append(
                         string.IsNullOrWhiteSpace(result)
                             ? detail.DisplayName
                             : $"{detail.DisplayName}: {colorize(result)}"
                     );
+                    block.Append("</indent>");
                 }
                 content = block.ToString();
             }
 
+            // Ownership-gated groups render dimmed; their own text already carries
+            // the condition ("(if you have Powder Keg or the Big One)").
             if (!outcome.IsEligible)
             {
                 lines.Add(
-                    $"<size=85%><color={IneligibleColor}>· {content} {CollectionPanelText.OutcomeLocked()}</color></size>"
+                    $"<size=85%><color={IneligibleColor}>· <indent=1em>{content}</indent></color></size>"
                 );
                 continue;
             }
@@ -118,7 +122,7 @@ internal static class CollectionEncounterGameTooltipText
             var prefix = outcome.Percent.HasValue
                 ? $"<color={AccentColor}>{outcome.Percent.Value}%</color> "
                 : string.Empty;
-            lines.Add($"· {prefix}{content}");
+            lines.Add($"· <indent=1em>{prefix}{content}</indent>");
         }
         return string.Join("\n<size=45%> </size>\n", lines);
     }

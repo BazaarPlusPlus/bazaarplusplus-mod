@@ -109,10 +109,10 @@ internal static class CollectionPanelText
         "以下 {0} 种随机其一：",
         "以下 {0} 種隨機其一："
     );
-    private static readonly LocalizedTextSet OutcomeLockedText = new(
-        "(requires cards you don't own)",
-        "（前置未满足）",
-        "（前置未滿足）"
+    private static readonly LocalizedTextSet OutcomeGainSkillText = new(
+        "Gain skill: {0}",
+        "获得技能：{0}",
+        "獲得技能：{0}"
     );
     private static readonly LocalizedTextSet LevelUpBoardSlotsText = new(
         "+{0} board slots",
@@ -211,7 +211,8 @@ internal static class CollectionPanelText
     internal static string OutcomeSubPool(int count) =>
         string.Format(Resolve(OutcomeSubPoolText), count);
 
-    internal static string OutcomeLocked() => Resolve(OutcomeLockedText);
+    internal static string OutcomeGainSkill(string skillName) =>
+        string.Format(Resolve(OutcomeGainSkillText), skillName);
 
     internal static string LevelUpBoardSlots(int count) =>
         string.Format(Resolve(LevelUpBoardSlotsText), count);
