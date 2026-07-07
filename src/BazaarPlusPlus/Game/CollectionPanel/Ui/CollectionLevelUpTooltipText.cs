@@ -25,11 +25,18 @@ internal static class CollectionLevelUpTooltipText
 {
     private const string AccentColor = "#FFD37E";
 
+    // Board (carpet) slot unlocks are server-driven and not in TLevelUp; the native
+    // tooltip hardcodes the same facts (a static "2" on the carpet icon, grayed once
+    // the current level reaches 4), so mirror those constants here.
+    private const int BoardSlotsPerLevel = 2;
+    private const int LastBoardSlotLevel = 4;
+
     public static string Build(
         TLevelUp? levelUp,
         Func<Guid, TCardBase?> resolveTemplate,
         EHero? currentHero,
-        Func<string, string>? colorizeResult = null
+        Func<string, string>? colorizeResult = null,
+        int? currentLevel = null
     )
     {
         if (levelUp == null)
@@ -39,6 +46,8 @@ internal static class CollectionLevelUpTooltipText
         var lines = new List<string>();
         if (levelUp.HealthIncrease > 0)
             lines.Add(colorize(CollectionPanelText.LevelUpMaxHealth((int)levelUp.HealthIncrease)));
+        if (currentLevel.HasValue && currentLevel.Value < LastBoardSlotLevel)
+            lines.Add(colorize(CollectionPanelText.LevelUpBoardSlots(BoardSlotsPerLevel)));
 
         // Weight-0 groups spawn deterministically (own line each); weighted groups are
         // random alternatives and collapse into one "One of:" block.

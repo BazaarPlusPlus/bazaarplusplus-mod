@@ -48,7 +48,8 @@ internal static class HeroLevelRewardsTooltipPatch
                 heroLevelTooltipData._nextLevelUp,
                 id => ResolveTemplate(staticData, id),
                 EncounterEventTooltipPatch.TryReadCurrentHero(),
-                BppTooltipText.ColorKeywords
+                BppTooltipText.ColorKeywords,
+                heroLevelTooltipData.GetCurrentAndNextLevel().currentLevel
             );
             if (string.IsNullOrEmpty(content))
             {
