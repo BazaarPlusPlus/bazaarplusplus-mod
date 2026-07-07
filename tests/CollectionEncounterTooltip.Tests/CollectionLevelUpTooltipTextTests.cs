@@ -128,7 +128,7 @@ public sealed class CollectionLevelUpTooltipTextTests
 
         var text = CollectionLevelUpTooltipText.Build(levelUp, _ => null, currentHero: null);
 
-        Assert.Contains("1× random reward (10 options)", text);
+        Assert.Contains("Random reward (10 options)", text);
     }
 
     private static TSpawnGroup Group(

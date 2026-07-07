@@ -89,6 +89,11 @@ internal static class CollectionPanelText
         "随机奖励 ×{0}（{1} 个选项）",
         "隨機獎勵 ×{0}（{1} 個選項）"
     );
+    private static readonly LocalizedTextSet LevelUpRandomPoolSingleText = new(
+        "Random reward ({0} options)",
+        "随机奖励（{0} 个选项）",
+        "隨機獎勵（{0} 個選項）"
+    );
     private static readonly LocalizedTextSet LevelUpOneOfText = new(
         "Choose one:",
         "选择其一：",
@@ -200,6 +205,9 @@ internal static class CollectionPanelText
 
     internal static string LevelUpRandomPool(int count, int optionCount) =>
         string.Format(Resolve(LevelUpRandomPoolText), count, optionCount);
+
+    internal static string LevelUpRandomPoolSingle(int optionCount) =>
+        string.Format(Resolve(LevelUpRandomPoolSingleText), optionCount);
 
     internal static string LevelUpOneOf() => Resolve(LevelUpOneOfText);
 

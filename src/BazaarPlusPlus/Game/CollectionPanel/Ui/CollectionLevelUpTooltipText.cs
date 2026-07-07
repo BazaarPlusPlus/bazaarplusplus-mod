@@ -70,11 +70,14 @@ internal static class CollectionLevelUpTooltipText
             // block so the inter-line spacer stays between blocks only.
             var block = new StringBuilder(CollectionPanelText.LevelUpOneOf());
             foreach (var candidate in candidates)
-                block.Append('\n').Append("· ").Append(candidate);
+            {
+                // Hanging indent keeps soft-wrapped candidate lines aligned.
+                block.Append('\n').Append("· <indent=1em>").Append(candidate).Append("</indent>");
+            }
             lines.Add(block.ToString());
         }
 
-        return lines.Count == 0 ? string.Empty : string.Join("\n<size=45%> </size>\n", lines);
+        return lines.Count == 0 ? string.Empty : string.Join("\n<size=45%> </size>\n", lines);
     }
 
     private static void CollectGroup(
@@ -138,9 +141,13 @@ internal static class CollectionLevelUpTooltipText
         if (optionCount == 0)
             return;
 
+        // Inside a choose-one list a single draw needs no "x1" marker.
         var limit = group.Limit is TFixedValue fixedValue ? (int)fixedValue.Value : 1;
+        var draws = Math.Min(limit, optionCount);
         candidates.Add(
-            CollectionPanelText.LevelUpRandomPool(Math.Min(limit, optionCount), optionCount)
+            draws == 1
+                ? CollectionPanelText.LevelUpRandomPoolSingle(optionCount)
+                : CollectionPanelText.LevelUpRandomPool(draws, optionCount)
         );
     }
 
