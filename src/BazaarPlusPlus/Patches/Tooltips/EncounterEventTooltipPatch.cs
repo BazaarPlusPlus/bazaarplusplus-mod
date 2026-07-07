@@ -6,6 +6,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
+using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -41,19 +42,24 @@ internal static class EncounterEventTooltipPatch
         {
             // Empty text is the ResetValues path (or a card with no description);
             // never show a section there — _currentCard may be stale.
-            var content = string.IsNullOrEmpty(text) ? null : BuildContent(__instance);
+            var content =
+                string.IsNullOrEmpty(text) || !EventPreviewGate.IsEnabled()
+                    ? null
+                    : BuildContent(__instance);
             if (string.IsNullOrEmpty(content))
             {
                 BppTooltipSections.HideAll(__instance);
                 return;
             }
 
-            if (!BppTooltipSections.TryShow(
+            if (
+                !BppTooltipSections.TryShow(
                     __instance,
                     SectionKey,
                     __instance.passiveEffectParent,
                     content!
-                ))
+                )
+            )
                 return;
             BppTooltipSections.Hide(__instance, HeroLevelRewardsTooltipPatch.SectionKey);
             DumpLayoutOnce(__instance, text);

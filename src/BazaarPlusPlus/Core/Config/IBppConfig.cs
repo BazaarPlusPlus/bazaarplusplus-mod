@@ -10,6 +10,8 @@ internal interface IBppConfig
 
     ConfigEntry<PreviewVisibilityMode>? EnchantPreviewModeConfig { get; }
 
+    ConfigEntry<bool>? EnableEventPreviewConfig { get; }
+
     ConfigEntry<bool>? EnableCombatStatusBarConfig { get; }
 
     ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; }
