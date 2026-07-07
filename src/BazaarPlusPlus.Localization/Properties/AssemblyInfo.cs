@@ -9,3 +9,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("HistoryPanelServerHealth.Tests")]
 [assembly: InternalsVisibleTo("LiveBuildRecommendations.Tests")]
 [assembly: InternalsVisibleTo("SettingsDockRegistry.Tests")]
+[assembly: InternalsVisibleTo("CollectionEncounterTooltip.Tests")]
