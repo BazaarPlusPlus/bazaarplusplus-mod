@@ -1,0 +1,32 @@
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs
+  s_190772a4ef67fb::t_3f6acba2602abd 18-22
+docs/drafts/2026-07-08-subtitle-mode-settings-plan.md
+  s_190772a4ef67fb::t_7c2ede22732f52 1-2,4-112
+  s_190772a4ef67fb::t_b24e06e15ec58f 3
+tests/SettingsDockRegistry.Tests/SettingsDockRegistryTests.cs
+  s_190772a4ef67fb::t_7264c40f098ed9 461,479-480,482,485,490,492-523
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesSettingsMenuLabel.cs
+  s_190772a4ef67fb::t_d695c50b807ba5 8
+src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesSettingsDockEntry.cs
+  s_190772a4ef67fb::t_e963118dd0de15 12-16,23-26,40-63,65,67-100
+src/BazaarPlusPlus/Core/Config/BppConfig.cs
+  s_190772a4ef67fb::t_7069ff73b1a35a 88,100
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "91622637d330bc1972abb6dbd624ffa365913231",
+  "prompts": {},
+  "sessions": {
+    "s_190772a4ef67fb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3d53-a179-7610-9300-2b88fce5e3f6",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
