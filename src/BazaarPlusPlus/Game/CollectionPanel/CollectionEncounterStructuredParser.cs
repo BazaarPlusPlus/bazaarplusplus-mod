@@ -104,6 +104,18 @@ internal static class CollectionEncounterStructuredParser
         return false;
     }
 
+    // The number of choices the event actually presents (SelectionContext spawn limit);
+    // groups beyond it never spawn even when their prerequisites hold.
+    public static int? TryParseEventChoiceLimit(object? source)
+    {
+        var token = ToToken(source);
+        if (token == null)
+            return null;
+
+        var spawnContext = token.SelectToken("SelectionContext.SpawnContext") ?? token;
+        return ReadQuantity(spawnContext);
+    }
+
     private static void AppendStepReferencesFromGroup(
         JToken group,
         List<CollectionEncounterStepReference> result,
@@ -111,6 +123,7 @@ internal static class CollectionEncounterStructuredParser
     )
     {
         var groupPrerequisiteIds = ReadPrerequisiteIds(group["Prerequisites"]);
+        var groupPrerequisiteTags = ReadPrerequisiteTagGroups(group["Prerequisites"]);
         var filters = group["Filters"] as JArray;
         if (filters == null)
             return;
@@ -121,14 +134,44 @@ internal static class CollectionEncounterStructuredParser
                 groupPrerequisiteIds,
                 ReadPrerequisiteIds(filter["Prerequisites"])
             );
+            var prerequisiteTags = new List<IReadOnlyList<string>>(groupPrerequisiteTags);
+            prerequisiteTags.AddRange(ReadPrerequisiteTagGroups(filter["Prerequisites"]));
 
             foreach (var id in ReadGuids(filter["Ids"]))
             {
                 if (!seen.Add(id))
                     continue;
-                result.Add(new CollectionEncounterStepReference(id, prerequisiteIds));
+                result.Add(
+                    new CollectionEncounterStepReference(id, prerequisiteIds, prerequisiteTags)
+                );
             }
         }
+    }
+
+    // Tag-based ownership prerequisites ("if you have a Friend"): each conditional's
+    // Tags array is one any-of group; all groups must be satisfied.
+    private static IReadOnlyList<IReadOnlyList<string>> ReadPrerequisiteTagGroups(JToken? token)
+    {
+        if (token == null || token.Type == JTokenType.Null)
+            return Array.Empty<IReadOnlyList<string>>();
+
+        var groups = new List<IReadOnlyList<string>>();
+        foreach (var obj in EnumerateObjects(token))
+        {
+            if (obj["Tags"] is not JArray tags || tags.Count == 0)
+                continue;
+
+            var names = new List<string>();
+            foreach (var tag in tags)
+            {
+                var name = tag.ToString();
+                if (!string.IsNullOrWhiteSpace(name) && !names.Contains(name))
+                    names.Add(name);
+            }
+            if (names.Count > 0)
+                groups.Add(names);
+        }
+        return groups;
     }
 
     private static CollectionEncounterRewardFilter? TryParseTokenSpawnContext(JToken spawnContext)

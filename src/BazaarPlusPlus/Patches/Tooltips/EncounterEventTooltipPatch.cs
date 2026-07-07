@@ -74,7 +74,7 @@ internal static class EncounterEventTooltipPatch
             template,
             staticData,
             TryReadCurrentHero(),
-            TryBuildOwnedTemplateChecker()
+            TryBuildInventory()
         );
         if (option == null || !option.HasChoiceDetails)
             return null;
@@ -99,9 +99,10 @@ internal static class EncounterEventTooltipPatch
     }
 
     // Snapshot of the player's current inventory (hand + stash items and skills) by
-    // template id, used to grey out options whose card prerequisites are unmet.
+    // template id and owned tag names, used to grey out options whose ownership
+    // prerequisites ("if you have a Bushel" / "if you have a Friend") are unmet.
     // Null (out of run / read failure) means eligibility is not evaluated.
-    private static Func<Guid, bool>? TryBuildOwnedTemplateChecker()
+    private static CollectionEncounterInventory? TryBuildInventory()
     {
         try
         {
@@ -109,11 +110,12 @@ internal static class EncounterEventTooltipPatch
             if (player == null)
                 return null;
 
-            var owned = new HashSet<Guid>();
-            AddTemplateIds(owned, player.Hand?.GetItemsAsEnumerable());
-            AddTemplateIds(owned, player.Stash?.GetItemsAsEnumerable());
-            AddTemplateIds(owned, player.Skills);
-            return owned.Contains;
+            var templateIds = new HashSet<Guid>();
+            var tagNames = new HashSet<string>(StringComparer.Ordinal);
+            AddCards(templateIds, tagNames, player.Hand?.GetItemsAsEnumerable());
+            AddCards(templateIds, tagNames, player.Stash?.GetItemsAsEnumerable());
+            AddCards(templateIds, tagNames, player.Skills);
+            return new CollectionEncounterInventory(templateIds, tagNames);
         }
         catch (Exception ex)
         {
@@ -122,14 +124,23 @@ internal static class EncounterEventTooltipPatch
         }
     }
 
-    private static void AddTemplateIds(HashSet<Guid> owned, System.Collections.IEnumerable? cards)
+    private static void AddCards(
+        HashSet<Guid> templateIds,
+        HashSet<string> tagNames,
+        System.Collections.IEnumerable? cards
+    )
     {
         if (cards == null)
             return;
         foreach (var card in cards)
         {
-            if (card is BazaarGameClient.Domain.Models.Cards.Card typed)
-                owned.Add(typed.TemplateId);
+            if (card is not BazaarGameClient.Domain.Models.Cards.Card typed)
+                continue;
+            templateIds.Add(typed.TemplateId);
+            foreach (var tag in typed.Tags)
+                tagNames.Add(tag.ToString());
+            foreach (var hiddenTag in typed.HiddenTags)
+                tagNames.Add(hiddenTag.ToString());
         }
     }
 

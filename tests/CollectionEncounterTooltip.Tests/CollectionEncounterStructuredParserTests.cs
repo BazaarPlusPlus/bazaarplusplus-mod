@@ -599,4 +599,48 @@ public sealed class CollectionEncounterStructuredParserTests
 
         public bool IsNot { get; init; }
     }
+
+    [Fact]
+    public void TryParseEventStepReferences_reads_tag_prerequisite_groups()
+    {
+        var json =
+            """
+            {
+              "$type": "TCardEncounterEvent",
+              "SelectionContext": {
+                "SpawnContext": {
+                  "Limit": { "$type": "TFixedValue", "Value": 3.0 },
+                  "Groups": [
+                    {
+                      "Filters": [{ "Ids": ["10000000-0000-0000-0000-000000000001"] }],
+                      "Prerequisites": [
+                        {
+                          "$type": "TPrerequisiteCardCount",
+                          "Subject": {
+                            "$type": "TTargetCardSection",
+                            "TargetSection": "AbsolutePlayerHandAndStash",
+                            "Conditions": {
+                              "$type": "TCardConditionalTag",
+                              "Tags": ["Toy", "Drone"],
+                              "Operator": "Any"
+                            }
+                          },
+                          "Comparison": "GreaterThanOrEqual",
+                          "Amount": 1
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+            """;
+
+        var references = CollectionEncounterStructuredParser.TryParseEventStepReferences(json);
+
+        var reference = Assert.Single(references);
+        var tagGroup = Assert.Single(reference.PrerequisiteTagGroups);
+        Assert.Equal(new[] { "Toy", "Drone" }, tagGroup);
+        Assert.Equal(3, CollectionEncounterStructuredParser.TryParseEventChoiceLimit(json));
+    }
 }

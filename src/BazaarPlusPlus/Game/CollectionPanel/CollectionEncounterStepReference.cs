@@ -8,16 +8,22 @@ internal sealed class CollectionEncounterStepReference
 {
     public CollectionEncounterStepReference(
         Guid templateId,
-        IReadOnlyList<Guid>? prerequisiteTemplateIds = null
+        IReadOnlyList<Guid>? prerequisiteTemplateIds = null,
+        IReadOnlyList<IReadOnlyList<string>>? prerequisiteTagGroups = null
     )
     {
         TemplateId = templateId;
         PrerequisiteTemplateIds = Deduplicate(prerequisiteTemplateIds);
+        PrerequisiteTagGroups = prerequisiteTagGroups ?? Array.Empty<IReadOnlyList<string>>();
     }
 
     public Guid TemplateId { get; }
 
     public IReadOnlyList<Guid> PrerequisiteTemplateIds { get; }
+
+    // Tag-based ownership prerequisites ("if you have a Friend"): each inner list is an
+    // any-of group; every group must be satisfied for the step to be offered.
+    public IReadOnlyList<IReadOnlyList<string>> PrerequisiteTagGroups { get; }
 
     private static IReadOnlyList<Guid> Deduplicate(IReadOnlyList<Guid>? ids)
     {

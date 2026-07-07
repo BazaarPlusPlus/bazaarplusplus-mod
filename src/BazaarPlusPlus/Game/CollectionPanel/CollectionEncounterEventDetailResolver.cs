@@ -14,7 +14,7 @@ internal static class CollectionEncounterEventDetailResolver
         TCardBase? eventTemplate,
         object? staticData,
         EHero? currentHero,
-        Func<Guid, bool>? ownsTemplate = null
+        CollectionEncounterInventory? inventory = null
     )
     {
         if (eventTemplate == null || !IsEncounterEventTemplate(eventTemplate))
@@ -22,7 +22,7 @@ internal static class CollectionEncounterEventDetailResolver
 
         var resultText = CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty;
         var rewardFilter = ResolveRewardFilter(eventTemplate, resultText);
-        var choiceDetails = ResolveChoiceDetails(eventTemplate, staticData, currentHero, ownsTemplate);
+        var choiceDetails = ResolveChoiceDetails(eventTemplate, staticData, currentHero, inventory);
         return new CollectionEncounterOption(
             eventTemplate.Id,
             CollectionLocalizationResolver.ResolveTitle(eventTemplate) ?? eventTemplate.InternalName,
@@ -39,56 +39,73 @@ internal static class CollectionEncounterEventDetailResolver
         TCardBase eventTemplate,
         object? staticData,
         EHero? currentHero,
-        Func<Guid, bool>? ownsTemplate
+        CollectionEncounterInventory? inventory
     )
     {
-        // Eligible options first; prerequisite-unmet ones render dimmed at the bottom.
-        var eligible = new List<CollectionEncounterChoiceDetail>();
-        var ineligible = new List<CollectionEncounterChoiceDetail>();
         var structuredReferences = CollectionEncounterStructuredParser.TryParseEventStepReferences(
             eventTemplate
         );
+
+        // First pass: hero-visible steps in data order, with prerequisite evaluation.
+        var candidates = new List<(TCardBase Step, bool MeetsPrerequisites)>();
         foreach (var reference in structuredReferences)
         {
             var rawStep = BppStaticDataAccess.GetCardTemplate(staticData, reference.TemplateId);
             if (rawStep == null || !IsEncounterStepTemplate(rawStep))
                 continue;
+            if (!CollectionEncounterHeroEligibility.Matches(rawStep.Heroes, currentHero))
+                continue;
 
-            var isEligible = MeetsCardPrerequisites(reference, ownsTemplate);
-            AddChoiceDetail(isEligible ? eligible : ineligible, rawStep, currentHero, isEligible);
+            candidates.Add((rawStep, MeetsOwnershipPrerequisites(reference, inventory)));
         }
 
-        eligible.AddRange(ineligible);
-        return eligible;
+        // The event only presents the first <limit> prerequisite-passing steps
+        // (Sequential spawn); the rest — prerequisite-unmet or beyond the limit —
+        // render dimmed at the bottom.
+        var choiceLimit =
+            CollectionEncounterStructuredParser.TryParseEventChoiceLimit(eventTemplate)
+            ?? int.MaxValue;
+        var presented = new List<CollectionEncounterChoiceDetail>();
+        var dimmed = new List<CollectionEncounterChoiceDetail>();
+        foreach (var (step, meetsPrerequisites) in candidates)
+        {
+            var isPresented = meetsPrerequisites && presented.Count < choiceLimit;
+            AddChoiceDetail(isPresented ? presented : dimmed, step, isPresented);
+        }
+
+        presented.AddRange(dimmed);
+        return presented;
     }
 
-    // Card prerequisites ("if you have a Bushel") are per-id ownership checks combined
-    // with AND. Without inventory access (or for run-state prerequisites, which carry
-    // no card ids) the option counts as eligible rather than guessing.
-    private static bool MeetsCardPrerequisites(
+    // Ownership prerequisites combine with AND: every specific-card id must be owned
+    // and every "if you have a <Tag>" group must match at least one owned tag. Without
+    // inventory access (or for run-state prerequisites, which carry neither ids nor
+    // tags) the option counts as eligible rather than guessing.
+    private static bool MeetsOwnershipPrerequisites(
         CollectionEncounterStepReference reference,
-        Func<Guid, bool>? ownsTemplate
+        CollectionEncounterInventory? inventory
     )
     {
-        if (ownsTemplate == null || reference.PrerequisiteTemplateIds.Count == 0)
+        if (inventory == null)
             return true;
 
         foreach (var id in reference.PrerequisiteTemplateIds)
-            if (!ownsTemplate(id))
+            if (!inventory.OwnsTemplate(id))
                 return false;
+
+        foreach (var tagGroup in reference.PrerequisiteTagGroups)
+            if (!inventory.OwnsAnyTag(tagGroup))
+                return false;
+
         return true;
     }
 
     private static void AddChoiceDetail(
         List<CollectionEncounterChoiceDetail> result,
         TCardBase stepTemplate,
-        EHero? currentHero,
         bool isEligible
     )
     {
-        if (!CollectionEncounterHeroEligibility.Matches(stepTemplate.Heroes, currentHero))
-            return;
-
         var resultText = CollectionLocalizationResolver.ResolveDescription(stepTemplate) ?? string.Empty;
         result.Add(
             new CollectionEncounterChoiceDetail(
