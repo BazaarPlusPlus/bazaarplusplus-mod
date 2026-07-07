@@ -13,6 +13,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<PreviewVisibilityMode>? EnchantPreviewModeConfig { get; private set; }
 
+    public ConfigEntry<bool>? EnableEventPreviewConfig { get; private set; }
+
     public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
 
     public ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; private set; }
@@ -66,6 +68,12 @@ internal sealed class BppConfig : IBppConfig
             "Mode",
             DefaultEnchantPreviewMode,
             "When to show enchant preview text in item tooltips. Off = hold Ctrl only. AutoOnPedestalChoice = auto-show while an enchant pedestal is offered on the choice screen, hold Ctrl otherwise. Always = append to every eligible tooltip."
+        );
+        EnableEventPreviewConfig = config.Bind(
+            "EventPreview",
+            "Enabled",
+            true,
+            "Whether to append the event-choice breakdown and hero level-up reward sections to native tooltips."
         );
         EnableCombatStatusBarConfig = config.Bind(
             "CombatStatusBar",

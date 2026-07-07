@@ -54,7 +54,7 @@ internal static class CollectionLocalizationResolver
         return null;
     }
 
-    // Installed by the tooltip patch layer: maps a canonical attribute keyword
+    // Installed at plugin startup (Plugin.InstallStaticUtilities): maps a canonical attribute keyword
     // ("Heal") to the game's localized display word ("治疗" on zh clients) via
     // TooltipTypography. Null (or a null return) falls back to the English name so
     // the data layer never depends on game UI services directly.

@@ -3,6 +3,7 @@
 using System;
 using BazaarGameShared.Domain.Cards;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
+using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -16,7 +17,10 @@ namespace BazaarPlusPlus.Patches.Tooltips;
 // ("NEXT LEVEL REWARDS" icon strip). HandleTooltip starts with ResetValues, which
 // routes through RenderPassiveEffectTextBlock(empty) and hides all BPP sections, so
 // showing the level section here needs no extra teardown elsewhere.
-[HarmonyPatch(typeof(HeroLevelTooltipTypeHandler), nameof(HeroLevelTooltipTypeHandler.HandleTooltip))]
+[HarmonyPatch(
+    typeof(HeroLevelTooltipTypeHandler),
+    nameof(HeroLevelTooltipTypeHandler.HandleTooltip)
+)]
 internal static class HeroLevelRewardsTooltipPatch
 {
     internal const string SectionKey = "level-rewards";
@@ -31,6 +35,9 @@ internal static class HeroLevelRewardsTooltipPatch
     {
         try
         {
+            if (!EventPreviewGate.IsEnabled())
+                return;
+
             if (tooltipData is not HeroLevelTooltipData heroLevelTooltipData)
             {
                 BppLog.Debug("LevelTooltip", "Skipped: not hero level data");
