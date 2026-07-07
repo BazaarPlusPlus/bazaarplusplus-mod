@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Text;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Game;
@@ -48,9 +49,18 @@ internal static class CollectionLevelUpTooltipText
         }
 
         if (singleRewards.Count == 1)
+        {
             lines.Add(singleRewards[0]);
+        }
         else if (singleRewards.Count > 1)
-            lines.Add(CollectionPanelText.LevelUpOneOf(string.Join(" / ", singleRewards)));
+        {
+            // One alternative per bulleted line under a shared header, as a single
+            // block so the inter-line spacer stays between blocks only.
+            var block = new StringBuilder(CollectionPanelText.LevelUpOneOf());
+            foreach (var reward in singleRewards)
+                block.Append('\n').Append("· ").Append(reward);
+            lines.Add(block.ToString());
+        }
         lines.AddRange(poolLines);
 
         return lines.Count == 0 ? string.Empty : string.Join("\n<size=45%> </size>\n", lines);
@@ -82,19 +92,20 @@ internal static class CollectionLevelUpTooltipText
             if (template == null)
                 return;
 
-            // Reward card names ("Shiny!", "Pip (Level Up)") are internal flavor the
-            // player never interacts with — show only what the reward actually does.
-            var description = CollectionLocalizationResolver.ResolveDescription(template);
-            if (!string.IsNullOrWhiteSpace(description))
-            {
-                singleRewards.Add(colorize(description!));
-                return;
-            }
-
             var title = CollectionLocalizationResolver.ResolveTitle(template)
                 ?? template.InternalName;
-            if (!string.IsNullOrWhiteSpace(title))
+            var description = CollectionLocalizationResolver.ResolveDescription(template);
+            if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(description))
+                return;
+
+            if (string.IsNullOrWhiteSpace(description))
                 singleRewards.Add($"<color={AccentColor}>{title}</color>");
+            else if (string.IsNullOrWhiteSpace(title))
+                singleRewards.Add(colorize(description!));
+            else
+                singleRewards.Add(
+                    $"<color={AccentColor}>{title}:</color> {colorize(description!)}"
+                );
             return;
         }
 

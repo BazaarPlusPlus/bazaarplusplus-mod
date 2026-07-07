@@ -90,9 +90,9 @@ internal static class CollectionPanelText
         "隨機獎勵 ×{0}（{1} 個選項）"
     );
     private static readonly LocalizedTextSet LevelUpOneOfText = new(
-        "One of: {0}",
-        "随机其一：{0}",
-        "隨機其一：{0}"
+        "One of:",
+        "随机其一：",
+        "隨機其一："
     );
 
     private static readonly LocalizedTextSet CatalogLoadingText = new(
@@ -176,8 +176,7 @@ internal static class CollectionPanelText
     internal static string LevelUpRandomPool(int count, int optionCount) =>
         string.Format(Resolve(LevelUpRandomPoolText), count, optionCount);
 
-    internal static string LevelUpOneOf(string alternatives) =>
-        string.Format(Resolve(LevelUpOneOfText), alternatives);
+    internal static string LevelUpOneOf() => Resolve(LevelUpOneOfText);
 
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 
