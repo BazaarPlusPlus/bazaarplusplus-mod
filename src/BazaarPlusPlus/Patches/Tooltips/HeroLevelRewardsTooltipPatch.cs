@@ -37,6 +37,12 @@ internal static class HeroLevelRewardsTooltipPatch
                 return;
             }
 
+            // Native gap: HandleTooltip resets the view via ResetValues, which clears
+            // every section except the quest rows — a pooled controller that last
+            // showed a quest item (e.g. a shop basket) leaks its "Sell N Food" rows
+            // into the hero-level tooltip. Clear them the way the card path does.
+            controller._questDisplayService?.BuildDisplay(null, null);
+
             var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
             var content = CollectionLevelUpTooltipText.Build(
                 heroLevelTooltipData._nextLevelUp,
