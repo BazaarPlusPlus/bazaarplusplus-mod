@@ -15,10 +15,11 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
 
 // Content for the BPP section appended below the native "next level rewards" tooltip:
-// the max-health gain plus one line per reward the player can actually receive,
-// resolved from the level-up spawn groups (single reward -> its card title and
-// description; random pools -> a count summary). Board-conditional bonus groups
-// (e.g. "Inspired by ..." skills gated on specific board cards) are omitted.
+// the max-health gain plus the rewards the player can actually receive, resolved from
+// the level-up spawn groups. Weighted single-reward groups are random alternatives, so
+// they collapse into one "One of: A / B" sentence instead of one line each; random
+// pools become a count summary. Board-conditional bonus groups (e.g. "Inspired by ..."
+// skills gated on specific board cards) are omitted.
 internal static class CollectionLevelUpTooltipText
 {
     private const string AccentColor = "#FFD37E";
@@ -38,17 +39,26 @@ internal static class CollectionLevelUpTooltipText
         if (levelUp.HealthIncrease > 0)
             lines.Add(colorize(CollectionPanelText.LevelUpMaxHealth((int)levelUp.HealthIncrease)));
 
+        var singleRewards = new List<string>();
+        var poolLines = new List<string>();
         if (levelUp.Rewards is TSpawnContextQuery query)
         {
             foreach (var group in query.Groups)
-                AppendGroup(lines, group, resolveTemplate, currentHero, colorize);
+                CollectGroup(singleRewards, poolLines, group, resolveTemplate, currentHero, colorize);
         }
+
+        if (singleRewards.Count == 1)
+            lines.Add(singleRewards[0]);
+        else if (singleRewards.Count > 1)
+            lines.Add(CollectionPanelText.LevelUpOneOf(string.Join(" / ", singleRewards)));
+        lines.AddRange(poolLines);
 
         return lines.Count == 0 ? string.Empty : string.Join("\n<size=45%> </size>\n", lines);
     }
 
-    private static void AppendGroup(
-        List<string> lines,
+    private static void CollectGroup(
+        List<string> singleRewards,
+        List<string> poolLines,
         TSpawnGroup group,
         Func<Guid, TCardBase?> resolveTemplate,
         EHero? currentHero,
@@ -72,19 +82,24 @@ internal static class CollectionLevelUpTooltipText
             if (template == null)
                 return;
 
+            // Reward card names ("Shiny!", "Pip (Level Up)") are internal flavor the
+            // player never interacts with — show only what the reward actually does.
+            var description = CollectionLocalizationResolver.ResolveDescription(template);
+            if (!string.IsNullOrWhiteSpace(description))
+            {
+                singleRewards.Add(colorize(description!));
+                return;
+            }
+
             var title = CollectionLocalizationResolver.ResolveTitle(template)
                 ?? template.InternalName;
-            var description = CollectionLocalizationResolver.ResolveDescription(template);
-            lines.Add(
-                string.IsNullOrWhiteSpace(description)
-                    ? $"<color={AccentColor}>{title}</color>"
-                    : $"<color={AccentColor}>{title}:</color> {colorize(description!)}"
-            );
+            if (!string.IsNullOrWhiteSpace(title))
+                singleRewards.Add($"<color={AccentColor}>{title}</color>");
             return;
         }
 
         var limit = group.Limit is TFixedValue fixedValue ? (int)fixedValue.Value : 1;
-        lines.Add(CollectionPanelText.LevelUpRandomPool(limit, ids.Count));
+        poolLines.Add(CollectionPanelText.LevelUpRandomPool(limit, ids.Count));
     }
 
     // Only hero conditions are evaluated; groups gated on board state ("Inspired by"

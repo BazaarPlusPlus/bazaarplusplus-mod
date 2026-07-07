@@ -114,6 +114,16 @@ internal static class BppTooltipSections
         foreach (var group in blockClone.GetComponentsInChildren<CanvasGroup>(true))
             group.alpha = 1f;
 
+        // The source block's LayoutElement.ignoreLayout is toggled together with its
+        // visibility; a clone taken while the source was hidden (e.g. the hero-level
+        // tooltip, where the passive box is off) inherits ignore=true, so the tooltip's
+        // vertical layout/fitter reserves no space and the frame fails to grow around
+        // the section. Always participate in layout.
+        var rootLayoutElement =
+            blockClone.GetComponent<UnityEngine.UI.LayoutElement>()
+            ?? blockClone.AddComponent<UnityEngine.UI.LayoutElement>();
+        rootLayoutElement.ignoreLayout = false;
+
         var label = textController.textObject;
         if (label != null)
         {
