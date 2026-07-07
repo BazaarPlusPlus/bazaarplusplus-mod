@@ -44,6 +44,12 @@ internal static class CollectionLocalizationResolver
         return null;
     }
 
+    // Installed by the tooltip patch layer: maps a canonical attribute keyword
+    // ("Heal") to the game's localized display word ("治疗" on zh clients) via
+    // TooltipTypography. Null (or a null return) falls back to the English name so
+    // the data layer never depends on game UI services directly.
+    internal static Func<string, string?>? AttributeUnitLocalizer;
+
     private static string? FormatAbilityPlaceholders(TCardBase template, string? text)
     {
         if (string.IsNullOrWhiteSpace(text) || !text.Contains("{ability.", StringComparison.Ordinal))
@@ -56,11 +62,25 @@ internal static class CollectionLocalizationResolver
             {
                 if (!TryResolveAbilityValue(template, match.Groups[1].Value, out var value, out var unit))
                     return match.Value;
+                if (unit == null)
+                    return value;
+
+                var localizedUnit = AttributeUnitLocalizer?.Invoke(unit);
+                if (string.IsNullOrWhiteSpace(localizedUnit))
+                    localizedUnit = unit;
+
                 // Some templates spell the unit out right after the placeholder
-                // ("Gain {ability.0} Gold"); only append when the text does not.
-                if (unit != null && !FollowingWordEquals(text!, match.Index + match.Length, unit))
-                    return $"{value} {unit}";
-                return value;
+                // ("Gain {ability.0} Gold" / "获得{ability.0}金币"); only append
+                // when the text does not, in either language.
+                var after = match.Index + match.Length;
+                if (FollowingWordEquals(text!, after, unit)
+                    || FollowingWordEquals(text!, after, localizedUnit!))
+                    return value;
+
+                // CJK words join without a space.
+                return IsCjk(localizedUnit![0])
+                    ? $"{value}{localizedUnit}"
+                    : $"{value} {localizedUnit}";
             },
             RegexOptions.CultureInvariant
         );
@@ -72,10 +92,15 @@ internal static class CollectionLocalizationResolver
             index++;
         if (index + word.Length > text.Length)
             return false;
-        return string.Compare(text, index, word, 0, word.Length, StringComparison.OrdinalIgnoreCase)
-                == 0
-            && (index + word.Length == text.Length || !char.IsLetter(text[index + word.Length]));
+        if (string.Compare(text, index, word, 0, word.Length, StringComparison.OrdinalIgnoreCase) != 0)
+            return false;
+        // CJK has no word boundaries; for Latin words require the match to end the word.
+        if (IsCjk(word[0]))
+            return true;
+        return index + word.Length == text.Length || !char.IsLetter(text[index + word.Length]);
     }
+
+    private static bool IsCjk(char value) => value >= '⺀';
 
     private static bool TryResolveAbilityValue(
         TCardBase template,

@@ -27,6 +27,13 @@ internal static class EncounterEventTooltipPatch
 {
     private const string SectionKey = "encounter";
 
+    static EncounterEventTooltipPatch()
+    {
+        // The data layer resolves ability units ("gains 20 Heal") language-neutrally;
+        // route its unit words through the game's localized keyword table.
+        CollectionLocalizationResolver.AttributeUnitLocalizer = BppTooltipText.TryLocalizeKeyword;
+    }
+
     [HarmonyPostfix]
     private static void Postfix(CardTooltipController __instance, string text)
     {
@@ -170,6 +177,35 @@ internal static class BppTooltipText
         catch (Exception)
         {
             return text;
+        }
+    }
+
+    // Localized display word for a canonical attribute keyword ("Heal" -> "治疗" on zh
+    // clients) from the game's keyword table; null when unknown so callers fall back
+    // to the English name.
+    public static string? TryLocalizeKeyword(string canonicalName)
+    {
+        try
+        {
+            var typography = Data.TooltipTypography;
+            if (typography == null)
+                return null;
+
+            foreach (
+                var translation in typography.GetKeywordTranslations(
+                    $"{{keyword.{canonicalName.ToLowerInvariant()}}}",
+                    includePrimaryTranslation: true
+                )
+            )
+            {
+                if (!string.IsNullOrWhiteSpace(translation))
+                    return translation;
+            }
+            return null;
+        }
+        catch (Exception)
+        {
+            return null;
         }
     }
 }
