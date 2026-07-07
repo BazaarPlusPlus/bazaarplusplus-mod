@@ -1,0 +1,21 @@
+Directory.Build.props
+  s_99d1799b0d44e3::t_50b15d07a52ffc 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "21972aa1f0d0c048013544736697c4c30a6155a0",
+  "prompts": {},
+  "sessions": {
+    "s_99d1799b0d44e3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3ae2-509f-7662-af90-4c689fc00956",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
