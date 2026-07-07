@@ -97,7 +97,11 @@ internal static class CollectionEncounterGameTooltipText
                 foreach (var detail in outcome.Details)
                 {
                     var result = ChoiceResultText(detail, dayTierCeiling);
-                    // Hanging indent keeps soft-wrapped lines aligned with the dash.
+                    // A small uniform gap between sub-items: inline sprite icons
+                    // inflate some line boxes, and without this the rhythm between
+                    // entries looks accidental. Hanging indent keeps soft-wrapped
+                    // lines aligned with the dash.
+                    block.Append("\n<size=25%> </size>");
                     block.Append("\n<indent=2.2em>- ");
                     block.Append(
                         string.IsNullOrWhiteSpace(result)
@@ -138,9 +142,32 @@ internal static class CollectionEncounterGameTooltipText
         if (string.IsNullOrWhiteSpace(result))
             return string.Empty;
 
-        result = result.Replace("\r", string.Empty).Replace('\n', ' ');
+        result = CollapseWhitespace(
+            result.Replace("\r", string.Empty).Replace('\n', ' ')
+        );
         var suffix = DayTierSuffix(choice, dayTierCeiling);
-        return suffix == null ? result : $"{result} {suffix}";
+        if (suffix == null)
+            return result;
+        // Full-width punctuation carries its own visual gap; an ASCII space in
+        // front of it reads as a hole.
+        return suffix.Length > 0 && suffix[0] >= '⺀'
+            ? $"{result}{suffix}"
+            : $"{result} {suffix}";
+    }
+
+    private static string CollapseWhitespace(string text)
+    {
+        var builder = new System.Text.StringBuilder(text.Length);
+        var previousWasSpace = false;
+        foreach (var character in text)
+        {
+            var isSpace = character == ' ';
+            if (isSpace && previousWasSpace)
+                continue;
+            previousWasSpace = isSpace;
+            builder.Append(character);
+        }
+        return builder.ToString();
     }
 
     // A pool with no tier constraint (or one spanning every dealable tier) is day-driven:
