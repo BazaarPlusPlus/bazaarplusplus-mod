@@ -114,6 +114,19 @@ internal static class BppTooltipSections
         foreach (var group in blockClone.GetComponentsInChildren<CanvasGroup>(true))
             group.alpha = 1f;
 
+        // Only the text participates: the clone inherits the passive box's other
+        // children and the quest-row container among them stays active, silently
+        // padding the section with dead height.
+        var textTransform = textController.transform;
+        foreach (Transform child in blockClone.transform)
+            if (child != textTransform && !textTransform.IsChildOf(child))
+                child.gameObject.SetActive(false);
+
+        // The seam to the block above already carries the native box's bottom
+        // padding and the layout spacing; the clone's own top padding doubles it up.
+        if (blockClone.GetComponent<UnityEngine.UI.LayoutGroup>() is { } layoutGroup)
+            layoutGroup.padding.top = 0;
+
         // The source block's LayoutElement.ignoreLayout is toggled together with its
         // visibility; a clone taken while the source was hidden (e.g. the hero-level
         // tooltip, where the passive box is off) inherits ignore=true, so the tooltip's
