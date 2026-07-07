@@ -40,24 +40,35 @@ internal static class CollectionLevelUpTooltipText
         if (levelUp.HealthIncrease > 0)
             lines.Add(colorize(CollectionPanelText.LevelUpMaxHealth((int)levelUp.HealthIncrease)));
 
-        var singleRewards = new List<string>();
+        // Weight-0 groups spawn deterministically (own line each); weighted groups are
+        // random alternatives and collapse into one "One of:" block.
+        var certainRewards = new List<string>();
+        var alternativeRewards = new List<string>();
         var poolLines = new List<string>();
         if (levelUp.Rewards is TSpawnContextQuery query)
         {
             foreach (var group in query.Groups)
-                CollectGroup(singleRewards, poolLines, group, resolveTemplate, currentHero, colorize);
+                CollectGroup(
+                    group.RandomWeight == 0 ? certainRewards : alternativeRewards,
+                    poolLines,
+                    group,
+                    resolveTemplate,
+                    currentHero,
+                    colorize
+                );
         }
 
-        if (singleRewards.Count == 1)
+        lines.AddRange(certainRewards);
+        if (alternativeRewards.Count == 1)
         {
-            lines.Add(singleRewards[0]);
+            lines.Add(alternativeRewards[0]);
         }
-        else if (singleRewards.Count > 1)
+        else if (alternativeRewards.Count > 1)
         {
             // One alternative per bulleted line under a shared header, as a single
             // block so the inter-line spacer stays between blocks only.
             var block = new StringBuilder(CollectionPanelText.LevelUpOneOf());
-            foreach (var reward in singleRewards)
+            foreach (var reward in alternativeRewards)
                 block.Append('\n').Append("· ").Append(reward);
             lines.Add(block.ToString());
         }
@@ -86,12 +97,27 @@ internal static class CollectionLevelUpTooltipText
         if (ids.Count == 0)
             return;
 
+        // Spawn filtering also honours each reward card's own Heroes field (the group's
+        // run prerequisite alone is coarser: e.g. "Core Initialization" sits in a
+        // Dooley-or-Jules group but the card itself is Dooley-only). Unresolvable
+        // templates cannot be judged and stay counted.
+        var eligible = new List<TCardBase>();
+        var unresolved = 0;
+        foreach (var id in ids)
+        {
+            var template = resolveTemplate(id);
+            if (template == null)
+                unresolved++;
+            else if (CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
+                eligible.Add(template);
+        }
+
         if (ids.Count == 1)
         {
-            var template = resolveTemplate(ids[0]);
-            if (template == null)
+            if (eligible.Count == 0)
                 return;
 
+            var template = eligible[0];
             var title = CollectionLocalizationResolver.ResolveTitle(template)
                 ?? template.InternalName;
             var description = CollectionLocalizationResolver.ResolveDescription(template);
@@ -109,8 +135,14 @@ internal static class CollectionLevelUpTooltipText
             return;
         }
 
+        var optionCount = eligible.Count + unresolved;
+        if (optionCount == 0)
+            return;
+
         var limit = group.Limit is TFixedValue fixedValue ? (int)fixedValue.Value : 1;
-        poolLines.Add(CollectionPanelText.LevelUpRandomPool(limit, ids.Count));
+        poolLines.Add(
+            CollectionPanelText.LevelUpRandomPool(Math.Min(limit, optionCount), optionCount)
+        );
     }
 
     // Only hero conditions are evaluated; groups gated on board state ("Inspired by"
