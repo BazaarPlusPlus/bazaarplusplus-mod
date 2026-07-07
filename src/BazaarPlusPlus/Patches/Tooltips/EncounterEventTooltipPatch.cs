@@ -185,10 +185,10 @@ internal static class EncounterEventTooltipPatch
             : null;
     }
 
-    // Snapshot of the player's current inventory (hand + stash items and skills) by
-    // template id and owned tag names, used to grey out options whose ownership
-    // prerequisites ("if you have a Bushel" / "if you have a Friend") are unmet.
-    // Null (out of run / read failure) means eligibility is not evaluated.
+    // Per-card snapshot of the player's current inventory (hand + stash items and
+    // skills), used to evaluate ownership prerequisites — including count
+    // comparisons ("Equal 0" = only while you do NOT own it) and per-card tag
+    // operators. Null (out of run / read failure) means eligibility is not evaluated.
     private static CollectionEncounterInventory? TryBuildInventory()
     {
         try
@@ -197,12 +197,11 @@ internal static class EncounterEventTooltipPatch
             if (player == null)
                 return null;
 
-            var templateIds = new HashSet<Guid>();
-            var tagNames = new HashSet<string>(StringComparer.Ordinal);
-            AddCards(templateIds, tagNames, player.Hand?.GetItemsAsEnumerable());
-            AddCards(templateIds, tagNames, player.Stash?.GetItemsAsEnumerable());
-            AddCards(templateIds, tagNames, player.Skills);
-            return new CollectionEncounterInventory(templateIds, tagNames);
+            var cards = new List<CollectionEncounterInventoryCard>();
+            AddCards(cards, player.Hand?.GetItemsAsEnumerable());
+            AddCards(cards, player.Stash?.GetItemsAsEnumerable());
+            AddCards(cards, player.Skills);
+            return new CollectionEncounterInventory(cards);
         }
         catch (Exception ex)
         {
@@ -212,22 +211,22 @@ internal static class EncounterEventTooltipPatch
     }
 
     private static void AddCards(
-        HashSet<Guid> templateIds,
-        HashSet<string> tagNames,
-        System.Collections.IEnumerable? cards
+        List<CollectionEncounterInventoryCard> cards,
+        System.Collections.IEnumerable? source
     )
     {
-        if (cards == null)
+        if (source == null)
             return;
-        foreach (var card in cards)
+        foreach (var card in source)
         {
             if (card is not BazaarGameClient.Domain.Models.Cards.Card typed)
                 continue;
-            templateIds.Add(typed.TemplateId);
+            var tagNames = new HashSet<string>(StringComparer.Ordinal);
             foreach (var tag in typed.Tags)
                 tagNames.Add(tag.ToString());
             foreach (var hiddenTag in typed.HiddenTags)
                 tagNames.Add(hiddenTag.ToString());
+            cards.Add(new CollectionEncounterInventoryCard(typed.TemplateId, tagNames));
         }
     }
 

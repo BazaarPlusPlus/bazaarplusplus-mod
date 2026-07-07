@@ -109,6 +109,21 @@ internal static class CollectionPanelText
         "战斗：随机怪物（{0} 种）",
         "戰鬥：隨機怪物（{0} 種）"
     );
+    private static readonly LocalizedTextSet OutcomeRandomItemText = new(
+        "Random item",
+        "随机物品",
+        "隨機物品"
+    );
+    private static readonly LocalizedTextSet OutcomeRandomSkillText = new(
+        "Random skill",
+        "随机技能",
+        "隨機技能"
+    );
+    private static readonly LocalizedTextSet OutcomeRandomRewardText = new(
+        "Random reward",
+        "随机奖励",
+        "隨機獎勵"
+    );
     private static readonly LocalizedTextSet OutcomeSubPoolText = new(
         "one of {0}:",
         "以下 {0} 种随机其一：",
@@ -215,6 +230,12 @@ internal static class CollectionPanelText
 
     internal static string OutcomeCombatPool(int count) =>
         string.Format(Resolve(OutcomeCombatPoolText), count);
+
+    internal static string OutcomeRandomItem() => Resolve(OutcomeRandomItemText);
+
+    internal static string OutcomeRandomSkill() => Resolve(OutcomeRandomSkillText);
+
+    internal static string OutcomeRandomReward() => Resolve(OutcomeRandomRewardText);
 
     internal static string OutcomeSubPool(int count) =>
         string.Format(Resolve(OutcomeSubPoolText), count);

@@ -28,8 +28,16 @@ public sealed class CollectionEncounterStructuredParserTests
                             "10000000-0000-0000-0000-000000000002"
                           ],
                           "Prerequisites": {
-                            "$type": "THasCardPrerequisite",
-                            "Ids": ["20000000-0000-0000-0000-000000000001"]
+                            "$type": "TPrerequisiteCardCount",
+                            "Subject": {
+                              "Conditions": {
+                                "$type": "TCardConditionalId",
+                                "Id": "20000000-0000-0000-0000-000000000001",
+                                "IsNot": false
+                              }
+                            },
+                            "Comparison": "GreaterThanOrEqual",
+                            "Amount": 1
                           }
                         }
                       ]
@@ -43,8 +51,8 @@ public sealed class CollectionEncounterStructuredParserTests
         var references = CollectionEncounterStructuredParser.TryParseEventStepReferences(json);
 
         Assert.Equal(new[] { brewId, tradeId }, references.Select(reference => reference.TemplateId));
-        Assert.Equal(new[] { tinyFurryMonsterId }, Assert.Single(references[0].PrerequisiteIdGroups));
-        Assert.Equal(new[] { tinyFurryMonsterId }, Assert.Single(references[1].PrerequisiteIdGroups));
+        Assert.Equal(new[] { tinyFurryMonsterId }, Assert.Single(references[0].Requirements).Ids);
+        Assert.Equal(new[] { tinyFurryMonsterId }, Assert.Single(references[1].Requirements).Ids);
     }
 
     [Fact]
@@ -62,15 +70,31 @@ public sealed class CollectionEncounterStructuredParserTests
                   "Groups": [
                     {
                       "Prerequisites": {
-                        "$type": "THasCardPrerequisite",
-                        "Ids": ["20000000-0000-0000-0000-000000000002"]
+                        "$type": "TPrerequisiteCardCount",
+                        "Subject": {
+                          "Conditions": {
+                            "$type": "TCardConditionalId",
+                            "Id": "20000000-0000-0000-0000-000000000002",
+                            "IsNot": false
+                          }
+                        },
+                        "Comparison": "GreaterThanOrEqual",
+                        "Amount": 1
                       },
                       "Filters": [
                         {
                           "Ids": ["10000000-0000-0000-0000-000000000003"],
                           "Prerequisites": {
-                            "$type": "THasCardPrerequisite",
-                            "TemplateId": "20000000-0000-0000-0000-000000000003"
+                            "$type": "TPrerequisiteCardCount",
+                            "Subject": {
+                              "Conditions": {
+                                "$type": "TCardConditionalId",
+                                "Id": "20000000-0000-0000-0000-000000000003",
+                                "IsNot": false
+                              }
+                            },
+                            "Comparison": "GreaterThanOrEqual",
+                            "Amount": 1
                           }
                         }
                       ]
@@ -86,9 +110,9 @@ public sealed class CollectionEncounterStructuredParserTests
         );
 
         Assert.Equal(stepId, reference.TemplateId);
-        Assert.Equal(2, reference.PrerequisiteIdGroups.Count);
-        Assert.Equal(new[] { groupPrerequisiteId }, reference.PrerequisiteIdGroups[0]);
-        Assert.Equal(new[] { filterPrerequisiteId }, reference.PrerequisiteIdGroups[1]);
+        Assert.Equal(2, reference.Requirements.Count);
+        Assert.Equal(new[] { groupPrerequisiteId }, reference.Requirements[0].Ids);
+        Assert.Equal(new[] { filterPrerequisiteId }, reference.Requirements[1].Ids);
     }
 
     [Fact]
@@ -638,8 +662,13 @@ public sealed class CollectionEncounterStructuredParserTests
         var references = CollectionEncounterStructuredParser.TryParseEventStepReferences(json);
 
         var reference = Assert.Single(references);
-        var tagGroup = Assert.Single(reference.PrerequisiteTagGroups);
-        Assert.Equal(new[] { "Toy", "Drone" }, tagGroup);
+        var requirement = Assert.Single(reference.Requirements);
+        Assert.Equal(2, requirement.TagCandidateGroups.Count);
+        Assert.Equal(new[] { "Toy" }, requirement.TagCandidateGroups[0]);
+        Assert.Equal(new[] { "Drone" }, requirement.TagCandidateGroups[1]);
+        Assert.Equal("Any", requirement.TagOperator);
+        Assert.Equal("GreaterThanOrEqual", requirement.Comparison);
+        Assert.Equal(1, requirement.Amount);
         Assert.Equal(3, CollectionEncounterStructuredParser.TryParseEventChoiceLimit(json));
     }
 }

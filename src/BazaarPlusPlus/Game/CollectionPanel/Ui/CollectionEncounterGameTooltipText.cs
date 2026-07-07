@@ -83,11 +83,7 @@ internal static class CollectionEncounterGameTooltipText
             }
             else if (outcome.Details.Count == 1)
             {
-                var detail = outcome.Details[0];
-                var result = ChoiceResultText(detail, dayTierCeiling);
-                content = string.IsNullOrWhiteSpace(result)
-                    ? detail.DisplayName
-                    : $"{detail.DisplayName}: {colorize(result)}";
+                content = DetailLine(outcome.Details[0], colorize, dayTierCeiling);
             }
             else
             {
@@ -96,15 +92,10 @@ internal static class CollectionEncounterGameTooltipText
                 );
                 foreach (var detail in outcome.Details)
                 {
-                    var result = ChoiceResultText(detail, dayTierCeiling);
                     // Hanging indent keeps soft-wrapped lines aligned with the dash.
                     block.Append(CollectionTooltipMarkup.SubItemBreak);
                     block.Append("<indent=2.2em>- ");
-                    block.Append(
-                        string.IsNullOrWhiteSpace(result)
-                            ? detail.DisplayName
-                            : $"{detail.DisplayName}: {colorize(result)}"
-                    );
+                    block.Append(DetailLine(detail, colorize, dayTierCeiling));
                     block.Append("</indent>");
                 }
                 content = block.ToString();
@@ -128,6 +119,22 @@ internal static class CollectionEncounterGameTooltipText
         return CollectionTooltipMarkup.Wrap(
             string.Join(CollectionTooltipMarkup.BlockBreak, lines)
         );
+    }
+
+    // One outcome entry: "Name: result", bare name, or bare result — query-pool
+    // summaries have no card name, so their result text stands alone.
+    private static string DetailLine(
+        CollectionEncounterChoiceDetail detail,
+        Func<string, string> colorize,
+        ETier? dayTierCeiling
+    )
+    {
+        var result = ChoiceResultText(detail, dayTierCeiling);
+        if (string.IsNullOrWhiteSpace(result))
+            return detail.DisplayName;
+        return string.IsNullOrWhiteSpace(detail.DisplayName)
+            ? colorize(result)
+            : $"{detail.DisplayName}: {colorize(result)}";
     }
 
     // Flattens embedded newlines (descriptions render as list entries) and appends

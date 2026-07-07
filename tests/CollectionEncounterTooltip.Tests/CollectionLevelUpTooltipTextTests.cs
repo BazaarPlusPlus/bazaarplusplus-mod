@@ -1,4 +1,8 @@
+using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Cards.Encounter.Step;
+using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Spawning;
 using BazaarGameShared.Domain.Game;
 using BazaarGameShared.Domain.Prerequisites;
 using BazaarGameShared.Domain.Prerequisites.Conditionals;
@@ -130,6 +134,69 @@ public sealed class CollectionLevelUpTooltipTextTests
 
         Assert.Contains("Random reward (10 options)", text);
     }
+
+    [Fact]
+    public void Random_selection_merges_uniform_weighted_groups_into_one_pool()
+    {
+        // Level 9/18 shape: dominant pool + enchant groups whose weight equals their
+        // card count (w2 x [Yetarian, Sanguine] + w1 x [Arcane] = one random of 3).
+        var poolIds = Enumerable
+            .Range(0, 9)
+            .Select(i => Guid.Parse($"50000000-0000-0000-0000-{i:d12}"))
+            .ToList();
+        var enchantA = Guid.Parse("60000000-0000-0000-0000-000000000001");
+        var enchantB = Guid.Parse("60000000-0000-0000-0000-000000000002");
+        var enchantC = Guid.Parse("60000000-0000-0000-0000-000000000003");
+        var titles = new Dictionary<Guid, string>
+        {
+            [enchantA] = "Yetarian Tomb",
+            [enchantB] = "Sanguine Valley",
+            [enchantC] = "Arcane Abyss",
+        };
+        var levelUp = new TLevelUp
+        {
+            Level = 9,
+            Rewards = new TSpawnContextQuery
+            {
+                SelectionMethod = ESpawnSelectionMethod.Random,
+                Groups =
+                {
+                    WeightedGroup(poolIds, weight: 199),
+                    WeightedGroup(new List<Guid> { enchantA, enchantB }, weight: 2),
+                    WeightedGroup(new List<Guid> { enchantC }, weight: 1),
+                },
+            },
+        };
+
+        var text = CollectionLevelUpTooltipText.Build(
+            levelUp,
+            id => titles.TryGetValue(id, out var title) ? Step(title) : null,
+            currentHero: null
+        );
+
+        Assert.Contains("one of 3", text);
+        Assert.Contains("Yetarian Tomb", text);
+        Assert.Contains("Sanguine Valley", text);
+        Assert.Contains("Arcane Abyss", text);
+        Assert.DoesNotContain("one of 2", text);
+        Assert.Contains("Random reward (9 options)", text);
+    }
+
+    private static TCardEncounterStep Step(string title) =>
+        new()
+        {
+            Localization = new TCardLocalization
+            {
+                Title = new TLocalizableText { Text = title },
+            },
+        };
+
+    private static TSpawnGroup WeightedGroup(List<Guid> ids, uint weight) =>
+        new()
+        {
+            Filters = { new TSpawnFilterIdList { Ids = ids } },
+            RandomWeight = weight,
+        };
 
     private static TSpawnGroup Group(
         IEnumerable<Guid> ids,

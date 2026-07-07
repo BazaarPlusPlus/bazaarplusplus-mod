@@ -11,15 +11,15 @@ internal sealed class CollectionEncounterOutcomeGroupData
     public CollectionEncounterOutcomeGroupData(
         uint weight,
         IReadOnlyList<Guid> ids,
-        IReadOnlyList<IReadOnlyList<Guid>> prerequisiteIdGroups,
-        IReadOnlyList<IReadOnlyList<string>> prerequisiteTagGroups,
+        IReadOnlyList<CollectionEncounterOutcomeQueryPool> queryPools,
+        IReadOnlyList<CollectionEncounterCardRequirement> requirements,
         CollectionEncounterDayCondition? dayCondition
     )
     {
         Weight = weight;
         Ids = ids;
-        PrerequisiteIdGroups = prerequisiteIdGroups;
-        PrerequisiteTagGroups = prerequisiteTagGroups;
+        QueryPools = queryPools;
+        Requirements = requirements;
         DayCondition = dayCondition;
     }
 
@@ -27,12 +27,33 @@ internal sealed class CollectionEncounterOutcomeGroupData
 
     public IReadOnlyList<Guid> Ids { get; }
 
-    // Any-of card-id groups (one per prerequisite, e.g. "Powder Keg or the Big One").
-    public IReadOnlyList<IReadOnlyList<Guid>> PrerequisiteIdGroups { get; }
+    // Dynamic pools (TSpawnFilterQuery) spawned alongside/instead of fixed ids;
+    // kept even when the constraints don't parse so the weight stays in the roll.
+    public IReadOnlyList<CollectionEncounterOutcomeQueryPool> QueryPools { get; }
 
-    public IReadOnlyList<IReadOnlyList<string>> PrerequisiteTagGroups { get; }
+    // Card-count ownership prerequisites; all must be satisfied for the group to
+    // participate in the roll.
+    public IReadOnlyList<CollectionEncounterCardRequirement> Requirements { get; }
 
     public CollectionEncounterDayCondition? DayCondition { get; }
+}
+
+// A TSpawnFilterQuery pool inside an outcome group: the constraints summarized as a
+// reward filter (null when unparseable) plus the group's spawn quantity.
+internal sealed class CollectionEncounterOutcomeQueryPool
+{
+    public CollectionEncounterOutcomeQueryPool(
+        CollectionEncounterRewardFilter? filter,
+        int? quantity
+    )
+    {
+        Filter = filter;
+        Quantity = quantity;
+    }
+
+    public CollectionEncounterRewardFilter? Filter { get; }
+
+    public int? Quantity { get; }
 }
 
 internal readonly struct CollectionEncounterDayCondition

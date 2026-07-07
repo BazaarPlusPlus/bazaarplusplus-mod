@@ -21,8 +21,8 @@ public class CollectionEncounterOutcomeMergeTests
             {
                 Combat(weight: 25, ids: new[] { MonsterA }),
                 Combat(weight: 25, ids: new[] { MonsterB }),
-                Rewards(weight: 40),
-                Rewards(weight: 10),
+                Rewards(weight: 40, text: "Get a big thing"),
+                Rewards(weight: 10, text: "Get a small thing"),
             },
             totalWeight: 100
         );
@@ -43,7 +43,7 @@ public class CollectionEncounterOutcomeMergeTests
             {
                 Combat(weight: 33, ids: new[] { MonsterA }),
                 Combat(weight: 33, ids: new[] { MonsterB }),
-                Rewards(weight: 33),
+                Rewards(weight: 33, text: "Get a thing"),
             },
             totalWeight: 99
         );
@@ -101,7 +101,8 @@ public class CollectionEncounterOutcomeMergeTests
         );
 
     private static CollectionEncounterEventDetailResolver.OutcomeGroupResolution Rewards(
-        uint weight
+        uint weight,
+        string text
     ) =>
         new(
             weight,
@@ -113,10 +114,30 @@ public class CollectionEncounterOutcomeMergeTests
                 new(
                     Guid.NewGuid(),
                     displayName: "Reward",
-                    resultText: "Get a thing",
+                    resultText: text,
                     rewardFilter: null,
                     isSourceMatch: false
                 ),
             }
         );
+
+    // Same rendered content in several weighted groups (Farai's per-NPC package
+    // split) collapses into one line with the weights summed.
+    [Fact]
+    public void Same_content_groups_merge_with_summed_weights()
+    {
+        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
+            new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>
+            {
+                Rewards(weight: 2, text: "Aila's Package"),
+                Rewards(weight: 1, text: "Aila's Package"),
+                Rewards(weight: 3, text: "Barkun's Package"),
+            },
+            totalWeight: 6
+        );
+
+        Assert.Equal(2, views.Count);
+        Assert.Equal(50, views[0].Percent);
+        Assert.Equal(50, views[1].Percent);
+    }
 }

@@ -7,6 +7,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Game;
 using BazaarGameShared.Domain.Prerequisites;
 using BazaarGameShared.Domain.Prerequisites.Conditionals;
+using BazaarGameShared.Domain.Spawning;
 using BazaarGameShared.Domain.Spawning.SpawnFilters;
 using BazaarGameShared.Domain.Spawning.SpawnGroups;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
@@ -56,8 +57,33 @@ internal static class CollectionLevelUpTooltipText
         var candidates = new List<string>();
         if (levelUp.Rewards is TSpawnContextQuery query)
         {
+            // Random selection (levels 9/18): groups whose weight equals their card
+            // count are uniform per-card rolls competing for one offered slot — the
+            // enchant reward is split across such groups only to encode card counts
+            // (w2×[Yetarian, Sanguine] + w1×[Arcane] = one random enchant of three).
+            // Merge them into a single pool candidate instead of listing each group.
+            var uniformPool = new List<Guid>();
+            var isRandomSelection = query.SelectionMethod == ESpawnSelectionMethod.Random;
             foreach (var group in query.Groups)
+            {
+                if (isRandomSelection
+                    && PassesPrerequisites(group, currentHero)
+                    && UniformPoolIds(group) is { } poolIds)
+                {
+                    uniformPool.AddRange(poolIds);
+                    continue;
+                }
                 CollectGroup(candidates, group, resolveTemplate, currentHero, colorize);
+            }
+            if (uniformPool.Count > 0)
+                CollectCandidates(
+                    candidates,
+                    uniformPool,
+                    limit: 1,
+                    resolveTemplate,
+                    currentHero,
+                    colorize
+                );
         }
 
         if (candidates.Count == 1)
@@ -86,6 +112,20 @@ internal static class CollectionLevelUpTooltipText
             : CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
     }
 
+    // A weighted group whose weight equals its card count: every card is a uniform
+    // roll for the same offered slot, so such groups merge into one pool.
+    private static List<Guid>? UniformPoolIds(TSpawnGroup group)
+    {
+        if (group.RandomWeight == 0)
+            return null;
+
+        var ids = new List<Guid>();
+        foreach (var filter in group.Filters)
+            if (filter is TSpawnFilterIdList idList)
+                ids.AddRange(idList.Ids);
+        return ids.Count > 0 && group.RandomWeight == ids.Count ? ids : null;
+    }
+
     private static void CollectGroup(
         List<string> candidates,
         TSpawnGroup group,
@@ -105,6 +145,19 @@ internal static class CollectionLevelUpTooltipText
         if (ids.Count == 0)
             return;
 
+        var limit = group.Limit is TFixedValue fixedValue ? (int)fixedValue.Value : 1;
+        CollectCandidates(candidates, ids, limit, resolveTemplate, currentHero, colorize);
+    }
+
+    private static void CollectCandidates(
+        List<string> candidates,
+        List<Guid> ids,
+        int limit,
+        Func<Guid, TCardBase?> resolveTemplate,
+        EHero? currentHero,
+        Func<string, string> colorize
+    )
+    {
         // Spawn filtering also honours each reward card's own Heroes field (the group's
         // run prerequisite alone is coarser: e.g. "Core Initialization" sits in a
         // Dooley-or-Jules group but the card itself is Dooley-only). Unresolvable
@@ -148,7 +201,6 @@ internal static class CollectionLevelUpTooltipText
             return;
 
         // Inside a choose-one list a single draw needs no "x1" marker.
-        var limit = group.Limit is TFixedValue fixedValue ? (int)fixedValue.Value : 1;
         var draws = Math.Min(limit, optionCount);
 
         // After hero filtering most pools shrink to a handful of concrete rewards;

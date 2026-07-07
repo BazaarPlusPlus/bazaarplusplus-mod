@@ -118,7 +118,26 @@ internal static class CollectionEncounterEventDetailResolver
                 AddChoiceDetail(details, template, isEligible: true);
             }
 
-            var isCombatPool = resolvedCount > 0 && combatIds.Count * 2 > resolvedCount;
+            // Dynamic pools roll a summary line; the reward filter drives the
+            // day-tier suffix exactly like card-text rewards.
+            foreach (var pool in group.QueryPools)
+                details.Add(
+                    new CollectionEncounterChoiceDetail(
+                        Guid.Empty,
+                        displayName: string.Empty,
+                        resultText: QueryPoolResultText(pool),
+                        rewardFilter: pool.Filter,
+                        isSourceMatch: false
+                    )
+                );
+
+            // Variant cards sharing one title+text (e.g. two "Aila's Package" ids in
+            // a single Farai group) read as duplicates; keep one.
+            DedupeDetails(details);
+
+            var isCombatPool = group.QueryPools.Count == 0
+                && resolvedCount > 0
+                && combatIds.Count * 2 > resolvedCount;
             resolutions.Add(
                 new OutcomeGroupResolution(group.Weight, eligible, isCombatPool, combatIds, details)
             );
@@ -126,6 +145,34 @@ internal static class CollectionEncounterEventDetailResolver
 
         var views = BuildOutcomeViews(resolutions, totalWeight);
         return views.Count == 0 ? null : views;
+    }
+
+    private static string QueryPoolResultText(CollectionEncounterOutcomeQueryPool pool)
+    {
+        var baseText = pool.Filter?.CardType switch
+        {
+            ECardType.Skill => CollectionPanelText.OutcomeRandomSkill(),
+            ECardType.Item => CollectionPanelText.OutcomeRandomItem(),
+            _ => CollectionPanelText.OutcomeRandomReward(),
+        };
+        var quantity = pool.Quantity ?? pool.Filter?.Quantity;
+        return quantity is > 1 ? $"{quantity}× {baseText}" : baseText;
+    }
+
+    private static void DedupeDetails(List<CollectionEncounterChoiceDetail> details)
+    {
+        for (var i = details.Count - 1; i > 0; i--)
+        {
+            for (var j = 0; j < i; j++)
+            {
+                if (string.Equals(details[i].DisplayName, details[j].DisplayName, StringComparison.Ordinal)
+                    && string.Equals(details[i].ResultText, details[j].ResultText, StringComparison.Ordinal))
+                {
+                    details.RemoveAt(i);
+                    break;
+                }
+            }
+        }
     }
 
     // Per-group resolution before percentage math and combat-pool merging.
@@ -168,6 +215,8 @@ internal static class CollectionEncounterEventDetailResolver
         var combatSlots = new Dictionary<bool, int>();
         var combatWeights = new Dictionary<bool, uint>();
         var combatIds = new Dictionary<bool, HashSet<Guid>>();
+        var contentSlots = new Dictionary<string, int>(StringComparer.Ordinal);
+        var contentWeights = new Dictionary<string, uint>(StringComparer.Ordinal);
 
         int? Percent(bool eligible, uint weight) =>
             eligible && totalWeight > 0 ? (int)Math.Round(weight * 100.0 / totalWeight) : null;
@@ -204,9 +253,22 @@ internal static class CollectionEncounterEventDetailResolver
 
             if (resolution.Details.Count == 0)
                 continue;
+
+            // Groups rendering identically (e.g. Farai's weight-2 pool of two
+            // "Aila's Package" variants next to a weight-1 single) merge into one
+            // line, weights summed before rounding — separate lines would show the
+            // same text several times with misleadingly split percentages.
+            var signature = ContentSignature(resolution);
+            if (contentSlots.TryGetValue(signature, out var contentSlot))
+            {
+                contentWeights[signature] += resolution.Weight;
+                continue;
+            }
+            contentSlots[signature] = views.Count;
+            contentWeights[signature] = resolution.Weight;
             views.Add(
                 new CollectionEncounterOutcomeView(
-                    Percent(resolution.Eligible, resolution.Weight),
+                    null,
                     resolution.Eligible,
                     isCombatPool: false,
                     resolution.Details.Count,
@@ -224,7 +286,31 @@ internal static class CollectionEncounterEventDetailResolver
                 Array.Empty<CollectionEncounterChoiceDetail>()
             );
 
+        foreach (var (signature, slot) in contentSlots)
+        {
+            var view = views[slot];
+            views[slot] = new CollectionEncounterOutcomeView(
+                Percent(view.IsEligible, contentWeights[signature]),
+                view.IsEligible,
+                isCombatPool: false,
+                view.OptionCount,
+                view.Details
+            );
+        }
+
         return views;
+    }
+
+    private static string ContentSignature(OutcomeGroupResolution resolution)
+    {
+        var builder = new System.Text.StringBuilder(resolution.Eligible ? "e" : "i");
+        foreach (var detail in resolution.Details)
+            builder
+                .Append('\x1f')
+                .Append(detail.DisplayName)
+                .Append('\x1e')
+                .Append(detail.ResultText);
+        return builder.ToString();
     }
 
     private static bool MeetsOutcomePrerequisites(
@@ -235,11 +321,8 @@ internal static class CollectionEncounterEventDetailResolver
         if (inventory == null)
             return true;
 
-        foreach (var idGroup in group.PrerequisiteIdGroups)
-            if (!inventory.OwnsAnyTemplate(idGroup))
-                return false;
-        foreach (var tagGroup in group.PrerequisiteTagGroups)
-            if (!inventory.OwnsAnyTag(tagGroup))
+        foreach (var requirement in group.Requirements)
+            if (!requirement.Matches(inventory))
                 return false;
         return true;
     }
@@ -294,10 +377,9 @@ internal static class CollectionEncounterEventDetailResolver
         return presented;
     }
 
-    // Ownership prerequisites combine with AND across groups; each group is any-of
-    // (a conditional may list alternatives, e.g. "Powder Keg or the Big One").
-    // Without inventory access (or for run-state prerequisites, which carry neither
-    // ids nor tags) the option counts as eligible rather than guessing.
+    // Card-count prerequisites combine with AND. Without inventory access (or for
+    // run-state prerequisites, which yield no requirements) the option counts as
+    // eligible rather than guessing.
     private static bool MeetsOwnershipPrerequisites(
         CollectionEncounterStepReference reference,
         CollectionEncounterInventory? inventory
@@ -306,12 +388,8 @@ internal static class CollectionEncounterEventDetailResolver
         if (inventory == null)
             return true;
 
-        foreach (var idGroup in reference.PrerequisiteIdGroups)
-            if (!inventory.OwnsAnyTemplate(idGroup))
-                return false;
-
-        foreach (var tagGroup in reference.PrerequisiteTagGroups)
-            if (!inventory.OwnsAnyTag(tagGroup))
+        foreach (var requirement in reference.Requirements)
+            if (!requirement.Matches(inventory))
                 return false;
 
         return true;
