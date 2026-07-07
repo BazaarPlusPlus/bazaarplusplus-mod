@@ -379,6 +379,8 @@ internal static class CollectionEncounterEventDetailResolver
         // price tiers) are not offered at all.
         var candidates = new List<(TCardBase Step, bool MeetsPrerequisites)>();
         var pools = new List<CollectionEncounterChoiceDetail>();
+        var eventDescription =
+            CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty;
         foreach (var group in choiceGroups)
         {
             if (group.DayCondition is { } dayCondition
@@ -388,7 +390,8 @@ internal static class CollectionEncounterEventDetailResolver
 
             if (group.IsRandomPool)
             {
-                if (ResolveChoicePool(group, staticData, currentHero, inventory) is { } pool)
+                if (ResolveChoicePool(group, staticData, currentHero, inventory, eventDescription)
+                    is { } pool)
                     pools.Add(pool);
                 continue;
             }
@@ -494,7 +497,8 @@ internal static class CollectionEncounterEventDetailResolver
         CollectionEncounterChoiceGroupData group,
         object? staticData,
         EHero? currentHero,
-        CollectionEncounterInventory? inventory
+        CollectionEncounterInventory? inventory,
+        string eventDescription
     )
     {
         var entries = new List<CollectionEncounterChoiceDetail>();
@@ -544,6 +548,20 @@ internal static class CollectionEncounterEventDetailResolver
 
         if (entries.Count == 0)
             return null;
+
+        // A pool that dedupes to one entry is no pool ("one of 1:") — and when that
+        // entry is a bare title the event description already spells out ("Get 4
+        // Bronze-tier Spare Change" / "Spare Change"), the line says nothing at all.
+        if (entries.Count == 1)
+        {
+            var single = entries[0];
+            if (string.IsNullOrEmpty(single.ResultText)
+                && !string.IsNullOrEmpty(single.DisplayName)
+                && eventDescription.Contains(single.DisplayName, StringComparison.OrdinalIgnoreCase))
+                return null;
+            return single;
+        }
+
         // Small pools expand into their entries; large ones stay a count summary.
         return PoolDetail(new CollectionEncounterChoicePool(
             isCombat: false,

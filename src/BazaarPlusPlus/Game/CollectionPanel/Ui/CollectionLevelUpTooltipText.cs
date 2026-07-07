@@ -179,7 +179,9 @@ internal static class CollectionLevelUpTooltipText
                 eligible.Add(template);
         }
 
-        if (ids.Count == 1)
+        // Pools that filter down to one concrete reward render as that reward, not
+        // as a "one of 1:" wrapper.
+        if (ids.Count == 1 || (unresolved == 0 && eligible.Count == 1))
         {
             if (eligible.Count == 0)
                 return;

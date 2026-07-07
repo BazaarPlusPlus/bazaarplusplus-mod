@@ -220,6 +220,36 @@ public sealed class CollectionLevelUpTooltipTextTests
         );
     }
 
+    [Fact]
+    public void Pool_filtered_down_to_one_reward_renders_without_pool_header()
+    {
+        var mine = Guid.Parse("80000000-0000-0000-0000-000000000001");
+        var otherHeros = Guid.Parse("80000000-0000-0000-0000-000000000002");
+        var templates = new Dictionary<Guid, TCardEncounterStep>
+        {
+            [mine] = Step("Spare Change"),
+            [otherHeros] = Step("Core Initialization"),
+        };
+        templates[otherHeros].Heroes.Add(EHero.Dooley);
+        var levelUp = new TLevelUp
+        {
+            Level = 3,
+            Rewards = new TSpawnContextQuery
+            {
+                Groups = { Group(new List<Guid> { mine, otherHeros }, limit: 1) },
+            },
+        };
+
+        var text = CollectionLevelUpTooltipText.Build(
+            levelUp,
+            id => templates.TryGetValue(id, out var template) ? template : null,
+            currentHero: EHero.Jules
+        );
+
+        Assert.Contains("Spare Change", text);
+        Assert.DoesNotContain("one of", text);
+    }
+
     private static TCardEncounterStep Step(string title) =>
         new()
         {
