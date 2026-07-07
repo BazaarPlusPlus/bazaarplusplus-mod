@@ -4,6 +4,7 @@ using System;
 using System.IO;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.Input;
@@ -19,6 +20,7 @@ using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Http;
 using BazaarPlusPlus.Patches;
+using BazaarPlusPlus.Patches.Tooltips;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -155,6 +157,7 @@ public class Plugin : BaseUnityPlugin
     {
         LegendaryPositionDisplayFormatter.Install(services.Config);
         L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config));
+        CollectionLocalizationResolver.AttributeUnitLocalizer = BppTooltipText.TryLocalizeKeyword;
         BppUiFont.Install(() =>
             services.Config.UiFontKindConfig?.Value ?? BppConfig.DefaultUiFontKind
         );

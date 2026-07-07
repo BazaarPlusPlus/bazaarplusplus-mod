@@ -28,13 +28,6 @@ internal static class EncounterEventTooltipPatch
 {
     private const string SectionKey = "encounter";
 
-    static EncounterEventTooltipPatch()
-    {
-        // The data layer resolves ability units ("gains 20 Heal") language-neutrally;
-        // route its unit words through the game's localized keyword table.
-        CollectionLocalizationResolver.AttributeUnitLocalizer = BppTooltipText.TryLocalizeKeyword;
-    }
-
     [HarmonyPostfix]
     private static void Postfix(CardTooltipController __instance, string text)
     {
@@ -202,8 +195,10 @@ internal static class BppTooltipText
             // table's extra entries are matching variants ("Heals"/"Healing") that
             // must not leak into appended text.
             var languageCode = PlayerPreferences.Data.LanguageCode ?? string.Empty;
-            if (languageCode.Length == 0
-                || languageCode.StartsWith("en", StringComparison.OrdinalIgnoreCase))
+            if (
+                languageCode.Length == 0
+                || languageCode.StartsWith("en", StringComparison.OrdinalIgnoreCase)
+            )
                 return null;
 
             var typography = Data.TooltipTypography;
