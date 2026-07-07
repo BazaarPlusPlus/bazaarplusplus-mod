@@ -1,4 +1,9 @@
 #nullable enable
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core;
 
@@ -21,6 +26,15 @@ internal static class CollectionLocalizationResolver
         return PickText(title);
     }
 
+    public static string? ResolveDescription(TCardBase template)
+    {
+        var description = template.Localization?.Description;
+        if (description == null)
+            return null;
+        var text = PickText(description);
+        return FormatAbilityPlaceholders(template, text);
+    }
+
     private static string? PickText(TLocalizableText text)
     {
         if (!string.IsNullOrWhiteSpace(text.Text))
@@ -28,5 +42,165 @@ internal static class CollectionLocalizationResolver
         if (!string.IsNullOrWhiteSpace(text.Key))
             return text.Key;
         return null;
+    }
+
+    private static string? FormatAbilityPlaceholders(TCardBase template, string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text) || !text.Contains("{ability.", StringComparison.Ordinal))
+            return text;
+
+        return Regex.Replace(
+            text!,
+            @"\{ability\.([^}]+)\}",
+            match =>
+            {
+                if (!TryResolveAbilityValue(template, match.Groups[1].Value, out var value, out var unit))
+                    return match.Value;
+                // Some templates spell the unit out right after the placeholder
+                // ("Gain {ability.0} Gold"); only append when the text does not.
+                if (unit != null && !FollowingWordEquals(text!, match.Index + match.Length, unit))
+                    return $"{value} {unit}";
+                return value;
+            },
+            RegexOptions.CultureInvariant
+        );
+    }
+
+    private static bool FollowingWordEquals(string text, int index, string word)
+    {
+        while (index < text.Length && char.IsWhiteSpace(text[index]))
+            index++;
+        if (index + word.Length > text.Length)
+            return false;
+        return string.Compare(text, index, word, 0, word.Length, StringComparison.OrdinalIgnoreCase)
+                == 0
+            && (index + word.Length == text.Length || !char.IsLetter(text[index + word.Length]));
+    }
+
+    private static bool TryResolveAbilityValue(
+        TCardBase template,
+        string abilityId,
+        out string valueText,
+        out string? unit
+    )
+    {
+        valueText = string.Empty;
+        unit = null;
+        var abilities = template.GetType().GetProperty("Abilities")?.GetValue(template);
+        if (abilities is not IEnumerable enumerable)
+            return false;
+
+        foreach (var entry in enumerable)
+        {
+            if (!TryReadEntry(entry, out var key, out var ability))
+                continue;
+            if (!string.Equals(key?.ToString(), abilityId, StringComparison.Ordinal))
+                continue;
+
+            var action = ability?.GetType().GetProperty("Action")?.GetValue(ability);
+            var value = action?.GetType().GetProperty("Value")?.GetValue(action);
+            var scalar = value?.GetType().GetProperty("Value")?.GetValue(value);
+            if (!TryFormatScalar(scalar, out valueText))
+                return false;
+
+            unit = ResolveAttributeUnit(action);
+            return true;
+        }
+
+        return false;
+    }
+
+    // The game renders "{ability.0}" with attribute-specific styling that conveys the
+    // unit; plain text needs the word spelled out. Only well-known keyword attributes
+    // are appended (they also pick up native keyword coloring in the tooltip); things
+    // like Quest_1 stay silent because the surrounding text already carries the context.
+    private static string? ResolveAttributeUnit(object? action)
+    {
+        var attribute = action?.GetType().GetProperty("AttributeType")?.GetValue(action);
+        if (attribute == null)
+            return null;
+
+        var name = attribute.ToString();
+        if (string.IsNullOrEmpty(name) || name.Contains('_'))
+            return null;
+
+        if (name.EndsWith("Amount", StringComparison.Ordinal))
+            name = name[..^"Amount".Length];
+        if (name.EndsWith("Apply", StringComparison.Ordinal))
+            name = name[..^"Apply".Length];
+
+        return KnownAttributeUnits.Contains(name) ? name : null;
+    }
+
+    private static readonly HashSet<string> KnownAttributeUnits = new(StringComparer.Ordinal)
+    {
+        "Heal",
+        "Poison",
+        "Shield",
+        "Burn",
+        "Damage",
+        "Regen",
+        "Freeze",
+        "Haste",
+        "Slow",
+        "Charge",
+        "Ammo",
+        "Lifesteal",
+        "Crit",
+        "Income",
+        "Gold",
+        "Experience",
+        "Value",
+    };
+
+    private static bool TryReadEntry(object entry, out object? key, out object? value)
+    {
+        if (entry is DictionaryEntry dictionaryEntry)
+        {
+            key = dictionaryEntry.Key;
+            value = dictionaryEntry.Value;
+            return true;
+        }
+
+        var type = entry.GetType();
+        key = type.GetProperty("Key")?.GetValue(entry);
+        value = type.GetProperty("Value")?.GetValue(entry);
+        return key != null;
+    }
+
+    private static bool TryFormatScalar(object? scalar, out string valueText)
+    {
+        valueText = string.Empty;
+        switch (scalar)
+        {
+            case null:
+                return false;
+            case float value:
+                valueText = FormatNumber(value);
+                return true;
+            case double value:
+                valueText = FormatNumber(value);
+                return true;
+            case decimal value:
+                valueText = FormatNumber((double)value);
+                return true;
+            case int value:
+                valueText = value.ToString(CultureInfo.InvariantCulture);
+                return true;
+            case long value:
+                valueText = value.ToString(CultureInfo.InvariantCulture);
+                return true;
+            default:
+                valueText = scalar.ToString() ?? string.Empty;
+                return !string.IsNullOrWhiteSpace(valueText);
+        }
+    }
+
+    private static string FormatNumber(double value)
+    {
+        var rounded = Math.Round(value);
+        return Math.Abs(value - rounded) < 0.0001
+            ? rounded.ToString(CultureInfo.InvariantCulture)
+            : value.ToString("0.##", CultureInfo.InvariantCulture);
     }
 }

@@ -69,6 +69,26 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet SortSizeText = new("Size", "尺寸", "尺寸");
     private static readonly LocalizedTextSet MerchantHeaderText = new("Merchant", "商人", "商人");
     private static readonly LocalizedTextSet TrainerHeaderText = new("Trainer", "训练师", "訓練師");
+    private static readonly LocalizedTextSet EncounterDayTierSuffixText = new(
+        "(up to {0})",
+        "（最高{0}）",
+        "（最高{0}）"
+    );
+    private static readonly LocalizedTextSet EncounterTierExactText = new(
+        "({0})",
+        "（{0}）",
+        "（{0}）"
+    );
+    private static readonly LocalizedTextSet LevelUpMaxHealthText = new(
+        "+{0} Max Health",
+        "+{0} 生命上限",
+        "+{0} 生命上限"
+    );
+    private static readonly LocalizedTextSet LevelUpRandomPoolText = new(
+        "{0}× random reward ({1} options)",
+        "随机奖励 ×{0}（{1} 个选项）",
+        "隨機獎勵 ×{0}（{1} 個選項）"
+    );
 
     private static readonly LocalizedTextSet CatalogLoadingText = new(
         "Loading card data...",
@@ -138,6 +158,18 @@ internal static class CollectionPanelText
 
     internal static string SourceHeader(ECardType activeType) =>
         activeType == ECardType.Skill ? Resolve(TrainerHeaderText) : Resolve(MerchantHeaderText);
+
+    internal static string EncounterDayTierSuffix(ETier tier) =>
+        string.Format(Resolve(EncounterDayTierSuffixText), Tier(tier));
+
+    internal static string EncounterTierExact(ETier tier) =>
+        string.Format(Resolve(EncounterTierExactText), Tier(tier));
+
+    internal static string LevelUpMaxHealth(int amount) =>
+        string.Format(Resolve(LevelUpMaxHealthText), amount);
+
+    internal static string LevelUpRandomPool(int count, int optionCount) =>
+        string.Format(Resolve(LevelUpRandomPoolText), count, optionCount);
 
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 
