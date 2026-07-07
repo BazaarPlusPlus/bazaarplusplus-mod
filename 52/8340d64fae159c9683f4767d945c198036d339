@@ -1,0 +1,34 @@
+src/BazaarPlusPlus/Patches/Tooltips/EncounterEventTooltipPatch.cs
+  s_c0b2458e5390f0::t_9113a85fae507c 198-201
+src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionLocalizationResolver.cs
+  s_e3bbc541bb2a0b::t_2fd73201c42711 57
+src/BazaarPlusPlus/Plugin.cs
+  s_c0b2458e5390f0::t_b3ff8f01f38c5a 23,160
+  s_c0b2458e5390f0::t_f81910095c6591 7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "528340d64fae159c9683f4767d945c198036d339",
+  "prompts": {},
+  "sessions": {
+    "s_c0b2458e5390f0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3d3a-f5bd-7972-b5de-2682538fe3f9",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    },
+    "s_e3bbc541bb2a0b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d4d79d4f-630e-4261-9c76-f09d47ebe619",
+        "model": "claude-fable-5"
+      },
+      "human_author": null
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
