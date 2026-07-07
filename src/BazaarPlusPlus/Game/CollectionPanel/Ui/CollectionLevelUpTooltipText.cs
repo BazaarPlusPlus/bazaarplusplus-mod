@@ -72,12 +72,18 @@ internal static class CollectionLevelUpTooltipText
             foreach (var candidate in candidates)
             {
                 // Hanging indent keeps soft-wrapped candidate lines aligned.
-                block.Append('\n').Append("· <indent=1em>").Append(candidate).Append("</indent>");
+                block
+                    .Append(CollectionTooltipMarkup.BulletBreak)
+                    .Append("· <indent=1em>")
+                    .Append(candidate)
+                    .Append("</indent>");
             }
             lines.Add(block.ToString());
         }
 
-        return lines.Count == 0 ? string.Empty : string.Join("\n<line-height=55%><size=45%> </size></line-height>\n", lines);
+        return lines.Count == 0
+            ? string.Empty
+            : CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
     }
 
     private static void CollectGroup(
@@ -161,8 +167,8 @@ internal static class CollectionLevelUpTooltipText
                 var entryDescription = CollectionLocalizationResolver.ResolveDescription(template)
                     ?.Replace("\r", string.Empty)
                     .Replace('\n', ' ');
-                block.Append("\n<line-height=35%><size=25%> </size></line-height>");
-                block.Append("\n<indent=2.2em>- ");
+                block.Append(CollectionTooltipMarkup.SubItemBreak);
+                block.Append("<indent=2.2em>- ");
                 block.Append(
                     string.IsNullOrWhiteSpace(entryDescription)
                         ? $"<color={AccentColor}>{entryTitle}</color>"

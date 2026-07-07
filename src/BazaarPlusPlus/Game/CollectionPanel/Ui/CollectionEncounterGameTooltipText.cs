@@ -60,9 +60,9 @@ internal static class CollectionEncounterGameTooltipText
                     : $"<color={AccentColor}>{choice.DisplayName}:</color> {colorize(result)}"
             );
         }
-        // A shrunken non-empty spacer line between choices keeps distinct options
-        // visually separated without inflating intra-choice line wrapping.
-        return string.Join("\n<line-height=55%><size=45%> </size></line-height>\n", lines);
+        return CollectionTooltipMarkup.Wrap(
+            string.Join(CollectionTooltipMarkup.BlockBreak, lines)
+        );
     }
 
     // Random-outcome events: one block per rolled alternative with its normalized
@@ -97,12 +97,9 @@ internal static class CollectionEncounterGameTooltipText
                 foreach (var detail in outcome.Details)
                 {
                     var result = ChoiceResultText(detail, dayTierCeiling);
-                    // A small uniform gap between sub-items: inline sprite icons
-                    // inflate some line boxes, and without this the rhythm between
-                    // entries looks accidental. Hanging indent keeps soft-wrapped
-                    // lines aligned with the dash.
-                    block.Append("\n<line-height=35%><size=25%> </size></line-height>");
-                    block.Append("\n<indent=2.2em>- ");
+                    // Hanging indent keeps soft-wrapped lines aligned with the dash.
+                    block.Append(CollectionTooltipMarkup.SubItemBreak);
+                    block.Append("<indent=2.2em>- ");
                     block.Append(
                         string.IsNullOrWhiteSpace(result)
                             ? detail.DisplayName
@@ -128,7 +125,9 @@ internal static class CollectionEncounterGameTooltipText
                 : string.Empty;
             lines.Add($"· <indent=1em>{prefix}{content}</indent>");
         }
-        return string.Join("\n<line-height=55%><size=45%> </size></line-height>\n", lines);
+        return CollectionTooltipMarkup.Wrap(
+            string.Join(CollectionTooltipMarkup.BlockBreak, lines)
+        );
     }
 
     // Flattens embedded newlines (descriptions render as list entries) and appends
