@@ -342,26 +342,39 @@ internal static class CollectionEncounterEventDetailResolver
         CollectionEncounterInventory? inventory
     )
     {
-        var structuredReferences = CollectionEncounterStructuredParser.TryParseEventStepReferences(
+        var choiceGroups = CollectionEncounterStructuredParser.TryParseEventChoiceGroups(
             eventTemplate
         );
 
-        // First pass: hero-visible steps in data order, with prerequisite evaluation.
+        // First pass in data order: fixed steps become candidates subject to the
+        // presentation limit; a Random-selection group is one rolled pool line.
         var candidates = new List<(TCardBase Step, bool MeetsPrerequisites)>();
-        foreach (var reference in structuredReferences)
+        var pools = new List<CollectionEncounterChoiceDetail>();
+        foreach (var group in choiceGroups)
         {
-            var rawStep = BppStaticDataAccess.GetCardTemplate(staticData, reference.TemplateId);
-            if (rawStep == null || !IsEncounterStepTemplate(rawStep))
+            if (group.IsRandomPool)
+            {
+                if (ResolveChoicePool(group, staticData, currentHero, inventory) is { } pool)
+                    pools.Add(pool);
                 continue;
-            if (!CollectionEncounterHeroEligibility.Matches(rawStep.Heroes, currentHero))
-                continue;
+            }
 
-            candidates.Add((rawStep, MeetsOwnershipPrerequisites(reference, inventory)));
+            foreach (var reference in group.Members)
+            {
+                var rawStep = BppStaticDataAccess.GetCardTemplate(staticData, reference.TemplateId);
+                if (rawStep == null || !IsEncounterStepTemplate(rawStep))
+                    continue;
+                if (!CollectionEncounterHeroEligibility.Matches(rawStep.Heroes, currentHero))
+                    continue;
+
+                candidates.Add((rawStep, MeetsOwnershipPrerequisites(reference, inventory)));
+            }
         }
 
         // The event only presents the first <limit> prerequisite-passing steps
         // (Sequential spawn); the rest — prerequisite-unmet or beyond the limit —
-        // render dimmed at the bottom.
+        // render dimmed at the bottom. Rolled pools always render (their members
+        // compete for the remaining presentation slots at random).
         var choiceLimit =
             CollectionEncounterStructuredParser.TryParseEventChoiceLimit(eventTemplate)
             ?? int.MaxValue;
@@ -373,9 +386,86 @@ internal static class CollectionEncounterEventDetailResolver
             AddChoiceDetail(isPresented ? presented : dimmed, step, isPresented);
         }
 
+        presented.AddRange(pools);
         presented.AddRange(dimmed);
         return presented;
     }
+
+    // A Random-selection spawn group inside a choice event: the offered choices are
+    // rolled from its members, which may be encounter steps, skills, items or
+    // combats. Renders as one pool line: a combat roll, a small expandable list, or
+    // a bare option count.
+    private static CollectionEncounterChoiceDetail? ResolveChoicePool(
+        CollectionEncounterChoiceGroupData group,
+        object? staticData,
+        EHero? currentHero,
+        CollectionEncounterInventory? inventory
+    )
+    {
+        var entries = new List<CollectionEncounterChoiceDetail>();
+        var combatIds = new HashSet<Guid>();
+        var resolvedCount = 0;
+        foreach (var member in group.Members)
+        {
+            var template = BppStaticDataAccess.GetCardTemplate(staticData, member.TemplateId);
+            if (template == null)
+                continue;
+            resolvedCount++;
+            if (IsEncounterCombatTemplate(template))
+            {
+                combatIds.Add(template.Id);
+                continue;
+            }
+            if (!CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
+                continue;
+            if (!MeetsOwnershipPrerequisites(member, inventory))
+                continue;
+            if (IsSkillTemplate(template))
+            {
+                var skillName = CollectionLocalizationResolver.ResolveTitle(template)
+                    ?? template.InternalName;
+                entries.Add(
+                    new CollectionEncounterChoiceDetail(
+                        template.Id,
+                        CollectionPanelText.OutcomeGainSkill(skillName),
+                        resultText: string.Empty,
+                        rewardFilter: null,
+                        isSourceMatch: false
+                    )
+                );
+                continue;
+            }
+            AddChoiceDetail(entries, template, isEligible: true);
+        }
+
+        DedupeDetails(entries);
+
+        if (combatIds.Count * 2 > resolvedCount && combatIds.Count > 0)
+            return PoolDetail(new CollectionEncounterChoicePool(
+                isCombat: true,
+                combatIds.Count,
+                Array.Empty<CollectionEncounterChoiceDetail>()
+            ));
+
+        if (entries.Count == 0)
+            return null;
+        // Small pools expand into their entries; large ones stay a count summary.
+        return PoolDetail(new CollectionEncounterChoicePool(
+            isCombat: false,
+            entries.Count,
+            entries.Count <= 8 ? entries : Array.Empty<CollectionEncounterChoiceDetail>()
+        ));
+    }
+
+    private static CollectionEncounterChoiceDetail PoolDetail(CollectionEncounterChoicePool pool) =>
+        new(
+            Guid.Empty,
+            displayName: string.Empty,
+            resultText: string.Empty,
+            rewardFilter: null,
+            isSourceMatch: false,
+            pool: pool
+        );
 
     // Card-count prerequisites combine with AND. Without inventory access (or for
     // run-state prerequisites, which yield no requirements) the option counts as

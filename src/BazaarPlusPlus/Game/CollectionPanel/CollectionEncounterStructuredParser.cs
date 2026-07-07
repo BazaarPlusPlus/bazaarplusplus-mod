@@ -16,19 +16,45 @@ internal static class CollectionEncounterStructuredParser
         object? source
     )
     {
+        var result = new List<CollectionEncounterStepReference>();
+        foreach (var group in TryParseEventChoiceGroups(source))
+            result.AddRange(group.Members);
+        return result;
+    }
+
+    // Choice-event spawn groups with their boundaries preserved: a group with its own
+    // SelectionMethod=Random is a pool the event rolls members from (Advanced
+    // Training's 16 trainings, Epic Battle's 14 monsters) rather than a fixed list
+    // of always-offered steps.
+    public static IReadOnlyList<CollectionEncounterChoiceGroupData> TryParseEventChoiceGroups(
+        object? source
+    )
+    {
         var token = ToToken(source);
         if (token == null)
-            return Array.Empty<CollectionEncounterStepReference>();
+            return Array.Empty<CollectionEncounterChoiceGroupData>();
 
         var spawnContext = token.SelectToken("SelectionContext.SpawnContext") ?? token;
-        var result = new List<CollectionEncounterStepReference>();
+        var result = new List<CollectionEncounterChoiceGroupData>();
         var seen = new HashSet<Guid>();
         foreach (var groupsToken in FindProperties(spawnContext, "Groups"))
         {
             if (groupsToken is not JArray groups)
                 continue;
             foreach (var group in groups)
-                AppendStepReferencesFromGroup(group, result, seen);
+            {
+                var members = new List<CollectionEncounterStepReference>();
+                AppendStepReferencesFromGroup(group, members, seen);
+                if (members.Count == 0)
+                    continue;
+
+                var isRandomPool = Enum.TryParse<ESpawnSelectionMethod>(
+                        group["SelectionMethod"]?.ToString(),
+                        ignoreCase: true,
+                        out var selectionMethod
+                    ) && selectionMethod == ESpawnSelectionMethod.Random;
+                result.Add(new CollectionEncounterChoiceGroupData(isRandomPool, members));
+            }
         }
 
         return result;

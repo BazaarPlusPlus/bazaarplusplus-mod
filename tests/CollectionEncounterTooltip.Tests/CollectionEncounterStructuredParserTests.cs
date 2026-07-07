@@ -624,6 +624,53 @@ public sealed class CollectionEncounterStructuredParserTests
     }
 
     [Fact]
+    public void TryParseEventChoiceGroups_marks_random_selection_groups_as_pools()
+    {
+        // Advanced Training shape: outer Sequential limit 3, one group that itself
+        // selects randomly over its member ids.
+        var json =
+            """
+            {
+              "$type": "TCardEncounterEvent",
+              "SelectionContext": {
+                "SpawnContext": {
+                  "SelectionMethod": "Sequential",
+                  "Limit": { "$type": "TFixedValue", "Value": 3.0 },
+                  "Groups": [
+                    {
+                      "SelectionMethod": "Random",
+                      "RandomWeight": 2,
+                      "Filters": [
+                        {
+                          "$type": "TSpawnFilterIdList",
+                          "Ids": [
+                            "10000000-0000-0000-0000-000000000001",
+                            "10000000-0000-0000-0000-000000000002"
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "SelectionMethod": "Sequential",
+                      "Filters": [
+                        { "$type": "TSpawnFilterIdList", "Ids": ["10000000-0000-0000-0000-000000000003"] }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+            """;
+
+        var groups = CollectionEncounterStructuredParser.TryParseEventChoiceGroups(json);
+
+        Assert.Equal(2, groups.Count);
+        Assert.True(groups[0].IsRandomPool);
+        Assert.Equal(2, groups[0].Members.Count);
+        Assert.False(groups[1].IsRandomPool);
+    }
+
+    [Fact]
     public void TryParseEventStepReferences_reads_tag_prerequisite_groups()
     {
         var json =

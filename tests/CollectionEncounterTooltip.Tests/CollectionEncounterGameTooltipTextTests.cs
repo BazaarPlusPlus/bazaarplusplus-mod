@@ -280,4 +280,83 @@ public sealed class CollectionEncounterGameTooltipTextTests
     {
         public BppChineseLocaleMode CurrentMode => BppChineseLocaleMode.Mainland;
     }
+
+    [Fact]
+    public void Choice_pool_renders_combat_summary()
+    {
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Empty,
+                displayName: string.Empty,
+                resultText: string.Empty,
+                rewardFilter: null,
+                isSourceMatch: false,
+                pool: new CollectionEncounterChoicePool(
+                    isCombat: true,
+                    optionCount: 14,
+                    Array.Empty<CollectionEncounterChoiceDetail>()
+                )
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(option);
+
+        Assert.Contains("Fight a monster (14 possible)", text);
+    }
+
+    [Fact]
+    public void Choice_pool_expands_small_entry_lists_and_counts_large_ones()
+    {
+        var small = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Empty,
+                displayName: string.Empty,
+                resultText: string.Empty,
+                rewardFilter: null,
+                isSourceMatch: false,
+                pool: new CollectionEncounterChoicePool(
+                    isCombat: false,
+                    optionCount: 2,
+                    new[]
+                    {
+                        new CollectionEncounterChoiceDetail(
+                            Guid.NewGuid(),
+                            "Aquatic Training",
+                            "Your leftmost item gains the Aquatic type",
+                            rewardFilter: null,
+                            isSourceMatch: false
+                        ),
+                        new CollectionEncounterChoiceDetail(
+                            Guid.NewGuid(),
+                            "Apparel Training",
+                            "Your leftmost item gains the Apparel type",
+                            rewardFilter: null,
+                            isSourceMatch: false
+                        ),
+                    }
+                )
+            )
+        );
+        var smallText = CollectionEncounterGameTooltipText.Build(small);
+        Assert.Contains("one of 2:", smallText);
+        Assert.Contains("Aquatic Training", smallText);
+
+        var large = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Empty,
+                displayName: string.Empty,
+                resultText: string.Empty,
+                rewardFilter: null,
+                isSourceMatch: false,
+                pool: new CollectionEncounterChoicePool(
+                    isCombat: false,
+                    optionCount: 16,
+                    Array.Empty<CollectionEncounterChoiceDetail>()
+                )
+            )
+        );
+        var largeText = CollectionEncounterGameTooltipText.Build(large);
+        Assert.Contains("Random reward (16 options)", largeText);
+        Assert.DoesNotContain("one of", largeText);
+    }
 }

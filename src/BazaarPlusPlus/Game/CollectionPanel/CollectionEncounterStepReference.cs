@@ -22,3 +22,21 @@ internal sealed class CollectionEncounterStepReference
     // are alternatives).
     public IReadOnlyList<CollectionEncounterCardRequirement> Requirements { get; }
 }
+
+// One spawn group of a choice event: fixed always-offered steps, or — when the
+// group itself selects randomly — a pool the event rolls members from.
+internal sealed class CollectionEncounterChoiceGroupData
+{
+    public CollectionEncounterChoiceGroupData(
+        bool isRandomPool,
+        IReadOnlyList<CollectionEncounterStepReference> members
+    )
+    {
+        IsRandomPool = isRandomPool;
+        Members = members;
+    }
+
+    public bool IsRandomPool { get; }
+
+    public IReadOnlyList<CollectionEncounterStepReference> Members { get; }
+}

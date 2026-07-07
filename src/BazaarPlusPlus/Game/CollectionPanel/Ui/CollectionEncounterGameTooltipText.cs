@@ -41,6 +41,14 @@ internal static class CollectionEncounterGameTooltipText
         var lines = new List<string>();
         foreach (var choice in option.ChoiceDetails)
         {
+            // Rolled pools ("Advanced Training" trainings, "Epic Battle" monsters)
+            // render as one summary line instead of one line per member.
+            if (choice.Pool is { } pool)
+            {
+                lines.Add(ChoicePoolLine(pool, colorize, dayTierCeiling));
+                continue;
+            }
+
             var result = ChoiceResultText(choice, dayTierCeiling);
 
             // Prerequisite-unmet options render as one flat dimmed line (no accent, no
@@ -119,6 +127,40 @@ internal static class CollectionEncounterGameTooltipText
         return CollectionTooltipMarkup.Wrap(
             string.Join(CollectionTooltipMarkup.BlockBreak, lines)
         );
+    }
+
+    // One rolled-pool choice line: combat roll, small expandable entry list (with
+    // accent-colored names to match sibling choice lines), or a bare option count.
+    private static string ChoicePoolLine(
+        CollectionEncounterChoicePool pool,
+        Func<string, string> colorize,
+        ETier? dayTierCeiling
+    )
+    {
+        if (pool.IsCombat)
+            return $"<color={AccentColor}>{CollectionPanelText.OutcomeCombatPool(pool.OptionCount)}</color>";
+
+        if (pool.Entries.Count == 0)
+            return CollectionPanelText.LevelUpRandomPoolSingle(pool.OptionCount);
+
+        var block = new System.Text.StringBuilder(
+            CollectionPanelText.OutcomeSubPool(pool.Entries.Count)
+        );
+        foreach (var entry in pool.Entries)
+        {
+            var result = ChoiceResultText(entry, dayTierCeiling);
+            block.Append(CollectionTooltipMarkup.SubItemBreak);
+            block.Append("<indent=2.2em>- ");
+            block.Append(
+                string.IsNullOrWhiteSpace(result)
+                    ? $"<color={AccentColor}>{entry.DisplayName}</color>"
+                    : string.IsNullOrWhiteSpace(entry.DisplayName)
+                        ? colorize(result)
+                        : $"<color={AccentColor}>{entry.DisplayName}:</color> {colorize(result)}"
+            );
+            block.Append("</indent>");
+        }
+        return block.ToString();
     }
 
     // One outcome entry: "Name: result", bare name, or bare result — query-pool
