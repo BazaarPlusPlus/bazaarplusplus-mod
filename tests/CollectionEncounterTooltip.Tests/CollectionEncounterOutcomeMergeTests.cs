@@ -143,6 +143,50 @@ public class CollectionEncounterOutcomeMergeTests
         Assert.Equal(25, views[1].Percent);
     }
 
+    // Shops (limit > 1) with nothing but nameless pools or a single view describe
+    // stock composition, not outcome odds; one-shot rolls (limit 1) always render.
+    [Fact]
+    public void Multi_spawn_events_without_real_alternatives_suppress()
+    {
+        var single = new List<CollectionEncounterOutcomeView>
+        {
+            View(100, "Random item", nameless: true),
+        };
+        var namelessPair = new List<CollectionEncounterOutcomeView>
+        {
+            View(50, "Random item", nameless: true),
+            View(50, "Random item", nameless: true),
+        };
+        var named = new List<CollectionEncounterOutcomeView>
+        {
+            View(10, "Treasure Chest", nameless: false),
+            View(90, "Random item", nameless: true),
+        };
+
+        Assert.True(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(single, 2));
+        Assert.True(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 3));
+        Assert.False(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(named, 2));
+        Assert.False(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 1));
+    }
+
+    private static CollectionEncounterOutcomeView View(int percent, string text, bool nameless) =>
+        new(
+            percent,
+            isEligible: true,
+            isCombatPool: false,
+            optionCount: 1,
+            new[]
+            {
+                new CollectionEncounterChoiceDetail(
+                    Guid.NewGuid(),
+                    displayName: nameless ? string.Empty : text,
+                    resultText: nameless ? text : string.Empty,
+                    rewardFilter: null,
+                    isSourceMatch: false
+                ),
+            }
+        );
+
     private static CollectionEncounterEventDetailResolver.OutcomeGroupResolution TitleOnly(
         uint weight,
         string title

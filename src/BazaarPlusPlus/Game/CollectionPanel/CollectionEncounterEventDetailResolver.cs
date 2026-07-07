@@ -28,9 +28,12 @@ internal static class CollectionEncounterEventDetailResolver
             staticData,
             currentHero,
             inventory,
-            currentDay
+            currentDay,
+            out var isRandomSelectionEvent
         );
-        var choiceDetails = outcomeGroups != null
+        // A suppressed random-selection event (shop stock generation) must not fall
+        // back to rendering its spawn groups as choices either.
+        var choiceDetails = outcomeGroups != null || isRandomSelectionEvent
             ? Array.Empty<CollectionEncounterChoiceDetail>()
             : ResolveChoiceDetails(eventTemplate, staticData, currentHero, inventory, currentDay);
         return new CollectionEncounterOption(
@@ -54,13 +57,21 @@ internal static class CollectionEncounterEventDetailResolver
         object? staticData,
         EHero? currentHero,
         CollectionEncounterInventory? inventory,
-        int? currentDay
+        int? currentDay,
+        out bool isRandomSelectionEvent
     )
     {
-        if (!CollectionEncounterStructuredParser.TryParseEventOutcomeGroups(
-                eventTemplate,
-                out var groups
-            ))
+        isRandomSelectionEvent = CollectionEncounterStructuredParser.TryParseEventOutcomeGroups(
+            eventTemplate,
+            out var groups
+        );
+        if (!isRandomSelectionEvent)
+            return null;
+
+        // Shops use the same outer Random spawn context — for stock generation, not
+        // a one-shot roll; "100% random item" explains nothing the description
+        // ("Sells Small items") doesn't already say.
+        if (HasMerchantTag(eventTemplate))
             return null;
 
         var active = new List<(CollectionEncounterOutcomeGroupData Group, bool Eligible)>();
@@ -144,7 +155,56 @@ internal static class CollectionEncounterEventDetailResolver
         }
 
         var views = BuildOutcomeViews(resolutions, totalWeight);
-        return views.Count == 0 ? null : views;
+        if (views.Count == 0)
+            return null;
+
+        var spawnLimit =
+            CollectionEncounterStructuredParser.TryParseEventChoiceLimit(eventTemplate) ?? 1;
+        return ShouldSuppressOutcomeViews(views, spawnLimit) ? null : views;
+    }
+
+    private static bool HasMerchantTag(TCardBase eventTemplate)
+    {
+        try
+        {
+            var tags = eventTemplate.GetType().GetProperty("Tags")?.GetValue(eventTemplate);
+            if (tags is not System.Collections.IEnumerable enumerable)
+                return false;
+            foreach (var tag in enumerable)
+                if (string.Equals(tag?.ToString(), "Merchant", StringComparison.Ordinal))
+                    return true;
+            return false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    // A spawn limit above one means the roll composes multiple spawns (shop stock,
+    // multi-offer events) rather than picking one outcome. When such an event has no
+    // real alternatives to explain — a single view, or nothing but nameless random
+    // pools (Seraphim's two 50% item pools) — the breakdown is stock composition
+    // noise, not outcome odds.
+    internal static bool ShouldSuppressOutcomeViews(
+        IReadOnlyList<CollectionEncounterOutcomeView> views,
+        int spawnLimit
+    )
+    {
+        if (spawnLimit <= 1)
+            return false;
+        if (views.Count == 1)
+            return true;
+
+        foreach (var view in views)
+        {
+            if (view.IsCombatPool)
+                return false;
+            foreach (var detail in view.Details)
+                if (!string.IsNullOrEmpty(detail.DisplayName))
+                    return false;
+        }
+        return true;
     }
 
     private static string QueryPoolResultText(CollectionEncounterOutcomeQueryPool pool)
