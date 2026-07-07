@@ -193,6 +193,14 @@ internal static class BppTooltipText
     {
         try
         {
+            // On English clients the canonical name IS the display word; the keyword
+            // table's extra entries are matching variants ("Heals"/"Healing") that
+            // must not leak into appended text.
+            var languageCode = PlayerPreferences.Data.LanguageCode ?? string.Empty;
+            if (languageCode.Length == 0
+                || languageCode.StartsWith("en", StringComparison.OrdinalIgnoreCase))
+                return null;
+
             var typography = Data.TooltipTypography;
             if (typography == null)
                 return null;
