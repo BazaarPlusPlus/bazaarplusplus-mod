@@ -1,0 +1,41 @@
+src/BazaarPlusPlus/Core/Config/BppConfig.cs
+  s_c0b2458e5390f0::t_9934bf4dba6b46 16-17,72-76
+  s_c0b2458e5390f0::t_f3b00184ff1ed2 77
+src/BazaarPlusPlus/Patches/Tooltips/EncounterEventTooltipPatch.cs
+  s_c0b2458e5390f0::t_9934bf4dba6b46 9
+  s_c0b2458e5390f0::t_9113a85fae507c 48,55
+  s_c0b2458e5390f0::t_bb2769edd4b9d2 45-47,56,61-62
+src/BazaarPlusPlus/BppComposition.cs
+  s_c0b2458e5390f0::t_9934bf4dba6b46 11,121
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs
+  s_c0b2458e5390f0::t_9934bf4dba6b46 11-23
+src/BazaarPlusPlus/Game/EventPreview/EventPreviewSettingsDockEntry.cs
+  s_c0b2458e5390f0::t_9934bf4dba6b46 1-25
+src/BazaarPlusPlus/Game/EventPreview/EventPreviewSettingsMenuLabel.cs
+  s_c0b2458e5390f0::t_9934bf4dba6b46 1-22
+src/BazaarPlusPlus/Game/EventPreview/EventPreviewGate.cs
+  s_c0b2458e5390f0::t_9934bf4dba6b46 1-12
+src/BazaarPlusPlus/Core/Config/IBppConfig.cs
+  s_c0b2458e5390f0::t_9934bf4dba6b46 13-14
+src/BazaarPlusPlus/Patches/Tooltips/HeroLevelRewardsTooltipPatch.cs
+  s_c0b2458e5390f0::t_9934bf4dba6b46 6,38-40
+  s_c0b2458e5390f0::t_9113a85fae507c 20-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "47436d2f911d97de02f7fed3d84eec4129b7b493",
+  "prompts": {},
+  "sessions": {
+    "s_c0b2458e5390f0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3d3a-f5bd-7972-b5de-2682538fe3f9",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
