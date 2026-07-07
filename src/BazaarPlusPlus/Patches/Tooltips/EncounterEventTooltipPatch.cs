@@ -197,6 +197,9 @@ internal static class BppTooltipText
             if (typography == null)
                 return null;
 
+            // Prefer an actual translation over entries that merely echo the
+            // canonical English name (the primary entry often does on zh clients).
+            string? echo = null;
             foreach (
                 var translation in typography.GetKeywordTranslations(
                     $"{{keyword.{canonicalName.ToLowerInvariant()}}}",
@@ -204,10 +207,16 @@ internal static class BppTooltipText
                 )
             )
             {
-                if (!string.IsNullOrWhiteSpace(translation))
-                    return translation;
+                if (string.IsNullOrWhiteSpace(translation))
+                    continue;
+                if (string.Equals(translation, canonicalName, StringComparison.OrdinalIgnoreCase))
+                {
+                    echo ??= translation;
+                    continue;
+                }
+                return translation;
             }
-            return null;
+            return echo;
         }
         catch (Exception)
         {

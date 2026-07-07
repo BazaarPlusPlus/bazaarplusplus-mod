@@ -79,11 +79,21 @@ internal static class CollectionLocalizationResolver
                 if (string.IsNullOrWhiteSpace(localizedUnit))
                     localizedUnit = unit;
 
-                // Some templates spell the unit out right after the placeholder
-                // ("Gain {ability.0} Gold" / "获得{ability.0}金币" / "Gain
-                // {ability.0} XP" for Experience); only append when the text does
-                // not already carry it, in either language or a known alias.
                 var after = match.Index + match.Length;
+
+                // CJK text carries its own unit or measure word right after the
+                // placeholder ("获得{ability.0}点经验值" / "…{ability.0}金币"),
+                // so appending anything there only produces mixed-language noise.
+                var next = after;
+                while (next < text!.Length && char.IsWhiteSpace(text[next]))
+                    next++;
+                if (next < text.Length && IsCjk(text[next]))
+                    return value;
+
+                // Some templates spell the unit out right after the placeholder
+                // ("Gain {ability.0} Gold" / "Gain {ability.0} XP" for Experience);
+                // only append when the text does not already carry it, in either
+                // language or a known alias.
                 if (FollowingWordEquals(text!, after, unit)
                     || FollowingWordEquals(text!, after, localizedUnit!))
                     return value;
