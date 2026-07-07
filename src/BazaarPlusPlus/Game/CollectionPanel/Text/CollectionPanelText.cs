@@ -90,9 +90,9 @@ internal static class CollectionPanelText
         "隨機獎勵 ×{0}（{1} 個選項）"
     );
     private static readonly LocalizedTextSet LevelUpOneOfText = new(
-        "One of:",
-        "随机其一：",
-        "隨機其一："
+        "Choose one:",
+        "选择其一：",
+        "選擇其一："
     );
     private static readonly LocalizedTextSet LevelUpBoardSlotsText = new(
         "+{0} board slots",

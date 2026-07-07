@@ -49,46 +49,36 @@ internal static class CollectionLevelUpTooltipText
         if (currentLevel.HasValue && currentLevel.Value < LastBoardSlotLevel)
             lines.Add(colorize(CollectionPanelText.LevelUpBoardSlots(BoardSlotsPerLevel)));
 
-        // Weight-0 groups spawn deterministically (own line each); weighted groups are
-        // random alternatives and collapse into one "One of:" block.
-        var certainRewards = new List<string>();
-        var alternativeRewards = new List<string>();
-        var poolLines = new List<string>();
+        // Level-up rewards are a selection screen (LevelUpState allows
+        // SelectItem/SelectSkill/SelectEncounter): every spawned group contributes
+        // candidates and the player picks one — the native pack icon's "1". Render all
+        // candidates as one "Choose one:" list; random pools contribute a count entry.
+        var candidates = new List<string>();
         if (levelUp.Rewards is TSpawnContextQuery query)
         {
             foreach (var group in query.Groups)
-                CollectGroup(
-                    group.RandomWeight == 0 ? certainRewards : alternativeRewards,
-                    poolLines,
-                    group,
-                    resolveTemplate,
-                    currentHero,
-                    colorize
-                );
+                CollectGroup(candidates, group, resolveTemplate, currentHero, colorize);
         }
 
-        lines.AddRange(certainRewards);
-        if (alternativeRewards.Count == 1)
+        if (candidates.Count == 1)
         {
-            lines.Add(alternativeRewards[0]);
+            lines.Add(candidates[0]);
         }
-        else if (alternativeRewards.Count > 1)
+        else if (candidates.Count > 1)
         {
-            // One alternative per bulleted line under a shared header, as a single
+            // One candidate per bulleted line under a shared header, as a single
             // block so the inter-line spacer stays between blocks only.
             var block = new StringBuilder(CollectionPanelText.LevelUpOneOf());
-            foreach (var reward in alternativeRewards)
-                block.Append('\n').Append("· ").Append(reward);
+            foreach (var candidate in candidates)
+                block.Append('\n').Append("· ").Append(candidate);
             lines.Add(block.ToString());
         }
-        lines.AddRange(poolLines);
 
         return lines.Count == 0 ? string.Empty : string.Join("\n<size=45%> </size>\n", lines);
     }
 
     private static void CollectGroup(
-        List<string> singleRewards,
-        List<string> poolLines,
+        List<string> candidates,
         TSpawnGroup group,
         Func<Guid, TCardBase?> resolveTemplate,
         EHero? currentHero,
@@ -134,11 +124,11 @@ internal static class CollectionLevelUpTooltipText
                 return;
 
             if (string.IsNullOrWhiteSpace(description))
-                singleRewards.Add($"<color={AccentColor}>{title}</color>");
+                candidates.Add($"<color={AccentColor}>{title}</color>");
             else if (string.IsNullOrWhiteSpace(title))
-                singleRewards.Add(colorize(description!));
+                candidates.Add(colorize(description!));
             else
-                singleRewards.Add(
+                candidates.Add(
                     $"<color={AccentColor}>{title}:</color> {colorize(description!)}"
                 );
             return;
@@ -149,7 +139,7 @@ internal static class CollectionLevelUpTooltipText
             return;
 
         var limit = group.Limit is TFixedValue fixedValue ? (int)fixedValue.Value : 1;
-        poolLines.Add(
+        candidates.Add(
             CollectionPanelText.LevelUpRandomPool(Math.Min(limit, optionCount), optionCount)
         );
     }
