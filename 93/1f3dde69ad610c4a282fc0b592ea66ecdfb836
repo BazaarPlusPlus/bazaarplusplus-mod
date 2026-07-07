@@ -1,0 +1,24 @@
+src/BazaarPlusPlus/Plugin.cs
+  s_c0b2458e5390f0::t_f81910095c6591 7
+  s_c0b2458e5390f0::t_b3ff8f01f38c5a 23,160
+src/BazaarPlusPlus/Patches/Tooltips/EncounterEventTooltipPatch.cs
+  s_c0b2458e5390f0::t_9113a85fae507c 198-201
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "931f3dde69ad610c4a282fc0b592ea66ecdfb836",
+  "prompts": {},
+  "sessions": {
+    "s_c0b2458e5390f0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f3d3a-f5bd-7972-b5de-2682538fe3f9",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
