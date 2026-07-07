@@ -140,11 +140,16 @@ internal static class CollectionLocalizationResolver
         if (abilities is not IEnumerable enumerable)
             return false;
 
+        // Placeholder ids may carry accessor suffixes ("{ability.0.mod}"): resolve
+        // against the base ability id as an approximation.
+        var dot = abilityId.IndexOf('.');
+        var baseAbilityId = dot > 0 ? abilityId[..dot] : abilityId;
+
         foreach (var entry in enumerable)
         {
             if (!TryReadEntry(entry, out var key, out var ability))
                 continue;
-            if (!string.Equals(key?.ToString(), abilityId, StringComparison.Ordinal))
+            if (!string.Equals(key?.ToString(), baseAbilityId, StringComparison.Ordinal))
                 continue;
 
             var action = ability?.GetType().GetProperty("Action")?.GetValue(ability);

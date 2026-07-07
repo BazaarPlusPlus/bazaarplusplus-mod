@@ -144,6 +144,36 @@ internal static class CollectionLevelUpTooltipText
         // Inside a choose-one list a single draw needs no "x1" marker.
         var limit = group.Limit is TFixedValue fixedValue ? (int)fixedValue.Value : 1;
         var draws = Math.Min(limit, optionCount);
+
+        // After hero filtering most pools shrink to a handful of concrete rewards;
+        // list those out instead of hiding them behind a count.
+        if (unresolved == 0 && eligible.Count <= 8)
+        {
+            var block = new StringBuilder(
+                draws == 1
+                    ? CollectionPanelText.OutcomeSubPool(eligible.Count)
+                    : CollectionPanelText.LevelUpRandomPool(draws, eligible.Count)
+            );
+            foreach (var template in eligible)
+            {
+                var entryTitle = CollectionLocalizationResolver.ResolveTitle(template)
+                    ?? template.InternalName;
+                var entryDescription = CollectionLocalizationResolver.ResolveDescription(template)
+                    ?.Replace("\r", string.Empty)
+                    .Replace('\n', ' ');
+                block.Append("\n<size=25%> </size>");
+                block.Append("\n<indent=2.2em>- ");
+                block.Append(
+                    string.IsNullOrWhiteSpace(entryDescription)
+                        ? $"<color={AccentColor}>{entryTitle}</color>"
+                        : $"<color={AccentColor}>{entryTitle}:</color> {colorize(entryDescription!)}"
+                );
+                block.Append("</indent>");
+            }
+            candidates.Add(block.ToString());
+            return;
+        }
+
         candidates.Add(
             draws == 1
                 ? CollectionPanelText.LevelUpRandomPoolSingle(optionCount)
