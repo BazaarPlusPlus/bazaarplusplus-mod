@@ -94,6 +94,41 @@ public sealed class CollectionLevelUpTooltipTextTests
         );
     }
 
+    [Fact]
+    public void Build_keeps_hero_gated_groups_when_hero_is_unknown()
+    {
+        var poolIds = Enumerable
+            .Range(0, 10)
+            .Select(i => Guid.Parse($"40000000-0000-0000-0000-{i:d12}"))
+            .ToList();
+        var levelUp = new TLevelUp
+        {
+            Level = 3,
+            Rewards = new TSpawnContextQuery
+            {
+                Groups =
+                {
+                    Group(
+                        poolIds,
+                        limit: 1,
+                        new TPrerequisiteRun
+                        {
+                            Conditions = new TRunConditionalPlayerHero
+                            {
+                                Heroes = { EHero.Dooley },
+                                Operator = EListComparisonOperator.Any,
+                            },
+                        }
+                    ),
+                },
+            },
+        };
+
+        var text = CollectionLevelUpTooltipText.Build(levelUp, _ => null, currentHero: null);
+
+        Assert.Contains("1× random reward (10 options)", text);
+    }
+
     private static TSpawnGroup Group(
         IEnumerable<Guid> ids,
         int limit,

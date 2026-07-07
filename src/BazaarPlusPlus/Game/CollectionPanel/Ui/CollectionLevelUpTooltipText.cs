@@ -88,7 +88,8 @@ internal static class CollectionLevelUpTooltipText
     }
 
     // Only hero conditions are evaluated; groups gated on board state ("Inspired by"
-    // bonus skills) are omitted, and unknown run conditions keep the group visible.
+    // bonus skills) are omitted, and unknown run conditions — including an unknown
+    // current hero — keep the group visible rather than silently dropping rewards.
     private static bool PassesPrerequisites(TSpawnGroup group, EHero? currentHero)
     {
         if (group.Prerequisites == null)
@@ -115,8 +116,10 @@ internal static class CollectionLevelUpTooltipText
         EHero? currentHero
     )
     {
+        // Hero detection failed: keep hero-gated groups visible (consistent with
+        // CollectionEncounterHeroEligibility) instead of hiding them all.
         if (currentHero == null)
-            return false;
+            return true;
 
         var contains = condition.Heroes.Contains(currentHero.Value);
         return condition.Operator switch

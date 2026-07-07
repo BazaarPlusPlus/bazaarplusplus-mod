@@ -57,13 +57,27 @@ internal static class BppTooltipSections
 
     public static void HideAll(CardTooltipController controller)
     {
+        // Controllers are pooled but not immortal: prune entries whose controller or
+        // cloned block has been destroyed so the static cache cannot grow across
+        // scene reloads. (Unity's overloaded == treats destroyed objects as null.)
+        List<(CardTooltipController, string)>? stale = null;
         foreach (var entry in Sections)
         {
-            if (!ReferenceEquals(entry.Key.Item1, controller))
+            if (entry.Key.Item1 == null || entry.Value.Block == null)
+            {
+                stale ??= new List<(CardTooltipController, string)>();
+                stale.Add(entry.Key);
                 continue;
-            if (entry.Value.Block != null)
+            }
+
+            if (ReferenceEquals(entry.Key.Item1, controller))
                 entry.Value.Block.SetActive(false);
         }
+
+        if (stale == null)
+            return;
+        foreach (var key in stale)
+            Sections.Remove(key);
     }
 
     private static Section? Ensure(CardTooltipController controller, string key, GameObject anchor)
