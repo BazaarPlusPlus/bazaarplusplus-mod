@@ -9,13 +9,11 @@ using BazaarGameShared.Domain.Core;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
-// TCardLocalization (decompiled/Cards/TCardLocalization.cs) carries a Title TLocalizableText
-// with Key + Text. The decompiled TLocalizableText (decompiled/Core/TLocalizableText.cs) only
-// exposes Key + Text and does not branch by language; the live game appears to populate Text
-// with the player's current language at load time. We accept the Text field verbatim, falling
-// back to the key for diagnostic visibility, then InternalName at the caller.
-//
-// If a future game update separates language variants, this is the single seam to update.
+// TCardLocalization carries Title/Description TLocalizableText with Key + Text. The Text
+// field is the authored (English) fallback; the current-language translation resolves via
+// TooltipExtensions.GetLocalizedText -> LocalizationService.TryGetText keyed lookup, which
+// is what the native tooltip pipeline uses. We do the same, falling back to Text (and then
+// the key for diagnostic visibility) when the service is unavailable — e.g. in unit tests.
 internal static class CollectionLocalizationResolver
 {
     public static string? ResolveTitle(TCardBase template)
@@ -37,6 +35,18 @@ internal static class CollectionLocalizationResolver
 
     private static string? PickText(TLocalizableText text)
     {
+        try
+        {
+            var localized = TheBazaar.Tooltips.TooltipExtensions.GetLocalizedText(text);
+            if (!string.IsNullOrWhiteSpace(localized))
+                return localized;
+        }
+        catch (Exception)
+        {
+            // Localization service unavailable (unit tests / early startup):
+            // fall back to the authored text below.
+        }
+
         if (!string.IsNullOrWhiteSpace(text.Text))
             return text.Text;
         if (!string.IsNullOrWhiteSpace(text.Key))
