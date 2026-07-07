@@ -145,6 +145,84 @@ public sealed class CollectionEncounterGameTooltipTextTests
     }
 
     [Fact]
+    public void Build_renders_outcome_groups_with_percentages()
+    {
+        var option = new CollectionEncounterOption(
+            Guid.Parse("10000000-0000-0000-0000-00000000000b"),
+            "Mountain Pass",
+            sourceKey: null,
+            sourceKind: null,
+            Guid.Parse("10000000-0000-0000-0000-00000000000b"),
+            "Aid a caravan descending the Great Plateau",
+            rewardFilter: null,
+            choiceDetails: null,
+            outcomeGroups: new[]
+            {
+                new CollectionEncounterOutcomeView(
+                    percent: 40,
+                    isEligible: true,
+                    isCombatPool: false,
+                    optionCount: 2,
+                    new[]
+                    {
+                        new CollectionEncounterChoiceDetail(
+                            Guid.Parse("10000000-0000-0000-0000-00000000000c"),
+                            "A Routine Job",
+                            "Gain 2 XP",
+                            rewardFilter: null,
+                            isSourceMatch: false
+                        ),
+                        new CollectionEncounterChoiceDetail(
+                            Guid.Parse("10000000-0000-0000-0000-00000000000d"),
+                            "Generous Tip",
+                            "Gain 10 Gold\nand 1 XP",
+                            rewardFilter: null,
+                            isSourceMatch: false
+                        ),
+                    }
+                ),
+                new CollectionEncounterOutcomeView(
+                    percent: 50,
+                    isEligible: true,
+                    isCombatPool: true,
+                    optionCount: 10,
+                    Array.Empty<CollectionEncounterChoiceDetail>()
+                ),
+                new CollectionEncounterOutcomeView(
+                    percent: null,
+                    isEligible: false,
+                    isCombatPool: false,
+                    optionCount: 1,
+                    new[]
+                    {
+                        new CollectionEncounterChoiceDetail(
+                            Guid.Parse("10000000-0000-0000-0000-00000000000e"),
+                            "Clear the Way",
+                            "(if you have Powder Keg) Gain 5 Gold",
+                            rewardFilter: null,
+                            isSourceMatch: false
+                        ),
+                    }
+                ),
+            }
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(option);
+
+        Assert.Contains("Possible outcomes:", text);
+        Assert.Contains("<color=#FFD37E>40%</color>", text);
+        Assert.Contains("- A Routine Job: Gain 2 XP", text);
+        // Embedded newlines flatten so sub-entries stay one line each.
+        Assert.Contains("- Generous Tip: Gain 10 Gold and 1 XP", text);
+        Assert.Contains("Fight a monster (10 possible)", text);
+        // Prerequisite-unmet groups render dimmed without a percentage.
+        Assert.Contains(
+            "<size=85%><color=#8F8268>· Clear the Way: (if you have Powder Keg) Gain 5 Gold (requires cards you don't own)</color></size>",
+            text
+        );
+    }
+
+    [Fact]
     public void Build_returns_empty_without_choice_details()
     {
         var option = new CollectionEncounterOption(

@@ -70,12 +70,17 @@ internal static class CollectionLocalizationResolver
                     localizedUnit = unit;
 
                 // Some templates spell the unit out right after the placeholder
-                // ("Gain {ability.0} Gold" / "获得{ability.0}金币"); only append
-                // when the text does not, in either language.
+                // ("Gain {ability.0} Gold" / "获得{ability.0}金币" / "Gain
+                // {ability.0} XP" for Experience); only append when the text does
+                // not already carry it, in either language or a known alias.
                 var after = match.Index + match.Length;
                 if (FollowingWordEquals(text!, after, unit)
                     || FollowingWordEquals(text!, after, localizedUnit!))
                     return value;
+                if (UnitAliases.TryGetValue(unit, out var aliases))
+                    foreach (var alias in aliases)
+                        if (FollowingWordEquals(text!, after, alias))
+                            return value;
 
                 // CJK words join without a space.
                 return IsCjk(localizedUnit![0])
@@ -125,10 +130,65 @@ internal static class CollectionLocalizationResolver
             var action = ability?.GetType().GetProperty("Action")?.GetValue(ability);
             var value = action?.GetType().GetProperty("Value")?.GetValue(action);
             var scalar = value?.GetType().GetProperty("Value")?.GetValue(value);
-            if (!TryFormatScalar(scalar, out valueText))
-                return false;
+            if (TryFormatScalar(scalar, out valueText))
+            {
+                unit = ResolveAttributeUnit(action);
+                return true;
+            }
 
-            unit = ResolveAttributeUnit(action);
+            // Deal-card actions carry the count in their spawn limit
+            // ("Get {ability.N} Loot items").
+            var spawnContext = action?.GetType().GetProperty("SpawnContext")?.GetValue(action);
+            var limit = spawnContext?.GetType().GetProperty("Limit")?.GetValue(spawnContext);
+            var limitScalar = limit?.GetType().GetProperty("Value")?.GetValue(limit);
+            if (TryFormatScalar(limitScalar, out valueText))
+                return true;
+
+            // Apply-style actions ("TActionPlayerRegenApply") carry no value; the
+            // amount lives in the card's own Attributes under "<X>ApplyAmount".
+            return TryResolveFromCardAttributes(template, action, out valueText, out unit);
+        }
+
+        return false;
+    }
+
+    private static bool TryResolveFromCardAttributes(
+        TCardBase template,
+        object? action,
+        out string valueText,
+        out string? unit
+    )
+    {
+        valueText = string.Empty;
+        unit = null;
+        var actionName = action?.GetType().Name;
+        if (actionName == null)
+            return false;
+
+        const string prefixPlayer = "TActionPlayer";
+        const string prefixCard = "TActionCard";
+        var core = actionName.StartsWith(prefixPlayer, StringComparison.Ordinal)
+            ? actionName[prefixPlayer.Length..]
+            : actionName.StartsWith(prefixCard, StringComparison.Ordinal)
+                ? actionName[prefixCard.Length..]
+                : null;
+        if (string.IsNullOrEmpty(core))
+            return false;
+
+        var attributeKey = core + "Amount"; // e.g. RegenApply -> RegenApplyAmount
+        var attributes = template.GetType().GetProperty("Attributes")?.GetValue(template);
+        if (attributes is not IEnumerable attributeEntries)
+            return false;
+
+        foreach (var entry in attributeEntries)
+        {
+            if (!TryReadEntry(entry, out var key, out var attributeValue))
+                continue;
+            if (!string.Equals(key?.ToString(), attributeKey, StringComparison.Ordinal))
+                continue;
+            if (!TryFormatScalar(attributeValue, out valueText))
+                return false;
+            unit = NormalizeAttributeUnit(attributeKey);
             return true;
         }
 
@@ -142,11 +202,12 @@ internal static class CollectionLocalizationResolver
     private static string? ResolveAttributeUnit(object? action)
     {
         var attribute = action?.GetType().GetProperty("AttributeType")?.GetValue(action);
-        if (attribute == null)
-            return null;
+        return attribute == null ? null : NormalizeAttributeUnit(attribute.ToString());
+    }
 
-        var name = attribute.ToString();
-        if (string.IsNullOrEmpty(name) || name.Contains('_'))
+    private static string? NormalizeAttributeUnit(string? name)
+    {
+        if (string.IsNullOrEmpty(name) || name!.Contains('_'))
             return null;
 
         if (name.EndsWith("Amount", StringComparison.Ordinal))
@@ -156,6 +217,11 @@ internal static class CollectionLocalizationResolver
 
         return KnownAttributeUnits.Contains(name) ? name : null;
     }
+
+    private static readonly Dictionary<string, string[]> UnitAliases = new(StringComparer.Ordinal)
+    {
+        ["Experience"] = new[] { "XP" },
+    };
 
     private static readonly HashSet<string> KnownAttributeUnits = new(StringComparer.Ordinal)
     {

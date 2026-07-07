@@ -81,9 +81,10 @@ internal static class EncounterEventTooltipPatch
             template,
             staticData,
             TryReadCurrentHero(),
-            TryBuildInventory()
+            TryBuildInventory(),
+            TryReadCurrentDay()
         );
-        if (option == null || !option.HasChoiceDetails)
+        if (option == null || (!option.HasChoiceDetails && !option.HasOutcomeGroups))
             return null;
 
         return CollectionEncounterGameTooltipText.Build(
@@ -153,10 +154,15 @@ internal static class EncounterEventTooltipPatch
 
     private static ETier? TryReadDayTierCeiling()
     {
+        var day = TryReadCurrentDay();
+        return day.HasValue ? DayTierSchedule.CeilingTier(day.Value) : null;
+    }
+
+    private static int? TryReadCurrentDay()
+    {
         try
         {
-            var day = (int?)Data.Run?.Day;
-            return day.HasValue ? DayTierSchedule.CeilingTier(day.Value) : null;
+            return (int?)Data.Run?.Day;
         }
         catch (Exception)
         {

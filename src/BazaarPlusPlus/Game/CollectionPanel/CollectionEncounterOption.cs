@@ -15,7 +15,8 @@ internal sealed class CollectionEncounterOption
         Guid representativeTemplateId,
         string resultText,
         CollectionEncounterRewardFilter? rewardFilter,
-        IReadOnlyList<CollectionEncounterChoiceDetail>? choiceDetails = null
+        IReadOnlyList<CollectionEncounterChoiceDetail>? choiceDetails = null,
+        IReadOnlyList<CollectionEncounterOutcomeView>? outcomeGroups = null
     )
     {
         TemplateId = templateId;
@@ -26,6 +27,7 @@ internal sealed class CollectionEncounterOption
         ResultText = resultText ?? string.Empty;
         RewardFilter = rewardFilter;
         ChoiceDetails = choiceDetails ?? Array.Empty<CollectionEncounterChoiceDetail>();
+        OutcomeGroups = outcomeGroups;
     }
 
     public Guid TemplateId { get; }
@@ -49,4 +51,10 @@ internal sealed class CollectionEncounterOption
     public bool HasRewardFilter => RewardFilter != null;
 
     public bool HasChoiceDetails => ChoiceDetails.Count > 0;
+
+    // Non-null for random-outcome events (the event rolls one weighted group instead
+    // of presenting choices).
+    public IReadOnlyList<CollectionEncounterOutcomeView>? OutcomeGroups { get; }
+
+    public bool HasOutcomeGroups => OutcomeGroups is { Count: > 0 };
 }

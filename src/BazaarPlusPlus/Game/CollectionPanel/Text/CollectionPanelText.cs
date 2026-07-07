@@ -94,6 +94,26 @@ internal static class CollectionPanelText
         "选择其一：",
         "選擇其一："
     );
+    private static readonly LocalizedTextSet OutcomesHeaderText = new(
+        "Possible outcomes:",
+        "随机结果：",
+        "隨機結果："
+    );
+    private static readonly LocalizedTextSet OutcomeCombatPoolText = new(
+        "Fight a monster ({0} possible)",
+        "战斗：随机怪物（{0} 种）",
+        "戰鬥：隨機怪物（{0} 種）"
+    );
+    private static readonly LocalizedTextSet OutcomeSubPoolText = new(
+        "one of {0}:",
+        "以下 {0} 种随机其一：",
+        "以下 {0} 種隨機其一："
+    );
+    private static readonly LocalizedTextSet OutcomeLockedText = new(
+        "(requires cards you don't own)",
+        "（前置未满足）",
+        "（前置未滿足）"
+    );
     private static readonly LocalizedTextSet LevelUpBoardSlotsText = new(
         "+{0} board slots",
         "+{0} 个摊位格子",
@@ -182,6 +202,16 @@ internal static class CollectionPanelText
         string.Format(Resolve(LevelUpRandomPoolText), count, optionCount);
 
     internal static string LevelUpOneOf() => Resolve(LevelUpOneOfText);
+
+    internal static string OutcomesHeader() => Resolve(OutcomesHeaderText);
+
+    internal static string OutcomeCombatPool(int count) =>
+        string.Format(Resolve(OutcomeCombatPoolText), count);
+
+    internal static string OutcomeSubPool(int count) =>
+        string.Format(Resolve(OutcomeSubPoolText), count);
+
+    internal static string OutcomeLocked() => Resolve(OutcomeLockedText);
 
     internal static string LevelUpBoardSlots(int count) =>
         string.Format(Resolve(LevelUpBoardSlotsText), count);

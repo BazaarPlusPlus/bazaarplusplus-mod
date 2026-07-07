@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Spawning;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -116,13 +117,93 @@ internal static class CollectionEncounterStructuredParser
         return ReadQuantity(spawnContext);
     }
 
+    // Random-outcome events (outer SelectionMethod=Random) roll one weighted group
+    // instead of presenting choices; returns the group data for probability display.
+    public static bool TryParseEventOutcomeGroups(
+        object? source,
+        out IReadOnlyList<CollectionEncounterOutcomeGroupData> groups
+    )
+    {
+        groups = Array.Empty<CollectionEncounterOutcomeGroupData>();
+        var token = ToToken(source);
+        if (token == null)
+            return false;
+
+        var spawnContext = token.SelectToken("SelectionContext.SpawnContext");
+        if (spawnContext == null)
+            return false;
+        // Runtime objects serialize enums numerically; raw JSON uses names.
+        if (!Enum.TryParse<ESpawnSelectionMethod>(
+                spawnContext["SelectionMethod"]?.ToString(),
+                ignoreCase: true,
+                out var selectionMethod
+            ) || selectionMethod != ESpawnSelectionMethod.Random)
+            return false;
+
+        var result = new List<CollectionEncounterOutcomeGroupData>();
+        if (spawnContext["Groups"] is JArray groupArray)
+        {
+            foreach (var group in groupArray)
+            {
+                var ids = new List<Guid>();
+                if (group["Filters"] is JArray filters)
+                    foreach (var filter in filters)
+                        foreach (var id in ReadGuids(filter["Ids"]))
+                            if (!ids.Contains(id))
+                                ids.Add(id);
+                if (ids.Count == 0)
+                    continue;
+
+                var weight = ReadUInt(group["RandomWeight"]);
+                result.Add(
+                    new CollectionEncounterOutcomeGroupData(
+                        weight,
+                        ids,
+                        ReadPrerequisiteIdGroups(group["Prerequisites"]),
+                        ReadPrerequisiteTagGroups(group["Prerequisites"]),
+                        ReadDayCondition(group["Prerequisites"])
+                    )
+                );
+            }
+        }
+
+        groups = result;
+        return result.Count > 0;
+    }
+
+    private static uint ReadUInt(JToken? token) =>
+        token != null && uint.TryParse(token.ToString(), out var value) ? value : 0;
+
+    private static CollectionEncounterDayCondition? ReadDayCondition(JToken? token)
+    {
+        if (token == null || token.Type == JTokenType.Null)
+            return null;
+
+        foreach (var obj in EnumerateObjects(token))
+        {
+            if (obj["CurrentDay"] == null)
+                continue;
+            if (!int.TryParse(obj["CurrentDay"]!.ToString(), out var day))
+                continue;
+            var comparison = Enum.TryParse<EComparisonOperator>(
+                obj["ComparisonOperator"]?.ToString(),
+                ignoreCase: true,
+                out var parsedComparison
+            )
+                ? parsedComparison.ToString()
+                : "Equal";
+            return new CollectionEncounterDayCondition(day, comparison);
+        }
+        return null;
+    }
+
     private static void AppendStepReferencesFromGroup(
         JToken group,
         List<CollectionEncounterStepReference> result,
         HashSet<Guid> seen
     )
     {
-        var groupPrerequisiteIds = ReadPrerequisiteIds(group["Prerequisites"]);
+        var groupPrerequisiteIdGroups = ReadPrerequisiteIdGroups(group["Prerequisites"]);
         var groupPrerequisiteTags = ReadPrerequisiteTagGroups(group["Prerequisites"]);
         var filters = group["Filters"] as JArray;
         if (filters == null)
@@ -130,10 +211,8 @@ internal static class CollectionEncounterStructuredParser
 
         foreach (var filter in filters)
         {
-            var prerequisiteIds = MergePrerequisiteIds(
-                groupPrerequisiteIds,
-                ReadPrerequisiteIds(filter["Prerequisites"])
-            );
+            var prerequisiteIdGroups = new List<IReadOnlyList<Guid>>(groupPrerequisiteIdGroups);
+            prerequisiteIdGroups.AddRange(ReadPrerequisiteIdGroups(filter["Prerequisites"]));
             var prerequisiteTags = new List<IReadOnlyList<string>>(groupPrerequisiteTags);
             prerequisiteTags.AddRange(ReadPrerequisiteTagGroups(filter["Prerequisites"]));
 
@@ -142,10 +221,37 @@ internal static class CollectionEncounterStructuredParser
                 if (!seen.Add(id))
                     continue;
                 result.Add(
-                    new CollectionEncounterStepReference(id, prerequisiteIds, prerequisiteTags)
+                    new CollectionEncounterStepReference(id, prerequisiteIdGroups, prerequisiteTags)
                 );
             }
         }
+    }
+
+    // Card-id ownership prerequisites: each prerequisite object contributes one any-of
+    // group ("if you have Powder Keg or the Big One" is a single conditional with two
+    // ids); all groups must be satisfied.
+    private static IReadOnlyList<IReadOnlyList<Guid>> ReadPrerequisiteIdGroups(JToken? token)
+    {
+        if (token == null || token.Type == JTokenType.Null)
+            return Array.Empty<IReadOnlyList<Guid>>();
+
+        var groups = new List<IReadOnlyList<Guid>>();
+        if (token is JArray prerequisites)
+        {
+            foreach (var prerequisite in prerequisites)
+            {
+                var ids = ReadPrerequisiteIds(prerequisite);
+                if (ids.Count > 0)
+                    groups.Add(ids);
+            }
+        }
+        else
+        {
+            var ids = ReadPrerequisiteIds(token);
+            if (ids.Count > 0)
+                groups.Add(ids);
+        }
+        return groups;
     }
 
     // Tag-based ownership prerequisites ("if you have a Friend"): each conditional's
@@ -383,26 +489,6 @@ internal static class CollectionEncounterStructuredParser
         }
 
         return ids;
-    }
-
-    private static IReadOnlyList<Guid> MergePrerequisiteIds(
-        IReadOnlyList<Guid> groupIds,
-        IReadOnlyList<Guid> filterIds
-    )
-    {
-        if (groupIds.Count == 0)
-            return filterIds;
-        if (filterIds.Count == 0)
-            return groupIds;
-
-        var result = new List<Guid>(groupIds.Count + filterIds.Count);
-        foreach (var id in groupIds)
-            if (!result.Contains(id))
-                result.Add(id);
-        foreach (var id in filterIds)
-            if (!result.Contains(id))
-                result.Add(id);
-        return result;
     }
 
     private static bool LooksLikeIdProperty(string name) =>

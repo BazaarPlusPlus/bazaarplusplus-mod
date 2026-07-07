@@ -43,8 +43,8 @@ public sealed class CollectionEncounterStructuredParserTests
         var references = CollectionEncounterStructuredParser.TryParseEventStepReferences(json);
 
         Assert.Equal(new[] { brewId, tradeId }, references.Select(reference => reference.TemplateId));
-        Assert.Equal(new[] { tinyFurryMonsterId }, references[0].PrerequisiteTemplateIds);
-        Assert.Equal(new[] { tinyFurryMonsterId }, references[1].PrerequisiteTemplateIds);
+        Assert.Equal(new[] { tinyFurryMonsterId }, Assert.Single(references[0].PrerequisiteIdGroups));
+        Assert.Equal(new[] { tinyFurryMonsterId }, Assert.Single(references[1].PrerequisiteIdGroups));
     }
 
     [Fact]
@@ -86,10 +86,9 @@ public sealed class CollectionEncounterStructuredParserTests
         );
 
         Assert.Equal(stepId, reference.TemplateId);
-        Assert.Equal(
-            new[] { groupPrerequisiteId, filterPrerequisiteId },
-            reference.PrerequisiteTemplateIds
-        );
+        Assert.Equal(2, reference.PrerequisiteIdGroups.Count);
+        Assert.Equal(new[] { groupPrerequisiteId }, reference.PrerequisiteIdGroups[0]);
+        Assert.Equal(new[] { filterPrerequisiteId }, reference.PrerequisiteIdGroups[1]);
     }
 
     [Fact]

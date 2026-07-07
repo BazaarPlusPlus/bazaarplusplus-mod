@@ -14,7 +14,8 @@ internal static class CollectionEncounterEventDetailResolver
         TCardBase? eventTemplate,
         object? staticData,
         EHero? currentHero,
-        CollectionEncounterInventory? inventory = null
+        CollectionEncounterInventory? inventory = null,
+        int? currentDay = null
     )
     {
         if (eventTemplate == null || !IsEncounterEventTemplate(eventTemplate))
@@ -22,7 +23,16 @@ internal static class CollectionEncounterEventDetailResolver
 
         var resultText = CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty;
         var rewardFilter = ResolveRewardFilter(eventTemplate, resultText);
-        var choiceDetails = ResolveChoiceDetails(eventTemplate, staticData, currentHero, inventory);
+        var outcomeGroups = ResolveOutcomeGroups(
+            eventTemplate,
+            staticData,
+            currentHero,
+            inventory,
+            currentDay
+        );
+        var choiceDetails = outcomeGroups != null
+            ? Array.Empty<CollectionEncounterChoiceDetail>()
+            : ResolveChoiceDetails(eventTemplate, staticData, currentHero, inventory);
         return new CollectionEncounterOption(
             eventTemplate.Id,
             CollectionLocalizationResolver.ResolveTitle(eventTemplate) ?? eventTemplate.InternalName,
@@ -31,9 +41,104 @@ internal static class CollectionEncounterEventDetailResolver
             eventTemplate.Id,
             resultText,
             rewardFilter,
-            choiceDetails
+            choiceDetails,
+            outcomeGroups
         );
     }
+
+    // Random-outcome events roll one weighted group: percentages normalize over the
+    // groups actually in the roll (day condition matching, ownership prerequisites
+    // met); prerequisite-unmet groups render dimmed without a percentage.
+    private static IReadOnlyList<CollectionEncounterOutcomeView>? ResolveOutcomeGroups(
+        TCardBase eventTemplate,
+        object? staticData,
+        EHero? currentHero,
+        CollectionEncounterInventory? inventory,
+        int? currentDay
+    )
+    {
+        if (!CollectionEncounterStructuredParser.TryParseEventOutcomeGroups(
+                eventTemplate,
+                out var groups
+            ))
+            return null;
+
+        var active = new List<(CollectionEncounterOutcomeGroupData Group, bool Eligible)>();
+        uint totalWeight = 0;
+        foreach (var group in groups)
+        {
+            if (group.DayCondition is { } dayCondition
+                && currentDay.HasValue
+                && !dayCondition.Matches(currentDay.Value))
+                continue;
+
+            var eligible = MeetsOutcomePrerequisites(group, inventory);
+            active.Add((group, eligible));
+            if (eligible)
+                totalWeight += group.Weight;
+        }
+
+        if (active.Count == 0)
+            return null;
+
+        var views = new List<CollectionEncounterOutcomeView>();
+        foreach (var (group, eligible) in active)
+        {
+            var details = new List<CollectionEncounterChoiceDetail>();
+            var combatCount = 0;
+            var resolvedCount = 0;
+            foreach (var id in group.Ids)
+            {
+                var template = BppStaticDataAccess.GetCardTemplate(staticData, id);
+                if (template == null)
+                    continue;
+                resolvedCount++;
+                if (IsEncounterCombatTemplate(template))
+                {
+                    combatCount++;
+                    continue;
+                }
+                if (!CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
+                    continue;
+                AddChoiceDetail(details, template, isEligible: true);
+            }
+
+            var isCombatPool = resolvedCount > 0 && combatCount * 2 > resolvedCount;
+            var optionCount = isCombatPool ? combatCount : details.Count;
+            if (optionCount == 0)
+                continue;
+
+            int? percent = eligible && totalWeight > 0
+                ? (int)Math.Round(group.Weight * 100.0 / totalWeight)
+                : null;
+            views.Add(
+                new CollectionEncounterOutcomeView(percent, eligible, isCombatPool, optionCount, details)
+            );
+        }
+
+        return views.Count == 0 ? null : views;
+    }
+
+    private static bool MeetsOutcomePrerequisites(
+        CollectionEncounterOutcomeGroupData group,
+        CollectionEncounterInventory? inventory
+    )
+    {
+        if (inventory == null)
+            return true;
+
+        foreach (var idGroup in group.PrerequisiteIdGroups)
+            if (!inventory.OwnsAnyTemplate(idGroup))
+                return false;
+        foreach (var tagGroup in group.PrerequisiteTagGroups)
+            if (!inventory.OwnsAnyTag(tagGroup))
+                return false;
+        return true;
+    }
+
+    private static bool IsEncounterCombatTemplate(TCardBase template) =>
+        string.Equals(template.GetType().Name, "TCardEncounterCombat", StringComparison.Ordinal)
+        || string.Equals(template.Type.ToString(), "CombatEncounter", StringComparison.Ordinal);
 
     private static IReadOnlyList<CollectionEncounterChoiceDetail> ResolveChoiceDetails(
         TCardBase eventTemplate,
@@ -77,10 +182,10 @@ internal static class CollectionEncounterEventDetailResolver
         return presented;
     }
 
-    // Ownership prerequisites combine with AND: every specific-card id must be owned
-    // and every "if you have a <Tag>" group must match at least one owned tag. Without
-    // inventory access (or for run-state prerequisites, which carry neither ids nor
-    // tags) the option counts as eligible rather than guessing.
+    // Ownership prerequisites combine with AND across groups; each group is any-of
+    // (a conditional may list alternatives, e.g. "Powder Keg or the Big One").
+    // Without inventory access (or for run-state prerequisites, which carry neither
+    // ids nor tags) the option counts as eligible rather than guessing.
     private static bool MeetsOwnershipPrerequisites(
         CollectionEncounterStepReference reference,
         CollectionEncounterInventory? inventory
@@ -89,8 +194,8 @@ internal static class CollectionEncounterEventDetailResolver
         if (inventory == null)
             return true;
 
-        foreach (var id in reference.PrerequisiteTemplateIds)
-            if (!inventory.OwnsTemplate(id))
+        foreach (var idGroup in reference.PrerequisiteIdGroups)
+            if (!inventory.OwnsAnyTemplate(idGroup))
                 return false;
 
         foreach (var tagGroup in reference.PrerequisiteTagGroups)

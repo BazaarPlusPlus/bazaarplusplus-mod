@@ -29,20 +29,19 @@ internal static class CollectionEncounterGameTooltipText
         ETier? dayTierCeiling = null
     )
     {
-        if (option == null || !option.HasChoiceDetails)
+        if (option == null)
             return string.Empty;
 
         var colorize = colorizeResult ?? (text => text);
+        if (option.HasOutcomeGroups)
+            return BuildOutcomes(option.OutcomeGroups!, colorize, dayTierCeiling);
+        if (!option.HasChoiceDetails)
+            return string.Empty;
+
         var lines = new List<string>();
         foreach (var choice in option.ChoiceDetails)
         {
-            var result = choice.ResultText;
-            if (!string.IsNullOrWhiteSpace(result))
-            {
-                var suffix = DayTierSuffix(choice, dayTierCeiling);
-                if (suffix != null)
-                    result = $"{result} {suffix}";
-            }
+            var result = ChoiceResultText(choice, dayTierCeiling);
 
             // Prerequisite-unmet options render as one flat dimmed line (no accent, no
             // keyword coloring) at reduced size; the resolver already sorted them last.
@@ -64,6 +63,80 @@ internal static class CollectionEncounterGameTooltipText
         // A shrunken non-empty spacer line between choices keeps distinct options
         // visually separated without inflating intra-choice line wrapping.
         return string.Join("\n<size=45%> </size>\n", lines);
+    }
+
+    // Random-outcome events: one block per rolled alternative with its normalized
+    // probability; prerequisite-unmet groups render dimmed without a percentage.
+    private static string BuildOutcomes(
+        IReadOnlyList<CollectionEncounterOutcomeView> outcomes,
+        Func<string, string> colorize,
+        ETier? dayTierCeiling
+    )
+    {
+        var lines = new List<string> { CollectionPanelText.OutcomesHeader() };
+        foreach (var outcome in outcomes)
+        {
+            string content;
+            if (outcome.IsCombatPool)
+            {
+                content = CollectionPanelText.OutcomeCombatPool(outcome.OptionCount);
+            }
+            else if (outcome.Details.Count == 1)
+            {
+                var detail = outcome.Details[0];
+                var result = ChoiceResultText(detail, dayTierCeiling);
+                content = string.IsNullOrWhiteSpace(result)
+                    ? detail.DisplayName
+                    : $"{detail.DisplayName}: {colorize(result)}";
+            }
+            else
+            {
+                var block = new System.Text.StringBuilder(
+                    CollectionPanelText.OutcomeSubPool(outcome.Details.Count)
+                );
+                foreach (var detail in outcome.Details)
+                {
+                    var result = ChoiceResultText(detail, dayTierCeiling);
+                    block.Append("\n   - ");
+                    block.Append(
+                        string.IsNullOrWhiteSpace(result)
+                            ? detail.DisplayName
+                            : $"{detail.DisplayName}: {colorize(result)}"
+                    );
+                }
+                content = block.ToString();
+            }
+
+            if (!outcome.IsEligible)
+            {
+                lines.Add(
+                    $"<size=85%><color={IneligibleColor}>· {content} {CollectionPanelText.OutcomeLocked()}</color></size>"
+                );
+                continue;
+            }
+
+            var prefix = outcome.Percent.HasValue
+                ? $"<color={AccentColor}>{outcome.Percent.Value}%</color> "
+                : string.Empty;
+            lines.Add($"· {prefix}{content}");
+        }
+        return string.Join("\n<size=45%> </size>\n", lines);
+    }
+
+    // Flattens embedded newlines (descriptions render as list entries) and appends
+    // the day-tier suffix where the pool is day-driven.
+    private static string ChoiceResultText(
+        CollectionEncounterChoiceDetail choice,
+        ETier? dayTierCeiling
+    )
+    {
+        var result = choice.ResultText;
+        if (string.IsNullOrWhiteSpace(result))
+            return string.Empty;
+
+        result = result.Replace("\r", string.Empty).Replace('\n', ' ');
+        var suffix = DayTierSuffix(choice, dayTierCeiling);
+        return suffix == null ? result : $"{result} {suffix}";
     }
 
     // A pool with no tier constraint (or one spanning every dealable tier) is day-driven:

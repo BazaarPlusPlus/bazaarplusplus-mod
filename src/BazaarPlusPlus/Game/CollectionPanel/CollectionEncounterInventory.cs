@@ -20,6 +20,14 @@ internal sealed class CollectionEncounterInventory
 
     public bool OwnsTemplate(Guid templateId) => _templateIds.Contains(templateId);
 
+    public bool OwnsAnyTemplate(IReadOnlyList<Guid> anyOfIds)
+    {
+        foreach (var id in anyOfIds)
+            if (_templateIds.Contains(id))
+                return true;
+        return false;
+    }
+
     public bool OwnsAnyTag(IReadOnlyList<string> anyOfTags)
     {
         foreach (var tag in anyOfTags)
