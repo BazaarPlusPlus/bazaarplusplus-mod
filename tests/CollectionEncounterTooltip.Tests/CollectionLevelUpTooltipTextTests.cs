@@ -182,6 +182,44 @@ public sealed class CollectionLevelUpTooltipTextTests
         Assert.Contains("Random reward (9 options)", text);
     }
 
+    [Fact]
+    public void Duplicate_candidate_blocks_render_once()
+    {
+        // Level 7 shape: two weight-0 slots rolling over the same teacher pool.
+        var poolIds = new List<Guid>
+        {
+            Guid.Parse("70000000-0000-0000-0000-000000000001"),
+            Guid.Parse("70000000-0000-0000-0000-000000000002"),
+        };
+        var titles = new Dictionary<Guid, string>
+        {
+            [poolIds[0]] = "Bjorn",
+            [poolIds[1]] = "Malafang",
+        };
+        var levelUp = new TLevelUp
+        {
+            Level = 7,
+            Rewards = new TSpawnContextQuery
+            {
+                Groups =
+                {
+                    Group(poolIds, limit: 1),
+                    Group(poolIds, limit: 1),
+                },
+            },
+        };
+
+        var text = CollectionLevelUpTooltipText.Build(
+            levelUp,
+            id => titles.TryGetValue(id, out var title) ? Step(title) : null,
+            currentHero: null
+        );
+
+        Assert.Single(
+            System.Text.RegularExpressions.Regex.Matches(text, "one of 2")
+        );
+    }
+
     private static TCardEncounterStep Step(string title) =>
         new()
         {

@@ -86,6 +86,12 @@ internal static class CollectionLevelUpTooltipText
                 );
         }
 
+        // Sequential screens may roll several slots from the same pool (level 7
+        // offers two teacher slots over one 10-id pool, level 16 three); repeating
+        // the identical block adds nothing to "what can I get" — keep one.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        candidates.RemoveAll(candidate => !seen.Add(candidate));
+
         if (candidates.Count == 1)
         {
             lines.Add(candidates[0]);
