@@ -53,7 +53,13 @@ internal static class CollectionEncounterStructuredParser
                         ignoreCase: true,
                         out var selectionMethod
                     ) && selectionMethod == ESpawnSelectionMethod.Random;
-                result.Add(new CollectionEncounterChoiceGroupData(isRandomPool, members));
+                result.Add(
+                    new CollectionEncounterChoiceGroupData(
+                        isRandomPool,
+                        members,
+                        ReadDayCondition(group["Prerequisites"])
+                    )
+                );
             }
         }
 

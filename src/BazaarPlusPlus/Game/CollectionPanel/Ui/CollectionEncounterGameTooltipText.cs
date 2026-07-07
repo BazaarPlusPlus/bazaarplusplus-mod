@@ -89,6 +89,11 @@ internal static class CollectionEncounterGameTooltipText
             {
                 content = CollectionPanelText.OutcomeCombatPool(outcome.OptionCount);
             }
+            else if (outcome.Details.Count == 0)
+            {
+                // Collapsed same-shaped cluster (Farai's NPC packages): count only.
+                content = CollectionPanelText.LevelUpRandomPoolSingle(outcome.OptionCount);
+            }
             else if (outcome.Details.Count == 1)
             {
                 content = DetailLine(outcome.Details[0], colorize, dayTierCeiling);

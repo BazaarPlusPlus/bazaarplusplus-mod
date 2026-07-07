@@ -32,7 +32,7 @@ internal static class CollectionEncounterEventDetailResolver
         );
         var choiceDetails = outcomeGroups != null
             ? Array.Empty<CollectionEncounterChoiceDetail>()
-            : ResolveChoiceDetails(eventTemplate, staticData, currentHero, inventory);
+            : ResolveChoiceDetails(eventTemplate, staticData, currentHero, inventory, currentDay);
         return new CollectionEncounterOption(
             eventTemplate.Id,
             CollectionLocalizationResolver.ResolveTitle(eventTemplate) ?? eventTemplate.InternalName,
@@ -286,6 +286,7 @@ internal static class CollectionEncounterEventDetailResolver
                 Array.Empty<CollectionEncounterChoiceDetail>()
             );
 
+        var titleOnlySlots = new List<(int Slot, uint Weight)>();
         foreach (var (signature, slot) in contentSlots)
         {
             var view = views[slot];
@@ -296,6 +297,31 @@ internal static class CollectionEncounterEventDetailResolver
                 view.OptionCount,
                 view.Details
             );
+            if (view.IsEligible
+                && view.Details.Count == 1
+                && string.IsNullOrEmpty(view.Details[0].ResultText)
+                && !string.IsNullOrEmpty(view.Details[0].DisplayName))
+                titleOnlySlots.Add((slot, contentWeights[signature]));
+        }
+
+        // A large cluster of same-shaped title-only outcomes (Farai's ~26 NPC
+        // packages, Underground Resistance's 22) reads as a wall; collapse it into
+        // one pool line with the summed probability.
+        if (titleOnlySlots.Count > 8)
+        {
+            titleOnlySlots.Sort((a, b) => a.Slot.CompareTo(b.Slot));
+            uint pooledWeight = 0;
+            foreach (var (_, weight) in titleOnlySlots)
+                pooledWeight += weight;
+            views[titleOnlySlots[0].Slot] = new CollectionEncounterOutcomeView(
+                Percent(true, pooledWeight),
+                isEligible: true,
+                isCombatPool: false,
+                titleOnlySlots.Count,
+                Array.Empty<CollectionEncounterChoiceDetail>()
+            );
+            for (var i = titleOnlySlots.Count - 1; i >= 1; i--)
+                views.RemoveAt(titleOnlySlots[i].Slot);
         }
 
         return views;
@@ -339,7 +365,8 @@ internal static class CollectionEncounterEventDetailResolver
         TCardBase eventTemplate,
         object? staticData,
         EHero? currentHero,
-        CollectionEncounterInventory? inventory
+        CollectionEncounterInventory? inventory,
+        int? currentDay
     )
     {
         var choiceGroups = CollectionEncounterStructuredParser.TryParseEventChoiceGroups(
@@ -348,10 +375,17 @@ internal static class CollectionEncounterEventDetailResolver
 
         // First pass in data order: fixed steps become candidates subject to the
         // presentation limit; a Random-selection group is one rolled pool line.
+        // Day-gated groups outside the current day (Wishing Fountain's per-day
+        // price tiers) are not offered at all.
         var candidates = new List<(TCardBase Step, bool MeetsPrerequisites)>();
         var pools = new List<CollectionEncounterChoiceDetail>();
         foreach (var group in choiceGroups)
         {
+            if (group.DayCondition is { } dayCondition
+                && currentDay.HasValue
+                && !dayCondition.Matches(currentDay.Value))
+                continue;
+
             if (group.IsRandomPool)
             {
                 if (ResolveChoicePool(group, staticData, currentHero, inventory) is { } pool)
@@ -378,17 +412,78 @@ internal static class CollectionEncounterEventDetailResolver
         var choiceLimit =
             CollectionEncounterStructuredParser.TryParseEventChoiceLimit(eventTemplate)
             ?? int.MaxValue;
+        var titled = new List<(string Title, bool MeetsPrerequisites)>(candidates.Count);
+        foreach (var (step, meetsPrerequisites) in candidates)
+            titled.Add((
+                CollectionLocalizationResolver.ResolveTitle(step) ?? step.InternalName,
+                meetsPrerequisites
+            ));
+        var dispositions = ResolvePresentation(titled, choiceLimit);
         var presented = new List<CollectionEncounterChoiceDetail>();
         var dimmed = new List<CollectionEncounterChoiceDetail>();
-        foreach (var (step, meetsPrerequisites) in candidates)
+        for (var i = 0; i < candidates.Count; i++)
         {
-            var isPresented = meetsPrerequisites && presented.Count < choiceLimit;
-            AddChoiceDetail(isPresented ? presented : dimmed, step, isPresented);
+            switch (dispositions[i])
+            {
+                case ChoicePresentation.Presented:
+                    AddChoiceDetail(presented, candidates[i].Step, isEligible: true);
+                    break;
+                case ChoicePresentation.Dimmed:
+                    AddChoiceDetail(dimmed, candidates[i].Step, isEligible: false);
+                    break;
+            }
         }
 
         presented.AddRange(pools);
         presented.AddRange(dimmed);
         return presented;
+    }
+
+    internal enum ChoicePresentation
+    {
+        // Default array value must not collide with Presented (set in a first pass
+        // that later passes key off).
+        Hidden = 0,
+        Presented,
+        Dimmed,
+    }
+
+    // Splits choice candidates into offered / dimmed / hidden. Beyond-limit steps
+    // whose title repeats an already-visible option are escalation variants of the
+    // same action (Wishing Fountain lists 18 "Make a Wish" price tiers behind the
+    // 3 offered ones) and hide entirely; prerequisite-unmet steps always show
+    // dimmed — knowing what you're missing is the point of that section.
+    internal static ChoicePresentation[] ResolvePresentation(
+        IReadOnlyList<(string Title, bool MeetsPrerequisites)> candidates,
+        int limit
+    )
+    {
+        var result = new ChoicePresentation[candidates.Count];
+        var seenTitles = new HashSet<string>(StringComparer.Ordinal);
+        var presentedCount = 0;
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            if (candidates[i].MeetsPrerequisites && presentedCount < limit)
+            {
+                result[i] = ChoicePresentation.Presented;
+                presentedCount++;
+                seenTitles.Add(candidates[i].Title);
+            }
+        }
+
+        for (var i = 0; i < candidates.Count; i++)
+        {
+            if (result[i] == ChoicePresentation.Presented)
+                continue;
+            if (candidates[i].MeetsPrerequisites && !seenTitles.Add(candidates[i].Title))
+            {
+                result[i] = ChoicePresentation.Hidden;
+                continue;
+            }
+            result[i] = ChoicePresentation.Dimmed;
+        }
+
+        return result;
     }
 
     // A Random-selection spawn group inside a choice event: the offered choices are

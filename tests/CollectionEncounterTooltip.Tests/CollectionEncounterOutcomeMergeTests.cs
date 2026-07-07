@@ -121,6 +121,49 @@ public class CollectionEncounterOutcomeMergeTests
             }
         );
 
+    // Farai/Underground Resistance: dozens of title-only package outcomes collapse
+    // into one pooled line with the summed probability.
+    [Fact]
+    public void Large_title_only_clusters_collapse_into_one_pool_view()
+    {
+        var resolutions = new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>();
+        for (var i = 0; i < 10; i++)
+            resolutions.Add(TitleOnly(weight: 3, title: $"NPC {i}'s Package"));
+        resolutions.Add(Rewards(weight: 10, text: "Gain 5 Gold"));
+
+        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
+            resolutions,
+            totalWeight: 40
+        );
+
+        Assert.Equal(2, views.Count);
+        Assert.Equal(10, views[0].OptionCount);
+        Assert.Empty(views[0].Details);
+        Assert.Equal(75, views[0].Percent);
+        Assert.Equal(25, views[1].Percent);
+    }
+
+    private static CollectionEncounterEventDetailResolver.OutcomeGroupResolution TitleOnly(
+        uint weight,
+        string title
+    ) =>
+        new(
+            weight,
+            eligible: true,
+            isCombatPool: false,
+            new HashSet<Guid>(),
+            new List<CollectionEncounterChoiceDetail>
+            {
+                new(
+                    Guid.NewGuid(),
+                    displayName: title,
+                    resultText: string.Empty,
+                    rewardFilter: null,
+                    isSourceMatch: false
+                ),
+            }
+        );
+
     // Same rendered content in several weighted groups (Farai's per-NPC package
     // split) collapses into one line with the weights summed.
     [Fact]

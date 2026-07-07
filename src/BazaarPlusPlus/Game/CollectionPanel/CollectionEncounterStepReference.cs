@@ -29,14 +29,20 @@ internal sealed class CollectionEncounterChoiceGroupData
 {
     public CollectionEncounterChoiceGroupData(
         bool isRandomPool,
-        IReadOnlyList<CollectionEncounterStepReference> members
+        IReadOnlyList<CollectionEncounterStepReference> members,
+        CollectionEncounterDayCondition? dayCondition = null
     )
     {
         IsRandomPool = isRandomPool;
         Members = members;
+        DayCondition = dayCondition;
     }
 
     public bool IsRandomPool { get; }
 
     public IReadOnlyList<CollectionEncounterStepReference> Members { get; }
+
+    // Day-gated groups (Wishing Fountain carries one price tier per day); inactive
+    // groups are not offered at all, so they must not render as choices.
+    public CollectionEncounterDayCondition? DayCondition { get; }
 }
