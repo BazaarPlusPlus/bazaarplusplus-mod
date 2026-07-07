@@ -81,11 +81,11 @@ internal static class CollectionEncounterEventDetailResolver
         if (active.Count == 0)
             return null;
 
-        var views = new List<CollectionEncounterOutcomeView>();
+        var resolutions = new List<OutcomeGroupResolution>();
         foreach (var (group, eligible) in active)
         {
             var details = new List<CollectionEncounterChoiceDetail>();
-            var combatCount = 0;
+            var combatIds = new HashSet<Guid>();
             var resolvedCount = 0;
             foreach (var id in group.Ids)
             {
@@ -95,7 +95,7 @@ internal static class CollectionEncounterEventDetailResolver
                 resolvedCount++;
                 if (IsEncounterCombatTemplate(template))
                 {
-                    combatCount++;
+                    combatIds.Add(template.Id);
                     continue;
                 }
                 if (!CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
@@ -118,20 +118,113 @@ internal static class CollectionEncounterEventDetailResolver
                 AddChoiceDetail(details, template, isEligible: true);
             }
 
-            var isCombatPool = resolvedCount > 0 && combatCount * 2 > resolvedCount;
-            var optionCount = isCombatPool ? combatCount : details.Count;
-            if (optionCount == 0)
-                continue;
-
-            int? percent = eligible && totalWeight > 0
-                ? (int)Math.Round(group.Weight * 100.0 / totalWeight)
-                : null;
-            views.Add(
-                new CollectionEncounterOutcomeView(percent, eligible, isCombatPool, optionCount, details)
+            var isCombatPool = resolvedCount > 0 && combatIds.Count * 2 > resolvedCount;
+            resolutions.Add(
+                new OutcomeGroupResolution(group.Weight, eligible, isCombatPool, combatIds, details)
             );
         }
 
+        var views = BuildOutcomeViews(resolutions, totalWeight);
         return views.Count == 0 ? null : views;
+    }
+
+    // Per-group resolution before percentage math and combat-pool merging.
+    internal readonly struct OutcomeGroupResolution
+    {
+        public OutcomeGroupResolution(
+            uint weight,
+            bool eligible,
+            bool isCombatPool,
+            HashSet<Guid> combatIds,
+            List<CollectionEncounterChoiceDetail> details
+        )
+        {
+            Weight = weight;
+            Eligible = eligible;
+            IsCombatPool = isCombatPool;
+            CombatIds = combatIds;
+            Details = details;
+        }
+
+        public uint Weight { get; }
+        public bool Eligible { get; }
+        public bool IsCombatPool { get; }
+        public HashSet<Guid> CombatIds { get; }
+        public List<CollectionEncounterChoiceDetail> Details { get; }
+    }
+
+    // Random-outcome events often split "fight a monster" across several weighted
+    // groups; the tooltip shows no monster names, so per-group combat lines are pure
+    // redundancy ("25% fight + 25% fight"). Same-eligibility combat pools collapse
+    // into one line at the first group's position — weights summed before rounding
+    // (33+33 rounds to 67, not 66) and monster ids unioned so overlapping pools
+    // don't inflate the "N possible" count.
+    internal static List<CollectionEncounterOutcomeView> BuildOutcomeViews(
+        List<OutcomeGroupResolution> resolutions,
+        uint totalWeight
+    )
+    {
+        var views = new List<CollectionEncounterOutcomeView>();
+        var combatSlots = new Dictionary<bool, int>();
+        var combatWeights = new Dictionary<bool, uint>();
+        var combatIds = new Dictionary<bool, HashSet<Guid>>();
+
+        int? Percent(bool eligible, uint weight) =>
+            eligible && totalWeight > 0 ? (int)Math.Round(weight * 100.0 / totalWeight) : null;
+
+        foreach (var resolution in resolutions)
+        {
+            if (resolution.IsCombatPool)
+            {
+                if (resolution.CombatIds.Count == 0)
+                    continue;
+                if (combatSlots.TryGetValue(resolution.Eligible, out var slot))
+                {
+                    combatWeights[resolution.Eligible] += resolution.Weight;
+                    combatIds[resolution.Eligible].UnionWith(resolution.CombatIds);
+                }
+                else
+                {
+                    combatSlots[resolution.Eligible] = views.Count;
+                    combatWeights[resolution.Eligible] = resolution.Weight;
+                    combatIds[resolution.Eligible] = new HashSet<Guid>(resolution.CombatIds);
+                    // Placeholder patched below once all combat groups are merged in.
+                    views.Add(
+                        new CollectionEncounterOutcomeView(
+                            null,
+                            resolution.Eligible,
+                            isCombatPool: true,
+                            optionCount: 0,
+                            Array.Empty<CollectionEncounterChoiceDetail>()
+                        )
+                    );
+                }
+                continue;
+            }
+
+            if (resolution.Details.Count == 0)
+                continue;
+            views.Add(
+                new CollectionEncounterOutcomeView(
+                    Percent(resolution.Eligible, resolution.Weight),
+                    resolution.Eligible,
+                    isCombatPool: false,
+                    resolution.Details.Count,
+                    resolution.Details
+                )
+            );
+        }
+
+        foreach (var (eligible, slot) in combatSlots)
+            views[slot] = new CollectionEncounterOutcomeView(
+                Percent(eligible, combatWeights[eligible]),
+                eligible,
+                isCombatPool: true,
+                combatIds[eligible].Count,
+                Array.Empty<CollectionEncounterChoiceDetail>()
+            );
+
+        return views;
     }
 
     private static bool MeetsOutcomePrerequisites(
