@@ -65,13 +65,16 @@ internal static class CollectionLocalizationResolver
         if (string.IsNullOrWhiteSpace(text) || !text.Contains("{ability.", StringComparison.Ordinal))
             return text;
 
-        return Regex.Replace(
+        var formatted = Regex.Replace(
             text!,
             @"\{ability\.([^}]+)\}",
             match =>
             {
+                // Unresolvable placeholders (e.g. live-computed totals) degrade to
+                // nothing rather than leaking raw tokens; leftover empty brackets
+                // are cleaned afterwards.
                 if (!TryResolveAbilityValue(template, match.Groups[1].Value, out var value, out var unit))
-                    return match.Value;
+                    return string.Empty;
                 if (unit == null)
                     return value;
 
@@ -109,6 +112,28 @@ internal static class CollectionLocalizationResolver
             },
             RegexOptions.CultureInvariant
         );
+        return CleanDroppedPlaceholders(formatted);
+    }
+
+    // After dropping unresolvable placeholders, remove the empty bracket pairs and
+    // doubled spaces they leave behind ("... you have [{ability.0}]" -> "... you have").
+    private static string CleanDroppedPlaceholders(string text)
+    {
+        text = text.Replace("[]", string.Empty)
+            .Replace("[ ]", string.Empty)
+            .Replace("()", string.Empty)
+            .Replace("（）", string.Empty);
+        var builder = new System.Text.StringBuilder(text.Length);
+        var previousWasSpace = false;
+        foreach (var character in text)
+        {
+            var isSpace = character == ' ';
+            if (isSpace && previousWasSpace)
+                continue;
+            previousWasSpace = isSpace;
+            builder.Append(character);
+        }
+        return builder.ToString().TrimEnd();
     }
 
     private static bool FollowingWordEquals(string text, int index, string word)
@@ -140,10 +165,12 @@ internal static class CollectionLocalizationResolver
         if (abilities is not IEnumerable enumerable)
             return false;
 
-        // Placeholder ids may carry accessor suffixes ("{ability.0.mod}"): resolve
-        // against the base ability id as an approximation.
+        // Placeholder ids may carry accessor suffixes: "{ability.0.mod}" refers to
+        // the value's Modifier ("Gain {ability.0.mod} Gold for each ..."), while the
+        // bare id on such computed values is the live total and stays unresolved.
         var dot = abilityId.IndexOf('.');
         var baseAbilityId = dot > 0 ? abilityId[..dot] : abilityId;
+        var accessor = dot > 0 ? abilityId[(dot + 1)..] : null;
 
         foreach (var entry in enumerable)
         {
@@ -154,6 +181,18 @@ internal static class CollectionLocalizationResolver
 
             var action = ability?.GetType().GetProperty("Action")?.GetValue(ability);
             var value = action?.GetType().GetProperty("Value")?.GetValue(action);
+
+            if (string.Equals(accessor, "mod", StringComparison.OrdinalIgnoreCase))
+            {
+                var modifier = value?.GetType().GetProperty("Modifier")?.GetValue(value);
+                var modifierValue = modifier?.GetType().GetProperty("Value")?.GetValue(modifier);
+                var modifierScalar = modifierValue
+                    ?.GetType()
+                    .GetProperty("Value")
+                    ?.GetValue(modifierValue);
+                return TryFormatScalar(modifierScalar, out valueText);
+            }
+
             var scalar = value?.GetType().GetProperty("Value")?.GetValue(value);
             if (TryFormatScalar(scalar, out valueText))
             {

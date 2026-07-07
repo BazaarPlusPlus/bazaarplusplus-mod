@@ -77,7 +77,7 @@ internal static class CollectionLevelUpTooltipText
             lines.Add(block.ToString());
         }
 
-        return lines.Count == 0 ? string.Empty : string.Join("\n<size=45%> </size>\n", lines);
+        return lines.Count == 0 ? string.Empty : string.Join("\n<line-height=55%><size=45%> </size></line-height>\n", lines);
     }
 
     private static void CollectGroup(
@@ -161,7 +161,7 @@ internal static class CollectionLevelUpTooltipText
                 var entryDescription = CollectionLocalizationResolver.ResolveDescription(template)
                     ?.Replace("\r", string.Empty)
                     .Replace('\n', ' ');
-                block.Append("\n<size=25%> </size>");
+                block.Append("\n<line-height=35%><size=25%> </size></line-height>");
                 block.Append("\n<indent=2.2em>- ");
                 block.Append(
                     string.IsNullOrWhiteSpace(entryDescription)

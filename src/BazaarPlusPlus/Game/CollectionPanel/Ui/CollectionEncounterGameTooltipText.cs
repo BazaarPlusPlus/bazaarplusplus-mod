@@ -62,7 +62,7 @@ internal static class CollectionEncounterGameTooltipText
         }
         // A shrunken non-empty spacer line between choices keeps distinct options
         // visually separated without inflating intra-choice line wrapping.
-        return string.Join("\n<size=45%> </size>\n", lines);
+        return string.Join("\n<line-height=55%><size=45%> </size></line-height>\n", lines);
     }
 
     // Random-outcome events: one block per rolled alternative with its normalized
@@ -101,7 +101,7 @@ internal static class CollectionEncounterGameTooltipText
                     // inflate some line boxes, and without this the rhythm between
                     // entries looks accidental. Hanging indent keeps soft-wrapped
                     // lines aligned with the dash.
-                    block.Append("\n<size=25%> </size>");
+                    block.Append("\n<line-height=35%><size=25%> </size></line-height>");
                     block.Append("\n<indent=2.2em>- ");
                     block.Append(
                         string.IsNullOrWhiteSpace(result)
@@ -128,7 +128,7 @@ internal static class CollectionEncounterGameTooltipText
                 : string.Empty;
             lines.Add($"· <indent=1em>{prefix}{content}</indent>");
         }
-        return string.Join("\n<size=45%> </size>\n", lines);
+        return string.Join("\n<line-height=55%><size=45%> </size></line-height>\n", lines);
     }
 
     // Flattens embedded newlines (descriptions render as list entries) and appends
