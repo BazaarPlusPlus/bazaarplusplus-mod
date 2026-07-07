@@ -12,6 +12,8 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
 internal static class VoiceLineDisplay
 {
+    private const float MatchingBilingualChineseFontScaleBoost = 0.08f;
+
     private static GameObject? _labelRoot;
     private static TextMeshProUGUI? _combinedLabel;
     private static TextMeshProUGUI? _englishLabel;
@@ -487,6 +489,7 @@ internal static class VoiceLineDisplay
         }
 
         var hasEnglish = !string.IsNullOrEmpty(text.English);
+        var hasChinese = !string.IsNullOrEmpty(text.Chinese);
         if (_englishLabel != null)
         {
             _englishLabel.text = text.English;
@@ -496,7 +499,8 @@ internal static class VoiceLineDisplay
         if (_chineseUiLabel != null)
         {
             _chineseUiLabel.text = text.Chinese;
-            _chineseUiLabel.gameObject.SetActive(!string.IsNullOrEmpty(text.Chinese));
+            _chineseUiLabel.gameObject.SetActive(hasChinese);
+            ApplySplitTextFontScales(hasEnglish, hasChinese);
             // English now wraps to a variable number of lines, so push the Chinese row
             // below the English row's measured height instead of a fixed single-line
             // offset (which would overlap the later English lines at larger scales).
@@ -507,6 +511,26 @@ internal static class VoiceLineDisplay
                 Math.Abs(_secondLineOffset)
             );
         }
+    }
+
+    private static void ApplySplitTextFontScales(bool hasEnglish, bool hasChinese)
+    {
+        if (_sourceLabel == null)
+            return;
+
+        var settings = VoiceLineSettings.Current;
+        var fontScales = ResolveFontScales(settings, hasEnglish, hasChinese);
+        var englishFontSize = Math.Max(_sourceLabel.fontSize * fontScales.English, 16f);
+        var chineseFontSize = Math.Max(_sourceLabel.fontSize * fontScales.Chinese, 16f);
+        var lineHeight = Math.Max(englishFontSize, chineseFontSize) * 1.25f;
+
+        if (_englishLabel != null)
+            _englishLabel.fontSize = englishFontSize;
+        if (_chineseUiLabel != null)
+            _chineseUiLabel.fontSize = Math.Max((int)Math.Round(chineseFontSize), 16);
+
+        _secondLineOffset = -lineHeight;
+        ConfigureLineRect(_englishLabel?.rectTransform, 0f, lineHeight);
     }
 
     private static float MeasureEnglishHeight(string englishText)
@@ -551,13 +575,40 @@ internal static class VoiceLineDisplay
     private static string BuildCombinedText(DisplayText text)
     {
         var settings = VoiceLineSettings.Current;
+        var fontScales = ResolveFontScales(
+            settings,
+            !string.IsNullOrEmpty(text.English),
+            !string.IsNullOrEmpty(text.Chinese)
+        );
 
         if (string.IsNullOrEmpty(text.English))
-            return BuildSizedLine(text.Chinese, settings.ChineseFontScale);
+            return BuildSizedLine(text.Chinese, fontScales.Chinese);
         if (string.IsNullOrEmpty(text.Chinese))
-            return BuildSizedLine(text.English, settings.EnglishFontScale);
+            return BuildSizedLine(text.English, fontScales.English);
 
-        return $"{BuildSizedLine(text.English, settings.EnglishFontScale)}\n{BuildSizedLine(text.Chinese, settings.ChineseFontScale)}";
+        return $"{BuildSizedLine(text.English, fontScales.English)}\n"
+            + BuildSizedLine(text.Chinese, fontScales.Chinese);
+    }
+
+    private static FontScales ResolveFontScales(
+        VoiceLineSettings settings,
+        bool hasEnglish,
+        bool hasChinese
+    )
+    {
+        var chineseScale = settings.ChineseFontScale;
+        if (
+            hasEnglish
+            && hasChinese
+            && Math.Abs(settings.ChineseFontScale - settings.EnglishFontScale) < 0.001f
+        )
+        {
+            // When bilingual subtitles use the same configured scale, a slightly larger
+            // Chinese line looks more visually balanced next to the English line.
+            chineseScale = settings.EnglishFontScale + MatchingBilingualChineseFontScaleBoost;
+        }
+
+        return new FontScales(settings.EnglishFontScale, chineseScale);
     }
 
     private static string BuildSizedLine(string value, float scale)
@@ -603,5 +654,18 @@ internal static class VoiceLineDisplay
 
         public bool IsEmpty =>
             string.IsNullOrWhiteSpace(English) && string.IsNullOrWhiteSpace(Chinese);
+    }
+
+    private readonly struct FontScales
+    {
+        public FontScales(float english, float chinese)
+        {
+            English = english;
+            Chinese = chinese;
+        }
+
+        public float English { get; }
+
+        public float Chinese { get; }
     }
 }
