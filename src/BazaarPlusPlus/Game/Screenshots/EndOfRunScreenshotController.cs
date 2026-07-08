@@ -18,6 +18,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 {
     private const float CaptureRetryCooldownSeconds = 1f;
     private const float FirstCaptureDelaySeconds = 8f;
+    private const float ControllerScanIntervalSeconds = 0.5f;
     private static readonly System.Reflection.MethodInfo? ContinueClickMethod = AccessTools.Method(
         typeof(EndOfRunScreenController),
         "OnContinueClick"
@@ -36,6 +37,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private bool? _lastLoggedBlockerActive;
     private string? _lastLoggedBlockerStateSummary;
     private EndOfRunScreenController? _cachedEndOfRunScreenController;
+    private float _nextControllerScanAtSeconds;
     private int _trackedEndOfRunControllerId;
     private float _endOfRunEnteredAtSeconds = -1f;
     private IBppServices? _services;
@@ -460,6 +462,14 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         var cached = _cachedEndOfRunScreenController;
         if (cached != null)
             return cached.gameObject.activeInHierarchy ? cached : null;
+
+        // The scan walks every loaded object (measured ~2ms/call on a mature scene), so a
+        // cache miss must not rescan every frame. Detecting the end-of-run screen up to
+        // half a second late is imperceptible against the 8s first-capture delay.
+        var now = Time.realtimeSinceStartup;
+        if (now < _nextControllerScanAtSeconds)
+            return null;
+        _nextControllerScanAtSeconds = now + ControllerScanIntervalSeconds;
 
         _cachedEndOfRunScreenController = ScanForActiveEndOfRunScreenController();
         return _cachedEndOfRunScreenController;
