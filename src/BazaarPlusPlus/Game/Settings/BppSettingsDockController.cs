@@ -40,6 +40,7 @@ internal sealed partial class BppSettingsDockController
     private bool _isExpanded;
     private int _screenshotSuppressionCount;
     private BppSettingsDockPlacement _placement;
+    private BppSettingsDockSceneKind _lastSceneKind = BppSettingsDockSceneKind.Default;
     private static bool _fontResolutionLogged;
 
     internal static void Attach(Button anchorButton, BppSettingsDockPlacement placement)
@@ -129,10 +130,15 @@ internal sealed partial class BppSettingsDockController
 
     private void LateUpdate()
     {
-        if (!_screenResizeSync.ShouldSync(Screen.width, Screen.height))
-            return;
+        var sceneKind = BppSettingsDockSceneContext.ResolveCurrentSceneKind();
+        if (sceneKind != _lastSceneKind)
+        {
+            _lastSceneKind = sceneKind;
+            SyncDockButtonPlacement();
+        }
 
-        SyncDockButtonPlacement();
+        if (_screenResizeSync.ShouldSync(Screen.width, Screen.height))
+            SyncDockButtonPlacement();
     }
 
     private IDisposable BeginInstanceScreenshotSuppression()
@@ -367,6 +373,12 @@ internal sealed partial class BppSettingsDockController
         if (_anchorButton == null || _dockButtonRect == null)
             return;
 
+        var placement = _placement.ResolveForScene(
+            BppSettingsDockSceneContext.ResolveCurrentSceneKind()
+        );
+        if (_panelRoot != null)
+            ConfigurePanelRect(_panelRoot, placement);
+
         var parentRect = _dockButtonRect.parent as RectTransform;
         var anchorRect = _anchorButton.transform as RectTransform;
         if (parentRect == null || anchorRect == null)
@@ -395,7 +407,7 @@ internal sealed partial class BppSettingsDockController
             topLocal.y,
             bottomLocal.y,
             _dockButtonRect.localPosition.z,
-            _placement
+            placement
         );
         _dockButtonRect.localPosition = new Vector3(dockPosition.X, dockPosition.Y, dockPosition.Z);
         _dockButtonRect.localRotation = Quaternion.identity;

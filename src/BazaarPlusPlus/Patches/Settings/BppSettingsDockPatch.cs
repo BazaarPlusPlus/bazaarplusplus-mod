@@ -50,10 +50,20 @@ internal static class BppSettingsDockAwakePatch
                 BppDockButtonIconKind.CollectionPanel
             )
         );
-        BppSettingsDockController.Attach(
-            button,
-            BppSettingsDockPlacement.LeftOfSettingButton(key, BppDockButtonIconKind.SettingsDock)
+        var settingsPlacement = BppSettingsDockPlacement.LeftOfSettingButton(
+            key,
+            BppDockButtonIconKind.SettingsDock
         );
+        if (key == "MainMenu")
+        {
+            settingsPlacement = settingsPlacement.WithChestOpeningPlacement(
+                BppSettingsDockSide.AboveAnchor,
+                BppSettingsDockPanelDirection.UpLeft,
+                siblingStepCount: 2
+            );
+        }
+
+        BppSettingsDockController.Attach(button, settingsPlacement);
     }
 }
 
