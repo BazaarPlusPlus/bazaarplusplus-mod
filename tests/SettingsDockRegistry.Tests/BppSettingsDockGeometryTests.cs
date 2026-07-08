@@ -185,4 +185,20 @@ public class BppSettingsDockGeometryTests
         Assert.True(changed);
         Assert.False(same);
     }
+
+    [Fact]
+    public void ScreenResizeSyncTracker_requests_sync_for_configured_frames_after_size_changes()
+    {
+        var tracker = new BppScreenResizeSyncTracker(syncFrameCount: 3);
+
+        Assert.True(tracker.ShouldSync(1920, 1080));
+        Assert.True(tracker.ShouldSync(1920, 1080));
+        Assert.True(tracker.ShouldSync(1920, 1080));
+        Assert.False(tracker.ShouldSync(1920, 1080));
+
+        Assert.True(tracker.ShouldSync(2560, 1440));
+        Assert.True(tracker.ShouldSync(2560, 1440));
+        Assert.True(tracker.ShouldSync(2560, 1440));
+        Assert.False(tracker.ShouldSync(2560, 1440));
+    }
 }

@@ -17,10 +17,8 @@ internal sealed class CollectionPanelDockButtonController
     private Button? _anchorButton;
     private Button? _dockButton;
     private RectTransform? _dockButtonRect;
+    private readonly BppScreenResizeSyncTracker _screenResizeSync = new(ScreenResizeSyncFrameCount);
     private int _screenshotSuppressionCount;
-    private int _lastScreenWidth = -1;
-    private int _lastScreenHeight = -1;
-    private int _pendingScreenResizeSyncFrames;
     private BppSettingsDockPlacement _placement;
 
     internal static void Attach(Button anchorButton, BppSettingsDockPlacement placement)
@@ -86,24 +84,9 @@ internal sealed class CollectionPanelDockButtonController
 
     private void LateUpdate()
     {
-        if (
-            BppSettingsDockGeometry.ShouldSyncForScreenSize(
-                _lastScreenWidth,
-                _lastScreenHeight,
-                Screen.width,
-                Screen.height
-            )
-        )
-        {
-            _lastScreenWidth = Screen.width;
-            _lastScreenHeight = Screen.height;
-            _pendingScreenResizeSyncFrames = ScreenResizeSyncFrameCount;
-        }
-
-        if (_pendingScreenResizeSyncFrames <= 0)
+        if (!_screenResizeSync.ShouldSync(Screen.width, Screen.height))
             return;
 
-        _pendingScreenResizeSyncFrames--;
         SyncDockButtonPlacement();
     }
 

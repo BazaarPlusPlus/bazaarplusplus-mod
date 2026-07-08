@@ -36,11 +36,9 @@ internal sealed partial class BppSettingsDockController
     private TextMeshProUGUI? _headerLabel;
     private TMP_FontAsset? _uiFont;
     private Material? _uiFontMaterial;
+    private readonly BppScreenResizeSyncTracker _screenResizeSync = new(ScreenResizeSyncFrameCount);
     private bool _isExpanded;
     private int _screenshotSuppressionCount;
-    private int _lastScreenWidth = -1;
-    private int _lastScreenHeight = -1;
-    private int _pendingScreenResizeSyncFrames;
     private BppSettingsDockPlacement _placement;
     private static bool _fontResolutionLogged;
 
@@ -131,24 +129,9 @@ internal sealed partial class BppSettingsDockController
 
     private void LateUpdate()
     {
-        if (
-            BppSettingsDockGeometry.ShouldSyncForScreenSize(
-                _lastScreenWidth,
-                _lastScreenHeight,
-                Screen.width,
-                Screen.height
-            )
-        )
-        {
-            _lastScreenWidth = Screen.width;
-            _lastScreenHeight = Screen.height;
-            _pendingScreenResizeSyncFrames = ScreenResizeSyncFrameCount;
-        }
-
-        if (_pendingScreenResizeSyncFrames <= 0)
+        if (!_screenResizeSync.ShouldSync(Screen.width, Screen.height))
             return;
 
-        _pendingScreenResizeSyncFrames--;
         SyncDockButtonPlacement();
     }
 
