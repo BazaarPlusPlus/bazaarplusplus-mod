@@ -463,6 +463,12 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         if (cached != null)
             return cached.gameObject.activeInHierarchy ? cached : null;
 
+        // The screen only exists inside the game's end-of-run app states (the game's own
+        // UI gates on the same check while it is up), so outside them skip scanning
+        // entirely — including on reconnect, where the restored state reopens the gate.
+        if (AppState.CurrentState is not { } appState || !appState.IsEndOfRunState())
+            return null;
+
         // The scan walks every loaded object (measured ~2ms/call on a mature scene), so a
         // cache miss must not rescan every frame. Detecting the end-of-run screen up to
         // half a second late is imperceptible against the 8s first-capture delay.
