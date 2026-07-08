@@ -48,11 +48,13 @@ internal static class CollectionEncounterStructuredParser
                 if (members.Count == 0)
                     continue;
 
-                var isRandomPool = Enum.TryParse<ESpawnSelectionMethod>(
+                var isRandomPool =
+                    Enum.TryParse<ESpawnSelectionMethod>(
                         group["SelectionMethod"]?.ToString(),
                         ignoreCase: true,
                         out var selectionMethod
-                    ) && selectionMethod == ESpawnSelectionMethod.Random;
+                    )
+                    && selectionMethod == ESpawnSelectionMethod.Random;
                 result.Add(
                     new CollectionEncounterChoiceGroupData(
                         isRandomPool,
@@ -165,11 +167,14 @@ internal static class CollectionEncounterStructuredParser
         if (spawnContext == null)
             return false;
         // Runtime objects serialize enums numerically; raw JSON uses names.
-        if (!Enum.TryParse<ESpawnSelectionMethod>(
+        if (
+            !Enum.TryParse<ESpawnSelectionMethod>(
                 spawnContext["SelectionMethod"]?.ToString(),
                 ignoreCase: true,
                 out var selectionMethod
-            ) || selectionMethod != ESpawnSelectionMethod.Random)
+            )
+            || selectionMethod != ESpawnSelectionMethod.Random
+        )
             return false;
 
         var result = new List<CollectionEncounterOutcomeGroupData>();
@@ -192,8 +197,7 @@ internal static class CollectionEncounterStructuredParser
                         // normalization of everything else, so they are kept as
                         // pool summaries even when the constraints don't parse.
                         var constraintsToken = filter["Constraints"];
-                        if (constraintsToken != null
-                            && constraintsToken.Type != JTokenType.Null)
+                        if (constraintsToken != null && constraintsToken.Type != JTokenType.Null)
                         {
                             // Constraints arrive as a single (possibly ConstraintAnd)
                             // object; enumerate to its leaf constraint objects.
@@ -317,11 +321,13 @@ internal static class CollectionEncounterStructuredParser
         if (comparisonToken == null || amountToken == null)
             return null;
         // Runtime objects serialize enums numerically; raw JSON uses names.
-        if (!Enum.TryParse<EComparisonOperator>(
+        if (
+            !Enum.TryParse<EComparisonOperator>(
                 comparisonToken.ToString(),
                 ignoreCase: true,
                 out var comparison
-            ))
+            )
+        )
             return null;
         if (!int.TryParse(amountToken.ToString(), out var amount))
             return null;
@@ -330,7 +336,13 @@ internal static class CollectionEncounterStructuredParser
         var tagOperator = nameof(EListComparisonOperator.Any);
         foreach (var conditional in EnumerateObjects(entry))
         {
-            if (string.Equals(conditional["IsNot"]?.ToString(), "true", StringComparison.OrdinalIgnoreCase))
+            if (
+                string.Equals(
+                    conditional["IsNot"]?.ToString(),
+                    "true",
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
                 return null;
             // Tier conditionals (Grandmaster's "no Bronze/Silver/Gold skills") need
             // per-card tier data the inventory snapshot doesn't carry.
@@ -339,12 +351,14 @@ internal static class CollectionEncounterStructuredParser
             if (conditional["Tags"] is not JArray tags || tags.Count == 0)
                 continue;
 
-            if (conditional["Operator"] is { } operatorToken
+            if (
+                conditional["Operator"] is { } operatorToken
                 && Enum.TryParse<EListComparisonOperator>(
                     operatorToken.ToString(),
                     ignoreCase: true,
                     out var parsedOperator
-                ))
+                )
+            )
                 tagOperator = parsedOperator.ToString();
 
             foreach (var tag in tags)
@@ -387,7 +401,8 @@ internal static class CollectionEncounterStructuredParser
         var type = conditional["$type"]?.ToString();
         var candidates = new List<string>();
         var allowHidden = type == null || type.Contains("HiddenTag");
-        var allowCard = type == null || (type.Contains("ConditionalTag") && !type.Contains("HiddenTag"));
+        var allowCard =
+            type == null || (type.Contains("ConditionalTag") && !type.Contains("HiddenTag"));
         if (allowHidden && Enum.TryParse<EHiddenTag>(raw, out var hiddenTag))
             candidates.Add(hiddenTag.ToString());
         if (allowCard && Enum.TryParse<ECardTag>(raw, out var cardTag))
@@ -407,13 +422,17 @@ internal static class CollectionEncounterStructuredParser
         if (spawnContext == null)
             return null;
 
-        var merged = SpawnConstraints.TryMergeCompatible(ParseRuntimeSpawnConstraints(spawnContext));
+        var merged = SpawnConstraints.TryMergeCompatible(
+            ParseRuntimeSpawnConstraints(spawnContext)
+        );
         return merged?.ToRewardFilter(ReadRuntimeQuantity(spawnContext));
     }
 
     private static IReadOnlyList<SpawnConstraints> ParseTokenSpawnConstraints(JToken spawnContext)
     {
         var result = new List<SpawnConstraints>();
+        var spawnContextConstraints = new SpawnConstraints();
+        AddTokenBehaviors(spawnContextConstraints, spawnContext["Behaviors"]);
         foreach (var groupsToken in FindProperties(spawnContext, "Groups"))
         {
             if (groupsToken is not JArray groups)
@@ -421,8 +440,9 @@ internal static class CollectionEncounterStructuredParser
 
             foreach (var group in groups)
             {
-                var groupConstraints = new SpawnConstraints();
+                var groupConstraints = spawnContextConstraints.Clone();
                 AddTokenConstraints(groupConstraints, group["Constraints"]);
+                AddTokenBehaviors(groupConstraints, group["Behaviors"]);
                 var filters = group["Filters"] as JArray;
                 if (filters == null)
                     continue;
@@ -445,10 +465,12 @@ internal static class CollectionEncounterStructuredParser
         if (result.Count > 0)
             return result;
 
-        var fallback = new SpawnConstraints();
+        var fallback = spawnContextConstraints.Clone();
         foreach (var obj in EnumerateObjects(spawnContext))
         {
-            if (LooksLikeTokenConstraintObject(obj))
+            if (LooksLikeTokenSpawnBehaviorObject(obj))
+                fallback.AddTokenSpawnBehaviorObject(obj);
+            else if (LooksLikeTokenConstraintObject(obj))
                 fallback.AddTokenConstraintObject(obj);
             else
                 fallback.AddTokenFilterProperties(obj);
@@ -460,11 +482,17 @@ internal static class CollectionEncounterStructuredParser
     private static IReadOnlyList<SpawnConstraints> ParseRuntimeSpawnConstraints(object spawnContext)
     {
         var result = new List<SpawnConstraints>();
+        var spawnContextConstraints = new SpawnConstraints();
+        foreach (var behavior in ReadMemberSequence(spawnContext, "Behaviors"))
+            spawnContextConstraints.AddRuntimeSpawnBehaviorObject(behavior);
+
         foreach (var group in ReadMemberSequence(spawnContext, "Groups"))
         {
-            var groupConstraints = new SpawnConstraints();
+            var groupConstraints = spawnContextConstraints.Clone();
             foreach (var constraint in ReadMemberSequence(group, "Constraints"))
                 groupConstraints.AddRuntimeConstraintObject(constraint);
+            foreach (var behavior in ReadMemberSequence(group, "Behaviors"))
+                groupConstraints.AddRuntimeSpawnBehaviorObject(behavior);
 
             foreach (var filter in ReadMemberSequence(group, "Filters"))
             {
@@ -488,19 +516,29 @@ internal static class CollectionEncounterStructuredParser
         if (result.Count > 0)
             return result;
 
-        var fallback = new SpawnConstraints();
+        var fallback = spawnContextConstraints.Clone();
         fallback.AddRuntimeFilterProperties(spawnContext);
         return fallback.HasAny ? new[] { fallback } : Array.Empty<SpawnConstraints>();
     }
 
     private static void AddTokenConstraints(SpawnConstraints constraints, JToken? token)
     {
-        if (token is not JArray array)
+        if (token == null || token.Type == JTokenType.Null)
             return;
 
-        foreach (var child in array)
-            if (child is JObject constraintObject)
+        foreach (var constraintObject in EnumerateObjects(token))
+            if (LooksLikeTokenConstraintObject(constraintObject))
                 constraints.AddTokenConstraintObject(constraintObject);
+    }
+
+    private static void AddTokenBehaviors(SpawnConstraints constraints, JToken? token)
+    {
+        if (token == null || token.Type == JTokenType.Null)
+            return;
+
+        foreach (var behaviorObject in EnumerateObjects(token))
+            if (LooksLikeTokenSpawnBehaviorObject(behaviorObject))
+                constraints.AddTokenSpawnBehaviorObject(behaviorObject);
     }
 
     private static int? ReadQuantity(JToken spawnContext)
@@ -616,6 +654,12 @@ internal static class CollectionEncounterStructuredParser
         obj.TryGetValue("IsNot", StringComparison.OrdinalIgnoreCase, out _)
         || !string.IsNullOrWhiteSpace(obj["$type"]?.ToString());
 
+    private static bool LooksLikeTokenSpawnBehaviorObject(JObject obj)
+    {
+        var typeHint = NormalizeName(obj["$type"]?.ToString() ?? string.Empty);
+        return typeHint.Contains("spawnbehavior");
+    }
+
     private static IEnumerable<object> EnumerateRuntimeDealCardActions(object? source)
     {
         if (source == null || source is string || source is JToken)
@@ -665,13 +709,17 @@ internal static class CollectionEncounterStructuredParser
         }
 
         foreach (var memberValue in ReadRuntimeMemberValues(value))
-            foreach (var nested in EnumerateRuntimeObjects(memberValue, seen, depth + 1))
-                yield return nested;
+        foreach (var nested in EnumerateRuntimeObjects(memberValue, seen, depth + 1))
+            yield return nested;
     }
 
     private static IEnumerable<object> ReadRuntimeMemberValues(object value)
     {
-        foreach (var property in value.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
+        foreach (
+            var property in value
+                .GetType()
+                .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+        )
         {
             if (!property.CanRead || property.GetIndexParameters().Length > 0)
                 continue;
@@ -690,7 +738,9 @@ internal static class CollectionEncounterStructuredParser
                 yield return memberValue;
         }
 
-        foreach (var field in value.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public))
+        foreach (
+            var field in value.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public)
+        )
         {
             object? memberValue;
             try
@@ -801,6 +851,7 @@ internal static class CollectionEncounterStructuredParser
     private sealed class SpawnConstraints
     {
         private ECardType? _cardType;
+        private bool _usesDayTierTable = true;
         private readonly List<ECardSize> _sizes = new();
         private readonly List<ECardSize> _excludedSizes = new();
         private readonly List<ETier> _tiers = new();
@@ -868,6 +919,7 @@ internal static class CollectionEncounterStructuredParser
                 IntersectInto(merged._excludedTiers, other._excludedTiers);
                 IntersectInto(merged._excludedTags, other._excludedTags);
                 IntersectInto(merged._excludedKeywords, other._excludedKeywords);
+                merged._usesDayTierTable = merged._usesDayTierTable && other._usesDayTierTable;
             }
             return merged;
         }
@@ -888,7 +940,11 @@ internal static class CollectionEncounterStructuredParser
 
         public SpawnConstraints Clone()
         {
-            var clone = new SpawnConstraints { _cardType = _cardType };
+            var clone = new SpawnConstraints
+            {
+                _cardType = _cardType,
+                _usesDayTierTable = _usesDayTierTable,
+            };
             clone._sizes.AddRange(_sizes);
             clone._excludedSizes.AddRange(_excludedSizes);
             clone._tiers.AddRange(_tiers);
@@ -908,7 +964,12 @@ internal static class CollectionEncounterStructuredParser
                     continue;
 
                 var normalized = NormalizeName(property.Name);
-                AddValues(property.Name, property.Value, IsExcludedPropertyName(normalized), string.Empty);
+                AddValues(
+                    property.Name,
+                    property.Value,
+                    IsExcludedPropertyName(normalized),
+                    string.Empty
+                );
             }
         }
 
@@ -927,9 +988,21 @@ internal static class CollectionEncounterStructuredParser
             }
         }
 
+        public void AddTokenSpawnBehaviorObject(JObject obj)
+        {
+            var typeHint = NormalizeName(obj["$type"]?.ToString() ?? string.Empty);
+            ApplyTierTableBehavior(typeHint, obj);
+            if (typeHint.Contains("spawnbehaviortier"))
+                AddTokenConstraintObject(obj);
+        }
+
         public void AddRuntimeFilterProperties(object source)
         {
-            foreach (var property in source.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            foreach (
+                var property in source
+                    .GetType()
+                    .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            )
             {
                 if (!property.CanRead || property.GetIndexParameters().Length > 0)
                     continue;
@@ -949,7 +1022,12 @@ internal static class CollectionEncounterStructuredParser
                 if (token != null)
                 {
                     var normalized = NormalizeName(property.Name);
-                    AddValues(property.Name, token, IsExcludedPropertyName(normalized), string.Empty);
+                    AddValues(
+                        property.Name,
+                        token,
+                        IsExcludedPropertyName(normalized),
+                        string.Empty
+                    );
                 }
             }
         }
@@ -968,7 +1046,11 @@ internal static class CollectionEncounterStructuredParser
             }
 
             var excluded = ReadRuntimeBool(ReadMemberValue(source, "IsNot"));
-            foreach (var property in source.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public))
+            foreach (
+                var property in source
+                    .GetType()
+                    .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            )
             {
                 if (
                     !property.CanRead
@@ -1004,6 +1086,14 @@ internal static class CollectionEncounterStructuredParser
                 if (token != null)
                     AddValues(property.Name, token, excluded, typeHint);
             }
+        }
+
+        public void AddRuntimeSpawnBehaviorObject(object source)
+        {
+            var typeHint = NormalizeName(source.GetType().Name);
+            ApplyRuntimeTierTableBehavior(typeHint, source);
+            if (typeHint.Contains("spawnbehaviortier"))
+                AddRuntimeConstraintObject(source);
         }
 
         private void AddValues(string propertyName, JToken value, bool excluded, string typeHint)
@@ -1080,9 +1170,62 @@ internal static class CollectionEncounterStructuredParser
                 _keywords,
                 summary,
                 _excludedTags,
-                _excludedKeywords
+                _excludedKeywords,
+                _usesDayTierTable
             );
         }
+
+        private void ApplyTierTableBehavior(string typeHint, JObject obj)
+        {
+            if (
+                typeHint.Contains("spawnbehaviortier")
+                || typeHint.Contains("downshifttier")
+                || IsEnabledIgnoreTierTable(typeHint, obj)
+                || IsEnabledInheritTier(typeHint, obj)
+            )
+                _usesDayTierTable = false;
+        }
+
+        private void ApplyRuntimeTierTableBehavior(string typeHint, object source)
+        {
+            if (
+                typeHint.Contains("spawnbehaviortier")
+                || typeHint.Contains("downshifttier")
+                || IsEnabledRuntimeIgnoreTierTable(typeHint, source)
+                || IsEnabledRuntimeInheritTier(typeHint, source)
+            )
+                _usesDayTierTable = false;
+        }
+
+        private static bool IsEnabledIgnoreTierTable(string typeHint, JObject obj) =>
+            typeHint.Contains("ignoretier")
+            && (
+                !obj.TryGetValue(
+                    "IgnoreTierTable",
+                    StringComparison.OrdinalIgnoreCase,
+                    out var enabled
+                ) || ReadBool(enabled)
+            );
+
+        private static bool IsEnabledInheritTier(string typeHint, JObject obj) =>
+            typeHint.Contains("inherittier")
+            && (
+                !obj.TryGetValue("Inherits", StringComparison.OrdinalIgnoreCase, out var inherits)
+                || ReadBool(inherits)
+            );
+
+        private static bool IsEnabledRuntimeIgnoreTierTable(string typeHint, object source) =>
+            typeHint.Contains("ignoretier")
+            && (
+                ReadMemberValue(source, "IgnoreTierTable") is not { } enabled
+                || ReadRuntimeBool(enabled)
+            );
+
+        private static bool IsEnabledRuntimeInheritTier(string typeHint, object source) =>
+            typeHint.Contains("inherittier")
+            && (
+                ReadMemberValue(source, "Inherits") is not { } inherits || ReadRuntimeBool(inherits)
+            );
 
         private ECardType? InferCardType()
         {
@@ -1292,6 +1435,7 @@ internal static class CollectionEncounterStructuredParser
 
         public new bool Equals(object? x, object? y) => ReferenceEquals(x, y);
 
-        public int GetHashCode(object obj) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
+        public int GetHashCode(object obj) =>
+            System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(obj);
     }
 }

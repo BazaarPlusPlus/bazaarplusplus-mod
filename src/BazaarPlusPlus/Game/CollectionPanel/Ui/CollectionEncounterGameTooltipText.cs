@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -14,6 +15,12 @@ internal static class CollectionEncounterGameTooltipText
 {
     private const string AccentColor = "#FFD37E";
     private const string IneligibleColor = "#8F8268";
+    private const string EnglishTierNames = "bronze|silver|gold|diamond|legendary";
+
+    private static readonly Regex ExplicitTierDescriptorRegex = new(
+        $@"\b(?:{EnglishTierNames})\s*-?\s*tier\b",
+        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant
+    );
 
     private static readonly ETier[] DealableTiers =
     {
@@ -68,9 +75,7 @@ internal static class CollectionEncounterGameTooltipText
                     : $"<color={AccentColor}>{choice.DisplayName}:</color> {colorize(result)}"
             );
         }
-        return CollectionTooltipMarkup.Wrap(
-            string.Join(CollectionTooltipMarkup.BlockBreak, lines)
-        );
+        return CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
     }
 
     // Random-outcome events: one block per rolled alternative with its normalized
@@ -129,9 +134,7 @@ internal static class CollectionEncounterGameTooltipText
                 : string.Empty;
             lines.Add($"· <indent=1em>{prefix}{content}</indent>");
         }
-        return CollectionTooltipMarkup.Wrap(
-            string.Join(CollectionTooltipMarkup.BlockBreak, lines)
-        );
+        return CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
     }
 
     // One rolled-pool choice line: combat roll, small expandable entry list (with
@@ -159,9 +162,8 @@ internal static class CollectionEncounterGameTooltipText
             block.Append(
                 string.IsNullOrWhiteSpace(result)
                     ? $"<color={AccentColor}>{entry.DisplayName}</color>"
-                    : string.IsNullOrWhiteSpace(entry.DisplayName)
-                        ? colorize(result)
-                        : $"<color={AccentColor}>{entry.DisplayName}:</color> {colorize(result)}"
+                : string.IsNullOrWhiteSpace(entry.DisplayName) ? colorize(result)
+                : $"<color={AccentColor}>{entry.DisplayName}:</color> {colorize(result)}"
             );
             block.Append("</indent>");
         }
@@ -195,17 +197,13 @@ internal static class CollectionEncounterGameTooltipText
         if (string.IsNullOrWhiteSpace(result))
             return string.Empty;
 
-        result = CollapseWhitespace(
-            result.Replace("\r", string.Empty).Replace('\n', ' ')
-        );
+        result = CollapseWhitespace(result.Replace("\r", string.Empty).Replace('\n', ' '));
         var suffix = DayTierSuffix(choice, dayTierCeiling);
         if (suffix == null)
             return result;
         // Full-width punctuation carries its own visual gap; an ASCII space in
         // front of it reads as a hole.
-        return suffix.Length > 0 && suffix[0] >= '⺀'
-            ? $"{result}{suffix}"
-            : $"{result} {suffix}";
+        return suffix.Length > 0 && suffix[0] >= '⺀' ? $"{result}{suffix}" : $"{result} {suffix}";
     }
 
     private static string CollapseWhitespace(string text)
@@ -232,6 +230,10 @@ internal static class CollectionEncounterGameTooltipText
     )
     {
         if (!dayTierCeiling.HasValue || choice.RewardFilter is not { } reward)
+            return null;
+        if (!reward.UsesDayTierTable)
+            return null;
+        if (ExplicitTierDescriptorRegex.IsMatch(choice.ResultText ?? string.Empty))
             return null;
 
         var tiers = reward.Tiers;
