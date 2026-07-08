@@ -158,8 +158,8 @@ Assert(
 );
 
 Assert(
-    ItemEnchantPreviewTooltipLayerPolicy.ElevatedSortingOrder > 100,
-    "Enchant preview tooltip sorting should sit above fixed always-on-top screen UI."
+    ItemEnchantPreviewTooltipLayerPolicy.ElevatedSortingOrder(150) == 151,
+    "Enchant preview elevation should sit one step above the tooltip clone's own sorting order, not an absolute layer."
 );
 
 var segment = ItemEnchantPreviewFormatting.CreateSegment(
