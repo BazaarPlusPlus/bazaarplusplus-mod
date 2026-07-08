@@ -108,6 +108,30 @@ public sealed class CollectionEncounterGameTooltipTextTests
     }
 
     [Fact]
+    public void Build_does_not_append_day_tier_when_localized_result_text_already_names_a_tier()
+    {
+        L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-000000000005"),
+                "深夜点心",
+                "获得2个钻石级食物",
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
+                isSourceMatch: false
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(
+            option,
+            colorizeResult: null,
+            dayTierCeiling: ETier.Gold
+        );
+
+        Assert.Contains("获得2个钻石级食物", text);
+        Assert.DoesNotContain("获得2个钻石级食物（最高黄金）", text);
+    }
+
+    [Fact]
     public void Build_does_not_append_day_tier_when_reward_ignores_day_tier_table()
     {
         var option = CreateOption(
@@ -325,7 +349,12 @@ public sealed class CollectionEncounterGameTooltipTextTests
 
     private sealed class TestLanguageProvider : ILanguageProvider
     {
-        public string CurrentLanguageCode => "en";
+        public TestLanguageProvider(string languageCode = "en")
+        {
+            CurrentLanguageCode = languageCode;
+        }
+
+        public string CurrentLanguageCode { get; }
     }
 
     private sealed class TestLocaleModeProvider : ILocaleModeProvider

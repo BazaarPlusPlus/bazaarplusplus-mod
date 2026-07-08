@@ -652,7 +652,8 @@ internal static class CollectionEncounterStructuredParser
 
     private static bool LooksLikeTokenConstraintObject(JObject obj) =>
         obj.TryGetValue("IsNot", StringComparison.OrdinalIgnoreCase, out _)
-        || !string.IsNullOrWhiteSpace(obj["$type"]?.ToString());
+        || !string.IsNullOrWhiteSpace(obj["$type"]?.ToString())
+        || HasKnownTokenConstraintProperty(obj);
 
     private static bool LooksLikeTokenSpawnBehaviorObject(JObject obj)
     {
@@ -993,7 +994,7 @@ internal static class CollectionEncounterStructuredParser
             var typeHint = NormalizeName(obj["$type"]?.ToString() ?? string.Empty);
             ApplyTierTableBehavior(typeHint, obj);
             if (typeHint.Contains("spawnbehaviortier"))
-                AddTokenConstraintObject(obj);
+                AddTokenSpawnBehaviorTier(obj);
         }
 
         public void AddRuntimeFilterProperties(object source)
@@ -1093,7 +1094,55 @@ internal static class CollectionEncounterStructuredParser
             var typeHint = NormalizeName(source.GetType().Name);
             ApplyRuntimeTierTableBehavior(typeHint, source);
             if (typeHint.Contains("spawnbehaviortier"))
-                AddRuntimeConstraintObject(source);
+                AddRuntimeSpawnBehaviorTier(source);
+        }
+
+        private void AddTokenSpawnBehaviorTier(JObject obj)
+        {
+            var excluded = ReadBool(obj["IsNot"]);
+            foreach (var property in obj.Properties())
+            {
+                if (!IsTierProperty(NormalizeName(property.Name)))
+                    continue;
+
+                foreach (var raw in EnumerateScalarValues(property.Value))
+                    AddEnum(excluded ? _excludedTiers : _tiers, raw);
+            }
+        }
+
+        private void AddRuntimeSpawnBehaviorTier(object source)
+        {
+            var excluded = ReadRuntimeBool(ReadMemberValue(source, "IsNot"));
+            foreach (
+                var property in source
+                    .GetType()
+                    .GetProperties(BindingFlags.Instance | BindingFlags.Public)
+            )
+            {
+                if (
+                    !property.CanRead
+                    || property.GetIndexParameters().Length > 0
+                    || !IsTierProperty(NormalizeName(property.Name))
+                )
+                    continue;
+
+                object? value;
+                try
+                {
+                    value = property.GetValue(source);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                var token = ToToken(value);
+                if (token == null)
+                    continue;
+
+                foreach (var raw in EnumerateScalarValues(token))
+                    AddEnum(excluded ? _excludedTiers : _tiers, raw);
+            }
         }
 
         private void AddValues(string propertyName, JToken value, bool excluded, string typeHint)
@@ -1289,6 +1338,32 @@ internal static class CollectionEncounterStructuredParser
         || normalized == "cardtype"
         || normalized == "cardtypes"
         || normalized == "cardtypesany";
+
+    private static bool IsTierProperty(string normalized) =>
+        normalized == "tier" || normalized == "tiers" || normalized == "cardtier";
+
+    private static bool HasKnownTokenConstraintProperty(JObject obj)
+    {
+        foreach (var property in obj.Properties())
+        {
+            var normalized = NormalizeName(property.Name);
+            if (
+                IsCardTypeProperty(normalized)
+                || IsTierProperty(normalized)
+                || normalized == "size"
+                || normalized == "sizes"
+                || normalized == "tag"
+                || normalized == "tags"
+                || normalized == "hiddentag"
+                || normalized == "hiddentags"
+                || normalized == "keyword"
+                || normalized == "keywords"
+            )
+                return true;
+        }
+
+        return false;
+    }
 
     private static bool ReadBool(JToken? token) =>
         token != null

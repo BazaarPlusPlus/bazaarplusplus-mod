@@ -399,6 +399,51 @@ public sealed class CollectionEncounterStructuredParserTests
     }
 
     [Fact]
+    public void TryParseRewardFilter_reads_only_tier_fields_from_spawn_behavior_tier()
+    {
+        var json = """
+            {
+              "$type": "TCardEncounterStep",
+              "Abilities": {
+                "0": {
+                  "Action": {
+                    "$type": "TActionGameDealCards",
+                    "SpawnContext": {
+                      "$type": "TSpawnContextQuery",
+                      "Limit": { "$type": "TFixedValue", "Value": 1.0 },
+                      "Groups": [
+                        {
+                          "Filters": [
+                            {
+                              "Constraints": [
+                                { "$type": "ConstraintCardType", "Types": ["Item"] },
+                                { "$type": "ConstraintTag", "Tags": ["Food"] }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      "Behaviors": [
+                        {
+                          "$type": "TSpawnBehaviorTier",
+                          "Tiers": ["Diamond"],
+                          "DisplayName": "Gold"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+            """;
+
+        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+
+        Assert.NotNull(reward);
+        Assert.Equal(new[] { ETier.Diamond }, reward.Tiers);
+    }
+
+    [Fact]
     public void TryParseRewardFilter_reads_runtime_spawn_behavior_tier()
     {
         var step = new RuntimeEncounterStep
@@ -611,6 +656,49 @@ public sealed class CollectionEncounterStructuredParserTests
         Assert.Empty(reward.Tags);
         Assert.Equal(new[] { ECardTag.Loot }, reward.ExcludedTags);
         Assert.Equal("Medium Bronze-Diamond Item, not Loot", reward.FilterSummary);
+    }
+
+    [Fact]
+    public void TryParseRewardFilter_reads_token_constraints_without_type_metadata()
+    {
+        var json = """
+            {
+              "$type": "TCardEncounterStep",
+              "Abilities": {
+                "0": {
+                  "Action": {
+                    "$type": "TActionGameDealCards",
+                    "SpawnContext": {
+                      "$type": "TSpawnContextQuery",
+                      "Limit": { "$type": "TFixedValue", "Value": 1.0 },
+                      "Groups": [
+                        {
+                          "Filters": [
+                            {
+                              "Constraints": [
+                                { "Types": ["Item"] },
+                                { "Sizes": ["Small"] },
+                                { "Tiers": ["Silver"] },
+                                { "Tags": ["Food"] }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+            """;
+
+        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+
+        Assert.NotNull(reward);
+        Assert.Equal(ECardType.Item, reward.CardType);
+        Assert.Equal(new[] { ECardSize.Small }, reward.Sizes);
+        Assert.Equal(new[] { ETier.Silver }, reward.Tiers);
+        Assert.Equal(new[] { ECardTag.Food }, reward.Tags);
     }
 
     [Fact]

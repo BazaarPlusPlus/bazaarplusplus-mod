@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -15,12 +14,6 @@ internal static class CollectionEncounterGameTooltipText
 {
     private const string AccentColor = "#FFD37E";
     private const string IneligibleColor = "#8F8268";
-    private const string EnglishTierNames = "bronze|silver|gold|diamond|legendary";
-
-    private static readonly Regex ExplicitTierDescriptorRegex = new(
-        $@"\b(?:{EnglishTierNames})\s*-?\s*tier\b",
-        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant
-    );
 
     private static readonly ETier[] DealableTiers =
     {
@@ -233,11 +226,11 @@ internal static class CollectionEncounterGameTooltipText
             return null;
         if (!reward.UsesDayTierTable)
             return null;
-        if (ExplicitTierDescriptorRegex.IsMatch(choice.ResultText ?? string.Empty))
-            return null;
 
         var tiers = reward.Tiers;
         if (tiers.Count != 0 && tiers.Count < DealableTiers.Length)
+            return null;
+        if (HasExplicitTierDescriptor(choice.ResultText))
             return null;
 
         var ceilingRank = CollectionCardFacetRanks.TierRank(dayTierCeiling.Value);
@@ -251,5 +244,96 @@ internal static class CollectionEncounterGameTooltipText
         return effective.Count == 1
             ? CollectionPanelText.EncounterTierExact(effective[0])
             : CollectionPanelText.EncounterDayTierSuffix(effective[^1]);
+    }
+
+    private static bool HasExplicitTierDescriptor(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        foreach (var tier in Enum.GetValues(typeof(ETier)))
+        {
+            if (tier is ETier value && HasExplicitTierDescriptor(text, value))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasExplicitTierDescriptor(string text, ETier tier)
+    {
+        if (HasEnglishTierDescriptor(text, tier.ToString()))
+            return true;
+
+        var localized = CollectionPanelText.Tier(tier);
+        if (string.IsNullOrWhiteSpace(localized))
+            return false;
+
+        return ContainsOrdinalIgnoreCase(text, $"{localized}级")
+            || ContainsOrdinalIgnoreCase(text, $"{localized}階")
+            || ContainsOrdinalIgnoreCase(text, $"{localized}品质")
+            || ContainsOrdinalIgnoreCase(text, $"{localized}品質")
+            || ContainsOrdinalIgnoreCase(text, CollectionPanelText.EncounterTierExact(tier));
+    }
+
+    private static bool HasEnglishTierDescriptor(string text, string tierName)
+    {
+        var index = 0;
+        while (index < text.Length)
+        {
+            index = text.IndexOf(tierName, index, StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+                return false;
+
+            if (IsAsciiWordBoundary(text, index - 1))
+            {
+                var cursor = index + tierName.Length;
+                while (cursor < text.Length && char.IsWhiteSpace(text[cursor]))
+                    cursor++;
+                if (cursor < text.Length && text[cursor] == '-')
+                    cursor++;
+                while (cursor < text.Length && char.IsWhiteSpace(text[cursor]))
+                    cursor++;
+
+                const string TierSuffix = "tier";
+                if (
+                    cursor + TierSuffix.Length <= text.Length
+                    && string.Compare(
+                        text,
+                        cursor,
+                        TierSuffix,
+                        0,
+                        TierSuffix.Length,
+                        StringComparison.OrdinalIgnoreCase
+                    ) == 0
+                    && IsAsciiWordBoundary(text, cursor + TierSuffix.Length)
+                )
+                    return true;
+            }
+
+            index += tierName.Length;
+        }
+
+        return false;
+    }
+
+    private static bool IsAsciiWordBoundary(string text, int index)
+    {
+        if (index < 0 || index >= text.Length)
+            return true;
+
+        var character = text[index];
+        return !(
+            character >= 'a' && character <= 'z'
+            || character >= 'A' && character <= 'Z'
+            || character >= '0' && character <= '9'
+            || character == '_'
+        );
+    }
+
+    private static bool ContainsOrdinalIgnoreCase(string text, string value)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && text.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }
