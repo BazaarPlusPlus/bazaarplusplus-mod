@@ -8,6 +8,7 @@ internal sealed class BppConfig : IBppConfig
 {
     internal const PreviewVisibilityMode DefaultEnchantPreviewMode = PreviewVisibilityMode.Always;
     internal const BppUiFontKind DefaultUiFontKind = BppUiFontKind.LxgwWenKai;
+    internal const SubtitlePosition DefaultVoiceSubtitlesPosition = SubtitlePosition.TopCenter;
 
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
 
@@ -90,7 +91,7 @@ internal sealed class BppConfig : IBppConfig
         VoiceSubtitlesPositionConfig = config.Bind(
             "VoiceSubtitles",
             "Position",
-            SubtitlePosition.TopLeft,
+            DefaultVoiceSubtitlesPosition,
             "Where voice-over subtitles are anchored on screen."
         );
         VoiceSubtitlesLanguageModeConfig = config.Bind(

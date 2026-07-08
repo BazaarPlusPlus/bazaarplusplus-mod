@@ -12,6 +12,10 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
 internal static class VoiceLineDisplay
 {
+    private const float ScaleComparisonTolerance = 0.0001f;
+    private const float BilingualChineseScaleMultiplier = 1.08f;
+    private const float CenteredChineseTrailingPunctuationWidthRatio = 0.5f;
+
     private static GameObject? _labelRoot;
     private static TextMeshProUGUI? _combinedLabel;
     private static TextMeshProUGUI? _englishLabel;
@@ -20,6 +24,7 @@ internal static class VoiceLineDisplay
     private static bool _mountedFromVersionLabel;
     private static int _nextDisplayId;
     private static float _secondLineOffset = -28f;
+    private static float _centeredChineseWidthReduction;
     private static RectTransform? _sourceRect;
     private static TextMeshProUGUI? _sourceLabel;
     private static readonly ConcurrentQueue<VoiceSubtitleCue> QueuedShows = new();
@@ -185,6 +190,7 @@ internal static class VoiceLineDisplay
         _chineseUiLabel = null;
         _lifetime = null;
         _mountedFromVersionLabel = false;
+        _centeredChineseWidthReduction = 0f;
         _sourceRect = null;
         _sourceLabel = null;
     }
@@ -210,7 +216,7 @@ internal static class VoiceLineDisplay
         }
 
         var activeBefore = labelObject.activeSelf;
-        TryApplySettingsToLabel("show");
+        TryApplySettingsToLabel("show", text);
         ApplyText(text);
         labelObject.SetActive(true);
         if (VoiceSubtitlesLog.Verbose)
@@ -264,7 +270,7 @@ internal static class VoiceLineDisplay
             );
     }
 
-    private static bool TryApplySettingsToLabel(string reason)
+    private static bool TryApplySettingsToLabel(string reason, DisplayText? currentText = null)
     {
         if (CurrentLabelObject == null || _sourceRect == null || _sourceLabel == null)
             return false;
@@ -276,7 +282,13 @@ internal static class VoiceLineDisplay
             if (_combinedLabel != null)
                 ConfigureCombinedText(_sourceLabel, _combinedLabel, settings);
             else
-                ConfigureSplitText(_sourceLabel, _englishLabel, _chineseUiLabel, settings);
+                ConfigureSplitText(
+                    _sourceLabel,
+                    _englishLabel,
+                    _chineseUiLabel,
+                    settings,
+                    currentText
+                );
             return true;
         }
         catch (Exception ex)
@@ -367,11 +379,13 @@ internal static class VoiceLineDisplay
         TextMeshProUGUI source,
         TextMeshProUGUI? english,
         Text? chineseUi,
-        VoiceLineSettings settings
+        VoiceLineSettings settings,
+        DisplayText? currentText = null
     )
     {
         var englishFontSize = Math.Max(source.fontSize * settings.EnglishFontScale, 16f);
-        var chineseFontSize = Math.Max(source.fontSize * settings.ChineseFontScale, 16f);
+        var chineseFontScale = ResolveEffectiveChineseFontScale(settings, currentText);
+        var chineseFontSize = Math.Max(source.fontSize * chineseFontScale, 16f);
         var lineHeight = Math.Max(englishFontSize, chineseFontSize) * 1.25f;
 
         if (english != null)
@@ -423,8 +437,18 @@ internal static class VoiceLineDisplay
         }
 
         _secondLineOffset = -lineHeight;
+        _centeredChineseWidthReduction = ResolveCenteredChineseWidthReduction(
+            settings.Position,
+            chineseFontSize,
+            currentText
+        );
         ConfigureLineRect(english?.rectTransform, 0f, lineHeight);
-        ConfigureLineRect(chineseUi?.rectTransform, _secondLineOffset, lineHeight);
+        ConfigureLineRect(
+            chineseUi?.rectTransform,
+            _secondLineOffset,
+            lineHeight,
+            _centeredChineseWidthReduction
+        );
     }
 
     private static TextMeshProUGUI? CreateEnglishLabel(Transform parent)
@@ -458,7 +482,12 @@ internal static class VoiceLineDisplay
         return labelObject;
     }
 
-    private static void ConfigureLineRect(RectTransform? rect, float yOffset, float lineHeight)
+    private static void ConfigureLineRect(
+        RectTransform? rect,
+        float yOffset,
+        float lineHeight,
+        float widthReduction = 0f
+    )
     {
         if (rect == null)
             return;
@@ -466,8 +495,8 @@ internal static class VoiceLineDisplay
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(1f, 1f);
         rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(0f, yOffset);
-        rect.sizeDelta = new Vector2(0f, Math.Max(48f, lineHeight));
+        rect.anchoredPosition = new Vector2(widthReduction, yOffset);
+        rect.sizeDelta = new Vector2(-widthReduction, Math.Max(48f, lineHeight));
         rect.localScale = Vector3.one;
         rect.localRotation = Quaternion.identity;
     }
@@ -504,7 +533,8 @@ internal static class VoiceLineDisplay
             ConfigureLineRect(
                 _chineseUiLabel.rectTransform,
                 chineseOffset,
-                Math.Abs(_secondLineOffset)
+                Math.Abs(_secondLineOffset),
+                _centeredChineseWidthReduction
             );
         }
     }
@@ -557,7 +587,8 @@ internal static class VoiceLineDisplay
         if (string.IsNullOrEmpty(text.Chinese))
             return BuildSizedLine(text.English, settings.EnglishFontScale);
 
-        return $"{BuildSizedLine(text.English, settings.EnglishFontScale)}\n{BuildSizedLine(text.Chinese, settings.ChineseFontScale)}";
+        return $"{BuildSizedLine(text.English, settings.EnglishFontScale)}\n"
+            + BuildSizedLine(text.Chinese, ResolveEffectiveChineseFontScale(settings, text));
     }
 
     private static string BuildSizedLine(string value, float scale)
@@ -565,6 +596,51 @@ internal static class VoiceLineDisplay
         var percent = (int)Math.Round(scale * 100f);
         return $"<size={percent}%>{value}</size>";
     }
+
+    private static float ResolveEffectiveChineseFontScale(
+        VoiceLineSettings settings,
+        DisplayText? currentText
+    )
+    {
+        if (
+            currentText.HasValue
+            && currentText.Value.HasEnglishAndChinese
+            && AreScalesEquivalent(settings.EnglishFontScale, settings.ChineseFontScale)
+        )
+        {
+            // When bilingual subtitles use the same configured scale, Chinese looks
+            // slightly smaller next to the Latin line; a tiny render-only multiplier
+            // keeps the two rows visually balanced without changing the saved setting.
+            return settings.EnglishFontScale * BilingualChineseScaleMultiplier;
+        }
+
+        return settings.ChineseFontScale;
+    }
+
+    private static float ResolveCenteredChineseWidthReduction(
+        SubtitlePosition position,
+        float chineseFontSize,
+        DisplayText? currentText
+    )
+    {
+        if (
+            position != SubtitlePosition.TopCenter
+            || !currentText.HasValue
+            || string.IsNullOrEmpty(currentText.Value.Chinese)
+        )
+        {
+            return 0f;
+        }
+
+        // Centered Chinese subtitles almost always end with Chinese punctuation. The
+        // punctuation consumes a full character slot but has less visual weight, so
+        // keeping the right edge fixed and removing half a character from the measured
+        // row width makes the centered line look more balanced.
+        return chineseFontSize * CenteredChineseTrailingPunctuationWidthRatio;
+    }
+
+    private static bool AreScalesEquivalent(float left, float right) =>
+        Math.Abs(left - right) <= ScaleComparisonTolerance;
 
     private static string DescribeVersionLabel(TextMeshProUGUI? label)
     {
@@ -600,6 +676,9 @@ internal static class VoiceLineDisplay
         public string English { get; }
 
         public string Chinese { get; }
+
+        public bool HasEnglishAndChinese =>
+            !string.IsNullOrEmpty(English) && !string.IsNullOrEmpty(Chinese);
 
         public bool IsEmpty =>
             string.IsNullOrWhiteSpace(English) && string.IsNullOrWhiteSpace(Chinese);
