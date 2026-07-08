@@ -13,7 +13,7 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 internal static class VoiceLineDisplay
 {
     private const float ScaleComparisonTolerance = 0.0001f;
-    private const float BilingualChineseScaleBoost = 0.08f;
+    private const float BilingualChineseScaleMultiplier = 1.08f;
     private const float CenteredChineseTrailingPunctuationWidthRatio = 0.5f;
 
     private static GameObject? _labelRoot;
@@ -609,9 +609,9 @@ internal static class VoiceLineDisplay
         )
         {
             // When bilingual subtitles use the same configured scale, Chinese looks
-            // slightly smaller next to the Latin line; a tiny render-only boost makes
-            // the two rows feel visually balanced without changing the saved setting.
-            return settings.EnglishFontScale + BilingualChineseScaleBoost;
+            // slightly smaller next to the Latin line; a tiny render-only multiplier
+            // keeps the two rows visually balanced without changing the saved setting.
+            return settings.EnglishFontScale * BilingualChineseScaleMultiplier;
         }
 
         return settings.ChineseFontScale;

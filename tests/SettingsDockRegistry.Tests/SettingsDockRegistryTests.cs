@@ -531,6 +531,39 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
+    public void VoiceSubtitlesPositionDockEntry_defaults_top_center_and_cycles_to_top_left()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-voice-subtitles-position-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var definition = new VoiceSubtitlesPositionSettingsDockEntry().Build(config);
+
+            Assert.Equal(SubtitlePosition.TopCenter, config.VoiceSubtitlesPositionConfig!.Value);
+            Assert.Equal("Top Center", definition.ResolveStatus("en"));
+            Assert.Equal("顶部居中", definition.ResolveStatus("zh-CN"));
+            Assert.False(definition.IsActive());
+
+            definition.Activate();
+
+            Assert.Equal(SubtitlePosition.TopLeft, config.VoiceSubtitlesPositionConfig.Value);
+            Assert.Equal("Top Left", definition.ResolveStatus("en"));
+            Assert.True(definition.IsActive());
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
     public void VoiceSubtitlesDockEntries_register_master_and_setting_rows()
     {
         var configPath = Path.Combine(

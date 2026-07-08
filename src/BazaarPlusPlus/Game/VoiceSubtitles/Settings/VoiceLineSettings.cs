@@ -39,7 +39,8 @@ internal sealed class VoiceLineSettings
         {
             var config = BppPatchHost.Services.Config;
             return new VoiceLineSettings(
-                config.VoiceSubtitlesPositionConfig?.Value ?? SubtitlePosition.TopLeft,
+                config.VoiceSubtitlesPositionConfig?.Value
+                    ?? BppConfig.DefaultVoiceSubtitlesPosition,
                 config.VoiceSubtitlesLanguageModeConfig?.Value ?? SubtitleLanguageMode.Both,
                 config.VoiceSubtitlesEnglishFontScaleConfig?.Value ?? DefaultEnglishFontScale,
                 config.VoiceSubtitlesChineseFontScaleConfig?.Value ?? DefaultChineseFontScale

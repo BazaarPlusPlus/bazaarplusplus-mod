@@ -119,7 +119,7 @@ internal sealed class VoiceSubtitlesPositionSettingsDockEntry : ISettingsDockEnt
             "VoiceSubtitlesPosition",
             ResolveLabel,
             languageCode => ResolveStatus(config, languageCode),
-            () => ReadPosition(config) != SubtitlePosition.TopLeft,
+            () => ReadPosition(config) != BppConfig.DefaultVoiceSubtitlesPosition,
             () => CyclePosition(config),
             collapseAfterActivate: false
         );
@@ -127,7 +127,7 @@ internal sealed class VoiceSubtitlesPositionSettingsDockEntry : ISettingsDockEnt
     private static string ResolveLabel(string languageCode) => Resolve(Label, languageCode);
 
     private static SubtitlePosition ReadPosition(IBppConfig config) =>
-        config.VoiceSubtitlesPositionConfig?.Value ?? SubtitlePosition.TopLeft;
+        config.VoiceSubtitlesPositionConfig?.Value ?? BppConfig.DefaultVoiceSubtitlesPosition;
 
     private static string ResolveStatus(IBppConfig config, string languageCode)
     {
