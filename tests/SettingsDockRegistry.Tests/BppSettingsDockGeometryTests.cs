@@ -128,43 +128,47 @@ public class BppSettingsDockGeometryTests
     }
 
     [Fact]
-    public void ResolveForScene_uses_chest_opening_override_when_configured()
+    public void ResolveForScene_uses_right_dock_stacked_override_when_configured()
     {
         var placement = BppSettingsDockPlacement
             .LeftOfSettingButton("MainMenu", BppDockButtonIconKind.SettingsDock)
-            .WithChestOpeningPlacement(
+            .WithRightDockStackedPlacement(
                 BppSettingsDockSide.AboveAnchor,
                 BppSettingsDockPanelDirection.UpLeft,
                 siblingStepCount: 2
             );
 
         var defaultPlacement = placement.ResolveForScene(BppSettingsDockSceneKind.Default);
-        var chestPlacement = placement.ResolveForScene(BppSettingsDockSceneKind.ChestOpening);
+        var stackedPlacement = placement.ResolveForScene(BppSettingsDockSceneKind.RightDockStacked);
 
         Assert.Equal(BppSettingsDockSide.LeftOfAnchor, defaultPlacement.Side);
         Assert.Equal(1, defaultPlacement.SiblingStepCount);
-        Assert.Equal(BppSettingsDockSide.AboveAnchor, chestPlacement.Side);
-        Assert.Equal(2, chestPlacement.SiblingStepCount);
-        Assert.Equal(BppDockButtonIconKind.SettingsDock, chestPlacement.ButtonIconKind);
+        Assert.Equal(BppSettingsDockSide.AboveAnchor, stackedPlacement.Side);
+        Assert.Equal(2, stackedPlacement.SiblingStepCount);
+        Assert.Equal(BppDockButtonIconKind.SettingsDock, stackedPlacement.ButtonIconKind);
     }
 
     [Theory]
-    [InlineData("ChestOpening", null, true)]
-    [InlineData("Chest Scene", "Chest Scene", true)]
-    [InlineData("CollectionWheel", "Chest Scene", false)]
-    public void ResolveSceneKind_detects_chest_opening_scene(
+    [InlineData("ChestOpening", null, null, true)]
+    [InlineData("Chest Scene", "Chest Scene", null, true)]
+    [InlineData("Store", null, null, true)]
+    [InlineData("Bazaar Store Scene", null, "Bazaar Store Scene", true)]
+    [InlineData("CollectionWheel", "Chest Scene", "Bazaar Store Scene", false)]
+    public void ResolveSceneKind_detects_right_dock_stacked_scenes(
         string activeSceneName,
         string? catalogChestSceneName,
-        bool expectChestOpening
+        string? catalogStoreSceneName,
+        bool expectRightDockStacked
     )
     {
         var result = BppSettingsDockSceneContext.ResolveSceneKind(
             activeSceneName,
-            catalogChestSceneName
+            catalogChestSceneName,
+            catalogStoreSceneName
         );
 
-        var expected = expectChestOpening
-            ? BppSettingsDockSceneKind.ChestOpening
+        var expected = expectRightDockStacked
+            ? BppSettingsDockSceneKind.RightDockStacked
             : BppSettingsDockSceneKind.Default;
         Assert.Equal(expected, result);
     }

@@ -56,7 +56,7 @@ internal static class BppSettingsDockAwakePatch
         );
         if (key == "MainMenu")
         {
-            settingsPlacement = settingsPlacement.WithChestOpeningPlacement(
+            settingsPlacement = settingsPlacement.WithRightDockStackedPlacement(
                 BppSettingsDockSide.AboveAnchor,
                 BppSettingsDockPanelDirection.UpLeft,
                 siblingStepCount: 2

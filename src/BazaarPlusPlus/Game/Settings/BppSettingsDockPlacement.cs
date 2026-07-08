@@ -18,7 +18,7 @@ internal enum BppSettingsDockPanelDirection
 internal enum BppSettingsDockSceneKind
 {
     Default,
-    ChestOpening,
+    RightDockStacked,
 }
 
 internal readonly struct BppSettingsDockResolvedPlacement(
@@ -41,22 +41,22 @@ internal readonly struct BppSettingsDockPlacement
 {
     private const float DefaultSiblingGap = 18f;
     private readonly BppSettingsDockResolvedPlacement _defaultPlacement;
-    private readonly BppSettingsDockResolvedPlacement _chestOpeningPlacement;
-    private readonly bool _hasChestOpeningPlacement;
+    private readonly BppSettingsDockResolvedPlacement _rightDockStackedPlacement;
+    private readonly bool _hasRightDockStackedPlacement;
 
     private BppSettingsDockPlacement(
         string key,
         BppDockButtonIconKind buttonIconKind,
         BppSettingsDockResolvedPlacement defaultPlacement,
-        bool hasChestOpeningPlacement = false,
-        BppSettingsDockResolvedPlacement chestOpeningPlacement = default
+        bool hasRightDockStackedPlacement = false,
+        BppSettingsDockResolvedPlacement rightDockStackedPlacement = default
     )
     {
         Key = key;
         ButtonIconKind = buttonIconKind;
         _defaultPlacement = defaultPlacement;
-        _hasChestOpeningPlacement = hasChestOpeningPlacement;
-        _chestOpeningPlacement = chestOpeningPlacement;
+        _hasRightDockStackedPlacement = hasRightDockStackedPlacement;
+        _rightDockStackedPlacement = rightDockStackedPlacement;
     }
 
     internal string Key { get; }
@@ -106,7 +106,7 @@ internal readonly struct BppSettingsDockPlacement
             )
         );
 
-    internal BppSettingsDockPlacement WithChestOpeningPlacement(
+    internal BppSettingsDockPlacement WithRightDockStackedPlacement(
         BppSettingsDockSide side,
         BppSettingsDockPanelDirection panelDirection,
         int siblingStepCount
@@ -115,15 +115,18 @@ internal readonly struct BppSettingsDockPlacement
             Key,
             ButtonIconKind,
             _defaultPlacement,
-            hasChestOpeningPlacement: true,
+            hasRightDockStackedPlacement: true,
             new BppSettingsDockResolvedPlacement(side, panelDirection, SiblingGap, siblingStepCount)
         );
 
     internal BppSettingsDockPlacement ResolveForScene(BppSettingsDockSceneKind sceneKind)
     {
-        if (sceneKind != BppSettingsDockSceneKind.ChestOpening || !_hasChestOpeningPlacement)
+        if (
+            sceneKind != BppSettingsDockSceneKind.RightDockStacked
+            || !_hasRightDockStackedPlacement
+        )
             return this;
 
-        return new(Key, ButtonIconKind, _chestOpeningPlacement);
+        return new(Key, ButtonIconKind, _rightDockStackedPlacement);
     }
 }

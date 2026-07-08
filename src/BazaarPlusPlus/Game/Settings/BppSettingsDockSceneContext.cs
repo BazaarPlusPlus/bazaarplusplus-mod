@@ -8,32 +8,40 @@ namespace BazaarPlusPlus.Game.Settings;
 internal static class BppSettingsDockSceneContext
 {
     private const string FallbackChestOpeningSceneName = "ChestOpening";
+    private const string FallbackStoreSceneName = "Store";
 
     internal static BppSettingsDockSceneKind ResolveCurrentSceneKind()
     {
         var activeSceneName = SceneManager.GetActiveScene().name;
-        return ResolveSceneKind(activeSceneName, ResolveChestOpeningSceneName());
+        return ResolveSceneKind(
+            activeSceneName,
+            ResolveSceneName(SceneID.ChestOpening),
+            ResolveSceneName(SceneID.Store)
+        );
     }
 
     internal static BppSettingsDockSceneKind ResolveSceneKind(
         string activeSceneName,
-        string? chestOpeningSceneName
+        string? chestOpeningSceneName,
+        string? storeSceneName
     )
     {
         if (
             IsSceneName(activeSceneName, chestOpeningSceneName)
             || IsSceneName(activeSceneName, FallbackChestOpeningSceneName)
+            || IsSceneName(activeSceneName, storeSceneName)
+            || IsSceneName(activeSceneName, FallbackStoreSceneName)
         )
-            return BppSettingsDockSceneKind.ChestOpening;
+            return BppSettingsDockSceneKind.RightDockStacked;
 
         return BppSettingsDockSceneKind.Default;
     }
 
-    private static string? ResolveChestOpeningSceneName()
+    private static string? ResolveSceneName(SceneID sceneId)
     {
         try
         {
-            return SceneLoader.CatalogSO?.GetName(SceneID.ChestOpening);
+            return SceneLoader.CatalogSO?.GetName(sceneId);
         }
         catch (Exception)
         {
