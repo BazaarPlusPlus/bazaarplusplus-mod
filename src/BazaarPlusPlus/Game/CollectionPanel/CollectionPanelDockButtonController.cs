@@ -12,11 +12,15 @@ internal sealed class CollectionPanelDockButtonController
         IBppNativeSettingsButtonCloneOwner
 {
     private const string LogCategory = "CollectionPanelDockButton";
+    private const int ScreenResizeSyncFrameCount = 6;
 
     private Button? _anchorButton;
     private Button? _dockButton;
     private RectTransform? _dockButtonRect;
     private int _screenshotSuppressionCount;
+    private int _lastScreenWidth = -1;
+    private int _lastScreenHeight = -1;
+    private int _pendingScreenResizeSyncFrames;
     private BppSettingsDockPlacement _placement;
 
     internal static void Attach(Button anchorButton, BppSettingsDockPlacement placement)
@@ -78,6 +82,29 @@ internal sealed class CollectionPanelDockButtonController
 
         SyncDockButtonPlacement();
         ApplyScreenshotSuppressionVisibility();
+    }
+
+    private void LateUpdate()
+    {
+        if (
+            BppSettingsDockGeometry.ShouldSyncForScreenSize(
+                _lastScreenWidth,
+                _lastScreenHeight,
+                Screen.width,
+                Screen.height
+            )
+        )
+        {
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
+            _pendingScreenResizeSyncFrames = ScreenResizeSyncFrameCount;
+        }
+
+        if (_pendingScreenResizeSyncFrames <= 0)
+            return;
+
+        _pendingScreenResizeSyncFrames--;
+        SyncDockButtonPlacement();
     }
 
     private IDisposable BeginInstanceScreenshotSuppression()

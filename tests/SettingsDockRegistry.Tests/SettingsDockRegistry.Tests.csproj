@@ -38,7 +38,13 @@
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
     </Reference>
+    <Reference Include="UnityEngine.UI">
+      <HintPath>$(ManagedPath)/UnityEngine.UI.dll</HintPath>
+    </Reference>
     <None Include="$(ManagedPath)/UnityEngine.CoreModule.dll" Link="UnityEngine.CoreModule.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(ManagedPath)/UnityEngine.UI.dll" Link="UnityEngine.UI.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

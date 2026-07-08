@@ -1,5 +1,6 @@
 using BazaarPlusPlus.Game.Settings;
 using UnityEngine;
+using UnityEngine.UI;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests.SettingsDockRegistry;
@@ -152,5 +153,36 @@ public class BppSettingsDockGeometryTests
         Assert.Equal(Color.white, collection.Normal);
         Assert.True(settings.FadeDuration > 0f);
         Assert.True(collection.FadeDuration > 0f);
+    }
+
+    [Fact]
+    public void ResolveButtonState_prefers_native_hover_transition()
+    {
+        var nativeColors = ColorBlock.defaultColorBlock;
+        nativeColors.highlightedColor = new Color(0.96f, 0.74f, 0.18f, 1f);
+        var nativeState = BppDockButtonVisualState.Capture(
+            Selectable.Transition.SpriteSwap,
+            nativeColors,
+            new SpriteState(),
+            new AnimationTriggers()
+        );
+
+        var resolved = BppDockButtonVisuals.ResolveButtonState(
+            BppDockButtonIconKind.SettingsDock,
+            nativeState
+        );
+
+        Assert.Equal(Selectable.Transition.SpriteSwap, resolved.Transition);
+        Assert.Equal(nativeColors.highlightedColor, resolved.Colors.highlightedColor);
+    }
+
+    [Fact]
+    public void ShouldSyncForScreenSize_returns_true_when_resolution_changes()
+    {
+        var changed = BppSettingsDockGeometry.ShouldSyncForScreenSize(1920, 1080, 2560, 1440);
+        var same = BppSettingsDockGeometry.ShouldSyncForScreenSize(1920, 1080, 1920, 1080);
+
+        Assert.True(changed);
+        Assert.False(same);
     }
 }

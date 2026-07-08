@@ -25,6 +25,7 @@ internal sealed partial class BppSettingsDockController
     private const float RowSpacing = 12f;
     private const float RowInnerPadding = 16f;
     private const float StatusWidth = 80f;
+    private const int ScreenResizeSyncFrameCount = 6;
 
     private readonly List<DockSettingRowView> _rows = [];
 
@@ -37,6 +38,9 @@ internal sealed partial class BppSettingsDockController
     private Material? _uiFontMaterial;
     private bool _isExpanded;
     private int _screenshotSuppressionCount;
+    private int _lastScreenWidth = -1;
+    private int _lastScreenHeight = -1;
+    private int _pendingScreenResizeSyncFrames;
     private BppSettingsDockPlacement _placement;
     private static bool _fontResolutionLogged;
 
@@ -123,6 +127,29 @@ internal sealed partial class BppSettingsDockController
     private void OnDisable()
     {
         SetExpanded(false);
+    }
+
+    private void LateUpdate()
+    {
+        if (
+            BppSettingsDockGeometry.ShouldSyncForScreenSize(
+                _lastScreenWidth,
+                _lastScreenHeight,
+                Screen.width,
+                Screen.height
+            )
+        )
+        {
+            _lastScreenWidth = Screen.width;
+            _lastScreenHeight = Screen.height;
+            _pendingScreenResizeSyncFrames = ScreenResizeSyncFrameCount;
+        }
+
+        if (_pendingScreenResizeSyncFrames <= 0)
+            return;
+
+        _pendingScreenResizeSyncFrames--;
+        SyncDockButtonPlacement();
     }
 
     private IDisposable BeginInstanceScreenshotSuppression()
