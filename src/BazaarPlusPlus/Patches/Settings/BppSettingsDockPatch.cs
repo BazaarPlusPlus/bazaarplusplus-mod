@@ -83,9 +83,10 @@ internal static class BppSettingsDockFightMenuPatch
                 );
                 BppSettingsDockController.Attach(
                     button,
-                    BppSettingsDockPlacement.LeftOfSettingButton(
+                    BppSettingsDockPlacement.AboveSettingButton(
                         "FightMenu",
-                        BppDockButtonIconKind.SettingsDock
+                        BppDockButtonIconKind.SettingsDock,
+                        siblingStepCount: 2
                     )
                 );
             }

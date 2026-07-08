@@ -102,6 +102,32 @@ public class BppSettingsDockGeometryTests
     }
 
     [Fact]
+    public void CalculateDockButtonLocalPosition_places_clone_multiple_steps_above_anchor()
+    {
+        var placement = BppSettingsDockPlacement.AboveSettingButton(
+            "FightMenu",
+            BppDockButtonIconKind.SettingsDock,
+            siblingStepCount: 2
+        );
+
+        var result = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
+            anchorCenterLocalX: 100f,
+            anchorCenterLocalY: 40f,
+            anchorLeftLocalX: 60f,
+            anchorRightLocalX: 140f,
+            anchorTopLocalY: 70f,
+            anchorBottomLocalY: 10f,
+            currentLocalZ: 7f,
+            placement
+        );
+
+        Assert.Equal(100f, result.X);
+        Assert.Equal(196f, result.Y);
+        Assert.Equal(7f, result.Z);
+        Assert.Equal(2, placement.SiblingStepCount);
+    }
+
+    [Fact]
     public void CalculateDockButtonLocalPosition_places_clone_world_above_when_local_axis_is_flipped()
     {
         var placement = BppSettingsDockPlacement.AboveSettingButton(

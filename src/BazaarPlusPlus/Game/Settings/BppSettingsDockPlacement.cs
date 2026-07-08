@@ -24,7 +24,8 @@ internal readonly struct BppSettingsDockPlacement
         BppSettingsDockSide side,
         BppSettingsDockPanelDirection panelDirection,
         float siblingGap,
-        BppDockButtonIconKind buttonIconKind
+        BppDockButtonIconKind buttonIconKind,
+        int siblingStepCount
     )
     {
         Key = key;
@@ -32,6 +33,7 @@ internal readonly struct BppSettingsDockPlacement
         PanelDirection = panelDirection;
         SiblingGap = siblingGap;
         ButtonIconKind = buttonIconKind;
+        SiblingStepCount = siblingStepCount > 0 ? siblingStepCount : 1;
     }
 
     internal string Key { get; }
@@ -43,6 +45,8 @@ internal readonly struct BppSettingsDockPlacement
     internal float SiblingGap { get; }
 
     internal BppDockButtonIconKind ButtonIconKind { get; }
+
+    internal int SiblingStepCount { get; }
 
     internal string DockButtonObjectName => $"BPP_SettingsDockButton_{Key}";
 
@@ -57,18 +61,21 @@ internal readonly struct BppSettingsDockPlacement
             BppSettingsDockSide.LeftOfAnchor,
             BppSettingsDockPanelDirection.UpLeft,
             DefaultSiblingGap,
-            buttonIconKind
+            buttonIconKind,
+            siblingStepCount: 1
         );
 
     internal static BppSettingsDockPlacement AboveSettingButton(
         string key,
-        BppDockButtonIconKind buttonIconKind
+        BppDockButtonIconKind buttonIconKind,
+        int siblingStepCount = 1
     ) =>
         new(
             key,
             BppSettingsDockSide.AboveAnchor,
             BppSettingsDockPanelDirection.UpLeft,
             DefaultSiblingGap,
-            buttonIconKind
+            buttonIconKind,
+            siblingStepCount
         );
 }

@@ -39,7 +39,10 @@ internal static class BppSettingsDockGeometry
         {
             return new BppSettingsDockLocalPosition(
                 anchorCenterLocalX,
-                anchorCenterLocalY + worldUpDirectionLocal * (heightLocal + placement.SiblingGap),
+                anchorCenterLocalY
+                    + worldUpDirectionLocal
+                        * (heightLocal + placement.SiblingGap)
+                        * placement.SiblingStepCount,
                 currentLocalZ
             );
         }
