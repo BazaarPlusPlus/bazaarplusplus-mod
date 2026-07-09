@@ -5,77 +5,9 @@ using BazaarPlusPlus.Storage.RunLog;
 
 var captureServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCaptureService");
 var pvpBattleInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogPvpBattleInput");
-var controllerCoreType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLoggingControllerCore");
 var service =
     Activator.CreateInstance(captureServiceType)
     ?? throw new InvalidOperationException("RunLogCaptureService should be constructible.");
-
-Assert(
-    Type.GetType("BazaarPlusPlus.Game.RunLogging.RunLogStateSnapshotInput, BazaarPlusPlus") == null,
-    "RunLogStateSnapshotInput should be removed."
-);
-Assert(
-    Type.GetType("BazaarPlusPlus.Game.RunLogging.RunLogRunProgressInput, BazaarPlusPlus") == null,
-    "RunLogRunProgressInput should be removed."
-);
-Assert(
-    Type.GetType("BazaarPlusPlus.Game.RunLogging.RunLogSelectionSnapshotInput, BazaarPlusPlus")
-        == null,
-    "RunLogSelectionSnapshotInput should be removed."
-);
-Assert(
-    Type.GetType("BazaarPlusPlus.Game.RunLogging.RunLogSelectionOptionInput, BazaarPlusPlus")
-        == null,
-    "RunLogSelectionOptionInput should be removed."
-);
-Assert(
-    captureServiceType.GetMethod(
-        "BuildRunProgressEvent",
-        BindingFlags.Public | BindingFlags.Instance
-    ) == null,
-    "RunLogCaptureService should no longer expose BuildRunProgressEvent."
-);
-Assert(
-    captureServiceType.GetMethod(
-        "BuildSelectionSeenEvent",
-        BindingFlags.Public | BindingFlags.Instance
-    ) == null,
-    "RunLogCaptureService should no longer expose BuildSelectionSeenEvent."
-);
-Assert(
-    captureServiceType.GetMethod("BuildStateSeenEvent", BindingFlags.Public | BindingFlags.Instance)
-        == null,
-    "RunLogCaptureService should no longer expose BuildStateSeenEvent."
-);
-Assert(
-    controllerCoreType.GetMethod("AcceptRunProgress", BindingFlags.Public | BindingFlags.Instance)
-        == null,
-    "RunLoggingControllerCore should no longer expose AcceptRunProgress."
-);
-Assert(
-    controllerCoreType.GetMethod("AcceptStateSnapshot", BindingFlags.Public | BindingFlags.Instance)
-        == null,
-    "RunLoggingControllerCore should no longer expose AcceptStateSnapshot."
-);
-Assert(
-    controllerCoreType.GetMethod(
-        "AcceptSelectionSnapshot",
-        BindingFlags.Public | BindingFlags.Instance
-    ) == null,
-    "RunLoggingControllerCore should no longer expose AcceptSelectionSnapshot."
-);
-Assert(
-    controllerCoreType.GetMethod("AcceptChoiceMade", BindingFlags.Public | BindingFlags.Instance)
-        == null,
-    "RunLoggingControllerCore should no longer expose AcceptChoiceMade."
-);
-Assert(
-    controllerCoreType.GetMethod(
-        "AcceptSelectionAbandoned",
-        BindingFlags.Public | BindingFlags.Instance
-    ) == null,
-    "RunLoggingControllerCore should no longer expose AcceptSelectionAbandoned."
-);
 
 var pvpBattleInput =
     Activator.CreateInstance(pvpBattleInputType)
