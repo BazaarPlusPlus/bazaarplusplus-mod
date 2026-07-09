@@ -1,0 +1,71 @@
+src/BazaarPlusPlus/Game/Settings/BppDockButtonVisualState.cs
+  s_a1fa66067498d9::t_9b3319465213ed 2,12-14,27-30,36-45,47-51,56-58,62,64-66,70-97
+  s_a1fa66067498d9::t_e4fc9c794610ee 98
+src/BazaarPlusPlus/Game/Settings/BppDockButtonVisuals.cs
+  s_a1fa66067498d9::t_46e261c3beb84a 104-110
+src/BazaarPlusPlus/Game/Settings/BppDockButtonAvoidance.cs
+  s_a1fa66067498d9::t_f41ee1ce0cde33 257
+  s_a1fa66067498d9::t_e01b7ec3e35f8d 185,189-195,219,221,237,265,284,292-295,301,310,352,358,360
+  s_a1fa66067498d9::t_83885726cfaeb9 268-269
+  s_a1fa66067498d9::t_c8bda808d340fc 277-281
+  s_a1fa66067498d9::t_bfdb7cc53c5637 209,211,214,217
+  s_a1fa66067498d9::t_8e19418fb54015 350
+  s_a1fa66067498d9::t_b4276cfdc6ffda 210,212-213,215-216,218,222-225,319
+  s_a1fa66067498d9::t_d201c2c9f72b10 1-184,186-188,196-208,220,226-236,238-256,258-259,261-264,266-267,270-276,282-283,285-291,296-300,302-309,311-318,320-349,351,353-357,359,361-369
+  s_a1fa66067498d9::t_a28d7fb0a7cce7 260
+tests/SettingsDockRegistry.Tests/BppDockButtonAvoidanceTests.cs
+  s_a1fa66067498d9::t_dbaa1392931813 179-180,186-195
+  s_a1fa66067498d9::t_a6a8764e2d4f7f 1-167,169-171,173-174,200-205,207
+  s_a1fa66067498d9::t_8e19418fb54015 168,172,182-185,196-197,206
+  s_a1fa66067498d9::t_15511cc88ce0da 175-178,181,198-199
+tests/SettingsDockRegistry.Tests/BppSettingsDockGeometryTests.cs
+  s_a1fa66067498d9::t_a6a8764e2d4f7f 230-236,239,241-252,254,256-257,265-295,297
+  s_a1fa66067498d9::t_5f2f6fda56adf8 298-322
+  s_a1fa66067498d9::t_0a9a6e2f196a8e 296
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockController.cs
+  s_a1fa66067498d9::t_e01b7ec3e35f8d 42,418
+  s_a1fa66067498d9::t_c8bda808d340fc 426,428-433
+  s_a1fa66067498d9::t_82616323ee1718 29,41,47,138-144,326-328,419-425,427,434-435,440-458
+  s_a1fa66067498d9::t_bfdb7cc53c5637 43,394,396-400
+  s_a1fa66067498d9::t_dfb3f37835c719 459-460
+src/BazaarPlusPlus/Game/Settings/BppSettingsDockSceneContext.cs
+  s_a1fa66067498d9::t_5affc05544fcd5 23-24
+src/BazaarPlusPlus/Game/Settings/BppNativeSettingsButtonClone.cs
+  s_a1fa66067498d9::t_6796a51ee35156 53
+  s_a1fa66067498d9::t_46e261c3beb84a 30-34,55-57
+tests/SettingsDockRegistry.Tests/BppDockButtonIdempotencyTests.cs
+  s_a1fa66067498d9::t_a6a8764e2d4f7f 1-10,12-14,16-18,25-30,32-33,35-42,61,65-68,74-97
+  s_a1fa66067498d9::t_8e19418fb54015 11,15,31,34,45,52-55,58-59,62,69-73
+  s_a1fa66067498d9::t_fbbac960c8067b 22-24,57,60
+  s_a1fa66067498d9::t_5f2f6fda56adf8 19-21,43-44,46-51,56
+  s_a1fa66067498d9::t_157154f21f9491 63-64
+src/BazaarPlusPlus/Game/Settings/BppDockLayoutSyncTracker.cs
+  s_a1fa66067498d9::t_8e19418fb54015 37,61
+  s_a1fa66067498d9::t_e182d896c990ac 8,16,36,53-60,62-63
+  s_a1fa66067498d9::t_f41ee1ce0cde33 49
+  s_a1fa66067498d9::t_5affc05544fcd5 1-7,9-15,17-35,38-48,50-52,64-69
+src/BazaarPlusPlus/Game/Settings/BppDockButtonExpandedVisualState.cs
+  s_a1fa66067498d9::t_a28d7fb0a7cce7 64-66
+  s_a1fa66067498d9::t_9b3319465213ed 1-2,4-15,17-36,38-40,42,45-51,56-63,67-68,80-81
+  s_a1fa66067498d9::t_f41ee1ce0cde33 16
+  s_a1fa66067498d9::t_6796a51ee35156 3,37,52-55,69-79
+  s_a1fa66067498d9::t_32f07b00a460e5 41,43-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "99b6948dc680e48a4ec0297d69eea624c16720fe",
+  "prompts": {},
+  "sessions": {
+    "s_a1fa66067498d9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f4827-9ba5-7bb3-be51-a177927ef453",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
