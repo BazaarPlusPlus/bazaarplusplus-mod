@@ -145,6 +145,23 @@ Assert(
     "Enchant preview tooltip header should use the full product name."
 );
 
+Assert(
+    ItemEnchantPreviewTooltipLayerPolicy.ShouldElevateForPassiveText(
+        "native text\nBazaarPlusPlus\npreview"
+    ),
+    "Enchant preview tooltip should request elevated canvas sorting when the BPP section is present."
+);
+
+Assert(
+    !ItemEnchantPreviewTooltipLayerPolicy.ShouldElevateForPassiveText("native text only"),
+    "Native-only passive tooltip text should keep the game's canvas sorting."
+);
+
+Assert(
+    ItemEnchantPreviewTooltipLayerPolicy.ElevatedSortingOrder(150) == 151,
+    "Enchant preview elevation should sit one step above the tooltip clone's own sorting order, not an absolute layer."
+);
+
 var segment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
     "Freeze for 2 seconds"
