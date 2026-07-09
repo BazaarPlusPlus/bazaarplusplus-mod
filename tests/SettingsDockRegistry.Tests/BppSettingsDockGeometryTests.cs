@@ -1,5 +1,6 @@
 using BazaarPlusPlus.Game.Settings;
 using UnityEngine;
+using UnityEngine.UI;
 using Xunit;
 
 namespace BazaarPlusPlus.Tests.SettingsDockRegistry;
@@ -101,6 +102,78 @@ public class BppSettingsDockGeometryTests
     }
 
     [Fact]
+    public void CalculateDockButtonLocalPosition_places_clone_multiple_steps_above_anchor()
+    {
+        var placement = BppSettingsDockPlacement.AboveSettingButton(
+            "FightMenu",
+            BppDockButtonIconKind.SettingsDock,
+            siblingStepCount: 2
+        );
+
+        var result = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
+            anchorCenterLocalX: 100f,
+            anchorCenterLocalY: 40f,
+            anchorLeftLocalX: 60f,
+            anchorRightLocalX: 140f,
+            anchorTopLocalY: 70f,
+            anchorBottomLocalY: 10f,
+            currentLocalZ: 7f,
+            placement
+        );
+
+        Assert.Equal(100f, result.X);
+        Assert.Equal(196f, result.Y);
+        Assert.Equal(7f, result.Z);
+        Assert.Equal(2, placement.SiblingStepCount);
+    }
+
+    [Fact]
+    public void ResolveForScene_uses_right_dock_stacked_override_when_configured()
+    {
+        var placement = BppSettingsDockPlacement
+            .LeftOfSettingButton("MainMenu", BppDockButtonIconKind.SettingsDock)
+            .WithRightDockStackedPlacement(
+                BppSettingsDockSide.AboveAnchor,
+                BppSettingsDockPanelDirection.UpLeft,
+                siblingStepCount: 2
+            );
+
+        var defaultPlacement = placement.ResolveForScene(BppSettingsDockSceneKind.Default);
+        var stackedPlacement = placement.ResolveForScene(BppSettingsDockSceneKind.RightDockStacked);
+
+        Assert.Equal(BppSettingsDockSide.LeftOfAnchor, defaultPlacement.Side);
+        Assert.Equal(1, defaultPlacement.SiblingStepCount);
+        Assert.Equal(BppSettingsDockSide.AboveAnchor, stackedPlacement.Side);
+        Assert.Equal(2, stackedPlacement.SiblingStepCount);
+        Assert.Equal(BppDockButtonIconKind.SettingsDock, stackedPlacement.ButtonIconKind);
+    }
+
+    [Theory]
+    [InlineData("ChestOpening", null, null, true)]
+    [InlineData("Chest Scene", "Chest Scene", null, true)]
+    [InlineData("Store", null, null, true)]
+    [InlineData("Bazaar Store Scene", null, "Bazaar Store Scene", true)]
+    [InlineData("CollectionWheel", "Chest Scene", "Bazaar Store Scene", false)]
+    public void ResolveSceneKind_detects_right_dock_stacked_scenes(
+        string activeSceneName,
+        string? catalogChestSceneName,
+        string? catalogStoreSceneName,
+        bool expectRightDockStacked
+    )
+    {
+        var result = BppSettingsDockSceneContext.ResolveSceneKind(
+            activeSceneName,
+            catalogChestSceneName,
+            catalogStoreSceneName
+        );
+
+        var expected = expectRightDockStacked
+            ? BppSettingsDockSceneKind.RightDockStacked
+            : BppSettingsDockSceneKind.Default;
+        Assert.Equal(expected, result);
+    }
+
+    [Fact]
     public void CalculateDockButtonLocalPosition_places_clone_world_above_when_local_axis_is_flipped()
     {
         var placement = BppSettingsDockPlacement.AboveSettingButton(
@@ -152,5 +225,126 @@ public class BppSettingsDockGeometryTests
         Assert.Equal(Color.white, collection.Normal);
         Assert.True(settings.FadeDuration > 0f);
         Assert.True(collection.FadeDuration > 0f);
+    }
+
+    [Theory]
+    [InlineData(Selectable.Transition.ColorTint)]
+    [InlineData(Selectable.Transition.SpriteSwap)]
+    [InlineData(Selectable.Transition.Animation)]
+    public void ResolveButtonState_preserves_native_transition_state(
+        Selectable.Transition transition
+    )
+    {
+        var nativeColors = ColorBlock.defaultColorBlock;
+        nativeColors.normalColor = new Color(0.15f, 0.25f, 0.35f, 1f);
+        nativeColors.highlightedColor = new Color(0.96f, 0.74f, 0.18f, 1f);
+        nativeColors.pressedColor = new Color(0.68f, 0.42f, 0.12f, 1f);
+        nativeColors.selectedColor = new Color(0.28f, 0.78f, 0.44f, 1f);
+        nativeColors.disabledColor = new Color(0.3f, 0.3f, 0.3f, 0.5f);
+        var nativeSpriteState = new SpriteState();
+        var nativeAnimationTriggers = new AnimationTriggers
+        {
+            normalTrigger = "DockNormal",
+            highlightedTrigger = "DockHighlighted",
+            pressedTrigger = "DockPressed",
+            selectedTrigger = "DockSelected",
+            disabledTrigger = "DockDisabled",
+        };
+        var nativeState = BppDockButtonVisualState.Capture(
+            transition,
+            nativeColors,
+            nativeSpriteState,
+            nativeAnimationTriggers
+        );
+
+        var resolved = BppDockButtonVisuals.ResolveButtonState(
+            BppDockButtonIconKind.SettingsDock,
+            nativeState
+        );
+
+        Assert.Equal(transition, resolved.Transition);
+        Assert.Equal(nativeColors, resolved.Colors);
+        Assert.Equal(nativeSpriteState, resolved.SpriteState);
+        Assert.Same(nativeAnimationTriggers, resolved.AnimationTriggers);
+    }
+
+    [Fact]
+    public void Expanded_visual_changes_only_normal_baseline_and_collapse_restores_it()
+    {
+        var nativeColors = ColorBlock.defaultColorBlock;
+        nativeColors.normalColor = new Color(0.15f, 0.25f, 0.35f, 1f);
+        nativeColors.highlightedColor = new Color(0.96f, 0.74f, 0.18f, 1f);
+        nativeColors.pressedColor = new Color(0.68f, 0.42f, 0.12f, 1f);
+        nativeColors.selectedColor = new Color(0.28f, 0.78f, 0.44f, 1f);
+        nativeColors.disabledColor = new Color(0.3f, 0.3f, 0.3f, 0.5f);
+        var nativeState = BppDockButtonVisualState.Capture(
+            Selectable.Transition.ColorTint,
+            nativeColors,
+            new SpriteState(),
+            new AnimationTriggers()
+        );
+
+        var expanded = nativeState.ResolveBaselineColors(isExpanded: true);
+        var collapsed = nativeState.ResolveBaselineColors(isExpanded: false);
+
+        Assert.Equal(nativeColors.selectedColor, expanded.normalColor);
+        Assert.Equal(nativeColors.highlightedColor, expanded.highlightedColor);
+        Assert.Equal(nativeColors.pressedColor, expanded.pressedColor);
+        Assert.Equal(nativeColors.disabledColor, expanded.disabledColor);
+        Assert.Equal(nativeColors, collapsed);
+    }
+
+    [Fact]
+    public void Expanded_animation_reuses_selected_trigger_without_changing_interaction_triggers()
+    {
+        var nativeTriggers = new AnimationTriggers
+        {
+            normalTrigger = "DockNormal",
+            highlightedTrigger = "DockHighlighted",
+            pressedTrigger = "DockPressed",
+            selectedTrigger = "DockSelected",
+            disabledTrigger = "DockDisabled",
+        };
+        var nativeState = BppDockButtonVisualState.Capture(
+            Selectable.Transition.Animation,
+            ColorBlock.defaultColorBlock,
+            new SpriteState(),
+            nativeTriggers
+        );
+
+        var expanded = nativeState.ResolveBaselineAnimationTriggers(isExpanded: true);
+        var collapsed = nativeState.ResolveBaselineAnimationTriggers(isExpanded: false);
+
+        Assert.Equal(nativeTriggers.selectedTrigger, expanded.normalTrigger);
+        Assert.Equal(nativeTriggers.highlightedTrigger, expanded.highlightedTrigger);
+        Assert.Equal(nativeTriggers.pressedTrigger, expanded.pressedTrigger);
+        Assert.Equal(nativeTriggers.disabledTrigger, expanded.disabledTrigger);
+        Assert.Equal(nativeTriggers.normalTrigger, collapsed.normalTrigger);
+    }
+
+    [Fact]
+    public void ShouldSyncForScreenSize_returns_true_when_resolution_changes()
+    {
+        var changed = BppSettingsDockGeometry.ShouldSyncForScreenSize(1920, 1080, 2560, 1440);
+        var same = BppSettingsDockGeometry.ShouldSyncForScreenSize(1920, 1080, 1920, 1080);
+
+        Assert.True(changed);
+        Assert.False(same);
+    }
+
+    [Fact]
+    public void ScreenResizeSyncTracker_requests_sync_for_configured_frames_after_size_changes()
+    {
+        var tracker = new BppScreenResizeSyncTracker(syncFrameCount: 3);
+
+        Assert.True(tracker.ShouldSync(1920, 1080));
+        Assert.True(tracker.ShouldSync(1920, 1080));
+        Assert.True(tracker.ShouldSync(1920, 1080));
+        Assert.False(tracker.ShouldSync(1920, 1080));
+
+        Assert.True(tracker.ShouldSync(2560, 1440));
+        Assert.True(tracker.ShouldSync(2560, 1440));
+        Assert.True(tracker.ShouldSync(2560, 1440));
+        Assert.False(tracker.ShouldSync(2560, 1440));
     }
 }

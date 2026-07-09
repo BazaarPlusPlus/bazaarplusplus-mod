@@ -43,6 +43,32 @@ internal static class BppDockButtonVisuals
         );
     }
 
+    internal static BppDockButtonVisualState ResolveButtonState(
+        BppDockButtonIconKind kind,
+        BppDockButtonVisualState? nativeState
+    )
+    {
+        if (nativeState.HasValue)
+            return nativeState.Value;
+
+        var spec = ResolveColors(kind);
+        return BppDockButtonVisualState.Capture(
+            Selectable.Transition.ColorTint,
+            new ColorBlock
+            {
+                normalColor = spec.Normal,
+                highlightedColor = spec.Highlighted,
+                pressedColor = spec.Pressed,
+                selectedColor = spec.Selected,
+                disabledColor = spec.Disabled,
+                colorMultiplier = 1f,
+                fadeDuration = spec.FadeDuration,
+            },
+            new SpriteState(),
+            new AnimationTriggers()
+        );
+    }
+
     internal static Image? ResolveNativeIconImage(GameObject cloneObject)
     {
         return cloneObject
@@ -54,7 +80,8 @@ internal static class BppDockButtonVisuals
         GameObject cloneObject,
         BppDockButtonIconKind kind,
         Image? explicitIcon,
-        bool freshClone
+        bool freshClone,
+        BppDockButtonVisualState? nativeState
     )
     {
         if (cloneObject == null)
@@ -72,22 +99,15 @@ internal static class BppDockButtonVisuals
             DisableUnusedChildRaycasts(cloneObject.transform);
 
         var button = cloneObject.GetComponent<Button>() ?? cloneObject.AddComponent<Button>();
-        button.targetGraphic = frame;
-        button.transition = Selectable.Transition.ColorTint;
         button.navigation = new Navigation { mode = Navigation.Mode.None };
         button.interactable = true;
+        var resolvedState = ResolveButtonState(kind, nativeState);
+        resolvedState.ApplyTo(button, frame);
 
-        var spec = ResolveColors(kind);
-        button.colors = new ColorBlock
-        {
-            normalColor = spec.Normal,
-            highlightedColor = spec.Highlighted,
-            pressedColor = spec.Pressed,
-            selectedColor = spec.Selected,
-            disabledColor = spec.Disabled,
-            colorMultiplier = 1f,
-            fadeDuration = spec.FadeDuration,
-        };
+        var expandedVisualState =
+            button.GetComponent<BppDockButtonExpandedVisualState>()
+            ?? button.gameObject.AddComponent<BppDockButtonExpandedVisualState>();
+        expandedVisualState.Initialize(button, resolvedState);
     }
 
     private static Image? FindMarkedIconImage(GameObject cloneObject)

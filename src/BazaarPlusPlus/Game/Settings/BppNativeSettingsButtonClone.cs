@@ -27,11 +27,17 @@ internal static class BppNativeSettingsButtonClone
         if (existing != null)
         {
             ConfigureRect(existing, anchorButton.transform as RectTransform);
+            var expandedVisualState = existing.GetComponent<BppDockButtonExpandedVisualState>();
+            expandedVisualState?.SetExpanded(false);
+            var existingVisualState =
+                expandedVisualState?.CapturedNativeState
+                ?? BppDockButtonVisualState.Capture(existing.GetComponent<Button>());
             BppDockButtonVisuals.Apply(
                 existing.gameObject,
                 placement.ButtonIconKind,
                 explicitIcon: null,
-                freshClone: false
+                freshClone: false,
+                nativeState: existingVisualState
             );
             return existing;
         }
@@ -44,12 +50,19 @@ internal static class BppNativeSettingsButtonClone
         cloneObject.name = placement.DockButtonObjectName;
 
         var nativeIcon = BppDockButtonVisuals.ResolveNativeIconImage(cloneObject);
+        var nativeButtonController = cloneObject.GetComponent<BazaarButtonController>();
+        var nativeVisualState = BppDockButtonVisualState.Capture(
+            cloneObject.GetComponent<Button>(),
+            nativeButtonController?.DefaultImage,
+            nativeButtonController?.ClickedImage
+        );
         StripNativeButtonBehavior(cloneObject);
         BppDockButtonVisuals.Apply(
             cloneObject,
             placement.ButtonIconKind,
             nativeIcon,
-            freshClone: true
+            freshClone: true,
+            nativeState: nativeVisualState
         );
 
         var rect = cloneObject.GetComponent<RectTransform>();
