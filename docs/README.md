@@ -15,16 +15,11 @@ The code is the source of truth. Current implementation guidance lives in one ar
 
 Only future work or items needing human confirmation belong in [plans/](plans/). Curated into here by consolidation runs; write new specs/designs/plans to [drafts/](drafts/):
 
-- [plans/sell-hotkey-regression-debug-plan.md](plans/sell-hotkey-regression-debug-plan.md) — native sell-hotkey regression investigation.
-- [plans/history-panel-hero-portrait-badge.md](plans/history-panel-hero-portrait-badge.md) — replace HistoryPanel text hero badges with portraits (CollectionPanel side already shipped).
-- [plans/collection-panel-filter-target-structure.md](plans/collection-panel-filter-target-structure.md) — remaining CollectionPanel source-filter validation after schema v4 landed.
-- [plans/achievement-service-design.md](plans/achievement-service-design.md) — proposed achievement catalog, server status API, parser, and storage design.
-- [plans/achievement-ui-local-mvp.md](plans/achievement-ui-local-mvp.md) — confirmed local achievement-tab UI MVP (4-PR plan, no server).
-- [plans/shortcut-tutorial-settings-dock-link.md](plans/shortcut-tutorial-settings-dock-link.md) — proposed hotkey-tutorial settings dock row.
-- [plans/bazaardb-merchant-filter-comparison.md](plans/bazaardb-merchant-filter-comparison.md) — external BazaarDB comparison input; not code-verified.
+- [plans/choice-timeline-run-bundle-plan.md](plans/choice-timeline-run-bundle-plan.md) — choice timeline in run bundles; awaiting sign-off on its §11 open decisions.
+- [plans/history-panel-hero-portrait-badge.md](plans/history-panel-hero-portrait-badge.md) — replace HistoryPanel text hero badges with portraits (reuse the shipped `GameInterop/HeroPortraits` provider).
 - [plans/reverse-engineering/offline-local-run-design.md](plans/reverse-engineering/offline-local-run-design.md) and [plans/reverse-engineering/predefined-match-and-random-system-design.md](plans/reverse-engineering/predefined-match-and-random-system-design.md) — unimplemented reverse-engineering proposals.
 
-Shipped/superseded plans (package-card art ×3, settings-dock toggle, live-build rail polish, unused-code deletion, achievements-tab) were swept to [archive/plans/](archive/plans/) on 2026-06-12.
+Swept on 2026-07-10: 34 drafts + 6 stale plans classified against HEAD 7a68e8bb — implemented/abandoned/superseded ones moved to [archive/](archive/) with status banners, 2 zero-value executor briefs deleted, 1 pending draft promoted here. The achievement system and package custom-art subsystem were deleted from the code on 2026-06-30; their plans are archived as abandoned. (Earlier sweep: 2026-06-12.)
 
 ## Archive
 

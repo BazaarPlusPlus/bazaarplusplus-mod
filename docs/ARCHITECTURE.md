@@ -1,14 +1,18 @@
 # BazaarPlusPlus Architecture
 
-This is the living architecture document for the current repository state. The code remains the source of truth; this document summarizes only behavior verified against current source paths during the 2026-06-10 documentation calibration.
+This is the living architecture document for the current repository state. The code remains the source of truth; this document summarizes only behavior verified against current source paths during the 2026-07-10 documentation calibration.
 
 ## Runtime Shape
 
-BazaarPlusPlus is a BepInEx 5 plugin. `Plugin.Awake()` creates `BppComposition`, installs static facades such as `BppLog`, `BppPatchHost`, localization, settings dock entries, hotkeys, and run-log readers, applies Harmony patches, starts feature modules, then mounts Unity components onto the plugin `GameObject` (`src/BazaarPlusPlus/Plugin.cs:34-67`, `src/BazaarPlusPlus/Plugin.cs:102-111`).
+BazaarPlusPlus is a BepInEx 5 plugin. `Plugin.Awake()` resolves the game build channel via `GameBuildInfoResolver`, creates `BppComposition`, installs static facades such as `BppLog`, `BppPatchHost`, localization, UI font, settings dock entries, hotkeys, and run-log readers, applies Harmony patches per patch class (so one broken game target degrades only its own feature, never the whole plugin), starts feature modules, builds the online and BazaarDB-link HTTP clients, then mounts Unity components onto the plugin `GameObject` (`src/BazaarPlusPlus/Plugin.cs:40-93`, `src/BazaarPlusPlus/Plugin.cs:213-245`).
 
-`BppComposition` is the manual composition root. It wires feature modules through `BppFeatureRegistry`, Unity components through `BppMountableRegistry`, and in-game settings rows through `SettingsDockEntryRegistry` (`src/BazaarPlusPlus/BppComposition.cs:83-123`). It also publishes the passive BazaarAgent game facades through `BazaarAgentGameBridge` so the optional host plugin can consume them without the main plugin referencing the agent core (`src/BazaarPlusPlus/BppComposition.cs:125-135`).
+`BppComposition` is the manual composition root; it receives the resolved `IGameBuildInfo`. It wires feature modules through `BppFeatureRegistry`, Unity components through `BppMountableRegistry`, and in-game settings rows through `SettingsDockEntryRegistry` (`src/BazaarPlusPlus/BppComposition.cs:99-159`). It also publishes the passive BazaarAgent game facades through `BazaarAgentGameBridge` so the optional host plugin can consume them without the main plugin referencing the agent core (`src/BazaarPlusPlus/BppComposition.cs:161-171`).
 
-The main plugin project targets `netstandard2.1`, uses C# 12, publicizes game assemblies, embeds data resources, and references the three unconditional child assemblies: `BazaarPlusPlus.ModApi`, `BazaarPlusPlus.Storage`, and `BazaarPlusPlus.Localization` (`src/BazaarPlusPlus/BazaarPlusPlus.csproj:7-10`, `src/BazaarPlusPlus/BazaarPlusPlus.csproj:23-32`, `src/BazaarPlusPlus/BazaarPlusPlus.csproj:107-109`, `src/BazaarPlusPlus/BazaarPlusPlus.csproj:164-166`). The shared version is `BppVersion` in `Directory.Build.props` (`Directory.Build.props:3`).
+The main plugin project targets `netstandard2.1`, uses C# 12, publicizes game assemblies, embeds data resources (including `Data\VoiceSubtitles\voice-lines.json`), and references the three unconditional child assemblies: `BazaarPlusPlus.ModApi`, `BazaarPlusPlus.Storage`, and `BazaarPlusPlus.Localization` (`src/BazaarPlusPlus/BazaarPlusPlus.csproj:22-31`, `src/BazaarPlusPlus/BazaarPlusPlus.csproj:110-112`, `src/BazaarPlusPlus/BazaarPlusPlus.csproj:167-170`). The shared version is `BppVersion` in `Directory.Build.props` (`Directory.Build.props:3`).
+
+## Game Build Channel And PTR Isolation
+
+`GameBuildInfoResolver` classifies the running client as Online/Ptr/Unknown from the bundleVersion `-ptr` token plus a corroborating `TheBazaar.Config.ServerOption` type probe, treating disagreement as Ptr to protect the production dataset (`src/BazaarPlusPlus/GameInterop/GameBuildInfoResolver.cs:29-63`). The channel is injected into the composition (`src/BazaarPlusPlus/Plugin.cs:49-50`), stamped onto recorded runs (`src/BazaarPlusPlus/Game/RunLogging/RunLoggingGameDataReader.cs:23-25`), and PTR runs are excluded from the upload feed (`src/BazaarPlusPlus/Game/RunLogging/Upload/RunBundleUploadStore.cs:47`, `:75`). Premise tests live in `tests/PtrCompatibility.Tests/`.
 
 ## Assemblies And Boundaries
 
@@ -32,23 +36,27 @@ The main source tree follows these boundaries:
 - `Patches/`: Harmony patches. Patches reach services through `BppPatchHost`, not constructor injection (`src/BazaarPlusPlus/Patches/BppPatchHost.cs:7-24`).
 - `Infrastructure/`: cross-cutting logging, font loading, UI tokens, stable text helpers, and shared non-feature utilities.
 
-Architecture tests ratchet these boundaries, including `Core/` layering, shared item-board preview ownership, BazaarAgent isolation, and source layout (`tests/Architecture.Tests/CoreLayeringTests.cs:29-74`, `tests/Architecture.Tests/CoreLayeringTests.cs:287-346`, `tests/Architecture.Tests/CoreLayeringTests.cs:931-998`).
+Architecture tests ratchet these boundaries, including `Core/` layering, shared item-board preview ownership, BazaarAgent isolation, voice-subtitle guards, and source layout (`tests/Architecture.Tests/CoreLayeringTests.cs`, ~1750 lines; Core layering starts at `:30`).
 
 ## Data And File Locations
 
 Runtime data that BazaarPlusPlus owns is rooted under the game directory's `BazaarPlusPlusV4` folder. `BepInExPathProvider.Initialize()` sets the SQLite database path, combat replay payload directory, screenshot directory, combat replay video directory, and plugin directory (`src/BazaarPlusPlus/Core/Paths/BepInExPathProvider.cs:18-41`).
 
-The local SQLite schema is versioned in `RunLogSchema`. The current local database schema version is `16`, row schema version is `11`, and upload payload schema version is `5` (`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs:10-18`). The schema creates runs, run events, battles, battle snapshots, run screenshots, combat replay videos, sync cursors, run sync state, and BazaarDB snapshot upload state plus indexes (`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs:57-263`).
+The local SQLite schema is versioned in `RunLogSchema`. The current local database schema version is `17` (v17 added the `build_channel` run column for PTR isolation), row schema version is `11`, and upload payload schema version is `5` (`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs:10-14`). The schema creates runs, run events, battles, battle snapshots, run screenshots, combat replay videos, sync cursors, run sync state, and BazaarDB snapshot upload state plus indexes (`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs:57-263`).
 
 ## Event Flow
 
-The plugin uses an in-memory event bus for decoupled runtime coordination. `RunLifecycleModule`, `CombatReplayModule`, and `CombatStatusBarModule` are feature modules registered at startup (`src/BazaarPlusPlus/BppComposition.cs:79-86`). The combat status bar subscribes to `CombatSimObserved` and `CombatFrameAdvanced`; it stores the latest message id/outcome in run context and advances the HUD frame count from replay events (`src/BazaarPlusPlus/Game/CombatStatusBar/CombatStatusBarModule.cs:25-55`).
+The plugin uses an in-memory event bus for decoupled runtime coordination. `RunLifecycleModule`, `CombatReplayModule`, `CombatStatusBarModule`, `VoiceSubtitlesInteropModule`, and `VoiceSubtitlesModule` are feature modules registered at startup (`src/BazaarPlusPlus/BppComposition.cs:105-109`). The combat status bar subscribes to `CombatSimObserved` and `CombatFrameAdvanced`; it stores the latest message id/outcome in run context and advances the HUD frame count from replay events (`src/BazaarPlusPlus/Game/CombatStatusBar/CombatStatusBarModule.cs:25-55`).
 
 PvP battle evidence is a shared `Game/PvpBattles` module, not a `GameInterop` adapter. It captures local/opponent identities and board snapshots from live game state and net messages (`src/BazaarPlusPlus/Game/PvpBattles/PvpBattleSnapshotCollector.cs:16-66`). Run logging subscribes to `PvpBattleRecorded`, attaches the battle to the current run when possible, and passes a replay event into the run-log core (`src/BazaarPlusPlus/Game/RunLogging/RunLoggingModule.cs:92-100`, `src/BazaarPlusPlus/Game/RunLogging/RunLoggingModule.cs:185-217`).
 
+## Overlay Panels
+
+`Game/OverlayPanels/OverlayPanelHost.cs` is the single Unity adapter that owns main-overlay-panel lifecycle: it reads per-frame input (escape, panel toggle hotkeys, combat state, scene changes), runs the pure `OverlayLifecycleCore` rules, and dispatches open/close/tick to registered panels (`src/BazaarPlusPlus/Game/OverlayPanels/OverlayPanelHost.cs:12-45`). It mounts before every panel mount, and CollectionPanel, HistoryPanel, and LiveBuildPanel all register through its accessor, enforcing at-most-one-open-panel (`src/BazaarPlusPlus/BppComposition.cs:126-149`). Lifecycle tests live in `tests/OverlayPanelLifecycle.Tests/`.
+
 ## Collection Panel
 
-CollectionPanel is a full-screen Item/Skill catalog mounted by `CollectionPanelMount` (`src/BazaarPlusPlus/BppComposition.cs:109`). Its filter state is pure mutable data: active tab/card type, single-select hero set, tiers, tags, hidden keyword tags, Any/All facet modes, sizes, selected source key, run-day filter, and sort priority (`src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionFilterState.cs:24-49`). The tab model contains only `Items` and `Skills` (`src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionTabKind.cs:6-15`).
+CollectionPanel is a full-screen Item/Skill catalog mounted by `CollectionPanelMount`, registered with the shared Overlay Panel Host (`src/BazaarPlusPlus/BppComposition.cs:126-130`). Its filter state is pure mutable data: active tab/card type, single-select hero set, tiers, tags, hidden keyword tags, Any/All facet modes, sizes, selected source key, run-day filter, and sort priority (`src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionFilterState.cs:24-49`). The tab model contains only `Items` and `Skills` (`src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionTabKind.cs:6-15`).
 
 Filtering is code-owned and deterministic. `CollectionFilterEngine.Apply()` applies active card type, excludes package cards from normal results, applies source offer pool membership, hero, tier, day, tag, keyword, and size filters, then sorts by tier/size priority plus localized display name (`src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionFilterEngine.cs:15-80`). Tag and keyword facets support `Any` and `All` matching (`src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionFilterEngine.cs:99-135`), and the UI exposes mode toggles in the tag and keyword headers (`src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionPanelView.Tree.cs:173-199`).
 
@@ -60,7 +68,7 @@ Card VMs project base card tags and per-enchantment facets from game templates. 
 
 HistoryPanel is mounted through `HistoryPanelMount`, configured with runtime dependencies, data services, replay services, and an item-board preview source (`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanel.cs:129-143`). It renders battle previews by asking the shared item-board preview renderer to render a projected board and handling preview phases (`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanel.cs:318-340`).
 
-HistoryPanel's right rail contains local database status, remote server health probing, runs/ghost tabs, ghost filters, delete/replay controls, and status text (`src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Tree.cs:333-405`). Server health display state is derived from the mod API health probe result without changing storage state (`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelServerHealth.cs:51-81`).
+HistoryPanel's right rail contains local database status, remote server health probing, runs/ghost tabs, ghost filters, delete/replay controls, status text, and a collapsible BazaarDB account-link card (`src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.Tree.cs:356-410`). The account-link card POSTs a one-time code to the bazaardb.gg redeem endpoint through `BazaarDbLinkClient`, built at startup on a dedicated 30s-timeout HttpClient independent of the mod-api base URL (`src/BazaarPlusPlus/Plugin.cs:181-195`), with link state persisted by `Game/HistoryPanel/AccountLink/BazaarDbAccountLinkStore.cs`. Server health display state is derived from the mod API health probe result without changing storage state (`src/BazaarPlusPlus/Game/HistoryPanel/HistoryPanelServerHealth.cs:51-81`).
 
 `GameInterop/ItemBoardPreview` is the shared board-rendering adapter for HistoryPanel and LiveBuildPanel. `BppItemBoardSlotPlanner` plans cards onto a 10-socket board, with special handling for selectable shop/container boards (`src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs:10-24`).
 
@@ -78,23 +86,29 @@ BPP UI chrome suppression is centralized in `Game/OverlayPanels`. Screenshot mod
 
 End-of-run screenshot capture initializes from the screenshot and run-log paths, creates a screenshot service, and writes screenshot metadata to SQLite when the database path is available (`src/BazaarPlusPlus/Game/Screenshots/EndOfRunScreenshotController.cs:60-73`). It suppresses BPP UI chrome during capture (`src/BazaarPlusPlus/Game/Screenshots/EndOfRunScreenshotController.cs:411-414`).
 
-BazaarDB snapshot upload is optional. When enabled and the database/screenshots paths are valid, `BazaarDbSnapshotUploadController` creates API routes, a SQLite-backed upload store, an HTTP client, and an upload service keyed by the current profile account id (`src/BazaarPlusPlus/Game/Screenshots/Upload/BazaarDbSnapshotUploadController.cs:50-82`).
+Uploads are consolidated behind an `IUploadFeed` seam: `UploadPumpMount` mounts two `BackgroundUploadPump` components, one draining `BazaarDbSnapshotUploadFeed` (optional, keyed by the current profile account id) and one draining `RunBundleUploadFeed` (`src/BazaarPlusPlus/Game/Upload/UploadPumpMount.cs:22-29`), with `StartupUploadAttemptGate`/`StartupUploadAttemptRunner` handling the startup catch-up attempt (`src/BazaarPlusPlus/Game/Upload/StartupUploadAttemptGate.cs`).
 
-Run and replay uploads use the mod API client and local storage state. Ghost battle sync imports remote battle data into local history storage; server-side behavior is outside this repository and should not be treated as code-verified here.
+Run and replay uploads use the mod API client and local storage state; PTR runs are excluded at the feed level (see §Game Build Channel). Ghost battle sync imports remote battle data into local history storage; server-side behavior is outside this repository and should not be treated as code-verified here.
 
 ## Tooltip Preview, Settings, And Hotkeys
 
 Enchant preview visibility is a three-state setting controlled by `PreviewVisibilityMode`: `Off`, `AutoOnPedestalChoice`, and `Always`. `BppSettingsDockCatalog.NextPreviewVisibilityMode()` cycles those states and resolves localized status labels for dock display (`src/BazaarPlusPlus/Game/Settings/BppSettingsDockCatalog.cs:32-61`).
 
-`TooltipPreviewModePolicy` owns preview priority. Upgrade hotkey wins first, then enchant hotkey, then enchant `Always`, then enchant `AutoOnPedestalChoice` only when the current choice pedestal is an enchant pedestal (`src/BazaarPlusPlus/Game/Tooltips/TooltipPreviewModePolicy.cs:30-43`). Default BPP tooltip hotkeys are Ctrl for enchant preview and Shift for upgrade preview (`src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs:47-51`).
+`TooltipPreviewModePolicy` owns preview priority. Upgrade hotkey wins first, then enchant hotkey, then enchant `Always`, then enchant `AutoOnPedestalChoice` only when the current choice pedestal is an enchant pedestal (`src/BazaarPlusPlus/Game/Tooltips/TooltipPreviewModePolicy.cs:30-43`). A `TooltipModifierRefreshController` mountable re-resolves open preview tooltips when the Ctrl/Shift hold state changes (`src/BazaarPlusPlus/Game/Tooltips/TooltipModifierRefreshController.cs:17`). The tooltip patch surface also covers encounter/event tooltips (gated by the `Game/EventPreview` settings toggle), quest reward previews, and hero level rewards (`src/BazaarPlusPlus/Patches/Tooltips/`), with mod-appended text rendered through the shared `BppTooltipSections` helper (`src/BazaarPlusPlus/Patches/Tooltips/BppTooltipSections.cs:8-16`).
 
-The current BPP hotkey conflict check compares BPP actions against other BPP actions (`src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs:207-209`). Native game binding conflicts, including sell-hotkey interactions, remain an active investigation item in `docs/plans/`.
+BPP hotkeys are user-rebindable and persisted in config per action. `BppHotkeyActionId` covers five actions: the two hold-preview hotkeys (Ctrl enchant / Shift upgrade defaults) plus toggles for CollectionPanel, LiveBuildPanel, and HistoryPanel (`src/BazaarPlusPlus/Game/Input/BppHotkeyActionId.cs:4-11`, `src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs:70-74`); rebinding rows are cloned from native settings rows (`src/BazaarPlusPlus/Game/Input/BppKeyBindRowController.cs`), and panel toggle presses are resolved per frame by the Overlay Panel Host. The conflict check compares BPP actions only against other BPP actions, not native `Gameplay/*` bindings (`src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs:289-313`).
+
+The settings dock registers all feature rows through `SettingsDockEntryRegistry` with order constants centralized in `BppSettingsDockOrder` (`src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs:7-22`); the roster spans history, name override, legendary position, enchant preview, event preview, combat status bar, Chinese locale, UI font, supporter list, voice subtitles, end-of-run screenshot, hotkey tutorial, and BazaarDB upload (`src/BazaarPlusPlus/BppComposition.cs:111-123`).
 
 ## Localization And Fonts
 
-`BazaarPlusPlus.Localization` is the localization resolution engine. The `L` facade is installed at plugin startup with language and locale-mode providers, then resolves `LocalizedTextSet` values against current language and Chinese locale mode (`src/BazaarPlusPlus.Localization/L.cs:11-30`, `src/BazaarPlusPlus/Plugin.cs:107-109`).
+`BazaarPlusPlus.Localization` is the localization resolution engine. The `L` facade is installed at plugin startup with language and locale-mode providers, then resolves `LocalizedTextSet` values against current language and Chinese locale mode (`src/BazaarPlusPlus.Localization/L.cs:11-30`, `src/BazaarPlusPlus/Plugin.cs:159`).
 
-CJK text in BPP-owned UI is handled with an embedded LXGW WenKai font. `BppUiFont` extracts `LXGWWenKai-Regular.ttf` from embedded resources to a BepInEx cache path and loads it as a Unity `Font` (`src/BazaarPlusPlus/Infrastructure/Fonts/BppUiFont.cs:14-40`). The font and license are embedded by the main project (`src/BazaarPlusPlus/BazaarPlusPlus.csproj:31-32`). The font file is subset by Unicode range rather than by the current source strings so BPP-owned Chinese UI keeps broad glyph coverage (`src/BazaarPlusPlus/Resources/Fonts/README.md:1-15`).
+The BPP UI font is user-selectable: `BppUiFont.Default` resolves the configured `BppUiFontKind` (embedded LXGW WenKai, the CJK-capable default, or the engine sans-serif) through a provider installed at startup (`src/BazaarPlusPlus/Infrastructure/Fonts/BppUiFont.cs:27-53`, `src/BazaarPlusPlus/Plugin.cs:161-163`), with a `UiFontSettingsDockEntry` dock row (`src/BazaarPlusPlus/BppComposition.cs:116`). LXGW WenKai is still extracted from embedded resources to a BepInEx cache path (`src/BazaarPlusPlus/BazaarPlusPlus.csproj:28-29`); the font file is subset by Unicode range rather than by the current source strings so BPP-owned Chinese UI keeps broad glyph coverage (`src/BazaarPlusPlus/Resources/Fonts/README.md:1-15`).
+
+## Voice Subtitles
+
+`Game/VoiceSubtitles` renders in-game voice-over subtitles (the BazaarLine integration): `VoiceSubtitlesModule` plus a `GameInterop/VoiceSubtitles` bridge module observe game VO playback (`src/BazaarPlusPlus/BppComposition.cs:105-109`), and `VoiceLineDisplayDispatcher`/`VersionLabelScanner` mountables render cues (`src/BazaarPlusPlus/BppComposition.cs:150-151`). The line catalog is an embedded `voice-lines.json` (`src/BazaarPlusPlus/BazaarPlusPlus.csproj:25`) with a background remote refresh (`src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceLinesRepository.cs:16-17`). The feature is gated by a master toggle (default OFF) in `BazaarPlusPlus.cfg` `[VoiceSubtitles]` (`src/BazaarPlusPlus/Game/VoiceSubtitles/VoiceSubtitlesGate.cs:8-11`, `src/BazaarPlusPlus/Core/Config/BppConfig.cs:85-90`), with a four-state Subtitle Mode dock row registered via `VoiceSubtitlesSettingsDockEntry.RegisterAll` (`src/BazaarPlusPlus/BppComposition.cs:113`). Subtitle labels clone the donor label's font/material rather than `BppUiFont` (see `docs/MEMORY.md` for the TMP wrap/overflow trap).
 
 ## Supporter Attribution
 
@@ -113,12 +127,7 @@ The host listens only on loopback. The default port is fixed at `127.0.0.1:47900
 - `POST /v1/replay/record`
 - `POST /v1/replay/continue`
 
-The action set (`POST /v1/actions`) adds `ReturnToMenu` (schema `2.1.0`): emitted only in
-`EndRunVictory`/`EndRunDefeat` while the scene loader is not transitioning, it advances the
-end-of-run screen back to hero-select via `RunManager.LoadMainMenu()` — the same call the native
-"return to menu" button makes — closing the unattended `run → next run` loop. `isClientBusy` now
-reflects the real client state (`AppState.IsWaitingForServerResponse || AppState.BlockInput`) instead
-of a constant `false`.
+The action set (`POST /v1/actions`, current schema `2.2.0`, `src/BazaarPlusPlus.BazaarAgent/Contract/BazaarAgentDecision.cs:11`) includes two Flow actions beyond the basics: `ReturnToMenu`, emitted only in `EndRunVictory`/`EndRunDefeat` while the scene loader is not transitioning, advances the end-of-run screen back to hero-select via `RunManager.LoadMainMenu()` — closing the unattended `run → next run` loop; and `Continue` (ADR-0008), emitted only when a replay sits at `finishedAwaitingContinue`, routed to the same `CombatReplayRuntime.TryContinueReplay` facade so the agent stays replay-agnostic. `isClientBusy` reflects the real client state (`AppState.IsWaitingForServerResponse || AppState.BlockInput`).
 
 Those routes are dispatched in `BazaarAgentHttpServer.HandleContextAsync()` (`src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs:132-160`). Replay record accepts a raw binary GhostBattlePayload msgpack+gzip body and optional battle id from header/query before queueing a start command; replay continue queues an explicit continue command (`src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs:245-276`).
 
@@ -126,4 +135,4 @@ Those routes are dispatched in `BazaarAgentHttpServer.HandleContextAsync()` (`sr
 
 This repository already uses `docs/adr/` for decision records. The documentation restructure keeps that convention instead of creating a parallel `docs/decisions/` tree.
 
-Current decision records cover encounter status probes, the mountable registry, HistoryPanel preview overlay rendering, preview visibility mode, BazaarAgent isolation, BazaarAgent as a separate plugin, and external replay video control. See [adr/](adr/).
+Current decision records cover encounter status probes, the mountable registry, HistoryPanel preview overlay rendering, preview visibility mode, BazaarAgent isolation, BazaarAgent as a separate plugin, external replay video control, and replay continue as an agent action. See [adr/](adr/).
