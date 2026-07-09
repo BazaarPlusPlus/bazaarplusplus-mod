@@ -68,9 +68,7 @@ internal static class CollectionEncounterGameTooltipText
                     : $"<color={AccentColor}>{choice.DisplayName}:</color> {colorize(result)}"
             );
         }
-        return CollectionTooltipMarkup.Wrap(
-            string.Join(CollectionTooltipMarkup.BlockBreak, lines)
-        );
+        return CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
     }
 
     // Random-outcome events: one block per rolled alternative with its normalized
@@ -129,9 +127,7 @@ internal static class CollectionEncounterGameTooltipText
                 : string.Empty;
             lines.Add($"· <indent=1em>{prefix}{content}</indent>");
         }
-        return CollectionTooltipMarkup.Wrap(
-            string.Join(CollectionTooltipMarkup.BlockBreak, lines)
-        );
+        return CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
     }
 
     // One rolled-pool choice line: combat roll, small expandable entry list (with
@@ -159,9 +155,8 @@ internal static class CollectionEncounterGameTooltipText
             block.Append(
                 string.IsNullOrWhiteSpace(result)
                     ? $"<color={AccentColor}>{entry.DisplayName}</color>"
-                    : string.IsNullOrWhiteSpace(entry.DisplayName)
-                        ? colorize(result)
-                        : $"<color={AccentColor}>{entry.DisplayName}:</color> {colorize(result)}"
+                : string.IsNullOrWhiteSpace(entry.DisplayName) ? colorize(result)
+                : $"<color={AccentColor}>{entry.DisplayName}:</color> {colorize(result)}"
             );
             block.Append("</indent>");
         }
@@ -195,17 +190,13 @@ internal static class CollectionEncounterGameTooltipText
         if (string.IsNullOrWhiteSpace(result))
             return string.Empty;
 
-        result = CollapseWhitespace(
-            result.Replace("\r", string.Empty).Replace('\n', ' ')
-        );
+        result = CollapseWhitespace(result.Replace("\r", string.Empty).Replace('\n', ' '));
         var suffix = DayTierSuffix(choice, dayTierCeiling);
         if (suffix == null)
             return result;
         // Full-width punctuation carries its own visual gap; an ASCII space in
         // front of it reads as a hole.
-        return suffix.Length > 0 && suffix[0] >= '⺀'
-            ? $"{result}{suffix}"
-            : $"{result} {suffix}";
+        return suffix.Length > 0 && suffix[0] >= '⺀' ? $"{result}{suffix}" : $"{result} {suffix}";
     }
 
     private static string CollapseWhitespace(string text)
@@ -233,9 +224,13 @@ internal static class CollectionEncounterGameTooltipText
     {
         if (!dayTierCeiling.HasValue || choice.RewardFilter is not { } reward)
             return null;
+        if (!reward.UsesDayTierTable)
+            return null;
 
         var tiers = reward.Tiers;
         if (tiers.Count != 0 && tiers.Count < DealableTiers.Length)
+            return null;
+        if (HasExplicitTierDescriptor(choice.ResultText))
             return null;
 
         var ceilingRank = CollectionCardFacetRanks.TierRank(dayTierCeiling.Value);
@@ -249,5 +244,108 @@ internal static class CollectionEncounterGameTooltipText
         return effective.Count == 1
             ? CollectionPanelText.EncounterTierExact(effective[0])
             : CollectionPanelText.EncounterDayTierSuffix(effective[^1]);
+    }
+
+    private static bool HasExplicitTierDescriptor(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
+        foreach (var tier in Enum.GetValues(typeof(ETier)))
+        {
+            if (tier is ETier value && HasExplicitTierDescriptor(text, value))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool HasExplicitTierDescriptor(string text, ETier tier)
+    {
+        var tierName = tier.ToString();
+        if (HasEnglishTierDescriptor(text, tierName))
+            return true;
+        if (ContainsOrdinalIgnoreCase(text, $"({tierName})"))
+            return true;
+
+        // The result text is written in the game language's script, which is independent
+        // of the BPP locale mode, so both Chinese variants are always tested.
+        var (_, chineseMainland, chineseTraditional) = CollectionPanelText.TierForms(tier);
+        return HasChineseTierDescriptor(text, chineseMainland)
+            || HasChineseTierDescriptor(text, chineseTraditional);
+    }
+
+    private static bool HasChineseTierDescriptor(string text, string tierWord)
+    {
+        if (string.IsNullOrEmpty(tierWord))
+            return false;
+
+        return ContainsOrdinalIgnoreCase(text, $"{tierWord}级")
+            || ContainsOrdinalIgnoreCase(text, $"{tierWord}級")
+            || ContainsOrdinalIgnoreCase(text, $"{tierWord}階")
+            || ContainsOrdinalIgnoreCase(text, $"{tierWord}品质")
+            || ContainsOrdinalIgnoreCase(text, $"{tierWord}品質")
+            || ContainsOrdinalIgnoreCase(text, $"（{tierWord}）");
+    }
+
+    private static bool HasEnglishTierDescriptor(string text, string tierName)
+    {
+        var index = 0;
+        while (index < text.Length)
+        {
+            index = text.IndexOf(tierName, index, StringComparison.OrdinalIgnoreCase);
+            if (index < 0)
+                return false;
+
+            if (IsAsciiWordBoundary(text, index - 1))
+            {
+                var cursor = index + tierName.Length;
+                while (cursor < text.Length && char.IsWhiteSpace(text[cursor]))
+                    cursor++;
+                if (cursor < text.Length && text[cursor] == '-')
+                    cursor++;
+                while (cursor < text.Length && char.IsWhiteSpace(text[cursor]))
+                    cursor++;
+
+                const string TierSuffix = "tier";
+                if (
+                    cursor + TierSuffix.Length <= text.Length
+                    && string.Compare(
+                        text,
+                        cursor,
+                        TierSuffix,
+                        0,
+                        TierSuffix.Length,
+                        StringComparison.OrdinalIgnoreCase
+                    ) == 0
+                    && IsAsciiWordBoundary(text, cursor + TierSuffix.Length)
+                )
+                    return true;
+            }
+
+            index += tierName.Length;
+        }
+
+        return false;
+    }
+
+    private static bool IsAsciiWordBoundary(string text, int index)
+    {
+        if (index < 0 || index >= text.Length)
+            return true;
+
+        var character = text[index];
+        return !(
+            character >= 'a' && character <= 'z'
+            || character >= 'A' && character <= 'Z'
+            || character >= '0' && character <= '9'
+            || character == '_'
+        );
+    }
+
+    private static bool ContainsOrdinalIgnoreCase(string text, string value)
+    {
+        return !string.IsNullOrWhiteSpace(value)
+            && text.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
     }
 }

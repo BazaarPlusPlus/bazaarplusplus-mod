@@ -17,7 +17,8 @@ internal sealed class CollectionEncounterRewardFilter
         IReadOnlyList<EHiddenTag> keywords,
         string filterSummary,
         IReadOnlyList<ECardTag>? excludedTags = null,
-        IReadOnlyList<EHiddenTag>? excludedKeywords = null
+        IReadOnlyList<EHiddenTag>? excludedKeywords = null,
+        bool usesDayTierTable = true
     )
     {
         CardType = cardType;
@@ -30,6 +31,7 @@ internal sealed class CollectionEncounterRewardFilter
         FilterSummary = filterSummary ?? string.Empty;
         ExcludedTags = excludedTags ?? Array.Empty<ECardTag>();
         ExcludedKeywords = excludedKeywords ?? Array.Empty<EHiddenTag>();
+        UsesDayTierTable = usesDayTierTable;
     }
 
     public ECardType CardType { get; }
@@ -52,6 +54,8 @@ internal sealed class CollectionEncounterRewardFilter
 
     public IReadOnlyList<EHiddenTag> ExcludedKeywords { get; }
 
+    public bool UsesDayTierTable { get; }
+
     public bool HasTierGateOverride => Tiers.Count > 0;
 
     public CollectionEncounterRewardFilter WithFromAnyHero(bool fromAnyHero)
@@ -69,7 +73,8 @@ internal sealed class CollectionEncounterRewardFilter
             Keywords,
             FilterSummary,
             ExcludedTags,
-            ExcludedKeywords
+            ExcludedKeywords,
+            UsesDayTierTable
         );
     }
 }

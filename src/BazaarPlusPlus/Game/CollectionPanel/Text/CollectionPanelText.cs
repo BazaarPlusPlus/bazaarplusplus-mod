@@ -254,15 +254,27 @@ internal static class CollectionPanelText
 
     internal static string SourceDisclaimer() => Resolve(SourceDisclaimerText);
 
-    internal static string Tier(ETier tier) =>
+    internal static string Tier(ETier tier)
+    {
+        var (english, chineseMainland, chineseTraditional) = TierForms(tier);
+        return chineseMainland.Length == 0
+            ? english
+            : FormatSimple(english, chineseMainland, chineseTraditional);
+    }
+
+    // Game-authored text follows the game language's script, not the BPP locale mode,
+    // so matchers against game text need both Chinese variants at once.
+    internal static (string English, string ChineseMainland, string ChineseTraditional) TierForms(
+        ETier tier
+    ) =>
         tier switch
         {
-            ETier.Bronze => FormatSimple("Bronze", "青铜", "青銅"),
-            ETier.Silver => FormatSimple("Silver", "白银", "白銀"),
-            ETier.Gold => FormatSimple("Gold", "黄金", "黃金"),
-            ETier.Diamond => FormatSimple("Diamond", "钻石", "鑽石"),
-            ETier.Legendary => FormatSimple("Legendary", "传说", "傳說"),
-            _ => tier.ToString(),
+            ETier.Bronze => ("Bronze", "青铜", "青銅"),
+            ETier.Silver => ("Silver", "白银", "白銀"),
+            ETier.Gold => ("Gold", "黄金", "黃金"),
+            ETier.Diamond => ("Diamond", "钻石", "鑽石"),
+            ETier.Legendary => ("Legendary", "传说", "傳說"),
+            _ => (tier.ToString(), string.Empty, string.Empty),
         };
 
     internal static string Size(ECardSize size) =>

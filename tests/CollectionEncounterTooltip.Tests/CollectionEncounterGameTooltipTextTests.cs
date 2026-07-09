@@ -85,6 +85,114 @@ public sealed class CollectionEncounterGameTooltipTextTests
     }
 
     [Fact]
+    public void Build_does_not_append_day_tier_when_result_text_already_names_a_tier()
+    {
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-000000000005"),
+                "Have a Late Night Treat",
+                "Get 2 Diamond-tier Food",
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
+                isSourceMatch: false
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(
+            option,
+            colorizeResult: null,
+            dayTierCeiling: ETier.Gold
+        );
+
+        Assert.Contains("Get 2 Diamond-tier Food", text);
+        Assert.DoesNotContain("Get 2 Diamond-tier Food (up to Gold)", text);
+    }
+
+    [Fact]
+    public void Build_does_not_append_day_tier_when_localized_result_text_already_names_a_tier()
+    {
+        L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-000000000005"),
+                "深夜点心",
+                "获得2个钻石级食物",
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
+                isSourceMatch: false
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(
+            option,
+            colorizeResult: null,
+            dayTierCeiling: ETier.Gold
+        );
+
+        Assert.Contains("获得2个钻石级食物", text);
+        Assert.DoesNotContain("获得2个钻石级食物（最高黄金）", text);
+    }
+
+    // The result text follows the game language's script, not the BPP locale mode, so
+    // the tier-descriptor guard must hold when the two scripts disagree.
+    [Theory]
+    [InlineData("获得2个钻石级食物", true)]
+    [InlineData("獲得2個鑽石級食物", false)]
+    public void Build_does_not_append_day_tier_when_game_script_differs_from_locale_mode(
+        string resultText,
+        bool traditionalOutputMode
+    )
+    {
+        var mode = traditionalOutputMode
+            ? BppChineseLocaleMode.Taiwan
+            : BppChineseLocaleMode.Mainland;
+        L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider(mode));
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-000000000005"),
+                "深夜点心",
+                resultText,
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
+                isSourceMatch: false
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(
+            option,
+            colorizeResult: null,
+            dayTierCeiling: ETier.Gold
+        );
+
+        Assert.Contains(resultText, text);
+        Assert.DoesNotContain("最高", text);
+    }
+
+    [Fact]
+    public void Build_does_not_append_day_tier_when_reward_ignores_day_tier_table()
+    {
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-000000000006"),
+                "Fight the Beast",
+                "Get a Rage item",
+                CreateRewardFilter(
+                    tiers: Array.Empty<ETier>(),
+                    summary: "Rage Item",
+                    usesDayTierTable: false
+                ),
+                isSourceMatch: false
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(
+            option,
+            colorizeResult: null,
+            dayTierCeiling: ETier.Gold
+        );
+
+        Assert.Contains("Get a Rage item", text);
+        Assert.DoesNotContain("Get a Rage item (up to Gold)", text);
+    }
+
+    [Fact]
     public void Build_shows_the_exact_tier_when_the_day_ceiling_leaves_one()
     {
         // A Bronze-Diamond span (e.g. from a not-Legendary complement) is day-driven:
@@ -242,7 +350,8 @@ public sealed class CollectionEncounterGameTooltipTextTests
 
     private static CollectionEncounterRewardFilter CreateRewardFilter(
         ETier[] tiers,
-        string summary
+        string summary,
+        bool usesDayTierTable = true
     ) =>
         new(
             ECardType.Item,
@@ -254,7 +363,8 @@ public sealed class CollectionEncounterGameTooltipTextTests
             Array.Empty<EHiddenTag>(),
             summary,
             Array.Empty<ECardTag>(),
-            Array.Empty<EHiddenTag>()
+            Array.Empty<EHiddenTag>(),
+            usesDayTierTable
         );
 
     private static CollectionEncounterOption CreateOption(
@@ -273,12 +383,22 @@ public sealed class CollectionEncounterGameTooltipTextTests
 
     private sealed class TestLanguageProvider : ILanguageProvider
     {
-        public string CurrentLanguageCode => "en";
+        public TestLanguageProvider(string languageCode = "en")
+        {
+            CurrentLanguageCode = languageCode;
+        }
+
+        public string CurrentLanguageCode { get; }
     }
 
     private sealed class TestLocaleModeProvider : ILocaleModeProvider
     {
-        public BppChineseLocaleMode CurrentMode => BppChineseLocaleMode.Mainland;
+        public TestLocaleModeProvider(BppChineseLocaleMode mode = BppChineseLocaleMode.Mainland)
+        {
+            CurrentMode = mode;
+        }
+
+        public BppChineseLocaleMode CurrentMode { get; }
     }
 
     [Fact]
