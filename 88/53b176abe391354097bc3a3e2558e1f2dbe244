@@ -1,0 +1,30 @@
+native/mac-audio-tap/BppMacAudio.h
+  s_ae56b63e58f9f0::t_7a86ca764088e0 5-7,10-11
+native/mac-audio-tap/BppMacAudio.m
+  s_ae56b63e58f9f0::t_c9da57162054c3 204-205
+  s_ae56b63e58f9f0::t_cabac76dbab528 23-24
+  s_ae56b63e58f9f0::t_6c5380816c1389 1,3-8
+native/mac-audio-tap/build.sh
+  s_ae56b63e58f9f0::t_5eb17c6c35a8b5 6,10
+native/mac-audio-tap/README.md
+  s_ae56b63e58f9f0::t_5a9dec9600b8c9 6-21,40,76,93-94
+  s_ae56b63e58f9f0::t_9805c4cde11f62 73-74
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "8853b176abe391354097bc3a3e2558e1f2dbe244",
+  "prompts": {},
+  "sessions": {
+    "s_ae56b63e58f9f0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20306ec4-0efe-4196-a5d4-c755e6e7f7d9",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
