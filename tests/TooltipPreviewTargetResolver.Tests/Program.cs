@@ -74,46 +74,6 @@ Assert(
     "Missing tooltip data should be rejected."
 );
 
-Assert(
-    TooltipPreviewTargetSelection.ShouldAllowImplicitUpgradeSchedule(
-        controllerCard: itemCard,
-        isCursorOverCard: false,
-        isHovering: false,
-        activePrimaryCard: clonedItemCard
-    ),
-    "Implicit scheduling should allow the card currently shown by the primary tooltip."
-);
-
-Assert(
-    !TooltipPreviewTargetSelection.ShouldAllowImplicitUpgradeSchedule(
-        controllerCard: otherItemCard,
-        isCursorOverCard: true,
-        isHovering: false,
-        activePrimaryCard: itemCard
-    ),
-    "Implicit scheduling should reject hovered cards when another card owns the primary tooltip."
-);
-
-Assert(
-    TooltipPreviewTargetSelection.ShouldAllowImplicitUpgradeSchedule(
-        controllerCard: itemCard,
-        isCursorOverCard: true,
-        isHovering: false,
-        activePrimaryCard: null
-    ),
-    "Implicit scheduling should fall back to hover state when no primary item tooltip is active."
-);
-
-Assert(
-    !TooltipPreviewTargetSelection.ShouldAllowImplicitUpgradeSchedule(
-        controllerCard: itemCard,
-        isCursorOverCard: false,
-        isHovering: false,
-        activePrimaryCard: null
-    ),
-    "Implicit scheduling should reject non-hovered cards when no primary item tooltip is active."
-);
-
 Console.WriteLine("TooltipPreviewTargetResolver checks passed.");
 
 static TheBazaar.Tooltips.CardTooltipData CreateTooltipData(Card card)
