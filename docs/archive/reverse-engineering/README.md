@@ -24,6 +24,8 @@ superseded-by: docs/ARCHITECTURE.md
   预定义对局、共享种子、可复现随机系统、对战系统和回放/校验方案。
 - [decompile-and-data-notes.md](decompile-and-data-notes.md)  
   安装目录、`Magic` 搜索、可反编译程序集、`GameData.db.zip`、Addressables 资源和数据包结构记录。
+- `2026-06-15-shop-entry-1..5-*.md`（2026-07-10 归档）  
+  「进商店逻辑」五篇系列：旧客户端 `BazaarCardDealer` 铺货/单卡概率逐行逆向 + client/server 边界。分析对象是 legacy 客户端 dealer（线上铺货已由服务端 GameSim 权威）；其落地功能（Collection 商店概率浮层）在 a8fee8b9 未发布即移除，系列按该 commit 的明确意图保留为参考。
 
 ## 结论摘要
 
