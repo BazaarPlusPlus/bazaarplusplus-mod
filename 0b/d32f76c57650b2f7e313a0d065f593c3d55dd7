@@ -1,0 +1,24 @@
+src/BazaarPlusPlus/Patches/Tooltips/ItemEnchantPreviewTooltipLayerPatch.cs
+  s_60e8a1b53ad4c3::t_be6cc43762b7e4 70
+  s_60e8a1b53ad4c3::t_ed08de937904dd 99-115
+src/BazaarPlusPlus/Patches/Tooltips/QuestRewardPreviewTooltipPatch.cs
+  s_60e8a1b53ad4c3::t_3efd6e5b836287 35-40,45,48-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "0bd32f76c57650b2f7e313a0d065f593c3d55dd7",
+  "prompts": {},
+  "sessions": {
+    "s_60e8a1b53ad4c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44df11e4-d44a-45c1-808b-ceaffe97ceed",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
