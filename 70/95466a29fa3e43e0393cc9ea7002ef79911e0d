@@ -1,0 +1,37 @@
+src/BazaarPlusPlus/Game/CollectionPanel/Text/CollectionPanelText.cs
+  s_60e8a1b53ad4c3::t_7e5c4d84325aff 257-266,272-277
+  s_60e8a1b53ad4c3::t_270f934d88683d 267-269
+src/BazaarPlusPlus/Game/CollectionPanel/Ui/CollectionEncounterGameTooltipText.cs
+  s_60e8a1b53ad4c3::t_fc5818a11899f0 284
+  s_60e8a1b53ad4c3::t_efc086bb0af3e8 265-266,268-276,278-280,283,285-288
+tests/CollectionEncounterTooltip.Tests/AssemblyInfo.cs
+  s_60e8a1b53ad4c3::t_7ad6d353189a19 1-6
+src/BazaarPlusPlus/Game/CollectionPanel/CollectionEncounterStructuredParser.cs
+  s_60e8a1b53ad4c3::t_a41d591362b973 1227-1228,1232,1243-1246
+tests/CollectionEncounterTooltip.Tests/CollectionEncounterGameTooltipTextTests.cs
+  s_60e8a1b53ad4c3::t_9ec382238b92ff 396-401
+  s_60e8a1b53ad4c3::t_4b18077380a79e 137-138,141,144-146
+  s_60e8a1b53ad4c3::t_e2b6681a2e130f 134-136,139-140,142-143,147-167
+tests/CollectionEncounterTooltip.Tests/CollectionEncounterStructuredParserTests.cs
+  s_60e8a1b53ad4c3::t_dfb7cf4a9ed06b 401-446,548
+  s_60e8a1b53ad4c3::t_270f934d88683d 580
+  s_60e8a1b53ad4c3::t_5fa84fb1ac6c9a 549-579,581-597
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "7095466a29fa3e43e0393cc9ea7002ef79911e0d",
+  "prompts": {},
+  "sessions": {
+    "s_60e8a1b53ad4c3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "44df11e4-d44a-45c1-808b-ceaffe97ceed",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
