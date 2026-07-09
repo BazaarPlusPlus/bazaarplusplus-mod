@@ -3,9 +3,22 @@
 The native half of Combat Replay's macOS audio capture. All CoreAudio interaction lives
 here so the C# side stays a plain pull loop identical to the Windows WASAPI path.
 
-- **Why this exists + how the tap works:** [`docs/design/archive/2026-05-31-combat-replay-audio-macos-process-tap.md`](../../docs/archive/design/archive/2026-05-31-combat-replay-audio-macos-process-tap.md)
-- **Archived feature note:** [`docs/features/combat-replay.md`](../../docs/archive/features/combat-replay.md)
-- **C# consumer:** [`src/BazaarPlusPlus/Game/CombatReplay/Audio/CoreAudioProcessTapCaptureTap.cs`](../../src/BazaarPlusPlus/Game/CombatReplay/Audio/CoreAudioProcessTapCaptureTap.cs)
+C# consumer: [`src/BazaarPlusPlus/Game/CombatReplay/Audio/CoreAudioProcessTapCaptureTap.cs`](../../src/BazaarPlusPlus/Game/CombatReplay/Audio/CoreAudioProcessTapCaptureTap.cs)
+
+## How it works
+
+`BppMacAudio_Start` translates the current PID into a CoreAudio process object, creates a
+private stereo-mixdown process tap on it, wraps the tap in a private aggregate device, and
+installs an IOProc that pushes samples into a lock-free single-producer/single-consumer
+FIFO (interleaving planar buffers on the fly). The consumer polls `BppMacAudio_Read` from
+its own background thread; `BppMacAudio_Stop` tears everything down in reverse creation
+order. The IOProc runs on a CoreAudio realtime thread and never allocates, locks, calls
+ObjC/Foundation, logs, or blocks — and no CoreAudio realtime thread ever enters the Mono
+runtime.
+
+The process-tap APIs are a macOS 14.2+ feature; this module gates itself at macOS 15 via
+`BppMacAudio_IsSupported` (NSProcessInfo product version) and weak-imports the tap symbols
+so the dylib still loads and degrades cleanly on older systems.
 
 ## Files
 
@@ -24,7 +37,7 @@ here so the C# side stays a plain pull loop identical to the Windows WASAPI path
 Requirements: macOS + Xcode / Command Line Tools SDK, Apple Silicon (arm64). The script
 runs one `clang` command, then copies the dylib into the installer repo (see below).
 
-Load-bearing `clang` flags — do not change without reading design §8:
+Load-bearing `clang` flags — do not change without understanding why:
 
 - `-arch arm64` — the only supported target (Apple Silicon).
 - `-fobjc-arc` — ARC manages the ObjC objects (`CATapDescription`, the aggregate-device dict).
@@ -57,10 +70,10 @@ the dylib still builds locally and that is not an error.
 
 > **After changing the native source, rebuild and commit the refreshed dylib in the installer
 > repo** — it is a committed prebuilt, like `libe_sqlite3.dylib`; the mod repo carries source
-> only. `clang` output is deterministic, so unchanged source yields a byte-identical dylib and
-> no installer diff.
+> only. `clang` output is deterministic for a given toolchain/SDK, so unchanged source yields
+> a byte-identical dylib and no installer diff; a toolchain update alone can change the bytes.
 
-## Naming + packaging (deviates from the design doc's shorthand)
+## Naming + packaging
 
 - The artifact is **`libBppMacAudio.dylib`** (lib-prefixed) but C# binds
   `[DllImport("BppMacAudio")]`; Unity-Mono resolves it via its `lib{name}.dylib` probe — the
@@ -77,5 +90,5 @@ nm -gU libBppMacAudio.dylib | grep BppMacAudio   # expect the four _BppMacAudio_
 ```
 
 A bare-process `Start`/`Read`/`Stop` smoke test exercises the tap / aggregate-device / IOProc /
-FIFO plumbing (it captures silence — a CLI process emits no audio), while the real acceptance
-check is `ffmpeg volumedetect` on an in-game recording. Both are described in design §10 / §13.
+FIFO plumbing (it captures silence — a CLI process emits no audio). The real acceptance check
+is `ffmpeg volumedetect` on an in-game recording.
