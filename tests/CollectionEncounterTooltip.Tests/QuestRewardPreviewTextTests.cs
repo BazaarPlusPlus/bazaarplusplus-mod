@@ -64,6 +64,21 @@ public sealed class QuestRewardPreviewTextTests
     }
 
     [Fact]
+    public void AppendRewardPreview_dedupes_rewards_after_inline_size_scaling()
+    {
+        var text = BppQuestRewardPreviewText.AppendRewardPreview(
+            "Sell 8 Food",
+            "This has +<size=121%>50%</size> Crit Chance",
+            "This has +<size=122%>50%</size> Crit Chance"
+        );
+
+        Assert.Equal(
+            "Sell 8 Food\n<size=55%>This has +<size=67%>50%</size> Crit Chance</size>",
+            text
+        );
+    }
+
+    [Fact]
     public void AppendRewardPreview_keeps_original_text_when_reward_is_empty()
     {
         var text = BppQuestRewardPreviewText.AppendRewardPreview(

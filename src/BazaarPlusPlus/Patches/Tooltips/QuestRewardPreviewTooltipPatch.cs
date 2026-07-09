@@ -63,7 +63,7 @@ internal static class QuestRewardPreviewTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("QuestTooltip", $"Failed to append quest reward preview: {ex.Message}");
+            BppLog.Error("QuestTooltip", "Failed to append quest reward preview", ex);
         }
     }
 }
@@ -101,10 +101,10 @@ internal static class BppQuestRewardPreviewText
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var value in values)
         {
-            var line = NormalizeInline(value);
+            var line = ScaleInlineSizes(NormalizeInline(value), RewardInlineSizeScale);
             if (line.Length == 0 || !seen.Add(line))
                 continue;
-            lines.Add(ScaleInlineSizes(line, RewardInlineSizeScale));
+            lines.Add(line);
         }
 
         return string.Join(" / ", lines);
