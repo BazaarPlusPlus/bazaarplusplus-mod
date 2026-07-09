@@ -1,0 +1,119 @@
+docs/archive/plans/achievement-ui-local-mvp.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-159
+docs/plans/choice-timeline-run-bundle-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 2-139
+  s_316b3915691fc2::t_a965f0a36e3e40 1
+docs/archive/plans/2026-07-06-bazaardb-manual-linked-button-and-online-gate-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-259
+docs/archive/plans/2026-07-06-voice-subtitles-performance-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-262
+docs/ARCHITECTURE.md
+  s_316b3915691fc2::t_cf070609554fe3 71
+  s_316b3915691fc2::t_15355845ca9587 3,7,9,11-15
+  s_316b3915691fc2::t_c6cacef2fa3f6b 105-109,111
+  s_316b3915691fc2::t_6e49a6eea3443b 53-56,59
+  s_316b3915691fc2::t_911d820badb04e 45
+  s_316b3915691fc2::t_b0f6877a2a512d 49
+  s_316b3915691fc2::t_6a526696221788 89,91
+  s_316b3915691fc2::t_7c4644f4597597 97,99-101
+  s_316b3915691fc2::t_9248f147aaa4f1 130
+  s_316b3915691fc2::t_834e7cb3fd7fa8 39
+  s_316b3915691fc2::t_757797b0c318dc 138
+docs/archive/plans/2026-07-06-preview-tooltip-ctrl-enchant-refresh-plan.md
+  s_316b3915691fc2::t_a3c084e8e7ce96 8
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-7,9-114
+docs/archive/design/2026-06-21-bazaaragent-autonomous-loop-completion-design.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-258
+docs/archive/plans/achievement-service-design.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-474
+docs/archive/design/2026-06-24-bazaardb-account-link-history-panel.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-297
+docs/archive/plans/2026-06-19-achievement-flicker-tooltip-fix-plan-v2.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-610
+docs/archive/reverse-engineering/2026-06-15-shop-entry-5-client-server-boundary.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-378
+docs/archive/plans/2026-07-03-online-ptr-dual-version-compat.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-170
+docs/archive/reverse-engineering/2026-06-15-shop-entry-2-stocking-explainer.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-556
+docs/archive/debugging/sell-hotkey-regression-debug-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-150
+docs/archive/plans/2026-06-19-potion-reference-collection-filter-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-549
+docs/archive/plans/2026-06-19-five-deepening-refactors-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-154
+docs/archive/plans/2026-06-24-bazaardb-account-link-implementation-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-579
+docs/archive/plans/2026-07-06-ui-font-selection-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-152
+docs/archive/design/2026-07-04-overlay-panel-host-design.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-173
+docs/archive/plans/bazaardb-merchant-filter-comparison.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-48
+docs/archive/reverse-engineering/2026-06-15-shop-entry-3-native-loose-deep-dive.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-458
+docs/archive/plans/2026-07-02-bazaardb-link-on-demand-collapse-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-572
+docs/archive/plans/2026-06-20-history-panel-filter-region-redesign.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-562
+docs/archive/plans/2026-06-21-bazaaragent-autonomous-loop-completion-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-529
+docs/INDEX.md
+  s_316b3915691fc2::t_f078974a382be3 2,12-13,15,28,36-39,47-50,53
+docs/archive/plans/2026-06-19-custom-card-foundation-and-achievements-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-319
+docs/archive/debugging/2026-07-08-tooltip-overlay-third-recurrence.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-60
+docs/archive/plans/2026-07-02-keybind-settings-text-fixes-and-panel-toggle-hotkeys-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-884
+docs/archive/plans/2026-07-03-bazaarline-voicesubtitles-integration-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-222
+docs/archive/plans/2026-07-08-subtitle-mode-settings-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-121
+docs/archive/plans/2026-06-22-replay-continue-action-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-336
+docs/archive/reverse-engineering/2026-06-15-shop-entry-4-single-card-reference.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-910
+docs/MEMORY.md
+  s_316b3915691fc2::t_8d36275d317651 14-15,20-22,29,33,35-36,42,46-48,50-53,61,63-64,70,72-80,82
+docs/archive/plans/shortcut-tutorial-settings-dock-link.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-366
+docs/archive/plans/2026-06-30-achievement-system-deletion-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-323
+docs/README.md
+  s_316b3915691fc2::t_049853efe05c0b 18-19,22
+docs/archive/plans/collection-panel-filter-target-structure.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-36
+docs/archive/audits/2026-07-08-performance-audit.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-130
+docs/archive/plans/2026-07-03-card-preview-native-proportions-fix-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-147
+docs/archive/plans/2026-07-04-private-pitchfork-stickybeans-source-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-530
+docs/archive/reverse-engineering/README.md
+  s_316b3915691fc2::t_822bbc7a8d93d6 27-28
+docs/archive/reverse-engineering/2026-06-15-shop-entry-1-lifecycle.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-302
+docs/archive/plans/2026-07-07-event-preview-toggle-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-204
+docs/archive/plans/2026-06-30-remove-package-art-and-tab-plan.md
+  s_316b3915691fc2::t_3bf5e8d7be657c 1-511
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "dbd4e6c53ed56dd856f1387b903f3b987584ba7f",
+  "prompts": {},
+  "sessions": {
+    "s_316b3915691fc2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a0d7194-5782-4b1c-aea7-8c2e58f3703c",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
