@@ -1,0 +1,23 @@
+tests/Architecture.Tests/CoreLayeringTests.cs
+  s_077a2ad3a18291::t_f76bb7482ede73 333-336,341-344
+tests/CollectionFilterEngine.Tests/CollectionFilterEngine.Tests.csproj
+  s_077a2ad3a18291::t_dfd931d009bc52 138-140
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "5193ea9ae69559d4379af348e0d5d402317d48a7",
+  "prompts": {},
+  "sessions": {
+    "s_077a2ad3a18291": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d7d281ea-6809-4b73-8359-0e986a81a900",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
