@@ -22,6 +22,27 @@ internal readonly struct BppDockButtonColorSpec(
     internal float FadeDuration { get; } = fadeDuration;
 }
 
+internal readonly struct BppDockButtonNativeVisuals(
+    ColorBlock colors,
+    SpriteState spriteState,
+    AnimationTriggers animationTriggers,
+    Image? targetImage,
+    Sprite? normalSprite
+)
+{
+    internal ColorBlock Colors { get; } = colors;
+    internal SpriteState SpriteState { get; } = spriteState;
+    internal AnimationTriggers AnimationTriggers { get; } = animationTriggers;
+    internal Image? TargetImage { get; } = targetImage;
+    internal Sprite? NormalSprite { get; } = normalSprite;
+
+    internal bool HasSpriteSwapSprites =>
+        SpriteState.highlightedSprite != null
+        || SpriteState.pressedSprite != null
+        || SpriteState.selectedSprite != null
+        || SpriteState.disabledSprite != null;
+}
+
 internal static class BppDockButtonVisuals
 {
     private const string IconObjectName = "BPP_DockButtonIcon";
@@ -50,11 +71,41 @@ internal static class BppDockButtonVisuals
             ?.ButtonIcon;
     }
 
+    internal static BppDockButtonNativeVisuals? CaptureNativeButtonVisuals(GameObject cloneObject)
+    {
+        var button = cloneObject.GetComponent<Button>();
+        if (button == null)
+            return null;
+
+        var nativeButton = cloneObject.GetComponent<BazaarButtonController>();
+        var targetImage =
+            button.targetGraphic as Image
+            ?? button.image
+            ?? nativeButton?.GetComponent<Image>()
+            ?? cloneObject.GetComponent<Image>();
+        var normalSprite = nativeButton?.DefaultImage ?? targetImage?.sprite;
+        var spriteState = button.spriteState;
+        if (spriteState.pressedSprite == null && nativeButton?.ClickedImage != null)
+            spriteState.pressedSprite = nativeButton.ClickedImage;
+
+        if (spriteState.selectedSprite == null && nativeButton?.ClickedImage != null)
+            spriteState.selectedSprite = nativeButton.ClickedImage;
+
+        return new BppDockButtonNativeVisuals(
+            button.colors,
+            spriteState,
+            button.animationTriggers,
+            targetImage,
+            normalSprite
+        );
+    }
+
     internal static void Apply(
         GameObject cloneObject,
         BppDockButtonIconKind kind,
         Image? explicitIcon,
-        bool freshClone
+        bool freshClone,
+        BppDockButtonNativeVisuals? nativeButtonVisuals
     )
     {
         if (cloneObject == null)
@@ -73,10 +124,13 @@ internal static class BppDockButtonVisuals
 
         var button = cloneObject.GetComponent<Button>() ?? cloneObject.AddComponent<Button>();
         button.targetGraphic = frame;
-        button.transition = Selectable.Transition.ColorTint;
         button.navigation = new Navigation { mode = Navigation.Mode.None };
         button.interactable = true;
 
+        if (TryApplyNativeButtonVisuals(button, nativeButtonVisuals, frame))
+            return;
+
+        button.transition = Selectable.Transition.ColorTint;
         var spec = ResolveColors(kind);
         button.colors = new ColorBlock
         {
@@ -88,6 +142,59 @@ internal static class BppDockButtonVisuals
             colorMultiplier = 1f,
             fadeDuration = spec.FadeDuration,
         };
+    }
+
+    private static bool TryApplyNativeButtonVisuals(
+        Button button,
+        BppDockButtonNativeVisuals? nativeButtonVisuals,
+        Image fallbackTargetImage
+    )
+    {
+        if (nativeButtonVisuals is not { } native || !native.HasSpriteSwapSprites)
+            return false;
+
+        var targetImage = ResolveTargetImage(button, native.TargetImage) ?? fallbackTargetImage;
+        if (native.NormalSprite != null)
+            targetImage.sprite = native.NormalSprite;
+
+        targetImage.enabled = true;
+        fallbackTargetImage.raycastTarget = true;
+        if (targetImage != fallbackTargetImage)
+            targetImage.raycastTarget = false;
+
+        button.transition = Selectable.Transition.None;
+        button.colors = native.Colors;
+        button.spriteState = native.SpriteState;
+        button.animationTriggers = native.AnimationTriggers;
+        button.targetGraphic = targetImage;
+
+        var stateVisual =
+            button.GetComponent<BppDockButtonNativeStateVisual>()
+            ?? button.gameObject.AddComponent<BppDockButtonNativeStateVisual>();
+        stateVisual.Initialize(
+            button,
+            targetImage,
+            native.NormalSprite ?? targetImage.sprite,
+            native.SpriteState.highlightedSprite,
+            native.SpriteState.pressedSprite,
+            native.SpriteState.selectedSprite,
+            native.SpriteState.disabledSprite
+        );
+        return true;
+    }
+
+    private static Image? ResolveTargetImage(Button button, Image? targetImage)
+    {
+        if (targetImage == null)
+            return null;
+
+        if (
+            targetImage.transform == button.transform
+            || targetImage.transform.IsChildOf(button.transform)
+        )
+            return targetImage;
+
+        return null;
     }
 
     private static Image? FindMarkedIconImage(GameObject cloneObject)

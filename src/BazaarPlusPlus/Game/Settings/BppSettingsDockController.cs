@@ -303,6 +303,9 @@ internal sealed partial class BppSettingsDockController
     private void SetExpanded(bool expanded)
     {
         _isExpanded = expanded;
+        if (_dockButton != null)
+            _dockButton.GetComponent<BppDockButtonNativeStateVisual>()?.SetSelected(expanded);
+
         if (_panelRoot != null)
         {
             if (expanded)
