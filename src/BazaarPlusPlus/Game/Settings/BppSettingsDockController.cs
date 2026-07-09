@@ -26,6 +26,7 @@ internal sealed partial class BppSettingsDockController
     private const float RowInnerPadding = 16f;
     private const float StatusWidth = 80f;
     private const int ScreenResizeSyncFrameCount = 6;
+    private const int LayoutImmediateSyncFrameCount = 2;
 
     private readonly List<DockSettingRowView> _rows = [];
 
@@ -37,10 +38,13 @@ internal sealed partial class BppSettingsDockController
     private TMP_FontAsset? _uiFont;
     private Material? _uiFontMaterial;
     private readonly BppScreenResizeSyncTracker _screenResizeSync = new(ScreenResizeSyncFrameCount);
+    private readonly BppDockLayoutSyncTracker _layoutSync = new(LayoutImmediateSyncFrameCount);
+    private readonly BppDockButtonAvoidance _avoidance = new();
+    private readonly Vector3[] _anchorCornerScratch = new Vector3[4];
     private bool _isExpanded;
     private int _screenshotSuppressionCount;
     private BppSettingsDockPlacement _placement;
-    private BppSettingsDockSceneKind _lastSceneKind = BppSettingsDockSceneKind.Default;
+    private string? _lastAvoidanceLogKey;
     private static bool _fontResolutionLogged;
 
     internal static void Attach(Button anchorButton, BppSettingsDockPlacement placement)
@@ -131,13 +135,13 @@ internal sealed partial class BppSettingsDockController
     private void LateUpdate()
     {
         var sceneKind = BppSettingsDockSceneContext.ResolveCurrentSceneKind();
-        if (sceneKind != _lastSceneKind)
-        {
-            _lastSceneKind = sceneKind;
-            SyncDockButtonPlacement();
-        }
-
-        if (_screenResizeSync.ShouldSync(Screen.width, Screen.height))
+        var shouldSync = _layoutSync.ShouldSync(
+            BppSettingsDockSceneContext.ResolveCurrentSceneHandle(),
+            sceneKind,
+            Time.realtimeSinceStartup
+        );
+        shouldSync |= _screenResizeSync.ShouldSync(Screen.width, Screen.height);
+        if (shouldSync)
             SyncDockButtonPlacement();
     }
 
@@ -319,6 +323,9 @@ internal sealed partial class BppSettingsDockController
     private void SetExpanded(bool expanded)
     {
         _isExpanded = expanded;
+        if (_dockButton != null)
+            _dockButton.GetComponent<BppDockButtonExpandedVisualState>()?.SetExpanded(expanded);
+
         if (_panelRoot != null)
         {
             if (expanded)
@@ -384,14 +391,13 @@ internal sealed partial class BppSettingsDockController
         if (parentRect == null || anchorRect == null)
             return;
 
-        var corners = new Vector3[4];
-        anchorRect.GetWorldCorners(corners);
+        anchorRect.GetWorldCorners(_anchorCornerScratch);
 
-        var centerWorld = (corners[0] + corners[2]) * 0.5f;
-        var leftWorld = (corners[0] + corners[1]) * 0.5f;
-        var rightWorld = (corners[2] + corners[3]) * 0.5f;
-        var topWorld = (corners[1] + corners[2]) * 0.5f;
-        var bottomWorld = (corners[0] + corners[3]) * 0.5f;
+        var centerWorld = (_anchorCornerScratch[0] + _anchorCornerScratch[2]) * 0.5f;
+        var leftWorld = (_anchorCornerScratch[0] + _anchorCornerScratch[1]) * 0.5f;
+        var rightWorld = (_anchorCornerScratch[2] + _anchorCornerScratch[3]) * 0.5f;
+        var topWorld = (_anchorCornerScratch[1] + _anchorCornerScratch[2]) * 0.5f;
+        var bottomWorld = (_anchorCornerScratch[0] + _anchorCornerScratch[3]) * 0.5f;
 
         var centerLocal = parentRect.InverseTransformPoint(centerWorld);
         var leftLocal = parentRect.InverseTransformPoint(leftWorld);
@@ -409,9 +415,47 @@ internal sealed partial class BppSettingsDockController
             _dockButtonRect.localPosition.z,
             placement
         );
-        _dockButtonRect.localPosition = new Vector3(dockPosition.X, dockPosition.Y, dockPosition.Z);
+        var avoidance = _avoidance.Resolve(
+            parentRect,
+            anchorRect,
+            _dockButtonRect,
+            dockPosition,
+            placement
+        );
+        if (avoidance.CanApply)
+        {
+            dockPosition = avoidance.Position;
+            _dockButtonRect.localPosition = new Vector3(
+                dockPosition.X,
+                dockPosition.Y,
+                dockPosition.Z
+            );
+        }
+
+        LogDockButtonAvoidance(avoidance);
         _dockButtonRect.localRotation = Quaternion.identity;
         _dockButtonRect.SetAsLastSibling();
+    }
+
+    private void LogDockButtonAvoidance(BppDockButtonAvoidanceResult avoidance)
+    {
+        if (!avoidance.WasAdjusted)
+        {
+            _lastAvoidanceLogKey = null;
+            return;
+        }
+
+        var key =
+            $"{avoidance.BlockerName}:{Mathf.RoundToInt(avoidance.Position.X * 100f)}:{Mathf.RoundToInt(avoidance.Position.Y * 100f)}";
+        if (string.Equals(_lastAvoidanceLogKey, key, StringComparison.Ordinal))
+            return;
+
+        _lastAvoidanceLogKey = key;
+        BppLog.Debug(
+            LogCategory,
+            $"Dock button '{_placement.Key}' moved to an available stacked slot after '{avoidance.BlockerName ?? "bounds"}' blocked its resolved position: "
+                + $"local=({avoidance.Position.X:0.##}, {avoidance.Position.Y:0.##})."
+        );
     }
 
     private sealed class DockSettingRowView

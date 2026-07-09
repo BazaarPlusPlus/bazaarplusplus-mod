@@ -227,16 +227,34 @@ public class BppSettingsDockGeometryTests
         Assert.True(collection.FadeDuration > 0f);
     }
 
-    [Fact]
-    public void ResolveButtonState_prefers_native_hover_transition()
+    [Theory]
+    [InlineData(Selectable.Transition.ColorTint)]
+    [InlineData(Selectable.Transition.SpriteSwap)]
+    [InlineData(Selectable.Transition.Animation)]
+    public void ResolveButtonState_preserves_native_transition_state(
+        Selectable.Transition transition
+    )
     {
         var nativeColors = ColorBlock.defaultColorBlock;
+        nativeColors.normalColor = new Color(0.15f, 0.25f, 0.35f, 1f);
         nativeColors.highlightedColor = new Color(0.96f, 0.74f, 0.18f, 1f);
+        nativeColors.pressedColor = new Color(0.68f, 0.42f, 0.12f, 1f);
+        nativeColors.selectedColor = new Color(0.28f, 0.78f, 0.44f, 1f);
+        nativeColors.disabledColor = new Color(0.3f, 0.3f, 0.3f, 0.5f);
+        var nativeSpriteState = new SpriteState();
+        var nativeAnimationTriggers = new AnimationTriggers
+        {
+            normalTrigger = "DockNormal",
+            highlightedTrigger = "DockHighlighted",
+            pressedTrigger = "DockPressed",
+            selectedTrigger = "DockSelected",
+            disabledTrigger = "DockDisabled",
+        };
         var nativeState = BppDockButtonVisualState.Capture(
-            Selectable.Transition.SpriteSwap,
+            transition,
             nativeColors,
-            new SpriteState(),
-            new AnimationTriggers()
+            nativeSpriteState,
+            nativeAnimationTriggers
         );
 
         var resolved = BppDockButtonVisuals.ResolveButtonState(
@@ -244,8 +262,64 @@ public class BppSettingsDockGeometryTests
             nativeState
         );
 
-        Assert.Equal(Selectable.Transition.SpriteSwap, resolved.Transition);
-        Assert.Equal(nativeColors.highlightedColor, resolved.Colors.highlightedColor);
+        Assert.Equal(transition, resolved.Transition);
+        Assert.Equal(nativeColors, resolved.Colors);
+        Assert.Equal(nativeSpriteState, resolved.SpriteState);
+        Assert.Same(nativeAnimationTriggers, resolved.AnimationTriggers);
+    }
+
+    [Fact]
+    public void Expanded_visual_changes_only_normal_baseline_and_collapse_restores_it()
+    {
+        var nativeColors = ColorBlock.defaultColorBlock;
+        nativeColors.normalColor = new Color(0.15f, 0.25f, 0.35f, 1f);
+        nativeColors.highlightedColor = new Color(0.96f, 0.74f, 0.18f, 1f);
+        nativeColors.pressedColor = new Color(0.68f, 0.42f, 0.12f, 1f);
+        nativeColors.selectedColor = new Color(0.28f, 0.78f, 0.44f, 1f);
+        nativeColors.disabledColor = new Color(0.3f, 0.3f, 0.3f, 0.5f);
+        var nativeState = BppDockButtonVisualState.Capture(
+            Selectable.Transition.ColorTint,
+            nativeColors,
+            new SpriteState(),
+            new AnimationTriggers()
+        );
+
+        var expanded = nativeState.ResolveBaselineColors(isExpanded: true);
+        var collapsed = nativeState.ResolveBaselineColors(isExpanded: false);
+
+        Assert.Equal(nativeColors.selectedColor, expanded.normalColor);
+        Assert.Equal(nativeColors.highlightedColor, expanded.highlightedColor);
+        Assert.Equal(nativeColors.pressedColor, expanded.pressedColor);
+        Assert.Equal(nativeColors.disabledColor, expanded.disabledColor);
+        Assert.Equal(nativeColors, collapsed);
+    }
+
+    [Fact]
+    public void Expanded_animation_reuses_selected_trigger_without_changing_interaction_triggers()
+    {
+        var nativeTriggers = new AnimationTriggers
+        {
+            normalTrigger = "DockNormal",
+            highlightedTrigger = "DockHighlighted",
+            pressedTrigger = "DockPressed",
+            selectedTrigger = "DockSelected",
+            disabledTrigger = "DockDisabled",
+        };
+        var nativeState = BppDockButtonVisualState.Capture(
+            Selectable.Transition.Animation,
+            ColorBlock.defaultColorBlock,
+            new SpriteState(),
+            nativeTriggers
+        );
+
+        var expanded = nativeState.ResolveBaselineAnimationTriggers(isExpanded: true);
+        var collapsed = nativeState.ResolveBaselineAnimationTriggers(isExpanded: false);
+
+        Assert.Equal(nativeTriggers.selectedTrigger, expanded.normalTrigger);
+        Assert.Equal(nativeTriggers.highlightedTrigger, expanded.highlightedTrigger);
+        Assert.Equal(nativeTriggers.pressedTrigger, expanded.pressedTrigger);
+        Assert.Equal(nativeTriggers.disabledTrigger, expanded.disabledTrigger);
+        Assert.Equal(nativeTriggers.normalTrigger, collapsed.normalTrigger);
     }
 
     [Fact]

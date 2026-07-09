@@ -101,7 +101,13 @@ internal static class BppDockButtonVisuals
         var button = cloneObject.GetComponent<Button>() ?? cloneObject.AddComponent<Button>();
         button.navigation = new Navigation { mode = Navigation.Mode.None };
         button.interactable = true;
-        ResolveButtonState(kind, nativeState).ApplyTo(button, frame);
+        var resolvedState = ResolveButtonState(kind, nativeState);
+        resolvedState.ApplyTo(button, frame);
+
+        var expandedVisualState =
+            button.GetComponent<BppDockButtonExpandedVisualState>()
+            ?? button.gameObject.AddComponent<BppDockButtonExpandedVisualState>();
+        expandedVisualState.Initialize(button, resolvedState);
     }
 
     private static Image? FindMarkedIconImage(GameObject cloneObject)

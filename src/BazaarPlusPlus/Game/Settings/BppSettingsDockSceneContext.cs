@@ -20,6 +20,8 @@ internal static class BppSettingsDockSceneContext
         );
     }
 
+    internal static int ResolveCurrentSceneHandle() => SceneManager.GetActiveScene().handle;
+
     internal static BppSettingsDockSceneKind ResolveSceneKind(
         string activeSceneName,
         string? chestOpeningSceneName,
