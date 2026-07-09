@@ -398,6 +398,52 @@ public sealed class CollectionEncounterStructuredParserTests
         Assert.False(reward.UsesDayTierTable);
     }
 
+    // An exclusion-only tier behavior ("any tier except X") leaves the pool governed by
+    // the day tier table; only an inclusive tier list pins the pool to fixed tiers.
+    [Fact]
+    public void TryParseRewardFilter_keeps_day_tier_table_for_exclusion_only_spawn_behavior_tier()
+    {
+        var json = """
+            {
+              "$type": "TCardEncounterStep",
+              "Abilities": {
+                "0": {
+                  "Action": {
+                    "$type": "TActionGameDealCards",
+                    "SpawnContext": {
+                      "$type": "TSpawnContextQuery",
+                      "Limit": { "$type": "TFixedValue", "Value": 1.0 },
+                      "Groups": [
+                        {
+                          "Filters": [
+                            {
+                              "Constraints": [
+                                { "$type": "ConstraintCardType", "Types": ["Item"] }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      "Behaviors": [
+                        { "$type": "TSpawnBehaviorTier", "Tiers": ["Bronze"], "IsNot": true }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+            """;
+
+        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+
+        Assert.NotNull(reward);
+        Assert.Equal(
+            new[] { ETier.Silver, ETier.Gold, ETier.Diamond, ETier.Legendary },
+            reward.Tiers
+        );
+        Assert.True(reward.UsesDayTierTable);
+    }
+
     [Fact]
     public void TryParseRewardFilter_reads_only_tier_fields_from_spawn_behavior_tier()
     {
@@ -497,6 +543,56 @@ public sealed class CollectionEncounterStructuredParserTests
         Assert.Equal(new[] { ETier.Diamond }, reward.Tiers);
         Assert.Equal(new[] { ECardTag.Food }, reward.Tags);
         Assert.False(reward.UsesDayTierTable);
+    }
+
+    [Fact]
+    public void TryParseRewardFilter_keeps_day_tier_table_for_exclusion_only_runtime_behavior()
+    {
+        var step = new RuntimeEncounterStep
+        {
+            Abilities = new Dictionary<string, RuntimeAbility>
+            {
+                ["0"] = new()
+                {
+                    Action = new TActionGameDealCards
+                    {
+                        SpawnContext = new RuntimeSpawnContext
+                        {
+                            Limit = new RuntimeFixedValue { Value = 1.0 },
+                            Groups = new[]
+                            {
+                                new RuntimeSpawnGroup
+                                {
+                                    Filters = new[]
+                                    {
+                                        new RuntimeSpawnFilter
+                                        {
+                                            Constraints = new object[]
+                                            {
+                                                new ConstraintCardType { Types = new[] { "Item" } },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                            Behaviors = new object[]
+                            {
+                                new TSpawnBehaviorTier { Tiers = new[] { "Bronze" }, IsNot = true },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(step);
+
+        Assert.NotNull(reward);
+        Assert.Equal(
+            new[] { ETier.Silver, ETier.Gold, ETier.Diamond, ETier.Legendary },
+            reward.Tiers
+        );
+        Assert.True(reward.UsesDayTierTable);
     }
 
     [Fact]

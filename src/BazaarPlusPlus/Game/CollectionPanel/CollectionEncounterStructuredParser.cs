@@ -1224,10 +1224,12 @@ internal static class CollectionEncounterStructuredParser
             );
         }
 
+        // An exclusion-only tier behavior (IsNot: "any tier except X") leaves the pool
+        // day-table-driven; only an inclusive tier list pins the pool to fixed tiers.
         private void ApplyTierTableBehavior(string typeHint, JObject obj)
         {
             if (
-                typeHint.Contains("spawnbehaviortier")
+                (typeHint.Contains("spawnbehaviortier") && !ReadBool(obj["IsNot"]))
                 || typeHint.Contains("downshifttier")
                 || IsEnabledIgnoreTierTable(typeHint, obj)
                 || IsEnabledInheritTier(typeHint, obj)
@@ -1238,7 +1240,10 @@ internal static class CollectionEncounterStructuredParser
         private void ApplyRuntimeTierTableBehavior(string typeHint, object source)
         {
             if (
-                typeHint.Contains("spawnbehaviortier")
+                (
+                    typeHint.Contains("spawnbehaviortier")
+                    && !ReadRuntimeBool(ReadMemberValue(source, "IsNot"))
+                )
                 || typeHint.Contains("downshifttier")
                 || IsEnabledRuntimeIgnoreTierTable(typeHint, source)
                 || IsEnabledRuntimeInheritTier(typeHint, source)

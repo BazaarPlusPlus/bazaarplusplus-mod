@@ -131,6 +131,40 @@ public sealed class CollectionEncounterGameTooltipTextTests
         Assert.DoesNotContain("获得2个钻石级食物（最高黄金）", text);
     }
 
+    // The result text follows the game language's script, not the BPP locale mode, so
+    // the tier-descriptor guard must hold when the two scripts disagree.
+    [Theory]
+    [InlineData("获得2个钻石级食物", true)]
+    [InlineData("獲得2個鑽石級食物", false)]
+    public void Build_does_not_append_day_tier_when_game_script_differs_from_locale_mode(
+        string resultText,
+        bool traditionalOutputMode
+    )
+    {
+        var mode = traditionalOutputMode
+            ? BppChineseLocaleMode.Taiwan
+            : BppChineseLocaleMode.Mainland;
+        L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider(mode));
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-000000000005"),
+                "深夜点心",
+                resultText,
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
+                isSourceMatch: false
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(
+            option,
+            colorizeResult: null,
+            dayTierCeiling: ETier.Gold
+        );
+
+        Assert.Contains(resultText, text);
+        Assert.DoesNotContain("最高", text);
+    }
+
     [Fact]
     public void Build_does_not_append_day_tier_when_reward_ignores_day_tier_table()
     {
@@ -359,7 +393,12 @@ public sealed class CollectionEncounterGameTooltipTextTests
 
     private sealed class TestLocaleModeProvider : ILocaleModeProvider
     {
-        public BppChineseLocaleMode CurrentMode => BppChineseLocaleMode.Mainland;
+        public TestLocaleModeProvider(BppChineseLocaleMode mode = BppChineseLocaleMode.Mainland)
+        {
+            CurrentMode = mode;
+        }
+
+        public BppChineseLocaleMode CurrentMode { get; }
     }
 
     [Fact]

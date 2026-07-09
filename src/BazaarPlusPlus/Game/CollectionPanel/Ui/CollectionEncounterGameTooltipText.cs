@@ -262,18 +262,30 @@ internal static class CollectionEncounterGameTooltipText
 
     private static bool HasExplicitTierDescriptor(string text, ETier tier)
     {
-        if (HasEnglishTierDescriptor(text, tier.ToString()))
+        var tierName = tier.ToString();
+        if (HasEnglishTierDescriptor(text, tierName))
+            return true;
+        if (ContainsOrdinalIgnoreCase(text, $"({tierName})"))
             return true;
 
-        var localized = CollectionPanelText.Tier(tier);
-        if (string.IsNullOrWhiteSpace(localized))
+        // The result text is written in the game language's script, which is independent
+        // of the BPP locale mode, so both Chinese variants are always tested.
+        var (_, chineseMainland, chineseTraditional) = CollectionPanelText.TierForms(tier);
+        return HasChineseTierDescriptor(text, chineseMainland)
+            || HasChineseTierDescriptor(text, chineseTraditional);
+    }
+
+    private static bool HasChineseTierDescriptor(string text, string tierWord)
+    {
+        if (string.IsNullOrEmpty(tierWord))
             return false;
 
-        return ContainsOrdinalIgnoreCase(text, $"{localized}级")
-            || ContainsOrdinalIgnoreCase(text, $"{localized}階")
-            || ContainsOrdinalIgnoreCase(text, $"{localized}品质")
-            || ContainsOrdinalIgnoreCase(text, $"{localized}品質")
-            || ContainsOrdinalIgnoreCase(text, CollectionPanelText.EncounterTierExact(tier));
+        return ContainsOrdinalIgnoreCase(text, $"{tierWord}级")
+            || ContainsOrdinalIgnoreCase(text, $"{tierWord}級")
+            || ContainsOrdinalIgnoreCase(text, $"{tierWord}階")
+            || ContainsOrdinalIgnoreCase(text, $"{tierWord}品质")
+            || ContainsOrdinalIgnoreCase(text, $"{tierWord}品質")
+            || ContainsOrdinalIgnoreCase(text, $"（{tierWord}）");
     }
 
     private static bool HasEnglishTierDescriptor(string text, string tierName)
