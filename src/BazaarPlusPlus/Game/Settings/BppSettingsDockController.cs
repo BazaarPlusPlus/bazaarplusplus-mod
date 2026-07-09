@@ -38,6 +38,7 @@ internal sealed partial class BppSettingsDockController
     private bool _isExpanded;
     private int _screenshotSuppressionCount;
     private BppSettingsDockPlacement _placement;
+    private string? _lastAvoidanceLogKey;
     private static bool _fontResolutionLogged;
 
     internal static void Attach(Button anchorButton, BppSettingsDockPlacement placement)
@@ -390,9 +391,40 @@ internal sealed partial class BppSettingsDockController
             _dockButtonRect.localPosition.z,
             _placement
         );
+        var avoidance = BppDockButtonAvoidance.StackAboveCollectionButtonWhenLeftSlotIsBlocked(
+            parentRect,
+            anchorRect,
+            _dockButtonRect,
+            dockPosition,
+            _placement
+        );
+        dockPosition = avoidance.Position;
+        LogDockButtonAvoidance(avoidance);
+
         _dockButtonRect.localPosition = new Vector3(dockPosition.X, dockPosition.Y, dockPosition.Z);
         _dockButtonRect.localRotation = Quaternion.identity;
         _dockButtonRect.SetAsLastSibling();
+    }
+
+    private void LogDockButtonAvoidance(BppDockButtonAvoidanceResult avoidance)
+    {
+        if (!avoidance.WasAdjusted)
+        {
+            _lastAvoidanceLogKey = null;
+            return;
+        }
+
+        var key =
+            $"{avoidance.BlockerName}:{Mathf.RoundToInt(avoidance.Position.X * 100f)}:{Mathf.RoundToInt(avoidance.Position.Y * 100f)}";
+        if (string.Equals(_lastAvoidanceLogKey, key, StringComparison.Ordinal))
+            return;
+
+        _lastAvoidanceLogKey = key;
+        BppLog.Debug(
+            LogCategory,
+            $"Dock button '{_placement.Key}' stacked above collection button because native button '{avoidance.BlockerName}' occupied the left slot: "
+                + $"local=({avoidance.Position.X:0.##}, {avoidance.Position.Y:0.##})."
+        );
     }
 
     private sealed class DockSettingRowView
