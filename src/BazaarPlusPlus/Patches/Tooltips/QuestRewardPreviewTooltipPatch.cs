@@ -32,18 +32,23 @@ internal static class QuestRewardPreviewTooltipPatch
     {
         try
         {
+            // Icon-override quests already surface their reward through the native icon
+            // plus its hover detail popup, and their custom icon layout has the least
+            // room for an extra line, so they keep the native-only presentation.
+            if (!string.IsNullOrEmpty(entry.QuestEntry.IconKeyOverride))
+                return;
+
             if (DescriptionTextField?.GetValue(__instance) is not TMP_Text descriptionText)
                 return;
 
-            var questTooltips = entry.QuestEntry.Localization?.Tooltips;
             var rewardTooltips = entry.QuestEntry.Reward?.Localization?.Tooltips;
-            if (questTooltips == null || rewardTooltips == null)
+            if (rewardTooltips == null)
                 return;
 
-            var questText = currentTooltipData.RenderQuestTooltips(
-                questTooltips,
-                ETooltipType.Passive
-            );
+            // Native SetData unconditionally rendered the quest text into the description
+            // field right before this postfix, so it is read back instead of paying a
+            // second RenderQuestTooltips pass.
+            var questText = descriptionText.text;
             var passiveRewardText = currentTooltipData.RenderQuestTooltips(
                 rewardTooltips,
                 ETooltipType.Passive

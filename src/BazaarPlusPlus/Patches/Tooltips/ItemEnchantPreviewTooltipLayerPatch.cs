@@ -67,6 +67,7 @@ internal static class TooltipLayerOverride
 
     private static void Apply(Canvas? canvas, int ownerId, bool elevated)
     {
+        PruneDestroyedCanvases();
         if (canvas == null)
             return;
 
@@ -94,5 +95,22 @@ internal static class TooltipLayerOverride
 
         canvas.sortingOrder = existing.SortingOrder;
         States.Remove(canvas);
+    }
+
+    // A canvas destroyed while an elevation owner is still registered (full teardown
+    // skips the ResetValues-driven restore) would otherwise pin a dead key forever.
+    private static void PruneDestroyedCanvases()
+    {
+        List<Canvas>? destroyed = null;
+        foreach (var canvas in States.Keys)
+        {
+            if (canvas == null)
+                (destroyed ??= new List<Canvas>()).Add(canvas);
+        }
+
+        if (destroyed == null)
+            return;
+        foreach (var canvas in destroyed)
+            States.Remove(canvas);
     }
 }
