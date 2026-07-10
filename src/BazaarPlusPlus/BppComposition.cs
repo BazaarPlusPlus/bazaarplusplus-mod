@@ -108,19 +108,19 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_voiceSubtitlesInteropModule);
         _featureRegistry.Register(_voiceSubtitlesModule);
 
-        _settingsDockRegistry.Register(new BazaarDbSnapshotUploadSettingsDockEntry());
-        _settingsDockRegistry.Register(new FixedSupporterListSettingsDockEntry());
+        _settingsDockRegistry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(_settingsDockRegistry);
         _settingsDockRegistry.Register(new HotkeyTutorialSettingsDockEntry());
-        _settingsDockRegistry.Register(new ChineseLocaleModeSettingsDockEntry(_eventBus));
-        _settingsDockRegistry.Register(new UiFontSettingsDockEntry());
-        _settingsDockRegistry.Register(new CombatStatusBarSettingsDockEntry());
+        _settingsDockRegistry.Register(ChineseLocaleModeSettingsDockEntry.Create(_eventBus));
+        _settingsDockRegistry.Register(UiFontSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(CombatStatusBarSettingsDockEntry.Create());
         _settingsDockRegistry.Register(new EndOfRunScreenshotSettingsDockEntry());
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
-        _settingsDockRegistry.Register(new ItemEnchantPreviewSettingsDockEntry());
-        _settingsDockRegistry.Register(new EventPreviewSettingsDockEntry());
-        _settingsDockRegistry.Register(new LegendaryPositionSettingsDockEntry());
-        _settingsDockRegistry.Register(new NameOverrideSettingsDockEntry());
+        _settingsDockRegistry.Register(ItemEnchantPreviewSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(EventPreviewSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(LegendaryPositionSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(NameOverrideSettingsDockEntry.Create());
 
         _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
         // The overlay host must mount before every Main Overlay Panel mount below: panels

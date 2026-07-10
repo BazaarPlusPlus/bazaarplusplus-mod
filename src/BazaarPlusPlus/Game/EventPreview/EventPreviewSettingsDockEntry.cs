@@ -4,22 +4,19 @@ using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.EventPreview;
 
-internal sealed class EventPreviewSettingsDockEntry : ISettingsDockEntry
+internal static class EventPreviewSettingsDockEntry
 {
-    public int Order => BppSettingsDockOrder.EventPreview;
-
-    public BppSettingsDockDefinition Build(IBppConfig config) =>
-        new(
+    internal static CyclingSettingsDockEntry<bool> Create() =>
+        CyclingSettingsDockEntry<bool>.Toggle(
+            BppSettingsDockOrder.EventPreview,
             "EventPreview",
             EventPreviewSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                () => config.EnableEventPreviewConfig?.Value ?? true,
-                enabled =>
-                {
-                    var entry = config.EnableEventPreviewConfig;
-                    if (entry != null)
-                        entry.Value = enabled;
-                }
-            )
+            config => config.EnableEventPreviewConfig?.Value ?? true,
+            (config, enabled) =>
+            {
+                var entry = config.EnableEventPreviewConfig;
+                if (entry != null)
+                    entry.Value = enabled;
+            }
         );
 }

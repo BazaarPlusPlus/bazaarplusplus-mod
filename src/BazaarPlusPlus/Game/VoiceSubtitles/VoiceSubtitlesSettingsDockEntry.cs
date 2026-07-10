@@ -7,23 +7,29 @@ using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
-internal sealed class VoiceSubtitlesSettingsDockEntry : ISettingsDockEntry
+internal static class VoiceSubtitlesSettingsDockEntry
 {
     private static readonly LocalizedTextSet Off = new("OFF", "关闭", "關閉");
     private static readonly LocalizedTextSet Both = new("BOTH", "双语", "雙語");
     private static readonly LocalizedTextSet Chinese = new("ZH", "中文", "中文");
     private static readonly LocalizedTextSet English = new("EN", "英文", "英文");
 
-    public int Order => BppSettingsDockOrder.VoiceSubtitles;
-
-    public BppSettingsDockDefinition Build(IBppConfig config) =>
+    internal static CyclingSettingsDockEntry<SubtitleMode> Create() =>
         new(
+            BppSettingsDockOrder.VoiceSubtitles,
             "VoiceSubtitles",
             VoiceSubtitlesSettingsMenuLabel.Resolve,
-            languageCode => ResolveStatus(config, languageCode),
-            () => ReadMode(config) != SubtitleMode.Off,
-            () => CycleMode(config),
-            collapseAfterActivate: false
+            new[]
+            {
+                SubtitleMode.Off,
+                SubtitleMode.Both,
+                SubtitleMode.Chinese,
+                SubtitleMode.English,
+            },
+            ReadMode,
+            WriteMode,
+            mode => mode != SubtitleMode.Off,
+            ResolveStatus
         );
 
     internal static void RegisterAll(SettingsDockEntryRegistry registry)
@@ -31,10 +37,10 @@ internal sealed class VoiceSubtitlesSettingsDockEntry : ISettingsDockEntry
         if (registry == null)
             throw new ArgumentNullException(nameof(registry));
 
-        registry.Register(new VoiceSubtitlesSettingsDockEntry());
-        registry.Register(new VoiceSubtitlesPositionSettingsDockEntry());
-        registry.Register(new VoiceSubtitlesEnglishFontScaleSettingsDockEntry());
-        registry.Register(new VoiceSubtitlesChineseFontScaleSettingsDockEntry());
+        registry.Register(Create());
+        registry.Register(VoiceSubtitlesPositionSettingsDockEntry.Create());
+        registry.Register(VoiceSubtitlesEnglishFontScaleSettingsDockEntry.Create());
+        registry.Register(VoiceSubtitlesChineseFontScaleSettingsDockEntry.Create());
     }
 
     private static SubtitleMode ReadMode(IBppConfig config)
@@ -48,30 +54,6 @@ internal sealed class VoiceSubtitlesSettingsDockEntry : ISettingsDockEntry
             SubtitleLanguageMode.EnglishOnly => SubtitleMode.English,
             _ => SubtitleMode.Both,
         };
-    }
-
-    private static string ResolveStatus(IBppConfig config, string languageCode)
-    {
-        var text = ReadMode(config) switch
-        {
-            SubtitleMode.Both => Both,
-            SubtitleMode.Chinese => Chinese,
-            SubtitleMode.English => English,
-            _ => Off,
-        };
-        return text.Resolve(languageCode, L.CurrentMode);
-    }
-
-    private static void CycleMode(IBppConfig config)
-    {
-        var next = ReadMode(config) switch
-        {
-            SubtitleMode.Off => SubtitleMode.Both,
-            SubtitleMode.Both => SubtitleMode.Chinese,
-            SubtitleMode.Chinese => SubtitleMode.English,
-            _ => SubtitleMode.Off,
-        };
-        WriteMode(config, next);
     }
 
     private static void WriteMode(IBppConfig config, SubtitleMode mode)
@@ -92,7 +74,19 @@ internal sealed class VoiceSubtitlesSettingsDockEntry : ISettingsDockEntry
         }
     }
 
-    private enum SubtitleMode
+    private static string ResolveStatus(SubtitleMode mode, string languageCode)
+    {
+        var text = mode switch
+        {
+            SubtitleMode.Both => Both,
+            SubtitleMode.Chinese => Chinese,
+            SubtitleMode.English => English,
+            _ => Off,
+        };
+        return text.Resolve(languageCode, L.CurrentMode);
+    }
+
+    internal enum SubtitleMode
     {
         Off,
         Both,
@@ -101,7 +95,7 @@ internal sealed class VoiceSubtitlesSettingsDockEntry : ISettingsDockEntry
     }
 }
 
-internal sealed class VoiceSubtitlesPositionSettingsDockEntry : ISettingsDockEntry
+internal static class VoiceSubtitlesPositionSettingsDockEntry
 {
     private static readonly LocalizedTextSet Label = new(
         "Subtitle Position",
@@ -112,27 +106,36 @@ internal sealed class VoiceSubtitlesPositionSettingsDockEntry : ISettingsDockEnt
     private static readonly LocalizedTextSet TopRight = new("Top Right", "右上", "右上");
     private static readonly LocalizedTextSet TopCenter = new("Top Center", "顶部居中", "頂部置中");
 
-    public int Order => BppSettingsDockOrder.VoiceSubtitlesPosition;
-
-    public BppSettingsDockDefinition Build(IBppConfig config) =>
+    internal static CyclingSettingsDockEntry<SubtitlePosition> Create() =>
         new(
+            BppSettingsDockOrder.VoiceSubtitlesPosition,
             "VoiceSubtitlesPosition",
             ResolveLabel,
-            languageCode => ResolveStatus(config, languageCode),
-            () => ReadPosition(config) != BppConfig.DefaultVoiceSubtitlesPosition,
-            () => CyclePosition(config),
-            collapseAfterActivate: false
+            new[]
+            {
+                SubtitlePosition.TopLeft,
+                SubtitlePosition.TopRight,
+                SubtitlePosition.TopCenter,
+            },
+            config =>
+                config.VoiceSubtitlesPositionConfig?.Value
+                ?? BppConfig.DefaultVoiceSubtitlesPosition,
+            (config, position) =>
+            {
+                var entry = config.VoiceSubtitlesPositionConfig;
+                if (entry != null)
+                    entry.Value = position;
+            },
+            position => position != BppConfig.DefaultVoiceSubtitlesPosition,
+            ResolveStatus
         );
 
     private static string ResolveLabel(string languageCode) => Resolve(Label, languageCode);
 
-    private static SubtitlePosition ReadPosition(IBppConfig config) =>
-        config.VoiceSubtitlesPositionConfig?.Value ?? BppConfig.DefaultVoiceSubtitlesPosition;
-
-    private static string ResolveStatus(IBppConfig config, string languageCode)
+    private static string ResolveStatus(SubtitlePosition position, string languageCode)
     {
         return Resolve(
-            ReadPosition(config) switch
+            position switch
             {
                 SubtitlePosition.TopRight => TopRight,
                 SubtitlePosition.TopCenter => TopCenter,
@@ -142,96 +145,67 @@ internal sealed class VoiceSubtitlesPositionSettingsDockEntry : ISettingsDockEnt
         );
     }
 
-    private static void CyclePosition(IBppConfig config)
-    {
-        var entry = config.VoiceSubtitlesPositionConfig;
-        if (entry == null)
-            return;
-
-        entry.Value = entry.Value switch
-        {
-            SubtitlePosition.TopLeft => SubtitlePosition.TopRight,
-            SubtitlePosition.TopRight => SubtitlePosition.TopCenter,
-            _ => SubtitlePosition.TopLeft,
-        };
-    }
-
     private static string Resolve(LocalizedTextSet text, string languageCode) =>
         text.Resolve(languageCode, L.CurrentMode);
 }
 
-internal sealed class VoiceSubtitlesEnglishFontScaleSettingsDockEntry
-    : VoiceSubtitlesFontScaleSettingsDockEntry
+internal static class VoiceSubtitlesEnglishFontScaleSettingsDockEntry
 {
-    public override int Order => BppSettingsDockOrder.VoiceSubtitlesEnglishFontScale;
-
-    protected override string Key => "VoiceSubtitlesEnglishFontScale";
-
-    protected override LocalizedTextSet Label => new("English Size", "英文字号", "英文字號");
-
-    protected override float DefaultScale => 1f;
-
-    protected override float ReadScale(IBppConfig config) =>
-        config.VoiceSubtitlesEnglishFontScaleConfig?.Value ?? DefaultScale;
-
-    protected override void WriteScale(IBppConfig config, float scale)
-    {
-        var entry = config.VoiceSubtitlesEnglishFontScaleConfig;
-        if (entry != null)
-            entry.Value = scale;
-    }
+    internal static CyclingSettingsDockEntry<float> Create() =>
+        VoiceSubtitlesFontScaleDockEntryFactory.Create(
+            BppSettingsDockOrder.VoiceSubtitlesEnglishFontScale,
+            "VoiceSubtitlesEnglishFontScale",
+            new LocalizedTextSet("English Size", "英文字号", "英文字號"),
+            config => config.VoiceSubtitlesEnglishFontScaleConfig?.Value ?? 1f,
+            (config, scale) =>
+            {
+                var entry = config.VoiceSubtitlesEnglishFontScaleConfig;
+                if (entry != null)
+                    entry.Value = scale;
+            }
+        );
 }
 
-internal sealed class VoiceSubtitlesChineseFontScaleSettingsDockEntry
-    : VoiceSubtitlesFontScaleSettingsDockEntry
+internal static class VoiceSubtitlesChineseFontScaleSettingsDockEntry
 {
-    public override int Order => BppSettingsDockOrder.VoiceSubtitlesChineseFontScale;
-
-    protected override string Key => "VoiceSubtitlesChineseFontScale";
-
-    protected override LocalizedTextSet Label => new("Chinese Size", "中文字号", "中文字號");
-
-    protected override float DefaultScale => 1f;
-
-    protected override float ReadScale(IBppConfig config) =>
-        config.VoiceSubtitlesChineseFontScaleConfig?.Value ?? DefaultScale;
-
-    protected override void WriteScale(IBppConfig config, float scale)
-    {
-        var entry = config.VoiceSubtitlesChineseFontScaleConfig;
-        if (entry != null)
-            entry.Value = scale;
-    }
+    internal static CyclingSettingsDockEntry<float> Create() =>
+        VoiceSubtitlesFontScaleDockEntryFactory.Create(
+            BppSettingsDockOrder.VoiceSubtitlesChineseFontScale,
+            "VoiceSubtitlesChineseFontScale",
+            new LocalizedTextSet("Chinese Size", "中文字号", "中文字號"),
+            config => config.VoiceSubtitlesChineseFontScaleConfig?.Value ?? 1f,
+            (config, scale) =>
+            {
+                var entry = config.VoiceSubtitlesChineseFontScaleConfig;
+                if (entry != null)
+                    entry.Value = scale;
+            }
+        );
 }
 
-internal abstract class VoiceSubtitlesFontScaleSettingsDockEntry : ISettingsDockEntry
+internal static class VoiceSubtitlesFontScaleDockEntryFactory
 {
     private const float ComparisonTolerance = 0.0001f;
     private static readonly float[] ScaleLadder = { 1f, 1.25f, 1.5f, 1.75f, 2f, 2.25f, 2.5f };
 
-    public abstract int Order { get; }
-
-    protected abstract string Key { get; }
-
-    protected abstract LocalizedTextSet Label { get; }
-
-    protected abstract float DefaultScale { get; }
-
-    public BppSettingsDockDefinition Build(IBppConfig config) =>
+    internal static CyclingSettingsDockEntry<float> Create(
+        int order,
+        string key,
+        LocalizedTextSet label,
+        Func<IBppConfig, float> read,
+        Action<IBppConfig, float> write
+    ) =>
         new(
-            Key,
-            ResolveLabel,
-            _ => FormatStatus(ReadScale(config)),
-            () => Math.Abs(ReadScale(config) - DefaultScale) > ComparisonTolerance,
-            () => WriteScale(config, NextScale(ReadScale(config))),
-            collapseAfterActivate: false
+            order,
+            key,
+            languageCode => label.Resolve(languageCode, L.CurrentMode),
+            ScaleLadder,
+            read,
+            write,
+            scale => Math.Abs(scale - 1f) > ComparisonTolerance,
+            (scale, _) => scale.ToString("0.##", CultureInfo.InvariantCulture) + "x",
+            nextOverride: NextScale
         );
-
-    protected abstract float ReadScale(IBppConfig config);
-
-    protected abstract void WriteScale(IBppConfig config, float scale);
-
-    private string ResolveLabel(string languageCode) => Label.Resolve(languageCode, L.CurrentMode);
 
     private static float NextScale(float current)
     {
@@ -242,10 +216,5 @@ internal abstract class VoiceSubtitlesFontScaleSettingsDockEntry : ISettingsDock
         }
 
         return ScaleLadder[0];
-    }
-
-    private static string FormatStatus(float scale)
-    {
-        return scale.ToString("0.##", CultureInfo.InvariantCulture) + "x";
     }
 }

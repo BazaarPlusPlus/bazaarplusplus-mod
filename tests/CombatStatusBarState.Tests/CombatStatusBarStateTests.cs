@@ -221,56 +221,6 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void SettingsMenuBridge_ReadsInitialValueAndWritesBackChanges()
-    {
-        var enabled = false;
-        var bridge = new CombatStatusBarSettingsMenuBridge(() => enabled, value => enabled = value);
-
-        Assert.False(bridge.GetInitialValue());
-
-        bridge.ApplyValue(true);
-
-        Assert.True(enabled);
-    }
-
-    [Fact]
-    public void SharedSettingsMenuBridge_ReadsInitialValue_WritesBackChanges_AndInvokesOnChanged()
-    {
-        var enabled = false;
-        bool? changedValue = null;
-        var bridge = new SettingsMenuToggleBridge(
-            () => enabled,
-            value => enabled = value,
-            value => changedValue = value
-        );
-
-        Assert.False(bridge.GetInitialValue());
-
-        bridge.ApplyValue(true);
-
-        Assert.True(enabled);
-        Assert.True(changedValue);
-    }
-
-    [Fact]
-    public void DockDefinition_ToggleRow_ReportsStatusAndFlipsStateOnActivate()
-    {
-        var enabled = false;
-        var bridge = new SettingsMenuToggleBridge(() => enabled, value => enabled = value);
-        var definition = new BppSettingsDockDefinition("CombatStatusBar", _ => "Combat", bridge);
-
-        Assert.False(definition.IsActive());
-        Assert.Equal("OFF", definition.ResolveStatus("en"));
-
-        definition.Activate();
-
-        Assert.True(enabled);
-        Assert.True(definition.IsActive());
-        Assert.Equal("ON", definition.ResolveStatus("en"));
-        Assert.False(definition.CollapseAfterActivate);
-    }
-
-    [Fact]
     public void DockDefinition_ActionRow_InvokesAction_AndReportsDynamicStatus()
     {
         var open = false;
@@ -313,26 +263,6 @@ public sealed class CombatStatusBarStateTests : IDisposable
         var result = CombatStatusBarSettingsMenuLabel.Resolve(languageCode);
 
         Assert.Equal(expected, result);
-    }
-
-    [Fact]
-    public void NameOverrideSettingsMenuBridge_ReadsInitialValue_WritesBackChanges_AndRequestsRefreshOnEveryChange()
-    {
-        var enabled = false;
-        var refreshCount = 0;
-        var bridge = new NameOverrideSettingsMenuBridge(
-            () => enabled,
-            value => enabled = value,
-            () => refreshCount++
-        );
-
-        Assert.False(bridge.GetInitialValue());
-
-        bridge.ApplyValue(true);
-        bridge.ApplyValue(false);
-
-        Assert.False(enabled);
-        Assert.Equal(2, refreshCount);
     }
 
     [Theory]

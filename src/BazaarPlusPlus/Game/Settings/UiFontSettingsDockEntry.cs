@@ -4,22 +4,27 @@ using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.Settings;
 
-internal sealed class UiFontSettingsDockEntry : ISettingsDockEntry
+internal static class UiFontSettingsDockEntry
 {
     private static readonly LocalizedTextSet Label = new("UI Font", "界面字体");
     private static readonly LocalizedTextSet LxgwWenKaiStatus = new("KAI", "楷体");
     private static readonly LocalizedTextSet SansSerifStatus = new("SANS", "黑体");
 
-    public int Order => BppSettingsDockOrder.UiFont;
-
-    public BppSettingsDockDefinition Build(IBppConfig config) =>
-        new(
+    internal static CyclingSettingsDockEntry<BppUiFontKind> Create() =>
+        new CyclingSettingsDockEntry<BppUiFontKind>(
+            BppSettingsDockOrder.UiFont,
             "UiFont",
             ResolveLabel,
-            languageCode => ResolveStatus(ReadKind(config), languageCode),
-            () => IsOverrideActive(config),
-            () => CycleKind(config),
-            collapseAfterActivate: false
+            new[] { BppUiFontKind.LxgwWenKai, BppUiFontKind.SansSerif },
+            ReadKind,
+            (config, kind) =>
+            {
+                var entry = config.UiFontKindConfig;
+                if (entry != null)
+                    entry.Value = kind;
+            },
+            kind => kind != BppConfig.DefaultUiFontKind,
+            ResolveStatus
         );
 
     private static string ResolveLabel(string languageCode) =>
@@ -29,22 +34,6 @@ internal sealed class UiFontSettingsDockEntry : ISettingsDockEntry
         config.UiFontKindConfig?.Value == BppUiFontKind.SansSerif
             ? BppUiFontKind.SansSerif
             : BppConfig.DefaultUiFontKind;
-
-    private static bool IsOverrideActive(IBppConfig config) =>
-        ReadKind(config) != BppConfig.DefaultUiFontKind;
-
-    private static void CycleKind(IBppConfig config)
-    {
-        var entry = config.UiFontKindConfig;
-        if (entry == null)
-            return;
-
-        entry.Value = ReadKind(config) switch
-        {
-            BppUiFontKind.SansSerif => BppUiFontKind.LxgwWenKai,
-            _ => BppUiFontKind.SansSerif,
-        };
-    }
 
     private static string ResolveStatus(BppUiFontKind kind, string languageCode)
     {

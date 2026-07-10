@@ -5,23 +5,19 @@ using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.Supporters;
 
-internal sealed class FixedSupporterListSettingsDockEntry : ISettingsDockEntry
+internal static class FixedSupporterListSettingsDockEntry
 {
-    public int Order => BppSettingsDockOrder.FixedSupporterList;
-
-    public BppSettingsDockDefinition Build(IBppConfig config) =>
-        new(
+    internal static CyclingSettingsDockEntry<bool> Create() =>
+        CyclingSettingsDockEntry<bool>.Toggle(
+            BppSettingsDockOrder.FixedSupporterList,
             "StreamMode",
             FixedSupporterListSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                () => ReadEnabled(config),
-                enabled => WriteEnabled(config, enabled)
-            )
+            ReadEnabled,
+            WriteEnabled
         );
 
     private static bool ReadEnabled(IBppConfig config) =>
-        config.UseFixedSupporterListConfig?.Value
-        ?? BPPSupporterListSourcePolicy.DefaultUseFixedList;
+        config.UseFixedSupporterListConfig?.Value ?? false;
 
     private static void WriteEnabled(IBppConfig config, bool enabled)
     {
