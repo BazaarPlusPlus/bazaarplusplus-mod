@@ -926,6 +926,12 @@ public class SettingsDockRegistryTests
         Assert.True(definition.CollapseAfterActivate);
     }
 
+    [Fact]
+    public void HistoryPanelDockEntry_uses_game_history_order()
+    {
+        Assert.Equal(BppSettingsDockOrder.GameHistory, new HistoryPanelSettingsDockEntry().Order);
+    }
+
     [Theory]
     [InlineData(
         "NameOverride",
