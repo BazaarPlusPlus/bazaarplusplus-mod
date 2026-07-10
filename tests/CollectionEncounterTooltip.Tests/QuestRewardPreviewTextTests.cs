@@ -6,25 +6,6 @@ namespace CollectionEncounterTooltip.Tests;
 
 public sealed class QuestRewardPreviewTextTests
 {
-    [Theory]
-    [InlineData(false, false, true)]
-    [InlineData(true, false, false)]
-    [InlineData(true, true, true)]
-    public void Reward_preview_keeps_icon_override_skip_except_for_collection_cards(
-        bool hasIconOverride,
-        bool isCollectionCard,
-        bool expected
-    )
-    {
-        Assert.Equal(
-            expected,
-            QuestRewardPreviewTooltipPatch.ShouldAppendRewardPreview(
-                hasIconOverride,
-                isCollectionCard
-            )
-        );
-    }
-
     [Fact]
     public void AppendRewardPreview_adds_passive_reward_on_smaller_nested_line()
     {

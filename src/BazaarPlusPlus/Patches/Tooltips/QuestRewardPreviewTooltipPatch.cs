@@ -6,7 +6,6 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Tooltips;
-using BazaarPlusPlus.Game.CollectionPanel.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
@@ -33,15 +32,8 @@ internal static class QuestRewardPreviewTooltipPatch
     {
         try
         {
-            var hasIconOverride = !string.IsNullOrEmpty(entry.QuestEntry.IconKeyOverride);
-            var isCollectionCard = CollectionTierTooltipRegistry.Contains(
-                currentTooltipData.CardInstance
-            );
-            // Normal tooltips keep icon-override rewards in the native nested hover. Collection
-            // tooltips cannot reliably enter that second hover surface, so keep the reward inline.
-            if (!ShouldAppendRewardPreview(hasIconOverride, isCollectionCard))
-                return;
-
+            // The native icon remains useful as a compact reward marker, but unlocked tooltips
+            // cannot enter its nested hover. Keep the reward text inline on every tooltip surface.
             if (DescriptionTextField?.GetValue(__instance) is not TMP_Text descriptionText)
                 return;
 
@@ -75,9 +67,6 @@ internal static class QuestRewardPreviewTooltipPatch
             BppLog.Error("QuestTooltip", "Failed to append quest reward preview", ex);
         }
     }
-
-    internal static bool ShouldAppendRewardPreview(bool hasIconOverride, bool isCollectionCard) =>
-        !hasIconOverride || isCollectionCard;
 }
 
 internal static class BppQuestRewardPreviewText
