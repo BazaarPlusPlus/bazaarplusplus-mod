@@ -4,8 +4,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Tooltips;
+using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
@@ -74,11 +74,6 @@ internal static class BppQuestRewardPreviewText
     private const int RewardSizePercent = 55;
     private const float RewardInlineSizeScale = RewardSizePercent / 100f;
 
-    private static readonly Regex SizeTagRegex = new Regex(
-        "<size=(\\d+)%>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant
-    );
-
     public static string AppendRewardPreview(
         string? questText,
         string? passiveRewardText,
@@ -102,31 +97,16 @@ internal static class BppQuestRewardPreviewText
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var value in values)
         {
-            var line = ScaleInlineSizes(NormalizeInline(value), RewardInlineSizeScale);
+            var line = ItemEnchantPreviewFormatting.ScaleInlineSizes(
+                NormalizeInline(value),
+                RewardInlineSizeScale
+            );
             if (line.Length == 0 || !seen.Add(line))
                 continue;
             lines.Add(line);
         }
 
         return string.Join(" / ", lines);
-    }
-
-    private static string ScaleInlineSizes(string text, float scale)
-    {
-        if (string.IsNullOrEmpty(text))
-            return text;
-
-        return SizeTagRegex.Replace(
-            text,
-            match =>
-            {
-                if (!int.TryParse(match.Groups[1].Value, out var size))
-                    return match.Value;
-
-                var scaledSize = Math.Max(1, (int)Math.Round(size * scale));
-                return $"<size={scaledSize}%>";
-            }
-        );
     }
 
     private static string NormalizeInline(string? text)

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Text;
 using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Infrastructure;
@@ -56,7 +57,44 @@ public static class ItemEnchantPreviewFormatting
         return NativeLineHeightRegex.Replace(text, CjkLineHeight);
     }
 
-    private static string ScaleInlineSizes(string text, float scale)
+    public static void AppendTooltipText(StringBuilder builder, string text)
+    {
+        if (builder == null || string.IsNullOrWhiteSpace(text))
+            return;
+
+        var lineStart = 0;
+        for (var index = 0; index < text.Length; index++)
+        {
+            var character = text[index];
+            if (character != '\r' && character != '\n')
+                continue;
+
+            AppendLine(builder, text, lineStart, index - lineStart);
+            if (character == '\r' && index + 1 < text.Length && text[index + 1] == '\n')
+                index++;
+            lineStart = index + 1;
+        }
+
+        AppendLine(builder, text, lineStart, text.Length - lineStart);
+    }
+
+    private static void AppendLine(StringBuilder builder, string text, int startIndex, int length)
+    {
+        if (length <= 0)
+            return;
+
+        for (var index = startIndex; index < startIndex + length; index++)
+        {
+            if (char.IsWhiteSpace(text[index]))
+                continue;
+
+            builder.Append(text, startIndex, length);
+            builder.Append('\n');
+            return;
+        }
+    }
+
+    internal static string ScaleInlineSizes(string text, float scale)
     {
         if (string.IsNullOrEmpty(text))
             return text;
