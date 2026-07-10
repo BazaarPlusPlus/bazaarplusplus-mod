@@ -38,16 +38,3 @@ public sealed class RunLogPvpBattleInput
 
     public string? OpponentName { get; set; }
 }
-
-public sealed class RunLogPlayerStatsSnapshot
-{
-    public int? MaxHealth { get; set; }
-
-    public int? Prestige { get; set; }
-
-    public int? Level { get; set; }
-
-    public int? Income { get; set; }
-
-    public int? Gold { get; set; }
-}

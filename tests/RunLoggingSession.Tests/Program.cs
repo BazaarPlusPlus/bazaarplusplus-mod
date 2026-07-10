@@ -1,19 +1,23 @@
 #nullable enable
 using System.Reflection;
 using System.Threading.Tasks;
-using BazaarPlusPlus.Storage.RunLog;
+using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Storage.RunLog;
 
 var managerType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogSessionManager");
-var ctor = managerType.GetConstructor([typeof(IRunLogStore), typeof(Func<DateTimeOffset>)]);
+var ctor = managerType.GetConstructor([
+    typeof(IRunLogStore),
+    typeof(Func<DateTimeOffset>),
+    typeof(Func<PlayerStatsSnapshot?>),
+]);
 Assert(
     ctor != null,
-    "RunLogSessionManager should expose a constructor taking IRunLogStore and a clock."
+    "RunLogSessionManager should expose a constructor taking a store, clock, and stats provider."
 );
 
 var fakeStore = new FakeRunLogStore();
 var now = new DateTimeOffset(2026, 3, 15, 12, 15, 30, TimeSpan.Zero);
-var manager = ctor!.Invoke([fakeStore, new Func<DateTimeOffset>(() => now)]);
+var manager = ctor!.Invoke([fakeStore, new Func<DateTimeOffset>(() => now), null]);
 
 var request = new RunLogCreateRequest
 {
@@ -98,7 +102,11 @@ fakeStore.ResumeState = new RunLogSessionState
     Hour = 2,
 };
 
-var restoredManager = ctor.Invoke([fakeStore, new Func<DateTimeOffset>(() => now.AddMinutes(12))]);
+var restoredManager = ctor.Invoke([
+    fakeStore,
+    new Func<DateTimeOffset>(() => now.AddMinutes(12)),
+    null,
+]);
 Invoke<RunLogSessionState?>(managerType, restoredManager, "RestoreActiveSession", []);
 Assert(
     GetProperty<bool>(managerType, restoredManager, "HasActiveSession"),
@@ -134,6 +142,7 @@ mismatchStore.ResumeState = new RunLogSessionState
 var mismatchManager = ctor.Invoke([
     mismatchStore,
     new Func<DateTimeOffset>(() => now.AddMinutes(20)),
+    null,
 ]);
 Invoke<RunLogSessionState>(
     managerType,
@@ -159,6 +168,47 @@ Assert(
 Assert(
     mismatchStore.LastAbandonment?.Reason == "session_mismatch",
     "Mismatched sessions should be abandoned with the session_mismatch reason."
+);
+
+var checkpointStore = new FakeRunLogStore();
+PlayerStatsSnapshot? currentStats = new PlayerStatsSnapshot
+{
+    MaxHealth = 110,
+    Prestige = 9,
+    Level = 7,
+    Income = 5,
+    Gold = 18,
+};
+var checkpointManager = ctor.Invoke([
+    checkpointStore,
+    new Func<DateTimeOffset>(() => now),
+    new Func<PlayerStatsSnapshot?>(() => currentStats),
+]);
+Invoke<RunLogSessionState>(managerType, checkpointManager, "EnsureActiveSession", [request]);
+var checkpoint = Invoke<RunLogCheckpoint>(managerType, checkpointManager, "SaveCheckpoint", []);
+Assert(
+    checkpoint.MaxHealth == 110
+        && checkpoint.Prestige == 9
+        && checkpoint.Level == 7
+        && checkpoint.Income == 5
+        && checkpoint.Gold == 18,
+    "SaveCheckpoint should persist all five stats from the injected provider."
+);
+
+currentStats = null;
+var lastKnownCheckpoint = Invoke<RunLogCheckpoint>(
+    managerType,
+    checkpointManager,
+    "SaveCheckpoint",
+    []
+);
+Assert(
+    lastKnownCheckpoint.MaxHealth == 110
+        && lastKnownCheckpoint.Prestige == 9
+        && lastKnownCheckpoint.Level == 7
+        && lastKnownCheckpoint.Income == 5
+        && lastKnownCheckpoint.Gold == 18,
+    "A null stats read should preserve the session's last-known checkpoint stats."
 );
 
 Console.WriteLine("RunLogging session checks passed.");

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
@@ -48,7 +49,11 @@ internal sealed class RunLoggingController : MonoBehaviour
             new ReplicatedRunLogStore(sqliteStore, uploadStore),
             new RunLogStoreLoggerBridge()
         );
-        _sessionManager = new RunLogSessionManager(_store);
+        var probe = services.RunSnapshot;
+        _sessionManager = new RunLogSessionManager(
+            _store,
+            statsProvider: () => probe.TryGetPlayerStats(out var stats) ? stats : null
+        );
         _sessionManager.RestoreActiveSession();
         _captureService = new RunLogCaptureService();
         _core = new RunLoggingControllerCore(_sessionManager, _captureService);
@@ -60,7 +65,17 @@ internal sealed class RunLoggingController : MonoBehaviour
             () => CombatReplayRuntime.Instance?.HasPendingPersistence == true,
             EnsureActiveRunFromGame,
             battleCatalog.AttachToRun,
-            buildRunLogAbandonment: RunLoggingGameDataReader.BuildRunLogAbandonment
+            utcNow: () => DateTime.UtcNow,
+            buildRunLogCompletion: reason =>
+                RunLogRecordMapper.BuildRunLogCompletion(
+                    reason,
+                    services.RunContext.LastRunExitKind,
+                    ReadRunBasics(probe),
+                    ReadPlayerStats(probe),
+                    ReadRank(probe)
+                ),
+            buildRunLogAbandonment: reason =>
+                RunLogRecordMapper.BuildRunLogAbandonment(reason, ReadRunBasics(probe))
         );
         _module.Start();
         BppLog.Info(
@@ -104,11 +119,32 @@ internal sealed class RunLoggingController : MonoBehaviour
 
     private RunLogSessionState? EnsureActiveRunFromGame()
     {
-        if (!RunLoggingGameDataReader.TryCreateRunLogCreateRequest(out var request))
+        var services = _services!;
+        var probe = services.RunSnapshot;
+        var basics = ReadRunBasics(probe);
+        var rank = ReadRank(probe);
+        if (
+            !RunLogRecordMapper.TryCreateRunLogCreateRequest(
+                basics,
+                rank,
+                services.RunContext.CurrentServerRunId,
+                services.GameBuild.Channel.ToString(),
+                out var request
+            )
+        )
             return null;
 
         return RequireCore().EnsureRunStarted(request);
     }
+
+    private static RunBasicsSnapshot? ReadRunBasics(IRunSnapshotProbe probe) =>
+        probe.TryGetRunBasics(out var basics) ? basics : null;
+
+    private static PlayerStatsSnapshot? ReadPlayerStats(IRunSnapshotProbe probe) =>
+        probe.TryGetPlayerStats(out var stats) ? stats : null;
+
+    private static RankSnapshot? ReadRank(IRunSnapshotProbe probe) =>
+        probe.TryGetRankSnapshot(out var rank) ? rank : null;
 
     private RunLogSessionManager RequireSessionManager()
     {

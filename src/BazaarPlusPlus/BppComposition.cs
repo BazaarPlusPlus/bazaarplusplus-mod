@@ -28,6 +28,7 @@ using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.Encounter;
+using BazaarPlusPlus.GameInterop.RunSnapshot;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Storage.Paths;
@@ -45,6 +46,7 @@ internal sealed class BppComposition : IDisposable
     private readonly RunContextStore _runContext = new();
     private readonly GameStateProbe _gameStateProbe = new();
     private readonly EncounterStateProbe _encounterStateProbe = new();
+    private readonly RunSnapshotProbe _runSnapshotProbe = new();
     private readonly BppRuntimeServices _services;
     private readonly BppFeatureRegistry _featureRegistry = new();
     private readonly BppMountableRegistry _mountables = new();
@@ -92,6 +94,7 @@ internal sealed class BppComposition : IDisposable
             _runContext,
             _gameStateProbe,
             _encounterStateProbe,
+            _runSnapshotProbe,
             gameBuild,
             logger
         );

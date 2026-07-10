@@ -164,7 +164,6 @@ public class Plugin : BaseUnityPlugin
         BppSettingsDockCatalog.Install(services.Config, settingsDockRegistry);
         BPPSupporterCatalog.Install(services.Config);
         BppHotkeyService.Install(services.Config);
-        RunLoggingGameDataReader.Install(services.RunContext, services.GameBuild);
     }
 
     private static void UninstallStaticUtilities()
@@ -175,7 +174,6 @@ public class Plugin : BaseUnityPlugin
         BppSettingsDockCatalog.Reset();
         BPPSupporterCatalog.Reset();
         BppHotkeyService.Reset();
-        RunLoggingGameDataReader.Reset();
     }
 
     private void BuildOnlineServices()
