@@ -143,6 +143,50 @@ public class CollectionEncounterOutcomeMergeTests
         Assert.Equal(25, views[1].Percent);
     }
 
+    [Fact]
+    public void Large_ineligible_title_only_clusters_collapse_into_one_dimmed_pool_view()
+    {
+        var resolutions = new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>();
+        for (var i = 0; i < 10; i++)
+            resolutions.Add(TitleOnly(weight: 3, title: $"NPC {i}'s Package", eligible: false));
+
+        var view = Assert.Single(
+            CollectionEncounterEventDetailResolver.BuildOutcomeViews(resolutions, totalWeight: 0)
+        );
+
+        Assert.False(view.IsEligible);
+        Assert.Null(view.Percent);
+        Assert.Equal(10, view.OptionCount);
+        Assert.Empty(view.Details);
+    }
+
+    [Fact]
+    public void Large_title_only_clusters_with_different_eligibility_collapse_separately()
+    {
+        var resolutions = new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>();
+        for (var i = 0; i < 10; i++)
+        {
+            if (i < 9)
+                resolutions.Add(TitleOnly(weight: 1, title: $"Available {i}"));
+            resolutions.Add(TitleOnly(weight: 1, title: $"Unavailable {i}", eligible: false));
+        }
+
+        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
+            resolutions,
+            totalWeight: 9
+        );
+
+        Assert.Equal(2, views.Count);
+        var eligible = views[0];
+        Assert.True(eligible.IsEligible);
+        Assert.Equal(100, eligible.Percent);
+        Assert.Equal(9, eligible.OptionCount);
+        var ineligible = views[1];
+        Assert.False(ineligible.IsEligible);
+        Assert.Null(ineligible.Percent);
+        Assert.Equal(10, ineligible.OptionCount);
+    }
+
     // Shops (limit > 1) with nothing but nameless pools or a single view describe
     // stock composition, not outcome odds; one-shot rolls (limit 1) always render.
     [Fact]
@@ -189,11 +233,12 @@ public class CollectionEncounterOutcomeMergeTests
 
     private static CollectionEncounterEventDetailResolver.OutcomeGroupResolution TitleOnly(
         uint weight,
-        string title
+        string title,
+        bool eligible = true
     ) =>
         new(
             weight,
-            eligible: true,
+            eligible,
             isCombatPool: false,
             new HashSet<Guid>(),
             new List<CollectionEncounterChoiceDetail>

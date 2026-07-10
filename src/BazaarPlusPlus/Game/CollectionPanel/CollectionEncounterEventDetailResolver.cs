@@ -346,7 +346,7 @@ internal static class CollectionEncounterEventDetailResolver
                 Array.Empty<CollectionEncounterChoiceDetail>()
             );
 
-        var titleOnlySlots = new List<(int Slot, uint Weight)>();
+        var titleOnlySlotsByEligibility = new Dictionary<bool, List<(int Slot, uint Weight)>>();
         foreach (var (signature, slot) in contentSlots)
         {
             var view = views[slot];
@@ -357,32 +357,48 @@ internal static class CollectionEncounterEventDetailResolver
                 view.OptionCount,
                 view.Details
             );
-            if (view.IsEligible
-                && view.Details.Count == 1
+            if (
+                view.Details.Count == 1
                 && string.IsNullOrEmpty(view.Details[0].ResultText)
-                && !string.IsNullOrEmpty(view.Details[0].DisplayName))
-                titleOnlySlots.Add((slot, contentWeights[signature]));
+                && !string.IsNullOrEmpty(view.Details[0].DisplayName)
+            )
+            {
+                if (!titleOnlySlotsByEligibility.TryGetValue(view.IsEligible, out var slots))
+                {
+                    slots = new List<(int Slot, uint Weight)>();
+                    titleOnlySlotsByEligibility[view.IsEligible] = slots;
+                }
+                slots.Add((slot, contentWeights[signature]));
+            }
         }
 
         // A large cluster of same-shaped title-only outcomes (Farai's ~26 NPC
-        // packages, Underground Resistance's 22) reads as a wall; collapse it into
-        // one pool line with the summed probability.
-        if (titleOnlySlots.Count > 8)
+        // packages, Underground Resistance's 22) reads as a wall. Collapse eligible
+        // and ineligible clusters separately so unavailable results stay dimmed and
+        // carry no probability.
+        var slotsToRemove = new List<int>();
+        foreach (var (eligible, titleOnlySlots) in titleOnlySlotsByEligibility)
         {
+            if (titleOnlySlots.Count <= 8)
+                continue;
+
             titleOnlySlots.Sort((a, b) => a.Slot.CompareTo(b.Slot));
             uint pooledWeight = 0;
             foreach (var (_, weight) in titleOnlySlots)
                 pooledWeight += weight;
             views[titleOnlySlots[0].Slot] = new CollectionEncounterOutcomeView(
-                Percent(true, pooledWeight),
-                isEligible: true,
+                Percent(eligible, pooledWeight),
+                eligible,
                 isCombatPool: false,
                 titleOnlySlots.Count,
                 Array.Empty<CollectionEncounterChoiceDetail>()
             );
-            for (var i = titleOnlySlots.Count - 1; i >= 1; i--)
-                views.RemoveAt(titleOnlySlots[i].Slot);
+            for (var i = 1; i < titleOnlySlots.Count; i++)
+                slotsToRemove.Add(titleOnlySlots[i].Slot);
         }
+        slotsToRemove.Sort();
+        for (var i = slotsToRemove.Count - 1; i >= 0; i--)
+            views.RemoveAt(slotsToRemove[i]);
 
         return views;
     }
