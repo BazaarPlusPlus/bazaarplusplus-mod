@@ -6,19 +6,16 @@ using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
-internal sealed class BazaarDbSnapshotUploadSettingsDockEntry : ISettingsDockEntry
+internal static class BazaarDbSnapshotUploadSettingsDockEntry
 {
-    public int Order => BppSettingsDockOrder.BazaarDbUpload;
-
-    public BppSettingsDockDefinition Build(IBppConfig config) =>
-        new(
+    internal static CyclingSettingsDockEntry<bool> Create() =>
+        CyclingSettingsDockEntry<bool>.Toggle(
+            BppSettingsDockOrder.BazaarDbUpload,
             "BazaarDbUpload",
             BazaarDbSnapshotUploadSettingsMenuLabel.Resolve,
-            new SettingsMenuToggleBridge(
-                () => ReadEnabled(config),
-                enabled => WriteEnabled(config, enabled),
-                OnEnabledChanged
-            )
+            ReadEnabled,
+            WriteEnabled,
+            OnEnabledChanged
         );
 
     private static bool ReadEnabled(IBppConfig config) =>

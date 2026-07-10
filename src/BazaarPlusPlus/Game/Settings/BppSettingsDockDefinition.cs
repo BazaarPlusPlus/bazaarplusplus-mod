@@ -8,20 +8,6 @@ internal sealed class BppSettingsDockDefinition
     internal BppSettingsDockDefinition(
         string key,
         Func<string, string> resolveLabel,
-        SettingsMenuToggleBridge bridge
-    )
-        : this(
-            key,
-            resolveLabel,
-            _ => bridge.GetInitialValue() ? "ON" : "OFF",
-            bridge.GetInitialValue,
-            () => bridge.ApplyValue(!bridge.GetInitialValue()),
-            collapseAfterActivate: false
-        ) { }
-
-    internal BppSettingsDockDefinition(
-        string key,
-        Func<string, string> resolveLabel,
         Func<string, string> resolveStatus,
         Func<bool> isActive,
         Action activate,

@@ -33,16 +33,8 @@
       Link="UiSuppressionScope.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\Settings\SettingsMenuToggleBridge.cs"
-      Link="SettingsMenuToggleBridge.cs"
-    />
-    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\Settings\BppSettingsDockDefinition.cs"
       Link="BppSettingsDockDefinition.cs"
-    />
-    <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\CombatStatusBar\CombatStatusBar.SettingsMenuBridge.cs"
-      Link="CombatStatusBar.SettingsMenuBridge.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CombatStatusBar\CombatStatusBar.SettingsMenuLabel.cs"
@@ -59,10 +51,6 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\ItemEnchantPreview\EnchantPreview.SettingsMenuLabel.cs"
       Link="EnchantPreview.SettingsMenuLabel.cs"
-    />
-    <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\NameOverride\NameOverride.SettingsMenuBridge.cs"
-      Link="NameOverride.SettingsMenuBridge.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\NameOverride\NameOverride.SettingsMenuLabel.cs"

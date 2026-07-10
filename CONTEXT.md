@@ -25,6 +25,11 @@ _Avoid_: popup, window
 The single module that owns main-overlay-panel lifecycle: mutual exclusion, scene-change policy, combat gating, hotkey and escape routing, and the per-frame tick. Panels register content callbacks with the host instead of re-implementing the lifecycle.
 _Avoid_: panel mutex (the deleted `BppOverlayPanelMutex` predecessor)
 
+## Settings dock
+
+**Cycling Settings Dock Entry（循环设置项）**:
+settings dock 中「点击在有序值阶梯上循环、越省缺即高亮、渲染本地化状态」的统一概念，由 `CyclingSettingsDockEntry<T>` 承载；功能侧只贡献数据（阶梯 + 读写 + 文案 + 可选 nextOverride/onChanged）。bool 开关是 `Toggle` 工厂承载的二值特例。动作按钮与锁定开关（局末截图的强制锁开策略）不属于此概念。
+
 ## Collection sources
 
 **Collection Source Catalog**:
