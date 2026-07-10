@@ -83,8 +83,6 @@ internal sealed class HistoryPanelState
 
     public bool FilteredRunsDirty { get; set; } = true;
 
-    public bool IsVisible { get; set; }
-
     public bool ShouldClearStatusWhenDeleteConfirmationExpires()
     {
         return DeleteRunConfirmationStatusActive;

@@ -99,9 +99,9 @@ internal sealed partial class HistoryPanel
         var filteredRuns = FilteredRuns;
         var visibleRuns = filteredRuns.ToList();
         var visibleBattles =
-            _sectionMode == HistorySectionMode.Ghost
+            _state.SectionMode == HistorySectionMode.Ghost
                 ? FilteredGhostBattles.ToList()
-                : _battles.ToList();
+                : _state.Battles.ToList();
 
         var selectedBattle = ActiveSelectedBattle;
         var hasSelectedBattle = selectedBattle != null;
@@ -111,13 +111,13 @@ internal sealed partial class HistoryPanel
             _coordinator?.ResolveDatabaseChip()
             ?? HistoryPanelDecisions.ResolveDatabaseChip(false, false);
         var buttons = HistoryPanelButtonModel.Build(
-            _replayActionInProgress,
+            _state.ReplayActionInProgress,
             canReplaySelectedBattle,
             replayUnavailableReason,
             _coordinator?.GetReplayActionLabel(selectedBattle) ?? HistoryPanelText.Replay(),
             _runtime?.IsInGameRun == true,
             canRecordSelectedBattle,
-            _sectionMode == HistorySectionMode.Runs
+            _state.SectionMode == HistorySectionMode.Runs
                 && selectedRun != null
                 && _coordinator?.IsDeleteRunConfirmationActive(selectedRun.RunId, now) == true,
             canDeleteSelectedRun
@@ -163,13 +163,13 @@ internal sealed partial class HistoryPanel
             Subtitle = HistoryPanelText.Subtitle(),
             Supporters = _supporters,
             CountChipText =
-                _sectionMode == HistorySectionMode.Ghost
+                _state.SectionMode == HistorySectionMode.Ghost
                     ? HistoryPanelText.CountGhost(FilteredGhostBattles.Count)
                     : HistoryPanelText.CountRuns(filteredRuns.Count),
             BattleChipText =
-                _sectionMode == HistorySectionMode.Ghost
+                _state.SectionMode == HistorySectionMode.Ghost
                     ? HistoryPanelText.CountBattles(FilteredGhostBattles.Count)
-                    : HistoryPanelText.CountBattles(_battles.Count),
+                    : HistoryPanelText.CountBattles(_state.Battles.Count),
             DatabaseChipText = databaseChip.Text,
             DatabaseChipSeverity = databaseChip.Severity,
             ServerHealthButtonText = serverHealthDisplay.ButtonText,
@@ -200,19 +200,19 @@ internal sealed partial class HistoryPanel
             AccountLinkBannerText = _state.AccountLinkBannerMessage,
             AccountLinkBannerSeverity = _state.AccountLinkBannerSeverity,
             AccountLinkFormVisible = accountFormVisible,
-            SectionMode = _sectionMode,
-            GhostBattleFilter = _ghostBattleFilter,
+            SectionMode = _state.SectionMode,
+            GhostBattleFilter = _state.GhostBattleFilter,
             SelectedRunHero = _state.SelectedRunHero,
             GhostDayMin10 = _state.GhostDayMin10,
-            StatusMessage = _statusMessage,
+            StatusMessage = _state.StatusMessage,
             StatusSeverity = statusSeverity,
             Runs = visibleRuns,
             VisibleBattles = visibleBattles,
-            SelectedRunIndex = _selectedRunIndex,
+            SelectedRunIndex = _state.SelectedRunIndex,
             SelectedBattleIndex =
-                _sectionMode == HistorySectionMode.Ghost
-                    ? _selectedGhostBattleIndex
-                    : _selectedBattleIndex,
+                _state.SectionMode == HistorySectionMode.Ghost
+                    ? _state.SelectedGhostBattleIndex
+                    : _state.SelectedBattleIndex,
             RunsBattleSubtitle =
                 selectedRun == null
                     ? HistoryPanelText.SelectRunSubtitle()
