@@ -684,8 +684,8 @@ AssertFalse(
 );
 AssertValues(
     CollectionFacetAvailability
-        .KeywordsFor(new[] { derivedLifestealVm }, ECardType.Item)
-        .Select(tag => tag.ToString())
+        .SnapshotFor(new[] { derivedLifestealVm })
+        .ItemKeywords.Select(tag => tag.ToString())
         .ToArray(),
     new[] { nameof(EHiddenTag.Lifesteal) },
     "Available item keywords should include Lifesteal derived from item attributes."
@@ -984,19 +984,14 @@ var availableFacetCards = new[]
     ),
     Card("Potion Reference", ETier.Bronze, hiddenTags: new[] { EHiddenTag.PotionReference }),
 };
+var availableFacets = CollectionFacetAvailability.SnapshotFor(availableFacetCards);
 AssertValues(
-    CollectionFacetAvailability
-        .TagsFor(availableFacetCards, ECardType.Item)
-        .Select(tag => tag.ToString())
-        .ToArray(),
+    availableFacets.ItemTags.Select(tag => tag.ToString()).ToArray(),
     new[] { nameof(ECardTag.Weapon) },
     "Available item tags should include only non-package catalog tags that are in the BazaarDB-facing whitelist."
 );
 AssertValues(
-    CollectionFacetAvailability
-        .KeywordsFor(availableFacetCards, ECardType.Item)
-        .Select(tag => tag.ToString())
-        .ToArray(),
+    availableFacets.ItemKeywords.Select(tag => tag.ToString()).ToArray(),
     new[]
     {
         nameof(EHiddenTag.Damage),
@@ -1006,10 +1001,7 @@ AssertValues(
     "Available item keywords should include non-package catalog keywords and curated references from the same facet."
 );
 AssertValues(
-    CollectionFacetAvailability
-        .KeywordsFor(availableFacetCards, ECardType.Skill)
-        .Select(tag => tag.ToString())
-        .ToArray(),
+    availableFacets.SkillKeywords.Select(tag => tag.ToString()).ToArray(),
     new[] { nameof(EHiddenTag.Quest) },
     "Available skill keywords should be computed independently from item keywords."
 );
