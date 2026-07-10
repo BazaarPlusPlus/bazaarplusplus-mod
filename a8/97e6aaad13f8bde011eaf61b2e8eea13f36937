@@ -1,0 +1,23 @@
+src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs
+  s_0dfdc18593b2f7::t_fe09ee5c64ea4a 334-336
+src/BazaarPlusPlus/Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs
+  s_0dfdc18593b2f7::t_2addf3f57384ef 960-963
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "a897e6aaad13f8bde011eaf61b2e8eea13f36937",
+  "prompts": {},
+  "sessions": {
+    "s_0dfdc18593b2f7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e3809e7-311c-4a53-b69e-dadb5ee7066e",
+        "model": "claude-fable-5"
+      },
+      "human_author": "Xinyu YANG <cauyxy@gmail.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
