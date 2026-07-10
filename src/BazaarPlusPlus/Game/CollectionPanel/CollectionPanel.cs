@@ -331,6 +331,9 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (!_isVisible)
             return;
         _searchRefreshGate.Cancel();
+        // Drop composition state with the panel: a composition whose terminating Count==0
+        // event never arrives would otherwise keep Advance() blocked after the next Open().
+        DetachImeKeyboard();
         CancelPanelLoad();
         _isVisible = false;
         HideNativeCardLayerImmediately();

@@ -957,7 +957,10 @@ internal sealed class CollectionGridVirtualizer
         foreach (var pair in previousCells)
         {
             var cell = pair.Value;
-            if (!retention.TryGetValue(pair.Key, out var newIndex))
+            // A retained card can be destroyed out from under us (the same anticipated state
+            // ShowWhenReady and TickFades guard); recycle it like the pre-retention path did
+            // instead of dereferencing a dead GameObject and orphaning the rest of the loop.
+            if (!retention.TryGetValue(pair.Key, out var newIndex) || cell.Card == null)
             {
                 RecycleCell(cell);
                 continue;
