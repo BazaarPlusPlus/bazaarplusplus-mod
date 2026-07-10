@@ -1,9 +1,58 @@
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
+using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.TagTypography;
+
+var searchRefreshGate = new CollectionSearchRefreshGate(0.16f);
+AssertFalse(
+    searchRefreshGate.Advance(1f),
+    "An idle search refresh gate should not request a list rebuild."
+);
+searchRefreshGate.Schedule();
+AssertFalse(
+    searchRefreshGate.Advance(0.1f),
+    "Search refresh should wait while the user is still typing."
+);
+searchRefreshGate.Schedule();
+AssertFalse(
+    searchRefreshGate.Advance(0.1f),
+    "Another keystroke should restart the search refresh delay."
+);
+AssertTrue(
+    searchRefreshGate.Advance(0.061f),
+    "Search refresh should run once after the typing pause expires."
+);
+AssertFalse(
+    searchRefreshGate.Advance(1f),
+    "An elapsed search refresh should not run more than once."
+);
+searchRefreshGate.Schedule();
+searchRefreshGate.Cancel();
+AssertFalse(
+    searchRefreshGate.Advance(1f),
+    "Cancelling a pending search refresh should prevent a later rebuild."
+);
+searchRefreshGate.Schedule();
+AssertFalse(
+    searchRefreshGate.Advance(1f, isComposing: true),
+    "Search refresh should remain paused while an IME composition is active."
+);
+AssertTrue(
+    searchRefreshGate.IsPending,
+    "IME composition should preserve the pending committed search refresh."
+);
+AssertFalse(
+    searchRefreshGate.Advance(0.1f),
+    "The debounce should resume from its pre-composition duration."
+);
+AssertTrue(
+    searchRefreshGate.Advance(0.061f),
+    "The committed query should refresh once after composition ends and debounce elapses."
+);
 
 var heroState = new CollectionFilterState();
 heroState.ToggleHero(EHero.Vanessa);
@@ -1152,6 +1201,58 @@ AssertEqual(
     "CollectionQuery should use null retained keywords when no keywords are selected."
 );
 
+var searchOutsideActiveFilters = Card(
+    "Lighter",
+    ETier.Gold,
+    size: ECardSize.Large,
+    tags: new[] { ECardTag.Tool },
+    hiddenTags: new[] { EHiddenTag.Burn },
+    heroes: new[] { EHero.Dooley }
+);
+var searchGlobalFilter = new CollectionFilterState
+{
+    SelectedSourceKey = querySource.SourceKey,
+    SearchQuery = "lighter",
+    SelectedRunDay = 1,
+};
+searchGlobalFilter.Heroes.Add(EHero.Vanessa);
+searchGlobalFilter.Tiers.Add(ETier.Bronze);
+searchGlobalFilter.Tags.Add(ECardTag.Weapon);
+searchGlobalFilter.Keywords.Add(EHiddenTag.Damage);
+searchGlobalFilter.Sizes.Add(ECardSize.Small);
+var searchGlobalResult = CollectionQuery.Run(
+    new[] { queryCatalogCards[0], searchOutsideActiveFilters },
+    searchGlobalFilter,
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertSequence(
+    searchGlobalResult.Cards,
+    Array.Empty<Guid>(),
+    "Collection search should AND text with source, hero, day, tier, size, tag, and keyword filters."
+);
+AssertTrue(
+    searchGlobalResult.OfferMatchesByCardId != null,
+    "Collection search should retain resolved source offer metadata."
+);
+
+var searchWithinFilters = new CollectionFilterState
+{
+    SelectedSourceKey = querySource.SourceKey,
+    SearchQuery = "damage",
+};
+searchWithinFilters.Heroes.Add(EHero.Vanessa);
+searchWithinFilters.Tags.Add(ECardTag.Weapon);
+searchWithinFilters.Keywords.Add(EHiddenTag.Damage);
+AssertSequence(
+    CollectionQuery
+        .Run(queryCatalogCards, searchWithinFilters, queryAvailability, queryCatalog, queryResolver)
+        .Cards,
+    new[] { queryCatalogCards[0].Id },
+    "Collection search should return text matches that satisfy every selected filter."
+);
+
 var emptyTrimFilter = new CollectionFilterState();
 emptyTrimFilter.Tags.Add(ECardTag.Tool);
 emptyTrimFilter.Keywords.Add(EHiddenTag.Shield);
@@ -1523,6 +1624,227 @@ AssertSequence(
     "Suppressing the day gate leaves the manual Tier row in force."
 );
 
+var searchDamageReference = Card(
+    "Internal Synergy",
+    ETier.Bronze,
+    hiddenTags: new[] { EHiddenTag.BurnReference },
+    description: "When you <color=#00ffff>Slow</color>, Charge this {ability.0} seconds.",
+    internalName: "Internal_Synergy_Card",
+    artKey: "anglerfish_art"
+);
+var searchShield = Card(
+    "Bulwark",
+    ETier.Bronze,
+    hiddenTags: new[] { EHiddenTag.Shield },
+    description: "Gain {ability.0} Shield."
+);
+var searchChinese = Card(
+    "深水琵琶鱼",
+    ETier.Bronze,
+    description: "当你减速时，充能 {ability.0} 秒。"
+);
+var searchLighter = Card("Lighter", ETier.Bronze, description: "Burn an item.");
+var searchInitialism = Card("Molten Ball Blaster", ETier.Bronze);
+var searchRepeatedLetters = Card(
+    "Dreaded Damage Dealer",
+    ETier.Bronze,
+    internalName: "DreadedDamageDealer"
+);
+var searchLetterSoup = Card(
+    "Lime",
+    ETier.Bronze,
+    description: "Iguana Gold Honey Teapot Echo Rabbit."
+);
+var tooltipOnlySearchVm = CollectionCardVm.From(
+    new TCardItem
+    {
+        Id = Guid.NewGuid(),
+        Type = ECardType.Item,
+        StartingTier = ETier.Bronze,
+        Size = ECardSize.Small,
+        InternalName = "Tooltip Search Probe",
+        ArtKey = "tooltip-search-probe",
+        Localization = new TCardLocalization
+        {
+            Title = new TLocalizableText { Text = "Tooltip Search Probe" },
+            Tooltips = new List<TTooltip>
+            {
+                new()
+                {
+                    Content = new TLocalizableText
+                    {
+                        Text = "Deal <color=#ff0000>Burn</color> to enemies {ability.0}.",
+                    },
+                },
+            },
+        },
+    }
+);
+var localizationHashSearchVm = CollectionCardVm.From(
+    new TCardItem
+    {
+        Id = Guid.NewGuid(),
+        Type = ECardType.Skill,
+        StartingTier = ETier.Bronze,
+        Size = ECardSize.Medium,
+        InternalName = "Hash Search Probe",
+        ArtKey = "hash-search-probe",
+        Localization = new TCardLocalization
+        {
+            Title = new TLocalizableText
+            {
+                Key = "69d1f37d94ddc3150f8dd44d12d53ced",
+                Text = "Gumball Machine",
+            },
+        },
+    }
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchDamageReference, searchShield, searchChinese },
+        new CollectionFilterState { SearchQuery = "slow charge" }
+    ),
+    new[] { searchDamageReference.Id },
+    "Collection search should match normalized description text after stripping tooltip markup and ability placeholders."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { tooltipOnlySearchVm },
+        new CollectionFilterState { SearchQuery = "burn enemies" }
+    ),
+    new[] { tooltipOnlySearchVm.Id },
+    "Collection search should match normalized tooltip text when a card has no description."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchLighter, searchLetterSoup },
+        new CollectionFilterState { SearchQuery = "lighter" }
+    ),
+    new[] { searchLighter.Id },
+    "Collection search should not fuzzy-match a full card name across unrelated corpus words."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchLighter, searchLetterSoup },
+        new CollectionFilterState { SearchQuery = "lightr" }
+    ),
+    Array.Empty<Guid>(),
+    "Collection search should require a contiguous Latin substring instead of skipped letters."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchLighter },
+        new CollectionFilterState { SearchQuery = "light" }
+    ),
+    new[] { searchLighter.Id },
+    "Collection search should preserve conventional partial-word matching."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchInitialism, searchLighter },
+        new CollectionFilterState { SearchQuery = "mbb" }
+    ),
+    new[] { searchInitialism.Id },
+    "Collection search should match a card name by its word initialism."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchInitialism },
+        new CollectionFilterState { SearchQuery = "mxb" }
+    ),
+    Array.Empty<Guid>(),
+    "Initialism matching should compare word initials rather than skip arbitrary letters."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchRepeatedLetters },
+        new CollectionFilterState { SearchQuery = "dddd" }
+    ),
+    Array.Empty<Guid>(),
+    "Repeated Latin letters should not jump across a long internal word."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { localizationHashSearchVm },
+        new CollectionFilterState { ActiveType = ECardType.Skill, SearchQuery = "ddddddddd" }
+    ),
+    Array.Empty<Guid>(),
+    "Collection search should not expose opaque localization hashes as searchable content."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { localizationHashSearchVm },
+        new CollectionFilterState { ActiveType = ECardType.Skill, SearchQuery = "gumball" }
+    ),
+    new[] { localizationHashSearchVm.Id },
+    "Removing localization hashes should preserve authored fallback text search."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchDamageReference, searchShield },
+        new CollectionFilterState { SearchQuery = "burn related" }
+    ),
+    new[] { searchDamageReference.Id },
+    "Collection search should match internal reference hidden tags as related content."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchDamageReference, searchShield },
+        new CollectionFilterState { SearchQuery = "angler" }
+    ),
+    new[] { searchDamageReference.Id },
+    "Collection search should match internal art keys."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchDamageReference, searchShield },
+        new CollectionFilterState { SearchQuery = "internal card" }
+    ),
+    new[] { searchDamageReference.Id },
+    "Collection search should match contiguous internal-name terms with all query terms required."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchDamageReference, searchShield },
+        new CollectionFilterState { SearchQuery = "ability" }
+    ),
+    Array.Empty<Guid>(),
+    "Collection search should remove unresolved ability template tokens from the searchable text."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchDamageReference, searchShield, searchChinese },
+        new CollectionFilterState { SearchQuery = "减速 充能" }
+    ),
+    new[] { searchChinese.Id },
+    "Collection search should match Chinese description text without pinyin."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchDamageReference, searchShield, searchChinese },
+        new CollectionFilterState { SearchQuery = "减速充能" }
+    ),
+    new[] { searchChinese.Id },
+    "Collection search should match compact Chinese queries against normalized description text."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { searchDamageReference, searchShield },
+        new CollectionFilterState { SearchQuery = "intnl" }
+    ),
+    Array.Empty<Guid>(),
+    "Collection search should not treat Latin abbreviations as skipped-letter matches."
+);
+var prebuiltSearchText = Card("Surface", ETier.Bronze, searchText: "localized fallback corpus");
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { prebuiltSearchText, searchShield },
+        new CollectionFilterState { SearchQuery = "fallback corpus" }
+    ),
+    new[] { prebuiltSearchText.Id },
+    "Collection search should honor prebuilt card search text."
+);
+
 Console.WriteLine("CollectionFilterEngine checks passed.");
 
 static CollectionCardVm Card(
@@ -1533,7 +1855,12 @@ static CollectionCardVm Card(
     bool isPackage = false,
     IReadOnlyCollection<ECardTag>? tags = null,
     IReadOnlyCollection<EHiddenTag>? hiddenTags = null,
-    IReadOnlyCollection<EHero>? heroes = null
+    IReadOnlyCollection<EHero>? heroes = null,
+    string? description = null,
+    string? internalName = null,
+    string? artKey = null,
+    IReadOnlyDictionary<EEnchantmentType, CollectionCardEnchantmentFacets>? enchantments = null,
+    string? searchText = null
 ) =>
     new()
     {
@@ -1544,9 +1871,14 @@ static CollectionCardVm Card(
         Tags = tags ?? Array.Empty<ECardTag>(),
         HiddenTags = hiddenTags ?? Array.Empty<EHiddenTag>(),
         DisplayName = name,
-        InternalName = name,
+        Description = description ?? string.Empty,
+        InternalName = internalName ?? name,
+        ArtKey = artKey ?? string.Empty,
         IsPackage = isPackage,
         Heroes = heroes ?? Array.Empty<EHero>(),
+        Enchantments =
+            enchantments ?? new Dictionary<EEnchantmentType, CollectionCardEnchantmentFacets>(),
+        SearchText = searchText ?? string.Empty,
     };
 
 static CollectionSourceEntry Source(

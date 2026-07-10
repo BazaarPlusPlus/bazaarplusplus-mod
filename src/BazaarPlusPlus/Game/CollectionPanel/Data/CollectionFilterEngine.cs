@@ -58,6 +58,8 @@ internal static class CollectionFilterEngine
                 continue;
             if (sizeFilterCount > 0 && !filter.Sizes.Contains(card.Size))
                 continue;
+            if (!CollectionCardSearch.Matches(card, filter.SearchQuery))
+                continue;
             result.Add(card);
         }
 

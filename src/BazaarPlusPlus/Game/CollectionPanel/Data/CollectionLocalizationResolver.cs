@@ -33,25 +33,98 @@ internal static class CollectionLocalizationResolver
         return FormatAbilityPlaceholders(template, text);
     }
 
+    public static IReadOnlyList<string> ResolveTitleSearchTexts(TCardBase template) =>
+        SearchTexts(template, template.Localization?.Title, formatAbilityPlaceholders: false);
+
+    public static IReadOnlyList<string> ResolveDescriptionSearchTexts(TCardBase template) =>
+        SearchTexts(template, template.Localization?.Description, formatAbilityPlaceholders: true);
+
+    public static IReadOnlyList<string> ResolveTooltipSearchTexts(TCardBase template)
+    {
+        var tooltips = template.Localization?.Tooltips;
+        if (tooltips == null || tooltips.Count == 0)
+            return Array.Empty<string>();
+
+        var values = new List<string>(tooltips.Count * 3);
+        foreach (var tooltip in tooltips)
+            AddSearchTexts(values, template, tooltip?.Content, formatAbilityPlaceholders: true);
+        return values;
+    }
+
+    private static IReadOnlyList<string> SearchTexts(
+        TCardBase template,
+        TLocalizableText? text,
+        bool formatAbilityPlaceholders
+    )
+    {
+        if (text == null)
+            return Array.Empty<string>();
+
+        var values = new List<string>(3);
+        AddSearchTexts(values, template, text, formatAbilityPlaceholders);
+        return values;
+    }
+
+    private static void AddSearchTexts(
+        List<string> values,
+        TCardBase template,
+        TLocalizableText? text,
+        bool formatAbilityPlaceholders
+    )
+    {
+        if (text == null)
+            return;
+
+        AddSearchText(values, TryGetLocalizedText(text), template, formatAbilityPlaceholders);
+        AddSearchText(values, text.Text, template, formatAbilityPlaceholders);
+    }
+
     private static string? PickText(TLocalizableText text)
     {
-        try
-        {
-            var localized = TheBazaar.Tooltips.TooltipExtensions.GetLocalizedText(text);
-            if (!string.IsNullOrWhiteSpace(localized))
-                return localized;
-        }
-        catch (Exception)
-        {
-            // Localization service unavailable (unit tests / early startup):
-            // fall back to the authored text below.
-        }
+        var localized = TryGetLocalizedText(text);
+        if (!string.IsNullOrWhiteSpace(localized))
+            return localized;
 
         if (!string.IsNullOrWhiteSpace(text.Text))
             return text.Text;
         if (!string.IsNullOrWhiteSpace(text.Key))
             return text.Key;
         return null;
+    }
+
+    private static string? TryGetLocalizedText(TLocalizableText text)
+    {
+        try
+        {
+            return TheBazaar.Tooltips.TooltipExtensions.GetLocalizedText(text);
+        }
+        catch (Exception)
+        {
+            // Localization service unavailable (unit tests / early startup):
+            // fall back to the authored text below.
+            return null;
+        }
+    }
+
+    private static void AddSearchText(
+        List<string> values,
+        string? text,
+        TCardBase template,
+        bool formatAbilityPlaceholders
+    )
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return;
+
+        var value = formatAbilityPlaceholders ? FormatAbilityPlaceholders(template, text) : text;
+        if (string.IsNullOrWhiteSpace(value))
+            return;
+
+        foreach (var existing in values)
+            if (string.Equals(existing, value, StringComparison.Ordinal))
+                return;
+
+        values.Add(value!);
     }
 
     // Installed at plugin startup (Plugin.InstallStaticUtilities): maps a canonical attribute keyword
@@ -62,7 +135,9 @@ internal static class CollectionLocalizationResolver
 
     private static string? FormatAbilityPlaceholders(TCardBase template, string? text)
     {
-        if (string.IsNullOrWhiteSpace(text) || !text.Contains("{ability.", StringComparison.Ordinal))
+        if (
+            string.IsNullOrWhiteSpace(text) || !text.Contains("{ability.", StringComparison.Ordinal)
+        )
             return text;
 
         var formatted = Regex.Replace(
@@ -73,7 +148,14 @@ internal static class CollectionLocalizationResolver
                 // Unresolvable placeholders (e.g. live-computed totals) degrade to
                 // nothing rather than leaking raw tokens; leftover empty brackets
                 // are cleaned afterwards.
-                if (!TryResolveAbilityValue(template, match.Groups[1].Value, out var value, out var unit))
+                if (
+                    !TryResolveAbilityValue(
+                        template,
+                        match.Groups[1].Value,
+                        out var value,
+                        out var unit
+                    )
+                )
                     return string.Empty;
                 if (unit == null)
                     return value;
@@ -97,8 +179,10 @@ internal static class CollectionLocalizationResolver
                 // ("Gain {ability.0} Gold" / "Gain {ability.0} XP" for Experience);
                 // only append when the text does not already carry it, in either
                 // language or a known alias.
-                if (FollowingWordEquals(text!, after, unit)
-                    || FollowingWordEquals(text!, after, localizedUnit!))
+                if (
+                    FollowingWordEquals(text!, after, unit)
+                    || FollowingWordEquals(text!, after, localizedUnit!)
+                )
                     return value;
                 if (UnitAliases.TryGetValue(unit, out var aliases))
                     foreach (var alias in aliases)
@@ -142,7 +226,10 @@ internal static class CollectionLocalizationResolver
             index++;
         if (index + word.Length > text.Length)
             return false;
-        if (string.Compare(text, index, word, 0, word.Length, StringComparison.OrdinalIgnoreCase) != 0)
+        if (
+            string.Compare(text, index, word, 0, word.Length, StringComparison.OrdinalIgnoreCase)
+            != 0
+        )
             return false;
         // CJK has no word boundaries; for Latin words require the match to end the word.
         if (IsCjk(word[0]))
@@ -231,11 +318,12 @@ internal static class CollectionLocalizationResolver
 
         const string prefixPlayer = "TActionPlayer";
         const string prefixCard = "TActionCard";
-        var core = actionName.StartsWith(prefixPlayer, StringComparison.Ordinal)
-            ? actionName[prefixPlayer.Length..]
+        var core =
+            actionName.StartsWith(prefixPlayer, StringComparison.Ordinal)
+                ? actionName[prefixPlayer.Length..]
             : actionName.StartsWith(prefixCard, StringComparison.Ordinal)
                 ? actionName[prefixCard.Length..]
-                : null;
+            : null;
         if (string.IsNullOrEmpty(core))
             return false;
 

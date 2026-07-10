@@ -4,6 +4,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -71,6 +72,8 @@ internal sealed partial class CollectionPanelView
 
         _subtitle = BPPSupporterAttributionRow.Create();
         rail.Add(_subtitle);
+
+        rail.Add(CreateSearchField());
 
         var primaryControlsRow = CreateOperationRow(UiSpacing.Sm);
         rail.Add(primaryControlsRow);
@@ -254,6 +257,142 @@ internal sealed partial class CollectionPanelView
         spacer.style.flexShrink = 1f;
         spacer.style.minWidth = UiSpacing.Md;
         return spacer;
+    }
+
+    private VisualElement CreateSearchField()
+    {
+        var container = new VisualElement();
+        container.style.flexDirection = FlexDirection.Column;
+        container.style.marginTop = UiSpacing.Md;
+        container.style.marginBottom = UiSpacing.Sm;
+        container.style.flexShrink = 0f;
+        container.style.width = Length.Percent(100f);
+
+        _searchLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        _searchLabel.text = CollectionPanelText.SearchLabel();
+        _searchLabel.style.marginBottom = UiSpacing.Xs;
+        container.Add(_searchLabel);
+
+        var frame = new VisualElement();
+        frame.style.flexDirection = FlexDirection.Row;
+        frame.style.alignItems = Align.Center;
+        frame.style.height = Sizes.ButtonStandardHeight;
+        frame.style.backgroundColor = Colors.HistoryStatusBackground;
+        UiStyle.Border(frame.style, Borders.Thin, Colors.HistoryListFrameBorder);
+        UiStyle.Radius(frame.style, Radii.Md);
+        UiStyle.HorizontalPadding(frame.style, UiSpacing.Md);
+        container.Add(frame);
+
+        var field = new TextField { label = string.Empty };
+        _searchField = field;
+        field.tooltip = CollectionPanelText.SearchTooltip();
+        field.style.flexGrow = 1f;
+        field.style.flexShrink = 1f;
+        field.style.minWidth = 0f;
+        field.style.height = Length.Percent(100f);
+        field.style.backgroundColor = Color.clear;
+        field.style.color = Colors.HistoryChipText;
+        field.style.unityFont = BppUiFont.Default;
+        field.style.unityFontDefinition = FontDefinition.FromFont(BppUiFont.Default);
+        field.style.fontSize = Sizes.FontSmall;
+        field.style.borderLeftWidth = 0f;
+        field.style.borderRightWidth = 0f;
+        field.style.borderTopWidth = 0f;
+        field.style.borderBottomWidth = 0f;
+        UiStyle.Padding(field.style, UiSpacing.None, UiSpacing.None);
+        frame.Add(field);
+
+        field.RegisterValueChangedCallback(evt => _commands.SetSearchQuery(evt.newValue));
+        var hovered = false;
+        var focused = false;
+        void RefreshFrame()
+        {
+            var background = Colors.HistoryStatusBackground;
+            var border = Colors.HistoryListFrameBorder;
+            if (focused)
+            {
+                background = Colors.ButtonHoverBackgroundFor(Colors.HistoryStatusBackground);
+                border = Colors.ButtonHoverBorderFor(Colors.HistoryStatusBackground);
+            }
+            else if (hovered)
+            {
+                background = Colors.RowHoverBackgroundFor(Colors.HistoryStatusBackground);
+                border = Colors.RowHoverBorderFor(Colors.HistoryStatusBorder);
+            }
+
+            frame.style.backgroundColor = background;
+            UiStyle.BorderColor(frame.style, border);
+        }
+
+        field.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            hovered = true;
+            RefreshFrame();
+        });
+        field.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            hovered = false;
+            RefreshFrame();
+        });
+        field.RegisterCallback<FocusInEvent>(_ =>
+        {
+            focused = true;
+            RefreshFrame();
+        });
+        field.RegisterCallback<FocusOutEvent>(_ =>
+        {
+            focused = false;
+            RefreshFrame();
+        });
+        RefreshFrame();
+
+        field.RegisterCallback<GeometryChangedEvent>(_ => StyleSearchField(field));
+        return container;
+    }
+
+    private static void StyleSearchField(TextField field)
+    {
+        var label = field.Q<Label>();
+        if (label != null)
+        {
+            label.style.display = DisplayStyle.None;
+        }
+
+        var input = field.Q(TextField.textInputUssName);
+        if (input != null)
+        {
+            input.style.flexGrow = 1f;
+            input.style.height = Length.Percent(100f);
+            input.style.alignSelf = Align.Stretch;
+            input.style.backgroundColor = Color.clear;
+            input.style.color = Colors.HistoryChipText;
+            input.style.unityFont = BppUiFont.Default;
+            input.style.unityFontDefinition = FontDefinition.FromFont(BppUiFont.Default);
+            input.style.fontSize = Sizes.FontSmall;
+            input.style.unityTextAlign = TextAnchor.MiddleLeft;
+            input.style.borderLeftWidth = 0f;
+            input.style.borderRightWidth = 0f;
+            input.style.borderTopWidth = 0f;
+            input.style.borderBottomWidth = 0f;
+            input.style.marginLeft = UiSpacing.None;
+            input.style.marginRight = UiSpacing.None;
+            input.style.marginTop = UiSpacing.None;
+            input.style.marginBottom = UiSpacing.None;
+            UiStyle.Padding(input.style, UiSpacing.None, UiSpacing.None);
+        }
+
+        var text = input?.Q<TextElement>();
+        if (text != null)
+        {
+            text.style.flexGrow = 1f;
+            text.style.height = Length.Percent(100f);
+            text.style.alignSelf = Align.Stretch;
+            text.style.color = Colors.HistoryChipText;
+            text.style.unityFont = BppUiFont.Default;
+            text.style.unityFontDefinition = FontDefinition.FromFont(BppUiFont.Default);
+            text.style.fontSize = Sizes.FontSmall;
+            text.style.unityTextAlign = TextAnchor.MiddleLeft;
+        }
     }
 
     private static Label CreateCountLabel()

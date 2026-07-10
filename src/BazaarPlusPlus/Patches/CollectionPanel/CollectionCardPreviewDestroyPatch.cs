@@ -1,6 +1,8 @@
 #nullable enable
 #pragma warning disable CS0436
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
+using BazaarPlusPlus.Game.CollectionPanel.Tooltips;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using HarmonyLib;
 using TheBazaar.UI;
 
@@ -24,6 +26,9 @@ internal static class CollectionCardPreviewDestroyPatch
         var marker = __instance.GetComponent<CollectionPanelOwnedMarker>();
         if (marker == null)
             return;
+
+        if (NativeCardPreviewReflection.TryGetTooltipData(__instance, out var tooltipData))
+            CollectionTierTooltipRegistry.Unregister(tooltipData.CardInstance);
 
         marker.ReleaseCurrentArtKey();
 

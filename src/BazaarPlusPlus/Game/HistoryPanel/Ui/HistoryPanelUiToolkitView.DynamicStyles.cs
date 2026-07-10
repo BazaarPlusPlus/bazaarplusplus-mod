@@ -163,16 +163,26 @@ internal sealed partial class HistoryPanelUiToolkitView
 
     private static void ApplyRunRowState(RunRowRefs refs, bool selected)
     {
-        refs.Root.style.backgroundColor = selected
-            ? Colors.RunRowSelectedBackground
-            : Colors.HistoryRowBackground;
+        var background = selected ? Colors.RunRowSelectedBackground : Colors.HistoryRowBackground;
+        if (refs.Pressed)
+            background = Colors.RowPressedBackgroundFor(background);
+        else if (refs.Hovered)
+            background = Colors.RowHoverBackgroundFor(background);
+
+        refs.Root.style.backgroundColor = background;
         refs.Accent.style.backgroundColor = selected
             ? Colors.RunRowSelectedAccent
             : Colors.RunRowDefaultAccent;
         var borderColor = selected ? Colors.RunRowSelectedBorder : Colors.RunRowDefaultBorder;
+        if (refs.Pressed)
+            borderColor = Colors.RowPressedBorderFor(borderColor);
+        else if (refs.Hovered)
+            borderColor = Colors.RowHoverBorderFor(borderColor);
+
         UiStyle.BorderColor(refs.Root.style, borderColor);
         UiStyle.BorderColor(refs.OutcomeBubble.style, borderColor);
         refs.OutcomeBubble.style.opacity = selected ? 1f : 0.96f;
+        refs.Root.style.opacity = refs.Pressed ? 0.96f : 1f;
     }
 
     private static void ApplyBattleRowState(
@@ -184,17 +194,24 @@ internal sealed partial class HistoryPanelUiToolkitView
         var isWin = HistoryPanelFormatter.IsBattleWin(battle);
         var isLoss = HistoryPanelFormatter.IsBattleLoss(battle);
         var isEliminated = HistoryPanelFormatter.IsGhostOpponentEliminated(battle);
-        refs.Root.style.backgroundColor = GetBattleRowBackground(
-            selected,
-            isEliminated,
-            isWin,
-            isLoss
-        );
+        var background = GetBattleRowBackground(selected, isEliminated, isWin, isLoss);
+        if (refs.Pressed)
+            background = Colors.RowPressedBackgroundFor(background);
+        else if (refs.Hovered)
+            background = Colors.RowHoverBackgroundFor(background);
+
+        refs.Root.style.backgroundColor = background;
         refs.Accent.style.backgroundColor = GetBattleAccent(isEliminated, isWin, isLoss);
         var borderColor = GetBattleBorder(isEliminated, isWin, isLoss);
+        if (refs.Pressed)
+            borderColor = Colors.RowPressedBorderFor(borderColor);
+        else if (refs.Hovered)
+            borderColor = Colors.RowHoverBorderFor(borderColor);
+
         UiStyle.BorderColor(refs.Root.style, borderColor);
         refs.DayBubble.style.backgroundColor = GetBattleDayBackground(isEliminated, isWin, isLoss);
         UiStyle.BorderColor(refs.DayBubble.style, borderColor);
+        refs.Root.style.opacity = refs.Pressed ? 0.96f : 1f;
     }
 
     // Categorized status banner: writes all four border sides each call (UiStyle.Border sets four

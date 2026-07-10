@@ -19,12 +19,14 @@ using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.LowLevel;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
 internal sealed class CollectionPanel : MonoBehaviour
 {
     private const float CatalogBuildFrameBudgetMs = 4f;
+    private const float SearchRefreshDebounceSeconds = 0.16f;
     private const string OverlayPanelId = "CollectionPanel";
 
     private static CollectionPanel? _instance;
@@ -61,6 +63,11 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private readonly CollectionCatalog _catalog = new();
     private readonly CollectionFilterState _filter = new();
+    private readonly CollectionSearchRefreshGate _searchRefreshGate = new(
+        SearchRefreshDebounceSeconds
+    );
+    private Keyboard? _imeKeyboard;
+    private bool _isImeComposing;
     private readonly CollectionSourceOfferPoolCache _offerPoolCache = new();
     private readonly ICollectionSourceCatalog _sourceCatalog = new StaticCollectionSourceCatalog();
     private readonly ICollectionPanelHeroPreferenceStore _heroPreferenceStore =
@@ -137,9 +144,12 @@ internal sealed class CollectionPanel : MonoBehaviour
             )
             {
                 OnSceneChanged = DisposeUnityRuntime,
+                HotkeyGuard = () => !IsVisible || !IsTextInputFocused(),
             }
         );
     }
+
+    private bool IsTextInputFocused() => _view?.IsTextInputFocused() == true;
 
     internal static void NotifyLocaleChanged()
     {
@@ -320,6 +330,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         if (!_isVisible)
             return;
+        _searchRefreshGate.Cancel();
         CancelPanelLoad();
         _isVisible = false;
         HideNativeCardLayerImmediately();
@@ -375,6 +386,13 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         }
 
+        if (_searchRefreshGate.Advance(dt, isComposing: IsImeCompositionActive()))
+        {
+            _scrollY = 0f;
+            ApplyFilters();
+            RefreshView();
+        }
+
         // Startup self-heal for tag typography: a refresh that ran inside the game's async
         // typography registration window rendered degraded chips, and no further Refresh
         // arrives without user interaction. Re-render once the instance appears (the check is
@@ -424,11 +442,36 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void OnDestroy()
     {
+        DetachImeKeyboard();
         if (ReferenceEquals(_instance, this))
             _instance = null;
         _overlayHandle?.Dispose();
         _overlayHandle = null;
         DisposeRuntime();
+    }
+
+    private bool IsImeCompositionActive()
+    {
+        var keyboard = Keyboard.current;
+        if (ReferenceEquals(_imeKeyboard, keyboard))
+            return _isImeComposing;
+
+        DetachImeKeyboard();
+        _imeKeyboard = keyboard;
+        if (_imeKeyboard != null)
+            _imeKeyboard.onIMECompositionChange += OnImeCompositionChange;
+        return false;
+    }
+
+    private void OnImeCompositionChange(IMECompositionString composition) =>
+        _isImeComposing = composition.Count > 0;
+
+    private void DetachImeKeyboard()
+    {
+        if (_imeKeyboard != null)
+            _imeKeyboard.onIMECompositionChange -= OnImeCompositionChange;
+        _imeKeyboard = null;
+        _isImeComposing = false;
     }
 
     private void DisposeRuntime()
@@ -439,6 +482,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void DisposeUnityRuntime()
     {
+        _searchRefreshGate.Cancel();
         CancelPanelLoad();
         var virtualizer = _virtualizer;
         var overlay = _overlay;
@@ -664,6 +708,16 @@ internal sealed class CollectionPanel : MonoBehaviour
             panel.ApplyFilters();
             panel.RefreshView();
         }
+
+        public void SetSearchQuery(string query)
+        {
+            query ??= string.Empty;
+            if (string.Equals(panel._filter.SearchQuery, query, StringComparison.Ordinal))
+                return;
+
+            panel._filter.SearchQuery = query;
+            panel._searchRefreshGate.Schedule();
+        }
     }
 
     private void StartPanelLoad()
@@ -823,6 +877,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void ApplyFilters()
     {
+        _searchRefreshGate.Cancel();
         if (_virtualizer == null)
             return;
 
@@ -898,6 +953,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedKeywords = _filter.Keywords,
             TagMatchMode = _filter.TagMatchMode,
             KeywordMatchMode = _filter.KeywordMatchMode,
+            SearchQuery = _filter.SearchQuery,
             SelectedSourceKey = profile.ShowSourceFilter ? _filter.SelectedSourceKey : null,
             SourceSelectorEnabled = profile.ShowSourceFilter && !_isLoadingCatalog,
             SortPriority = _filter.SortPriority,

@@ -31,9 +31,9 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // hand it back to the pool after the task settles, so the next Take never collides with
 // the in-flight load on the same instance.
 //
-// Filter/tab changes cancel everything in flight by bumping the global generation guard
-// and re-seeding the visible set; in-progress SetUp tasks complete (their continuations
-// no-op because the generation has moved), and the realized cells are recycled.
+// Filter/tab changes cancel everything in flight by bumping the global generation guard.
+// Already-shown cards that remain in the next visible set keep their native instances and
+// move directly to their new indices; removed and not-yet-shown cells are recycled.
 internal sealed class CollectionGridVirtualizer
 {
     internal const float FallbackNativeCardHeight = 484f;
@@ -93,8 +93,9 @@ internal sealed class CollectionGridVirtualizer
     public bool HasPendingBinds => _pendingBindTracker.HasPendingBinds;
     public Task WhenPendingBindsSettled => _pendingBindTracker.WhenSettled;
 
-    // SetVisible swaps in a new ordered visible set (typically after filter change) and
-    // recycles everything currently realized. Caller is expected to also reset scrollY to 0.
+    // SetVisible swaps in a new ordered visible set (typically after filter change). Cards
+    // already shown in both sets retain their native instances and current opacity; only newly
+    // realized cards enter the fade-in path. Caller is expected to also reset scrollY to 0.
     public void SetVisible(
         IReadOnlyList<CollectionCardVm> visible,
         CollectionTabKind activeTab,
@@ -104,6 +105,7 @@ internal sealed class CollectionGridVirtualizer
         >? sourceMatchesByCardId = null
     )
     {
+        var retention = BuildRetentionPlan(visible);
         BumpGeneration();
         _visible = visible ?? Array.Empty<CollectionCardVm>();
         _sourceMatchesByCardId =
@@ -112,8 +114,7 @@ internal sealed class CollectionGridVirtualizer
         _gap = CollectionGridConstants.GridGap;
         _layout = CollectionGridLayout.Build(_visible, activeTab);
         RecomputePixelization();
-        RecycleAll();
-        _slots?.Clear();
+        RetainShownCells(retention);
         _lastScrollY = float.NaN;
         _firstWindowDiagnostics =
             BppBuild.IsDebug && _visible.Count > 0
@@ -435,11 +436,7 @@ internal sealed class CollectionGridVirtualizer
         }
     }
 
-    private bool TryAdoptBinding(
-        int index,
-        CollectionCardVm vm,
-        CollectionCardBinding binding
-    )
+    private bool TryAdoptBinding(int index, CollectionCardVm vm, CollectionCardBinding binding)
     {
         if (_realized.ContainsKey(index))
             return false;
@@ -605,10 +602,7 @@ internal sealed class CollectionGridVirtualizer
         return true;
     }
 
-    private static bool TryMeasureRawImageBounds(
-        RectTransform root,
-        out NativeVisualBounds bounds
-    )
+    private static bool TryMeasureRawImageBounds(RectTransform root, out NativeVisualBounds bounds)
     {
         var corners = new Vector3[4];
         var minX = float.PositiveInfinity;
@@ -860,6 +854,7 @@ internal sealed class CollectionGridVirtualizer
             // off to TickFades to ramp it up.
             cell.FadeAlpha = 0f;
             cell.FadeActive = true;
+            cell.IsShown = true;
         }
         catch (Exception ex)
         {
@@ -917,6 +912,67 @@ internal sealed class CollectionGridVirtualizer
         foreach (var pair in _realized)
             RecycleCell(pair.Value);
         _realized.Clear();
+    }
+
+    private IReadOnlyDictionary<int, int> BuildRetentionPlan(
+        IReadOnlyList<CollectionCardVm>? nextVisible
+    )
+    {
+        var realizedCardIdsByIndex = new Dictionary<int, Guid>(_realized.Count);
+        foreach (var pair in _realized)
+        {
+            var cell = pair.Value;
+            if (!cell.IsShown)
+                continue;
+            realizedCardIdsByIndex[pair.Key] = cell.Vm.Id;
+        }
+
+        nextVisible ??= Array.Empty<CollectionCardVm>();
+        var nextVisibleCardIds = new Guid[nextVisible.Count];
+        for (var index = 0; index < nextVisible.Count; index++)
+            nextVisibleCardIds[index] = nextVisible[index].Id;
+
+        var plannedRetention = CollectionGridRetentionPlan.Build(
+            realizedCardIdsByIndex,
+            nextVisibleCardIds
+        );
+        var retention = new Dictionary<int, int>(plannedRetention.Count);
+        foreach (var pair in plannedRetention)
+        {
+            var cell = _realized[pair.Key];
+            var newIndex = pair.Value;
+            if (ReferenceEquals(cell.Vm, nextVisible[newIndex]))
+                retention[pair.Key] = newIndex;
+        }
+
+        return retention;
+    }
+
+    private void RetainShownCells(IReadOnlyDictionary<int, int> retention)
+    {
+        DispatchHoverOut();
+        var previousCells = new List<KeyValuePair<int, RealizedCell>>(_realized);
+        _realized.Clear();
+
+        foreach (var pair in previousCells)
+        {
+            var cell = pair.Value;
+            if (!retention.TryGetValue(pair.Key, out var newIndex))
+            {
+                RecycleCell(cell);
+                continue;
+            }
+
+            cell.HoverRelay?.Clear();
+            cell.HoverRelay?.Bind(cell.Card);
+            cell.Index = newIndex;
+            cell.Vm = _visible[newIndex];
+            _sourceMatchesByCardId.TryGetValue(cell.Vm.Id, out var sourceMatches);
+            CollectionSourceAttributionBadge.Bind(cell.Card.gameObject, sourceMatches);
+            _realized[newIndex] = cell;
+            ApplyCellScale(newIndex, cell);
+            Reposition(newIndex, cell);
+        }
     }
 
     private void CancelPendingBind(int index)
@@ -982,8 +1038,8 @@ internal sealed class CollectionGridVirtualizer
             CachedRect = cachedRect;
         }
 
-        public int Index { get; }
-        public CollectionCardVm Vm { get; }
+        public int Index { get; set; }
+        public CollectionCardVm Vm { get; set; }
         public Component Card { get; }
         public NativeCardPreviewKind Kind { get; }
         public Task SetUpTask { get; }
@@ -991,6 +1047,7 @@ internal sealed class CollectionGridVirtualizer
         public CollectionCardHoverRelay HoverRelay { get; }
         public RectTransform CachedRect { get; }
         public bool PendingReturn { get; set; }
+        public bool IsShown { get; set; }
 
         // Fade state. ShowWhenReady sets FadeActive=true with FadeAlpha=0 right after the
         // card's Show(true); TickFades ramps FadeAlpha → 1 and writes it to the CanvasGroup.

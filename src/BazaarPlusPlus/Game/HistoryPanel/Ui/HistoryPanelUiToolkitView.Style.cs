@@ -125,6 +125,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         }
         button.tooltip = text;
         button.style.overflow = Overflow.Hidden;
+        UiHover.ApplyButtonPalette(button, Colors.HistoryButtonBackground, Colors.White);
         return button;
     }
 
@@ -158,6 +159,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         }
         button.tooltip = text;
         button.style.overflow = Overflow.Hidden;
+        UiHover.ApplyButtonPalette(button, Colors.HistoryButtonBackground, Colors.White);
         return button;
     }
 
@@ -172,9 +174,7 @@ internal sealed partial class HistoryPanelUiToolkitView
 
     private static void StyleButton(Button button, Color background, Color textColor)
     {
-        button.style.backgroundColor = background;
-        button.style.color = textColor;
-        UiStyle.BorderColor(button.style, Colors.ButtonBorderFor(background));
+        UiHover.ApplyButtonPalette(button, background, textColor);
     }
 
     private static Font GetUiFont() => BppUiFont.Default;

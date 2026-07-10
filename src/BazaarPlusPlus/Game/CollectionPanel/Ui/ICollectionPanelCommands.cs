@@ -22,4 +22,5 @@ internal interface ICollectionPanelCommands
     void ToggleKeywordMatchMode();
     void ToggleSource(string sourceKey);
     void SetSortPriority(CollectionSortPriority priority);
+    void SetSearchQuery(string query);
 }

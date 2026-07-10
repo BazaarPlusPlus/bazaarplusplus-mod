@@ -1,6 +1,66 @@
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
+using BazaarPlusPlus.Game.CollectionPanel.Tooltips;
+
+var mergedTierText = CollectionTierTooltipTextMerger.Merge(
+    new[]
+    {
+        new CollectionTierTooltipText(ETier.Silver, "减速 <color=#C58F63>1</color> 件物品 1 秒"),
+        new CollectionTierTooltipText(ETier.Gold, "减速 <color=#C58F63>2</color> 件物品 1 秒"),
+        new CollectionTierTooltipText(ETier.Diamond, "减速 <color=#C58F63>3</color> 件物品 1 秒"),
+    }
+);
+
+var mergedCooldownText = CollectionTierTooltipTextMerger.MergeCooldown(
+    new[]
+    {
+        new CollectionTierTooltipText(ETier.Bronze, "10"),
+        new CollectionTierTooltipText(ETier.Silver, "8"),
+        new CollectionTierTooltipText(ETier.Gold, "7"),
+        new CollectionTierTooltipText(ETier.Diamond, "5"),
+    }
+);
+AssertEqual(
+    "<size=36%><color=#B46241>10</color>><color=#C0C0C0>8</color>><color=#FFD700>7</color>><color=#00FFFF>5</color></size>",
+    mergedCooldownText,
+    "Cooldown tier text should use compact values and a clock-sized font."
+);
+AssertEqual(
+    "减速 <color=#C58F63><color=#C0C0C0>1</color> <sprite name=Fusion> <color=#FFD700>2</color> <sprite name=Fusion> <color=#00FFFF>3</color></color> 件物品 1 秒",
+    mergedTierText,
+    "Tier tooltip text should keep common copy once and merge only changed values with tier colors."
+);
+AssertEqual(
+    "冷却 4.0 秒",
+    CollectionTierTooltipTextMerger.Merge(
+        new[]
+        {
+            new CollectionTierTooltipText(ETier.Silver, "冷却 4.0 秒"),
+            new CollectionTierTooltipText(ETier.Gold, "冷却 4.0 秒"),
+            new CollectionTierTooltipText(ETier.Diamond, "冷却 4.0 秒"),
+        }
+    ),
+    "Values shared by every available tier should render only once."
+);
+
+var retainedA = Guid.NewGuid();
+var removedB = Guid.NewGuid();
+var retainedC = Guid.NewGuid();
+var addedD = Guid.NewGuid();
+var retention = CollectionGridRetentionPlan.Build(
+    new Dictionary<int, Guid>
+    {
+        [0] = retainedA,
+        [1] = removedB,
+        [2] = retainedC,
+    },
+    new[] { retainedC, retainedA, addedD }
+);
+AssertEqual(2, retention.Count, "Only cards present in both grids should be retained.");
+AssertEqual(1, retention[0], "A retained card should map to its new visible index.");
+AssertEqual(0, retention[2], "Reordered retained cards should map by stable card ID.");
+AssertFalse(retention.ContainsKey(1), "Filtered-out cards should not be retained.");
 
 // --- Skill grid: SkillColumns-wide square array, ceil(count / SkillColumns) shelves ---
 var skills = Make(ECardType.Skill, 19, _ => ECardSize.Medium);

@@ -38,6 +38,7 @@ internal sealed class CollectionPanelViewModel
     public HashSet<EHiddenTag> SelectedKeywords { get; set; } = new();
     public CollectionFacetMatchMode TagMatchMode { get; set; } = CollectionFacetMatchMode.Any;
     public CollectionFacetMatchMode KeywordMatchMode { get; set; } = CollectionFacetMatchMode.Any;
+    public string SearchQuery { get; set; } = string.Empty;
     public string? SelectedSourceKey { get; set; }
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
@@ -88,6 +89,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Button? _itemTabButton;
     private Button? _skillTabButton;
     private Button? _closeButton;
+    private Label? _searchLabel;
+    private TextField? _searchField;
     private Button? _dayToggleButton;
     private Label? _sortLabel;
     private Button? _sortQualityButton;
@@ -317,6 +320,8 @@ internal sealed partial class CollectionPanelView : IDisposable
             : DisplayStyle.Flex;
         _loadingVisible = model.IsLoading;
         _loadingMessage = model.StatusMessage ?? CollectionPanelText.CatalogLoading();
+        if (_searchField != null && !string.Equals(_searchField.value, model.SearchQuery))
+            _searchField.SetValueWithoutNotify(model.SearchQuery);
         if (_loadingLabel != null)
         {
             _loadingLabel.style.display = model.IsLoading ? DisplayStyle.Flex : DisplayStyle.None;
@@ -469,6 +474,10 @@ internal sealed partial class CollectionPanelView : IDisposable
     {
         if (_closeButton != null)
             _closeButton.text = CollectionPanelText.Close();
+        if (_searchLabel != null)
+            _searchLabel.text = CollectionPanelText.SearchLabel();
+        if (_searchField != null)
+            _searchField.tooltip = CollectionPanelText.SearchTooltip();
         if (_itemTabButton != null)
             _itemTabButton.text = CollectionPanelText.ItemsTab();
         if (_skillTabButton != null)
@@ -516,6 +525,30 @@ internal sealed partial class CollectionPanelView : IDisposable
         var height = Mathf.Max(0f, contentHeightPixels / ppp);
         _gridContentSpacer.style.height = height;
         _gridContentSpacer.style.minHeight = height;
+    }
+
+    internal bool IsTextInputFocused()
+    {
+        var focused = _root?.focusController?.focusedElement as VisualElement;
+        if (focused == null)
+            return false;
+
+        var textField = focused as TextField ?? focused.GetFirstAncestorOfType<TextField>();
+        return textField != null && IsVisibleAndEnabled(textField);
+    }
+
+    private bool IsVisibleAndEnabled(VisualElement element)
+    {
+        for (var current = element; current != null; current = current.parent)
+        {
+            if (current.style.display.value == DisplayStyle.None || !current.enabledInHierarchy)
+                return false;
+
+            if (current == _root)
+                return true;
+        }
+
+        return false;
     }
 
     public float ReadScrollYPixels()

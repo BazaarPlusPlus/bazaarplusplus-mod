@@ -26,6 +26,12 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet ItemsTabText = new("Items", "物品", "物品");
     private static readonly LocalizedTextSet SkillsTabText = new("Skills", "技能", "技能");
     private static readonly LocalizedTextSet CloseText = new("Close", "关闭", "關閉");
+    private static readonly LocalizedTextSet SearchLabelText = new("Search", "搜索", "搜尋");
+    private static readonly LocalizedTextSet SearchTooltipText = new(
+        "Search names, descriptions, internal ids, tags, and related effects.",
+        "搜索名称、描述、内部 ID、标签和相关效果。",
+        "搜尋名稱、描述、內部 ID、標籤和相關效果。"
+    );
 
     private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄");
     private static readonly LocalizedTextSet DayHeaderText = new("Day", "天数", "天數");
@@ -170,6 +176,10 @@ internal static class CollectionPanelText
     internal static string SkillsTab() => Resolve(SkillsTabText);
 
     internal static string Close() => Resolve(CloseText);
+
+    internal static string SearchLabel() => Resolve(SearchLabelText);
+
+    internal static string SearchTooltip() => Resolve(SearchTooltipText);
 
     internal static string HeroHeader() => Resolve(HeroHeaderText);
 
