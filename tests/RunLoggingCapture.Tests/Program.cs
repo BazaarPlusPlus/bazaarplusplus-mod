@@ -116,6 +116,47 @@ Assert(
     "The abandonment mapper should preserve the final run basics and reason."
 );
 
+var nullBasicsArgs = new object?[] { null, rank, "server-run-42", "Ptr", null };
+Assert(
+    !Invoke<bool>(mapperType, null, "TryCreateRunLogCreateRequest", nullBasicsArgs)
+        && nullBasicsArgs[4] == null,
+    "Null basics should not produce a create request."
+);
+
+var herolessBasics = Activator.CreateInstance(basicsType)!;
+SetProperty(basicsType, herolessBasics, "Day", 8);
+var herolessArgs = new object?[] { herolessBasics, rank, "server-run-42", "Ptr", null };
+Assert(
+    !Invoke<bool>(mapperType, null, "TryCreateRunLogCreateRequest", herolessArgs)
+        && herolessArgs[4] == null,
+    "Basics without a hero should not produce a create request (the old Player-null guard)."
+);
+
+var blankRunIdArgs = new object?[] { basics, rank, "   ", "Ptr", null };
+Assert(
+    !Invoke<bool>(mapperType, null, "TryCreateRunLogCreateRequest", blankRunIdArgs)
+        && blankRunIdArgs[4] == null,
+    "A blank server run id should not produce a create request."
+);
+
+var completedRun = Invoke<RunLogCompletion>(
+    mapperType,
+    null,
+    "BuildRunLogCompletion",
+    ["run_state_exit", Enum.Parse(runExitKindType, "Completed"), basics, null, rank]
+);
+Assert(
+    completedRun.Status == "completed"
+        && completedRun.MaxHealth == null
+        && completedRun.Prestige == null
+        && completedRun.Level == null
+        && completedRun.Income == null
+        && completedRun.Gold == null
+        && completedRun.FinalDay == 8
+        && completedRun.Victories == 10,
+    "A non-interrupted exit should map to completed, and missing stats should map to null fields while basics survive."
+);
+
 Console.WriteLine("RunLogging capture checks passed.");
 
 static Type RequireType(string fullName)

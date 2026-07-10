@@ -219,6 +219,22 @@ Assert(
         && screenshotRecord.BuildChannel == "Online",
     "The screenshot record mapper should preserve capture data and supplied run snapshots."
 );
+SetProperty(captureResultType, captureResult, "HeroName", "Buffed Banana");
+var namedHeroRecord = (RunScreenshotRecord)
+    createRecord.Invoke(null, [captureResult, basics, rank, 37, true, "Online"])!;
+Assert(
+    namedHeroRecord.HeroName == "Buffed Banana",
+    "A non-blank capture hero name should win over the snapshot hero."
+);
+var nullBasicsRecord = (RunScreenshotRecord)
+    createRecord.Invoke(null, [captureResult, null, rank, null, false, "Online"])!;
+Assert(
+    nullBasicsRecord.Day == null
+        && nullBasicsRecord.VictoriesAtCapture == null
+        && nullBasicsRecord.HeroName == "Buffed Banana"
+        && nullBasicsRecord.ScreenshotId == "shot-42",
+    "Missing run basics should null day and victories while capture data survives."
+);
 var screenshotPath = InvokeBuildRelativePath(
     pathBuilderType,
     runId: "Run-42/Final",
