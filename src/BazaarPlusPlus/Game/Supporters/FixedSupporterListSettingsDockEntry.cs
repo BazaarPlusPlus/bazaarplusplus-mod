@@ -17,7 +17,8 @@ internal static class FixedSupporterListSettingsDockEntry
         );
 
     private static bool ReadEnabled(IBppConfig config) =>
-        config.UseFixedSupporterListConfig?.Value ?? false;
+        config.UseFixedSupporterListConfig?.Value
+        ?? BPPSupporterListSourcePolicy.DefaultUseFixedList;
 
     private static void WriteEnabled(IBppConfig config, bool enabled)
     {
