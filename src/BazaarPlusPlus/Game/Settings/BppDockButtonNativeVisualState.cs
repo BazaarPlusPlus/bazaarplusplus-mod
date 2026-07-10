@@ -5,13 +5,12 @@ using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.Settings;
 
-internal sealed class BppDockButtonExpandedVisualState : MonoBehaviour
+internal sealed class BppDockButtonNativeVisualState : MonoBehaviour
 {
     private Button? _button;
     private Image? _targetImage;
     private BppDockButtonVisualState _nativeState;
     private bool _isInitialized;
-    private bool _isExpanded;
 
     internal BppDockButtonVisualState? CapturedNativeState => _isInitialized ? _nativeState : null;
 
@@ -25,47 +24,35 @@ internal sealed class BppDockButtonExpandedVisualState : MonoBehaviour
             _isInitialized = true;
         }
 
-        ApplyBaseline();
+        ResetToNormal();
     }
 
-    internal void SetExpanded(bool isExpanded)
+    internal void ResetToNormal()
     {
-        if (!_isInitialized || _isExpanded == isExpanded)
+        if (!_isInitialized || _button == null)
             return;
 
-        _isExpanded = isExpanded;
         ClearNativeSelection();
-        ApplyBaseline();
+        if (_targetImage != null)
+            _targetImage.sprite = _nativeState.ResolveNormalSprite();
+
+        switch (_nativeState.Transition)
+        {
+            case Selectable.Transition.ColorTint:
+                _button.colors = _nativeState.ResolveNormalColors();
+                break;
+            case Selectable.Transition.SpriteSwap:
+                break;
+            case Selectable.Transition.Animation:
+                _button.animationTriggers = _nativeState.CloneAnimationTriggers();
+                break;
+        }
     }
 
     private void OnEnable()
     {
         if (_isInitialized)
-            ApplyBaseline();
-    }
-
-    private void ApplyBaseline()
-    {
-        if (_button == null)
-            return;
-
-        var baselineSprite = _nativeState.ResolveBaselineSprite(_isExpanded);
-        if (_targetImage != null)
-            _targetImage.sprite = baselineSprite;
-
-        switch (_nativeState.Transition)
-        {
-            case Selectable.Transition.ColorTint:
-                _button.colors = _nativeState.ResolveBaselineColors(_isExpanded);
-                break;
-            case Selectable.Transition.SpriteSwap:
-                break;
-            case Selectable.Transition.Animation:
-                _button.animationTriggers = _nativeState.ResolveBaselineAnimationTriggers(
-                    _isExpanded
-                );
-                break;
-        }
+            ResetToNormal();
     }
 
     private void ClearNativeSelection()

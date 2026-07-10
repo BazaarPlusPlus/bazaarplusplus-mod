@@ -10,8 +10,7 @@ internal readonly struct BppDockButtonVisualState(
     SpriteState spriteState,
     AnimationTriggers animationTriggers,
     Graphic? targetGraphic,
-    Sprite? normalBaseSprite,
-    Sprite? selectedBaseSprite
+    Sprite? normalBaseSprite
 )
 {
     internal Selectable.Transition Transition { get; } = transition;
@@ -26,8 +25,6 @@ internal readonly struct BppDockButtonVisualState(
 
     internal Sprite? NormalBaseSprite { get; } = normalBaseSprite;
 
-    internal Sprite? SelectedBaseSprite { get; } = selectedBaseSprite;
-
     internal static BppDockButtonVisualState Capture(
         Selectable.Transition transition,
         ColorBlock colors,
@@ -40,14 +37,12 @@ internal readonly struct BppDockButtonVisualState(
             spriteState,
             animationTriggers,
             targetGraphic: null,
-            normalBaseSprite: null,
-            selectedBaseSprite: null
+            normalBaseSprite: null
         );
 
     internal static BppDockButtonVisualState? Capture(
         Button? button,
-        Sprite? normalBaseSprite = null,
-        Sprite? selectedBaseSprite = null
+        Sprite? normalBaseSprite = null
     )
     {
         if (button == null)
@@ -62,22 +57,15 @@ internal readonly struct BppDockButtonVisualState(
             spriteState,
             button.animationTriggers,
             button.targetGraphic,
-            normalBaseSprite ?? targetImage?.sprite,
-            selectedBaseSprite ?? spriteState.selectedSprite
+            normalBaseSprite ?? targetImage?.sprite
         );
     }
 
-    internal ColorBlock ResolveBaselineColors(bool isExpanded)
-    {
-        if (!isExpanded)
-            return Colors;
+    // Opening the settings popover is not a persistent button selection. Resetting to this native
+    // baseline lets SpriteSwap return from its hover override without exposing ClickedImage.
+    internal ColorBlock ResolveNormalColors() => Colors;
 
-        var expanded = Colors;
-        expanded.normalColor = Colors.selectedColor;
-        return expanded;
-    }
-
-    internal AnimationTriggers ResolveBaselineAnimationTriggers(bool isExpanded)
+    internal AnimationTriggers CloneAnimationTriggers()
     {
         var resolved = new AnimationTriggers
         {
@@ -87,14 +75,10 @@ internal readonly struct BppDockButtonVisualState(
             selectedTrigger = AnimationTriggers.selectedTrigger,
             disabledTrigger = AnimationTriggers.disabledTrigger,
         };
-        if (isExpanded && !string.IsNullOrEmpty(AnimationTriggers.selectedTrigger))
-            resolved.normalTrigger = AnimationTriggers.selectedTrigger;
-
         return resolved;
     }
 
-    internal Sprite? ResolveBaselineSprite(bool isExpanded) =>
-        isExpanded && SelectedBaseSprite != null ? SelectedBaseSprite : NormalBaseSprite;
+    internal Sprite? ResolveNormalSprite() => NormalBaseSprite;
 
     internal void ApplyTo(Button button, Graphic fallbackTargetGraphic)
     {

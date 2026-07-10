@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using BazaarPlusPlus.Game.Settings;
 using UnityEngine;
 using UnityEngine.UI;
@@ -269,7 +270,7 @@ public class BppSettingsDockGeometryTests
     }
 
     [Fact]
-    public void Expanded_visual_changes_only_normal_baseline_and_collapse_restores_it()
+    public void Settings_popover_visual_keeps_native_normal_color_baseline()
     {
         var nativeColors = ColorBlock.defaultColorBlock;
         nativeColors.normalColor = new Color(0.15f, 0.25f, 0.35f, 1f);
@@ -284,18 +285,13 @@ public class BppSettingsDockGeometryTests
             new AnimationTriggers()
         );
 
-        var expanded = nativeState.ResolveBaselineColors(isExpanded: true);
-        var collapsed = nativeState.ResolveBaselineColors(isExpanded: false);
+        var resolved = nativeState.ResolveNormalColors();
 
-        Assert.Equal(nativeColors.selectedColor, expanded.normalColor);
-        Assert.Equal(nativeColors.highlightedColor, expanded.highlightedColor);
-        Assert.Equal(nativeColors.pressedColor, expanded.pressedColor);
-        Assert.Equal(nativeColors.disabledColor, expanded.disabledColor);
-        Assert.Equal(nativeColors, collapsed);
+        Assert.Equal(nativeColors, resolved);
     }
 
     [Fact]
-    public void Expanded_animation_reuses_selected_trigger_without_changing_interaction_triggers()
+    public void Settings_popover_animation_keeps_native_normal_trigger()
     {
         var nativeTriggers = new AnimationTriggers
         {
@@ -312,14 +308,29 @@ public class BppSettingsDockGeometryTests
             nativeTriggers
         );
 
-        var expanded = nativeState.ResolveBaselineAnimationTriggers(isExpanded: true);
-        var collapsed = nativeState.ResolveBaselineAnimationTriggers(isExpanded: false);
+        var resolved = nativeState.CloneAnimationTriggers();
 
-        Assert.Equal(nativeTriggers.selectedTrigger, expanded.normalTrigger);
-        Assert.Equal(nativeTriggers.highlightedTrigger, expanded.highlightedTrigger);
-        Assert.Equal(nativeTriggers.pressedTrigger, expanded.pressedTrigger);
-        Assert.Equal(nativeTriggers.disabledTrigger, expanded.disabledTrigger);
-        Assert.Equal(nativeTriggers.normalTrigger, collapsed.normalTrigger);
+        Assert.Equal(nativeTriggers.normalTrigger, resolved.normalTrigger);
+        Assert.Equal(nativeTriggers.highlightedTrigger, resolved.highlightedTrigger);
+        Assert.Equal(nativeTriggers.pressedTrigger, resolved.pressedTrigger);
+        Assert.Equal(nativeTriggers.selectedTrigger, resolved.selectedTrigger);
+        Assert.Equal(nativeTriggers.disabledTrigger, resolved.disabledTrigger);
+    }
+
+    [Fact]
+    public void Settings_popover_sprite_keeps_native_normal_base_sprite()
+    {
+        var normalSprite = (Sprite)RuntimeHelpers.GetUninitializedObject(typeof(Sprite));
+        var nativeState = new BppDockButtonVisualState(
+            Selectable.Transition.SpriteSwap,
+            ColorBlock.defaultColorBlock,
+            new SpriteState(),
+            new AnimationTriggers(),
+            targetGraphic: null,
+            normalSprite
+        );
+
+        Assert.Same(normalSprite, nativeState.ResolveNormalSprite());
     }
 
     [Fact]
