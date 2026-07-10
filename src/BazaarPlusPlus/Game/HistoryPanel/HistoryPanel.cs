@@ -55,71 +55,11 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _state.GetSelectedGhostBattle(FilteredGhostBattles);
 
     private HistoryBattleRecord? ActiveSelectedBattle =>
-        _sectionMode == HistorySectionMode.Ghost ? SelectedGhostBattle : SelectedBattle;
+        _state.SectionMode == HistorySectionMode.Ghost ? SelectedGhostBattle : SelectedBattle;
 
     private IReadOnlyList<HistoryBattleRecord> FilteredGhostBattles => GetFilteredGhostBattles();
 
     private IReadOnlyList<HistoryRunRecord> FilteredRuns => GetFilteredRuns();
-
-    private List<HistoryRunRecord> _runs => _state.Runs;
-
-    private List<HistoryBattleRecord> _battles => _state.Battles;
-
-    private List<HistoryBattleRecord> _ghostBattles => _state.GhostBattles;
-
-    private List<HistoryBattleRecord> _filteredGhostBattles => _state.FilteredGhostBattles;
-
-    private int _selectedRunIndex
-    {
-        get => _state.SelectedRunIndex;
-        set => _state.SelectedRunIndex = value;
-    }
-
-    private int _selectedBattleIndex
-    {
-        get => _state.SelectedBattleIndex;
-        set => _state.SelectedBattleIndex = value;
-    }
-
-    private int _selectedGhostBattleIndex
-    {
-        get => _state.SelectedGhostBattleIndex;
-        set => _state.SelectedGhostBattleIndex = value;
-    }
-
-    private GhostBattleFilter _ghostBattleFilter
-    {
-        get => _state.GhostBattleFilter;
-        set => _state.GhostBattleFilter = value;
-    }
-
-    private string? _statusMessage
-    {
-        get => _state.StatusMessage;
-        set
-        {
-            _state.StatusMessage = value;
-            _state.DeleteRunConfirmationStatusActive = false;
-        }
-    }
-
-    private PreviewSelectionMode _previewSelectionMode
-    {
-        get => _state.PreviewSelectionMode;
-        set => _state.PreviewSelectionMode = value;
-    }
-
-    private HistorySectionMode _sectionMode
-    {
-        get => _state.SectionMode;
-        set => _state.SectionMode = value;
-    }
-
-    private bool _replayActionInProgress
-    {
-        get => _state.ReplayActionInProgress;
-        set => _state.ReplayActionInProgress = value;
-    }
 
     private void Awake()
     {
@@ -275,10 +215,13 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private HistoryBattlePreviewData BuildSelectedBattlePreviewData()
     {
         var activeSelectedBattle = ActiveSelectedBattle;
-        if (_previewSelectionMode == PreviewSelectionMode.Battle && activeSelectedBattle != null)
+        if (
+            _state.PreviewSelectionMode == PreviewSelectionMode.Battle
+            && activeSelectedBattle != null
+        )
         {
             var signature = $"battle:{activeSelectedBattle.BattleId}";
-            return _sectionMode == HistorySectionMode.Ghost
+            return _state.SectionMode == HistorySectionMode.Ghost
                 ? ResolveGhostPreviewData(activeSelectedBattle, signature)
                 : HistoryBattlePreviewProjection.BuildOpponent(
                     activeSelectedBattle.Snapshots,
@@ -286,7 +229,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
                 );
         }
 
-        var runPreviewBattle = PickRunPreviewBattle(_battles);
+        var runPreviewBattle = PickRunPreviewBattle(_state.Battles);
         if (runPreviewBattle != null)
         {
             return HistoryBattlePreviewProjection.BuildPlayer(
@@ -474,12 +417,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private IReadOnlyList<HistoryBattleRecord> GetFilteredGhostBattles()
     {
-        return _coordinator?.GetFilteredGhostBattles() ?? _filteredGhostBattles;
+        return _coordinator?.GetFilteredGhostBattles() ?? Array.Empty<HistoryBattleRecord>();
     }
 
     private IReadOnlyList<HistoryRunRecord> GetFilteredRuns()
     {
-        return _coordinator?.GetFilteredRuns() ?? _state.FilteredRuns;
+        return _coordinator?.GetFilteredRuns() ?? Array.Empty<HistoryRunRecord>();
     }
 
     private static string GetSceneToken(Scene scene)

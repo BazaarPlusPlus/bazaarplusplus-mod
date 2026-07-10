@@ -66,13 +66,11 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state.AccountLinkInProgress = false;
         RefreshAccountLinkIdentityFromGame();
         _state.ReplayActionInProgress = false;
-        _state.IsVisible = true;
         RefreshSectionOnEntry();
     }
 
     public void OnPanelHidden()
     {
-        _state.IsVisible = false;
         _state.GhostSyncInProgress = false;
         _state.ReplayActionInProgress = false;
         _state.ServerHealthProbeInProgress = false;
