@@ -1,9 +1,11 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.Settings;
@@ -39,9 +41,9 @@ internal sealed partial class BppSettingsDockController
     private Material? _uiFontMaterial;
     private readonly BppScreenResizeSyncTracker _screenResizeSync = new(ScreenResizeSyncFrameCount);
     private readonly BppDockLayoutSyncTracker _layoutSync = new(LayoutImmediateSyncFrameCount);
-    private readonly BppDockButtonAvoidance _avoidance = new();
-    private readonly Vector3[] _anchorCornerScratch = new Vector3[4];
+    private readonly BppDockButtonScreenLayout _screenLayout = new();
     private bool _isExpanded;
+    private bool _hasAvailableDockLayout;
     private int _screenshotSuppressionCount;
     private BppSettingsDockPlacement _placement;
     private string? _lastAvoidanceLogKey;
@@ -125,19 +127,19 @@ internal sealed partial class BppSettingsDockController
     {
         ApplyScreenshotSuppressionVisibility();
         RefreshView();
+        SyncDockButtonPlacement();
     }
 
     private void OnDisable()
     {
+        SetDockLayoutAvailable(false);
         SetExpanded(false);
     }
 
     private void LateUpdate()
     {
-        var sceneKind = BppSettingsDockSceneContext.ResolveCurrentSceneKind();
         var shouldSync = _layoutSync.ShouldSync(
-            BppSettingsDockSceneContext.ResolveCurrentSceneHandle(),
-            sceneKind,
+            SceneManager.GetActiveScene().name,
             Time.realtimeSinceStartup
         );
         shouldSync |= _screenResizeSync.ShouldSync(Screen.width, Screen.height);
@@ -162,7 +164,7 @@ internal sealed partial class BppSettingsDockController
 
     private void ApplyScreenshotSuppressionVisibility()
     {
-        var shouldBeVisible = _screenshotSuppressionCount == 0;
+        var shouldBeVisible = _screenshotSuppressionCount == 0 && _hasAvailableDockLayout;
         if (_dockButtonRect != null && _dockButtonRect.gameObject.activeSelf != shouldBeVisible)
             _dockButtonRect.gameObject.SetActive(shouldBeVisible);
     }
@@ -380,77 +382,65 @@ internal sealed partial class BppSettingsDockController
         if (_anchorButton == null || _dockButtonRect == null)
             return;
 
-        var placement = _placement.ResolveForScene(
-            BppSettingsDockSceneContext.ResolveCurrentSceneKind()
-        );
+        var placement = _placement;
         if (_panelRoot != null)
             ConfigurePanelRect(_panelRoot, placement);
 
-        var parentRect = _dockButtonRect.parent as RectTransform;
-        var anchorRect = _anchorButton.transform as RectTransform;
-        if (parentRect == null || anchorRect == null)
+        var collectionController =
+            _anchorButton.GetComponent<CollectionPanelDockButtonController>();
+        var collectionRect = collectionController?.DockButtonRect;
+        if (collectionRect == null)
             return;
 
-        anchorRect.GetWorldCorners(_anchorCornerScratch);
-
-        var centerWorld = (_anchorCornerScratch[0] + _anchorCornerScratch[2]) * 0.5f;
-        var leftWorld = (_anchorCornerScratch[0] + _anchorCornerScratch[1]) * 0.5f;
-        var rightWorld = (_anchorCornerScratch[2] + _anchorCornerScratch[3]) * 0.5f;
-        var topWorld = (_anchorCornerScratch[1] + _anchorCornerScratch[2]) * 0.5f;
-        var bottomWorld = (_anchorCornerScratch[0] + _anchorCornerScratch[3]) * 0.5f;
-
-        var centerLocal = parentRect.InverseTransformPoint(centerWorld);
-        var leftLocal = parentRect.InverseTransformPoint(leftWorld);
-        var rightLocal = parentRect.InverseTransformPoint(rightWorld);
-        var topLocal = parentRect.InverseTransformPoint(topWorld);
-        var bottomLocal = parentRect.InverseTransformPoint(bottomWorld);
-
-        var dockPosition = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
-            centerLocal.x,
-            centerLocal.y,
-            leftLocal.x,
-            rightLocal.x,
-            topLocal.y,
-            bottomLocal.y,
-            _dockButtonRect.localPosition.z,
-            placement
-        );
-        var avoidance = _avoidance.Resolve(
-            parentRect,
-            anchorRect,
+        var plan = _screenLayout.ResolveAndApply(
+            _anchorButton,
+            collectionRect,
             _dockButtonRect,
-            dockPosition,
-            placement
+            placement.SiblingGap
         );
-        // The native container can be smaller than valid sibling slots. Keep the desired position
-        // when avoidance cannot validate an override instead of leaving a stale coordinate.
-        if (avoidance.CanApply)
-            dockPosition = avoidance.Position;
-        _dockButtonRect.localPosition = new Vector3(dockPosition.X, dockPosition.Y, dockPosition.Z);
+        SetDockLayoutAvailable(plan.CanApply);
+        if (!plan.CanApply)
+            SetExpanded(false);
 
-        LogDockButtonAvoidance(avoidance);
-        _dockButtonRect.localRotation = Quaternion.identity;
-        _dockButtonRect.SetAsLastSibling();
+        LogDockButtonLayout(plan);
     }
 
-    private void LogDockButtonAvoidance(BppDockButtonAvoidanceResult avoidance)
+    private void SetDockLayoutAvailable(bool available)
     {
-        if (!avoidance.WasAdjusted)
+        _hasAvailableDockLayout = available;
+        ApplyScreenshotSuppressionVisibility();
+        _anchorButton
+            ?.GetComponent<CollectionPanelDockButtonController>()
+            ?.SetLayoutAvailable(available);
+    }
+
+    private void LogDockButtonLayout(BppDockButtonLayoutPlan plan)
+    {
+        if (plan.CanApply && !plan.WasAdjusted)
         {
             _lastAvoidanceLogKey = null;
             return;
         }
 
         var key =
-            $"{avoidance.BlockerName}:{Mathf.RoundToInt(avoidance.Position.X * 100f)}:{Mathf.RoundToInt(avoidance.Position.Y * 100f)}";
+            $"{plan.CanApply}:{plan.SettingsSlot}:{plan.BlockerName}:{Mathf.RoundToInt(plan.SettingsBounds.CenterX)}:{Mathf.RoundToInt(plan.SettingsBounds.CenterY)}";
         if (string.Equals(_lastAvoidanceLogKey, key, StringComparison.Ordinal))
             return;
 
         _lastAvoidanceLogKey = key;
-        BppLog.Debug(
+        if (!plan.CanApply)
+        {
+            BppLog.Warn(
+                LogCategory,
+                $"No visible dock slot is available for '{_placement.Key}'; retrying without applying an invalid desired position."
+            );
+            return;
+        }
+
+        BppLog.Info(
             LogCategory,
-            $"Dock button '{_placement.Key}' moved to an available stacked slot after '{avoidance.BlockerName ?? "bounds"}' blocked its resolved position: "
-                + $"local=({avoidance.Position.X:0.##}, {avoidance.Position.Y:0.##})."
+            $"Dock button '{_placement.Key}' moved above Collection after '{plan.BlockerName ?? "viewport"}' blocked gear-left: "
+                + $"screen=({plan.SettingsBounds.CenterX:0.##}, {plan.SettingsBounds.CenterY:0.##})."
         );
     }
 

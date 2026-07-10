@@ -12,14 +12,19 @@ internal sealed class CollectionPanelDockButtonController
         IBppNativeSettingsButtonCloneOwner
 {
     private const string LogCategory = "CollectionPanelDockButton";
-    private const int ScreenResizeSyncFrameCount = 6;
 
-    private Button? _anchorButton;
     private Button? _dockButton;
     private RectTransform? _dockButtonRect;
-    private readonly BppScreenResizeSyncTracker _screenResizeSync = new(ScreenResizeSyncFrameCount);
+    private bool _hasAvailableDockLayout;
     private int _screenshotSuppressionCount;
-    private BppSettingsDockPlacement _placement;
+
+    internal RectTransform? DockButtonRect => _dockButtonRect;
+
+    internal void SetLayoutAvailable(bool available)
+    {
+        _hasAvailableDockLayout = available;
+        ApplyScreenshotSuppressionVisibility();
+    }
 
     internal static void Attach(Button anchorButton, BppSettingsDockPlacement placement)
     {
@@ -29,7 +34,6 @@ internal sealed class CollectionPanelDockButtonController
         var existingController = anchorButton.GetComponent<CollectionPanelDockButtonController>();
         if (existingController != null && existingController._dockButtonRect != null)
         {
-            existingController.SyncDockButtonPlacement();
             existingController.ApplyScreenshotSuppressionVisibility();
             return;
         }
@@ -65,8 +69,6 @@ internal sealed class CollectionPanelDockButtonController
         RectTransform dockButton
     )
     {
-        _anchorButton = anchorButton;
-        _placement = placement;
         _dockButtonRect = dockButton;
         _dockButton = dockButton.GetComponent<Button>();
         if (_dockButton == null)
@@ -78,16 +80,7 @@ internal sealed class CollectionPanelDockButtonController
         _dockButton.onClick.RemoveAllListeners();
         _dockButton.onClick.AddListener(OnDockButtonClicked);
 
-        SyncDockButtonPlacement();
         ApplyScreenshotSuppressionVisibility();
-    }
-
-    private void LateUpdate()
-    {
-        if (!_screenResizeSync.ShouldSync(Screen.width, Screen.height))
-            return;
-
-        SyncDockButtonPlacement();
     }
 
     private IDisposable BeginInstanceScreenshotSuppression()
@@ -107,7 +100,7 @@ internal sealed class CollectionPanelDockButtonController
 
     private void ApplyScreenshotSuppressionVisibility()
     {
-        var shouldBeVisible = _screenshotSuppressionCount == 0;
+        var shouldBeVisible = _screenshotSuppressionCount == 0 && _hasAvailableDockLayout;
         if (_dockButtonRect != null && _dockButtonRect.gameObject.activeSelf != shouldBeVisible)
             _dockButtonRect.gameObject.SetActive(shouldBeVisible);
     }
@@ -115,51 +108,6 @@ internal sealed class CollectionPanelDockButtonController
     private void OnDockButtonClicked()
     {
         CollectionPanel.OpenFromDockButton();
-    }
-
-    private void OnRectTransformDimensionsChange()
-    {
-        SyncDockButtonPlacement();
-    }
-
-    private void SyncDockButtonPlacement()
-    {
-        if (_anchorButton == null || _dockButtonRect == null)
-            return;
-
-        var parentRect = _dockButtonRect.parent as RectTransform;
-        var anchorRect = _anchorButton.transform as RectTransform;
-        if (parentRect == null || anchorRect == null)
-            return;
-
-        var corners = new Vector3[4];
-        anchorRect.GetWorldCorners(corners);
-
-        var centerWorld = (corners[0] + corners[2]) * 0.5f;
-        var leftWorld = (corners[0] + corners[1]) * 0.5f;
-        var rightWorld = (corners[2] + corners[3]) * 0.5f;
-        var topWorld = (corners[1] + corners[2]) * 0.5f;
-        var bottomWorld = (corners[0] + corners[3]) * 0.5f;
-
-        var centerLocal = parentRect.InverseTransformPoint(centerWorld);
-        var leftLocal = parentRect.InverseTransformPoint(leftWorld);
-        var rightLocal = parentRect.InverseTransformPoint(rightWorld);
-        var topLocal = parentRect.InverseTransformPoint(topWorld);
-        var bottomLocal = parentRect.InverseTransformPoint(bottomWorld);
-
-        var dockPosition = BppSettingsDockGeometry.CalculateDockButtonLocalPosition(
-            centerLocal.x,
-            centerLocal.y,
-            leftLocal.x,
-            rightLocal.x,
-            topLocal.y,
-            bottomLocal.y,
-            _dockButtonRect.localPosition.z,
-            _placement
-        );
-        _dockButtonRect.localPosition = new Vector3(dockPosition.X, dockPosition.Y, dockPosition.Z);
-        _dockButtonRect.localRotation = Quaternion.identity;
-        _dockButtonRect.SetAsLastSibling();
     }
 
     private sealed class ScreenshotSuppressionLease(CollectionPanelDockButtonController controller)

@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 
 namespace BazaarPlusPlus.Game.Settings;
 
@@ -8,8 +9,7 @@ internal sealed class BppDockLayoutSyncTracker
     private const float SteadyStateProbeIntervalSeconds = 2f;
 
     private readonly int _immediateSyncFrameCount;
-    private int _lastSceneHandle = int.MinValue;
-    private BppSettingsDockSceneKind _lastSceneKind;
+    private string? _lastSceneName;
     private int _pendingImmediateSyncFrames;
     private int _nextDelayedProbe;
     private float _sceneChangedAtSeconds;
@@ -20,16 +20,11 @@ internal sealed class BppDockLayoutSyncTracker
         _immediateSyncFrameCount = immediateSyncFrameCount > 0 ? immediateSyncFrameCount : 1;
     }
 
-    internal bool ShouldSync(
-        int sceneHandle,
-        BppSettingsDockSceneKind sceneKind,
-        float realtimeSeconds
-    )
+    internal bool ShouldSync(string sceneName, float realtimeSeconds)
     {
-        if (sceneHandle != _lastSceneHandle || sceneKind != _lastSceneKind)
+        if (!string.Equals(sceneName, _lastSceneName, StringComparison.Ordinal))
         {
-            _lastSceneHandle = sceneHandle;
-            _lastSceneKind = sceneKind;
+            _lastSceneName = sceneName;
             _pendingImmediateSyncFrames = _immediateSyncFrameCount;
             _nextDelayedProbe = 0;
             _sceneChangedAtSeconds = realtimeSeconds;
