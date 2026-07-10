@@ -110,6 +110,20 @@ All six projects live under `src/<AssemblyName>/`, each in its own directory so 
 - A long-running automation task must self-heal — auto-relaunch the game process on crash/exit and continue until the goal is met, rather than stopping on the first failure
 - Never build mod file-write paths from `Application.dataPath` — on macOS its parent is the `.app` bundle root, and unsealed writes there break `codesign` re-signing and the trampoline repair (blocking `./run.sh build` after every game update). Anchor writes on `BepInEx.Paths.GameRootPath` / the `<GameRoot>/BazaarPlusPlusV4/` data dir, which BepInEx special-cases on macOS to the directory containing the `.app`
 
+## Agent skills
+
+### Issue tracker
+
+Issues live in this repo's GitHub Issues (`cauyxy/bazaarplusplus-mod`), operated via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five canonical triage labels are used as-is: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: vocabulary in `CONTEXT.md` at the root, decisions in `docs/adr/`. See `docs/agents/domain.md`.
+
 # Rules Hygiene
 
 These rules are read by every agent session. Keep them high-signal.
