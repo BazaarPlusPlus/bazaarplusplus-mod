@@ -131,7 +131,7 @@ internal static class CollectionLocalizationResolver
     // ("Heal") to the game's localized display word ("治疗" on zh clients) via
     // TooltipTypography. Null (or a null return) falls back to the English name so
     // the data layer never depends on game UI services directly.
-    internal static Func<string, string?>? AttributeUnitLocalizer;
+    internal static Func<string, string?>? AttributeUnitLocalizer = null;
 
     private static string? FormatAbilityPlaceholders(TCardBase template, string? text)
     {
