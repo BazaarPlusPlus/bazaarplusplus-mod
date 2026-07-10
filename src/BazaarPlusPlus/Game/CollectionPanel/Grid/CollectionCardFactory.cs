@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.Game.CollectionPanel.Tooltips;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.StaticCards;
@@ -106,6 +107,7 @@ internal sealed class CollectionCardFactory
             return CollectionCardBindResult.NotReady();
 
         PrepareCollectionCardForBind(handle.Card);
+        RegisterCollectionTooltip(handle.Card);
         _activeHandles[handle.Card] = handle;
         return CollectionCardBindResult.Bound(
             new CollectionCardBinding(handle.Card, handle.Kind, Task.CompletedTask)
@@ -116,6 +118,8 @@ internal sealed class CollectionCardFactory
     {
         if (card == null)
             return;
+
+        UnregisterCollectionTooltip(card);
 
         if (_activeHandles.Remove(card, out var handle))
         {
@@ -149,6 +153,18 @@ internal sealed class CollectionCardFactory
         if (canvasGroup == null)
             canvasGroup = card.gameObject.AddComponent<CanvasGroup>();
         canvasGroup.alpha = 0f;
+    }
+
+    private static void RegisterCollectionTooltip(Component card)
+    {
+        if (NativeCardPreviewReflection.TryGetTooltipData(card, out var tooltipData))
+            CollectionTierTooltipRegistry.Register(tooltipData.CardInstance);
+    }
+
+    private static void UnregisterCollectionTooltip(Component card)
+    {
+        if (NativeCardPreviewReflection.TryGetTooltipData(card, out var tooltipData))
+            CollectionTierTooltipRegistry.Unregister(tooltipData.CardInstance);
     }
 }
 

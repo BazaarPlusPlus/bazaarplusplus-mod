@@ -147,6 +147,32 @@ internal static class Colors
             0.58f
         );
 
+    public static Color ButtonHoverBackgroundFor(Color background) =>
+        Mix(background, Color.white, 0.12f, Mathf.Clamp01(background.a + 0.02f));
+
+    public static Color ButtonPressedBackgroundFor(Color background) =>
+        Mix(background, Color.black, 0.10f, background.a);
+
+    public static Color ButtonHoverBorderFor(Color background) =>
+        Rgba(
+            Mathf.Clamp01(background.r + 0.18f),
+            Mathf.Clamp01(background.g + 0.18f),
+            Mathf.Clamp01(background.b + 0.18f),
+            0.78f
+        );
+
+    public static Color RowHoverBackgroundFor(Color background) =>
+        Mix(background, Color.white, 0.07f, background.a);
+
+    public static Color RowPressedBackgroundFor(Color background) =>
+        Mix(background, Color.black, 0.06f, background.a);
+
+    public static Color RowHoverBorderFor(Color border) =>
+        Mix(border, HistoryLevelAccent, 0.32f, Mathf.Clamp01(border.a + 0.18f));
+
+    public static Color RowPressedBorderFor(Color border) =>
+        Mix(border, ButtonSelectedBackground, 0.36f, Mathf.Clamp01(border.a + 0.14f));
+
     public static Color InfoChipBackground(Color accent) =>
         Rgba(
             Mathf.Lerp(0.14f, accent.r, 0.10f),
@@ -170,6 +196,14 @@ internal static class Colors
 
     public static Color FromRgb(int r, int g, int b, float alpha = 0.98f) =>
         Rgba(r / 255f, g / 255f, b / 255f, alpha);
+
+    private static Color Mix(Color from, Color to, float amount, float alpha) =>
+        Rgba(
+            Mathf.Lerp(from.r, to.r, amount),
+            Mathf.Lerp(from.g, to.g, amount),
+            Mathf.Lerp(from.b, to.b, amount),
+            alpha
+        );
 
     private static Color Rgba(float r, float g, float b, float a) => new(r, g, b, a);
 }

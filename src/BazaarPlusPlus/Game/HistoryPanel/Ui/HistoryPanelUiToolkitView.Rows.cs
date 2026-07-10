@@ -92,6 +92,27 @@ internal sealed partial class HistoryPanelUiToolkitView
             goldChip
         );
         row.userData = refs;
+        row.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            refs.Hovered = true;
+            RefreshRunRowState(refs);
+        });
+        row.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            refs.Hovered = false;
+            refs.Pressed = false;
+            RefreshRunRowState(refs);
+        });
+        row.RegisterCallback<MouseDownEvent>(_ =>
+        {
+            refs.Pressed = true;
+            RefreshRunRowState(refs);
+        });
+        row.RegisterCallback<MouseUpEvent>(_ =>
+        {
+            refs.Pressed = false;
+            RefreshRunRowState(refs);
+        });
         row.RegisterCallback<ClickEvent>(_ =>
         {
             if (!_suppressSelectionCallbacks && refs.Index >= 0)
@@ -112,6 +133,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         var run = items[index];
         var refs = (RunRowRefs)element.userData;
         refs.Index = index;
+        refs.Hovered = false;
+        refs.Pressed = false;
         BindRunOutcomeBubble(refs.OutcomeBubble, run);
         var timing = new List<string>();
         var duration = HistoryPanelFormatter.FormatRunDuration(run);
@@ -297,6 +320,27 @@ internal sealed partial class HistoryPanelUiToolkitView
             opponentName
         );
         row.userData = refs;
+        row.RegisterCallback<MouseEnterEvent>(_ =>
+        {
+            refs.Hovered = true;
+            RefreshBattleRowState(refs);
+        });
+        row.RegisterCallback<MouseLeaveEvent>(_ =>
+        {
+            refs.Hovered = false;
+            refs.Pressed = false;
+            RefreshBattleRowState(refs);
+        });
+        row.RegisterCallback<MouseDownEvent>(_ =>
+        {
+            refs.Pressed = true;
+            RefreshBattleRowState(refs);
+        });
+        row.RegisterCallback<MouseUpEvent>(_ =>
+        {
+            refs.Pressed = false;
+            RefreshBattleRowState(refs);
+        });
         row.RegisterCallback<ClickEvent>(_ =>
         {
             if (!_suppressSelectionCallbacks && refs.Index >= 0)
@@ -317,6 +361,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         var battle = items[index];
         var refs = (BattleRowRefs)element.userData;
         refs.Index = index;
+        refs.Hovered = false;
+        refs.Pressed = false;
 
         refs.DayBubble.text = battle.Day?.ToString() ?? "?";
         refs.Time.text = HistoryPanelFormatter.FormatTimestamp(battle.RecordedAtUtc);
@@ -348,6 +394,23 @@ internal sealed partial class HistoryPanelUiToolkitView
         refs.EliminatedChip.style.display = isEliminated ? DisplayStyle.Flex : DisplayStyle.None;
 
         ApplyBattleRowState(refs, _battleList?.selectedIndex == index, battle);
+    }
+
+    private void RefreshRunRowState(RunRowRefs refs)
+    {
+        ApplyRunRowState(refs, _runsList?.selectedIndex == refs.Index);
+    }
+
+    private void RefreshBattleRowState(BattleRowRefs refs)
+    {
+        if (
+            _battleList?.itemsSource is not List<HistoryBattleRecord> items
+            || refs.Index < 0
+            || refs.Index >= items.Count
+        )
+            return;
+
+        ApplyBattleRowState(refs, _battleList.selectedIndex == refs.Index, items[refs.Index]);
     }
 
     private sealed class RunRowRefs
@@ -415,6 +478,10 @@ internal sealed partial class HistoryPanelUiToolkitView
         public Label GoldChip { get; }
 
         public int Index { get; set; }
+
+        public bool Hovered { get; set; }
+
+        public bool Pressed { get; set; }
     }
 
     private sealed class BattleRowRefs
@@ -466,5 +533,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         public Label OpponentName { get; }
 
         public int Index { get; set; }
+
+        public bool Hovered { get; set; }
+
+        public bool Pressed { get; set; }
     }
 }

@@ -758,28 +758,21 @@ internal sealed partial class CollectionPanelView
     // state keeps the gold highlight regardless so selection always reads the same way.
     private static void RefreshChip(Button chip, bool selected, Color? unselectedTextColor = null)
     {
-        if (selected)
-        {
-            chip.style.backgroundColor = Colors.ButtonSelectedBackground;
-            chip.style.color = Colors.ButtonSelectedText;
-            UiStyle.BorderColor(
-                chip.style,
-                Colors.ButtonBorderFor(Colors.ButtonSelectedBackground)
-            );
-        }
-        else
-        {
-            chip.style.backgroundColor = Colors.HistoryChipBackground;
-            chip.style.color = unselectedTextColor ?? Colors.HistoryChipText;
-            UiStyle.BorderColor(chip.style, Colors.ButtonBorderFor(Colors.HistoryChipBackground));
-        }
+        StyleButton(
+            chip,
+            selected ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
+            selected ? Colors.ButtonSelectedText : unselectedTextColor ?? Colors.HistoryChipText
+        );
     }
 
     private static void RefreshTierChip(ETier tier, Button chip, bool selected)
     {
         var textColor = TierTextColor(tier);
-        RefreshChip(chip, selected, textColor);
-        chip.style.color = textColor;
+        StyleButton(
+            chip,
+            selected ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
+            textColor
+        );
     }
 
     private static Color TierTextColor(ETier tier) =>
@@ -883,13 +876,12 @@ internal sealed partial class CollectionPanelView
             textElement.style.unityFont = BppUiFont.Default;
         }
         button.tooltip = text;
+        UiHover.ApplyButtonPalette(button, Colors.HistoryButtonBackground, Colors.White);
         return button;
     }
 
     private static void StyleButton(Button button, Color background, Color textColor)
     {
-        button.style.backgroundColor = background;
-        button.style.color = textColor;
-        UiStyle.BorderColor(button.style, Colors.ButtonBorderFor(background));
+        UiHover.ApplyButtonPalette(button, background, textColor);
     }
 }

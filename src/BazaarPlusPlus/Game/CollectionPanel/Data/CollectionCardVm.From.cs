@@ -21,12 +21,29 @@ internal sealed partial class CollectionCardVm
         CollectionCardClassification classification
     )
     {
+        var titleSearchTexts = CollectionLocalizationResolver.ResolveTitleSearchTexts(template);
+        var displayName = FirstOrEmpty(titleSearchTexts);
+        if (string.IsNullOrWhiteSpace(displayName))
+            displayName = template.InternalName;
+        var descriptionSearchTexts = CollectionLocalizationResolver.ResolveDescriptionSearchTexts(
+            template
+        );
+        var tooltipSearchTexts = CollectionLocalizationResolver.ResolveTooltipSearchTexts(template);
+        var description = FirstOrEmpty(descriptionSearchTexts);
+        var searchableContent = string.Join(" ", descriptionSearchTexts);
+        if (tooltipSearchTexts.Count > 0)
+            searchableContent = string.Concat(
+                searchableContent,
+                " ",
+                string.Join(" ", tooltipSearchTexts)
+            );
+        var hiddenTags = CollectionDerivedKeywordFacts.ProjectHiddenTags(template);
         var enchantments =
             template is TCardItem item && item.Enchantments != null
                 ? ProjectEnchantments(item.Enchantments)
                 : new Dictionary<EEnchantmentType, CollectionCardEnchantmentFacets>();
 
-        return new CollectionCardVm
+        var vm = new CollectionCardVm
         {
             Id = template.Id,
             Type = template.Type,
@@ -34,16 +51,39 @@ internal sealed partial class CollectionCardVm
             StartingTier = template.StartingTier,
             Heroes = template.Heroes,
             Tags = template.Tags,
-            HiddenTags = CollectionDerivedKeywordFacts.ProjectHiddenTags(template),
-            DisplayName =
-                CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName,
+            HiddenTags = hiddenTags,
+            DisplayName = displayName,
+            Description = description,
             InternalName = template.InternalName,
             ArtKey = template.ArtKey,
             IsEnchantable = enchantments.Count > 0,
             Enchantments = enchantments,
             IsPackage = classification.IsPackage,
+            SearchText = CollectionCardSearch.BuildCorpus(
+                new CollectionCardVm
+                {
+                    Id = template.Id,
+                    Type = template.Type,
+                    Size = template.Size,
+                    StartingTier = template.StartingTier,
+                    Heroes = template.Heroes,
+                    Tags = template.Tags,
+                    HiddenTags = hiddenTags,
+                    DisplayName = string.Join(" ", titleSearchTexts),
+                    Description = searchableContent,
+                    InternalName = template.InternalName,
+                    ArtKey = template.ArtKey,
+                    IsEnchantable = enchantments.Count > 0,
+                    Enchantments = enchantments,
+                    IsPackage = classification.IsPackage,
+                }
+            ),
         };
+        return vm;
     }
+
+    private static string FirstOrEmpty(IReadOnlyList<string> values) =>
+        values.Count > 0 ? values[0] : string.Empty;
 
     private static IReadOnlyDictionary<
         EEnchantmentType,

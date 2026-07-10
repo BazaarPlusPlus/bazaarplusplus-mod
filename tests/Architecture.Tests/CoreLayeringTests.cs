@@ -272,6 +272,101 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void CollectionGridVirtualizer_retains_shown_cards_when_filters_reorder_the_grid()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var virtualizerSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CollectionPanel",
+                "Grid",
+                "CollectionGridVirtualizer.cs"
+            )
+        );
+
+        var setVisibleStart = virtualizerSource.IndexOf(
+            "public void SetVisible(",
+            StringComparison.Ordinal
+        );
+        var setViewportStart = virtualizerSource.IndexOf(
+            "public void SetViewport(",
+            setVisibleStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(setVisibleStart >= 0 && setViewportStart > setVisibleStart);
+
+        var setVisibleSource = virtualizerSource.Substring(
+            setVisibleStart,
+            setViewportStart - setVisibleStart
+        );
+        Assert.Contains("RetainShownCells", setVisibleSource);
+        Assert.DoesNotContain("RecycleAll();", setVisibleSource);
+        Assert.Contains("if (!cell.IsShown)", virtualizerSource);
+        Assert.Contains("ReferenceEquals(cell.Vm, nextVisible[newIndex])", virtualizerSource);
+        Assert.Contains("cell.Index = newIndex;", virtualizerSource);
+        Assert.Contains("cell.HoverRelay?.Bind(cell.Card);", virtualizerSource);
+        Assert.Contains("Reposition(newIndex, cell);", virtualizerSource);
+    }
+
+    [Fact]
+    public void CollectionPanel_tier_tooltips_are_scoped_to_collection_preview_cards()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var patchSource = File.ReadAllText(
+            Path.Combine(mainSource, "Patches", "CollectionPanel", "CollectionTierTooltipPatch.cs")
+        );
+        var previewSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Patches",
+                "CollectionPanel",
+                "CollectionTierTooltipPreview.cs"
+            )
+        );
+        var factorySource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "CollectionCardFactory.cs")
+        );
+        var destroyPatchSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Patches",
+                "CollectionPanel",
+                "CollectionCardPreviewDestroyPatch.cs"
+            )
+        );
+
+        Assert.Contains("nameof(CardTooltipData.GetActiveAbilityTooltipBlock)", patchSource);
+        Assert.Contains("nameof(CardTooltipData.GetPassiveTooltipBlock)", patchSource);
+        Assert.Contains("nameof(CooldownRenderer.RenderFromTooltip)", patchSource);
+        Assert.Contains("CollectionTierTooltipRegistry.Contains", previewSource);
+        Assert.Contains("CollectionTierTooltipRegistry.Register", factorySource);
+        Assert.Contains("CollectionTierTooltipRegistry.Unregister", factorySource);
+        Assert.Contains("CollectionTierTooltipRegistry.Unregister", destroyPatchSource);
+        Assert.Contains("CardExtensions.BuildAttributeDictionaryForTier", previewSource);
+        Assert.Contains("CollectionTierTooltipTextMerger.Merge", previewSource);
+        Assert.Contains("TryGetTierAttributeValues", previewSource);
+    }
+
+    [Fact]
+    public void CollectionPanel_IME_tracking_uses_the_new_input_system()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "CollectionPanel.cs"
+            )
+        );
+
+        Assert.Contains("onIMECompositionChange", source);
+        Assert.DoesNotContain("UnityEngine.Input.compositionString", source);
+    }
+
+    [Fact]
     public void ItemBoardPreview_uses_native_socket_proportions_for_slot_grid_defaults()
     {
         var repoRoot = RepoRoot();

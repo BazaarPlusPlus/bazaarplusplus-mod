@@ -41,6 +41,14 @@
       Link="CollectionFilterEngine.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardSearch.cs"
+      Link="CollectionCardSearch.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionSearchRefreshGate.cs"
+      Link="CollectionSearchRefreshGate.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionQuery.cs"
       Link="CollectionQuery.cs"
     />

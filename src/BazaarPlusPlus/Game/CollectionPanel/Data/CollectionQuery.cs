@@ -177,6 +177,7 @@ internal static class CollectionQuery
         {
             ActiveType = source.ActiveType,
             SelectedSourceKey = source.SelectedSourceKey,
+            SearchQuery = source.SearchQuery,
             SelectedRunDay = source.SelectedRunDay,
             SortPriority = source.SortPriority,
             TagMatchMode = source.TagMatchMode,

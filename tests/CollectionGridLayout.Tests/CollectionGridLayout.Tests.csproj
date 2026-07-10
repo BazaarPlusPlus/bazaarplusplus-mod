@@ -45,6 +45,14 @@
       Link="CollectionGridPixelization.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionGridRetentionPlan.cs"
+      Link="CollectionGridRetentionPlan.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Tooltips\CollectionTierTooltipTextMerger.cs"
+      Link="CollectionTierTooltipTextMerger.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionCardMaterialLru.cs"
       Link="CollectionCardMaterialLru.cs"
     />

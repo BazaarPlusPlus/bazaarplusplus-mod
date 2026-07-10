@@ -41,6 +41,7 @@ internal sealed class CollectionFilterState
     // shown and applied.
     public HashSet<ECardSize> Sizes { get; } = new();
     public string? SelectedSourceKey { get; set; }
+    public string SearchQuery { get; set; } = string.Empty;
 
     // User-selected run "Day" filter; null means no day filtering. Starts enabled so the panel
     // binds it to Data.Run.Day on open; outside a run, OutOfRunDay keeps the toggle visibly active
