@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
@@ -14,14 +13,13 @@ internal static class EncounterPortraitSpriteProvider
 {
     private const string LogComponent = "EncounterPortrait";
 
-    private static readonly Dictionary<Guid, Sprite?> CachedSprites = new();
-    private static readonly Dictionary<Guid, Task<Sprite?>> InFlightLoads = new();
+    private static readonly AsyncLoadCache<Guid, Sprite> Portraits = new(LoadPortraitCoreAsync);
 
     internal static bool TryGetCached(Guid sourceTemplateId, out Sprite? sprite)
     {
         sprite = null;
         return sourceTemplateId != Guid.Empty
-            && CachedSprites.TryGetValue(sourceTemplateId, out sprite);
+            && Portraits.TryGetCached(sourceTemplateId, out sprite);
     }
 
     internal static Task<Sprite?> LoadPortraitAsync(Guid sourceTemplateId)
@@ -29,21 +27,13 @@ internal static class EncounterPortraitSpriteProvider
         if (sourceTemplateId == Guid.Empty)
             return Task.FromResult<Sprite?>(null);
 
-        if (CachedSprites.TryGetValue(sourceTemplateId, out var cached))
-            return Task.FromResult(cached);
-
-        if (InFlightLoads.TryGetValue(sourceTemplateId, out var inFlight))
-            return inFlight;
-
-        var task = LoadAndMaybeCacheAsync(sourceTemplateId);
-        InFlightLoads[sourceTemplateId] = task;
-        return task;
+        return Portraits.GetOrLoadAsync(sourceTemplateId);
     }
 
-    private static async Task<Sprite?> LoadAndMaybeCacheAsync(Guid sourceTemplateId)
+    private static async Task<AsyncLoadResult<Sprite>> LoadPortraitCoreAsync(Guid sourceTemplateId)
     {
         Sprite? result = null;
-        var shouldCacheResult = false;
+        var shouldCache = false;
         try
         {
             var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
@@ -54,12 +44,12 @@ internal static class EncounterPortraitSpriteProvider
                 || template.ArtKey == "Invalid"
             )
             {
-                shouldCacheResult = staticData != null;
+                shouldCache = staticData != null;
                 BppLog.Warn(
                     LogComponent,
                     $"No encounter art key sourceTemplateId={sourceTemplateId}; using text fallback."
                 );
-                return null;
+                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
             if (!Services.TryGet<AssetLoader>(out var assetLoader) || assetLoader == null)
@@ -68,10 +58,10 @@ internal static class EncounterPortraitSpriteProvider
                     LogComponent,
                     $"AssetLoader unavailable sourceTemplateId={sourceTemplateId}; using text fallback."
                 );
-                return null;
+                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
-            shouldCacheResult = true;
+            shouldCache = true;
             var encounterData = await assetLoader.LoadAssetAsyncByAddress<EncounterAssetDataSO>(
                 template.ArtKey
             );
@@ -81,11 +71,11 @@ internal static class EncounterPortraitSpriteProvider
                     LogComponent,
                     $"Encounter asset unavailable artKey={template.ArtKey}; using text fallback."
                 );
-                return null;
+                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
             result = await encounterData.LoadPortraitSpriteAsync();
-            return result;
+            return new AsyncLoadResult<Sprite>(result, shouldCache);
         }
         catch (Exception ex)
         {
@@ -93,13 +83,7 @@ internal static class EncounterPortraitSpriteProvider
                 LogComponent,
                 $"Failed to load encounter portrait sourceTemplateId={sourceTemplateId}: {ex.Message}"
             );
-            return null;
-        }
-        finally
-        {
-            InFlightLoads.Remove(sourceTemplateId);
-            if (shouldCacheResult)
-                CachedSprites[sourceTemplateId] = result;
+            return new AsyncLoadResult<Sprite>(null, shouldCache);
         }
     }
 }
