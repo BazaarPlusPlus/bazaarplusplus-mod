@@ -1070,6 +1070,34 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Settings_dock_uses_one_screen_space_layout_path_and_runtime_safe_scene_identity()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var settingsControllerSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "Settings", "BppSettingsDockController.cs")
+        );
+        var collectionControllerSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CollectionPanel",
+                "CollectionPanelDockButtonController.cs"
+            )
+        );
+        var settingsPatchSource = File.ReadAllText(
+            Path.Combine(mainSource, "Patches", "Settings", "BppSettingsDockPatch.cs")
+        );
+
+        Assert.Contains("BppDockButtonScreenLayout", settingsControllerSource);
+        Assert.Contains("GetActiveScene().name", settingsControllerSource);
+        Assert.DoesNotContain("GetActiveScene().handle", settingsControllerSource);
+        Assert.DoesNotContain("CalculateDockButtonLocalPosition", collectionControllerSource);
+        Assert.DoesNotContain("siblingStepCount: 2", settingsPatchSource);
+        Assert.DoesNotContain("WithRightDockStackedPlacement", settingsPatchSource);
+    }
+
+    [Fact]
     public void PvpBattles_remains_a_shared_game_module()
     {
         var repoRoot = RepoRoot();
