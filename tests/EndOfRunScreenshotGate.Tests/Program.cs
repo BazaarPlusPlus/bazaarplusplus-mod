@@ -1,6 +1,8 @@
 #nullable enable
 using System.IO;
 using System.Reflection;
+using BazaarPlusPlus.Core.GameState;
+using BazaarPlusPlus.Storage.RunScreenshot;
 
 var assembly = Assembly.Load("BazaarPlusPlus");
 var gateType = assembly.GetType(
@@ -160,6 +162,62 @@ var captureSourceType = Assembly
 Assert(
     Enum.GetNames(captureSourceType) is ["EndOfRunAuto"],
     "Screenshot capture sources should only expose EndOfRunAuto."
+);
+var captureResultType = assembly.GetType(
+    "BazaarPlusPlus.Game.Screenshots.ScreenshotCaptureResult",
+    throwOnError: true
+)!;
+var basicsType = assembly.GetType(
+    "BazaarPlusPlus.Core.GameState.RunBasicsSnapshot",
+    throwOnError: true
+)!;
+var recordMapperType = assembly.GetType(
+    "BazaarPlusPlus.Game.Screenshots.RunScreenshotRecordMapper",
+    throwOnError: true
+)!;
+var captureResult = Activator.CreateInstance(captureResultType)!;
+var capturedAtLocal = new DateTimeOffset(2026, 7, 11, 20, 30, 0, TimeSpan.FromHours(8));
+var capturedAtUtc = capturedAtLocal.ToUniversalTime();
+SetProperty(captureResultType, captureResult, "ScreenshotId", "shot-42");
+SetProperty(captureResultType, captureResult, "RunId", "run-42");
+SetProperty(captureResultType, captureResult, "HeroName", null);
+SetProperty(captureResultType, captureResult, "BattleId", "battle-42");
+SetProperty(
+    captureResultType,
+    captureResult,
+    "CaptureSource",
+    Enum.Parse(captureSourceType, "EndOfRunAuto")
+);
+SetProperty(captureResultType, captureResult, "RelativePath", "2026-07-11/final.png");
+SetProperty(captureResultType, captureResult, "CapturedAtLocal", capturedAtLocal);
+SetProperty(captureResultType, captureResult, "CapturedAtUtc", capturedAtUtc);
+var basics = Activator.CreateInstance(basicsType)!;
+SetProperty(basicsType, basics, "Day", 12);
+SetProperty(basicsType, basics, "Victories", 10);
+SetProperty(basicsType, basics, "Hero", "Vanessa");
+var rank = new RankSnapshot { Rank = "Legend", Rating = 2750 };
+var createRecord = recordMapperType.GetMethod(
+    "CreateRecord",
+    BindingFlags.Public | BindingFlags.Static
+)!;
+var screenshotRecord = (RunScreenshotRecord)
+    createRecord.Invoke(null, [captureResult, basics, rank, 37, true, "Online"])!;
+Assert(
+    screenshotRecord.ScreenshotId == "shot-42"
+        && screenshotRecord.RunId == "run-42"
+        && screenshotRecord.HeroName == "Vanessa"
+        && screenshotRecord.BattleId == "battle-42"
+        && screenshotRecord.IsPrimary
+        && screenshotRecord.ImageRelativePath == "2026-07-11/final.png"
+        && screenshotRecord.CapturedAtLocal == capturedAtLocal
+        && screenshotRecord.CapturedAtUtc == capturedAtUtc
+        && screenshotRecord.Day == 12
+        && screenshotRecord.PlayerRank == "Legend"
+        && screenshotRecord.PlayerRating == 2750
+        && screenshotRecord.PlayerPosition == 37
+        && screenshotRecord.VictoriesAtCapture == 10
+        && screenshotRecord.BuildChannel == "Online",
+    "The screenshot record mapper should preserve capture data and supplied run snapshots."
 );
 var screenshotPath = InvokeBuildRelativePath(
     pathBuilderType,
@@ -412,6 +470,15 @@ static string InvokeGetSummaryRevealState(
         ?? throw new InvalidOperationException("GetRevealState returned null.");
     return Enum.GetName(stateType, value)
         ?? throw new InvalidOperationException("Reveal state enum name was null.");
+}
+
+static void SetProperty(Type type, object instance, string name, object? value)
+{
+    var property = type.GetProperty(name, BindingFlags.Public | BindingFlags.Instance);
+    if (property == null)
+        throw new InvalidOperationException($"Property not found: {type.FullName}.{name}");
+
+    property.SetValue(instance, value);
 }
 
 static void Assert(bool condition, string message)

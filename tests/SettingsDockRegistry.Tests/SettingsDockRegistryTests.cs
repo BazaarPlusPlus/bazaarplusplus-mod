@@ -87,6 +87,7 @@ public class SettingsDockRegistryTests
         public IRunContext RunContext => null!;
         public IGameStateProbe GameStateProbe => null!;
         public IEncounterStateProbe EncounterState => null!;
+        public IRunSnapshotProbe RunSnapshot => null!;
         public IGameBuildInfo GameBuild => null!;
         public ManualLogSource Logger => null!;
     }

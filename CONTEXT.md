@@ -15,6 +15,9 @@ An encounter that upgrades or enchants one of the player's existing items, rathe
 The on-demand, pull-based read of the player's *current* run/encounter state (`IEncounterStateProbe.GetEncounterIds()`, `GetChoicePedestal()`, `GetTargetingState()`). The project's chosen way to expose "where is the player in the run right now" — as status queries, not a recorded timeline.
 _Avoid_: encounter tracker, run timeline (deliberately not built — see [ADR-0001](docs/adr/0001-encounter-status-probe-not-timeline-tracker.md))
 
+**Run Snapshot Probe（运行快照探针）**:
+对「当前 run 的可记录事实」（天数/小时/胜负/英雄/模式、玩家五属性、段位、排行榜名次）的按需拉取读取，由 `IRunSnapshotProbe`（Core）+ `GameInterop/RunSnapshot` 适配器承载，按读取成本分方法。RunLogging 与 Screenshots 的记录构造是消费快照的纯映射器，不再直读游戏全局。
+
 ## Overlay panels
 
 **Main Overlay Panel**:

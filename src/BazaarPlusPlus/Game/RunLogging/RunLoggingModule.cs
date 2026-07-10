@@ -40,9 +40,9 @@ internal sealed class RunLoggingModule
         RunLoggingControllerCore core,
         Func<bool> hasPendingReplayPersistence,
         Func<RunLogSessionState?> ensureActiveRunFromGame,
-        Func<DateTime>? utcNow = null,
-        Func<string, RunLogCompletion>? buildRunLogCompletion = null,
-        Func<string, RunLogAbandonment>? buildRunLogAbandonment = null
+        Func<DateTime> utcNow,
+        Func<string, RunLogCompletion> buildRunLogCompletion,
+        Func<string, RunLogAbandonment> buildRunLogAbandonment
     )
         : this(
             eventBus,
@@ -65,9 +65,9 @@ internal sealed class RunLoggingModule
         Func<bool> hasPendingReplayPersistence,
         Func<RunLogSessionState?> ensureActiveRunFromGame,
         Action<string, string> attachBattleToRun,
-        Func<DateTime>? utcNow = null,
-        Func<string, RunLogCompletion>? buildRunLogCompletion = null,
-        Func<string, RunLogAbandonment>? buildRunLogAbandonment = null
+        Func<DateTime> utcNow,
+        Func<string, RunLogCompletion> buildRunLogCompletion,
+        Func<string, RunLogAbandonment> buildRunLogAbandonment
     )
     {
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
@@ -82,11 +82,12 @@ internal sealed class RunLoggingModule
             ?? throw new ArgumentNullException(nameof(ensureActiveRunFromGame));
         _attachBattleToRun =
             attachBattleToRun ?? throw new ArgumentNullException(nameof(attachBattleToRun));
-        _utcNow = utcNow ?? (() => DateTime.UtcNow);
+        _utcNow = utcNow ?? throw new ArgumentNullException(nameof(utcNow));
         _buildRunLogCompletion =
-            buildRunLogCompletion ?? RunLoggingGameDataReader.BuildRunLogCompletion;
+            buildRunLogCompletion ?? throw new ArgumentNullException(nameof(buildRunLogCompletion));
         _buildRunLogAbandonment =
-            buildRunLogAbandonment ?? RunLoggingGameDataReader.BuildRunLogAbandonment;
+            buildRunLogAbandonment
+            ?? throw new ArgumentNullException(nameof(buildRunLogAbandonment));
     }
 
     public void Start()

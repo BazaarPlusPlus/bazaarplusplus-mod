@@ -1,23 +1,23 @@
 #nullable enable
-using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Storage.RunScreenshot;
-using TheBazaar;
 
 namespace BazaarPlusPlus.Game.Screenshots;
 
-internal static class RunScreenshotMetadataReader
+internal static class RunScreenshotRecordMapper
 {
     public static RunScreenshotRecord CreateRecord(
         ScreenshotCaptureResult capture,
-        bool isPrimary = false,
-        string? buildChannel = null
+        RunBasicsSnapshot? basics,
+        RankSnapshot? rank,
+        int? position,
+        bool isPrimary,
+        string? buildChannel
     )
     {
-        BppClientCacheBridge.TryGetPlayerRankSnapshot(out var playerRank, out var playerRating);
-        BppClientCacheBridge.TryGetPlayerLeaderboardPosition(out var playerPosition);
         var heroName = !string.IsNullOrWhiteSpace(capture.HeroName)
             ? capture.HeroName
-            : Data.Run?.Player?.Hero.ToString();
+            : basics?.Hero;
 
         return new RunScreenshotRecord
         {
@@ -30,11 +30,11 @@ internal static class RunScreenshotMetadataReader
             ImageRelativePath = capture.RelativePath,
             CapturedAtLocal = capture.CapturedAtLocal,
             CapturedAtUtc = capture.CapturedAtUtc,
-            Day = Data.Run == null ? null : (int?)Data.Run.Day,
-            PlayerRank = playerRank,
-            PlayerRating = playerRating,
-            PlayerPosition = playerPosition,
-            VictoriesAtCapture = Data.Run == null ? null : unchecked((int)Data.Run.Victories),
+            Day = basics?.Day,
+            PlayerRank = rank?.Rank,
+            PlayerRating = rank?.Rating,
+            PlayerPosition = position,
+            VictoriesAtCapture = basics?.Victories,
             BuildChannel = buildChannel,
         };
     }
