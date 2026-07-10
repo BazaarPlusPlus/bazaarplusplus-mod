@@ -197,6 +197,30 @@ public class BppDockButtonAvoidanceTests
         Assert.True(tracker.ShouldSync(10, BppSettingsDockSceneKind.RightDockStacked, 12f));
     }
 
+    // The main-menu left slot is valid even though it extends outside the native button container.
+    [Fact]
+    public void Resolve_reports_desired_and_no_apply_when_desired_and_candidates_are_out_of_bounds()
+    {
+        var smallParent = new BppDockButtonBounds(-100f, 100f, -100f, 100f);
+        var desired = Position(-378f, 0f); // left of the anchor, well outside the small container
+        var stackedAbove = Position(0f, 388f); // every stacked candidate is also out of bounds
+
+        var result = BppDockButtonAvoidanceSolver.Resolve(
+            smallParent,
+            dockWidth: 170f,
+            dockHeight: 170f,
+            desired,
+            new[] { stackedAbove },
+            Array.Empty<BppDockButtonObstacle>()
+        );
+
+        Assert.False(result.CanApply);
+        Assert.False(result.WasAdjusted);
+        Assert.Null(result.BlockerName);
+        Assert.Equal(desired.X, result.Position.X);
+        Assert.Equal(desired.Y, result.Position.Y);
+    }
+
     private static BppSettingsDockLocalPosition Position(float x, float y) => new(x, y, 0f);
 
     private static BppDockButtonObstacle ActiveBlocker(

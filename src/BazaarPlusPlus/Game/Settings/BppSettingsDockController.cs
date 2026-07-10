@@ -422,15 +422,11 @@ internal sealed partial class BppSettingsDockController
             dockPosition,
             placement
         );
+        // The native container can be smaller than valid sibling slots. Keep the desired position
+        // when avoidance cannot validate an override instead of leaving a stale coordinate.
         if (avoidance.CanApply)
-        {
             dockPosition = avoidance.Position;
-            _dockButtonRect.localPosition = new Vector3(
-                dockPosition.X,
-                dockPosition.Y,
-                dockPosition.Z
-            );
-        }
+        _dockButtonRect.localPosition = new Vector3(dockPosition.X, dockPosition.Y, dockPosition.Z);
 
         LogDockButtonAvoidance(avoidance);
         _dockButtonRect.localRotation = Quaternion.identity;
