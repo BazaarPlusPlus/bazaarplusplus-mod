@@ -3,6 +3,7 @@ using System;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
@@ -12,11 +13,20 @@ internal sealed class CollectionPanelDockButtonController
         IBppNativeSettingsButtonCloneOwner
 {
     private const string LogCategory = "CollectionPanelDockButton";
+    private const int ScreenResizeSyncFrameCount = 6;
+    private const int LayoutImmediateSyncFrameCount = 2;
 
+    private Button? _anchorButton;
     private Button? _dockButton;
     private RectTransform? _dockButtonRect;
+    private readonly BppScreenResizeSyncTracker _screenResizeSync = new(
+        ScreenResizeSyncFrameCount
+    );
+    private readonly BppDockLayoutSyncTracker _layoutSync = new(LayoutImmediateSyncFrameCount);
+    private readonly BppDockButtonScreenLayout _screenLayout = new();
     private bool _hasAvailableDockLayout;
     private int _screenshotSuppressionCount;
+    private string? _lastLayoutLogKey;
 
     internal RectTransform? DockButtonRect => _dockButtonRect;
 
@@ -34,7 +44,7 @@ internal sealed class CollectionPanelDockButtonController
         var existingController = anchorButton.GetComponent<CollectionPanelDockButtonController>();
         if (existingController != null && existingController._dockButtonRect != null)
         {
-            existingController.ApplyScreenshotSuppressionVisibility();
+            existingController.SyncDockButtonPlacement();
             return;
         }
 
@@ -69,6 +79,7 @@ internal sealed class CollectionPanelDockButtonController
         RectTransform dockButton
     )
     {
+        _anchorButton = anchorButton;
         _dockButtonRect = dockButton;
         _dockButton = dockButton.GetComponent<Button>();
         if (_dockButton == null)
@@ -80,7 +91,49 @@ internal sealed class CollectionPanelDockButtonController
         _dockButton.onClick.RemoveAllListeners();
         _dockButton.onClick.AddListener(OnDockButtonClicked);
 
-        ApplyScreenshotSuppressionVisibility();
+        SyncDockButtonPlacement();
+    }
+
+    private void OnEnable() => SyncDockButtonPlacement();
+
+    private void LateUpdate()
+    {
+        var shouldSync = _layoutSync.ShouldSync(
+            SceneManager.GetActiveScene().name,
+            Time.realtimeSinceStartup
+        );
+        shouldSync |= _screenResizeSync.ShouldSync(Screen.width, Screen.height);
+        if (shouldSync)
+            SyncDockButtonPlacement();
+    }
+
+    private void OnRectTransformDimensionsChange() => SyncDockButtonPlacement();
+
+    private void SyncDockButtonPlacement()
+    {
+        if (_anchorButton == null || _dockButtonRect == null)
+            return;
+
+        var available = _screenLayout.TryResolveAndApplyCollection(
+            _anchorButton,
+            _dockButtonRect,
+            BppSettingsDockPlacement.DefaultSiblingGap,
+            out var blockerName
+        );
+        SetLayoutAvailable(available);
+
+        var logKey = $"{available}:{blockerName}";
+        if (string.Equals(_lastLayoutLogKey, logKey, StringComparison.Ordinal))
+            return;
+
+        _lastLayoutLogKey = logKey;
+        if (available)
+            BppLog.Debug(LogCategory, "Collection dock layout is available.");
+        else
+            BppLog.Warn(
+                LogCategory,
+                $"Collection dock layout is unavailable; blocker='{blockerName ?? "measurement"}'."
+            );
     }
 
     private IDisposable BeginInstanceScreenshotSuppression()

@@ -22,7 +22,6 @@ internal static class BppDockButtonSpriteProvider
 
         var suffix = kind switch
         {
-            BppDockButtonIconKind.SettingsDock => "Resources.DockButtons.bpp-settings-icon.png",
             BppDockButtonIconKind.CollectionPanel =>
                 "Resources.DockButtons.collection-panel-icon.png",
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),

@@ -247,6 +247,98 @@ public class SettingsDockRegistryTests
         Assert.Equal("ON", definition.ResolveStatus("en"));
     }
 
+    [Fact]
+    public void Toggle_definition_exposes_native_read_write_contract()
+    {
+        var enabled = false;
+        var definition = CyclingSettingsDockEntry<bool>
+            .Toggle(
+                order: 0,
+                key: "Test",
+                resolveLabel: _ => "Test",
+                read: _ => enabled,
+                write: (_, next) => enabled = next
+            )
+            .Build(new BppConfig());
+
+        Assert.Equal(BppSettingsControlKind.Toggle, definition.ControlKind);
+        Assert.False(definition.ReadToggle!());
+
+        definition.WriteToggle!(true);
+
+        Assert.True(enabled);
+        Assert.True(definition.ReadToggle());
+    }
+
+    [Fact]
+    public void Choice_definition_selects_standard_ladder_value_directly()
+    {
+        var value = 1;
+        var definition = CreateIntegerCyclingEntry(() => value, next => value = next).Build(
+            new BppConfig()
+        );
+
+        var state = definition.ResolveChoiceState!("en");
+        definition.SelectStandardChoice!(1);
+
+        Assert.Equal(BppSettingsControlKind.Choice, definition.ControlKind);
+        Assert.Equal(new[] { "1", "2" }, state.Options);
+        Assert.Equal(0, state.SelectedIndex);
+        Assert.False(state.HasSyntheticCurrentOption);
+        Assert.Equal(2, value);
+    }
+
+    [Fact]
+    public void Choice_definition_preserves_unknown_current_value_as_synthetic_option()
+    {
+        var value = 99;
+        var definition = CreateIntegerCyclingEntry(() => value, next => value = next).Build(
+            new BppConfig()
+        );
+
+        var state = definition.ResolveChoiceState!("en");
+
+        Assert.Equal(new[] { "99", "1", "2" }, state.Options);
+        Assert.Equal(0, state.SelectedIndex);
+        Assert.True(state.HasSyntheticCurrentOption);
+        Assert.Equal(99, value);
+    }
+
+    [Fact]
+    public void Action_definitions_preserve_close_host_contract()
+    {
+        var history = new HistoryPanelSettingsDockEntry().Build(new BppConfig());
+
+        Assert.Equal(BppSettingsControlKind.Action, history.ControlKind);
+        Assert.True(history.CollapseAfterActivate);
+    }
+
+    [Fact]
+    public void EndOfRunScreenshot_uses_disabled_native_toggle_while_forced()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-native-screenshot-toggle-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            var config = new BppConfig();
+            config.Initialize(new ConfigFile(configPath, saveOnInit: false));
+            config.BazaarDbUploadEnabled!.Value = true;
+            config.EndOfRunScreenshotEnabledConfig!.Value = false;
+            var definition = new EndOfRunScreenshotSettingsDockEntry().Build(config);
+
+            Assert.Equal(BppSettingsControlKind.Toggle, definition.ControlKind);
+            Assert.True(definition.ReadToggle!());
+            Assert.False(definition.IsInteractable!());
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
     private static CyclingSettingsDockEntry<int> CreateIntegerCyclingEntry(
         Func<int> read,
         Action<int> write
@@ -1098,6 +1190,8 @@ public class SettingsDockRegistryTests
         registry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
         registry.Register(new EndOfRunScreenshotSettingsDockEntry());
+        registry.Register(new HistoryPanelSettingsDockEntry());
+        registry.Register(CombatStatusBarSpeedSettingsDockEntry.Create());
         registry.Register(UiFontSettingsDockEntry.Create());
         registry.Register(ChineseLocaleModeSettingsDockEntry.Create(new InMemoryBppEventBus()));
 
@@ -1108,6 +1202,7 @@ public class SettingsDockRegistryTests
             Assert.Equal(
                 new[]
                 {
+                    "CombatStatusBarSpeed",
                     "ChineseLocaleMode",
                     "UiFont",
                     "StreamMode",
@@ -1116,6 +1211,7 @@ public class SettingsDockRegistryTests
                     "VoiceSubtitlesEnglishFontScale",
                     "VoiceSubtitlesChineseFontScale",
                     "EndOfRunScreenshot",
+                    "GameHistory",
                     "BazaarDbUpload",
                 },
                 BppSettingsDockCatalog.Definitions.Select(d => d.Key)

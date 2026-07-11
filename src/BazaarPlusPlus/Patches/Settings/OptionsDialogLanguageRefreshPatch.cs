@@ -16,7 +16,7 @@ internal static class OptionsDialogLanguageRefreshPatch
     {
         try
         {
-            BppSettingsDockController.RefreshAll();
+            BppNativeSettingsSectionController.RefreshAll();
             BppKeybindSettingsAwakePatch.RefreshLanguage(__instance);
             HistoryPanel.RefreshLocalization();
         }

@@ -16,14 +16,7 @@ internal sealed class BppScreenResizeSyncTracker
 
     internal bool ShouldSync(int currentWidth, int currentHeight)
     {
-        if (
-            BppSettingsDockGeometry.ShouldSyncForScreenSize(
-                _lastScreenWidth,
-                _lastScreenHeight,
-                currentWidth,
-                currentHeight
-            )
-        )
+        if (_lastScreenWidth != currentWidth || _lastScreenHeight != currentHeight)
         {
             _lastScreenWidth = currentWidth;
             _lastScreenHeight = currentHeight;

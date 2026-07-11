@@ -9,13 +9,14 @@ internal sealed class EndOfRunScreenshotSettingsDockEntry : ISettingsDockEntry
     public int Order => BppSettingsDockOrder.EndOfRunScreenshot;
 
     public BppSettingsDockDefinition Build(IBppConfig config) =>
-        new(
+        BppSettingsDockDefinition.Toggle(
             "EndOfRunScreenshot",
             EndOfRunScreenshotSettingsMenuLabel.Resolve,
             _ => EndOfRunScreenshotSettingsPolicy.IsEnabledOrForced(config) ? "ON" : "OFF",
             () => EndOfRunScreenshotSettingsPolicy.IsEnabledOrForced(config),
-            () => ToggleEnabled(config),
-            collapseAfterActivate: false
+            enabled => WriteEnabled(config, enabled),
+            isInteractable: () => !EndOfRunScreenshotSettingsPolicy.IsForcedOn(config),
+            activate: () => ToggleEnabled(config)
         );
 
     private static bool ReadEnabled(IBppConfig config) =>

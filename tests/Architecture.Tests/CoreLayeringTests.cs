@@ -1190,10 +1190,7 @@ public class CoreLayeringTests
             "CollectionPanelDockButtonController.BeginScreenshotSuppression",
             chromeSuppressionSource
         );
-        Assert.Contains(
-            "BppSettingsDockController.BeginScreenshotSuppression",
-            chromeSuppressionSource
-        );
+        Assert.DoesNotContain("BppSettingsDockController", chromeSuppressionSource);
         Assert.Contains(
             "CombatStatusBarFeature.BeginScreenshotSuppression",
             chromeSuppressionSource
@@ -1201,12 +1198,17 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Settings_dock_uses_one_screen_space_layout_path_and_runtime_safe_scene_identity()
+    public void Native_settings_and_collection_dock_have_separate_layout_owners()
     {
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
-        var settingsControllerSource = File.ReadAllText(
-            Path.Combine(mainSource, "Game", "Settings", "BppSettingsDockController.cs")
+        var nativeSettingsSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "Settings",
+                "BppNativeSettingsSectionController.cs"
+            )
         );
         var collectionControllerSource = File.ReadAllText(
             Path.Combine(
@@ -1223,9 +1225,17 @@ public class CoreLayeringTests
             Path.Combine(mainSource, "Game", "Settings", "BppDockButtonScreenLayout.cs")
         );
 
-        Assert.Contains("BppDockButtonScreenLayout", settingsControllerSource);
-        Assert.Contains("GetActiveScene().name", settingsControllerSource);
-        Assert.DoesNotContain("GetActiveScene().handle", settingsControllerSource);
+        Assert.Contains("ScrollSpyEntry", nativeSettingsSource);
+        Assert.Contains("BPP_SettingsSection", nativeSettingsSource);
+        Assert.False(
+            File.Exists(
+                Path.Combine(mainSource, "Game", "Settings", "BppSettingsDockController.cs")
+            )
+        );
+        Assert.Contains("TryResolveAndApplyCollection", collectionControllerSource);
+        Assert.Contains("GetActiveScene().name", collectionControllerSource);
+        Assert.DoesNotContain("GetActiveScene().handle", collectionControllerSource);
+        Assert.DoesNotContain("BppSettingsDockController", settingsPatchSource);
         Assert.DoesNotContain("CalculateDockButtonLocalPosition", collectionControllerSource);
         Assert.DoesNotContain("siblingStepCount: 2", settingsPatchSource);
         Assert.DoesNotContain("WithRightDockStackedPlacement", settingsPatchSource);
