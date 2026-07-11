@@ -277,7 +277,7 @@ internal static class BppHotkeyService
     }
 
     // normalizedPath must already be normalized; every caller passes a
-    // NormalizeBindingPath or GetBindingPath result.
+    // HotkeyBindingPathCore.Normalize or GetBindingPath result.
     private static InputAction GetOrCreateAction(string normalizedPath)
     {
         if (CachedActions.TryGetValue(normalizedPath, out var existingAction))
