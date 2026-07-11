@@ -7,7 +7,7 @@ The code is the source of truth. Current implementation guidance lives in one ar
 - [MEMORY.md](MEMORY.md) — dense, agent-facing durable knowledge. **Load this first.**
 - [ARCHITECTURE.md](ARCHITECTURE.md) — living architecture and data-flow summary for the current code (the structure/overview layer).
 - [../CONTEXT.md](../CONTEXT.md) — project vocabulary (glossary only).
-- [../README.md](../README.md) / [../README_en.md](../README_en.md) — project entry points, quick start, build commands, and high-level feature list.
+- [../README.md](../README.md) — project entry point, quick start, build commands, and high-level feature list.
 - [agents/](agents/) — per-repo config for the engineering skills (issue tracker, triage labels, domain-doc consumer rules).
 
 ## Decision records (`adr/`, immutable)
