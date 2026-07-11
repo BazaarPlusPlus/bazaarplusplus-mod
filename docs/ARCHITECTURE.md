@@ -1,6 +1,6 @@
 # BazaarPlusPlus Architecture
 
-This is the living architecture document for the current repository state. The code remains the source of truth; this document summarizes only behavior verified against current source paths during the 2026-07-10 documentation calibration.
+This is the living architecture document for the current repository state. The code remains the source of truth; this document summarizes only behavior verified against current source paths during the 2026-07-10 documentation calibration, amended 2026-07-11 for the architecture-review batch (PRs #22–#28, #30, #31).
 
 ## Runtime Shape
 
@@ -30,13 +30,13 @@ The optional BazaarAgent assemblies are:
 
 The main source tree follows these boundaries:
 
-- `Core/`: pure mod abstractions such as config, event bus, runtime service interfaces, run context, and path contracts.
-- `GameInterop/`: adapters over game, Unity, or publicized runtime surfaces, including client cache reads, static card data reads, encounter status probes, live card snapshots, item-board preview adapters, and BazaarAgent cross-plugin facades.
-- `Game/`: feature workflows, UI, user-facing policy, filtering, upload orchestration, storage use, and BPP-owned domain modules such as PvP battle evidence.
+- `Core/`: pure mod abstractions such as config, event bus, runtime service interfaces, run context, path contracts, and the run-snapshot contract (`IRunSnapshotProbe` plus its `RunBasicsSnapshot`/`PlayerStatsSnapshot`/`RankSnapshot` DTOs in `Core/GameState/`).
+- `GameInterop/`: adapters over game, Unity, or publicized runtime surfaces, including client cache reads, static card data reads, encounter status probes, the run snapshot probe (`GameInterop/RunSnapshot/` — the only place `Data.Run`/rank/leaderboard reads happen for RunLogging and Screenshots), live card snapshots, item-board preview adapters, and BazaarAgent cross-plugin facades.
+- `Game/`: feature workflows, UI, user-facing policy, filtering, upload orchestration, storage use, and BPP-owned domain modules such as PvP battle evidence. Record construction for run logs and screenshots is pure mappers (`RunLogRecordMapper`, `RunScreenshotRecordMapper`) consuming probe snapshots.
 - `Patches/`: Harmony patches. Patches reach services through `BppPatchHost`, not constructor injection (`src/BazaarPlusPlus/Patches/BppPatchHost.cs:7-24`).
-- `Infrastructure/`: cross-cutting logging, font loading, UI tokens, stable text helpers, and shared non-feature utilities.
+- `Infrastructure/`: cross-cutting logging, font loading, UI tokens, stable text helpers, and shared non-feature utilities, including the generic seams `AtomicFileWriter`, `AsyncLoadCache<TKey,TValue>` (in-flight-deduped negative-caching async loads; hero/encounter portrait providers are thin facades over it), and `FileBackedPayloadStore<T>` (battleId-keyed atomic MessagePack payload files; the combat-replay and ghost payload stores are name-pinned facades over it).
 
-Architecture tests ratchet these boundaries, including `Core/` layering, shared item-board preview ownership, BazaarAgent isolation, voice-subtitle guards, and source layout (`tests/Architecture.Tests/CoreLayeringTests.cs`, ~1750 lines; Core layering starts at `:30`).
+Architecture tests ratchet these boundaries, including `Core/` layering, shared item-board preview ownership, BazaarAgent isolation, voice-subtitle guards, and source layout (`tests/Architecture.Tests/CoreLayeringTests.cs`; Core layering starts at `:30`). Behavioral guarantees of the composition registries (feature start/stop fault isolation, mount ordering) are pinned by `tests/CompositionRuntime.Tests/`; `BppMountableRegistry.MountAll` deliberately has no per-item fault isolation (pinned as current behavior, unlike `BppFeatureRegistry`).
 
 ## Data And File Locations
 
@@ -92,11 +92,13 @@ Run and replay uploads use the mod API client and local storage state; PTR runs 
 
 ## Tooltip Preview, Settings, And Hotkeys
 
-Enchant preview visibility is a three-state setting controlled by `PreviewVisibilityMode`: `Off`, `AutoOnPedestalChoice`, and `Always`. `BppSettingsDockCatalog.NextPreviewVisibilityMode()` cycles those states and resolves localized status labels for dock display (`src/BazaarPlusPlus/Game/Settings/BppSettingsDockCatalog.cs:32-61`).
+Enchant preview visibility is a three-state setting controlled by `PreviewVisibilityMode`: `Off`, `AutoOnPedestalChoice`, and `Always`. `BppSettingsDockCatalog.NextPreviewVisibilityMode()` supplies its cycle order and status labels (`src/BazaarPlusPlus/Game/Settings/BppSettingsDockCatalog.cs`).
+
+Settings-dock rows themselves are data: every cycling or boolean row is a `CyclingSettingsDockEntry<T>` (with a `Toggle` factory for the bool case) built by a per-feature static factory supplying order, key, value ladder, read/write delegates, highlight predicate, status text, and optional `nextOverride`/`onChanged` hooks (`src/BazaarPlusPlus/Game/Settings/CyclingSettingsDockEntry.cs`). Only the action buttons (history panel, hotkey tutorial) and the force-lockable end-of-run screenshot toggle remain hand-built definitions.
 
 `TooltipPreviewModePolicy` owns preview priority. Upgrade hotkey wins first, then enchant hotkey, then enchant `Always`, then enchant `AutoOnPedestalChoice` only when the current choice pedestal is an enchant pedestal (`src/BazaarPlusPlus/Game/Tooltips/TooltipPreviewModePolicy.cs:30-43`). A `TooltipModifierRefreshController` mountable re-resolves open preview tooltips when the Ctrl/Shift hold state changes (`src/BazaarPlusPlus/Game/Tooltips/TooltipModifierRefreshController.cs:17`). The tooltip patch surface also covers encounter/event tooltips (gated by the `Game/EventPreview` settings toggle), quest reward previews, and hero level rewards (`src/BazaarPlusPlus/Patches/Tooltips/`), with mod-appended text rendered through the shared `BppTooltipSections` helper (`src/BazaarPlusPlus/Patches/Tooltips/BppTooltipSections.cs:8-16`).
 
-BPP hotkeys are user-rebindable and persisted in config per action. `BppHotkeyActionId` covers five actions: the two hold-preview hotkeys (Ctrl enchant / Shift upgrade defaults) plus toggles for CollectionPanel, LiveBuildPanel, and HistoryPanel (`src/BazaarPlusPlus/Game/Input/BppHotkeyActionId.cs:4-11`, `src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs:70-74`); rebinding rows are cloned from native settings rows (`src/BazaarPlusPlus/Game/Input/BppKeyBindRowController.cs`), and panel toggle presses are resolved per frame by the Overlay Panel Host. The conflict check compares BPP actions only against other BPP actions, not native `Gameplay/*` bindings (`src/BazaarPlusPlus/Game/Input/BppHotkeyService.cs:289-313`).
+BPP hotkeys are user-rebindable and persisted in config per action. `BppHotkeyActionId` covers five actions: the two hold-preview hotkeys (Ctrl enchant / Shift upgrade defaults) plus toggles for CollectionPanel, LiveBuildPanel, and HistoryPanel (`src/BazaarPlusPlus/Game/Input/BppHotkeyActionId.cs`); rebinding rows are cloned from native settings rows (`src/BazaarPlusPlus/Game/Input/BppKeyBindRowController.cs`), and panel toggle presses are resolved per frame by the Overlay Panel Host. Binding-path normalization, ctrl/shift alias expansion, conflict detection, and the default/display data tables are the pure `HotkeyBindingPathCore` (`src/BazaarPlusPlus/Game/Input/HotkeyBindingPathCore.cs`, compile-linked into the zero-ManagedPath `tests/HotkeyBindingPath.Tests/`); `BppHotkeyService` remains the Unity/config facade. Binding paths in `BazaarPlusPlus.cfg` `[Hotkeys]` are untrusted input: junk normalizes to empty and falls back to the action default. The conflict check compares BPP actions only against other BPP actions, not native `Gameplay/*` bindings.
 
 The settings dock registers all feature rows through `SettingsDockEntryRegistry` with order constants centralized in `BppSettingsDockOrder` (`src/BazaarPlusPlus/Game/Settings/BppSettingsDockOrder.cs:7-22`); the roster spans history, name override, legendary position, enchant preview, event preview, combat status bar, Chinese locale, UI font, supporter list, voice subtitles, end-of-run screenshot, hotkey tutorial, and BazaarDB upload (`src/BazaarPlusPlus/BppComposition.cs:111-123`).
 

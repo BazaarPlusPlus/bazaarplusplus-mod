@@ -1,5 +1,5 @@
 <!-- Generated manifest. Rebuilt by consolidation runs from frontmatter/state. Do not hand-edit. -->
-<!-- Last rebuilt: 2026-07-10 (HEAD 7a68e8bb) -->
+<!-- Last rebuilt: 2026-07-11 (HEAD db858231) -->
 
 # Documentation Index
 
@@ -9,8 +9,8 @@ Manifest of all docs by layer, topic, and status. The code is the source of trut
 
 | Path | Topic | Status | Last verified |
 |---|---|---|---|
-| [MEMORY.md](MEMORY.md) | dense durable knowledge / rules / gotchas | curated | 2026-07-10 (7a68e8bb) |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | living architecture & data flow (= truth/overview) | truth | 2026-07-10 calibration |
+| [MEMORY.md](MEMORY.md) | dense durable knowledge / rules / gotchas | curated | 2026-07-11 (db858231) |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | living architecture & data flow (= truth/overview) | truth | 2026-07-10 calibration + 2026-07-11 batch amendment |
 | [../CONTEXT.md](../CONTEXT.md) | project vocabulary | truth | current |
 | [README.md](README.md) | docs lifecycle map | current | 2026-07-10 |
 
@@ -45,7 +45,7 @@ Historical session artifacts; each carries a `status:` banner. Treat claims as c
 | Subtree | Contents |
 |---|---|
 | [archive/plans/](archive/plans/) | shipped/superseded/abandoned plans (incl. 27 swept 2026-07-10: BazaarDB link ×4, voice subtitles ×3, PTR compat, keybinds, UI font, event preview, tooltips ×2, achievements ×5, five-deepening refactors, collection filter ×3, replay continue, overlay/BazaarAgent loop plans, sources, card proportions, history filters, shortcut tutorial) |
-| [archive/design/](archive/design/) | dated point-in-time design specs (+ `design/archive/` finished specs; +3 swept 2026-07-10); see [archive/design/README.md](archive/design/README.md) |
+| [archive/design/](archive/design/) | dated point-in-time design specs (+ `design/archive/` finished specs; +3 swept 2026-07-10; +10 swept 2026-07-11: the architecture-review batch design docs PRs #22–#31 and the settings-dock PR#18 rediagnosis, all implemented); see [archive/design/README.md](archive/design/README.md) |
 | [archive/audits/](archive/audits/) | doc/code drift, health, feasibility, and performance audits |
 | [archive/debugging/](archive/debugging/) | debugging session notes (incl. tooltip-overlay third recurrence, stale sell-hotkey debug plan) |
 | [archive/features/](archive/features/) | per-feature historical overviews |

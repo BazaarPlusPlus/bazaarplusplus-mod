@@ -34,6 +34,7 @@ One line each; full record in `docs/adr/`. This repo uses `docs/adr/`, not a `de
 - ADR-0007: External battle video recording via three primitive replay-control HTTP endpoints (`record`/`context`/`continue`); only `CombatReplayRuntime.TryContinueReplay` exits ReplayState. [adr/0007]
 - ADR-0008 (2026-06-22): Replay exit exposed to the agent as a first-class `Continue` Flow action, emitted only at `finishedAwaitingContinue`, routed to the same `TryContinueReplay`; BazaarAgent action schema 2.1.0→2.2.0. [adr/0008]
 - Non-ADR (2026-06-19): C5 "retire the three Core seams" refactor REJECTED — keep the seams; do not re-propose. [archive/plans/2026-06-19-five-deepening-refactors-plan.md]
+- Non-ADR (2026-07-11 architecture-review batch, all red-teamed — do NOT re-propose): unified `RunGuardedAsync` over HistoryPanelCoordinator's four async handlers (6 divergence axes = config record); "HistoryPanel two-writer state" (proxy setters were dead code; coordinator already sole writer); OnPanelShown symmetric flag reset (trigger unreachable post-OverlayPanelHost; `GhostBattleSync.Tests` deliberately pins the preserve behavior); unifying the two tooltip line-normalizers (char-level different transforms); moving the facet snapshot onto `CollectionCatalogBuildResult` (deliberate hot-path placement in `SetCatalogCards`, bf91a60a); interop-before-game feature registration order (not load-bearing). [archive/design/2026-07-11-*.md]
 
 ## Durable knowledge
 
@@ -64,6 +65,9 @@ Verified facts about how the system works.
 - BPP settings dock buttons are clones of native dock buttons (`BppDockButtonVisuals`) that must avoid native-button bounds (`BppDockButtonAvoidance`) and re-sync geometry for several frames after a screen-size change. [`src/BazaarPlusPlus/Game/Settings/BppDockButtonVisuals.cs:72-98` | `Game/Settings/BppScreenResizeSyncTracker.cs:17-39`]
 - Synthetic/unknown GUIDs must never reach `CollectionCardFactory.TryBind`'s template lookup — unknown GUID → per-frame SQLite query + Warn spam (game has no negative cache). Memoize failed binds. [archive/plans/2026-06-10-collection-panel-achievements-tab.md | `Grid/CollectionGridVirtualizer.cs`]
 - New architecture boundaries the compiler can't enforce get an architecture test. [`tests/Architecture.Tests/CoreLayeringTests.cs`]
+- Settings-dock rows are data specs via `CyclingSettingsDockEntry<T>`/`Toggle` factories — new rows contribute ladders/delegates, not classes; enchant preview keeps `NextPreviewVisibilityMode` as its `nextOverride` (unknown enum → Auto). [`src/BazaarPlusPlus/Game/Settings/CyclingSettingsDockEntry.cs`]
+- Pure-module test pattern for Unity-adjacent logic: keep the file free of Unity/game types and Compile-Include it into a zero-ManagedPath test project (`OverlayLifecycleCore` → `HotkeyBindingPathCore` → `AsyncLoadCache` all follow it; no InternalsVisibleTo needed).
+- `CombatReplayPayloadStore`/`GhostBattlePayloadStore` class/method names, ctor arity, and file suffixes are reflection-pinned by exe-runner tests — keep the named facades over `FileBackedPayloadStore<T>`; never rename. [`tests/CombatReplayRecording.Tests/Program.cs` | `tests/GhostBattleSync.Tests/Program.cs`]
 
 ## Gotchas
 
@@ -80,3 +84,4 @@ Verified facts about how the system works.
 - `DayTierSchedule` (Game/CollectionPanel/Data) survives the removed shop-probability feature and is still live via `CollectionFilterEngine`/`EncounterEventTooltipPatch` (tier-ceiling filter); it is a hardcoded approximation of `tierManager.json` that shifts with balance patches. [`src/BazaarPlusPlus/Game/CollectionPanel/Data/DayTierSchedule.cs`]
 - Tests split per-feature: some are xUnit (`dotnet test`, has `Microsoft.NET.Test.Sdk`), others exe-runners (`dotnet run --project`). Check the csproj before running. [CLAUDE.md]
 - exe-runner test csprojs pin source files via explicit Compile-Include — moving/removing shared files breaks them silently. [`tests/HistoryPanelPreview.Tests/HistoryPanelPreview.Tests.csproj`]
+- Portrait providers negative-cache exceptions past their service-readiness gates: a transient asset-load exception permanently caches a null portrait until restart (shared latent behavior, preserved by design in the `AsyncLoadCache` migration — fix would be a behavior change). [`GameInterop/HeroPortraits/` | `GameInterop/EncounterPortraits/`]
