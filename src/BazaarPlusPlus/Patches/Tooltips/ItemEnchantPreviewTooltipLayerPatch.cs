@@ -104,8 +104,10 @@ internal static class TooltipLayerOverride
         List<Canvas>? destroyed = null;
         foreach (var canvas in States.Keys)
         {
+            // Unity fake-null: == means "destroyed", but the managed reference (the
+            // dictionary key we must remove) is still non-null.
             if (canvas == null)
-                (destroyed ??= new List<Canvas>()).Add(canvas);
+                (destroyed ??= new List<Canvas>()).Add(canvas!);
         }
 
         if (destroyed == null)
