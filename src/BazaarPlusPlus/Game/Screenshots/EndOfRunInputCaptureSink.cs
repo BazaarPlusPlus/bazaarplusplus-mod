@@ -52,7 +52,6 @@ internal sealed class EndOfRunInputCaptureSink
     public void OnPointerClick(PointerEventData eventData)
     {
         CaptureFocus();
-        EndOfRunScreenshotController.NotifyBlockerClick();
         eventData.Use();
     }
 

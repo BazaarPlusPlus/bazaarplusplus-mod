@@ -8,7 +8,9 @@ namespace BazaarPlusPlus.Game.Screenshots;
 
 internal enum EndOfRunSummaryRevealState
 {
+    TargetDetectionFailed,
     NotSummary,
+    NoLoadedCards,
     RevealInProgress,
     RevealComplete,
     DetectionFailed,
@@ -20,7 +22,9 @@ internal static class EndOfRunSummaryRevealDetector
         "TheBazaar.UI.EndOfRun.EndOfRunSummaryController";
     private const string ActiveControllerFieldName = "_activeController";
     private const string LoadedCardsFieldName = "loadedCards";
-    private const string CardRevealDelayFieldName = "cardRevealDelay";
+    private const string SkillSequenceFieldName = "_skillSequence";
+    private const string TweenDurationFieldName = "duration";
+    private const string TweenIsCompleteFieldName = "isComplete";
     private const string AnimatorPropertyName = "Animator";
     private const string GetBoolMethodName = "GetBool";
     private const string FaceUpParamName = "FaceUp";
@@ -28,16 +32,14 @@ internal static class EndOfRunSummaryRevealDetector
     private static bool _warnedMissingLoadedCardsField;
     private static bool _warnedMissingAnimatorProperty;
     private static bool _warnedMissingAnimatorGetBool;
-
-    public static bool IsSummaryRevealInProgress(object? screenController)
-    {
-        return GetRevealState(screenController) == EndOfRunSummaryRevealState.RevealInProgress;
-    }
+    private static bool _warnedMissingSkillSequenceField;
+    private static bool _warnedMissingTweenDurationField;
+    private static bool _warnedMissingTweenCompleteField;
 
     public static EndOfRunSummaryRevealState GetRevealState(object? screenController)
     {
         if (!TryGetSummaryController(screenController, out var activeController))
-            return EndOfRunSummaryRevealState.DetectionFailed;
+            return EndOfRunSummaryRevealState.TargetDetectionFailed;
         if (activeController == null)
             return EndOfRunSummaryRevealState.NotSummary;
         if (!IsSummaryController(activeController))
@@ -48,7 +50,7 @@ internal static class EndOfRunSummaryRevealDetector
                 LoadedCardsFieldName,
                 out var loadedCardsValue,
                 ref _warnedMissingLoadedCardsField,
-                "Failed to resolve EndOfRunSummaryController.loadedCards; end-of-run mouse blocking will fall back to the game's default behavior."
+                "Failed to resolve EndOfRunSummaryController.loadedCards; automatic capture will use the bounded fallback."
             )
         )
         {
@@ -57,17 +59,19 @@ internal static class EndOfRunSummaryRevealDetector
         if (loadedCardsValue is not IEnumerable loadedCards)
             return EndOfRunSummaryRevealState.DetectionFailed;
 
+        var loadedCardCount = 0;
         foreach (var loadedCard in loadedCards)
         {
             if (loadedCard == null)
                 continue;
+            loadedCardCount++;
             if (
                 !TryGetMemberValue(
                     loadedCard,
                     AnimatorPropertyName,
                     out var animator,
                     ref _warnedMissingAnimatorProperty,
-                    "Failed to resolve summary card Animator; end-of-run mouse blocking will fall back to the game's default behavior."
+                    "Failed to resolve summary card Animator; automatic capture will use the bounded fallback."
                 )
             )
             {
@@ -81,7 +85,7 @@ internal static class EndOfRunSummaryRevealDetector
                     FaceUpParamName,
                     out var isFaceUp,
                     ref _warnedMissingAnimatorGetBool,
-                    "Failed to resolve Animator.GetBool(string) for summary reveal detection; end-of-run mouse blocking will fall back to the game's default behavior."
+                    "Failed to resolve Animator.GetBool(string) for summary reveal detection; automatic capture will use the bounded fallback."
                 )
             )
             {
@@ -91,51 +95,59 @@ internal static class EndOfRunSummaryRevealDetector
                 return EndOfRunSummaryRevealState.RevealInProgress;
         }
 
-        return EndOfRunSummaryRevealState.RevealComplete;
-    }
-
-    public static bool TryGetRevealTimeoutSeconds(
-        object? screenController,
-        out float timeoutSeconds
-    )
-    {
-        timeoutSeconds = 0f;
         if (
-            !TryGetSummaryController(screenController, out var activeController)
-            || activeController == null
+            !TryGetFieldValue(
+                activeController,
+                SkillSequenceFieldName,
+                out var skillSequence,
+                ref _warnedMissingSkillSequenceField,
+                "Failed to resolve EndOfRunSummaryController._skillSequence; automatic capture will use the bounded fallback."
+            )
         )
-            return false;
-        if (!IsSummaryController(activeController))
-            return false;
-
-        var field = activeController
-            .GetType()
-            .GetField(
-                CardRevealDelayFieldName,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-            );
-        if (field == null)
-            return false;
-
-        var delayValue = field.GetValue(activeController);
-        if (delayValue == null)
         {
-            return false;
+            return EndOfRunSummaryRevealState.DetectionFailed;
         }
 
-        if (delayValue is int delayMilliseconds)
+        // DisplaySkills runs immediately after DisplayCardsAsync is invoked. Until its sequence
+        // exists, the summary display has started but has not reached a settled frame.
+        if (skillSequence == null)
+            return EndOfRunSummaryRevealState.RevealInProgress;
+
+        if (
+            !TryGetFieldValue(
+                skillSequence,
+                TweenDurationFieldName,
+                out var durationValue,
+                ref _warnedMissingTweenDurationField,
+                "Failed to resolve the end-of-run skill sequence duration; automatic capture will use the bounded fallback."
+            ) || durationValue is not float duration
+        )
         {
-            timeoutSeconds = Math.Max(0f, delayMilliseconds / 1000f);
-            return true;
+            return EndOfRunSummaryRevealState.DetectionFailed;
         }
 
-        if (delayValue is float delaySeconds)
+        if (duration > 0f)
         {
-            timeoutSeconds = Math.Max(0f, delaySeconds);
-            return true;
+            if (
+                !TryGetFieldValue(
+                    skillSequence,
+                    TweenIsCompleteFieldName,
+                    out var isCompleteValue,
+                    ref _warnedMissingTweenCompleteField,
+                    "Failed to resolve end-of-run skill animation completion; automatic capture will use the bounded fallback."
+                ) || isCompleteValue is not bool isComplete
+            )
+            {
+                return EndOfRunSummaryRevealState.DetectionFailed;
+            }
+
+            if (!isComplete)
+                return EndOfRunSummaryRevealState.RevealInProgress;
         }
 
-        return false;
+        return loadedCardCount == 0
+            ? EndOfRunSummaryRevealState.NoLoadedCards
+            : EndOfRunSummaryRevealState.RevealComplete;
     }
 
     private static bool TryGetSummaryController(
@@ -150,7 +162,7 @@ internal static class EndOfRunSummaryRevealDetector
                 ActiveControllerFieldName,
                 out activeController,
                 ref _warnedMissingActiveControllerField,
-                "Failed to resolve EndOfRunScreenController._activeController; end-of-run mouse blocking will fall back to the game's default behavior."
+                "Failed to resolve EndOfRunScreenController._activeController; automatic capture will use the bounded fallback."
             )
         )
         {
@@ -181,12 +193,17 @@ internal static class EndOfRunSummaryRevealDetector
         if (instance == null)
             return false;
 
-        var field = instance
-            .GetType()
-            .GetField(
+        FieldInfo? field = null;
+        for (var type = instance.GetType(); type != null && field == null; type = type.BaseType)
+        {
+            field = type.GetField(
                 fieldName,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                BindingFlags.Instance
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                    | BindingFlags.DeclaredOnly
             );
+        }
         if (field == null)
         {
             WarnOnce(ref warned, warningMessage);

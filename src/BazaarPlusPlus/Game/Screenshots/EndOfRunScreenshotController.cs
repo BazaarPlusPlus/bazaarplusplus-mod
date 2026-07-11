@@ -1,13 +1,13 @@
 #nullable enable
 using System;
 using System.Collections;
+using System.IO;
 using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Storage.RunScreenshot;
-using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
 using UnityEngine;
@@ -17,14 +17,11 @@ namespace BazaarPlusPlus.Game.Screenshots;
 internal sealed class EndOfRunScreenshotController : MonoBehaviour
 {
     private const float CaptureRetryCooldownSeconds = 1f;
-    private const float FirstCaptureDelaySeconds = 8f;
+    private const float CaptureAttemptTimeoutSeconds = 15f;
+    private const float MetadataPersistenceTimeoutSeconds = 5f;
+    private const float RevealFallbackTimeoutSeconds = 20f;
     private const float ControllerScanIntervalSeconds = 0.5f;
-    private static readonly System.Reflection.MethodInfo? ContinueClickMethod = AccessTools.Method(
-        typeof(EndOfRunScreenController),
-        "OnContinueClick"
-    );
     private static EndOfRunScreenshotController? _current;
-    private static bool _reportedMissingContinueClick;
     private readonly EndOfRunScreenshotGate _gate = new();
     private readonly EndOfRunMouseBlocker _mouseBlocker = new();
     private ScreenshotService? _screenshotService;
@@ -32,14 +29,15 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private IDisposable? _runInitializedSubscription;
     private IDisposable? _captureSuppressionScope;
     private Coroutine? _captureCoroutine;
+    private Task<ScreenshotCaptureResult?>? _activeCaptureTask;
     private string? _bufferedRunId;
     private string? _bufferedHeroName;
     private bool? _lastLoggedBlockerActive;
-    private string? _lastLoggedBlockerStateSummary;
+    private EndOfRunCaptureReadinessState? _lastLoggedReadiness;
     private EndOfRunScreenController? _cachedEndOfRunScreenController;
     private float _nextControllerScanAtSeconds;
     private int _trackedEndOfRunControllerId;
-    private float _endOfRunEnteredAtSeconds = -1f;
+    private int _captureGeneration;
     private IBppServices? _services;
 
     private void Awake()
@@ -86,7 +84,9 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void OnEnable()
     {
+        _current = this;
         Events.RunStarted.AddListener(OnRunStarted, this);
+        Events.EndOfRunScreenInitializing.AddListener(OnEndOfRunScreenInitializing, this);
         if (_services != null && _runInitializedSubscription == null)
         {
             _runInitializedSubscription = _services.EventBus.Subscribe<RunInitializedObserved>(
@@ -97,10 +97,14 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void OnDisable()
     {
+        if (ReferenceEquals(_current, this))
+            _current = null;
+
         Events.RunStarted.RemoveListener(OnRunStarted);
+        Events.EndOfRunScreenInitializing.RemoveListener(OnEndOfRunScreenInitializing);
         _runInitializedSubscription?.Dispose();
         _runInitializedSubscription = null;
-        ResetCaptureUiState();
+        ResetCaptureUiState(disarmGate: true);
     }
 
     private void OnDestroy()
@@ -108,20 +112,30 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         if (ReferenceEquals(_current, this))
             _current = null;
 
-        ResetCaptureUiState();
+        ResetCaptureUiState(disarmGate: true);
     }
 
     private void Update()
     {
-        SyncEndOfRunMouseBlocker();
+        SyncEndOfRunCapture();
     }
 
     private void OnRunStarted()
     {
+        ResetCaptureUiState(disarmGate: false);
         _gate.ResetForNewRun();
-        ResetCaptureUiState();
         ResetBufferedRunContext();
         RefreshBufferedRunContext();
+    }
+
+    private void OnEndOfRunScreenInitializing()
+    {
+        ResetCaptureUiState(disarmGate: true);
+        _gate.ArmForEndOfRun();
+        BppLog.Info(
+            "EndOfRunScreenshot",
+            $"CaptureState action=armed frame={Time.frameCount} time={Time.unscaledTime:F3} source=end-of-run-screen-initializing"
+        );
     }
 
     private void OnRunInitializedObserved(RunInitializedObserved observed)
@@ -132,109 +146,137 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         RefreshBufferedRunContext();
     }
 
-    public static bool TryConsumeContinuePassthrough()
+    public static bool ShouldBlockContinueUntilCapture(EndOfRunScreenController controller)
     {
-        return _current?.ConsumeContinuePassthrough() == true;
+        var current = _current;
+        return current != null
+            && current.isActiveAndEnabled
+            && current.ShouldBlockContinueUntilCaptureInternal(controller);
     }
 
-    public static bool ShouldSuppressContinueWhileCaptureInFlight()
+    public static void NotifySummaryRevealStarted(EndOfRunSummaryController summaryController)
     {
-        return _current?.ShouldBlockMouseInput() == true;
+        var current = _current;
+        if (current == null || !current.isActiveAndEnabled)
+            return;
+
+        current.MarkSummaryRevealStarted(summaryController);
     }
 
-    public static void NotifyBlockerClick()
-    {
-        _current?.HandleBlockerClick();
-    }
-
-    public static bool TryCaptureFirstContinue(
-        EndOfRunScreenController controller,
-        bool isInteractionBlocked
-    )
-    {
-        return _current?.CaptureFirstContinue(controller, isInteractionBlocked) == true;
-    }
-
-    public static bool ShouldBlockContinueUntilFirstCapture(EndOfRunScreenController controller)
-    {
-        return _current?.ShouldBlockContinueUntilFirstCaptureInternal(controller) == true;
-    }
-
-    private bool ConsumeContinuePassthrough()
-    {
-        return _gate.ConsumeContinuePassthrough();
-    }
-
-    private bool ShouldBlockMouseInput()
-    {
-        return IsEndOfRunScreenshotEnabled() && _gate.IsAttemptInFlight();
-    }
-
-    private bool ShouldBlockContinueUntilFirstCaptureInternal(EndOfRunScreenController controller)
+    private bool ShouldBlockContinueUntilCaptureInternal(EndOfRunScreenController controller)
     {
         if (!IsEndOfRunScreenshotEnabled() || _screenshotService == null)
             return false;
 
-        TrackEndOfRunEntry(controller);
-        return ShouldHoldBeforeFirstCapture(out _);
+        EnsureCaptureArmed(controller, "continue-prefix-catch-up");
+        var readiness = GetCaptureReadiness(controller);
+        return _gate.ShouldBlockContinue(
+            readiness,
+            isCaptureEnabled: true,
+            Time.time,
+            RevealFallbackTimeoutSeconds
+        );
     }
 
-    private void HandleBlockerClick()
+    private void SyncEndOfRunCapture()
     {
-        var controller = FindActiveEndOfRunScreenController();
-        if (controller == null)
+        if (!IsEndOfRunScreenshotEnabled() || _screenshotService == null)
+        {
+            _mouseBlocker.Detach();
             return;
+        }
 
-        TrackEndOfRunEntry(controller);
-
-        if (_gate.HasCapturedForCurrentRun() || ShouldHoldBeforeFirstCapture(out _))
+        var screenController = FindActiveEndOfRunScreenController();
+        if (screenController == null)
+        {
+            _mouseBlocker.Detach();
             return;
+        }
 
-        _ = CaptureFirstContinue(controller, isInteractionBlocked: false);
-    }
+        EnsureCaptureArmed(screenController, "controller-catch-up");
+        if (_gate.HasFinishedForCurrentRun())
+        {
+            _mouseBlocker.Detach();
+            return;
+        }
 
-    private bool CaptureFirstContinue(
-        EndOfRunScreenController controller,
-        bool isInteractionBlocked
-    )
-    {
+        var readiness = GetCaptureReadiness(screenController);
         if (
-            _screenshotService == null
-            || !_gate.ShouldCaptureOnContinue(
-                IsEndOfRunScreenshotEnabled(),
-                isInteractionBlocked,
-                Time.unscaledTime
+            _captureCoroutine == null
+            && _gate.TryBeginAutomaticCapture(
+                readiness,
+                isCaptureEnabled: true,
+                Time.time,
+                RevealFallbackTimeoutSeconds
             )
         )
-            return false;
+        {
+            var trigger =
+                readiness == EndOfRunCaptureReadinessState.Ready
+                    ? "reveal-complete"
+                    : "timeout-fallback";
+            _mouseBlocker.Attach(screenController);
+            BppLog.Info(
+                "EndOfRunScreenshot",
+                $"CaptureState action=start frame={Time.frameCount} time={Time.unscaledTime:F3} trigger={trigger} readiness={readiness} runId={ResolveRunId() ?? "<null>"} hero={ResolveHeroName() ?? "<null>"}"
+            );
+            _captureCoroutine = StartCoroutine(
+                CaptureEndOfRun(screenController, _captureGeneration)
+            );
+        }
 
-        if (_captureCoroutine != null)
-            return false;
-
-        var activeController = FindActiveEndOfRunScreenController();
-        if (activeController != null)
-            _mouseBlocker.Attach(activeController);
-
-        BppLog.Info(
-            "EndOfRunScreenshot",
-            $"CaptureFirstContinue action=start frame={Time.frameCount} time={Time.unscaledTime:F3} isInteractionBlocked={isInteractionBlocked} runId={ResolveRunId() ?? "<null>"} hero={ResolveHeroName() ?? "<null>"}"
+        var shouldBlock = _gate.ShouldBlockContinue(
+            readiness,
+            isCaptureEnabled: true,
+            Time.time,
+            RevealFallbackTimeoutSeconds
         );
-
-        _captureCoroutine = StartCoroutine(CaptureAndContinue(controller));
-        return true;
+        LogBlockerStateChange(shouldBlock, readiness);
+        if (shouldBlock)
+            _mouseBlocker.Attach(screenController);
+        else
+            _mouseBlocker.Detach();
     }
 
-    private IEnumerator CaptureAndContinue(EndOfRunScreenController controller)
+    private IEnumerator CaptureEndOfRun(
+        EndOfRunScreenController screenController,
+        int captureGeneration
+    )
     {
         ScreenshotCaptureResult? capture = null;
-        var shouldPassthrough = false;
+        var attemptResolved = false;
         try
         {
+            // FaceUp is set at the end of the native reveal task. Give its finally/layout
+            // work a full player-loop turn before suppressing BPP chrome and reading pixels.
+            yield return null;
+            if (!IsCaptureContextCurrent(screenController, captureGeneration))
+            {
+                FailOpenIfCurrent(captureGeneration);
+                attemptResolved = true;
+                BppLog.Warn(
+                    "EndOfRunScreenshot",
+                    "Automatic capture was abandoned because the end-of-run screen changed before capture."
+                );
+                yield break;
+            }
+
             _captureSuppressionScope = BeginUiSuppression();
             yield return new WaitForEndOfFrame();
+            if (!IsCaptureContextCurrent(screenController, captureGeneration))
+            {
+                FailOpenIfCurrent(captureGeneration);
+                attemptResolved = true;
+                BppLog.Warn(
+                    "EndOfRunScreenshot",
+                    "Automatic capture was abandoned because the end-of-run screen changed during frame settling."
+                );
+                yield break;
+            }
 
             Exception? captureFailure = null;
             Task<ScreenshotCaptureResult?>? captureTask = null;
+            var attemptDeadline = Time.realtimeSinceStartup + CaptureAttemptTimeoutSeconds;
             try
             {
                 captureTask = _screenshotService?.CaptureCurrentFrameAsync(
@@ -253,9 +295,37 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
             if (captureTask != null)
             {
+                _activeCaptureTask = captureTask;
                 while (!captureTask.IsCompleted)
-                    yield return null;
+                {
+                    if (!IsCaptureContextCurrent(screenController, captureGeneration))
+                    {
+                        AbandonCaptureTask(captureTask);
+                        FailOpenIfCurrent(captureGeneration);
+                        attemptResolved = true;
+                        BppLog.Warn(
+                            "EndOfRunScreenshot",
+                            "Automatic capture was abandoned because the end-of-run screen changed while the frame was being written."
+                        );
+                        yield break;
+                    }
 
+                    if (Time.realtimeSinceStartup >= attemptDeadline)
+                    {
+                        AbandonCaptureTask(captureTask);
+                        FailOpenIfCurrent(captureGeneration);
+                        attemptResolved = true;
+                        BppLog.Error(
+                            "EndOfRunScreenshot",
+                            $"End-of-run screenshot capture exceeded {CaptureAttemptTimeoutSeconds:F0}s; releasing Continue without retrying the in-flight write."
+                        );
+                        yield break;
+                    }
+
+                    yield return null;
+                }
+
+                ReleaseCaptureTask(captureTask);
                 try
                 {
                     capture = captureTask.GetAwaiter().GetResult();
@@ -266,8 +336,16 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                 }
             }
 
-            if (capture != null && captureFailure == null)
+            if (captureFailure != null)
             {
+                attemptResolved = true;
+                HandleCaptureFailure(captureFailure);
+            }
+            else if (capture != null)
+            {
+                DisposeCaptureSuppressionScope();
+                Exception? persistenceFailure = null;
+                var persistenceTimedOut = false;
                 Task? persistTask = null;
                 try
                 {
@@ -275,90 +353,205 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                 }
                 catch (Exception ex)
                 {
-                    captureFailure = ex;
+                    persistenceFailure = ex;
                 }
 
                 if (persistTask != null)
                 {
-                    while (!persistTask.IsCompleted)
+                    var persistenceDeadline =
+                        Time.realtimeSinceStartup + MetadataPersistenceTimeoutSeconds;
+                    while (
+                        !persistTask.IsCompleted && Time.realtimeSinceStartup < persistenceDeadline
+                    )
+                    {
                         yield return null;
-
-                    try
-                    {
-                        persistTask.GetAwaiter().GetResult();
                     }
-                    catch (Exception ex)
+
+                    persistenceTimedOut = !persistTask.IsCompleted;
+                    if (persistenceTimedOut)
                     {
-                        captureFailure = ex;
+                        ObserveLatePersistence(persistTask);
+                    }
+                    else
+                    {
+                        try
+                        {
+                            persistTask.GetAwaiter().GetResult();
+                        }
+                        catch (Exception ex)
+                        {
+                            persistenceFailure = ex;
+                        }
                     }
                 }
-            }
 
-            if (captureFailure != null)
-            {
-                _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
-                BppLog.Error(
-                    "EndOfRunScreenshot",
-                    "End-of-run screenshot capture failed.",
-                    captureFailure
-                );
-            }
-            else if (capture != null)
-            {
-                _gate.MarkAttemptCompleted();
-                shouldPassthrough = true;
+                if (captureGeneration == _captureGeneration)
+                    _gate.CompleteCaptureAttempt();
+                attemptResolved = true;
+                if (persistenceTimedOut)
+                {
+                    BppLog.Warn(
+                        "EndOfRunScreenshot",
+                        $"Screenshot metadata persistence exceeded {MetadataPersistenceTimeoutSeconds:F0}s; releasing Continue while the background save finishes."
+                    );
+                }
+                else if (persistenceFailure != null)
+                {
+                    BppLog.Error(
+                        "EndOfRunScreenshot",
+                        "Failed to persist end-of-run screenshot metadata.",
+                        persistenceFailure
+                    );
+                }
+
                 BppLog.Info(
                     "EndOfRunScreenshot",
-                    $"CaptureCoroutine action=captured frame={Time.frameCount} time={Time.unscaledTime:F3}"
+                    $"CaptureState action=captured frame={Time.frameCount} time={Time.unscaledTime:F3}"
                 );
             }
             else
             {
-                _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
-                BppLog.Warn(
-                    "EndOfRunScreenshot",
-                    "Screenshot attempt aborted before it could be queued."
-                );
-            }
-
-            if (shouldPassthrough)
-            {
-                yield return null;
-                _gate.AllowNextContinuePassthrough();
-                BppLog.Info(
-                    "EndOfRunScreenshot",
-                    $"CaptureCoroutine action=invoke-continue frame={Time.frameCount} time={Time.unscaledTime:F3}"
-                );
-                TryInvokeContinueClick(controller);
+                attemptResolved = true;
+                HandleCaptureFailure(null);
             }
         }
         finally
         {
+            AbandonActiveCaptureTask();
             _captureCoroutine = null;
             DisposeCaptureSuppressionScope();
-            if (_gate.IsAttemptInFlight() && !shouldPassthrough)
-                _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
+            if (_gate.IsCaptureAttemptInFlight() && !attemptResolved)
+                HandleCaptureFailure(null);
             _mouseBlocker.Detach();
         }
     }
 
-    private static void TryInvokeContinueClick(EndOfRunScreenController controller)
+    private void HandleCaptureFailure(Exception? failure)
     {
-        if (ContinueClickMethod == null)
-        {
-            if (!_reportedMissingContinueClick)
-            {
-                _reportedMissingContinueClick = true;
-                BppLog.Warn(
-                    "EndOfRunScreenshot",
-                    "EndOfRunScreenController.OnContinueClick was not found; skipping automatic continue after screenshot capture."
-                );
-            }
+        var willRetry = _gate.AbortCaptureAttempt(Time.time + CaptureRetryCooldownSeconds);
+        var message = willRetry
+            ? "End-of-run screenshot capture failed; one retry remains."
+            : "End-of-run screenshot capture failed twice; releasing Continue without a screenshot.";
+        if (failure == null)
+            BppLog.Warn("EndOfRunScreenshot", message);
+        else
+            BppLog.Error("EndOfRunScreenshot", message, failure);
+    }
 
+    private void MarkSummaryRevealStarted(EndOfRunSummaryController summaryController)
+    {
+        var screenController = summaryController.StateMachine;
+        if (screenController == null || !screenController.gameObject.activeInHierarchy)
+            return;
+
+        var controllerId = screenController.GetInstanceID();
+        if (_trackedEndOfRunControllerId != 0 && _trackedEndOfRunControllerId != controllerId)
+        {
+            BppLog.Warn(
+                "EndOfRunScreenshot",
+                "Ignored a summary reveal signal from a stale end-of-run controller."
+            );
             return;
         }
 
-        ContinueClickMethod.Invoke(controller, []);
+        TrackEndOfRunController(screenController);
+        if (_gate.HasFinishedForCurrentRun() || _gate.HasSummaryRevealStarted())
+            return;
+
+        if (!_gate.IsArmed())
+            _gate.ArmForEndOfRun();
+        _gate.MarkSummaryRevealStarted();
+        BppLog.Info(
+            "EndOfRunScreenshot",
+            $"CaptureState action=reveal-started frame={Time.frameCount} time={Time.unscaledTime:F3}"
+        );
+    }
+
+    private EndOfRunCaptureReadinessState GetCaptureReadiness(EndOfRunScreenController controller)
+    {
+        return EndOfRunCaptureReadinessDetector.GetState(
+            controller,
+            _gate.HasSummaryRevealStarted()
+        );
+    }
+
+    private void FailOpenIfCurrent(int captureGeneration)
+    {
+        if (captureGeneration == _captureGeneration)
+            _gate.FailOpen();
+    }
+
+    private static void ObserveAndDeleteLateCapture(Task<ScreenshotCaptureResult?> captureTask)
+    {
+        _ = captureTask.ContinueWith(
+            task =>
+            {
+                try
+                {
+                    if (
+                        task.Status == TaskStatus.RanToCompletion
+                        && task.Result is { FilePath: { Length: > 0 } filePath }
+                        && File.Exists(filePath)
+                    )
+                    {
+                        File.Delete(filePath);
+                        BppLog.Warn(
+                            "EndOfRunScreenshot",
+                            $"Deleted a screenshot that completed after its capture context expired: {filePath}"
+                        );
+                    }
+                    else if (task.IsFaulted)
+                    {
+                        _ = task.Exception;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    BppLog.Warn(
+                        "EndOfRunScreenshot",
+                        $"Failed to clean up a late screenshot capture: {ex.Message}"
+                    );
+                }
+            },
+            TaskScheduler.Default
+        );
+    }
+
+    private void AbandonCaptureTask(Task<ScreenshotCaptureResult?> captureTask)
+    {
+        ReleaseCaptureTask(captureTask);
+        ObserveAndDeleteLateCapture(captureTask);
+    }
+
+    private void AbandonActiveCaptureTask()
+    {
+        var captureTask = _activeCaptureTask;
+        if (captureTask != null)
+            AbandonCaptureTask(captureTask);
+    }
+
+    private void ReleaseCaptureTask(Task<ScreenshotCaptureResult?> captureTask)
+    {
+        if (ReferenceEquals(_activeCaptureTask, captureTask))
+            _activeCaptureTask = null;
+    }
+
+    private static void ObserveLatePersistence(Task persistTask)
+    {
+        _ = persistTask.ContinueWith(
+            task =>
+            {
+                if (task.IsFaulted)
+                {
+                    BppLog.Error(
+                        "EndOfRunScreenshot",
+                        "Screenshot metadata persistence failed after its UI timeout.",
+                        task.Exception!.GetBaseException()
+                    );
+                }
+            },
+            TaskScheduler.Default
+        );
     }
 
     private Task PersistCaptureAsync(ScreenshotCaptureResult? capture, bool isPrimary = false)
@@ -446,8 +639,10 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         _captureSuppressionScope = null;
     }
 
-    private void ResetCaptureUiState()
+    private void ResetCaptureUiState(bool disarmGate)
     {
+        _captureGeneration++;
+        AbandonActiveCaptureTask();
         if (_captureCoroutine != null)
         {
             StopCoroutine(_captureCoroutine);
@@ -456,32 +651,46 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
         DisposeCaptureSuppressionScope();
         _gate.CancelCaptureAttempt();
+        if (disarmGate)
+            _gate.Disarm();
         _mouseBlocker.Destroy();
         _cachedEndOfRunScreenController = null;
+        _nextControllerScanAtSeconds = 0f;
         _trackedEndOfRunControllerId = 0;
-        _endOfRunEnteredAtSeconds = -1f;
+        _lastLoggedBlockerActive = null;
+        _lastLoggedReadiness = null;
+    }
+
+    private void EnsureCaptureArmed(EndOfRunScreenController controller, string source)
+    {
+        TrackEndOfRunController(controller);
+        if (_gate.IsArmed() || _gate.HasFinishedForCurrentRun())
+            return;
+
+        _gate.ArmForEndOfRun();
+        BppLog.Info(
+            "EndOfRunScreenshot",
+            $"CaptureState action=armed frame={Time.frameCount} time={Time.unscaledTime:F3} source={source}"
+        );
+    }
+
+    private bool IsCaptureContextCurrent(EndOfRunScreenController controller, int captureGeneration)
+    {
+        return captureGeneration == _captureGeneration
+            && controller != null
+            && controller.gameObject.activeInHierarchy
+            && controller.GetInstanceID() == _trackedEndOfRunControllerId;
     }
 
     private EndOfRunScreenController? FindActiveEndOfRunScreenController()
     {
-        // Keep the cached controller while it is alive — even when inactive — so an
-        // inactive-but-alive end-of-run screen does not trigger a FindObjectsOfType
-        // scan every frame; an inactive cached controller reports as "no active
-        // controller". Unity's overloaded equality treats destroyed objects as null,
-        // so the scan resumes automatically after the controller is torn down.
         var cached = _cachedEndOfRunScreenController;
         if (cached != null)
             return cached.gameObject.activeInHierarchy ? cached : null;
 
-        // The screen only exists inside the game's end-of-run app states (the game's own
-        // UI gates on the same check while it is up), so outside them skip scanning
-        // entirely — including on reconnect, where the restored state reopens the gate.
         if (AppState.CurrentState is not { } appState || !appState.IsEndOfRunState())
             return null;
 
-        // The scan walks every loaded object (measured ~2ms/call on a mature scene), so a
-        // cache miss must not rescan every frame. Detecting the end-of-run screen up to
-        // half a second late is imperceptible against the 8s first-capture delay.
         var now = Time.realtimeSinceStartup;
         if (now < _nextControllerScanAtSeconds)
             return null;
@@ -498,107 +707,36 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         );
         foreach (var controller in controllers)
         {
-            if (controller == null)
-                continue;
-
-            if (controller.gameObject.activeInHierarchy)
+            if (controller != null && controller.gameObject.activeInHierarchy)
                 return controller;
         }
 
         return null;
     }
 
-    private void SyncEndOfRunMouseBlocker()
-    {
-        if (!IsEndOfRunScreenshotEnabled() || _screenshotService == null)
-        {
-            _mouseBlocker.Detach();
-            return;
-        }
-
-        var screenController = FindActiveEndOfRunScreenController();
-        if (screenController == null)
-        {
-            _mouseBlocker.Detach();
-            _trackedEndOfRunControllerId = 0;
-            _endOfRunEnteredAtSeconds = -1f;
-            return;
-        }
-
-        TrackEndOfRunEntry(screenController);
-        var shouldShowBlocker =
-            ShouldHoldBeforeFirstCapture(out var holdReason) || ShouldBlockMouseInput();
-
-        LogBlockerStateChange(
-            isActive: shouldShowBlocker,
-            shouldShowBlocker
-                ? (
-                    ShouldBlockMouseInput()
-                        ? $"reason=capture-in-flight {holdReason}"
-                        : $"reason={(holdReason.StartsWith("reason=wait-for-first-capture-window", StringComparison.Ordinal) ? "first-capture-window-blocked" : "continue-blocked")} {holdReason}"
-                )
-                : $"reason=continue-unblocked {holdReason}"
-        );
-        if (shouldShowBlocker)
-            _mouseBlocker.Attach(screenController);
-        else
-            _mouseBlocker.Detach();
-    }
-
-    private void LogBlockerStateChange(bool isActive, string stateSummary)
-    {
-        if (
-            _lastLoggedBlockerActive == isActive
-            && string.Equals(_lastLoggedBlockerStateSummary, stateSummary, StringComparison.Ordinal)
-        )
-            return;
-
-        _lastLoggedBlockerActive = isActive;
-        _lastLoggedBlockerStateSummary = stateSummary;
-        BppLog.Info(
-            "EndOfRunScreenshot",
-            $"BlockerState active={isActive} frame={Time.frameCount} time={Time.unscaledTime:F3} {stateSummary}"
-        );
-    }
-
-    private bool ShouldHoldBeforeFirstCapture(out string holdReason)
-    {
-        if (_gate.HasCapturedForCurrentRun())
-        {
-            holdReason = "reason=already-captured";
-            return false;
-        }
-
-        if (_endOfRunEnteredAtSeconds < 0f)
-        {
-            holdReason = "reason=awaiting-end-of-run-entry";
-            return true;
-        }
-
-        var elapsedSeconds = Time.unscaledTime - _endOfRunEnteredAtSeconds;
-        if (elapsedSeconds >= FirstCaptureDelaySeconds)
-        {
-            holdReason =
-                $"reason=first-capture-window-open elapsed={elapsedSeconds:F3} delay={FirstCaptureDelaySeconds:F3}";
-            return false;
-        }
-
-        holdReason =
-            $"reason=wait-for-first-capture-window elapsed={elapsedSeconds:F3} delay={FirstCaptureDelaySeconds:F3} remaining={FirstCaptureDelaySeconds - elapsedSeconds:F3}";
-        return true;
-    }
-
-    private void TrackEndOfRunEntry(EndOfRunScreenController controller)
+    private void TrackEndOfRunController(EndOfRunScreenController controller)
     {
         var controllerId = controller.GetInstanceID();
-        if (_trackedEndOfRunControllerId == controllerId && _endOfRunEnteredAtSeconds >= 0f)
+        if (_trackedEndOfRunControllerId == controllerId)
             return;
 
         _trackedEndOfRunControllerId = controllerId;
-        _endOfRunEnteredAtSeconds = Time.unscaledTime;
         BppLog.Info(
             "EndOfRunScreenshot",
-            $"EndOfRunEntry frame={Time.frameCount} time={Time.unscaledTime:F3} controller={controller.name} delay={FirstCaptureDelaySeconds:F3}"
+            $"CaptureState action=controller-tracked frame={Time.frameCount} time={Time.unscaledTime:F3} controller={controller.name}"
+        );
+    }
+
+    private void LogBlockerStateChange(bool isActive, EndOfRunCaptureReadinessState readiness)
+    {
+        if (_lastLoggedBlockerActive == isActive && _lastLoggedReadiness == readiness)
+            return;
+
+        _lastLoggedBlockerActive = isActive;
+        _lastLoggedReadiness = readiness;
+        BppLog.Info(
+            "EndOfRunScreenshot",
+            $"BlockerState active={isActive} frame={Time.frameCount} time={Time.unscaledTime:F3} readiness={readiness} armed={_gate.IsArmed()} inFlight={_gate.IsCaptureAttemptInFlight()} captured={_gate.HasCapturedForCurrentRun()}"
         );
     }
 }
