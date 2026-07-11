@@ -24,6 +24,12 @@
 - 这不是 EventSystem 未 deselect：clone 已禁用 navigation，BPP 也会清 current selected object；清完后代码仍主动重写 selected 基线。
 - 反编译的原生 `SettingDialogsView` 打开设置只调用 ShowSettings，并不会把普通 settings popover 按钮设成持久 selected。持久选择只用于 playmode、tab 等真正的选择控件。
 
+### 3. 实机复测新增：三枚按钮的金色外框过紧
+
+- 新 planner 首版只用 `Button.targetGraphic.rectTransform` 作为 footprint。该矩形是 Selectable 的 transition/raycast 主 Graphic，不保证覆盖原生按钮的所有装饰子 Graphic。
+- 实机截图中圆形主体没有重叠，但左右/上下金色尖角已经接触；说明 planner 的数值 gap 被 target rect 之外的装饰 overhang 吃掉。
+- 修复口径不是盲目增大常量，而是把按钮自身所有有效 Graphic 投影合并成 composite visual footprint；settings panel 与 nested button 必须排除，避免面板展开后反过来改变 dock 尺寸。
+
 ## 已完成的视觉修复
 
 - 保留原生 hover / pressed / normal transition。
@@ -37,7 +43,7 @@
 - Collection/book 的第一候选固定在原生 gear 上方；Settings/sliders 的第一候选固定在 gear 左侧。不再因为 `FightMenu`、store 或 chest 场景名直接改成竖排。
 - 只有 settings 的 gear-left 可见矩形与当前真正可见的原生按钮（例如商城 info）相交时，才尝试 book 上方候选；第二候选也必须通过 blocker 与 viewport/safe-bounds 校验。
 - planner 使用统一的可见投影空间：优先 screen/display 空间；只有运行时证明 anchor、clone 与 blocker 属于同一个 root canvas 时才能使用 root-local。跨 canvas 的 blocker 也要投影到同一空间。
-- 所有尺寸与候选关系均基于 `Button.targetGraphic` 的可见矩形，而不是 clone root。apply 阶段以“目标可见中心 - 当前 targetGraphic 可见中心”的位移平移 clone root，并一次转换成 parent 的完整 local XYZ。
+- 所有尺寸与候选关系均基于按钮自身的 composite visual footprint：以 `targetGraphic` 为基线，再合并有效装饰子 Graphic；不把 settings panel 或 nested button 算入 dock 外框。apply 阶段以“目标 composite 中心 - 当前 composite 中心”的位移平移 clone root，并一次转换成 parent 的完整 local XYZ。
 - blocker 的“可见”不能只看 `activeInHierarchy`：还需检查 Graphic enabled/cull、有效 CanvasGroup alpha 和 viewport 相交；不可交互但仍可见的按钮仍然是 blocker。
 - 删除 `FightMenu`、store、chest 的硬编码纵向 override 和旧的场景双轨 fallback；最终只保留一条 blocker-driven 定位链。保留 FightMenu 的 attach patch，只删除其 `Above step2` 定位策略。
 - 如果 book 上方也被占用或越界，继续按 viewport 向上查找第一个合法槽位；没有合法槽时隐藏两枚 clone 并继续 probe，绝不再回退到无效 `desired`。
@@ -51,7 +57,9 @@
 - [x] 以不触发游戏目录部署的 `CompatCheck` 配置验证：主项目 build 成功（0 warning / 0 error），Architecture.Tests 29/29 通过。
 - [x] 新 planner red：初始 seam 保持 gear-left 时，商城 info blocker 与第二候选占用两个用例按预期失败。
 - [x] 纯逻辑回归：无 blocker 时 book-above-gear + settings-left-of-gear；商城 info 覆盖 left 时选择 above-planned-book；首个 stacked slot 被占时继续向上；无槽时返回不可应用而不是重叠 desired。
-- [x] 最终顺序验证：SettingsDockRegistry.Tests 54/54、Architecture.Tests 30/30、主项目 CompatCheck build 0 warning / 0 error。
+- [x] 最终顺序验证：rebase 到最新 `origin/master` 后，SettingsDockRegistry.Tests 87/87、Architecture.Tests 33/33、主项目 CompatCheck build 0 warning / 0 error。
+- [x] 装饰 overhang 回归：构造 target rect 120px、四向尖角外伸到 144px 的 composite footprint，断言 book/gear 与 settings/gear 的最终视觉外框仍保留 18px gap；同时覆盖 inactive owner 重试语义、panel/nested-button 排除与非对称视觉中心。
+- [x] 用户使用部署 DLL `0b7725c2…` 实机复测本次间距并确认“看着还行”；该结论只覆盖本次观察到的按钮组，不外推为全部场景矩阵已完成。
 - [ ] blocker 回归：inactive、alpha=0、culled 与无关 blocker 不触发；可见但 non-interactable 的 blocker 触发；另一 root canvas 的可见 blocker 仍可命中；BPP book/panel 不被当作 native blocker。
 - [ ] 坐标回归：覆盖旋转/3D 父级、非零 visual child offset 与不同按钮 footprint；round-trip 后断言最终 `targetGraphic` 可见中心关系和完整 XYZ，而不是只断言 local X/Y 标量。
 - [x] 生命周期纯逻辑：scene name 变化重启即时同步窗口；异步与稳态 probe 持续执行；架构测试禁止恢复 `Scene.handle`、Collection 第二 writer 或 scene step2。
@@ -61,5 +69,6 @@
 
 - 主菜单和战斗在左侧无原生 blocker 时不应无条件竖排。
 - 商城等左侧已有原生按钮的场景不得重叠，并按用户确认的候选顺序避让。
+- 三枚按钮以完整金色外框计距，尖角之间保留明确空隙，不再只保证 target rect 的数学间距。
 - 设置菜单打开后移开鼠标，按钮不会露出蓝色 `ClickedImage` / selected 基线。
 - 临时诊断代码清理完毕，回归测试能在错误实现上失败、在最终实现上通过。

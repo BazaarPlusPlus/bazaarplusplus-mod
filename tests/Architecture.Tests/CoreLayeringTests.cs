@@ -1183,6 +1183,9 @@ public class CoreLayeringTests
         var settingsPatchSource = File.ReadAllText(
             Path.Combine(mainSource, "Patches", "Settings", "BppSettingsDockPatch.cs")
         );
+        var screenLayoutSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "Settings", "BppDockButtonScreenLayout.cs")
+        );
 
         Assert.Contains("BppDockButtonScreenLayout", settingsControllerSource);
         Assert.Contains("GetActiveScene().name", settingsControllerSource);
@@ -1190,6 +1193,9 @@ public class CoreLayeringTests
         Assert.DoesNotContain("CalculateDockButtonLocalPosition", collectionControllerSource);
         Assert.DoesNotContain("siblingStepCount: 2", settingsPatchSource);
         Assert.DoesNotContain("WithRightDockStackedPlacement", settingsPatchSource);
+        Assert.Contains("IsActiveBelowOwner", screenLayoutSource);
+        Assert.Contains("current == owner.transform", screenLayoutSource);
+        Assert.DoesNotContain("GetComponentInParent<Button>()", screenLayoutSource);
     }
 
     [Fact]

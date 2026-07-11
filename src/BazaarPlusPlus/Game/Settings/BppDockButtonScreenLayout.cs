@@ -9,9 +9,10 @@ namespace BazaarPlusPlus.Game.Settings;
 internal sealed class BppDockButtonScreenLayout
 {
     private const string BppObjectPrefix = "BPP_";
-    private const float VisibleAlphaThreshold = 0.01f;
+    private const string SettingsPanelPrefix = "BPP_SettingsDockPanel_";
 
     private readonly List<BppDockButtonObstacle> _blockerScratch = [];
+    private readonly List<Graphic> _graphicScratch = [];
     private readonly Vector3[] _cornerScratch = new Vector3[4];
 
     internal BppDockButtonLayoutPlan ResolveAndApply(
@@ -24,7 +25,7 @@ internal sealed class BppDockButtonScreenLayout
         var collectionButton = collectionRect.GetComponent<Button>();
         var settingsButton = settingsRect.GetComponent<Button>();
         if (collectionButton == null || settingsButton == null)
-            return default;
+            return BppDockButtonLayoutPlan.MeasurementFailure();
 
         if (
             !TryCalculateButtonFootprint(
@@ -39,12 +40,12 @@ internal sealed class BppDockButtonScreenLayout
             )
             || !TryCalculateButtonFootprint(settingsButton, settingsRect, out var settingsBounds)
         )
-            return default;
+            return BppDockButtonLayoutPlan.MeasurementFailure();
 
         var viewportBounds = new BppDockButtonBounds(0f, Screen.width, 0f, Screen.height);
         var anchorCanvas = ResolveRootCanvas(anchorButton.transform);
         if (anchorCanvas == null || !anchorCanvas.isActiveAndEnabled)
-            return default;
+            return BppDockButtonLayoutPlan.MeasurementFailure();
 
         var gap = ResolveScreenGap(settingsRect.parent as RectTransform, localGap);
         var blockers = CollectVisibleNativeBlockers(
@@ -71,12 +72,14 @@ internal sealed class BppDockButtonScreenLayout
             !TryCalculateTargetLocalPosition(
                 collectionRect,
                 collectionButton,
+                collectionBounds,
                 plan.CollectionBounds,
                 out var collectionLocalPosition
             )
             || !TryCalculateTargetLocalPosition(
                 settingsRect,
                 settingsButton,
+                settingsBounds,
                 plan.SettingsBounds,
                 out var settingsLocalPosition
             )
@@ -88,7 +91,8 @@ internal sealed class BppDockButtonScreenLayout
                 plan.SettingsBounds,
                 plan.SettingsSlot,
                 plan.BlockerName,
-                wasAdjusted: false
+                wasAdjusted: false,
+                failureReason: BppDockButtonLayoutFailureReason.MeasurementUnavailable
             );
         }
 
@@ -110,7 +114,7 @@ internal sealed class BppDockButtonScreenLayout
     )
     {
         _blockerScratch.Clear();
-        foreach (var button in UnityEngine.Object.FindObjectsOfType<Button>(includeInactive: true))
+        foreach (var button in UnityEngine.Object.FindObjectsOfType<Button>(includeInactive: false))
         {
             if (
                 button == null
@@ -133,13 +137,10 @@ internal sealed class BppDockButtonScreenLayout
             )
                 continue;
 
-            var targetGraphic = button.targetGraphic;
-            if (
-                targetGraphic == null
-                || !IsVisible(targetGraphic)
-                || !TryCalculateScreenBounds(targetGraphic.rectTransform, out var bounds)
-                || !viewportBounds.Overlaps(bounds)
-            )
+            if (!TryCalculateVisibleButtonFootprint(button, out var bounds))
+                continue;
+
+            if (!viewportBounds.Overlaps(bounds))
                 continue;
 
             _blockerScratch.Add(
@@ -161,7 +162,49 @@ internal sealed class BppDockButtonScreenLayout
     )
     {
         var visualRect = button.targetGraphic?.rectTransform ?? fallbackRect;
-        return TryCalculateScreenBounds(visualRect, out bounds);
+        if (!TryCalculateScreenBounds(visualRect, out var targetGraphicBounds))
+        {
+            bounds = default;
+            return false;
+        }
+
+        _graphicScratch.Clear();
+        button.GetComponentsInChildren(includeInactive: true, _graphicScratch);
+        foreach (var graphic in _graphicScratch)
+        {
+            if (!IsFootprintGraphic(button, graphic))
+                continue;
+
+            if (TryCalculateScreenBounds(graphic.rectTransform, out var graphicBounds))
+                targetGraphicBounds = targetGraphicBounds.Union(graphicBounds);
+        }
+
+        bounds = targetGraphicBounds;
+        return bounds.IsValid && bounds.Width > 0.0001f && bounds.Height > 0.0001f;
+    }
+
+    private bool TryCalculateVisibleButtonFootprint(Button button, out BppDockButtonBounds bounds)
+    {
+        bounds = default;
+        var hasVisibleGraphic = false;
+        _graphicScratch.Clear();
+        button.GetComponentsInChildren(includeInactive: false, _graphicScratch);
+        foreach (var graphic in _graphicScratch)
+        {
+            if (!IsOwnedVisual(button, graphic) || !IsVisible(graphic))
+                continue;
+
+            if (!TryCalculateScreenBounds(graphic.rectTransform, out var graphicBounds))
+                continue;
+
+            bounds = hasVisibleGraphic ? bounds.Union(graphicBounds) : graphicBounds;
+            hasVisibleGraphic = true;
+        }
+
+        if (!hasVisibleGraphic)
+            return false;
+
+        return bounds.IsValid && bounds.Width > 0.0001f && bounds.Height > 0.0001f;
     }
 
     private bool TryCalculateScreenBounds(RectTransform rect, out BppDockButtonBounds bounds)
@@ -193,6 +236,7 @@ internal sealed class BppDockButtonScreenLayout
     private bool TryCalculateTargetLocalPosition(
         RectTransform buttonRect,
         Button button,
+        BppDockButtonBounds currentFootprintBounds,
         BppDockButtonBounds targetBounds,
         out Vector3 targetLocalPosition
     )
@@ -203,13 +247,13 @@ internal sealed class BppDockButtonScreenLayout
         if (parentRect == null)
             return false;
 
-        if (
-            !TryCalculateScreenBounds(visualRect, out var currentBounds)
-            || !TryResolveEventCamera(visualRect, out var camera)
-        )
+        if (!currentFootprintBounds.IsValid || !TryResolveEventCamera(visualRect, out var camera))
             return false;
 
-        var currentScreenCenter = new Vector2(currentBounds.CenterX, currentBounds.CenterY);
+        var currentScreenCenter = new Vector2(
+            currentFootprintBounds.CenterX,
+            currentFootprintBounds.CenterY
+        );
         var targetScreenCenter = new Vector2(targetBounds.CenterX, targetBounds.CenterY);
         if (
             !RectTransformUtility.ScreenPointToLocalPointInRectangle(
@@ -272,7 +316,86 @@ internal sealed class BppDockButtonScreenLayout
             }
         }
 
-        return alpha > VisibleAlphaThreshold;
+        return alpha > BppDockButtonVisualFootprint.VisibleAlphaThreshold;
+    }
+
+    private static bool IsFootprintGraphic(Button owner, Graphic graphic) =>
+        graphic != null
+        && BppDockButtonVisualFootprint.ShouldIncludeGraphic(
+            graphic.enabled,
+            IsActiveBelowOwner(graphic.transform, owner.transform),
+            ResolveAuthoredAlpha(graphic, owner.transform),
+            IsOwnedVisual(owner, graphic),
+            IsInsideSettingsPanel(graphic.transform, owner.transform)
+        );
+
+    private static bool IsOwnedVisual(Button owner, Graphic graphic)
+    {
+        for (var current = graphic.transform; current != null; current = current.parent)
+        {
+            if (current == owner.transform)
+                return true;
+
+            if (current.GetComponent<Button>() != null)
+                return false;
+        }
+
+        return false;
+    }
+
+    private static bool IsInsideSettingsPanel(Transform candidate, Transform buttonRoot)
+    {
+        for (
+            var current = candidate;
+            current != null && current != buttonRoot;
+            current = current.parent
+        )
+        {
+            if (current.name.StartsWith(SettingsPanelPrefix, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsActiveBelowOwner(Transform candidate, Transform buttonRoot)
+    {
+        // The clone root can be hidden while layout is retried. Only authored child states matter.
+        for (
+            var current = candidate;
+            current != null && current != buttonRoot;
+            current = current.parent
+        )
+        {
+            if (!current.gameObject.activeSelf)
+                return false;
+        }
+
+        return true;
+    }
+
+    private static float ResolveAuthoredAlpha(Graphic graphic, Transform buttonRoot)
+    {
+        var alpha = graphic.color.a;
+        var stopAtCurrentTransform = false;
+        for (
+            var current = graphic.transform;
+            current != null && current != buttonRoot && !stopAtCurrentTransform;
+            current = current.parent
+        )
+        {
+            foreach (var group in current.GetComponents<CanvasGroup>())
+            {
+                alpha *= group.alpha;
+                if (group.ignoreParentGroups)
+                {
+                    stopAtCurrentTransform = true;
+                    break;
+                }
+            }
+        }
+
+        return alpha;
     }
 
     private static float ResolveScreenGap(RectTransform? referenceRect, float localGap)

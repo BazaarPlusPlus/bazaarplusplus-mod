@@ -9,13 +9,23 @@ internal enum BppDockButtonLayoutSlot
     AboveCollection,
 }
 
+internal enum BppDockButtonLayoutFailureReason
+{
+    None,
+    MeasurementUnavailable,
+    CollectionUnavailable,
+    CollectionBlocked,
+    NoSettingsSlot,
+}
+
 internal readonly struct BppDockButtonLayoutPlan(
     bool canApply,
     BppDockButtonBounds collectionBounds,
     BppDockButtonBounds settingsBounds,
     BppDockButtonLayoutSlot settingsSlot,
     string? blockerName,
-    bool wasAdjusted
+    bool wasAdjusted,
+    BppDockButtonLayoutFailureReason failureReason = BppDockButtonLayoutFailureReason.None
 )
 {
     internal bool CanApply { get; } = canApply;
@@ -24,6 +34,18 @@ internal readonly struct BppDockButtonLayoutPlan(
     internal BppDockButtonLayoutSlot SettingsSlot { get; } = settingsSlot;
     internal string? BlockerName { get; } = blockerName;
     internal bool WasAdjusted { get; } = wasAdjusted;
+    internal BppDockButtonLayoutFailureReason FailureReason { get; } = failureReason;
+
+    internal static BppDockButtonLayoutPlan MeasurementFailure() =>
+        new(
+            canApply: false,
+            collectionBounds: default,
+            settingsBounds: default,
+            BppDockButtonLayoutSlot.LeftOfGear,
+            blockerName: null,
+            wasAdjusted: false,
+            failureReason: BppDockButtonLayoutFailureReason.MeasurementUnavailable
+        );
 }
 
 internal static class BppDockButtonLayoutPlanner
@@ -62,8 +84,10 @@ internal static class BppDockButtonLayoutPlanner
             || collectionHeight <= 0f
             || settingsWidth <= 0f
             || settingsHeight <= 0f
-            || !viewportBounds.Contains(collectionBounds)
         )
+            return BppDockButtonLayoutPlan.MeasurementFailure();
+
+        if (!viewportBounds.Contains(collectionBounds))
         {
             return new BppDockButtonLayoutPlan(
                 canApply: false,
@@ -71,7 +95,22 @@ internal static class BppDockButtonLayoutPlanner
                 leftSettingsBounds,
                 BppDockButtonLayoutSlot.LeftOfGear,
                 blockerName: null,
-                wasAdjusted: false
+                wasAdjusted: false,
+                failureReason: BppDockButtonLayoutFailureReason.CollectionUnavailable
+            );
+        }
+
+        var collectionBlocker = FindBlocker(collectionBounds, blockers);
+        if (collectionBlocker != null)
+        {
+            return new BppDockButtonLayoutPlan(
+                canApply: false,
+                collectionBounds,
+                leftSettingsBounds,
+                BppDockButtonLayoutSlot.LeftOfGear,
+                collectionBlocker,
+                wasAdjusted: false,
+                failureReason: BppDockButtonLayoutFailureReason.CollectionBlocked
             );
         }
 
@@ -124,7 +163,8 @@ internal static class BppDockButtonLayoutPlanner
             leftSettingsBounds,
             BppDockButtonLayoutSlot.LeftOfGear,
             leftBlocker,
-            wasAdjusted: false
+            wasAdjusted: false,
+            failureReason: BppDockButtonLayoutFailureReason.NoSettingsSlot
         );
     }
 
