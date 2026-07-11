@@ -38,17 +38,20 @@ Swept on 2026-07-11: 4 implemented drafts (PR#17 collection search + cooldown ti
 
 Historical session artifacts; frontmatter states why each file moved. Treat archived implementation claims as current only if they also appear in [ARCHITECTURE.md](ARCHITECTURE.md) or current code.
 
+Cleanup on 2026-07-11: 71 low-value archived docs were **deleted** (executor prompts, checkbox twins of kept design docs, deleted-feature plans, stale reference snapshots, resolved audits, retired superpowers-workflow artifacts). What survives is either referenced by ADRs/MEMORY/plans or carries unique root-cause / decompiled-evidence content. Deleted docs — and any dangling links to them inside surviving frozen docs — are recoverable from git history (commit message lists the criteria).
+
 | Subtree | Contents |
 |---|---|
-| [archive/plans/](archive/plans/) | shipped/superseded/abandoned plans (incl. 27 swept 2026-07-10: BazaarDB link ×4, voice subtitles ×3, PTR compat, keybinds, UI font, event preview, tooltips ×2, achievements ×5, five-deepening refactors, collection filter ×3, replay continue, overlay/BazaarAgent loop plans, sources, card proportions, history filters, shortcut tutorial) |
-| [archive/design/](archive/design/) | dated point-in-time design specs (+ `design/archive/` finished specs; +3 swept 2026-07-10; +10 swept 2026-07-11: the architecture-review batch design docs PRs #22–#31 and the settings-dock PR#18 rediagnosis; +3 more 2026-07-11: the PR#17 collection search/IME/hash and cooldown docs — all implemented); see [archive/design/README.md](archive/design/README.md) |
-| [archive/audits/](archive/audits/) | doc/code drift, health, feasibility, and performance audits |
-| [archive/debugging/](archive/debugging/) | debugging session notes (incl. tooltip-overlay third recurrence, stale sell-hotkey debug plan) |
-| [archive/features/](archive/features/) | per-feature historical overviews |
-| [archive/reference/](archive/reference/) | API/schema/hotkey/settings reference snapshots |
-| [archive/reverse-engineering/](archive/reverse-engineering/) | decompile & protocol notes; shop-entry series 1–5 (old client dealer RE); parked offline-run / predefined-match proposals |
-| [archive/superpowers/](archive/superpowers/) | superpowers plans & specs |
+| [archive/plans/](archive/plans/) | plans retained for their root-cause records, decision registers, or MEMORY citations (e.g. PTR 216-API diff base, shader-keyword flicker root cause, five-deepening refactors verdicts) |
+| [archive/design/](archive/design/) | design specs retained for decompiled-evidence and rejected-approach analysis (incl. the 2026-07-11 architecture-review batch and the PR#17 search/cooldown records); see [archive/design/README.md](archive/design/README.md) |
+| [archive/audits/](archive/audits/) | ADR-pinned feasibility audit + the 2026-07-08 performance audit (open GC backlog + probe-refuted items) |
+| [archive/debugging/](archive/debugging/) | root-cause debugging records (tooltip-overlay third recurrence, enchant auto-preview state detection) |
+| [archive/features/](archive/features/) | ADR-pinned feature overviews + the ghost-battle cross-repo data-flow trace |
+| [archive/reference/](archive/reference/) | BazaarAgent HTTP API v1 snapshot (ADR-0007) |
+| [archive/reverse-engineering/](archive/reverse-engineering/) | decompile & protocol notes; shop-entry series 1–5 (old client dealer RE); parked offline-run / predefined-match proposals — most re-derivation-expensive class, kept whole |
+| [archive/superpowers/](archive/superpowers/) | the two ADR-pinned superpowers artifacts (module-isolation spec, dependency-inversion prompt) |
 | [archive/mod-features-overview.md](archive/mod-features-overview.md) | historical feature overview |
+| [archive/2026-06-15-collection-panel-shop-probability-design.md](archive/2026-06-15-collection-panel-shop-probability-design.md) | shop-probability rejected-approach analysis (series #6 of the shop-entry RE docs) |
 
 ## Agent Rules
 

@@ -6,6 +6,8 @@ superseded-by: docs/ARCHITECTURE.md
 
 # BazaarPlusPlus 功能总览
 
+> 2026-07-11 归档清理删除了本文多数「详见」链接指向的 features/reference 快照文档（内容已由代码与 `docs/ARCHITECTURE.md` 取代）；需要时从 git history 找回。
+
 本文根据当前代码整理模组**已实现**的能力；若与实现不一致，以 `Plugin.cs`、`BppComposition.cs`、`Core/`、`Game/`、`Patches/` 为准。
 
 ## 概述

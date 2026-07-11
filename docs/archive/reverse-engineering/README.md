@@ -18,9 +18,9 @@ superseded-by: docs/ARCHITECTURE.md
   所有主要接口 DTO、MessagePack DTO、mod DTO、BazaarAgent DTO 和本地 fixture DTO 建议。
 - [session-command-protocol.md](session-command-protocol.md)  
   `/sessions`、`/commands`、`DELETE /sessions` 的 MessagePack 协议、命令/消息 DTO、客户端状态流和失败恢复逻辑。
-- [offline-local-run-design.md](../../plans/reverse-engineering/offline-local-run-design.md)
+- [offline-local-run-design.md](offline-local-run-design.md)
   将游戏改成本地运行、不依赖网络的完整方案，包括最小实现、推荐架构、替换点、接口实现方式和风险边界。
-- [predefined-match-and-random-system-design.md](../../plans/reverse-engineering/predefined-match-and-random-system-design.md)
+- [predefined-match-and-random-system-design.md](predefined-match-and-random-system-design.md)
   预定义对局、共享种子、可复现随机系统、对战系统和回放/校验方案。
 - [decompile-and-data-notes.md](decompile-and-data-notes.md)  
   安装目录、`Magic` 搜索、可反编译程序集、`GameData.db.zip`、Addressables 资源和数据包结构记录。
