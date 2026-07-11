@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Infrastructure;
@@ -15,8 +14,7 @@ internal static class HeroPortraitSpriteProvider
 {
     private const string LogComponent = "HeroPortrait";
 
-    private static readonly Dictionary<EHero, Sprite?> CachedSprites = new();
-    private static readonly Dictionary<EHero, Task<Sprite?>> InFlightLoads = new();
+    private static readonly AsyncLoadCache<EHero, Sprite> Portraits = new(LoadPortraitCoreAsync);
 
     internal static bool IsRenderableHero(EHero hero) =>
         hero != EHero.Common && !string.Equals(hero.ToString(), "Hero8", StringComparison.Ordinal);
@@ -24,7 +22,7 @@ internal static class HeroPortraitSpriteProvider
     internal static bool TryGetCached(EHero hero, out Sprite? sprite)
     {
         sprite = null;
-        return IsRenderableHero(hero) && CachedSprites.TryGetValue(hero, out sprite);
+        return IsRenderableHero(hero) && Portraits.TryGetCached(hero, out sprite);
     }
 
     internal static Task<Sprite?> LoadDefaultPortraitAsync(EHero hero)
@@ -32,21 +30,13 @@ internal static class HeroPortraitSpriteProvider
         if (!IsRenderableHero(hero))
             return Task.FromResult<Sprite?>(null);
 
-        if (CachedSprites.TryGetValue(hero, out var cached))
-            return Task.FromResult(cached);
-
-        if (InFlightLoads.TryGetValue(hero, out var inFlight))
-            return inFlight;
-
-        var task = LoadAndMaybeCacheAsync(hero);
-        InFlightLoads[hero] = task;
-        return task;
+        return Portraits.GetOrLoadAsync(hero);
     }
 
-    private static async Task<Sprite?> LoadAndMaybeCacheAsync(EHero hero)
+    private static async Task<AsyncLoadResult<Sprite>> LoadPortraitCoreAsync(EHero hero)
     {
         Sprite? result = null;
-        var shouldCacheResult = false;
+        var shouldCache = false;
 
         try
         {
@@ -57,18 +47,18 @@ internal static class HeroPortraitSpriteProvider
                     LogComponent,
                     $"CollectionManager unavailable for hero={hero}; using text fallback."
                 );
-                return null;
+                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
             SkinAssetDataSO? skin = collectionManager.GetDefaultHeroSkin(hero);
-            shouldCacheResult = true;
+            shouldCache = true;
             if (skin == null)
             {
                 BppLog.Warn(
                     LogComponent,
                     $"No default hero skin for hero={hero}; using text fallback."
                 );
-                return null;
+                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
             result = await skin.LoadPortraitSpriteAsync();
@@ -77,7 +67,7 @@ internal static class HeroPortraitSpriteProvider
                     LogComponent,
                     $"No static portrait sprite for hero={hero}; using text fallback."
                 );
-            return result;
+            return new AsyncLoadResult<Sprite>(result, shouldCache);
         }
         catch (Exception ex)
         {
@@ -85,13 +75,7 @@ internal static class HeroPortraitSpriteProvider
                 LogComponent,
                 $"Failed to load hero portrait for hero={hero}: {ex.Message}"
             );
-            return null;
-        }
-        finally
-        {
-            InFlightLoads.Remove(hero);
-            if (shouldCacheResult)
-                CachedSprites[hero] = result;
+            return new AsyncLoadResult<Sprite>(null, shouldCache);
         }
     }
 }
