@@ -197,6 +197,42 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Overlay_panel_host_mounts_before_every_main_overlay_panel()
+    {
+        var repoRoot = RepoRoot();
+        var compositionSource = File.ReadAllText(
+            Path.Combine(MainSourceRoot(repoRoot), "BppComposition.cs")
+        );
+
+        var hostIndex = compositionSource.IndexOf(
+            "_mountables.Register(overlayPanelHostMount);",
+            StringComparison.Ordinal
+        );
+        var collectionIndex = compositionSource.IndexOf(
+            "_mountables.Register(new CollectionPanelMount",
+            StringComparison.Ordinal
+        );
+        var historyIndex = compositionSource.IndexOf(
+            "new HistoryPanelMount(",
+            StringComparison.Ordinal
+        );
+        var liveBuildIndex = compositionSource.IndexOf(
+            "_mountables.Register(new LiveBuildPanelMount",
+            StringComparison.Ordinal
+        );
+
+        Assert.True(hostIndex >= 0, "OverlayPanelHostMount registration should exist.");
+        Assert.True(
+            collectionIndex >= 0 && historyIndex >= 0 && liveBuildIndex >= 0,
+            "Every Main Overlay Panel mount registration should exist."
+        );
+        Assert.True(
+            hostIndex < collectionIndex && hostIndex < historyIndex && hostIndex < liveBuildIndex,
+            "OverlayPanelHostMount must register before every Main Overlay Panel mount."
+        );
+    }
+
+    [Fact]
     public void CollectionPanel_close_hides_native_card_layer_synchronously()
     {
         var repoRoot = RepoRoot();
