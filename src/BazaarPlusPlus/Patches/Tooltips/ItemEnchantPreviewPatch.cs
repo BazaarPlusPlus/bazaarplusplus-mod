@@ -17,43 +17,6 @@ namespace BazaarPlusPlus.Patches.Tooltips;
 [HarmonyPatch(typeof(CardTooltipData), nameof(CardTooltipData.GetPassiveTooltipBlock))]
 public static class CardTooltipDataPassivePatch
 {
-    private static void AppendTooltipText(StringBuilder builder, string text)
-    {
-        if (builder == null || string.IsNullOrWhiteSpace(text))
-            return;
-
-        var lineStart = 0;
-        for (var index = 0; index < text.Length; index++)
-        {
-            var character = text[index];
-            if (character != '\r' && character != '\n')
-                continue;
-
-            AppendLine(builder, text, lineStart, index - lineStart);
-            if (character == '\r' && index + 1 < text.Length && text[index + 1] == '\n')
-                index++;
-            lineStart = index + 1;
-        }
-
-        AppendLine(builder, text, lineStart, text.Length - lineStart);
-    }
-
-    private static void AppendLine(StringBuilder builder, string text, int startIndex, int length)
-    {
-        if (length <= 0)
-            return;
-
-        for (var index = startIndex; index < startIndex + length; index++)
-        {
-            if (char.IsWhiteSpace(text[index]))
-                continue;
-
-            builder.Append(text, startIndex, length);
-            builder.Append('\n');
-            return;
-        }
-    }
-
     [HarmonyPostfix]
     static void Postfix(
         CardTooltipData __instance,
@@ -104,7 +67,7 @@ public static class CardTooltipDataPassivePatch
             foreach (var segment in previewSegments)
             {
                 if (!string.IsNullOrWhiteSpace(segment.Text))
-                    AppendTooltipText(passiveBuilder, segment.Text);
+                    ItemEnchantPreviewFormatting.AppendTooltipText(passiveBuilder, segment.Text);
             }
         }
         catch (System.Exception ex)
