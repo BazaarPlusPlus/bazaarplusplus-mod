@@ -19,11 +19,14 @@
    - `IsModifierPath`、`IsExplicitlyUnsupportedMousePath`、`TryNormalizeSupportedMouseButtonName`；
    - `FindConflict(BppHotkeyActionId candidateId, string normalizedCandidatePath, IReadOnlyDictionary<BppHotkeyActionId, string> currentPaths) : BppHotkeyActionId?` —— 现 `TryGetConflictingAction` 的集合代数，配置读取上移调用方；
    - 数据表单源化：`SupportedMouseButtonNames`（一份，三处消费）、`DisplayAliases`、`DefaultBindingPaths` + `GetDefault(actionId)`。
+   - `KeyboardPrefix`、`MousePrefix`、`CtrlAliasPath`、`ShiftAliasPath` 与 5 个鼠标键名常量全部移入 Core 并保持 `internal const`，门面仅以限定名引用。
    - 注意 `BppHotkeyActionId` 是零依赖 enum，可被纯文件引用 ✓。
 2. **`BppHotkeyService` 保留为 Unity/IO 门面**：全部公开签名不变；混合成员改为「组合纯核 + Unity 触达」——红队补全的成员归属清单：
    - `GetBindingPath`：读 cfg + `Core.Normalize` + 回退默认（门面）；
    - `TryGetConflictingAction`（门面）：**currentPaths 必须是 `{id → GetBindingPath(id)}` 对全部 `DefaultBindingPaths.Keys` 的已解析字典（含默认值回填），不得用原始 cfg 值**——否则默认绑定的冲突被静默漏检（红队 rev）；`FindConflict` 内部跳过 candidateId；
    - `TryGetSupportedMouseButtonName` **纯化后移入 Core**（白名单链版）；`TryFindSupportedMouseButton`（活设备 switch）留门面并改为消费 Core 白名单；
+   - `WasToggleHotkeyPressedThisFrame` 留门面，但原 `IsModifierBindingPath` 调用改接 Core 的 `IsModifierPath`；`UsesDefault`、`ResetToDefault`、`TrySetBindingPath`、`IsPressed`、`IsModifierPressed` 均留门面；
+   - `TryFindSupportedMouseButton` 保留自己的规范键名 → 活设备 control switch；其输入已由 Core 白名单验证，switch 的 case 常量均以 Core 限定名引用；
    - **`TryFindMouseControl`（`:444-454`）随 D1+D2 一并删除**（唯二调用点都被删，勿留孤儿——红队 rev）；
    - `IsExplicitlyUnsupportedMousePath`：**保留**入 Core 作 belt-and-suspenders（其守卫在白名单链之后实为防御性 no-op，红队核实；测试对它**直接**测，不靠 Normalize("<Mouse>/scroll") 间接覆盖）；
    - `WasPressedThisFrame`/`IsPressed`/`IsHeld`/`GetOrCreateAction`/`GetBindingDisplay`/`Reset`/`Install`/config I/O：全留门面。

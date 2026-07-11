@@ -9,8 +9,8 @@ namespace BazaarPlusPlus.Game.Input;
 // it is compile-linked into HotkeyBindingPath.Tests together with BppHotkeyActionId.
 internal static class HotkeyBindingPathCore
 {
-    private const string KeyboardPrefix = "<Keyboard>/";
-    private const string MousePrefix = "<Mouse>/";
+    internal const string KeyboardPrefix = "<Keyboard>/";
+    internal const string MousePrefix = "<Mouse>/";
     internal const string CtrlAliasPath = KeyboardPrefix + "ctrl";
     internal const string ShiftAliasPath = KeyboardPrefix + "shift";
     internal const string LeftMouseButtonName = "leftButton";

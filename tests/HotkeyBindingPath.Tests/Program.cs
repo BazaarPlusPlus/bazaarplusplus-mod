@@ -2,6 +2,8 @@ using BazaarPlusPlus.Game.Input;
 
 var failures = new List<string>();
 
+CheckPrefixConstants();
+
 void Check(bool condition, string message)
 {
     if (!condition)
@@ -24,6 +26,12 @@ void CheckSequence(IEnumerable<string> expected, IEnumerable<string> actual, str
             $"{message}: expected [{string.Join(", ", expectedArray)}], got [{string.Join(", ", actualArray)}]"
         );
     }
+}
+
+void CheckPrefixConstants()
+{
+    CheckEqual("<Keyboard>/", HotkeyBindingPathCore.KeyboardPrefix, "Keyboard prefix constant");
+    CheckEqual("<Mouse>/", HotkeyBindingPathCore.MousePrefix, "Mouse prefix constant");
 }
 
 var normalizeCases = new (string? Input, string Expected, string Name)[]
