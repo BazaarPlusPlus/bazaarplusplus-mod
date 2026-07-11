@@ -9,7 +9,6 @@ internal static class BppSettingsDockOrder
     internal const int EnchantPreview = 2;
     internal const int EventPreview = 3;
     internal const int CombatStatusBar = 4;
-    internal const int CombatStatusBarSpeed = 5;
     internal const int ChineseLocaleMode = 6;
     internal const int UiFont = 7;
     internal const int FixedSupporterList = 8;

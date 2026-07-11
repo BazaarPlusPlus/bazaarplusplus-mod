@@ -1191,7 +1191,6 @@ public class SettingsDockRegistryTests
         VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
         registry.Register(new EndOfRunScreenshotSettingsDockEntry());
         registry.Register(new HistoryPanelSettingsDockEntry());
-        registry.Register(CombatStatusBarSpeedSettingsDockEntry.Create());
         registry.Register(UiFontSettingsDockEntry.Create());
         registry.Register(ChineseLocaleModeSettingsDockEntry.Create(new InMemoryBppEventBus()));
 
@@ -1202,7 +1201,6 @@ public class SettingsDockRegistryTests
             Assert.Equal(
                 new[]
                 {
-                    "CombatStatusBarSpeed",
                     "ChineseLocaleMode",
                     "UiFont",
                     "StreamMode",

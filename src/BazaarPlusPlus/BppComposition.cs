@@ -117,7 +117,6 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(ChineseLocaleModeSettingsDockEntry.Create(_eventBus));
         _settingsDockRegistry.Register(UiFontSettingsDockEntry.Create());
         _settingsDockRegistry.Register(CombatStatusBarSettingsDockEntry.Create());
-        _settingsDockRegistry.Register(CombatStatusBarSpeedSettingsDockEntry.Create());
         _settingsDockRegistry.Register(new EndOfRunScreenshotSettingsDockEntry());
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(ItemEnchantPreviewSettingsDockEntry.Create());
