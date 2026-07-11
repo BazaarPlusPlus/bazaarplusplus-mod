@@ -38,5 +38,5 @@ Decision: the context reader emits a generic **`Continue`** Flow action whenever
 ## Related
 
 - ADR-0007 (external replay video recording; established `TryContinueReplay` as the only programmatic exit).
-- ADR-0005 (AutoBazaar isolated transport core), ADR-0006 (BazaarAgent as its own plugin).
+- ADR-0006 (BazaarAgent as its own plugin; absorbed ADR-0005's transport-only-core decision).
 - Agent-side transport: `bazaarplusplus-agent` `src/transport/modHttpClient.ts` (posts `/v1/actions`; no replay awareness).

@@ -12,7 +12,7 @@ The code is the source of truth. Current implementation guidance lives in one ar
 
 ## Decision records (`adr/`, immutable)
 
-This repo keeps the existing ADR convention instead of adding a duplicate `decisions/` directory.
+This repo keeps the existing ADR convention instead of adding a duplicate `decisions/` directory. ADR-0005 (AutoBazaar transport-only core, superseded) was collapsed into ADR-0006 on 2026-07-11; the file is recoverable from git history and numbering is never reused.
 
 | Path | Topic | Status |
 |---|---|---|
@@ -20,8 +20,7 @@ This repo keeps the existing ADR convention instead of adding a duplicate `decis
 | [adr/0002](adr/0002-mountable-feature-registry.md) | mountable/feature registry | accepted |
 | [adr/0003](adr/0003-history-panel-preview-overlay.md) | HistoryPanel ScreenSpaceOverlay preview | accepted |
 | [adr/0004](adr/0004-preview-visibility-three-state-mode.md) | three-state preview visibility | accepted |
-| [adr/0005](adr/0005-autobazaar-isolated-transport-core.md) | AutoBazaar transport-only core | superseded by 0006 |
-| [adr/0006](adr/0006-bazaaragent-as-its-own-plugin.md) | BazaarAgent as its own plugin | accepted |
+| [adr/0006](adr/0006-bazaaragent-as-its-own-plugin.md) | BazaarAgent as its own plugin (absorbs 0005) | accepted |
 | [adr/0007](adr/0007-bazaaragent-external-replay-video-recording.md) | external replay video recording | accepted |
 | [adr/0008](adr/0008-replay-continue-as-agent-action.md) | replay continue as agent `Continue` action | accepted |
 
@@ -29,7 +28,7 @@ This repo keeps the existing ADR convention instead of adding a duplicate `decis
 
 Task plans, feature requests, and bugs are tracked as **GitHub issues** (see [agents/issue-tracker.md](agents/issue-tracker.md)), not repo docs. The former `docs/plans/` directory was retired on 2026-07-11; its two remaining plans migrated verbatim to [#32](https://github.com/cauyxy/bazaarplusplus-mod/issues/32) (HistoryPanel hero portrait badges, `ready-for-agent`) and [#33](https://github.com/cauyxy/bazaarplusplus-mod/issues/33) (choice timeline in run bundles, `needs-info` pending §11 sign-off).
 
-[drafts/](drafts/) remains the write buffer for **knowledge documents only** — design records, root-cause analyses, decision/option analyses produced mid-session. Task plans do not go there. Consolidation runs sweep drafts into MEMORY/ADR/archive. (Sweeps: 2026-07-11, 2026-07-10, 2026-06-12.)
+`drafts/` remains the write buffer for **knowledge documents only** — design records, root-cause analyses, decision/option analyses produced mid-session. Task plans do not go there. Consolidation runs sweep drafts into MEMORY/ADR/archive, so the directory only exists while unswept drafts are pending (its `.gitkeep` placeholder was dropped on 2026-07-11 — just create the directory when writing a draft). (Sweeps: 2026-07-11, 2026-07-10, 2026-06-12.)
 
 ## Archive (`archive/`, frozen — never current)
 
