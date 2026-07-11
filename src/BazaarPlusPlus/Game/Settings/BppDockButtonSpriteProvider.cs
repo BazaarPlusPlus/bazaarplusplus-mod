@@ -13,23 +13,19 @@ internal static class BppDockButtonSpriteProvider
 {
     private const string LogCategory = "BppDockButtonSprite";
 
-    private static readonly Dictionary<BppDockButtonIconKind, Sprite?> _cache = new();
+    private const string IconResourceSuffix = "Resources.DockButtons.collection-panel-icon.png";
 
-    internal static Sprite? Get(BppDockButtonIconKind kind)
+    private static Sprite? _cachedSprite;
+    private static bool _cacheResolved;
+
+    internal static Sprite? Get()
     {
-        if (_cache.TryGetValue(kind, out var cached))
-            return cached;
+        if (_cacheResolved)
+            return _cachedSprite;
 
-        var suffix = kind switch
-        {
-            BppDockButtonIconKind.CollectionPanel =>
-                "Resources.DockButtons.collection-panel-icon.png",
-            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
-        };
-
-        var sprite = LoadSprite(suffix, kind.ToString());
-        _cache[kind] = sprite;
-        return sprite;
+        _cachedSprite = LoadSprite(IconResourceSuffix, "CollectionPanel");
+        _cacheResolved = true;
+        return _cachedSprite;
     }
 
     private static Sprite? LoadSprite(string resourceSuffix, string spriteName)

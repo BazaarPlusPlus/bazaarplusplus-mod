@@ -203,18 +203,6 @@ internal static class VoiceSubtitlesFontScaleDockEntryFactory
             read,
             write,
             scale => Math.Abs(scale - 1f) > ComparisonTolerance,
-            (scale, _) => scale.ToString("0.##", CultureInfo.InvariantCulture) + "x",
-            nextOverride: NextScale
+            (scale, _) => scale.ToString("0.##", CultureInfo.InvariantCulture) + "x"
         );
-
-    private static float NextScale(float current)
-    {
-        foreach (var candidate in ScaleLadder)
-        {
-            if (candidate > current + ComparisonTolerance)
-                return candidate;
-        }
-
-        return ScaleLadder[0];
-    }
 }

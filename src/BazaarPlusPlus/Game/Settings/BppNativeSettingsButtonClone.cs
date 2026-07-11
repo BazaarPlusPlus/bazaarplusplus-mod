@@ -35,7 +35,6 @@ internal static class BppNativeSettingsButtonClone
                 ?? BppDockButtonVisualState.Capture(existing.GetComponent<Button>());
             BppDockButtonVisuals.Apply(
                 existing.gameObject,
-                placement.ButtonIconKind,
                 explicitIcon: null,
                 freshClone: false,
                 nativeState: existingVisualState
@@ -59,7 +58,6 @@ internal static class BppNativeSettingsButtonClone
         StripNativeButtonBehavior(cloneObject);
         BppDockButtonVisuals.Apply(
             cloneObject,
-            placement.ButtonIconKind,
             nativeIcon,
             freshClone: true,
             nativeState: nativeVisualState

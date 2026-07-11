@@ -34,7 +34,11 @@ internal static class CollectionPanelDockButtonAwakePatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("CollectionPanelDockButton", "Failed to attach collection dock button", ex);
+            BppLog.Error(
+                "CollectionPanelDockButton",
+                "Failed to attach collection dock button",
+                ex
+            );
         }
     }
 
@@ -45,10 +49,7 @@ internal static class CollectionPanelDockButtonAwakePatch
 
         CollectionPanelDockButtonController.Attach(
             button,
-            BppSettingsDockPlacement.ForButton(
-                $"CollectionPanel_{key}",
-                BppDockButtonIconKind.CollectionPanel
-            )
+            BppSettingsDockPlacement.ForButton($"CollectionPanel_{key}")
         );
     }
 }
@@ -72,10 +73,7 @@ internal static class CollectionPanelDockButtonFightMenuPatch
             {
                 CollectionPanelDockButtonController.Attach(
                     button,
-                    BppSettingsDockPlacement.ForButton(
-                        "CollectionPanel_FightMenu",
-                        BppDockButtonIconKind.CollectionPanel
-                    )
+                    BppSettingsDockPlacement.ForButton("CollectionPanel_FightMenu")
                 );
             }
         }

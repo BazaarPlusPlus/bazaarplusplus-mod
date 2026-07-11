@@ -6,13 +6,14 @@ using BazaarPlusPlus.Core.Config;
 namespace BazaarPlusPlus.Game.Settings;
 
 /// <summary>
-/// A settings dock row that cycles through an ordered value ladder.
+/// A settings dock row backed by an ordered value ladder, rendered as a native toggle or
+/// dropdown choice.
 /// </summary>
 /// <remarks>
 /// The <c>write</c> callback owns persistence and any coupled persistence (for example,
 /// forcing another setting on). The optional <c>onChanged</c> callback reacts after the
 /// write completes (for example, publishing an event, refreshing UI, or arming a pump) and
-/// is invoked unconditionally with the new value after every activation.
+/// is invoked unconditionally with the new value after every write.
 /// </remarks>
 internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
 {
@@ -23,7 +24,6 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
     private readonly Action<IBppConfig, T> _write;
     private readonly Func<T, bool> _highlightWhen;
     private readonly Func<T, string, string> _resolveStatus;
-    private readonly Func<T, T>? _nextOverride;
     private readonly Action<T>? _onChanged;
     private readonly bool _renderAsToggle;
 
@@ -36,7 +36,6 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
         Action<IBppConfig, T> write,
         Func<T, bool> highlightWhen,
         Func<T, string, string> resolveStatus,
-        Func<T, T>? nextOverride = null,
         Action<T>? onChanged = null,
         bool renderAsToggle = false
     )
@@ -54,7 +53,6 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
         _write = write ?? throw new ArgumentNullException(nameof(write));
         _highlightWhen = highlightWhen ?? throw new ArgumentNullException(nameof(highlightWhen));
         _resolveStatus = resolveStatus ?? throw new ArgumentNullException(nameof(resolveStatus));
-        _nextOverride = nextOverride;
         _onChanged = onChanged;
         _renderAsToggle = renderAsToggle;
     }
@@ -66,25 +64,20 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
         if (config == null)
             throw new ArgumentNullException(nameof(config));
 
-        var activate = () => Write(config, Next(_read(config)));
         if (_renderAsToggle && typeof(T) == typeof(bool))
         {
             return BppSettingsDockDefinition.Toggle(
                 _key,
                 _resolveLabel,
-                languageCode => _resolveStatus(_read(config), languageCode),
                 () => (bool)(object)_read(config)!,
-                enabled => Write(config, (T)(object)enabled),
-                activate: activate
+                enabled => Write(config, (T)(object)enabled)
             );
         }
 
         return BppSettingsDockDefinition.Choice(
             _key,
             _resolveLabel,
-            languageCode => _resolveStatus(_read(config), languageCode),
             () => _highlightWhen(_read(config)),
-            activate,
             languageCode => ResolveChoiceState(config, languageCode),
             standardIndex => SelectStandardChoice(config, standardIndex)
         );
@@ -152,20 +145,5 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
     {
         _write(config, value);
         _onChanged?.Invoke(value);
-    }
-
-    private T Next(T current)
-    {
-        if (_nextOverride != null)
-            return _nextOverride(current);
-
-        var comparer = EqualityComparer<T>.Default;
-        for (var i = 0; i < _ladder.Count; i++)
-        {
-            if (comparer.Equals(_ladder[i], current))
-                return _ladder[(i + 1) % _ladder.Count];
-        }
-
-        return _ladder[0];
     }
 }

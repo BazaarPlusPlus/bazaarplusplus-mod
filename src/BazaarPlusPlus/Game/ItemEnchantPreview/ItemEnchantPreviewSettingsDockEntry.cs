@@ -25,7 +25,6 @@ internal static class ItemEnchantPreviewSettingsDockEntry
                     entry.Value = mode;
             },
             mode => mode != PreviewVisibilityMode.Off,
-            BppSettingsDockCatalog.ResolvePreviewVisibilityModeStatus,
-            nextOverride: BppSettingsDockCatalog.NextPreviewVisibilityMode
+            BppSettingsDockCatalog.ResolvePreviewVisibilityModeStatus
         );
 }

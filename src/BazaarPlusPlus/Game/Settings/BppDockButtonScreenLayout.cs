@@ -41,11 +41,7 @@ internal sealed class BppDockButtonScreenLayout
         }
 
         if (
-            !TryCalculateButtonFootprint(
-                collectionButton,
-                collectionRect,
-                out var collectionBounds
-            )
+            !TryCalculateButtonFootprint(collectionButton, collectionRect, out var collectionBounds)
         )
         {
             blockerName = "collection-footprint-unavailable";
@@ -317,8 +313,7 @@ internal sealed class BppDockButtonScreenLayout
             graphic.enabled,
             IsActiveBelowOwner(graphic.transform, owner.transform),
             ResolveAuthoredAlpha(graphic, owner.transform),
-            IsOwnedVisual(owner, graphic),
-            isInsideSettingsPanel: false
+            IsOwnedVisual(owner, graphic)
         );
 
     private static bool IsOwnedVisual(Button owner, Graphic graphic)

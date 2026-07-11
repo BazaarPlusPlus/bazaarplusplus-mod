@@ -42,7 +42,6 @@ public class SettingsDockRegistryTests
             return new BppSettingsDockDefinition(
                 Key,
                 resolveLabel: _ => $"Label-{Key}",
-                resolveStatus: _ => "ON",
                 isActive: () => true,
                 activate: () => { },
                 collapseAfterActivate: false
@@ -136,52 +135,6 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void CyclingEntry_wraps_from_last_ladder_value_to_first()
-    {
-        var value = 2;
-        var entry = CreateIntegerCyclingEntry(() => value, next => value = next);
-        var definition = entry.Build(new BppConfig());
-
-        definition.Activate();
-
-        Assert.Equal(1, value);
-    }
-
-    [Fact]
-    public void CyclingEntry_falls_back_to_first_ladder_value_when_current_is_unknown()
-    {
-        var value = 99;
-        var entry = CreateIntegerCyclingEntry(() => value, next => value = next);
-        var definition = entry.Build(new BppConfig());
-
-        definition.Activate();
-
-        Assert.Equal(1, value);
-    }
-
-    [Fact]
-    public void CyclingEntry_prefers_nextOverride_over_ladder_lookup()
-    {
-        var value = 1;
-        var entry = new CyclingSettingsDockEntry<int>(
-            order: 0,
-            key: "Test",
-            resolveLabel: _ => "Test",
-            ladder: new[] { 1, 2 },
-            read: _ => value,
-            write: (_, next) => value = next,
-            highlightWhen: _ => false,
-            resolveStatus: (current, _) => current.ToString(),
-            nextOverride: _ => 42
-        );
-        var definition = entry.Build(new BppConfig());
-
-        definition.Activate();
-
-        Assert.Equal(42, value);
-    }
-
-    [Fact]
     public void CyclingEntry_invokes_onChanged_after_write_with_the_new_value()
     {
         var value = 1;
@@ -203,7 +156,7 @@ public class SettingsDockRegistryTests
         );
         var definition = entry.Build(new BppConfig());
 
-        definition.Activate();
+        definition.SelectStandardChoice!(1);
 
         Assert.Equal(new[] { ("write", 2), ("changed", 2) }, observed);
     }
@@ -215,12 +168,14 @@ public class SettingsDockRegistryTests
         var entry = CreateIntegerCyclingEntry(() => value, next => value = next);
         var definition = entry.Build(new BppConfig());
 
-        Assert.Equal("1", definition.ResolveStatus("en"));
+        var state = definition.ResolveChoiceState!("en");
+        Assert.Equal("1", state.Options[state.SelectedIndex]);
         Assert.False(definition.IsActive());
 
         value = 2;
 
-        Assert.Equal("2", definition.ResolveStatus("en"));
+        state = definition.ResolveChoiceState("en");
+        Assert.Equal("2", state.Options[state.SelectedIndex]);
         Assert.True(definition.IsActive());
     }
 
@@ -238,13 +193,13 @@ public class SettingsDockRegistryTests
         var definition = entry.Build(new BppConfig());
 
         Assert.False(definition.IsActive());
-        Assert.Equal("OFF", definition.ResolveStatus("zh-CN"));
+        Assert.False(definition.ReadToggle!());
 
-        definition.Activate();
+        definition.WriteToggle!(true);
 
         Assert.True(enabled);
         Assert.True(definition.IsActive());
-        Assert.Equal("ON", definition.ResolveStatus("en"));
+        Assert.True(definition.ReadToggle());
     }
 
     [Fact]
@@ -274,9 +229,8 @@ public class SettingsDockRegistryTests
     public void Choice_definition_selects_standard_ladder_value_directly()
     {
         var value = 1;
-        var definition = CreateIntegerCyclingEntry(() => value, next => value = next).Build(
-            new BppConfig()
-        );
+        var definition = CreateIntegerCyclingEntry(() => value, next => value = next)
+            .Build(new BppConfig());
 
         var state = definition.ResolveChoiceState!("en");
         definition.SelectStandardChoice!(1);
@@ -292,9 +246,8 @@ public class SettingsDockRegistryTests
     public void Choice_definition_preserves_unknown_current_value_as_synthetic_option()
     {
         var value = 99;
-        var definition = CreateIntegerCyclingEntry(() => value, next => value = next).Build(
-            new BppConfig()
-        );
+        var definition = CreateIntegerCyclingEntry(() => value, next => value = next)
+            .Build(new BppConfig());
 
         var state = definition.ResolveChoiceState!("en");
 
@@ -355,15 +308,15 @@ public class SettingsDockRegistryTests
         );
 
     [Fact]
-    public void NameOverrideDockEntry_requests_refresh_after_every_activation()
+    public void NameOverrideDockEntry_requests_refresh_after_every_write()
     {
         var refreshCount = 0;
         var definition = NameOverrideSettingsDockEntry
             .Create(() => refreshCount++)
             .Build(new BppConfig());
 
-        definition.Activate();
-        definition.Activate();
+        definition.WriteToggle!(true);
+        definition.WriteToggle(false);
 
         Assert.Equal(2, refreshCount);
     }
@@ -374,7 +327,7 @@ public class SettingsDockRegistryTests
         var definition = EventPreviewSettingsDockEntry.Create().Build(new BppConfig());
 
         Assert.True(definition.IsActive());
-        Assert.Equal("ON", definition.ResolveStatus("en"));
+        Assert.True(definition.ReadToggle!());
     }
 
     [Fact]
@@ -409,7 +362,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void ChineseLocaleModeDockEntry_cycles_between_cn_and_tw_only()
+    public void ChineseLocaleModeDockEntry_selects_between_cn_and_tw_only()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -428,30 +381,30 @@ public class SettingsDockRegistryTests
             );
             var definition = ChineseLocaleModeSettingsDockEntry.Create(eventBus).Build(config);
 
-            Assert.Equal("CN", definition.ResolveStatus("en"));
+            var state = definition.ResolveChoiceState!("en");
+            Assert.Equal(new[] { "CN", "TW" }, state.Options);
+            Assert.Equal(0, state.SelectedIndex);
             Assert.False(definition.IsActive());
 
-            definition.Activate();
+            definition.SelectStandardChoice!(1);
 
             Assert.Equal(BppChineseLocaleMode.Taiwan, config.ChineseLocaleModeConfig!.Value);
-            Assert.Equal("TW", definition.ResolveStatus("en"));
             Assert.True(definition.IsActive());
 
-            definition.Activate();
+            definition.SelectStandardChoice(0);
 
             Assert.Equal(BppChineseLocaleMode.Mainland, config.ChineseLocaleModeConfig!.Value);
-            Assert.Equal("CN", definition.ResolveStatus("en"));
             Assert.False(definition.IsActive());
 
             config.ChineseLocaleModeConfig.Value = (BppChineseLocaleMode)2;
 
-            Assert.Equal("TW", definition.ResolveStatus("en"));
+            state = definition.ResolveChoiceState("en");
+            Assert.Equal("TW", state.Options[state.SelectedIndex]);
             Assert.True(definition.IsActive());
 
-            definition.Activate();
+            definition.SelectStandardChoice(0);
 
             Assert.Equal(BppChineseLocaleMode.Mainland, config.ChineseLocaleModeConfig.Value);
-            Assert.Equal("CN", definition.ResolveStatus("en"));
             Assert.Equal(3, changedCount);
         }
         finally
@@ -483,8 +436,10 @@ public class SettingsDockRegistryTests
             Assert.Equal(BppConfig.DefaultUiFontKind, config.UiFontKindConfig!.Value);
             Assert.Equal("UI Font", definition.ResolveLabel("en"));
             Assert.Equal("界面字体", definition.ResolveLabel("zh-CN"));
-            Assert.Equal("KAI", definition.ResolveStatus("en"));
-            Assert.Equal("楷体", definition.ResolveStatus("zh-CN"));
+            var englishState = definition.ResolveChoiceState!("en");
+            Assert.Equal("KAI", englishState.Options[englishState.SelectedIndex]);
+            var chineseState = definition.ResolveChoiceState("zh-CN");
+            Assert.Equal("楷体", chineseState.Options[chineseState.SelectedIndex]);
             Assert.False(definition.IsActive());
             Assert.False(definition.CollapseAfterActivate);
         }
@@ -496,7 +451,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void UiFontDockEntry_cycles_between_lxgw_wenkai_and_sans_serif()
+    public void UiFontDockEntry_selects_between_lxgw_wenkai_and_sans_serif()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -510,18 +465,20 @@ public class SettingsDockRegistryTests
             config.Initialize(configFile);
             var definition = UiFontSettingsDockEntry.Create().Build(config);
 
-            definition.Activate();
+            definition.SelectStandardChoice!(1);
 
             Assert.Equal(BppUiFontKind.SansSerif, config.UiFontKindConfig!.Value);
-            Assert.Equal("SANS", definition.ResolveStatus("en"));
-            Assert.Equal("黑体", definition.ResolveStatus("zh-CN"));
+            var state = definition.ResolveChoiceState!("en");
+            Assert.Equal("SANS", state.Options[state.SelectedIndex]);
+            var chineseState = definition.ResolveChoiceState("zh-CN");
+            Assert.Equal("黑体", chineseState.Options[chineseState.SelectedIndex]);
             Assert.True(definition.IsActive());
 
-            definition.Activate();
+            definition.SelectStandardChoice(0);
 
             Assert.Equal(BppUiFontKind.LxgwWenKai, config.UiFontKindConfig.Value);
-            Assert.Equal("KAI", definition.ResolveStatus("en"));
-            Assert.Equal("楷体", definition.ResolveStatus("zh-CN"));
+            state = definition.ResolveChoiceState("en");
+            Assert.Equal("KAI", state.Options[state.SelectedIndex]);
             Assert.False(definition.IsActive());
         }
         finally
@@ -532,7 +489,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void UiFontDockEntry_treats_unknown_value_as_default_then_cycles_to_sans_serif()
+    public void UiFontDockEntry_treats_unknown_value_as_default_then_selects_sans_serif()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -548,13 +505,15 @@ public class SettingsDockRegistryTests
 
             config.UiFontKindConfig!.Value = (BppUiFontKind)99;
 
-            Assert.Equal("KAI", definition.ResolveStatus("en"));
+            var state = definition.ResolveChoiceState!("en");
+            Assert.Equal("KAI", state.Options[state.SelectedIndex]);
             Assert.False(definition.IsActive());
 
-            definition.Activate();
+            definition.SelectStandardChoice!(1);
 
             Assert.Equal(BppUiFontKind.SansSerif, config.UiFontKindConfig.Value);
-            Assert.Equal("SANS", definition.ResolveStatus("en"));
+            state = definition.ResolveChoiceState("en");
+            Assert.Equal("SANS", state.Options[state.SelectedIndex]);
             Assert.True(definition.IsActive());
         }
         finally
@@ -565,7 +524,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void EnchantPreviewDockEntry_cycles_unknown_mode_to_auto()
+    public void EnchantPreviewDockEntry_recovers_from_unknown_mode_via_choice_selection()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -579,7 +538,10 @@ public class SettingsDockRegistryTests
             config.EnchantPreviewModeConfig!.Value = (PreviewVisibilityMode)99;
             var definition = ItemEnchantPreviewSettingsDockEntry.Create().Build(config);
 
-            definition.Activate();
+            var state = definition.ResolveChoiceState!("en");
+            Assert.True(state.HasSyntheticCurrentOption);
+
+            definition.SelectStandardChoice!(1);
 
             Assert.Equal(
                 PreviewVisibilityMode.AutoOnPedestalChoice,
@@ -615,13 +577,13 @@ public class SettingsDockRegistryTests
             Assert.Equal("End-of-run Screenshot", definition.ResolveLabel("en"));
             Assert.Equal("终局截图", definition.ResolveLabel("zh-CN"));
             Assert.True(definition.IsActive());
-            Assert.Equal("ON", definition.ResolveStatus("en"));
+            Assert.True(definition.ReadToggle!());
 
-            definition.Activate();
+            definition.WriteToggle!(false);
 
             Assert.False(config.EndOfRunScreenshotEnabledConfig!.Value);
             Assert.False(definition.IsActive());
-            Assert.Equal("OFF", definition.ResolveStatus("en"));
+            Assert.False(definition.ReadToggle());
             Assert.False(definition.CollapseAfterActivate);
         }
         finally
@@ -655,19 +617,19 @@ public class SettingsDockRegistryTests
                     : FixedSupporterListSettingsDockEntry.Create().Build(config);
 
             Assert.False(screenshotDefinition.IsActive());
-            Assert.Equal("OFF", screenshotDefinition.ResolveStatus("en"));
+            Assert.False(screenshotDefinition.ReadToggle!());
 
-            dependencyDefinition.Activate();
-
-            Assert.True(config.EndOfRunScreenshotEnabledConfig.Value);
-            Assert.True(screenshotDefinition.IsActive());
-            Assert.Equal("ON", screenshotDefinition.ResolveStatus("en"));
-
-            dependencyDefinition.Activate();
+            dependencyDefinition.WriteToggle!(true);
 
             Assert.True(config.EndOfRunScreenshotEnabledConfig.Value);
             Assert.True(screenshotDefinition.IsActive());
-            Assert.Equal("ON", screenshotDefinition.ResolveStatus("en"));
+            Assert.True(screenshotDefinition.ReadToggle());
+
+            dependencyDefinition.WriteToggle(false);
+
+            Assert.True(config.EndOfRunScreenshotEnabledConfig.Value);
+            Assert.True(screenshotDefinition.IsActive());
+            Assert.True(screenshotDefinition.ReadToggle());
         }
         finally
         {
@@ -703,13 +665,9 @@ public class SettingsDockRegistryTests
             var screenshotDefinition = new EndOfRunScreenshotSettingsDockEntry().Build(config);
 
             Assert.True(screenshotDefinition.IsActive());
-            Assert.Equal("ON", screenshotDefinition.ResolveStatus("en"));
-
-            screenshotDefinition.Activate();
-
+            Assert.True(screenshotDefinition.ReadToggle!());
+            Assert.False(screenshotDefinition.IsInteractable!());
             Assert.True(config.EndOfRunScreenshotEnabledConfig.Value);
-            Assert.True(screenshotDefinition.IsActive());
-            Assert.Equal("ON", screenshotDefinition.ResolveStatus("en"));
         }
         finally
         {
@@ -740,13 +698,13 @@ public class SettingsDockRegistryTests
             Assert.Equal("Stream Mode", definition.ResolveLabel("en"));
             Assert.Equal("直播模式", definition.ResolveLabel("zh-CN"));
             Assert.False(definition.IsActive());
-            Assert.Equal("OFF", definition.ResolveStatus("en"));
+            Assert.False(definition.ReadToggle!());
 
-            definition.Activate();
+            definition.WriteToggle!(true);
 
             Assert.True(config.UseFixedSupporterListConfig!.Value);
             Assert.True(definition.IsActive());
-            Assert.Equal("ON", definition.ResolveStatus("en"));
+            Assert.True(definition.ReadToggle());
             Assert.False(definition.CollapseAfterActivate);
 
             configFile.Save();
@@ -765,7 +723,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void VoiceSubtitlesDockEntry_cycles_subtitle_mode_through_off_both_chinese_english()
+    public void VoiceSubtitlesDockEntry_selects_subtitle_mode_from_off_both_chinese_english()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -788,18 +746,21 @@ public class SettingsDockRegistryTests
             Assert.False(config.EnableVoiceSubtitlesConfig!.Value);
             Assert.Equal(SubtitleLanguageMode.Both, config.VoiceSubtitlesLanguageModeConfig!.Value);
             Assert.False(definition.IsActive());
-            Assert.Equal("OFF", definition.ResolveStatus("en"));
-            Assert.Equal("关闭", definition.ResolveStatus("zh-CN"));
+            var state = definition.ResolveChoiceState!("en");
+            Assert.Equal(new[] { "OFF", "BOTH", "ZH", "EN" }, state.Options);
+            Assert.Equal(0, state.SelectedIndex);
+            Assert.Equal(
+                new[] { "关闭", "双语", "中文", "英文" },
+                definition.ResolveChoiceState("zh-CN").Options
+            );
 
-            definition.Activate();
+            definition.SelectStandardChoice!(1);
 
             Assert.True(config.EnableVoiceSubtitlesConfig.Value);
             Assert.Equal(SubtitleLanguageMode.Both, config.VoiceSubtitlesLanguageModeConfig.Value);
             Assert.True(definition.IsActive());
-            Assert.Equal("BOTH", definition.ResolveStatus("en"));
-            Assert.Equal("双语", definition.ResolveStatus("zh-CN"));
 
-            definition.Activate();
+            definition.SelectStandardChoice(2);
 
             Assert.True(config.EnableVoiceSubtitlesConfig.Value);
             Assert.Equal(
@@ -807,10 +768,8 @@ public class SettingsDockRegistryTests
                 config.VoiceSubtitlesLanguageModeConfig.Value
             );
             Assert.True(definition.IsActive());
-            Assert.Equal("ZH", definition.ResolveStatus("en"));
-            Assert.Equal("中文", definition.ResolveStatus("zh-CN"));
 
-            definition.Activate();
+            definition.SelectStandardChoice(3);
 
             Assert.True(config.EnableVoiceSubtitlesConfig.Value);
             Assert.Equal(
@@ -818,16 +777,12 @@ public class SettingsDockRegistryTests
                 config.VoiceSubtitlesLanguageModeConfig.Value
             );
             Assert.True(definition.IsActive());
-            Assert.Equal("EN", definition.ResolveStatus("en"));
-            Assert.Equal("英文", definition.ResolveStatus("zh-CN"));
 
-            definition.Activate();
+            definition.SelectStandardChoice(0);
 
             Assert.False(config.EnableVoiceSubtitlesConfig.Value);
             Assert.Equal(SubtitleLanguageMode.Both, config.VoiceSubtitlesLanguageModeConfig.Value);
             Assert.False(definition.IsActive());
-            Assert.Equal("OFF", definition.ResolveStatus("en"));
-            Assert.Equal("关闭", definition.ResolveStatus("zh-CN"));
             Assert.False(definition.CollapseAfterActivate);
         }
         finally
@@ -838,7 +793,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void VoiceSubtitlesPositionDockEntry_defaults_top_center_and_cycles_to_top_left()
+    public void VoiceSubtitlesPositionDockEntry_defaults_top_center_and_selects_top_left()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -853,14 +808,17 @@ public class SettingsDockRegistryTests
             var definition = VoiceSubtitlesPositionSettingsDockEntry.Create().Build(config);
 
             Assert.Equal(SubtitlePosition.TopCenter, config.VoiceSubtitlesPositionConfig!.Value);
-            Assert.Equal("Top Center", definition.ResolveStatus("en"));
-            Assert.Equal("顶部居中", definition.ResolveStatus("zh-CN"));
+            var state = definition.ResolveChoiceState!("en");
+            Assert.Equal("Top Center", state.Options[state.SelectedIndex]);
+            var chineseState = definition.ResolveChoiceState("zh-CN");
+            Assert.Equal("顶部居中", chineseState.Options[chineseState.SelectedIndex]);
             Assert.False(definition.IsActive());
 
-            definition.Activate();
+            definition.SelectStandardChoice!(0);
 
             Assert.Equal(SubtitlePosition.TopLeft, config.VoiceSubtitlesPositionConfig.Value);
-            Assert.Equal("Top Left", definition.ResolveStatus("en"));
+            state = definition.ResolveChoiceState("en");
+            Assert.Equal("Top Left", state.Options[state.SelectedIndex]);
             Assert.True(definition.IsActive());
         }
         finally
@@ -918,7 +876,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void VoiceSubtitlesDockEntry_defaults_chinese_scale_to_one_and_cycles_to_next_ladder_value()
+    public void VoiceSubtitlesDockEntry_defaults_chinese_scale_to_one_and_selects_next_ladder_value()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -942,12 +900,14 @@ public class SettingsDockRegistryTests
             Assert.Equal("中文字號", definition.ResolveLabel("zh-Hant"));
 
             Assert.Equal(1.0f, config.VoiceSubtitlesChineseFontScaleConfig!.Value, precision: 2);
-            Assert.Equal("1x", definition.ResolveStatus("en"));
+            var state = definition.ResolveChoiceState!("en");
+            Assert.Equal("1x", state.Options[state.SelectedIndex]);
             Assert.False(definition.IsActive());
 
-            definition.Activate();
+            definition.SelectStandardChoice!(1);
 
-            Assert.Equal("1.25x", definition.ResolveStatus("en"));
+            state = definition.ResolveChoiceState("en");
+            Assert.Equal("1.25x", state.Options[state.SelectedIndex]);
             Assert.True(definition.IsActive());
             Assert.Equal(1.25f, config.VoiceSubtitlesChineseFontScaleConfig.Value, precision: 2);
         }
@@ -959,7 +919,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void VoiceSubtitlesFontScaleDockEntry_uses_first_strictly_greater_ladder_value()
+    public void VoiceSubtitlesFontScaleDockEntry_preserves_off_ladder_value_as_synthetic_choice()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -973,7 +933,11 @@ public class SettingsDockRegistryTests
             config.VoiceSubtitlesEnglishFontScaleConfig!.Value = 1.3f;
             var definition = VoiceSubtitlesEnglishFontScaleSettingsDockEntry.Create().Build(config);
 
-            definition.Activate();
+            var state = definition.ResolveChoiceState!("en");
+            Assert.True(state.HasSyntheticCurrentOption);
+            Assert.Equal("1.3x", state.Options[0]);
+
+            definition.SelectStandardChoice!(2);
 
             Assert.Equal(1.5f, config.VoiceSubtitlesEnglishFontScaleConfig.Value, precision: 2);
         }
@@ -1134,10 +1098,10 @@ public class SettingsDockRegistryTests
 
             for (var i = 0; i < expectedStatuses.Length; i++)
             {
-                actualStatuses.Add(definition.ResolveStatus("en"));
+                actualStatuses.Add(ResolveDisplayStatus(definition));
                 actualHighlights.Add(definition.IsActive());
                 if (i + 1 < expectedStatuses.Length)
-                    definition.Activate();
+                    SelectNextValue(definition);
             }
 
             Assert.Equal(expectedOrder, entry.Order);
@@ -1156,6 +1120,29 @@ public class SettingsDockRegistryTests
             if (File.Exists(configPath))
                 File.Delete(configPath);
         }
+    }
+
+    private static string ResolveDisplayStatus(BppSettingsDockDefinition definition)
+    {
+        if (definition.ControlKind == BppSettingsControlKind.Toggle)
+            return definition.ReadToggle!() ? "ON" : "OFF";
+
+        var state = definition.ResolveChoiceState!("en");
+        return state.Options[state.SelectedIndex];
+    }
+
+    private static void SelectNextValue(BppSettingsDockDefinition definition)
+    {
+        if (definition.ControlKind == BppSettingsControlKind.Toggle)
+        {
+            definition.WriteToggle!(!definition.ReadToggle!());
+            return;
+        }
+
+        var state = definition.ResolveChoiceState!("en");
+        var standardCount = state.Options.Count - (state.HasSyntheticCurrentOption ? 1 : 0);
+        var currentStandardIndex = state.HasSyntheticCurrentOption ? -1 : state.SelectedIndex;
+        definition.SelectStandardChoice!((currentStandardIndex + 1) % standardCount);
     }
 
     private static ISettingsDockEntry CreateCyclingEntry(string key) =>

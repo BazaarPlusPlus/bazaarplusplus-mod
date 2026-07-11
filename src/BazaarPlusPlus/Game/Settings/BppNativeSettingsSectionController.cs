@@ -90,12 +90,18 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
                 || choiceDonor == null
             )
             {
-                BppLog.Warn(LogCategory, "Native settings donors were incomplete; install skipped.");
+                BppLog.Warn(
+                    LogCategory,
+                    "Native settings donors were incomplete; install skipped."
+                );
                 return;
             }
             originalEntries = entries;
 
-            var supportSection = FindDirectChildAncestor(scrollRect.content, contactButton.transform);
+            var supportSection = FindDirectChildAncestor(
+                scrollRect.content,
+                contactButton.transform
+            );
             if (supportSection == null)
             {
                 BppLog.Warn(LogCategory, "Could not resolve the native support section.");
@@ -120,7 +126,8 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
                 throw new InvalidOperationException("Failed to stage native settings clones.");
 
             ConfigureNavigation(stagedNavigation);
-            var controller = optionsDialog.gameObject.AddComponent<BppNativeSettingsSectionController>();
+            var controller =
+                optionsDialog.gameObject.AddComponent<BppNativeSettingsSectionController>();
             controller._optionsDialog = optionsDialog;
             controller._closeButton = closeButton;
             controller._sectionRoot = stagedSection;
@@ -224,12 +231,14 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         RemoveDonorRows(sectionRoot);
         RemoveDonorArtifacts(sectionRoot);
 
-        foreach (var kind in new[]
-        {
-            BppSettingsControlKind.Toggle,
-            BppSettingsControlKind.Choice,
-            BppSettingsControlKind.Action,
-        })
+        foreach (
+            var kind in new[]
+            {
+                BppSettingsControlKind.Toggle,
+                BppSettingsControlKind.Choice,
+                BppSettingsControlKind.Action,
+            }
+        )
         {
             foreach (var definition in BppSettingsDockCatalog.Definitions)
             {
@@ -244,19 +253,27 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
                 };
                 var sourceSection = FindDirectChildAncestor(content, sourceControl.transform);
                 if (sourceSection == null)
-                    throw new InvalidOperationException($"No source section for '{definition.Key}'.");
+                    throw new InvalidOperationException(
+                        $"No source section for '{definition.Key}'."
+                    );
 
                 var sourceRow = FindSingleSelectableRow(sourceSection, sourceControl);
                 if (sourceRow == null)
                     throw new InvalidOperationException($"No source row for '{definition.Key}'.");
 
-                var rowObject = Instantiate(sourceRow.gameObject, sectionRoot, worldPositionStays: false);
+                var rowObject = Instantiate(
+                    sourceRow.gameObject,
+                    sectionRoot,
+                    worldPositionStays: false
+                );
                 rowObject.name = RowObjectPrefix + definition.Key;
                 rowObject.SetActive(true);
                 StripNativeLocalization(rowObject.transform);
                 var rowRect = rowObject.GetComponent<RectTransform>();
                 if (rowRect == null)
-                    throw new InvalidOperationException($"Row '{definition.Key}' has no RectTransform.");
+                    throw new InvalidOperationException(
+                        $"Row '{definition.Key}' has no RectTransform."
+                    );
 
                 var view = ConfigureRow(definition, rowRect);
                 _rows.Add(view);
@@ -266,10 +283,7 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         ArrangeRowsWithoutLayout(sectionRoot);
     }
 
-    private NativeRowView ConfigureRow(
-        BppSettingsDockDefinition definition,
-        RectTransform rowRoot
-    )
+    private NativeRowView ConfigureRow(BppSettingsDockDefinition definition, RectTransform rowRoot)
     {
         Toggle? toggle = null;
         TMP_Dropdown? choice = null;
@@ -279,7 +293,9 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             case BppSettingsControlKind.Toggle:
                 toggle = rowRoot.GetComponentInChildren<Toggle>(true);
                 if (toggle == null)
-                    throw new InvalidOperationException($"Toggle donor failed for '{definition.Key}'.");
+                    throw new InvalidOperationException(
+                        $"Toggle donor failed for '{definition.Key}'."
+                    );
                 toggle.onValueChanged = new Toggle.ToggleEvent();
                 toggle.onValueChanged.AddListener(enabled =>
                 {
@@ -291,7 +307,9 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             case BppSettingsControlKind.Choice:
                 choice = rowRoot.GetComponentInChildren<TMP_Dropdown>(true);
                 if (choice == null)
-                    throw new InvalidOperationException($"Choice donor failed for '{definition.Key}'.");
+                    throw new InvalidOperationException(
+                        $"Choice donor failed for '{definition.Key}'."
+                    );
                 choice.onValueChanged = new TMP_Dropdown.DropdownEvent();
                 choice.onValueChanged.AddListener(selectedIndex =>
                 {
@@ -312,7 +330,9 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             default:
                 action = rowRoot.GetComponentInChildren<Button>(true);
                 if (action == null)
-                    throw new InvalidOperationException($"Action donor failed for '{definition.Key}'.");
+                    throw new InvalidOperationException(
+                        $"Action donor failed for '{definition.Key}'."
+                    );
                 action.onClick = new Button.ButtonClickedEvent();
                 action.onClick.AddListener(() => ActivateAction(definition));
                 RemoveOtherSelectables(rowRoot, action);
@@ -330,7 +350,7 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         if (definition.CollapseAfterActivate)
             _closeButton?.onClick.Invoke();
 
-        definition.Activate();
+        definition.Activate?.Invoke();
         RefreshView(force: true);
     }
 
@@ -345,17 +365,26 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         {
             presentationHash = (presentationHash * 31) ^ row.Definition.Key.GetHashCode();
             presentationHash = (presentationHash * 31) ^ row.Definition.IsActive().GetHashCode();
-            presentationHash =
-                (presentationHash * 31)
-                ^ row.Definition.ResolveStatus(languageCode).GetHashCode();
-            if (row.Definition.ControlKind == BppSettingsControlKind.Toggle)
+            switch (row.Definition.ControlKind)
             {
-                presentationHash =
-                    (presentationHash * 31)
-                    ^ (row.Definition.ReadToggle?.Invoke() == true).GetHashCode();
-                presentationHash =
-                    (presentationHash * 31)
-                    ^ (row.Definition.IsInteractable?.Invoke() != false).GetHashCode();
+                case BppSettingsControlKind.Toggle:
+                    presentationHash =
+                        (presentationHash * 31)
+                        ^ (row.Definition.ReadToggle?.Invoke() == true).GetHashCode();
+                    presentationHash =
+                        (presentationHash * 31)
+                        ^ (row.Definition.IsInteractable?.Invoke() != false).GetHashCode();
+                    break;
+                case BppSettingsControlKind.Choice:
+                {
+                    var state = row.Definition.ResolveChoiceState?.Invoke(languageCode);
+                    if (state == null)
+                        break;
+                    presentationHash = (presentationHash * 31) ^ state.SelectedIndex;
+                    foreach (var option in state.Options)
+                        presentationHash = (presentationHash * 31) ^ option.GetHashCode();
+                    break;
+                }
             }
         }
 
@@ -407,7 +436,8 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             return mutations;
 
         var dialogRoot = _optionsDialog.transform as RectTransform;
-        var splitContainer = _optionsDialog.transform.Find("ScalerOffset/SplitContainer") as RectTransform;
+        var splitContainer =
+            _optionsDialog.transform.Find("ScalerOffset/SplitContainer") as RectTransform;
         if (dialogRoot == null || splitContainer == null)
         {
             BppLog.Warn(LogCategory, "Native settings footer geometry was unavailable.");
@@ -520,7 +550,9 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         StripNativeLocalization(navigationRoot);
         var toggle = navigationRoot.GetComponent<Toggle>();
         if (toggle == null)
-            throw new InvalidOperationException("Native support navigation donor was not a Toggle.");
+            throw new InvalidOperationException(
+                "Native support navigation donor was not a Toggle."
+            );
 
         toggle.onValueChanged = new Toggle.ToggleEvent();
         toggle.SetIsOnWithoutNotify(false);
@@ -529,7 +561,6 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             label.fontStyle &= ~FontStyles.UpperCase;
             label.text = "BazaarPlusPlus";
         }
-
     }
 
     private static void SetSectionHeader(RectTransform sectionRoot)
@@ -591,14 +622,16 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
                 header = label;
         }
 
-        var headerRoot = header == null
-            ? null
-            : FindDirectChildAncestor(sectionRoot, header.transform);
+        var headerRoot =
+            header == null ? null : FindDirectChildAncestor(sectionRoot, header.transform);
         var toRemove = new List<GameObject>();
         for (var index = 0; index < sectionRoot.childCount; index++)
         {
             var child = sectionRoot.GetChild(index);
-            if (child != headerRoot && !child.name.StartsWith(RowObjectPrefix, StringComparison.Ordinal))
+            if (
+                child != headerRoot
+                && !child.name.StartsWith(RowObjectPrefix, StringComparison.Ordinal)
+            )
                 toRemove.Add(child.gameObject);
         }
 
@@ -648,10 +681,7 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             DestroyImmediate(localizable);
     }
 
-    private static void HideFooterObject(
-        GameObject target,
-        ICollection<FooterMutation> mutations
-    )
+    private static void HideFooterObject(GameObject target, ICollection<FooterMutation> mutations)
     {
         foreach (var mutation in mutations)
         {
@@ -669,11 +699,7 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             yield return BuildPath(mutation.Target.transform);
     }
 
-    private static RectTransform? CloneInactive(
-        RectTransform source,
-        Transform parent,
-        string name
-    )
+    private static RectTransform? CloneInactive(RectTransform source, Transform parent, string name)
     {
         var clone = Instantiate(source.gameObject, parent, worldPositionStays: false);
         clone.name = name;
@@ -683,7 +709,11 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
 
     private static RectTransform? FindDirectChildAncestor(Transform parent, Transform descendant)
     {
-        for (var current = descendant; current != null && current != parent; current = current.parent)
+        for (
+            var current = descendant;
+            current != null && current != parent;
+            current = current.parent
+        )
         {
             if (current.parent == parent)
                 return current as RectTransform;

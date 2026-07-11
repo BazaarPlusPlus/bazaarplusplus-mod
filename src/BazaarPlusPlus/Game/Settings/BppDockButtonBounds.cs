@@ -90,12 +90,6 @@ internal static class BppDockButtonVisualFootprint
         bool isEnabled,
         bool isActiveBelowOwner,
         float authoredAlpha,
-        bool belongsToOwner,
-        bool isInsideSettingsPanel
-    ) =>
-        isEnabled
-        && isActiveBelowOwner
-        && authoredAlpha > VisibleAlphaThreshold
-        && belongsToOwner
-        && !isInsideSettingsPanel;
+        bool belongsToOwner
+    ) => isEnabled && isActiveBelowOwner && authoredAlpha > VisibleAlphaThreshold && belongsToOwner;
 }

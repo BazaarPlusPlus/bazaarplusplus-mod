@@ -221,14 +221,13 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
-    public void DockDefinition_ActionRow_InvokesAction_AndReportsDynamicStatus()
+    public void DockDefinition_ActionRow_InvokesAction_AndTracksActiveState()
     {
         var open = false;
         var activationCount = 0;
         var definition = new BppSettingsDockDefinition(
             "GameHistory",
             _ => "Game History",
-            _ => open ? "OPEN" : "VIEW",
             () => open,
             () =>
             {
@@ -239,13 +238,11 @@ public sealed class CombatStatusBarStateTests : IDisposable
         );
 
         Assert.False(definition.IsActive());
-        Assert.Equal("VIEW", definition.ResolveStatus("en"));
 
-        definition.Activate();
+        definition.Activate!();
 
         Assert.Equal(1, activationCount);
         Assert.True(definition.IsActive());
-        Assert.Equal("OPEN", definition.ResolveStatus("en"));
         Assert.True(definition.CollapseAfterActivate);
     }
 

@@ -27,7 +27,7 @@ internal static class BppDockButtonVisuals
     private const string IconObjectName = "BPP_DockButtonIcon";
     private static readonly Color CollectionHover = new(0.62f, 0.86f, 1f, 1f);
 
-    internal static BppDockButtonColorSpec ResolveColors(BppDockButtonIconKind kind)
+    internal static BppDockButtonColorSpec ResolveColors()
     {
         var hover = CollectionHover;
         return new BppDockButtonColorSpec(
@@ -41,14 +41,13 @@ internal static class BppDockButtonVisuals
     }
 
     internal static BppDockButtonVisualState ResolveButtonState(
-        BppDockButtonIconKind kind,
         BppDockButtonVisualState? nativeState
     )
     {
         if (nativeState.HasValue)
             return nativeState.Value;
 
-        var spec = ResolveColors(kind);
+        var spec = ResolveColors();
         return BppDockButtonVisualState.Capture(
             Selectable.Transition.ColorTint,
             new ColorBlock
@@ -75,7 +74,6 @@ internal static class BppDockButtonVisuals
 
     internal static void Apply(
         GameObject cloneObject,
-        BppDockButtonIconKind kind,
         Image? explicitIcon,
         bool freshClone,
         BppDockButtonVisualState? nativeState
@@ -85,7 +83,7 @@ internal static class BppDockButtonVisuals
             return;
 
         var frame = cloneObject.GetComponent<Image>() ?? cloneObject.AddComponent<Image>();
-        var sprite = BppDockButtonSpriteProvider.Get(kind);
+        var sprite = BppDockButtonSpriteProvider.Get();
         var icon = explicitIcon ?? FindMarkedIconImage(cloneObject) ?? FindIconImage(cloneObject);
         if (sprite != null && icon != null)
             ApplyIcon(icon, sprite);
@@ -98,7 +96,7 @@ internal static class BppDockButtonVisuals
         var button = cloneObject.GetComponent<Button>() ?? cloneObject.AddComponent<Button>();
         button.navigation = new Navigation { mode = Navigation.Mode.None };
         button.interactable = true;
-        var resolvedState = ResolveButtonState(kind, nativeState);
+        var resolvedState = ResolveButtonState(nativeState);
         resolvedState.ApplyTo(button, frame);
 
         var nativeVisualState =

@@ -12,26 +12,10 @@ internal sealed class EndOfRunScreenshotSettingsDockEntry : ISettingsDockEntry
         BppSettingsDockDefinition.Toggle(
             "EndOfRunScreenshot",
             EndOfRunScreenshotSettingsMenuLabel.Resolve,
-            _ => EndOfRunScreenshotSettingsPolicy.IsEnabledOrForced(config) ? "ON" : "OFF",
             () => EndOfRunScreenshotSettingsPolicy.IsEnabledOrForced(config),
             enabled => WriteEnabled(config, enabled),
-            isInteractable: () => !EndOfRunScreenshotSettingsPolicy.IsForcedOn(config),
-            activate: () => ToggleEnabled(config)
+            isInteractable: () => !EndOfRunScreenshotSettingsPolicy.IsForcedOn(config)
         );
-
-    private static bool ReadEnabled(IBppConfig config) =>
-        config.EndOfRunScreenshotEnabledConfig?.Value ?? true;
-
-    private static void ToggleEnabled(IBppConfig config)
-    {
-        if (EndOfRunScreenshotSettingsPolicy.IsForcedOn(config))
-        {
-            EndOfRunScreenshotSettingsPolicy.ForceEnabled(config);
-            return;
-        }
-
-        WriteEnabled(config, !ReadEnabled(config));
-    }
 
     private static void WriteEnabled(IBppConfig config, bool enabled)
     {

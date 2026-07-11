@@ -36,18 +36,12 @@ internal sealed class BppSettingsDockDefinition
     internal BppSettingsDockDefinition(
         string key,
         Func<string, string> resolveLabel,
-        Func<string, string> resolveStatus,
         Func<bool> isActive,
         Action activate,
         bool collapseAfterActivate
     )
+        : this(key, resolveLabel, isActive)
     {
-        Key = !string.IsNullOrWhiteSpace(key)
-            ? key
-            : throw new ArgumentException("Key is required.", nameof(key));
-        ResolveLabel = resolveLabel ?? throw new ArgumentNullException(nameof(resolveLabel));
-        ResolveStatus = resolveStatus ?? throw new ArgumentNullException(nameof(resolveStatus));
-        IsActive = isActive ?? throw new ArgumentNullException(nameof(isActive));
         Activate = activate ?? throw new ArgumentNullException(nameof(activate));
         CollapseAfterActivate = collapseAfterActivate;
         ControlKind = BppSettingsControlKind.Action;
@@ -56,10 +50,20 @@ internal sealed class BppSettingsDockDefinition
     private BppSettingsDockDefinition(
         string key,
         Func<string, string> resolveLabel,
-        Func<string, string> resolveStatus,
+        Func<bool> isActive
+    )
+    {
+        Key = !string.IsNullOrWhiteSpace(key)
+            ? key
+            : throw new ArgumentException("Key is required.", nameof(key));
+        ResolveLabel = resolveLabel ?? throw new ArgumentNullException(nameof(resolveLabel));
+        IsActive = isActive ?? throw new ArgumentNullException(nameof(isActive));
+    }
+
+    private BppSettingsDockDefinition(
+        string key,
+        Func<string, string> resolveLabel,
         Func<bool> isActive,
-        Action activate,
-        bool collapseAfterActivate,
         BppSettingsControlKind controlKind,
         Func<bool>? readToggle,
         Action<bool>? writeToggle,
@@ -67,14 +71,7 @@ internal sealed class BppSettingsDockDefinition
         Func<string, BppSettingsChoiceState>? resolveChoiceState,
         Action<int>? selectStandardChoice
     )
-        : this(
-            key,
-            resolveLabel,
-            resolveStatus,
-            isActive,
-            activate,
-            collapseAfterActivate
-        )
+        : this(key, resolveLabel, isActive)
     {
         ControlKind = controlKind;
         ReadToggle = readToggle;
@@ -88,11 +85,9 @@ internal sealed class BppSettingsDockDefinition
 
     internal Func<string, string> ResolveLabel { get; }
 
-    internal Func<string, string> ResolveStatus { get; }
-
     internal Func<bool> IsActive { get; }
 
-    internal Action Activate { get; }
+    internal Action? Activate { get; }
 
     internal bool CollapseAfterActivate { get; }
 
@@ -111,19 +106,14 @@ internal sealed class BppSettingsDockDefinition
     internal static BppSettingsDockDefinition Toggle(
         string key,
         Func<string, string> resolveLabel,
-        Func<string, string> resolveStatus,
         Func<bool> read,
         Action<bool> write,
-        Func<bool>? isInteractable = null,
-        Action? activate = null
+        Func<bool>? isInteractable = null
     ) =>
         new(
             key,
             resolveLabel,
-            resolveStatus,
             read,
-            activate ?? (() => write(!read())),
-            collapseAfterActivate: false,
             BppSettingsControlKind.Toggle,
             read,
             write,
@@ -135,19 +125,14 @@ internal sealed class BppSettingsDockDefinition
     internal static BppSettingsDockDefinition Choice(
         string key,
         Func<string, string> resolveLabel,
-        Func<string, string> resolveStatus,
         Func<bool> isActive,
-        Action activate,
         Func<string, BppSettingsChoiceState> resolveChoiceState,
         Action<int> selectStandardChoice
     ) =>
         new(
             key,
             resolveLabel,
-            resolveStatus,
             isActive,
-            activate,
-            collapseAfterActivate: false,
             BppSettingsControlKind.Choice,
             readToggle: null,
             writeToggle: null,

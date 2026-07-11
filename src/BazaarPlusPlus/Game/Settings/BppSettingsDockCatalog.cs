@@ -31,15 +31,6 @@ internal static class BppSettingsDockCatalog
 
     internal static IReadOnlyList<BppSettingsDockDefinition> Definitions => _definitions;
 
-    internal static PreviewVisibilityMode NextPreviewVisibilityMode(PreviewVisibilityMode mode) =>
-        mode switch
-        {
-            PreviewVisibilityMode.Off => PreviewVisibilityMode.AutoOnPedestalChoice,
-            PreviewVisibilityMode.AutoOnPedestalChoice => PreviewVisibilityMode.Always,
-            PreviewVisibilityMode.Always => PreviewVisibilityMode.Off,
-            _ => PreviewVisibilityMode.AutoOnPedestalChoice,
-        };
-
     internal static string ResolvePreviewVisibilityModeStatus(
         PreviewVisibilityMode mode,
         string languageCode
