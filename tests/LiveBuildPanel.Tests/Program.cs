@@ -7,7 +7,7 @@ using BazaarPlusPlus.Infrastructure.UiTokens;
 using BazaarPlusPlus.Localization;
 
 TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground();
-TestSupporterAttributionCountWithinRailCap();
+TestSupporterAttributionCountFillsRail();
 TestCandidateToggleUsesTemplateId();
 TestCandidatePruneKeepsSelectableRowsOnly();
 TestRowVmTogglePolicyComesFromBoardType();
@@ -30,7 +30,7 @@ static void TestOverlaySortingLayersKeepNativeCardsBetweenPanelAndForeground()
     );
 }
 
-static void TestSupporterAttributionCountWithinRailCap()
+static void TestSupporterAttributionCountFillsRail()
 {
     RegisterPluginReflectionAssemblyResolution();
     var assembly = Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "BazaarPlusPlus.dll"));
@@ -46,10 +46,7 @@ static void TestSupporterAttributionCountWithinRailCap()
     );
     Assert(field != null, "LiveBuildPanel should keep supporter attribution count named.");
     var count = (int)field!.GetRawConstantValue()!;
-    Assert(
-        count >= 1 && count <= 4,
-        $"LiveBuildPanel should request 1-4 supporters (within the attribution row cap), got {count}."
-    );
+    Assert(count == 4, $"LiveBuildPanel should fill the four-supporter attribution rail, got {count}.");
 }
 
 static void RegisterPluginReflectionAssemblyResolution()

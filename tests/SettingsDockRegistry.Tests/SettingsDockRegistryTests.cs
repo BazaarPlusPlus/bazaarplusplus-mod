@@ -892,41 +892,6 @@ public class SettingsDockRegistryTests
         }
     }
 
-    [Theory]
-    [InlineData("zh-CN", "https://bazaarplusplus.com/tutorial")]
-    [InlineData("zh-Hant", "https://bazaarplusplus.com/tutorial")]
-    [InlineData("en", "https://bazaarplusplus.com/tutorial?lang=en")]
-    [InlineData("de-DE", "https://bazaarplusplus.com/tutorial?lang=en")]
-    [InlineData("", "https://bazaarplusplus.com/tutorial?lang=en")]
-    public void HotkeyTutorialLinks_resolves_tutorial_url_by_language(
-        string languageCode,
-        string expected
-    )
-    {
-        var result = HotkeyTutorialLinks.ResolveTutorialUrl(languageCode);
-
-        Assert.Equal(expected, result);
-        Assert.DoesNotContain("lang=en?lang=en", result);
-    }
-
-    [Fact]
-    public void HotkeyTutorialDockEntry_builds_action_definition()
-    {
-        L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
-        var entry = new HotkeyTutorialSettingsDockEntry();
-
-        var definition = entry.Build(config: null!);
-
-        Assert.Equal(BppSettingsDockOrder.HotkeyTutorial, entry.Order);
-        Assert.Equal("HotkeyTutorial", definition.Key);
-        Assert.Equal("快捷键教程", definition.ResolveLabel("zh-CN"));
-        Assert.Equal("Hotkey Tutorial", definition.ResolveLabel("en"));
-        Assert.Equal("打开", definition.ResolveStatus("zh-CN"));
-        Assert.Equal("OPEN", definition.ResolveStatus("en"));
-        Assert.True(definition.IsActive());
-        Assert.True(definition.CollapseAfterActivate);
-    }
-
     [Fact]
     public void HistoryPanelDockEntry_uses_game_history_order()
     {
@@ -1125,12 +1090,11 @@ public class SettingsDockRegistryTests
         };
 
     [Fact]
-    public void SettingsDockCatalog_sorts_ui_font_adjacent_to_chinese_locale_and_hotkey_below_screenshot()
+    public void SettingsDockCatalog_sorts_ui_font_adjacent_to_chinese_locale()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
         var registry = new SettingsDockEntryRegistry();
         registry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create());
-        registry.Register(new HotkeyTutorialSettingsDockEntry());
         registry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
         registry.Register(new EndOfRunScreenshotSettingsDockEntry());
@@ -1152,7 +1116,6 @@ public class SettingsDockRegistryTests
                     "VoiceSubtitlesEnglishFontScale",
                     "VoiceSubtitlesChineseFontScale",
                     "EndOfRunScreenshot",
-                    "HotkeyTutorial",
                     "BazaarDbUpload",
                 },
                 BppSettingsDockCatalog.Definitions.Select(d => d.Key)
