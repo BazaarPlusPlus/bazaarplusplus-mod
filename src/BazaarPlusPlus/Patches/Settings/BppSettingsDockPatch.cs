@@ -10,7 +10,7 @@ using UnityEngine.UI;
 namespace BazaarPlusPlus.Patches.Settings;
 
 [HarmonyPatch(typeof(SettingDialogsView), "Awake")]
-internal static class BppSettingsDockAwakePatch
+internal static class CollectionPanelDockButtonAwakePatch
 {
     private static readonly System.Reflection.FieldInfo? MainMenuSettingOptionButtonField =
         AccessTools.Field(typeof(SettingDialogsView), "MainMenuSettingOptionButton");
@@ -23,22 +23,22 @@ internal static class BppSettingsDockAwakePatch
     {
         try
         {
-            AttachButtons(
+            AttachButton(
                 MainMenuSettingOptionButtonField?.GetValue(__instance) as Button,
                 "MainMenu"
             );
-            AttachButtons(
+            AttachButton(
                 HeroSelectSettingOptionButtonField?.GetValue(__instance) as Button,
                 "HeroSelect"
             );
         }
         catch (Exception ex)
         {
-            BppLog.Error("BppSettingsDock", "Failed to attach BPP settings dock", ex);
+            BppLog.Error("CollectionPanelDockButton", "Failed to attach collection dock button", ex);
         }
     }
 
-    private static void AttachButtons(Button? button, string key)
+    private static void AttachButton(Button? button, string key)
     {
         if (button == null)
             return;
@@ -50,16 +50,11 @@ internal static class BppSettingsDockAwakePatch
                 BppDockButtonIconKind.CollectionPanel
             )
         );
-        var settingsPlacement = BppSettingsDockPlacement.ForButton(
-            key,
-            BppDockButtonIconKind.SettingsDock
-        );
-        BppSettingsDockController.Attach(button, settingsPlacement);
     }
 }
 
 [HarmonyPatch(typeof(FightMenuDialog), "Start")]
-internal static class BppSettingsDockFightMenuPatch
+internal static class CollectionPanelDockButtonFightMenuPatch
 {
     private static readonly System.Reflection.FieldInfo? SettingButtonField = AccessTools.Field(
         typeof(FightMenuDialog),
@@ -82,18 +77,15 @@ internal static class BppSettingsDockFightMenuPatch
                         BppDockButtonIconKind.CollectionPanel
                     )
                 );
-                BppSettingsDockController.Attach(
-                    button,
-                    BppSettingsDockPlacement.ForButton(
-                        "FightMenu",
-                        BppDockButtonIconKind.SettingsDock
-                    )
-                );
             }
         }
         catch (Exception ex)
         {
-            BppLog.Error("BppSettingsDock", "Failed to attach BPP settings dock in fight menu", ex);
+            BppLog.Error(
+                "CollectionPanelDockButton",
+                "Failed to attach collection dock button in fight menu",
+                ex
+            );
         }
     }
 }

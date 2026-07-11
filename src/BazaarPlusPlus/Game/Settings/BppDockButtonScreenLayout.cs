@@ -9,23 +9,24 @@ namespace BazaarPlusPlus.Game.Settings;
 internal sealed class BppDockButtonScreenLayout
 {
     private const string BppObjectPrefix = "BPP_";
-    private const string SettingsPanelPrefix = "BPP_SettingsDockPanel_";
-
     private readonly List<BppDockButtonObstacle> _blockerScratch = [];
     private readonly List<Graphic> _graphicScratch = [];
     private readonly Vector3[] _cornerScratch = new Vector3[4];
 
-    internal BppDockButtonLayoutPlan ResolveAndApply(
+    internal bool TryResolveAndApplyCollection(
         Button anchorButton,
         RectTransform collectionRect,
-        RectTransform settingsRect,
-        float localGap
+        float localGap,
+        out string? blockerName
     )
     {
+        blockerName = null;
         var collectionButton = collectionRect.GetComponent<Button>();
-        var settingsButton = settingsRect.GetComponent<Button>();
-        if (collectionButton == null || settingsButton == null)
-            return BppDockButtonLayoutPlan.MeasurementFailure();
+        if (collectionButton == null)
+        {
+            blockerName = "missing-collection-button";
+            return false;
+        }
 
         if (
             !TryCalculateButtonFootprint(
@@ -33,83 +34,75 @@ internal sealed class BppDockButtonScreenLayout
                 (RectTransform)anchorButton.transform,
                 out var gearBounds
             )
-            || !TryCalculateButtonFootprint(
+        )
+        {
+            blockerName = "gear-footprint-unavailable";
+            return false;
+        }
+
+        if (
+            !TryCalculateButtonFootprint(
                 collectionButton,
                 collectionRect,
                 out var collectionBounds
             )
-            || !TryCalculateButtonFootprint(settingsButton, settingsRect, out var settingsBounds)
         )
-            return BppDockButtonLayoutPlan.MeasurementFailure();
+        {
+            blockerName = "collection-footprint-unavailable";
+            return false;
+        }
 
         var viewportBounds = new BppDockButtonBounds(0f, Screen.width, 0f, Screen.height);
         var anchorCanvas = ResolveRootCanvas(anchorButton.transform);
         if (anchorCanvas == null || !anchorCanvas.isActiveAndEnabled)
-            return BppDockButtonLayoutPlan.MeasurementFailure();
+        {
+            blockerName = "anchor-canvas-unavailable";
+            return false;
+        }
 
-        var gap = ResolveScreenGap(settingsRect.parent as RectTransform, localGap);
+        var gap = ResolveScreenGap(collectionRect.parent as RectTransform, localGap);
         var blockers = CollectVisibleNativeBlockers(
             viewportBounds,
             anchorButton,
             collectionButton,
-            settingsButton,
             anchorCanvas.targetDisplay
         );
-        var plan = BppDockButtonLayoutPlanner.Resolve(
+        var plan = BppCollectionDockButtonLayoutPlanner.Resolve(
             viewportBounds,
             gearBounds,
             collectionBounds.Width,
             collectionBounds.Height,
-            settingsBounds.Width,
-            settingsBounds.Height,
             gap,
             blockers
         );
+        blockerName = plan.BlockerName;
         if (!plan.CanApply)
-            return plan;
+            return false;
 
         if (
             !TryCalculateTargetLocalPosition(
                 collectionRect,
                 collectionButton,
                 collectionBounds,
-                plan.CollectionBounds,
+                plan.Bounds,
                 out var collectionLocalPosition
-            )
-            || !TryCalculateTargetLocalPosition(
-                settingsRect,
-                settingsButton,
-                settingsBounds,
-                plan.SettingsBounds,
-                out var settingsLocalPosition
             )
         )
         {
-            return new BppDockButtonLayoutPlan(
-                canApply: false,
-                plan.CollectionBounds,
-                plan.SettingsBounds,
-                plan.SettingsSlot,
-                plan.BlockerName,
-                wasAdjusted: false,
-                failureReason: BppDockButtonLayoutFailureReason.MeasurementUnavailable
-            );
+            blockerName = "target-local-position-unavailable";
+            return false;
         }
 
         collectionRect.localPosition = collectionLocalPosition;
-        settingsRect.localPosition = settingsLocalPosition;
         collectionRect.localRotation = Quaternion.identity;
-        settingsRect.localRotation = Quaternion.identity;
         collectionRect.SetAsLastSibling();
-        settingsRect.SetAsLastSibling();
-        return plan;
+        return true;
     }
 
     private IReadOnlyList<BppDockButtonObstacle> CollectVisibleNativeBlockers(
         BppDockButtonBounds viewportBounds,
         Button anchorButton,
         Button collectionButton,
-        Button settingsButton,
         int targetDisplay
     )
     {
@@ -120,7 +113,6 @@ internal sealed class BppDockButtonScreenLayout
                 button == null
                 || button == anchorButton
                 || button == collectionButton
-                || button == settingsButton
                 || !button.gameObject.scene.IsValid()
                 || !button.isActiveAndEnabled
                 || !button.gameObject.activeInHierarchy
@@ -326,7 +318,7 @@ internal sealed class BppDockButtonScreenLayout
             IsActiveBelowOwner(graphic.transform, owner.transform),
             ResolveAuthoredAlpha(graphic, owner.transform),
             IsOwnedVisual(owner, graphic),
-            IsInsideSettingsPanel(graphic.transform, owner.transform)
+            isInsideSettingsPanel: false
         );
 
     private static bool IsOwnedVisual(Button owner, Graphic graphic)
@@ -338,21 +330,6 @@ internal sealed class BppDockButtonScreenLayout
 
             if (current.GetComponent<Button>() != null)
                 return false;
-        }
-
-        return false;
-    }
-
-    private static bool IsInsideSettingsPanel(Transform candidate, Transform buttonRoot)
-    {
-        for (
-            var current = candidate;
-            current != null && current != buttonRoot;
-            current = current.parent
-        )
-        {
-            if (current.name.StartsWith(SettingsPanelPrefix, StringComparison.Ordinal))
-                return true;
         }
 
         return false;

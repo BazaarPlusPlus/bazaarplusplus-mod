@@ -25,6 +25,7 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
     private readonly Func<T, string, string> _resolveStatus;
     private readonly Func<T, T>? _nextOverride;
     private readonly Action<T>? _onChanged;
+    private readonly bool _renderAsToggle;
 
     internal CyclingSettingsDockEntry(
         int order,
@@ -36,7 +37,8 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
         Func<T, bool> highlightWhen,
         Func<T, string, string> resolveStatus,
         Func<T, T>? nextOverride = null,
-        Action<T>? onChanged = null
+        Action<T>? onChanged = null,
+        bool renderAsToggle = false
     )
     {
         Order = order;
@@ -54,6 +56,7 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
         _resolveStatus = resolveStatus ?? throw new ArgumentNullException(nameof(resolveStatus));
         _nextOverride = nextOverride;
         _onChanged = onChanged;
+        _renderAsToggle = renderAsToggle;
     }
 
     public int Order { get; }
@@ -63,18 +66,27 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
         if (config == null)
             throw new ArgumentNullException(nameof(config));
 
-        return new BppSettingsDockDefinition(
+        var activate = () => Write(config, Next(_read(config)));
+        if (_renderAsToggle && typeof(T) == typeof(bool))
+        {
+            return BppSettingsDockDefinition.Toggle(
+                _key,
+                _resolveLabel,
+                languageCode => _resolveStatus(_read(config), languageCode),
+                () => (bool)(object)_read(config)!,
+                enabled => Write(config, (T)(object)enabled),
+                activate: activate
+            );
+        }
+
+        return BppSettingsDockDefinition.Choice(
             _key,
             _resolveLabel,
             languageCode => _resolveStatus(_read(config), languageCode),
             () => _highlightWhen(_read(config)),
-            () =>
-            {
-                var next = Next(_read(config));
-                _write(config, next);
-                _onChanged?.Invoke(next);
-            },
-            collapseAfterActivate: false
+            activate,
+            languageCode => ResolveChoiceState(config, languageCode),
+            standardIndex => SelectStandardChoice(config, standardIndex)
         );
     }
 
@@ -95,8 +107,52 @@ internal sealed class CyclingSettingsDockEntry<T> : ISettingsDockEntry
             write,
             value => value,
             (value, _) => value ? "ON" : "OFF",
-            onChanged: onChanged
+            onChanged: onChanged,
+            renderAsToggle: true
         );
+
+    private BppSettingsChoiceState ResolveChoiceState(IBppConfig config, string languageCode)
+    {
+        var current = _read(config);
+        var comparer = EqualityComparer<T>.Default;
+        var selectedStandardIndex = -1;
+        for (var index = 0; index < _ladder.Count; index++)
+        {
+            if (comparer.Equals(_ladder[index], current))
+            {
+                selectedStandardIndex = index;
+                break;
+            }
+        }
+
+        var hasSyntheticCurrent = selectedStandardIndex < 0;
+        var options = new List<string>(_ladder.Count + (hasSyntheticCurrent ? 1 : 0));
+        if (hasSyntheticCurrent)
+            options.Add(_resolveStatus(current, languageCode));
+
+        foreach (var value in _ladder)
+            options.Add(_resolveStatus(value, languageCode));
+
+        return new BppSettingsChoiceState(
+            options,
+            hasSyntheticCurrent ? 0 : selectedStandardIndex,
+            hasSyntheticCurrent
+        );
+    }
+
+    private void SelectStandardChoice(IBppConfig config, int standardIndex)
+    {
+        if (standardIndex < 0 || standardIndex >= _ladder.Count)
+            return;
+
+        Write(config, _ladder[standardIndex]);
+    }
+
+    private void Write(IBppConfig config, T value)
+    {
+        _write(config, value);
+        _onChanged?.Invoke(value);
+    }
 
     private T Next(T current)
     {
