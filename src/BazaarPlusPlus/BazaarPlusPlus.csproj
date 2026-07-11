@@ -176,23 +176,9 @@
   >
     <Message Text="[BazaarPlusPlus] Building for Debug" Importance="high" />
     <ItemGroup>
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\$(TargetName).dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\$(TargetName).version" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\Microsoft.Data.Sqlite.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.batteries_v2.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.core.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SQLitePCLRaw.provider.e_sqlite3.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\SixLabors.ImageSharp.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\System.Buffers.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\System.Memory.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\System.Numerics.Vectors.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\System.Text.Encoding.CodePages.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\e_sqlite3.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\libe_sqlite3.dylib" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\libBppMacAudio.dylib" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.ModApi.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.Storage.dll" />
-      <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.Localization.dll" />
+      <!-- Scrub only the optional BazaarAgent assemblies (a default build must remove
+           them). Everything else this target ships is re-copied below with
+           SkipUnchangedFiles, which pre-deleting would defeat. -->
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.BazaarAgent.dll" />
       <FilesToDelete Include="$(GamePath)\BepInEx\plugins\BazaarPlusPlus.BazaarAgentHost.dll" />
     </ItemGroup>
@@ -235,6 +221,7 @@
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
       DestinationFiles="$(GamePath)\BepInEx\plugins\$(TargetName).dll"
+      SkipUnchangedFiles="true"
     />
     <Copy
       SourceFiles="@(PluginManagedRuntimeFiles)"

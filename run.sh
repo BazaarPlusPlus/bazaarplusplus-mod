@@ -62,7 +62,14 @@ repair_macos_trampoline() {
 
 build() {
     local bazaaragent="${1:-false}"
-    local args=(-verbosity detailed)
+    local fast="${2:-false}"
+    local args=()
+
+    if [[ "$fast" == "true" ]]; then
+        # Inner-loop accelerator: skips NuGet restore. Run a normal build after
+        # editing any csproj or creating a fresh worktree.
+        args+=(--no-restore)
+    fi
 
     print_bazaaragent_mode "$bazaaragent"
     repair_macos_trampoline
@@ -70,9 +77,9 @@ build() {
     # so building it builds and deploys all three. A default build builds only the main
     # plugin, whose build actively scrubs both host dlls from the plugins folder.
     if [[ "$bazaaragent" == "true" ]]; then
-        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
+        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj ${args[@]+"${args[@]}"}
     else
-        dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj "${args[@]}"
+        dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj ${args[@]+"${args[@]}"}
     fi
 }
 
@@ -99,7 +106,7 @@ resolve_release_managed() {
 build_all() {
     local prod="${1:-false}"
     local bazaaragent="${2:-false}"
-    local args=(-t:BuildAll -verbosity detailed)
+    local args=(-t:BuildAll)
 
     if [[ "$prod" == "true" ]]; then
         args+=(-p:BuildProductionPackage=true)
@@ -127,10 +134,12 @@ build_all() {
 
 parse_build_options() {
     local bazaaragent=false
+    local fast=false
 
     while (($# > 0)); do
         case "$1" in
             --with-bazaaragent) bazaaragent=true ;;
+            --fast) fast=true ;;
             *)
                 usage
                 exit 1
@@ -139,7 +148,7 @@ parse_build_options() {
         shift
     done
 
-    build "$bazaaragent"
+    build "$bazaaragent" "$fast"
 }
 
 test_all() {
@@ -298,7 +307,7 @@ build_matrix() {
 usage() {
     cat <<EOF
 Usage:
-  $0 build [--with-bazaaragent]
+  $0 build [--with-bazaaragent] [--fast]
   $0 all [--prod] [--with-bazaaragent]
   $0 test
   $0 format
@@ -311,6 +320,7 @@ Usage:
 
 Options:
   --with-bazaaragent  Build and copy the optional BazaarAgent assemblies.
+  --fast              With build: skip NuGet restore (rerun without it after csproj edits or in a fresh worktree).
   --prod              With all: also build the production installer package.
 EOF
 }

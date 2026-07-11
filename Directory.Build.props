@@ -3,4 +3,15 @@
     <BppVersion>4.4.3</BppVersion>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
+
+  <!-- macOS-only build accelerator: hardlink copy-local and obj->bin copies
+       (measured: warm touch-rebuild 5.9s -> 2.2s). Must stay off on Windows:
+       there, builds that mix hardlink and plain-copy modes (IDE builds force
+       these properties off) overwrite THROUGH shared inodes, silently corrupting
+       the NuGet cache and the game's Managed dir. macOS File.Copy unlinks the
+       destination first, so mixed mode is safe on APFS. -->
+  <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+    <CreateHardLinksForCopyFilesToOutputDirectoryIfPossible>true</CreateHardLinksForCopyFilesToOutputDirectoryIfPossible>
+    <CreateHardLinksForCopyLocalIfPossible>true</CreateHardLinksForCopyLocalIfPossible>
+  </PropertyGroup>
 </Project>
