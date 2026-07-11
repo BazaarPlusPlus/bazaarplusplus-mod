@@ -404,6 +404,14 @@ try
         Activator.CreateInstance(ghostPayloadStoreType, ghostPayloadStorePath)
         ?? throw new InvalidOperationException("GhostBattlePayloadStore should be constructible.");
     InvokeVoid(ghostPayloadStoreType, ghostPayloadStore, "Save", [extractedPayload]);
+    var ghostPayloadFiles = Directory
+        .EnumerateFiles(ghostPayloadStorePath, "battle-001.ghost.mpack.gz*")
+        .Select(Path.GetFileName)
+        .ToArray();
+    Assert(
+        ghostPayloadFiles.SequenceEqual(["battle-001.ghost.mpack.gz"]),
+        "Ghost payload store should use the exact file name without leaving temp artifacts behind."
+    );
     var reloadedGhostPayload =
         Invoke<object?>(ghostPayloadStoreType, ghostPayloadStore, "Load", ["battle-001"])
         ?? throw new InvalidOperationException(
