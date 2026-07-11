@@ -25,7 +25,7 @@ namespace BazaarPlusPlus.Game.LiveBuildPanel;
 internal sealed class LiveBuildPanel : MonoBehaviour
 {
     private const string OverlayPanelId = "LiveBuildPanel";
-    private const int SupporterAttributionCount = 2;
+    private const int SupporterAttributionCount = 4;
 
     private static LiveBuildPanel? _instance;
     private readonly LiveCardSnapshotReader _reader = new();
