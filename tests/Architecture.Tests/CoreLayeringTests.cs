@@ -213,7 +213,7 @@ public class CoreLayeringTests
             StringComparison.Ordinal
         );
         var historyIndex = compositionSource.IndexOf(
-            "_mountables.Register(\n            new HistoryPanelMount",
+            "new HistoryPanelMount(",
             StringComparison.Ordinal
         );
         var liveBuildIndex = compositionSource.IndexOf(
@@ -222,6 +222,10 @@ public class CoreLayeringTests
         );
 
         Assert.True(hostIndex >= 0, "OverlayPanelHostMount registration should exist.");
+        Assert.True(
+            collectionIndex >= 0 && historyIndex >= 0 && liveBuildIndex >= 0,
+            "Every Main Overlay Panel mount registration should exist."
+        );
         Assert.True(
             hostIndex < collectionIndex && hostIndex < historyIndex && hostIndex < liveBuildIndex,
             "OverlayPanelHostMount must register before every Main Overlay Panel mount."
