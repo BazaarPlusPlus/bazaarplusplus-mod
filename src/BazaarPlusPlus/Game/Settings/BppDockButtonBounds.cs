@@ -53,6 +53,22 @@ internal readonly struct BppDockButtonBounds(float minX, float maxX, float minY,
         && MaxX > other.MinX
         && MinY < other.MaxY
         && MaxY > other.MinY;
+
+    internal BppDockButtonBounds Union(BppDockButtonBounds other)
+    {
+        if (!IsValid)
+            return other;
+
+        if (!other.IsValid)
+            return this;
+
+        return new BppDockButtonBounds(
+            Math.Min(MinX, other.MinX),
+            Math.Max(MaxX, other.MaxX),
+            Math.Min(MinY, other.MinY),
+            Math.Max(MaxY, other.MaxY)
+        );
+    }
 }
 
 internal readonly struct BppDockButtonObstacle(
@@ -64,4 +80,22 @@ internal readonly struct BppDockButtonObstacle(
     internal string Name { get; } = name;
     internal BppDockButtonBounds Bounds { get; } = bounds;
     internal bool IsActive { get; } = isActive;
+}
+
+internal static class BppDockButtonVisualFootprint
+{
+    internal const float VisibleAlphaThreshold = 0.01f;
+
+    internal static bool ShouldIncludeGraphic(
+        bool isEnabled,
+        bool isActiveBelowOwner,
+        float authoredAlpha,
+        bool belongsToOwner,
+        bool isInsideSettingsPanel
+    ) =>
+        isEnabled
+        && isActiveBelowOwner
+        && authoredAlpha > VisibleAlphaThreshold
+        && belongsToOwner
+        && !isInsideSettingsPanel;
 }

@@ -423,16 +423,25 @@ internal sealed partial class BppSettingsDockController
         }
 
         var key =
-            $"{plan.CanApply}:{plan.SettingsSlot}:{plan.BlockerName}:{Mathf.RoundToInt(plan.SettingsBounds.CenterX)}:{Mathf.RoundToInt(plan.SettingsBounds.CenterY)}";
+            $"{plan.CanApply}:{plan.FailureReason}:{plan.SettingsSlot}:{plan.BlockerName}:{Mathf.RoundToInt(plan.SettingsBounds.CenterX)}:{Mathf.RoundToInt(plan.SettingsBounds.CenterY)}";
         if (string.Equals(_lastAvoidanceLogKey, key, StringComparison.Ordinal))
             return;
 
         _lastAvoidanceLogKey = key;
         if (!plan.CanApply)
         {
+            if (plan.FailureReason == BppDockButtonLayoutFailureReason.MeasurementUnavailable)
+            {
+                BppLog.Debug(
+                    LogCategory,
+                    $"Dock layout measurement is not ready for '{_placement.Key}'; retrying."
+                );
+                return;
+            }
+
             BppLog.Warn(
                 LogCategory,
-                $"No visible dock slot is available for '{_placement.Key}'; retrying without applying an invalid desired position."
+                $"Dock layout is unavailable for '{_placement.Key}' reason={plan.FailureReason} blocker='{plan.BlockerName ?? "none"}'; retrying without applying an invalid desired position."
             );
             return;
         }
