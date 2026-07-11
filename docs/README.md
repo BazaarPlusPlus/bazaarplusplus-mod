@@ -25,14 +25,11 @@ This repo keeps the existing ADR convention instead of adding a duplicate `decis
 | [adr/0007](adr/0007-bazaaragent-external-replay-video-recording.md) | external replay video recording | accepted |
 | [adr/0008](adr/0008-replay-continue-as-agent-action.md) | replay continue as agent `Continue` action | accepted |
 
-## Active Plans
+## Future Work
 
-Only future work or items needing human confirmation belong in [plans/](plans/). Curated into here by consolidation runs; write new specs/designs/plans to [drafts/](drafts/):
+Task plans, feature requests, and bugs are tracked as **GitHub issues** (see [agents/issue-tracker.md](agents/issue-tracker.md)), not repo docs. The former `docs/plans/` directory was retired on 2026-07-11; its two remaining plans migrated verbatim to [#32](https://github.com/cauyxy/bazaarplusplus-mod/issues/32) (HistoryPanel hero portrait badges, `ready-for-agent`) and [#33](https://github.com/cauyxy/bazaarplusplus-mod/issues/33) (choice timeline in run bundles, `needs-info` pending §11 sign-off).
 
-- [plans/choice-timeline-run-bundle-plan.md](plans/choice-timeline-run-bundle-plan.md) — choice timeline in run bundles; awaiting sign-off on its §11 open decisions.
-- [plans/history-panel-hero-portrait-badge.md](plans/history-panel-hero-portrait-badge.md) — replace HistoryPanel text hero badges with portraits (reuse the shipped `GameInterop/HeroPortraits` provider).
-
-Swept on 2026-07-11: 4 implemented drafts (PR#17 collection search + cooldown tier rendering) archived; the 2 parked reverse-engineering proposals moved to [archive/reverse-engineering/](archive/reverse-engineering/). Earlier sweeps: 2026-07-10 (34 drafts + 6 stale plans against HEAD 7a68e8bb; the achievement system and package custom-art subsystem were deleted from the code on 2026-06-30, their plans archived as abandoned), 2026-06-12.
+[drafts/](drafts/) remains the write buffer for **knowledge documents only** — design records, root-cause analyses, decision/option analyses produced mid-session. Task plans do not go there. Consolidation runs sweep drafts into MEMORY/ADR/archive. (Sweeps: 2026-07-11, 2026-07-10, 2026-06-12.)
 
 ## Archive (`archive/`, frozen — never current)
 

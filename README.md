@@ -64,7 +64,7 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/Th
 - [docs/README.md](docs/README.md)：文档索引与生命周期说明。
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：当前实现的 living architecture（按主题组织，带代码证据）。
 - [docs/adr/](docs/adr/)：设计决策记录（本仓库沿用 ADR 目录作为 decision records）。
-- [docs/plans/](docs/plans/)：仍未落地或仍需人工确认的后续工作。
+- [GitHub Issues](https://github.com/cauyxy/bazaarplusplus-mod/issues)：后续工作、需求与 bug 追踪（`docs/plans/` 已于 2026-07-11 退役）。
 - [docs/archive/](docs/archive/)：已实现、已废弃或历史参考文档；归档内容只保留历史上下文，不再作为当前实现说明。
 
 ## License

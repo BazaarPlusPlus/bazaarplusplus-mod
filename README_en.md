@@ -66,7 +66,7 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/Th
 - [docs/README.md](docs/README.md): documentation index and lifecycle rules.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): living architecture for the current implementation, organized by topic and grounded in code paths.
 - [docs/adr/](docs/adr/): architecture decision records. This repository keeps the existing ADR convention instead of a separate `docs/decisions/` tree.
-- [docs/plans/](docs/plans/): active or needs-human-decision future work only.
+- [GitHub Issues](https://github.com/cauyxy/bazaarplusplus-mod/issues): future work, feature requests, and bug tracking (the `docs/plans/` directory was retired on 2026-07-11).
 - [docs/archive/](docs/archive/): implemented, superseded, or historical documents. Archived content is not current implementation guidance.
 
 ## License
