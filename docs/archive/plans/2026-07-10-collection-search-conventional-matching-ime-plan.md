@@ -1,3 +1,12 @@
+---
+status: implemented
+archived: 2026-07-11
+calibrated: 2026-07-11
+superseded-by: code
+---
+
+> Status: IMPLEMENTED. All checkboxes completed and merged with PR#17 (collection search + tier tooltips). Companion design doc: [../design/2026-07-10-collection-search-conventional-matching-ime.md](../design/2026-07-10-collection-search-conventional-matching-ime.md).
+
 # Collection Conventional Search And IME Plan
 
 - [x] Add regression tests: Latin queries require contiguous text; exact partial words still

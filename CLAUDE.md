@@ -122,7 +122,9 @@ The five canonical triage labels are used as-is: `needs-triage`, `needs-info`, `
 
 ### Domain docs
 
-Single-context: vocabulary in `CONTEXT.md` at the root, decisions in `docs/adr/`. See `docs/agents/domain.md`.
+Single-context: vocabulary in `CONTEXT.md` at the root, decisions in `docs/adr/`. See `docs/agents/domain.md`. The full documentation map is `docs/README.md`.
+
+Durable project knowledge lives in `docs/MEMORY.md` (load first) with detail in `docs/ARCHITECTURE.md` (the structure/overview layer). `docs/archive/` is historical, never current. Write new specs, designs, and plans to `docs/drafts/` — a periodic consolidation run sweeps it. Day-to-day edit policy: `docs/ARCHITECTURE.md` and `docs/adr/` may be corrected anytime; `MEMORY.md`, `docs/plans/`, and `docs/README.md` are curated ONLY by consolidation runs — new knowledge goes to `drafts/`, not into them directly. Rationale lives only in `docs/adr/`; elsewhere link, don't restate. Keep `MEMORY.md` under 200 lines: merge, don't append. Boundaries: AGENTS.md/CLAUDE.md = process, MEMORY.md = knowledge, ARCHITECTURE.md = structure.
 
 # Rules Hygiene
 
@@ -154,8 +156,3 @@ Rules emerge from validated patterns, not one-off observations. The workflow is:
 2. Team validates the pattern in code review
 3. A dedicated commit adds the rule with context on why it exists
 
-## Domain docs
-
-Single-context: project vocabulary lives in `CONTEXT.md`, design decisions in `docs/adr/`. The full documentation map is `docs/README.md`.
-
-Durable project knowledge lives in `docs/MEMORY.md` (load first) with detail in `docs/ARCHITECTURE.md` (the structure/overview layer) and the index in `docs/INDEX.md`. `docs/archive/` is historical, never current. Write new specs, designs, and plans to `docs/drafts/` — a periodic consolidation run sweeps it. Day-to-day edit policy: `docs/ARCHITECTURE.md` and `docs/adr/` may be corrected anytime; `MEMORY.md`, `docs/plans/`, and `INDEX.md` are curated ONLY by consolidation runs — new knowledge goes to `drafts/`, not into them directly. Rationale lives only in `docs/adr/`; elsewhere link, don't restate. Keep `MEMORY.md` under 200 lines: merge, don't append. Boundaries: AGENTS.md/CLAUDE.md = process, MEMORY.md = knowledge, ARCHITECTURE.md = structure.

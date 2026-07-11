@@ -16,7 +16,8 @@ The on-demand, pull-based read of the player's *current* run/encounter state (`I
 _Avoid_: encounter tracker, run timeline (deliberately not built — see [ADR-0001](docs/adr/0001-encounter-status-probe-not-timeline-tracker.md))
 
 **Run Snapshot Probe（运行快照探针）**:
-对「当前 run 的可记录事实」（天数/小时/胜负/英雄/模式、玩家五属性、段位、排行榜名次）的按需拉取读取，由 `IRunSnapshotProbe`（Core）+ `GameInterop/RunSnapshot` 适配器承载，按读取成本分方法。RunLogging 与 Screenshots 的记录构造是消费快照的纯映射器，不再直读游戏全局。
+对「当前 run 的可记录事实」（天数/小时/胜负/英雄/模式、玩家五属性、段位、排行榜名次）的按需拉取读取。消费方把快照映射成自己的记录，不直读游戏全局。
+_Avoid_: run tracker、直读全局状态
 
 ## Overlay panels
 
@@ -31,7 +32,7 @@ _Avoid_: panel mutex (the deleted `BppOverlayPanelMutex` predecessor)
 ## Settings dock
 
 **Cycling Settings Dock Entry（循环设置项）**:
-settings dock 中「点击在有序值阶梯上循环、越省缺即高亮、渲染本地化状态」的统一概念，由 `CyclingSettingsDockEntry<T>` 承载；功能侧只贡献数据（阶梯 + 读写 + 文案 + 可选 nextOverride/onChanged）。bool 开关是 `Toggle` 工厂承载的二值特例。动作按钮与锁定开关（局末截图的强制锁开策略）不属于此概念。
+settings dock 中「点击在有序值阶梯上循环、偏离默认值即高亮、渲染本地化状态」的设置项统一概念；功能侧只贡献数据，不写行为类。bool 开关是它的二值特例。动作按钮与锁定开关（局末截图的强制锁开策略）不属于此概念。
 
 ## Collection sources
 

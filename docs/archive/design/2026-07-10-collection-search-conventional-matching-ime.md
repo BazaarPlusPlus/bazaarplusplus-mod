@@ -1,3 +1,12 @@
+---
+status: implemented
+archived: 2026-07-11
+calibrated: 2026-07-11
+superseded-by: code
+---
+
+> Status: IMPLEMENTED. The recommended language-aware option A shipped with PR#17: contiguous Latin matching plus exact initialisms (`CollectionCardSearch.cs:38-65`), IME composition pausing the search debounce via `Keyboard.onIMECompositionChange` (`CollectionPanel.cs:465`), and text search flowing through the normal filter pipeline. Retained as the option-analysis record.
+
 # Collection conventional search and IME handling
 
 ## Background

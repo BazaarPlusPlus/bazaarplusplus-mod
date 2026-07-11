@@ -1,3 +1,12 @@
+---
+status: implemented
+archived: 2026-07-11
+calibrated: 2026-07-11
+superseded-by: code
+---
+
+> Status: IMPLEMENTED. Approach 1 shipped with PR#17: two-tier cooldowns use the native fusing layout (`CollectionTierTooltipPatch.cs:79` `SetCooldown(values[0], canFuse: true, values[1])`), longer chains use the compact merged string (`:83` `MergeCooldown`). Retained as the design-decision record.
+
 # Collection cooldown tier rendering
 
 ## Background

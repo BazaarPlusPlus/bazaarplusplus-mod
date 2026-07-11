@@ -1,8 +1,11 @@
 ---
-status: needs-human-decision
+status: parked
+archived: 2026-07-11
 calibrated: 2026-06-10
 note: "Unimplemented reverse-engineering proposal. Claims require current decompiled/game-runtime verification before implementation."
 ---
+
+> Status: PARKED (2026-07-11 consolidation). Aspirational proposal, not abandoned — no work planned short-term, so it moved out of active plans. Reopening requires re-verifying every claim against current `decompiled/` output first.
 
 # 本地运行与离线化方案
 

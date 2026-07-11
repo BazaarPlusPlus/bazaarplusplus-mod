@@ -1,3 +1,12 @@
+---
+status: implemented
+archived: 2026-07-11
+calibrated: 2026-07-11
+superseded-by: code
+---
+
+> Status: IMPLEMENTED with PR#17. `AddSearchTexts` indexes only localized + authored text (`CollectionLocalizationResolver.cs:78-79`); `TLocalizableText.Key` survives only as a display fallback in `PickText` (`:90`), never as a search variant. Retained as the root-cause record.
+
 # Collection search localization hash leakage
 
 ## Background
