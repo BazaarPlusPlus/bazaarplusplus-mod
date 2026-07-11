@@ -14,7 +14,7 @@ internal static class HeroPortraitSpriteProvider
 {
     private const string LogComponent = "HeroPortrait";
 
-    private static readonly AsyncLoadCache<EHero, Sprite> Portraits = new(LoadPortraitAsync);
+    private static readonly AsyncLoadCache<EHero, Sprite> Portraits = new(LoadPortraitCoreAsync);
 
     internal static bool IsRenderableHero(EHero hero) =>
         hero != EHero.Common && !string.Equals(hero.ToString(), "Hero8", StringComparison.Ordinal);
@@ -33,7 +33,7 @@ internal static class HeroPortraitSpriteProvider
         return Portraits.GetOrLoadAsync(hero);
     }
 
-    private static async Task<AsyncLoadResult<Sprite>> LoadPortraitAsync(EHero hero)
+    private static async Task<AsyncLoadResult<Sprite>> LoadPortraitCoreAsync(EHero hero)
     {
         Sprite? result = null;
         var shouldCache = false;
