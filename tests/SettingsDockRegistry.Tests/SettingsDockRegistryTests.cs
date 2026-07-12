@@ -10,6 +10,7 @@ using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.QuestRewardPreview;
 using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
@@ -17,6 +18,7 @@ using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Localization;
+using BazaarPlusPlus.Patches;
 using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -329,6 +331,150 @@ public class SettingsDockRegistryTests
 
         Assert.True(definition.IsActive());
         Assert.True(definition.ReadToggle!());
+    }
+
+    [Fact]
+    public void QuestRewardPreviewDockEntry_persists_off_on_off_without_changing_event_preview()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-quest-reward-preview-toggle-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            var configFile = new ConfigFile(configPath, saveOnInit: false);
+            var config = new BppConfig();
+            config.Initialize(configFile);
+            var questDefinition = QuestRewardPreviewSettingsDockEntry.Create().Build(config);
+            var eventDefinition = EventPreviewSettingsDockEntry.Create().Build(config);
+
+            Assert.False(questDefinition.ReadToggle!());
+            Assert.True(eventDefinition.ReadToggle!());
+
+            questDefinition.WriteToggle!(true);
+            configFile.Save();
+
+            var reloadedFile = new ConfigFile(configPath, saveOnInit: false);
+            var reloaded = new BppConfig();
+            reloaded.Initialize(reloadedFile);
+            Assert.True(reloaded.EnableQuestRewardPreviewConfig!.Value);
+            Assert.True(reloaded.EnableEventPreviewConfig!.Value);
+
+            var reloadedEventDefinition = EventPreviewSettingsDockEntry.Create().Build(reloaded);
+            var reloadedQuestDefinition = QuestRewardPreviewSettingsDockEntry
+                .Create()
+                .Build(reloaded);
+            reloadedEventDefinition.WriteToggle!(false);
+            Assert.True(reloadedQuestDefinition.ReadToggle!());
+
+            reloadedQuestDefinition.WriteToggle!(false);
+            reloadedFile.Save();
+
+            var finalFile = new ConfigFile(configPath, saveOnInit: false);
+            var finalConfig = new BppConfig();
+            finalConfig.Initialize(finalFile);
+            Assert.False(finalConfig.EnableQuestRewardPreviewConfig!.Value);
+            Assert.False(finalConfig.EnableEventPreviewConfig!.Value);
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
+    public void QuestRewardPreviewGate_reads_only_quest_reward_preview_config()
+    {
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-quest-reward-preview-gate-{Guid.NewGuid():N}.cfg"
+        );
+        try
+        {
+            var config = new BppConfig();
+            config.Initialize(new ConfigFile(configPath, saveOnInit: false));
+            BppPatchHost.Install(new ContractTestServices(config));
+
+            Assert.False(QuestRewardPreviewGate.IsEnabled());
+
+            config.EnableEventPreviewConfig!.Value = false;
+            Assert.False(QuestRewardPreviewGate.IsEnabled());
+
+            config.EnableQuestRewardPreviewConfig!.Value = true;
+            Assert.True(QuestRewardPreviewGate.IsEnabled());
+
+            config.EnableEventPreviewConfig.Value = true;
+            Assert.True(QuestRewardPreviewGate.IsEnabled());
+        }
+        finally
+        {
+            BppPatchHost.Reset();
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
+    }
+
+    [Fact]
+    public void SettingsDockOrder_is_unique_and_keeps_bilingual_names_after_quest_preview()
+    {
+        var ordered = new[]
+        {
+            ("NameOverride", BppSettingsDockOrder.NameOverride),
+            ("LegendaryPosition", BppSettingsDockOrder.LegendaryPosition),
+            ("EnchantPreview", BppSettingsDockOrder.EnchantPreview),
+            ("EventPreview", BppSettingsDockOrder.EventPreview),
+            ("QuestRewardPreview", BppSettingsDockOrder.QuestRewardPreview),
+            ("CombatStatusBar", BppSettingsDockOrder.CombatStatusBar),
+            ("BilingualItemNames", BppSettingsDockOrder.BilingualItemNames),
+            ("ChineseLocaleMode", BppSettingsDockOrder.ChineseLocaleMode),
+            ("UiFont", BppSettingsDockOrder.UiFont),
+            ("FixedSupporterList", BppSettingsDockOrder.FixedSupporterList),
+            ("VoiceSubtitles", BppSettingsDockOrder.VoiceSubtitles),
+            ("VoiceSubtitlesPosition", BppSettingsDockOrder.VoiceSubtitlesPosition),
+            ("VoiceSubtitlesEnglishFontScale", BppSettingsDockOrder.VoiceSubtitlesEnglishFontScale),
+            ("VoiceSubtitlesChineseFontScale", BppSettingsDockOrder.VoiceSubtitlesChineseFontScale),
+            ("EndOfRunScreenshot", BppSettingsDockOrder.EndOfRunScreenshot),
+            ("GameHistory", BppSettingsDockOrder.GameHistory),
+            ("BazaarDbUpload", BppSettingsDockOrder.BazaarDbUpload),
+        };
+
+        Assert.Equal(Enumerable.Range(0, ordered.Length), ordered.Select(item => item.Item2));
+        Assert.Contains(ordered, item => item.Item1 == "BilingualItemNames");
+    }
+
+    [Fact]
+    public void ToggleRowGrouping_keeps_odd_toggle_and_leaves_following_non_toggle_rows_untouched()
+    {
+        var groups = BppNativeSettingsSectionController.PlanToggleRowGroups(
+            new[]
+            {
+                BppSettingsControlKind.Toggle,
+                BppSettingsControlKind.Toggle,
+                BppSettingsControlKind.Toggle,
+                BppSettingsControlKind.Choice,
+                BppSettingsControlKind.Action,
+            }
+        );
+
+        Assert.Equal(new (int LeftIndex, int? RightIndex)[] { (0, 1), (2, null) }, groups);
+        Assert.Single(groups, group => !group.RightIndex.HasValue);
+        Assert.DoesNotContain(groups, group => group.LeftIndex >= 3 || group.RightIndex >= 3);
+    }
+
+    [Fact]
+    public void ToggleRowGrouping_preserves_existing_paired_toggle_layout()
+    {
+        var groups = BppNativeSettingsSectionController.PlanToggleRowGroups(
+            new[]
+            {
+                BppSettingsControlKind.Toggle,
+                BppSettingsControlKind.Toggle,
+                BppSettingsControlKind.Choice,
+            }
+        );
+
+        Assert.Equal(new (int LeftIndex, int? RightIndex)[] { (0, 1) }, groups);
     }
 
     [Fact]
@@ -989,6 +1135,14 @@ public class SettingsDockRegistryTests
         "true>false>true"
     )]
     [InlineData(
+        "QuestRewardPreview",
+        BppSettingsDockOrder.QuestRewardPreview,
+        "Quest Reward Preview",
+        "任务奖励预览",
+        "OFF>ON>OFF",
+        "false>true>false"
+    )]
+    [InlineData(
         "CombatStatusBar",
         BppSettingsDockOrder.CombatStatusBar,
         "Combat Status Bar",
@@ -1161,6 +1315,7 @@ public class SettingsDockRegistryTests
             "LegendaryPositionDisplay" => LegendaryPositionSettingsDockEntry.Create(() => { }),
             "EnchantPreview" => ItemEnchantPreviewSettingsDockEntry.Create(),
             "EventPreview" => EventPreviewSettingsDockEntry.Create(),
+            "QuestRewardPreview" => QuestRewardPreviewSettingsDockEntry.Create(),
             "CombatStatusBar" => CombatStatusBarSettingsDockEntry.Create(),
             "BilingualItemNames" => BilingualItemNamesSettingsDockEntry.Create(),
             "ChineseLocaleMode" => ChineseLocaleModeSettingsDockEntry.Create(

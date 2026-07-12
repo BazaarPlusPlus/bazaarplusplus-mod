@@ -20,6 +20,7 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
     private const string RowObjectPrefix = "BPP_SettingsRow_";
     private const string ToggleGroupSpacerObjectName = "BPP_SettingsToggleGroupSpacer";
     private const string TogglePairObjectPrefix = "BPP_SettingsTogglePair_";
+    private const string TogglePairFillerObjectName = "BPP_SettingsTogglePairFiller";
     private const float ToggleColumnSpacing = 24f;
     private const float SplitContainerExtraHeight = 24f;
 
@@ -652,20 +653,19 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
     private void GroupToggleRows(RectTransform sectionRoot)
     {
         var pairIndex = 0;
-        for (var index = 0; index + 1 < _rows.Count; index += 2)
-        {
-            var left = _rows[index];
-            var right = _rows[index + 1];
-            if (
-                left.Definition.ControlKind != BppSettingsControlKind.Toggle
-                || right.Definition.ControlKind != BppSettingsControlKind.Toggle
-            )
-                break;
+        var controlKinds = new BppSettingsControlKind[_rows.Count];
+        for (var index = 0; index < _rows.Count; index++)
+            controlKinds[index] = _rows[index].Definition.ControlKind;
 
-            var preferredHeight = Math.Max(
-                ResolveRowHeight(left.Root),
-                ResolveRowHeight(right.Root)
-            );
+        foreach (var group in PlanToggleRowGroups(controlKinds))
+        {
+            var left = _rows[group.LeftIndex];
+            var right = group.RightIndex.HasValue ? _rows[group.RightIndex.Value] : null;
+
+            var preferredHeight =
+                right == null
+                    ? ResolveRowHeight(left.Root)
+                    : Math.Max(ResolveRowHeight(left.Root), ResolveRowHeight(right.Root));
             var siblingIndex = left.Root.GetSiblingIndex();
             if (pairIndex == 0)
                 CreateToggleGroupSpacer(sectionRoot, siblingIndex++);
@@ -694,9 +694,51 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             pairElement.flexibleWidth = 1f;
 
             left.Root.SetParent(pairRect, worldPositionStays: false);
-            right.Root.SetParent(pairRect, worldPositionStays: false);
+            if (right != null)
+                right.Root.SetParent(pairRect, worldPositionStays: false);
+            else
+                CreateTogglePairFiller(pairRect, left.Root);
             pairIndex++;
         }
+    }
+
+    internal static IReadOnlyList<(int LeftIndex, int? RightIndex)> PlanToggleRowGroups(
+        IReadOnlyList<BppSettingsControlKind> controlKinds
+    )
+    {
+        var groups = new List<(int LeftIndex, int? RightIndex)>();
+        for (var index = 0; index < controlKinds.Count; index += 2)
+        {
+            if (controlKinds[index] != BppSettingsControlKind.Toggle)
+                break;
+
+            var rightIndex =
+                index + 1 < controlKinds.Count
+                && controlKinds[index + 1] == BppSettingsControlKind.Toggle
+                    ? index + 1
+                    : (int?)null;
+            groups.Add((index, rightIndex));
+            if (!rightIndex.HasValue)
+                break;
+        }
+
+        return groups;
+    }
+
+    private static void CreateTogglePairFiller(RectTransform pairRoot, RectTransform leftRow)
+    {
+        var fillerObject = new GameObject(
+            TogglePairFillerObjectName,
+            typeof(RectTransform),
+            typeof(LayoutElement)
+        );
+        var fillerRect = fillerObject.GetComponent<RectTransform>();
+        fillerRect.SetParent(pairRoot, worldPositionStays: false);
+
+        var fillerElement = fillerObject.GetComponent<LayoutElement>();
+        fillerElement.minWidth = LayoutUtility.GetMinWidth(leftRow);
+        fillerElement.preferredWidth = LayoutUtility.GetPreferredWidth(leftRow);
+        fillerElement.flexibleWidth = LayoutUtility.GetFlexibleWidth(leftRow);
     }
 
     private static void CreateToggleGroupSpacer(RectTransform sectionRoot, int siblingIndex)

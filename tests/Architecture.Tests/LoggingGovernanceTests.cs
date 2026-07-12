@@ -171,7 +171,7 @@ public sealed class LoggingGovernanceTests
             ["Game/Settings/BppDockButtonSpriteProvider.cs"] = "41:Warn,62:Warn",
             ["Game/Settings/BppNativeSettingsButtonClone.cs"] = "72:Debug",
             ["Game/Settings/BppNativeSettingsSectionController.cs"] =
-                "94:Warn,108:Warn,115:Warn,169:Info,193:Error,444:Warn,459:Warn,466:Info,476:Info,483:Warn,534:Info",
+                "95:Warn,109:Warn,116:Warn,170:Info,194:Error,445:Warn,460:Warn,467:Info,477:Info,484:Warn,535:Info",
             ["Game/Supporters/BPPSupporterCatalog.cs"] =
                 "118:Info,125:Warn,163:Info,170:Warn,186:Warn",
             ["Game/Tooltips/CardTooltipDataFactory.cs"] = "135:Warn",
@@ -230,7 +230,7 @@ public sealed class LoggingGovernanceTests
             ["Patches/Tooltips/HeroLevelRewardsTooltipPatch.cs"] =
                 "42:Debug,74:Debug,86:Debug,98:Error",
             ["Patches/Tooltips/ItemEnchantPreviewPatch.cs"] = "87:Error",
-            ["Patches/Tooltips/QuestRewardPreviewTooltipPatch.cs"] = "67:Error",
+            ["Patches/Tooltips/QuestRewardPreviewTooltipPatch.cs"] = "71:Error",
             ["Plugin.cs"] =
                 "47:Info,58:Info,60:Warn,66:Info,83:Info,85:Info,87:Info,91:Error,149:Error,211:Warn,221:Info,226:Info,246:Error,251:Warn,255:Info",
         };

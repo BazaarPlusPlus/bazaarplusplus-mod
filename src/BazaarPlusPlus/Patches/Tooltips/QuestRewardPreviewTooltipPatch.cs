@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
+using BazaarPlusPlus.Game.QuestRewardPreview;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
@@ -32,6 +33,9 @@ internal static class QuestRewardPreviewTooltipPatch
     {
         try
         {
+            if (!QuestRewardPreviewGate.IsEnabled())
+                return;
+
             // The native icon remains useful as a compact reward marker, but unlocked tooltips
             // cannot enter its nested hover. Keep the reward text inline on every tooltip surface.
             if (DescriptionTextField?.GetValue(__instance) is not TMP_Text descriptionText)
