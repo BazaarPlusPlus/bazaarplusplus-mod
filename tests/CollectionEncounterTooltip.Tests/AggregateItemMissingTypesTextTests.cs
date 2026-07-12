@@ -72,7 +72,7 @@ public sealed class AggregateItemMissingTypesTextTests
         );
 
         Assert.Equal(
-            "This has the Types of items you have.\n<size=65%>Missing Types: Food, Tool</size>",
+            "This has the Types of items you have.\n<line-height=70%><size=65%>Missing Types: Food, Tool</size>",
             content
         );
     }
