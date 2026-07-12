@@ -5,11 +5,13 @@
 // `decompile-all-ptr` refresh — a failure here means a seam premise drifted.
 #nullable enable
 var repoRoot = FindRepoRoot();
+var decompiledSourceRoot =
+    Environment.GetEnvironmentVariable("BPP_DECOMPILED_SOURCE_ROOT") ?? repoRoot;
 var failures = new List<string>();
 
 CheckTree(
     "online (decompiled/)",
-    Path.Combine(repoRoot, "decompiled"),
+    Path.Combine(decompiledSourceRoot, "decompiled"),
     netMessageProcessor =>
     {
         // NetMessageDispatchSeam premise: online has no private Receive funnel, the
@@ -35,14 +37,7 @@ CheckTree(
     },
     (root, tree) =>
     {
-        // Convergence trigger: when a refreshed online tree loses this method, the
-        // PTR cosmetics layout was promoted — do plan PR4 (repoint
-        // RandomHeroSkinPoolTogglePatch to CosmeticsPanelController, retire the skip).
-        Require(
-            ReadTreeFile(root, tree, "TheBazaar", "CosmeticsListManager.cs"),
-            "OnRandomizeToggleChanged",
-            "RandomHeroSkinPoolTogglePatch online target (failure = PTR layout promoted, do PR4)"
-        );
+        CheckNativePoolPremises(root, tree);
         // GameBuildInfoResolver probe premise: ServerOption must stay PTR-only. If it
         // appears in online, the resolver would classify online as Ptr on the probe
         // side and (per the disagreement rule) pause uploads — revisit the resolver.
@@ -56,7 +51,7 @@ CheckTree(
 
 CheckTree(
     "PTR (decompiled-vptr/)",
-    Path.Combine(repoRoot, "decompiled-vptr"),
+    Path.Combine(decompiledSourceRoot, "decompiled-vptr"),
     netMessageProcessor =>
     {
         Require(
@@ -77,16 +72,7 @@ CheckTree(
     },
     (root, tree) =>
     {
-        RequireAbsent(
-            ReadTreeFile(root, tree, "TheBazaar", "CosmeticsListManager.cs"),
-            "OnRandomizeToggleChanged",
-            "PTR CosmeticsListManager must lack the toggle handler (Prepare()-skip premise)"
-        );
-        Require(
-            ReadTreeFile(root, tree, "TheBazaar", "CosmeticsPanelController.cs"),
-            "OnRandomizeToggleChanged",
-            "PTR relocated toggle handler (PR4 target)"
-        );
+        CheckNativePoolPremises(root, tree);
         Require(
             ReadTreeFile(root, tree, "TheBazaar", "Config.cs"),
             "class ServerOption",
@@ -105,6 +91,37 @@ if (failures.Count > 0)
 
 Console.WriteLine("PTR compatibility checks passed.");
 return;
+
+void CheckNativePoolPremises(string root, string tree)
+{
+    var cosmeticsList = ReadTreeFile(root, tree, "TheBazaar", "CosmeticsListManager.cs");
+    Require(cosmeticsList, "void FetchCosmetics(", "native collectible session boundary");
+    Require(cosmeticsList, "void EquipItem(EquipableItem item)", "native collectible click seam");
+
+    var cosmeticItem = ReadTreeFile(root, tree, "TheBazaar", "CosmeticItem.cs");
+    Require(cosmeticItem, "void SetData(", "native collectible registration seam");
+    Require(cosmeticItem, "void SetEquipState(bool state)", "native collectible visual seam");
+
+    var collectionManager = ReadTreeFile(root, tree, "TheBazaar", "CollectionManager.cs");
+    Require(
+        collectionManager,
+        "void SetRandomizeLoadout(EHero hero, bool randomize)",
+        "online/PTR shared randomized-loadout mode seam"
+    );
+
+    var heroItem = ReadTreeFile(root, tree, string.Empty, "HeroItemView.cs");
+    Require(heroItem, "void Start()", "native hero-card initialization seam");
+    Require(heroItem, "void OnItemSelected(bool showVisuals = true)", "native hero click seam");
+    Require(heroItem, "void UpdateView(EHero selectedHero)", "native hero visual update seam");
+
+    var heroSelect = ReadTreeFile(root, tree, "TheBazaar.UI", "HeroSelectButtonsView.cs");
+    Require(
+        heroSelect,
+        "bool _isProgrammaticSelection",
+        "native programmatic hero-selection marker"
+    );
+    Require(heroSelect, "void OnHeroPurchased(EHero hero)", "native hero-purchase selection seam");
+}
 
 void CheckTree(
     string label,

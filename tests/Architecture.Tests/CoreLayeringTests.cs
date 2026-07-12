@@ -1182,6 +1182,78 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Random_pools_reuse_native_cards_without_legacy_or_per_card_ui()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var lobbyRoot = Path.Combine(mainSource, "Game", "Lobby");
+        var heroRoot = Path.Combine(lobbyRoot, "RandomHeroPool");
+        var collectibleRoot = Path.Combine(lobbyRoot, "RandomHeroSkinPool");
+
+        Assert.False(File.Exists(Path.Combine(lobbyRoot, "LobbyPanelLayout.cs")));
+        Assert.False(File.Exists(Path.Combine(heroRoot, "RandomHeroPoolPanelController.cs")));
+        Assert.False(
+            File.Exists(Path.Combine(collectibleRoot, "RandomHeroSkinPoolPanelController.cs"))
+        );
+
+        var heroController = File.ReadAllText(
+            Path.Combine(heroRoot, "RandomHeroPoolNativeController.cs")
+        );
+        var collectibleController = File.ReadAllText(
+            Path.Combine(collectibleRoot, "RandomHeroSkinPoolNativeController.cs")
+        );
+        var patchSource = string.Join(
+            "\n",
+            File.ReadAllText(
+                Path.Combine(mainSource, "Patches", "Lobby", "RandomHeroPoolPatches.cs")
+            ),
+            File.ReadAllText(
+                Path.Combine(mainSource, "Patches", "Lobby", "RandomHeroSkinPoolPatches.cs")
+            )
+        );
+        var replacementSource = string.Join(
+            "\n",
+            heroController,
+            collectibleController,
+            patchSource
+        );
+
+        Assert.DoesNotContain("BPP_RandomHeroPoolPanel", replacementSource);
+        Assert.DoesNotContain("BPP_RandomCollectiblePoolPanel", replacementSource);
+        Assert.DoesNotContain("new GameObject", replacementSource);
+        Assert.DoesNotContain("UnityEngine.UI.Button", replacementSource);
+        Assert.DoesNotContain("TextMeshPro", replacementSource);
+        Assert.DoesNotContain("Outline", replacementSource);
+        Assert.DoesNotContain("item.gameObject.AddComponent", replacementSource);
+        Assert.Contains(
+            "view.gameObject.AddComponent<RandomHeroPoolNativeController>()",
+            heroController
+        );
+        Assert.Contains(
+            "view.gameObject.AddComponent<RandomHeroSkinPoolNativeController>()",
+            collectibleController
+        );
+    }
+
+    [Fact]
+    public void Random_pool_preference_keys_remain_account_scoped_and_stable()
+    {
+        var lobbyRoot = Path.Combine(MainSourceRoot(RepoRoot()), "Game", "Lobby");
+        var heroPrefs = File.ReadAllText(
+            Path.Combine(lobbyRoot, "RandomHeroPool", "RandomHeroPoolPlayerPrefs.cs")
+        );
+        var collectiblePrefs = File.ReadAllText(
+            Path.Combine(lobbyRoot, "RandomHeroSkinPool", "RandomHeroSkinPoolPlayerPrefs.cs")
+        );
+
+        Assert.Contains("BPP.RandomHeroPool.Selected", heroPrefs);
+        Assert.Contains("BPP.RandomCollectiblePool.Selected", collectiblePrefs);
+        Assert.Contains("ResolveAccountScopeForPrefs", heroPrefs);
+        Assert.Contains("ResolveAccountScopeForPrefs", collectiblePrefs);
+        Assert.Contains("collectionType.ToString()", collectiblePrefs);
+        Assert.Contains("hero.ToString()", collectiblePrefs);
+    }
+
+    [Fact]
     public void Capture_modules_use_ui_chrome_suppression_seam()
     {
         var repoRoot = RepoRoot();
