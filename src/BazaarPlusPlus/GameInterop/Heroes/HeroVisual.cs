@@ -6,9 +6,8 @@ namespace BazaarPlusPlus.GameInterop.Heroes;
 
 /// <summary>
 /// Shared hero identity badge resolver: maps a hero name (<c>EHero.ToString()</c>) to a short
-/// code, brand background color, and a luminance-picked text color. Extracted so HistoryPanel,
-/// RandomHeroPool, and LiveBuildPanel consume one source of truth instead of each hand-rolling
-/// the mapping (it had already drifted — RandomHeroPool inlined raw RGB literals).
+/// code, brand background color, and a luminance-picked text color. HistoryPanel and
+/// LiveBuildPanel consume one source of truth instead of hand-rolling the mapping.
 /// </summary>
 internal static class HeroVisual
 {
