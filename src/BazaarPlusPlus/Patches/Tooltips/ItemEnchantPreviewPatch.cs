@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.GameState;
-using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Infrastructure;
@@ -14,8 +13,7 @@ using TheBazaar.UI.Tooltips;
 
 namespace BazaarPlusPlus.Patches.Tooltips;
 
-// Owns every BPP text section rendered beneath the native passive-effect block.
-// One postfix avoids cross-feature HideAll/order races on this pooled controller.
+// Renders the enchant preview beneath the native passive-effect block.
 [HarmonyPatch(
     typeof(CardTooltipController),
     nameof(CardTooltipController.RenderPassiveEffectTextBlock)
@@ -45,26 +43,21 @@ internal static class BppTooltipSectionRenderPatch
     };
 
     [HarmonyPostfix]
-    private static void Postfix(CardTooltipController __instance, string text)
+    [HarmonyPriority(Priority.Last)]
+    private static void Postfix(
+        CardTooltipController __instance,
+        string text,
+        List<CardQuestGroupData>? questData
+    )
     {
         try
         {
-            BppTooltipSections.HideAll(__instance);
-            TooltipLayerOverride.SetElevated(__instance, elevated: false);
-            if (BppTooltipSectionResetState.IsResetting(__instance))
-                return;
+            ItemEnchantPreviewTooltipLifecycle.Hide(__instance);
 
-            var encounterContent = EncounterEventTooltipPatch.BuildContent(__instance);
-            if (!string.IsNullOrEmpty(encounterContent))
-            {
-                BppTooltipSections.TryShow(
-                    __instance,
-                    EncounterEventTooltipPatch.SectionKey,
-                    __instance.passiveEffectParent,
-                    encounterContent!
-                );
+            // ResetValues is the only native caller that passes null quest data.
+            // Bail out before reading CurrentTooltipData, which is still stale then.
+            if (questData == null)
                 return;
-            }
 
             var enchantContent = BuildEnchantContent(__instance);
             if (string.IsNullOrEmpty(enchantContent))
@@ -128,11 +121,11 @@ internal static class BppTooltipSectionResetPatch
 {
     [HarmonyPrefix]
     private static void Prefix(CardTooltipController __instance) =>
-        BppTooltipSectionResetState.Enter(__instance);
+        ItemEnchantPreviewTooltipLifecycle.Hide(__instance);
 
-    [HarmonyPostfix]
-    private static void Postfix(CardTooltipController __instance) =>
-        BppTooltipSectionResetState.Exit(__instance);
+    [HarmonyFinalizer]
+    private static void Finalizer(CardTooltipController __instance) =>
+        ItemEnchantPreviewTooltipLifecycle.Hide(__instance);
 }
 
 [HarmonyPatch(typeof(CardTooltipController), nameof(CardTooltipController.ClearCurrentCard))]
@@ -140,7 +133,7 @@ internal static class BppTooltipSectionClearPatch
 {
     [HarmonyPrefix]
     private static void Prefix(CardTooltipController __instance) =>
-        BppTooltipSectionLifecycle.Hide(__instance);
+        ItemEnchantPreviewTooltipLifecycle.Hide(__instance);
 }
 
 [HarmonyPatch(typeof(CardTooltipController), "OnDisable")]
@@ -148,7 +141,7 @@ internal static class BppTooltipSectionDisablePatch
 {
     [HarmonyPrefix]
     private static void Prefix(CardTooltipController __instance) =>
-        BppTooltipSectionLifecycle.Hide(__instance);
+        ItemEnchantPreviewTooltipLifecycle.Hide(__instance);
 }
 
 [HarmonyPatch(typeof(CardTooltipController), nameof(CardTooltipController.OnDestroy))]
@@ -157,31 +150,23 @@ internal static class BppTooltipSectionDestroyPatch
     [HarmonyPrefix]
     private static void Prefix(CardTooltipController __instance)
     {
-        BppTooltipSectionResetState.Exit(__instance);
         TooltipLayerOverride.SetElevated(__instance, elevated: false);
         BppTooltipSections.ReleaseAll(__instance);
     }
 }
 
-internal static class BppTooltipSectionLifecycle
+internal static class ItemEnchantPreviewTooltipLifecycle
 {
     internal static void Hide(CardTooltipController controller)
     {
-        BppTooltipSections.HideAll(controller);
+        BppTooltipSections.Hide(
+            controller,
+            BppTooltipSectionRenderPatch.EnchantWithNativeSectionKey
+        );
+        BppTooltipSections.Hide(
+            controller,
+            BppTooltipSectionRenderPatch.EnchantWithoutNativeSectionKey
+        );
         TooltipLayerOverride.SetElevated(controller, elevated: false);
     }
-}
-
-internal static class BppTooltipSectionResetState
-{
-    private static readonly HashSet<int> ResettingControllers = new();
-
-    internal static void Enter(CardTooltipController controller) =>
-        ResettingControllers.Add(controller.GetInstanceID());
-
-    internal static void Exit(CardTooltipController controller) =>
-        ResettingControllers.Remove(controller.GetInstanceID());
-
-    internal static bool IsResetting(CardTooltipController controller) =>
-        ResettingControllers.Contains(controller.GetInstanceID());
 }

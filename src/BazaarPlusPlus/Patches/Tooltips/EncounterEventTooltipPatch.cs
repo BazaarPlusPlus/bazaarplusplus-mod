@@ -9,19 +9,62 @@ using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
+using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI.Tooltips;
 
 namespace BazaarPlusPlus.Patches.Tooltips;
 
-// Builds the event-choice breakdown consumed by the shared BPP tooltip-section renderer.
+// Renders the event-choice breakdown as its own tooltip section (a clone of the
+// tooltip's native passive-text block) right below the description.
+// RenderPassiveEffectTextBlock runs for every card rendered into the pooled tooltip
+// (and with empty text on ResetValues), so all BPP sections are re-evaluated — and
+// hidden for non-event cards — on each render.
+[HarmonyPatch(
+    typeof(CardTooltipController),
+    nameof(CardTooltipController.RenderPassiveEffectTextBlock)
+)]
 internal static class EncounterEventTooltipPatch
 {
-    internal const string SectionKey = "encounter";
+    private const string SectionKey = "encounter";
 
-    internal static string? BuildContent(CardTooltipController controller)
+    [HarmonyPostfix]
+    private static void Postfix(CardTooltipController __instance, string text)
     {
-        if (Data.IsInCombat || !EventPreviewGate.IsEnabled())
+        try
+        {
+            // Empty text is the ResetValues path (or a card with no description);
+            // never show a section there — _currentCard may be stale.
+            var content =
+                string.IsNullOrEmpty(text) || !EventPreviewGate.IsEnabled()
+                    ? null
+                    : BuildContent(__instance);
+            if (string.IsNullOrEmpty(content))
+            {
+                BppTooltipSections.HideAll(__instance);
+                return;
+            }
+
+            if (
+                !BppTooltipSections.TryShow(
+                    __instance,
+                    SectionKey,
+                    __instance.passiveEffectParent,
+                    content!
+                )
+            )
+                return;
+            BppTooltipSections.Hide(__instance, HeroLevelRewardsTooltipPatch.SectionKey);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Error("EncounterTooltip", "Failed to render encounter event section", ex);
+        }
+    }
+
+    private static string? BuildContent(CardTooltipController controller)
+    {
+        if (Data.IsInCombat)
             return null;
 
         var card = controller._currentCard;
