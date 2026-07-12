@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.Tooltips;
@@ -15,31 +16,11 @@ internal static class AggregateItemMissingTypesText
         "尚缺類型："
     );
 
-    // Player-facing item types currently present in game data. System-only tags
-    // (Combat/Event/Unsellable/etc.) are deliberately excluded.
-    internal static readonly IReadOnlyList<ECardTag> ItemTypes = new[]
-    {
-        ECardTag.Weapon,
-        ECardTag.Friend,
-        ECardTag.Aquatic,
-        ECardTag.Tool,
-        ECardTag.Drone,
-        ECardTag.Vehicle,
-        ECardTag.Food,
-        ECardTag.Trap,
-        ECardTag.Toy,
-        ECardTag.Potion,
-        ECardTag.Reagent,
-        ECardTag.Relic,
-        ECardTag.Dragon,
-        ECardTag.Core,
-        ECardTag.Tech,
-        ECardTag.Dinosaur,
-        ECardTag.Ray,
-        ECardTag.Apparel,
-        ECardTag.Property,
-        ECardTag.Loot,
-    };
+    // Aggregate item auras copy item types only; Merchant is a player-facing card
+    // tag used by collection data but is not a type carried by item templates.
+    internal static readonly IReadOnlyList<ECardTag> ItemTypes = PlayerFacingCardTags
+        .Ordered.Where(tag => tag != ECardTag.Merchant)
+        .ToArray();
 
     internal static IReadOnlyList<ECardTag> FindMissing(IEnumerable<ECardTag> present)
     {

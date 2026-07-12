@@ -32,12 +32,15 @@ internal static class AggregateItemMissingTypesTooltipPatch
                 return;
             }
 
-            BppTooltipSections.TryShow(
-                __instance,
-                SectionKey,
-                __instance.passiveEffectParent,
-                content!
-            );
+            if (
+                !BppTooltipSections.TryShow(
+                    __instance,
+                    SectionKey,
+                    __instance.passiveEffectParent,
+                    content!
+                )
+            )
+                BppTooltipSections.Hide(__instance, SectionKey);
         }
         catch (Exception ex)
         {
