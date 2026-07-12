@@ -18,8 +18,9 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
     private const string SectionObjectName = "BPP_SettingsSection";
     private const string NavigationObjectName = "BPP_SettingsNavigationToggle";
     private const string RowObjectPrefix = "BPP_SettingsRow_";
-    private const float SectionFirstRowY = -112f;
-    private const float SectionRowSpacing = 8f;
+    private const string ToggleGroupSpacerObjectName = "BPP_SettingsToggleGroupSpacer";
+    private const string TogglePairObjectPrefix = "BPP_SettingsTogglePair_";
+    private const float ToggleColumnSpacing = 24f;
     private const float SplitContainerExtraHeight = 24f;
 
     private static readonly FieldInfo? EntriesField = AccessTools.Field(
@@ -280,7 +281,7 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             }
         }
 
-        ArrangeRowsWithoutLayout(sectionRoot);
+        GroupToggleRows(sectionRoot);
     }
 
     private NativeRowView ConfigureRow(BppSettingsDockDefinition definition, RectTransform rowRoot)
@@ -648,31 +649,78 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         }
     }
 
-    private void ArrangeRowsWithoutLayout(RectTransform sectionRoot)
+    private void GroupToggleRows(RectTransform sectionRoot)
     {
-        if (_rows.Count == 0)
-            return;
-
-        var donorRect = _rows[0].Root;
-        var currentY = SectionFirstRowY;
-        var totalHeight = Math.Abs(currentY);
-        foreach (var row in _rows)
+        var pairIndex = 0;
+        for (var index = 0; index + 1 < _rows.Count; index += 2)
         {
-            var height = LayoutUtility.GetPreferredHeight(row.Root);
-            if (height <= 0f)
-                height = Math.Max(1f, row.Root.rect.height);
-            row.Root.anchorMin = donorRect.anchorMin;
-            row.Root.anchorMax = donorRect.anchorMax;
-            row.Root.pivot = donorRect.pivot;
-            row.Root.anchoredPosition = new Vector2(donorRect.anchoredPosition.x, currentY);
-            currentY -= height + SectionRowSpacing;
-            totalHeight += height + SectionRowSpacing;
-        }
+            var left = _rows[index];
+            var right = _rows[index + 1];
+            if (
+                left.Definition.ControlKind != BppSettingsControlKind.Toggle
+                || right.Definition.ControlKind != BppSettingsControlKind.Toggle
+            )
+                break;
 
-        sectionRoot.SetSizeWithCurrentAnchors(
-            RectTransform.Axis.Vertical,
-            Math.Max(sectionRoot.rect.height, totalHeight + 16f)
+            var preferredHeight = Math.Max(
+                ResolveRowHeight(left.Root),
+                ResolveRowHeight(right.Root)
+            );
+            var siblingIndex = left.Root.GetSiblingIndex();
+            if (pairIndex == 0)
+                CreateToggleGroupSpacer(sectionRoot, siblingIndex++);
+
+            var pairObject = new GameObject(
+                TogglePairObjectPrefix + pairIndex,
+                typeof(RectTransform),
+                typeof(HorizontalLayoutGroup),
+                typeof(LayoutElement)
+            );
+            var pairRect = pairObject.GetComponent<RectTransform>();
+            pairRect.SetParent(sectionRoot, worldPositionStays: false);
+            pairRect.SetSiblingIndex(siblingIndex);
+
+            var pairLayout = pairObject.GetComponent<HorizontalLayoutGroup>();
+            pairLayout.spacing = ToggleColumnSpacing;
+            pairLayout.childAlignment = TextAnchor.UpperLeft;
+            pairLayout.childControlWidth = true;
+            pairLayout.childControlHeight = true;
+            pairLayout.childForceExpandWidth = true;
+            pairLayout.childForceExpandHeight = false;
+
+            var pairElement = pairObject.GetComponent<LayoutElement>();
+            pairElement.minHeight = preferredHeight;
+            pairElement.preferredHeight = preferredHeight;
+            pairElement.flexibleWidth = 1f;
+
+            left.Root.SetParent(pairRect, worldPositionStays: false);
+            right.Root.SetParent(pairRect, worldPositionStays: false);
+            pairIndex++;
+        }
+    }
+
+    private static void CreateToggleGroupSpacer(RectTransform sectionRoot, int siblingIndex)
+    {
+        var spacerObject = new GameObject(
+            ToggleGroupSpacerObjectName,
+            typeof(RectTransform),
+            typeof(LayoutElement)
         );
+        var spacerRect = spacerObject.GetComponent<RectTransform>();
+        spacerRect.SetParent(sectionRoot, worldPositionStays: false);
+        spacerRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 0f);
+        spacerRect.SetSiblingIndex(siblingIndex);
+
+        var spacerElement = spacerObject.GetComponent<LayoutElement>();
+        spacerElement.minHeight = 0f;
+        spacerElement.preferredHeight = 0f;
+        spacerElement.flexibleHeight = 0f;
+    }
+
+    private static float ResolveRowHeight(RectTransform row)
+    {
+        var height = LayoutUtility.GetPreferredHeight(row);
+        return height > 0f ? height : Math.Max(1f, row.rect.height);
     }
 
     private static void StripNativeLocalization(Transform root)
