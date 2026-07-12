@@ -13,10 +13,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <!-- MessagePack: compile-only reference. Do not bundle a replacement; the plugin runtime
          deliberately loads the game's MessagePack.dll. -->
-    <PackageReference
-      Include="MessagePack"
-      Version="3.1.7"
-      ExcludeAssets="runtime"
-    />
+    <PackageReference Include="MessagePack" Version="3.1.7" ExcludeAssets="runtime" />
   </ItemGroup>
 </Project>

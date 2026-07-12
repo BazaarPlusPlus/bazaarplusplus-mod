@@ -66,9 +66,11 @@ internal static class CollectionLevelUpTooltipText
             var isRandomSelection = query.SelectionMethod == ESpawnSelectionMethod.Random;
             foreach (var group in query.Groups)
             {
-                if (isRandomSelection
+                if (
+                    isRandomSelection
                     && PassesPrerequisites(group, currentHero)
-                    && UniformPoolIds(group) is { } poolIds)
+                    && UniformPoolIds(group) is { } poolIds
+                )
                 {
                     uniformPool.AddRange(poolIds);
                     continue;
@@ -187,8 +189,8 @@ internal static class CollectionLevelUpTooltipText
                 return;
 
             var template = eligible[0];
-            var title = CollectionLocalizationResolver.ResolveTitle(template)
-                ?? template.InternalName;
+            var title =
+                CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName;
             var description = CollectionLocalizationResolver.ResolveDescription(template);
             if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(description))
                 return;
@@ -198,9 +200,7 @@ internal static class CollectionLevelUpTooltipText
             else if (string.IsNullOrWhiteSpace(title))
                 candidates.Add(colorize(description!));
             else
-                candidates.Add(
-                    $"<color={AccentColor}>{title}:</color> {colorize(description!)}"
-                );
+                candidates.Add($"<color={AccentColor}>{title}:</color> {colorize(description!)}");
             return;
         }
 
@@ -222,9 +222,10 @@ internal static class CollectionLevelUpTooltipText
             );
             foreach (var template in eligible)
             {
-                var entryTitle = CollectionLocalizationResolver.ResolveTitle(template)
-                    ?? template.InternalName;
-                var entryDescription = CollectionLocalizationResolver.ResolveDescription(template)
+                var entryTitle =
+                    CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName;
+                var entryDescription = CollectionLocalizationResolver
+                    .ResolveDescription(template)
                     ?.Replace("\r", string.Empty)
                     .Replace('\n', ' ');
                 block.Append(CollectionTooltipMarkup.SubItemBreak);
@@ -271,10 +272,7 @@ internal static class CollectionLevelUpTooltipText
         return true;
     }
 
-    private static bool PassesHeroCondition(
-        TRunConditionalPlayerHero condition,
-        EHero? currentHero
-    )
+    private static bool PassesHeroCondition(TRunConditionalPlayerHero condition, EHero? currentHero)
     {
         // Hero detection failed: keep hero-gated groups visible (consistent with
         // CollectionEncounterHeroEligibility) instead of hiding them all.

@@ -3,7 +3,9 @@ var repoRoot = FindRepoRoot();
 var assetLoaderPath = Path.Combine(repoRoot, "decompiled", "TheBazaarRuntime", "AssetLoader.cs");
 if (!File.Exists(assetLoaderPath))
 {
-    throw new InvalidOperationException($"Required decompiled source file is missing: {assetLoaderPath}");
+    throw new InvalidOperationException(
+        $"Required decompiled source file is missing: {assetLoaderPath}"
+    );
 }
 
 var assetLoaderText = File.ReadAllText(assetLoaderPath);
@@ -23,10 +25,30 @@ var constructAndInstantiateUICardBody = GetRequiredMethodBody(
     assetLoaderText,
     "private async Task<GameObject> ConstructAndInstantiateUICard"
 );
-RequireStatementContains(assetLoaderPath, constructAndInstantiateUICardBody, "assetReference =", "SmallCardUIAssetRef");
-RequireStatementContains(assetLoaderPath, constructAndInstantiateUICardBody, "assetReference =", "MediumCardUIAssetRef");
-RequireStatementContains(assetLoaderPath, constructAndInstantiateUICardBody, "assetReference =", "LargeCardUIAssetRef");
-RequireStatementContains(assetLoaderPath, constructAndInstantiateUICardBody, "assetReference =", "SkillUIAssetRef");
+RequireStatementContains(
+    assetLoaderPath,
+    constructAndInstantiateUICardBody,
+    "assetReference =",
+    "SmallCardUIAssetRef"
+);
+RequireStatementContains(
+    assetLoaderPath,
+    constructAndInstantiateUICardBody,
+    "assetReference =",
+    "MediumCardUIAssetRef"
+);
+RequireStatementContains(
+    assetLoaderPath,
+    constructAndInstantiateUICardBody,
+    "assetReference =",
+    "LargeCardUIAssetRef"
+);
+RequireStatementContains(
+    assetLoaderPath,
+    constructAndInstantiateUICardBody,
+    "assetReference =",
+    "SkillUIAssetRef"
+);
 RequireContains(assetLoaderPath, constructAndInstantiateUICardBody, "component.Resize();");
 RequireContains(
     assetLoaderPath,
@@ -53,10 +75,14 @@ var sourceFiles = Directory
 
 if (sourceFiles.Length == 0)
 {
-    throw new InvalidOperationException($"No C# source files found under required source directory: {sourceRoot}");
+    throw new InvalidOperationException(
+        $"No C# source files found under required source directory: {sourceRoot}"
+    );
 }
 
-var sourceTexts = sourceFiles.Select(path => new SourceFile(path, File.ReadAllText(path))).ToArray();
+var sourceTexts = sourceFiles
+    .Select(path => new SourceFile(path, File.ReadAllText(path)))
+    .ToArray();
 RequireAbsent(
     sourceTexts,
     [
@@ -95,16 +121,20 @@ static void RequireContains(string path, string text, string requiredText)
 {
     if (!text.Contains(requiredText, StringComparison.Ordinal))
     {
-        throw new InvalidOperationException(
-            $"Required string missing from {path}: {requiredText}"
-        );
+        throw new InvalidOperationException($"Required string missing from {path}: {requiredText}");
     }
 }
 
 static void RequireStatementContains(string path, string text, params string[] requiredFragments)
 {
-    if (text.Split(';').Any(statement =>
-        requiredFragments.All(fragment => statement.Contains(fragment, StringComparison.Ordinal))))
+    if (
+        text.Split(';')
+            .Any(statement =>
+                requiredFragments.All(fragment =>
+                    statement.Contains(fragment, StringComparison.Ordinal)
+                )
+            )
+    )
     {
         return;
     }
@@ -172,9 +202,7 @@ static void RequireAbsent(SourceFile[] sourceTexts, string[] obsoleteTexts)
 {
     var findings = obsoleteTexts
         .SelectMany(obsoleteText =>
-            sourceTexts
-                .SelectMany(source => FindMatches(source, obsoleteText))
-                .Take(10)
+            sourceTexts.SelectMany(source => FindMatches(source, obsoleteText)).Take(10)
         )
         .ToArray();
 

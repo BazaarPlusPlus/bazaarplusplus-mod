@@ -1203,12 +1203,7 @@ public class CoreLayeringTests
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
         var nativeSettingsSource = File.ReadAllText(
-            Path.Combine(
-                mainSource,
-                "Game",
-                "Settings",
-                "BppNativeSettingsSectionController.cs"
-            )
+            Path.Combine(mainSource, "Game", "Settings", "BppNativeSettingsSectionController.cs")
         );
         var collectionControllerSource = File.ReadAllText(
             Path.Combine(

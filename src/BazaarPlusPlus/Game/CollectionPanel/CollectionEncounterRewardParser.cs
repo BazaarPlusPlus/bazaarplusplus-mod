@@ -65,9 +65,7 @@ internal static class CollectionEncounterRewardParser
         var isSkillReward = ContainsWord(lower, "skill") || ContainsWord(lower, "skills");
         var tags = ParseEnums<ECardTag>(lower, ItemTagTerms);
         var isItemReward =
-            ContainsWord(lower, "item")
-            || ContainsWord(lower, "items")
-            || tags.Count > 0;
+            ContainsWord(lower, "item") || ContainsWord(lower, "items") || tags.Count > 0;
 
         if (!isSkillReward && !isItemReward)
             return null;
@@ -144,7 +142,12 @@ internal static class CollectionEncounterRewardParser
         return result;
     }
 
-    private static void AddIfMentioned<TEnum>(string lower, string word, TEnum value, List<TEnum> result)
+    private static void AddIfMentioned<TEnum>(
+        string lower,
+        string word,
+        TEnum value,
+        List<TEnum> result
+    )
         where TEnum : struct
     {
         if (!ContainsWord(lower, word))

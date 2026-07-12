@@ -91,8 +91,7 @@ internal static class NativeCardPreviewRuntime
         {
             throw;
         }
-        catch (TargetInvocationException ex)
-            when (ex.InnerException is OperationCanceledException)
+        catch (TargetInvocationException ex) when (ex.InnerException is OperationCanceledException)
         {
             ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
             throw;

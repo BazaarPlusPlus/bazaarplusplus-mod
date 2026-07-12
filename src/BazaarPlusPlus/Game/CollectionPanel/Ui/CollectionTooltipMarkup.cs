@@ -24,6 +24,5 @@ internal static class CollectionTooltipMarkup
 
     // The base line height must already be set when the first break is reached,
     // so every built text starts with it.
-    public static string Wrap(string content) =>
-        content.Length == 0 ? content : BaseLine + content;
+    public static string Wrap(string content) => content.Length == 0 ? content : BaseLine + content;
 }

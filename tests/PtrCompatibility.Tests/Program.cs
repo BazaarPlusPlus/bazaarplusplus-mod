@@ -122,9 +122,7 @@ void CheckTree(
     }
 
     _currentTreeLabel = label;
-    netMessageProcessorChecks(
-        ReadTreeFile(treeRoot, label, "TheBazaar", "NetMessageProcessor.cs")
-    );
+    netMessageProcessorChecks(ReadTreeFile(treeRoot, label, "TheBazaar", "NetMessageProcessor.cs"));
     otherChecks(treeRoot, label);
 }
 

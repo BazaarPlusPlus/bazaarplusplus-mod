@@ -46,7 +46,10 @@ static void TestSupporterAttributionCountFillsRail()
     );
     Assert(field != null, "LiveBuildPanel should keep supporter attribution count named.");
     var count = (int)field!.GetRawConstantValue()!;
-    Assert(count == 4, $"LiveBuildPanel should fill the four-supporter attribution rail, got {count}.");
+    Assert(
+        count == 4,
+        $"LiveBuildPanel should fill the four-supporter attribution rail, got {count}."
+    );
 }
 
 static void RegisterPluginReflectionAssemblyResolution()

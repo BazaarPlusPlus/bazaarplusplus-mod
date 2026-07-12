@@ -2,10 +2,10 @@ using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Encounter.Step;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarGameShared.Domain.Spawning;
 using BazaarGameShared.Domain.Game;
 using BazaarGameShared.Domain.Prerequisites;
 using BazaarGameShared.Domain.Prerequisites.Conditionals;
+using BazaarGameShared.Domain.Spawning;
 using BazaarGameShared.Domain.Spawning.SpawnFilters;
 using BazaarGameShared.Domain.Spawning.SpawnGroups;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
@@ -201,11 +201,7 @@ public sealed class CollectionLevelUpTooltipTextTests
             Level = 7,
             Rewards = new TSpawnContextQuery
             {
-                Groups =
-                {
-                    Group(poolIds, limit: 1),
-                    Group(poolIds, limit: 1),
-                },
+                Groups = { Group(poolIds, limit: 1), Group(poolIds, limit: 1) },
             },
         };
 
@@ -215,9 +211,7 @@ public sealed class CollectionLevelUpTooltipTextTests
             currentHero: null
         );
 
-        Assert.Single(
-            System.Text.RegularExpressions.Regex.Matches(text, "one of 2")
-        );
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(text, "one of 2"));
     }
 
     [Fact]
@@ -253,18 +247,11 @@ public sealed class CollectionLevelUpTooltipTextTests
     private static TCardEncounterStep Step(string title) =>
         new()
         {
-            Localization = new TCardLocalization
-            {
-                Title = new TLocalizableText { Text = title },
-            },
+            Localization = new TCardLocalization { Title = new TLocalizableText { Text = title } },
         };
 
     private static TSpawnGroup WeightedGroup(List<Guid> ids, uint weight) =>
-        new()
-        {
-            Filters = { new TSpawnFilterIdList { Ids = ids } },
-            RandomWeight = weight,
-        };
+        new() { Filters = { new TSpawnFilterIdList { Ids = ids } }, RandomWeight = weight };
 
     private static TSpawnGroup Group(
         IEnumerable<Guid> ids,

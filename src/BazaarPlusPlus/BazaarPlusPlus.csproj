@@ -97,11 +97,7 @@
     />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.28" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
-    <PackageReference
-      Include="SourceGear.sqlite3"
-      Version="3.50.4.5"
-      GeneratePathProperty="true"
-    />
+    <PackageReference Include="SourceGear.sqlite3" Version="3.50.4.5" GeneratePathProperty="true" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 

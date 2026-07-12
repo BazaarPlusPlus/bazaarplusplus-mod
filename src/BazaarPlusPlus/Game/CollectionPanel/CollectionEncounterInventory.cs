@@ -52,12 +52,12 @@ internal sealed class CollectionEncounterInventory
     {
         var count = 0;
         foreach (var card in _cards)
-            foreach (var id in anyOfIds)
-                if (card.TemplateId == id)
-                {
-                    count++;
-                    break;
-                }
+        foreach (var id in anyOfIds)
+            if (card.TemplateId == id)
+            {
+                count++;
+                break;
+            }
         return count;
     }
 
@@ -98,9 +98,9 @@ internal sealed class CollectionEncounterInventory
     )
     {
         foreach (var candidate in candidates)
-            foreach (var tag in card.TagNames)
-                if (string.Equals(tag, candidate, StringComparison.Ordinal))
-                    return true;
+        foreach (var tag in card.TagNames)
+            if (string.Equals(tag, candidate, StringComparison.Ordinal))
+                return true;
         return false;
     }
 }

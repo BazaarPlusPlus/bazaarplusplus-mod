@@ -5,11 +5,7 @@ namespace BazaarPlusPlus.GameInterop.CardPreview;
 
 internal readonly struct NativeCardPreviewLease
 {
-    public NativeCardPreviewLease(
-        Component card,
-        NativeCardPreviewKind kind,
-        bool alreadySetUp
-    )
+    public NativeCardPreviewLease(Component card, NativeCardPreviewKind kind, bool alreadySetUp)
     {
         Card = card;
         Kind = kind;

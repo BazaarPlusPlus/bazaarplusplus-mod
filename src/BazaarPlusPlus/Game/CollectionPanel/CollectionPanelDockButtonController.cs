@@ -19,9 +19,7 @@ internal sealed class CollectionPanelDockButtonController
     private Button? _anchorButton;
     private Button? _dockButton;
     private RectTransform? _dockButtonRect;
-    private readonly BppScreenResizeSyncTracker _screenResizeSync = new(
-        ScreenResizeSyncFrameCount
-    );
+    private readonly BppScreenResizeSyncTracker _screenResizeSync = new(ScreenResizeSyncFrameCount);
     private readonly BppDockLayoutSyncTracker _layoutSync = new(LayoutImmediateSyncFrameCount);
     private readonly BppDockButtonScreenLayout _screenLayout = new();
     private bool _hasAvailableDockLayout;

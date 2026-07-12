@@ -44,9 +44,10 @@ internal sealed class CollectionEncounterCardRequirement
 
     public bool Matches(CollectionEncounterInventory inventory)
     {
-        var count = Ids.Count > 0
-            ? inventory.CountMatchingTemplates(Ids)
-            : inventory.CountMatchingTags(TagCandidateGroups, TagOperator);
+        var count =
+            Ids.Count > 0
+                ? inventory.CountMatchingTemplates(Ids)
+                : inventory.CountMatchingTags(TagCandidateGroups, TagOperator);
         return Comparison switch
         {
             "Equal" => count == Amount,

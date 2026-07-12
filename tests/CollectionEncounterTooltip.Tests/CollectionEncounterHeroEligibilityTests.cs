@@ -10,10 +10,7 @@ public sealed class CollectionEncounterHeroEligibilityTests
     public void Includes_common_steps_for_a_specific_hero()
     {
         Assert.True(
-            CollectionEncounterHeroEligibility.Matches(
-                new[] { EHero.Common },
-                EHero.Stelle
-            )
+            CollectionEncounterHeroEligibility.Matches(new[] { EHero.Common }, EHero.Stelle)
         );
     }
 
@@ -31,9 +28,7 @@ public sealed class CollectionEncounterHeroEligibilityTests
     [Fact]
     public void Excludes_steps_for_other_heroes()
     {
-        Assert.False(
-            CollectionEncounterHeroEligibility.Matches(new[] { EHero.Mak }, EHero.Stelle)
-        );
+        Assert.False(CollectionEncounterHeroEligibility.Matches(new[] { EHero.Mak }, EHero.Stelle));
     }
 
     [Fact]

@@ -208,9 +208,13 @@ public class CollectionEncounterOutcomeMergeTests
         };
 
         Assert.True(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(single, 2));
-        Assert.True(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 3));
+        Assert.True(
+            CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 3)
+        );
         Assert.False(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(named, 2));
-        Assert.False(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 1));
+        Assert.False(
+            CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 1)
+        );
     }
 
     private static CollectionEncounterOutcomeView View(int percent, string text, bool nameless) =>

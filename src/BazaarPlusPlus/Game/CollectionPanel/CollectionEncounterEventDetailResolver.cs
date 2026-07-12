@@ -21,7 +21,8 @@ internal static class CollectionEncounterEventDetailResolver
         if (eventTemplate == null || !IsEncounterEventTemplate(eventTemplate))
             return null;
 
-        var resultText = CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty;
+        var resultText =
+            CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty;
         var rewardFilter = ResolveRewardFilter(eventTemplate, resultText);
         var outcomeGroups = ResolveOutcomeGroups(
             eventTemplate,
@@ -33,12 +34,20 @@ internal static class CollectionEncounterEventDetailResolver
         );
         // A suppressed random-selection event (shop stock generation) must not fall
         // back to rendering its spawn groups as choices either.
-        var choiceDetails = outcomeGroups != null || isRandomSelectionEvent
-            ? Array.Empty<CollectionEncounterChoiceDetail>()
-            : ResolveChoiceDetails(eventTemplate, staticData, currentHero, inventory, currentDay);
+        var choiceDetails =
+            outcomeGroups != null || isRandomSelectionEvent
+                ? Array.Empty<CollectionEncounterChoiceDetail>()
+                : ResolveChoiceDetails(
+                    eventTemplate,
+                    staticData,
+                    currentHero,
+                    inventory,
+                    currentDay
+                );
         return new CollectionEncounterOption(
             eventTemplate.Id,
-            CollectionLocalizationResolver.ResolveTitle(eventTemplate) ?? eventTemplate.InternalName,
+            CollectionLocalizationResolver.ResolveTitle(eventTemplate)
+                ?? eventTemplate.InternalName,
             sourceKey: null,
             sourceKind: null,
             eventTemplate.Id,
@@ -78,9 +87,11 @@ internal static class CollectionEncounterEventDetailResolver
         uint totalWeight = 0;
         foreach (var group in groups)
         {
-            if (group.DayCondition is { } dayCondition
+            if (
+                group.DayCondition is { } dayCondition
                 && currentDay.HasValue
-                && !dayCondition.Matches(currentDay.Value))
+                && !dayCondition.Matches(currentDay.Value)
+            )
                 continue;
 
             var eligible = MeetsOutcomePrerequisites(group, inventory);
@@ -113,7 +124,8 @@ internal static class CollectionEncounterEventDetailResolver
                     continue;
                 if (IsSkillTemplate(template))
                 {
-                    var skillName = CollectionLocalizationResolver.ResolveTitle(template)
+                    var skillName =
+                        CollectionLocalizationResolver.ResolveTitle(template)
                         ?? template.InternalName;
                     details.Add(
                         new CollectionEncounterChoiceDetail(
@@ -146,7 +158,8 @@ internal static class CollectionEncounterEventDetailResolver
             // a single Farai group) read as duplicates; keep one.
             DedupeDetails(details);
 
-            var isCombatPool = group.QueryPools.Count == 0
+            var isCombatPool =
+                group.QueryPools.Count == 0
                 && resolvedCount > 0
                 && combatIds.Count * 2 > resolvedCount;
             resolutions.Add(
@@ -225,8 +238,18 @@ internal static class CollectionEncounterEventDetailResolver
         {
             for (var j = 0; j < i; j++)
             {
-                if (string.Equals(details[i].DisplayName, details[j].DisplayName, StringComparison.Ordinal)
-                    && string.Equals(details[i].ResultText, details[j].ResultText, StringComparison.Ordinal))
+                if (
+                    string.Equals(
+                        details[i].DisplayName,
+                        details[j].DisplayName,
+                        StringComparison.Ordinal
+                    )
+                    && string.Equals(
+                        details[i].ResultText,
+                        details[j].ResultText,
+                        StringComparison.Ordinal
+                    )
+                )
                 {
                     details.RemoveAt(i);
                     break;
@@ -459,15 +482,25 @@ internal static class CollectionEncounterEventDetailResolver
             CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty;
         foreach (var group in choiceGroups)
         {
-            if (group.DayCondition is { } dayCondition
+            if (
+                group.DayCondition is { } dayCondition
                 && currentDay.HasValue
-                && !dayCondition.Matches(currentDay.Value))
+                && !dayCondition.Matches(currentDay.Value)
+            )
                 continue;
 
             if (group.IsRandomPool)
             {
-                if (ResolveChoicePool(group, staticData, currentHero, inventory, eventDescription)
-                    is { } pool)
+                if (
+                    ResolveChoicePool(
+                        group,
+                        staticData,
+                        currentHero,
+                        inventory,
+                        eventDescription
+                    ) is
+                    { } pool
+                )
                     pools.Add(pool);
                 continue;
             }
@@ -493,10 +526,12 @@ internal static class CollectionEncounterEventDetailResolver
             ?? int.MaxValue;
         var titled = new List<(string Title, bool MeetsPrerequisites)>(candidates.Count);
         foreach (var (step, meetsPrerequisites) in candidates)
-            titled.Add((
-                CollectionLocalizationResolver.ResolveTitle(step) ?? step.InternalName,
-                meetsPrerequisites
-            ));
+            titled.Add(
+                (
+                    CollectionLocalizationResolver.ResolveTitle(step) ?? step.InternalName,
+                    meetsPrerequisites
+                )
+            );
         var dispositions = ResolvePresentation(titled, choiceLimit);
         var presented = new List<CollectionEncounterChoiceDetail>();
         var dimmed = new List<CollectionEncounterChoiceDetail>();
@@ -597,8 +632,8 @@ internal static class CollectionEncounterEventDetailResolver
                 continue;
             if (IsSkillTemplate(template))
             {
-                var skillName = CollectionLocalizationResolver.ResolveTitle(template)
-                    ?? template.InternalName;
+                var skillName =
+                    CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName;
                 entries.Add(
                     new CollectionEncounterChoiceDetail(
                         template.Id,
@@ -616,11 +651,13 @@ internal static class CollectionEncounterEventDetailResolver
         DedupeDetails(entries);
 
         if (combatIds.Count * 2 > resolvedCount && combatIds.Count > 0)
-            return PoolDetail(new CollectionEncounterChoicePool(
-                isCombat: true,
-                combatIds.Count,
-                Array.Empty<CollectionEncounterChoiceDetail>()
-            ));
+            return PoolDetail(
+                new CollectionEncounterChoicePool(
+                    isCombat: true,
+                    combatIds.Count,
+                    Array.Empty<CollectionEncounterChoiceDetail>()
+                )
+            );
 
         if (entries.Count == 0)
             return null;
@@ -631,19 +668,23 @@ internal static class CollectionEncounterEventDetailResolver
         if (entries.Count == 1)
         {
             var single = entries[0];
-            if (string.IsNullOrEmpty(single.ResultText)
+            if (
+                string.IsNullOrEmpty(single.ResultText)
                 && !string.IsNullOrEmpty(single.DisplayName)
-                && eventDescription.Contains(single.DisplayName, StringComparison.OrdinalIgnoreCase))
+                && eventDescription.Contains(single.DisplayName, StringComparison.OrdinalIgnoreCase)
+            )
                 return null;
             return single;
         }
 
         // Small pools expand into their entries; large ones stay a count summary.
-        return PoolDetail(new CollectionEncounterChoicePool(
-            isCombat: false,
-            entries.Count,
-            entries.Count <= 8 ? entries : Array.Empty<CollectionEncounterChoiceDetail>()
-        ));
+        return PoolDetail(
+            new CollectionEncounterChoicePool(
+                isCombat: false,
+                entries.Count,
+                entries.Count <= 8 ? entries : Array.Empty<CollectionEncounterChoiceDetail>()
+            )
+        );
     }
 
     private static CollectionEncounterChoiceDetail PoolDetail(CollectionEncounterChoicePool pool) =>
@@ -680,11 +721,13 @@ internal static class CollectionEncounterEventDetailResolver
         bool isEligible
     )
     {
-        var resultText = CollectionLocalizationResolver.ResolveDescription(stepTemplate) ?? string.Empty;
+        var resultText =
+            CollectionLocalizationResolver.ResolveDescription(stepTemplate) ?? string.Empty;
         result.Add(
             new CollectionEncounterChoiceDetail(
                 stepTemplate.Id,
-                CollectionLocalizationResolver.ResolveTitle(stepTemplate) ?? stepTemplate.InternalName,
+                CollectionLocalizationResolver.ResolveTitle(stepTemplate)
+                    ?? stepTemplate.InternalName,
                 StripHeroConditionPrefix(resultText, stepTemplate.Heroes),
                 ResolveRewardFilter(stepTemplate, resultText),
                 isSourceMatch: false,
@@ -702,14 +745,15 @@ internal static class CollectionEncounterEventDetailResolver
             return text;
 
         var trimmed = text.TrimStart();
-        var close = trimmed.Length == 0
-            ? '\0'
-            : trimmed[0] switch
-            {
-                '(' => ')',
-                '（' => '）',
-                _ => '\0',
-            };
+        var close =
+            trimmed.Length == 0
+                ? '\0'
+                : trimmed[0] switch
+                {
+                    '(' => ')',
+                    '（' => '）',
+                    _ => '\0',
+                };
         if (close == '\0')
             return text;
 

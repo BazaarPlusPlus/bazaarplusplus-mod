@@ -62,8 +62,7 @@ public class CollectionEncounterRequirementTests
     [Fact]
     public void Outcome_groups_keep_query_pools_in_the_roll()
     {
-        var json =
-            """
+        var json = """
             {
               "$type": "TCardEncounterEvent",
               "SelectionContext": {
@@ -119,8 +118,7 @@ public class CollectionEncounterRequirementTests
     [Fact]
     public void Requirements_parse_from_prerequisites_without_type_markers()
     {
-        var json =
-            """
+        var json = """
             [
               {
                 "Subject": {
@@ -145,8 +143,7 @@ public class CollectionEncounterRequirementTests
     [Fact]
     public void Negated_and_tier_conditionals_yield_no_requirement()
     {
-        var json =
-            """
+        var json = """
             [
               {
                 "Subject": {
