@@ -35,12 +35,15 @@ internal static class CollectionLevelUpTooltipText
         if (levelUp == null)
             return string.Empty;
 
-        var colorize = colorizeResult ?? (text => text);
-        var lines = new List<string>();
+        var rawColorize = colorizeResult ?? (text => text);
+        string Colorize(string text) =>
+            CollectionTooltipMarkup.NormalizeInlineFragment(rawColorize(text));
+
+        var lines = new List<CollectionTooltipMarkup.Block>();
         if (levelUp.HealthIncrease > 0)
-            lines.Add(colorize(CollectionPanelText.LevelUpMaxHealth((int)levelUp.HealthIncrease)));
+            lines.Add(Colorize(CollectionPanelText.LevelUpMaxHealth((int)levelUp.HealthIncrease)));
         if (currentLevel.HasValue && currentLevel.Value < LastBoardSlotLevel)
-            lines.Add(colorize(CollectionPanelText.LevelUpBoardSlots(BoardSlotsPerLevel)));
+            lines.Add(Colorize(CollectionPanelText.LevelUpBoardSlots(BoardSlotsPerLevel)));
 
         // Level-up rewards are a selection screen (LevelUpState allows
         // SelectItem/SelectSkill/SelectEncounter): every spawned group contributes
@@ -66,7 +69,7 @@ internal static class CollectionLevelUpTooltipText
                     uniformPool.AddRange(poolIds);
                     continue;
                 }
-                CollectGroup(candidates, group, resolveTemplate, currentHero, colorize);
+                CollectGroup(candidates, group, resolveTemplate, currentHero, Colorize);
             }
             if (uniformPool.Count > 0)
                 CollectCandidates(
@@ -75,7 +78,7 @@ internal static class CollectionLevelUpTooltipText
                     limit: 1,
                     resolveTemplate,
                     currentHero,
-                    colorize
+                    Colorize
                 );
         }
 
@@ -106,9 +109,7 @@ internal static class CollectionLevelUpTooltipText
             lines.Add(block.ToString());
         }
 
-        return lines.Count == 0
-            ? string.Empty
-            : CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
+        return CollectionTooltipMarkup.JoinBlocks(lines);
     }
 
     // A weighted group whose weight equals its card count: every card is a uniform

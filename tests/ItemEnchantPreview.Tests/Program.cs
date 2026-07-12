@@ -190,14 +190,14 @@ var sectionText = ItemEnchantPreviewFormatting.BuildSectionText(
     new[]
     {
         segment,
-        new TooltipSegment("second\r\n\r\nthird", null, null, -1),
+        new TooltipSegment("<size=55%>second\r\n\r\nthird</size>", null, null, -1),
     }
 );
 Assert(
     sectionText
-        == $"{segment.Text}<size=55%><line-height=2.1em>\n</line-height></size>second<size=55%><line-height=2.1em>\n</line-height></size>third"
+        == $"{segment.Text}<size=55%><line-height=2.1em>\n</line-height></size><size=55%>second\n\nthird</size>"
         && !sectionText.EndsWith("\n", StringComparison.Ordinal),
-    "Section text should normalize lines, use stable entry breaks, and avoid a trailing blank line."
+    "Section text should separate entries without flattening an entry's paragraphs or list lines."
 );
 
 var key1 = ItemEnchantPreviewCache.CreateKey(snapshot);

@@ -81,13 +81,15 @@ public sealed class CollectionLevelUpTooltipTextTests
             Plan(levelUp),
             resolveTemplate: _ => null,
             currentHero: EHero.Vanessa,
-            colorizeResult: result => $"«{result}»",
+            colorizeResult: result => $"<line-height=1.6em>«{result}»</line-height>",
             currentLevel: 2
         );
 
         Assert.Contains("«+150 Max Health»", text);
         Assert.Contains("«+2 board slots»", text);
         Assert.Contains("3× random reward (25 options)", text);
+        Assert.Contains("<line-height=1.6em>\n<line-height=1.15em>", text);
+        Assert.DoesNotContain("<line-height=1.6em>«", text);
         // Single-id groups with unresolvable templates and filtered groups add nothing.
         Assert.DoesNotContain("30000000", text);
     }

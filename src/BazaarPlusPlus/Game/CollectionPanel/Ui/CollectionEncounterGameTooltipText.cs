@@ -32,20 +32,23 @@ internal static class CollectionEncounterGameTooltipText
         if (option == null)
             return string.Empty;
 
-        var colorize = colorizeResult ?? (text => text);
+        var rawColorize = colorizeResult ?? (text => text);
+        string Colorize(string text) =>
+            CollectionTooltipMarkup.NormalizeInlineFragment(rawColorize(text));
+
         if (option.HasOutcomeGroups)
-            return BuildOutcomes(option.OutcomeGroups!, colorize, dayTierCeiling);
+            return BuildOutcomes(option.OutcomeGroups!, Colorize, dayTierCeiling);
         if (!option.HasChoiceDetails)
             return string.Empty;
 
-        var lines = new List<string>();
+        var lines = new List<CollectionTooltipMarkup.Block>();
         foreach (var choice in option.ChoiceDetails)
         {
             // Rolled pools ("Advanced Training" trainings, "Epic Battle" monsters)
             // render as one summary line instead of one line per member.
             if (choice.Pool is { } pool)
             {
-                lines.Add(ChoicePoolLine(pool, colorize, dayTierCeiling));
+                lines.Add(ChoicePoolLine(pool, Colorize, dayTierCeiling));
                 continue;
             }
 
@@ -58,17 +61,22 @@ internal static class CollectionEncounterGameTooltipText
                 var flat = string.IsNullOrWhiteSpace(result)
                     ? choice.DisplayName
                     : $"{choice.DisplayName}: {result}";
-                lines.Add($"<size=85%><color={IneligibleColor}>{flat}</color></size>");
+                lines.Add(
+                    new CollectionTooltipMarkup.Block(
+                        $"<color={IneligibleColor}>{flat}</color>",
+                        fontSizePercent: 85
+                    )
+                );
                 continue;
             }
 
             lines.Add(
                 string.IsNullOrWhiteSpace(result)
                     ? $"<color={AccentColor}>{choice.DisplayName}</color>"
-                    : $"<color={AccentColor}>{choice.DisplayName}:</color> {colorize(result)}"
+                    : $"<color={AccentColor}>{choice.DisplayName}:</color> {Colorize(result)}"
             );
         }
-        return CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
+        return CollectionTooltipMarkup.JoinBlocks(lines);
     }
 
     // Random-outcome events: one block per rolled alternative with its normalized
@@ -79,7 +87,10 @@ internal static class CollectionEncounterGameTooltipText
         ETier? dayTierCeiling
     )
     {
-        var lines = new List<string> { CollectionPanelText.OutcomesHeader() };
+        var lines = new List<CollectionTooltipMarkup.Block>
+        {
+            CollectionPanelText.OutcomesHeader(),
+        };
         foreach (var outcome in outcomes)
         {
             string content;
@@ -117,7 +128,10 @@ internal static class CollectionEncounterGameTooltipText
             if (!outcome.IsEligible)
             {
                 lines.Add(
-                    $"<size=85%><color={IneligibleColor}>· <indent=1em>{content}</indent></color></size>"
+                    new CollectionTooltipMarkup.Block(
+                        $"<color={IneligibleColor}>· <indent=1em>{content}</indent></color>",
+                        fontSizePercent: 85
+                    )
                 );
                 continue;
             }
@@ -127,7 +141,7 @@ internal static class CollectionEncounterGameTooltipText
                 : string.Empty;
             lines.Add($"· <indent=1em>{prefix}{content}</indent>");
         }
-        return CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
+        return CollectionTooltipMarkup.JoinBlocks(lines);
     }
 
     // One rolled-pool choice line: combat roll, small expandable entry list (with
