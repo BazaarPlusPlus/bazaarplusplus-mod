@@ -21,7 +21,7 @@ internal static class BilingualItemNamesSettingsDockEntry
             BppSettingsDockOrder.BilingualItemNames,
             "BilingualItemNames",
             languageCode => Labels.Resolve(languageCode, L.CurrentMode),
-            config => config.EnableBilingualItemNamesConfig?.Value ?? true,
+            config => config.EnableBilingualItemNamesConfig?.Value ?? false,
             (config, enabled) =>
             {
                 var entry = config.EnableBilingualItemNamesConfig;

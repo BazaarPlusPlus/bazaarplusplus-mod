@@ -5,7 +5,8 @@ namespace BazaarPlusPlus.Game.BilingualItemNames;
 
 internal static class BilingualItemNamePresentation
 {
-    private const string SubtitleSize = "65%";
+    private const string SubtitleSize = "42%";
+    private const string SubtitleOffset = "-4px";
 
     internal static string? TryBuild(
         string? primaryTitle,
@@ -25,6 +26,6 @@ internal static class BilingualItemNamePresentation
         )
             return null;
 
-        return $"{primaryTitle}\n<size={SubtitleSize}><noparse>{chineseTitle.Trim()}</noparse></size>";
+        return $"{primaryTitle}\n<size={SubtitleSize}><voffset={SubtitleOffset}><noparse>{chineseTitle.Trim()}</noparse></voffset></size>";
     }
 }

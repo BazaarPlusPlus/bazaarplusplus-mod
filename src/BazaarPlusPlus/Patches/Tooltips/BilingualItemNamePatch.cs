@@ -26,7 +26,7 @@ internal static class BilingualItemNamePatch
         {
             var card = tooltipData.CardInstance;
             var enabled =
-                BppPatchHost.Services.Config.EnableBilingualItemNamesConfig?.Value ?? true;
+                BppPatchHost.Services.Config.EnableBilingualItemNamesConfig?.Value ?? false;
             var currentLanguageIsChinese = LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode);
             if (!enabled || card?.Type != ECardType.Item || currentLanguageIsChinese)
                 return;
@@ -44,7 +44,7 @@ internal static class BilingualItemNamePatch
             if (title == null || controller.headerText == null)
                 return;
 
-            BppTmpFont.TryInstallFallback(controller.headerText, chineseTitle);
+            BppTmpFont.TryInstallSystemCjkFallback(controller.headerText, chineseTitle);
             controller.headerText.TrySetText(title);
         }
         catch (Exception ex)

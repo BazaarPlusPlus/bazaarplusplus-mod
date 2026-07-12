@@ -87,7 +87,7 @@ internal sealed class BppConfig : IBppConfig
         EnableBilingualItemNamesConfig = config.Bind(
             "BilingualItemNames",
             "Enabled",
-            true,
+            false,
             "Whether item tooltips show the official Simplified Chinese name below the current-language name. Hidden while the game itself is using Chinese."
         );
         EnableVoiceSubtitlesConfig = config.Bind(

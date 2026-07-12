@@ -101,8 +101,8 @@ static void TestBilingualItemNamePresentation()
             enabled: true,
             isItem: true,
             currentLanguageIsChinese: false
-        ) == "Lighter\n<size=65%><noparse>打火机</noparse></size>",
-        "Enabled item tooltips should append a smaller official Chinese title."
+        ) == "Lighter\n<size=42%><voffset=-4px><noparse>打火机</noparse></voffset></size>",
+        "Enabled item tooltips should append a 42%-sized Chinese title with a 4px gap."
     );
     Assert(
         BilingualItemNamePresentation.TryBuild(

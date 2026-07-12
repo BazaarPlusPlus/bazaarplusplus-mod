@@ -15,9 +15,20 @@ internal static class BppTmpFont
     private const int SamplingPointSize = 90;
     private const int AtlasPadding = 9;
     private const int AtlasSize = 2048;
+    private static readonly string[] SystemCjkFontNames =
+    {
+        "PingFang SC",
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        "Noto Sans CJK SC",
+        "Noto Sans SC",
+        "Arial Unicode MS",
+    };
 
     private static TMP_FontAsset? _default;
+    private static TMP_FontAsset? _systemCjk;
     private static bool _loadFailureLogged;
+    private static bool _systemCjkLoadFailureLogged;
     private static readonly ConditionalWeakTable<TMP_Text, FontSnapshot> OriginalFonts = new();
 
     public static bool TryApply(TMP_Text? text, string? sampleText)
@@ -44,12 +55,12 @@ internal static class BppTmpFont
         return true;
     }
 
-    public static bool TryInstallFallback(TMP_Text? text, string? sampleText)
+    public static bool TryInstallSystemCjkFallback(TMP_Text? text, string? sampleText)
     {
         if (text?.font == null || !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(sampleText))
             return false;
 
-        var fontAsset = ResolveDefault();
+        var fontAsset = ResolveSystemCjk();
         if (fontAsset == null)
             return false;
 
@@ -64,6 +75,51 @@ internal static class BppTmpFont
 
         WarmCharacters(fontAsset, sampleText);
         return true;
+    }
+
+    private static TMP_FontAsset? ResolveSystemCjk()
+    {
+        if (_systemCjk != null)
+            return _systemCjk;
+
+        try
+        {
+            var systemFont = Font.CreateDynamicFontFromOSFont(
+                SystemCjkFontNames,
+                SamplingPointSize
+            );
+            if (systemFont == null)
+            {
+                LogSystemCjkLoadFailure("CreateDynamicFontFromOSFont returned null.");
+                return null;
+            }
+
+            var fontAsset = TMP_FontAsset.CreateFontAsset(
+                systemFont,
+                SamplingPointSize,
+                AtlasPadding,
+                GlyphRenderMode.SDFAA,
+                AtlasSize,
+                AtlasSize,
+                AtlasPopulationMode.Dynamic,
+                enableMultiAtlasSupport: true
+            );
+            if (fontAsset == null)
+            {
+                LogSystemCjkLoadFailure("CreateFontAsset returned null.");
+                return null;
+            }
+
+            fontAsset.name = $"BPP System CJK TMP ({systemFont.name})";
+            _systemCjk = fontAsset;
+            BppLog.Info(Component, $"Loaded system CJK TMP font '{fontAsset.name}'.");
+            return _systemCjk;
+        }
+        catch (Exception ex)
+        {
+            LogSystemCjkLoadFailure(ex.Message);
+            return null;
+        }
     }
 
     private static TMP_FontAsset? ResolveDefault()
@@ -145,6 +201,15 @@ internal static class BppTmpFont
 
         _loadFailureLogged = true;
         BppLog.Warn(Component, $"Failed to load embedded TMP UI font. {reason}");
+    }
+
+    private static void LogSystemCjkLoadFailure(string reason)
+    {
+        if (_systemCjkLoadFailureLogged)
+            return;
+
+        _systemCjkLoadFailureLogged = true;
+        BppLog.Warn(Component, $"Failed to load a system CJK TMP font. {reason}");
     }
 
     private sealed class FontSnapshot

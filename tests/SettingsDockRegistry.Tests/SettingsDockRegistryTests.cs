@@ -1001,8 +1001,8 @@ public class SettingsDockRegistryTests
         BppSettingsDockOrder.BilingualItemNames,
         "Bilingual Item Names",
         "双语物品名",
-        "ON>OFF>ON",
-        "true>false>true"
+        "OFF>ON>OFF",
+        "false>true>false"
     )]
     [InlineData(
         "ChineseLocaleMode",
