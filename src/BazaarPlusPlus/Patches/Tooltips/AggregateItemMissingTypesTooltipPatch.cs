@@ -1,7 +1,8 @@
 #nullable enable
 #pragma warning disable CS0436
 using System;
-using System.Collections.Generic;
+using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Effect.Actions;
 using BazaarGameShared.Domain.Effect.AuraActions;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop.StaticCards;
@@ -57,7 +58,7 @@ internal static class AggregateItemMissingTypesTooltipPatch
 
         var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
         var template = BppStaticDataAccess.GetCardTemplate(staticData, card.TemplateId);
-        if (template == null || !AddsTagsFromOwnedItems(template.Auras.Values))
+        if (template == null || !AddsItemTypes(template))
             return null;
 
         // The live card's Tags are the source of truth: they already include both
@@ -66,13 +67,17 @@ internal static class AggregateItemMissingTypesTooltipPatch
         return AggregateItemMissingTypesText.Build(card.Tags, BppTooltipText.ColorKeywords);
     }
 
-    private static bool AddsTagsFromOwnedItems(
-        IEnumerable<BazaarGameShared.Domain.Effect.TCardAura> auras
-    )
+    private static bool AddsItemTypes(TCardBase template)
     {
-        foreach (var aura in auras)
+        foreach (var aura in template.Auras.Values)
         {
             if (aura.Action is TAuraActionCardAddTagsBySource)
+                return true;
+        }
+
+        foreach (var ability in template.Abilities.Values)
+        {
+            if (ability.Action is TActionCardAddTagsBySource)
                 return true;
         }
 
