@@ -22,22 +22,22 @@ public sealed class BazaarAgentHostPlugin : BaseUnityPlugin
     public const string PluginVersion = MyPluginInfo.PLUGIN_VERSION;
 
     private BazaarAgentRuntimeController? _controller;
+    private BazaarAgentBepInExLogger? _hostLogger;
 
     private void Awake()
     {
+        var logger = new BazaarAgentBepInExLogger(Logger);
+        _hostLogger = logger;
         var gameProbe = BazaarAgentGameBridge.Current;
         if (gameProbe is null)
         {
-            Logger.LogError(
-                "BazaarPlusPlus game-interop facade unavailable; BazaarAgent host inactive."
-            );
+            logger.TryEmit(BazaarAgentLogEvents.HostInitializationFailed());
             return;
         }
 
-        var logger = new BazaarAgentBepInExLogger(Logger);
         var options = new BazaarAgentBepInExOptions();
         var contextReader = new BazaarAgentGameContextReader(gameProbe, logger);
-        var dispatcher = new BazaarAgentGameActionDispatcher(logger);
+        var dispatcher = new BazaarAgentGameActionDispatcher();
         // Replay control (record/continue) is the only path that may exit ReplayState, and only
         // on an explicit POST /v1/replay/continue. No tick-driven replay auto-advance exists.
         var replaySink = new BazaarAgentGameReplayControlSink();
@@ -51,7 +51,7 @@ public sealed class BazaarAgentHostPlugin : BaseUnityPlugin
             new SystemBazaarAgentClock()
         );
 
-        logger.Info("BazaarAgent host plugin initialized");
+        logger.TryEmit(BazaarAgentLogEvents.HostInitialized());
     }
 
     private void Update() => _controller?.Tick();
@@ -60,5 +60,7 @@ public sealed class BazaarAgentHostPlugin : BaseUnityPlugin
     {
         _controller?.Dispose();
         _controller = null;
+        _hostLogger?.Dispose();
+        _hostLogger = null;
     }
 }

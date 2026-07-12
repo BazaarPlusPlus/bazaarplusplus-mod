@@ -25,7 +25,11 @@ public static class BazaarAgentReplayControlProcessor
         {
             outcome =
                 command.Kind == BazaarAgentReplayControlKind.Start
-                    ? sink.Start(command.Payload ?? Array.Empty<byte>(), command.BattleId)
+                    ? sink.Start(
+                        pending.RequestId,
+                        command.Payload ?? Array.Empty<byte>(),
+                        command.BattleId
+                    )
                     : sink.Continue();
         }
         catch (Exception ex)
@@ -35,7 +39,15 @@ public static class BazaarAgentReplayControlProcessor
             pending.SetResponse(
                 new BazaarAgentServerResponse(500, BuildErrorBody("internal", ex.GetType().Name))
             );
-            logger.Error($"replay control {command.Kind} threw", ex);
+            logger.TryEmit(
+                BazaarAgentLogEvents.ReplayRequestFailed(
+                    pending.RequestId,
+                    command.Kind,
+                    command.BattleId,
+                    BazaarAgentLogReasonCode.ReplaySinkException,
+                    ex
+                )
+            );
             return;
         }
 

@@ -13,13 +13,17 @@ namespace BazaarPlusPlus.BazaarAgentHost;
 /// </summary>
 internal sealed class BazaarAgentGameReplayControlSink : IBazaarAgentReplayControlSink
 {
-    public BazaarAgentReplayControlOutcome Start(byte[] ghostBattlePayloadBytes, string? battleId)
+    public BazaarAgentReplayControlOutcome Start(
+        string requestId,
+        byte[] ghostBattlePayloadBytes,
+        string? battleId
+    )
     {
         var recorder = BazaarAgentGameBridge.CurrentRecorder;
         if (recorder is null)
             return Unavailable();
 
-        return Map(recorder.TryStartRecord(ghostBattlePayloadBytes, battleId));
+        return Map(recorder.TryStartRecord(requestId, ghostBattlePayloadBytes, battleId));
     }
 
     public BazaarAgentReplayControlOutcome Continue()

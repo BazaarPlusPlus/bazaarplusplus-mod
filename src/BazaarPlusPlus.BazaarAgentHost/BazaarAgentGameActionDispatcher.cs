@@ -16,13 +16,6 @@ namespace BazaarPlusPlus.BazaarAgentHost;
 
 internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispatcher
 {
-    private readonly IBazaarAgentLogger _logger;
-
-    public BazaarAgentGameActionDispatcher(IBazaarAgentLogger logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
-
     /// <summary>Main thread only. Routes the action through AppState.CurrentState.*Command()
     /// so the game's UI animation + state-validation chain runs the same way a real click does.</summary>
     public BazaarAgentDispatchResult Execute(
@@ -36,8 +29,12 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
         }
         catch (Exception ex)
         {
-            _logger.Error($"dispatch threw for {action.ActionKind}", ex);
-            return new(false, $"dispatcher exception: {ex.GetType().Name}");
+            return new(
+                false,
+                $"dispatcher exception: {ex.GetType().Name}",
+                BazaarAgentDispatchDiagnostic.DispatcherException,
+                ex
+            );
         }
     }
 

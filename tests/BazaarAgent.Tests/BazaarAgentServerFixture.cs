@@ -10,22 +10,45 @@ internal sealed class ServerFixture : IDisposable
     public BazaarAgentHttpServer Server { get; }
     public BazaarAgentCommandQueue<BazaarAgentAction> Queue { get; }
     public BazaarAgentCommandQueue<BazaarAgentReplayCommand> ReplayQueue { get; }
+    public CapturingBazaarAgentLogger Logger { get; } = new();
     private BazaarAgentContextSnapshot? _snapshot;
     public BazaarAgentContextSnapshot? CurrentSnapshot => _snapshot;
 
     public void SetSnapshot(BazaarAgentContextSnapshot? s) => _snapshot = s;
 
-    public ServerFixture(int timeoutMs = 5000, int replayTimeoutMs = 5000)
+    public ServerFixture(
+        int timeoutMs = 5000,
+        int replayTimeoutMs = 5000,
+        Func<BazaarAgentContextSnapshot?>? snapshotGetter = null,
+        Func<string>? requestIdFactory = null,
+        Func<
+            System.Net.HttpListenerContext,
+            int,
+            string,
+            BazaarAgentHttpLogRoute,
+            System.Threading.Tasks.Task<byte[]?>
+        >? requestBodyReaderOverride = null,
+        Func<
+            System.Net.HttpListenerContext,
+            int,
+            string,
+            string?,
+            Exception?
+        >? errorEnvelopeWriter = null
+    )
     {
         Port = PickFreePort();
         Queue = new BazaarAgentCommandQueue<BazaarAgentAction>(timeoutMs);
         ReplayQueue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(replayTimeoutMs);
         Server = new BazaarAgentHttpServer(
             Port,
-            () => CurrentSnapshot,
+            snapshotGetter ?? (() => CurrentSnapshot),
             Queue,
             ReplayQueue,
-            new TestLogger()
+            Logger,
+            requestIdFactory ?? BazaarAgentUlid.New,
+            requestBodyReaderOverride,
+            errorEnvelopeWriter
         );
         Server.Start();
     }
@@ -57,13 +80,4 @@ internal sealed class ServerFixture : IDisposable
         listener.Stop();
         return port;
     }
-}
-
-internal sealed class TestLogger : IBazaarAgentLogger
-{
-    public void Info(string message) { }
-
-    public void Warning(string message) { }
-
-    public void Error(string message, Exception? exception = null) { }
 }

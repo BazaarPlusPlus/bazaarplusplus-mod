@@ -859,6 +859,25 @@ public class CoreLayeringTests
         );
     }
 
+    [Fact]
+    public void BazaarAgent_core_project_dependencies_remain_System_and_Newtonsoft_only()
+    {
+        var root = ProjectRoot(RepoRoot(), "BazaarPlusPlus.BazaarAgent");
+        var projectPath = Path.Combine(root, "BazaarPlusPlus.BazaarAgent.csproj");
+        var project = XDocument.Load(projectPath);
+        var elements = project.Descendants().ToList();
+        var packages = elements
+            .Where(element => element.Name.LocalName == "PackageReference")
+            .Select(element => Attribute(element, "Include"))
+            .Where(name => name != null)
+            .OrderBy(name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.Equal(new[] { "NETStandard.Library", "Newtonsoft.Json" }, packages);
+        Assert.DoesNotContain(elements, element => element.Name.LocalName == "ProjectReference");
+        Assert.DoesNotContain(elements, element => element.Name.LocalName == "Reference");
+    }
+
     // External battle video recording depends on replays staying in the
     // finishedAwaitingContinue phase until an explicit POST /v1/replay/continue: the recording
     // only finalizes (moov atom) when ReplayState.Exit() runs, and the exit timing belongs to the

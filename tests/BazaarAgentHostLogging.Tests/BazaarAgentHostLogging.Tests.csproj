@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RestoreAdditionalProjectSources>
+      https://api.nuget.org/v3/index.json;
+      https://nuget.bepinex.dev/v3/index.json;
+    </RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="BepInEx.Core" Version="5.*" />
+    <PackageReference Include="BepInEx.BaseLib" Version="5.4.20" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/BazaarPlusPlus.BazaarAgent/BazaarPlusPlus.BazaarAgent.csproj" />
+    <Compile
+      Include="../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentBepInExLogger.cs"
+      Link="Host/BazaarAgentBepInExLogger.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentLogRenderer.cs"
+      Link="Host/BazaarAgentLogRenderer.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentLogStormGuard.cs"
+      Link="Host/BazaarAgentLogStormGuard.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentDegradationLogState.cs"
+      Link="Host/BazaarAgentDegradationLogState.cs"
+    />
+    <None Include="$(PkgBepInEx_BaseLib)/lib/netstandard2.0/BepInEx.dll" Link="BepInEx.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

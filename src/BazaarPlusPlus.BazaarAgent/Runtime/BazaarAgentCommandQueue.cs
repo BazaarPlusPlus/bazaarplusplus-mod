@@ -40,11 +40,15 @@ public sealed class BazaarAgentPendingCommand<TCommand>
     private Timer? _timer;
 
     public TCommand Command { get; }
+    public string RequestId { get; }
     public Task<BazaarAgentServerResponse> ResponseTask => _tcs.Task;
     public bool IsDiscarded => Volatile.Read(ref _claimed) == ClaimTimeout;
 
-    internal BazaarAgentPendingCommand(TCommand command, int timeoutMilliseconds)
+    internal BazaarAgentPendingCommand(string requestId, TCommand command, int timeoutMilliseconds)
     {
+        if (string.IsNullOrWhiteSpace(requestId))
+            throw new ArgumentException("Request id is required.", nameof(requestId));
+        RequestId = requestId;
         Command = command;
         _timer = new Timer(TimeoutCallback, null, timeoutMilliseconds, Timeout.Infinite);
     }
@@ -105,13 +109,15 @@ public sealed class BazaarAgentCommandQueue<TCommand> : IDisposable
 
     public BazaarAgentCommandQueue(int timeoutMilliseconds) => _timeoutMs = timeoutMilliseconds;
 
-    public Task<BazaarAgentServerResponse> EnqueueAndAwaitAsync(TCommand command)
+    public Task<BazaarAgentServerResponse> EnqueueAndAwaitAsync(string requestId, TCommand command)
     {
+        if (string.IsNullOrWhiteSpace(requestId))
+            throw new ArgumentException("Request id is required.", nameof(requestId));
         if (Volatile.Read(ref _disposed) != 0)
             return Task.FromResult(
                 new BazaarAgentServerResponse(503, "{\"error\":\"unavailable\"}")
             );
-        var p = new BazaarAgentPendingCommand<TCommand>(command, _timeoutMs);
+        var p = new BazaarAgentPendingCommand<TCommand>(requestId, command, _timeoutMs);
         _queue.Enqueue(p);
         return p.ResponseTask;
     }

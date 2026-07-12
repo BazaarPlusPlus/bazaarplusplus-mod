@@ -40,7 +40,18 @@ public interface IBazaarAgentActionDispatcher
     );
 }
 
-public readonly record struct BazaarAgentDispatchResult(bool Executed, string? Error);
+public enum BazaarAgentDispatchDiagnostic
+{
+    None,
+    DispatcherException,
+}
+
+public readonly record struct BazaarAgentDispatchResult(
+    bool Executed,
+    string? Error,
+    BazaarAgentDispatchDiagnostic Diagnostic = BazaarAgentDispatchDiagnostic.None,
+    Exception? DiagnosticException = null
+);
 
 public enum BazaarAgentReplayControlKind
 {
@@ -84,18 +95,18 @@ public readonly record struct BazaarAgentReplayControlOutcome(
 /// </summary>
 public interface IBazaarAgentReplayControlSink
 {
-    BazaarAgentReplayControlOutcome Start(byte[] ghostBattlePayloadBytes, string? battleId);
+    BazaarAgentReplayControlOutcome Start(
+        string requestId,
+        byte[] ghostBattlePayloadBytes,
+        string? battleId
+    );
 
     BazaarAgentReplayControlOutcome Continue();
 }
 
 public interface IBazaarAgentLogger
 {
-    void Info(string message);
-
-    void Warning(string message);
-
-    void Error(string message, Exception? exception = null);
+    void Emit(BazaarAgentLogEvent logEvent);
 }
 
 public interface IBazaarAgentClock

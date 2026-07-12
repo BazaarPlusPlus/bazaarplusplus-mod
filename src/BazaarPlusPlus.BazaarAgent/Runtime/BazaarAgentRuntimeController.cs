@@ -20,6 +20,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     private readonly IBazaarAgentClock _clock;
     private readonly Action? _snapshotPublished;
     private readonly BazaarAgentContextSnapshotPublisher _snapshots = new();
+    private readonly BazaarAgentListenerLogState _listenerLogState = new();
     private readonly JsonSerializerSettings _responseJson = new()
     {
         ContractResolver = new CamelCasePropertyNamesContractResolver(),
@@ -77,7 +78,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         var context = _contextReader.Build(cooldownLeft);
         var snapshot = _snapshots.Publish(context);
         if (snapshot.TickId == 1)
-            _logger.Info($"First snapshot published. state={context.StateName}");
+            _logger.TryEmit(BazaarAgentLogEvents.SnapshotReady(context.StateName));
 
         _snapshotPublished?.Invoke();
 
@@ -95,7 +96,14 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             catch (Exception ex)
             {
                 pending.SetResponse(new BazaarAgentServerResponse(500, "{\"error\":\"internal\"}"));
-                _logger.Error("action processing threw", ex);
+                _logger.TryEmit(
+                    BazaarAgentLogEvents.ActionFailed(
+                        pending.RequestId,
+                        pending.Command.ActionKind,
+                        BazaarAgentLogReasonCode.ActionProcessingException,
+                        ex
+                    )
+                );
             }
         }
 
@@ -116,7 +124,9 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
         if (_http is not null)
         {
-            _logger.Info($"Restarting listener (port {_currentPort} -> {desiredPort})");
+            _logger.TryEmitDebug(() =>
+                BazaarAgentLogEvents.ListenerRestartStarted(_currentPort, desiredPort)
+            );
             StopListener();
         }
 
@@ -135,43 +145,32 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             );
             _http.Start();
             _currentPort = desiredPort;
-            _logger.Info($"Listener started on http://127.0.0.1:{desiredPort}");
+            _listenerLogState.OnStartSucceeded(desiredPort, _logger);
         }
         catch (Exception ex)
         {
-            _logger.Error($"Listener failed on port {desiredPort}", ex);
+            _listenerLogState.OnStartFailed(desiredPort, ex, _logger);
             StopListener();
         }
     }
 
     private void StopListener()
     {
-        try
-        {
-            _http?.Stop();
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning($"Listener stop failed: {ex.GetType().Name}: {ex.Message}");
-        }
+        var report = _http?.Stop() ?? new BazaarAgentListenerStopReport();
+        report.Capture(BazaarAgentListenerStopPhase.ActionQueueDispose, () => _queue?.Dispose());
+        report.Capture(
+            BazaarAgentListenerStopPhase.ReplayQueueDispose,
+            () => _replayQueue?.Dispose()
+        );
 
-        try
+        if (report.FirstException is { } firstException)
         {
-            _queue?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning($"Listener queue disposal failed: {ex.GetType().Name}: {ex.Message}");
-        }
-
-        try
-        {
-            _replayQueue?.Dispose();
-        }
-        catch (Exception ex)
-        {
-            _logger.Warning(
-                $"Replay control queue disposal failed: {ex.GetType().Name}: {ex.Message}"
+            _logger.TryEmit(
+                BazaarAgentLogEvents.ListenerStopDegraded(
+                    report.FailedPhaseCount,
+                    report.FirstFailedPhase,
+                    firstException
+                )
             );
         }
 
@@ -202,7 +201,15 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             catch (Exception ex)
             {
                 pending.SetResponse(new BazaarAgentServerResponse(500, "{\"error\":\"internal\"}"));
-                _logger.Error("replay control processing threw", ex);
+                _logger.TryEmit(
+                    BazaarAgentLogEvents.ReplayRequestFailed(
+                        pending.RequestId,
+                        pending.Command.Kind,
+                        pending.Command.BattleId,
+                        BazaarAgentLogReasonCode.ReplayProcessorException,
+                        ex
+                    )
+                );
             }
         }
     }
@@ -222,6 +229,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             var errorBody = BazaarAgentResponseJson.BuildValidationErrorBody(validation);
             pending.SetResponse(new BazaarAgentServerResponse(validation.HttpStatus, errorBody));
             LogDecision(
+                pending.RequestId,
                 decisionId,
                 snapshot,
                 action,
@@ -239,13 +247,41 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
             var okBody = BuildOkBody(decisionId, snapshot, action, executed: true);
             pending.SetResponse(new BazaarAgentServerResponse(200, okBody));
-            LogDecision(decisionId, snapshot, action, executed: true, error: null);
+            LogDecision(
+                pending.RequestId,
+                decisionId,
+                snapshot,
+                action,
+                executed: true,
+                error: null
+            );
             return;
         }
 
         var dispatchErrorBody = BuildDispatchErrorBody(result.Error);
         pending.SetResponse(new BazaarAgentServerResponse(500, dispatchErrorBody));
-        LogDecision(decisionId, snapshot, action, executed: false, error: result.Error);
+        if (
+            result.Diagnostic == BazaarAgentDispatchDiagnostic.DispatcherException
+            && result.DiagnosticException is { } diagnosticException
+        )
+        {
+            _logger.TryEmit(
+                BazaarAgentLogEvents.ActionFailed(
+                    pending.RequestId,
+                    action.ActionKind,
+                    BazaarAgentLogReasonCode.ActionDispatchException,
+                    diagnosticException
+                )
+            );
+        }
+        LogDecision(
+            pending.RequestId,
+            decisionId,
+            snapshot,
+            action,
+            executed: false,
+            error: result.Error
+        );
     }
 
     private string BuildDispatchErrorBody(string? details)
@@ -275,6 +311,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     }
 
     private void LogDecision(
+        string requestId,
         string decisionId,
         BazaarAgentContextSnapshot snapshot,
         BazaarAgentAction action,
@@ -302,7 +339,14 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         }
         catch (Exception ex)
         {
-            _logger.Error("decision log append failed", ex);
+            _logger.TryEmit(
+                BazaarAgentLogEvents.DecisionLogAppendFailed(
+                    decisionId,
+                    snapshot.Context.RunId,
+                    requestId,
+                    ex
+                )
+            );
         }
     }
 

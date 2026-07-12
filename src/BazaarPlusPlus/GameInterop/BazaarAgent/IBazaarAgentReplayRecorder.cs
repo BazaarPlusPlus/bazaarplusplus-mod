@@ -12,7 +12,11 @@ public interface IBazaarAgentReplayRecorder
     /// <summary>Decodes a GhostBattlePayload msgpack+gzip blob, runs the recording guards, and
     /// boots replay playback with video recording enabled. <paramref name="expectedBattleId"/>
     /// (from the request header/query), when present, is cross-checked against the payload.</summary>
-    BppReplayControlResult TryStartRecord(byte[] ghostBattlePayloadBytes, string? expectedBattleId);
+    BppReplayControlResult TryStartRecord(
+        string requestId,
+        byte[] ghostBattlePayloadBytes,
+        string? expectedBattleId
+    );
 
     /// <summary>Drives the replay "continue" button (<c>ReplayState.Exit()</c>), which finalizes
     /// the recording. Rejected unless the replay has finished and awaits continue.</summary>

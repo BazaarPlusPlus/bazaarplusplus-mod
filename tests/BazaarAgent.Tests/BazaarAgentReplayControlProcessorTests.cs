@@ -7,22 +7,26 @@ using Xunit;
 
 public class BazaarAgentReplayControlProcessorTests
 {
+    private const string RequestId = "01JABCDEFGHJKMNPQRSTVWXYZ";
+
     private sealed class RecordingSink : IBazaarAgentReplayControlSink
     {
-        public List<(byte[] Payload, string? BattleId)> StartCalls { get; } = new();
+        public List<(string RequestId, byte[] Payload, string? BattleId)> StartCalls { get; } =
+            new();
         public int ContinueCalls { get; private set; }
         public BazaarAgentReplayControlOutcome NextOutcome { get; set; } =
             new(BazaarAgentReplayControlStatus.Accepted, null, null);
         public Exception? ThrowOnStart { get; set; }
 
         public BazaarAgentReplayControlOutcome Start(
+            string requestId,
             byte[] ghostBattlePayloadBytes,
             string? battleId
         )
         {
             if (ThrowOnStart is not null)
                 throw ThrowOnStart;
-            StartCalls.Add((ghostBattlePayloadBytes, battleId));
+            StartCalls.Add((requestId, ghostBattlePayloadBytes, battleId));
             return NextOutcome;
         }
 
@@ -33,24 +37,20 @@ public class BazaarAgentReplayControlProcessorTests
         }
     }
 
-    private sealed class TestLogger : IBazaarAgentLogger
-    {
-        public void Info(string message) { }
-
-        public void Warning(string message) { }
-
-        public void Error(string message, Exception? exception = null) { }
-    }
-
     private static async Task<BazaarAgentServerResponse> RunAsync(
         BazaarAgentCommandQueue<BazaarAgentReplayCommand> queue,
         Task<BazaarAgentServerResponse> awaiting,
-        RecordingSink sink
+        RecordingSink sink,
+        IBazaarAgentLogger? logger = null
     )
     {
         var pending = queue.TryDequeue();
         Assert.NotNull(pending);
-        BazaarAgentReplayControlProcessor.Process(pending!, sink, new TestLogger());
+        BazaarAgentReplayControlProcessor.Process(
+            pending!,
+            sink,
+            logger ?? new CapturingBazaarAgentLogger()
+        );
         return await awaiting;
     }
 
@@ -65,6 +65,7 @@ public class BazaarAgentReplayControlProcessorTests
         var payload = new byte[] { 1, 2, 3 };
 
         var task = queue.EnqueueAndAwaitAsync(
+            RequestId,
             new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, payload, "b-1")
         );
         var res = await RunAsync(queue, task, sink);
@@ -73,6 +74,7 @@ public class BazaarAgentReplayControlProcessorTests
         Assert.Contains("\"recording-started\"", res.JsonBody);
         Assert.Contains("\"battleId\":\"b-1\"", res.JsonBody);
         var call = Assert.Single(sink.StartCalls);
+        Assert.Equal(RequestId, call.RequestId);
         Assert.Equal(payload, call.Payload);
         Assert.Equal("b-1", call.BattleId);
         Assert.Equal(0, sink.ContinueCalls);
@@ -85,6 +87,7 @@ public class BazaarAgentReplayControlProcessorTests
         var sink = new RecordingSink();
 
         var task = queue.EnqueueAndAwaitAsync(
+            RequestId,
             new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Continue, null, null)
         );
         var res = await RunAsync(queue, task, sink);
@@ -109,6 +112,7 @@ public class BazaarAgentReplayControlProcessorTests
         var sink = new RecordingSink { NextOutcome = new(status, "why it failed", null) };
 
         var task = queue.EnqueueAndAwaitAsync(
+            RequestId,
             new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, new byte[] { 1 }, null)
         );
         var res = await RunAsync(queue, task, sink);
@@ -122,15 +126,69 @@ public class BazaarAgentReplayControlProcessorTests
     public async Task SinkException_Returns500Internal()
     {
         using var queue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(5000);
-        var sink = new RecordingSink { ThrowOnStart = new InvalidOperationException("boom") };
+        var exception = new InvalidOperationException("boom");
+        var sink = new RecordingSink { ThrowOnStart = exception };
 
         var task = queue.EnqueueAndAwaitAsync(
-            new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, new byte[] { 1 }, null)
+            RequestId,
+            new BazaarAgentReplayCommand(
+                BazaarAgentReplayControlKind.Start,
+                new byte[] { 1 },
+                "0123456789abcdef0123456789abcdef"
+            )
         );
-        var res = await RunAsync(queue, task, sink);
+        var pending = queue.TryDequeue();
+        Assert.NotNull(pending);
+        var logger = new CapturingBazaarAgentLogger(_ =>
+            Assert.True(pending!.ResponseTask.IsCompleted)
+        );
+        BazaarAgentReplayControlProcessor.Process(pending!, sink, logger);
+        var res = await task;
 
         Assert.Equal(500, res.HttpStatus);
         Assert.Contains("\"error\":\"internal\"", res.JsonBody);
+        var logEvent = Assert.Single(logger.Events);
+        Assert.Equal(BazaarAgentLogSeverity.Error, logEvent.Definition.Severity);
+        Assert.Equal("agent.replay_request.failed", logEvent.Definition.EventId);
+        Assert.Same(exception, logEvent.Exception);
+        Assert.Collection(
+            logEvent.Values,
+            value => Assert.Equal(RequestId, value.Value),
+            value => Assert.Equal(BazaarAgentReplayLogAction.Record, value.Value),
+            value => Assert.Equal("0123456789abcdef0123456789abcdef", value.Value),
+            value => Assert.Equal(BazaarAgentLogReasonCode.ReplaySinkException, value.Value)
+        );
+    }
+
+    [Fact]
+    public async Task SinkException_does_not_copy_an_unvalidated_request_battle_id_into_the_log()
+    {
+        using var queue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(5000);
+        var sink = new RecordingSink { ThrowOnStart = new InvalidOperationException("boom") };
+        var task = queue.EnqueueAndAwaitAsync(
+            RequestId,
+            new BazaarAgentReplayCommand(
+                BazaarAgentReplayControlKind.Start,
+                new byte[] { 1 },
+                "token=must-not-appear"
+            )
+        );
+        var pending = Assert.IsType<BazaarAgentPendingCommand<BazaarAgentReplayCommand>>(
+            queue.TryDequeue()
+        );
+        var logger = new CapturingBazaarAgentLogger();
+
+        BazaarAgentReplayControlProcessor.Process(pending, sink, logger);
+        _ = await task;
+
+        var logEvent = Assert.Single(logger.Events);
+        Assert.Null(logEvent.Values[2].Value);
+        Assert.DoesNotContain(
+            logEvent.Values,
+            value =>
+                value.Value?.ToString()?.Contains("must-not-appear", StringComparison.Ordinal)
+                == true
+        );
     }
 
     [Fact]
@@ -140,6 +198,7 @@ public class BazaarAgentReplayControlProcessorTests
             timeoutMilliseconds: 50
         );
         var task = queue.EnqueueAndAwaitAsync(
+            RequestId,
             new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Continue, null, null)
         );
         var res = await task;
@@ -154,6 +213,7 @@ public class BazaarAgentReplayControlProcessorTests
     {
         var queue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(60_000);
         var task = queue.EnqueueAndAwaitAsync(
+            RequestId,
             new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, new byte[] { 1 }, "b")
         );
         queue.Dispose();
@@ -162,6 +222,7 @@ public class BazaarAgentReplayControlProcessorTests
 
         // Post-dispose enqueues short-circuit to 503 without queueing.
         var after = await queue.EnqueueAndAwaitAsync(
+            RequestId,
             new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Continue, null, null)
         );
         Assert.Equal(503, after.HttpStatus);

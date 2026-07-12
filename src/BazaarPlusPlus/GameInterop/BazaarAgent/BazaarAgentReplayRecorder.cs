@@ -11,12 +11,12 @@ namespace BazaarPlusPlus.GameInterop;
 /// </summary>
 internal sealed class BazaarAgentReplayRecorder : IBazaarAgentReplayRecorder
 {
-    private readonly Func<byte[], string?, BppReplayControlResult> _tryStartRecord;
+    private readonly Func<string, byte[], string?, BppReplayControlResult> _tryStartRecord;
     private readonly Func<BppReplayControlResult> _tryContinueReplay;
     private readonly Func<BppReplayPhaseSnapshot> _getReplayPhase;
 
     public BazaarAgentReplayRecorder(
-        Func<byte[], string?, BppReplayControlResult> tryStartRecord,
+        Func<string, byte[], string?, BppReplayControlResult> tryStartRecord,
         Func<BppReplayControlResult> tryContinueReplay,
         Func<BppReplayPhaseSnapshot> getReplayPhase
     )
@@ -28,9 +28,10 @@ internal sealed class BazaarAgentReplayRecorder : IBazaarAgentReplayRecorder
     }
 
     public BppReplayControlResult TryStartRecord(
+        string requestId,
         byte[] ghostBattlePayloadBytes,
         string? expectedBattleId
-    ) => _tryStartRecord(ghostBattlePayloadBytes, expectedBattleId);
+    ) => _tryStartRecord(requestId, ghostBattlePayloadBytes, expectedBattleId);
 
     public BppReplayControlResult TryContinueReplay() => _tryContinueReplay();
 

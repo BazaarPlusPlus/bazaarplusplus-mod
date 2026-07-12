@@ -31,8 +31,14 @@ internal static class BazaarAgentReplayRecorderWiring
     )
     {
         return new BazaarAgentReplayRecorder(
-            tryStartRecord: (payloadBytes, expectedBattleId) =>
-                TryStartRecord(runtimeAccessor(), services, payloadBytes, expectedBattleId),
+            tryStartRecord: (requestId, payloadBytes, expectedBattleId) =>
+                TryStartRecord(
+                    runtimeAccessor(),
+                    services,
+                    requestId,
+                    payloadBytes,
+                    expectedBattleId
+                ),
             tryContinueReplay: () => TryContinueReplay(runtimeAccessor()),
             getReplayPhase: () => GetReplayPhase(runtimeAccessor(), services)
         );
@@ -41,6 +47,7 @@ internal static class BazaarAgentReplayRecorderWiring
     private static BppReplayControlResult TryStartRecord(
         CombatReplayRuntime? runtime,
         IBppServices services,
+        string requestId,
         byte[] payloadBytes,
         string? expectedBattleId
     )

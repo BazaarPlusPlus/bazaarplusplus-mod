@@ -21,8 +21,10 @@ internal static class BazaarAgentSceneProbe
     private static FieldInfo? _clientCacheProfileField;
     private static PropertyInfo? _profileValueProp;
     private static bool _reflectionAttempted;
+    private static bool _permanentDegradationReported;
 
     private static (bool sceneOk, bool appStateNull, bool profileLoaded)? _lastDiagnosis;
+    private static readonly BazaarAgentDegradationLogState TransientLogState = new();
 
     public static bool IsAtHeroSelectAndReadyForNewRun(IBazaarAgentLogger logger)
     {
@@ -31,14 +33,32 @@ internal static class BazaarAgentSceneProbe
             var sceneName = SceneManager.GetActiveScene().name;
             var sceneOk = string.Equals(sceneName, HeroSelectSceneName, StringComparison.Ordinal);
             var appStateNull = AppState.CurrentState == null;
-            var profileLoaded = TryReadProfileLoaded(logger);
+            var profileResult = TryReadProfileLoaded();
+            var profileLoaded = profileResult.Loaded;
+            if (profileResult.PermanentFailure is { } permanentFailure)
+            {
+                if (!_permanentDegradationReported)
+                {
+                    _permanentDegradationReported = true;
+                    logger.TryEmit(BazaarAgentLogEvents.SceneProbeDegraded(permanentFailure));
+                }
+            }
+            else
+            {
+                TransientLogState.ReportRecovered(logger, BazaarAgentLogEvents.SceneProbeRecovered);
+            }
 
             var snapshot = (sceneOk, appStateNull, profileLoaded);
             if (_lastDiagnosis != snapshot)
             {
                 _lastDiagnosis = snapshot;
-                logger.Info(
-                    $"SceneProbe: scene='{sceneName}' (ok={sceneOk}) appStateNull={appStateNull} profileLoaded={profileLoaded}"
+                logger.TryEmitDebug(() =>
+                    BazaarAgentLogEvents.SceneProbeStateChanged(
+                        sceneName,
+                        sceneOk,
+                        appStateNull,
+                        profileLoaded
+                    )
                 );
             }
 
@@ -46,12 +66,19 @@ internal static class BazaarAgentSceneProbe
         }
         catch (Exception ex)
         {
-            logger.Error("IsAtHeroSelectAndReadyForNewRun failed", ex);
+            TransientLogState.ReportDegraded(
+                logger,
+                () =>
+                    BazaarAgentLogEvents.SceneProbeDegraded(
+                        BazaarAgentLogReasonCode.SceneProbeException,
+                        ex
+                    )
+            );
             return false;
         }
     }
 
-    private static bool TryReadProfileLoaded(IBazaarAgentLogger logger)
+    private static ProfileReadResult TryReadProfileLoaded()
     {
         if (!_reflectionAttempted)
         {
@@ -59,8 +86,9 @@ internal static class BazaarAgentSceneProbe
             var clientCacheType = AccessTools.TypeByName("TheBazaar.ClientCache");
             if (clientCacheType is null)
             {
-                logger.Info("TheBazaar.ClientCache not found via reflection");
-                return false;
+                return ProfileReadResult.Permanent(
+                    BazaarAgentLogReasonCode.ClientCacheTypeUnavailable
+                );
             }
             _clientCacheProfileField = clientCacheType.GetField(
                 "Profile",
@@ -71,12 +99,33 @@ internal static class BazaarAgentSceneProbe
                 _profileValueProp = _clientCacheProfileField.FieldType.GetProperty("Value");
             }
         }
-        if (_clientCacheProfileField is null || _profileValueProp is null)
-            return false;
+        if (_clientCacheProfileField is null)
+            return ProfileReadResult.Permanent(BazaarAgentLogReasonCode.ProfileFieldUnavailable);
+        if (_profileValueProp is null)
+            return ProfileReadResult.Permanent(
+                BazaarAgentLogReasonCode.ProfileValuePropertyUnavailable
+            );
         var profileCache = _clientCacheProfileField.GetValue(null);
         if (profileCache is null)
-            return false;
+            return ProfileReadResult.Healthy(loaded: false);
         var profile = _profileValueProp.GetValue(profileCache);
-        return profile is not null;
+        return ProfileReadResult.Healthy(profile is not null);
+    }
+
+    private readonly struct ProfileReadResult
+    {
+        private ProfileReadResult(bool loaded, BazaarAgentLogReasonCode? permanentFailure)
+        {
+            Loaded = loaded;
+            PermanentFailure = permanentFailure;
+        }
+
+        internal bool Loaded { get; }
+        internal BazaarAgentLogReasonCode? PermanentFailure { get; }
+
+        internal static ProfileReadResult Healthy(bool loaded) => new(loaded, null);
+
+        internal static ProfileReadResult Permanent(BazaarAgentLogReasonCode reasonCode) =>
+            new(loaded: false, reasonCode);
     }
 }

@@ -27,6 +27,11 @@ public sealed class LoggingGovernanceTests
         RegexOptions.CultureInvariant
     );
 
+    private static readonly Regex LegacyHostAgentLoggerCall = new(
+        @"\b(?:logger|_logger)\.(?<member>Info|Warning|Error)\s*\(",
+        RegexOptions.CultureInvariant
+    );
+
     private static readonly Regex LogShapedCall = new(
         @"\.(?<member>Log|LogDebug|LogInfo|LogWarning|LogError|LogFatal|LogMessage)\s*\(",
         RegexOptions.CultureInvariant
@@ -62,7 +67,7 @@ public sealed class LoggingGovernanceTests
     private static readonly IReadOnlyDictionary<string, string> ExpectedLegacyCalls =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["BazaarAgentReplayRecorderWiring.cs"] = "94:Info",
+            ["BazaarAgentReplayRecorderWiring.cs"] = "101:Info",
             ["Core/Events/InMemoryBppEventBus.cs"] = "69:Error",
             ["Core/Runtime/BppFeatureRegistry.cs"] = "26:Error,45:Error",
             ["Game/CollectionPanel/CollectionPanel.cs"] =
@@ -255,14 +260,10 @@ public sealed class LoggingGovernanceTests
         };
 
     private static readonly IReadOnlyDictionary<string, string> ExpectedAgentLoggerCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["Runtime/BazaarAgentReplayControlProcessor.cs"] = "38:Error",
-            ["Runtime/BazaarAgentRuntimeController.cs"] =
-                "80:Info,98:Error,119:Info,138:Info,142:Error,155:Warning,164:Warning,173:Warning,205:Error,305:Error",
-            ["Transport/BazaarAgentHttpServer.cs"] =
-                "76:Warning,84:Warning,92:Warning,116:Warning,165:Error,172:Warning,183:Warning,323:Error,374:Warning,411:Warning",
-        };
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
+    private static readonly IReadOnlyDictionary<string, string> ExpectedHostAgentLoggerCalls =
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     private static readonly IReadOnlyDictionary<string, string> ExpectedStorageLoggerCalls =
         new Dictionary<string, string>(StringComparer.Ordinal)
@@ -282,7 +283,6 @@ public sealed class LoggingGovernanceTests
     private static readonly IReadOnlyDictionary<string, string> ExpectedNonAdapterLogShapedCalls =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["BazaarPlusPlus.BazaarAgentHost/BazaarAgentHostPlugin.cs"] = "31:LogError",
             ["BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs"] = "862:Log",
         };
 
@@ -314,6 +314,7 @@ public sealed class LoggingGovernanceTests
     public void Agent_and_Storage_free_text_ports_match_the_shrinking_allowlists()
     {
         var agentRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.BazaarAgent");
+        var hostRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.BazaarAgentHost");
         var storageRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.Storage");
 
         AssertFingerprintsEqual(
@@ -322,9 +323,37 @@ public sealed class LoggingGovernanceTests
             "The BazaarAgent free-text logger surface is frozen until #54 replaces it."
         );
         AssertFingerprintsEqual(
+            ExpectedHostAgentLoggerCalls,
+            FingerprintMatches(hostRoot, LegacyHostAgentLoggerCall, relativeTo: hostRoot),
+            "The BazaarAgent Host free-text logger surface was removed by #54 and must stay empty."
+        );
+        AssertFingerprintsEqual(
             ExpectedStorageLoggerCalls,
             FingerprintMatches(storageRoot, LegacyStorageLoggerCall, relativeTo: storageRoot),
             "The Storage free-text logger surface is frozen until #53 replaces it."
+        );
+    }
+
+    [Fact]
+    public void BazaarAgent_logger_port_accepts_only_governed_events()
+    {
+        var ports = File.ReadAllText(
+            Path.Combine(
+                RepoRoot(),
+                "src",
+                "BazaarPlusPlus.BazaarAgent",
+                "Contract",
+                "BazaarAgentPorts.cs"
+            )
+        );
+
+        Assert.Contains("void Emit(BazaarAgentLogEvent logEvent);", ports);
+        Assert.DoesNotMatch(
+            new Regex(
+                @"void\s+(?:Info|Warning|Error)\s*\(\s*string",
+                RegexOptions.CultureInvariant
+            ),
+            ports
         );
     }
 
@@ -345,6 +374,58 @@ public sealed class LoggingGovernanceTests
             "Direct BepInEx writes are restricted to approved adapters. The broad .Log scan also "
                 + "pins known non-BepInEx calls so generic ManualLogSource receiver names cannot "
                 + "escape the boundary."
+        );
+    }
+
+    [Fact]
+    public void BazaarAgentHost_bootstrap_uses_the_structured_adapter_before_bridge_access()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                RepoRoot(),
+                "src",
+                "BazaarPlusPlus.BazaarAgentHost",
+                "BazaarAgentHostPlugin.cs"
+            )
+        );
+        var adapter = source.IndexOf(
+            "new BazaarAgentBepInExLogger(Logger)",
+            StringComparison.Ordinal
+        );
+        var bridge = source.IndexOf("BazaarAgentGameBridge.Current", StringComparison.Ordinal);
+
+        Assert.True(adapter >= 0 && bridge >= 0 && adapter < bridge);
+        Assert.Contains("BazaarAgentLogEvents.HostInitializationFailed()", source);
+        Assert.Contains("BazaarAgentLogEvents.HostInitialized()", source);
+        Assert.DoesNotContain("Logger.Log", source);
+    }
+
+    [Fact]
+    public void BazaarAgent_dispatcher_returns_typed_failures_without_logging()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                RepoRoot(),
+                "src",
+                "BazaarPlusPlus.BazaarAgentHost",
+                "BazaarAgentGameActionDispatcher.cs"
+            )
+        );
+
+        Assert.DoesNotContain("IBazaarAgentLogger", source);
+        Assert.DoesNotContain("_logger", source);
+        Assert.Contains("BazaarAgentDispatchDiagnostic.DispatcherException", source);
+        Assert.Contains(
+            "DiagnosticException",
+            File.ReadAllText(
+                Path.Combine(
+                    RepoRoot(),
+                    "src",
+                    "BazaarPlusPlus.BazaarAgent",
+                    "Contract",
+                    "BazaarAgentPorts.cs"
+                )
+            )
         );
     }
 

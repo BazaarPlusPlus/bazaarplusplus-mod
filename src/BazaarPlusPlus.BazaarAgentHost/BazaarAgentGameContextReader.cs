@@ -24,6 +24,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 {
     private readonly IBazaarAgentGameProbe _gameProbe;
     private readonly IBazaarAgentLogger _logger;
+    private readonly BazaarAgentDegradationLogState _logState = new();
 
     public BazaarAgentGameContextReader(IBazaarAgentGameProbe gameProbe, IBazaarAgentLogger logger)
     {
@@ -39,11 +40,13 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
     {
         try
         {
-            return BuildCore(_gameProbe, _logger, actionCooldownRemainingSeconds);
+            var context = BuildCore(_gameProbe, _logger, actionCooldownRemainingSeconds);
+            _logState.ReportRecovered(_logger, BazaarAgentLogEvents.ContextRecovered);
+            return context;
         }
         catch (Exception ex)
         {
-            _logger.Error("context build failed", ex);
+            _logState.ReportDegraded(_logger, () => BazaarAgentLogEvents.ContextDegraded(ex));
             return MakeDegenerate(actionCooldownRemainingSeconds);
         }
     }
