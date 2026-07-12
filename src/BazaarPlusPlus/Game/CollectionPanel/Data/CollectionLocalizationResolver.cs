@@ -14,7 +14,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 // TooltipExtensions.GetLocalizedText -> LocalizationService.TryGetText keyed lookup, which
 // is what the native tooltip pipeline uses. We do the same, falling back to Text (and then
 // the key for diagnostic visibility) when the service is unavailable — e.g. in unit tests.
-internal static class CollectionLocalizationResolver
+internal static partial class CollectionLocalizationResolver
 {
     public static string? ResolveTitle(TCardBase template)
     {
@@ -133,7 +133,23 @@ internal static class CollectionLocalizationResolver
     // the data layer never depends on game UI services directly.
     internal static Func<string, string?>? AttributeUnitLocalizer = null;
 
-    private static string? FormatAbilityPlaceholders(TCardBase template, string? text)
+    private delegate bool AbilityValueResolver(
+        string abilityId,
+        out string valueText,
+        out string? unit
+    );
+
+    private static string? FormatAbilityPlaceholders(TCardBase template, string? text) =>
+        FormatAbilityPlaceholders(
+            text,
+            (string abilityId, out string valueText, out string? unit) =>
+                TryResolveAbilityValue(template, abilityId, out valueText, out unit)
+        );
+
+    private static string? FormatAbilityPlaceholders(
+        string? text,
+        AbilityValueResolver resolveAbilityValue
+    )
     {
         if (
             string.IsNullOrWhiteSpace(text) || !text.Contains("{ability.", StringComparison.Ordinal)
@@ -149,12 +165,7 @@ internal static class CollectionLocalizationResolver
                 // nothing rather than leaking raw tokens; leftover empty brackets
                 // are cleaned afterwards.
                 if (
-                    !TryResolveAbilityValue(
-                        template,
-                        match.Groups[1].Value,
-                        out var value,
-                        out var unit
-                    )
+                    !resolveAbilityValue(match.Groups[1].Value, out var value, out var unit)
                 )
                     return string.Empty;
                 if (unit == null)

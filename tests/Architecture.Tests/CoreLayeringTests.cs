@@ -209,7 +209,7 @@ public class CoreLayeringTests
             StringComparison.Ordinal
         );
         var collectionIndex = compositionSource.IndexOf(
-            "_mountables.Register(new CollectionPanelMount",
+            "new CollectionPanelMount(",
             StringComparison.Ordinal
         );
         var historyIndex = compositionSource.IndexOf(

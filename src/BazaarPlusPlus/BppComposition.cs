@@ -29,6 +29,7 @@ using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.GameInterop.RunSnapshot;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Storage.Paths;
@@ -47,6 +48,7 @@ internal sealed class BppComposition : IDisposable
     private readonly GameStateProbe _gameStateProbe = new();
     private readonly EncounterStateProbe _encounterStateProbe = new();
     private readonly RunSnapshotProbe _runSnapshotProbe = new();
+    private readonly BppStaticCardMapProvider _staticCardMapProvider = new();
     private readonly BppRuntimeServices _services;
     private readonly BppFeatureRegistry _featureRegistry = new();
     private readonly BppMountableRegistry _mountables = new();
@@ -125,11 +127,33 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(NameOverrideSettingsDockEntry.Create());
 
         _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
+        var encounterPreviewCachePath = System.IO.Path.Combine(
+            System.IO.Path.GetDirectoryName(
+                _paths.RunLogDatabasePath
+                    ?? throw new InvalidOperationException("Run log database path is not initialized.")
+            )!,
+            "EncounterPreview",
+            "preview-plans.json"
+        );
+        _mountables.Register(
+            new ComponentMount<EventPreviewPlanController>((controller, services) =>
+                controller.Initialize(
+                    services,
+                    _staticCardMapProvider,
+                    encounterPreviewCachePath
+                )
+            )
+        );
         // The overlay host must mount before every Main Overlay Panel mount below: panels
         // register their lifecycle with it through the accessor.
         var overlayPanelHostMount = new OverlayPanelHostMount();
         _mountables.Register(overlayPanelHostMount);
-        _mountables.Register(new CollectionPanelMount(() => overlayPanelHostMount.Host));
+        _mountables.Register(
+            new CollectionPanelMount(
+                () => overlayPanelHostMount.Host,
+                _staticCardMapProvider
+            )
+        );
         _mountables.Register(
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
         );
