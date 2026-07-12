@@ -176,6 +176,7 @@ public class Plugin : BaseUnityPlugin
         BPPSupporterCatalog.Reset();
         BppHotkeyService.Reset();
         ChineseTranslationCatalog.Reset();
+        NativeChineseFontFallback.Reset();
     }
 
     private void BuildOnlineServices()

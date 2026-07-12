@@ -4,7 +4,6 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.BilingualItemNames;
 using BazaarPlusPlus.GameInterop.Localization;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Localization;
 using HarmonyLib;
 using TheBazaar.Extensions;
@@ -44,7 +43,7 @@ internal static class BilingualItemNamePatch
             if (title == null || controller.headerText == null)
                 return;
 
-            BppTmpFont.TryInstallSystemCjkFallback(controller.headerText, chineseTitle);
+            NativeChineseFontFallback.TryInstall(controller.headerText, chineseTitle);
             controller.headerText.TrySetText(title);
         }
         catch (Exception ex)

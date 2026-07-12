@@ -1132,6 +1132,25 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Bilingual_item_names_use_the_games_native_chinese_serif_fallback()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var patchSource = File.ReadAllText(
+            Path.Combine(mainSource, "Patches", "Tooltips", "BilingualItemNamePatch.cs")
+        );
+        var providerSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Localization", "NativeChineseFontFallback.cs")
+        );
+
+        Assert.Contains("NativeChineseFontFallback.TryInstall", patchSource);
+        Assert.Contains("NotoFontFallbackRuntime", providerSource);
+        Assert.Contains("NotoSerifFallbacksOrdered", providerSource);
+        Assert.DoesNotContain("CreateDynamicFontFromOSFont", providerSource);
+        Assert.DoesNotContain("PingFang", providerSource);
+        Assert.DoesNotContain("Microsoft YaHei", providerSource);
+    }
+
+    [Fact]
     public void RandomHeroSkinPool_has_no_legacy_playerprefs_migration()
     {
         var repoRoot = RepoRoot();
