@@ -10,11 +10,11 @@ public sealed class CollectionTooltipMarkupTests
     {
         Assert.Equal("<line-height=1.6em>\n", CollectionTooltipMarkup.BlockBreak);
         Assert.Equal(
-            "<line-height=1.35em>\n<line-height=1.15em>",
+            "<line-height=1.35em>\n<line-height=1.3em>",
             CollectionTooltipMarkup.SubItemBreak
         );
         Assert.Equal(
-            "<line-height=1.25em>\n<line-height=1.15em>",
+            "<line-height=1.4em>\n<line-height=1.3em>",
             CollectionTooltipMarkup.BulletBreak
         );
     }
@@ -32,11 +32,11 @@ public sealed class CollectionTooltipMarkupTests
         );
 
         Assert.Equal(
-            "<line-height=1.15em>Full size"
+            "<line-height=1.3em>Full size"
                 + "<line-height=1.6em>\n"
-                + "<size=85%><line-height=1.15em>Small one"
+                + "<size=85%><line-height=1.3em>Small one"
                 + "<line-height=1.6em>\n</size>"
-                + "<size=85%><line-height=1.15em>Small two</size>",
+                + "<size=85%><line-height=1.3em>Small two</size>",
             text
         );
     }
@@ -73,9 +73,9 @@ public sealed class CollectionTooltipMarkupTests
         );
 
         Assert.Equal(
-            "<size=85%><line-height=1.15em>Choose one:"
-                + "<line-height=1.25em>\n<line-height=1.15em>· first"
-                + "<line-height=1.35em>\n<line-height=1.15em>- nested</size>",
+            "<size=85%><line-height=1.3em>Choose one:"
+                + "<line-height=1.4em>\n<line-height=1.3em>· first"
+                + "<line-height=1.35em>\n<line-height=1.3em>- nested</size>",
             text
         );
     }

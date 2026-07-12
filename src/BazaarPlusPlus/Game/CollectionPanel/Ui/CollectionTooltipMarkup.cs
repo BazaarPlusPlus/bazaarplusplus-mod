@@ -12,7 +12,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
 // and process their trailing newline before closing it.
 internal static class CollectionTooltipMarkup
 {
-    private const string BaseLine = "<line-height=1.15em>";
+    private const string BaseLine = "<line-height=1.3em>";
     private const string NativeLineHeightOpen = "<line-height=1.6em>";
     private const string LineHeightClose = "</line-height>";
 
@@ -24,7 +24,7 @@ internal static class CollectionTooltipMarkup
     public const string SubItemBreak = "<line-height=1.35em>\n" + BaseLine;
 
     // Between bulleted candidates in a "Choose one:" list.
-    public const string BulletBreak = "<line-height=1.25em>\n" + BaseLine;
+    public const string BulletBreak = "<line-height=1.4em>\n" + BaseLine;
 
     internal readonly struct Block
     {
