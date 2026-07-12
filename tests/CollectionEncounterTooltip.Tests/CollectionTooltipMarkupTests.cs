@@ -28,7 +28,7 @@ public sealed class CollectionTooltipMarkupTests
 
         Assert.Equal(
             "<line-height=1.4em>Intro"
-                + "<line-height=1.65em>\n"
+                + "<line-height=1.9em>\n"
                 + "<line-height=1.4em>Choose one:"
                 + "<line-height=1.5em>\n<line-height=1.4em>· <indent=1em>first</indent>"
                 + "<line-height=1.4em>\n<line-height=1.4em><indent=2.2em>- detail</indent>"
@@ -54,7 +54,7 @@ public sealed class CollectionTooltipMarkupTests
 
         Assert.Equal(
             "<line-height=1.4em>Full size"
-                + "<line-height=1.65em>\n"
+                + "<line-height=1.9em>\n"
                 + "<size=85%><line-height=1.4em>"
                 + "<line-height=1.4em>· <indent=1em>dimmed</indent></size>",
             text
@@ -73,7 +73,7 @@ public sealed class CollectionTooltipMarkupTests
         );
 
         Assert.Equal(
-            "<size=85%><line-height=1.4em>Small<line-height=1.65em>\n</size>"
+            "<size=85%><line-height=1.4em>Small<line-height=1.9em>\n</size>"
                 + "<line-height=1.4em>Full",
             text
         );
