@@ -1143,6 +1143,7 @@ public class CoreLayeringTests
         );
 
         Assert.Contains("NativeChineseFontFallback.TryInstall", patchSource);
+        Assert.Contains("&& !NativeChineseFontFallback.TryInstall", patchSource);
         Assert.Contains("ECardType.Item", patchSource);
         Assert.Contains("ECardType.EventEncounter", patchSource);
         Assert.Contains("NotoFontFallbackRuntime", providerSource);
@@ -1151,6 +1152,9 @@ public class CoreLayeringTests
         Assert.Contains("text.font = clone", providerSource);
         Assert.Contains("binding.Text != null", providerSource);
         Assert.Contains("Object.DestroyImmediate(binding.Clone)", providerSource);
+        Assert.Contains("AsyncOperationHandle<TMP_FontAsset> handle = default", providerSource);
+        Assert.Contains("Handles.Add(handle);\n                handle = default;", providerSource);
+        Assert.Contains("TryRelease(handle)", providerSource);
         Assert.Contains("Addressables.Release(handle)", providerSource);
         Assert.Contains("finally", providerSource);
         Assert.DoesNotContain("CreateDynamicFontFromOSFont", providerSource);

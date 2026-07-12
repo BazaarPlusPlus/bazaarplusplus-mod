@@ -91,17 +91,7 @@ internal static class NativeChineseFontFallback
         finally
         {
             foreach (var handle in Handles)
-            {
-                try
-                {
-                    if (handle.IsValid())
-                        Addressables.Release(handle);
-                }
-                catch (Exception ex)
-                {
-                    BppLog.Warn(Component, $"Failed to release a zh-CN font handle: {ex.Message}");
-                }
-            }
+                TryRelease(handle);
             Handles.Clear();
         }
 
@@ -181,20 +171,18 @@ internal static class NativeChineseFontFallback
             if (reference == null || !reference.RuntimeKeyIsValid())
                 continue;
 
+            AsyncOperationHandle<TMP_FontAsset> handle = default;
             try
             {
-                var handle = Addressables.LoadAssetAsync<TMP_FontAsset>(reference.RuntimeKey);
+                handle = Addressables.LoadAssetAsync<TMP_FontAsset>(reference.RuntimeKey);
                 var font = handle.WaitForCompletion();
                 if (handle.Status != AsyncOperationStatus.Succeeded || font == null)
-                {
-                    if (handle.IsValid())
-                        Addressables.Release(handle);
                     continue;
-                }
 
-                Handles.Add(handle);
                 font.ReadFontAssetDefinition();
                 loaded.Add(font);
+                Handles.Add(handle);
+                handle = default;
             }
             catch (Exception ex)
             {
@@ -204,6 +192,10 @@ internal static class NativeChineseFontFallback
                     BppLog.Warn(Component, $"Failed to load the game's zh-CN font: {ex.Message}");
                 }
             }
+            finally
+            {
+                TryRelease(handle);
+            }
         }
 
         if (loaded.Count > 0)
@@ -212,6 +204,19 @@ internal static class NativeChineseFontFallback
                 $"Loaded the game's native zh-CN font fallback: {string.Join(", ", loaded.ConvertAll(font => font.name))}."
             );
         return loaded.ToArray();
+    }
+
+    private static void TryRelease(AsyncOperationHandle<TMP_FontAsset> handle)
+    {
+        try
+        {
+            if (handle.IsValid())
+                Addressables.Release(handle);
+        }
+        catch (Exception ex)
+        {
+            BppLog.Warn(Component, $"Failed to release a zh-CN font handle: {ex.Message}");
+        }
     }
 
     private sealed class FontBinding

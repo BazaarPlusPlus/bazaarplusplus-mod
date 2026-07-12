@@ -46,8 +46,11 @@ internal static class BilingualItemNamePatch
             if (title == null || controller.headerText == null)
                 return;
 
-            if (!currentLanguageIsChinese)
-                NativeChineseFontFallback.TryInstall(controller.headerText, secondaryTitle);
+            if (
+                !currentLanguageIsChinese
+                && !NativeChineseFontFallback.TryInstall(controller.headerText, secondaryTitle)
+            )
+                return;
             controller.headerText.TrySetText(title);
         }
         catch (Exception ex)
