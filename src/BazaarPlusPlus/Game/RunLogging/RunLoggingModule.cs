@@ -106,15 +106,20 @@ internal sealed class RunLoggingModule
     {
         if (_deferredRunCompletion != null && _sessionManager.HasActiveSession)
         {
+            var runId = _deferredRunCompletionRunId ?? _sessionManager.ActiveSession?.RunId;
             try
             {
                 TryCompleteDeferredRunExit(forceCompletion: true);
             }
             catch (Exception ex)
             {
-                BppLog.Error(
-                    "RunLoggingModule",
-                    $"Failed to finalize deferred run completion during teardown: {ex}"
+                BppLog.ErrorEvent(
+                    RunLoggingLogEvents.CompletionFailed,
+                    ex,
+                    RunLoggingLogEvents.RunId.Bind(runId),
+                    RunLoggingLogEvents.FailureReasonCode.Bind(
+                        RunLoggingReasonCode.TeardownFinalizationException
+                    )
                 );
             }
         }
@@ -142,14 +147,25 @@ internal sealed class RunLoggingModule
         }
         catch (Exception ex)
         {
-            BppLog.Error("RunLoggingModule", $"Run initialization handling failed: {ex}");
+            BppLog.ErrorEvent(
+                RunLoggingLogEvents.ActivationFailed,
+                ex,
+                RunLoggingLogEvents.RunId.Bind(observed.RunId),
+                RunLoggingLogEvents.FailureReasonCode.Bind(
+                    RunLoggingReasonCode.RunActivationException
+                )
+            );
         }
     }
 
     private void OnRunLifecycleChanged(RunLifecycleChanged change)
     {
+        string? runId = null;
+        var transition = RunLoggingTransition.Unknown;
         try
         {
+            runId = _sessionManager.ActiveSession?.RunId ?? _runContext.CurrentServerRunId;
+            transition = ToLogTransition(change);
             if (change.IsInGameRun)
             {
                 HandleRunActivation(_runContext.CurrentServerRunId);
@@ -179,15 +195,24 @@ internal sealed class RunLoggingModule
         }
         catch (Exception ex)
         {
-            BppLog.Error("RunLoggingModule", $"Run lifecycle transition handling failed: {ex}");
+            BppLog.ErrorEvent(
+                RunLoggingLogEvents.TransitionFailed,
+                ex,
+                RunLoggingLogEvents.RunId.Bind(runId),
+                RunLoggingLogEvents.Transition.Bind(transition),
+                RunLoggingLogEvents.TransitionFailureReasonCode.Bind(
+                    RunLoggingReasonCode.RunTransitionException
+                )
+            );
         }
     }
 
     private void OnPvpBattleRecorded(PvpBattleRecorded recorded)
     {
+        PvpBattleManifest? manifest = null;
         try
         {
-            var manifest = recorded.Manifest;
+            manifest = recorded.Manifest;
             var inRun = _runContext.IsInGameRun;
             if (
                 manifest == null
@@ -222,20 +247,29 @@ internal sealed class RunLoggingModule
         }
         catch (Exception ex)
         {
-            BppLog.Error("RunLoggingModule", $"PVP battle capture failed: {ex}");
+            EmitBattleCaptureFailure(manifest, RunLoggingReasonCode.BattleCaptureException, ex);
         }
     }
 
     private void OnCombatReplayPersistenceDrained(CombatReplayPersistenceDrained drained)
     {
+        string? runId = null;
         try
         {
+            runId = _deferredRunCompletionRunId ?? _sessionManager.ActiveSession?.RunId;
             if (!_runContext.IsInGameRun)
                 TryCompleteDeferredRunExit();
         }
         catch (Exception ex)
         {
-            BppLog.Error("RunLoggingModule", $"Replay persistence drain handling failed: {ex}");
+            BppLog.ErrorEvent(
+                RunLoggingLogEvents.ReplayDrainHandlingFailed,
+                ex,
+                RunLoggingLogEvents.RunId.Bind(runId),
+                RunLoggingLogEvents.FailureReasonCode.Bind(
+                    RunLoggingReasonCode.ReplayDrainHandlingException
+                )
+            );
         }
     }
 
@@ -286,10 +320,7 @@ internal sealed class RunLoggingModule
                 && !string.Equals(session.RunId, manifest.RunId, StringComparison.Ordinal)
             )
             {
-                BppLog.Warn(
-                    "RunLoggingModule",
-                    $"Skipping replay event for run {manifest.RunId} because active in-run session is {session.RunId}."
-                );
+                EmitBattleCaptureFailure(manifest, RunLoggingReasonCode.InRunMismatch);
                 return null;
             }
 
@@ -302,19 +333,17 @@ internal sealed class RunLoggingModule
 
         if (string.IsNullOrWhiteSpace(manifest.RunId))
         {
-            BppLog.Warn(
-                "RunLoggingModule",
-                $"Skipping deferred replay event for battle {manifest.BattleId} because manifest run id is unavailable."
+            EmitBattleCaptureFailure(
+                manifest,
+                RunLoggingReasonCode.ManifestRunUnavailable,
+                fallbackRunId: deferredSession.RunId
             );
             return null;
         }
 
         if (!string.Equals(deferredSession.RunId, manifest.RunId, StringComparison.Ordinal))
         {
-            BppLog.Warn(
-                "RunLoggingModule",
-                $"Skipping deferred replay event for run {manifest.RunId} because active deferred session is {deferredSession.RunId}."
-            );
+            EmitBattleCaptureFailure(manifest, RunLoggingReasonCode.DeferredRunMismatch);
             return null;
         }
 
@@ -341,6 +370,7 @@ internal sealed class RunLoggingModule
         }
 
         var now = _utcNow();
+        RunLoggingReasonCode? degradationReason = null;
         if (!forceCompletion && _hasPendingReplayPersistence())
         {
             var deadline =
@@ -349,22 +379,66 @@ internal sealed class RunLoggingModule
             if (now < deadline)
                 return false;
 
-            BppLog.Warn(
-                "RunLoggingModule",
-                "Completing run before replay persistence drained after grace timeout."
-            );
+            degradationReason = RunLoggingReasonCode.ReplayDrainTimeout;
         }
         else if (forceCompletion && _hasPendingReplayPersistence())
         {
-            BppLog.Warn(
-                "RunLoggingModule",
-                "Completing deferred run during teardown before replay persistence drained."
-            );
+            degradationReason = RunLoggingReasonCode.ShutdownForced;
         }
 
+        var completedRunId = activeSession.RunId;
         _core.CompleteRun(_deferredRunCompletion);
         ClearDeferredRunCompletion();
+        if (degradationReason.HasValue)
+        {
+            BppLog.WarnEvent(
+                RunLoggingLogEvents.CompletionDegraded,
+                RunLoggingLogEvents.RunId.Bind(completedRunId),
+                RunLoggingLogEvents.CompletionDegradedReasonCode.Bind(degradationReason.Value),
+                RunLoggingLogEvents.GraceMilliseconds.Bind(
+                    (long)ReplayPersistenceCompletionGracePeriod.TotalMilliseconds
+                )
+            );
+        }
         return true;
+    }
+
+    private void EmitBattleCaptureFailure(
+        PvpBattleManifest? manifest,
+        RunLoggingReasonCode reasonCode,
+        Exception? exception = null,
+        string? fallbackRunId = null
+    )
+    {
+        var runId = !string.IsNullOrWhiteSpace(manifest?.RunId)
+            ? manifest.RunId
+            : fallbackRunId
+                ?? _sessionManager.ActiveSession?.RunId
+                ?? _deferredRunCompletionRunId
+                ?? _runContext.CurrentServerRunId;
+        var fields = new[]
+        {
+            RunLoggingLogEvents.RunId.Bind(runId),
+            RunLoggingLogEvents.BattleId.Bind(manifest?.BattleId),
+            RunLoggingLogEvents.BattleFailureReasonCode.Bind(reasonCode),
+        };
+        if (exception == null)
+            BppLog.ErrorEvent(RunLoggingLogEvents.BattleCaptureFailed, fields);
+        else
+            BppLog.ErrorEvent(RunLoggingLogEvents.BattleCaptureFailed, exception, fields);
+    }
+
+    private static RunLoggingTransition ToLogTransition(RunLifecycleChanged change)
+    {
+        if (change.IsInGameRun)
+            return RunLoggingTransition.RunEntered;
+        if (IsCompletedTransition(change))
+            return RunLoggingTransition.RunEnded;
+        if (IsInterruptedTransition(change))
+            return RunLoggingTransition.RunInterrupted;
+        if (string.Equals(change.Reason, "Live run-state reconciliation", StringComparison.Ordinal))
+            return RunLoggingTransition.StateReconciled;
+        return RunLoggingTransition.Unknown;
     }
 
     private void CancelDeferredRunExitIfRunResumed()

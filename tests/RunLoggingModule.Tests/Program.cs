@@ -1,9 +1,10 @@
 #nullable enable
 using System.Reflection;
 using BazaarPlusPlus.Core.RunContext;
+using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Storage.RunLog;
-using BazaarPlusPlus.Storage.RunLog;
+using BepInEx.Logging;
 
 var assembly = Assembly.Load("BazaarPlusPlus");
 var eventBusType = RequireType("BazaarPlusPlus.Core.Events.InMemoryBppEventBus");
@@ -17,6 +18,11 @@ var runContextStoreType = RequireType("BazaarPlusPlus.GameInterop.RunContextStor
 var captureServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCaptureService");
 var runLifecycleChangedType = RequireType("BazaarPlusPlus.Core.Events.RunLifecycleChanged");
 var runExitKindType = RequireType("BazaarPlusPlus.Core.RunContext.RunExitKind");
+var pvpBattleRecordedType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleRecorded");
+using var logSource = new ManualLogSource("run-logging-tests");
+var capturedLogs = new List<LogEventArgs>();
+logSource.LogEvent += (_, args) => capturedLogs.Add(args);
+InstallBppLog(logSource);
 
 var store = new FakeRunLogStore();
 var now = new DateTimeOffset(2026, 4, 1, 0, 0, 0, TimeSpan.Zero);
@@ -150,6 +156,28 @@ Assert(
     "A new run id should start a fresh active session."
 );
 
+capturedLogs.Clear();
+var mismatchManifest = new PvpBattleManifest
+{
+    BattleId = "76543210-full-battle-id",
+    RunId = "abcdef12-full-run-id",
+    CombatKind = "PVPCombat",
+};
+var mismatchRecorded = Activator.CreateInstance(pvpBattleRecordedType)!;
+SetProperty(mismatchRecorded, "Manifest", mismatchManifest);
+InvokeVoid(moduleType, module, "OnPvpBattleRecorded", [mismatchRecorded]);
+var mismatchLog = AssertSingleLog(capturedLogs, "run_logging.battle.capture_failed");
+Assert(mismatchLog.Level == LogLevel.Error, "A dropped battle record should be Error.");
+var mismatchText = mismatchLog.Data?.ToString() ?? string.Empty;
+Assert(mismatchText.Contains("run_id=abcdef12"), "Battle failure should correlate the run.");
+Assert(mismatchText.Contains("battle_id=76543210"), "Battle failure should correlate the battle.");
+Assert(mismatchText.Contains("reason_code=in_run_mismatch"), "Mismatch reason should be typed.");
+Assert(
+    !mismatchText.Contains("abcdef12-full-run-id")
+        && !mismatchText.Contains("76543210-full-battle-id"),
+    "Battle failure logs should not expose full correlation ids."
+);
+
 var pendingReplayModule =
     Activator.CreateInstance(
         moduleType,
@@ -184,6 +212,7 @@ SetProperty(completedExit, "LastRunExitKind", Enum.Parse(runExitKindType, "Compl
 SetProperty(completedExit, "Reason", "Run ended");
 pendingReplayPersistence = true;
 InvokeVoid(moduleType, pendingReplayModule, "OnRunLifecycleChanged", [completedExit]);
+SetProperty(runContext, "IsInGameRun", false);
 
 Assert(
     GetField(pendingReplayModule, "_deferredRunCompletion") != null,
@@ -194,8 +223,27 @@ Assert(
     "Deferred completion should wait for replay persistence to drain."
 );
 
+now = now.AddSeconds(3);
+store.ThrowOnCompleteRun = true;
+capturedLogs.Clear();
+var failedPersistenceDrain = Activator.CreateInstance(combatReplayPersistenceDrainedType)!;
+InvokeVoid(
+    moduleType,
+    pendingReplayModule,
+    "OnCombatReplayPersistenceDrained",
+    [failedPersistenceDrain]
+);
+var drainFailureLog = AssertSingleLog(capturedLogs, "run_logging.replay_drain.handling_failed");
+Assert(drainFailureLog.Level == LogLevel.Error, "A drain completion throw should be Error.");
+Assert(
+    capturedLogs.All(args =>
+        args.Data?.ToString()?.Contains("run_logging.run.completion_degraded") != true
+    ),
+    "A failed completion must not also claim successful degraded completion."
+);
+store.ThrowOnCompleteRun = false;
+
 pendingReplayPersistence = false;
-SetProperty(runContext, "IsInGameRun", false);
 var persistenceDrained = Activator.CreateInstance(combatReplayPersistenceDrainedType)!;
 InvokeVoid(
     moduleType,
@@ -264,11 +312,39 @@ static void Assert(bool condition, string message)
         throw new InvalidOperationException(message);
 }
 
+static LogEventArgs AssertSingleLog(IReadOnlyList<LogEventArgs> logs, string eventId)
+{
+    var matches = logs.Where(args => args.Data?.ToString()?.Contains("event=" + eventId) == true)
+        .ToArray();
+    if (matches.Length != 1)
+    {
+        throw new InvalidOperationException(
+            $"Expected one {eventId} event, found {matches.Length}: "
+                + string.Join(" | ", logs.Select(args => args.Data?.ToString()))
+        );
+    }
+    return matches[0];
+}
+
+static void InstallBppLog(ManualLogSource source)
+{
+    var bppLogType = RequireType("BazaarPlusPlus.Infrastructure.BppLog");
+    var install = bppLogType.GetMethod(
+        "Install",
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+    );
+    if (install == null)
+        throw new InvalidOperationException("BppLog.Install was not found.");
+    install.Invoke(null, [source]);
+}
+
 file sealed class FakeRunLogStore : IRunLogStore
 {
     public int CompleteRunCalls { get; private set; }
 
     public int MarkRunAbandonedCalls { get; private set; }
+
+    public bool ThrowOnCompleteRun { get; set; }
 
     public RunLogSessionState? ActiveState { get; private set; }
 
@@ -316,6 +392,8 @@ file sealed class FakeRunLogStore : IRunLogStore
 
     public void CompleteRun(string runId, RunLogCompletion completion)
     {
+        if (ThrowOnCompleteRun)
+            throw new InvalidOperationException("complete run failed");
         CompleteRunCalls++;
         ActiveState = null;
     }

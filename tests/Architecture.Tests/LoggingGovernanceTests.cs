@@ -135,7 +135,7 @@ public sealed class LoggingGovernanceTests
             ["Game/HistoryPanel/HistoryPanel.cs"] =
                 "151:Warn,179:Warn,186:Error,438:Info,455:Warn,466:Info,473:Error",
             ["Game/HistoryPanel/HistoryPanelCoordinator.cs"] =
-                "123:Error,161:Error,350:Info,399:Error,455:Error,535:Error,551:Info,558:Warn,631:Error,656:Info,727:Info,774:Error,790:Error,863:Error",
+                "123:Error,161:Error,350:Info,399:Error,455:Error,535:Error,551:Info,558:Warn,844:Error,860:Error,933:Error",
             ["Game/HistoryPanel/HistoryPanelMount.cs"] = "39:Warn,46:Warn,63:Warn",
             ["Game/HistoryPanel/HistoryPanelReplayService.cs"] = "245:Warn",
             ["Game/HistoryPanel/Storage/HistoryPanelRepository.cs"] = "201:Warn",
@@ -157,19 +157,13 @@ public sealed class LoggingGovernanceTests
             ["Game/OverlayPanels/OverlayPanelHostMount.cs"] = "18:Info",
             ["Game/PvpBattles/PvpBattleSnapshotCollector.cs"] =
                 "226:Warn,242:Warn,324:Warn,343:Warn,364:Warn,408:Warn",
-            ["Game/RunLifecycle/RunLifecycleModule.cs"] = "39:Info,64:Info,105:Debug",
             ["Game/RunLogging/RunLogStoreLoggerBridge.cs"] = "10:Warn,13:Error",
-            ["Game/RunLogging/RunLoggingController.cs"] = "81:Info",
-            ["Game/RunLogging/RunLoggingModule.cs"] =
-                "115:Error,145:Error,182:Error,225:Error,238:Error,289:Warn,305:Warn,314:Warn,352:Warn,359:Warn",
-            ["Game/RunLogging/Upload/RunBundleUploadFeed.cs"] = "44:Warn,65:Info,88:Error",
-            ["Game/RunLogging/Upload/RunBundleUploadService.cs"] = "51:Info,60:Info,128:Debug",
             ["Game/Screenshots/EndOfRunCaptureReadinessDetector.cs"] = "72:Warn,98:Warn",
             ["Game/Screenshots/EndOfRunScreenshotController.cs"] =
                 "62:Warn,211:Debug,218:Warn,256:Warn,269:Warn,305:Warn,317:Error,392:Warn,399:Error,430:Warn,432:Error,444:Warn,488:Warn,500:Warn,536:Error,577:Error",
             ["Game/Screenshots/EndOfRunSummaryRevealDetector.cs"] = "288:Warn",
             ["Game/Screenshots/ScreenshotService.cs"] = "60:Error,71:Info,79:Error,218:Debug",
-            ["Game/Screenshots/Upload/BazaarDbSnapshotUploadFeed.cs"] = "36:Warn,63:Info,77:Error",
+            ["Game/Screenshots/Upload/BazaarDbSnapshotUploadFeed.cs"] = "30:Warn,57:Info,75:Error",
             ["Game/Screenshots/Upload/BazaarDbSnapshotUploadService.cs"] =
                 "65:Info,74:Info,86:Warn,94:Debug",
             ["Game/Screenshots/Upload/BazaarDbSnapshotUploadSettingsDockEntry.cs"] = "39:Info",
@@ -183,8 +177,6 @@ public sealed class LoggingGovernanceTests
             ["Game/Tooltips/TooltipModifierRefreshController.cs"] = "59:Error,163:Debug",
             ["Game/Tooltips/TooltipPreviewTargetResolver.cs"] =
                 "50:Debug,60:Debug,70:Debug,79:Debug,87:Debug",
-            ["Game/Upload/BackgroundUploadPump.cs"] = "40:Info,120:Warn",
-            ["Game/Upload/StartupUploadAttemptRunner.cs"] = "127:Info,138:Info,151:Error,166:Error",
             ["Game/VoiceSubtitles/VoiceSubtitlesLog.cs"] = "16:Info,18:Debug,20:Warn,22:Error",
             ["GameInterop/BppClientCacheBridge.cs"] = "51:Debug,153:Debug",
             ["GameInterop/CardPreview/NativeCardPreviewAssetLoader.cs"] =
@@ -210,7 +202,7 @@ public sealed class LoggingGovernanceTests
             ["GameInterop/TagTypography/KeywordIconSpriteProvider.cs"] = "62:Warn",
             ["GameInterop/TagTypography/NativeTagTypography.cs"] = "255:Warn",
             ["GameInterop/VoiceSubtitles/VoiceSubtitlesInteropLog.cs"] = "16:Info,18:Debug,20:Warn",
-            ["Infrastructure/FileBackedPayloadStore.cs"] = "71:Warn,79:Warn",
+            ["Infrastructure/FileBackedPayloadStore.cs"] = "118:Warn,124:Warn",
             ["Infrastructure/Fonts/BppTmpFont.cs"] = "70:Info,91:Debug,123:Warn",
             ["Infrastructure/Fonts/BppUiFont.cs"] = "67:Info,76:Warn,83:Info",
             ["Patches/CollectionPanel/CollectionItemLoadArtPatch.cs"] = "140:Warn",

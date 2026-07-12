@@ -40,6 +40,6 @@ internal static class BazaarDbSnapshotUploadSettingsDockEntry
             BazaarDbSnapshotUploadFeed.BazaarDbSnapshotScope,
             "BazaarDB screenshot upload toggle armed an immediate attempt."
         );
-        BackgroundUploadPump.ArmImmediate(BazaarDbSnapshotUploadFeed.BazaarDbSnapshotScope);
+        BackgroundUploadPump.ArmImmediate(UploadFeedKind.BazaarDbSnapshot);
     }
 }

@@ -13,7 +13,7 @@ namespace BazaarPlusPlus.Game.Upload;
 internal sealed class BackgroundUploadPump : MonoBehaviour
 {
     private static readonly TimeSpan ShutdownDrainTimeout = TimeSpan.FromMilliseconds(500);
-    private static readonly Dictionary<string, BackgroundUploadPump> CurrentByScope = new();
+    private static readonly Dictionary<UploadFeedKind, BackgroundUploadPump> CurrentByFeed = new();
 
     private IBppServices? _services;
     private IUploadFeed? _feed;
@@ -21,6 +21,7 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
     private CancellationTokenSource? _shutdown;
     private StartupUploadAttemptGate? _startupGate;
     private StartupUploadAttemptRunner? _startupRunner;
+    private UploadFeedLogState? _logState;
     private IDisposable? _runLifecycleSubscription;
     private IDisposable? _extraArmHookSubscription;
 
@@ -31,16 +32,24 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _feed = feed ?? throw new ArgumentNullException(nameof(feed));
 
-        var descriptor = _feed.Descriptor;
+        var feedKind = _feed.Kind;
+        _logState = new UploadFeedLogState(feedKind);
         if (services.GameBuild.Channel == GameBuildChannel.Ptr)
         {
             // Session gate: no upload feed arms on the PTR build. The durable defense
             // is the build_channel row filter in the upload stores — it keeps
             // PTR-recorded rows out of uploads even after switching back to online.
-            BppLog.Info(descriptor.LogScope, "Uploads disabled on the PTR game build.");
+            BppLog.DebugEvent(
+                UploadLogEvents.FeedSkipped,
+                () =>
+                    [
+                        UploadLogEvents.FeedSkippedFeed.Bind(feedKind),
+                        UploadLogEvents.FeedSkippedReasonCode.Bind(UploadLogReasonCode.PtrBuild),
+                    ]
+            );
             return;
         }
-        var activation = _feed.Activate(_services);
+        var activation = _feed.Activate(_services, _logState);
         if (activation == null)
             return;
 
@@ -53,17 +62,12 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
             Time.unscaledTime + startupDelaySeconds,
             retryIntervalSeconds
         );
-        _startupRunner = new StartupUploadAttemptRunner(
-            descriptor.LogScope,
-            descriptor.SkipLiveRunMessage,
-            descriptor.StartMessage,
-            descriptor.FailureMessage
-        );
+        _startupRunner = new StartupUploadAttemptRunner(feedKind, _logState);
         _runLifecycleSubscription = _services.EventBus.Subscribe<RunLifecycleChanged>(
             OnRunLifecycleChanged
         );
         _extraArmHookSubscription = activation.ExtraArmHook?.Subscribe(_services, ArmImmediate);
-        CurrentByScope[descriptor.LogScope] = this;
+        CurrentByFeed[feedKind] = this;
     }
 
     private void Update()
@@ -103,7 +107,7 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
             _shutdown = null;
         }
 
-        var descriptor = _feed?.Descriptor;
+        var feedKind = _feed?.Kind;
         var activation = _activation;
         _activation = null;
         Action? disposeActivation =
@@ -117,33 +121,37 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
                 )
             )
             {
-                BppLog.Warn(
-                    descriptor?.LogScope ?? "BackgroundUploadPump",
-                    $"Startup upload did not drain within {ShutdownDrainTimeout.TotalMilliseconds:0}ms; cleanup will finish asynchronously."
+                BppLog.WarnEvent(
+                    UploadLogEvents.ShutdownDrainDegraded,
+                    UploadLogEvents.ShutdownDrainDegradedFeed.Bind(feedKind),
+                    UploadLogEvents.ShutdownDrainDegradedTimeoutMs.Bind(
+                        (long)ShutdownDrainTimeout.TotalMilliseconds
+                    ),
+                    UploadLogEvents.ShutdownDrainDegradedReasonCode.Bind(
+                        UploadLogReasonCode.ShutdownDrainTimeout
+                    )
                 );
             }
         }
         else
             disposeActivation?.Invoke();
 
-        if (
-            descriptor.HasValue
-            && CurrentByScope.TryGetValue(descriptor.Value.LogScope, out var current)
-        )
+        if (feedKind.HasValue && CurrentByFeed.TryGetValue(feedKind.Value, out var current))
         {
             if (ReferenceEquals(current, this))
-                CurrentByScope.Remove(descriptor.Value.LogScope);
+                CurrentByFeed.Remove(feedKind.Value);
         }
 
         _startupGate = null;
         _startupRunner = null;
+        _logState = null;
         _services = null;
         _feed = null;
     }
 
-    public static void ArmImmediate(string logScope)
+    public static void ArmImmediate(UploadFeedKind feed)
     {
-        if (CurrentByScope.TryGetValue(logScope, out var current))
+        if (CurrentByFeed.TryGetValue(feed, out var current))
             current.ArmImmediate();
     }
 

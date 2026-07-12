@@ -78,9 +78,9 @@ internal sealed class RunLoggingController : MonoBehaviour
                 RunLogRecordMapper.BuildRunLogAbandonment(reason, ReadRunBasics(probe))
         );
         _module.Start();
-        BppLog.Info(
-            "RunLoggingController",
-            $"Initialized run logging database: {services.Paths.RunLogDatabasePath}"
+        BppLog.DebugEvent(
+            RunLoggingLogEvents.StoreReady,
+            () => new[] { RunLoggingLogEvents.DatabasePath.Bind(services.Paths.RunLogDatabasePath) }
         );
     }
 

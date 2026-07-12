@@ -4,3 +4,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("CollectionEncounterTooltip.Tests")]
 [assembly: InternalsVisibleTo("CompositionRuntime.Tests")]
 [assembly: InternalsVisibleTo("ItemEnchantPreview.Tests")]
+[assembly: InternalsVisibleTo("StartupUploadRunner.Tests")]

@@ -2,11 +2,62 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
 
 namespace BazaarPlusPlus.Infrastructure;
 
 internal delegate bool TryDeserialize<T>(byte[]? payloadBytes, out T? payload, out string? error)
     where T : class;
+
+internal enum FileBackedPayloadLoadStatus
+{
+    Missing,
+    Loaded,
+    Invalid,
+    Unreadable,
+}
+
+internal sealed class FileBackedPayloadLoadResult<T>
+    where T : class
+{
+    private FileBackedPayloadLoadResult(
+        FileBackedPayloadLoadStatus status,
+        T? payload,
+        string? fingerprint,
+        string? error,
+        Exception? exception
+    )
+    {
+        Status = status;
+        Payload = payload;
+        Fingerprint = fingerprint;
+        Error = error;
+        Exception = exception;
+    }
+
+    internal FileBackedPayloadLoadStatus Status { get; }
+    internal T? Payload { get; }
+    internal string? Fingerprint { get; }
+    internal string? Error { get; }
+    internal Exception? Exception { get; }
+
+    internal static FileBackedPayloadLoadResult<T> Missing() =>
+        new(FileBackedPayloadLoadStatus.Missing, null, null, null, null);
+
+    internal static FileBackedPayloadLoadResult<T> Loaded(T? payload, string fingerprint) =>
+        new(FileBackedPayloadLoadStatus.Loaded, payload, fingerprint, null, null);
+
+    internal static FileBackedPayloadLoadResult<T> Invalid(
+        string fingerprint,
+        string? error,
+        Exception? exception = null
+    ) => new(FileBackedPayloadLoadStatus.Invalid, null, fingerprint, error, exception);
+
+    internal static FileBackedPayloadLoadResult<T> Unreadable(
+        string fingerprint,
+        Exception exception
+    ) => new(FileBackedPayloadLoadStatus.Unreadable, null, fingerprint, null, exception);
+}
 
 internal sealed class FileBackedPayloadStore<T>
     where T : class
@@ -55,32 +106,69 @@ internal sealed class FileBackedPayloadStore<T>
 
     public T? Load(string battleId)
     {
+        var result = LoadDetailed(battleId);
+        switch (result.Status)
+        {
+            case FileBackedPayloadLoadStatus.Loaded:
+                return result.Payload;
+            case FileBackedPayloadLoadStatus.Invalid:
+                var invalidKind = result.Exception == null ? "invalid" : "unreadable";
+                var invalidDiagnostic =
+                    result.Exception?.Message ?? result.Error ?? "unknown_error";
+                BppLog.Warn(
+                    _logTag,
+                    $"Skipping {invalidKind} {_payloadLogLabel} '{GetFilePath(battleId)}': {invalidDiagnostic}"
+                );
+                return null;
+            case FileBackedPayloadLoadStatus.Unreadable:
+                BppLog.Warn(
+                    _logTag,
+                    $"Skipping unreadable {_payloadLogLabel} '{GetFilePath(battleId)}': {result.Exception?.Message ?? "unknown_error"}"
+                );
+                return null;
+            default:
+                return null;
+        }
+    }
+
+    internal FileBackedPayloadLoadResult<T> LoadDetailed(string battleId)
+    {
         if (string.IsNullOrWhiteSpace(battleId))
-            return null;
+            return FileBackedPayloadLoadResult<T>.Missing();
 
         var filePath = GetFilePath(battleId);
-        if (!File.Exists(filePath))
-            return null;
-
+        byte[] payloadBytes;
         try
         {
-            var payloadBytes = File.ReadAllBytes(filePath);
-            if (_tryDeserialize(payloadBytes, out var payload, out var error))
-                return payload;
-
-            BppLog.Warn(
-                _logTag,
-                $"Skipping invalid {_payloadLogLabel} '{filePath}': {error ?? "unknown_error"}"
-            );
-            return null;
+            payloadBytes = File.ReadAllBytes(filePath);
+        }
+        catch (FileNotFoundException)
+        {
+            return FileBackedPayloadLoadResult<T>.Missing();
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return FileBackedPayloadLoadResult<T>.Missing();
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                _logTag,
-                $"Skipping unreadable {_payloadLogLabel} '{filePath}': {ex.Message}"
+            return FileBackedPayloadLoadResult<T>.Unreadable(
+                FingerprintUnreadableFile(filePath),
+                ex
             );
-            return null;
+        }
+
+        var fingerprint = Fingerprint(payloadBytes);
+        try
+        {
+            if (_tryDeserialize(payloadBytes, out var payload, out var error))
+                return FileBackedPayloadLoadResult<T>.Loaded(payload, fingerprint);
+
+            return FileBackedPayloadLoadResult<T>.Invalid(fingerprint, error);
+        }
+        catch (Exception ex)
+        {
+            return FileBackedPayloadLoadResult<T>.Invalid(fingerprint, null, ex);
         }
     }
 
@@ -119,5 +207,27 @@ internal sealed class FileBackedPayloadStore<T>
     private string GetFilePath(string battleId)
     {
         return Path.Combine(_rootPath, $"{battleId}{_fileSuffix}");
+    }
+
+    private static string Fingerprint(byte[] payloadBytes)
+    {
+        using var sha256 = SHA256.Create();
+        return BitConverter
+            .ToString(sha256.ComputeHash(payloadBytes))
+            .Replace("-", "")
+            .ToLowerInvariant();
+    }
+
+    private static string FingerprintUnreadableFile(string filePath)
+    {
+        try
+        {
+            var info = new FileInfo(filePath);
+            return $"metadata:{info.Length:x}:{info.LastWriteTimeUtc.Ticks:x}";
+        }
+        catch
+        {
+            return "metadata:unavailable";
+        }
     }
 }

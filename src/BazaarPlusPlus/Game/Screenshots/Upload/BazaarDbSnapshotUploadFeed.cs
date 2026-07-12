@@ -13,15 +13,9 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
 {
     public const string BazaarDbSnapshotScope = "BazaarDbSnapshotUploadController";
 
-    public UploadFeedDescriptor Descriptor { get; } =
-        new(
-            BazaarDbSnapshotScope,
-            "Skipping BazaarDB screenshot upload because a live run is active.",
-            "Starting BazaarDB screenshot upload attempt.",
-            "BazaarDB screenshot upload failed"
-        );
+    public UploadFeedKind Kind => UploadFeedKind.BazaarDbSnapshot;
 
-    public UploadFeedActivation? Activate(IBppServices services)
+    public UploadFeedActivation? Activate(IBppServices services, UploadFeedLogState logState)
     {
         try
         {
@@ -67,7 +61,11 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
 
             return new UploadFeedActivation
             {
-                UploadInBackgroundAsync = uploadService.UploadPendingInBackgroundAsync,
+                UploadInBackgroundAsync = async cancellationToken =>
+                {
+                    await uploadService.UploadPendingInBackgroundAsync(cancellationToken);
+                    return UploadAttemptResult.NoHealthSignal();
+                },
                 IsEnabled = () => IsEnabled(services),
                 Disposable = httpClient,
             };

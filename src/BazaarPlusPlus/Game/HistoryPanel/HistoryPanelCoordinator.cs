@@ -575,11 +575,22 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
-        var accountId = RefreshAccountLinkIdentityFromGame(clearBanner: false);
+        var logRequest = StartAccountLinkLogRequest(AccountLinkMethod.Redeem);
+        string? accountId;
+        try
+        {
+            accountId = RefreshAccountLinkIdentityFromGame(clearBanner: false);
+        }
+        catch (Exception ex)
+        {
+            logRequest.Failed(AccountLinkReason.UnexpectedException, ex);
+            throw;
+        }
         var trimmedCode = code?.Trim() ?? string.Empty;
         if (string.IsNullOrWhiteSpace(accountId))
         {
             SetAccountLinkBanner(HistoryPanelText.AccountLink.SignedOut(), StatusSeverity.Failure);
+            logRequest.Skipped(AccountLinkReason.SignedOut);
             _requestUiRefresh();
             return;
         }
@@ -587,6 +598,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (string.IsNullOrEmpty(trimmedCode))
         {
             SetAccountLinkBanner(HistoryPanelText.AccountLink.EmptyCode(), StatusSeverity.Failure);
+            logRequest.Skipped(AccountLinkReason.EmptyCode);
             _requestUiRefresh();
             return;
         }
@@ -594,6 +606,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (_linkClient == null)
         {
             SetAccountLinkBanner(HistoryPanelText.AccountLink.Offline(), StatusSeverity.Failure);
+            logRequest.Skipped(AccountLinkReason.ClientUnavailable);
             _requestUiRefresh();
             return;
         }
@@ -608,39 +621,67 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         {
             result = await _linkClient.RedeemAsync(trimmedCode, accountId, _session.Token);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
             if (!_session.IsCurrent(sessionVersion))
+            {
+                logRequest.Abandon();
                 return; // panel closed / re-opened mid-flight: discard silently.
+            }
 
             // Still the active session, so this is the HttpClient self-timeout, not a user cancel
             // (a real session cancel bumps the version above). Surface it as a transport failure
             // instead of silently clearing the banner.
             _state.AccountLinkInProgress = false;
             SetAccountLinkBanner(HistoryPanelText.AccountLink.Offline(), StatusSeverity.Failure);
+            logRequest.Failed(AccountLinkReason.RequestTimeout, ex);
             _requestUiRefresh();
             return;
         }
         catch (Exception ex)
         {
             if (!_session.IsCurrent(sessionVersion))
+            {
+                logRequest.Abandon();
                 return;
+            }
 
             _state.AccountLinkInProgress = false;
             SetAccountLinkBanner(HistoryPanelText.AccountLink.Offline(), StatusSeverity.Failure);
-            BppLog.Error("HistoryPanel", "Failed to redeem BazaarDB link code", ex);
+            logRequest.Failed(AccountLinkReason.UnexpectedException, ex);
             _requestUiRefresh();
             return;
         }
 
         if (!_session.IsCurrent(sessionVersion))
+        {
+            logRequest.Abandon();
             return;
+        }
 
         _state.AccountLinkInProgress = false;
-        var currentAccountId = NormalizeAccountId(BppClientCacheBridge.TryGetProfileAccountId());
+        string? currentAccountId;
+        try
+        {
+            currentAccountId = NormalizeAccountId(BppClientCacheBridge.TryGetProfileAccountId());
+        }
+        catch (Exception ex)
+        {
+            logRequest.Failed(AccountLinkReason.UnexpectedException, ex);
+            throw;
+        }
         if (!string.Equals(currentAccountId, accountId, StringComparison.Ordinal))
         {
-            RefreshAccountLinkIdentityFromGame();
+            try
+            {
+                RefreshAccountLinkIdentityFromGame();
+            }
+            catch (Exception ex)
+            {
+                logRequest.Failed(AccountLinkReason.UnexpectedException, ex);
+                throw;
+            }
+            logRequest.Skipped(AccountLinkReason.AccountChanged);
             _requestUiRefresh();
             return;
         }
@@ -652,9 +693,19 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         {
             _state.LocalLinkedHint = true;
             _state.AccountLinkExpanded = false;
-            _accountLinkStore.SaveHint(accountId);
-            BppLog.Info("HistoryPanel", $"BazaarDB link redeemed account={accountId}");
+            try
+            {
+                _accountLinkStore.SaveHint(accountId);
+            }
+            catch (Exception ex)
+            {
+                logRequest.Failed(AccountLinkReason.UnexpectedException, ex);
+                throw;
+            }
+            logRequest.Succeeded();
         }
+        else
+            logRequest.Failed(result.Outcome);
 
         SetAccountLinkBanner(
             RedeemBannerMessage(result.Outcome),
@@ -712,19 +763,38 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (_state.AccountLinkInProgress)
             return;
 
-        var accountId = RefreshAccountLinkIdentityFromGame(clearBanner: false);
+        var logRequest = StartAccountLinkLogRequest(AccountLinkMethod.Manual);
+        string? accountId;
+        try
+        {
+            accountId = RefreshAccountLinkIdentityFromGame(clearBanner: false);
+        }
+        catch (Exception ex)
+        {
+            logRequest.Failed(AccountLinkReason.UnexpectedException, ex);
+            throw;
+        }
         if (string.IsNullOrWhiteSpace(accountId))
         {
             SetAccountLinkBanner(HistoryPanelText.AccountLink.SignedOut(), StatusSeverity.Failure);
+            logRequest.Skipped(AccountLinkReason.SignedOut);
             _requestUiRefresh();
             return;
         }
 
         _state.LocalLinkedHint = true;
         _state.AccountLinkExpanded = false;
-        _accountLinkStore.SaveHint(accountId);
+        try
+        {
+            _accountLinkStore.SaveHint(accountId);
+        }
+        catch (Exception ex)
+        {
+            logRequest.Failed(AccountLinkReason.UnexpectedException, ex);
+            throw;
+        }
         SetAccountLinkBanner(null, StatusSeverity.Neutral);
-        BppLog.Info("HistoryPanel", $"BazaarDB link marked manually account={accountId}");
+        logRequest.Succeeded();
         _requestUiRefresh();
     }
 
@@ -950,6 +1020,9 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         var normalized = accountId?.Trim();
         return string.IsNullOrWhiteSpace(normalized) ? null : normalized;
     }
+
+    private static AccountLinkLogRequest StartAccountLinkLogRequest(AccountLinkMethod method) =>
+        new(Guid.NewGuid().ToString("N"), method, HistoryPanelAccountLinkBppLogSink.Instance);
 
     private void InvalidateFilteredGhostBattles()
     {

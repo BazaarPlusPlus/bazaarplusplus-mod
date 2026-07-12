@@ -341,6 +341,29 @@ public sealed class BppLogPipelineTests
     }
 
     [Fact]
+    public void Targeted_recovery_only_resets_the_matching_warning_key()
+    {
+        var (pipeline, output, _) = CreatePipeline();
+        var offline = new[] { WarningReason.Bind("offline") };
+        var timeout = new[] { WarningReason.Bind("timeout") };
+        pipeline.Emit(BppLogSeverity.Warning, GuardedWarning, offline);
+        pipeline.Emit(BppLogSeverity.Warning, GuardedWarning, timeout);
+
+        pipeline.RecoverStorm(GuardedWarning, offline);
+        pipeline.Emit(BppLogSeverity.Warning, GuardedWarning, offline);
+        pipeline.Emit(BppLogSeverity.Warning, GuardedWarning, timeout);
+
+        Assert.Equal(3, output.Count);
+        Assert.Contains("reason=offline", output[2].Message);
+
+        pipeline.Flush();
+
+        Assert.Equal(4, output.Count);
+        Assert.Contains("source_event=logging.test.degraded", output[3].Message);
+        Assert.Contains("suppressed_count=1", output[3].Message);
+    }
+
+    [Fact]
     public void Shutdown_flush_is_idempotent()
     {
         var (pipeline, output, _) = CreatePipeline();

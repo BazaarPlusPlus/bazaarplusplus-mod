@@ -220,6 +220,33 @@ public sealed class BppLogPipelineReliabilityTests
         Assert.Equal(0, evaluations);
     }
 
+    [Fact]
+    public void Debug_exception_factory_is_evaluated_only_in_debug_builds()
+    {
+        var emitter = new BppLogEmitter();
+        var output = new List<string>();
+        var evaluations = 0;
+        emitter.Install(CreatePipeline((_, message) => output.Add(message)));
+
+        emitter.Debug(
+            Event,
+            new InvalidOperationException("bounded diagnostic"),
+            () =>
+            {
+                evaluations++;
+                return new[] { ValueField.Bind("expensive") };
+            }
+        );
+
+#if DEBUG
+        Assert.Equal(1, evaluations);
+        Assert.Contains("exception_type=", Assert.Single(output));
+#else
+        Assert.Equal(0, evaluations);
+        Assert.Empty(output);
+#endif
+    }
+
     private static BppLogPipeline CreatePipeline(Action<BppLogSeverity, string> sink) =>
         new(new BppLogEventRenderer(), sink, () => DateTimeOffset.UnixEpoch);
 

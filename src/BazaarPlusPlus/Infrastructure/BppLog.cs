@@ -61,6 +61,13 @@ internal static class BppLog
         Func<BppLogFieldValue[]> valuesFactory
     ) => StructuredEmitter.Debug(definition, valuesFactory);
 
+    [Conditional("DEBUG")]
+    public static void DebugEvent(
+        BppLogEventDefinition definition,
+        Exception exception,
+        Func<BppLogFieldValue[]> valuesFactory
+    ) => StructuredEmitter.Debug(definition, exception, valuesFactory);
+
     public static void Info(string component, string message) =>
         Emit(LogLevel.Info, Format(component, message));
 
@@ -102,6 +109,11 @@ internal static class BppLog
 
     public static void RecoverStorm(BppLogEventDefinition definition) =>
         StructuredEmitter.RecoverStorm(definition);
+
+    public static void RecoverStorm(
+        BppLogEventDefinition definition,
+        params BppLogFieldValue[] values
+    ) => StructuredEmitter.RecoverStorm(definition, values);
 
     public static void Flush()
     {

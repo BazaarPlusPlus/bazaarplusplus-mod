@@ -117,6 +117,30 @@ internal sealed class BppLogPipeline
 
     internal void RecoverStorm(BppLogEventDefinition definition)
     {
+        RecoverStormCore(definition, stormKey: null);
+    }
+
+    internal void RecoverStorm(
+        BppLogEventDefinition definition,
+        IReadOnlyList<BppLogFieldValue>? values
+    )
+    {
+        if (
+            !TryBuildStormKey(
+                BppLogSeverity.Warning,
+                definition,
+                values,
+                exception: null,
+                out var stormKey
+            )
+        )
+            return;
+
+        RecoverStormCore(definition, stormKey);
+    }
+
+    private void RecoverStormCore(BppLogEventDefinition definition, string? stormKey)
+    {
         if (_insideSink)
             return;
 
@@ -132,7 +156,10 @@ internal sealed class BppLogPipeline
                 var keys = new List<string>();
                 foreach (var pair in _entries)
                 {
-                    if (ReferenceEquals(pair.Value.Definition, definition))
+                    if (
+                        ReferenceEquals(pair.Value.Definition, definition)
+                        && (stormKey == null || string.Equals(pair.Key, stormKey, StringComparison.Ordinal))
+                    )
                         keys.Add(pair.Key);
                 }
                 for (var index = 0; index < keys.Count; index++)

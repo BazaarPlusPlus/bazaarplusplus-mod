@@ -60,11 +60,46 @@ internal sealed class BppLogEmitter
         }
     }
 
+    [Conditional("DEBUG")]
+    internal void Debug(
+        BppLogEventDefinition definition,
+        Exception exception,
+        Func<BppLogFieldValue[]> valuesFactory
+    )
+    {
+        try
+        {
+            var pipeline = Volatile.Read(ref _pipeline);
+            if (pipeline == null || valuesFactory == null)
+                return;
+            pipeline.Emit(BppLogSeverity.Debug, definition, valuesFactory(), exception);
+        }
+        catch
+        {
+            // Debug diagnostics never affect feature behavior.
+        }
+    }
+
     internal void RecoverStorm(BppLogEventDefinition definition)
     {
         try
         {
             Volatile.Read(ref _pipeline)?.RecoverStorm(definition);
+        }
+        catch
+        {
+            // Recovery reporting is best effort.
+        }
+    }
+
+    internal void RecoverStorm(
+        BppLogEventDefinition definition,
+        IReadOnlyList<BppLogFieldValue>? values
+    )
+    {
+        try
+        {
+            Volatile.Read(ref _pipeline)?.RecoverStorm(definition, values);
         }
         catch
         {

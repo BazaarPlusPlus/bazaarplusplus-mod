@@ -6,6 +6,8 @@ using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
+using BazaarPlusPlus.Game.Upload;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Storage.RunLog;
@@ -13,10 +15,11 @@ using BazaarPlusPlus.Storage.Sqlite;
 
 namespace BazaarPlusPlus.Game.RunLogging.Upload;
 
-internal sealed class RunBundleUploadStore : SqliteStoreBase
+internal sealed class RunBundleUploadStore : SqliteStoreBase, IRunBundleUploadStore
 {
     private readonly CombatReplayPayloadStore _payloadStore;
     private readonly IPvpBattleCatalog _battleCatalog;
+    private readonly UploadPayloadFailureLogGate _payloadFailureLogGate = new();
 
     public RunBundleUploadStore(
         string databasePath,
@@ -159,14 +162,21 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
 
     public RunBundleUploadSnapshot? TryBuildRunBundleSnapshot(string runId, string playerAccountId)
     {
+        return BuildRunBundleSnapshot(runId, playerAccountId).Snapshot;
+    }
+
+    internal RunBundleBuildResult BuildRunBundleSnapshot(string runId, string playerAccountId)
+    {
         var runRow = TryGetRunUploadRow(runId);
         if (runRow == null)
-            return null;
+            return RunBundleBuildResult.NotReady();
 
         var battleManifests = _battleCatalog.ListByRunId(runId);
         var battleProjections = new List<BattleProjection>();
         var artifactBattles = new List<RunArtifactBattle>();
         var battleIds = new List<string>();
+        var hasMissingPayload = false;
+        UploadLogReasonCode? integrityFailureReason = null;
         var runEnded = !string.IsNullOrWhiteSpace(runRow.EndedAtUtc);
         var finalBattleId = runEnded
             ? battleManifests
@@ -180,9 +190,40 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
             if (string.IsNullOrWhiteSpace(manifest.BattleId))
                 continue;
 
-            var payload = _payloadStore.Load(manifest.BattleId);
+            var payloadResult = _payloadStore.LoadDetailed(manifest.BattleId);
+            if (payloadResult.Status == FileBackedPayloadLoadStatus.Missing)
+            {
+                _payloadFailureLogGate.Clear(runId, manifest.BattleId);
+                hasMissingPayload = true;
+                continue;
+            }
+            if (
+                payloadResult.Status == FileBackedPayloadLoadStatus.Invalid
+                || payloadResult.Status == FileBackedPayloadLoadStatus.Unreadable
+            )
+            {
+                var reasonCode =
+                    payloadResult.Status == FileBackedPayloadLoadStatus.Invalid
+                        ? UploadLogReasonCode.PayloadInvalid
+                        : UploadLogReasonCode.PayloadUnreadable;
+                _payloadFailureLogGate.Report(
+                    runId,
+                    manifest.BattleId,
+                    payloadResult.Fingerprint ?? "unavailable",
+                    reasonCode,
+                    payloadResult.Exception
+                );
+                integrityFailureReason ??= reasonCode;
+                continue;
+            }
+
+            _payloadFailureLogGate.Clear(runId, manifest.BattleId);
+            var payload = payloadResult.Payload;
             if (payload == null)
-                return null;
+            {
+                hasMissingPayload = true;
+                continue;
+            }
 
             battleIds.Add(manifest.BattleId);
             battleProjections.Add(
@@ -195,44 +236,56 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase
             artifactBattles.Add(BuildArtifactBattle(manifest, payload));
         }
 
+        if (integrityFailureReason.HasValue)
+            return RunBundleBuildResult.IntegrityFailed(integrityFailureReason.Value);
+        if (hasMissingPayload)
+            return RunBundleBuildResult.NotReady();
+
         var artifact = new RunArtifact { RunId = runId, Battles = artifactBattles };
         var artifactBytes = RunBundleArtifactCodec.Serialize(artifact);
 
-        return new RunBundleUploadSnapshot
-        {
-            RunId = runId,
-            LastSeq = runRow.LastSeq,
-            UploadedStatus = runRow.Status,
-            BattleIds = battleIds,
-            ArtifactBytes = artifactBytes,
-            Metadata = new RunBundleUploadRequest
+        return RunBundleBuildResult.Ready(
+            new RunBundleUploadSnapshot
             {
-                SchemaVersion = RunLogSchema.UploadPayloadSchemaVersion,
-                PlayerAccountId = playerAccountId,
-                SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
-                ArtifactCodec = RunBundleArtifactCodec.ContentType,
-                RunProjection = new RunProjection
+                RunId = runId,
+                LastSeq = runRow.LastSeq,
+                UploadedStatus = runRow.Status,
+                BattleIds = battleIds,
+                ArtifactBytes = artifactBytes,
+                Metadata = new RunBundleUploadRequest
                 {
-                    RunId = runId,
-                    Status = runRow.Status ?? string.Empty,
-                    HeroId = null,
-                    HeroName = runRow.Hero,
-                    PlayerRank = runRow.PlayerRank,
-                    PlayerRating = runRow.PlayerRating,
-                    PlayerPosition = null,
-                    StartedAtUtc = runRow.StartedAtUtc,
-                    EndedAtUtc = runRow.EndedAtUtc ?? string.Empty,
-                    FinalDay = runRow.FinalDay,
-                    FinalWins = runRow.Victories,
-                    FinalLosses = runRow.Losses,
-                    FinalPlayerRank = runRow.FinalPlayerRank,
-                    FinalPlayerRating = runRow.FinalPlayerRating,
-                    FinalPlayerPosition = null,
+                    SchemaVersion = RunLogSchema.UploadPayloadSchemaVersion,
+                    PlayerAccountId = playerAccountId,
+                    SubmittedAtUtc = DateTimeOffset.UtcNow.ToString("o"),
+                    ArtifactCodec = RunBundleArtifactCodec.ContentType,
+                    RunProjection = new RunProjection
+                    {
+                        RunId = runId,
+                        Status = runRow.Status ?? string.Empty,
+                        HeroId = null,
+                        HeroName = runRow.Hero,
+                        PlayerRank = runRow.PlayerRank,
+                        PlayerRating = runRow.PlayerRating,
+                        PlayerPosition = null,
+                        StartedAtUtc = runRow.StartedAtUtc,
+                        EndedAtUtc = runRow.EndedAtUtc ?? string.Empty,
+                        FinalDay = runRow.FinalDay,
+                        FinalWins = runRow.Victories,
+                        FinalLosses = runRow.Losses,
+                        FinalPlayerRank = runRow.FinalPlayerRank,
+                        FinalPlayerRating = runRow.FinalPlayerRating,
+                        FinalPlayerPosition = null,
+                    },
+                    BattleProjections = battleProjections,
                 },
-                BattleProjections = battleProjections,
-            },
-        };
+            }
+        );
     }
+
+    RunBundleBuildResult IRunBundleUploadStore.BuildRunBundleSnapshot(
+        string runId,
+        string playerAccountId
+    ) => BuildRunBundleSnapshot(runId, playerAccountId);
 
     private RunUploadRow? TryGetRunUploadRow(string runId)
     {

@@ -44,6 +44,11 @@ internal sealed class CombatReplayPayloadStore
         return _store.Load(battleId);
     }
 
+    internal FileBackedPayloadLoadResult<PvpReplayPayload> LoadDetailed(string battleId)
+    {
+        return _store.LoadDetailed(battleId);
+    }
+
     public bool Exists(string battleId)
     {
         return _store.Exists(battleId);
