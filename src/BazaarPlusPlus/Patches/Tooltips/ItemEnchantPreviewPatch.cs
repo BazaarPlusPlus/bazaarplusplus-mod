@@ -63,11 +63,11 @@ internal static class BppTooltipSectionRenderPatch
             if (string.IsNullOrEmpty(enchantContent))
                 return;
 
-            var hasNativePassiveText = !string.IsNullOrWhiteSpace(text);
-            var sectionKey = hasNativePassiveText
+            var hasNativeContent = HasNativeContent(text, questData.Count);
+            var sectionKey = hasNativeContent
                 ? EnchantWithNativeSectionKey
                 : EnchantWithoutNativeSectionKey;
-            var sectionStyle = hasNativePassiveText
+            var sectionStyle = hasNativeContent
                 ? EnchantWithNativeStyle
                 : EnchantWithoutNativeStyle;
 
@@ -87,6 +87,9 @@ internal static class BppTooltipSectionRenderPatch
             BppLog.Error("TooltipSection", "Failed to render BPP tooltip section", ex);
         }
     }
+
+    internal static bool HasNativeContent(string passiveText, int questGroupCount) =>
+        !string.IsNullOrWhiteSpace(passiveText) || questGroupCount > 0;
 
     private static string? BuildEnchantContent(CardTooltipController controller)
     {

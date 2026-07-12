@@ -4,6 +4,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.ItemEnchantPreview.Preview;
+using BazaarPlusPlus.Patches.Tooltips;
 using TheBazaar.Tooltips;
 
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
@@ -144,6 +145,15 @@ Assert(
         "BazaarPlusPlus.Patches.Tooltips.CardTooltipDataPassivePatch"
     ) == null,
     "Enchant preview must not append into the game's native passive-tooltip string."
+);
+
+Assert(
+    BppTooltipSectionRenderPatch.HasNativeContent(passiveText: "", questGroupCount: 1),
+    "Quest rows should count as native content and keep the divider above enchant previews."
+);
+Assert(
+    !BppTooltipSectionRenderPatch.HasNativeContent(passiveText: "", questGroupCount: 0),
+    "An otherwise empty native block should not add a divider above enchant previews."
 );
 
 Assert(
