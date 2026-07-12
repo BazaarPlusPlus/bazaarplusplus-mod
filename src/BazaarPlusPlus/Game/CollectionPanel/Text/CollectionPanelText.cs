@@ -43,7 +43,7 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet TierHeaderText = new("Quality", "品质", "品質");
     private static readonly LocalizedTextSet TagHeaderText = new("Types", "类型", "類型");
     private static readonly LocalizedTextSet KeywordHeaderText = new("Tags", "标签", "標籤");
-    private static readonly LocalizedTextSet KeywordReferenceSectionText = new(
+    private static readonly LocalizedTextSet KeywordRelatedSectionText = new(
         "Related",
         "相关",
         "相關"
@@ -193,7 +193,7 @@ internal static class CollectionPanelText
 
     internal static string KeywordHeader() => Resolve(KeywordHeaderText);
 
-    internal static string KeywordReferenceSection() => Resolve(KeywordReferenceSectionText);
+    internal static string KeywordRelatedSection() => Resolve(KeywordRelatedSectionText);
 
     internal static string FacetMatchMode(CollectionFacetMatchMode mode) =>
         mode == CollectionFacetMatchMode.All

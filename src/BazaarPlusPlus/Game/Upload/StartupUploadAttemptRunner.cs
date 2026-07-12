@@ -41,21 +41,28 @@ internal sealed class StartupUploadAttemptRunner
 
     public bool HasPendingTask => _task != null;
 
-    public void ObservePendingTaskOnShutdown(Action? afterObserved = null)
+    public bool TryDrainPendingTaskOnShutdown(TimeSpan timeout, Action? afterObserved = null)
     {
         var task = _task;
         _task = null;
         if (task == null)
         {
             RunShutdownCleanup(afterObserved);
-            return;
+            return true;
         }
 
         if (task.IsCompleted)
         {
             ObserveTaskCompletion(task);
             RunShutdownCleanup(afterObserved);
-            return;
+            return true;
+        }
+
+        if (WaitForCompletion(task, timeout))
+        {
+            ObserveTaskCompletion(task);
+            RunShutdownCleanup(afterObserved);
+            return true;
         }
 
         task.ContinueWith(
@@ -68,6 +75,22 @@ internal sealed class StartupUploadAttemptRunner
             TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default
         );
+        return false;
+    }
+
+    private static bool WaitForCompletion(Task task, TimeSpan timeout)
+    {
+        try
+        {
+            return ReferenceEquals(
+                Task.WhenAny(task, Task.Delay(timeout)).GetAwaiter().GetResult(),
+                task
+            );
+        }
+        catch
+        {
+            return task.IsCompleted;
+        }
     }
 
     public void Tick(

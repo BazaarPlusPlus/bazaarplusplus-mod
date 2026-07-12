@@ -578,6 +578,16 @@ var damageReferenceItem = Card(
     ETier.Bronze,
     hiddenTags: new[] { EHiddenTag.DamageReference }
 );
+var multicastItem = Card(
+    "Multicast Item",
+    ETier.Bronze,
+    hiddenTags: new[] { EHiddenTag.Multicast }
+);
+var damageMulticastItem = Card(
+    "Damage Multicast Item",
+    ETier.Bronze,
+    hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.Multicast }
+);
 var itemKeywordFilter = new CollectionFilterState();
 itemKeywordFilter.Keywords.Add(EHiddenTag.Damage);
 AssertSequence(
@@ -610,6 +620,41 @@ AssertSequence(
     ),
     new[] { damageShieldItem.Id },
     "All keyword mode requires every selected item keyword on the same card."
+);
+var multicastFilter = new CollectionFilterState();
+multicastFilter.Keywords.Add(EHiddenTag.Multicast);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { damageItem, multicastItem, damageMulticastItem },
+        multicastFilter
+    ),
+    new[] { damageMulticastItem.Id, multicastItem.Id },
+    "Multicast filtering should match only cards carrying EHiddenTag.Multicast."
+);
+var anyMulticastKeywordFilter = new CollectionFilterState();
+anyMulticastKeywordFilter.Keywords.Add(EHiddenTag.Damage);
+anyMulticastKeywordFilter.Keywords.Add(EHiddenTag.Multicast);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { multicastItem, damageMulticastItem, damageItem, shieldItem },
+        anyMulticastKeywordFilter
+    ),
+    new[] { damageItem.Id, damageMulticastItem.Id, multicastItem.Id },
+    "Any keyword mode should OR Multicast with existing keywords."
+);
+var allMulticastKeywordFilter = new CollectionFilterState
+{
+    KeywordMatchMode = CollectionFacetMatchMode.All,
+};
+allMulticastKeywordFilter.Keywords.Add(EHiddenTag.Damage);
+allMulticastKeywordFilter.Keywords.Add(EHiddenTag.Multicast);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { multicastItem, damageMulticastItem, damageItem },
+        allMulticastKeywordFilter
+    ),
+    new[] { damageMulticastItem.Id },
+    "All keyword mode should require Multicast and every other selected keyword on the same card."
 );
 var itemKeywordAndReferenceFilter = new CollectionFilterState();
 itemKeywordAndReferenceFilter.Keywords.Add(EHiddenTag.Damage);
@@ -730,6 +775,31 @@ AssertSequence(
     new[] { derivedLifestealVm.Id },
     "All keyword mode should still match a VM with derived Lifesteal when Lifesteal is the only selected keyword."
 );
+var attributeOnlyMulticastTemplate = new TCardItem
+{
+    Id = Guid.NewGuid(),
+    Type = ECardType.Item,
+    StartingTier = ETier.Bronze,
+    Size = ECardSize.Medium,
+    InternalName = "Attribute Only Multicast Item",
+    ArtKey = "Assets/Cards/AttributeOnlyMulticastItem.png",
+    HiddenTags = new HashSet<EHiddenTag>(),
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = new TCardTier
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Multicast] = 3,
+            },
+        },
+    },
+};
+var attributeOnlyMulticastVm = CollectionCardVm.From(attributeOnlyMulticastTemplate);
+AssertFalse(
+    attributeOnlyMulticastVm.HiddenTags.Contains(EHiddenTag.Multicast),
+    "CollectionCardVm.From should not derive Multicast from tier attribute values."
+);
 
 AssertEqual(
     PlayerFacingCardTags.Ordered.Count,
@@ -829,6 +899,7 @@ AssertValues(
         nameof(EHiddenTag.Gold),
         nameof(EHiddenTag.Income),
         nameof(EHiddenTag.Value),
+        nameof(EHiddenTag.Multicast),
         nameof(EHiddenTag.QuestReference),
         nameof(EHiddenTag.FlyingReference),
         nameof(EHiddenTag.HasteReference),
@@ -893,6 +964,18 @@ AssertFalse(
     CollectionKeywordWhitelist.IsReferenceKeyword(EHiddenTag.Poison),
     "Base gameplay keywords should not be classified as reference keywords."
 );
+AssertTrue(
+    CollectionKeywordWhitelist.IsRelatedKeyword(EHiddenTag.Multicast),
+    "Multicast should be classified into the Related keyword subsection."
+);
+AssertTrue(
+    CollectionKeywordWhitelist.IsRelatedKeyword(EHiddenTag.PotionReference),
+    "Curated reference keywords should remain in the Related keyword subsection."
+);
+AssertFalse(
+    CollectionKeywordWhitelist.IsRelatedKeyword(EHiddenTag.Poison),
+    "Base gameplay keywords should remain outside the Related keyword subsection."
+);
 
 AssertTrue(
     ReferenceTagBaseResolver.TryResolve(EHiddenTag.PotionReference, out var potionReferenceBase),
@@ -951,7 +1034,6 @@ foreach (
         EHiddenTag.CanCrit,
         EHiddenTag.Experience,
         EHiddenTag.Level,
-        EHiddenTag.Multicast,
         EHiddenTag.Reload,
         EHiddenTag.Tempo,
         EHiddenTag.Ticket,
@@ -961,6 +1043,10 @@ foreach (
         CollectionKeywordWhitelist.Ordered.Contains(nonBazaarDbKeyword),
         $"Keyword whitelist should exclude non-BazaarDB keyword {nonBazaarDbKeyword}."
     );
+AssertTrue(
+    CollectionKeywordWhitelist.Ordered.Contains(EHiddenTag.Multicast),
+    "CollectionPanel should include Multicast as an explicit Related keyword without changing the BazaarDB taxonomy."
+);
 
 var availableFacetCards = new[]
 {
@@ -970,6 +1056,7 @@ var availableFacetCards = new[]
         tags: new[] { ECardTag.Weapon, ECardTag.Ingredient },
         hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.DamageReference }
     ),
+    Card("Multicast Item", ETier.Bronze, hiddenTags: new[] { EHiddenTag.Multicast }),
     Card(
         "Package Shield",
         ETier.Bronze,
@@ -996,6 +1083,7 @@ AssertValues(
     new[]
     {
         nameof(EHiddenTag.Damage),
+        nameof(EHiddenTag.Multicast),
         nameof(EHiddenTag.DamageReference),
         nameof(EHiddenTag.PotionReference),
     },
@@ -1005,6 +1093,17 @@ AssertValues(
     availableFacets.SkillKeywords.Select(tag => tag.ToString()).ToArray(),
     new[] { nameof(EHiddenTag.Quest) },
     "Available skill keywords should be computed independently from item keywords."
+);
+var facetsWithoutMulticast = CollectionFacetAvailability.SnapshotFor(
+    new[] { damageItem, damageSkill }
+);
+AssertFalse(
+    facetsWithoutMulticast.KeywordsFor(ECardType.Item).Contains(EHiddenTag.Multicast),
+    "Item keyword availability should omit Multicast when the item catalog has no Multicast template."
+);
+AssertFalse(
+    availableFacets.KeywordsFor(ECardType.Skill).Contains(EHiddenTag.Multicast),
+    "Skill keyword availability should omit Multicast when only the item catalog contains it."
 );
 
 var queryCatalogCards = new[]

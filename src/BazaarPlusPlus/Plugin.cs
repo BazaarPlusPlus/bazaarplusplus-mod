@@ -37,9 +37,11 @@ public class Plugin : BaseUnityPlugin
     private ModOnlineClient? _onlineClient;
     private BazaarDbLinkClient? _bazaarDbLinkClient;
     private bool _patchesApplied;
+    private bool _teardownStarted;
 
     protected virtual void Awake()
     {
+        BppLog.Install(Logger);
         try
         {
             BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
@@ -51,7 +53,6 @@ public class Plugin : BaseUnityPlugin
             _composition = new BppComposition(Logger, configFile, gameBuild);
 
             var services = _composition.Services;
-            BppLog.Install(services.Logger);
             BppPatchHost.Install(services);
 
             BppLog.Info("Plugin", $"Game build: '{gameBuild.RawVersion}' → {gameBuild.Channel}");
@@ -95,9 +96,18 @@ public class Plugin : BaseUnityPlugin
 
     protected virtual void OnDestroy()
     {
+        Teardown();
+    }
+
+    private void Teardown()
+    {
+        if (_teardownStarted)
+            return;
+        _teardownStarted = true;
+
         RunTeardownSteps();
         RunTeardownStep("flush logs", BppLog.Flush);
-        BppPatchHost.Reset();
+        RunTeardownStep("reset patch host", BppPatchHost.Reset);
     }
 
     // Every step runs in isolation and Harmony is unpatched first: a throw in any single
@@ -247,7 +257,7 @@ public class Plugin : BaseUnityPlugin
 
     private void CleanupFailedInitialization()
     {
-        RunTeardownSteps();
+        Teardown();
     }
 
     private void DisposeOnlineServices()

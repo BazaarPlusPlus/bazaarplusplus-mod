@@ -12,6 +12,7 @@ namespace BazaarPlusPlus.Game.Upload;
 
 internal sealed class BackgroundUploadPump : MonoBehaviour
 {
+    private static readonly TimeSpan ShutdownDrainTimeout = TimeSpan.FromMilliseconds(500);
     private static readonly Dictionary<string, BackgroundUploadPump> CurrentByScope = new();
 
     private IBppServices? _services;
@@ -108,7 +109,20 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
         Action? disposeActivation =
             activation?.Disposable == null ? null : activation.Disposable.Dispose;
         if (_startupRunner != null)
-            _startupRunner.ObservePendingTaskOnShutdown(disposeActivation);
+        {
+            if (
+                !_startupRunner.TryDrainPendingTaskOnShutdown(
+                    ShutdownDrainTimeout,
+                    disposeActivation
+                )
+            )
+            {
+                BppLog.Warn(
+                    descriptor?.LogScope ?? "BackgroundUploadPump",
+                    $"Startup upload did not drain within {ShutdownDrainTimeout.TotalMilliseconds:0}ms; cleanup will finish asynchronously."
+                );
+            }
+        }
         else
             disposeActivation?.Invoke();
 

@@ -5,7 +5,7 @@ using BazaarGameShared.Domain.Core.Types;
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
 // Player-facing EHiddenTag keyword options, ordered to mirror BazaarDB's Types & Tags
-// mechanism slice while excluding system-only hidden tags. Reference tags stay in this same
+// mechanism slice while excluding system-only hidden tags. Related keywords stay in this same
 // keyword facet because they are still card HiddenTags; the UI renders them as a later subsection.
 // Catalog availability then removes options that current game data does not actually use.
 internal static class CollectionKeywordWhitelist
@@ -33,6 +33,7 @@ internal static class CollectionKeywordWhitelist
         EHiddenTag.Gold,
         EHiddenTag.Income,
         EHiddenTag.Value,
+        EHiddenTag.Multicast,
         EHiddenTag.QuestReference,
         EHiddenTag.FlyingReference,
         EHiddenTag.HasteReference,
@@ -52,6 +53,9 @@ internal static class CollectionKeywordWhitelist
         EHiddenTag.EconomyReference,
         EHiddenTag.PotionReference,
     };
+
+    public static bool IsRelatedKeyword(EHiddenTag tag) =>
+        tag == EHiddenTag.Multicast || IsReferenceKeyword(tag);
 
     public static bool IsReferenceKeyword(EHiddenTag tag) =>
         tag

@@ -1524,6 +1524,96 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Plugin_installs_logger_before_first_Awake_emission()
+    {
+        var pluginSource = File.ReadAllText(Path.Combine(MainSourceRoot(RepoRoot()), "Plugin.cs"));
+        var awakeStart = pluginSource.IndexOf(
+            "protected virtual void Awake()",
+            StringComparison.Ordinal
+        );
+        var awakeEnd = pluginSource.IndexOf(
+            "protected virtual void OnDestroy()",
+            awakeStart,
+            StringComparison.Ordinal
+        );
+        var awakeSource = pluginSource.Substring(awakeStart, awakeEnd - awakeStart);
+        var install = awakeSource.IndexOf("BppLog.Install(", StringComparison.Ordinal);
+        var firstEmission = new[]
+        {
+            "BppLog.Debug(",
+            "BppLog.Info(",
+            "BppLog.Warn(",
+            "BppLog.Error(",
+        }
+            .Select(token => awakeSource.IndexOf(token, StringComparison.Ordinal))
+            .Where(index => index >= 0)
+            .Min();
+
+        Assert.True(install >= 0, "Plugin.Awake must install the logger.");
+        Assert.True(
+            install < firstEmission,
+            "Plugin.Awake must install the logger before its first operational emission."
+        );
+    }
+
+    [Fact]
+    public void Plugin_flushes_logs_after_feature_teardown_on_all_paths()
+    {
+        var pluginSource = File.ReadAllText(Path.Combine(MainSourceRoot(RepoRoot()), "Plugin.cs"));
+        var teardownStart = pluginSource.IndexOf(
+            "private void Teardown()",
+            StringComparison.Ordinal
+        );
+        var teardownEnd = pluginSource.IndexOf(
+            "private void RunTeardownSteps()",
+            teardownStart,
+            StringComparison.Ordinal
+        );
+        var teardownSource = pluginSource.Substring(teardownStart, teardownEnd - teardownStart);
+
+        Assert.True(
+            teardownSource.IndexOf("RunTeardownSteps();", StringComparison.Ordinal)
+                < teardownSource.IndexOf("BppLog.Flush", StringComparison.Ordinal),
+            "Registered teardown hooks must run before pending storm summaries are flushed."
+        );
+        Assert.Contains(
+            "protected virtual void OnDestroy()\n    {\n        Teardown();",
+            pluginSource
+        );
+        Assert.Contains(
+            "private void CleanupFailedInitialization()\n    {\n        Teardown();",
+            pluginSource
+        );
+    }
+
+    [Fact]
+    public void BppLog_Debug_facade_keeps_compile_time_guards_and_lazy_fields()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(MainSourceRoot(RepoRoot()), "Infrastructure", "BppLog.cs")
+        );
+        var legacySignature = source.IndexOf(
+            "public static void Debug(string component, string message)",
+            StringComparison.Ordinal
+        );
+        var structuredSignature = source.IndexOf(
+            "public static void Debug(\n        BppLogEventDefinition definition",
+            StringComparison.Ordinal
+        );
+
+        Assert.True(legacySignature >= 0 && structuredSignature >= 0);
+        Assert.Contains(
+            "[Conditional(\"DEBUG\")]",
+            source.Substring(Math.Max(0, legacySignature - 80), 80)
+        );
+        Assert.Contains(
+            "[Conditional(\"DEBUG\")]",
+            source.Substring(Math.Max(0, structuredSignature - 80), 80)
+        );
+        Assert.Contains("Func<BppLogFieldValue[]> valuesFactory", source);
+    }
+
+    [Fact]
     public void Production_assemblies_live_under_src_not_repo_root()
     {
         var repoRoot = RepoRoot();

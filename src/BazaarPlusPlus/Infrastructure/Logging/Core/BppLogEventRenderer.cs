@@ -79,6 +79,36 @@ internal sealed class BppLogEventRenderer
         }
     }
 
+    internal bool TryFingerprint(BppLogFieldDefinition field, object? value, out string fingerprint)
+    {
+        try
+        {
+            return _valueFormatter.TryFingerprint(field, value, out fingerprint);
+        }
+        catch
+        {
+            fingerprint = string.Empty;
+            return false;
+        }
+    }
+
+    internal bool TryFingerprint(Exception? exception, out string fingerprint)
+    {
+        fingerprint = string.Empty;
+        if (exception == null)
+            return false;
+
+        try
+        {
+            return _exceptionProjector.TryFingerprint(exception, out fingerprint);
+        }
+        catch
+        {
+            fingerprint = string.Empty;
+            return false;
+        }
+    }
+
     private static bool IsValidDefinition(BppLogEventDefinition? definition)
     {
         if (definition == null || definition.Scope == null)
