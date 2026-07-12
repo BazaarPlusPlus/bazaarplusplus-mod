@@ -32,8 +32,6 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private Task<ScreenshotCaptureResult?>? _activeCaptureTask;
     private string? _bufferedRunId;
     private string? _bufferedHeroName;
-    private bool? _lastLoggedBlockerActive;
-    private EndOfRunCaptureReadinessState? _lastLoggedReadiness;
     private EndOfRunScreenController? _cachedEndOfRunScreenController;
     private float _nextControllerScanAtSeconds;
     private int _trackedEndOfRunControllerId;
@@ -132,10 +130,6 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     {
         ResetCaptureUiState(disarmGate: true);
         _gate.ArmForEndOfRun();
-        BppLog.Info(
-            "EndOfRunScreenshot",
-            $"CaptureState action=armed frame={Time.frameCount} time={Time.unscaledTime:F3} source=end-of-run-screen-initializing"
-        );
     }
 
     private void OnRunInitializedObserved(RunInitializedObserved observed)
@@ -168,7 +162,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         if (!IsEndOfRunScreenshotEnabled() || _screenshotService == null)
             return false;
 
-        EnsureCaptureArmed(controller, "continue-prefix-catch-up");
+        EnsureCaptureArmed(controller);
         var readiness = GetCaptureReadiness(controller);
         return _gate.ShouldBlockContinue(
             readiness,
@@ -193,7 +187,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             return;
         }
 
-        EnsureCaptureArmed(screenController, "controller-catch-up");
+        EnsureCaptureArmed(screenController);
         if (_gate.HasFinishedForCurrentRun())
         {
             _mouseBlocker.Detach();
@@ -211,15 +205,21 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             )
         )
         {
-            var trigger =
-                readiness == EndOfRunCaptureReadinessState.Ready
-                    ? "reveal-complete"
-                    : "timeout-fallback";
             _mouseBlocker.Attach(screenController);
-            BppLog.Info(
-                "EndOfRunScreenshot",
-                $"CaptureState action=start frame={Time.frameCount} time={Time.unscaledTime:F3} trigger={trigger} readiness={readiness} runId={ResolveRunId() ?? "<null>"} hero={ResolveHeroName() ?? "<null>"}"
-            );
+            if (readiness == EndOfRunCaptureReadinessState.Ready)
+            {
+                BppLog.Debug(
+                    "EndOfRunScreenshot",
+                    $"CaptureState action=start frame={Time.frameCount} time={Time.unscaledTime:F3} trigger=reveal-complete readiness={readiness} runId={ResolveRunId() ?? "<null>"} hero={ResolveHeroName() ?? "<null>"}"
+                );
+            }
+            else
+            {
+                BppLog.Warn(
+                    "EndOfRunScreenshot",
+                    $"CaptureState action=start frame={Time.frameCount} time={Time.unscaledTime:F3} trigger=timeout-fallback readiness={readiness} runId={ResolveRunId() ?? "<null>"} hero={ResolveHeroName() ?? "<null>"}; readiness detection did not recover before the bounded deadline."
+                );
+            }
             _captureCoroutine = StartCoroutine(
                 CaptureEndOfRun(screenController, _captureGeneration)
             );
@@ -231,7 +231,6 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             Time.time,
             RevealFallbackTimeoutSeconds
         );
-        LogBlockerStateChange(shouldBlock, readiness);
         if (shouldBlock)
             _mouseBlocker.Attach(screenController);
         else
@@ -403,11 +402,6 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                         persistenceFailure
                     );
                 }
-
-                BppLog.Info(
-                    "EndOfRunScreenshot",
-                    $"CaptureState action=captured frame={Time.frameCount} time={Time.unscaledTime:F3}"
-                );
             }
             else
             {
@@ -461,10 +455,6 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         if (!_gate.IsArmed())
             _gate.ArmForEndOfRun();
         _gate.MarkSummaryRevealStarted();
-        BppLog.Info(
-            "EndOfRunScreenshot",
-            $"CaptureState action=reveal-started frame={Time.frameCount} time={Time.unscaledTime:F3}"
-        );
     }
 
     private EndOfRunCaptureReadinessState GetCaptureReadiness(EndOfRunScreenController controller)
@@ -657,21 +647,15 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         _cachedEndOfRunScreenController = null;
         _nextControllerScanAtSeconds = 0f;
         _trackedEndOfRunControllerId = 0;
-        _lastLoggedBlockerActive = null;
-        _lastLoggedReadiness = null;
     }
 
-    private void EnsureCaptureArmed(EndOfRunScreenController controller, string source)
+    private void EnsureCaptureArmed(EndOfRunScreenController controller)
     {
         TrackEndOfRunController(controller);
         if (_gate.IsArmed() || _gate.HasFinishedForCurrentRun())
             return;
 
         _gate.ArmForEndOfRun();
-        BppLog.Info(
-            "EndOfRunScreenshot",
-            $"CaptureState action=armed frame={Time.frameCount} time={Time.unscaledTime:F3} source={source}"
-        );
     }
 
     private bool IsCaptureContextCurrent(EndOfRunScreenController controller, int captureGeneration)
@@ -721,22 +705,5 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             return;
 
         _trackedEndOfRunControllerId = controllerId;
-        BppLog.Info(
-            "EndOfRunScreenshot",
-            $"CaptureState action=controller-tracked frame={Time.frameCount} time={Time.unscaledTime:F3} controller={controller.name}"
-        );
-    }
-
-    private void LogBlockerStateChange(bool isActive, EndOfRunCaptureReadinessState readiness)
-    {
-        if (_lastLoggedBlockerActive == isActive && _lastLoggedReadiness == readiness)
-            return;
-
-        _lastLoggedBlockerActive = isActive;
-        _lastLoggedReadiness = readiness;
-        BppLog.Info(
-            "EndOfRunScreenshot",
-            $"BlockerState active={isActive} frame={Time.frameCount} time={Time.unscaledTime:F3} readiness={readiness} armed={_gate.IsArmed()} inFlight={_gate.IsCaptureAttemptInFlight()} captured={_gate.HasCapturedForCurrentRun()}"
-        );
     }
 }

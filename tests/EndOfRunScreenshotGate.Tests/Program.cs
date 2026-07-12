@@ -865,6 +865,9 @@ var controllerSource = File.ReadAllText(
         "src/BazaarPlusPlus/Game/Screenshots/EndOfRunScreenshotController.cs"
     )
 );
+var screenshotServiceSource = File.ReadAllText(
+    Path.Combine(repositoryRoot, "src/BazaarPlusPlus/Game/Screenshots/ScreenshotService.cs")
+);
 var onEnableSource = ExtractSourceSegment(
     controllerSource,
     "private void OnEnable()",
@@ -1009,6 +1012,28 @@ Assert(
 Assert(
     !controllerSource.Contains("TryCaptureFirstContinue", StringComparison.Ordinal),
     "Continue clicks must not remain the trigger for end-of-run capture."
+);
+Assert(
+    !controllerSource.Contains("CaptureState action=armed", StringComparison.Ordinal)
+        && !controllerSource.Contains(
+            "CaptureState action=controller-tracked",
+            StringComparison.Ordinal
+        )
+        && !controllerSource.Contains(
+            "CaptureState action=reveal-started",
+            StringComparison.Ordinal
+        )
+        && !controllerSource.Contains("BlockerState", StringComparison.Ordinal)
+        && !controllerSource.Contains("CaptureState action=captured", StringComparison.Ordinal)
+        && syncCaptureSource.Contains("BppLog.Debug(", StringComparison.Ordinal)
+        && syncCaptureSource.Contains("trigger=reveal-complete", StringComparison.Ordinal)
+        && syncCaptureSource.Contains("BppLog.Warn(", StringComparison.Ordinal)
+        && syncCaptureSource.Contains("trigger=timeout-fallback", StringComparison.Ordinal)
+        && screenshotServiceSource.Contains(
+            "BppLog.Info(\"ScreenshotService\", $\"Saved screenshot:",
+            StringComparison.Ordinal
+        ),
+    "Normal lifecycle chatter should stay removed, normal capture start should be Debug-only, fallback should warn, and saved-path success should remain Info."
 );
 var continuePatchSource = File.ReadAllText(
     Path.Combine(repositoryRoot, "src/BazaarPlusPlus/Patches/EndOfRun/EndOfRunScreenshotPatch.cs")
