@@ -3,16 +3,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.GameInterop.Cards;
+using BazaarPlusPlus.Game.CardTags;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.Tooltips;
 
 internal static class AggregateItemMissingTypesText
 {
-    private const int InlineFontSizePercent = 65;
-    private const int InlineLineHeightPercent = 70;
-
     private static readonly LocalizedTextSet Heading = new(
         "Missing Types:",
         "尚缺类型：",
@@ -33,23 +30,23 @@ internal static class AggregateItemMissingTypesText
 
     internal static string? Build(
         IEnumerable<ECardTag> present,
-        Func<string, string>? colorize = null
+        Func<string, string>? colorize = null,
+        Func<string, string?>? localizeType = null
     )
     {
         var missing = FindMissing(present);
         if (missing.Count == 0)
             return null;
 
-        var typeList = string.Join(", ", missing.Select(tag => tag.ToString()));
+        var typeList = string.Join(
+            ", ",
+            missing.Select(tag =>
+            {
+                var canonicalName = tag.ToString();
+                return localizeType?.Invoke(canonicalName) ?? canonicalName;
+            })
+        );
         var content = $"{L.Resolve(Heading)} {typeList}";
         return colorize?.Invoke(content) ?? content;
     }
-
-    internal static string AppendToPassiveText(string passiveText, string missingTypes) =>
-        string.IsNullOrWhiteSpace(passiveText)
-            ? InlineMissingTypes(missingTypes)
-            : $"{passiveText.TrimEnd()}\n{InlineMissingTypes(missingTypes)}";
-
-    private static string InlineMissingTypes(string missingTypes) =>
-        $"<line-height={InlineLineHeightPercent}%><size={InlineFontSizePercent}%>{missingTypes}</size>";
 }

@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.GameInterop.Cards;
+namespace BazaarPlusPlus.Game.CardTags;
 
 // Canonical ordering for card tags that are meaningful to players. Feature-specific
-// consumers may filter this list further (for example aggregate item auras copy only
-// item types, so Merchant is excluded there).
+// consumers may filter this list further (for example aggregate item effects only
+// count item types, so Merchant is excluded there).
 internal static class PlayerFacingCardTags
 {
     public static readonly IReadOnlyList<ECardTag> Ordered = new[]

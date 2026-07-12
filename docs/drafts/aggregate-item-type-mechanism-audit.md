@@ -71,4 +71,4 @@ Issue #48 / PR #62 希望为“自身获得其他物品类型，并按自身类�
 | Laurel's Fortress | Jules | Silver | 直接统计其他手牌的 distinct types |
 | Rowboat | Vanessa | Gold | 直接统计手牌（包含自身）的 distinct types |
 
-PR #62 已修正为同时识别三条结构路径，并新增 resolver 测试固定持续 aura、永久 action、外部 distinct-count 三类机制。Mysterious Crystal 不在目标矩阵：其 tooltip 应提示“可能授予哪些随机类型”而不是“自身还缺哪些类型”，属于不同产品语义。
+PR #62 已修正为同时识别三条顶层结构路径，并按 live card 的当前附魔额外检查对应 enchantment abilities/auras；resolver 测试固定了持续 aura、永久 action、外部 distinct-count 与“只读取当前附魔”四类语义。Mysterious Crystal 不在目标矩阵：其 tooltip 应提示“可能授予哪些随机类型”而不是“自身还缺哪些类型”，属于不同产品语义。

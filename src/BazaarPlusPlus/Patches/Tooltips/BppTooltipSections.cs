@@ -2,6 +2,7 @@
 #pragma warning disable CS0436
 using System.Collections.Generic;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Fonts;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
 
@@ -56,6 +57,7 @@ internal static class BppTooltipSections
             return false;
 
         ApplySourcePadding(section, style);
+        BppTmpFont.TryApply(section.Text.textObject, content);
         section.Text.SetText(content);
         var siblingIndex = anchor.transform.GetSiblingIndex() + 1;
         if (section.Divider != null)
@@ -84,36 +86,6 @@ internal static class BppTooltipSections
             section.Divider.SetActive(false);
         RestoreSourcePadding(section);
         section.Block.SetActive(false);
-    }
-
-    public static void HideAll(CardTooltipController controller)
-    {
-        // Controllers are pooled but not immortal: prune entries whose controller or
-        // cloned block has been destroyed so the static cache cannot grow across
-        // scene reloads. (Unity's overloaded == treats destroyed objects as null.)
-        List<(CardTooltipController, string)>? stale = null;
-        foreach (var entry in Sections)
-        {
-            if (entry.Key.Item1 == null || entry.Value.Block == null)
-            {
-                stale ??= new List<(CardTooltipController, string)>();
-                stale.Add(entry.Key);
-                continue;
-            }
-
-            if (ReferenceEquals(entry.Key.Item1, controller))
-            {
-                if (entry.Value.Divider != null)
-                    entry.Value.Divider.SetActive(false);
-                RestoreSourcePadding(entry.Value);
-                entry.Value.Block.SetActive(false);
-            }
-        }
-
-        if (stale == null)
-            return;
-        foreach (var key in stale)
-            Sections.Remove(key);
     }
 
     public static void ReleaseAll(CardTooltipController controller)

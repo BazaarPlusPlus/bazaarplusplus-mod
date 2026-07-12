@@ -1,3 +1,4 @@
+using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
@@ -7,7 +8,6 @@ using BazaarGameShared.Domain.Targeting;
 using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Localization;
-using BazaarPlusPlus.Patches.Tooltips;
 using Xunit;
 
 namespace CollectionEncounterTooltip.Tests;
@@ -64,17 +64,16 @@ public sealed class AggregateItemMissingTypesTextTests
     }
 
     [Fact]
-    public void AppendToPassiveText_places_missing_types_inside_the_native_passive_block()
+    public void Build_localizes_type_names_for_simplified_chinese()
     {
-        var content = AggregateItemMissingTypesText.AppendToPassiveText(
-            "This has the Types of items you have.\n",
-            "Missing Types: Food, Tool"
+        L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
+
+        var content = AggregateItemMissingTypesText.Build(
+            AggregateItemMissingTypesText.ItemTypes.Where(tag => tag != ECardTag.Relic),
+            localizeType: typeName => typeName == "Relic" ? "遗物" : null
         );
 
-        Assert.Equal(
-            "This has the Types of items you have.\n<line-height=70%><size=65%>Missing Types: Food, Tool</size>",
-            content
-        );
+        Assert.Equal("尚缺类型： 遗物", content);
     }
 
     [Fact]
@@ -88,9 +87,7 @@ public sealed class AggregateItemMissingTypesTextTests
             },
         };
 
-        Assert.True(
-            AggregateItemMissingTypesTooltipPatch.TryResolveTypeSource(template, out var source)
-        );
+        Assert.True(AggregateItemTypeSourceResolver.TryResolve(template, out var source));
         Assert.Null(source.Section);
     }
 
@@ -105,9 +102,7 @@ public sealed class AggregateItemMissingTypesTextTests
             },
         };
 
-        Assert.True(
-            AggregateItemMissingTypesTooltipPatch.TryResolveTypeSource(template, out var source)
-        );
+        Assert.True(AggregateItemTypeSourceResolver.TryResolve(template, out var source));
         Assert.Null(source.Section);
     }
 
@@ -136,11 +131,54 @@ public sealed class AggregateItemMissingTypesTextTests
             },
         };
 
-        Assert.True(
-            AggregateItemMissingTypesTooltipPatch.TryResolveTypeSource(template, out var source)
-        );
+        Assert.True(AggregateItemTypeSourceResolver.TryResolve(template, out var source));
         Assert.Equal(ETargetCardSectionTargetSection.SelfHand, source.Section);
         Assert.True(source.ExcludeSelf);
+    }
+
+    [Fact]
+    public void Source_resolver_uses_only_the_active_enchantments_distinct_type_aggregator()
+    {
+        var template = new TCardItem
+        {
+            Enchantments = new Dictionary<EEnchantmentType, TEnchantment>
+            {
+                [EEnchantmentType.Obsidian] = new()
+                {
+                    Auras = new Dictionary<string, TCardAura>
+                    {
+                        ["count-types"] = new()
+                        {
+                            Action = new TAuraActionCardModifyAttribute
+                            {
+                                Value = new TReferenceValueCardTagCount
+                                {
+                                    Distinct = true,
+                                    Target = new TTargetCardSection
+                                    {
+                                        TargetSection = ETargetCardSectionTargetSection.SelfHand,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+                [EEnchantmentType.Golden] = new(),
+            },
+        };
+
+        Assert.False(
+            AggregateItemTypeSourceResolver.TryResolve(template, EEnchantmentType.Golden, out _)
+        );
+
+        Assert.True(
+            AggregateItemTypeSourceResolver.TryResolve(
+                template,
+                EEnchantmentType.Obsidian,
+                out var source
+            )
+        );
+        Assert.Equal(ETargetCardSectionTargetSection.SelfHand, source.Section);
     }
 
     private sealed class TestLanguageProvider(string languageCode = "en") : ILanguageProvider
