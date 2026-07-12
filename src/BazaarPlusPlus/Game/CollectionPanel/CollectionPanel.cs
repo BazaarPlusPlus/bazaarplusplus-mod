@@ -15,6 +15,7 @@ using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
@@ -61,7 +62,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         ECardSize.Large,
     };
 
-    private readonly CollectionCatalog _catalog = new();
+    private CollectionCatalog _catalog = null!;
     private readonly CollectionFilterState _filter = new();
     private readonly CollectionSearchRefreshGate _searchRefreshGate = new(
         SearchRefreshDebounceSeconds
@@ -119,14 +120,20 @@ internal sealed class CollectionPanel : MonoBehaviour
     // DayTierSchedule.OutOfRunDay. Recomputed on every open.
     private int? _currentRunDay;
 
-    public void Initialize(IBppServices services)
+    public void Initialize(IBppServices services, BppStaticCardMapProvider cardMapProvider)
     {
         if (_initialized)
             return;
+        if (services == null)
+            throw new ArgumentNullException(nameof(services));
+        if (cardMapProvider == null)
+            throw new ArgumentNullException(nameof(cardMapProvider));
+
         _initialized = true;
         _instance = this;
         _services = services;
         _config = services.Config;
+        _catalog = new CollectionCatalog(cardMapProvider);
     }
 
     internal void AttachToOverlayHost(OverlayPanelHost overlayHost)

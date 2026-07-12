@@ -10,11 +10,16 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
 internal sealed class CollectionCatalog
 {
+    private readonly BppStaticCardMapProvider _cardMapProvider;
     private IReadOnlyList<CollectionCardVm>? _cache;
     private object? _cacheSource;
     private int _cacheSourceTemplateCount;
-    private Task<Dictionary<Guid, ITCard>?>? _cardMapTask;
-    private object? _cardMapTaskSource;
+
+    public CollectionCatalog(BppStaticCardMapProvider cardMapProvider)
+    {
+        _cardMapProvider =
+            cardMapProvider ?? throw new ArgumentNullException(nameof(cardMapProvider));
+    }
 
     public bool TryGetCached(out CollectionCatalogBuildResult result)
     {
@@ -47,7 +52,7 @@ internal sealed class CollectionCatalog
     /// <summary>
     /// True once an off-thread card-map load has been kicked for the current static-data source.
     /// </summary>
-    public bool HasCardMapLoadStarted => _cardMapTask != null;
+    public bool HasCardMapLoadStarted => _cardMapProvider.HasLoadStartedForCurrentSource;
 
     /// <summary>
     /// Kicks (or returns the in-flight) off-thread load of the full game card map so the heavy
@@ -58,17 +63,7 @@ internal sealed class CollectionCatalog
     /// </summary>
     public Task<Dictionary<Guid, ITCard>?>? BeginCardMapLoad(out object? source)
     {
-        source = BppStaticDataAccess.TryGetReadyManagerObject();
-        if (source == null)
-            return null;
-
-        if (_cardMapTask != null && ReferenceEquals(_cardMapTaskSource, source))
-            return _cardMapTask;
-
-        var captured = source;
-        _cardMapTaskSource = source;
-        _cardMapTask = Task.Run(() => BppStaticDataAccess.LoadCardMap(captured));
-        return _cardMapTask;
+        return _cardMapProvider.BeginLoad(out source);
     }
 
     /// <summary>

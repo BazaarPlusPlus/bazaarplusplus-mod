@@ -1,17 +1,9 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
-using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarGameShared.Domain.Game;
-using BazaarGameShared.Domain.Prerequisites;
-using BazaarGameShared.Domain.Prerequisites.Conditionals;
-using BazaarGameShared.Domain.Spawning;
-using BazaarGameShared.Domain.Spawning.SpawnFilters;
-using BazaarGameShared.Domain.Spawning.SpawnGroups;
-using BazaarGameShared.Domain.Spawning.SpawningContexts;
-using BazaarGameShared.Domain.Values;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
@@ -33,8 +25,8 @@ internal static class CollectionLevelUpTooltipText
     private const int LastBoardSlotLevel = 4;
 
     public static string Build(
-        TLevelUp? levelUp,
-        Func<Guid, TCardBase?> resolveTemplate,
+        CollectionLevelUpPreviewPlan? levelUp,
+        Func<Guid, CollectionEncounterPreviewTemplatePlan?> resolveTemplate,
         EHero? currentHero,
         Func<string, string>? colorizeResult = null,
         int? currentLevel = null
@@ -55,7 +47,7 @@ internal static class CollectionLevelUpTooltipText
         // candidates and the player picks one — the native pack icon's "1". Render all
         // candidates as one "Choose one:" list; random pools contribute a count entry.
         var candidates = new List<string>();
-        if (levelUp.Rewards is TSpawnContextQuery query)
+        if (levelUp.Groups.Count > 0)
         {
             // Random selection (levels 9/18): groups whose weight equals their card
             // count are uniform per-card rolls competing for one offered slot — the
@@ -63,11 +55,10 @@ internal static class CollectionLevelUpTooltipText
             // (w2×[Yetarian, Sanguine] + w1×[Arcane] = one random enchant of three).
             // Merge them into a single pool candidate instead of listing each group.
             var uniformPool = new List<Guid>();
-            var isRandomSelection = query.SelectionMethod == ESpawnSelectionMethod.Random;
-            foreach (var group in query.Groups)
+            foreach (var group in levelUp.Groups)
             {
                 if (
-                    isRandomSelection
+                    levelUp.IsRandomSelection
                     && PassesPrerequisites(group, currentHero)
                     && UniformPoolIds(group) is { } poolIds
                 )
@@ -122,22 +113,19 @@ internal static class CollectionLevelUpTooltipText
 
     // A weighted group whose weight equals its card count: every card is a uniform
     // roll for the same offered slot, so such groups merge into one pool.
-    private static List<Guid>? UniformPoolIds(TSpawnGroup group)
+    private static List<Guid>? UniformPoolIds(CollectionLevelUpPreviewGroup group)
     {
         if (group.RandomWeight == 0)
             return null;
 
-        var ids = new List<Guid>();
-        foreach (var filter in group.Filters)
-            if (filter is TSpawnFilterIdList idList)
-                ids.AddRange(idList.Ids);
+        var ids = new List<Guid>(group.TemplateIds);
         return ids.Count > 0 && group.RandomWeight == ids.Count ? ids : null;
     }
 
     private static void CollectGroup(
         List<string> candidates,
-        TSpawnGroup group,
-        Func<Guid, TCardBase?> resolveTemplate,
+        CollectionLevelUpPreviewGroup group,
+        Func<Guid, CollectionEncounterPreviewTemplatePlan?> resolveTemplate,
         EHero? currentHero,
         Func<string, string> colorize
     )
@@ -145,23 +133,19 @@ internal static class CollectionLevelUpTooltipText
         if (!PassesPrerequisites(group, currentHero))
             return;
 
-        var ids = new List<Guid>();
-        foreach (var filter in group.Filters)
-            if (filter is TSpawnFilterIdList idList)
-                ids.AddRange(idList.Ids);
+        var ids = new List<Guid>(group.TemplateIds);
 
         if (ids.Count == 0)
             return;
 
-        var limit = group.Limit is TFixedValue fixedValue ? (int)fixedValue.Value : 1;
-        CollectCandidates(candidates, ids, limit, resolveTemplate, currentHero, colorize);
+        CollectCandidates(candidates, ids, group.Limit, resolveTemplate, currentHero, colorize);
     }
 
     private static void CollectCandidates(
         List<string> candidates,
         List<Guid> ids,
         int limit,
-        Func<Guid, TCardBase?> resolveTemplate,
+        Func<Guid, CollectionEncounterPreviewTemplatePlan?> resolveTemplate,
         EHero? currentHero,
         Func<string, string> colorize
     )
@@ -170,7 +154,7 @@ internal static class CollectionLevelUpTooltipText
         // run prerequisite alone is coarser: e.g. "Core Initialization" sits in a
         // Dooley-or-Jules group but the card itself is Dooley-only). Unresolvable
         // templates cannot be judged and stay counted.
-        var eligible = new List<TCardBase>();
+        var eligible = new List<CollectionEncounterPreviewTemplatePlan>();
         var unresolved = 0;
         foreach (var id in ids)
         {
@@ -251,28 +235,19 @@ internal static class CollectionLevelUpTooltipText
     // Only hero conditions are evaluated; groups gated on board state ("Inspired by"
     // bonus skills) are omitted, and unknown run conditions — including an unknown
     // current hero — keep the group visible rather than silently dropping rewards.
-    private static bool PassesPrerequisites(TSpawnGroup group, EHero? currentHero)
+    private static bool PassesPrerequisites(CollectionLevelUpPreviewGroup group, EHero? currentHero)
     {
-        if (group.Prerequisites == null)
-            return true;
-
-        foreach (var prerequisite in group.Prerequisites)
-        {
-            switch (prerequisite)
-            {
-                case TPrerequisiteCardCount:
-                    return false;
-                case TPrerequisiteRun { Conditions: TRunConditionalPlayerHero heroCondition }:
-                    if (!PassesHeroCondition(heroCondition, currentHero))
-                        return false;
-                    break;
-            }
-        }
+        foreach (var condition in group.HeroConditions)
+            if (!PassesHeroCondition(condition, currentHero))
+                return false;
 
         return true;
     }
 
-    private static bool PassesHeroCondition(TRunConditionalPlayerHero condition, EHero? currentHero)
+    private static bool PassesHeroCondition(
+        CollectionLevelUpPreviewHeroCondition condition,
+        EHero? currentHero
+    )
     {
         // Hero detection failed: keep hero-gated groups visible (consistent with
         // CollectionEncounterHeroEligibility) instead of hiding them all.
@@ -280,9 +255,9 @@ internal static class CollectionLevelUpTooltipText
             return true;
 
         var contains = condition.Heroes.Contains(currentHero.Value);
-        return condition.Operator switch
+        return condition.ComparisonOperator switch
         {
-            EListComparisonOperator.None => !contains,
+            "None" => !contains,
             _ => contains,
         };
     }
