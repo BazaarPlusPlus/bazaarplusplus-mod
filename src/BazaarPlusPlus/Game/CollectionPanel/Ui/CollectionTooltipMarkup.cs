@@ -11,8 +11,8 @@ internal static class CollectionTooltipMarkup
 {
     private const string ProseLine = "<line-height=1.4em>";
     private const string ParagraphGap = "<line-height=1.9em>\n";
-    private const string ListItemGap = "<line-height=1.75em>\n";
-    private const string NestedItemGap = "<line-height=1.4em>\n";
+    private const string ListItemGap = "<line-height=1.9em>\n";
+    private const string NestedItemGap = "<line-height=1.65em>\n";
     private const string NativeLineHeightOpen = "<line-height=1.6em>";
     private const string LineHeightClose = "</line-height>";
 
