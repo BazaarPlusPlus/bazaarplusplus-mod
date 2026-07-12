@@ -10,6 +10,8 @@ namespace BazaarPlusPlus.Game.Tooltips;
 
 internal static class AggregateItemMissingTypesText
 {
+    private const int InlineFontSizePercent = 65;
+
     private static readonly LocalizedTextSet Heading = new(
         "Missing Types:",
         "尚缺类型：",
@@ -44,6 +46,6 @@ internal static class AggregateItemMissingTypesText
 
     internal static string AppendToPassiveText(string passiveText, string missingTypes) =>
         string.IsNullOrWhiteSpace(passiveText)
-            ? missingTypes
-            : $"{passiveText.TrimEnd()}\n{missingTypes}";
+            ? $"<size={InlineFontSizePercent}%>{missingTypes}</size>"
+            : $"{passiveText.TrimEnd()}\n<size={InlineFontSizePercent}%>{missingTypes}</size>";
 }
