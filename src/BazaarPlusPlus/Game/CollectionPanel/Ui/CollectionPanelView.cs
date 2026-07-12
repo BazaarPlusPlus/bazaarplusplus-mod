@@ -99,7 +99,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _tierFilterLabel;
     private Label? _tagFilterLabel;
     private Label? _keywordFilterLabel;
-    private Label? _keywordReferenceSectionLabel;
+    private Label? _keywordRelatedSectionLabel;
     private Button? _tagMatchModeButton;
     private Button? _keywordMatchModeButton;
     private VisualElement? _heroChipRow;
@@ -451,8 +451,8 @@ internal sealed partial class CollectionPanelView : IDisposable
             _tagFilterLabel.text = CollectionPanelText.TagHeader();
         if (_keywordFilterLabel != null)
             _keywordFilterLabel.text = CollectionPanelText.KeywordHeader();
-        if (_keywordReferenceSectionLabel != null)
-            _keywordReferenceSectionLabel.text = CollectionPanelText.KeywordReferenceSection();
+        if (_keywordRelatedSectionLabel != null)
+            _keywordRelatedSectionLabel.text = CollectionPanelText.KeywordRelatedSection();
 
         UpdateContentSpacerHeight(model.ContentHeight);
 
@@ -498,8 +498,8 @@ internal sealed partial class CollectionPanelView : IDisposable
             _tagFilterLabel.text = CollectionPanelText.TagHeader();
         if (_keywordFilterLabel != null)
             _keywordFilterLabel.text = CollectionPanelText.KeywordHeader();
-        if (_keywordReferenceSectionLabel != null)
-            _keywordReferenceSectionLabel.text = CollectionPanelText.KeywordReferenceSection();
+        if (_keywordRelatedSectionLabel != null)
+            _keywordRelatedSectionLabel.text = CollectionPanelText.KeywordRelatedSection();
         if (_disclaimerLabel != null)
         {
             _disclaimerLabel.text = CollectionPanelText.SourceDisclaimer();

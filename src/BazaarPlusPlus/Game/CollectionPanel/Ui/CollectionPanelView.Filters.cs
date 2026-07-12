@@ -154,14 +154,14 @@ internal sealed partial class CollectionPanelView
         if (!KeywordChipsMatch(keywords))
         {
             ClearKeywordFacetRow();
-            var hasReferenceSection = false;
+            var hasRelatedSection = false;
             foreach (var keyword in keywords)
             {
-                if (!hasReferenceSection && CollectionKeywordWhitelist.IsReferenceKeyword(keyword))
+                if (!hasRelatedSection && CollectionKeywordWhitelist.IsRelatedKeyword(keyword))
                 {
-                    _keywordReferenceSectionLabel = CreateKeywordReferenceSectionLabel();
-                    _keywordChipRow.Add(_keywordReferenceSectionLabel);
-                    hasReferenceSection = true;
+                    _keywordRelatedSectionLabel = CreateKeywordRelatedSectionLabel();
+                    _keywordChipRow.Add(_keywordRelatedSectionLabel);
+                    hasRelatedSection = true;
                 }
 
                 var captured = keyword;
@@ -215,14 +215,14 @@ internal sealed partial class CollectionPanelView
         }
         _keywordChips.Clear();
         _keywordChipOrder.Clear();
-        _keywordReferenceSectionLabel = null;
+        _keywordRelatedSectionLabel = null;
         _keywordChipRow?.Clear();
     }
 
-    private static Label CreateKeywordReferenceSectionLabel()
+    private static Label CreateKeywordRelatedSectionLabel()
     {
         var label = CreateLabel(Sizes.FontTiny, FontStyle.Bold, Colors.HistoryStatusText);
-        label.text = CollectionPanelText.KeywordReferenceSection();
+        label.text = CollectionPanelText.KeywordRelatedSection();
         label.style.width = Length.Percent(100f);
         label.style.flexBasis = Length.Percent(100f);
         label.style.marginTop = UiSpacing.Xs;
