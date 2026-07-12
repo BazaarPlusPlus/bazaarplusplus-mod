@@ -15,7 +15,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 
 - **Run Logging 与 HistoryPanel**：活跃 run 写入本地 SQLite；游戏内可浏览 runs、PVP battles、ghost battles，并预览保存的战斗快照。
 - **战斗回放**：本地保存 PVP replay payload；HistoryPanel 在条件满足时可回放已保存战斗。
-- **终局自动截图**：终局 `Continue` 前保存主截图和 SQLite 元数据。
+- **终局自动截图**：终局总结页的卡牌与技能展示动画稳定后，自动保存主截图和 SQLite 元数据，再放行 `Continue`。
 
 ### 云同步（可选）
 
