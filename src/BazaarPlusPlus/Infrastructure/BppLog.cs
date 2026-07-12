@@ -56,7 +56,7 @@ internal static class BppLog
     }
 
     [Conditional("DEBUG")]
-    public static void Debug(
+    public static void DebugEvent(
         BppLogEventDefinition definition,
         Func<BppLogFieldValue[]> valuesFactory
     ) => StructuredEmitter.Debug(definition, valuesFactory);
@@ -73,22 +73,28 @@ internal static class BppLog
     public static void Error(string component, string message, Exception ex) =>
         Emit(LogLevel.Error, FormatError(component, message, ex));
 
-    public static void Info(BppLogEventDefinition definition, params BppLogFieldValue[] values) =>
-        StructuredEmitter.Emit(BppLogSeverity.Info, definition, values);
+    public static void InfoEvent(
+        BppLogEventDefinition definition,
+        params BppLogFieldValue[] values
+    ) => StructuredEmitter.Emit(BppLogSeverity.Info, definition, values);
 
-    public static void Warn(BppLogEventDefinition definition, params BppLogFieldValue[] values) =>
-        StructuredEmitter.Emit(BppLogSeverity.Warning, definition, values);
+    public static void WarnEvent(
+        BppLogEventDefinition definition,
+        params BppLogFieldValue[] values
+    ) => StructuredEmitter.Emit(BppLogSeverity.Warning, definition, values);
 
-    public static void Warn(
+    public static void WarnEvent(
         BppLogEventDefinition definition,
         Exception exception,
         params BppLogFieldValue[] values
     ) => StructuredEmitter.Emit(BppLogSeverity.Warning, definition, values, exception);
 
-    public static void Error(BppLogEventDefinition definition, params BppLogFieldValue[] values) =>
-        StructuredEmitter.Emit(BppLogSeverity.Error, definition, values);
+    public static void ErrorEvent(
+        BppLogEventDefinition definition,
+        params BppLogFieldValue[] values
+    ) => StructuredEmitter.Emit(BppLogSeverity.Error, definition, values);
 
-    public static void Error(
+    public static void ErrorEvent(
         BppLogEventDefinition definition,
         Exception exception,
         params BppLogFieldValue[] values

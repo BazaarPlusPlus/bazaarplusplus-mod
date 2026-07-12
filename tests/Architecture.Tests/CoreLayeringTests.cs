@@ -1597,7 +1597,7 @@ public class CoreLayeringTests
             StringComparison.Ordinal
         );
         var structuredSignature = source.IndexOf(
-            "public static void Debug(\n        BppLogEventDefinition definition",
+            "public static void DebugEvent(\n        BppLogEventDefinition definition",
             StringComparison.Ordinal
         );
 
