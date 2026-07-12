@@ -41,4 +41,9 @@ internal static class AggregateItemMissingTypesText
         var content = $"{L.Resolve(Heading)} {typeList}";
         return colorize?.Invoke(content) ?? content;
     }
+
+    internal static string AppendToPassiveText(string passiveText, string missingTypes) =>
+        string.IsNullOrWhiteSpace(passiveText)
+            ? missingTypes
+            : $"{passiveText.TrimEnd()}\n{missingTypes}";
 }

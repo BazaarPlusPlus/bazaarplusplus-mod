@@ -21,34 +21,20 @@ namespace BazaarPlusPlus.Patches.Tooltips;
 )]
 internal static class AggregateItemMissingTypesTooltipPatch
 {
-    private const string SectionKey = "aggregate-missing-types";
-
-    [HarmonyPostfix]
-    [HarmonyPriority(Priority.Last)]
-    private static void Postfix(CardTooltipController __instance, string text)
+    [HarmonyPrefix]
+    [HarmonyPriority(Priority.First)]
+    private static void Prefix(CardTooltipController __instance, ref string text)
     {
         try
         {
             var content = string.IsNullOrEmpty(text) ? null : BuildContent(__instance);
             if (string.IsNullOrEmpty(content))
-            {
-                BppTooltipSections.Hide(__instance, SectionKey);
                 return;
-            }
 
-            if (
-                !BppTooltipSections.TryShow(
-                    __instance,
-                    SectionKey,
-                    __instance.passiveEffectParent,
-                    content!
-                )
-            )
-                BppTooltipSections.Hide(__instance, SectionKey);
+            text = AggregateItemMissingTypesText.AppendToPassiveText(text, content!);
         }
         catch (Exception ex)
         {
-            BppTooltipSections.Hide(__instance, SectionKey);
             BppLog.Error("AggregateTypesTooltip", "Failed to render missing item types", ex);
         }
     }

@@ -64,6 +64,17 @@ public sealed class AggregateItemMissingTypesTextTests
     }
 
     [Fact]
+    public void AppendToPassiveText_places_missing_types_inside_the_native_passive_block()
+    {
+        var content = AggregateItemMissingTypesText.AppendToPassiveText(
+            "This has the Types of items you have.\n",
+            "Missing Types: Food, Tool"
+        );
+
+        Assert.Equal("This has the Types of items you have.\nMissing Types: Food, Tool", content);
+    }
+
+    [Fact]
     public void Source_resolver_recognizes_persistent_action_aggregators()
     {
         var template = new TCardItem
