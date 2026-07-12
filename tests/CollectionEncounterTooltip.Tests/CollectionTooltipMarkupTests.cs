@@ -55,9 +55,18 @@ public sealed class CollectionTooltipMarkupTests
         Assert.Equal(
             "<line-height=1.4em>Full size"
                 + "<line-height=1.9em>\n"
-                + "<size=85%><line-height=1.4em>"
-                + "<line-height=1.4em>· <indent=1em>dimmed</indent></size>",
+                + "<size=85%><line-height=1.4em>· <indent=1em>dimmed</indent></size>",
             text
+        );
+    }
+
+    [Fact]
+    public void Unknown_block_type_fails_instead_of_rendering_an_empty_block()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            CollectionTooltipMarkup.Render(
+                new CollectionTooltipMarkup.Block[] { new UnknownBlock() }
+            )
         );
     }
 
@@ -88,5 +97,11 @@ public sealed class CollectionTooltipMarkupTests
                 "<line-height=1.6em>Gain <color=green>Health</color></line-height>"
             )
         );
+    }
+
+    private sealed class UnknownBlock : CollectionTooltipMarkup.Block
+    {
+        public UnknownBlock()
+            : base(fontSizePercent: 100) { }
     }
 }

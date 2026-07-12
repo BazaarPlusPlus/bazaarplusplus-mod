@@ -89,15 +89,14 @@ internal static class CollectionTooltipMarkup
     private static void AppendBlock(StringBuilder builder, Block block, bool hasFollowingBlock)
     {
         OpenSize(builder, block.FontSizePercent);
-        builder.Append(ProseLine);
         switch (block)
         {
             case Paragraph paragraph:
-                builder.Append(paragraph.Content);
+                builder.Append(ProseLine).Append(paragraph.Content);
                 break;
             case ListBlock list:
                 if (!string.IsNullOrEmpty(list.Header))
-                    builder.Append(list.Header);
+                    builder.Append(ProseLine).Append(list.Header);
                 AppendListItems(
                     builder,
                     list.Items,
@@ -105,6 +104,12 @@ internal static class CollectionTooltipMarkup
                     hasLeadingContent: !string.IsNullOrEmpty(list.Header)
                 );
                 break;
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(block),
+                    block.GetType().FullName,
+                    "Unsupported tooltip prose block type."
+                );
         }
         if (hasFollowingBlock)
             builder.Append(ParagraphGap);
