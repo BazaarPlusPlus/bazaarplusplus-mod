@@ -41,7 +41,8 @@ internal static class EncounterEventTooltipPatch
                     : BuildContent(__instance);
             if (string.IsNullOrEmpty(content))
             {
-                BppTooltipSections.HideAll(__instance);
+                BppTooltipSections.Hide(__instance, SectionKey);
+                BppTooltipSections.Hide(__instance, HeroLevelRewardsTooltipPatch.SectionKey);
                 return;
             }
 

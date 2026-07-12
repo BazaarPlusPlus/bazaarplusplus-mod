@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CardTags;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -75,8 +76,8 @@ internal static class CollectionFacetAvailability
 
     private static IReadOnlyList<ECardTag> OrderedTags(HashSet<ECardTag> present)
     {
-        var available = new List<ECardTag>(CollectionTagWhitelist.Ordered.Count);
-        foreach (var tag in CollectionTagWhitelist.Ordered)
+        var available = new List<ECardTag>(PlayerFacingCardTags.Ordered.Count);
+        foreach (var tag in PlayerFacingCardTags.Ordered)
             if (present.Contains(tag))
                 available.Add(tag);
         return available;

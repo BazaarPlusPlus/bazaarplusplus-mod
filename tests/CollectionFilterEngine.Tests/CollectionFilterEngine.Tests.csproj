@@ -121,10 +121,6 @@
       Link="CollectionCardClassification.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTagWhitelist.cs"
-      Link="CollectionTagWhitelist.cs"
-    />
-    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionKeywordWhitelist.cs"
       Link="CollectionKeywordWhitelist.cs"
     />
@@ -135,6 +131,10 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\PackageIdentity.cs"
       Link="PackageIdentity.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CardTags\PlayerFacingCardTags.cs"
+      Link="PlayerFacingCardTags.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\GameInterop\TagTypography\ReferenceTagBaseResolver.cs"

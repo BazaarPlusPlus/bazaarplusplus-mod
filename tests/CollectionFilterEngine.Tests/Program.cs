@@ -3,6 +3,7 @@ using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Tooltips;
+using BazaarPlusPlus.Game.CardTags;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.TagTypography;
@@ -731,12 +732,12 @@ AssertSequence(
 );
 
 AssertEqual(
-    CollectionTagWhitelist.Ordered.Count,
-    CollectionTagWhitelist.Ordered.Distinct().Count(),
+    PlayerFacingCardTags.Ordered.Count,
+    PlayerFacingCardTags.Ordered.Distinct().Count(),
     "Tag whitelist entries must be distinct."
 );
 AssertValues(
-    CollectionTagWhitelist.Ordered.Select(tag => tag.ToString()).ToArray(),
+    PlayerFacingCardTags.Ordered.Select(tag => tag.ToString()).ToArray(),
     new[]
     {
         nameof(ECardTag.Weapon),
@@ -773,14 +774,14 @@ foreach (
     }
 )
     AssertFalse(
-        CollectionTagWhitelist.Ordered.Contains(mechanismTag),
+        PlayerFacingCardTags.Ordered.Contains(mechanismTag),
         $"Tag whitelist must exclude mechanism tag {mechanismTag}."
     );
 foreach (
     var bazaarDbTag in new[] { ECardTag.Apparel, ECardTag.Merchant, ECardTag.Loot, ECardTag.Weapon }
 )
     AssertTrue(
-        CollectionTagWhitelist.Ordered.Contains(bazaarDbTag),
+        PlayerFacingCardTags.Ordered.Contains(bazaarDbTag),
         $"Tag whitelist should include BazaarDB type/tag {bazaarDbTag}."
     );
 foreach (
@@ -794,7 +795,7 @@ foreach (
     }
 )
     AssertFalse(
-        CollectionTagWhitelist.Ordered.Contains(unusedTypeTag),
+        PlayerFacingCardTags.Ordered.Contains(unusedTypeTag),
         $"Tag whitelist should exclude non-BazaarDB type/tag {unusedTypeTag}."
     );
 

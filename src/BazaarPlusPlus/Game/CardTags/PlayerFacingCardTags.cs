@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.CollectionPanel.Data;
+namespace BazaarPlusPlus.Game.CardTags;
 
-// Player-facing ECardTag filter options, ordered to mirror BazaarDB's Types & Tags type slice.
-// Event/combat/system-only tags stay out; catalog availability then removes options that current
-// game data does not actually use.
-internal static class CollectionTagWhitelist
+// Canonical ordering for card tags that are meaningful to players. Feature-specific
+// consumers may filter this list further (for example aggregate item effects only
+// count item types, so Merchant is excluded there).
+internal static class PlayerFacingCardTags
 {
     public static readonly IReadOnlyList<ECardTag> Ordered = new[]
     {
