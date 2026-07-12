@@ -1404,6 +1404,54 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Structured_logging_core_has_no_runtime_framework_dependencies()
+    {
+        var repoRoot = RepoRoot();
+        var coreDirectory = Path.Combine(
+            MainSourceRoot(repoRoot),
+            "Infrastructure",
+            "Logging",
+            "Core"
+        );
+        Assert.True(
+            Directory.Exists(coreDirectory),
+            $"Could not locate structured logging core at '{coreDirectory}'."
+        );
+
+        var forbiddenTokens = new[]
+        {
+            "BepInEx",
+            "UnityEngine",
+            "HarmonyLib",
+            "TheBazaar",
+            "BazaarGameClient",
+            "BazaarGameShared",
+        };
+        var violations = new List<string>();
+        foreach (var file in EnumerateSourceFiles(coreDirectory))
+        {
+            var relative = Path.GetRelativePath(coreDirectory, file).Replace('\\', '/');
+            var lineNumber = 0;
+            foreach (var line in File.ReadLines(file))
+            {
+                lineNumber++;
+                foreach (var token in forbiddenTokens)
+                {
+                    if (line.Contains(token, StringComparison.Ordinal))
+                        violations.Add($"{relative}:{lineNumber}: {token}");
+                }
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Structured logging core must remain System-only; runtime adapters belong outside "
+                + "Infrastructure/Logging/Core. Offending references:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
+    [Fact]
     public void Production_assemblies_live_under_src_not_repo_root()
     {
         var repoRoot = RepoRoot();

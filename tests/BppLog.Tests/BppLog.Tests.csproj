@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>12</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
@@ -24,6 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Infrastructure\Logging\Core\*.cs"
+      Link="Logging\Core\%(Filename)%(Extension)"
+    />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Infrastructure\LogRepeatSuppressor.cs"
       Link="LogRepeatSuppressor.cs"
