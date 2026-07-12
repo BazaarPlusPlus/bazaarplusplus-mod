@@ -331,7 +331,7 @@ public sealed class CollectionEncounterGameTooltipTextTests
         // Prerequisite-unmet groups render dimmed without a percentage; their own
         // text already carries the condition.
         Assert.Contains(
-            "<size=85%><line-height=1.5em>\n<line-height=1.4em><color=#8F8268>· <indent=1em>Clear the Way: (if you have Powder Keg) Gain 5 Gold</indent></color></size>",
+            "<size=85%><line-height=1.75em>\n<line-height=1.4em><color=#8F8268>· <indent=1em>Clear the Way: (if you have Powder Keg) Gain 5 Gold</indent></color></size>",
             text
         );
     }

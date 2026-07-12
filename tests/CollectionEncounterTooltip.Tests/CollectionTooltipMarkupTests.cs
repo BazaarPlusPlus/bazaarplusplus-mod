@@ -30,9 +30,9 @@ public sealed class CollectionTooltipMarkupTests
             "<line-height=1.4em>Intro"
                 + "<line-height=1.9em>\n"
                 + "<line-height=1.4em>Choose one:"
-                + "<line-height=1.5em>\n<line-height=1.4em>· <indent=1em>first</indent>"
+                + "<line-height=1.75em>\n<line-height=1.4em>· <indent=1em>first</indent>"
                 + "<line-height=1.4em>\n<line-height=1.4em><indent=2.2em>- detail</indent>"
-                + "<line-height=1.5em>\n<line-height=1.4em>· <indent=1em>second</indent>",
+                + "<line-height=1.75em>\n<line-height=1.4em>· <indent=1em>second</indent>",
             text
         );
     }
