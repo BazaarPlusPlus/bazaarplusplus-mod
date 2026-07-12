@@ -12,6 +12,8 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? EnableEventPreviewConfig { get; }
 
+    ConfigEntry<bool>? EnableQuestRewardPreviewConfig { get; }
+
     ConfigEntry<bool>? EnableCombatStatusBarConfig { get; }
 
     ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; }

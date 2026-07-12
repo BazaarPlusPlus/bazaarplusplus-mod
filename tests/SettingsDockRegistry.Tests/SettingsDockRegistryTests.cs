@@ -9,6 +9,7 @@ using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
+using BazaarPlusPlus.Game.QuestRewardPreview;
 using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
@@ -988,6 +989,14 @@ public class SettingsDockRegistryTests
         "true>false>true"
     )]
     [InlineData(
+        "QuestRewardPreview",
+        BppSettingsDockOrder.QuestRewardPreview,
+        "Quest Reward Preview",
+        "任务奖励预览",
+        "OFF>ON>OFF",
+        "false>true>false"
+    )]
+    [InlineData(
         "CombatStatusBar",
         BppSettingsDockOrder.CombatStatusBar,
         "Combat Status Bar",
@@ -1152,6 +1161,7 @@ public class SettingsDockRegistryTests
             "LegendaryPositionDisplay" => LegendaryPositionSettingsDockEntry.Create(() => { }),
             "EnchantPreview" => ItemEnchantPreviewSettingsDockEntry.Create(),
             "EventPreview" => EventPreviewSettingsDockEntry.Create(),
+            "QuestRewardPreview" => QuestRewardPreviewSettingsDockEntry.Create(),
             "CombatStatusBar" => CombatStatusBarSettingsDockEntry.Create(),
             "ChineseLocaleMode" => ChineseLocaleModeSettingsDockEntry.Create(
                 new InMemoryBppEventBus()

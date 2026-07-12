@@ -16,6 +16,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableEventPreviewConfig { get; private set; }
 
+    public ConfigEntry<bool>? EnableQuestRewardPreviewConfig { get; private set; }
+
     public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
 
     public ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; private set; }
@@ -75,6 +77,12 @@ internal sealed class BppConfig : IBppConfig
             "Enabled",
             true,
             "Whether to append the event-choice breakdown and hero level-up reward sections to native tooltips."
+        );
+        EnableQuestRewardPreviewConfig = config.Bind(
+            "QuestRewardPreview",
+            "Enabled",
+            false,
+            "Whether to append quest completion reward effects to quest item tooltips."
         );
         EnableCombatStatusBarConfig = config.Bind(
             "CombatStatusBar",

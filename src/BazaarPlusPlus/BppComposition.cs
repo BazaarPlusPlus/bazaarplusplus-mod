@@ -17,6 +17,7 @@ using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
+using BazaarPlusPlus.Game.QuestRewardPreview;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Screenshots;
@@ -123,6 +124,7 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(ItemEnchantPreviewSettingsDockEntry.Create());
         _settingsDockRegistry.Register(EventPreviewSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(QuestRewardPreviewSettingsDockEntry.Create());
         _settingsDockRegistry.Register(LegendaryPositionSettingsDockEntry.Create());
         _settingsDockRegistry.Register(NameOverrideSettingsDockEntry.Create());
 
