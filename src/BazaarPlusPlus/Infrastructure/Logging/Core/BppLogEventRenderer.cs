@@ -111,11 +111,9 @@ internal sealed class BppLogEventRenderer
 
     private static bool IsValidDefinition(BppLogEventDefinition? definition)
     {
-        if (definition == null || definition.Scope == null)
+        if (definition == null || !BppLogFeatureScope.IsDeclared(definition.Scope))
             return false;
-        if (!IsScopeName(definition.Scope.PrefixName))
-            return false;
-        if (!IsDottedSnakeIdentifier(definition.EventId, minimumSegments: 3))
+        if (!BppLogSchemaRules.IsDottedSnakeIdentifier(definition.EventId, minimumSegments: 3))
             return false;
         return definition.EventId.StartsWith(
             definition.Scope.EventIdPrefix + ".",
@@ -128,7 +126,7 @@ internal sealed class BppLogEventRenderer
         out BppLogFieldDefinition[] fields
     )
     {
-        if (definition.Fields.Count > 128)
+        if (definition.Fields.Count > BppLogSchemaRules.MaximumFields)
         {
             fields = Array.Empty<BppLogFieldDefinition>();
             return false;
@@ -141,10 +139,10 @@ internal sealed class BppLogEventRenderer
             if (
                 field == null
                 || field.Order < 0
-                || !IsSnakeIdentifier(field.Name)
-                || !IsKnownPrivacy(field.Privacy)
-                || !IsKnownCorrelation(field.Correlation)
-                || !IsKnownCardinality(field.Cardinality)
+                || !BppLogSchemaRules.IsSnakeIdentifier(field.Name)
+                || !BppLogSchemaRules.IsKnownPrivacy(field.Privacy)
+                || !BppLogSchemaRules.IsKnownCorrelation(field.Correlation)
+                || !BppLogSchemaRules.IsKnownCardinality(field.Cardinality)
             )
                 return false;
             fields[index] = field;
@@ -158,82 +156,6 @@ internal sealed class BppLogEventRenderer
         }
         return true;
     }
-
-    private static bool IsKnownPrivacy(BppLogFieldPrivacy privacy) =>
-        privacy == BppLogFieldPrivacy.Public
-        || privacy == BppLogFieldPrivacy.UntrustedText
-        || privacy == BppLogFieldPrivacy.Sensitive
-        || privacy == BppLogFieldPrivacy.LocalPath
-        || privacy == BppLogFieldPrivacy.RemoteUri;
-
-    private static bool IsKnownCorrelation(BppLogCorrelationPolicy correlation) =>
-        correlation == BppLogCorrelationPolicy.None
-        || correlation == BppLogCorrelationPolicy.Full
-        || correlation == BppLogCorrelationPolicy.Short
-        || correlation == BppLogCorrelationPolicy.Hash;
-
-    private static bool IsKnownCardinality(BppLogCardinality cardinality) =>
-        cardinality == BppLogCardinality.Low || cardinality == BppLogCardinality.High;
-
-    private static bool IsScopeName(string? value)
-    {
-        if (string.IsNullOrEmpty(value))
-            return false;
-        if (!IsAsciiLetter(value[0]))
-            return false;
-        for (var index = 0; index < value.Length; index++)
-        {
-            var character = value[index];
-            if (IsAsciiLetter(character) || (character >= '0' && character <= '9'))
-                continue;
-            return false;
-        }
-        return value.Length <= 32;
-    }
-
-    private static bool IsDottedSnakeIdentifier(string? value, int minimumSegments)
-    {
-        if (string.IsNullOrEmpty(value) || value.Length > 128)
-            return false;
-        var segments = value.Split('.');
-        if (segments.Length < minimumSegments)
-            return false;
-        for (var index = 0; index < segments.Length; index++)
-        {
-            if (!IsSnakeIdentifier(segments[index]))
-                return false;
-        }
-        return true;
-    }
-
-    private static bool IsSnakeIdentifier(string? value)
-    {
-        if (string.IsNullOrEmpty(value) || value.Length > 64)
-            return false;
-        if (value[0] < 'a' || value[0] > 'z' || value[value.Length - 1] == '_')
-            return false;
-
-        var previousUnderscore = false;
-        for (var index = 0; index < value.Length; index++)
-        {
-            var character = value[index];
-            if (character == '_')
-            {
-                if (previousUnderscore)
-                    return false;
-                previousUnderscore = true;
-                continue;
-            }
-            previousUnderscore = false;
-            if ((character >= 'a' && character <= 'z') || (character >= '0' && character <= '9'))
-                continue;
-            return false;
-        }
-        return true;
-    }
-
-    private static bool IsAsciiLetter(char value) =>
-        (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z');
 
     private static bool TryFindValue(
         BppLogFieldDefinition field,
