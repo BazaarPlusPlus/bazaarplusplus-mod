@@ -9,11 +9,11 @@ namespace BazaarPlusPlus.Infrastructure.Logging;
 internal sealed class BppLogValueFormatter
 {
     internal const int DefaultValueBudget = 256;
+    internal const int FingerprintInputCharacterBudget = 1024 * 1024;
 
     private const int ScalarInputBudget = 4096;
     private const int ExceptionInputBudget = 16384;
     private const int DiagnosticSanitizationInputLimit = 1024 * 1024;
-    private const int CorrelationHashInputLimit = 1024 * 1024;
 
     private readonly BppLogRedactor _redactor;
 
@@ -44,9 +44,9 @@ internal sealed class BppLogValueFormatter
         {
             if (field.Correlation == BppLogCorrelationPolicy.Hash)
             {
-                if (raw.Length > CorrelationHashInputLimit)
+                if (raw.Length > FingerprintInputCharacterBudget)
                     return new RenderedValue("<correlation-too-long>", true);
-                var hashed = EscapeAndQuote(Hash(raw), DefaultValueBudget, preserveTail: false);
+                var hashed = EscapeAndQuote(Hash(raw, 12), DefaultValueBudget, preserveTail: false);
                 return hashed;
             }
 
@@ -93,6 +93,39 @@ internal sealed class BppLogValueFormatter
         catch
         {
             return new RenderedValue("<unavailable>", false);
+        }
+    }
+
+    internal bool TryFingerprint(BppLogFieldDefinition field, object? value, out string fingerprint)
+    {
+        fingerprint = string.Empty;
+        if (value == null || field.Privacy == BppLogFieldPrivacy.Sensitive)
+            return false;
+
+        try
+        {
+            return TryFingerprintText(FormatScalar(value), out fingerprint);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    internal bool TryFingerprintText(string? value, out string fingerprint)
+    {
+        fingerprint = string.Empty;
+        try
+        {
+            if (value == null || value.Length > FingerprintInputCharacterBudget)
+                return false;
+            fingerprint = Hash(value, 64);
+            return fingerprint.Length == 64;
+        }
+        catch
+        {
+            fingerprint = string.Empty;
+            return false;
         }
     }
 
@@ -145,7 +178,7 @@ internal sealed class BppLogValueFormatter
         }
     }
 
-    private static string Hash(string value)
+    private static string Hash(string value, int hexCharacterCount)
     {
         using var sha256 = SHA256.Create();
         var byteBuffer = new byte[4096];
@@ -209,9 +242,13 @@ internal sealed class BppLogValueFormatter
             sha256.TransformBlock(byteBuffer, 0, byteCount, byteBuffer, 0);
         sha256.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
         var bytes = sha256.Hash ?? Array.Empty<byte>();
-        if (bytes.Length < 6)
+        if (
+            hexCharacterCount <= 0
+            || (hexCharacterCount & 1) != 0
+            || bytes.Length < hexCharacterCount / 2
+        )
             return "<unrenderable>";
-        var result = new char[12];
+        var result = new char[hexCharacterCount];
         const string resultHex = "0123456789abcdef";
         for (var index = 0; index < result.Length / 2; index++)
         {

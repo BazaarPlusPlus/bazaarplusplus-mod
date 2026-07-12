@@ -1,4 +1,5 @@
 #nullable enable
+using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
@@ -38,13 +39,13 @@ Assert(
     hasPendingTaskProperty != null,
     "StartupUploadAttemptRunner should expose pending task state."
 );
-var observePendingTaskOnShutdownMethod = runnerType.GetMethod(
-    "ObservePendingTaskOnShutdown",
+var tryDrainPendingTaskOnShutdownMethod = runnerType.GetMethod(
+    "TryDrainPendingTaskOnShutdown",
     BindingFlags.Public | BindingFlags.Instance
 );
 Assert(
-    observePendingTaskOnShutdownMethod != null,
-    "StartupUploadAttemptRunner should expose shutdown observation."
+    tryDrainPendingTaskOnShutdownMethod != null,
+    "StartupUploadAttemptRunner should expose bounded shutdown drain."
 );
 
 var startCount = 0;
@@ -132,6 +133,39 @@ Assert(
     "Runner should retry once the live run ends instead of consuming the startup opportunity."
 );
 
+var drainRunner = Activator.CreateInstance(
+    runnerType,
+    "RunnerTests",
+    "Skipping startup upload because a live run is active.",
+    "Starting startup upload attempt.",
+    "Startup upload failed"
+)!;
+var drainGate = Activator.CreateInstance(gateType, 0f, 10f)!;
+var drainUpload = new TaskCompletionSource<object?>(
+    TaskCreationOptions.RunContinuationsAsynchronously
+);
+Task StartDrainAsync(CancellationToken _) => drainUpload.Task;
+tickMethod.Invoke(
+    drainRunner,
+    [drainGate, 0f, false, (Func<CancellationToken, Task>)StartDrainAsync, CancellationToken.None]
+);
+var drainCleanupCount = 0;
+_ = Task.Run(async () =>
+{
+    await Task.Delay(50);
+    drainUpload.SetResult(null);
+});
+var drained = (bool)(
+    tryDrainPendingTaskOnShutdownMethod!.Invoke(
+        drainRunner,
+        [TimeSpan.FromSeconds(1), (Action)(() => drainCleanupCount++)]
+    ) ?? false
+);
+Assert(
+    drained && drainCleanupCount == 1,
+    "Shutdown observation should synchronously drain a promptly completing upload before returning."
+);
+
 var shutdownRunner = Activator.CreateInstance(
     runnerType,
     "RunnerTests",
@@ -161,10 +195,22 @@ Assert(
 );
 
 var cleanupCount = 0;
-observePendingTaskOnShutdownMethod!.Invoke(shutdownRunner, [(Action)(() => cleanupCount++)]);
+var drainStopwatch = Stopwatch.StartNew();
+var timedOutDrain = (bool)(
+    tryDrainPendingTaskOnShutdownMethod.Invoke(
+        shutdownRunner,
+        [TimeSpan.FromMilliseconds(20), (Action)(() => cleanupCount++)]
+    ) ?? true
+);
+drainStopwatch.Stop();
 Assert(
     !(bool)(hasPendingTaskProperty.GetValue(shutdownRunner) ?? true),
     "Shutdown observation should detach the pending task from the runner."
+);
+Assert(!timedOutDrain, "Shutdown drain should report an incomplete task at its timeout.");
+Assert(
+    drainStopwatch.Elapsed < TimeSpan.FromSeconds(1),
+    "Shutdown drain timeout must remain bounded."
 );
 Assert(cleanupCount == 0, "Shutdown cleanup should wait for the pending upload to finish.");
 
@@ -172,6 +218,39 @@ pendingUpload.SetException(new InvalidOperationException("upload failed after sh
 Assert(
     SpinWait.SpinUntil(() => cleanupCount == 1, TimeSpan.FromSeconds(2)),
     "Shutdown observation should consume completion and then run cleanup."
+);
+
+var cancellationRunner = Activator.CreateInstance(
+    runnerType,
+    "RunnerTests",
+    "Skipping startup upload because a live run is active.",
+    "Starting startup upload attempt.",
+    "Startup upload failed"
+)!;
+var cancellationGate = Activator.CreateInstance(gateType, 0f, 10f)!;
+using var cancellation = new CancellationTokenSource();
+Task StartCancellationAsync(CancellationToken token) => Task.Delay(Timeout.Infinite, token);
+tickMethod.Invoke(
+    cancellationRunner,
+    [
+        cancellationGate,
+        0f,
+        false,
+        (Func<CancellationToken, Task>)StartCancellationAsync,
+        cancellation.Token,
+    ]
+);
+cancellation.Cancel();
+var cancellationCleanupCount = 0;
+var cancelledDrain = (bool)(
+    tryDrainPendingTaskOnShutdownMethod.Invoke(
+        cancellationRunner,
+        [TimeSpan.FromSeconds(1), (Action)(() => cancellationCleanupCount++)]
+    ) ?? false
+);
+Assert(
+    cancelledDrain && cancellationCleanupCount == 1,
+    "A cancelled upload should drain and clean up synchronously before logger flush."
 );
 
 Console.WriteLine("Startup upload runner tests passed.");
