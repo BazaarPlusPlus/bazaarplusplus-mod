@@ -99,7 +99,7 @@ static void TestBilingualItemNamePresentation()
             "Lighter",
             "打火机",
             enabled: true,
-            isItem: true,
+            isSupportedCard: true,
             currentLanguageIsChinese: false
         ) == "Lighter\n<size=42%><voffset=-4px><noparse>打火机</noparse></voffset></size>",
         "Enabled item tooltips should append a 42%-sized Chinese title with a 4px gap."
@@ -109,7 +109,7 @@ static void TestBilingualItemNamePresentation()
             "Lighter",
             "打火机",
             enabled: false,
-            isItem: true,
+            isSupportedCard: true,
             currentLanguageIsChinese: false
         ) == null,
         "Disabled bilingual names should preserve the native title."
@@ -119,7 +119,7 @@ static void TestBilingualItemNamePresentation()
             "Lighter",
             "打火机",
             enabled: true,
-            isItem: false,
+            isSupportedCard: false,
             currentLanguageIsChinese: false
         ) == null,
         "Skill and encounter tooltips should not receive item subtitles."
@@ -129,7 +129,7 @@ static void TestBilingualItemNamePresentation()
             "打火机",
             "打火机",
             enabled: true,
-            isItem: true,
+            isSupportedCard: true,
             currentLanguageIsChinese: true
         ) == null,
         "Chinese clients should not duplicate the Chinese title."

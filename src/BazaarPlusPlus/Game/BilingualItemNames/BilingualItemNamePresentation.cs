@@ -12,13 +12,13 @@ internal static class BilingualItemNamePresentation
         string? primaryTitle,
         string? chineseTitle,
         bool enabled,
-        bool isItem,
+        bool isSupportedCard,
         bool currentLanguageIsChinese
     )
     {
         if (
             !enabled
-            || !isItem
+            || !isSupportedCard
             || currentLanguageIsChinese
             || string.IsNullOrWhiteSpace(primaryTitle)
             || string.IsNullOrWhiteSpace(chineseTitle)

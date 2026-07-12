@@ -7,13 +7,13 @@ namespace BazaarPlusPlus.Game.BilingualItemNames;
 internal static class BilingualItemNamesSettingsDockEntry
 {
     private static readonly LocalizedTextSet Labels = new(
-        "Bilingual Item Names",
-        "双语物品名",
-        "雙語物品名",
-        "Zweisprachige Gegenstandsnamen",
-        "Nomes Bilíngues de Itens",
-        "이중 언어 아이템 이름",
-        "Nomi Oggetto Bilingue"
+        "Bilingual Names",
+        "双语名称",
+        "雙語名稱",
+        "Zweisprachige Namen",
+        "Nomes Bilíngues",
+        "이중 언어 이름",
+        "Nomi Bilingue"
     );
 
     internal static CyclingSettingsDockEntry<bool> Create() =>

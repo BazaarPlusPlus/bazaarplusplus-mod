@@ -1143,6 +1143,8 @@ public class CoreLayeringTests
         );
 
         Assert.Contains("NativeChineseFontFallback.TryInstall", patchSource);
+        Assert.Contains("ECardType.Item", patchSource);
+        Assert.Contains("ECardType.EventEncounter", patchSource);
         Assert.Contains("NotoFontFallbackRuntime", providerSource);
         Assert.Contains("NotoSerifFallbacksOrdered", providerSource);
         Assert.DoesNotContain("CreateDynamicFontFromOSFont", providerSource);

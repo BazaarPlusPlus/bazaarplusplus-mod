@@ -999,8 +999,8 @@ public class SettingsDockRegistryTests
     [InlineData(
         "BilingualItemNames",
         BppSettingsDockOrder.BilingualItemNames,
-        "Bilingual Item Names",
-        "双语物品名",
+        "Bilingual Names",
+        "双语名称",
         "OFF>ON>OFF",
         "false>true>false"
     )]
