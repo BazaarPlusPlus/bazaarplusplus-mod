@@ -9,8 +9,9 @@ using UnityEngine;
 namespace BazaarPlusPlus.Patches.Tooltips;
 
 // Manages BPP-owned text sections cloned into the pooled native tooltip. Each section
-// is a clone of the tooltip's passive-text block (native typography), keyed per
-// controller + purpose, inserted after a caller-supplied anchor sibling.
+// is a clone of the tooltip's passive-text block, keyed per controller + purpose,
+// inserted after a caller-supplied anchor sibling. Native typography is preserved
+// unless BPP-authored content contains CJK text, which uses the embedded TMP font.
 internal static class BppTooltipSections
 {
     // Clearly below the native body size so appended blocks read as secondary info.
