@@ -6,6 +6,7 @@ using TheBazaar.Localization;
 using TMPro;
 using UnityEngine.AddressableAssets;
 using UnityEngine.ResourceManagement.AsyncOperations;
+using Object = UnityEngine.Object;
 
 namespace BazaarPlusPlus.GameInterop.Localization;
 
@@ -18,7 +19,7 @@ internal static class NativeChineseFontFallback
     private const string Component = "BilingualNames";
     private const string ChineseLocale = "zh-CN";
     private static readonly List<AsyncOperationHandle<TMP_FontAsset>> Handles = new();
-    private static readonly List<InstalledFallback> InstalledFallbacks = new();
+    private static readonly List<FontBinding> Bindings = new();
     private static TMP_FontAsset[]? _serifFallbacks;
     private static TMP_FontAsset[]? _sansFallbacks;
     private static bool _configurationWarningLogged;
@@ -36,7 +37,11 @@ internal static class NativeChineseFontFallback
         if (fallbacks.Length == 0)
             return false;
 
-        var table = text.font.fallbackFontAssetTable;
+        var binding = FindOrCreateBinding(text);
+        if (binding == null || binding.Clone == null)
+            return false;
+
+        var table = binding.Clone.fallbackFontAssetTable;
         if (table == null)
             return false;
 
@@ -47,7 +52,6 @@ internal static class NativeChineseFontFallback
                 continue;
 
             table.Add(fallback);
-            InstalledFallbacks.Add(new InstalledFallback(text.font, fallback));
             installed = true;
         }
 
@@ -58,19 +62,75 @@ internal static class NativeChineseFontFallback
 
     internal static void Reset()
     {
-        foreach (var installed in InstalledFallbacks)
-            installed.Primary?.fallbackFontAssetTable?.Remove(installed.Fallback);
-        InstalledFallbacks.Clear();
-
-        foreach (var handle in Handles)
-            if (handle.IsValid())
-                Addressables.Release(handle);
-        Handles.Clear();
+        try
+        {
+            foreach (var binding in Bindings)
+            {
+                try
+                {
+                    if (
+                        binding.Text != null
+                        && binding.Clone != null
+                        && binding.Text.font == binding.Clone
+                        && binding.Original != null
+                    )
+                        binding.Text.font = binding.Original;
+                }
+                catch (Exception ex)
+                {
+                    BppLog.Warn(Component, $"Failed to restore a tooltip font: {ex.Message}");
+                }
+                finally
+                {
+                    if (binding.Clone != null)
+                        Object.DestroyImmediate(binding.Clone);
+                }
+            }
+            Bindings.Clear();
+        }
+        finally
+        {
+            foreach (var handle in Handles)
+            {
+                try
+                {
+                    if (handle.IsValid())
+                        Addressables.Release(handle);
+                }
+                catch (Exception ex)
+                {
+                    BppLog.Warn(Component, $"Failed to release a zh-CN font handle: {ex.Message}");
+                }
+            }
+            Handles.Clear();
+        }
 
         _serifFallbacks = null;
         _sansFallbacks = null;
         _configurationWarningLogged = false;
         _loadWarningLogged = false;
+    }
+
+    private static FontBinding? FindOrCreateBinding(TMP_Text text)
+    {
+        foreach (var binding in Bindings)
+            if (binding.Text == text)
+                return binding;
+
+        var primary = text.font;
+        if (primary == null)
+            return null;
+
+        var clone = Object.Instantiate(primary);
+        clone.name = $"{primary.name} (BPP Bilingual Tooltip)";
+        clone.fallbackFontAssetTable = new List<TMP_FontAsset>(
+            primary.fallbackFontAssetTable ?? new List<TMP_FontAsset>()
+        );
+        text.font = clone;
+
+        var created = new FontBinding(text, primary, clone);
+        Bindings.Add(created);
+        return created;
     }
 
     private static TMP_FontAsset[] ResolveFallbacks(bool preferSerif)
@@ -154,16 +214,19 @@ internal static class NativeChineseFontFallback
         return loaded.ToArray();
     }
 
-    private sealed class InstalledFallback
+    private sealed class FontBinding
     {
-        internal InstalledFallback(TMP_FontAsset primary, TMP_FontAsset fallback)
+        internal FontBinding(TMP_Text text, TMP_FontAsset original, TMP_FontAsset clone)
         {
-            Primary = primary;
-            Fallback = fallback;
+            Text = text;
+            Original = original;
+            Clone = clone;
         }
 
-        internal TMP_FontAsset Primary { get; }
+        internal TMP_Text Text { get; }
 
-        internal TMP_FontAsset Fallback { get; }
+        internal TMP_FontAsset Original { get; }
+
+        internal TMP_FontAsset Clone { get; }
     }
 }

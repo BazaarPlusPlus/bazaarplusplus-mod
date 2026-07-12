@@ -29,23 +29,24 @@ internal static class BilingualItemNamePatch
             var currentLanguageIsChinese = LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode);
             var supportedCard =
                 card?.Type == ECardType.Item || card?.Type == ECardType.EventEncounter;
-            if (!enabled || !supportedCard || currentLanguageIsChinese)
+            if (!enabled || !supportedCard)
                 return;
 
-            var chineseTitle = ChineseTranslationCatalog.TryResolve(
-                tooltipData.CardTemplate.Localization?.Title
-            );
+            var titleToken = tooltipData.CardTemplate.Localization?.Title;
+            var secondaryTitle = currentLanguageIsChinese
+                ? titleToken?.Text
+                : ChineseTranslationCatalog.TryResolve(titleToken);
             var title = BilingualItemNamePresentation.TryBuild(
                 controller.headerText?.text,
-                chineseTitle,
+                secondaryTitle,
                 enabled,
-                isSupportedCard: true,
-                currentLanguageIsChinese
+                isSupportedCard: true
             );
             if (title == null || controller.headerText == null)
                 return;
 
-            NativeChineseFontFallback.TryInstall(controller.headerText, chineseTitle);
+            if (!currentLanguageIsChinese)
+                NativeChineseFontFallback.TryInstall(controller.headerText, secondaryTitle);
             controller.headerText.TrySetText(title);
         }
         catch (Exception ex)

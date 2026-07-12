@@ -10,22 +10,20 @@ internal static class BilingualItemNamePresentation
 
     internal static string? TryBuild(
         string? primaryTitle,
-        string? chineseTitle,
+        string? secondaryTitle,
         bool enabled,
-        bool isSupportedCard,
-        bool currentLanguageIsChinese
+        bool isSupportedCard
     )
     {
         if (
             !enabled
             || !isSupportedCard
-            || currentLanguageIsChinese
             || string.IsNullOrWhiteSpace(primaryTitle)
-            || string.IsNullOrWhiteSpace(chineseTitle)
-            || string.Equals(primaryTitle.Trim(), chineseTitle.Trim(), StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(secondaryTitle)
+            || string.Equals(primaryTitle.Trim(), secondaryTitle.Trim(), StringComparison.Ordinal)
         )
             return null;
 
-        return $"{primaryTitle}\n<size={SubtitleSize}><voffset={SubtitleOffset}><noparse>{chineseTitle.Trim()}</noparse></voffset></size>";
+        return $"{primaryTitle}\n<size={SubtitleSize}><voffset={SubtitleOffset}><noparse>{secondaryTitle.Trim()}</noparse></voffset></size>";
     }
 }

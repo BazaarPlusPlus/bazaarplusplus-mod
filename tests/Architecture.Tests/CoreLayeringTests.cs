@@ -1147,6 +1147,12 @@ public class CoreLayeringTests
         Assert.Contains("ECardType.EventEncounter", patchSource);
         Assert.Contains("NotoFontFallbackRuntime", providerSource);
         Assert.Contains("NotoSerifFallbacksOrdered", providerSource);
+        Assert.Contains("Object.Instantiate(primary)", providerSource);
+        Assert.Contains("text.font = clone", providerSource);
+        Assert.Contains("binding.Text != null", providerSource);
+        Assert.Contains("Object.DestroyImmediate(binding.Clone)", providerSource);
+        Assert.Contains("Addressables.Release(handle)", providerSource);
+        Assert.Contains("finally", providerSource);
         Assert.DoesNotContain("CreateDynamicFontFromOSFont", providerSource);
         Assert.DoesNotContain("PingFang", providerSource);
         Assert.DoesNotContain("Microsoft YaHei", providerSource);
