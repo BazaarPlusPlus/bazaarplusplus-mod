@@ -7,12 +7,14 @@ internal static class BilingualItemNamePresentation
 {
     private const string SubtitleSize = "42%";
     private const string SubtitleOffset = "-7px";
+    private const string EnglishSubtitleLeadingSpace = "<space=2px>";
 
     internal static string? TryBuild(
         string? primaryTitle,
         string? secondaryTitle,
         bool enabled,
-        bool isSupportedCard
+        bool isSupportedCard,
+        bool alignEnglishSubtitle
     )
     {
         if (
@@ -24,6 +26,7 @@ internal static class BilingualItemNamePresentation
         )
             return null;
 
-        return $"{primaryTitle}\n<size={SubtitleSize}><voffset={SubtitleOffset}><noparse>{secondaryTitle.Trim()}</noparse></voffset></size>";
+        var leadingSpace = alignEnglishSubtitle ? EnglishSubtitleLeadingSpace : string.Empty;
+        return $"{primaryTitle}\n<size={SubtitleSize}><voffset={SubtitleOffset}>{leadingSpace}<noparse>{secondaryTitle.Trim()}</noparse></voffset></size>";
     }
 }

@@ -99,7 +99,8 @@ static void TestBilingualItemNamePresentation()
             "Lighter",
             "打火机",
             enabled: true,
-            isSupportedCard: true
+            isSupportedCard: true,
+            alignEnglishSubtitle: false
         ) == "Lighter\n<size=42%><voffset=-7px><noparse>打火机</noparse></voffset></size>",
         "Enabled item tooltips should append a 42%-sized Chinese title with a 7px offset."
     );
@@ -108,7 +109,8 @@ static void TestBilingualItemNamePresentation()
             "Lighter",
             "打火机",
             enabled: false,
-            isSupportedCard: true
+            isSupportedCard: true,
+            alignEnglishSubtitle: false
         ) == null,
         "Disabled bilingual names should preserve the native title."
     );
@@ -117,7 +119,8 @@ static void TestBilingualItemNamePresentation()
             "Lighter",
             "打火机",
             enabled: true,
-            isSupportedCard: false
+            isSupportedCard: false,
+            alignEnglishSubtitle: false
         ) == null,
         "Skill and encounter tooltips should not receive item subtitles."
     );
@@ -126,8 +129,10 @@ static void TestBilingualItemNamePresentation()
             "打火机",
             "Lighter",
             enabled: true,
-            isSupportedCard: true
-        ) == "打火机\n<size=42%><voffset=-7px><noparse>Lighter</noparse></voffset></size>",
+            isSupportedCard: true,
+            alignEnglishSubtitle: true
+        )
+            == "打火机\n<size=42%><voffset=-7px><space=2px><noparse>Lighter</noparse></voffset></size>",
         "Chinese clients should append the authored English title."
     );
 }

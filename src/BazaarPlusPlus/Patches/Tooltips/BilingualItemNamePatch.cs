@@ -40,7 +40,8 @@ internal static class BilingualItemNamePatch
                 controller.headerText?.text,
                 secondaryTitle,
                 enabled,
-                isSupportedCard: true
+                isSupportedCard: true,
+                alignEnglishSubtitle: currentLanguageIsChinese
             );
             if (title == null || controller.headerText == null)
                 return;
