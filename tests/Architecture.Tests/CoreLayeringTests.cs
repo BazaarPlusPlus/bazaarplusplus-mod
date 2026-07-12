@@ -1410,6 +1410,23 @@ public class CoreLayeringTests
         }
     }
 
+    [Fact]
+    public void Structured_tooltip_sections_disable_native_paragraph_spacing()
+    {
+        var tooltipPatches = Path.Combine(MainSourceRoot(RepoRoot()), "Patches", "Tooltips");
+        foreach (
+            var patchName in new[]
+            {
+                "EncounterEventTooltipPatch.cs",
+                "HeroLevelRewardsTooltipPatch.cs",
+            }
+        )
+        {
+            var source = File.ReadAllText(Path.Combine(tooltipPatches, patchName));
+            Assert.Contains("BppTooltipSections.MarkupControlledStyle", source);
+        }
+    }
+
     private static void ScanForAgentImports(string file, string baseDir, List<string> violations)
     {
         var relative = Path.GetRelativePath(baseDir, file).Replace('\\', '/');

@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -35,18 +34,29 @@ internal static class CollectionLevelUpTooltipText
         if (levelUp == null)
             return string.Empty;
 
-        var colorize = colorizeResult ?? (text => text);
-        var lines = new List<string>();
+        var rawColorize = colorizeResult ?? (text => text);
+        string Colorize(string text) =>
+            CollectionTooltipMarkup.NormalizeInlineFragment(rawColorize(text));
+
+        var lines = new List<CollectionTooltipMarkup.Block>();
         if (levelUp.HealthIncrease > 0)
-            lines.Add(colorize(CollectionPanelText.LevelUpMaxHealth((int)levelUp.HealthIncrease)));
+            lines.Add(
+                new CollectionTooltipMarkup.Paragraph(
+                    Colorize(CollectionPanelText.LevelUpMaxHealth((int)levelUp.HealthIncrease))
+                )
+            );
         if (currentLevel.HasValue && currentLevel.Value < LastBoardSlotLevel)
-            lines.Add(colorize(CollectionPanelText.LevelUpBoardSlots(BoardSlotsPerLevel)));
+            lines.Add(
+                new CollectionTooltipMarkup.Paragraph(
+                    Colorize(CollectionPanelText.LevelUpBoardSlots(BoardSlotsPerLevel))
+                )
+            );
 
         // Level-up rewards are a selection screen (LevelUpState allows
         // SelectItem/SelectSkill/SelectEncounter): every spawned group contributes
         // candidates and the player picks one — the native pack icon's "1". Render all
         // candidates as one "Choose one:" list; random pools contribute a count entry.
-        var candidates = new List<string>();
+        var candidates = new List<CollectionTooltipMarkup.ListItem>();
         if (levelUp.Groups.Count > 0)
         {
             // Random selection (levels 9/18): groups whose weight equals their card
@@ -66,7 +76,7 @@ internal static class CollectionLevelUpTooltipText
                     uniformPool.AddRange(poolIds);
                     continue;
                 }
-                CollectGroup(candidates, group, resolveTemplate, currentHero, colorize);
+                CollectGroup(candidates, group, resolveTemplate, currentHero, Colorize);
             }
             if (uniformPool.Count > 0)
                 CollectCandidates(
@@ -75,7 +85,7 @@ internal static class CollectionLevelUpTooltipText
                     limit: 1,
                     resolveTemplate,
                     currentHero,
-                    colorize
+                    Colorize
                 );
         }
 
@@ -83,32 +93,40 @@ internal static class CollectionLevelUpTooltipText
         // offers two teacher slots over one 10-id pool, level 16 three); repeating
         // the identical block adds nothing to "what can I get" — keep one.
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        candidates.RemoveAll(candidate => !seen.Add(candidate));
+        candidates.RemoveAll(candidate =>
+            !seen.Add(
+                CollectionTooltipMarkup.Render(
+                    new CollectionTooltipMarkup.Block[]
+                    {
+                        new CollectionTooltipMarkup.ListBlock(
+                            candidate.Content,
+                            candidate.Children
+                        ),
+                    }
+                )
+            )
+        );
 
         if (candidates.Count == 1)
         {
-            lines.Add(candidates[0]);
+            var candidate = candidates[0];
+            lines.Add(
+                candidate.Children.Count == 0
+                    ? new CollectionTooltipMarkup.Paragraph(candidate.Content)
+                    : new CollectionTooltipMarkup.ListBlock(candidate.Content, candidate.Children)
+            );
         }
         else if (candidates.Count > 1)
         {
-            // One candidate per bulleted line under a shared header, as a single
-            // block so the inter-line spacer stays between blocks only.
-            var block = new StringBuilder(CollectionPanelText.LevelUpOneOf());
-            foreach (var candidate in candidates)
-            {
-                // Hanging indent keeps soft-wrapped candidate lines aligned.
-                block
-                    .Append(CollectionTooltipMarkup.BulletBreak)
-                    .Append("· <indent=1em>")
-                    .Append(candidate)
-                    .Append("</indent>");
-            }
-            lines.Add(block.ToString());
+            lines.Add(
+                new CollectionTooltipMarkup.ListBlock(
+                    CollectionPanelText.LevelUpOneOf(),
+                    candidates
+                )
+            );
         }
 
-        return lines.Count == 0
-            ? string.Empty
-            : CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
+        return CollectionTooltipMarkup.Render(lines);
     }
 
     // A weighted group whose weight equals its card count: every card is a uniform
@@ -123,7 +141,7 @@ internal static class CollectionLevelUpTooltipText
     }
 
     private static void CollectGroup(
-        List<string> candidates,
+        List<CollectionTooltipMarkup.ListItem> candidates,
         CollectionLevelUpPreviewGroup group,
         Func<Guid, CollectionEncounterPreviewTemplatePlan?> resolveTemplate,
         EHero? currentHero,
@@ -142,7 +160,7 @@ internal static class CollectionLevelUpTooltipText
     }
 
     private static void CollectCandidates(
-        List<string> candidates,
+        List<CollectionTooltipMarkup.ListItem> candidates,
         List<Guid> ids,
         int limit,
         Func<Guid, CollectionEncounterPreviewTemplatePlan?> resolveTemplate,
@@ -180,11 +198,17 @@ internal static class CollectionLevelUpTooltipText
                 return;
 
             if (string.IsNullOrWhiteSpace(description))
-                candidates.Add($"<color={AccentColor}>{title}</color>");
+                candidates.Add(
+                    new CollectionTooltipMarkup.ListItem($"<color={AccentColor}>{title}</color>")
+                );
             else if (string.IsNullOrWhiteSpace(title))
-                candidates.Add(colorize(description!));
+                candidates.Add(new CollectionTooltipMarkup.ListItem(colorize(description!)));
             else
-                candidates.Add($"<color={AccentColor}>{title}:</color> {colorize(description!)}");
+                candidates.Add(
+                    new CollectionTooltipMarkup.ListItem(
+                        $"<color={AccentColor}>{title}:</color> {colorize(description!)}"
+                    )
+                );
             return;
         }
 
@@ -199,11 +223,11 @@ internal static class CollectionLevelUpTooltipText
         // list those out instead of hiding them behind a count.
         if (unresolved == 0 && eligible.Count <= 8)
         {
-            var block = new StringBuilder(
+            var header =
                 draws == 1
                     ? CollectionPanelText.OutcomeSubPool(eligible.Count)
-                    : CollectionPanelText.LevelUpRandomPool(draws, eligible.Count)
-            );
+                    : CollectionPanelText.LevelUpRandomPool(draws, eligible.Count);
+            var entries = new List<CollectionTooltipMarkup.ListItem>();
             foreach (var template in eligible)
             {
                 var entryTitle =
@@ -212,23 +236,24 @@ internal static class CollectionLevelUpTooltipText
                     .ResolveDescription(template)
                     ?.Replace("\r", string.Empty)
                     .Replace('\n', ' ');
-                block.Append(CollectionTooltipMarkup.SubItemBreak);
-                block.Append("<indent=2.2em>- ");
-                block.Append(
-                    string.IsNullOrWhiteSpace(entryDescription)
-                        ? $"<color={AccentColor}>{entryTitle}</color>"
-                        : $"<color={AccentColor}>{entryTitle}:</color> {colorize(entryDescription!)}"
+                entries.Add(
+                    new CollectionTooltipMarkup.ListItem(
+                        string.IsNullOrWhiteSpace(entryDescription)
+                            ? $"<color={AccentColor}>{entryTitle}</color>"
+                            : $"<color={AccentColor}>{entryTitle}:</color> {colorize(entryDescription!)}"
+                    )
                 );
-                block.Append("</indent>");
             }
-            candidates.Add(block.ToString());
+            candidates.Add(new CollectionTooltipMarkup.ListItem(header, entries));
             return;
         }
 
         candidates.Add(
-            draws == 1
-                ? CollectionPanelText.LevelUpRandomPoolSingle(optionCount)
-                : CollectionPanelText.LevelUpRandomPool(draws, optionCount)
+            new CollectionTooltipMarkup.ListItem(
+                draws == 1
+                    ? CollectionPanelText.LevelUpRandomPoolSingle(optionCount)
+                    : CollectionPanelText.LevelUpRandomPool(draws, optionCount)
+            )
         );
     }
 

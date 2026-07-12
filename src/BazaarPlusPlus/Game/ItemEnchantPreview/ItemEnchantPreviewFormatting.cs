@@ -60,12 +60,12 @@ public static class ItemEnchantPreviewFormatting
 
         var lines = segments
             .Where(segment => !string.IsNullOrWhiteSpace(segment.Text))
-            .SelectMany(segment =>
-                segment.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
-            )
-            .Where(line => !string.IsNullOrWhiteSpace(line));
+            .Select(segment => NormalizeEntryLineEndings(segment.Text));
         return string.Join(EntryBreak, lines);
     }
+
+    private static string NormalizeEntryLineEndings(string text) =>
+        text.Replace("\r\n", "\n").Replace('\r', '\n').Trim('\n');
 
     internal static string ScaleInlineSizes(string text, float scale)
     {

@@ -4,6 +4,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.ItemEnchantPreview.Preview;
+using BazaarPlusPlus.Patches.Tooltips;
 using TheBazaar.Tooltips;
 
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
@@ -147,6 +148,15 @@ Assert(
 );
 
 Assert(
+    BppTooltipSectionRenderPatch.HasNativeContent(passiveText: "", questGroupCount: 1),
+    "Quest rows should count as native content and keep the divider above enchant previews."
+);
+Assert(
+    !BppTooltipSectionRenderPatch.HasNativeContent(passiveText: "", questGroupCount: 0),
+    "An otherwise empty native block should not add a divider above enchant previews."
+);
+
+Assert(
     ItemEnchantPreviewTooltipLayerPolicy.ElevatedSortingOrder(150) == 151,
     "Enchant preview elevation should sit one step above the tooltip clone's own sorting order, not an absolute layer."
 );
@@ -190,14 +200,14 @@ var sectionText = ItemEnchantPreviewFormatting.BuildSectionText(
     new[]
     {
         segment,
-        new TooltipSegment("second\r\n\r\nthird", null, null, -1),
+        new TooltipSegment("<size=55%>second\r\n\r\nthird</size>", null, null, -1),
     }
 );
 Assert(
     sectionText
-        == $"{segment.Text}<size=55%><line-height=2.1em>\n</line-height></size>second<size=55%><line-height=2.1em>\n</line-height></size>third"
+        == $"{segment.Text}<size=55%><line-height=2.1em>\n</line-height></size><size=55%>second\n\nthird</size>"
         && !sectionText.EndsWith("\n", StringComparison.Ordinal),
-    "Section text should normalize lines, use stable entry breaks, and avoid a trailing blank line."
+    "Section text should separate entries without flattening an entry's paragraphs or list lines."
 );
 
 var key1 = ItemEnchantPreviewCache.CreateKey(snapshot);
