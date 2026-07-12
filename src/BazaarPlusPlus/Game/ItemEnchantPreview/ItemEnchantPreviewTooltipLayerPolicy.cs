@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
 public static class ItemEnchantPreviewTooltipLayerPolicy
@@ -14,13 +12,4 @@ public static class ItemEnchantPreviewTooltipLayerPolicy
 
     public static int ElevatedSortingOrder(int originalSortingOrder) =>
         originalSortingOrder + ElevatedSortingStep;
-
-    public static bool ShouldElevateForPassiveText(string? passiveTooltipText)
-    {
-        return !string.IsNullOrEmpty(passiveTooltipText)
-            && passiveTooltipText.Contains(
-                ItemEnchantPreviewFormatting.PreviewHeaderText,
-                StringComparison.Ordinal
-            );
-    }
 }

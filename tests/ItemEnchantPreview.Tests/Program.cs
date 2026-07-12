@@ -1,10 +1,10 @@
-using System.Text;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.ItemEnchantPreview.Preview;
+using TheBazaar.Tooltips;
 
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
     currentEnchantment: EEnchantmentType.Heavy,
@@ -140,20 +140,10 @@ Assert(
 );
 
 Assert(
-    ItemEnchantPreviewFormatting.PreviewHeaderText == "BazaarPlusPlus",
-    "Enchant preview tooltip header should use the full product name."
-);
-
-Assert(
-    ItemEnchantPreviewTooltipLayerPolicy.ShouldElevateForPassiveText(
-        "native text\nBazaarPlusPlus\npreview"
-    ),
-    "Enchant preview tooltip should request elevated canvas sorting when the BPP section is present."
-);
-
-Assert(
-    !ItemEnchantPreviewTooltipLayerPolicy.ShouldElevateForPassiveText("native text only"),
-    "Native-only passive tooltip text should keep the game's canvas sorting."
+    typeof(ItemEnchantPreviewFormatting).Assembly.GetType(
+        "BazaarPlusPlus.Patches.Tooltips.CardTooltipDataPassivePatch"
+    ) == null,
+    "Enchant preview must not append into the game's native passive-tooltip string."
 );
 
 Assert(
@@ -170,6 +160,10 @@ Assert(
     segment.Text.Contains("Icy") && segment.Text.Contains("Freeze for 2 seconds"),
     "Formatted segments should contain both the enchantment label and rendered body text."
 );
+Assert(
+    !segment.Text.Contains("·") && !segment.Text.Contains("\u00A0"),
+    "Formatted enchantment previews should not reserve bullet or indentation space."
+);
 
 var cjkSegment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
@@ -177,9 +171,9 @@ var cjkSegment = ItemEnchantPreviewFormatting.CreateSegment(
 );
 
 Assert(
-    cjkSegment.Text.Contains("<line-height=1.15em>")
+    cjkSegment.Text.Contains("<line-height=2.1em>")
         && !cjkSegment.Text.Contains("<line-height=1.6em>"),
-    "CJK enchant preview text should compact the game's native tooltip line height."
+    "CJK enchant preview text should use the readable wrapped-line height."
 );
 
 var englishLineHeightSegment = ItemEnchantPreviewFormatting.CreateSegment(
@@ -192,14 +186,18 @@ Assert(
     "Non-CJK enchant preview text should preserve the game's native tooltip line height."
 );
 
-var tooltipBuilder = new StringBuilder();
-ItemEnchantPreviewFormatting.AppendTooltipText(
-    tooltipBuilder,
-    "first\r\n\r\n second \rthird\n   \n"
+var sectionText = ItemEnchantPreviewFormatting.BuildSectionText(
+    new[]
+    {
+        segment,
+        new TooltipSegment("second\r\n\r\nthird", null, null, -1),
+    }
 );
 Assert(
-    tooltipBuilder.ToString() == "first\n second \nthird\n",
-    "AppendTooltipText should normalize CR/LF without keeping blank or whitespace-only lines."
+    sectionText
+        == $"{segment.Text}<size=55%><line-height=2.1em>\n</line-height></size>second<size=55%><line-height=2.1em>\n</line-height></size>third"
+        && !sectionText.EndsWith("\n", StringComparison.Ordinal),
+    "Section text should normalize lines, use stable entry breaks, and avoid a trailing blank line."
 );
 
 var key1 = ItemEnchantPreviewCache.CreateKey(snapshot);

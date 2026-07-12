@@ -3,35 +3,10 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
-using BazaarPlusPlus.Infrastructure;
-using HarmonyLib;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Patches.Tooltips;
-
-[HarmonyPatch(
-    typeof(CardTooltipController),
-    nameof(CardTooltipController.RenderPassiveEffectTextBlock)
-)]
-internal static class ItemEnchantPreviewTooltipLayerPatch
-{
-    [HarmonyPostfix]
-    private static void Postfix(CardTooltipController __instance, string text)
-    {
-        try
-        {
-            TooltipLayerOverride.SetElevated(
-                __instance,
-                ItemEnchantPreviewTooltipLayerPolicy.ShouldElevateForPassiveText(text)
-            );
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("ItemEnchantPreview", "Failed to update tooltip render layer", ex);
-        }
-    }
-}
 
 internal static class TooltipLayerOverride
 {
