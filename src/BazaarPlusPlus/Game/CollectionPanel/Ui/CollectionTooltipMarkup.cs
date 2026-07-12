@@ -5,69 +5,153 @@ using System.Text;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
 
-// Vertical rhythm for BPP tooltip sections is controlled exclusively through
-// <line-height> tags expressed in em, so every value follows the font size active
-// at that point. TMP resolves line-height immediately rather than keeping a CSS-like
-// relative value; scaled blocks therefore open <size> before setting their baseline
-// and process their trailing newline before closing it.
+// TMP has no CSS box model, so model prose semantics first and translate them here.
+// Callers describe paragraphs and lists; only this renderer owns vertical rhythm.
 internal static class CollectionTooltipMarkup
 {
-    private const string BaseLine = "<line-height=1.3em>";
+    private const string ProseLine = "<line-height=1.4em>";
+    private const string ParagraphGap = "<line-height=1.65em>\n";
+    private const string ListItemGap = "<line-height=1.5em>\n";
+    private const string NestedItemGap = "<line-height=1.4em>\n";
     private const string NativeLineHeightOpen = "<line-height=1.6em>";
     private const string LineHeightClose = "</line-height>";
 
-    // Between top-level blocks (choices, outcome groups, level-reward sections).
-    // JoinBlocks emits the next baseline after entering that block's size scope.
-    public const string BlockBreak = "<line-height=1.6em>\n";
-
-    // Between "- entry" lines inside an expanded pool.
-    public const string SubItemBreak = "<line-height=1.35em>\n" + BaseLine;
-
-    // Between bulleted candidates in a "Choose one:" list.
-    public const string BulletBreak = "<line-height=1.4em>\n" + BaseLine;
-
-    internal readonly struct Block
+    internal abstract class Block
     {
-        public Block(string content, int fontSizePercent = 100)
+        protected Block(int fontSizePercent)
+        {
+            FontSizePercent = fontSizePercent;
+        }
+
+        public int FontSizePercent { get; }
+    }
+
+    internal sealed class Paragraph : Block
+    {
+        public Paragraph(string content, int fontSizePercent = 100)
+            : base(fontSizePercent)
         {
             Content = content ?? string.Empty;
+        }
+
+        public string Content { get; }
+    }
+
+    internal sealed class ListBlock : Block
+    {
+        public ListBlock(string? header, IReadOnlyList<ListItem> items, int fontSizePercent = 100)
+            : base(fontSizePercent)
+        {
+            Header = header;
+            Items = items ?? Array.Empty<ListItem>();
+        }
+
+        public string? Header { get; }
+
+        public IReadOnlyList<ListItem> Items { get; }
+    }
+
+    internal sealed class ListItem
+    {
+        public ListItem(
+            string content,
+            IReadOnlyList<ListItem>? children = null,
+            int fontSizePercent = 100,
+            string? color = null
+        )
+        {
+            Content = content ?? string.Empty;
+            Children = children ?? Array.Empty<ListItem>();
             FontSizePercent = fontSizePercent;
+            Color = color;
         }
 
         public string Content { get; }
 
+        public IReadOnlyList<ListItem> Children { get; }
+
         public int FontSizePercent { get; }
 
-        public static implicit operator Block(string content) => new(content);
+        public string? Color { get; }
     }
 
-    public static string JoinBlocks(IReadOnlyList<Block> blocks)
+    public static string Render(IReadOnlyList<Block> blocks)
     {
         if (blocks == null || blocks.Count == 0)
             return string.Empty;
 
         var builder = new StringBuilder();
         for (var index = 0; index < blocks.Count; index++)
-        {
-            var block = blocks[index];
-            var isScaled = block.FontSizePercent != 100;
-            if (isScaled)
-                builder.Append("<size=").Append(block.FontSizePercent).Append("%>");
-
-            builder.Append(BaseLine).Append(block.Content);
-            if (index + 1 < blocks.Count)
-                builder.Append(BlockBreak);
-
-            if (isScaled)
-                builder.Append("</size>");
-        }
+            AppendBlock(builder, blocks[index], hasFollowingBlock: index + 1 < blocks.Count);
         return builder.ToString();
     }
 
-    // The game's ColorKeywords always wraps its return value in 1.6em. These
-    // fragments are embedded inside a block whose rhythm is already controlled
-    // here, and TMP's closing line-height tag resets rather than restores the
-    // outer value. Remove only that known outer pair; preserve any inner markup.
+    private static void AppendBlock(StringBuilder builder, Block block, bool hasFollowingBlock)
+    {
+        OpenSize(builder, block.FontSizePercent);
+        builder.Append(ProseLine);
+        switch (block)
+        {
+            case Paragraph paragraph:
+                builder.Append(paragraph.Content);
+                break;
+            case ListBlock list:
+                if (!string.IsNullOrEmpty(list.Header))
+                    builder.Append(list.Header);
+                AppendListItems(
+                    builder,
+                    list.Items,
+                    depth: 0,
+                    hasLeadingContent: !string.IsNullOrEmpty(list.Header)
+                );
+                break;
+        }
+        if (hasFollowingBlock)
+            builder.Append(ParagraphGap);
+        CloseSize(builder, block.FontSizePercent);
+    }
+
+    private static void AppendListItems(
+        StringBuilder builder,
+        IReadOnlyList<ListItem> items,
+        int depth,
+        bool hasLeadingContent
+    )
+    {
+        for (var index = 0; index < items.Count; index++)
+        {
+            var item = items[index];
+            OpenSize(builder, item.FontSizePercent);
+            if (hasLeadingContent || index > 0)
+                builder.Append(depth == 0 ? ListItemGap : NestedItemGap);
+            builder.Append(ProseLine);
+            if (!string.IsNullOrEmpty(item.Color))
+                builder.Append("<color=").Append(item.Color).Append(">");
+            if (depth == 0)
+                builder.Append("· <indent=1em>").Append(item.Content).Append("</indent>");
+            else
+                builder.Append("<indent=2.2em>- ").Append(item.Content).Append("</indent>");
+            AppendListItems(builder, item.Children, depth + 1, hasLeadingContent: true);
+            if (!string.IsNullOrEmpty(item.Color))
+                builder.Append("</color>");
+            CloseSize(builder, item.FontSizePercent);
+        }
+    }
+
+    private static void OpenSize(StringBuilder builder, int percent)
+    {
+        if (percent != 100)
+            builder.Append("<size=").Append(percent).Append("%>");
+    }
+
+    private static void CloseSize(StringBuilder builder, int percent)
+    {
+        if (percent != 100)
+            builder.Append("</size>");
+    }
+
+    // ColorKeywords wraps its result in a native line-height pair. Embedded inline
+    // content must inherit the prose element's line-height instead.
     public static string NormalizeInlineFragment(string content)
     {
         if (
