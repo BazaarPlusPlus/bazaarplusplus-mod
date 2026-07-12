@@ -72,20 +72,13 @@ internal static class EncounterEventTooltipPatch
             return null;
 
         var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
-        if (
-            staticData == null
-            || !EventPreviewPlanRuntime.TryGet(
-                staticData,
-                card.TemplateId,
-                out var eventPlan,
-                out var snapshot
-            )
-        )
+        var template = BppStaticDataAccess.GetCardTemplate(staticData, card.TemplateId);
+        if (template == null)
             return null;
 
         var option = CollectionEncounterEventDetailResolver.TryResolve(
-            eventPlan,
-            snapshot,
+            template,
+            staticData,
             TryReadCurrentHero(),
             TryBuildInventory(),
             TryReadCurrentDay()
