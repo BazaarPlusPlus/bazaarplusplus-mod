@@ -1,7 +1,6 @@
 #nullable enable
 #pragma warning disable CS0436
 using System;
-using BazaarGameShared.Domain.Cards;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
@@ -51,19 +50,28 @@ internal static class HeroLevelRewardsTooltipPatch
             controller._questDisplayService?.BuildDisplay(null, null);
 
             var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
+            var currentLevel = heroLevelTooltipData.GetCurrentAndNextLevel().currentLevel;
+            if (
+                staticData == null
+                || !EventPreviewPlanRuntime.TryGetLevelUp(
+                    staticData,
+                    currentLevel,
+                    out var levelUpPlan,
+                    out var snapshot
+                )
+            )
+                return;
+
             var content = CollectionLevelUpTooltipText.Build(
-                heroLevelTooltipData._nextLevelUp,
-                id => ResolveTemplate(staticData, id),
+                levelUpPlan,
+                id => snapshot.TryGetTemplate(id, out var template) ? template : null,
                 EncounterEventTooltipPatch.TryReadCurrentHero(),
                 BppTooltipText.ColorKeywords,
-                heroLevelTooltipData.GetCurrentAndNextLevel().currentLevel
+                currentLevel
             );
             if (string.IsNullOrEmpty(content))
             {
-                BppLog.Debug(
-                    "LevelTooltip",
-                    $"No content: nextLevelUp={(heroLevelTooltipData._nextLevelUp == null ? "null" : heroLevelTooltipData._nextLevelUp.Level.ToString())}, hero={EncounterEventTooltipPatch.TryReadCurrentHero()}"
-                );
+                BppLog.Debug("LevelTooltip", $"No content: level={currentLevel}");
                 return;
             }
 
@@ -84,7 +92,4 @@ internal static class HeroLevelRewardsTooltipPatch
             BppLog.Error("LevelTooltip", "Failed to render level-up rewards section", ex);
         }
     }
-
-    private static TCardBase? ResolveTemplate(object? staticData, Guid templateId) =>
-        BppStaticDataAccess.GetCardTemplate(staticData, templateId);
 }

@@ -70,6 +70,24 @@ internal static class CollectionEncounterStructuredParser
 
     public static CollectionEncounterRewardFilter? TryParseRewardFilter(object? source)
     {
+        return TryParseRewardFilterCore(source, () => ToToken(source));
+    }
+
+    internal static CollectionEncounterRewardFilter? TryParseRewardFilterWithPreparedToken(
+        object? source,
+        JToken? preparedToken
+    )
+    {
+        return TryParseRewardFilterCore(source, () => preparedToken);
+    }
+
+    internal static JToken? TryPrepareToken(object? source) => ToToken(source);
+
+    private static CollectionEncounterRewardFilter? TryParseRewardFilterCore(
+        object? source,
+        Func<JToken?> fallbackToken
+    )
+    {
         foreach (var runtimeAction in EnumerateRuntimeDealCardActions(source))
         {
             var reward = TryParseRuntimeDealCardAction(runtimeAction);
@@ -77,7 +95,7 @@ internal static class CollectionEncounterStructuredParser
                 return reward;
         }
 
-        var token = ToToken(source);
+        var token = fallbackToken();
         if (token == null)
             return null;
 

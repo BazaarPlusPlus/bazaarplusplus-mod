@@ -1,8 +1,11 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Game;
 using TheBazaar;
 using TheBazaar.DataManagement.Json;
 
@@ -14,6 +17,15 @@ namespace BazaarPlusPlus.GameInterop.StaticCards;
 /// </summary>
 internal static class BppStaticDataAccess
 {
+    private static readonly FieldInfo? DatabasePathField = typeof(JsonGameDataManager).GetField(
+        "_dbPath",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+    private static readonly FieldInfo? LevelUpsField = typeof(JsonGameDataManager).GetField(
+        "_levelUps",
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+    );
+
     public static TCardBase? GetCardTemplate(object? staticData, Guid templateId)
     {
         if (staticData is not JsonGameDataManager manager || templateId == Guid.Empty)
@@ -50,4 +62,71 @@ internal static class BppStaticDataAccess
     /// </summary>
     public static Dictionary<Guid, ITCard>? LoadCardMap(object? source) =>
         source is JsonGameDataManager manager ? manager.GetCardMap() : null;
+
+    /// <summary>
+    /// Copies the manager's eagerly-loaded level-up table so background preview compilation never
+    /// retains the game's mutable dictionary. Reflection is centralised here because the manager
+    /// exposes only point lookups and the level range is data-driven.
+    /// </summary>
+    public static Dictionary<int, TLevelUp>? SnapshotLevelUps(object? source)
+    {
+        if (source is not JsonGameDataManager manager)
+            return null;
+        if (LevelUpsField?.GetValue(manager) is not Dictionary<int, TLevelUp> levelUps)
+            return null;
+        return new Dictionary<int, TLevelUp>(levelUps);
+    }
+
+    /// <summary>
+    /// Captures the ordinary string inputs needed to identify the current GameData generation.
+    /// Call this on the Unity main thread: the fallback path and data URL touch game globals;
+    /// workers consume only the returned strings.
+    /// </summary>
+    public static BppGameDataSourceInfo? TryCaptureGameDataSourceInfo(object? source)
+    {
+        if (source is not JsonGameDataManager manager)
+            return null;
+
+        try
+        {
+            var databasePath = DatabasePathField?.GetValue(manager) as string;
+            if (string.IsNullOrWhiteSpace(databasePath))
+            {
+                databasePath = Path.Combine(
+                    TheBazaar.DataManagement.DataManifestActions.GetCachePath(),
+                    "GameData.db"
+                );
+            }
+
+            var directory = Path.GetDirectoryName(databasePath);
+            if (string.IsNullOrWhiteSpace(directory))
+                return null;
+
+            return new BppGameDataSourceInfo(
+                databasePath!,
+                Path.Combine(directory!, "manifest.json"),
+                TheBazaar.Config.DataURL ?? string.Empty
+            );
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+}
+
+internal sealed class BppGameDataSourceInfo
+{
+    public BppGameDataSourceInfo(string databasePath, string manifestPath, string dataBaseUrl)
+    {
+        DatabasePath = databasePath;
+        ManifestPath = manifestPath;
+        DataBaseUrl = dataBaseUrl;
+    }
+
+    public string DatabasePath { get; }
+
+    public string ManifestPath { get; }
+
+    public string DataBaseUrl { get; }
 }

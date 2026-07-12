@@ -1,56 +1,52 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.GameInterop.StaticCards;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
 internal static class CollectionEncounterEventDetailResolver
 {
     public static CollectionEncounterOption? TryResolve(
-        TCardBase? eventTemplate,
-        object? staticData,
+        CollectionEncounterPreviewEventPlan? eventPlan,
+        CollectionEncounterPreviewSnapshot snapshot,
         EHero? currentHero,
         CollectionEncounterInventory? inventory = null,
         int? currentDay = null
     )
     {
-        if (eventTemplate == null || !IsEncounterEventTemplate(eventTemplate))
+        if (
+            eventPlan == null
+            || snapshot == null
+            || !snapshot.TryGetTemplate(eventPlan.TemplateId, out var eventTemplate)
+            || eventTemplate.Kind != CollectionEncounterPreviewTemplateKind.Event
+        )
             return null;
 
         var resultText =
             CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty;
         var rewardFilter = ResolveRewardFilter(eventTemplate, resultText);
         var outcomeGroups = ResolveOutcomeGroups(
-            eventTemplate,
-            staticData,
+            eventPlan,
+            snapshot,
             currentHero,
             inventory,
-            currentDay,
-            out var isRandomSelectionEvent
+            currentDay
         );
+
         // A suppressed random-selection event (shop stock generation) must not fall
         // back to rendering its spawn groups as choices either.
-        var choiceDetails =
-            outcomeGroups != null || isRandomSelectionEvent
-                ? Array.Empty<CollectionEncounterChoiceDetail>()
-                : ResolveChoiceDetails(
-                    eventTemplate,
-                    staticData,
-                    currentHero,
-                    inventory,
-                    currentDay
-                );
+        var choiceDetails = outcomeGroups != null || eventPlan.IsRandomSelectionEvent
+            ? Array.Empty<CollectionEncounterChoiceDetail>()
+            : ResolveChoiceDetails(eventPlan, snapshot, currentHero, inventory, currentDay);
         return new CollectionEncounterOption(
-            eventTemplate.Id,
+            eventTemplate.TemplateId,
             CollectionLocalizationResolver.ResolveTitle(eventTemplate)
                 ?? eventTemplate.InternalName,
             sourceKey: null,
             sourceKind: null,
-            eventTemplate.Id,
+            eventTemplate.TemplateId,
             resultText,
             rewardFilter,
             choiceDetails,
@@ -62,30 +58,19 @@ internal static class CollectionEncounterEventDetailResolver
     // groups actually in the roll (day condition matching, ownership prerequisites
     // met); prerequisite-unmet groups render dimmed without a percentage.
     private static IReadOnlyList<CollectionEncounterOutcomeView>? ResolveOutcomeGroups(
-        TCardBase eventTemplate,
-        object? staticData,
+        CollectionEncounterPreviewEventPlan eventPlan,
+        CollectionEncounterPreviewSnapshot snapshot,
         EHero? currentHero,
         CollectionEncounterInventory? inventory,
-        int? currentDay,
-        out bool isRandomSelectionEvent
+        int? currentDay
     )
     {
-        isRandomSelectionEvent = CollectionEncounterStructuredParser.TryParseEventOutcomeGroups(
-            eventTemplate,
-            out var groups
-        );
-        if (!isRandomSelectionEvent)
-            return null;
-
-        // Shops use the same outer Random spawn context — for stock generation, not
-        // a one-shot roll; "100% random item" explains nothing the description
-        // ("Sells Small items") doesn't already say.
-        if (HasMerchantTag(eventTemplate))
+        if (!eventPlan.IsRandomSelectionEvent || eventPlan.SuppressRandomOutcome)
             return null;
 
         var active = new List<(CollectionEncounterOutcomeGroupData Group, bool Eligible)>();
         uint totalWeight = 0;
-        foreach (var group in groups)
+        foreach (var group in eventPlan.OutcomeGroups)
         {
             if (
                 group.DayCondition is { } dayCondition
@@ -111,25 +96,24 @@ internal static class CollectionEncounterEventDetailResolver
             var resolvedCount = 0;
             foreach (var id in group.Ids)
             {
-                var template = BppStaticDataAccess.GetCardTemplate(staticData, id);
-                if (template == null)
+                if (!snapshot.TryGetTemplate(id, out var template))
                     continue;
                 resolvedCount++;
-                if (IsEncounterCombatTemplate(template))
+                if (template.Kind == CollectionEncounterPreviewTemplateKind.CombatEncounter)
                 {
-                    combatIds.Add(template.Id);
+                    combatIds.Add(template.TemplateId);
                     continue;
                 }
                 if (!CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
                     continue;
-                if (IsSkillTemplate(template))
+                if (template.Kind == CollectionEncounterPreviewTemplateKind.Skill)
                 {
                     var skillName =
                         CollectionLocalizationResolver.ResolveTitle(template)
                         ?? template.InternalName;
                     details.Add(
                         new CollectionEncounterChoiceDetail(
-                            template.Id,
+                            template.TemplateId,
                             CollectionPanelText.OutcomeGainSkill(skillName),
                             resultText: string.Empty,
                             rewardFilter: null,
@@ -144,6 +128,7 @@ internal static class CollectionEncounterEventDetailResolver
             // Dynamic pools roll a summary line; the reward filter drives the
             // day-tier suffix exactly like card-text rewards.
             foreach (var pool in group.QueryPools)
+            {
                 details.Add(
                     new CollectionEncounterChoiceDetail(
                         Guid.Empty,
@@ -153,9 +138,8 @@ internal static class CollectionEncounterEventDetailResolver
                         isSourceMatch: false
                     )
                 );
+            }
 
-            // Variant cards sharing one title+text (e.g. two "Aila's Package" ids in
-            // a single Farai group) read as duplicates; keep one.
             DedupeDetails(details);
 
             var isCombatPool =
@@ -171,34 +155,13 @@ internal static class CollectionEncounterEventDetailResolver
         if (views.Count == 0)
             return null;
 
-        var spawnLimit =
-            CollectionEncounterStructuredParser.TryParseEventChoiceLimit(eventTemplate) ?? 1;
-        return ShouldSuppressOutcomeViews(views, spawnLimit) ? null : views;
-    }
-
-    private static bool HasMerchantTag(TCardBase eventTemplate)
-    {
-        try
-        {
-            var tags = eventTemplate.GetType().GetProperty("Tags")?.GetValue(eventTemplate);
-            if (tags is not System.Collections.IEnumerable enumerable)
-                return false;
-            foreach (var tag in enumerable)
-                if (string.Equals(tag?.ToString(), "Merchant", StringComparison.Ordinal))
-                    return true;
-            return false;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
+        return ShouldSuppressOutcomeViews(views, eventPlan.ChoiceLimit ?? 1) ? null : views;
     }
 
     // A spawn limit above one means the roll composes multiple spawns (shop stock,
     // multi-offer events) rather than picking one outcome. When such an event has no
     // real alternatives to explain — a single view, or nothing but nameless random
-    // pools (Seraphim's two 50% item pools) — the breakdown is stock composition
-    // noise, not outcome odds.
+    // pools — the breakdown is stock composition noise, not outcome odds.
     internal static bool ShouldSuppressOutcomeViews(
         IReadOnlyList<CollectionEncounterOutcomeView> views,
         int spawnLimit
@@ -258,7 +221,6 @@ internal static class CollectionEncounterEventDetailResolver
         }
     }
 
-    // Per-group resolution before percentage math and combat-pool merging.
     internal readonly struct OutcomeGroupResolution
     {
         public OutcomeGroupResolution(
@@ -283,12 +245,8 @@ internal static class CollectionEncounterEventDetailResolver
         public List<CollectionEncounterChoiceDetail> Details { get; }
     }
 
-    // Random-outcome events often split "fight a monster" across several weighted
-    // groups; the tooltip shows no monster names, so per-group combat lines are pure
-    // redundancy ("25% fight + 25% fight"). Same-eligibility combat pools collapse
-    // into one line at the first group's position — weights summed before rounding
-    // (33+33 rounds to 67, not 66) and monster ids unioned so overlapping pools
-    // don't inflate the "N possible" count.
+    // Same-shaped outcome groups are merged after current-locale text resolution so
+    // locale changes never require rebuilding the static plan.
     internal static List<CollectionEncounterOutcomeView> BuildOutcomeViews(
         List<OutcomeGroupResolution> resolutions,
         uint totalWeight
@@ -310,7 +268,7 @@ internal static class CollectionEncounterEventDetailResolver
             {
                 if (resolution.CombatIds.Count == 0)
                     continue;
-                if (combatSlots.TryGetValue(resolution.Eligible, out var slot))
+                if (combatSlots.TryGetValue(resolution.Eligible, out _))
                 {
                     combatWeights[resolution.Eligible] += resolution.Weight;
                     combatIds[resolution.Eligible].UnionWith(resolution.CombatIds);
@@ -320,7 +278,6 @@ internal static class CollectionEncounterEventDetailResolver
                     combatSlots[resolution.Eligible] = views.Count;
                     combatWeights[resolution.Eligible] = resolution.Weight;
                     combatIds[resolution.Eligible] = new HashSet<Guid>(resolution.CombatIds);
-                    // Placeholder patched below once all combat groups are merged in.
                     views.Add(
                         new CollectionEncounterOutcomeView(
                             null,
@@ -337,12 +294,8 @@ internal static class CollectionEncounterEventDetailResolver
             if (resolution.Details.Count == 0)
                 continue;
 
-            // Groups rendering identically (e.g. Farai's weight-2 pool of two
-            // "Aila's Package" variants next to a weight-1 single) merge into one
-            // line, weights summed before rounding — separate lines would show the
-            // same text several times with misleadingly split percentages.
             var signature = ContentSignature(resolution);
-            if (contentSlots.TryGetValue(signature, out var contentSlot))
+            if (contentSlots.TryGetValue(signature, out _))
             {
                 contentWeights[signature] += resolution.Weight;
                 continue;
@@ -361,6 +314,7 @@ internal static class CollectionEncounterEventDetailResolver
         }
 
         foreach (var (eligible, slot) in combatSlots)
+        {
             views[slot] = new CollectionEncounterOutcomeView(
                 Percent(eligible, combatWeights[eligible]),
                 eligible,
@@ -368,6 +322,7 @@ internal static class CollectionEncounterEventDetailResolver
                 combatIds[eligible].Count,
                 Array.Empty<CollectionEncounterChoiceDetail>()
             );
+        }
 
         var titleOnlySlotsByEligibility = new Dictionary<bool, List<(int Slot, uint Weight)>>();
         foreach (var (signature, slot) in contentSlots)
@@ -395,10 +350,8 @@ internal static class CollectionEncounterEventDetailResolver
             }
         }
 
-        // A large cluster of same-shaped title-only outcomes (Farai's ~26 NPC
-        // packages, Underground Resistance's 22) reads as a wall. Collapse eligible
-        // and ineligible clusters separately so unavailable results stay dimmed and
-        // carry no probability.
+        // A large cluster of title-only outcomes is a wall; collapse eligible and
+        // ineligible clusters separately so unavailable results stay dimmed.
         var slotsToRemove = new List<int>();
         foreach (var (eligible, titleOnlySlots) in titleOnlySlotsByEligibility)
         {
@@ -430,11 +383,13 @@ internal static class CollectionEncounterEventDetailResolver
     {
         var builder = new System.Text.StringBuilder(resolution.Eligible ? "e" : "i");
         foreach (var detail in resolution.Details)
+        {
             builder
                 .Append('\x1f')
                 .Append(detail.DisplayName)
                 .Append('\x1e')
                 .Append(detail.ResultText);
+        }
         return builder.ToString();
     }
 
@@ -452,35 +407,23 @@ internal static class CollectionEncounterEventDetailResolver
         return true;
     }
 
-    private static bool IsSkillTemplate(TCardBase template) =>
-        string.Equals(template.GetType().Name, "TCardSkill", StringComparison.Ordinal)
-        || string.Equals(template.Type.ToString(), "Skill", StringComparison.Ordinal);
-
-    private static bool IsEncounterCombatTemplate(TCardBase template) =>
-        string.Equals(template.GetType().Name, "TCardEncounterCombat", StringComparison.Ordinal)
-        || string.Equals(template.Type.ToString(), "CombatEncounter", StringComparison.Ordinal);
-
     private static IReadOnlyList<CollectionEncounterChoiceDetail> ResolveChoiceDetails(
-        TCardBase eventTemplate,
-        object? staticData,
+        CollectionEncounterPreviewEventPlan eventPlan,
+        CollectionEncounterPreviewSnapshot snapshot,
         EHero? currentHero,
         CollectionEncounterInventory? inventory,
         int? currentDay
     )
     {
-        var choiceGroups = CollectionEncounterStructuredParser.TryParseEventChoiceGroups(
-            eventTemplate
-        );
-
-        // First pass in data order: fixed steps become candidates subject to the
-        // presentation limit; a Random-selection group is one rolled pool line.
-        // Day-gated groups outside the current day (Wishing Fountain's per-day
-        // price tiers) are not offered at all.
-        var candidates = new List<(TCardBase Step, bool MeetsPrerequisites)>();
+        var candidates = new List<(
+            CollectionEncounterPreviewTemplatePlan Step,
+            bool MeetsPrerequisites
+        )>();
         var pools = new List<CollectionEncounterChoiceDetail>();
-        var eventDescription =
-            CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty;
-        foreach (var group in choiceGroups)
+        var eventDescription = snapshot.TryGetTemplate(eventPlan.TemplateId, out var eventTemplate)
+            ? CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty
+            : string.Empty;
+        foreach (var group in eventPlan.ChoiceGroups)
         {
             if (
                 group.DayCondition is { } dayCondition
@@ -492,14 +435,8 @@ internal static class CollectionEncounterEventDetailResolver
             if (group.IsRandomPool)
             {
                 if (
-                    ResolveChoicePool(
-                        group,
-                        staticData,
-                        currentHero,
-                        inventory,
-                        eventDescription
-                    ) is
-                    { } pool
+                    ResolveChoicePool(group, snapshot, currentHero, inventory, eventDescription)
+                    is { } pool
                 )
                     pools.Add(pool);
                 continue;
@@ -507,23 +444,18 @@ internal static class CollectionEncounterEventDetailResolver
 
             foreach (var reference in group.Members)
             {
-                var rawStep = BppStaticDataAccess.GetCardTemplate(staticData, reference.TemplateId);
-                if (rawStep == null || !IsEncounterStepTemplate(rawStep))
-                    continue;
-                if (!CollectionEncounterHeroEligibility.Matches(rawStep.Heroes, currentHero))
+                if (
+                    !snapshot.TryGetTemplate(reference.TemplateId, out var step)
+                    || step.Kind != CollectionEncounterPreviewTemplateKind.EncounterStep
+                    || !CollectionEncounterHeroEligibility.Matches(step.Heroes, currentHero)
+                )
                     continue;
 
-                candidates.Add((rawStep, MeetsOwnershipPrerequisites(reference, inventory)));
+                candidates.Add((step, MeetsOwnershipPrerequisites(reference, inventory)));
             }
         }
 
-        // The event only presents the first <limit> prerequisite-passing steps
-        // (Sequential spawn); the rest — prerequisite-unmet or beyond the limit —
-        // render dimmed at the bottom. Rolled pools always render (their members
-        // compete for the remaining presentation slots at random).
-        var choiceLimit =
-            CollectionEncounterStructuredParser.TryParseEventChoiceLimit(eventTemplate)
-            ?? int.MaxValue;
+        var choiceLimit = eventPlan.ChoiceLimit ?? int.MaxValue;
         var titled = new List<(string Title, bool MeetsPrerequisites)>(candidates.Count);
         foreach (var (step, meetsPrerequisites) in candidates)
             titled.Add(
@@ -555,18 +487,11 @@ internal static class CollectionEncounterEventDetailResolver
 
     internal enum ChoicePresentation
     {
-        // Default array value must not collide with Presented (set in a first pass
-        // that later passes key off).
         Hidden = 0,
         Presented,
         Dimmed,
     }
 
-    // Splits choice candidates into offered / dimmed / hidden. Beyond-limit steps
-    // whose title repeats an already-visible option are escalation variants of the
-    // same action (Wishing Fountain lists 18 "Make a Wish" price tiers behind the
-    // 3 offered ones) and hide entirely; prerequisite-unmet steps always show
-    // dimmed — knowing what you're missing is the point of that section.
     internal static ChoicePresentation[] ResolvePresentation(
         IReadOnlyList<(string Title, bool MeetsPrerequisites)> candidates,
         int limit
@@ -600,13 +525,9 @@ internal static class CollectionEncounterEventDetailResolver
         return result;
     }
 
-    // A Random-selection spawn group inside a choice event: the offered choices are
-    // rolled from its members, which may be encounter steps, skills, items or
-    // combats. Renders as one pool line: a combat roll, a small expandable list, or
-    // a bare option count.
     private static CollectionEncounterChoiceDetail? ResolveChoicePool(
         CollectionEncounterChoiceGroupData group,
-        object? staticData,
+        CollectionEncounterPreviewSnapshot snapshot,
         EHero? currentHero,
         CollectionEncounterInventory? inventory,
         string eventDescription
@@ -617,26 +538,25 @@ internal static class CollectionEncounterEventDetailResolver
         var resolvedCount = 0;
         foreach (var member in group.Members)
         {
-            var template = BppStaticDataAccess.GetCardTemplate(staticData, member.TemplateId);
-            if (template == null)
+            if (!snapshot.TryGetTemplate(member.TemplateId, out var template))
                 continue;
             resolvedCount++;
-            if (IsEncounterCombatTemplate(template))
+            if (template.Kind == CollectionEncounterPreviewTemplateKind.CombatEncounter)
             {
-                combatIds.Add(template.Id);
+                combatIds.Add(template.TemplateId);
                 continue;
             }
             if (!CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
                 continue;
             if (!MeetsOwnershipPrerequisites(member, inventory))
                 continue;
-            if (IsSkillTemplate(template))
+            if (template.Kind == CollectionEncounterPreviewTemplateKind.Skill)
             {
                 var skillName =
                     CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName;
                 entries.Add(
                     new CollectionEncounterChoiceDetail(
-                        template.Id,
+                        template.TemplateId,
                         CollectionPanelText.OutcomeGainSkill(skillName),
                         resultText: string.Empty,
                         rewardFilter: null,
@@ -662,9 +582,6 @@ internal static class CollectionEncounterEventDetailResolver
         if (entries.Count == 0)
             return null;
 
-        // A pool that dedupes to one entry is no pool ("one of 1:") — and when that
-        // entry is a bare title the event description already spells out ("Get 4
-        // Bronze-tier Spare Change" / "Spare Change"), the line says nothing at all.
         if (entries.Count == 1)
         {
             var single = entries[0];
@@ -687,7 +604,9 @@ internal static class CollectionEncounterEventDetailResolver
         );
     }
 
-    private static CollectionEncounterChoiceDetail PoolDetail(CollectionEncounterChoicePool pool) =>
+    private static CollectionEncounterChoiceDetail PoolDetail(
+        CollectionEncounterChoicePool pool
+    ) =>
         new(
             Guid.Empty,
             displayName: string.Empty,
@@ -697,9 +616,6 @@ internal static class CollectionEncounterEventDetailResolver
             pool: pool
         );
 
-    // Card-count prerequisites combine with AND. Without inventory access (or for
-    // run-state prerequisites, which yield no requirements) the option counts as
-    // eligible rather than guessing.
     private static bool MeetsOwnershipPrerequisites(
         CollectionEncounterStepReference reference,
         CollectionEncounterInventory? inventory
@@ -711,25 +627,23 @@ internal static class CollectionEncounterEventDetailResolver
         foreach (var requirement in reference.Requirements)
             if (!requirement.Matches(inventory))
                 return false;
-
         return true;
     }
 
     private static void AddChoiceDetail(
         List<CollectionEncounterChoiceDetail> result,
-        TCardBase stepTemplate,
+        CollectionEncounterPreviewTemplatePlan template,
         bool isEligible
     )
     {
         var resultText =
-            CollectionLocalizationResolver.ResolveDescription(stepTemplate) ?? string.Empty;
+            CollectionLocalizationResolver.ResolveDescription(template) ?? string.Empty;
         result.Add(
             new CollectionEncounterChoiceDetail(
-                stepTemplate.Id,
-                CollectionLocalizationResolver.ResolveTitle(stepTemplate)
-                    ?? stepTemplate.InternalName,
-                StripHeroConditionPrefix(resultText, stepTemplate.Heroes),
-                ResolveRewardFilter(stepTemplate, resultText),
+                template.TemplateId,
+                CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName,
+                StripHeroConditionPrefix(resultText, template.Heroes),
+                ResolveRewardFilter(template, resultText),
                 isSourceMatch: false,
                 prerequisiteSummary: "",
                 isEligible
@@ -737,9 +651,10 @@ internal static class CollectionEncounterEventDetailResolver
         );
     }
 
-    // Hero-restricted step descriptions start with a condition like "(if you are Jules) ";
-    // choices are already filtered to the current hero, so the prefix is just noise.
-    private static string StripHeroConditionPrefix(string text, IReadOnlyCollection<EHero> heroes)
+    private static string StripHeroConditionPrefix(
+        string text,
+        IReadOnlyCollection<EHero> heroes
+    )
     {
         if (string.IsNullOrEmpty(text) || !IsHeroRestricted(heroes))
             return text;
@@ -775,16 +690,12 @@ internal static class CollectionEncounterEventDetailResolver
         return true;
     }
 
-    // Only structured constraints are trusted for the displayed pool summary; the
-    // text parser cannot represent negations ("non-Weapon") and would show inverted
-    // filters. It is still consulted for the "from any Hero" phrasing, which the
-    // structured data does not carry.
     private static CollectionEncounterRewardFilter? ResolveRewardFilter(
-        TCardBase template,
+        CollectionEncounterPreviewTemplatePlan template,
         string resultText
     )
     {
-        var rewardFilter = CollectionEncounterStructuredParser.TryParseRewardFilter(template);
+        var rewardFilter = template.RewardFilter;
         if (rewardFilter == null)
             return null;
 
@@ -793,12 +704,4 @@ internal static class CollectionEncounterEventDetailResolver
             ? rewardFilter.WithFromAnyHero(true)
             : rewardFilter;
     }
-
-    private static bool IsEncounterEventTemplate(TCardBase template) =>
-        string.Equals(template.GetType().Name, "TCardEncounterEvent", StringComparison.Ordinal)
-        || string.Equals(template.Type.ToString(), "EventEncounter", StringComparison.Ordinal);
-
-    private static bool IsEncounterStepTemplate(TCardBase template) =>
-        string.Equals(template.GetType().Name, "TCardEncounterStep", StringComparison.Ordinal)
-        || string.Equals(template.Type.ToString(), "EncounterStep", StringComparison.Ordinal);
 }
