@@ -1,6 +1,13 @@
+using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Effect;
+using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Effect.AuraActions;
+using BazaarGameShared.Domain.Targeting;
+using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Localization;
+using BazaarPlusPlus.Patches.Tooltips;
 using Xunit;
 
 namespace CollectionEncounterTooltip.Tests;
@@ -54,6 +61,72 @@ public sealed class AggregateItemMissingTypesTextTests
         );
 
         Assert.Equal("尚缺类型： Relic", content);
+    }
+
+    [Fact]
+    public void Source_resolver_recognizes_persistent_action_aggregators()
+    {
+        var template = new TCardItem
+        {
+            Abilities = new Dictionary<string, TCardAbility>
+            {
+                ["gain-types"] = new() { Action = new TActionCardAddTagsBySource() },
+            },
+        };
+
+        Assert.True(
+            AggregateItemMissingTypesTooltipPatch.TryResolveTypeSource(template, out var source)
+        );
+        Assert.Null(source.Section);
+    }
+
+    [Fact]
+    public void Source_resolver_recognizes_live_aura_aggregators()
+    {
+        var template = new TCardItem
+        {
+            Auras = new Dictionary<string, TCardAura>
+            {
+                ["copy-types"] = new() { Action = new TAuraActionCardAddTagsBySource() },
+            },
+        };
+
+        Assert.True(
+            AggregateItemMissingTypesTooltipPatch.TryResolveTypeSource(template, out var source)
+        );
+        Assert.Null(source.Section);
+    }
+
+    [Fact]
+    public void Source_resolver_recognizes_external_distinct_type_aggregators()
+    {
+        var template = new TCardItem
+        {
+            Auras = new Dictionary<string, TCardAura>
+            {
+                ["count-types"] = new()
+                {
+                    Action = new TAuraActionCardModifyAttribute
+                    {
+                        Value = new TReferenceValueCardTagCount
+                        {
+                            Distinct = true,
+                            Target = new TTargetCardSection
+                            {
+                                TargetSection = ETargetCardSectionTargetSection.SelfHand,
+                                ExcludeSelf = true,
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        Assert.True(
+            AggregateItemMissingTypesTooltipPatch.TryResolveTypeSource(template, out var source)
+        );
+        Assert.Equal(ETargetCardSectionTargetSection.SelfHand, source.Section);
+        Assert.True(source.ExcludeSelf);
     }
 
     private sealed class TestLanguageProvider(string languageCode = "en") : ILanguageProvider
