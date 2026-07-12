@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TMPro;
 using UnityEngine;
@@ -38,6 +39,28 @@ internal static class BppTmpFont
         text.font = fontAsset;
         if (fontAsset.material != null)
             text.fontSharedMaterial = fontAsset.material;
+
+        WarmCharacters(fontAsset, sampleText);
+        return true;
+    }
+
+    public static bool TryInstallFallback(TMP_Text? text, string? sampleText)
+    {
+        if (text?.font == null || !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(sampleText))
+            return false;
+
+        var fontAsset = ResolveDefault();
+        if (fontAsset == null)
+            return false;
+
+        var fallbacks = text.font.fallbackFontAssetTable;
+        if (fallbacks == null)
+        {
+            fallbacks = new List<TMP_FontAsset>();
+            text.font.fallbackFontAssetTable = fallbacks;
+        }
+        if (!fallbacks.Contains(fontAsset))
+            fallbacks.Add(fontAsset);
 
         WarmCharacters(fontAsset, sampleText);
         return true;

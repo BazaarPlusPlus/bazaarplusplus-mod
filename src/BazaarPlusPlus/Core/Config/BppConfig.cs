@@ -18,6 +18,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableCombatStatusBarConfig { get; private set; }
 
+    public ConfigEntry<bool>? EnableBilingualItemNamesConfig { get; private set; }
+
     public ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; private set; }
 
     public ConfigEntry<SubtitlePosition>? VoiceSubtitlesPositionConfig { get; private set; }
@@ -81,6 +83,12 @@ internal sealed class BppConfig : IBppConfig
             "Enabled",
             false,
             "Whether to show the combat status bar with elapsed time, speed controls, and pause controls"
+        );
+        EnableBilingualItemNamesConfig = config.Bind(
+            "BilingualItemNames",
+            "Enabled",
+            true,
+            "Whether item tooltips show the official Simplified Chinese name below the current-language name. Hidden while the game itself is using Chinese."
         );
         EnableVoiceSubtitlesConfig = config.Bind(
             "VoiceSubtitles",

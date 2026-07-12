@@ -1,3 +1,4 @@
+using BazaarPlusPlus.Game.BilingualItemNames;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
@@ -5,6 +6,7 @@ using BazaarPlusPlus.Infrastructure.UiTokens;
 TestEmbeddedFontExtractionWritesResourceBytes();
 TestEmbeddedFontExtractionFailsForMissingResource();
 TestTmpFontPolicyDetectsCjkText();
+TestBilingualItemNamePresentation();
 TestStablePanelTextCompactionKeepsStableSlots();
 TestCollectionSortButtonWidthIsCompact();
 
@@ -87,6 +89,50 @@ static void TestTmpFontPolicyDetectsCjkText()
     Assert(
         !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont("㐀"),
         "TMP font policy should leave Extension A characters on the existing TMP fallback chain."
+    );
+}
+
+static void TestBilingualItemNamePresentation()
+{
+    Assert(
+        BilingualItemNamePresentation.TryBuild(
+            "Lighter",
+            "打火机",
+            enabled: true,
+            isItem: true,
+            currentLanguageIsChinese: false
+        ) == "Lighter\n<size=65%><noparse>打火机</noparse></size>",
+        "Enabled item tooltips should append a smaller official Chinese title."
+    );
+    Assert(
+        BilingualItemNamePresentation.TryBuild(
+            "Lighter",
+            "打火机",
+            enabled: false,
+            isItem: true,
+            currentLanguageIsChinese: false
+        ) == null,
+        "Disabled bilingual names should preserve the native title."
+    );
+    Assert(
+        BilingualItemNamePresentation.TryBuild(
+            "Lighter",
+            "打火机",
+            enabled: true,
+            isItem: false,
+            currentLanguageIsChinese: false
+        ) == null,
+        "Skill and encounter tooltips should not receive item subtitles."
+    );
+    Assert(
+        BilingualItemNamePresentation.TryBuild(
+            "打火机",
+            "打火机",
+            enabled: true,
+            isItem: true,
+            currentLanguageIsChinese: true
+        ) == null,
+        "Chinese clients should not duplicate the Chinese title."
     );
 }
 
