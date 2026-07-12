@@ -13,12 +13,29 @@ namespace BazaarPlusPlus.Patches.Tooltips;
 internal static class BppTooltipSections
 {
     // Clearly below the native body size so appended blocks read as secondary info.
-    private const float FontScale = 0.75f;
+    private const float DefaultFontScale = 0.75f;
 
     internal sealed class Section
     {
         public GameObject Block = null!;
         public CardEffectTooltipController Text = null!;
+        public GameObject? Divider;
+        public UnityEngine.UI.LayoutGroup? SourceLayout;
+        public int SourceBottomPadding;
+    }
+
+    internal sealed class Style
+    {
+        public bool ClearTopPadding { get; init; } = true;
+        public int? BottomPadding { get; init; }
+        public bool MirrorSourceTopPaddingToBottom { get; init; }
+        public float? SectionTopPaddingScale { get; init; }
+        public float? SectionBottomPaddingScale { get; init; }
+        public float? SourceBottomPaddingScale { get; init; }
+        public float? ParagraphSpacing { get; init; }
+        public float FontScale { get; init; } = DefaultFontScale;
+        public bool ShowNativeDivider { get; init; }
+        public float DividerHorizontalInset { get; init; }
     }
 
     private static readonly Dictionary<(CardTooltipController, string), Section> Sections = new();
@@ -27,18 +44,27 @@ internal static class BppTooltipSections
         CardTooltipController controller,
         string key,
         GameObject? anchor,
-        string content
+        string content,
+        Style? style = null
     )
     {
         if (anchor == null)
             return false;
 
-        var section = Ensure(controller, key, anchor);
+        var section = Ensure(controller, key, anchor, style);
         if (section == null)
             return false;
 
+        ApplySourcePadding(section, style);
         section.Text.SetText(content);
-        section.Block.transform.SetSiblingIndex(anchor.transform.GetSiblingIndex() + 1);
+        var siblingIndex = anchor.transform.GetSiblingIndex() + 1;
+        if (section.Divider != null)
+        {
+            section.Divider.transform.SetSiblingIndex(siblingIndex);
+            section.Divider.SetActive(true);
+            siblingIndex++;
+        }
+        section.Block.transform.SetSiblingIndex(siblingIndex);
         section.Block.SetActive(true);
         return true;
     }
@@ -49,9 +75,14 @@ internal static class BppTooltipSections
             return;
         if (section.Block == null)
         {
+            if (section.Divider != null)
+                Object.Destroy(section.Divider);
             Sections.Remove((controller, key));
             return;
         }
+        if (section.Divider != null)
+            section.Divider.SetActive(false);
+        RestoreSourcePadding(section);
         section.Block.SetActive(false);
     }
 
@@ -71,7 +102,12 @@ internal static class BppTooltipSections
             }
 
             if (ReferenceEquals(entry.Key.Item1, controller))
+            {
+                if (entry.Value.Divider != null)
+                    entry.Value.Divider.SetActive(false);
+                RestoreSourcePadding(entry.Value);
                 entry.Value.Block.SetActive(false);
+            }
         }
 
         if (stale == null)
@@ -80,7 +116,34 @@ internal static class BppTooltipSections
             Sections.Remove(key);
     }
 
-    private static Section? Ensure(CardTooltipController controller, string key, GameObject anchor)
+    public static void ReleaseAll(CardTooltipController controller)
+    {
+        List<(CardTooltipController, string)>? owned = null;
+        foreach (var entry in Sections)
+        {
+            if (!ReferenceEquals(entry.Key.Item1, controller))
+                continue;
+            owned ??= new List<(CardTooltipController, string)>();
+            owned.Add(entry.Key);
+            RestoreSourcePadding(entry.Value);
+            if (entry.Value.Divider != null)
+                Object.Destroy(entry.Value.Divider);
+            if (entry.Value.Block != null)
+                Object.Destroy(entry.Value.Block);
+        }
+
+        if (owned == null)
+            return;
+        foreach (var key in owned)
+            Sections.Remove(key);
+    }
+
+    private static Section? Ensure(
+        CardTooltipController controller,
+        string key,
+        GameObject anchor,
+        Style? style
+    )
     {
         if (Sections.TryGetValue((controller, key), out var existing))
         {
@@ -98,6 +161,35 @@ internal static class BppTooltipSections
 
         var blockClone = Object.Instantiate(passiveBlock, anchor.transform.parent);
         blockClone.name = $"BppTooltipSection_{key}";
+        var sourceLayout = anchor.GetComponent<UnityEngine.UI.LayoutGroup>();
+        var sourceBottomPadding = sourceLayout?.padding.bottom ?? 0;
+
+        GameObject? dividerClone = null;
+        if (style?.ShowNativeDivider == true && controller.dividerParent != null)
+        {
+            dividerClone = Object.Instantiate(controller.dividerParent, anchor.transform.parent);
+            dividerClone.name = $"BppTooltipSectionDivider_{key}";
+            foreach (var group in dividerClone.GetComponentsInChildren<CanvasGroup>(true))
+                group.alpha = 1f;
+            var dividerRect = dividerClone.GetComponent<RectTransform>();
+            var dividerImages = dividerClone.GetComponentsInChildren<UnityEngine.UI.Image>(true);
+            foreach (var image in dividerImages)
+            {
+                image.enabled = true;
+                var color = image.color;
+                color.a = 1f;
+                image.color = color;
+                image.canvasRenderer.SetAlpha(1f);
+                if (dividerRect != null && style.DividerHorizontalInset > 0f)
+                    InsetDividerImage(image, dividerRect, style.DividerHorizontalInset);
+            }
+            var dividerLayout =
+                dividerClone.GetComponent<UnityEngine.UI.LayoutElement>()
+                ?? dividerClone.AddComponent<UnityEngine.UI.LayoutElement>();
+            dividerLayout.ignoreLayout = false;
+            if (dividerRect != null && dividerLayout.preferredHeight < 0f)
+                dividerLayout.preferredHeight = dividerRect.rect.height;
+        }
 
         var textController = blockClone.GetComponentInChildren<CardEffectTooltipController>(
             includeInactive: true
@@ -105,6 +197,8 @@ internal static class BppTooltipSections
         if (textController == null)
         {
             BppLog.Info("TooltipSection", $"Ensure({key}) failed: no text controller in clone");
+            if (dividerClone != null)
+                Object.Destroy(dividerClone);
             Object.Destroy(blockClone);
             return null;
         }
@@ -125,7 +219,19 @@ internal static class BppTooltipSections
         // The seam to the block above already carries the native box's bottom
         // padding and the layout spacing; the clone's own top padding doubles it up.
         if (blockClone.GetComponent<UnityEngine.UI.LayoutGroup>() is { } layoutGroup)
-            layoutGroup.padding.top = 0;
+        {
+            var sourceTopPadding = layoutGroup.padding.top;
+            if (style?.SectionTopPaddingScale is { } topScale)
+                layoutGroup.padding.top = Mathf.RoundToInt(sourceTopPadding * topScale);
+            else if (style?.ClearTopPadding ?? true)
+                layoutGroup.padding.top = 0;
+            if (style?.SectionBottomPaddingScale is { } bottomScale)
+                layoutGroup.padding.bottom = Mathf.RoundToInt(sourceTopPadding * bottomScale);
+            else if (style?.MirrorSourceTopPaddingToBottom == true)
+                layoutGroup.padding.bottom = sourceTopPadding;
+            else if (style?.BottomPadding is { } bottomPadding)
+                layoutGroup.padding.bottom = bottomPadding;
+        }
 
         // The source block's LayoutElement.ignoreLayout is toggled together with its
         // visibility; a clone taken while the source was hidden (e.g. the hero-level
@@ -140,19 +246,79 @@ internal static class BppTooltipSections
         var label = textController.textObject;
         if (label != null)
         {
+            if (style?.ParagraphSpacing is { } paragraphSpacing)
+                label.paragraphSpacing = paragraphSpacing;
             if (label.enableAutoSizing)
             {
-                label.fontSizeMax *= FontScale;
+                label.fontSizeMax *= style?.FontScale ?? DefaultFontScale;
                 label.fontSizeMin = Mathf.Min(label.fontSizeMin, label.fontSizeMax);
             }
             else
             {
-                label.fontSize *= FontScale;
+                label.fontSize *= style?.FontScale ?? DefaultFontScale;
             }
         }
 
-        var section = new Section { Block = blockClone, Text = textController };
+        var section = new Section
+        {
+            Block = blockClone,
+            Text = textController,
+            Divider = dividerClone,
+            SourceLayout = sourceLayout,
+            SourceBottomPadding = sourceBottomPadding,
+        };
         Sections[(controller, key)] = section;
         return section;
+    }
+
+    private static void ApplySourcePadding(Section section, Style? style)
+    {
+        if (section.SourceLayout == null || style?.SourceBottomPaddingScale is not { } scale)
+            return;
+        section.SourceLayout.padding.bottom = Mathf.RoundToInt(section.SourceBottomPadding * scale);
+    }
+
+    private static void RestoreSourcePadding(Section section)
+    {
+        if (section.SourceLayout != null)
+            section.SourceLayout.padding.bottom = section.SourceBottomPadding;
+    }
+
+    private static void InsetDividerImage(
+        UnityEngine.UI.Image image,
+        RectTransform dividerRect,
+        float inset
+    )
+    {
+        var imageRect = image.rectTransform;
+        if (imageRect == dividerRect)
+        {
+            var insetObject = new GameObject(
+                "BppInsetDividerImage",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(UnityEngine.UI.Image)
+            );
+            var insetRect = (RectTransform)insetObject.transform;
+            insetRect.SetParent(dividerRect, worldPositionStays: false);
+            insetRect.anchorMin = Vector2.zero;
+            insetRect.anchorMax = Vector2.one;
+            insetRect.offsetMin = new Vector2(inset, 0f);
+            insetRect.offsetMax = new Vector2(-inset, 0f);
+
+            var insetImage = insetObject.GetComponent<UnityEngine.UI.Image>();
+            insetImage.sprite = image.sprite;
+            insetImage.material = image.material;
+            insetImage.color = image.color;
+            insetImage.type = image.type;
+            insetImage.preserveAspect = image.preserveAspect;
+            insetImage.fillCenter = image.fillCenter;
+            insetImage.raycastTarget = false;
+            image.enabled = false;
+            return;
+        }
+
+        imageRect.offsetMin = new Vector2(imageRect.offsetMin.x + inset, imageRect.offsetMin.y);
+        imageRect.offsetMax = new Vector2(imageRect.offsetMax.x - inset, imageRect.offsetMax.y);
     }
 }

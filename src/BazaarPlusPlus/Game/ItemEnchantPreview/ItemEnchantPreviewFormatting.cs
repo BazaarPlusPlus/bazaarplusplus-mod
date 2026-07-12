@@ -1,6 +1,7 @@
 #nullable enable
 using System;
-using System.Text;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Infrastructure;
@@ -12,13 +13,13 @@ namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
 public static class ItemEnchantPreviewFormatting
 {
-    public const string PreviewHeaderText = "BazaarPlusPlus";
-
     private const string LogComponent = "ItemEnchantPreview";
     private const int PrefixSizePercent = 60;
     private const int EffectSizePercent = 55;
-    private const string EnchantmentPrefix = "\u00A0\u00A0· ";
-    private const string CjkLineHeight = "<line-height=1.15em>";
+    private const string CjkLineHeight = "<line-height=2.1em>";
+    private const string CjkLineHeightEnd = "</line-height>";
+    private const string EntryBreak =
+        "<size=55%><line-height=2.1em>\n</line-height></size>";
 
     private static readonly Regex SizeTagRegex = new Regex(
         "<size=(\\d+)%>",
@@ -36,62 +37,34 @@ public static class ItemEnchantPreviewFormatting
     {
         var enchantmentLabel = GetEnchantmentLabel(enchantmentType);
         var colorHex = GetEnchantmentColorHex(enchantmentType);
-        var scaledText = ScaleInlineSizes(
-            NormalizeNativeLineHeight(renderedText),
-            EffectSizePercent / 100f
-        );
+        var usesCjkFont = BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(renderedText);
+        var normalizedText = usesCjkFont
+            ? NativeLineHeightRegex.Replace(renderedText, CjkLineHeight)
+            : renderedText;
+        var scaledText = ScaleInlineSizes(normalizedText, EffectSizePercent / 100f);
+        var lineHeightStart = usesCjkFont ? CjkLineHeight : string.Empty;
+        var lineHeightEnd = usesCjkFont ? CjkLineHeightEnd : string.Empty;
 
         return new TooltipSegment(
-            $"<size={PrefixSizePercent}%>{EnchantmentPrefix}<color=#{colorHex}>{enchantmentLabel}</color>: </size><size={EffectSizePercent}%>{scaledText}</size>",
+            $"<size={PrefixSizePercent}%><color=#{colorHex}>{enchantmentLabel}</color>: </size><size={EffectSizePercent}%>{lineHeightStart}{scaledText}{lineHeightEnd}</size>",
             null,
             null,
             -1
         );
     }
 
-    internal static string NormalizeNativeLineHeight(string text)
+    public static string BuildSectionText(IReadOnlyList<TooltipSegment> segments)
     {
-        if (!BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(text))
-            return text;
+        if (segments == null || segments.Count == 0)
+            return string.Empty;
 
-        return NativeLineHeightRegex.Replace(text, CjkLineHeight);
-    }
-
-    public static void AppendTooltipText(StringBuilder builder, string text)
-    {
-        if (builder == null || string.IsNullOrWhiteSpace(text))
-            return;
-
-        var lineStart = 0;
-        for (var index = 0; index < text.Length; index++)
-        {
-            var character = text[index];
-            if (character != '\r' && character != '\n')
-                continue;
-
-            AppendLine(builder, text, lineStart, index - lineStart);
-            if (character == '\r' && index + 1 < text.Length && text[index + 1] == '\n')
-                index++;
-            lineStart = index + 1;
-        }
-
-        AppendLine(builder, text, lineStart, text.Length - lineStart);
-    }
-
-    private static void AppendLine(StringBuilder builder, string text, int startIndex, int length)
-    {
-        if (length <= 0)
-            return;
-
-        for (var index = startIndex; index < startIndex + length; index++)
-        {
-            if (char.IsWhiteSpace(text[index]))
-                continue;
-
-            builder.Append(text, startIndex, length);
-            builder.Append('\n');
-            return;
-        }
+        var lines = segments
+            .Where(segment => !string.IsNullOrWhiteSpace(segment.Text))
+            .SelectMany(segment =>
+                segment.Text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            )
+            .Where(line => !string.IsNullOrWhiteSpace(line));
+        return string.Join(EntryBreak, lines);
     }
 
     internal static string ScaleInlineSizes(string text, float scale)
