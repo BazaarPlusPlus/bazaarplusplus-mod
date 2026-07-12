@@ -39,6 +39,11 @@ internal static class BppTooltipSections
         public float DividerHorizontalInset { get; init; }
     }
 
+    // Structured rich-text sections own their paragraph and list rhythm through
+    // explicit font-relative markup. Disable the cloned native label's additional
+    // paragraph spacing so every newline is counted exactly once.
+    internal static readonly Style MarkupControlledStyle = new() { ParagraphSpacing = 0f };
+
     private static readonly Dictionary<(CardTooltipController, string), Section> Sections = new();
 
     public static bool TryShow(

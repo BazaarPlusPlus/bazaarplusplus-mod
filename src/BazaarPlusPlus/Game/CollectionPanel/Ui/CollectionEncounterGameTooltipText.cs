@@ -32,20 +32,23 @@ internal static class CollectionEncounterGameTooltipText
         if (option == null)
             return string.Empty;
 
-        var colorize = colorizeResult ?? (text => text);
+        var rawColorize = colorizeResult ?? (text => text);
+        string Colorize(string text) =>
+            CollectionTooltipMarkup.NormalizeInlineFragment(rawColorize(text));
+
         if (option.HasOutcomeGroups)
-            return BuildOutcomes(option.OutcomeGroups!, colorize, dayTierCeiling);
+            return BuildOutcomes(option.OutcomeGroups!, Colorize, dayTierCeiling);
         if (!option.HasChoiceDetails)
             return string.Empty;
 
-        var lines = new List<string>();
+        var lines = new List<CollectionTooltipMarkup.Block>();
         foreach (var choice in option.ChoiceDetails)
         {
             // Rolled pools ("Advanced Training" trainings, "Epic Battle" monsters)
             // render as one summary line instead of one line per member.
             if (choice.Pool is { } pool)
             {
-                lines.Add(ChoicePoolLine(pool, colorize, dayTierCeiling));
+                lines.Add(ChoicePoolBlock(pool, Colorize, dayTierCeiling));
                 continue;
             }
 
@@ -58,17 +61,24 @@ internal static class CollectionEncounterGameTooltipText
                 var flat = string.IsNullOrWhiteSpace(result)
                     ? choice.DisplayName
                     : $"{choice.DisplayName}: {result}";
-                lines.Add($"<size=85%><color={IneligibleColor}>{flat}</color></size>");
+                lines.Add(
+                    new CollectionTooltipMarkup.Paragraph(
+                        $"<color={IneligibleColor}>{flat}</color>",
+                        fontSizePercent: 85
+                    )
+                );
                 continue;
             }
 
             lines.Add(
-                string.IsNullOrWhiteSpace(result)
-                    ? $"<color={AccentColor}>{choice.DisplayName}</color>"
-                    : $"<color={AccentColor}>{choice.DisplayName}:</color> {colorize(result)}"
+                new CollectionTooltipMarkup.Paragraph(
+                    string.IsNullOrWhiteSpace(result)
+                        ? $"<color={AccentColor}>{choice.DisplayName}</color>"
+                        : $"<color={AccentColor}>{choice.DisplayName}:</color> {Colorize(result)}"
+                )
             );
         }
-        return CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
+        return CollectionTooltipMarkup.Render(lines);
     }
 
     // Random-outcome events: one block per rolled alternative with its normalized
@@ -79,10 +89,11 @@ internal static class CollectionEncounterGameTooltipText
         ETier? dayTierCeiling
     )
     {
-        var lines = new List<string> { CollectionPanelText.OutcomesHeader() };
+        var items = new List<CollectionTooltipMarkup.ListItem>();
         foreach (var outcome in outcomes)
         {
             string content;
+            IReadOnlyList<CollectionTooltipMarkup.ListItem>? children = null;
             if (outcome.IsCombatPool)
             {
                 content = CollectionPanelText.OutcomeCombatPool(outcome.OptionCount);
@@ -98,26 +109,28 @@ internal static class CollectionEncounterGameTooltipText
             }
             else
             {
-                var block = new System.Text.StringBuilder(
-                    CollectionPanelText.OutcomeSubPool(outcome.Details.Count)
-                );
+                content = CollectionPanelText.OutcomeSubPool(outcome.Details.Count);
+                var entries = new List<CollectionTooltipMarkup.ListItem>();
                 foreach (var detail in outcome.Details)
-                {
-                    // Hanging indent keeps soft-wrapped lines aligned with the dash.
-                    block.Append(CollectionTooltipMarkup.SubItemBreak);
-                    block.Append("<indent=2.2em>- ");
-                    block.Append(DetailLine(detail, colorize, dayTierCeiling));
-                    block.Append("</indent>");
-                }
-                content = block.ToString();
+                    entries.Add(
+                        new CollectionTooltipMarkup.ListItem(
+                            DetailLine(detail, colorize, dayTierCeiling)
+                        )
+                    );
+                children = entries;
             }
 
             // Ownership-gated groups render dimmed; their own text already carries
             // the condition ("(if you have Powder Keg or the Big One)").
             if (!outcome.IsEligible)
             {
-                lines.Add(
-                    $"<size=85%><color={IneligibleColor}>· <indent=1em>{content}</indent></color></size>"
+                items.Add(
+                    new CollectionTooltipMarkup.ListItem(
+                        content,
+                        children,
+                        fontSizePercent: 85,
+                        color: IneligibleColor
+                    )
                 );
                 continue;
             }
@@ -125,42 +138,51 @@ internal static class CollectionEncounterGameTooltipText
             var prefix = outcome.Percent.HasValue
                 ? $"<color={AccentColor}>{outcome.Percent.Value}%</color> "
                 : string.Empty;
-            lines.Add($"· <indent=1em>{prefix}{content}</indent>");
+            items.Add(new CollectionTooltipMarkup.ListItem($"{prefix}{content}", children));
         }
-        return CollectionTooltipMarkup.Wrap(string.Join(CollectionTooltipMarkup.BlockBreak, lines));
+        return CollectionTooltipMarkup.Render(
+            new CollectionTooltipMarkup.Block[]
+            {
+                new CollectionTooltipMarkup.ListBlock(CollectionPanelText.OutcomesHeader(), items),
+            }
+        );
     }
 
     // One rolled-pool choice line: combat roll, small expandable entry list (with
     // accent-colored names to match sibling choice lines), or a bare option count.
-    private static string ChoicePoolLine(
+    private static CollectionTooltipMarkup.Block ChoicePoolBlock(
         CollectionEncounterChoicePool pool,
         Func<string, string> colorize,
         ETier? dayTierCeiling
     )
     {
         if (pool.IsCombat)
-            return $"<color={AccentColor}>{CollectionPanelText.OutcomeCombatPool(pool.OptionCount)}</color>";
+            return new CollectionTooltipMarkup.Paragraph(
+                $"<color={AccentColor}>{CollectionPanelText.OutcomeCombatPool(pool.OptionCount)}</color>"
+            );
 
         if (pool.Entries.Count == 0)
-            return CollectionPanelText.LevelUpRandomPoolSingle(pool.OptionCount);
+            return new CollectionTooltipMarkup.Paragraph(
+                CollectionPanelText.LevelUpRandomPoolSingle(pool.OptionCount)
+            );
 
-        var block = new System.Text.StringBuilder(
-            CollectionPanelText.OutcomeSubPool(pool.Entries.Count)
-        );
+        var entries = new List<CollectionTooltipMarkup.ListItem>();
         foreach (var entry in pool.Entries)
         {
             var result = ChoiceResultText(entry, dayTierCeiling);
-            block.Append(CollectionTooltipMarkup.SubItemBreak);
-            block.Append("<indent=2.2em>- ");
-            block.Append(
-                string.IsNullOrWhiteSpace(result)
-                    ? $"<color={AccentColor}>{entry.DisplayName}</color>"
-                : string.IsNullOrWhiteSpace(entry.DisplayName) ? colorize(result)
-                : $"<color={AccentColor}>{entry.DisplayName}:</color> {colorize(result)}"
+            entries.Add(
+                new CollectionTooltipMarkup.ListItem(
+                    string.IsNullOrWhiteSpace(result)
+                        ? $"<color={AccentColor}>{entry.DisplayName}</color>"
+                    : string.IsNullOrWhiteSpace(entry.DisplayName) ? colorize(result)
+                    : $"<color={AccentColor}>{entry.DisplayName}:</color> {colorize(result)}"
+                )
             );
-            block.Append("</indent>");
         }
-        return block.ToString();
+        return new CollectionTooltipMarkup.ListBlock(
+            CollectionPanelText.OutcomeSubPool(pool.Entries.Count),
+            entries
+        );
     }
 
     // One outcome entry: "Name: result", bare name, or bare result — query-pool

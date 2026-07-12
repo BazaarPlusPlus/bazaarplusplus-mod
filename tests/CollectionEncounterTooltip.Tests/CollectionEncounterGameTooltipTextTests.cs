@@ -33,7 +33,10 @@ public sealed class CollectionEncounterGameTooltipTextTests
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(option, result => $"«{result}»");
+        var text = CollectionEncounterGameTooltipText.Build(
+            option,
+            result => $"<line-height=1.6em>«{result}»</line-height>"
+        );
 
         Assert.DoesNotContain("You find a strange mushroom in the Greenheart", text);
         Assert.Contains("<color=#FFD37E>Keep It for Luck:</color> «Gain 1 XP»", text);
@@ -41,6 +44,7 @@ public sealed class CollectionEncounterGameTooltipTextTests
             "<color=#FFD37E>Share It With a Friend:</color> «Get a Small Silver-tier Friend»",
             text
         );
+        Assert.DoesNotContain("<line-height=1.6em>«", text);
         // No dim meta brackets anymore — the game text carries the information.
         Assert.DoesNotContain("[", text);
     }
@@ -244,7 +248,7 @@ public sealed class CollectionEncounterGameTooltipTextTests
         var text = CollectionEncounterGameTooltipText.Build(option, result => $"«{result}»");
 
         Assert.Contains(
-            "<size=85%><color=#8F8268>Add It to Your Bushel: (if you have a Bushel) Your Bushel gains 20 Heal</color></size>",
+            "<size=85%><line-height=1.4em><color=#8F8268>Add It to Your Bushel: (if you have a Bushel) Your Bushel gains 20 Heal</color></size>",
             text
         );
         // No accent color and no keyword colorizer on the dimmed line.
@@ -327,7 +331,7 @@ public sealed class CollectionEncounterGameTooltipTextTests
         // Prerequisite-unmet groups render dimmed without a percentage; their own
         // text already carries the condition.
         Assert.Contains(
-            "<size=85%><color=#8F8268>· <indent=1em>Clear the Way: (if you have Powder Keg) Gain 5 Gold</indent></color></size>",
+            "<line-height=1.9em>\n<size=85%><line-height=1.4em><color=#8F8268>· <indent=1em>Clear the Way: (if you have Powder Keg) Gain 5 Gold</indent></color></size>",
             text
         );
     }

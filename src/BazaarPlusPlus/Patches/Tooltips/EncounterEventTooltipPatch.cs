@@ -51,7 +51,8 @@ internal static class EncounterEventTooltipPatch
                     __instance,
                     SectionKey,
                     __instance.passiveEffectParent,
-                    content!
+                    content!,
+                    BppTooltipSections.MarkupControlledStyle
                 )
             )
                 return;

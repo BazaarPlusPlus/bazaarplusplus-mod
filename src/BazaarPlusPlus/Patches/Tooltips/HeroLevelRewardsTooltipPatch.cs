@@ -76,7 +76,13 @@ internal static class HeroLevelRewardsTooltipPatch
             }
 
             var anchor = controller._heroLevelTooltipViewComponent?._parent;
-            var shown = BppTooltipSections.TryShow(controller, SectionKey, anchor, content);
+            var shown = BppTooltipSections.TryShow(
+                controller,
+                SectionKey,
+                anchor,
+                content,
+                BppTooltipSections.MarkupControlledStyle
+            );
             BppLog.Debug(
                 "LevelTooltip",
                 $"content={content.Length}ch anchor={(anchor == null ? "null" : anchor.name)} shown={shown}"
