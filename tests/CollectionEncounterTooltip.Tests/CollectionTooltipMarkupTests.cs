@@ -89,6 +89,31 @@ public sealed class CollectionTooltipMarkupTests
     }
 
     [Fact]
+    public void List_item_gap_uses_the_preceding_items_font_size()
+    {
+        var text = CollectionTooltipMarkup.Render(
+            new CollectionTooltipMarkup.Block[]
+            {
+                new CollectionTooltipMarkup.ListBlock(
+                    null,
+                    new[]
+                    {
+                        new CollectionTooltipMarkup.ListItem("Small", fontSizePercent: 85),
+                        new CollectionTooltipMarkup.ListItem("Full"),
+                    }
+                ),
+            }
+        );
+
+        Assert.Equal(
+            "<size=85%><line-height=1.4em>· <indent=1em>Small</indent>"
+                + "<line-height=1.9em>\n</size>"
+                + "<line-height=1.4em>· <indent=1em>Full</indent>",
+            text
+        );
+    }
+
+    [Fact]
     public void Native_colorizer_line_height_does_not_override_prose_rhythm()
     {
         Assert.Equal(

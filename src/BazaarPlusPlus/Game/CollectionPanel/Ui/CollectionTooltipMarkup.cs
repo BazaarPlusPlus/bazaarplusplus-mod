@@ -126,9 +126,9 @@ internal static class CollectionTooltipMarkup
         for (var index = 0; index < items.Count; index++)
         {
             var item = items[index];
-            OpenSize(builder, item.FontSizePercent);
-            if (hasLeadingContent || index > 0)
+            if (index == 0 && hasLeadingContent)
                 builder.Append(depth == 0 ? ListItemGap : NestedItemGap);
+            OpenSize(builder, item.FontSizePercent);
             builder.Append(ProseLine);
             if (!string.IsNullOrEmpty(item.Color))
                 builder.Append("<color=").Append(item.Color).Append(">");
@@ -139,6 +139,8 @@ internal static class CollectionTooltipMarkup
             AppendListItems(builder, item.Children, depth + 1, hasLeadingContent: true);
             if (!string.IsNullOrEmpty(item.Color))
                 builder.Append("</color>");
+            if (index + 1 < items.Count)
+                builder.Append(depth == 0 ? ListItemGap : NestedItemGap);
             CloseSize(builder, item.FontSizePercent);
         }
     }
