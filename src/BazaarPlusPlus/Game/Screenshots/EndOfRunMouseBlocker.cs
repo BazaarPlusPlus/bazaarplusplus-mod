@@ -28,9 +28,12 @@ internal sealed class EndOfRunMouseBlocker
             return;
 
         _owner = screenController;
-        _blockerCanvasObject?.SetActive(true);
-        _blockerObject?.SetActive(true);
-        _inputSink?.CaptureFocus();
+        if (_blockerCanvasObject != null)
+            _blockerCanvasObject.SetActive(true);
+        if (_blockerObject != null)
+            _blockerObject.SetActive(true);
+        if (_inputSink != null)
+            _inputSink.CaptureFocus();
         _isAttached = true;
     }
 
@@ -39,9 +42,12 @@ internal sealed class EndOfRunMouseBlocker
         if (!_isAttached)
             return;
 
-        _inputSink?.ReleaseFocus();
-        _blockerCanvasObject?.SetActive(false);
-        _blockerObject?.SetActive(false);
+        if (_inputSink != null)
+            _inputSink.ReleaseFocus();
+        if (_blockerCanvasObject != null)
+            _blockerCanvasObject.SetActive(false);
+        if (_blockerObject != null)
+            _blockerObject.SetActive(false);
         _isAttached = false;
         _owner = null;
     }
@@ -105,7 +111,8 @@ internal sealed class EndOfRunMouseBlocker
 
     private void DestroyBlocker()
     {
-        _inputSink?.ReleaseFocus();
+        if (_inputSink != null)
+            _inputSink.ReleaseFocus();
         if (_blockerCanvasObject != null)
             Object.Destroy(_blockerCanvasObject);
 

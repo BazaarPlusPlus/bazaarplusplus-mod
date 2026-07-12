@@ -868,6 +868,12 @@ var controllerSource = File.ReadAllText(
 var screenshotServiceSource = File.ReadAllText(
     Path.Combine(repositoryRoot, "src/BazaarPlusPlus/Game/Screenshots/ScreenshotService.cs")
 );
+var mouseBlockerSource = File.ReadAllText(
+    Path.Combine(repositoryRoot, "src/BazaarPlusPlus/Game/Screenshots/EndOfRunMouseBlocker.cs")
+);
+var inputCaptureSinkSource = File.ReadAllText(
+    Path.Combine(repositoryRoot, "src/BazaarPlusPlus/Game/Screenshots/EndOfRunInputCaptureSink.cs")
+);
 var onEnableSource = ExtractSourceSegment(
     controllerSource,
     "private void OnEnable()",
@@ -946,6 +952,27 @@ Assert(
     "The native end-of-run screen event should subscribe, arm the gate, and unsubscribe."
 );
 Assert(
+    !mouseBlockerSource.Contains("_inputSink?.", StringComparison.Ordinal)
+        && !mouseBlockerSource.Contains("_blockerCanvasObject?.", StringComparison.Ordinal)
+        && !mouseBlockerSource.Contains("_blockerObject?.", StringComparison.Ordinal),
+    "Retained Unity blocker objects must use Unity destroyed-object checks, not CLR null-conditional calls."
+);
+Assert(
+    ExtractSourceSegment(
+            inputCaptureSinkSource,
+            "public void CaptureFocus()",
+            "public void ReleaseFocus()"
+        )
+        .Contains("if (this == null)", StringComparison.Ordinal)
+        && ExtractSourceSegment(
+                inputCaptureSinkSource,
+                "public void ReleaseFocus()",
+                "public void OnPointerClick("
+            )
+            .Contains("if (this == null)", StringComparison.Ordinal),
+    "The input sink should tolerate calls after Unity destroys its native component."
+);
+Assert(
     updateSource.Contains("SyncEndOfRunCapture();", StringComparison.Ordinal)
         && syncCaptureSource.Contains("_gate.TryBeginAutomaticCapture(", StringComparison.Ordinal),
     "Update should route automatic capture through the reveal-aware gate."
@@ -997,13 +1024,13 @@ Assert(
     "Capture and metadata polling need hard deadlines, context guards, and late-file cleanup."
 );
 Assert(
-    shouldBlockSource.Contains("Time.time,", StringComparison.Ordinal)
-        && CountOccurrences(syncCaptureSource, "Time.time,") >= 2
+    shouldBlockSource.Contains("Time.unscaledTime,", StringComparison.Ordinal)
+        && CountOccurrences(syncCaptureSource, "Time.unscaledTime,") >= 2
         && captureFailureSource.Contains(
-            "Time.time + CaptureRetryCooldownSeconds",
+            "Time.unscaledTime + CaptureRetryCooldownSeconds",
             StringComparison.Ordinal
         ),
-    "Reveal fallback and retry clocks should use game time, matching the native reveal driver."
+    "Reveal fallback and retry deadlines should remain bounded even when native game time is paused."
 );
 Assert(
     !controllerSource.Contains("FirstCaptureDelaySeconds", StringComparison.Ordinal),
@@ -1044,6 +1071,12 @@ var revealPatchSource = File.ReadAllText(
         "src/BazaarPlusPlus/Patches/EndOfRun/EndOfRunSummaryRevealPatch.cs"
     )
 );
+var rawRevealCompletionPatchSource = File.ReadAllText(
+    Path.Combine(
+        repositoryRoot,
+        "src/BazaarPlusPlus/Patches/EndOfRun/EndOfRunRawRevealCompletionPatch.cs"
+    )
+);
 Assert(
     continuePatchSource.Contains(
         "[HarmonyPatch(typeof(EndOfRunScreenController), \"OnContinueClick\")]",
@@ -1066,6 +1099,22 @@ Assert(
         && ExtractSourceSegment(revealPatchSource, "private static void Prefix(", "    }")
             .Contains("NotifySummaryRevealStarted(__instance);", StringComparison.Ordinal),
     "DisplayCardsAsync should mark native display start through its Harmony prefix."
+);
+Assert(
+    rawRevealCompletionPatchSource.Contains(
+        "[HarmonyPatch(typeof(BaseCardRevealAnimationDriver), \"CreateRawGraph\")]",
+        StringComparison.Ordinal
+    )
+        && rawRevealCompletionPatchSource.Contains(
+            "ScriptPlayableOutput.Create(",
+            StringComparison.Ordinal
+        )
+        && rawRevealCompletionPatchSource.Contains("__result,", StringComparison.Ordinal)
+        && rawRevealCompletionPatchSource.Contains(
+            "completionOutput.SetSourcePlayable(root, 1);",
+            StringComparison.Ordinal
+        ),
+    "Raw end-of-run graphs need a ScriptPlayableOutput so DelayPlayableBehavior.ProcessFrame can mark roots done."
 );
 
 Console.WriteLine("End-of-run screenshot gate checks passed.");

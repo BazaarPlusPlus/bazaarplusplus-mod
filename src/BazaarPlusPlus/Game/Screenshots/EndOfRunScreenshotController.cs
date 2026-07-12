@@ -167,7 +167,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         return _gate.ShouldBlockContinue(
             readiness,
             isCaptureEnabled: true,
-            Time.time,
+            Time.unscaledTime,
             RevealFallbackTimeoutSeconds
         );
     }
@@ -200,7 +200,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             && _gate.TryBeginAutomaticCapture(
                 readiness,
                 isCaptureEnabled: true,
-                Time.time,
+                Time.unscaledTime,
                 RevealFallbackTimeoutSeconds
             )
         )
@@ -228,7 +228,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         var shouldBlock = _gate.ShouldBlockContinue(
             readiness,
             isCaptureEnabled: true,
-            Time.time,
+            Time.unscaledTime,
             RevealFallbackTimeoutSeconds
         );
         if (shouldBlock)
@@ -422,7 +422,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void HandleCaptureFailure(Exception? failure)
     {
-        var willRetry = _gate.AbortCaptureAttempt(Time.time + CaptureRetryCooldownSeconds);
+        var willRetry = _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
         var message = willRetry
             ? "End-of-run screenshot capture failed; one retry remains."
             : "End-of-run screenshot capture failed twice; releasing Continue without a screenshot.";
