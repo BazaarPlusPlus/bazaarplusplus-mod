@@ -14,6 +14,8 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? EnableCombatStatusBarConfig { get; }
 
+    ConfigEntry<bool>? EnableBilingualItemNamesConfig { get; }
+
     ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; }
 
     ConfigEntry<SubtitlePosition>? VoiceSubtitlesPositionConfig { get; }

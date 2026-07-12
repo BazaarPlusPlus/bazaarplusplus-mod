@@ -1,3 +1,4 @@
+using BazaarPlusPlus.Game.BilingualItemNames;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
@@ -5,6 +6,7 @@ using BazaarPlusPlus.Infrastructure.UiTokens;
 TestEmbeddedFontExtractionWritesResourceBytes();
 TestEmbeddedFontExtractionFailsForMissingResource();
 TestTmpFontPolicyDetectsCjkText();
+TestBilingualItemNamePresentation();
 TestStablePanelTextCompactionKeepsStableSlots();
 TestCollectionSortButtonWidthIsCompact();
 
@@ -87,6 +89,51 @@ static void TestTmpFontPolicyDetectsCjkText()
     Assert(
         !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont("㐀"),
         "TMP font policy should leave Extension A characters on the existing TMP fallback chain."
+    );
+}
+
+static void TestBilingualItemNamePresentation()
+{
+    Assert(
+        BilingualItemNamePresentation.TryBuild(
+            "Lighter",
+            "打火机",
+            enabled: true,
+            isSupportedCard: true,
+            alignEnglishSubtitle: false
+        ) == "Lighter\n<size=42%><voffset=-7px><noparse>打火机</noparse></voffset></size>",
+        "Enabled item tooltips should append a 42%-sized Chinese title with a 7px offset."
+    );
+    Assert(
+        BilingualItemNamePresentation.TryBuild(
+            "Lighter",
+            "打火机",
+            enabled: false,
+            isSupportedCard: true,
+            alignEnglishSubtitle: false
+        ) == null,
+        "Disabled bilingual names should preserve the native title."
+    );
+    Assert(
+        BilingualItemNamePresentation.TryBuild(
+            "Lighter",
+            "打火机",
+            enabled: true,
+            isSupportedCard: false,
+            alignEnglishSubtitle: false
+        ) == null,
+        "Skill and encounter tooltips should not receive item subtitles."
+    );
+    Assert(
+        BilingualItemNamePresentation.TryBuild(
+            "打火机",
+            "Lighter",
+            enabled: true,
+            isSupportedCard: true,
+            alignEnglishSubtitle: true
+        )
+            == "打火机\n<size=42%><voffset=-7px><space=2px><noparse>Lighter</noparse></voffset></size>",
+        "Chinese clients should append the authored English title."
     );
 }
 

@@ -1132,6 +1132,37 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Bilingual_item_names_use_the_games_native_chinese_serif_fallback()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var patchSource = File.ReadAllText(
+            Path.Combine(mainSource, "Patches", "Tooltips", "BilingualItemNamePatch.cs")
+        );
+        var providerSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Localization", "NativeChineseFontFallback.cs")
+        );
+
+        Assert.Contains("NativeChineseFontFallback.TryInstall", patchSource);
+        Assert.Contains("&& !NativeChineseFontFallback.TryInstall", patchSource);
+        Assert.Contains("ECardType.Item", patchSource);
+        Assert.Contains("ECardType.EventEncounter", patchSource);
+        Assert.Contains("NotoFontFallbackRuntime", providerSource);
+        Assert.Contains("NotoSerifFallbacksOrdered", providerSource);
+        Assert.Contains("Object.Instantiate(primary)", providerSource);
+        Assert.Contains("text.font = clone", providerSource);
+        Assert.Contains("binding.Text != null", providerSource);
+        Assert.Contains("Object.DestroyImmediate(binding.Clone)", providerSource);
+        Assert.Contains("AsyncOperationHandle<TMP_FontAsset> handle = default", providerSource);
+        Assert.Contains("Handles.Add(handle);\n                handle = default;", providerSource);
+        Assert.Contains("TryRelease(handle)", providerSource);
+        Assert.Contains("Addressables.Release(handle)", providerSource);
+        Assert.Contains("finally", providerSource);
+        Assert.DoesNotContain("CreateDynamicFontFromOSFont", providerSource);
+        Assert.DoesNotContain("PingFang", providerSource);
+        Assert.DoesNotContain("Microsoft YaHei", providerSource);
+    }
+
+    [Fact]
     public void RandomHeroSkinPool_has_no_legacy_playerprefs_migration()
     {
         var repoRoot = RepoRoot();

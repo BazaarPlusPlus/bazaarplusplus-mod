@@ -20,6 +20,10 @@
       Include="../../src/BazaarPlusPlus/Infrastructure/StablePanelText.cs"
       Link="StablePanelText.cs"
     />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/BilingualItemNames/BilingualItemNamePresentation.cs"
+      Link="BilingualItemNamePresentation.cs"
+    />
     <Compile Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/Sizes.cs" Link="Sizes.cs" />
     <Compile Include="Program.cs" />
     <EmbeddedResource Include="Resources/embedded-font-test.txt" />

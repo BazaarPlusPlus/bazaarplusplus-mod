@@ -3,6 +3,7 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.BilingualItemNames;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.Game.HistoryPanel;
@@ -996,6 +997,14 @@ public class SettingsDockRegistryTests
         "false>true>false"
     )]
     [InlineData(
+        "BilingualItemNames",
+        BppSettingsDockOrder.BilingualItemNames,
+        "Bilingual Names",
+        "双语名称",
+        "OFF>ON>OFF",
+        "false>true>false"
+    )]
+    [InlineData(
         "ChineseLocaleMode",
         BppSettingsDockOrder.ChineseLocaleMode,
         "Chinese Locale",
@@ -1153,6 +1162,7 @@ public class SettingsDockRegistryTests
             "EnchantPreview" => ItemEnchantPreviewSettingsDockEntry.Create(),
             "EventPreview" => EventPreviewSettingsDockEntry.Create(),
             "CombatStatusBar" => CombatStatusBarSettingsDockEntry.Create(),
+            "BilingualItemNames" => BilingualItemNamesSettingsDockEntry.Create(),
             "ChineseLocaleMode" => ChineseLocaleModeSettingsDockEntry.Create(
                 new InMemoryBppEventBus()
             ),

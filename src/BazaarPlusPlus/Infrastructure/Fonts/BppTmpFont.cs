@@ -14,7 +14,6 @@ internal static class BppTmpFont
     private const int SamplingPointSize = 90;
     private const int AtlasPadding = 9;
     private const int AtlasSize = 2048;
-
     private static TMP_FontAsset? _default;
     private static bool _loadFailureLogged;
     private static readonly ConditionalWeakTable<TMP_Text, FontSnapshot> OriginalFonts = new();

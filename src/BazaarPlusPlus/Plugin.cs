@@ -13,6 +13,7 @@ using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.Localization;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Localization;
@@ -174,6 +175,8 @@ public class Plugin : BaseUnityPlugin
         BppSettingsDockCatalog.Reset();
         BPPSupporterCatalog.Reset();
         BppHotkeyService.Reset();
+        ChineseTranslationCatalog.Reset();
+        NativeChineseFontFallback.Reset();
     }
 
     private void BuildOnlineServices()

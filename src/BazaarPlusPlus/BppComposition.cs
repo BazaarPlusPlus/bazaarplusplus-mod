@@ -4,6 +4,7 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.BilingualItemNames;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
@@ -119,6 +120,7 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(ChineseLocaleModeSettingsDockEntry.Create(_eventBus));
         _settingsDockRegistry.Register(UiFontSettingsDockEntry.Create());
         _settingsDockRegistry.Register(CombatStatusBarSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(BilingualItemNamesSettingsDockEntry.Create());
         _settingsDockRegistry.Register(new EndOfRunScreenshotSettingsDockEntry());
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(ItemEnchantPreviewSettingsDockEntry.Create());
