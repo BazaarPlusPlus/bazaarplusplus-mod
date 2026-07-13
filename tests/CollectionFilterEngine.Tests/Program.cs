@@ -1,5 +1,6 @@
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
+using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Tooltips;
@@ -1500,110 +1501,197 @@ AssertFalse(
     "Common-scoped multi-hero skills are not general-shared."
 );
 
+var debugTemplateClassification = CollectionCardClassifier.Classify(
+    ECardType.Item,
+    ESpawnEligibility.Always,
+    "Assets/Cards/Debug.png",
+    "[DEBUG] Item"
+);
 AssertFalse(
-    CollectionCardClassifier
-        .Classify(ECardType.Item, "Assets/Cards/Debug.png", "[DEBUG] Item")
-        .IsCatalogCard,
+    debugTemplateClassification.IsCatalogCard,
     "Debug-marked templates do not enter the catalog even when they have art."
 );
 AssertEqual(
     CollectionCardEligibilityReason.DebugTemplate,
-    CollectionCardClassifier
-        .Classify(ECardType.Item, "Assets/Cards/Debug.png", "[DEBUG] Item")
-        .EligibilityReason,
+    debugTemplateClassification.EligibilityReason,
     "Debug-marked templates should report a reasoned rejection."
 );
+var templateNameClassification = CollectionCardClassifier.Classify(
+    ECardType.Item,
+    ESpawnEligibility.Always,
+    "Assets/Cards/Template.png",
+    "[TEMPLATE] Item"
+);
 AssertFalse(
-    CollectionCardClassifier
-        .Classify(ECardType.Item, "Assets/Cards/Template.png", "[TEMPLATE] Item")
-        .IsCatalogCard,
+    templateNameClassification.IsCatalogCard,
     "Template-marked entries do not enter the catalog even when they have art."
 );
 AssertEqual(
     CollectionCardEligibilityReason.TemplateInternalName,
-    CollectionCardClassifier
-        .Classify(ECardType.Item, "Assets/Cards/Template.png", "[TEMPLATE] Item")
-        .EligibilityReason,
+    templateNameClassification.EligibilityReason,
     "Template-marked entries should report a reasoned rejection."
 );
+var acceptedSkillClassification = CollectionCardClassifier.Classify(
+    ECardType.Skill,
+    ESpawnEligibility.Always,
+    "Assets/Cards/Skill.png",
+    "Real Skill"
+);
 AssertTrue(
-    CollectionCardClassifier
-        .Classify(ECardType.Skill, "Assets/Cards/Skill.png", "Real Skill")
-        .IsCatalogCard,
+    acceptedSkillClassification.IsCatalogCard,
     "Normal Item/Skill cards with art are catalog cards."
 );
 AssertEqual(
     CollectionCardEligibilityReason.Accepted,
-    CollectionCardClassifier
-        .Classify(ECardType.Skill, "Assets/Cards/Skill.png", "Real Skill")
-        .EligibilityReason,
+    acceptedSkillClassification.EligibilityReason,
     "Accepted catalog cards should report the accepted reason."
 );
+var placeholderSkillClassification = CollectionCardClassifier.Classify(
+    ECardType.Skill,
+    ESpawnEligibility.Always,
+    "Icon_Skill_Placeholder.png",
+    "Aggressive Mutations"
+);
 AssertFalse(
-    CollectionCardClassifier
-        .Classify(ECardType.Skill, "Icon_Skill_Placeholder.png", "Aggressive Mutations")
-        .IsCatalogCard,
+    placeholderSkillClassification.IsCatalogCard,
     "Placeholder skill art is not a catalog-ready skill."
 );
 AssertEqual(
     CollectionCardEligibilityReason.PlaceholderArtKey,
-    CollectionCardClassifier
-        .Classify(ECardType.Skill, "Icon_Skill_Placeholder.png", "Aggressive Mutations")
-        .EligibilityReason,
+    placeholderSkillClassification.EligibilityReason,
     "Placeholder art should report a reasoned rejection."
 );
 AssertFalse(
     CollectionCardClassifier
-        .Classify(ECardType.Skill, "Placeholder", "[SKILL TEMPLATE]")
+        .Classify(ECardType.Skill, ESpawnEligibility.Always, "Placeholder", "[SKILL TEMPLATE]")
         .IsCatalogCard,
     "Skill template placeholders do not enter the catalog."
 );
+var materialArtClassification = CollectionCardClassifier.Classify(
+    ECardType.Item,
+    ESpawnEligibility.Always,
+    "Assets/Cards/LegacyItem.mat",
+    "Legacy Material Item"
+);
 AssertFalse(
-    CollectionCardClassifier
-        .Classify(ECardType.Item, "Assets/Cards/LegacyItem.mat", "Legacy Material Item")
-        .IsCatalogCard,
+    materialArtClassification.IsCatalogCard,
     "Legacy material art keys do not enter the catalog."
 );
 AssertEqual(
     CollectionCardEligibilityReason.MaterialArtKey,
-    CollectionCardClassifier
-        .Classify(ECardType.Item, "Assets/Cards/LegacyItem.mat", "Legacy Material Item")
-        .EligibilityReason,
+    materialArtClassification.EligibilityReason,
     "Material art keys should report a reasoned rejection."
 );
 AssertFalse(
     CollectionCardClassifier
-        .Classify(ECardType.Item, "Assets/Cards/Template.png", "[SMALL ITEM TEMPLATE]")
+        .Classify(
+            ECardType.Item,
+            ESpawnEligibility.Always,
+            "Assets/Cards/Template.png",
+            "[SMALL ITEM TEMPLATE]"
+        )
         .IsCatalogCard,
     "Bracketed item template names do not enter the catalog."
 );
 AssertEqual(
     CollectionCardEligibilityReason.InvalidArtKey,
-    CollectionCardClassifier.Classify(ECardType.Item, "Invalid", "Real Item").EligibilityReason,
+    CollectionCardClassifier
+        .Classify(ECardType.Item, ESpawnEligibility.Always, "Invalid", "Real Item")
+        .EligibilityReason,
     "The literal Invalid art key should report a reasoned rejection."
 );
 AssertEqual(
     CollectionCardEligibilityReason.MissingArtKey,
-    CollectionCardClassifier.Classify(ECardType.Item, "", "Real Item").EligibilityReason,
+    CollectionCardClassifier
+        .Classify(ECardType.Item, ESpawnEligibility.Always, "", "Real Item")
+        .EligibilityReason,
     "A missing art key should report a reasoned rejection."
 );
 AssertEqual(
     CollectionCardEligibilityReason.UnsupportedType,
     CollectionCardClassifier
-        .Classify((ECardType)999, "Assets/Cards/Event.png", "Event")
+        .Classify((ECardType)999, ESpawnEligibility.Always, "Assets/Cards/Event.png", "Event")
         .EligibilityReason,
     "Unsupported card types should report a reasoned rejection."
 );
+var catalogEligibilityCases = new[]
+{
+    (
+        Name: "Item Always",
+        Template: CatalogTemplate(ECardType.Item, ESpawnEligibility.Always),
+        ExpectedCatalogCard: true,
+        ExpectedReason: CollectionCardEligibilityReason.Accepted
+    ),
+    (
+        Name: "Skill Always",
+        Template: CatalogTemplate(ECardType.Skill, ESpawnEligibility.Always),
+        ExpectedCatalogCard: true,
+        ExpectedReason: CollectionCardEligibilityReason.Accepted
+    ),
+    (
+        Name: "Item GuidOnly",
+        Template: CatalogTemplate(ECardType.Item, ESpawnEligibility.GuidOnly),
+        ExpectedCatalogCard: true,
+        ExpectedReason: CollectionCardEligibilityReason.Accepted
+    ),
+    (
+        Name: "Skill GuidOnly",
+        Template: CatalogTemplate(ECardType.Skill, ESpawnEligibility.GuidOnly),
+        ExpectedCatalogCard: true,
+        ExpectedReason: CollectionCardEligibilityReason.Accepted
+    ),
+    (
+        Name: "Item Never",
+        Template: CatalogTemplate(ECardType.Item, ESpawnEligibility.Never),
+        ExpectedCatalogCard: false,
+        ExpectedReason: CollectionCardEligibilityReason.NeverSpawnEligibility
+    ),
+    (
+        Name: "Skill Never",
+        Template: CatalogTemplate(ECardType.Skill, ESpawnEligibility.Never),
+        ExpectedCatalogCard: false,
+        ExpectedReason: CollectionCardEligibilityReason.NeverSpawnEligibility
+    ),
+};
+foreach (var testCase in catalogEligibilityCases)
+{
+    var classification = CollectionCardClassifier.Classify(testCase.Template);
+    AssertEqual(
+        testCase.ExpectedCatalogCard,
+        classification.IsCatalogCard,
+        $"{testCase.Name} should have the expected catalog eligibility."
+    );
+    AssertEqual(
+        testCase.ExpectedReason,
+        classification.EligibilityReason,
+        $"{testCase.Name} should report the expected catalog eligibility reason."
+    );
+}
 var hiddenTagPackageTemplate = new TCardItem
 {
+    Id = Guid.NewGuid(),
     Type = ECardType.Item,
+    SpawningEligibility = ESpawnEligibility.GuidOnly,
     ArtKey = "Assets/Cards/Bundle.png",
     InternalName = "Vanessa Starter Bundle",
     HiddenTags = new HashSet<EHiddenTag> { EHiddenTag.Package },
 };
+var hiddenTagPackageClassification = CollectionCardClassifier.Classify(hiddenTagPackageTemplate);
 AssertTrue(
-    CollectionCardClassifier.Classify(hiddenTagPackageTemplate).IsPackage,
+    hiddenTagPackageClassification.IsCatalogCard,
+    "GuidOnly package templates remain eligible for the catalog classifier."
+);
+AssertTrue(
+    hiddenTagPackageClassification.IsPackage,
     "HiddenTag.Package marks package templates as hidden from CollectionPanel."
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { CollectionCardVm.From(hiddenTagPackageTemplate, hiddenTagPackageClassification) },
+        new CollectionFilterState()
+    ),
+    Array.Empty<Guid>(),
+    "GuidOnly package templates remain hidden by the existing package visibility rule."
 );
 var packageNameWithoutTagTemplate = new TCardItem
 {
@@ -1938,6 +2026,26 @@ AssertSequence(
 );
 
 Console.WriteLine("CollectionFilterEngine checks passed.");
+
+static TCardBase CatalogTemplate(ECardType type, ESpawnEligibility spawningEligibility) =>
+    type switch
+    {
+        ECardType.Item => new TCardItem
+        {
+            Type = ECardType.Item,
+            SpawningEligibility = spawningEligibility,
+            ArtKey = "Assets/Cards/CatalogItem.png",
+            InternalName = "Catalog Item",
+        },
+        ECardType.Skill => new TCardSkill
+        {
+            Type = ECardType.Skill,
+            SpawningEligibility = spawningEligibility,
+            ArtKey = "Assets/Cards/CatalogSkill.png",
+            InternalName = "Catalog Skill",
+        },
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
+    };
 
 static CollectionCardVm Card(
     string name,
