@@ -14,6 +14,7 @@ public static class ItemEnchantPreviewFormatting
 {
     private const int PrefixSizePercent = 60;
     private const int EffectSizePercent = 55;
+    private const string NativeLineHeight = "<line-height=1.6em>";
     private const string WrappedLineHeight = "<line-height=1.9em>";
     private const string EntryBreakLineHeight = "<line-height=2.1em>";
     private const string LineHeightEnd = "</line-height>";
@@ -21,10 +22,6 @@ public static class ItemEnchantPreviewFormatting
 
     private static readonly Regex SizeTagRegex = new Regex(
         "<size=(\\d+)%>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant
-    );
-    private static readonly Regex NativeLineHeightRegex = new Regex(
-        "<line-height=1\\.6em>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant
     );
 
@@ -35,7 +32,7 @@ public static class ItemEnchantPreviewFormatting
     {
         var enchantmentLabel = GetEnchantmentLabel(enchantmentType);
         var colorHex = GetEnchantmentColorHex(enchantmentType);
-        var normalizedText = NativeLineHeightRegex.Replace(renderedText, WrappedLineHeight);
+        var normalizedText = renderedText.Replace(NativeLineHeight, WrappedLineHeight);
         var scaledText = ScaleInlineSizes(normalizedText, EffectSizePercent / 100f);
 
         return new TooltipSegment(
