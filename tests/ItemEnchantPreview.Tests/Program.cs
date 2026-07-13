@@ -163,8 +163,7 @@ Assert(
 
 var segment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "Freeze for 2 seconds",
-    "en-US"
+    "Freeze for 2 seconds"
 );
 
 Assert(
@@ -178,8 +177,7 @@ Assert(
 
 var cjkSegment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "<line-height=1.6em>冰冷时获得护盾</line-height>",
-    "zh-CN"
+    "<line-height=1.6em>冰冷时获得护盾</line-height>"
 );
 
 Assert(
@@ -190,8 +188,7 @@ Assert(
 
 var englishLineHeightSegment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "<line-height=1.6em>Freeze for 2 seconds</line-height>",
-    "en-US"
+    "<line-height=1.6em>Freeze for 2 seconds</line-height>"
 );
 
 Assert(
@@ -202,14 +199,13 @@ Assert(
 
 var germanLineHeightSegment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "<line-height=1.6em>Für 2 Sekunden einfrieren</line-height>",
-    "de-DE"
+    "<line-height=1.6em>Für 2 Sekunden einfrieren</line-height>"
 );
 
 Assert(
-    germanLineHeightSegment.Text.Contains("<line-height=1.6em>")
-        && !germanLineHeightSegment.Text.Contains("<line-height=2.1em>"),
-    "Non-English Latin enchant preview text should preserve the game's native line height."
+    germanLineHeightSegment.Text.Contains("<line-height=2.1em>")
+        && !germanLineHeightSegment.Text.Contains("<line-height=1.6em>"),
+    "All enchant preview text should use the same readable wrapped-line height."
 );
 
 var sectionText = ItemEnchantPreviewFormatting.BuildSectionText(

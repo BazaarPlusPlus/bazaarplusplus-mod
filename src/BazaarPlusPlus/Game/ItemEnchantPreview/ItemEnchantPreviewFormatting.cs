@@ -6,7 +6,6 @@ using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
-using BazaarPlusPlus.Localization;
 using TheBazaar.Tooltips;
 using TheBazaar.Utilities;
 
@@ -33,21 +32,12 @@ public static class ItemEnchantPreviewFormatting
     public static TooltipSegment CreateSegment(
         EEnchantmentType enchantmentType,
         string renderedText
-    ) => CreateSegment(enchantmentType, renderedText, L.CurrentLanguageCode);
-
-    internal static TooltipSegment CreateSegment(
-        EEnchantmentType enchantmentType,
-        string renderedText,
-        string languageCode
     )
     {
         var enchantmentLabel = GetEnchantmentLabel(enchantmentType);
         var colorHex = GetEnchantmentColorHex(enchantmentType);
         var usesCjkFont = BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(renderedText);
-        var normalizedText =
-            usesCjkFont || LanguageCodeMatcher.IsEnglish(languageCode)
-                ? NativeLineHeightRegex.Replace(renderedText, PreviewLineHeight)
-                : renderedText;
+        var normalizedText = NativeLineHeightRegex.Replace(renderedText, PreviewLineHeight);
         var scaledText = ScaleInlineSizes(normalizedText, EffectSizePercent / 100f);
         var lineHeightStart = usesCjkFont ? PreviewLineHeight : string.Empty;
         var lineHeightEnd = usesCjkFont ? PreviewLineHeightEnd : string.Empty;
