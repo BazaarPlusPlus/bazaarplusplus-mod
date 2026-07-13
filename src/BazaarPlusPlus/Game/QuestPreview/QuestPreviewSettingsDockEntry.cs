@@ -2,14 +2,17 @@
 using System;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Settings;
-using BazaarPlusPlus.Patches.Tooltips;
 
 namespace BazaarPlusPlus.Game.QuestPreview;
 
 internal static class QuestPreviewSettingsDockEntry
 {
-    internal static CyclingSettingsDockEntry<bool> Create(Action? clearPooledTooltips = null) =>
-        CyclingSettingsDockEntry<bool>.Toggle(
+    internal static CyclingSettingsDockEntry<bool> Create(Action clearPooledTooltips)
+    {
+        if (clearPooledTooltips == null)
+            throw new ArgumentNullException(nameof(clearPooledTooltips));
+
+        return CyclingSettingsDockEntry<bool>.Toggle(
             BppSettingsDockOrder.QuestPreview,
             "QuestPreview",
             QuestPreviewSettingsMenuLabel.Resolve,
@@ -25,10 +28,8 @@ internal static class QuestPreviewSettingsDockEntry
                 if (enabled)
                     return;
 
-                if (clearPooledTooltips != null)
-                    clearPooledTooltips();
-                else
-                    QuestPreviewPooledTooltipCleanup.Clear();
+                clearPooledTooltips();
             }
         );
+    }
 }

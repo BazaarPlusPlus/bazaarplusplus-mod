@@ -1938,8 +1938,16 @@ public class CoreLayeringTests
         var aggregateSource = File.ReadAllText(
             Path.Combine(tooltipPatches, "AggregateItemMissingTypesTooltipPatch.cs")
         );
-        var cleanupSource = File.ReadAllText(
-            Path.Combine(tooltipPatches, "QuestPreviewPooledTooltipCleanup.cs")
+        var questSettingsSource = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "QuestPreview",
+                "QuestPreviewSettingsDockEntry.cs"
+            )
+        );
+        var compositionSource = File.ReadAllText(
+            Path.Combine(MainSourceRoot(RepoRoot()), "BppComposition.cs")
         );
 
         Assert.Contains("QuestPreviewGate.IsEnabled()", questRewardSource);
@@ -1947,10 +1955,14 @@ public class CoreLayeringTests
         Assert.Contains("descriptionText.text = presentation.NativeText", questRewardSource);
         Assert.Contains("RestoreNativeTextLayoutCore(descriptionText)", questRewardSource);
         Assert.Contains("BppTooltipSections.HideAll(SectionKey)", aggregateSource);
-        Assert.Contains("QuestRewardPreviewTooltipPatch.ClearPooledPresentation()", cleanupSource);
+        Assert.DoesNotContain("BazaarPlusPlus.Patches", questSettingsSource);
+        Assert.Contains(
+            "QuestRewardPreviewTooltipPatch.ClearPooledPresentation()",
+            compositionSource
+        );
         Assert.Contains(
             "AggregateItemMissingTypesTooltipPatch.ClearPooledPresentation()",
-            cleanupSource
+            compositionSource
         );
     }
 

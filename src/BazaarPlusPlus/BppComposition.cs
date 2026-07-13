@@ -34,6 +34,7 @@ using BazaarPlusPlus.GameInterop.RunSnapshot;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
 using BazaarPlusPlus.ModApi.Clients;
+using BazaarPlusPlus.Patches.Tooltips;
 using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -125,7 +126,13 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(ItemEnchantPreviewSettingsDockEntry.Create());
         _settingsDockRegistry.Register(EventPreviewSettingsDockEntry.Create());
-        _settingsDockRegistry.Register(QuestPreviewSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(
+            QuestPreviewSettingsDockEntry.Create(() =>
+            {
+                QuestRewardPreviewTooltipPatch.ClearPooledPresentation();
+                AggregateItemMissingTypesTooltipPatch.ClearPooledPresentation();
+            })
+        );
         _settingsDockRegistry.Register(LegendaryPositionSettingsDockEntry.Create());
         _settingsDockRegistry.Register(NameOverrideSettingsDockEntry.Create());
 

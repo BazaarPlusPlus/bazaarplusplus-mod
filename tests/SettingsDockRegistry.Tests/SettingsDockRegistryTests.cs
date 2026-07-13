@@ -345,7 +345,7 @@ public class SettingsDockRegistryTests
             var configFile = new ConfigFile(configPath, saveOnInit: false);
             var config = new BppConfig();
             config.Initialize(configFile);
-            var questDefinition = QuestPreviewSettingsDockEntry.Create().Build(config);
+            var questDefinition = QuestPreviewSettingsDockEntry.Create(() => { }).Build(config);
             var eventDefinition = EventPreviewSettingsDockEntry.Create().Build(config);
 
             Assert.False(questDefinition.ReadToggle!());
@@ -361,7 +361,9 @@ public class SettingsDockRegistryTests
             Assert.True(reloaded.EnableEventPreviewConfig!.Value);
 
             var reloadedEventDefinition = EventPreviewSettingsDockEntry.Create().Build(reloaded);
-            var reloadedQuestDefinition = QuestPreviewSettingsDockEntry.Create().Build(reloaded);
+            var reloadedQuestDefinition = QuestPreviewSettingsDockEntry
+                .Create(() => { })
+                .Build(reloaded);
             reloadedEventDefinition.WriteToggle!(false);
             Assert.True(reloadedQuestDefinition.ReadToggle!());
 
@@ -1299,7 +1301,7 @@ public class SettingsDockRegistryTests
             "LegendaryPositionDisplay" => LegendaryPositionSettingsDockEntry.Create(() => { }),
             "EnchantPreview" => ItemEnchantPreviewSettingsDockEntry.Create(),
             "EventPreview" => EventPreviewSettingsDockEntry.Create(),
-            "QuestPreview" => QuestPreviewSettingsDockEntry.Create(),
+            "QuestPreview" => QuestPreviewSettingsDockEntry.Create(() => { }),
             "CombatStatusBar" => CombatStatusBarSettingsDockEntry.Create(),
             "BilingualItemNames" => BilingualItemNamesSettingsDockEntry.Create(),
             "ChineseLocaleMode" => ChineseLocaleModeSettingsDockEntry.Create(
