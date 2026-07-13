@@ -323,6 +323,7 @@ public sealed class VoiceObserverLoggingTests
 
         public void Dispose()
         {
+            BppLog.Flush();
             _source.LogEvent -= OnLogEvent;
             _source.Dispose();
         }

@@ -163,6 +163,7 @@ public sealed class VoiceSubtitlesEventCatalogTests
 
         public void Dispose()
         {
+            BppLog.Flush();
             _source.LogEvent -= OnLogEvent;
             _source.Dispose();
         }

@@ -13,6 +13,8 @@ internal static class RunBundleClientTests
     public static void Run()
     {
         UploadsRunBundleAsMultipart().GetAwaiter().GetResult();
+        ClassifiesPermanentClientFailures().GetAwaiter().GetResult();
+        KeepsRetryableFailuresTransient().GetAwaiter().GetResult();
         Console.WriteLine("RunBundleClientTests passed.");
     }
 
@@ -71,6 +73,56 @@ internal static class RunBundleClientTests
         );
     }
 
+    private static async Task ClassifiesPermanentClientFailures()
+    {
+        var result = await UploadWithResponse(
+            HttpStatusCode.Conflict,
+            "{\"error\":\"run_bundle_conflict\"}"
+        );
+
+        Assert(!result.Succeeded, "A 409 run bundle conflict must not succeed.");
+        Assert(result.Permanent, "A 409 run bundle conflict must be terminal, not retryable.");
+        Assert(
+            result.Error == "http_409:run_bundle_conflict",
+            "The structured conflict reason should be retained for local diagnostics."
+        );
+    }
+
+    private static async Task KeepsRetryableFailuresTransient()
+    {
+        foreach (
+            var status in new[]
+            {
+                HttpStatusCode.RequestTimeout,
+                (HttpStatusCode)429,
+                HttpStatusCode.InternalServerError,
+            }
+        )
+        {
+            var result = await UploadWithResponse(status, "{\"error\":\"temporary\"}");
+            Assert(!result.Succeeded, $"HTTP {(int)status} must not succeed.");
+            Assert(!result.Permanent, $"HTTP {(int)status} must remain retryable.");
+        }
+    }
+
+    private static async Task<RunBundleUploadResult> UploadWithResponse(
+        HttpStatusCode status,
+        string responseBody
+    )
+    {
+        using var client = new HttpClient(new FixedResponseHandler(status, responseBody));
+        var routes = ModApiRoutes.TryCreate("https://example.invalid")!;
+        return await new RunBundleClient(client, routes).UploadRunBundleAsync(
+            new RunBundleUploadRequest
+            {
+                PlayerAccountId = "acct-1",
+                RunProjection = new RunProjection { RunId = "run-1" },
+            },
+            [1],
+            CancellationToken.None
+        );
+    }
+
     private static void Assert(bool condition, string message)
     {
         if (!condition)
@@ -100,5 +152,25 @@ internal static class RunBundleClientTests
                 }
             );
         }
+    }
+
+    private sealed class FixedResponseHandler : HttpMessageHandler
+    {
+        private readonly HttpStatusCode _status;
+        private readonly string _responseBody;
+
+        internal FixedResponseHandler(HttpStatusCode status, string responseBody)
+        {
+            _status = status;
+            _responseBody = responseBody;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken
+        ) =>
+            Task.FromResult(
+                new HttpResponseMessage(_status) { Content = new StringContent(_responseBody) }
+            );
     }
 }

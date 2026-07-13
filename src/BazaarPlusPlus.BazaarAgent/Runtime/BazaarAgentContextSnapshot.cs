@@ -27,9 +27,16 @@ public sealed class BazaarAgentContextSnapshotPublisher
 
     public BazaarAgentContextSnapshot? Current => Volatile.Read(ref _current);
 
-    public BazaarAgentContextSnapshot Publish(BazaarAgentContext candidate)
+    public BazaarAgentContextSnapshot Publish(BazaarAgentContext candidate) =>
+        Publish(candidate, out _);
+
+    public BazaarAgentContextSnapshot Publish(
+        BazaarAgentContext candidate,
+        out bool isFirstSnapshot
+    )
     {
         var current = _current;
+        isFirstSnapshot = current is null;
         if (current is not null && EqualsIgnoreTimeAndTick(current.Context, candidate))
         {
             return current;

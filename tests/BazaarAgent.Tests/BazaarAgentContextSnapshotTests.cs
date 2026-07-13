@@ -32,6 +32,18 @@ public class BazaarAgentContextSnapshotTests
     }
 
     [Fact]
+    public void Publish_IdenticalContent_ReportsOnlyFirstPublication()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+
+        pub.Publish(MakeChoice(serverTime: "t1"), out var firstPublication);
+        pub.Publish(MakeChoice(serverTime: "t2"), out var repeatedPublication);
+
+        Assert.True(firstPublication);
+        Assert.False(repeatedPublication);
+    }
+
+    [Fact]
     public void Publish_DifferentPlayerGold_BumpsTickId()
     {
         var pub = new BazaarAgentContextSnapshotPublisher();

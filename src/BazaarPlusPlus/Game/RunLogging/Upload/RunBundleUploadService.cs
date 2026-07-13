@@ -114,11 +114,11 @@ internal sealed class RunBundleUploadService : IDisposable
                 );
                 if (!result.Succeeded)
                 {
-                    _store.MarkRunUploadFailed(
-                        runId,
-                        attemptedAtUtc,
-                        result.Error ?? "run_bundle_upload_failed"
-                    );
+                    var error = result.Error ?? "run_bundle_upload_failed";
+                    if (result.Permanent)
+                        _store.MarkRunUploadPermanentlyFailed(runId, attemptedAtUtc, error);
+                    else
+                        _store.MarkRunUploadFailed(runId, attemptedAtUtc, error);
                     observations.Add(
                         UploadAttemptObservation.Degraded(
                             runId,
@@ -193,6 +193,7 @@ internal interface IRunBundleUploadStore
     IReadOnlyList<string> GetPendingCompletedRunIds(int limit);
     RunBundleBuildResult BuildRunBundleSnapshot(string runId, string playerAccountId);
     void MarkRunUploadFailed(string runId, DateTimeOffset attemptedAtUtc, string error);
+    void MarkRunUploadPermanentlyFailed(string runId, DateTimeOffset attemptedAtUtc, string error);
     void MarkRunUploaded(
         string runId,
         long uploadedSeq,

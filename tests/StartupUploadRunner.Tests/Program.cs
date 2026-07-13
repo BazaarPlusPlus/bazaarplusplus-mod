@@ -39,6 +39,7 @@ SynchronousThrowEntersDegradedState();
 ShutdownDrainAndCleanupRemainBounded();
 DetailedPayloadOutcomeAndFailureGateAreStable();
 await HttpBackedRunBundleFailuresAndRecoveryStayPrivate();
+await PermanentRunBundleFailureStopsRetrying();
 
 Console.WriteLine("Startup upload runner tests passed.");
 return;
@@ -410,6 +411,31 @@ static async Task HttpBackedRunBundleFailuresAndRecoveryStayPrivate()
     Assert(!capture.Contains("private-token"), "Response credentials must remain private.");
 }
 
+static async Task PermanentRunBundleFailureStopsRetrying()
+{
+    using var httpClient = new HttpClient(
+        new SequenceHttpHandler(
+            HttpStatusCode.Conflict,
+            HttpStatusCode.Conflict,
+            HttpStatusCode.Conflict,
+            HttpStatusCode.Conflict,
+            "{\"error\":\"run_bundle_conflict\"}"
+        )
+    );
+    var routes = ModApiRoutes.TryCreate("https://example.test")!;
+    var store = new FakeRunBundleUploadStore();
+    using var service = new RunBundleUploadService(store, routes, httpClient, () => "account-id");
+
+    await service.UploadPendingRunBundlesAsync(CancellationToken.None);
+    await service.UploadPendingRunBundlesAsync(CancellationToken.None);
+
+    Assert(
+        store.PermanentFailureCount == 1,
+        "A permanent HTTP rejection should be recorded exactly once."
+    );
+    Assert(store.FailureCount == 0, "A permanent HTTP rejection must not enter retry state.");
+}
+
 static void AssertMetadataTypeMissing(string assemblyPath, string fullName)
 {
     if (MetadataContainsType(assemblyPath, fullName))
@@ -481,10 +507,11 @@ internal sealed class FakeRunBundleUploadStore : IRunBundleUploadStore
     private const string RunId = "run-http-12345678";
 
     internal int FailureCount { get; private set; }
+    internal int PermanentFailureCount { get; private set; }
     internal bool Uploaded { get; private set; }
 
     public IReadOnlyList<string> GetPendingCompletedRunIds(int limit) =>
-        Uploaded ? Array.Empty<string>() : new[] { RunId };
+        Uploaded || PermanentFailureCount > 0 ? Array.Empty<string>() : new[] { RunId };
 
     public RunBundleBuildResult BuildRunBundleSnapshot(string runId, string playerAccountId) =>
         RunBundleBuildResult.Ready(
@@ -516,6 +543,15 @@ internal sealed class FakeRunBundleUploadStore : IRunBundleUploadStore
     public void MarkRunUploadFailed(string runId, DateTimeOffset attemptedAtUtc, string error)
     {
         FailureCount++;
+    }
+
+    public void MarkRunUploadPermanentlyFailed(
+        string runId,
+        DateTimeOffset attemptedAtUtc,
+        string error
+    )
+    {
+        PermanentFailureCount++;
     }
 
     public void MarkRunUploaded(

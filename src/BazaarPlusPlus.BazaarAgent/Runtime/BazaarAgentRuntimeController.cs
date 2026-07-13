@@ -76,8 +76,8 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
         var cooldownLeft = ComputeCooldownLeft();
         var context = _contextReader.Build(cooldownLeft);
-        var snapshot = _snapshots.Publish(context);
-        if (snapshot.TickId == 1)
+        var snapshot = _snapshots.Publish(context, out var isFirstSnapshot);
+        if (isFirstSnapshot)
             _logger.TryEmit(BazaarAgentLogEvents.SnapshotReady(context.StateName));
 
         _snapshotPublished?.Invoke();

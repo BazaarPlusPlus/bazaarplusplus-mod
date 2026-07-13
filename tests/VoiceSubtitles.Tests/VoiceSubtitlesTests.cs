@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using BazaarPlusPlus.Game.VoiceSubtitles;
+using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
 using BepInEx.Logging;
 using Xunit;
@@ -792,6 +793,7 @@ public sealed class VoiceSubtitlesTests
 
         public void Dispose()
         {
+            BppLog.Flush();
             _source.LogEvent -= OnLogEvent;
             _source.Dispose();
         }

@@ -853,6 +853,14 @@ try
         createRun.Parameters.AddWithValue("$startedAtUtc", "2026-03-18T01:00:00.0000000+00:00");
         createRun.Parameters.AddWithValue("$lastSeenAtUtc", "2026-03-18T01:00:00.0000000+00:00");
         createRun.ExecuteNonQuery();
+
+        using var createSyncState = connection.CreateCommand();
+        createSyncState.CommandText = """
+            INSERT INTO run_sync_state (run_id, dirty, retry_count)
+            VALUES ($runId, 1, 7);
+            """;
+        createSyncState.Parameters.AddWithValue("$runId", "run-001");
+        createSyncState.ExecuteNonQuery();
     }
 
     Invoke(catalogType, battleCatalog!, "AttachToRun", new object?[] { "battle-001", "run-001" });
@@ -938,6 +946,37 @@ try
         Equals(GetProperty(finalProjection.GetType(), finalProjection, "IsFinalBattle"), true),
         "Run bundle upload should mark the sorted last battle of an ended run as final."
     );
+    Invoke(
+        uploadStoreType,
+        uploadStore!,
+        "MarkRunUploadPermanentlyFailed",
+        new object?[]
+        {
+            "run-001",
+            DateTimeOffset.Parse("2026-03-18T02:00:00.0000000+00:00"),
+            "http_409:run_bundle_conflict",
+        }
+    );
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
+        using var readSyncState = connection.CreateCommand();
+        readSyncState.CommandText = """
+            SELECT dirty, retry_count, last_error, uploaded_seq
+            FROM run_sync_state
+            WHERE run_id = $runId;
+            """;
+        readSyncState.Parameters.AddWithValue("$runId", "run-001");
+        using var reader = readSyncState.ExecuteReader();
+        Assert(reader.Read(), "The run sync state should remain available for diagnostics.");
+        Assert(reader.GetInt32(0) == 0, "A permanent rejection should leave retry selection.");
+        Assert(reader.GetInt32(1) == 8, "A permanent rejection should record its final attempt.");
+        Assert(
+            reader.GetString(2) == "http_409:run_bundle_conflict",
+            "A permanent rejection should retain its structured reason."
+        );
+        Assert(reader.IsDBNull(3), "A permanent rejection must not masquerade as an upload.");
+    }
 
     var captureService = Activator.CreateInstance(captureServiceType);
     Assert(captureService != null, "CombatReplayCaptureService should be constructible.");

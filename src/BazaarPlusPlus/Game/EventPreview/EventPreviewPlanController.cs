@@ -199,11 +199,7 @@ internal sealed class EventPreviewPlanController : MonoBehaviour
     )
     {
         var coverage = snapshot.Coverage;
-        var hasPartialCoverage =
-            coverage.EventFailureCount > 0
-            || coverage.LevelUpFailureCount > 0
-            || coverage.UnsupportedLevelUpPartCount > 0
-            || coverage.MissingReferencedTemplateCount > 0;
+        var hasPartialCoverage = EventPreviewPlanHealth.HasDegradedCoverage(coverage);
         if (persistError != null || hasPartialCoverage)
         {
             Interlocked.Exchange(ref _healthDegraded, 1);
@@ -237,6 +233,12 @@ internal sealed class EventPreviewPlanController : MonoBehaviour
             writeDurationMs,
             exception: null
         );
+    }
+
+    internal static class EventPreviewPlanHealth
+    {
+        internal static bool HasDegradedCoverage(CollectionPreviewCoverage coverage) =>
+            coverage.EventFailureCount > 0 || coverage.LevelUpFailureCount > 0;
     }
 
     private void ReportTerminal(

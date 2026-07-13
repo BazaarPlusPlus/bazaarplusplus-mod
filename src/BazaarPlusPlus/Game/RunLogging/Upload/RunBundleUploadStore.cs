@@ -98,6 +98,28 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase, IRunBundleUploadSt
         command.ExecuteNonQuery();
     }
 
+    public void MarkRunUploadPermanentlyFailed(
+        string runId,
+        DateTimeOffset attemptedAtUtc,
+        string error
+    )
+    {
+        using var connection = OpenConnection();
+        using var command = CreateCommand(connection);
+        command.CommandText = $"""
+            UPDATE {RunLogSchema.RunSyncStateTableName}
+            SET dirty = 0,
+                last_attempt_at_utc = $attemptedAtUtc,
+                retry_count = retry_count + 1,
+                last_error = $error
+            WHERE run_id = $runId;
+            """;
+        command.Parameters.AddWithValue("$runId", runId);
+        command.Parameters.AddWithValue("$attemptedAtUtc", attemptedAtUtc.ToString("o"));
+        command.Parameters.AddWithValue("$error", error);
+        command.ExecuteNonQuery();
+    }
+
     public void MarkRunUploaded(
         string runId,
         long uploadedSeq,

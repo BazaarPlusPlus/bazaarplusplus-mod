@@ -92,6 +92,32 @@ public sealed class VoiceSubtitlesLoggingTests
         Assert.Equal(2, capture.Count("event=voice_subtitles.settings.degraded"));
     }
 
+    [Fact]
+    public void New_capture_does_not_receive_the_previous_captures_storm_summary()
+    {
+        BppLog.Flush();
+        using (var producer = new LogCapture())
+        {
+            EmitPlaybackTrackingDegraded(attemptId: 1);
+            EmitPlaybackTrackingDegraded(attemptId: 2);
+            Assert.Equal(1, producer.Count("event=voice_subtitles.playback_tracking.degraded"));
+        }
+
+        using var consumer = new LogCapture();
+
+        Assert.False(consumer.Contains("source_event=voice_subtitles.playback_tracking.degraded"));
+    }
+
+    private static void EmitPlaybackTrackingDegraded(long attemptId) =>
+        BppLog.WarnEvent(
+            VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegraded,
+            VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegradedDisplayId.Bind(null),
+            VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegradedAttemptId.Bind(attemptId),
+            VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegradedReasonCode.Bind(
+                VoiceSubtitlesLogReasonCode.PlaybackQueryException
+            )
+        );
+
     private static string DescribeFields(BppLogEventDefinition definition) =>
         string.Join(
             "|",
@@ -123,6 +149,7 @@ public sealed class VoiceSubtitlesLoggingTests
 
         public void Dispose()
         {
+            BppLog.Flush();
             _source.LogEvent -= OnLogEvent;
             _source.Dispose();
         }

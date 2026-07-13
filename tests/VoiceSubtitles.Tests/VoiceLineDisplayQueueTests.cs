@@ -134,6 +134,7 @@ public sealed class VoiceLineDisplayQueueTests
 
         public void Dispose()
         {
+            BppLog.Flush();
             _source.LogEvent -= OnLogEvent;
             _source.Dispose();
         }
