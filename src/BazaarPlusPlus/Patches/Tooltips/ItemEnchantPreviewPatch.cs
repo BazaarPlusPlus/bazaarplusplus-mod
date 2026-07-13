@@ -26,10 +26,14 @@ internal static class BppTooltipSectionRenderPatch
     internal const string EnchantWithoutNativeSectionKey = "enchant-preview-without-native";
 
     private static readonly BppTooltipSections.Style EnchantWithNativeStyle =
-        CreateEnchantWithNativeStyle(sectionTopPaddingScale: 1f);
+        CreateEnchantWithNativeStyle(sectionTopPaddingScale: 1f, sourceBottomPaddingScale: 0.5f);
 
     private static readonly BppTooltipSections.Style EnchantAfterQuestStyle =
-        CreateEnchantWithNativeStyle(sectionTopPaddingScale: 0f);
+        CreateEnchantWithNativeStyle(
+            sectionTopPaddingScale: 0f,
+            sourceBottomPaddingScale: 0f,
+            questGroupBottomPaddingScale: 0f
+        );
 
     private static readonly BppTooltipSections.Style EnchantWithoutNativeStyle = new()
     {
@@ -99,13 +103,16 @@ internal static class BppTooltipSectionRenderPatch
     }
 
     private static BppTooltipSections.Style CreateEnchantWithNativeStyle(
-        float sectionTopPaddingScale
+        float sectionTopPaddingScale,
+        float sourceBottomPaddingScale,
+        float? questGroupBottomPaddingScale = null
     ) =>
         new()
         {
             SectionTopPaddingScale = sectionTopPaddingScale,
             SectionBottomPaddingScale = 1.75f,
-            SourceBottomPaddingScale = 0.5f,
+            SourceBottomPaddingScale = sourceBottomPaddingScale,
+            QuestGroupBottomPaddingScale = questGroupBottomPaddingScale,
             ParagraphSpacing = 4f,
             FontScale = 1.2f,
             ShowNativeDivider = true,

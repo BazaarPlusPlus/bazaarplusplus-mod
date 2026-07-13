@@ -168,6 +168,11 @@ Assert(
     questSectionLayout.Style.SectionTopPaddingScale == 0f,
     "Quest rows already provide the native section seam, so the enchant clone must not add top padding."
 );
+Assert(
+    questSectionLayout.Style.SourceBottomPaddingScale == 0f
+        && questSectionLayout.Style.QuestGroupBottomPaddingScale == 0f,
+    "Quest-only tooltips should remove the two host bottom paddings that stack below the last quest row."
+);
 
 var passiveTextSectionLayout = BppTooltipSectionRenderPatch.ResolveSectionLayout(
     passiveText: "Passive effect",
@@ -175,7 +180,9 @@ var passiveTextSectionLayout = BppTooltipSectionRenderPatch.ResolveSectionLayout
 );
 Assert(
     passiveTextSectionLayout.SectionKey == BppTooltipSectionRenderPatch.EnchantWithNativeSectionKey
-        && passiveTextSectionLayout.Style.SectionTopPaddingScale == 1f,
+        && passiveTextSectionLayout.Style.SectionTopPaddingScale == 1f
+        && passiveTextSectionLayout.Style.SourceBottomPaddingScale == 0.5f
+        && passiveTextSectionLayout.Style.QuestGroupBottomPaddingScale == null,
     "Passive text should retain its existing native-content spacing even when quest rows also exist."
 );
 
