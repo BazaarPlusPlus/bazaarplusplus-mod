@@ -137,9 +137,10 @@ internal static class QuestRewardPreviewTooltipPatch
 }
 
 // QuestDisplayService only rebuilds the outer quest-group parent after populating its rows.
-// Our entry postfix changes the TMP text and line spacing after each native SetData call, so
-// pooled entries can retain the previous card's height. Rebuild the group once all entries have
-// been populated; the native outer-parent rebuild that follows then consumes the corrected sizes.
+// Our entry postfix applies the preview layout or restores the native baseline after each native
+// SetData call, so pooled entries can retain the previous card's height in either transition.
+// Rebuild the group once all entries have been populated; the native outer-parent rebuild that
+// follows then consumes the corrected sizes.
 [HarmonyPatch(typeof(TooltipQuestGroup), nameof(TooltipQuestGroup.SetData))]
 internal static class QuestRewardPreviewQuestGroupLayoutPatch
 {
@@ -148,8 +149,7 @@ internal static class QuestRewardPreviewQuestGroupLayoutPatch
     {
         try
         {
-            if (QuestRewardPreviewGate.IsEnabled())
-                __instance.ForceRebuildLayout();
+            __instance.ForceRebuildLayout();
         }
         catch (Exception ex)
         {
