@@ -29,6 +29,8 @@ var captureReadinessStateType = assembly.GetType(
     throwOnError: true
 )!;
 
+ScreenshotCaptureOperationContractTests.Run(assembly);
+
 var readyCard = new TheBazaar.UI.EndOfRun.FakeItemController(true);
 var readyController = new TheBazaar.UI.EndOfRun.EndOfRunScreenController(
     transitionCount: 0,
@@ -927,11 +929,11 @@ var captureFailureSource = ExtractSourceSegment(
 var markRevealStartedSource = ExtractSourceSegment(
     controllerSource,
     "private void MarkSummaryRevealStarted(",
-    "private EndOfRunCaptureReadinessState GetCaptureReadiness("
+    "private EndOfRunCaptureReadinessOutcome GetCaptureReadiness("
 );
 var getReadinessSource = ExtractSourceSegment(
     controllerSource,
-    "private EndOfRunCaptureReadinessState GetCaptureReadiness(",
+    "private EndOfRunCaptureReadinessOutcome GetCaptureReadiness(",
     "private void FailOpenIfCurrent("
 );
 var resetCaptureSource = ExtractSourceSegment(
@@ -1009,7 +1011,7 @@ Assert(
             StringComparison.Ordinal
         )
         && captureCoroutineSource.Contains(
-            "AbandonCaptureTask(captureTask);",
+            "AbandonCaptureTask(captureTask, operation.ScreenshotId);",
             StringComparison.Ordinal
         )
         && captureCoroutineSource.Contains(
@@ -1052,15 +1054,31 @@ Assert(
         )
         && !controllerSource.Contains("BlockerState", StringComparison.Ordinal)
         && !controllerSource.Contains("CaptureState action=captured", StringComparison.Ordinal)
-        && syncCaptureSource.Contains("BppLog.Debug(", StringComparison.Ordinal)
-        && syncCaptureSource.Contains("trigger=reveal-complete", StringComparison.Ordinal)
-        && syncCaptureSource.Contains("BppLog.Warn(", StringComparison.Ordinal)
-        && syncCaptureSource.Contains("trigger=timeout-fallback", StringComparison.Ordinal)
-        && screenshotServiceSource.Contains(
-            "BppLog.Info(\"ScreenshotService\", $\"Saved screenshot:",
+        && !controllerSource.Contains("BppLog.", StringComparison.Ordinal)
+        && !screenshotServiceSource.Contains("BppLog.", StringComparison.Ordinal)
+        && syncCaptureSource.Contains("EnsureCaptureOperation(readiness)", StringComparison.Ordinal)
+        && captureCoroutineSource.Contains(
+            "ScreenshotId = operation.ScreenshotId",
             StringComparison.Ordinal
         ),
-    "Normal lifecycle chatter should stay removed, normal capture start should be Debug-only, fallback should warn, and saved-path success should remain Info."
+    "Capture terminal ownership should live in the preallocated operation, not controller/service prose logs."
+);
+Assert(
+    syncCaptureSource.IndexOf("EnsureCaptureOperation(readiness)", StringComparison.Ordinal)
+        < syncCaptureSource.IndexOf("TryBeginAutomaticCapture(", StringComparison.Ordinal)
+        && syncCaptureSource.Contains(
+            "CompleteReadinessFailureIfFinished(readinessOutcome)",
+            StringComparison.Ordinal
+        ),
+    "Readiness failures must allocate and close the screenshot operation before the gate fails open."
+);
+Assert(
+    captureCoroutineSource.IndexOf(
+        "RecordVerifiedArtifact(capture.FilePath)",
+        StringComparison.Ordinal
+    ) < captureCoroutineSource.IndexOf("_persistAsync?.Invoke", StringComparison.Ordinal)
+        && resetCaptureSource.Contains("TryCompleteContextReset", StringComparison.Ordinal),
+    "A verified PNG must be recorded before metadata wait so context reset degrades it instead of reporting it missing."
 );
 var continuePatchSource = File.ReadAllText(
     Path.Combine(repositoryRoot, "src/BazaarPlusPlus/Patches/EndOfRun/EndOfRunScreenshotPatch.cs")

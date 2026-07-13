@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Reflection;
-using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.Screenshots;
 
@@ -16,44 +15,61 @@ internal enum EndOfRunCaptureReadinessState
     DetectionFailed,
 }
 
+internal readonly record struct EndOfRunCaptureReadinessOutcome(
+    EndOfRunCaptureReadinessState State,
+    ScreenshotCaptureReasonCode? ReasonCode,
+    Exception? Exception
+);
+
 internal static class EndOfRunCaptureReadinessDetector
 {
     private const string TransitionCountFieldName = "_transitionCount";
-    private static bool _warnedMissingTransitionCount;
-    private static bool _warnedReadinessFailure;
 
     public static EndOfRunCaptureReadinessState GetState(
+        object? screenController,
+        bool hasSummaryRevealStarted
+    ) => GetOutcome(screenController, hasSummaryRevealStarted).State;
+
+    public static EndOfRunCaptureReadinessOutcome GetOutcome(
         object? screenController,
         bool hasSummaryRevealStarted
     )
     {
         if (screenController == null)
-            return EndOfRunCaptureReadinessState.NotSummary;
+            return Outcome(EndOfRunCaptureReadinessState.NotSummary);
 
         try
         {
-            var revealState = EndOfRunSummaryRevealDetector.GetRevealState(screenController);
+            var reveal = EndOfRunSummaryRevealDetector.GetRevealOutcome(screenController);
+            var revealState = reveal.State;
             if (revealState == EndOfRunSummaryRevealState.TargetDetectionFailed)
-                return EndOfRunCaptureReadinessState.UnknownTarget;
+                return Outcome(
+                    EndOfRunCaptureReadinessState.UnknownTarget,
+                    reveal.ReasonCode,
+                    reveal.Exception
+                );
             if (revealState == EndOfRunSummaryRevealState.NotSummary)
-                return EndOfRunCaptureReadinessState.NotSummary;
+                return Outcome(EndOfRunCaptureReadinessState.NotSummary);
 
             if (!TryGetTransitionCount(screenController, out var transitionCount))
             {
-                return hasSummaryRevealStarted
-                    ? EndOfRunCaptureReadinessState.DetectionFailed
-                    : EndOfRunCaptureReadinessState.RevealNotStarted;
+                return Outcome(
+                    hasSummaryRevealStarted
+                        ? EndOfRunCaptureReadinessState.DetectionFailed
+                        : EndOfRunCaptureReadinessState.RevealNotStarted,
+                    ScreenshotCaptureReasonCode.TransitionFieldMissing
+                );
             }
 
             // The native controller keeps this positive throughout preload, the intro/trophy
             // transition, and page transitions. This also prevents an all-null preloaded card
             // array from being mistaken for a genuinely empty, settled board.
             if (transitionCount > 0)
-                return EndOfRunCaptureReadinessState.TransitionInProgress;
+                return Outcome(EndOfRunCaptureReadinessState.TransitionInProgress);
             if (!hasSummaryRevealStarted)
-                return EndOfRunCaptureReadinessState.RevealNotStarted;
+                return Outcome(EndOfRunCaptureReadinessState.RevealNotStarted);
 
-            return revealState switch
+            var state = revealState switch
             {
                 EndOfRunSummaryRevealState.NoLoadedCards => EndOfRunCaptureReadinessState.Ready,
                 EndOfRunSummaryRevealState.RevealInProgress =>
@@ -63,21 +79,23 @@ internal static class EndOfRunCaptureReadinessDetector
                     EndOfRunCaptureReadinessState.DetectionFailed,
                 _ => EndOfRunCaptureReadinessState.DetectionFailed,
             };
+            return Outcome(
+                state,
+                state == EndOfRunCaptureReadinessState.DetectionFailed
+                    ? reveal.ReasonCode ?? ScreenshotCaptureReasonCode.RevealProbeFailed
+                    : null,
+                reveal.Exception
+            );
         }
         catch (Exception ex)
         {
-            if (!_warnedReadinessFailure)
-            {
-                _warnedReadinessFailure = true;
-                BppLog.Warn(
-                    "EndOfRunScreenshot",
-                    $"End-of-run capture readiness detection failed: {ex.Message}"
-                );
-            }
-
-            return hasSummaryRevealStarted
-                ? EndOfRunCaptureReadinessState.DetectionFailed
-                : EndOfRunCaptureReadinessState.RevealNotStarted;
+            return Outcome(
+                hasSummaryRevealStarted
+                    ? EndOfRunCaptureReadinessState.DetectionFailed
+                    : EndOfRunCaptureReadinessState.RevealNotStarted,
+                ScreenshotCaptureReasonCode.RevealProbeFailed,
+                ex
+            );
         }
     }
 
@@ -91,20 +109,15 @@ internal static class EndOfRunCaptureReadinessDetector
                 BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
             );
         if (field == null)
-        {
-            if (!_warnedMissingTransitionCount)
-            {
-                _warnedMissingTransitionCount = true;
-                BppLog.Warn(
-                    "EndOfRunScreenshot",
-                    "Failed to resolve EndOfRunScreenController._transitionCount; automatic capture will use the bounded fallback."
-                );
-            }
-
             return false;
-        }
 
         transitionCount = (int?)field.GetValue(screenController) ?? 0;
         return true;
     }
+
+    private static EndOfRunCaptureReadinessOutcome Outcome(
+        EndOfRunCaptureReadinessState state,
+        ScreenshotCaptureReasonCode? reasonCode = null,
+        Exception? exception = null
+    ) => new(state, reasonCode, exception);
 }

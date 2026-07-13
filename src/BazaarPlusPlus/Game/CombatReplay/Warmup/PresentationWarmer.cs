@@ -26,37 +26,39 @@ internal static class PresentationWarmer
 
     internal static async Task WarmPresentationAssetsAsync(
         PvpBattleManifest manifest,
-        CombatSequenceMessages sequence
+        CombatSequenceMessages sequence,
+        IReplayPlaybackOutcomeSink outcome
     )
     {
         var stopwatch = Stopwatch.StartNew();
         var stats = new ReplayWarmupStats();
-        await WarmAssetLoaderAsync(manifest, sequence, stats);
-        await CombatVfxWarmer.WarmCombatVfxAsync(sequence, stats);
-        stopwatch.Stop();
-        BppLog.Info(
-            "PresentationWarmer",
-            $"Saved replay warmup finished in {stopwatch.ElapsedMilliseconds}ms "
-                + $"sharedAssets(preloaded={stats.SharedAssetsPreloaded}, skipped={stats.SharedAssetsSkipped}) "
-                + $"cards(preloaded={stats.CardsPreloaded}, skipped={stats.CardsSkipped}, failed={stats.CardsFailed}) "
-                + $"overrideAssets(preloaded={stats.OverrideAssetsPreloaded}, skipped={stats.OverrideAssetsSkipped}, failed={stats.OverrideAssetsFailed}) "
-                + $"combatVfx(prewarmed={stats.VfxPrewarmed}, skipped={stats.VfxSkipped}, failed={stats.VfxFailed})"
-        );
+        try
+        {
+            await WarmAssetLoaderAsync(manifest, sequence, stats, outcome);
+            await CombatVfxWarmer.WarmCombatVfxAsync(sequence, stats, outcome);
+        }
+        finally
+        {
+            stopwatch.Stop();
+            ReplayWarmupLogging.PresentationCompleted(
+                outcome.BattleId,
+                stopwatch.ElapsedMilliseconds,
+                stats
+            );
+        }
     }
 
     private static async Task WarmAssetLoaderAsync(
         PvpBattleManifest manifest,
         CombatSequenceMessages sequence,
-        ReplayWarmupStats stats
+        ReplayWarmupStats stats,
+        IReplayPlaybackOutcomeSink outcome
     )
     {
         Services.TryGet<AssetLoader>(out var assetLoader);
         if (assetLoader == null)
         {
-            BppLog.Warn(
-                "PresentationWarmer",
-                "Saved replay visual warmup skipped because AssetLoader is unavailable."
-            );
+            outcome.ReportDegradation(ReplayPlaybackReasonCode.PresentationWarmupFailed);
             return;
         }
 
@@ -70,10 +72,7 @@ internal static class PresentationWarmer
             catch (Exception ex)
             {
                 WarmupCache.ReleaseSharedAssetsPreload();
-                BppLog.Warn(
-                    "PresentationWarmer",
-                    $"Saved replay asset preload failed: {ex.Message}"
-                );
+                outcome.ReportDegradation(ReplayPlaybackReasonCode.PresentationWarmupFailed, ex);
             }
         }
         else
@@ -96,7 +95,7 @@ internal static class PresentationWarmer
 
         var cardSemaphore = new SemaphoreSlim(WarmupConstants.ReplayWarmupConcurrency);
         var cardWarmupTasks = preloadRequests.Select(request =>
-            WarmCardAsync(assetLoader, request.Key, request.Value, cardSemaphore, stats)
+            WarmCardAsync(assetLoader, request.Key, request.Value, cardSemaphore, stats, outcome)
         );
         await Task.WhenAll(cardWarmupTasks);
 
@@ -105,7 +104,7 @@ internal static class PresentationWarmer
             .CombatMessage.Data.VfxKeys.Where(key => !string.IsNullOrWhiteSpace(key))
             .Distinct(StringComparer.Ordinal)
             .Select(overrideKey =>
-                WarmOverrideAssetAsync(assetLoader, overrideKey, overrideSemaphore, stats)
+                WarmOverrideAssetAsync(assetLoader, overrideKey, overrideSemaphore, stats, outcome)
             );
         await Task.WhenAll(overrideWarmupTasks);
     }
@@ -115,7 +114,8 @@ internal static class PresentationWarmer
         string cacheKey,
         (Guid TemplateId, ECardSize Size) request,
         SemaphoreSlim semaphore,
-        ReplayWarmupStats stats
+        ReplayWarmupStats stats,
+        IReplayPlaybackOutcomeSink outcome
     )
     {
         if (!WarmupCache.TryReserveCacheKey(WarmupCache.PreloadedCardKeys, cacheKey))
@@ -134,10 +134,7 @@ internal static class PresentationWarmer
         {
             WarmupCache.ReleaseCacheKey(WarmupCache.PreloadedCardKeys, cacheKey);
             stats.CardsFailed++;
-            BppLog.Warn(
-                "PresentationWarmer",
-                $"Saved replay card preload failed for template={request.TemplateId} size={request.Size}: {ex.Message}"
-            );
+            outcome.ReportDegradation(ReplayPlaybackReasonCode.PresentationWarmupFailed, ex);
         }
         finally
         {
@@ -149,7 +146,8 @@ internal static class PresentationWarmer
         AssetLoader assetLoader,
         string overrideKey,
         SemaphoreSlim semaphore,
-        ReplayWarmupStats stats
+        ReplayWarmupStats stats,
+        IReplayPlaybackOutcomeSink outcome
     )
     {
         if (!WarmupCache.TryReserveCacheKey(WarmupCache.PreloadedOverrideKeys, overrideKey))
@@ -168,9 +166,12 @@ internal static class PresentationWarmer
         {
             WarmupCache.ReleaseCacheKey(WarmupCache.PreloadedOverrideKeys, overrideKey);
             stats.OverrideAssetsFailed++;
-            BppLog.Debug(
-                "PresentationWarmer",
-                $"Saved replay override VFX preload skipped for '{overrideKey}': {ex.Message}"
+            outcome.ReportDegradation(ReplayPlaybackReasonCode.PresentationWarmupFailed, ex);
+            ReplayWarmupLogging.AssetSkipped(
+                ReplayWarmupStage.Presentation,
+                overrideKey,
+                ReplayWarmupAssetReasonCode.AssetLoadFailed,
+                ex
             );
         }
         finally

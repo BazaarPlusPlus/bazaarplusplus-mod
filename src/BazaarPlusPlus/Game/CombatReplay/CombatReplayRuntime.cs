@@ -26,6 +26,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private ReplayPersistenceOrchestrator? _persistence;
     private ReplayPlaybackPublisher? _playbackPublisher;
     private OpponentPortraitController? _portraitController;
+    private ReplayPlaybackLogOperation? _activePlaybackOperation;
+    private PendingReplayMenuReturn? _pendingMenuReturn;
+    private ReplayPlaybackReasonCode _startupInterruptionReason;
+    private Exception? _startupInterruptionException;
 
     private bool _returnToMenuAfterReplay;
     private bool _bootstrappedReplayActive;
@@ -128,6 +132,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         _persistence?.DrainPendingResults();
 
+        ObservePendingMenuReturn();
+
         // The exit-in-progress latch clears itself once ReplayState is actually gone; this is
         // the only reliable signal on the bootstrapped exit path, where the state transition
         // happens via RunManager.ReturnToMainMenu without a normal ReplayState exit event.
@@ -137,6 +143,23 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void OnDestroy()
     {
+        var operation = _activePlaybackOperation;
+        if (operation != null)
+        {
+            var ended = _playbackPublisher?.PublishEnded("runtime-destroyed", failed: true);
+            var failureReason = ended is { Succeeded: false }
+                ? ReplayPlaybackReasonCode.EndedPublishFailed
+                : ReplayPlaybackReasonCode.StartException;
+            CompletePlaybackOperation(
+                operation,
+                ReplayPlaybackEndReasonCode.RuntimeDestroyed,
+                ReplayRollbackStatus.NotRequired,
+                failureReason,
+                ended?.Exception
+            );
+        }
+        _activePlaybackOperation = null;
+        _pendingMenuReturn = null;
         _persistence?.Dispose();
 
         if (Instance == this)
@@ -225,7 +248,16 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
         catch (Exception ex)
         {
-            BppLog.Error("CombatReplayRuntime", $"Failed to capture combat replay: {ex}");
+            BppLog.ErrorEvent(
+                CombatReplayLogEvents.CaptureFailed,
+                ex,
+                CombatReplayLogEvents.CaptureFailedRunId.Bind(
+                    _services?.RunContext.CurrentServerRunId
+                ),
+                CombatReplayLogEvents.CaptureFailedReasonCode.Bind(
+                    ReplayCaptureReasonCode.CaptureOrEnqueueException
+                )
+            );
         }
     }
 
@@ -240,9 +272,13 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     public bool ReplaySaved(string battleId, bool recordVideo)
     {
-        if (!CanReplaySavedBattle(battleId, out var reason))
+        if (!CanReplaySavedBattle(battleId, out _))
         {
-            BppLog.Warn("CombatReplayRuntime", $"Rejected saved replay request: {reason}");
+            LogRequestRejected(
+                CombatReplayPlaybackSource.LocalSaved,
+                ResolveSavedReplayRejectionReason(battleId),
+                battleId
+            );
             return false;
         }
 
@@ -252,21 +288,60 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
         var manifest = controller.LoadBattle(battleId);
         if (manifest == null)
+        {
+            LogRequestRejected(
+                CombatReplayPlaybackSource.LocalSaved,
+                ReplayRequestRejectionReasonCode.ManifestUnavailable,
+                battleId
+            );
             return false;
+        }
 
         var payload = controller.LoadPayload(manifest);
         if (payload == null)
+        {
+            LogRequestRejected(
+                CombatReplayPlaybackSource.LocalSaved,
+                ReplayRequestRejectionReasonCode.PayloadUnavailable,
+                battleId
+            );
             return false;
+        }
 
-        var sequence = controller.LoadReplay(payload);
+        var operation = new ReplayPlaybackLogOperation(
+            battleId,
+            CombatReplayPlaybackSource.LocalSaved,
+            recordVideo
+        );
+        _activePlaybackOperation = operation;
+        CombatSequenceMessages sequence;
+        try
+        {
+            sequence = controller.LoadReplay(payload);
+        }
+        catch (Exception ex)
+        {
+            CompletePlaybackOperation(
+                operation,
+                ReplayPlaybackEndReasonCode.StartFailed,
+                ReplayRollbackStatus.NotRequired,
+                ReplayPlaybackReasonCode.StartException,
+                ex
+            );
+            return false;
+        }
+
         PlaybackUiState.InitializedBoardUiControllers.Clear();
         _savedReplayProgress = SavedReplayProgress.SavedPlaybackActive;
+        _startupInterruptionReason = ReplayPlaybackReasonCode.None;
+        _startupInterruptionException = null;
         _ = StartReplayAsync(
             manifest,
             sequence,
             battleId,
             CombatReplayPlaybackSource.LocalSaved,
-            recordVideo
+            recordVideo,
+            operation
         );
         return true;
     }
@@ -282,25 +357,61 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (payload == null)
             throw new ArgumentNullException(nameof(payload));
 
-        if (!CanReplaySavedCombats(out var reason))
+        if (!CanReplaySavedCombats(out _))
         {
-            BppLog.Warn("CombatReplayRuntime", $"Rejected imported replay request: {reason}");
+            LogRequestRejected(
+                CombatReplayPlaybackSource.ImportedGhost,
+                ResolveGeneralReplayRejectionReason(),
+                manifest.BattleId
+            );
             return false;
         }
 
         var loader = _loader;
         if (loader == null)
+        {
+            LogRequestRejected(
+                CombatReplayPlaybackSource.ImportedGhost,
+                ReplayRequestRejectionReasonCode.LoaderUnavailable,
+                manifest.BattleId
+            );
             return false;
+        }
 
-        var sequence = loader.Load(payload);
+        var operation = new ReplayPlaybackLogOperation(
+            manifest.BattleId,
+            CombatReplayPlaybackSource.ImportedGhost,
+            recordVideo
+        );
+        _activePlaybackOperation = operation;
+        CombatSequenceMessages sequence;
+        try
+        {
+            sequence = loader.Load(payload);
+        }
+        catch (Exception ex)
+        {
+            CompletePlaybackOperation(
+                operation,
+                ReplayPlaybackEndReasonCode.StartFailed,
+                ReplayRollbackStatus.NotRequired,
+                ReplayPlaybackReasonCode.StartException,
+                ex
+            );
+            return false;
+        }
+
         PlaybackUiState.InitializedBoardUiControllers.Clear();
         _savedReplayProgress = SavedReplayProgress.SavedPlaybackActive;
+        _startupInterruptionReason = ReplayPlaybackReasonCode.None;
+        _startupInterruptionException = null;
         _ = StartReplayAsync(
             manifest,
             sequence,
             manifest.BattleId,
             CombatReplayPlaybackSource.ImportedGhost,
-            recordVideo
+            recordVideo,
+            operation
         );
         return true;
     }
@@ -356,7 +467,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         CombatSequenceMessages sequence,
         string battleId,
         CombatReplayPlaybackSource source,
-        bool recordVideo
+        bool recordVideo,
+        ReplayPlaybackLogOperation operation
     )
     {
         var attemptedBootstrapFromLobby = false;
@@ -366,42 +478,108 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         {
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
-            _portraitController!.Cleanup();
+            _portraitController!.Cleanup(battleId);
             _portraitController.ApplySelectedHeroOverride(manifest);
             Data.ResetRunData();
             _runLifecycle!.RefreshRunStateFromCurrentState();
             attemptedBootstrapFromLobby = !ReplayBootstrap.IsBootstrapReady();
             var bootstrappedFromLobby = await ReplayBootstrap.EnsureBootstrapReadyAsync();
             _returnToMenuAfterReplay = bootstrappedFromLobby;
-            var bootstrapContext = ReplayBootstrap.ResolveDependencies();
-            OpponentPortraitController.EnsureOpponentIdentity(manifest, sequence.SpawnMessage);
-            await _portraitController.EnsureTemporaryOpponentPortraitAsync(manifest);
+            var bootstrapContext = ReplayBootstrap.ResolveDependencies(operation);
+            try
+            {
+                OpponentPortraitController.EnsureOpponentIdentity(
+                    manifest,
+                    sequence.SpawnMessage,
+                    operation
+                );
+                await _portraitController.EnsureTemporaryOpponentPortraitAsync(manifest, operation);
+            }
+            catch (Exception ex)
+            {
+                operation.ReportDegradation(
+                    ReplayPlaybackReasonCode.OpponentPortraitUnavailable,
+                    ex
+                );
+            }
             await ReplayBootstrap.InjectSavedReplayAsync(
                 bootstrapContext,
                 manifest,
                 sequence,
-                battleId,
+                operation,
                 _playbackPublisher.PublishStarting
             );
+            if (_startupInterruptionReason != ReplayPlaybackReasonCode.None)
+            {
+                throw new ReplayPlaybackStartInterruptedException(
+                    _startupInterruptionReason,
+                    _startupInterruptionException
+                );
+            }
             _bootstrappedReplayActive = bootstrappedFromLobby;
-            BppLog.Info("CombatReplayRuntime", $"Started replay for saved combat {battleId}");
+            if (operation.TryMarkStarted(out var started))
+                ReplayPlaybackLogWriter.EmitStarted(started);
         }
         catch (Exception ex)
         {
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
             _savedReplayProgress = SavedReplayProgress.StartFailureCleanup;
-            _portraitController!.Cleanup();
-            _portraitController.RestoreSelectedHeroOverride();
-            BppLog.Error("CombatReplayRuntime", $"Failed to start replay {battleId}: {ex}");
             // Unconditional: PublishEnded only publishes the event when "starting" was
             // published, but it must always clear the session (battle id) for a failed start.
-            _playbackPublisher!.PublishEnded("start-failed", failed: true);
+            var ended = ReplayPlaybackStateExitCoordinator.Handle(
+                startCoordinatorOwnsTerminal: false,
+                () => _playbackPublisher!.PublishEnded("start-failed", failed: true),
+                latchStartupInterruption: null,
+                (stage, cleanupException) =>
+                    LogCleanupFailure(stage, operation.BattleId, cleanupException),
+                new ReplayPlaybackCleanupStep(
+                    "opponent_portrait",
+                    () => _portraitController!.Cleanup(battleId)
+                ),
+                new ReplayPlaybackCleanupStep(
+                    "hero_restore",
+                    () => _portraitController!.RestoreSelectedHeroOverride()
+                )
+            );
+            var failureReason =
+                ex is ReplayPlaybackPublishException publishException ? publishException.ReasonCode
+                : ex is ReplayPlaybackStartInterruptedException interrupted ? interrupted.ReasonCode
+                : ReplayPlaybackReasonCode.StartException;
+            var failureException =
+                ex is ReplayPlaybackStartInterruptedException
+                    ? ex.InnerException
+                    : ex.InnerException ?? ex;
+            if (!ended.Succeeded)
+            {
+                failureReason = ReplayPlaybackReasonCode.EndedPublishFailed;
+                failureException = ended.Exception;
+            }
+            var rollbackStatus = ReplayRollbackStatus.NotRequired;
             if (attemptedBootstrapFromLobby)
-                await ReplayBootstrap.RollbackBootstrapAsync();
+            {
+                var rollback = await ReplayBootstrap.RollbackBootstrapAsync(operation);
+                rollbackStatus = rollback.Succeeded
+                    ? ReplayRollbackStatus.Succeeded
+                    : ReplayRollbackStatus.Failed;
+                if (!rollback.Succeeded)
+                {
+                    failureReason = ReplayPlaybackReasonCode.BootstrapRollbackFailed;
+                    failureException = rollback.Exception;
+                }
+            }
+            CompletePlaybackOperation(
+                operation,
+                ReplayPlaybackEndReasonCode.StartFailed,
+                rollbackStatus,
+                failureReason,
+                failureException
+            );
         }
         finally
         {
+            _startupInterruptionReason = ReplayPlaybackReasonCode.None;
+            _startupInterruptionException = null;
             _savedReplayProgress = _savedReplayProgress switch
             {
                 SavedReplayProgress.StartInProgress => SavedReplayProgress.SavedPlaybackActive,
@@ -419,38 +597,93 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (data.PreviousState is not ReplayState || data.CurrentState is ReplayState)
             return;
 
-        _portraitController?.RestoreSelectedHeroOverride();
+        var startCoordinatorOwnsTerminal =
+            _savedReplayProgress
+            is SavedReplayProgress.StartInProgress
+                or SavedReplayProgress.StartFailureCleanup;
         _savedReplayProgress = _savedReplayProgress switch
         {
             SavedReplayProgress.StartInProgress => SavedReplayProgress.StartFailureCleanup,
             SavedReplayProgress.SavedPlaybackActive => SavedReplayProgress.Idle,
             _ => _savedReplayProgress,
         };
-        _playbackPublisher?.PublishEnded("state-exit", failed: false);
-        _portraitController?.Cleanup();
-        PlaybackUiState.InitializedBoardUiControllers.Clear();
+        var operation = _activePlaybackOperation;
+        var ended = ReplayPlaybackStateExitCoordinator.Handle(
+            startCoordinatorOwnsTerminal,
+            () =>
+                _playbackPublisher?.PublishEnded("state-exit", failed: startCoordinatorOwnsTerminal)
+                ?? ReplayPlaybackPublishOutcome.Success(),
+            (reason, exception) =>
+            {
+                _startupInterruptionReason = reason;
+                _startupInterruptionException = exception;
+            },
+            (stage, exception) => LogCleanupFailure(stage, operation?.BattleId, exception),
+            new ReplayPlaybackCleanupStep(
+                "hero_restore",
+                () => _portraitController?.RestoreSelectedHeroOverride()
+            ),
+            new ReplayPlaybackCleanupStep(
+                "opponent_portrait",
+                () => _portraitController?.Cleanup(operation?.BattleId)
+            ),
+            new ReplayPlaybackCleanupStep(
+                "playback_ui",
+                PlaybackUiState.InitializedBoardUiControllers.Clear
+            )
+        );
+
+        if (startCoordinatorOwnsTerminal)
+            return;
+
+        if (_pendingMenuReturn != null)
+            return;
 
         if (!_returnToMenuAfterReplay || !_bootstrappedReplayActive)
+        {
+            if (operation != null)
+            {
+                CompletePlaybackOperation(
+                    operation,
+                    ReplayPlaybackEndReasonCode.StateExit,
+                    ReplayRollbackStatus.NotRequired,
+                    !ended.Succeeded
+                        ? ReplayPlaybackReasonCode.EndedPublishFailed
+                        : ReplayPlaybackReasonCode.None,
+                    ended.Exception
+                );
+            }
             return;
+        }
 
         _returnToMenuAfterReplay = false;
         _bootstrappedReplayActive = false;
 
-        try
+        if (operation != null)
         {
-            BppLog.Info(
-                "CombatReplayRuntime",
-                "Returning to main menu after bootstrapped replay exit."
-            );
-            Services.Get<RunManager>()?.ReturnToMainMenu();
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error(
-                "CombatReplayRuntime",
-                $"Failed to return to main menu after replay: {ex}"
+            BeginPendingMenuReturn(
+                operation,
+                ReplayPlaybackEndReasonCode.StateExit,
+                !ended.Succeeded
+                    ? ReplayPlaybackReasonCode.EndedPublishFailed
+                    : ReplayPlaybackReasonCode.None,
+                !ended.Succeeded ? ended.Exception : null
             );
         }
+    }
+
+    private static void LogCleanupFailure(string stage, string? battleId, Exception exception)
+    {
+        BppLog.DebugEvent(
+            CombatReplayLogEvents.PlaybackCleanupObserved,
+            exception,
+            () =>
+                [
+                    CombatReplayLogEvents.CleanupObservedStage.Bind(stage),
+                    CombatReplayLogEvents.CleanupObservedRemovedCount.Bind(0),
+                    CombatReplayLogEvents.CleanupObservedBattleId.Bind(battleId),
+                ]
+        );
     }
 
     internal static bool TryExitBootstrappedSavedReplayToMenu()
@@ -482,27 +715,225 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         // Covers the native continue-click path too (it never goes through TryContinueReplay);
         // Update() clears the latch once ReplayState is actually gone.
         LatchReplayExitInProgress();
-        _portraitController?.RestoreSelectedHeroOverride();
         // Bootstrapped saved replays exit through this manual path (the state-exit patch
         // intercepts the normal transition), so OnStateChanged's PublishEnded never fires for
         // them. Emit it here too, otherwise the video recorder never gets the "ended" signal and
         // leaves ffmpeg running on a never-finalized file (no moov atom -> unplayable MP4).
-        _playbackPublisher?.PublishEnded("saved-replay-exit", failed: false);
-        _portraitController?.Cleanup();
-        PlaybackUiState.InitializedBoardUiControllers.Clear();
+        var operation = _activePlaybackOperation;
+        var ended = ReplayPlaybackStateExitCoordinator.Handle(
+            startCoordinatorOwnsTerminal: false,
+            () =>
+                _playbackPublisher?.PublishEnded("saved-replay-exit", failed: false)
+                ?? ReplayPlaybackPublishOutcome.Success(),
+            latchStartupInterruption: null,
+            (stage, exception) => LogCleanupFailure(stage, operation?.BattleId, exception),
+            new ReplayPlaybackCleanupStep(
+                "hero_restore",
+                () => _portraitController?.RestoreSelectedHeroOverride()
+            ),
+            new ReplayPlaybackCleanupStep(
+                "opponent_portrait",
+                () => _portraitController?.Cleanup(operation?.BattleId)
+            ),
+            new ReplayPlaybackCleanupStep(
+                "playback_ui",
+                PlaybackUiState.InitializedBoardUiControllers.Clear
+            )
+        );
 
+        if (operation != null)
+        {
+            BeginPendingMenuReturn(
+                operation,
+                ReplayPlaybackEndReasonCode.SavedReplayExit,
+                !ended.Succeeded
+                    ? ReplayPlaybackReasonCode.EndedPublishFailed
+                    : ReplayPlaybackReasonCode.None,
+                !ended.Succeeded ? ended.Exception : null
+            );
+        }
+    }
+
+    private void BeginPendingMenuReturn(
+        ReplayPlaybackLogOperation operation,
+        ReplayPlaybackEndReasonCode endReasonCode,
+        ReplayPlaybackReasonCode priorFailureReason,
+        Exception? priorException
+    )
+    {
+        var dispatch = TryBeginReturnToMainMenu();
+        if (!dispatch.Succeeded)
+        {
+            CompletePlaybackOperation(
+                operation,
+                endReasonCode,
+                ReplayRollbackStatus.NotRequired,
+                ReplayPlaybackReasonCode.MenuReturnFailed,
+                dispatch.Exception
+            );
+            return;
+        }
+
+        _pendingMenuReturn = new PendingReplayMenuReturn(
+            operation,
+            endReasonCode,
+            priorFailureReason,
+            priorException,
+            Time.realtimeSinceStartup + ReplayExitSuppressionWindowSeconds
+        );
+    }
+
+    private void ObservePendingMenuReturn()
+    {
+        var pending = _pendingMenuReturn;
+        if (pending == null)
+            return;
+
+        if (SceneLoader.IsSceneLoaded(SceneID.HeroSelectScene))
+        {
+            _pendingMenuReturn = null;
+            CompletePlaybackOperation(
+                pending.Operation,
+                pending.EndReasonCode,
+                ReplayRollbackStatus.NotRequired,
+                pending.PriorFailureReason,
+                pending.PriorException
+            );
+            return;
+        }
+
+        if (Time.realtimeSinceStartup < pending.DeadlineRealtimeSeconds)
+            return;
+
+        _pendingMenuReturn = null;
+        CompletePlaybackOperation(
+            pending.Operation,
+            pending.EndReasonCode,
+            ReplayRollbackStatus.NotRequired,
+            ReplayPlaybackReasonCode.MenuReturnFailed,
+            new TimeoutException("Replay menu return was not confirmed before the deadline.")
+        );
+    }
+
+    private static ReplayMenuReturnOutcome TryBeginReturnToMainMenu()
+    {
         try
         {
-            BppLog.Info("CombatReplayRuntime", "Returning to main menu after saved replay exit.");
-            Services.Get<RunManager>()?.ReturnToMainMenu();
+            var runManager = Services.Get<RunManager>();
+            if (runManager == null)
+            {
+                return ReplayMenuReturnOutcome.Failure(
+                    new InvalidOperationException("RunManager is unavailable.")
+                );
+            }
+
+            runManager.ReturnToMainMenu();
+            return ReplayMenuReturnOutcome.Success();
         }
         catch (Exception ex)
         {
-            BppLog.Error("CombatReplayRuntime", $"Failed to exit saved replay: {ex}");
+            return ReplayMenuReturnOutcome.Failure(ex);
         }
+    }
+
+    private void CompletePlaybackOperation(
+        ReplayPlaybackLogOperation operation,
+        ReplayPlaybackEndReasonCode endReasonCode,
+        ReplayRollbackStatus rollbackStatus,
+        ReplayPlaybackReasonCode failureReasonCode,
+        Exception? exception
+    )
+    {
+        if (
+            operation.TryComplete(
+                endReasonCode,
+                rollbackStatus,
+                failureReasonCode,
+                exception,
+                out var terminal
+            )
+        )
+        {
+            ReplayPlaybackLogWriter.EmitTerminal(terminal);
+        }
+
+        if (ReferenceEquals(_activePlaybackOperation, operation))
+            _activePlaybackOperation = null;
+    }
+
+    private static void LogRequestRejected(
+        CombatReplayPlaybackSource source,
+        ReplayRequestRejectionReasonCode reasonCode,
+        string? battleId
+    )
+    {
+        BppLog.DebugEvent(
+            CombatReplayLogEvents.RequestRejected,
+            () =>
+                [
+                    CombatReplayLogEvents.RequestRejectedSource.Bind(source),
+                    CombatReplayLogEvents.RequestRejectedReasonCode.Bind(reasonCode),
+                    CombatReplayLogEvents.RequestRejectedBattleId.Bind(battleId),
+                ]
+        );
+    }
+
+    private ReplayRequestRejectionReasonCode ResolveSavedReplayRejectionReason(string? battleId)
+    {
+        if (string.IsNullOrWhiteSpace(battleId))
+            return ReplayRequestRejectionReasonCode.InvalidBattleId;
+        if (_controller == null)
+            return ReplayRequestRejectionReasonCode.RuntimeUnavailable;
+        var general = ResolveGeneralReplayRejectionReason();
+        if (general != ReplayRequestRejectionReasonCode.RuntimeUnavailable)
+            return general;
+        return !_controller.HasSavedReplay(battleId)
+            ? ReplayRequestRejectionReasonCode.PayloadUnavailable
+            : ReplayRequestRejectionReasonCode.RuntimeUnavailable;
+    }
+
+    private ReplayRequestRejectionReasonCode ResolveGeneralReplayRejectionReason()
+    {
+        if (IsReplayStartInProgress)
+            return ReplayRequestRejectionReasonCode.ReplayAlreadyStarting;
+        if (_services?.RunContext.IsInGameRun == true)
+            return ReplayRequestRejectionReasonCode.ActiveRun;
+        if (AppState.CurrentState is ReplayState)
+            return ReplayRequestRejectionReasonCode.ReplayAlreadyActive;
+        return ReplayRequestRejectionReasonCode.RuntimeUnavailable;
     }
 
     // Patches/Combat/CombatReplayVisualPatches.cs calls this static facade — keep the surface.
     public static void HideEncounterPickerOverlays() =>
         HealthBarBinder.HideEncounterPickerOverlays();
+}
+
+internal readonly record struct ReplayMenuReturnOutcome(bool Succeeded, Exception? Exception)
+{
+    internal static ReplayMenuReturnOutcome Success() => new(true, null);
+
+    internal static ReplayMenuReturnOutcome Failure(Exception exception) =>
+        new(false, exception ?? throw new ArgumentNullException(nameof(exception)));
+}
+
+internal sealed record PendingReplayMenuReturn(
+    ReplayPlaybackLogOperation Operation,
+    ReplayPlaybackEndReasonCode EndReasonCode,
+    ReplayPlaybackReasonCode PriorFailureReason,
+    Exception? PriorException,
+    float DeadlineRealtimeSeconds
+);
+
+internal sealed class ReplayPlaybackStartInterruptedException : Exception
+{
+    internal ReplayPlaybackStartInterruptedException(
+        ReplayPlaybackReasonCode reasonCode,
+        Exception? innerException
+    )
+        : base("ReplayState exited before replay startup completed.", innerException)
+    {
+        ReasonCode = reasonCode;
+    }
+
+    internal ReplayPlaybackReasonCode ReasonCode { get; }
 }

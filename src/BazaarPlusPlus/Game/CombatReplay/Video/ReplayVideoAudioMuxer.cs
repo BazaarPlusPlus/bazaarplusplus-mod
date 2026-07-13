@@ -28,7 +28,6 @@ internal readonly struct MuxResolution
 /// </summary>
 internal sealed class ReplayVideoAudioMuxer
 {
-    private const string LogComponent = "CombatReplayVideo";
     private const int MuxTimeoutMs = 60_000;
 
     private static readonly object s_pendingLock = new();
@@ -47,19 +46,48 @@ internal sealed class ReplayVideoAudioMuxer
         Failed,
     }
 
+    internal enum MuxReasonCode
+    {
+        Muxed,
+        CaptureFailed,
+        NoAudio,
+        FfmpegUnavailable,
+        AacUnavailable,
+        ProcessStartFailed,
+        ProcessTimeout,
+        NonZeroExit,
+        ZeroDurationOutput,
+        PromotionFailed,
+        UnexpectedException,
+    }
+
     internal readonly struct MuxResult
     {
         public readonly MuxStatus Status;
         public readonly string FinalFilePath;
         public readonly long FileSizeBytes;
-        public readonly string? Error;
+        public readonly MuxReasonCode ReasonCode;
+        public readonly int? ExitCode;
+        public readonly string StderrTail;
+        public readonly Exception? Exception;
 
-        public MuxResult(MuxStatus status, string finalFilePath, long fileSizeBytes, string? error)
+        public MuxResult(
+            MuxStatus status,
+            string finalFilePath,
+            long fileSizeBytes,
+            MuxReasonCode reasonCode,
+            int? exitCode = null,
+            string? stderrTail = null,
+            Exception? exception = null
+        )
         {
             Status = status;
             FinalFilePath = finalFilePath;
             FileSizeBytes = fileSizeBytes;
-            Error = error;
+            ReasonCode = reasonCode;
+            ExitCode = exitCode;
+            StderrTail = stderrTail ?? string.Empty;
+            Exception = exception;
         }
     }
 
@@ -72,6 +100,7 @@ internal sealed class ReplayVideoAudioMuxer
     /// swallowed (logged at Debug).
     /// </summary>
     private Task DispatchAsync(
+        string recordingId,
         string silentVideoTempPath,
         IReadOnlyList<string> wavPaths,
         string finalPath,
@@ -86,6 +115,7 @@ internal sealed class ReplayVideoAudioMuxer
             try
             {
                 result = Mux(
+                    recordingId,
                     ffmpegExecutable,
                     silentVideoTempPath,
                     wavPaths,
@@ -95,13 +125,13 @@ internal sealed class ReplayVideoAudioMuxer
             }
             catch (Exception ex)
             {
-                // Mux is defensive, but never let a background task crash unobserved.
-                BppLog.Error(
-                    LogComponent,
-                    $"Unexpected failure while muxing replay audio for '{finalPath}'.",
-                    ex
+                result = new MuxResult(
+                    MuxStatus.Failed,
+                    finalPath,
+                    0,
+                    MuxReasonCode.UnexpectedException,
+                    exception: ex
                 );
-                result = new MuxResult(MuxStatus.Failed, finalPath, 0, ex.Message);
             }
 
             if (onCompleted != null)
@@ -112,9 +142,21 @@ internal sealed class ReplayVideoAudioMuxer
                 }
                 catch (Exception ex)
                 {
-                    BppLog.Debug(
-                        LogComponent,
-                        $"Mux completion callback threw: {ex.GetType().Name} {ex.Message}"
+                    BppLog.DebugEvent(
+                        CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
+                        ex,
+                        () =>
+                            [
+                                CombatReplayVideoLogEvents.MuxRecordingId.Bind(recordingId),
+                                CombatReplayVideoLogEvents.MuxStage.Bind(
+                                    ReplayVideoLogStage.MuxCallback
+                                ),
+                                CombatReplayVideoLogEvents.MuxReasonCode.Bind(
+                                    ReplayVideoDiagnosticReasonCode.CallbackException
+                                ),
+                                CombatReplayVideoLogEvents.MuxPath.Bind(finalPath),
+                                CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
+                            ]
                     );
                 }
             }
@@ -125,6 +167,7 @@ internal sealed class ReplayVideoAudioMuxer
     }
 
     internal MuxResolution Resolve(
+        string recordingId,
         ReplayVideoCaptureStatus status,
         string tempVideoPath,
         string finalPath,
@@ -138,7 +181,7 @@ internal sealed class ReplayVideoAudioMuxer
 
         if (status != ReplayVideoCaptureStatus.Completed)
         {
-            var result = DeleteTempAndReport(tempVideoPath, usableWavPaths, finalPath);
+            var result = DeleteTempAndReport(recordingId, tempVideoPath, usableWavPaths, finalPath);
             onResolved(result);
             return new MuxResolution { Synchronous = result };
         }
@@ -151,8 +194,7 @@ internal sealed class ReplayVideoAudioMuxer
                 usableWavPaths,
                 finalPath,
                 MuxStatus.FellBackToSilent,
-                "no audio WAV available",
-                warn: false
+                MuxReasonCode.NoAudio
             );
             onResolved(result);
             return new MuxResolution { Synchronous = result };
@@ -165,8 +207,7 @@ internal sealed class ReplayVideoAudioMuxer
                 existingWavPaths,
                 finalPath,
                 MuxStatus.FellBackToSilent,
-                "ffmpeg unavailable",
-                warn: true
+                MuxReasonCode.FfmpegUnavailable
             );
             onResolved(result);
             return new MuxResolution { Synchronous = result };
@@ -179,14 +220,14 @@ internal sealed class ReplayVideoAudioMuxer
                 existingWavPaths,
                 finalPath,
                 MuxStatus.FellBackToSilent,
-                "ffmpeg has no AAC encoder",
-                warn: true
+                MuxReasonCode.AacUnavailable
             );
             onResolved(result);
             return new MuxResolution { Synchronous = result };
         }
 
         var task = DispatchAsync(
+            recordingId,
             tempVideoPath,
             existingWavPaths,
             finalPath,
@@ -202,6 +243,7 @@ internal sealed class ReplayVideoAudioMuxer
     /// promoted to the final path so the recording is preserved.
     /// </summary>
     internal MuxResult Mux(
+        string recordingId,
         string ffmpegExecutable,
         string silentVideoTempPath,
         IReadOnlyList<string> wavPaths,
@@ -212,7 +254,7 @@ internal sealed class ReplayVideoAudioMuxer
         var arguments = BuildArguments(silentVideoTempPath, wavPaths, finalPath, audioBitrateKbps);
 
         Process? process = null;
-        var stderr = new StringBuilder(capacity: 2048);
+        var stderr = new BoundedTextTail();
 
         try
         {
@@ -234,7 +276,7 @@ internal sealed class ReplayVideoAudioMuxer
                     silentVideoTempPath,
                     wavPaths,
                     finalPath,
-                    "ffmpeg mux process failed to start"
+                    MuxReasonCode.ProcessStartFailed
                 );
             }
 
@@ -243,14 +285,7 @@ internal sealed class ReplayVideoAudioMuxer
             {
                 try
                 {
-                    var text = process.StandardError.ReadToEnd();
-                    if (!string.IsNullOrEmpty(text))
-                    {
-                        lock (stderr)
-                        {
-                            stderr.Append(text);
-                        }
-                    }
+                    ReadStderr(stderr, process.StandardError);
                 }
                 catch
                 {
@@ -265,18 +300,19 @@ internal sealed class ReplayVideoAudioMuxer
 
             if (!process.WaitForExit(MuxTimeoutMs))
             {
-                ForceKill(process);
-                drainThread.Join(500);
+                var exited = ForceKill(process);
+                FinishDrainAfterTimeout(process, drainThread, exited);
                 return FallBack(
                     silentVideoTempPath,
                     wavPaths,
                     finalPath,
-                    $"ffmpeg mux timed out after {MuxTimeoutMs}ms"
+                    MuxReasonCode.ProcessTimeout,
+                    stderrTail: stderr.Value
                 );
             }
 
-            drainThread.Join(500);
             var exitCode = process.ExitCode;
+            FinishDrainAfterExit(process, drainThread);
             var stderrTail = ReadStderrTail(stderr);
 
             if (exitCode == 0 && File.Exists(finalPath))
@@ -294,8 +330,9 @@ internal sealed class ReplayVideoAudioMuxer
                         silentVideoTempPath,
                         wavPaths,
                         finalPath,
-                        $"ffmpeg exit 0 but output is empty/zero-duration "
-                            + $"({mixedSize} bytes vs silent {silentSize} bytes). stderr tail: {stderrTail}"
+                        MuxReasonCode.ZeroDurationOutput,
+                        exitCode: exitCode,
+                        stderrTail: stderrTail
                     );
                 }
 
@@ -304,18 +341,36 @@ internal sealed class ReplayVideoAudioMuxer
 #endif
                 TryDelete(silentVideoTempPath);
                 TryDelete(wavPaths);
-                BppLog.Info(
-                    LogComponent,
-                    $"Muxed replay audio into '{finalPath}' ({mixedSize} bytes)."
+                BppLog.DebugEvent(
+                    CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
+                    () =>
+                        [
+                            CombatReplayVideoLogEvents.MuxRecordingId.Bind(recordingId),
+                            CombatReplayVideoLogEvents.MuxStage.Bind(
+                                ReplayVideoLogStage.MuxCallback
+                            ),
+                            CombatReplayVideoLogEvents.MuxReasonCode.Bind(MuxReasonCode.Muxed),
+                            CombatReplayVideoLogEvents.MuxPath.Bind(finalPath),
+                            CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
+                        ]
                 );
-                return new MuxResult(MuxStatus.Muxed, finalPath, mixedSize, null);
+                return new MuxResult(
+                    MuxStatus.Muxed,
+                    finalPath,
+                    mixedSize,
+                    MuxReasonCode.Muxed,
+                    exitCode,
+                    stderrTail
+                );
             }
 
             return FallBack(
                 silentVideoTempPath,
                 wavPaths,
                 finalPath,
-                $"ffmpeg exit code {exitCode}. stderr tail: {stderrTail}"
+                MuxReasonCode.NonZeroExit,
+                exitCode,
+                stderrTail
             );
         }
         catch (Exception ex)
@@ -324,7 +379,9 @@ internal sealed class ReplayVideoAudioMuxer
                 silentVideoTempPath,
                 wavPaths,
                 finalPath,
-                $"{ex.GetType().Name}: {ex.Message}"
+                MuxReasonCode.UnexpectedException,
+                stderrTail: stderr.Value,
+                exception: ex
             );
         }
         finally
@@ -341,6 +398,7 @@ internal sealed class ReplayVideoAudioMuxer
     }
 
     private MuxResult DeleteTempAndReport(
+        string recordingId,
         string tempVideoPath,
         IReadOnlyList<string>? wavPaths,
         string finalPath
@@ -355,16 +413,30 @@ internal sealed class ReplayVideoAudioMuxer
                 MuxStatus.Failed,
                 finalPath,
                 FfmpegRawVideoEncoder.TryGetFileSize(finalPath),
-                "capture did not complete"
+                MuxReasonCode.CaptureFailed
             );
         }
         catch (Exception ex)
         {
-            BppLog.Debug(
-                LogComponent,
-                $"Failed to delete temp recording '{tempVideoPath}': {ex.Message}"
+            BppLog.DebugEvent(
+                CombatReplayVideoLogEvents.RecordingCleanupFailed,
+                ex,
+                () =>
+                    [
+                        CombatReplayVideoLogEvents.CleanupRecordingId.Bind(recordingId),
+                        CombatReplayVideoLogEvents.CleanupStage.Bind(
+                            ReplayVideoLogStage.TempDelete
+                        ),
+                        CombatReplayVideoLogEvents.CleanupPath.Bind(tempVideoPath),
+                    ]
             );
-            return new MuxResult(MuxStatus.Failed, finalPath, 0, ex.Message);
+            return new MuxResult(
+                MuxStatus.Failed,
+                finalPath,
+                0,
+                MuxReasonCode.CaptureFailed,
+                exception: ex
+            );
         }
     }
 
@@ -373,35 +445,24 @@ internal sealed class ReplayVideoAudioMuxer
         IReadOnlyList<string>? wavPaths,
         string finalPath,
         MuxStatus status,
-        string reason,
-        bool warn
+        MuxReasonCode reasonCode
     )
     {
-        if (warn)
-        {
-            BppLog.Warn(
-                LogComponent,
-                $"Skipping mux, falling back to silent video ({reason}): {finalPath}"
-            );
-        }
-        else
-        {
-            BppLog.Info(LogComponent, $"Finalizing silent video ({reason}): {finalPath}");
-        }
-
         try
         {
             var size = PromoteSilentToFinal(silentVideoTempPath, finalPath);
             TryDelete(wavPaths);
-            return new MuxResult(status, finalPath, size, reason);
+            return new MuxResult(status, finalPath, size, reasonCode);
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                LogComponent,
-                $"Failed to promote silent video '{silentVideoTempPath}' to '{finalPath}': {ex.Message}"
+            return new MuxResult(
+                MuxStatus.Failed,
+                finalPath,
+                0,
+                MuxReasonCode.PromotionFailed,
+                exception: ex
             );
-            return new MuxResult(MuxStatus.Failed, finalPath, 0, ex.Message);
         }
     }
 
@@ -409,20 +470,37 @@ internal sealed class ReplayVideoAudioMuxer
         string silentVideoTempPath,
         IReadOnlyList<string>? wavPaths,
         string finalPath,
-        string reason
+        MuxReasonCode reasonCode,
+        int? exitCode = null,
+        string? stderrTail = null,
+        Exception? exception = null
     )
     {
-        BppLog.Warn(LogComponent, $"Mux failed, falling back to silent video: {reason}");
-
         try
         {
             var size = PromoteSilentToFinal(silentVideoTempPath, finalPath);
             TryDelete(wavPaths);
-            return new MuxResult(MuxStatus.FellBackToSilent, finalPath, size, reason);
+            return new MuxResult(
+                MuxStatus.FellBackToSilent,
+                finalPath,
+                size,
+                reasonCode,
+                exitCode,
+                stderrTail,
+                exception
+            );
         }
         catch (Exception ex)
         {
-            return new MuxResult(MuxStatus.Failed, finalPath, 0, ex.Message);
+            return new MuxResult(
+                MuxStatus.Failed,
+                finalPath,
+                0,
+                MuxReasonCode.PromotionFailed,
+                exitCode,
+                stderrTail,
+                ex
+            );
         }
     }
 
@@ -561,32 +639,43 @@ internal sealed class ReplayVideoAudioMuxer
             if (!process.Start())
                 return true; // Could not probe; do not strip audio over a launch hiccup.
 
-            var stdout = process.StandardOutput.ReadToEnd();
+            var stderr = new BoundedTextTail();
+            var hasAac = false;
+            var stdoutThread = StartAacProbeDrain(process.StandardOutput, value => hasAac = value);
+            var stderrThread = StartProbeDrain(
+                "BPP.CombatReplayVideo.ProbeStderr",
+                process.StandardError,
+                stderr
+            );
             if (!process.WaitForExit(5000))
             {
-                ForceKill(process);
+                var exited = ForceKill(process);
+                FinishProbeDrains(process, stdoutThread, stderrThread, exited);
                 return true;
             }
+            if (!FinishProbeDrains(process, stdoutThread, stderrThread, processExited: true))
+                return true;
 
             // ffmpeg lists encoders as e.g. " A..... aac                  AAC (Advanced Audio Coding)".
             // Match the encoder token "aac" specifically (built-in or "libfdk_aac" both satisfy a
             // " aac " token search; libfdk_aac also contains "aac" so a substring check suffices).
-            var hasAac = HasAacToken(stdout);
-            if (!hasAac)
-            {
-                BppLog.Warn(
-                    LogComponent,
-                    $"Resolved ffmpeg '{ffmpegExecutable}' reports no AAC encoder; replay audio will fall back to silent video."
-                );
-            }
-
             return hasAac;
         }
         catch (Exception ex)
         {
-            BppLog.Debug(
-                LogComponent,
-                $"AAC encoder probe failed for '{ffmpegExecutable}': {ex.GetType().Name} {ex.Message}"
+            BppLog.DebugEvent(
+                CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
+                ex,
+                () =>
+                    [
+                        CombatReplayVideoLogEvents.MuxRecordingId.Bind(null),
+                        CombatReplayVideoLogEvents.MuxStage.Bind(ReplayVideoLogStage.MuxProbe),
+                        CombatReplayVideoLogEvents.MuxReasonCode.Bind(
+                            ReplayVideoDiagnosticReasonCode.ProbeFailed
+                        ),
+                        CombatReplayVideoLogEvents.MuxPath.Bind(ffmpegExecutable),
+                        CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
+                    ]
             );
             return true; // Assume available on probe failure; mux still degrades gracefully.
         }
@@ -604,6 +693,121 @@ internal sealed class ReplayVideoAudioMuxer
     }
 
     private static readonly char[] s_whitespace = { ' ', '\t', '\r', '\f', '\v' };
+
+    private static Thread StartProbeDrain(string name, TextReader reader, BoundedTextTail tail)
+    {
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                ReadStderr(tail, reader);
+            }
+            catch
+            {
+                // Process exited or its streams were closed after a bounded timeout.
+            }
+        })
+        {
+            IsBackground = true,
+            Name = name,
+        };
+        thread.Start();
+        return thread;
+    }
+
+    private static Thread StartAacProbeDrain(TextReader reader, Action<bool> onCompleted)
+    {
+        var thread = new Thread(() =>
+        {
+            var hasAac = false;
+            try
+            {
+                hasAac = ReadAacEncoderProbe(reader);
+            }
+            catch
+            {
+                // Process exited or its stream was closed after a bounded timeout.
+            }
+            onCompleted(hasAac);
+        })
+        {
+            IsBackground = true,
+            Name = "BPP.CombatReplayVideo.ProbeStdout",
+        };
+        thread.Start();
+        return thread;
+    }
+
+    private static bool ReadAacEncoderProbe(TextReader reader)
+    {
+        const int maximumLineLength = 1024;
+        var buffer = new char[256];
+        var line = new StringBuilder(maximumLineLength);
+        var lineOverflowed = false;
+        var found = false;
+        while (true)
+        {
+            var read = reader.Read(buffer, 0, buffer.Length);
+            if (read <= 0)
+                break;
+            for (var index = 0; index < read; index++)
+            {
+                var character = buffer[index];
+                if (character == '\n')
+                {
+                    if (!lineOverflowed && HasAacToken(line.ToString()))
+                        found = true;
+                    line.Clear();
+                    lineOverflowed = false;
+                    continue;
+                }
+
+                if (line.Length < maximumLineLength)
+                    line.Append(character);
+                else
+                    lineOverflowed = true;
+            }
+        }
+
+        if (!lineOverflowed && line.Length > 0 && HasAacToken(line.ToString()))
+            found = true;
+        return found;
+    }
+
+    private static bool FinishProbeDrains(
+        Process process,
+        Thread stdoutThread,
+        Thread stderrThread,
+        bool processExited
+    )
+    {
+        if (processExited)
+        {
+            var stdoutCompleted = stdoutThread.Join(TimeSpan.FromMilliseconds(1000));
+            var stderrCompleted = stderrThread.Join(TimeSpan.FromMilliseconds(1000));
+            if (stdoutCompleted && stderrCompleted)
+                return true;
+        }
+
+        try
+        {
+            process.StandardOutput.Close();
+        }
+        catch { }
+        try
+        {
+            process.StandardError.Close();
+        }
+        catch { }
+        try
+        {
+            process.Dispose();
+        }
+        catch { }
+        stdoutThread.Join(TimeSpan.FromMilliseconds(500));
+        stderrThread.Join(TimeSpan.FromMilliseconds(500));
+        return false;
+    }
 
     private static bool HasAacToken(string? encodersOutput)
     {
@@ -661,10 +865,19 @@ internal sealed class ReplayVideoAudioMuxer
         }
         catch (Exception ex)
         {
-            // Faulted tasks already logged their own failure; surface nothing here.
-            BppLog.Debug(
-                LogComponent,
-                $"Draining pending mux tasks observed an exception: {ex.GetType().Name} {ex.Message}"
+            BppLog.DebugEvent(
+                CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
+                ex,
+                () =>
+                    [
+                        CombatReplayVideoLogEvents.MuxRecordingId.Bind(null),
+                        CombatReplayVideoLogEvents.MuxStage.Bind(ReplayVideoLogStage.MuxDrain),
+                        CombatReplayVideoLogEvents.MuxReasonCode.Bind(
+                            ReplayVideoDiagnosticReasonCode.DrainFailed
+                        ),
+                        CombatReplayVideoLogEvents.MuxPath.Bind(null),
+                        CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
+                    ]
             );
             return false;
         }
@@ -703,15 +916,59 @@ internal sealed class ReplayVideoAudioMuxer
         );
     }
 
-    private static string ReadStderrTail(StringBuilder stderr)
+    private static string ReadStderrTail(BoundedTextTail stderr) => stderr.Value;
+
+    internal static string CollectStderrTailForTests(TextReader reader)
     {
-        lock (stderr)
+        var tail = new BoundedTextTail();
+        ReadStderr(tail, reader);
+        return tail.Value;
+    }
+
+    private static void ReadStderr(BoundedTextTail tail, TextReader reader) =>
+        tail.ReadFrom(reader);
+
+    private static void FinishDrainAfterTimeout(
+        Process process,
+        Thread drainThread,
+        bool processExited
+    )
+    {
+        if (processExited)
         {
-            var text = stderr.ToString();
-            if (text.Length <= 2048)
-                return text;
-            return text.Substring(text.Length - 2048);
+            FinishDrainAfterExit(process, drainThread);
+            return;
         }
+
+        try
+        {
+            process.StandardError.Close();
+        }
+        catch { }
+        try
+        {
+            process.Dispose();
+        }
+        catch { }
+        drainThread.Join(TimeSpan.FromMilliseconds(500));
+    }
+
+    private static void FinishDrainAfterExit(Process process, Thread drainThread)
+    {
+        if (drainThread.Join(TimeSpan.FromMilliseconds(1000)))
+            return;
+
+        try
+        {
+            process.StandardError.Close();
+        }
+        catch { }
+        try
+        {
+            process.Dispose();
+        }
+        catch { }
+        drainThread.Join(TimeSpan.FromMilliseconds(500));
     }
 
     private static void TryDelete(string? path)
@@ -726,9 +983,17 @@ internal sealed class ReplayVideoAudioMuxer
         }
         catch (Exception ex)
         {
-            BppLog.Debug(
-                LogComponent,
-                $"Failed to delete '{path}': {ex.GetType().Name} {ex.Message}"
+            BppLog.DebugEvent(
+                CombatReplayVideoLogEvents.RecordingCleanupFailed,
+                ex,
+                () =>
+                    [
+                        CombatReplayVideoLogEvents.CleanupRecordingId.Bind(null),
+                        CombatReplayVideoLogEvents.CleanupStage.Bind(
+                            ReplayVideoLogStage.TempDelete
+                        ),
+                        CombatReplayVideoLogEvents.CleanupPath.Bind(path),
+                    ]
             );
         }
     }
@@ -759,16 +1024,35 @@ internal sealed class ReplayVideoAudioMuxer
                     Directory.CreateDirectory(directory);
 
                 File.Copy(sourcePath, targetPath, overwrite: true);
-                BppLog.Info(
-                    LogComponent,
-                    $"Preserved replay audio debug stem '{targetPath}' from '{sourcePath}'."
+                BppLog.DebugEvent(
+                    CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
+                    () =>
+                        [
+                            CombatReplayVideoLogEvents.MuxRecordingId.Bind(null),
+                            CombatReplayVideoLogEvents.MuxStage.Bind(ReplayVideoLogStage.DebugStem),
+                            CombatReplayVideoLogEvents.MuxReasonCode.Bind(
+                                ReplayVideoDiagnosticReasonCode.None
+                            ),
+                            CombatReplayVideoLogEvents.MuxPath.Bind(targetPath),
+                            CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
+                        ]
                 );
             }
             catch (Exception ex)
             {
-                BppLog.Debug(
-                    LogComponent,
-                    $"Failed to preserve replay audio debug stem '{targetPath}': {ex.GetType().Name} {ex.Message}"
+                BppLog.DebugEvent(
+                    CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
+                    ex,
+                    () =>
+                        [
+                            CombatReplayVideoLogEvents.MuxRecordingId.Bind(null),
+                            CombatReplayVideoLogEvents.MuxStage.Bind(ReplayVideoLogStage.DebugStem),
+                            CombatReplayVideoLogEvents.MuxReasonCode.Bind(
+                                ReplayVideoDiagnosticReasonCode.StemPreserveFailed
+                            ),
+                            CombatReplayVideoLogEvents.MuxPath.Bind(targetPath),
+                            CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
+                        ]
                 );
             }
         }
@@ -838,19 +1122,25 @@ internal sealed class ReplayVideoAudioMuxer
         return builder.Length == 0 ? "audio" : builder.ToString();
     }
 
-    private static void ForceKill(Process process)
+    private static bool ForceKill(Process process)
     {
         try
         {
-            if (!process.HasExited)
-            {
-                process.Kill();
-                process.WaitForExit(500);
-            }
+            if (process.HasExited)
+                return true;
+            process.Kill();
+            return process.WaitForExit(500);
         }
         catch
         {
-            // ignore
+            try
+            {
+                return process.HasExited;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

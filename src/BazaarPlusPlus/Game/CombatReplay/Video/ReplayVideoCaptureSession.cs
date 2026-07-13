@@ -49,7 +49,11 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     private bool _started;
     private bool _disposed;
     private bool _finalized;
-    private string? _failureReason;
+    private ReplayVideoRecordingReasonCode? _failureReasonCode;
+    private ReplayVideoRecordingReasonCode? _degradationReasonCode;
+    private Exception? _failureException;
+    private int? _exitCode;
+    private string? _stderrTail;
 
     public ReplayVideoCaptureSession(ReplayVideoCaptureRequest request)
     {
@@ -60,7 +64,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
     public ReplayVideoCaptureRequest Request => _request;
 
-    public bool IsActive => _started && !_finalized && !_disposed && _failureReason == null;
+    public bool IsActive => _started && !_finalized && !_disposed && !_failureReasonCode.HasValue;
 
     public int CapturedFrames => _capturedFrames;
 
@@ -99,6 +103,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         _pacer = new WallClockCfrPacer(_request.Fps);
 
         _encoder = new FfmpegRawVideoEncoder(
+            _request.VideoId,
             _request.FfmpegExecutable,
             _request.OutputFilePath,
             _request.Width,
@@ -125,9 +130,22 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         _nextCaptureTime = Time.unscaledTimeAsDouble;
         _started = true;
 
-        BppLog.Info(
-            "CombatReplayVideo",
-            $"Frame orientation: graphicsUVStartsAtTop={SystemInfo.graphicsUVStartsAtTop} verticalFlip={!SystemInfo.graphicsUVStartsAtTop}"
+        BppLog.DebugEvent(
+            CombatReplayVideoLogEvents.VideoCaptureStatsObserved,
+            () =>
+                [
+                    CombatReplayVideoLogEvents.StatsRecordingId.Bind(_request.VideoId),
+                    CombatReplayVideoLogEvents.StatsStage.Bind(ReplayVideoLogStage.CaptureStarted),
+                    CombatReplayVideoLogEvents.StatsWidth.Bind(_request.Width),
+                    CombatReplayVideoLogEvents.StatsHeight.Bind(_request.Height),
+                    CombatReplayVideoLogEvents.StatsFps.Bind(_request.Fps),
+                    CombatReplayVideoLogEvents.StatsCapturedFrames.Bind(0),
+                    CombatReplayVideoLogEvents.StatsRepeatedFrames.Bind(0),
+                    CombatReplayVideoLogEvents.StatsDroppedFrames.Bind(0),
+                    CombatReplayVideoLogEvents.StatsDurationMs.Bind(0),
+                    CombatReplayVideoLogEvents.StatsSizeBytes.Bind(0),
+                    CombatReplayVideoLogEvents.StatsOutputPath.Bind(_request.OutputFilePath),
+                ]
         );
     }
 
@@ -139,7 +157,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         var encoder = _encoder;
         if (encoder.WriterFailed)
         {
-            _failureReason ??= encoder.FailureReason ?? "Encoder writer reported a failure.";
+            _failureReasonCode ??= ReplayVideoRecordingReasonCode.EncoderWriterFailed;
             return;
         }
 
@@ -188,7 +206,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         {
             if (encoder.WriterFailed)
             {
-                _failureReason ??= encoder.FailureReason ?? "Encoder writer failed.";
+                _failureReasonCode ??= ReplayVideoRecordingReasonCode.EncoderWriterFailed;
                 break;
             }
 
@@ -233,10 +251,8 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "CombatReplayVideo",
-                $"AsyncGPUReadback.WaitAllRequests threw during finalize: {ex.Message}"
-            );
+            _degradationReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
+            _failureException ??= ex;
         }
 
         EmitFinalFrame();
@@ -246,26 +262,43 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         {
             try
             {
-                var success = encoder.WaitForCompletion(TimeSpan.FromSeconds(20));
-                if (!success)
+                var outcome = encoder.WaitForCompletion(TimeSpan.FromSeconds(20));
+                _exitCode = outcome.ExitCode;
+                _stderrTail = outcome.StderrTail;
+                if (!outcome.Succeeded)
                 {
-                    _failureReason ??=
-                        encoder.FailureReason ?? "FFmpeg failed to finalize within timeout.";
+                    _failureReasonCode ??= MapEncoderReason(outcome.ReasonCode);
+                    _failureException ??= outcome.Exception;
                 }
             }
             catch (Exception ex)
             {
-                _failureReason ??= $"Encoder finalize crashed: {ex.GetType().Name} {ex.Message}";
-                BppLog.Error("CombatReplayVideo", "Encoder finalize crashed.", ex);
+                _failureReasonCode ??= ReplayVideoRecordingReasonCode.EncoderWriterFailed;
+                _failureException ??= ex;
             }
         }
 
         ReleaseRenderTexture();
 
         var result = BuildResult(endReason);
-        BppLog.Info(
-            "CombatReplayVideo",
-            $"Replay video capture finalized status={result.Status} frames={result.CapturedFrames} repeated={_repeatedFrames} dropped={result.DroppedFrames} duration_ms={result.DurationMs} size_bytes={result.FileSizeBytes} file={result.OutputFilePath}"
+        BppLog.DebugEvent(
+            CombatReplayVideoLogEvents.VideoCaptureStatsObserved,
+            () =>
+                [
+                    CombatReplayVideoLogEvents.StatsRecordingId.Bind(_request.VideoId),
+                    CombatReplayVideoLogEvents.StatsStage.Bind(
+                        ReplayVideoLogStage.CaptureFinalized
+                    ),
+                    CombatReplayVideoLogEvents.StatsWidth.Bind(_request.Width),
+                    CombatReplayVideoLogEvents.StatsHeight.Bind(_request.Height),
+                    CombatReplayVideoLogEvents.StatsFps.Bind(_request.Fps),
+                    CombatReplayVideoLogEvents.StatsCapturedFrames.Bind(result.CapturedFrames),
+                    CombatReplayVideoLogEvents.StatsRepeatedFrames.Bind(_repeatedFrames),
+                    CombatReplayVideoLogEvents.StatsDroppedFrames.Bind(result.DroppedFrames),
+                    CombatReplayVideoLogEvents.StatsDurationMs.Bind(result.DurationMs),
+                    CombatReplayVideoLogEvents.StatsSizeBytes.Bind(result.FileSizeBytes),
+                    CombatReplayVideoLogEvents.StatsOutputPath.Bind(result.OutputFilePath),
+                ]
         );
         return result;
     }
@@ -283,7 +316,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         {
             if (!_finalized)
             {
-                _failureReason ??= "Session disposed without finalize.";
+                _failureReasonCode ??= ReplayVideoRecordingReasonCode.Aborted;
                 _encoder?.Dispose();
             }
         }
@@ -320,12 +353,8 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
         catch (Exception ex)
         {
-            _failureReason ??= $"ScreenCapture failed: {ex.GetType().Name} {ex.Message}";
-            BppLog.Error(
-                "CombatReplayVideo",
-                "ScreenCapture.CaptureScreenshotIntoRenderTexture failed.",
-                ex
-            );
+            _failureReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
+            _failureException ??= ex;
             return false;
         }
     }
@@ -339,9 +368,17 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
         if (request.hasError)
         {
-            BppLog.Debug(
-                "CombatReplayVideo",
-                $"AsyncGPUReadback request {sequenceNumber} returned with error."
+            BppLog.DebugEvent(
+                CombatReplayVideoLogEvents.VideoCaptureFrameDegraded,
+                () =>
+                    [
+                        CombatReplayVideoLogEvents.FrameRecordingId.Bind(_request.VideoId),
+                        CombatReplayVideoLogEvents.FrameStage.Bind(ReplayVideoLogStage.Readback),
+                        CombatReplayVideoLogEvents.FrameReasonCode.Bind(
+                            ReplayVideoDiagnosticReasonCode.ReadbackFailed
+                        ),
+                        CombatReplayVideoLogEvents.FrameSequence.Bind(sequenceNumber),
+                    ]
             );
             _droppedFrames++;
             return;
@@ -382,9 +419,18 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         catch (Exception ex)
         {
             _droppedFrames++;
-            BppLog.Debug(
-                "CombatReplayVideo",
-                $"Failed to copy readback {sequenceNumber}: {ex.GetType().Name} {ex.Message}"
+            BppLog.DebugEvent(
+                CombatReplayVideoLogEvents.VideoCaptureFrameDegraded,
+                ex,
+                () =>
+                    [
+                        CombatReplayVideoLogEvents.FrameRecordingId.Bind(_request.VideoId),
+                        CombatReplayVideoLogEvents.FrameStage.Bind(ReplayVideoLogStage.Readback),
+                        CombatReplayVideoLogEvents.FrameReasonCode.Bind(
+                            ReplayVideoDiagnosticReasonCode.ReadbackFailed
+                        ),
+                        CombatReplayVideoLogEvents.FrameSequence.Bind(sequenceNumber),
+                    ]
             );
         }
     }
@@ -402,7 +448,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
         if (encoder.WriterFailed)
         {
-            _failureReason ??= encoder.FailureReason ?? "Encoder writer failed.";
+            _failureReasonCode ??= ReplayVideoRecordingReasonCode.EncoderWriterFailed;
             return;
         }
 
@@ -476,9 +522,17 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
         catch (Exception ex)
         {
-            BppLog.Debug(
-                "CombatReplayVideo",
-                $"Failed to release capture RenderTexture: {ex.Message}"
+            BppLog.DebugEvent(
+                CombatReplayVideoLogEvents.RecordingCleanupFailed,
+                ex,
+                () =>
+                    [
+                        CombatReplayVideoLogEvents.CleanupRecordingId.Bind(_request.VideoId),
+                        CombatReplayVideoLogEvents.CleanupStage.Bind(
+                            ReplayVideoLogStage.RenderTextureRelease
+                        ),
+                        CombatReplayVideoLogEvents.CleanupPath.Bind(null),
+                    ]
             );
         }
     }
@@ -497,16 +551,20 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         var fileSize = FfmpegRawVideoEncoder.TryGetFileSize(_request.OutputFilePath);
 
         var status =
-            _failureReason != null
+            _failureReasonCode.HasValue || fileSize <= 0
                 ? ReplayVideoCaptureStatus.Failed
                 : (
                     _capturedFrames > 0
                         ? ReplayVideoCaptureStatus.Completed
                         : ReplayVideoCaptureStatus.Failed
                 );
-        var error = _failureReason;
-        if (status == ReplayVideoCaptureStatus.Failed && error == null && _capturedFrames == 0)
-            error = $"No frames captured before {endReason}.";
+        var reasonCode =
+            _failureReasonCode
+            ?? (
+                status == ReplayVideoCaptureStatus.Failed
+                    ? ReplayVideoRecordingReasonCode.CaptureFailed
+                    : _degradationReasonCode ?? ReplayVideoRecordingReasonCode.Completed
+            );
 
         return new ReplayVideoCaptureResult
         {
@@ -527,7 +585,25 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             DroppedFrames = _droppedFrames,
             FileSizeBytes = fileSize,
             Status = status,
-            Error = error,
+            Error = status == ReplayVideoCaptureStatus.Failed ? reasonCode.ToString() : null,
+            ReasonCode = reasonCode,
+            ExitCode = _exitCode,
+            StderrTail = _stderrTail,
+            Exception = _failureException,
+            Degraded = _degradationReasonCode.HasValue,
         };
     }
+
+    private static ReplayVideoRecordingReasonCode MapEncoderReason(
+        FfmpegEncoderFailureReasonCode reasonCode
+    ) =>
+        reasonCode switch
+        {
+            FfmpegEncoderFailureReasonCode.NonZeroExit =>
+                ReplayVideoRecordingReasonCode.EncoderNonZeroExit,
+            FfmpegEncoderFailureReasonCode.WriterTimeout
+            or FfmpegEncoderFailureReasonCode.ProcessTimeout =>
+                ReplayVideoRecordingReasonCode.EncoderTimeout,
+            _ => ReplayVideoRecordingReasonCode.EncoderWriterFailed,
+        };
 }

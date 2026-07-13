@@ -1,5 +1,7 @@
 #nullable enable
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.GameInterop;
@@ -11,12 +13,11 @@ namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
 internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
 {
-    public const string BazaarDbSnapshotScope = "BazaarDbSnapshotUploadController";
-
     public UploadFeedKind Kind => UploadFeedKind.BazaarDbSnapshot;
 
-    public UploadFeedActivation? Activate(IBppServices services, UploadFeedLogState logState)
+    public UploadFeedActivation? Activate(IBppServices services, UploadFeedLogState _)
     {
+        var screenshotLogState = new ScreenshotUploadLogState();
         try
         {
             var databasePath = services.Paths.RunLogDatabasePath;
@@ -27,16 +28,20 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
                 || string.IsNullOrWhiteSpace(screenshotsDirectoryPath)
             )
             {
-                BppLog.Warn(
-                    BazaarDbSnapshotScope,
-                    "BazaarDB screenshot upload is enabled but database or screenshots paths are invalid."
+                screenshotLogState.ReportInitializationDegraded(
+                    ScreenshotUploadLogValues.InvalidLocalPaths
                 );
                 return null;
             }
 
             var routes = ModApiRoutes.TryCreate(ModApiUploadDefaults.ApiBaseUrl);
             if (routes == null)
+            {
+                screenshotLogState.ReportInitializationDegraded(
+                    ScreenshotUploadLogValues.RouteUnavailable
+                );
                 return null;
+            }
 
             var requestTimeoutSeconds = Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds);
             var store = new BazaarDbSnapshotUploadStore(databasePath, screenshotsDirectoryPath);
@@ -49,32 +54,27 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
                 store,
                 routes,
                 httpClient,
-                BppClientCacheBridge.TryGetProfileAccountId
-            );
-
-            var startupDelaySeconds = Math.Max(5, ModApiUploadDefaults.StartupDelaySeconds);
-            var retryIntervalSeconds = Math.Max(1, ModApiUploadDefaults.IntervalSeconds);
-            BppLog.Info(
-                BazaarDbSnapshotScope,
-                $"BazaarDB screenshot uploader armed. enabled={IsEnabled(services)}, startup_delay={startupDelaySeconds}s, retry_interval={retryIntervalSeconds}s."
+                BppClientCacheBridge.TryGetProfileAccountId,
+                screenshotLogState
             );
 
             return new UploadFeedActivation
             {
-                UploadInBackgroundAsync = async cancellationToken =>
-                {
-                    await uploadService.UploadPendingInBackgroundAsync(cancellationToken);
-                    return UploadAttemptResult.NoHealthSignal();
-                },
+                UploadInBackgroundAsync = cancellationToken =>
+                    RunAttemptAsync(
+                        uploadService.UploadPendingInBackgroundAsync,
+                        screenshotLogState,
+                        cancellationToken
+                    ),
                 IsEnabled = () => IsEnabled(services),
                 Disposable = httpClient,
             };
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                BazaarDbSnapshotScope,
-                $"Failed to initialize BazaarDB screenshot upload service: {ex}"
+            screenshotLogState.ReportInitializationDegraded(
+                ScreenshotUploadLogValues.InitializationException,
+                ex
             );
             return null;
         }
@@ -82,4 +82,28 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
 
     private static bool IsEnabled(IBppServices services) =>
         services.Config.BazaarDbUploadEnabled?.Value ?? false;
+
+    internal static async Task<UploadAttemptResult> RunAttemptAsync(
+        Func<CancellationToken, Task> uploadAsync,
+        ScreenshotUploadLogState logState,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            await uploadAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            logState.ReportHealthDegraded(
+                ScreenshotUploadLogValues.ServiceException,
+                roundTripMilliseconds: null
+            );
+        }
+        return UploadAttemptResult.NoHealthSignal();
+    }
 }

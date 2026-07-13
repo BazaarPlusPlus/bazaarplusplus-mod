@@ -12,6 +12,7 @@ namespace BazaarPlusPlus.Game.CombatReplay.Video;
 internal sealed class FfmpegRawVideoEncoder : IDisposable
 {
     private readonly string _executable;
+    private readonly string _recordingId;
     private readonly string _outputFilePath;
     private readonly int _width;
     private readonly int _height;
@@ -20,17 +21,19 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
     private readonly string _preset;
     private readonly BlockingCollection<byte[]> _frameQueue;
     private readonly Action<byte[]>? _onFrameConsumed;
-    private readonly StringBuilder _stderrBuffer = new(capacity: 2048);
-    private readonly object _stderrLock = new();
+    private readonly BoundedTextTail _stderrTail = new();
+    private readonly object _failureSync = new();
     private Process? _process;
     private Thread? _writerThread;
     private Thread? _stderrThread;
     private volatile bool _running;
     private volatile bool _writerFailed;
-    private volatile string? _failureReason;
+    private volatile FfmpegEncoderFailureReasonCode _failureReasonCode;
+    private Exception? _failureException;
     private long _bytesWritten;
 
     public FfmpegRawVideoEncoder(
+        string recordingId,
         string executable,
         string outputFilePath,
         int width,
@@ -42,6 +45,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         Action<byte[]>? onFrameConsumed = null
     )
     {
+        _recordingId = recordingId ?? throw new ArgumentNullException(nameof(recordingId));
         if (string.IsNullOrWhiteSpace(executable))
             throw new ArgumentException("FFmpeg executable is required.", nameof(executable));
         if (string.IsNullOrWhiteSpace(outputFilePath))
@@ -71,22 +75,13 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
 
     public bool WriterFailed => _writerFailed;
 
-    public string? FailureReason => _failureReason;
+    public FfmpegEncoderFailureReasonCode FailureReasonCode => _failureReasonCode;
 
     public int QueuedFrameCount => _frameQueue.Count;
 
     public long BytesWritten => Interlocked.Read(ref _bytesWritten);
 
-    public string StderrTail
-    {
-        get
-        {
-            lock (_stderrLock)
-            {
-                return _stderrBuffer.ToString();
-            }
-        }
-    }
+    public string StderrTail => _stderrTail.Value;
 
     public void Start()
     {
@@ -125,9 +120,22 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         };
         _stderrThread.Start();
 
-        BppLog.Info(
-            "CombatReplayVideo",
-            $"FFmpeg encoder started pid={_process.Id} {_width}x{_height}@{_fps} crf={_crf} preset={_preset} -> {_outputFilePath}"
+        BppLog.DebugEvent(
+            CombatReplayVideoLogEvents.VideoCaptureStatsObserved,
+            () =>
+                [
+                    CombatReplayVideoLogEvents.StatsRecordingId.Bind(_recordingId),
+                    CombatReplayVideoLogEvents.StatsStage.Bind(ReplayVideoLogStage.EncoderStarted),
+                    CombatReplayVideoLogEvents.StatsWidth.Bind(_width),
+                    CombatReplayVideoLogEvents.StatsHeight.Bind(_height),
+                    CombatReplayVideoLogEvents.StatsFps.Bind(_fps),
+                    CombatReplayVideoLogEvents.StatsCapturedFrames.Bind(null),
+                    CombatReplayVideoLogEvents.StatsRepeatedFrames.Bind(null),
+                    CombatReplayVideoLogEvents.StatsDroppedFrames.Bind(null),
+                    CombatReplayVideoLogEvents.StatsDurationMs.Bind(null),
+                    CombatReplayVideoLogEvents.StatsSizeBytes.Bind(null),
+                    CombatReplayVideoLogEvents.StatsOutputPath.Bind(_outputFilePath),
+                ]
         );
     }
 
@@ -157,7 +165,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         }
     }
 
-    public bool WaitForCompletion(TimeSpan timeout)
+    public FfmpegEncoderCompletionOutcome WaitForCompletion(TimeSpan timeout)
     {
         SignalEndOfStream();
 
@@ -168,12 +176,15 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
             var remaining = deadline - DateTime.UtcNow;
             if (remaining <= TimeSpan.Zero || !_writerThread.Join(remaining))
             {
-                BppLog.Warn(
-                    "CombatReplayVideo",
-                    "FFmpeg writer thread did not finish within timeout."
+                RecordFailure(FfmpegEncoderFailureReasonCode.WriterTimeout);
+                var exited = ForceKill();
+                FinishStderrAfterTimeout(exited);
+                _running = false;
+                return FfmpegEncoderCompletionOutcome.Failure(
+                    FfmpegEncoderFailureReasonCode.WriterTimeout,
+                    TryGetExitCode(),
+                    StderrTail
                 );
-                ForceKill();
-                return false;
             }
         }
 
@@ -184,30 +195,36 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
             var waitMs = remaining > TimeSpan.Zero ? (int)remaining.TotalMilliseconds : 0;
             if (!process.WaitForExit(Math.Max(waitMs, 200)))
             {
-                BppLog.Warn(
-                    "CombatReplayVideo",
-                    "FFmpeg did not exit within timeout; killing process."
+                RecordFailure(FfmpegEncoderFailureReasonCode.ProcessTimeout);
+                var exited = ForceKill();
+                FinishStderrAfterTimeout(exited);
+                _running = false;
+                return FfmpegEncoderCompletionOutcome.Failure(
+                    FfmpegEncoderFailureReasonCode.ProcessTimeout,
+                    TryGetExitCode(),
+                    StderrTail
                 );
-                ForceKill();
-                return false;
             }
 
-            if (process.ExitCode != 0)
+            var exitCode = process.ExitCode;
+            JoinStderrReader();
+
+            if (exitCode != 0)
             {
-                _writerFailed = true;
-                _failureReason ??=
-                    $"ffmpeg exit code {process.ExitCode}. stderr tail: {StderrTail}";
-                BppLog.Warn(
-                    "CombatReplayVideo",
-                    $"FFmpeg exited with non-zero code {process.ExitCode}. stderr tail: {StderrTail}"
+                RecordFailure(FfmpegEncoderFailureReasonCode.NonZeroExit);
+                return FfmpegEncoderCompletionOutcome.Failure(
+                    FfmpegEncoderFailureReasonCode.NonZeroExit,
+                    exitCode,
+                    StderrTail
                 );
-                return false;
             }
         }
 
-        _stderrThread?.Join(TimeSpan.FromMilliseconds(500));
+        JoinStderrReader();
         _running = false;
-        return !_writerFailed;
+        return _writerFailed
+            ? FailureOutcome()
+            : FfmpegEncoderCompletionOutcome.Success(StderrTail);
     }
 
     public void Dispose()
@@ -255,8 +272,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
             var stdin = _process?.StandardInput.BaseStream;
             if (stdin == null)
             {
-                _writerFailed = true;
-                _failureReason = "FFmpeg stdin stream is unavailable.";
+                RecordFailure(FfmpegEncoderFailureReasonCode.StdinUnavailable);
                 return;
             }
 
@@ -272,19 +288,31 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
                     }
                     catch (Exception ex)
                     {
-                        BppLog.Debug("CombatReplayVideo", $"onFrameConsumed threw: {ex.Message}");
+                        BppLog.DebugEvent(
+                            CombatReplayVideoLogEvents.VideoCaptureFrameDegraded,
+                            ex,
+                            () =>
+                                [
+                                    CombatReplayVideoLogEvents.FrameRecordingId.Bind(_recordingId),
+                                    CombatReplayVideoLogEvents.FrameStage.Bind(
+                                        ReplayVideoLogStage.FrameConsumeCallback
+                                    ),
+                                    CombatReplayVideoLogEvents.FrameReasonCode.Bind(
+                                        ReplayVideoDiagnosticReasonCode.CallbackException
+                                    ),
+                                    CombatReplayVideoLogEvents.FrameSequence.Bind(null),
+                                ]
+                        );
                     }
                 }
                 catch (IOException ex)
                 {
-                    _writerFailed = true;
-                    _failureReason = $"FFmpeg stdin write failed: {ex.Message}";
+                    RecordFailure(FfmpegEncoderFailureReasonCode.StdinWriteFailed, ex);
                     return;
                 }
                 catch (ObjectDisposedException)
                 {
-                    _writerFailed = true;
-                    _failureReason = "FFmpeg stdin was disposed.";
+                    RecordFailure(FfmpegEncoderFailureReasonCode.StdinWriteFailed);
                     return;
                 }
             }
@@ -296,8 +324,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
             }
             catch (IOException ex)
             {
-                _writerFailed = true;
-                _failureReason = $"FFmpeg stdin close failed: {ex.Message}";
+                RecordFailure(FfmpegEncoderFailureReasonCode.StdinCloseFailed, ex);
             }
             catch (ObjectDisposedException)
             {
@@ -306,9 +333,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         }
         catch (Exception ex)
         {
-            _writerFailed = true;
-            _failureReason = $"Writer thread crashed: {ex.GetType().Name} {ex.Message}";
-            BppLog.Error("CombatReplayVideo", "FFmpeg writer thread crashed.", ex);
+            RecordFailure(FfmpegEncoderFailureReasonCode.WriterCrashed, ex);
         }
     }
 
@@ -320,24 +345,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
             if (reader == null)
                 return;
 
-            string? line;
-            while ((line = reader.ReadLine()) != null)
-            {
-                if (string.IsNullOrWhiteSpace(line))
-                    continue;
-
-                lock (_stderrLock)
-                {
-                    if (_stderrBuffer.Length > 4096)
-                        _stderrBuffer.Remove(0, _stderrBuffer.Length - 2048);
-                    _stderrBuffer.Append(line).Append('\n');
-                }
-
-                if (line.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0)
-                {
-                    BppLog.Warn("CombatReplayVideo", $"ffmpeg: {line}");
-                }
-            }
+            ReadStderr(_stderrTail, reader);
         }
         catch (IOException)
         {
@@ -345,30 +353,150 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         }
         catch (Exception ex)
         {
-            BppLog.Debug(
-                "CombatReplayVideo",
-                $"FFmpeg stderr reader exited: {ex.GetType().Name} {ex.Message}"
+            BppLog.DebugEvent(
+                CombatReplayVideoLogEvents.VideoCaptureFrameDegraded,
+                ex,
+                () =>
+                    [
+                        CombatReplayVideoLogEvents.FrameRecordingId.Bind(_recordingId),
+                        CombatReplayVideoLogEvents.FrameStage.Bind(
+                            ReplayVideoLogStage.StderrReader
+                        ),
+                        CombatReplayVideoLogEvents.FrameReasonCode.Bind(
+                            ReplayVideoDiagnosticReasonCode.ReaderException
+                        ),
+                        CombatReplayVideoLogEvents.FrameSequence.Bind(null),
+                    ]
             );
         }
     }
 
-    private void ForceKill()
+    internal static string CollectStderrTailForTests(TextReader reader)
     {
-        var process = _process;
-        if (process == null)
+        var tail = new BoundedTextTail();
+        ReadStderr(tail, reader);
+        return tail.Value;
+    }
+
+    private static void ReadStderr(BoundedTextTail tail, TextReader reader) =>
+        tail.ReadFrom(reader);
+
+    private void JoinStderrReader()
+    {
+        var stderrThread = _stderrThread;
+        if (stderrThread == null || ReferenceEquals(stderrThread, Thread.CurrentThread))
+            return;
+        if (stderrThread.Join(TimeSpan.FromMilliseconds(1000)))
             return;
 
+        var process = _process;
         try
         {
-            if (!process.HasExited)
-            {
-                process.Kill();
-                process.WaitForExit(500);
-            }
+            process?.StandardError.Close();
+        }
+        catch { }
+        try
+        {
+            process?.Dispose();
+        }
+        catch { }
+        _process = null;
+        stderrThread.Join(TimeSpan.FromMilliseconds(500));
+    }
+
+    private void FinishStderrAfterTimeout(bool processExited)
+    {
+        if (processExited)
+        {
+            JoinStderrReader();
+            return;
+        }
+
+        var process = _process;
+        try
+        {
+            process?.StandardError.Close();
+        }
+        catch { }
+        try
+        {
+            process?.StandardInput.Close();
+        }
+        catch { }
+        try
+        {
+            process?.Dispose();
+        }
+        catch { }
+        _process = null;
+        _stderrThread?.Join(TimeSpan.FromMilliseconds(500));
+    }
+
+    private void RecordFailure(
+        FfmpegEncoderFailureReasonCode reasonCode,
+        Exception? exception = null
+    )
+    {
+        _writerFailed = true;
+        lock (_failureSync)
+        {
+            if (_failureReasonCode != FfmpegEncoderFailureReasonCode.None)
+                return;
+            _failureReasonCode = reasonCode;
+            _failureException = exception;
+        }
+    }
+
+    private FfmpegEncoderCompletionOutcome FailureOutcome()
+    {
+        lock (_failureSync)
+        {
+            return FfmpegEncoderCompletionOutcome.Failure(
+                _failureReasonCode == FfmpegEncoderFailureReasonCode.None
+                    ? FfmpegEncoderFailureReasonCode.WriterCrashed
+                    : _failureReasonCode,
+                TryGetExitCode(),
+                StderrTail,
+                _failureException
+            );
+        }
+    }
+
+    private int? TryGetExitCode()
+    {
+        try
+        {
+            return _process is { HasExited: true } process ? process.ExitCode : null;
         }
         catch
         {
-            // ignore
+            return null;
+        }
+    }
+
+    private bool ForceKill()
+    {
+        var process = _process;
+        if (process == null)
+            return true;
+
+        try
+        {
+            if (process.HasExited)
+                return true;
+            process.Kill();
+            return process.WaitForExit(500);
+        }
+        catch
+        {
+            try
+            {
+                return process.HasExited;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 

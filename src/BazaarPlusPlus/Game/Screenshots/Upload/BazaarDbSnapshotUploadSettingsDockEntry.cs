@@ -2,7 +2,6 @@
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Upload;
-using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
@@ -36,10 +35,6 @@ internal static class BazaarDbSnapshotUploadSettingsDockEntry
         if (!enabled)
             return;
 
-        BppLog.Info(
-            BazaarDbSnapshotUploadFeed.BazaarDbSnapshotScope,
-            "BazaarDB screenshot upload toggle armed an immediate attempt."
-        );
         BackgroundUploadPump.ArmImmediate(UploadFeedKind.BazaarDbSnapshot);
     }
 }

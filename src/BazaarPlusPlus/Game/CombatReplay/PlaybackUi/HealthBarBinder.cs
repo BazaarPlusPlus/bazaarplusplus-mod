@@ -60,10 +60,10 @@ internal static class HealthBarBinder
         encounterController.ShowCard(show: true);
     }
 
-    internal static async Task PrepareHealthBarsAsync()
+    internal static async Task PrepareHealthBarsAsync(IReplayPlaybackOutcomeSink outcome)
     {
-        var bindings = await RefreshHealthBarBindingsAsync();
-        ShowPlayerHealthBar(bindings.PlayerController);
+        var bindings = await RefreshHealthBarBindingsAsync(outcome);
+        ShowPlayerHealthBar(bindings.PlayerController, outcome);
         Data.PlayerExperienceBar?.ToggleExperienceBarAndText(isVisible: false);
         Events.TryShowEmptyOpponentHealthBar.Trigger();
     }
@@ -73,15 +73,25 @@ internal static class HealthBarBinder
         Events.TryRefillOpponentHealthBar.Trigger();
     }
 
-    private static async Task<ReplayBoardUiBindings> RefreshHealthBarBindingsAsync()
+    private static async Task<ReplayBoardUiBindings> RefreshHealthBarBindingsAsync(
+        IReplayPlaybackOutcomeSink outcome
+    )
     {
         var bindings = ResolveBoardUiControllers();
 
         if (bindings.PlayerController != null)
-            BindBoardUiController(bindings.PlayerController, registerPlayerHealthBar: true);
+            BindBoardUiController(
+                bindings.PlayerController,
+                registerPlayerHealthBar: true,
+                outcome: outcome
+            );
 
         if (bindings.OpponentController != null)
-            BindBoardUiController(bindings.OpponentController, registerPlayerHealthBar: false);
+            BindBoardUiController(
+                bindings.OpponentController,
+                registerPlayerHealthBar: false,
+                outcome: outcome
+            );
 
         await Task.Delay(150);
         return bindings;
@@ -138,7 +148,8 @@ internal static class HealthBarBinder
 
     private static void BindBoardUiController(
         BoardUIController controller,
-        bool registerPlayerHealthBar
+        bool registerPlayerHealthBar,
+        IReplayPlaybackOutcomeSink outcome
     )
     {
         var player =
@@ -146,34 +157,42 @@ internal static class HealthBarBinder
         if (player == null)
             return;
 
-        PlayerAttributeRepairer.EnsurePlayerAttributes(player, controller.combatantId);
+        PlayerAttributeRepairer.EnsurePlayerAttributes(player, controller.combatantId, outcome);
 
         if (PlaybackUiState.InitializedBoardUiControllers.Add(controller.GetInstanceID()))
             InvokeBoardUiMethod(controller, "Init", player);
 
         if (controller.combatantId == ECombatantId.Player)
-            PlayerAttributeRepairer.UnregisterPlayerPortraitPlacedHandler(controller);
+            PlayerAttributeRepairer.UnregisterPlayerPortraitPlacedHandler(controller, outcome);
 
         InvokeBoardUiMethod(controller, "SetBattlePlayer", player);
         ApplyBoardUiDividerConfig(controller);
-        PlayerAttributeRepairer.InitializeBoardUiHealthBar(controller, player);
+        PlayerAttributeRepairer.InitializeBoardUiHealthBar(controller, player, outcome);
 
         if (registerPlayerHealthBar && controller.combatantId == ECombatantId.Player)
             Data.RegisterPlayerHealthBar(controller);
     }
 
-    private static void ShowPlayerHealthBar(BoardUIController? playerController)
+    private static void ShowPlayerHealthBar(
+        BoardUIController? playerController,
+        IReplayPlaybackOutcomeSink outcome
+    )
     {
         if (playerController != null)
         {
             if (Data.Run?.Player != null)
                 PlayerAttributeRepairer.EnsurePlayerAttributes(
                     Data.Run.Player,
-                    ECombatantId.Player
+                    ECombatantId.Player,
+                    outcome
                 );
 
             InvokeBoardUiMethod(playerController, "SetBattlePlayer", Data.Run?.Player);
-            PlayerAttributeRepairer.InitializeBoardUiHealthBar(playerController, Data.Run?.Player);
+            PlayerAttributeRepairer.InitializeBoardUiHealthBar(
+                playerController,
+                Data.Run?.Player,
+                outcome
+            );
             playerController.ShowEmptyPlayerHealthBar();
             RevealBoardUiHealthBar(playerController, showStatusNumbers: true);
             PlayerAttributeRepairer.RecalculateHealthBarDividers(

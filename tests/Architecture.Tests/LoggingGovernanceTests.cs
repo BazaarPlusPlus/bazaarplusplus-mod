@@ -89,44 +89,6 @@ public sealed class LoggingGovernanceTests
                 "399:Warn,826:Debug,861:Debug,1258:Debug,1317:Debug",
             ["Game/CollectionPanel/Sources/CollectionSourceCatalog.cs"] =
                 "79:Info,87:Error,486:Warn",
-            ["Game/CombatReplay/Audio/CoreAudioProcessTapCaptureTap.cs"] =
-                "67:Warn,83:Info,88:Warn,129:Warn,183:Warn",
-            ["Game/CombatReplay/Audio/ReplayAudioCaptureFactory.cs"] = "76:Warn",
-            ["Game/CombatReplay/Audio/ReplayAudioTapStopper.cs"] = "49:Warn,54:Info",
-            ["Game/CombatReplay/Audio/WasapiLoopbackCaptureTap.cs"] =
-                "97:Warn,111:Warn,120:Warn,130:Warn,147:Warn,156:Warn,168:Warn,182:Info,190:Warn,223:Warn,237:Warn,314:Warn",
-            ["Game/CombatReplay/Bootstrap/ReplayBootstrap.cs"] =
-                "25:Info,55:Info,74:Info,118:Info,125:Warn,147:Error",
-            ["Game/CombatReplay/Bootstrap/SnapshotRehydrator.cs"] =
-                "31:Warn,49:Warn,67:Warn,86:Warn,106:Info",
-            ["Game/CombatReplay/Bootstrap/SocketBehaviorBridge.cs"] = "44:Warn,69:Warn",
-            ["Game/CombatReplay/CombatReplayPersistenceQueue.cs"] = "92:Warn,131:Warn",
-            ["Game/CombatReplay/CombatReplayRuntime.cs"] =
-                "228:Error,245:Warn,287:Warn,387:Info,396:Error,441:Info,449:Error,496:Info,501:Error",
-            ["Game/CombatReplay/PlaybackUi/OpponentPortraitController.cs"] =
-                "44:Warn,56:Warn,86:Warn,101:Warn,128:Warn,188:Warn",
-            ["Game/CombatReplay/PlaybackUi/PlayerAttributeRepairer.cs"] =
-                "67:Warn,99:Warn,130:Warn",
-            ["Game/CombatReplay/ReplayPersistenceOrchestrator.cs"] =
-                "64:Error,73:Info,110:Warn,119:Warn",
-            ["Game/CombatReplay/ReplayPlaybackPublisher.cs"] = "38:Info,68:Error,104:Error",
-            ["Game/CombatReplay/Video/CombatReplayVideoRecorder.cs"] =
-                "45:Warn,77:Info,101:Debug,105:Debug,114:Info,121:Warn,145:Info,151:Warn,157:Warn,176:Error,235:Info,242:Error,319:Info,357:Warn,395:Warn,446:Warn,540:Warn,592:Debug,631:Warn,691:Debug,705:Warn,725:Debug",
-            ["Game/CombatReplay/Video/FfmpegLocator.cs"] =
-                "27:Info,34:Info,112:Debug,150:Warn,161:Debug",
-            ["Game/CombatReplay/Video/FfmpegRawVideoEncoder.cs"] =
-                "128:Info,171:Warn,187:Warn,200:Warn,275:Debug,311:Error,338:Warn,348:Debug",
-            ["Game/CombatReplay/Video/ReplayVideoAudioMuxer.cs"] =
-                "99:Error,115:Debug,307:Info,363:Debug,382:Warn,389:Info,400:Warn,415:Warn,577:Warn,587:Debug,665:Debug,729:Debug,762:Info,769:Debug",
-            ["Game/CombatReplay/Video/ReplayVideoCaptureSession.cs"] =
-                "128:Info,236:Warn,259:Error,266:Info,324:Error,342:Debug,385:Debug,479:Debug",
-            ["Game/CombatReplay/Warmup/AudioBankWarmer.cs"] =
-                "26:Warn,37:Warn,61:Warn,79:Info,88:Warn,99:Info,109:Warn,116:Info,127:Warn,155:Warn,164:Info,172:Info,190:Warn,201:Warn,212:Info,229:Warn,238:Info,245:Warn",
-            ["Game/CombatReplay/Warmup/CombatVfxWarmer.cs"] = "29:Warn,232:Debug",
-            ["Game/CombatReplay/Warmup/PresentationWarmer.cs"] =
-                "37:Info,56:Warn,73:Warn,137:Warn,171:Debug",
-            ["Game/CombatReplay/Warmup/SoundtrackWarmer.cs"] =
-                "48:Warn,63:Warn,73:Warn,86:Info,134:Warn,158:Warn,196:Warn,228:Warn,251:Warn,259:Warn,317:Warn,342:Warn",
             ["Game/CombatStatusBar/CombatStatusBar.Config.cs"] = "22:Info",
             ["Game/EventPreview/EventPreviewPlanController.cs"] =
                 "64:Warn,110:Info,147:Error,154:Info,165:Error",
@@ -158,15 +120,6 @@ public sealed class LoggingGovernanceTests
             ["Game/PvpBattles/PvpBattleSnapshotCollector.cs"] =
                 "226:Warn,242:Warn,324:Warn,343:Warn,364:Warn,408:Warn",
             ["Game/RunLogging/RunLogStoreLoggerBridge.cs"] = "10:Warn,13:Error",
-            ["Game/Screenshots/EndOfRunCaptureReadinessDetector.cs"] = "72:Warn,98:Warn",
-            ["Game/Screenshots/EndOfRunScreenshotController.cs"] =
-                "62:Warn,211:Debug,218:Warn,256:Warn,269:Warn,305:Warn,317:Error,392:Warn,399:Error,430:Warn,432:Error,444:Warn,488:Warn,500:Warn,536:Error,577:Error",
-            ["Game/Screenshots/EndOfRunSummaryRevealDetector.cs"] = "288:Warn",
-            ["Game/Screenshots/ScreenshotService.cs"] = "60:Error,71:Info,79:Error,218:Debug",
-            ["Game/Screenshots/Upload/BazaarDbSnapshotUploadFeed.cs"] = "30:Warn,57:Info,75:Error",
-            ["Game/Screenshots/Upload/BazaarDbSnapshotUploadService.cs"] =
-                "65:Info,74:Info,86:Warn,94:Debug",
-            ["Game/Screenshots/Upload/BazaarDbSnapshotUploadSettingsDockEntry.cs"] = "39:Info",
             ["Game/Settings/BppDockButtonSpriteProvider.cs"] = "41:Warn,62:Warn",
             ["Game/Settings/BppNativeSettingsButtonClone.cs"] = "72:Debug",
             ["Game/Settings/BppNativeSettingsSectionController.cs"] =
@@ -289,18 +242,11 @@ public sealed class LoggingGovernanceTests
     {
         var root = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus");
         Assert.False(
-            File.Exists(
-                Path.Combine(root, "Game", "VoiceSubtitles", "VoiceSubtitlesLog.cs")
-            )
+            File.Exists(Path.Combine(root, "Game", "VoiceSubtitles", "VoiceSubtitlesLog.cs"))
         );
         Assert.False(
             File.Exists(
-                Path.Combine(
-                    root,
-                    "GameInterop",
-                    "VoiceSubtitles",
-                    "VoiceSubtitlesInteropLog.cs"
-                )
+                Path.Combine(root, "GameInterop", "VoiceSubtitles", "VoiceSubtitlesInteropLog.cs")
             )
         );
 
@@ -311,6 +257,31 @@ public sealed class LoggingGovernanceTests
             Assert.DoesNotContain("VoiceSubtitlesInteropLog", source, StringComparison.Ordinal);
             Assert.DoesNotContain("using VoiceSubtitlesLog", source, StringComparison.Ordinal);
         }
+    }
+
+    [Fact]
+    public void CombatReplay_and_Screenshots_free_text_logging_is_absent()
+    {
+        var gameRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus", "Game");
+        var migratedRoots = new[]
+        {
+            Path.Combine(gameRoot, "CombatReplay"),
+            Path.Combine(gameRoot, "Screenshots"),
+        };
+        var violations = migratedRoots
+            .SelectMany(ProductionFiles)
+            .SelectMany(file =>
+                LegacyBppLogCall
+                    .Matches(File.ReadAllText(file))
+                    .Select(match => $"{Path.GetRelativePath(gameRoot, file)}:{match.Value}")
+            )
+            .ToArray();
+
+        Assert.True(
+            violations.Length == 0,
+            "CombatReplay/Screenshots migrations must not retain free-text BppLog calls:\n"
+                + string.Join("\n", violations)
+        );
     }
 
     [Fact]

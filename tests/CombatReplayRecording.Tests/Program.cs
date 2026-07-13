@@ -1398,6 +1398,7 @@ static object InvokeResolve(
             muxer,
             new object?[]
             {
+                "recording-mux-test-00000001",
                 status,
                 tempVideoPath,
                 finalPath,

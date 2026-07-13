@@ -40,6 +40,16 @@ internal sealed class ReplayVideoCaptureResult
     public ReplayVideoCaptureStatus Status { get; init; }
 
     public string? Error { get; init; }
+
+    public ReplayVideoRecordingReasonCode ReasonCode { get; init; }
+
+    public int? ExitCode { get; init; }
+
+    public string? StderrTail { get; init; }
+
+    public Exception? Exception { get; init; }
+
+    public bool Degraded { get; init; }
 }
 
 internal enum ReplayVideoCaptureStatus

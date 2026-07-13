@@ -19,4 +19,16 @@ internal readonly struct ReplayAudioCaptureResult
     public float PeakAmplitude { get; init; }
 
     public bool Usable { get; init; }
+
+    public ReplayAudioBackend Backend { get; init; }
+
+    public int SampleRateHz { get; init; }
+
+    public int Channels { get; init; }
+
+    public string SampleFormat { get; init; }
+
+    public ReplayAudioFailureReasonCode FailureReason { get; init; }
+
+    public System.Exception? FailureException { get; init; }
 }

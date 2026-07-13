@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogSchema.cs"
+      Link="Logging/Core/BppLogSchema.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogEventCatalog.cs"
+      Link="Logging/Core/BppLogEventCatalog.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogSchemaRules.cs"
+      Link="Logging/Core/BppLogSchemaRules.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/CombatReplayPlaybackSource.cs"
+      Link="CombatReplayPlaybackSource.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/CombatReplayLogEvents.cs"
+      Link="CombatReplayLogEvents.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReplayPlaybackLogOperation.cs"
+      Link="ReplayPlaybackLogOperation.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReplayPlaybackStateExitCoordinator.cs"
+      Link="ReplayPlaybackStateExitCoordinator.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReplayPersistenceLogState.cs"
+      Link="ReplayPersistenceLogState.cs"
+    />
+  </ItemGroup>
+</Project>

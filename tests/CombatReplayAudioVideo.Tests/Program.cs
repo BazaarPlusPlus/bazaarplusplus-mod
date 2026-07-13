@@ -1,4 +1,5 @@
 using System.Reflection;
+using BepInEx.Logging;
 
 // Behavioral unit tests for the two design-mandated pure-logic units of the
 // combat-replay audio/video pipeline, reached as internal types via reflection
@@ -16,6 +17,11 @@ ZeroDurationMuxGuardTests.Run();
 MuxerArgumentTests.Run();
 MuxerDebugStemTests.Run();
 AudioTapPlanTests.Run();
+BoundedTextTailTests.Run();
+RecordingOperationContractTests.Run();
+MediaEventCatalogTests.Run();
+AudioStopTimeoutTests.Run();
+RecorderIntegrationContractTests.Run();
 
 Console.WriteLine("CombatReplayAudioVideo tests passed.");
 
@@ -680,6 +686,1173 @@ file static class AudioTapPlanTests
             method.Invoke(null, new object[] { tempVideoPath })
             ?? throw new InvalidOperationException("DeriveAudioWavPaths returned null.")
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 8) FFmpeg stderr collection: both process readers share a fixed-capacity,
+//    chunk-fed tail. A single hostile line must never expand retained memory.
+// ---------------------------------------------------------------------------
+file static class BoundedTextTailTests
+{
+    private static readonly Type TailType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.BoundedTextTail"
+    );
+
+    public static void Run()
+    {
+        const int capacity = 4096;
+        var hostile = "prefix\r\n\t" + new string('x', 100_000) + "\r\nTAIL";
+        var tail =
+            Activator.CreateInstance(
+                TailType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new object[] { capacity },
+                culture: null
+            ) ?? throw new InvalidOperationException("BoundedTextTail should be constructible.");
+        using var reader = new StringReader(hostile);
+        TestReflection.Invoke(
+            TailType,
+            tail,
+            "ReadFrom",
+            new[] { typeof(TextReader) },
+            new object[] { reader }
+        );
+
+        var value = (string)TestReflection.GetProp(TailType, tail, "Value")!;
+        TestReflection.Assert(value.Length <= capacity, "Retained stderr must respect its cap.");
+        TestReflection.Assert(
+            (int)TestReflection.GetProp(TailType, tail, "Length")! <= capacity,
+            "Observable collector length must stay bounded."
+        );
+        TestReflection.Assert(
+            (bool)TestReflection.GetProp(TailType, tail, "WasTruncated")!,
+            "A 100k stderr line must mark the tail truncated."
+        );
+        TestReflection.Assert(
+            value.EndsWith("\r\nTAIL", StringComparison.Ordinal),
+            "The collector must preserve the newest stderr content."
+        );
+
+        var root = FindRepositoryRoot();
+        var raw = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src/BazaarPlusPlus/Game/CombatReplay/Video/FfmpegRawVideoEncoder.cs"
+            )
+        );
+        var mux = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoAudioMuxer.cs"
+            )
+        );
+        TestReflection.Assert(
+            raw.Contains("BoundedTextTail", StringComparison.Ordinal)
+                && !raw.Contains("ReadLine()", StringComparison.Ordinal),
+            "Raw encoding stderr must use the bounded chunk collector, never ReadLine."
+        );
+        TestReflection.Assert(
+            mux.Contains("BoundedTextTail", StringComparison.Ordinal)
+                && !mux.Contains(".ReadToEnd()", StringComparison.Ordinal),
+            "Mux and probe pipes must use bounded concurrent collectors, never ReadToEnd."
+        );
+        TestReflection.Assert(
+            !raw.Contains("ffmpeg: {line}", StringComparison.Ordinal),
+            "Raw stderr must not emit one operational record per external line."
+        );
+
+        var rawTail = CollectThrough(
+            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegRawVideoEncoder",
+            hostile
+        );
+        var muxTail = CollectThrough(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer",
+            hostile
+        );
+        TestReflection.Assert(
+            rawTail == muxTail && rawTail.Length <= capacity,
+            "Both production stderr readers must retain the same bounded tail."
+        );
+
+        var muxerType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer"
+        );
+        var probeReader =
+            muxerType.GetMethod(
+                "ReadAacEncoderProbe",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException("Bounded AAC probe reader not found.");
+        using var noisyProbe = new StringReader(
+            new string('z', 100_000) + "\n A..... aac AAC encoder\n"
+        );
+        TestReflection.Assert(
+            (bool)(probeReader.Invoke(null, new object[] { noisyProbe }) ?? false),
+            "A hostile overlong probe line must be discarded without hiding a later AAC row."
+        );
+    }
+
+    private static string CollectThrough(string typeName, string stderr)
+    {
+        var type = TestReflection.RequireType(typeName);
+        var method =
+            type.GetMethod(
+                "CollectStderrTailForTests",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException($"{typeName} collector seam not found.");
+        using var reader = new StringReader(stderr);
+        return (string)(method.Invoke(null, new object[] { reader }) ?? string.Empty);
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(Environment.CurrentDirectory);
+        while (current != null)
+        {
+            if (
+                File.Exists(Path.Combine(current.FullName, "Directory.Build.props"))
+                && Directory.Exists(Path.Combine(current.FullName, "src", "BazaarPlusPlus"))
+            )
+                return current.FullName;
+            current = current.Parent;
+        }
+        throw new InvalidOperationException("Repository root not found.");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 9) Recorder-owned terminal: preallocated identity, result-based severity,
+//    verified artifact, and an atomic one-shot under late/shutdown races.
+// ---------------------------------------------------------------------------
+file static class RecordingOperationContractTests
+{
+    private static readonly Type OperationType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingOperation"
+    );
+    private static readonly Type CompletionType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingCompletion"
+    );
+    private static readonly Type SourceType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.CombatReplayPlaybackSource"
+    );
+    private static readonly Type AudioStatusType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioStatus"
+    );
+    private static readonly Type MetadataStatusType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoMetadataStatus"
+    );
+    private static readonly Type ReasonType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingReasonCode"
+    );
+    private static readonly Type LifecycleType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingLifecycle"
+    );
+
+    public static void Run()
+    {
+        var root = Path.Combine(
+            Path.GetTempPath(),
+            "bpp-recording-operation-tests",
+            Guid.NewGuid().ToString("N")
+        );
+        Directory.CreateDirectory(root);
+        try
+        {
+            using var logs = new StructuredLogCapture();
+            var fullPath = Path.Combine(root, "full.mp4");
+            File.WriteAllBytes(fullPath, new byte[] { 1, 2, 3, 4 });
+            var success = CreateOperation("recording-success-00000001");
+            TestReflection.Assert(
+                Complete(success, Completion(fullPath, "Full", "Complete", "Completed")),
+                "A full artifact should close its operation."
+            );
+            logs.AssertSingle(LogLevel.Info, "event=combat_replay.video_recording.succeeded");
+
+            logs.Clear();
+            var silentPath = Path.Combine(root, "silent.mp4");
+            File.WriteAllBytes(silentPath, new byte[] { 5 });
+            var degraded = CreateOperation("recording-degraded-00000002");
+            TestReflection.Assert(
+                Complete(
+                    degraded,
+                    Completion(silentPath, "Silent", "Complete", "AudioUnavailable")
+                ),
+                "A preserved silent artifact should close as degraded."
+            );
+            logs.AssertSingle(LogLevel.Warning, "event=combat_replay.video_recording.degraded");
+
+            logs.Clear();
+            var missing = CreateOperation("recording-missing-00000003");
+            TestReflection.Assert(
+                Complete(
+                    missing,
+                    Completion(Path.Combine(root, "missing.mp4"), "Full", "Complete", "Completed")
+                ),
+                "A missing artifact should still close the requested operation."
+            );
+            logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
+
+            logs.Clear();
+            var racing = CreateOperation("recording-race-00000004");
+            var racePath = Path.Combine(root, "race.mp4");
+            File.WriteAllBytes(racePath, new byte[] { 9 });
+            var completion = Completion(racePath, "Full", "Complete", "Completed");
+            var winners = 0;
+            Parallel.For(
+                0,
+                64,
+                _ =>
+                {
+                    if (Complete(racing, completion))
+                        Interlocked.Increment(ref winners);
+                }
+            );
+            TestReflection.Assert(winners == 1, "Exactly one concurrent terminal may win.");
+            logs.AssertSingle(LogLevel.Info, "event=combat_replay.video_recording.succeeded");
+            TestReflection.Assert(
+                !logs.Joined.Contains("recording-race-00000004", StringComparison.Ordinal),
+                "Rendered correlation must not expose the full recording id."
+            );
+            TestReflection.Assert(
+                !logs.Joined.Contains(root, StringComparison.Ordinal),
+                "Rendered output paths must not expose the absolute temp root."
+            );
+
+            HostileStderrRendersAsOneBoundedTerminal(root, logs);
+            ShutdownSweepClosesOrphanOnce(root, logs);
+            LifecycleScenarioMatrix(root, logs);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    private static void LifecycleScenarioMatrix(string root, StructuredLogCapture logs)
+    {
+        foreach (
+            var reason in new[]
+            {
+                "FfmpegUnavailable",
+                "AsyncGpuReadbackUnavailable",
+                "OutputPathUnavailable",
+                "InvalidDimensions",
+            }
+        )
+        {
+            logs.Clear();
+            var (lifecycle, operation) = StartLifecycle("preflight-" + reason);
+            InvokeLifecycle(
+                lifecycle,
+                "CompletePreflight",
+                operation,
+                Enum.Parse(ReasonType, reason),
+                null
+            );
+            logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
+            TestReflection.Assert(
+                !CompleteThroughLifecycle(
+                    lifecycle,
+                    operation,
+                    Completion(
+                        Path.Combine(root, reason + ".late.mp4"),
+                        "Full",
+                        "Complete",
+                        "Completed"
+                    )
+                ),
+                $"Late completion must lose after {reason}."
+            );
+        }
+
+        foreach (
+            var scenario in new[]
+            {
+                ("BeginException", "", "Failed", "Unavailable", LogLevel.Error),
+                ("EncoderWriterFailed", "", "Full", "Complete", LogLevel.Error),
+                ("EncoderTimeout", "", "Full", "Complete", LogLevel.Error),
+                ("EncoderNonZeroExit", "", "Full", "Complete", LogLevel.Error),
+                ("Aborted", "", "Failed", "Unavailable", LogLevel.Error),
+                ("Superseded", "superseded.mp4", "Silent", "Complete", LogLevel.Warning),
+                ("AudioUnavailable", "silent.mp4", "Silent", "Complete", LogLevel.Warning),
+                ("AudioCaptureFailed", "audio-start.mp4", "Silent", "Complete", LogLevel.Warning),
+                ("AudioStopFailed", "audio-stop.mp4", "Failed", "Complete", LogLevel.Warning),
+                ("MetadataFailed", "metadata.mp4", "Full", "Failed", LogLevel.Warning),
+            }
+        )
+        {
+            logs.Clear();
+            var (lifecycle, operation) = StartLifecycle("terminal-" + scenario.Item1);
+            var path = string.IsNullOrEmpty(scenario.Item2)
+                ? Path.Combine(root, scenario.Item1 + ".missing.mp4")
+                : Path.Combine(root, scenario.Item2);
+            if (!string.IsNullOrEmpty(scenario.Item2))
+                File.WriteAllBytes(path, new byte[] { 1 });
+            var completion = Completion(path, scenario.Item3, scenario.Item4, scenario.Item1);
+            TestReflection.Assert(
+                CompleteThroughLifecycle(lifecycle, operation, completion),
+                $"{scenario.Item1} should close its lifecycle."
+            );
+            logs.AssertSingle(
+                scenario.Item5,
+                scenario.Item5 == LogLevel.Warning
+                    ? "event=combat_replay.video_recording.degraded"
+                    : "event=combat_replay.video_recording.failed"
+            );
+            TestReflection.Assert(
+                !CompleteThroughLifecycle(lifecycle, operation, completion),
+                $"{scenario.Item1} must remain one-shot."
+            );
+        }
+
+        logs.Clear();
+        var (successLifecycle, successOperation) = StartLifecycle("resolved-success");
+        var successPath = Path.Combine(root, "resolved-success.mp4");
+        File.WriteAllBytes(successPath, new byte[] { 1, 2 });
+        TestReflection.Assert(
+            CompleteResolved(
+                successLifecycle,
+                successOperation,
+                Capture("Completed", "Completed"),
+                Mux("Muxed", "Muxed", successPath, 2),
+                "Full",
+                "Complete",
+                null
+            ),
+            "Full resolved mux should complete."
+        );
+        logs.AssertSingle(LogLevel.Info, "event=combat_replay.video_recording.succeeded");
+
+        logs.Clear();
+        var (fallbackLifecycle, fallbackOperation) = StartLifecycle("resolved-fallback");
+        var fallbackPath = Path.Combine(root, "resolved-fallback.mp4");
+        File.WriteAllBytes(fallbackPath, new byte[] { 3 });
+        TestReflection.Assert(
+            CompleteResolved(
+                fallbackLifecycle,
+                fallbackOperation,
+                Capture("Completed", "Completed"),
+                Mux("FellBackToSilent", "NonZeroExit", fallbackPath, 1),
+                "Silent",
+                "Complete",
+                null
+            ),
+            "Mux fallback should close degraded."
+        );
+        logs.AssertSingle(LogLevel.Warning, "event=combat_replay.video_recording.degraded");
+
+        foreach (
+            var resolved in new[]
+            {
+                (
+                    "audio-unavailable",
+                    "FellBackToSilent",
+                    "NoAudio",
+                    "Silent",
+                    "Complete",
+                    "AudioUnavailable"
+                ),
+                ("audio-stop-failed", "Muxed", "Muxed", "Failed", "Complete", "AudioStopFailed"),
+                ("metadata-failed", "Muxed", "Muxed", "Full", "Failed", (string?)null),
+            }
+        )
+        {
+            logs.Clear();
+            var (lifecycle, operation) = StartLifecycle("resolved-" + resolved.Item1);
+            var path = Path.Combine(root, "resolved-" + resolved.Item1 + ".mp4");
+            File.WriteAllBytes(path, new byte[] { 5 });
+            TestReflection.Assert(
+                CompleteResolved(
+                    lifecycle,
+                    operation,
+                    Capture("Completed", "Completed"),
+                    Mux(resolved.Item2, resolved.Item3, path, 1),
+                    resolved.Item4,
+                    resolved.Item5,
+                    resolved.Item6
+                ),
+                $"Resolved {resolved.Item1} should close degraded."
+            );
+            logs.AssertSingle(LogLevel.Warning, "event=combat_replay.video_recording.degraded");
+        }
+
+        logs.Clear();
+        var (promotionLifecycle, promotionOperation) = StartLifecycle("promotion-failed");
+        TestReflection.Assert(
+            CompleteResolved(
+                promotionLifecycle,
+                promotionOperation,
+                Capture("Completed", "Completed"),
+                Mux("Failed", "PromotionFailed", Path.Combine(root, "promotion.missing.mp4"), 0),
+                "Full",
+                "Complete",
+                null
+            ),
+            "Promotion failure should close failed."
+        );
+        logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
+
+        logs.Clear();
+        var (callbackLifecycle, callbackOperation) = StartLifecycle("callback-failed");
+        var callbackPath = Path.Combine(root, "callback.mp4");
+        File.WriteAllBytes(callbackPath, new byte[] { 4 });
+        InvokeLifecycle(
+            callbackLifecycle,
+            "CompleteMuxCallbackFailure",
+            callbackOperation,
+            Capture("Completed", "Completed"),
+            Mux("Muxed", "Muxed", callbackPath, 1),
+            Enum.Parse(AudioStatusType, "Full"),
+            Enum.Parse(MetadataStatusType, "Complete"),
+            new InvalidOperationException("callback")
+        );
+        logs.AssertSingle(LogLevel.Warning, "event=combat_replay.video_recording.degraded");
+        InvokeLifecycle(
+            callbackLifecycle,
+            "CompletePending",
+            Enum.Parse(ReasonType, "ShutdownTimeout")
+        );
+        logs.AssertSingle(LogLevel.Warning, "event=combat_replay.video_recording.degraded");
+
+        logs.Clear();
+        var (shutdownLifecycle, shutdownOperation) = StartLifecycle("shutdown-pending");
+        InvokeLifecycle(
+            shutdownLifecycle,
+            "CompletePending",
+            Enum.Parse(ReasonType, "ShutdownTimeout")
+        );
+        logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
+        var shutdownLatePath = Path.Combine(root, "shutdown-late.mp4");
+        File.WriteAllBytes(shutdownLatePath, new byte[] { 6 });
+        TestReflection.Assert(
+            !CompleteResolved(
+                shutdownLifecycle,
+                shutdownOperation,
+                Capture("Completed", "Completed"),
+                Mux("Muxed", "Muxed", shutdownLatePath, 1),
+                "Full",
+                "Complete",
+                null
+            ),
+            "Late mux completion must lose after shutdown."
+        );
+        logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
+    }
+
+    private static void ShutdownSweepClosesOrphanOnce(string root, StructuredLogCapture logs)
+    {
+        logs.Clear();
+        var registryType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingOperationRegistry"
+        );
+        var registry = Activator.CreateInstance(registryType, nonPublic: true)!;
+        var operation = CreateOperation("recording-callback-orphan-00000006");
+        registryType
+            .GetMethod(
+                "Register",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(registry, new[] { operation });
+        registryType
+            .GetMethod(
+                "CompletePending",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(registry, new[] { Enum.Parse(ReasonType, "ShutdownTimeout") });
+        logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
+        TestReflection.Assert(
+            logs.Joined.Contains("reason_code=shutdown_timeout", StringComparison.Ordinal),
+            "A successfully drained but orphaned callback must close as shutdown timeout."
+        );
+
+        var latePath = Path.Combine(root, "late.mp4");
+        File.WriteAllBytes(latePath, new byte[] { 1 });
+        var tryComplete = registryType.GetMethod(
+            "TryComplete",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
+        TestReflection.Assert(
+            !(bool)(
+                tryComplete.Invoke(
+                    registry,
+                    new[] { operation, Completion(latePath, "Full", "Complete", "Completed") }
+                ) ?? true
+            ),
+            "A late mux callback must lose after the shutdown sweep."
+        );
+        logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
+    }
+
+    private static void HostileStderrRendersAsOneBoundedTerminal(
+        string root,
+        StructuredLogCapture logs
+    )
+    {
+        logs.Clear();
+        var hostile =
+            new string('x', 100_000) + "\r\ninjected=true\t" + new string('y', 4000) + "TAIL";
+        var muxType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer"
+        );
+        var collector =
+            muxType.GetMethod(
+                "CollectStderrTailForTests",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException("Mux stderr collector seam not found.");
+        using var reader = new StringReader(hostile);
+        var retained = (string)(collector.Invoke(null, new object[] { reader }) ?? string.Empty);
+
+        var operation = CreateOperation("recording-hostile-stderr-00000005");
+        var completion = Completion(
+            Path.Combine(root, "hostile-missing.mp4"),
+            "Failed",
+            "Failed",
+            "EncoderNonZeroExit"
+        );
+        Set(completion, "StderrTail", retained);
+        Set(completion, "ExitCode", 19);
+        TestReflection.Assert(Complete(operation, completion), "Hostile terminal should close.");
+        logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
+
+        var rendered = logs.Joined;
+        TestReflection.Assert(rendered.Length <= 2048, "Terminal record must respect its budget.");
+        TestReflection.Assert(
+            rendered.Contains("field_truncated=true", StringComparison.Ordinal),
+            "Hostile stderr truncation must be explicit."
+        );
+        TestReflection.Assert(
+            !rendered.Contains('\r') && !rendered.Contains('\n') && !rendered.Contains('\t'),
+            "Hostile stderr must not inject literal record controls."
+        );
+        TestReflection.Assert(
+            rendered.Contains("\\r\\ninjected=true\\t", StringComparison.Ordinal),
+            "Hostile controls must be escaped inside the terminal field."
+        );
+        TestReflection.Assert(
+            !rendered.Contains("ffmpeg:", StringComparison.Ordinal),
+            "FFmpeg stderr must not create legacy per-line records."
+        );
+    }
+
+    private static (object Lifecycle, object Operation) StartLifecycle(string recordingId)
+    {
+        var factory = new Func<string>(() => recordingId);
+        var ctor =
+            LifecycleType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                new[] { typeof(Func<string>) },
+                modifiers: null
+            ) ?? throw new InvalidOperationException("Recording lifecycle constructor not found.");
+        var lifecycle = ctor.Invoke(new object[] { factory });
+        var start =
+            LifecycleType.GetMethod(
+                "Start",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException("Recording lifecycle Start not found.");
+        var operation =
+            start.Invoke(
+                lifecycle,
+                new[]
+                {
+                    "battle-lifecycle-00000001",
+                    Enum.Parse(SourceType, "ImportedGhost"),
+                    new DateTimeOffset(2026, 7, 13, 0, 0, 0, TimeSpan.Zero),
+                }
+            ) ?? throw new InvalidOperationException("Lifecycle Start returned null.");
+        return (lifecycle, operation);
+    }
+
+    private static bool CompleteThroughLifecycle(
+        object lifecycle,
+        object operation,
+        object completion
+    ) => (bool)(InvokeLifecycle(lifecycle, "TryComplete", operation, completion) ?? false);
+
+    private static bool CompleteResolved(
+        object lifecycle,
+        object operation,
+        object capture,
+        object mux,
+        string audioStatus,
+        string metadataStatus,
+        string? degradationReason
+    ) =>
+        (bool)(
+            InvokeLifecycle(
+                lifecycle,
+                "CompleteResolved",
+                operation,
+                capture,
+                mux,
+                Enum.Parse(AudioStatusType, audioStatus),
+                Enum.Parse(MetadataStatusType, metadataStatus),
+                degradationReason == null ? null : Enum.Parse(ReasonType, degradationReason),
+                null
+            ) ?? false
+        );
+
+    private static object Capture(string status, string reason)
+    {
+        var type = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureResult"
+        );
+        var instance = Activator.CreateInstance(type, nonPublic: true)!;
+        Set(instance, "VideoId", "video-lifecycle-00000001");
+        Set(instance, "CapturedFrames", 30);
+        Set(instance, "DroppedFrames", 2);
+        Set(
+            instance,
+            "Status",
+            Enum.Parse(
+                TestReflection.RequireType(
+                    "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureStatus"
+                ),
+                status
+            )
+        );
+        Set(instance, "ReasonCode", Enum.Parse(ReasonType, reason));
+        Set(instance, "EndedAtUtc", new DateTimeOffset(2026, 7, 13, 0, 0, 1, TimeSpan.Zero));
+        return instance;
+    }
+
+    private static object Mux(string status, string reason, string path, long size)
+    {
+        var type = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer+MuxResult"
+        );
+        var statusType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer+MuxStatus"
+        );
+        var reasonType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer+MuxReasonCode"
+        );
+        var ctor = type.GetConstructors(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )
+            .Single(candidate => candidate.GetParameters().Length == 7);
+        return ctor.Invoke(
+            new object?[]
+            {
+                Enum.Parse(statusType, status),
+                path,
+                size,
+                Enum.Parse(reasonType, reason),
+                null,
+                null,
+                null,
+            }
+        );
+    }
+
+    private static object? InvokeLifecycle(object lifecycle, string name, params object?[] args)
+    {
+        var method = LifecycleType
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+            .Single(candidate =>
+                candidate.Name == name && candidate.GetParameters().Length == args.Length
+            );
+        return method.Invoke(lifecycle, args);
+    }
+
+    private static object CreateOperation(string recordingId)
+    {
+        var ctor =
+            OperationType.GetConstructor(
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                new[] { typeof(string), typeof(string), SourceType, typeof(DateTimeOffset) },
+                modifiers: null
+            ) ?? throw new InvalidOperationException("Recording operation constructor not found.");
+        return ctor.Invoke(
+            new[]
+            {
+                recordingId,
+                "battle-private-00000001",
+                Enum.Parse(SourceType, "ImportedGhost"),
+                new DateTimeOffset(2026, 7, 13, 0, 0, 0, TimeSpan.Zero),
+            }
+        );
+    }
+
+    private static object Completion(
+        string path,
+        string audioStatus,
+        string metadataStatus,
+        string reason
+    )
+    {
+        var completion =
+            Activator.CreateInstance(CompletionType, nonPublic: true)
+            ?? throw new InvalidOperationException("Recording completion should be constructible.");
+        Set(completion, "FinalFilePath", path);
+        Set(completion, "CapturedFrames", 30);
+        Set(completion, "DroppedFrames", 0);
+        Set(completion, "AudioStatus", Enum.Parse(AudioStatusType, audioStatus));
+        Set(completion, "MetadataStatus", Enum.Parse(MetadataStatusType, metadataStatus));
+        Set(completion, "ReasonCode", Enum.Parse(ReasonType, reason));
+        return completion;
+    }
+
+    private static bool Complete(object operation, object completion)
+    {
+        var method =
+            OperationType.GetMethod(
+                "TryComplete",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                new[] { CompletionType },
+                modifiers: null
+            ) ?? throw new InvalidOperationException("TryComplete not found.");
+        return (bool)(method.Invoke(operation, new[] { completion }) ?? false);
+    }
+
+    private static void Set(object instance, string name, object? value)
+    {
+        var property =
+            instance
+                .GetType()
+                .GetProperty(
+                    name,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                )
+            ?? throw new InvalidOperationException($"Property not found: {name}");
+        property.SetValue(instance, value);
+    }
+
+    private sealed class StructuredLogCapture : IDisposable
+    {
+        private readonly ManualLogSource _source = new("CombatReplayAudioVideo.Tests");
+        private readonly List<LogEventArgs> _events = new();
+
+        internal StructuredLogCapture()
+        {
+            _source.LogEvent += OnLogEvent;
+            var bppLog = TestReflection.RequireType("BazaarPlusPlus.Infrastructure.BppLog");
+            var install =
+                bppLog.GetMethod(
+                    "Install",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+                ) ?? throw new InvalidOperationException("BppLog.Install not found.");
+            install.Invoke(null, new object[] { _source });
+        }
+
+        internal string Joined => string.Join("\n", _events.Select(evt => evt.Data?.ToString()));
+
+        internal void Clear() => _events.Clear();
+
+        internal void AssertSingle(LogLevel level, string eventToken)
+        {
+            var matches = _events.Where(evt =>
+                evt.Level == level
+                && evt.Data?.ToString()?.Contains(eventToken, StringComparison.Ordinal) == true
+            );
+            TestReflection.Assert(
+                matches.Count() == 1,
+                $"Expected exactly one {level} {eventToken}; records={Joined}"
+            );
+            TestReflection.Assert(
+                _events.Count(evt =>
+                    evt.Data?.ToString()
+                        ?.Contains("event=combat_replay.video_recording.", StringComparison.Ordinal)
+                    == true
+                ) == 1,
+                $"Expected one authoritative recording terminal; records={Joined}"
+            );
+        }
+
+        public void Dispose()
+        {
+            _source.LogEvent -= OnLogEvent;
+            _source.Dispose();
+        }
+
+        private void OnLogEvent(object? sender, LogEventArgs args) => _events.Add(args);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 10) Locked media event vocabulary: all eleven definitions are directly
+//     discoverable, unique, valid, and preserve their exact ordered schemas.
+// ---------------------------------------------------------------------------
+file static class MediaEventCatalogTests
+{
+    private static readonly IReadOnlyDictionary<string, string> Expected = new Dictionary<
+        string,
+        string
+    >(StringComparer.Ordinal)
+    {
+        ["combat_replay.video_recording.succeeded"] = TerminalSchema,
+        ["combat_replay.video_recording.degraded"] = TerminalSchema,
+        ["combat_replay.video_recording.failed"] =
+            TerminalSchema + "|exit_code:Public:Low:None|stderr_tail:UntrustedText:High:None",
+        ["combat_replay.audio_capture.started"] =
+            "recording_id:Public:High:Short|backend:Public:Low:None|sample_rate_hz:Public:High:None|channels:Public:Low:None|sample_format:Public:Low:None",
+        ["combat_replay.audio_capture.completed"] =
+            "recording_id:Public:High:Short|backend:Public:Low:None|usable:Public:Low:None|sample_float_count:Public:High:None|rms_db:Public:High:None|peak_db:Public:High:None|size_bytes:Public:High:None|wav_path:LocalPath:High:None",
+        ["combat_replay.ffmpeg.probe_completed"] =
+            "available:Public:Low:None|source:Public:Low:None|executable:LocalPath:High:None|reason_code:Public:Low:None|duration_ms:Public:High:None",
+        ["combat_replay.video_recording.lifecycle_observed"] =
+            "stage:Public:Low:None|recording_id:Public:High:Short|battle_id:Public:High:Short|pending_count:Public:High:None",
+        ["combat_replay.video_capture.stats_observed"] =
+            "recording_id:Public:High:Short|stage:Public:Low:None|width:Public:High:None|height:Public:High:None|fps:Public:Low:None|captured_frames:Public:High:None|repeated_frames:Public:High:None|dropped_frames:Public:High:None|duration_ms:Public:High:None|size_bytes:Public:High:None|output_path:LocalPath:High:None",
+        ["combat_replay.video_capture.frame_degraded"] =
+            "recording_id:Public:High:Short|stage:Public:Low:None|reason_code:Public:Low:None|sequence:Public:High:None",
+        ["combat_replay.video_recording.cleanup_failed"] =
+            "recording_id:Public:High:Short|stage:Public:Low:None|path:LocalPath:High:None",
+        ["combat_replay.video_mux.diagnostic_observed"] =
+            "recording_id:Public:High:Short|stage:Public:Low:None|reason_code:Public:Low:None|path:LocalPath:High:None|pending_count:Public:High:None",
+    };
+
+    private const string TerminalSchema =
+        "recording_id:Public:High:Short|battle_id:Public:High:Short|source:Public:Low:None|reason_code:Public:Low:None|duration_ms:Public:High:None|captured_frames:Public:High:None|dropped_frames:Public:High:None|size_bytes:Public:High:None|audio_status:Public:Low:None|metadata_status:Public:Low:None|output_path:LocalPath:High:None";
+
+    public static void Run()
+    {
+        var source = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.CombatReplayVideoLogEvents"
+        );
+        var eventDefinition = TestReflection.RequireType(
+            "BazaarPlusPlus.Infrastructure.Logging.BppLogEventDefinition"
+        );
+        var direct = source
+            .GetFields(
+                BindingFlags.Static
+                    | BindingFlags.Public
+                    | BindingFlags.NonPublic
+                    | BindingFlags.DeclaredOnly
+            )
+            .Where(field => field.FieldType == eventDefinition)
+            .Select(field => field.GetValue(null)!)
+            .ToArray();
+        TestReflection.Assert(
+            direct.Length == 11,
+            $"Expected 11 media events, got {direct.Length}."
+        );
+
+        var actual = direct.ToDictionary(EventId, Schema, StringComparer.Ordinal);
+        TestReflection.Assert(actual.Count == direct.Length, "Media event IDs must be unique.");
+        foreach (var expected in Expected)
+        {
+            TestReflection.Assert(
+                actual.TryGetValue(expected.Key, out var schema) && schema == expected.Value,
+                $"Schema drift for {expected.Key}: {schema ?? "<missing>"}"
+            );
+        }
+
+        var catalogType = TestReflection.RequireType(
+            "BazaarPlusPlus.Infrastructure.Logging.BppLogEventCatalog"
+        );
+        var discover =
+            catalogType.GetMethod(
+                "Discover",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException("BppLogEventCatalog.Discover not found.");
+        var catalog = discover.Invoke(null, new object[] { source.Assembly })!;
+        var discovered = (
+            (System.Collections.IEnumerable)
+                TestReflection.GetProp(catalogType, catalog, "Definitions")!
+        )
+            .Cast<object>()
+            .Select(EventId)
+            .ToHashSet(StringComparer.Ordinal);
+        TestReflection.Assert(
+            Expected.Keys.All(discovered.Contains),
+            "Every media definition must be discoverable from the assembly catalog."
+        );
+
+        var fromDefinitions =
+            catalogType.GetMethod(
+                "FromDefinitions",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )
+            ?? throw new InvalidOperationException("BppLogEventCatalog.FromDefinitions not found.");
+        var typed = Array.CreateInstance(eventDefinition, direct.Length);
+        for (var index = 0; index < direct.Length; index++)
+            typed.SetValue(direct[index], index);
+        var directCatalog = fromDefinitions.Invoke(null, new object[] { typed })!;
+        var validate =
+            catalogType.GetMethod(
+                "Validate",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException("BppLogEventCatalog.Validate not found.");
+        var validation = validate.Invoke(directCatalog, Array.Empty<object>())!;
+        TestReflection.Assert(
+            (bool)(
+                validation
+                    .GetType()
+                    .GetProperty(
+                        "IsValid",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                    )!
+                    .GetValue(validation)
+                ?? false
+            ),
+            "The locked media catalog must pass governance validation."
+        );
+    }
+
+    private static string EventId(object definition) =>
+        (string)(
+            TestReflection.GetProp(definition.GetType(), definition, "EventId") ?? string.Empty
+        );
+
+    private static string Schema(object definition)
+    {
+        var fields = (System.Collections.IEnumerable)
+            TestReflection.GetProp(definition.GetType(), definition, "Fields")!;
+        return string.Join(
+            "|",
+            fields
+                .Cast<object>()
+                .Select(field =>
+                    $"{TestReflection.GetProp(field.GetType(), field, "Name")}:{TestReflection.GetProp(field.GetType(), field, "Privacy")}:{TestReflection.GetProp(field.GetType(), field, "Cardinality")}:{TestReflection.GetProp(field.GetType(), field, "Correlation")}"
+                )
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 11) Audio teardown timeout is a typed result, and never leaves a timed-out
+//     tap eligible for muxing.
+// ---------------------------------------------------------------------------
+file static class AudioStopTimeoutTests
+{
+    public static void Run()
+    {
+        using var release = new ManualResetEventSlim(false);
+        var thread = new Thread(() => release.Wait()) { IsBackground = true };
+        thread.Start();
+        try
+        {
+            var joiner = TestReflection.RequireType(
+                "BazaarPlusPlus.Game.CombatReplay.Audio.ReplayAudioCaptureThreadJoiner"
+            );
+            var method =
+                joiner.GetMethod(
+                    "TryJoin",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+                ) ?? throw new InvalidOperationException("Replay audio join helper not found.");
+            var args = new object?[] { thread, 20, null };
+            TestReflection.Assert(
+                !(bool)(method.Invoke(null, args) ?? true),
+                "A live capture thread must fail its fixed bounded join."
+            );
+            TestReflection.Assert(
+                args[2] is TimeoutException timeout
+                    && timeout.Message
+                        == "Replay audio capture thread did not stop within the fixed timeout.",
+                "Join timeout must produce the fixed typed TimeoutException."
+            );
+        }
+        finally
+        {
+            release.Set();
+            thread.Join();
+        }
+
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src/BazaarPlusPlus/Game/CombatReplay/Audio/ReplayAudioTapStopper.cs"
+            )
+        );
+        TestReflection.Assert(
+            source.Contains(
+                "failureReason == ReplayAudioFailureReasonCode.None",
+                StringComparison.Ordinal
+            ),
+            "A failed audio stop must be excluded from usable mux inputs."
+        );
+        foreach (
+            var fileName in new[]
+            {
+                "CoreAudioProcessTapCaptureTap.cs",
+                "WasapiLoopbackCaptureTap.cs",
+            }
+        )
+        {
+            var backend = File.ReadAllText(
+                Path.Combine(root, "src/BazaarPlusPlus/Game/CombatReplay/Audio", fileName)
+            );
+            TestReflection.Assert(
+                backend.Contains("ReplayAudioCaptureThreadJoiner.TryJoin", StringComparison.Ordinal)
+                    && backend.Contains(
+                        "ScheduleDeferredCleanup(_thread)",
+                        StringComparison.Ordinal
+                    )
+                    && backend.Contains(
+                        "CleanupResources(deleteWav: true)",
+                        StringComparison.Ordinal
+                    )
+                    && backend.Contains(
+                        "ReplayAudioFailureReasonCode.BackendStopFailed",
+                        StringComparison.Ordinal
+                    ),
+                $"{fileName} must classify Join(false) and defer safe native/WAV cleanup."
+            );
+        }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(Environment.CurrentDirectory);
+        while (current != null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
+                return current.FullName;
+            current = current.Parent;
+        }
+        throw new InvalidOperationException("Repository root not found.");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 12) Locked recorder integration paths: identity/register ordering, all
+//     preflight/abort/shutdown closures, actual-start-only lifecycle, resolved
+//     final metadata, callback safety, and post-finalize failure semantics.
+// ---------------------------------------------------------------------------
+file static class RecorderIntegrationContractTests
+{
+    public static void Run()
+    {
+        var resolutionType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoMetadataResolution"
+        );
+        var captureStatusType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureStatus"
+        );
+        var statusMethod =
+            resolutionType.GetMethod(
+                "ResolvePersistedStatus",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException("Resolved metadata status helper not found.");
+        string Status(string capture, bool resolved, long size) =>
+            (string)(
+                statusMethod.Invoke(
+                    null,
+                    new[] { Enum.Parse(captureStatusType, capture), resolved, (object)size }
+                ) ?? string.Empty
+            );
+        TestReflection.Assert(
+            Status("Completed", true, 1) == "COMPLETED",
+            "Resolved artifact should persist completed."
+        );
+        TestReflection.Assert(
+            Status("Completed", false, 1) == "FAILED",
+            "Failed mux/promotion must persist failed despite bytes."
+        );
+        TestReflection.Assert(
+            Status("Completed", true, 0) == "FAILED",
+            "Missing final artifact must persist failed."
+        );
+        TestReflection.Assert(
+            Status("Failed", true, 1) == "FAILED",
+            "Failed capture must persist failed."
+        );
+
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src/BazaarPlusPlus/Game/CombatReplay/Video/CombatReplayVideoRecorder.cs"
+            )
+        );
+        var start = source.IndexOf("_operations.Start(", StringComparison.Ordinal);
+        var gate = source.IndexOf("CombatReplayRecordingGate.Evaluate(", StringComparison.Ordinal);
+        TestReflection.Assert(
+            start >= 0 && start < gate,
+            "The production lifecycle must allocate and register before preflight."
+        );
+        TestReflection.Assert(
+            source.Contains("VideoId = recordingId", StringComparison.Ordinal),
+            "The preallocated operation ID must flow into capture and metadata."
+        );
+        foreach (
+            var token in new[]
+            {
+                "AsyncGpuReadbackUnavailable",
+                "FfmpegUnavailable",
+                "OutputPathUnavailable",
+                "InvalidDimensions",
+                "BeginException",
+                "AbortActiveSession(\"superseded\")",
+                "AbortActiveSession(\"recorder-disabled\")",
+                "AbortActiveSession(\"recorder-destroyed\")",
+                "_operations.CompleteResolved(",
+                "_operations.CompleteMuxCallbackFailure(",
+                "CompletePending(ReplayVideoRecordingReasonCode.ShutdownTimeout)",
+            }
+        )
+        {
+            TestReflection.Assert(
+                source.Contains(token, StringComparison.Ordinal),
+                $"Missing recorder closure path: {token}"
+            );
+        }
+        TestReflection.Assert(
+            !source.Contains("SessionSubscribed", StringComparison.Ordinal)
+                && Count(source, "ReplayVideoLogStage.SessionStarted") == 1
+                && source.IndexOf("ReplayVideoLogStage.SessionStarted", StringComparison.Ordinal)
+                    > source.IndexOf("session.Start();", StringComparison.Ordinal),
+            "V4 must emit one actual-start Debug and no subscription/preflight noise."
+        );
+        TestReflection.Assert(
+            source.Contains(
+                "mux.Status != ReplayVideoAudioMuxer.MuxStatus.Failed",
+                StringComparison.Ordinal
+            )
+                && source.Contains(
+                    "resultReason != ReplayVideoRecordingReasonCode.Completed",
+                    StringComparison.Ordinal
+                ),
+            "Final metadata and post-finalize failures must agree with the terminal outcome."
+        );
+
+        var raw = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src/BazaarPlusPlus/Game/CombatReplay/Video/FfmpegRawVideoEncoder.cs"
+            )
+        );
+        var mux = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoAudioMuxer.cs"
+            )
+        );
+        TestReflection.Assert(
+            !raw.Contains("stderrThread.Join();", StringComparison.Ordinal)
+                && !mux.Contains("drainThread.Join();", StringComparison.Ordinal)
+                && !mux.Contains("stdoutThread.Join();", StringComparison.Ordinal),
+            "No external-process reader may have an unbounded terminal join."
+        );
+    }
+
+    private static int Count(string source, string token)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = source.IndexOf(token, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += token.Length;
+        }
+        return count;
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(Environment.CurrentDirectory);
+        while (current != null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
+                return current.FullName;
+            current = current.Parent;
+        }
+        throw new InvalidOperationException("Repository root not found.");
     }
 }
 

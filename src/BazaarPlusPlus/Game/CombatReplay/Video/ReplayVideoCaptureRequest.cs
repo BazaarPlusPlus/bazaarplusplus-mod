@@ -1,11 +1,9 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
 internal sealed class ReplayVideoCaptureRequest
 {
-    public string VideoId { get; init; } = Guid.NewGuid().ToString("N");
+    public string VideoId { get; init; } = string.Empty;
 
     public string BattleId { get; init; } = string.Empty;
 

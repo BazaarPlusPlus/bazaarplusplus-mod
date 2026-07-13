@@ -17,6 +17,7 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
     private readonly CombatReplayPayloadStore _payloadStore;
     private readonly BattleReplaySyncStateStore? _syncStateStore;
     private readonly CombatReplayPersistenceQueue _persistenceQueue;
+    private readonly object _drainGate = new();
     private bool _disposed;
 
     public ReplayPersistenceOrchestrator(IBppServices services, IPvpBattleCatalog battleCatalog)
@@ -37,6 +38,7 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
             _battleCatalog.Save,
             _payloadStore.Delete
         );
+        _persistenceQueue.SetLateResultsAvailableCallback(DrainLateShutdownResults);
 
         CleanupOrphanedPayloads();
     }
@@ -55,30 +57,80 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
 
     public void DrainPendingResults()
     {
-        var processedAny = false;
-        while (_persistenceQueue.TryDequeueResult(out var result))
+        DrainPendingResults(publishSideEffects: true);
+    }
+
+    private void DrainLateShutdownResults()
+    {
+        DrainPendingResults(publishSideEffects: false);
+    }
+
+    private void DrainPendingResults(bool publishSideEffects)
+    {
+        lock (_drainGate)
         {
-            processedAny = true;
-            if (!result.Succeeded)
+            var processedAny = false;
+            while (_persistenceQueue.TryDequeueResult(out var result))
             {
-                BppLog.Error(
-                    "ReplayPersistenceOrchestrator",
-                    $"Failed to persist combat replay {result.Manifest.BattleId}: {result.Error}"
+                processedAny = true;
+                if (!result.Succeeded)
+                {
+                    BppLog.ErrorEvent(
+                        CombatReplayLogEvents.PersistenceFailed,
+                        result.Error!,
+                        CombatReplayLogEvents.PersistenceBattleId.Bind(result.Manifest.BattleId),
+                        CombatReplayLogEvents.PersistenceRunId.Bind(result.Manifest.RunId),
+                        CombatReplayLogEvents.PersistenceReasonCode.Bind(
+                            result.Error is OperationCanceledException
+                                ? ReplayPersistenceReasonCode.ShutdownAbandoned
+                                : ReplayPersistenceReasonCode.PersistenceFailed
+                        )
+                    );
+                    continue;
+                }
+
+                if (publishSideEffects)
+                {
+                    try
+                    {
+                        _services.EventBus.Publish(
+                            new PvpBattleRecorded { Manifest = result.Manifest }
+                        );
+                        _syncStateStore?.MarkReplayDirty(result.Manifest.BattleId);
+                    }
+                    catch
+                    {
+                        // Persistence already succeeded. A secondary observer must not suppress its
+                        // authoritative result or prevent the remaining queue from draining.
+                    }
+                }
+
+                BppLog.DebugEvent(
+                    CombatReplayLogEvents.PersistenceSucceeded,
+                    () =>
+                        [
+                            CombatReplayLogEvents.PersistenceBattleId.Bind(
+                                result.Manifest.BattleId
+                            ),
+                            CombatReplayLogEvents.PersistenceRunId.Bind(result.Manifest.RunId),
+                            CombatReplayLogEvents.PersistenceReasonCode.Bind(
+                                ReplayPersistenceReasonCode.Persisted
+                            ),
+                        ]
                 );
-                continue;
             }
 
-            _services.EventBus.Publish(new PvpBattleRecorded { Manifest = result.Manifest });
-            _syncStateStore?.MarkReplayDirty(result.Manifest.BattleId);
-            BppLog.Info(
-                "ReplayPersistenceOrchestrator",
-                $"Saved combat replay {result.Manifest.BattleId} for run={result.Manifest.RunId ?? "unknown"}"
-            );
-        }
-
-        if (processedAny && !_persistenceQueue.HasPendingPersistence)
-        {
-            _services.EventBus.Publish(new CombatReplayPersistenceDrained());
+            if (publishSideEffects && processedAny && !_persistenceQueue.HasPendingPersistence)
+            {
+                try
+                {
+                    _services.EventBus.Publish(new CombatReplayPersistenceDrained());
+                }
+                catch
+                {
+                    // The queue is drained regardless of an observer failure.
+                }
+            }
         }
     }
 
@@ -89,11 +141,12 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
         _disposed = true;
 
         _persistenceQueue.Dispose();
-        DrainPendingResults();
+        DrainPendingResults(publishSideEffects: true);
     }
 
     private void CleanupOrphanedPayloads()
     {
+        var accumulator = new ReplayOrphanCleanupAccumulator();
         try
         {
             foreach (var battleId in _payloadStore.ListBattleIds())
@@ -107,19 +160,16 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                 }
                 catch (Exception ex)
                 {
-                    BppLog.Warn(
-                        "ReplayPersistenceOrchestrator",
-                        $"Failed to delete orphaned combat replay payload {battleId}: {ex.Message}"
-                    );
+                    accumulator.ReportDeleteFailure(ex);
                 }
             }
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "ReplayPersistenceOrchestrator",
-                $"Failed to scan combat replay payloads for orphan cleanup: {ex.Message}"
-            );
+            accumulator.ReportScanFailure(ex);
         }
+
+        if (accumulator.TryBuildResult(out var result))
+            ReplayPersistenceLogWriter.EmitOrphanCleanupDegraded(result);
     }
 }

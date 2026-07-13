@@ -2,7 +2,6 @@
 using System;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PvpBattles;
-using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
 
@@ -35,21 +34,20 @@ internal sealed class ReplayPlaybackPublisher
         _activeSource = source;
         _activeRecordVideo = recordVideo;
         _startingPublished = false;
-        BppLog.Info(
-            "ReplayPlaybackPublisher",
-            $"BeginSession battle={battleId} source={source} recordVideo={recordVideo}"
-        );
     }
 
-    public void PublishStarting()
+    public ReplayPlaybackPublishOutcome PublishStarting()
     {
         if (_startingPublished)
-            return;
+            return ReplayPlaybackPublishOutcome.Success();
 
         var battleId = _activeBattleId;
         if (string.IsNullOrEmpty(battleId))
-            return;
+            return ReplayPlaybackPublishOutcome.Failure(
+                new InvalidOperationException("Replay playback session is unavailable.")
+            );
 
+        _startingPublished = true;
         try
         {
             _services.EventBus.Publish(
@@ -61,19 +59,15 @@ internal sealed class ReplayPlaybackPublisher
                     RecordVideo = _activeRecordVideo,
                 }
             );
-            _startingPublished = true;
+            return ReplayPlaybackPublishOutcome.Success();
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                "ReplayPlaybackPublisher",
-                "Failed to publish CombatReplayPlaybackStarting event.",
-                ex
-            );
+            return ReplayPlaybackPublishOutcome.Failure(ex);
         }
     }
 
-    public void PublishEnded(string reason, bool failed)
+    public ReplayPlaybackPublishOutcome PublishEnded(string reason, bool failed)
     {
         // Always clear the session, even when no "starting" event was ever published (a start
         // that failed before playback began). Leaving _activeBattleId set would leak the failed
@@ -86,7 +80,7 @@ internal sealed class ReplayPlaybackPublisher
         _activeManifest = null;
 
         if (!startingPublished)
-            return;
+            return ReplayPlaybackPublishOutcome.Success();
 
         try
         {
@@ -98,14 +92,11 @@ internal sealed class ReplayPlaybackPublisher
                     Failed = failed,
                 }
             );
+            return ReplayPlaybackPublishOutcome.Success();
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                "ReplayPlaybackPublisher",
-                "Failed to publish CombatReplayPlaybackEnded event.",
-                ex
-            );
+            return ReplayPlaybackPublishOutcome.Failure(ex);
         }
     }
 }

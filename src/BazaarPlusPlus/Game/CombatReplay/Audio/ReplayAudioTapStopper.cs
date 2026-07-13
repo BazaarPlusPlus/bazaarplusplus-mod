@@ -1,17 +1,22 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
+using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Audio;
 
 internal static class ReplayAudioTapStopper
 {
-    public static List<string> StopAndCollectUsableWavPaths(List<IReplayAudioCaptureTap> taps)
+    public static List<string> StopAndCollectUsableWavPaths(
+        List<IReplayAudioCaptureTap> taps,
+        string recordingId,
+        out IReadOnlyList<ReplayAudioCaptureResult> captureResults
+    )
     {
-        var results = Stop(taps);
+        var results = Stop(taps, recordingId);
+        captureResults = results;
         var usableWavPaths = new List<string>(results.Count);
         foreach (var result in results)
         {
@@ -22,7 +27,10 @@ internal static class ReplayAudioTapStopper
         return usableWavPaths;
     }
 
-    public static List<ReplayAudioCaptureResult> Stop(List<IReplayAudioCaptureTap> taps)
+    public static List<ReplayAudioCaptureResult> Stop(
+        List<IReplayAudioCaptureTap> taps,
+        string recordingId
+    )
     {
         if (taps == null)
             throw new ArgumentNullException(nameof(taps));
@@ -33,27 +41,51 @@ internal static class ReplayAudioTapStopper
         var results = new List<ReplayAudioCaptureResult>(snapshot.Count);
         foreach (var tap in snapshot)
         {
-            var capturedAnySamples = tap.CapturedAnySamples;
-            var sampleFloats = tap.CapturedSampleFloats;
-            var wavPath = tap.WavFilePath;
-            var capturePointLabel = tap.CapturePointLabel;
-            var rmsAmplitude = tap.RmsAmplitude;
-            var peakAmplitude = tap.PeakAmplitude;
-
+            Exception? stopException = null;
             try
             {
                 tap.Stop();
             }
             catch (Exception ex)
             {
-                BppLog.Warn("CombatReplayAudio", $"Audio tap stop failed: {ex.Message}");
+                stopException = ex;
             }
 
+            var capturedAnySamples = tap.CapturedAnySamples;
+            var sampleFloats = tap.CapturedSampleFloats;
+            var wavPath = tap.WavFilePath;
+            var capturePointLabel = tap.CapturePointLabel;
+            var rmsAmplitude = tap.RmsAmplitude;
+            var peakAmplitude = tap.PeakAmplitude;
+            var failureReason =
+                stopException == null
+                    ? tap.FailureReason
+                    : ReplayAudioFailureReasonCode.BackendStopFailed;
+            var failureException = stopException ?? tap.FailureException;
+
             var fileSize = TryGetFileSize(wavPath);
-            var usable = IsUsable(capturedAnySamples, wavPath);
-            BppLog.Info(
-                "CombatReplayAudio",
-                $"Audio tap stopped source={capturePointLabel} captured={capturedAnySamples} sampleFloats={sampleFloats} rms_db={FormatAmplitudeDb(rmsAmplitude)} peak_db={FormatAmplitudeDb(peakAmplitude)} size_bytes={fileSize} file={wavPath}"
+            var usable =
+                failureReason == ReplayAudioFailureReasonCode.None
+                && IsUsable(capturedAnySamples, wavPath);
+            BppLog.DebugEvent(
+                CombatReplayVideoLogEvents.AudioCaptureCompleted,
+                () =>
+                    [
+                        CombatReplayVideoLogEvents.AudioCompletedRecordingId.Bind(recordingId),
+                        CombatReplayVideoLogEvents.AudioCompletedBackend.Bind(tap.Backend),
+                        CombatReplayVideoLogEvents.AudioCompletedUsable.Bind(usable),
+                        CombatReplayVideoLogEvents.AudioCompletedSampleFloatCount.Bind(
+                            sampleFloats
+                        ),
+                        CombatReplayVideoLogEvents.AudioCompletedRmsDb.Bind(
+                            FormatAmplitudeDb(rmsAmplitude)
+                        ),
+                        CombatReplayVideoLogEvents.AudioCompletedPeakDb.Bind(
+                            FormatAmplitudeDb(peakAmplitude)
+                        ),
+                        CombatReplayVideoLogEvents.AudioCompletedSizeBytes.Bind(fileSize),
+                        CombatReplayVideoLogEvents.AudioCompletedWavPath.Bind(wavPath),
+                    ]
             );
 
             if (!usable)
@@ -70,6 +102,12 @@ internal static class ReplayAudioTapStopper
                     RmsAmplitude = rmsAmplitude,
                     PeakAmplitude = peakAmplitude,
                     Usable = usable,
+                    Backend = tap.Backend,
+                    SampleRateHz = tap.SampleRateHz,
+                    Channels = tap.Channels,
+                    SampleFormat = tap.SampleFormat,
+                    FailureReason = failureReason,
+                    FailureException = failureException,
                 }
             );
         }
@@ -97,12 +135,12 @@ internal static class ReplayAudioTapStopper
         return 0;
     }
 
-    private static string FormatAmplitudeDb(double amplitude)
+    private static double FormatAmplitudeDb(double amplitude)
     {
         if (amplitude <= 0 || double.IsNaN(amplitude) || double.IsInfinity(amplitude))
-            return "-inf";
+            return -120.0;
 
-        return (20.0 * Math.Log10(amplitude)).ToString("F1", CultureInfo.InvariantCulture);
+        return Math.Round(20.0 * Math.Log10(amplitude), 1);
     }
 
     private static void DeleteWavBestEffort(string? wavPath)

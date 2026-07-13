@@ -26,10 +26,18 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
     private readonly EndOfRunMouseBlocker _mouseBlocker = new();
     private ScreenshotService? _screenshotService;
     private RunScreenshotSqliteStore? _screenshotStore;
+    private Func<ScreenshotCaptureRequest, Task<ScreenshotCaptureResult?>>? _captureAsync;
+    private Func<
+        ScreenshotCaptureResult?,
+        bool,
+        Task<ScreenshotMetadataPersistenceOutcome>
+    >? _persistAsync;
     private IDisposable? _runInitializedSubscription;
     private IDisposable? _captureSuppressionScope;
     private Coroutine? _captureCoroutine;
     private Task<ScreenshotCaptureResult?>? _activeCaptureTask;
+    private string? _activeCaptureScreenshotId;
+    private ScreenshotCaptureOperation? _captureOperation;
     private string? _bufferedRunId;
     private string? _bufferedHeroName;
     private EndOfRunScreenController? _cachedEndOfRunScreenController;
@@ -59,14 +67,13 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         var runLogDatabasePath = services.Paths.RunLogDatabasePath;
         if (string.IsNullOrWhiteSpace(screenshotsDirectoryPath))
         {
-            BppLog.Warn(
-                "EndOfRunScreenshot",
-                "Screenshot controller initialized without a screenshots directory."
-            );
+            ScreenshotCaptureDiagnostics.ReportInitializationFailed();
         }
         else
         {
             _screenshotService = new ScreenshotService(screenshotsDirectoryPath);
+            _captureAsync = _screenshotService.CaptureCurrentFrameAsync;
+            _persistAsync = PersistCaptureAsync;
             if (!string.IsNullOrWhiteSpace(runLogDatabasePath))
                 _screenshotStore = new RunScreenshotSqliteStore(runLogDatabasePath);
         }
@@ -78,6 +85,19 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                 OnRunInitializedObserved
             );
         }
+    }
+
+    internal void ConfigureCaptureSeamsForTests(
+        Func<ScreenshotCaptureRequest, Task<ScreenshotCaptureResult?>> captureAsync,
+        Func<
+            ScreenshotCaptureResult?,
+            bool,
+            Task<ScreenshotMetadataPersistenceOutcome>
+        > persistAsync
+    )
+    {
+        _captureAsync = captureAsync ?? throw new ArgumentNullException(nameof(captureAsync));
+        _persistAsync = persistAsync ?? throw new ArgumentNullException(nameof(persistAsync));
     }
 
     private void OnEnable()
@@ -163,13 +183,16 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             return false;
 
         EnsureCaptureArmed(controller);
-        var readiness = GetCaptureReadiness(controller);
-        return _gate.ShouldBlockContinue(
-            readiness,
+        var readinessOutcome = GetCaptureReadiness(controller);
+        EnsureCaptureOperation(readinessOutcome.State);
+        var shouldBlock = _gate.ShouldBlockContinue(
+            readinessOutcome.State,
             isCaptureEnabled: true,
             Time.unscaledTime,
             RevealFallbackTimeoutSeconds
         );
+        CompleteReadinessFailureIfFinished(readinessOutcome);
+        return shouldBlock;
     }
 
     private void SyncEndOfRunCapture()
@@ -194,7 +217,9 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             return;
         }
 
-        var readiness = GetCaptureReadiness(screenController);
+        var readinessOutcome = GetCaptureReadiness(screenController);
+        var readiness = readinessOutcome.State;
+        var operation = EnsureCaptureOperation(readiness);
         if (
             _captureCoroutine == null
             && _gate.TryBeginAutomaticCapture(
@@ -206,22 +231,18 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         )
         {
             _mouseBlocker.Attach(screenController);
-            if (readiness == EndOfRunCaptureReadinessState.Ready)
+            if (operation == null)
+                return;
+            if (readiness != EndOfRunCaptureReadinessState.Ready)
             {
-                BppLog.Debug(
-                    "EndOfRunScreenshot",
-                    $"CaptureState action=start frame={Time.frameCount} time={Time.unscaledTime:F3} trigger=reveal-complete readiness={readiness} runId={ResolveRunId() ?? "<null>"} hero={ResolveHeroName() ?? "<null>"}"
+                operation.RecordDegradation(
+                    readinessOutcome.ReasonCode ?? ScreenshotCaptureReasonCode.ReadinessDeadline,
+                    readinessOutcome.Exception
                 );
             }
-            else
-            {
-                BppLog.Warn(
-                    "EndOfRunScreenshot",
-                    $"CaptureState action=start frame={Time.frameCount} time={Time.unscaledTime:F3} trigger=timeout-fallback readiness={readiness} runId={ResolveRunId() ?? "<null>"} hero={ResolveHeroName() ?? "<null>"}; readiness detection did not recover before the bounded deadline."
-                );
-            }
+            operation.BeginAttempt();
             _captureCoroutine = StartCoroutine(
-                CaptureEndOfRun(screenController, _captureGeneration)
+                CaptureEndOfRun(screenController, _captureGeneration, operation)
             );
         }
 
@@ -231,6 +252,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             Time.unscaledTime,
             RevealFallbackTimeoutSeconds
         );
+        CompleteReadinessFailureIfFinished(readinessOutcome);
         if (shouldBlock)
             _mouseBlocker.Attach(screenController);
         else
@@ -239,7 +261,8 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private IEnumerator CaptureEndOfRun(
         EndOfRunScreenController screenController,
-        int captureGeneration
+        int captureGeneration,
+        ScreenshotCaptureOperation operation
     )
     {
         ScreenshotCaptureResult? capture = null;
@@ -253,9 +276,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             {
                 FailOpenIfCurrent(captureGeneration);
                 attemptResolved = true;
-                BppLog.Warn(
-                    "EndOfRunScreenshot",
-                    "Automatic capture was abandoned because the end-of-run screen changed before capture."
+                operation.RecordAttemptFailure(
+                    ScreenshotCaptureReasonCode.ContextExpired,
+                    exception: null,
+                    willRetry: false,
+                    NowMilliseconds()
                 );
                 yield break;
             }
@@ -266,22 +291,26 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             {
                 FailOpenIfCurrent(captureGeneration);
                 attemptResolved = true;
-                BppLog.Warn(
-                    "EndOfRunScreenshot",
-                    "Automatic capture was abandoned because the end-of-run screen changed during frame settling."
+                operation.RecordAttemptFailure(
+                    ScreenshotCaptureReasonCode.ContextExpired,
+                    exception: null,
+                    willRetry: false,
+                    NowMilliseconds()
                 );
                 yield break;
             }
 
             Exception? captureFailure = null;
+            var captureFailureReason = ScreenshotCaptureReasonCode.CaptureReturnedNull;
             Task<ScreenshotCaptureResult?>? captureTask = null;
             var attemptDeadline = Time.realtimeSinceStartup + CaptureAttemptTimeoutSeconds;
             try
             {
-                captureTask = _screenshotService?.CaptureCurrentFrameAsync(
+                captureTask = _captureAsync?.Invoke(
                     new ScreenshotCaptureRequest
                     {
-                        RunId = ResolveRunId(),
+                        ScreenshotId = operation.ScreenshotId,
+                        RunId = operation.RunId,
                         HeroName = ResolveHeroName(),
                         CaptureSource = RunScreenshotCaptureSource.EndOfRunAuto,
                     }
@@ -290,33 +319,39 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             catch (Exception ex)
             {
                 captureFailure = ex;
+                captureFailureReason = ScreenshotCaptureReasonCode.CaptureSynchronousException;
             }
 
             if (captureTask != null)
             {
                 _activeCaptureTask = captureTask;
+                _activeCaptureScreenshotId = operation.ScreenshotId;
                 while (!captureTask.IsCompleted)
                 {
                     if (!IsCaptureContextCurrent(screenController, captureGeneration))
                     {
-                        AbandonCaptureTask(captureTask);
+                        AbandonCaptureTask(captureTask, operation.ScreenshotId);
                         FailOpenIfCurrent(captureGeneration);
                         attemptResolved = true;
-                        BppLog.Warn(
-                            "EndOfRunScreenshot",
-                            "Automatic capture was abandoned because the end-of-run screen changed while the frame was being written."
+                        operation.RecordAttemptFailure(
+                            ScreenshotCaptureReasonCode.ContextExpired,
+                            exception: null,
+                            willRetry: false,
+                            NowMilliseconds()
                         );
                         yield break;
                     }
 
                     if (Time.realtimeSinceStartup >= attemptDeadline)
                     {
-                        AbandonCaptureTask(captureTask);
+                        AbandonCaptureTask(captureTask, operation.ScreenshotId);
                         FailOpenIfCurrent(captureGeneration);
                         attemptResolved = true;
-                        BppLog.Error(
-                            "EndOfRunScreenshot",
-                            $"End-of-run screenshot capture exceeded {CaptureAttemptTimeoutSeconds:F0}s; releasing Continue without retrying the in-flight write."
+                        operation.RecordAttemptFailure(
+                            ScreenshotCaptureReasonCode.CaptureTimeout,
+                            exception: null,
+                            willRetry: false,
+                            NowMilliseconds()
                         );
                         yield break;
                     }
@@ -332,27 +367,39 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                 catch (Exception ex)
                 {
                     captureFailure = ex;
+                    captureFailureReason = ScreenshotCaptureReasonCode.CaptureTaskFaulted;
                 }
             }
 
             if (captureFailure != null)
             {
                 attemptResolved = true;
-                HandleCaptureFailure(captureFailure);
+                HandleCaptureFailure(operation, captureFailureReason, captureFailure);
             }
             else if (capture != null)
             {
+                if (!IsUsableScreenshot(capture.FilePath))
+                {
+                    attemptResolved = true;
+                    HandleCaptureFailure(
+                        operation,
+                        ScreenshotCaptureReasonCode.CaptureArtifactUnavailable,
+                        failure: null
+                    );
+                    yield break;
+                }
+
+                operation.RecordVerifiedArtifact(capture.FilePath);
                 DisposeCaptureSuppressionScope();
-                Exception? persistenceFailure = null;
-                var persistenceTimedOut = false;
-                Task? persistTask = null;
+                var persistenceOutcome = ScreenshotMetadataPersistenceOutcome.Unavailable();
+                Task<ScreenshotMetadataPersistenceOutcome>? persistTask = null;
                 try
                 {
-                    persistTask = PersistCaptureAsync(capture, isPrimary: true);
+                    persistTask = _persistAsync?.Invoke(capture, true);
                 }
                 catch (Exception ex)
                 {
-                    persistenceFailure = ex;
+                    persistenceOutcome = ScreenshotMetadataPersistenceOutcome.Failed(ex);
                 }
 
                 if (persistTask != null)
@@ -366,20 +413,20 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                         yield return null;
                     }
 
-                    persistenceTimedOut = !persistTask.IsCompleted;
-                    if (persistenceTimedOut)
+                    if (!persistTask.IsCompleted)
                     {
                         ObserveLatePersistence(persistTask);
+                        persistenceOutcome = ScreenshotMetadataPersistenceOutcome.TimedOut();
                     }
                     else
                     {
                         try
                         {
-                            persistTask.GetAwaiter().GetResult();
+                            persistenceOutcome = persistTask.GetAwaiter().GetResult();
                         }
                         catch (Exception ex)
                         {
-                            persistenceFailure = ex;
+                            persistenceOutcome = ScreenshotMetadataPersistenceOutcome.Failed(ex);
                         }
                     }
                 }
@@ -387,26 +434,21 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                 if (captureGeneration == _captureGeneration)
                     _gate.CompleteCaptureAttempt();
                 attemptResolved = true;
-                if (persistenceTimedOut)
-                {
-                    BppLog.Warn(
-                        "EndOfRunScreenshot",
-                        $"Screenshot metadata persistence exceeded {MetadataPersistenceTimeoutSeconds:F0}s; releasing Continue while the background save finishes."
-                    );
-                }
-                else if (persistenceFailure != null)
-                {
-                    BppLog.Error(
-                        "EndOfRunScreenshot",
-                        "Failed to persist end-of-run screenshot metadata.",
-                        persistenceFailure
-                    );
-                }
+                operation.TryCompleteArtifact(
+                    artifactVerified: true,
+                    capture.FilePath,
+                    persistenceOutcome,
+                    NowMilliseconds()
+                );
             }
             else
             {
                 attemptResolved = true;
-                HandleCaptureFailure(null);
+                HandleCaptureFailure(
+                    operation,
+                    ScreenshotCaptureReasonCode.CaptureReturnedNull,
+                    failure: null
+                );
             }
         }
         finally
@@ -415,21 +457,25 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             _captureCoroutine = null;
             DisposeCaptureSuppressionScope();
             if (_gate.IsCaptureAttemptInFlight() && !attemptResolved)
-                HandleCaptureFailure(null);
+            {
+                HandleCaptureFailure(
+                    operation,
+                    ScreenshotCaptureReasonCode.CaptureReturnedNull,
+                    failure: null
+                );
+            }
             _mouseBlocker.Detach();
         }
     }
 
-    private void HandleCaptureFailure(Exception? failure)
+    private void HandleCaptureFailure(
+        ScreenshotCaptureOperation operation,
+        ScreenshotCaptureReasonCode reasonCode,
+        Exception? failure
+    )
     {
         var willRetry = _gate.AbortCaptureAttempt(Time.unscaledTime + CaptureRetryCooldownSeconds);
-        var message = willRetry
-            ? "End-of-run screenshot capture failed; one retry remains."
-            : "End-of-run screenshot capture failed twice; releasing Continue without a screenshot.";
-        if (failure == null)
-            BppLog.Warn("EndOfRunScreenshot", message);
-        else
-            BppLog.Error("EndOfRunScreenshot", message, failure);
+        operation.RecordAttemptFailure(reasonCode, failure, willRetry, NowMilliseconds());
     }
 
     private void MarkSummaryRevealStarted(EndOfRunSummaryController summaryController)
@@ -440,13 +486,7 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
         var controllerId = screenController.GetInstanceID();
         if (_trackedEndOfRunControllerId != 0 && _trackedEndOfRunControllerId != controllerId)
-        {
-            BppLog.Warn(
-                "EndOfRunScreenshot",
-                "Ignored a summary reveal signal from a stale end-of-run controller."
-            );
             return;
-        }
 
         TrackEndOfRunController(screenController);
         if (_gate.HasFinishedForCurrentRun() || _gate.HasSummaryRevealStarted())
@@ -457,11 +497,44 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         _gate.MarkSummaryRevealStarted();
     }
 
-    private EndOfRunCaptureReadinessState GetCaptureReadiness(EndOfRunScreenController controller)
+    private EndOfRunCaptureReadinessOutcome GetCaptureReadiness(EndOfRunScreenController controller)
     {
-        return EndOfRunCaptureReadinessDetector.GetState(
+        return EndOfRunCaptureReadinessDetector.GetOutcome(
             controller,
             _gate.HasSummaryRevealStarted()
+        );
+    }
+
+    private ScreenshotCaptureOperation? EnsureCaptureOperation(
+        EndOfRunCaptureReadinessState readiness
+    )
+    {
+        if (_captureOperation != null)
+            return _captureOperation;
+        if (readiness == EndOfRunCaptureReadinessState.NotSummary)
+            return null;
+
+        _captureOperation = new ScreenshotCaptureOperation(
+            Guid.NewGuid().ToString("N"),
+            ResolveRunId(),
+            RunScreenshotCaptureSource.EndOfRunAuto,
+            NowMilliseconds()
+        );
+        return _captureOperation;
+    }
+
+    private void CompleteReadinessFailureIfFinished(
+        EndOfRunCaptureReadinessOutcome readinessOutcome
+    )
+    {
+        if (!_gate.HasFinishedForCurrentRun() || _gate.HasCapturedForCurrentRun())
+            return;
+
+        _captureOperation?.RecordAttemptFailure(
+            readinessOutcome.ReasonCode ?? ScreenshotCaptureReasonCode.ReadinessDeadline,
+            readinessOutcome.Exception,
+            willRetry: false,
+            NowMilliseconds()
         );
     }
 
@@ -471,24 +544,25 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             _gate.FailOpen();
     }
 
-    private static void ObserveAndDeleteLateCapture(Task<ScreenshotCaptureResult?> captureTask)
+    private static void ObserveAndDeleteLateCapture(
+        Task<ScreenshotCaptureResult?> captureTask,
+        string? screenshotId
+    )
     {
         _ = captureTask.ContinueWith(
             task =>
             {
+                string? filePath = null;
                 try
                 {
                     if (
                         task.Status == TaskStatus.RanToCompletion
-                        && task.Result is { FilePath: { Length: > 0 } filePath }
-                        && File.Exists(filePath)
+                        && task.Result is { FilePath: { Length: > 0 } completedFilePath }
+                        && File.Exists(completedFilePath)
                     )
                     {
+                        filePath = completedFilePath;
                         File.Delete(filePath);
-                        BppLog.Warn(
-                            "EndOfRunScreenshot",
-                            $"Deleted a screenshot that completed after its capture context expired: {filePath}"
-                        );
                     }
                     else if (task.IsFaulted)
                     {
@@ -497,9 +571,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
                 }
                 catch (Exception ex)
                 {
-                    BppLog.Warn(
-                        "EndOfRunScreenshot",
-                        $"Failed to clean up a late screenshot capture: {ex.Message}"
+                    ScreenshotCaptureDiagnostics.ReportCleanupFailed(
+                        ScreenshotCaptureCleanupStage.LateFileDelete,
+                        screenshotId,
+                        filePath,
+                        ex
                     );
                 }
             },
@@ -507,47 +583,54 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         );
     }
 
-    private void AbandonCaptureTask(Task<ScreenshotCaptureResult?> captureTask)
+    private void AbandonCaptureTask(
+        Task<ScreenshotCaptureResult?> captureTask,
+        string? screenshotId
+    )
     {
         ReleaseCaptureTask(captureTask);
-        ObserveAndDeleteLateCapture(captureTask);
+        ObserveAndDeleteLateCapture(captureTask, screenshotId);
     }
 
     private void AbandonActiveCaptureTask()
     {
         var captureTask = _activeCaptureTask;
         if (captureTask != null)
-            AbandonCaptureTask(captureTask);
+            AbandonCaptureTask(captureTask, _activeCaptureScreenshotId);
     }
 
     private void ReleaseCaptureTask(Task<ScreenshotCaptureResult?> captureTask)
     {
         if (ReferenceEquals(_activeCaptureTask, captureTask))
+        {
             _activeCaptureTask = null;
+            _activeCaptureScreenshotId = null;
+        }
     }
 
-    private static void ObserveLatePersistence(Task persistTask)
+    private static void ObserveLatePersistence(
+        Task<ScreenshotMetadataPersistenceOutcome> persistTask
+    )
     {
         _ = persistTask.ContinueWith(
             task =>
             {
                 if (task.IsFaulted)
-                {
-                    BppLog.Error(
-                        "EndOfRunScreenshot",
-                        "Screenshot metadata persistence failed after its UI timeout.",
-                        task.Exception!.GetBaseException()
-                    );
-                }
+                    _ = task.Exception;
+                else if (task.Status == TaskStatus.RanToCompletion)
+                    _ = task.Result;
             },
             TaskScheduler.Default
         );
     }
 
-    private Task PersistCaptureAsync(ScreenshotCaptureResult? capture, bool isPrimary = false)
+    private Task<ScreenshotMetadataPersistenceOutcome> PersistCaptureAsync(
+        ScreenshotCaptureResult? capture,
+        bool isPrimary = false
+    )
     {
         if (capture == null || _screenshotStore == null)
-            return Task.CompletedTask;
+            return Task.FromResult(ScreenshotMetadataPersistenceOutcome.Unavailable());
 
         var services = _services!;
         var probe = services.RunSnapshot;
@@ -571,10 +654,11 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
             try
             {
                 screenshotStore.Save(record);
+                return ScreenshotMetadataPersistenceOutcome.Saved();
             }
             catch (Exception ex)
             {
-                BppLog.Error("ScreenshotService", "Failed to persist screenshot metadata.", ex);
+                return ScreenshotMetadataPersistenceOutcome.Failed(ex);
             }
         });
     }
@@ -631,6 +715,13 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
 
     private void ResetCaptureUiState(bool disarmGate)
     {
+        var operation = _captureOperation;
+        if (operation != null)
+        {
+            operation.TryCompleteContextReset(NowMilliseconds());
+            _captureOperation = null;
+        }
+
         _captureGeneration++;
         AbandonActiveCaptureTask();
         if (_captureCoroutine != null)
@@ -648,6 +739,22 @@ internal sealed class EndOfRunScreenshotController : MonoBehaviour
         _nextControllerScanAtSeconds = 0f;
         _trackedEndOfRunControllerId = 0;
     }
+
+    private static bool IsUsableScreenshot(string? filePath)
+    {
+        try
+        {
+            return !string.IsNullOrWhiteSpace(filePath)
+                && File.Exists(filePath)
+                && new FileInfo(filePath).Length > 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static long NowMilliseconds() => (long)Math.Round(Time.realtimeSinceStartup * 1000d);
 
     private void EnsureCaptureArmed(EndOfRunScreenController controller)
     {

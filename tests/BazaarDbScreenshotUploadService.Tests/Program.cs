@@ -3,8 +3,143 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Net.Http;
 using System.Reflection;
+using BepInEx.Logging;
 using Microsoft.Data.Sqlite;
 using static BazaarPlusPlus.Tests.Shared.ScreenshotUploadTestHelpers;
+
+var uploadLogEventsType = RequireType(
+    "BazaarPlusPlus.Game.Screenshots.Upload.ScreenshotUploadLogEvents"
+);
+var uploadDefinitions = uploadLogEventsType
+    .GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+    .Where(field => field.FieldType.Name == "BppLogEventDefinition")
+    .Select(field => field.GetValue(null)!)
+    .ToDictionary(
+        definition => GetStringProperty(definition, "EventId"),
+        definition => DescribeEventDefinition(definition),
+        StringComparer.Ordinal
+    );
+Assert(
+    uploadDefinitions.Count == 4,
+    $"Screenshot upload should declare exactly four structured events; got {uploadDefinitions.Count}."
+);
+AssertDefinition(
+    uploadDefinitions,
+    "screenshots.upload.initialization_degraded",
+    "reason_code:Public:Low:None|endpoint:Public:Low:None",
+    "endpoint|reason_code"
+);
+AssertDefinition(
+    uploadDefinitions,
+    "screenshots.upload.waiting",
+    "reason_code:Public:Low:None|pending_count:Public:Low:None",
+    null
+);
+AssertDefinition(
+    uploadDefinitions,
+    "screenshots.upload.degraded",
+    "endpoint:Public:Low:None|reason_code:Public:Low:None|rtt_ms:Public:High:None",
+    "reason_code"
+);
+AssertDefinition(
+    uploadDefinitions,
+    "screenshots.upload.recovered",
+    "endpoint:Public:Low:None|reason_code:Public:Low:None|outage_duration_ms:Public:High:None",
+    null
+);
+
+var uploadLogStateType = RequireType(
+    "BazaarPlusPlus.Game.Screenshots.Upload.ScreenshotUploadLogState"
+);
+var uploadLogState = Activator.CreateInstance(uploadLogStateType, nonPublic: true)!;
+var reportInitializationDegraded = uploadLogStateType.GetMethod(
+    "ReportInitializationDegraded",
+    BindingFlags.Instance | BindingFlags.NonPublic
+)!;
+using (var capture = new LogCapture())
+{
+    reportInitializationDegraded.Invoke(uploadLogState, ["invalid_local_paths", null]);
+    reportInitializationDegraded.Invoke(
+        uploadLogState,
+        [
+            "initialization_exception",
+            new InvalidOperationException(
+                "path=/Users/private/game/data.db url=https://private.invalid/bootstrap?token=private-query account_id=private-account response_body=private-body"
+            ),
+        ]
+    );
+
+    var initialization = capture.Events("screenshots.upload.initialization_degraded");
+    Assert(initialization.Count == 2, "Each failed activation should emit one structured warning.");
+    Assert(
+        initialization.All(entry => entry.Level == LogLevel.Warning),
+        "Optional screenshot upload initialization failure should be Warning, not Error."
+    );
+    Assert(
+        initialization.All(entry =>
+            entry.Data?.ToString()?.Contains("endpoint=bazaardb_snapshot") == true
+        ),
+        "Initialization degradation should use the governed endpoint."
+    );
+    Assert(
+        initialization[0].Data?.ToString()?.Contains("reason_code=invalid_local_paths") == true
+            && initialization[1].Data?.ToString()?.Contains("reason_code=initialization_exception")
+                == true,
+        "Initialization degradation should use fixed reason codes."
+    );
+    Assert(
+        initialization.All(entry =>
+            entry.Data?.ToString()?.Contains("/Users/private", StringComparison.Ordinal) != true
+            && entry.Data?.ToString()?.Contains("private-query", StringComparison.Ordinal) != true
+            && entry.Data?.ToString()?.Contains("private-account", StringComparison.Ordinal) != true
+            && entry.Data?.ToString()?.Contains("private-body", StringComparison.Ordinal) != true
+        ),
+        "Initialization diagnostics must redact paths, query secrets, accounts, and bodies."
+    );
+}
+
+var uploadFeedType = RequireType(
+    "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadFeed"
+);
+var runAttempt = uploadFeedType.GetMethod(
+    "RunAttemptAsync",
+    BindingFlags.Static | BindingFlags.NonPublic
+);
+Assert(runAttempt != null, "Screenshot upload feed should expose its attempt boundary for tests.");
+var attemptLogState = Activator.CreateInstance(uploadLogStateType, nonPublic: true)!;
+using (var capture = new LogCapture())
+{
+    Func<CancellationToken, Task> throwingUpload = _ =>
+        Task.FromException(new InvalidOperationException("private service detail"));
+    var firstResult = InvokeTaskWithResult(
+        runAttempt!,
+        null,
+        [throwingUpload, attemptLogState, CancellationToken.None]
+    );
+    var secondResult = InvokeTaskWithResult(
+        runAttempt!,
+        null,
+        [throwingUpload, attemptLogState, CancellationToken.None]
+    );
+
+    AssertNoHealthSignal(firstResult);
+    AssertNoHealthSignal(secondResult);
+    var serviceDegraded = capture.Events("screenshots.upload.degraded");
+    Assert(
+        serviceDegraded.Count == 1,
+        "Repeated non-cancellation service exceptions should stay inside one screenshot-owned degradation episode."
+    );
+    Assert(
+        serviceDegraded[0].Data?.ToString()?.Contains("reason_code=service_exception") == true,
+        "A caught service exception should use a fixed low-cardinality reason."
+    );
+    Assert(
+        serviceDegraded[0]
+            .Data?.ToString()
+            ?.Contains("private service detail", StringComparison.Ordinal) != true,
+        "Caught service exceptions should not expose service text."
+    );
+}
 
 var serviceType = RequireType(
     "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadService"
@@ -387,7 +522,7 @@ try
         "fake-cache/snapshot.png"
     );
 
-    // Test 8: health failure leaves pending rows untouched for the next retry
+    // Test 8: health state logs one warning per episode and one recovery after success
     SeedRunSnapshotWithFile(
         dbPath,
         screenshotsDir,
@@ -397,27 +532,108 @@ try
     ensureBackfilled.Invoke(store, []);
     {
         FakePreparedImage.PrepareCallCount = 0;
-        var handler = new RecordingHandler(req => new HttpResponseMessage(
-            HttpStatusCode.ServiceUnavailable
-        ));
+        var healthRequestCount = 0;
+        var handler = new RecordingHandler(req =>
+        {
+            if (req.Method == HttpMethod.Get && req.RequestUri?.AbsolutePath == "/health")
+            {
+                healthRequestCount++;
+                if (healthRequestCount is 1 or 2 or 3 or 5)
+                    return new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+                    {
+                        Content = new StringContent("private-health-response-body"),
+                    };
+
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(
+                        "{\"status\":\"ok\",\"server_time_utc\":\"2026-06-03T00:00:00.000Z\"}"
+                    ),
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"status\":\"ok\"}"),
+            };
+        });
         var client = new HttpClient(handler);
-        var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => "acct-9")]);
+        var service = ctor!.Invoke([
+            store,
+            routes,
+            client,
+            new Func<string?>(() => "private-account-id"),
+        ]);
         var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;
-        var task = (Task)uploadMethod.Invoke(service, [CancellationToken.None])!;
-        task.GetAwaiter().GetResult();
+        using var capture = new LogCapture();
+
+        for (var attempt = 0; attempt < 4; attempt++)
+            InvokeTask(uploadMethod, service);
 
         Assert(
-            GetUploadStatus(dbPath, "shot-health-fail") == "pending",
-            "Health failure should leave pending snapshots pending for retry."
+            capture.Events("screenshots.upload.degraded").Count == 1,
+            "Three failed health polls should emit one degradation warning."
         );
         Assert(
-            GetUploadAttempts(dbPath, "shot-health-fail") == 0,
-            "Health failure should not count as a screenshot upload attempt."
+            capture.Events("screenshots.upload.recovered").Count == 1,
+            "The first later health success should emit one recovery."
         );
-        Assert(handler.Requests.Count == 1, "Health failure should not continue into upload POST.");
+
+        SeedRunSnapshotWithFile(
+            dbPath,
+            screenshotsDir,
+            "shot-health-second-episode",
+            "2026-04-08_20-32-35-000_final_run-r1.png"
+        );
+        ensureBackfilled.Invoke(store, []);
+        InvokeTask(uploadMethod, service);
+        InvokeTask(uploadMethod, service);
+
+        var degraded = capture.Events("screenshots.upload.degraded");
+        var recovered = capture.Events("screenshots.upload.recovered");
+        Assert(degraded.Count == 2, "A later health outage should emit a new warning.");
+        Assert(recovered.Count == 2, "A later recovered outage should emit a new recovery.");
         Assert(
-            FakePreparedImage.PrepareCallCount == 0,
-            "Health failure should not invoke the image preparer."
+            degraded.All(entry => entry.Level == LogLevel.Warning),
+            "Health degradation should be Warning."
+        );
+        Assert(
+            recovered.All(entry => entry.Level == LogLevel.Info),
+            "Health recovery should be Info."
+        );
+        Assert(
+            degraded.All(entry =>
+                entry.Data?.ToString()?.Contains("endpoint=bazaardb_snapshot") == true
+                && entry.Data?.ToString()?.Contains("reason_code=health_probe_failed") == true
+                && entry.Data?.ToString()?.Contains("rtt_ms=") == true
+            ),
+            "Health degradation should use governed endpoint, reason, and RTT fields."
+        );
+        Assert(
+            recovered.All(entry =>
+                entry.Data?.ToString()?.Contains("endpoint=bazaardb_snapshot") == true
+                && entry.Data?.ToString()?.Contains("reason_code=health_probe_failed") == true
+                && entry.Data?.ToString()?.Contains("outage_duration_ms=") == true
+            ),
+            "Health recovery should carry the recovered reason and outage duration."
+        );
+        Assert(
+            capture.All.All(entry =>
+                entry.Data?.ToString()?.Contains("private-account-id", StringComparison.Ordinal)
+                    != true
+                && entry
+                    .Data?.ToString()
+                    ?.Contains("private-health-response-body", StringComparison.Ordinal) != true
+                && entry.Data?.ToString()?.Contains("example.invalid", StringComparison.Ordinal)
+                    != true
+                && entry.Data?.ToString()?.Contains("server_time", StringComparison.Ordinal) != true
+            ),
+            "Screenshot upload events must omit account, response body, URL, and server text."
+        );
+
+        Assert(
+            GetUploadStatus(dbPath, "shot-health-fail") == "uploaded",
+            "The later healthy attempt should preserve normal screenshot upload behavior."
         );
         client.Dispose();
     }
@@ -435,8 +651,8 @@ try
         var client = new HttpClient(handler);
         var service = ctor!.Invoke([store, routes, client, new Func<string?>(() => " ")]);
         var uploadMethod = serviceType.GetMethod("UploadPendingAsync")!;
-        var task = (Task)uploadMethod.Invoke(service, [CancellationToken.None])!;
-        task.GetAwaiter().GetResult();
+        using var capture = new LogCapture();
+        InvokeTask(uploadMethod, service);
 
         Assert(
             GetUploadStatus(dbPath, "shot-no-account") == "pending",
@@ -450,6 +666,21 @@ try
             handler.Requests.Count == 0,
             "Service should not probe health before the player account id is available."
         );
+#if DEBUG
+        var waiting = capture.Events("screenshots.upload.waiting");
+        Assert(waiting.Count == 1, "Missing account context should emit one Debug waiting event.");
+        Assert(waiting[0].Level == LogLevel.Debug, "Upload waiting should be Debug.");
+        Assert(
+            waiting[0].Data?.ToString()?.Contains("reason_code=account_context_unavailable") == true
+                && waiting[0].Data?.ToString()?.Contains("pending_count=") == true,
+            "Upload waiting should contain only governed reason and pending-count fields."
+        );
+#else
+        Assert(
+            capture.Events("screenshots.upload.waiting").Count == 0,
+            "Release should compile out upload waiting Debug events."
+        );
+#endif
         client.Dispose();
     }
 }
@@ -463,6 +694,97 @@ finally
 }
 
 Console.WriteLine("BazaarDbSnapshotUploadService checks passed.");
+
+static void AssertDefinition(
+    IReadOnlyDictionary<string, EventDefinitionDescription> definitions,
+    string eventId,
+    string expectedFields,
+    string? expectedStormKey
+)
+{
+    Assert(definitions.TryGetValue(eventId, out var definition), $"Missing event {eventId}.");
+    Assert(
+        string.Equals(definition.Fields, expectedFields, StringComparison.Ordinal),
+        $"{eventId} fields should be '{expectedFields}', got '{definition.Fields}'."
+    );
+    Assert(
+        string.Equals(definition.Scope, "Screenshots", StringComparison.Ordinal),
+        $"{eventId} should use the fixed Screenshots scope, got '{definition.Scope}'."
+    );
+    Assert(
+        string.Equals(definition.StormKey, expectedStormKey, StringComparison.Ordinal),
+        $"{eventId} storm key should be '{expectedStormKey ?? "<none>"}', got '{definition.StormKey ?? "<none>"}'."
+    );
+}
+
+static EventDefinitionDescription DescribeEventDefinition(object definition)
+{
+    var fields = ((System.Collections.IEnumerable)GetProperty(definition, "Fields"))
+        .Cast<object>()
+        .Select(field =>
+            $"{GetStringProperty(field, "Name")}:{GetProperty(field, "Privacy")}:{GetProperty(field, "Cardinality")}:{GetProperty(field, "Correlation")}"
+        );
+    var stormPolicy = GetNullableProperty(definition, "StormPolicy");
+    var scope = GetProperty(definition, "Scope");
+    var stormKey =
+        stormPolicy == null
+            ? null
+            : string.Join(
+                "|",
+                ((System.Collections.IEnumerable)GetProperty(stormPolicy, "KeyFields"))
+                    .Cast<object>()
+                    .Select(field => GetStringProperty(field, "Name"))
+            );
+    return new EventDefinitionDescription(
+        GetStringProperty(scope, "PrefixName"),
+        string.Join("|", fields),
+        stormKey
+    );
+}
+
+static object GetProperty(object instance, string name) =>
+    instance
+        .GetType()
+        .GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)!
+        .GetValue(instance)!;
+
+static object? GetNullableProperty(object instance, string name) =>
+    instance
+        .GetType()
+        .GetProperty(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)!
+        .GetValue(instance);
+
+static string GetStringProperty(object instance, string name) =>
+    (string)GetProperty(instance, name);
+
+static void InvokeTask(MethodInfo method, object instance)
+{
+    var task = (Task)method.Invoke(instance, [CancellationToken.None])!;
+    task.GetAwaiter().GetResult();
+}
+
+static object InvokeTaskWithResult(MethodInfo method, object? instance, object?[] arguments)
+{
+    var task = (Task)method.Invoke(instance, arguments)!;
+    task.GetAwaiter().GetResult();
+    return task.GetType().GetProperty("Result")!.GetValue(task)!;
+}
+
+static void AssertNoHealthSignal(object result)
+{
+    var observations = ((System.Collections.IEnumerable)GetProperty(result, "Observations"))
+        .Cast<object>()
+        .ToArray();
+    Assert(observations.Length == 1, "Attempt result should contain one observation.");
+    Assert(
+        string.Equals(
+            GetProperty(observations[0], "Kind").ToString(),
+            "NoHealthSignal",
+            StringComparison.Ordinal
+        ),
+        "Screenshot feed should prevent the generic upload state from observing its owned health."
+    );
+}
 
 static void SeedRunSnapshotWithFile(
     string dbPath,
@@ -605,6 +927,39 @@ internal sealed class RecordingHandler : HttpMessageHandler
     }
 }
 
+internal sealed class LogCapture : IDisposable
+{
+    private readonly ManualLogSource _source = new("BazaarDbScreenshotUploadService.Tests");
+    private readonly List<LogEventArgs> _events = [];
+
+    internal LogCapture()
+    {
+        _source.LogEvent += OnLogEvent;
+        var bppLogType = RequireType("BazaarPlusPlus.Infrastructure.BppLog");
+        bppLogType
+            .GetMethod("Install", BindingFlags.Public | BindingFlags.Static)!
+            .Invoke(null, [_source]);
+    }
+
+    internal IReadOnlyList<LogEventArgs> All => _events;
+
+    internal IReadOnlyList<LogEventArgs> Events(string eventId) =>
+        _events
+            .Where(entry =>
+                entry.Data?.ToString()?.Contains("event=" + eventId, StringComparison.Ordinal)
+                == true
+            )
+            .ToArray();
+
+    public void Dispose()
+    {
+        _source.LogEvent -= OnLogEvent;
+        _source.Dispose();
+    }
+
+    private void OnLogEvent(object? sender, LogEventArgs args) => _events.Add(args);
+}
+
 internal static class FakePreparedImage
 {
     public static object? NextImage { get; set; }
@@ -627,3 +982,9 @@ internal static class FakePreparedImage
         return NextImage;
     }
 }
+
+internal readonly record struct EventDefinitionDescription(
+    string Scope,
+    string Fields,
+    string? StormKey
+);
