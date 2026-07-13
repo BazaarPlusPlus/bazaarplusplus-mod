@@ -1285,14 +1285,26 @@ public class CoreLayeringTests
         var patchSource = File.ReadAllText(
             Path.Combine(mainSource, "Patches", "Tooltips", "BilingualItemNamePatch.cs")
         );
+        var eligibilitySource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "BilingualItemNames",
+                "BilingualNameCardEligibility.cs"
+            )
+        );
         var providerSource = File.ReadAllText(
             Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
         );
 
         Assert.Contains("NativeGameFonts.TryInstallFallback", patchSource);
         Assert.Contains("&& !NativeGameFonts.TryInstallFallback", patchSource);
-        Assert.Contains("ECardType.Item", patchSource);
-        Assert.Contains("ECardType.EventEncounter", patchSource);
+        Assert.Contains("BilingualNameCardEligibility.IsSupported", patchSource);
+        Assert.Contains("ECardType.Item", eligibilitySource);
+        Assert.Contains("ECardType.Skill", eligibilitySource);
+        Assert.Contains("ECardType.EncounterStep", eligibilitySource);
+        Assert.Contains("ECardType.EventEncounter", eligibilitySource);
+        Assert.DoesNotContain("ECardType.SocketEffect", eligibilitySource);
         Assert.Contains("NotoFontFallbackRuntime", providerSource);
         Assert.Contains("NotoSerifFallbacksOrdered", providerSource);
         Assert.Contains("Object.Instantiate(primary)", providerSource);

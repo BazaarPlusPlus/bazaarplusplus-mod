@@ -236,7 +236,7 @@ OS fallback 列表没有公共 setter；实现必须把“能够可靠清空并�
 | Main Menu 版本 label | formatter 只生成 ASCII；删除 `BppTmpFont.TryApply` 后保留 donor primary/material，不安装不可达的 CJK chain |
 | Voice Subtitles | 删除 `ResolveSystemChineseUiFont` 与 OS font candidates；TMP 英文/combined label 保留 donor，uGUI 中文行使用游戏 Sans SC `UnityEngine.Font` |
 | Combat Status Bar | 删除 `GetBuiltinResource<Font>("LegacyRuntime.ttf")`；所有 uGUI `Text` 使用同一个游戏 Sans SC `UnityEngine.Font` |
-| 双语名称 | 保留 donor clone + 游戏 `zh-CN` fallback 行为；切到共享 loader，不改变产品行为 |
+| 双语名称 | 保留 donor clone + 游戏 `zh-CN` fallback 行为并切到共享 loader；按已确认需求把适用类型从 Item / EventEncounter 扩到 Skill / EncounterStep（技能 / 奖励） |
 | Collection / History / Live Build 根节点 | 统一绑定游戏 Sans SC `UnityEngine.Font` 与专用 `PanelTextSettings`；Collection 顶层标题和 Live Build 终局阵容标题覆盖为游戏 Serif SC source font、normal style 与原生 heading 色 `#FFD5AC` |
 | TextField / Button 内部 text element | 清除分散的 `BppUiFont.Default`，继承根字体；只有 Unity 继承失效的控件保留显式游戏字体绑定 |
 | 赞助用户名 | 显示前校验；只处理当前实际显示文本，不预热整个远端名单 |
@@ -348,7 +348,7 @@ OS fallback 列表没有公共 setter；实现必须把“能够可靠清空并�
 - [x] 迁移 Voice Subtitles 中文 uGUI 行并删除 OS font path；英文/combined TMP donor 行为保持。
 - [x] 删除原生 tooltip / main-menu label 的 BPP 字体覆盖并保留 donor typography；原生 tooltip 的 CJK 安装游戏 chain，ASCII-only main-menu label 不安装不可达的 chain。
 - [ ] 重新验收附魔预览和 aggregate missing types 的 CJK line-height / wrapping。
-- [x] 保持双语名称行为不变，并切到共享 loader。
+- [x] 双语名称切到共享 loader，并把适用类型从 Item / EventEncounter 扩到 Skill / EncounterStep（技能 / 奖励）。
 
 完成条件：全仓对 `BppUiFont|BppTmpFont|UseUiFont|GetBuiltinResource<Font>|CreateDynamicFontFromOSFont|new Font\(` 的源码扫描无命中；所有用户可见 BPP 表面只引用游戏字体资产。
 
@@ -394,7 +394,7 @@ OS fallback 列表没有公共 setter；实现必须把“能够可靠清空并�
 - [ ] BPP `zh-Hant`：固定文案全部可见；测试串至少包含审计出的 145 个 Dynamic-only Han 字符之一，以证明未退化为静态两级；记录 SC regional glyph 取舍的人工验收结果。
 - [ ] 英文游戏 + BPP `zh-Hant`：事件预览、英雄升级奖励、附魔预览、aggregate missing types 均由 donor + 游戏 chain 显示；字体、材质、字号、outline 与原生一致。
 - [ ] 附魔预览多行 CJK 与 #74 的间距基线一致，没有因 LXGW → Noto 指标变化重新出现过宽/过窄间距。
-- [ ] 双语名称在英文/中文游戏 locale 下仍能显示另一语言。
+- [ ] Item、Skill、EncounterStep 奖励和 EventEncounter 的双语名称在英文/中文游戏 locale 下仍能显示另一语言。
 - [ ] Voice Subtitles 中文行确认使用游戏 Sans SC source font；英文/combined donor、换行和布局无回归，日志中没有 OS font creation。
 - [ ] 当前线上赞助名字抽样正常；构造 Emoji/Hangul 缺字名时不出现 tofu，且日志包含 code point。
 - [ ] 搜索框输入 unsupported 字符时只显示 missing glyph；受控 `PanelTextSettings` 的 OS fallback 列表保持为空。

@@ -28,8 +28,7 @@ internal static class BilingualItemNamePatch
             var enabled =
                 BppPatchHost.Services.Config.EnableBilingualItemNamesConfig?.Value ?? false;
             var currentLanguageIsChinese = LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode);
-            var supportedCard =
-                card?.Type == ECardType.Item || card?.Type == ECardType.EventEncounter;
+            var supportedCard = card != null && BilingualNameCardEligibility.IsSupported(card.Type);
             if (!enabled || !supportedCard)
                 return;
 
