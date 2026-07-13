@@ -1558,6 +1558,103 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Run_script_exposes_publish_and_fetch_data_without_all()
+    {
+        var repoRoot = RepoRoot();
+        var runScript = Path.Combine(repoRoot, "run.sh");
+        Assert.True(File.Exists(runScript), $"Could not locate run script at '{runScript}'.");
+
+        var text = File.ReadAllText(runScript);
+        Assert.Contains("publish)", text);
+        Assert.Contains("fetch-data)", text);
+        Assert.DoesNotContain("    all)", text);
+        Assert.DoesNotContain("$0 all", text);
+    }
+
+    [Fact]
+    public void Run_script_disables_ipv6_by_default_but_allows_an_explicit_override()
+    {
+        var repoRoot = RepoRoot();
+        var runScript = Path.Combine(repoRoot, "run.sh");
+        Assert.True(File.Exists(runScript), $"Could not locate run script at '{runScript}'.");
+
+        var text = File.ReadAllText(runScript);
+        Assert.Contains(
+            "export DOTNET_SYSTEM_NET_DISABLEIPV6=\"${DOTNET_SYSTEM_NET_DISABLEIPV6:-1}\"",
+            text
+        );
+    }
+
+    [Fact]
+    public void Installer_side_effects_require_an_explicit_production_package()
+    {
+        var repoRoot = RepoRoot();
+        var projectsAndTargets = new Dictionary<string, string[]>
+        {
+            [Path.Combine(MainSourceRoot(repoRoot), "BazaarPlusPlus.csproj")] =
+            [
+                "CopyToInstallerSource",
+                "PackageInstallerSource",
+            ],
+            [
+                Path.Combine(
+                    ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost"),
+                    "BazaarPlusPlus.BazaarAgentHost.csproj"
+                )
+            ] = ["CopyHostToInstallerSource", "PackageHostInstallerSource"],
+        };
+
+        foreach (var (projectPath, targetNames) in projectsAndTargets)
+        {
+            var project = XDocument.Load(projectPath);
+            foreach (var targetName in targetNames)
+            {
+                var target = Assert.Single(
+                    project.Descendants(),
+                    element =>
+                        element.Name.LocalName == "Target"
+                        && Attribute(element, "Name") == targetName
+                );
+                var condition = Attribute(target, "Condition") ?? string.Empty;
+                Assert.Contains("$(BuildProductionPackage)", condition);
+                Assert.Contains("true", condition);
+            }
+        }
+    }
+
+    [Fact]
+    public void Remote_embedded_data_pipeline_declares_the_two_stable_resources()
+    {
+        var repoRoot = RepoRoot();
+        var targetsPath = Path.Combine(MainSourceRoot(repoRoot), "RemoteEmbeddedData.targets");
+        Assert.True(File.Exists(targetsPath), $"Could not locate targets file at '{targetsPath}'.");
+
+        var targets = XDocument.Load(targetsPath);
+        var resources = targets
+            .Descendants()
+            .Where(element => element.Name.LocalName == "RemoteEmbeddedData")
+            .ToDictionary(
+                element => Attribute(element, "Include") ?? string.Empty,
+                element =>
+                    element
+                        .Elements()
+                        .ToDictionary(child => child.Name.LocalName, child => child.Value)
+            );
+
+        Assert.Equal(2, resources.Count);
+        Assert.Equal(
+            "BazaarPlusPlus.Data.VoiceSubtitles.voice-lines.json",
+            resources["voice-lines.json"]["LogicalName"]
+        );
+        Assert.Equal("102400", resources["voice-lines.json"]["MinBytes"]);
+        Assert.Equal(
+            "BazaarPlusPlus.Data.BuildRecommendations.tenwin_builds.json",
+            resources["tenwin_builds.json"]["LogicalName"]
+        );
+        Assert.Equal("51200", resources["tenwin_builds.json"]["MinBytes"]);
+    }
+
+    [Fact]
     public void BazaarAgent_host_repackages_production_zip_after_copying_optional_artifacts()
     {
         var repoRoot = RepoRoot();

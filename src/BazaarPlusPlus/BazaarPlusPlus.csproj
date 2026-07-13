@@ -18,11 +18,11 @@
       >false</BuildProductionPackage>
   </PropertyGroup>
 
+  <Import Project="RemoteEmbeddedData.targets" />
+
   <!-- Embedded resources -->
   <ItemGroup>
-    <EmbeddedResource Include="Data\BuildRecommendations\tenwin_builds.json" />
     <EmbeddedResource Include="Data\CollectionSources\collection-sources.json" />
-    <EmbeddedResource Include="Data\VoiceSubtitles\voice-lines.json" />
     <EmbeddedResource Include="Resources\DockButtons\collection-panel-icon.png" />
   </ItemGroup>
 
@@ -263,7 +263,7 @@
   <Target
     Name="CopyToInstallerSource"
     AfterTargets="Build"
-    Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)')"
+    Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)') and '$(BuildProductionPackage)' == 'true'"
   >
     <Message Text="[BazaarPlusPlus] Building for Release" Importance="high" />
     <WriteLinesToFile
@@ -405,12 +405,16 @@
   </Target>
 
   <!-- Build all -->
-  <Target Name="BuildAll">
-    <MSBuild Projects="$(MSBuildProjectFile)" Targets="Build" Properties="Configuration=Debug" />
+  <Target Name="BuildAll" DependsOnTargets="EnsureRemoteEmbeddedData">
     <MSBuild
       Projects="$(MSBuildProjectFile)"
       Targets="Build"
-      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage)"
+      Properties="Configuration=Debug;RemoteEmbeddedDataPrepared=true"
+    />
+    <MSBuild
+      Projects="$(MSBuildProjectFile)"
+      Targets="Build"
+      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);RemoteEmbeddedDataPrepared=true"
     />
   </Target>
 </Project>
