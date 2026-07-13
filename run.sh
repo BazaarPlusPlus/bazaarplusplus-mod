@@ -6,6 +6,10 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 RESET='\033[0m'
 
+# Some VPN/tunnel configurations advertise an unusable IPv6 route. Keep builds on
+# the working IPv4 path by default while allowing callers to opt back into IPv6.
+export DOTNET_SYSTEM_NET_DISABLEIPV6="${DOTNET_SYSTEM_NET_DISABLEIPV6:-1}"
+
 case "$(uname -s)" in
     Darwin)
         PLATFORM="macOS"
@@ -28,16 +32,16 @@ echo -e "${CYAN}== Building on ${GREEN}${PLATFORM}${CYAN} ==${RESET}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 GAME_ROOT="${BPP_GAME_ROOT:-$GAME_ROOT}"
 MANAGED="${BPP_MANAGED_PATH:-$MANAGED}"
-INSTALLER_SQLITE="$SCRIPT_DIR/../bazaarplusplus-installer/src-tauri/resources/SourceForBuild/macos/BepInEx/plugins/libe_sqlite3.dylib"
+INSTALLER_SOURCE="${BPP_INSTALLER_SOURCE_PATH:-$SCRIPT_DIR/../bazaarplusplus-installer/src-tauri/resources}"
 GAME_SQLITE="$GAME_ROOT/BepInEx/plugins/libe_sqlite3.dylib"
 TRAMPOLINE_REPAIR_SCRIPT="$SCRIPT_DIR/scripts/repair-macos-trampoline.sh"
-TRAMPOLINE_STUB="${BPP_TRAMPOLINE_STUB:-$SCRIPT_DIR/../bazaarplusplus-installer/src-tauri/resources/Trampoline/macos/bpp_launcher}"
 
 clear_macos_sqlite_quarantine() {
     [[ "$PLATFORM" == "macOS" ]] || return 0
 
+    local installer_source="${1:-$INSTALLER_SOURCE}"
     local target
-    for target in "$INSTALLER_SQLITE" "$GAME_SQLITE"; do
+    for target in "$installer_source/SourceForBuild/macos/BepInEx/plugins/libe_sqlite3.dylib" "$GAME_SQLITE"; do
         [[ -f "$target" ]] || continue
         xattr -d com.apple.quarantine "$target" 2>/dev/null || true
     done
@@ -55,8 +59,10 @@ print_bazaaragent_mode() {
 repair_macos_trampoline() {
     [[ "$PLATFORM" == "macOS" ]] || return 0
 
+    local installer_source="${1:-$INSTALLER_SOURCE}"
+    local trampoline_stub="${BPP_TRAMPOLINE_STUB:-$installer_source/Trampoline/macos/bpp_launcher}"
     BPP_GAME_ROOT="$GAME_ROOT" \
-        BPP_TRAMPOLINE_STUB="$TRAMPOLINE_STUB" \
+        BPP_TRAMPOLINE_STUB="$trampoline_stub" \
         bash "$TRAMPOLINE_REPAIR_SCRIPT"
 }
 
@@ -83,9 +89,9 @@ build() {
     fi
 }
 
-# The Release half of BuildAll copies the DLL into the installer resources that ship
-# to ONLINE users, but online/PTR share one install directory — a Release built while
-# the PTR branch is installed would ship a PTR-assembly build. Pin Release builds to
+# Production publishing copies the DLL into the installer resources that ship to
+# ONLINE users, but online/PTR share one install directory — a publish run while the
+# PTR branch is installed would ship a PTR-assembly build. Pin production builds to
 # an online Managed snapshot (game-libs/online-*/Managed, newest) when one exists;
 # otherwise require the installed branch to actually be public.
 resolve_release_managed() {
@@ -103,33 +109,84 @@ resolve_release_managed() {
     echo "$last"
 }
 
-build_all() {
-    local prod="${1:-false}"
-    local bazaaragent="${2:-false}"
-    local args=(-t:BuildAll)
+resolve_installer_source() {
+    local resolved="$INSTALLER_SOURCE"
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            -p:BPPInstallerSourcePath=*|--property:BPPInstallerSourcePath=*)
+                resolved="${arg#*=}"
+                ;;
+        esac
+    done
+    echo "$resolved"
+}
 
-    if [[ "$prod" == "true" ]]; then
-        args+=(-p:BuildProductionPackage=true)
+fetch_remote_data() {
+    local args=("$@")
+    dotnet msbuild src/BazaarPlusPlus/BazaarPlusPlus.csproj \
+        -t:FetchRemoteEmbeddedData \
+        ${args[@]+"${args[@]}"} \
+        -p:ForceRemoteEmbeddedDataRefresh=true
+}
+
+run_seed_gates() {
+    local args=("$@")
+    echo -e "${CYAN}== Validating ${GREEN}voice subtitle embedded seed${CYAN} ==${RESET}"
+    dotnet test tests/VoiceSubtitles.Tests/VoiceSubtitles.Tests.csproj \
+        -c Release \
+        ${args[@]+"${args[@]}"}
+    echo -e "${CYAN}== Validating ${GREEN}live build recommendation embedded seed${CYAN} ==${RESET}"
+    dotnet run --project tests/LiveBuildRecommendations.Tests/LiveBuildRecommendations.Tests.csproj \
+        -c Release \
+        ${args[@]+"${args[@]}"}
+}
+
+publish() {
+    local bazaaragent="${1:-false}"
+    shift || true
+    local passthrough_args=("$@")
+    local installer_source
+    installer_source=$(resolve_installer_source ${passthrough_args[@]+"${passthrough_args[@]}"})
+    if [[ ! -d "$installer_source" ]]; then
+        echo -e "${RED}Installer resources not found at '$installer_source'.${RESET}" >&2
+        echo -e "${RED}Pass -p:BPPInstallerSourcePath=/absolute/path/to/resources.${RESET}" >&2
+        exit 1
     fi
 
-    local release_managed
+    local common_args=(
+        ${passthrough_args[@]+"${passthrough_args[@]}"}
+        "-p:BPPInstallerSourcePath=$installer_source"
+    )
+
+    local release_managed=""
     release_managed=$(resolve_release_managed)
     if [[ -n "$release_managed" ]]; then
         echo -e "${CYAN}== Release pinned to ${GREEN}${release_managed}${CYAN} ==${RESET}"
-        args+=("-p:ManagedPath=$release_managed")
+        common_args+=("-p:ManagedPath=$release_managed")
     else
         require_steam_branch public
     fi
 
     print_bazaaragent_mode "$bazaaragent"
-    clear_macos_sqlite_quarantine
-    repair_macos_trampoline
+    clear_macos_sqlite_quarantine "$installer_source"
+    repair_macos_trampoline "$installer_source"
+
+    fetch_remote_data "${common_args[@]}"
+    run_seed_gates "${common_args[@]}" -p:RemoteEmbeddedDataPrepared=true
+
+    local build_args=(
+        -t:BuildAll
+        "${common_args[@]}"
+        -p:BuildProductionPackage=true
+        -p:RemoteEmbeddedDataPrepared=true
+    )
     if [[ "$bazaaragent" == "true" ]]; then
-        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj "${args[@]}"
+        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj "${build_args[@]}"
     else
-        dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj "${args[@]}"
+        dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj "${build_args[@]}"
     fi
-    clear_macos_sqlite_quarantine
+    clear_macos_sqlite_quarantine "$installer_source"
 }
 
 parse_build_options() {
@@ -149,6 +206,42 @@ parse_build_options() {
     done
 
     build "$bazaaragent" "$fast"
+}
+
+parse_publish_options() {
+    local bazaaragent=false
+    local msbuild_args=()
+
+    while (($# > 0)); do
+        case "$1" in
+            --with-bazaaragent) bazaaragent=true ;;
+            -p:*|--property:*) msbuild_args+=("$1") ;;
+            *)
+                usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
+
+    publish "$bazaaragent" ${msbuild_args[@]+"${msbuild_args[@]}"}
+}
+
+parse_fetch_data_options() {
+    local msbuild_args=()
+
+    while (($# > 0)); do
+        case "$1" in
+            -p:*|--property:*) msbuild_args+=("$1") ;;
+            *)
+                usage
+                exit 1
+                ;;
+        esac
+        shift
+    done
+
+    fetch_remote_data ${msbuild_args[@]+"${msbuild_args[@]}"}
 }
 
 test_all() {
@@ -308,7 +401,8 @@ usage() {
     cat <<EOF
 Usage:
   $0 build [--with-bazaaragent] [--fast]
-  $0 all [--prod] [--with-bazaaragent]
+  $0 publish [--with-bazaaragent] [-p:Name=Value ...]
+  $0 fetch-data [-p:Name=Value ...]
   $0 test
   $0 format
   $0 decompile [DllName]
@@ -321,27 +415,18 @@ Usage:
 Options:
   --with-bazaaragent  Build and copy the optional BazaarAgent assemblies.
   --fast              With build: skip NuGet restore (rerun without it after csproj edits or in a fresh worktree).
-  --prod              With all: also build the production installer package.
+  -p:Name=Value       Forward an MSBuild property to publish or fetch-data.
 EOF
 }
 
 case "${1:-}" in
-    all)
+    publish)
         shift
-        prod=false
-        bazaaragent=false
-        while (($# > 0)); do
-            case "$1" in
-                --prod) prod=true ;;
-                --with-bazaaragent) bazaaragent=true ;;
-                *)
-                    usage
-                    exit 1
-                    ;;
-            esac
-            shift
-        done
-        build_all "$prod" "$bazaaragent"
+        parse_publish_options "$@"
+        ;;
+    fetch-data)
+        shift
+        parse_fetch_data_options "$@"
         ;;
     build)
         shift
