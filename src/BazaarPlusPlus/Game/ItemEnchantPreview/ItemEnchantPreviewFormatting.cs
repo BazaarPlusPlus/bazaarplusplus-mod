@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
+using BazaarPlusPlus.Localization;
 using TheBazaar.Tooltips;
 using TheBazaar.Utilities;
 
@@ -16,10 +17,9 @@ public static class ItemEnchantPreviewFormatting
     private const string LogComponent = "ItemEnchantPreview";
     private const int PrefixSizePercent = 60;
     private const int EffectSizePercent = 55;
-    private const string CjkLineHeight = "<line-height=2.1em>";
-    private const string CjkLineHeightEnd = "</line-height>";
-    private const string EntryBreak =
-        "<size=55%><line-height=2.1em>\n</line-height></size>";
+    private const string PreviewLineHeight = "<line-height=2.1em>";
+    private const string PreviewLineHeightEnd = "</line-height>";
+    private const string EntryBreak = "<size=55%><line-height=2.1em>\n</line-height></size>";
 
     private static readonly Regex SizeTagRegex = new Regex(
         "<size=(\\d+)%>",
@@ -33,17 +33,24 @@ public static class ItemEnchantPreviewFormatting
     public static TooltipSegment CreateSegment(
         EEnchantmentType enchantmentType,
         string renderedText
+    ) => CreateSegment(enchantmentType, renderedText, L.CurrentLanguageCode);
+
+    internal static TooltipSegment CreateSegment(
+        EEnchantmentType enchantmentType,
+        string renderedText,
+        string languageCode
     )
     {
         var enchantmentLabel = GetEnchantmentLabel(enchantmentType);
         var colorHex = GetEnchantmentColorHex(enchantmentType);
         var usesCjkFont = BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(renderedText);
-        var normalizedText = usesCjkFont
-            ? NativeLineHeightRegex.Replace(renderedText, CjkLineHeight)
-            : renderedText;
+        var normalizedText =
+            usesCjkFont || LanguageCodeMatcher.IsEnglish(languageCode)
+                ? NativeLineHeightRegex.Replace(renderedText, PreviewLineHeight)
+                : renderedText;
         var scaledText = ScaleInlineSizes(normalizedText, EffectSizePercent / 100f);
-        var lineHeightStart = usesCjkFont ? CjkLineHeight : string.Empty;
-        var lineHeightEnd = usesCjkFont ? CjkLineHeightEnd : string.Empty;
+        var lineHeightStart = usesCjkFont ? PreviewLineHeight : string.Empty;
+        var lineHeightEnd = usesCjkFont ? PreviewLineHeightEnd : string.Empty;
 
         return new TooltipSegment(
             $"<size={PrefixSizePercent}%><color=#{colorHex}>{enchantmentLabel}</color>: </size><size={EffectSizePercent}%>{lineHeightStart}{scaledText}{lineHeightEnd}</size>",

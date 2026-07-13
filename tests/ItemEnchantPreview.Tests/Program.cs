@@ -163,7 +163,8 @@ Assert(
 
 var segment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "Freeze for 2 seconds"
+    "Freeze for 2 seconds",
+    "en-US"
 );
 
 Assert(
@@ -177,7 +178,8 @@ Assert(
 
 var cjkSegment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "<line-height=1.6em>冰冷时获得护盾</line-height>"
+    "<line-height=1.6em>冰冷时获得护盾</line-height>",
+    "zh-CN"
 );
 
 Assert(
@@ -188,20 +190,30 @@ Assert(
 
 var englishLineHeightSegment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "<line-height=1.6em>Freeze for 2 seconds</line-height>"
+    "<line-height=1.6em>Freeze for 2 seconds</line-height>",
+    "en-US"
 );
 
 Assert(
-    englishLineHeightSegment.Text.Contains("<line-height=1.6em>"),
-    "Non-CJK enchant preview text should preserve the game's native tooltip line height."
+    englishLineHeightSegment.Text.Contains("<line-height=2.1em>")
+        && !englishLineHeightSegment.Text.Contains("<line-height=1.6em>"),
+    "English enchant preview text should use the readable wrapped-line height."
+);
+
+var germanLineHeightSegment = ItemEnchantPreviewFormatting.CreateSegment(
+    EEnchantmentType.Icy,
+    "<line-height=1.6em>Für 2 Sekunden einfrieren</line-height>",
+    "de-DE"
+);
+
+Assert(
+    germanLineHeightSegment.Text.Contains("<line-height=1.6em>")
+        && !germanLineHeightSegment.Text.Contains("<line-height=2.1em>"),
+    "Non-English Latin enchant preview text should preserve the game's native line height."
 );
 
 var sectionText = ItemEnchantPreviewFormatting.BuildSectionText(
-    new[]
-    {
-        segment,
-        new TooltipSegment("<size=55%>second\r\n\r\nthird</size>", null, null, -1),
-    }
+    new[] { segment, new TooltipSegment("<size=55%>second\r\n\r\nthird</size>", null, null, -1) }
 );
 Assert(
     sectionText
