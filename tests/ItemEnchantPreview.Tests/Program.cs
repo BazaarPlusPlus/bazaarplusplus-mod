@@ -163,7 +163,8 @@ Assert(
 
 var segment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "Freeze for 2 seconds"
+    "Freeze for 2 seconds",
+    "en-US"
 );
 
 Assert(
@@ -177,7 +178,8 @@ Assert(
 
 var cjkSegment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "<line-height=1.6em>冰冷时获得护盾</line-height>"
+    "<line-height=1.6em>冰冷时获得护盾</line-height>",
+    "zh-CN"
 );
 
 Assert(
@@ -188,26 +190,55 @@ Assert(
 
 var englishLineHeightSegment = ItemEnchantPreviewFormatting.CreateSegment(
     EEnchantmentType.Icy,
-    "<line-height=1.6em>Freeze for 2 seconds</line-height>"
+    "<line-height=1.6em>Freeze for 2 seconds</line-height>",
+    "en-US"
 );
 
 Assert(
-    englishLineHeightSegment.Text.Contains("<line-height=1.6em>"),
-    "Non-CJK enchant preview text should preserve the game's native tooltip line height."
+    englishLineHeightSegment.Text.Contains("<line-height=1.9em>")
+        && !englishLineHeightSegment.Text.Contains("<line-height=1.6em>")
+        && !englishLineHeightSegment.Text.Contains("<line-height=2.1em>"),
+    "English enchant preview wrapped lines should be tighter than the entry break."
+);
+
+var germanLineHeightSegment = ItemEnchantPreviewFormatting.CreateSegment(
+    EEnchantmentType.Icy,
+    "<line-height=1.6em>Für 2 Sekunden einfrieren</line-height>",
+    "de-DE"
+);
+
+Assert(
+    germanLineHeightSegment.Text.Contains("<line-height=1.6em>")
+        && !germanLineHeightSegment.Text.Contains("<line-height=1.9em>")
+        && !germanLineHeightSegment.Text.Contains("<line-height=2.1em>"),
+    "Other non-CJK locales should preserve the game's native wrapped-line height."
 );
 
 var sectionText = ItemEnchantPreviewFormatting.BuildSectionText(
-    new[]
-    {
-        segment,
-        new TooltipSegment("<size=55%>second\r\n\r\nthird</size>", null, null, -1),
-    }
+    new[] { segment, new TooltipSegment("<size=55%>second\r\n\r\nthird</size>", null, null, -1) }
 );
 Assert(
     sectionText
         == $"{segment.Text}<size=55%><line-height=2.1em>\n</line-height></size><size=55%>second\n\nthird</size>"
         && !sectionText.EndsWith("\n", StringComparison.Ordinal),
     "Section text should separate entries without flattening an entry's paragraphs or list lines."
+);
+
+var cjkSectionText = ItemEnchantPreviewFormatting.BuildSectionText(
+    new[] { cjkSegment, cjkSegment }
+);
+Assert(
+    cjkSectionText.Contains("<size=55%><line-height=2.3em>\n</line-height></size>"),
+    "CJK enchant preview entries should use a wider break than their 2.1em wrapped lines."
+);
+
+var germanSectionText = ItemEnchantPreviewFormatting.BuildSectionText(
+    new[] { germanLineHeightSegment, germanLineHeightSegment }
+);
+Assert(
+    germanSectionText.Contains("<size=55%><line-height=2.1em>\n</line-height></size>")
+        && !germanSectionText.Contains("<line-height=2.3em>"),
+    "Other non-CJK locales should keep the default entry break above their native wrapped lines."
 );
 
 var key1 = ItemEnchantPreviewCache.CreateKey(snapshot);

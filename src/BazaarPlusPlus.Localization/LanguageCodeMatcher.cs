@@ -5,6 +5,9 @@ namespace BazaarPlusPlus.Localization;
 
 internal static class LanguageCodeMatcher
 {
+    internal static bool IsEnglish(string languageCode) =>
+        Matches(languageCode, "en", "en-US", "en-GB");
+
     internal static bool IsChinese(string languageCode) =>
         Matches(
             languageCode,
