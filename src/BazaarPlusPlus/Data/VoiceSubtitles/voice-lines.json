@@ -1,7 +1,7 @@
 {
 "schemaVersion":1,
-"contentHash":"sha256:0bb0ce57361dfbcefc64173370891bacf9b7aa85b5e3fc225422f4b8a299aec0",
-"generatedAt":"2026-07-03T16:16:13Z",
+"contentHash":"sha256:8f1f4107e74dbb691dc0acea22eca5cdd2645a24bcb9223618e073036e505911",
+"generatedAt":"2026-07-13T11:10:40Z",
 "count":5032,
 "lines":[
 {
@@ -644,7 +644,7 @@
 "stem":"024_JulesPvPDefeat1",
 "english":"Well, I ordered the dish. Guess I have to eat it.",
 "chinese":"好吧，菜是我点的。看来只能自己吃下去了。",
-"durationSeconds":3.82
+"durationSeconds":3.83
 },
 {
 "stem":"025_JulesPvPVictory5",
@@ -661,7 +661,7 @@
 {
 "stem":"027_JulesPvPVictory4",
 "english":"I have to teach Laurel to stand up for herself.",
-"chinese":"我得教劳蕾尔为自己站出来。",
+"chinese":"我得教劳蕾尔为自己站起来。",
 "durationSeconds":3.46
 },
 {
@@ -697,7 +697,7 @@
 {
 "stem":"033_JulesMultiClick2",
 "english":"That violence spread to the people. War and brutality were the soup of the day.",
-"chinese":"那份暴力蔓延到了民众之中。战争与残酷成了当日例汤。",
+"chinese":"那份暴力蔓延到了民众之中。战争与残暴成了每日例汤。",
 "durationSeconds":5.91
 },
 {
@@ -739,7 +739,7 @@
 {
 "stem":"043_JulesPvPVictory1",
 "english":"Balanced flavor, balanced life, don't get too salty.",
-"chinese":"味道要平衡，人生也要平衡，别太咸了。",
+"chinese":"菜要咸淡适中，日子也要拿捏分寸—，别把自己腌入味了。",
 "durationSeconds":4.49
 },
 {
@@ -853,7 +853,7 @@
 {
 "stem":"064_JulesMultiClick5",
 "english":"For my father, for my daughter, I will make our new life delicious.",
-"chinese":"为了我的父亲，为了我的女儿，我会把我们的新生活做得有滋有味。",
+"chinese":"为了我的父亲，为了我的女儿，我会把我们的新生活过得有滋有味。",
 "durationSeconds":6.07
 },
 {
@@ -967,7 +967,7 @@
 {
 "stem":"006_Karnok_LevelUp_05",
 "english":"Man gets stronger, finally!",
-"chinese":"人类终于变强了！",
+"chinese":"人终于变强了！",
 "durationSeconds":3.37
 },
 {
@@ -1117,7 +1117,7 @@
 {
 "stem":"033_Karnok_PvPIntro_11",
 "english":"If the creature takes over, run.",
-"chinese":"如果兽占了上风，就跑。",
+"chinese":"如果兽占了上风，快跑。",
 "durationSeconds":3.45
 },
 {
@@ -1291,7 +1291,7 @@
 {
 "stem":"062_Karnok_EndofRunHigh_04",
 "english":"Man and creature, best team. You're not wrong.",
-"chinese":"人类和兽，最强队伍。你倒也没说错。",
+"chinese":"人类和兽，最强搭档。你倒也没说错。",
 "durationSeconds":6.79
 },
 {
@@ -1315,7 +1315,7 @@
 {
 "stem":"067_Karnok_MultiClick_08",
 "english":"This was my life. Roaming the galaxy, hunting monsters and trying to hide my own. Hello!",
-"chinese":"这就是我的人生：游荡银河，猎杀怪物，同时藏好我自己的兽。你好！",
+"chinese":"这就是我的人生：游荡银河，猎杀怪物，同时把兽藏好。你好啊！",
 "durationSeconds":9.11
 },
 {
@@ -1357,13 +1357,13 @@
 {
 "stem":"074_Karnok_NoBuyGold_07",
 "english":"Why need coin? Kill and take! We don't do that.",
-"chinese":"为什么需要钱？杀了就拿！我们不那么做。",
+"chinese":"为什么需要钱？杀了抢过来！我们不那么做。",
 "durationSeconds":5.64
 },
 {
 "stem":"075_Karnok_NoBuySpace_07",
 "english":"Am I a hunter or scavenger? Gotta leave some behind.",
-"chinese":"我是猎人还是拾荒者？得留下一些。",
+"chinese":"我是猎人还是拾荒者？得舍弃点东西。",
 "durationSeconds":4.03
 },
 {
@@ -1705,7 +1705,7 @@
 {
 "stem":"132_Karnok_PcEDefeat_10",
 "english":"Did these things come from this foundation? Or did someone put them here?",
-"chinese":"这些东西来自这座地基吗？还是有人把它们放在这里？",
+"chinese":"这些东西来自基底吗？还是有人把它们放在这里？",
 "durationSeconds":5.51
 },
 {
@@ -1825,7 +1825,7 @@
 {
 "stem":"008_MakEndofRunHigh2_1",
 "english":"I can feel the foundation humming beneath my feet. Such power!",
-"chinese":"我能感到地基在脚下嗡鸣。何等力量！",
+"chinese":"我能感到基底在脚下嗡鸣。何等力量！",
 "durationSeconds":5.84
 },
 {
@@ -2221,7 +2221,7 @@
 {
 "stem":"082_MakIdle4",
 "english":"Do you feel that humming in the ground? It is the foundation on which this world was built.",
-"chinese":"你感觉到地下的嗡鸣了吗？那是支撑这个世界的根基。",
+"chinese":"你感觉到地下的嗡鸣了吗？那是支撑这个世界的基底。",
 "durationSeconds":7.27
 },
 {
@@ -2450,7 +2450,7 @@
 "stem":"025_PygmalienMultiClick1",
 "english":"Life on Jabali is simple. You pick some fruit, go to sleep, and repeat.",
 "chinese":"贾巴利的生活很简单。摘点水果，睡一觉，然后重复。",
-"durationSeconds":6.72
+"durationSeconds":6.73
 },
 {
 "stem":"026_PygmalienHitReact1",
@@ -2839,7 +2839,7 @@
 {
 "stem":"018_StellePvEDefeat06",
 "english":"Whatever happened to the Bazzarian Defence Corps?",
-"chinese":"大巴扎防卫队到底去哪儿了？",
+"chinese":"大巴扎防卫军到底去哪儿了？",
 "durationSeconds":2.97
 },
 {
@@ -2989,13 +2989,13 @@
 {
 "stem":"045_StelleMultiClick04",
 "english":"They were selling my work to Cloud Tops and Exeons, all kinds of militant scum. I had to leave.",
-"chinese":"他们把我的成果卖给云顶、埃克西昂，还有各种军阀混账。我只能离开。",
+"chinese":"他们把我的成果卖给云顶人、埃克西昂，还有各种军阀混账。我只能离开。",
 "durationSeconds":7.54
 },
 {
 "stem":"046_StelleIdle4",
 "english":"I'm as famous for fixing airships as my family is for owning them, so my time is valuable.",
-"chinese":"我修飞艇的名气，跟我家族买飞艇的名气差不多，所以我的时间很值钱。",
+"chinese":"我修飞艇的名气，和我家造飞艇的名气一样大，所以我的时间很值钱。",
 "durationSeconds":6.55
 },
 {
@@ -3630,8 +3630,8 @@
 },
 {
 "stem":"003_VanessaPvPIntro2",
-"english":"You should know, I'm a bit of a legend on Polago.",
-"chinese":"你该知道，我在波拉戈也算个传奇。",
+"english":"You should know, I'm a bit of a legend on Pelago.",
+"chinese":"你该知道，我在佩拉戈也算个传奇。",
 "durationSeconds":3.38
 },
 {
@@ -3672,8 +3672,8 @@
 },
 {
 "stem":"010_VanessaRunVictory3",
-"english":"All of this is just training. Our real fight is on Polago.",
-"chinese":"这一切不过是训练。真正的战斗，在波拉戈。",
+"english":"All of this is just training. Our real fight is on Pelago.",
+"chinese":"这一切不过是训练。真正的战斗，在佩拉戈。",
 "durationSeconds":4.3
 },
 {
@@ -4008,8 +4008,8 @@
 },
 {
 "stem":"071_VanessaRunVictory1",
-"english":"Haha, we could use you in the fight on Polago.",
-"chinese":"哈哈，波拉戈那场仗，我们用得上你。",
+"english":"Haha, we could use you in the fight on Pelago.",
+"chinese":"哈哈，佩拉戈那场仗，我们用得上你。",
 "durationSeconds":3.6
 },
 {
@@ -4038,8 +4038,8 @@
 },
 {
 "stem":"077_VanessaMultiClick1",
-"english":"Polago was a world of freedom. We forged our own destinies on open seas.",
-"chinese":"波拉戈曾是自由之地。我们在广阔海域上锻造自己的命运。",
+"english":"Pelago was a world of freedom. We forged our own destinies on open seas.",
+"chinese":"佩拉戈曾是自由之地。我们在广阔海域上锻造自己的命运。",
 "durationSeconds":5.83
 },
 {
@@ -4165,7 +4165,7 @@
 {
 "stem":"021_AdiraIde4_FX",
 "english":"I'm starting to suspect you are not doing a technique and are simply standing there for no reason.",
-"chinese":"我开始怀疑你没有练习技巧，只是无缘无故地站在那里。",
+"chinese":"我开始怀疑你根本不是在练什么招式，就只是在那里傻站着。",
 "durationSeconds":8.97
 },
 {
@@ -4183,13 +4183,13 @@
 {
 "stem":"024_AdiraMultiClick5_FX",
 "english":"Our journey from Felis bonded us, and Nufu is outside of that. I only hope we'll find a way to invite him in.",
-"chinese":"我们从费利斯一路走来，彼此结下了羁绊，而努夫还在这份羁绊之外。我只希望我们能找到办法邀请他加入。",
+"chinese":"我们从费利斯一路走来，彼此结下了羁绊，而努夫还没与我们结缘。我只希望我们能找到办法邀请他加入。",
 "durationSeconds":9.98
 },
 {
 "stem":"025_AdiraMultiClick3_FX",
 "english":"Truthfully, I love every member of our migration. Even Ryukon has his charms.",
-"chinese":"说实话，我爱我们移民中的每一位成员。就连龙虎也有他的魅力。",
+"chinese":"说实话，我爱我们迁徙队伍中的每一位成员。就连龙虎也有他的魅力。",
 "durationSeconds":8.12
 },
 {
@@ -4201,7 +4201,7 @@
 {
 "stem":"002_AeroFreeExit4",
 "english":"Sky Patrol Model 23, know when to disengage.",
-"chinese":"天空巡逻模型 23，知道何时脱离。",
+"chinese":"天空巡逻队 23 型，知道何时该脱离。",
 "durationSeconds":4.37
 },
 {
@@ -4243,55 +4243,55 @@
 {
 "stem":"009_AeroEnter3",
 "english":"I may be retired, but my Sky Patrol vows still hold. Integrity above all.",
-"chinese":"我可能已经退休了，但我的天空巡逻誓言仍然存在。诚信高于一切。",
+"chinese":"我也许退役了，但我在天空巡逻队立下的誓言还算数。诚信高于一切。",
 "durationSeconds":6.27
 },
 {
 "stem":"010_AeroMultiClick1",
 "english":"Look, I believe in what I do here, but it's not exactly my glory days, you know?",
-"chinese":"听着，我相信我在这里所做的事情，但这并不完全是我的辉煌岁月，你知道吗？",
+"chinese":"听着，我相信自己在这儿做的事，但这毕竟不是我的黄金岁月，你懂吧？",
 "durationSeconds":6.49
 },
 {
 "stem":"011_AeroIdle5",
 "english":"I'm going to step outside for a minute. You take your time here, bucko.",
-"chinese":"我要出去一会儿。你在这里慢慢来，巴科。",
+"chinese":"我出去透口气。你在这儿慢慢看，老兄。",
 "durationSeconds":8.47
 },
 {
 "stem":"012_AeroEnter5",
 "english":"If you plan to visit those outlands, you're gonna want something reliable.",
-"chinese":"如果你打算去那些荒原旅游，你会想要一些可靠的东西。",
+"chinese":"如果你打算去荒原，你会需要一辆可靠的家伙。",
 "durationSeconds":4.3
 },
 {
 "stem":"013_AeroEnter2",
 "english":"Who sells cars, boats, and planes at the same dealership? Someone with guts, that's who.",
-"chinese":"谁在同一家经销商处销售汽车、船只和飞机？有胆量的人，就是这样的人。",
+"chinese":"谁会在同一家店里卖车、船和飞机？有胆量的人，就这种人。",
 "durationSeconds":5.9
 },
 {
 "stem":"014_AeroMultiClick5",
 "english":"But I do what I can here. Quality rigs, fair prices. Aero gets you there-o.",
-"chinese":"但我在这里尽我所能。优质钻机，价格公道。翼罗助你一臂之力。",
+"chinese":"但我在这里尽力而为。好载具，公道价。翼罗送你到那儿喽。",
 "durationSeconds":7.38
 },
 {
 "stem":"015_AeroBuyExit4",
 "english":"Aero gets you there-o! Hoho, never get tired of that.",
-"chinese":"翼罗助你一臂之力——哦！呵呵，永远不会厌倦。",
+"chinese":"翼罗送你到那儿喽！呵呵，这句我永远说不腻。",
 "durationSeconds":4.79
 },
 {
 "stem":"016_AeroBuyExit5",
 "english":"This baby'll take you all the way to the builder's porch. Don't actually go there, of course.",
-"chinese":"这个宝贝会带你一直到建筑商的门廊。当然，实际上不要去那里。",
+"chinese":"这宝贝能一路把你送到建造者家门口。当然，别真的去那儿。",
 "durationSeconds":5.25
 },
 {
 "stem":"017_AeroMultiClick4",
 "english":"Hard to find that here in this market. Everyone's out for themselves.",
-"chinese":"在这个市场上很难找到。每个人都是为了自己。",
+"chinese":"这种东西在这个市场里很难找。人人都只顾自己。",
 "durationSeconds":5.75
 },
 {
@@ -4315,37 +4315,37 @@
 {
 "stem":"021_AeroIdle4",
 "english":"Ah, used to fly one of these back in Sky Patrol. Cruising the horizon at sunset, just me and the boys. Ah, those are good times.",
-"chinese":"啊，曾经在天空巡逻队驾驶其中一架返回。日落时分，在地平线上巡游，只有我和孩子们。啊，那些都是美好时光。",
+"chinese":"啊，当年在天空巡逻队，我就开过这种。日落时沿着地平线巡航，载具上只有我和兄弟们。啊，真是好日子。",
 "durationSeconds":13.57
 },
 {
 "stem":"022_AeroMultiClick3",
 "english":"Saw a lot of bad stuff, but we were a team. We had a purpose.",
-"chinese":"看到了很多不好的事情，但我们是一个团队。我们有一个目的。",
+"chinese":"见过不少糟心事，但我们是一个团队。我们有使命。",
 "durationSeconds":6.07
 },
 {
 "stem":"023_AeroFreeExit5",
 "english":"Take a test flight before you go, just for kicks.",
-"chinese":"出发前先试飞一下，只是为了好玩。",
+"chinese":"走之前试飞一圈吧，图个乐子。",
 "durationSeconds":2.71
 },
 {
 "stem":"024_AeroEnter4",
 "english":"The bazaar's a big place! You'll never see it all on foot.",
-"chinese":"大巴扎好大啊！你永远不会步行看到这一切。",
+"chinese":"大巴扎可大了！靠走路你永远看不完。",
 "durationSeconds":4.06
 },
 {
 "stem":"025_AeroBuyExit6",
 "english":"You have a good one.",
-"chinese":"你有一个很好的。",
+"chinese":"你眼光真不错。",
 "durationSeconds":1.57
 },
 {
 "stem":"026_AeroBuyExit2",
 "english":"I have one of these at home. Just plain fun to drive.",
-"chinese":"我家里有其中一件。驾驶起来很有趣。",
+"chinese":"我家也有一辆这种，开起来就是痛快。",
 "durationSeconds":3.96
 },
 {
@@ -4417,7 +4417,7 @@
 {
 "stem":"011_AhexaEnterFight5_FX",
 "english":"Who programmed me? I did. I'm Ahexa.",
-"chinese":"谁给我编程了？我做到了。我是阿海克萨。",
+"chinese":"是谁给我编程的？我。我是阿海克萨。",
 "durationSeconds":4.36
 },
 {
@@ -4483,7 +4483,7 @@
 {
 "stem":"001_AilaIde3",
 "english":"Each weapon has a story. Perhaps you're waiting to hear them?",
-"chinese":"每件武器都有一个故事。也许你正在等待听到他们的声音？",
+"chinese":"每件武器都有故事。也许你是在等它们开口？",
 "durationSeconds":4.19
 },
 {
@@ -4501,7 +4501,7 @@
 {
 "stem":"004_AilaBuyExit1",
 "english":"Use it well. Make me proud.",
-"chinese":"好好利用它。让我感到骄傲。",
+"chinese":"好好利用它。我以你为傲。",
 "durationSeconds":2.62
 },
 {
@@ -4651,13 +4651,13 @@
 {
 "stem":"004_AimbotBuyExit6",
 "english":"I do not test my weapons. The math of calibration tells me their effect.",
-"chinese":"我不测试我的武器。校准的数学告诉我它们的效果。",
+"chinese":"我不测试我的武器。数学校准告诉我它们的效果。",
 "durationSeconds":4.85
 },
 {
 "stem":"005_AimbotEnter5",
 "english":"I work in the art of precision. Welcome to my gallery.",
-"chinese":"我从事精确艺术工作。欢迎来到我的画廊。",
+"chinese":"我从事精密艺术工作。欢迎来到我的画廊。",
 "durationSeconds":4.65
 },
 {
@@ -4819,7 +4819,7 @@
 {
 "stem":"004_Aldric_Exit_03",
 "english":"For a Mitoan to create medicine, this is too much, but I can improve it.",
-"chinese":"对于一个米托安人来说，创造药物，这太过分了，但我可以改进它。",
+"chinese":"米托安人制药，也许太离经叛道了，但我还能把它做得更好。",
 "durationSeconds":5.81
 },
 {
@@ -4831,7 +4831,7 @@
 {
 "stem":"006_Aldric_Multiclick_02",
 "english":"Most Mitoan creatures have evolved powerful poisons. My people literally breathe it.",
-"chinese":"大多数米托亚生物都进化出了剧毒。我的族民确实呼吸着它。",
+"chinese":"大多数米托安生物都进化出了强毒。我的族人甚至以毒为息。",
 "durationSeconds":7.51
 },
 {
@@ -4849,7 +4849,7 @@
 {
 "stem":"009_Aldric_Exit_02",
 "english":"Please, find your medicine and return to me.",
-"chinese":"请找到你的药并返回给我。",
+"chinese":"请找到你的药，再回来找我。",
 "durationSeconds":2.94
 },
 {
@@ -4903,13 +4903,13 @@
 {
 "stem":"018_Aldric_Multiclick_03",
 "english":"I came here with Knightshade to seek a better life. He pursued the old ways, but I seek new ones.",
-"chinese":"我和癫茄来到这里是为了寻求更好的生活。他追求旧的方式，但我寻求新的方式。",
+"chinese":"我和癫茄来到这里，是为了寻求更好的生活。他追随旧道，而我寻找新路。",
 "durationSeconds":7.51
 },
 {
 "stem":"019_Aldric_Enter_03",
 "english":"Bring me your medicines. I will make them cures.",
-"chinese":"把你的药给我拿来。我会让他们痊愈。",
+"chinese":"把你的药给我。我会把它们炼成良方。",
 "durationSeconds":3.82
 },
 {
@@ -4945,13 +4945,13 @@
 {
 "stem":"002_Aleppa_Defeat_Placeholder_05",
 "english":"You always were an unruly brat. Good luck, sister.",
-"chinese":"你一直都是个不守规矩的小鬼。祝你好运，姐姐。",
+"chinese":"你一直都是个不守规矩的小鬼。祝你好运，妹妹。",
 "durationSeconds":5.43
 },
 {
 "stem":"003_Aleppa_Fight_Placeholder_03",
 "english":"This is beneath us, but I'm angry enough to do it.",
-"chinese":"这是我们的耻辱，但我很生气，就这么做了。",
+"chinese":"此举有失身份，但我气急了，顾不了那么多。",
 "durationSeconds":5.14
 },
 {
@@ -4969,13 +4969,13 @@
 {
 "stem":"006_Aleppa_Defeat_Placeholder_03",
 "english":"Father thought I might talk some sense into you. Now he will send someone harsher.",
-"chinese":"父亲认为我可以对你说一些道理。现在他会派一个更严厉的人来。",
+"chinese":"父亲还以为我可以和你讲道理。现在他会派一位更难对付的人来。",
 "durationSeconds":6.62
 },
 {
 "stem":"007_Aleppa_Fight_Placeholder_02",
 "english":"So I have to beat the sense into you? Fine.",
-"chinese":"所以我必须给你灌输理智？美好的。",
+"chinese":"所以我必须给你灌输理智？行吧。",
 "durationSeconds":4.87
 },
 {
@@ -4993,7 +4993,7 @@
 {
 "stem":"010_Aleppa_PortraitClick_Placeholder_02",
 "english":"Our stock has plummeted! Mother had to sell her favorite store yacht.",
-"chinese":"我们的库存暴跌了！母亲不得不卖掉她最喜欢的商店游艇。",
+"chinese":"我们的股票暴跌了！母亲不得不卖掉她最喜欢的商店游艇。",
 "durationSeconds":6.05
 },
 {
@@ -5035,7 +5035,7 @@
 {
 "stem":"007_Aleppa_Enter_Placeholder_03",
 "english":"You're embarrassing all of us with this game of yours.",
-"chinese":"你的这个游戏让我们所有人都感到尴尬。",
+"chinese":"你玩的把戏让我们所有人都感到尴尬。",
 "durationSeconds":4.63
 },
 {
@@ -5059,7 +5059,7 @@
 {
 "stem":"011_Aleppa_PortraitClick_Placeholder_02",
 "english":"Our stock has plummeted! Mother had to sell her favorite store yacht.",
-"chinese":"我们的库存暴跌了！母亲不得不卖掉她最喜欢的商店游艇。",
+"chinese":"我们的股票暴跌了！母亲不得不卖掉她最喜欢的商店游艇。",
 "durationSeconds":6.05
 },
 {
@@ -5113,13 +5113,13 @@
 {
 "stem":"007_AndeFreeExit2",
 "english":"Oh, I understand. Class isn't for everyone.",
-"chinese":"哦，我明白了。课程并不适合所有人。",
+"chinese":"哦，我明白了。阶级并不适合所有人。",
 "durationSeconds":4.02
 },
 {
 "stem":"008_AndeIde4",
 "english":"This is a family business. How dare you question our... What's that word? Ethics?",
-"chinese":"这是一家家族企业。你怎么敢质疑我们的……那个词是什么？伦理？",
+"chinese":"这可是家族产业。你怎么敢质疑我们的……那个词怎么说来着？……职业操守？",
 "durationSeconds":8.07
 },
 {
@@ -5161,19 +5161,19 @@
 {
 "stem":"015_AndeEnter2",
 "english":"Size dilutes the brain. Mind is highly concentrated.",
-"chinese":"尺寸会稀释大脑。精神高度集中。",
+"chinese":"体型稀释智慧，匠心浓缩精华。",
 "durationSeconds":4.24
 },
 {
 "stem":"016_AndeFreeExit5",
 "english":"Ugh. Window shoppers.",
-"chinese":"啊。橱窗购物者。",
+"chinese":"呃。光看不买。",
 "durationSeconds":2.46
 },
 {
 "stem":"017_AndeBuyExit3",
 "english":"Buyer's remorse never. Be remorseless.",
-"chinese":"买家永远不会后悔。毫不留情。",
+"chinese":"买定离手，没有妥协。",
 "durationSeconds":3.1
 },
 {
@@ -5215,13 +5215,13 @@
 {
 "stem":"024_AndeIde5",
 "english":"So maybe I exploit the occasional legal loophole, but I pass the savings on to you.",
-"chinese":"所以也许我偶尔会利用法律漏洞，但我会把节省下来的钱转嫁给你。",
+"chinese":"所以也许我偶尔会利用法律漏洞，但节省下来的钱也是给你优惠。",
 "durationSeconds":6.5
 },
 {
 "stem":"025_AndeBuyExit2",
 "english":"Tell everyone you got it here!",
-"chinese":"告诉大家你在这里找到了！",
+"chinese":"告诉大家你在这里找到了好东西！",
 "durationSeconds":2.09
 },
 {
@@ -5287,7 +5287,7 @@
 {
 "stem":"010_AnnexTrooperEnterFight3",
 "english":"Please read the terms and conditions before agreeing to annexation.",
-"chinese":"请在同意合并之前阅读条款和条件。",
+"chinese":"请在同意统合之前阅读条款和条件。",
 "durationSeconds":4.17
 },
 {
@@ -5329,7 +5329,7 @@
 {
 "stem":"018_AnnexTrooperEnterFight2",
 "english":"Submit to Annexation and enjoy all the benefits of the municipality.",
-"chinese":"服从并享受市政府的所有福利。",
+"chinese":"服从统合并享受自治领的所有福利。",
 "durationSeconds":4.97
 },
 {
@@ -5353,7 +5353,7 @@
 {
 "stem":"022_AnnexTrooperPortraitClick3",
 "english":"That you've come this far on your own makes no sense at all.",
-"chinese":"你自己已经走到这一步了，根本没有任何意义。",
+"chinese":"你们靠自己发展到了这个地步，这根本说不通。",
 "durationSeconds":3.91
 },
 {
@@ -5407,13 +5407,13 @@
 {
 "stem":"008_AntiquarianMultiClick2",
 "english":"I came here to pursue my studies away from his foolish wars. Imagine my surprise to find his daughter!",
-"chinese":"我来这里是为了远离他愚蠢的战争而继续学业。想象一下当我找到他的女儿时我有多惊讶！",
+"chinese":"我来这里是为了远离他愚蠢的战争而继续研究。想象一下当我找到他的女儿时我有多惊讶！",
 "durationSeconds":8.65
 },
 {
 "stem":"009_AntiquarianMultiClick3",
 "english":"Oh, that poor girl, living in that monster's shadow, every time he visits, it wounds her.",
-"chinese":"哦，那个可怜的女孩，生活在那个怪物的阴影下，每次他来访，她都会受伤。",
+"chinese":"哦，那个可怜的女孩，生活在那个怪物的阴影下，每次他来访，她心里都很难受。",
 "durationSeconds":7.78
 },
 {
@@ -5425,13 +5425,13 @@
 {
 "stem":"011_AntiquarianBuyExit6",
 "english":"I have a theory on the origins of this place, but Pearl says it's unscientific.",
-"chinese":"我对这个地方的起源有一个理论，但珍珠说这是不科学的。",
+"chinese":"我对这个地方的起源有套理论，但珍珠说那不科学。",
 "durationSeconds":6.96
 },
 {
 "stem":"012_AntiquarianEnter5",
 "english":"My excavation days are over, but Pearl keeps me supplied.",
-"chinese":"我的挖掘日子已经结束，但珍珠仍为我提供供应。",
+"chinese":"我的挖掘日子已经结束，但珍珠仍为我供应遗物。",
 "durationSeconds":5.7
 },
 {
@@ -5455,7 +5455,7 @@
 {
 "stem":"016_AntiquarianBuyExit5",
 "english":"It's a wonder these still hold their powers. Oh, the ancients built things to last.",
-"chinese":"令人惊奇的是，这些人仍然拥有他们的权力。哦，古人创造的东西经久耐用。",
+"chinese":"这些东西仍然蕴含力量，真是奇迹。哦，古人创造的东西经久耐用。",
 "durationSeconds":7.67
 },
 {
@@ -5497,7 +5497,7 @@
 {
 "stem":"023_AntiquarianIdle2",
 "english":"This modern painting, this ancient statue, the similarities are unmistakable.",
-"chinese":"这幅现代绘画，这幅古代雕像，相似之处是显而易见的。",
+"chinese":"这幅现代绘画，这件古代雕像，相似之处是显而易见的。",
 "durationSeconds":6.76
 },
 {
@@ -5515,13 +5515,13 @@
 {
 "stem":"026_AntiquarianFreeExit2",
 "english":"I don't even want to sell these, but Pearl says I need income.",
-"chinese":"我甚至不想卖掉这些，但珍珠说我需要收入。",
+"chinese":"我甚至不想卖掉这些，但珍珠说我需要收入来源。",
 "durationSeconds":5.52
 },
 {
 "stem":"027_AntiquarianBuyExit7",
 "english":"It feels wrong to sell artifacts, but the Bazaar is a marketplace.",
-"chinese":"出售文物感觉不对，但大巴扎是一个市场。",
+"chinese":"出售文物可能不道德，但大巴扎说到底是一个市场。",
 "durationSeconds":6.53
 },
 {
@@ -5557,13 +5557,13 @@
 {
 "stem":"005_ArgentaIde4_FX",
 "english":"I'm still here? Are you?",
-"chinese":"我还在这里吗？你是？",
+"chinese":"我还在这里吗？那你呢？",
 "durationSeconds":5.56
 },
 {
 "stem":"006_ArgentaMultiClick5_FX",
 "english":"But it's nice talking to someone who's not wise for a change. Um, no offense.",
-"chinese":"但与不明智的人交谈是件好事。嗯，无意冒犯。",
+"chinese":"不过偶尔能跟……不那么聪慧的人聊聊天，倒也挺好的。呃，没别的意思。",
 "durationSeconds":7.94
 },
 {
@@ -5575,7 +5575,7 @@
 {
 "stem":"008_ArgentaChooseSkillandExit4_FX",
 "english":"You seem lighter. I think you had a breakthrough.",
-"chinese":"你看起来更轻了。我认为你已经取得了突破。",
+"chinese":"你看起来更轻盈了。我认为你已经取得了突破。",
 "durationSeconds":6.55
 },
 {
@@ -5605,7 +5605,7 @@
 {
 "stem":"013_ArgentaIde1_FX",
 "english":"I can tell you think deeply. That's good.",
-"chinese":"我可以告诉你深思熟虑。那挺好的。",
+"chinese":"我可以说你深思熟虑，挺好的。",
 "durationSeconds":5.99
 },
 {
@@ -5617,7 +5617,7 @@
 {
 "stem":"015_ArgentaMultiClick3_FX",
 "english":"There's Pip, but I think he's in love with me. Sweet kid, but you know.",
-"chinese":"皮普在那儿，但我想他爱上了我。可爱的孩子，但你知道。",
+"chinese":"皮普在那儿，但我想他爱上了我。人很甜，不过，你懂的。",
 "durationSeconds":8.0
 },
 {
@@ -5635,7 +5635,7 @@
 {
 "stem":"018_ArgentaMultiClick2_FX",
 "english":"Having no one but wise old men to talk to, gets a little old.",
-"chinese":"除了明智的老人没有人可以交谈，就有点老了。",
+"chinese":"整天除了那帮老智者就没别人能说话，真有点腻了。",
 "durationSeconds":7.49
 },
 {
@@ -5659,13 +5659,13 @@
 {
 "stem":"022_ArgentaChooseSkillandExit3_FX",
 "english":"When you're ready, I'll send you to Orlin. But I'll keep you as long as I can.",
-"chinese":"当你准备好后，我会送你去奥林。但我会尽可能地留住你。",
+"chinese":"当你准备好后，我会送你去奥林那里。但我会尽可能地留住你。",
 "durationSeconds":6.96
 },
 {
 "stem":"023_ArgentaExitNoSkill2_FX",
 "english":"Hey, if it's about the gold, Pip is affordable. Cute kid too.",
-"chinese":"嘿，如果是关于黄金的话，皮普是可以承受的。孩子也很可爱。",
+"chinese":"嘿，如果是关于黄金的话，皮普可以付钱。还是个很可爱的孩子。",
 "durationSeconds":8.62
 },
 {
@@ -5695,13 +5695,13 @@
 {
 "stem":"003_ArtistExchangeIdle5",
 "english":"You must not tell your past what's to come, but you can wink.",
-"chinese":"你不能告诉你的过去将会发生什么，但你可以眨眼。",
+"chinese":"你不能给你的过去透露未来，但你可以眨眨眼。",
 "durationSeconds":5.67
 },
 {
 "stem":"004_ArtistExchangeMultiClick4",
 "english":"You may meet another like me. Do not trust this mandala.",
-"chinese":"你可能会遇到另一个像我一样的人。不要相信这个曼陀罗。",
+"chinese":"你可能会遇到另一个像我一样的人。不要相信这位曼荼罗。",
 "durationSeconds":6.14
 },
 {
@@ -5719,13 +5719,13 @@
 {
 "stem":"007_ArtistUpgradeExchangeA5",
 "english":"A tiny taste of the worlds you can't see.",
-"chinese":"尝尝你看不到的世界的微小味道。",
+"chinese":"让你稍微感受一下，那些你看不见的世界。",
 "durationSeconds":3.6
 },
 {
 "stem":"009_ArtistExchangeEnter2",
 "english":"Your things are so dull. Let me brighten them.",
-"chinese":"你的东西太乏味了。让我照亮它们。",
+"chinese":"你的东西太乏味了。让我点亮它们。",
 "durationSeconds":4.45
 },
 {
@@ -5749,7 +5749,7 @@
 {
 "stem":"013_ArtistUpgradeExchangeA6",
 "english":"The art flows through me and into whatever I touch.",
-"chinese":"艺术流经我并渗透到我所接触到的一切事物中。",
+"chinese":"艺术流经我身，渗透到我所接触到的一切事物中。",
 "durationSeconds":4.29
 },
 {
@@ -5761,7 +5761,7 @@
 {
 "stem":"015_ArtistExchangeIdle1",
 "english":"Time is a river that begins at its source, forever flowing.",
-"chinese":"时间是一条河流，从源头开始，永远流淌。",
+"chinese":"时间是一条河流，从源头开始，永恒流淌。",
 "durationSeconds":5.46
 },
 {
@@ -5869,7 +5869,7 @@
 {
 "stem":"010_AugmentedHillbilly_PortraitClick_01",
 "english":"When I came to the vessel, I was like the others, but it changed me.",
-"chinese":"我来到那艘容器时，和其他人没什么两样；可它改变了我。",
+"chinese":"我来到载体时，和其他人没什么两样；可它改变了我。",
 "durationSeconds":5.21
 },
 {
@@ -5887,13 +5887,13 @@
 {
 "stem":"013_AugmentedHillbilly_Victory_04",
 "english":"Within the vessel are wonders beyond comprehension, but you ain't ready for them.",
-"chinese":"容器之中有超越理解的奇迹，可你还没准备好。",
+"chinese":"载体之中有超越理解的奇迹，可你还没准备好。",
 "durationSeconds":5.9
 },
 {
 "stem":"014_AugmentedHillbilly_EnterFight_02",
 "english":"I feel strange. I feel smart. I feel every particle of the 11 dimensional universe.",
-"chinese":"我感觉很怪。我感觉很聪明。我感觉到十一维宇宙里的每一个粒子。",
+"chinese":"我感觉到异动。我感受着智慧。我感知着十一维宇宙里的每一个粒子。",
 "durationSeconds":9.6
 },
 {
@@ -5947,7 +5947,7 @@
 {
 "stem":"001_AverageVictory5",
 "english":"You ever hear a little voice in your back teeth, hm? Something about joining the municipality, hm?",
-"chinese":"你有没有听过后槽牙里传来小声音，嗯？说什么加入自治市，嗯？",
+"chinese":"你有没有听过后槽牙里传来小声音，嗯？说什么加入自治领，嗯？",
 "durationSeconds":8.25
 },
 {
@@ -6733,7 +6733,7 @@
 {
 "stem":"013_BjornIdle4",
 "english":"The Frostland Glacier slug is faster than you, probably smarter, too.",
-"chinese":"寒霜冰川蛞蝓都比你快，可能也比你聪明。",
+"chinese":"寒霜之地的冰川蛞蝓都比你快，可能也比你聪明。",
 "durationSeconds":5.02
 },
 {
@@ -6937,7 +6937,7 @@
 {
 "stem":"023_BlooCaptainDefeat1",
 "english":"Oh, I am a long way from Pelago.",
-"chinese":"哦，我离波拉戈可真远。",
+"chinese":"哦，我离佩拉戈可真远。",
 "durationSeconds":3.55
 },
 {
@@ -7003,7 +7003,7 @@
 {
 "stem":"015_BlooRaiderVictory4",
 "english":"We'll keelhaul you all the way to Pelago.",
-"chinese":"我们会把你一路拖到波拉戈！",
+"chinese":"我们会把你一路拖到佩拉戈！",
 "durationSeconds":5.23
 },
 {
@@ -7033,7 +7033,7 @@
 {
 "stem":"020_BlooRaiderEnterFight1",
 "english":"Pelago belongs to us now.",
-"chinese":"波拉戈现在归我们了。",
+"chinese":"佩拉戈现在归我们了。",
 "durationSeconds":2.85
 },
 {
@@ -7447,13 +7447,13 @@
 {
 "stem":"004_BouncertronPortraitClick2_FX",
 "english":"Please comply with club policy.",
-"chinese":"请遵守俱乐部规定。",
+"chinese":"请遵守会所规定。",
 "durationSeconds":2.32
 },
 {
 "stem":"005_BouncertronDefeat4_FX",
 "english":"Combat exception triggered. Club entry accepted.",
-"chinese":"战斗例外已触发。准许进入俱乐部。",
+"chinese":"战斗例外条例已触发。准许进入会所。",
 "durationSeconds":4.63
 },
 {
@@ -7501,13 +7501,13 @@
 {
 "stem":"015_BouncertronDefeat5_FX",
 "english":"Fashion requirement override. Welcome to the club!",
-"chinese":"时尚要求已覆盖。欢迎来到俱乐部！",
+"chinese":"时尚要求已覆盖。欢迎来到会所！",
 "durationSeconds":4.46
 },
 {
 "stem":"017_BouncertronDefeat2_FX",
 "english":"Defeat acknowledged. Club entry accepted.",
-"chinese":"失败已确认。准许进入俱乐部。",
+"chinese":"失败已确认。准许进入会所。",
 "durationSeconds":3.56
 },
 {
@@ -7519,7 +7519,7 @@
 {
 "stem":"019_BouncertronVictory1_FX",
 "english":"Ejection compliant with club policy. Lawsuit denied.",
-"chinese":"驱逐符合俱乐部规定。诉讼请求驳回。",
+"chinese":"驱逐符合会所规定。诉讼请求驳回。",
 "durationSeconds":4.36
 },
 {
@@ -7729,7 +7729,7 @@
 {
 "stem":"001_BountyHunterEnterEvent5_FX",
 "english":"Greetings, Vanessa. You're a long way from Pelago.",
-"chinese":"幸会，瓦内莎。你离波拉戈可真远。",
+"chinese":"幸会，瓦内莎。你离佩拉戈可真远。",
 "durationSeconds":5.01
 },
 {
@@ -7746,8 +7746,8 @@
 },
 {
 "stem":"004_BountyHunterEnterEvent1_FX",
-"english":"Vanessa of House Corzina, we've got a message for you.",
-"chinese":"科尔齐娜家族的瓦内莎，我们有话带给你。",
+"english":"Vanessa of House Korxena, we've got a message for you.",
+"chinese":"蔻森娜家族的瓦内莎，我们有话带给你。",
 "durationSeconds":5.47
 },
 {
@@ -7766,13 +7766,13 @@
 "stem":"002_BrolinIde3",
 "english":"While we wait for the Inglit roe to separate, we baste the Inglit in a sweet venom reduction.",
 "chinese":"趁英格利特鱼子分离时，我们给英格利特刷上一层甜毒浓汁。",
-"durationSeconds":6.84
+"durationSeconds":6.85
 },
 {
 "stem":"003_BrolinIde2",
 "english":"Once the galley is inflamed, we mulch it until well reduced.",
 "chinese":"等这锅料烧得火候上来，就把它捣碎，直到浓缩到位。",
-"durationSeconds":4.74
+"durationSeconds":4.75
 },
 {
 "stem":"004_BrolinIde4",
@@ -7880,7 +7880,7 @@
 "stem":"021_BrolinMultiClick1",
 "english":"I must ask you, Jules, are you as happy as you look?",
 "chinese":"我必须问你，朱尔斯，你真有看上去那么快乐吗？",
-"durationSeconds":4.34
+"durationSeconds":4.35
 },
 {
 "stem":"022_BrolinExitNoSkill3",
@@ -8179,7 +8179,7 @@
 {
 "stem":"001_CapitalPunisherVictory2",
 "english":"The municipality does not subsidize underperforming citizens. I will notify your next of kin.",
-"chinese":"市政当局不会补贴表现欠佳的市民。我会通知你的近亲。",
+"chinese":"自治领不会补贴表现欠佳的市民。我会通知你的亲人。",
 "durationSeconds":6.71
 },
 {
@@ -8203,7 +8203,7 @@
 {
 "stem":"006_CapitalPunisherDefeat3",
 "english":"The municipality can't support underperforming citizens. It would take nearly 1% of our budget.",
-"chinese":"市政当局负担不起表现欠佳的市民。那会占到我们预算将近百分之一。",
+"chinese":"自治领负担不起表现欠佳的市民。那会占到我们预算将近百分之一。",
 "durationSeconds":6.47
 },
 {
@@ -8239,7 +8239,7 @@
 {
 "stem":"013_CapitalPunisherEnterFight1",
 "english":"The Annexian Municipality offers simple solutions for a productive society. Allow me to demonstrate.",
-"chinese":"统合自治领为高产社会提供简单方案。请允许我示范。",
+"chinese":"统合自治领为高产社会提供简单方案。容我示范。",
 "durationSeconds":7.29
 },
 {
@@ -8263,7 +8263,7 @@
 {
 "stem":"017_CapitalPunisherEnterFight3",
 "english":"As a representative of the municipality, I am here to show the Bazaar how efficient a society can be.",
-"chinese":"作为市政当局代表，我来向大巴扎展示一个社会可以多么高效。",
+"chinese":"作为自治领代表，我来向大巴扎展示一个社会可以多么高效。",
 "durationSeconds":6.81
 },
 {
@@ -8341,7 +8341,7 @@
 {
 "stem":"008_VO_CastawayCorsair_Defeat_05",
 "english":"Ahhh! I never should have left Pelago!",
-"chinese":"啊！我就不该离开波拉戈！",
+"chinese":"啊！我就不该离开佩拉戈！",
 "durationSeconds":3.94
 },
 {
@@ -9199,7 +9199,7 @@
 {
 "stem":"017_ColtMultiClick2",
 "english":"I'll say this: the dervishes are tough, but they're mad as a cut snake.",
-"chinese":"我就这么说：旋舞者很硬，但疯得像受伤的蛇。",
+"chinese":"我就这么说：旋舞者很坚韧，但也疯得像受伤的蛇。",
 "durationSeconds":5.09
 },
 {
@@ -9337,7 +9337,7 @@
 {
 "stem":"016_Conspiracy_EnterFight_04",
 "english":"Who do you work for? The Volkas? The Municipality? Sky Patrol?",
-"chinese":"你替谁办事？沃卡斯？市政当局？天空巡逻队？",
+"chinese":"你替谁办事？沃卡斯？自治领？天空巡逻队？",
 "durationSeconds":4.19
 },
 {
@@ -10165,7 +10165,7 @@
 {
 "stem":"019_DabApprenticeDefeat5",
 "english":"It was aqua fortis, then tin salt! Argh!",
-"chinese":"是先加强水，再加锡盐！啊！",
+"chinese":"明明该先加王水，再加锡盐才对啊！——啊！",
 "durationSeconds":5.16
 },
 {
@@ -10441,7 +10441,7 @@
 {
 "stem":"001_DroneOperatorPortraitClick3",
 "english":"You ever think about their, like, lives or whatever?",
-"chinese":"你有没有想过他们，呃，生活什么的？",
+"chinese":"有没有想过……他们也有自己的生活？就……随便想想。",
 "durationSeconds":4.67
 },
 {
@@ -10531,7 +10531,7 @@
 {
 "stem":"018_DroneOperatorVictory2",
 "english":"Yo, Kellerman. You see that finisher? Sure hope I haven't sawed it.",
-"chinese":"哟，凯勒曼。看到那记终结了吗？真希望我没把它锯坏。",
+"chinese":"喂，凯勒曼。刚才那波收尾你看到了吧？可别给我剪掉了啊。",
 "durationSeconds":5.59
 },
 {
@@ -10753,7 +10753,7 @@
 {
 "stem":"018_DavvyPortraitClick5",
 "english":"Bah, you're not so bad are ye? We'll raise a pint after.",
-"chinese":"哼，你也没那么坏嘛？之后我们举杯喝一品脱。",
+"chinese":"哼，你也没那么坏嘛？待会我们喝一杯。",
 "durationSeconds":4.64
 },
 {
@@ -10825,7 +10825,7 @@
 {
 "stem":"006_EliMultiClick5",
 "english":"You can learn from the young, old man. We are the Great Work's prima materia.",
-"chinese":"老头，你也能向年轻人学习。我们都是大作的第一质料。",
+"chinese":"你也能向年轻人学习，老人家。我们才是成就伟业的原始材料。",
 "durationSeconds":4.31
 },
 {
@@ -10873,7 +10873,7 @@
 {
 "stem":"014_EliMultiClick2",
 "english":"Start with the wrong formula? Age sinks you deeper into error!",
-"chinese":"一开始公式就错？年岁只会让你在错误里越陷越深！",
+"chinese":"一开始就弄错了公式？年岁只会让你在错误里越陷越深！",
 "durationSeconds":3.65
 },
 {
@@ -10933,7 +10933,7 @@
 {
 "stem":"024_EliMultiClick4",
 "english":"So you'd be wise not to dismiss fresh perspectives.",
-"chinese":"所以你最好别轻视新鲜的视角。",
+"chinese":"所以你最好别看不起年轻的视角。",
 "durationSeconds":3.41
 },
 {
@@ -10945,7 +10945,7 @@
 {
 "stem":"026_EliEnter5",
 "english":"I can get from Negredo to Rubedo in 60 seconds. Beat that, old man!",
-"chinese":"我能在六十秒内从黑化到红化。你做得到吗，老头！",
+"chinese":"我能在六十秒内从黑化阶段跨越到红化阶段。你做得到吗，老头！",
 "durationSeconds":5.33
 },
 {
@@ -11185,7 +11185,7 @@
 {
 "stem":"002_FerrosKhanVictory2",
 "english":"Hush now.",
-"chinese":"安静。",
+"chinese":"闭嘴吧。",
 "durationSeconds":1.33
 },
 {
@@ -11335,7 +11335,7 @@
 {
 "stem":"006_FinnIde4",
 "english":"I recommend the walrus ceviche. Mmm, the citrus really balances the blubber. Mwah! Mwah!",
-"chinese":"我推荐海象酸橘汁腌鱼。嗯，柑橘味正好平衡那股脂肪。啵！啵！",
+"chinese":"我推荐海象酸橘汁腌鱼。嗯，柑橘味正好平衡那股油脂味。啵！啵！",
 "durationSeconds":8.27
 },
 {
@@ -11407,7 +11407,7 @@
 {
 "stem":"018_FinnOrder7",
 "english":"Eat the bones for stronger bones.",
-"chinese":"把骨头也吃了，骨头才会更强。",
+"chinese":"吃点骨头，以形补形。",
 "durationSeconds":2.77
 },
 {
@@ -11575,7 +11575,7 @@
 {
 "stem":"023_FlambeMultiClick5",
 "english":"Now, these things, my paint, my clothing, my torches, they are all me!",
-"chinese":"现在，这些东西，我的涂装、衣服、喷火器，全都是我！",
+"chinese":"现在，这些东西，我的涂装、衣服、喷火器，全都是我本身！",
 "durationSeconds":7.65
 },
 {
@@ -11623,7 +11623,7 @@
 {
 "stem":"010_FlameJugglerVictory5",
 "english":"Brilliant! Like fire!",
-"chinese":"辉煌！像火一样！",
+"chinese":"炽烈！像火一样！",
 "durationSeconds":3.31
 },
 {
@@ -11845,7 +11845,7 @@
 {
 "stem":"025_FlexMultiClick1",
 "english":"Life starts hard for us Minotaurians. You could say we're born lost.",
-"chinese":"我们米诺陶人一出生就不容易。可以说，我们天生就在迷路。",
+"chinese":"我们牛头人一出生就不容易。可以说，我们天生就在迷路。",
 "durationSeconds":5.16
 },
 {
@@ -12068,7 +12068,7 @@
 "stem":"015_ForjaUpgradeChoice2",
 "english":"The fire softens before it strengthens. Remember that.",
 "chinese":"火会先软化，再强化。记住这一点。",
-"durationSeconds":4.22
+"durationSeconds":4.23
 },
 {
 "stem":"016_ForjaPreBattleMultiClick2",
@@ -12266,7 +12266,7 @@
 "stem":"003_FortisIde2",
 "english":"Now, plant your legs firm, or your tentacles or rockets or whatever you got.",
 "chinese":"现在，把腿站稳，或者触手、火箭，随便你有什么。",
-"durationSeconds":5.24
+"durationSeconds":5.25
 },
 {
 "stem":"004_FortisChooseSkillandExit2",
@@ -12338,7 +12338,7 @@
 "stem":"015_FortisChooseSkillandExit1",
 "english":"If you wield it well enough, a shield can be its own kind of weapon.",
 "chinese":"如果你用得够好，盾牌本身也能成为一种武器。",
-"durationSeconds":5.04
+"durationSeconds":5.05
 },
 {
 "stem":"016_FortisEnter5",
@@ -13591,7 +13591,7 @@
 {
 "stem":"004_GoldieFreeExit1_FX",
 "english":"Poverty is a choice. Don't choose it somewhere else!",
-"chinese":"贫穷是一种选择。别在别的地方选它！",
+"chinese":"穷是你自找的，要穷死远点，别在这儿碍眼！",
 "durationSeconds":4.26
 },
 {
@@ -13603,7 +13603,7 @@
 {
 "stem":"006_GoldieBuyExit1_FX",
 "english":"Well, didn't think you had the coin for it.",
-"chinese":"哎，我就知道你没那钱。",
+"chinese":"哎，我没想到你还有那钱。",
 "durationSeconds":5.07
 },
 {
@@ -13639,7 +13639,7 @@
 {
 "stem":"012_GoldieIdle4_FX",
 "english":"Freya, Herma, they all want a piece of Goldie, but I keep my mind on the grind.",
-"chinese":"芙蕾雅、赫玛，她们都想分一杯戈尔迪的羹，可我心里只有搞钱。",
+"chinese":"芙蕾雅、赫玛，她们都想分一杯戈尔迪的羹，可我心里只想着搞钱。",
 "durationSeconds":7.91
 },
 {
@@ -13651,7 +13651,7 @@
 {
 "stem":"014_GoldieEnter5_FX",
 "english":"There's two kinds of people: rich and stupid.",
-"chinese":"世上只有两种人：有钱的，和蠢的。",
+"chinese":"世上只有两种人：有钱的和愚蠢的。",
 "durationSeconds":5.95
 },
 {
@@ -13669,7 +13669,7 @@
 {
 "stem":"017_GoldieBuyExit5_FX",
 "english":"Silvia's got class, but no taste. Oh, that's silver.",
-"chinese":"西尔维娅有格调，可没眼光。哦，那只是银子。",
+"chinese":"西尔维娅有格调，可没眼光。哦，那只是白银而已。",
 "durationSeconds":5.78
 },
 {
@@ -13944,8 +13944,8 @@
 },
 {
 "stem":"022_GrandfatherKlokPortraitClick4",
-"english":"The aethergy. The Foundation's soul became mine.",
-"chinese":"以太能。基底之魂成了我的灵魂。",
+"english":"The aethergy - The Foundation's soul became mine.",
+"chinese":"以太能—基底之魂组成我的灵魂。",
 "durationSeconds":5.03
 },
 {
@@ -14054,7 +14054,7 @@
 "stem":"017_GrandmasterTransform5",
 "english":"Perfect. Very, er, enlighten-ful.",
 "chinese":"完美。非常，呃，有启迪感。",
-"durationSeconds":4.68
+"durationSeconds":4.69
 },
 {
 "stem":"018_GrandmasterMultiClick4",
@@ -14581,19 +14581,19 @@
 {
 "stem":"012_HappyCamperPortraitClick2",
 "english":"You're not from the municipality, right? Right? Me neither, wink wink.",
-"chinese":"你不是市政当局的人，对吧？对吧？我也不是，眨眨眼。",
+"chinese":"你不是自治领的人，对吧？对吧？我也不是，眨眨眼。",
 "durationSeconds":4.65
 },
 {
 "stem":"013_HappyCamperVictory2",
 "english":"Go back to the municipality. Enjoy your Productivity Cube.",
-"chinese":"回市政区去吧。享受你的生产力方块。",
+"chinese":"回自治领去吧。享受你的生产力分区。",
 "durationSeconds":5.46
 },
 {
 "stem":"014_HappyCamperDefeat5",
 "english":"Please don't tell the municipality. They can't stand to lose a taxpayer.",
-"chinese":"请别告诉市政当局。他们可受不了少一个纳税人。",
+"chinese":"请别告诉自治领。他们可受不了少一个纳税人。",
 "durationSeconds":5.95
 },
 {
@@ -14611,7 +14611,7 @@
 {
 "stem":"018_HappyCamperEnterFight2",
 "english":"You're trapped in the municipality, but I can show you how to get out.",
-"chinese":"你被困在市政区里，但我可以教你怎么逃出来。",
+"chinese":"你被困在自治领里，但我可以教你怎么逃出来。",
 "durationSeconds":5.21
 },
 {
@@ -14635,7 +14635,7 @@
 {
 "stem":"022_HappyCamperDefeat3",
 "english":"I know they'll come for me. The municipality doesn't let go.",
-"chinese":"我知道他们会来抓我。市政当局从不放手。",
+"chinese":"我知道他们会来抓我。自治领从不放手。",
 "durationSeconds":4.16
 },
 {
@@ -14935,7 +14935,7 @@
 {
 "stem":"002_HellbillyVictory3_ALT01",
 "english":"We ain't buyin' what you're sellin', city slick!",
-"chinese":"你卖的东西我们不买，城里滑头！",
+"chinese":"你卖的东西我们不买，城巴佬！",
 "durationSeconds":3.23
 },
 {
@@ -14959,7 +14959,7 @@
 {
 "stem":"006_HellbillyPortraitClick5",
 "english":"Or maybe City Slick and a Big Knife.",
-"chinese":"或者叫《城里滑头和大刀子》。",
+"chinese":"或者叫《城巴佬和大刀子》。",
 "durationSeconds":4.73
 },
 {
@@ -14977,7 +14977,7 @@
 {
 "stem":"009_HellbillyEnterFight5",
 "english":"I can play you the ganjo, or I can play you the knife. Your choice.",
-"chinese":"我可以给你弹甘乔琴，也可以给你耍刀。你选。",
+"chinese":"我可以给你弹甘卓琴，也可以给你耍刀。你选。",
 "durationSeconds":5.58
 },
 {
@@ -15007,7 +15007,7 @@
 {
 "stem":"015_HellbillyPortraitClick4",
 "english":"Gonna call it, City Slick Ain't Going Home!",
-"chinese":"这首就叫《城里滑头回不了家》！",
+"chinese":"这首就叫《城巴佬回不了家》！",
 "durationSeconds":3.66
 },
 {
@@ -15877,13 +15877,13 @@
 {
 "stem":"007_JulesIdle5_ALT01",
 "english":"Do you know how hard it was to get a babysitter? Let's go!",
-"chinese":"你知道找个保姆有多难吗？开打吧！",
+"chinese":"你知道找个保姆有多难吗？快走吧！",
 "durationSeconds":4.4
 },
 {
 "stem":"008_JulesMultiClick3_ALT01",
 "english":"My father brought my people to safety by making a deal with the Infernal.",
-"chinese":"我父亲与地狱做了交易，才把我的族人带到安全之地。",
+"chinese":"我的父亲与炼狱之民做了交易，把我的族人带到了安全之地。",
 "durationSeconds":6.16
 },
 {
@@ -15913,7 +15913,7 @@
 {
 "stem":"013_JulesRunVictory3_ALT01",
 "english":"Honestly, I don't need any of this. I'm doing it for Laurel.",
-"chinese":"说实话，我不需要这些。我是为了劳蕾尔。",
+"chinese":"说实话，我不需要这些。我是为了劳蕾尔才这么做的。",
 "durationSeconds":4.0
 },
 {
@@ -15949,7 +15949,7 @@
 {
 "stem":"019_JulesMultiClick2_ALT01",
 "english":"That violence spread to the people. War and brutality were the soup of the day.",
-"chinese":"那种暴力蔓延到人民之间。战争与残暴成了每日例汤。",
+"chinese":"那份暴力蔓延到了民众之中。战争与残暴成了每日例汤。",
 "durationSeconds":5.78
 },
 {
@@ -16147,7 +16147,7 @@
 {
 "stem":"004_KeslaMultiClick3",
 "english":"Twenty years of parties, clubs, trying so hard to squeeze meaning out of nothing. I snapped.",
-"chinese":"二十年的派对和俱乐部，拼命想从虚无里榨出意义。我崩断了。",
+"chinese":"二十年的派对和会所，拼命想从虚无里榨出意义。我崩断了。",
 "durationSeconds":7.74
 },
 {
@@ -17845,7 +17845,7 @@
 {
 "stem":"005_LuxeMultiClick3",
 "english":"Luxury is a philosophy. And you are clearly no philosopher.",
-"chinese":"奢侈是一种哲学。而你显然不是哲学家。",
+"chinese":"奢侈是一种哲学，而你显然不是哲学家。",
 "durationSeconds":4.79
 },
 {
@@ -18217,7 +18217,7 @@
 {
 "stem":"019_MaddieEnter2",
 "english":"Don't touch the piles. Everything is organised.",
-"chinese":"别碰那些堆堆。每样东西都有序着呢。",
+"chinese":"别碰那堆东西。每样东西都有序着呢。",
 "durationSeconds":3.68
 },
 {
@@ -18373,7 +18373,7 @@
 {
 "stem":"022_MakIdle4",
 "english":"Do you feel that humming in the ground? It is the foundation on which this world was built.",
-"chinese":"可听见大地嗡鸣？那是世界根基的脉动。",
+"chinese":"可听见大地嗡鸣？那是世界基底的脉动。",
 "durationSeconds":7.27
 },
 {
@@ -18415,13 +18415,13 @@
 {
 "stem":"004_MalafangFreeExit4",
 "english":"Don't tell me you're buying from that Nightshade creep.",
-"chinese":"别告诉我你在从那个阴森的夜影那儿进货。",
+"chinese":"别告诉我你在从癫茄那个阴森家伙那儿进货。",
 "durationSeconds":2.86
 },
 {
 "stem":"005_MalafangFreeExit5",
 "english":"Look, Nightshade sells good stuff, but that mask... can't trust him.",
-"chinese":"听着，夜影的货是不错，但那面具……不可信。",
+"chinese":"听着，癫茄的货是不错，但那面具……不可信。",
 "durationSeconds":6.42
 },
 {
@@ -18457,7 +18457,7 @@
 {
 "stem":"011_MalafangEnter5",
 "english":"Nightshade knows his poisons, but he's got no flair, no fire!",
-"chinese":"夜影懂毒药，但他毫无激情，没有火气！",
+"chinese":"癫茄懂毒药，但他没有激情，没有火气！",
 "durationSeconds":6.92
 },
 {
@@ -18529,7 +18529,7 @@
 {
 "stem":"023_MalafangEnter4",
 "english":"I was born in a volcano, all right? I know my incendiaries!",
-"chinese":"我生在火山里行了吧？最懂燃烧物！",
+"chinese":"我生在火山里行了吧？我最懂燃烧物！",
 "durationSeconds":5.22
 },
 {
@@ -18583,7 +18583,7 @@
 {
 "stem":"005_MandalaTransform1",
 "english":"Change it? Me! It was already like that.",
-"chinese":"我改的？明明本来就是这样！",
+"chinese":"我改变的？明明本来就是这样！",
 "durationSeconds":4.04
 },
 {
@@ -18649,7 +18649,7 @@
 {
 "stem":"016_MandalaMultiClick1",
 "english":"You may have met another Mari, calls herself the artist.",
-"chinese":"你大概见过另一位玛里，自称艺术家的那位。",
+"chinese":"你大概见过另一位玛里族，自称艺术家的那位。",
 "durationSeconds":5.25
 },
 {
@@ -18925,7 +18925,7 @@
 {
 "stem":"021_MastAlchemistPortraitClick1",
 "english":"I have plenty of vitriol for you.",
-"chinese":"我可有的是硫酸招待你。",
+"chinese":"我备足了足量的矾酸来招待你。",
 "durationSeconds":2.12
 },
 {
@@ -20077,7 +20077,7 @@
 {
 "stem":"022_MythKeeperEnterFight2",
 "english":"The Foundation is beyond time! You are not the first to claim it!",
-"chinese":"基底超脱时间！你并非首个妄图占有它的人！",
+"chinese":"基底超脱于时间！你并非首个妄图占有它的人！",
 "durationSeconds":6.46
 },
 {
@@ -20191,7 +20191,7 @@
 {
 "stem":"018_NauticaBuyExit4",
 "english":"This belonged to a great Sea King! I mean, probably.",
-"chinese":"这可是某位海之王的遗物！大概吧。",
+"chinese":"这可是某位大海之王的遗物！大概吧。",
 "durationSeconds":4.51
 },
 {
@@ -20413,7 +20413,7 @@
 {
 "stem":"003_SpyDefeat5",
 "english":"You must be a member of the Bazaarian Defense Corps. How many members do they have, by the way?",
-"chinese":"你一定是大巴扎防卫队的人吧。顺便问一句，他们到底有多少成员？",
+"chinese":"你一定是大巴扎防卫军的人吧。顺便问一句，他们到底有多少成员？",
 "durationSeconds":5.36
 },
 {
@@ -20430,8 +20430,8 @@
 },
 {
 "stem":"006_SpyDefeat1",
-"english":"Admin, I'm compromised. Requesting transfer to Polago.",
-"chinese":"长官，我暴露了。请求调往波拉戈。",
+"english":"Admin, I'm compromised. Requesting transfer to Pelago.",
+"chinese":"长官，我暴露了。请求调往佩拉戈。",
 "durationSeconds":4.08
 },
 {
@@ -20479,7 +20479,7 @@
 {
 "stem":"014_SpyDefeat2",
 "english":"Those are nice weapons! Does the Bazaarian Defense Corps have those?",
-"chinese":"这些武器不错！大巴扎防卫队也有这种装备吗？",
+"chinese":"这些武器不错！大巴扎防卫军也有这种装备吗？",
 "durationSeconds":4.97
 },
 {
@@ -20803,7 +20803,7 @@
 {
 "stem":"023_OrionFreeExit5",
 "english":"Not the DIY type, huh? Guess you could always pay for repairs.",
-"chinese":"不喜欢自己DIY？那你总还能花钱修嘛。",
+"chinese":"不是自己动手的那类人？嗯，反正你总能花钱找人修。",
 "durationSeconds":4.89
 },
 {
@@ -20833,151 +20833,151 @@
 {
 "stem":"001_OrlinChooseSkillandExit2_FX",
 "english":"You learn skills quickly, but it takes patience to master them.",
-"chinese":"你学习技能很快，但需要耐心才能掌握它们。",
+"chinese":"你学得很快，可要练到炉火纯青，还得靠耐心。",
 "durationSeconds":8.02
 },
 {
 "stem":"002_OrlinMultiClick1_FX",
 "english":"Our journey from Felis was long, and I came to love all these others like my kittens.",
-"chinese":"我们从费利斯出发的旅程很长，我开始像爱我的小猫一样爱所有这些其他人。",
+"chinese":"从费利斯一路走来，旅途漫长；这些同伴，也渐渐像我的孩子一样亲了。",
 "durationSeconds":9.5
 },
 {
 "stem":"003_OrlinChooseSkillandExit4_FX",
 "english":"I have seen such talent once before, and it bloomed into Adira.",
-"chinese":"这样的天赋我曾经见过一次，绽放成艾迪拉。",
+"chinese":"这样的天赋，我曾经只见过一次。那一次，成就了艾迪拉。",
 "durationSeconds":9.08
 },
 {
 "stem":"004_OrlinMultiClick2_FX",
 "english":"Pip is very young, but he surprises me with his wisdom.",
-"chinese":"皮普很年轻，但他的智慧让我惊讶。",
+"chinese":"皮普年纪虽小，却常有惊人的见识。",
 "durationSeconds":6.82
 },
 {
 "stem":"005_OrlinIde3_FX",
 "english":"Adira would pretend to meditate when in fact he was asleep. Terrible student! And yet...",
-"chinese":"艾迪拉会假装冥想，而实际上他已经睡着了。可怕的学生！然而……",
+"chinese":"艾迪拉以前总是假装冥想，其实是在睡觉。糟糕透顶的学生！可偏偏……",
 "durationSeconds":8.88
 },
 {
 "stem":"006_OrlinChooseSkillandExit5_FX",
 "english":"Soon I think you will be ready for Adira's training.",
-"chinese":"我想你很快就能准备好接受艾迪拉的训练了。",
+"chinese":"我想，你很快就能承受艾迪拉的训练了。",
 "durationSeconds":6.71
 },
 {
 "stem":"007_OrlinChooseSkillandExit1_FX",
 "english":"All wisdom has power, but not all power has wisdom.",
-"chinese":"所有的智慧都有力量，但并非所有的力量都有智慧。",
+"chinese":"智慧必有力量，力量却未必拥有智慧。",
 "durationSeconds":7.8
 },
 {
 "stem":"008_OrlinMultiClick4_FX",
 "english":"Adira is powerful, though there is one skill he may never master, humility.",
-"chinese":"艾迪拉很强大，尽管他可能永远无法掌握一项技能，那就是谦逊。",
+"chinese":"艾迪拉确实强大，只是有一门功课，他恐怕永远学不会——谦逊。",
 "durationSeconds":9.95
 },
 {
 "stem":"009_OrlinExitNoSkill2_FX",
 "english":"Nufu seems wise, but he may only seem so.",
-"chinese":"努夫看起来很聪明，但他可能只是看起来如此。",
+"chinese":"努夫看起来睿智，可也许只是看起来而已。",
 "durationSeconds":7.15
 },
 {
 "stem":"010_OrlinExitNoSkill4_FX",
 "english":"I would promise to be here when you're ready, but I am very old.",
-"chinese":"我保证当你准备好时我会来这里，但我已经很老了。",
+"chinese":"我倒是想答应你，等你准备好时我还在这里。只是我实在老了。",
 "durationSeconds":8.84
 },
 {
 "stem":"011_OrlinIde2_FX",
 "english":"When I was your age, I could not be so silent. Perhaps your wisdom is greater.",
-"chinese":"当我像你这个年纪的时候，我不可能这么沉默。也许你的智慧更大。",
+"chinese":"我在你这个年纪时，可没有这般沉得住气。也许你的智慧更胜于我。",
 "durationSeconds":8.54
 },
 {
 "stem":"012_OrlinEnter1_FX",
 "english":"I do not teach. I help you discover for yourself.",
-"chinese":"我不负责灌输。我只是帮你自己领悟。",
+"chinese":"我不教你答案。我只是帮你自己找到答案。",
 "durationSeconds":7.25
 },
 {
 "stem":"013_OrlinExitNoSkill3_FX",
 "english":"Even if they don't come from me, your lessons will find you.",
-"chinese":"即使它们不是来自我，你的课程也会找到你。",
+"chinese":"哪怕不是从我这里，你该上的课，也总会找上你。",
 "durationSeconds":7.54
 },
 {
 "stem":"014_OrlinEnter3_FX",
 "english":"Why does Nufu set himself apart? We Sphinxians must work together.",
-"chinese":"努夫为何与众不同？我们斯芬克斯人必须共同努力。",
+"chinese":"努夫为何总要与众人隔开？我们斯芬克斯人本该彼此扶持。",
 "durationSeconds":8.72
 },
 {
 "stem":"015_OrlinMultiClick3_FX",
 "english":"Argenta's way is light, but she is serious about her craft, and she has much to teach.",
-"chinese":"阿根塔的方式很轻松，但她对自己的手艺很认真，而且她有很多东西可以教。",
+"chinese":"阿根塔的路数轻灵，但她对技艺从不轻慢，也有许多可教你的东西。",
 "durationSeconds":8.52
 },
 {
 "stem":"016_OrlinChooseSkillandExit3_FX",
 "english":"Every coin goes back to our community. We Sphinxians thank you.",
-"chinese":"每一枚硬币都会回到我们的社区。我们斯芬克斯人谢谢你。",
+"chinese":"每一枚硬币，最终都会回到族群手中。斯芬克斯人感谢你。",
 "durationSeconds":8.89
 },
 {
 "stem":"017_OrlinEnter5_FX",
 "english":"I will not train you to kill. I will train you to live.",
-"chinese":"我不会训练你杀人。我会训练你生活。",
+"chinese":"我训练你，不是为了杀人，而是为了活下去。",
 "durationSeconds":8.08
 },
 {
 "stem":"018_OrlinEnter4_FX",
 "english":"I am not a warrior. I am just a man who has lived a long time.",
-"chinese":"我不是战士。我只是一个活了很久的人。",
+"chinese":"我不是战士。我只是一个活得够久的人。",
 "durationSeconds":7.99
 },
 {
 "stem":"019_OrlinExitNoSkill1_FX",
 "english":"I too was once young and impatient. I understand.",
-"chinese":"我也曾经年轻过，缺乏耐心。我明白。",
+"chinese":"我也年轻急躁过。我懂。",
 "durationSeconds":7.16
 },
 {
 "stem":"020_OrlinExitNoSkill5_FX",
 "english":"If not today, tomorrow. If not this life, the next.",
-"chinese":"如果今天不行，明天也行。若今生不成，则下辈子。",
+"chinese":"今日不成，就待明日；今生不成，就待来世。",
 "durationSeconds":7.51
 },
 {
 "stem":"021_OrlinEnter2_FX",
 "english":"Adira has surpassed me in power, but he can never surpass me in years.",
-"chinese":"艾迪拉在力量上超越了我，但在岁月上他永远无法超越我。",
+"chinese":"艾迪拉的力量已在我之上。可论年岁，他永远越不过我。",
 "durationSeconds":9.6
 },
 {
 "stem":"022_OrlinIde1_FX",
 "english":"Good. All training begins with stillness.",
-"chinese":"好的。所有的训练都是从静止开始的。",
+"chinese":"很好。训练的第一步，是让自己静下来。",
 "durationSeconds":6.89
 },
 {
 "stem":"023_OrlinMultiClick5_FX",
 "english":"Nufu though, why does he live alone in that dojo, and how can you trust one who hides his true age?",
-"chinese":"努夫，为什么他一个人住在那个道场，你怎么能相信一个隐瞒真实年龄的人呢？",
+"chinese":"说到努夫，他为什么独自住在那座道场？一个连真实年龄都要藏起来的人，你又怎能信任？",
 "durationSeconds":10.85
 },
 {
 "stem":"024_OrlinIde5_FX",
 "english":"Very well, I will meditate on our purpose in this strange and wondrous place.",
-"chinese":"很好，我会在这个陌生而奇妙的地方思考我们的目的。",
+"chinese":"很好。我会在这片陌生又奇妙的地方，静思我们为何而来。",
 "durationSeconds":8.13
 },
 {
 "stem":"025_OrlinIde4_FX",
 "english":"It is perhaps not wise to waste time with such an old teacher, hmm?",
-"chinese":"在这样的老老师身上浪费时间或许不太明智，嗯？",
+"chinese":"把时间花在我这样一个老老师身上，未必明智吧，嗯？",
 "durationSeconds":8.17
 },
 {
@@ -21289,7 +21289,7 @@
 {
 "stem":"013_TeacherDefeat3",
 "english":"Well! Say goodbye to your letter of recommendation!",
-"chinese":"出色地！和你的推荐信说再见吧！",
+"chinese":"好啊！和你的推荐信说再见吧！",
 "durationSeconds":4.42
 },
 {
@@ -21403,7 +21403,7 @@
 {
 "stem":"009_StudentDefeat4",
 "english":"When the Municipality annexes the Bazaar, my degree will be worthless anyway! Ugh!",
-"chinese":"等市政当局吞并了大巴扎，我的学位无论如何也就不值钱了！啊!",
+"chinese":"等自治领吞并了大巴扎，我的学位无论如何也就不值钱了！啊！",
 "durationSeconds":5.46
 },
 {
@@ -21433,7 +21433,7 @@
 {
 "stem":"017_StudentPortraitClick5_ALT03",
 "english":"Like, the Municipality will annex us, or the Foundation will flip over and dump us into space. Whatever.",
-"chinese":"就像，市政当局将吞并我们，或者基底会翻转并将我们扔进太空。任何。",
+"chinese":"就像，自治领将吞并我们，或者基底会翻转并将我们扔进太空。管他呢。",
 "durationSeconds":8.44
 },
 {
@@ -21655,31 +21655,31 @@
 {
 "stem":"002_PinfeatherMultiClick1",
 "english":"My dad was in Sky Patrol. Well, now he sells cars, but Sky Patrol!",
-"chinese":"我爸爸在空巡队。好吧，现在他卖的是汽车，但是空巡队！",
+"chinese":"我爸爸以前在天空巡逻队。好吧，现在他卖车，但那可是天空巡逻队！",
 "durationSeconds":5.76
 },
 {
 "stem":"003_PinfeatherBuyExit5",
 "english":"Do you play Piggles? I'm not very good, but it's fun!",
-"chinese":"你玩小圆猪吗？我不是很好，但是很有趣！",
+"chinese":"你玩小圆猪吗？我玩得不太好，但真的很好玩！",
 "durationSeconds":3.11
 },
 {
 "stem":"004_PinfeatherFreeExit3",
 "english":"I don't even want to sell them, but I want that speedrunner!",
-"chinese":"我甚至不想卖掉它们，但我想要那个速跑者！",
+"chinese":"我其实都舍不得卖它们，可我想要那个速跑者！",
 "durationSeconds":3.89
 },
 {
 "stem":"005_PinfeatherMultiClick5",
 "english":"He doesn't really get what kids are into, but I still think he's cool.",
-"chinese":"他不太了解孩子们喜欢什么，但我仍然认为他很酷。",
+"chinese":"他不太懂小孩现在喜欢什么，但我还是觉得他很酷。",
 "durationSeconds":5.2
 },
 {
 "stem":"006_PinfeatherBuyExit2",
 "english":"Maybe we could go flying sometime, if my dad says it's okay.",
-"chinese":"如果我爸爸同意的话，也许我们可以找个时间去坐飞机。",
+"chinese":"如果爸爸同意，也许我们哪天可以一起去飞。",
 "durationSeconds":3.61
 },
 {
@@ -21691,13 +21691,13 @@
 {
 "stem":"008_PinfeatherEnter5",
 "english":"I love flying, but I'm scared to go far from home, so I just go straight up.",
-"chinese":"我喜欢飞行，但我害怕离家很远，所以我就直接飞上去。",
+"chinese":"我喜欢飞，但我不敢离家太远，所以就直上直下。",
 "durationSeconds":4.53
 },
 {
 "stem":"009_PinfeatherMultiClick4",
 "english":"That is too small, Pinny. Nobody could fit in that. It is a drone, Dad!",
-"chinese":"那太小了，平尼。没有人能适应这一点。这是一架无人机，爸爸！",
+"chinese":"那太小了，小针羽。没人坐得进去。爸爸，那是无人机！",
 "durationSeconds":4.74
 },
 {
@@ -21709,19 +21709,19 @@
 {
 "stem":"011_PinfeatherBuyExit1",
 "english":"My dad doesn't get why I spend all day building these, but he's the greatest.",
-"chinese":"我爸爸不明白为什么我要花一整天时间建造这些，但他是最伟大的。",
+"chinese":"我爸爸不明白我为什么整天造这些，但他最棒了。",
 "durationSeconds":4.68
 },
 {
 "stem":"012_PinfeatherIdle3",
 "english":"I'm gonna go get my dad. He'll know what to do.",
-"chinese":"我要去接我爸爸。他会知道该怎么做。",
+"chinese":"我要去找我爸爸来。他会知道该怎么办。",
 "durationSeconds":3.61
 },
 {
 "stem":"013_PinfeatherBuyExit7",
 "english":"Oh man, that one's so good!",
-"chinese":"噢，伙计，那太好了！",
+"chinese":"天哪，那个超棒！",
 "durationSeconds":1.99
 },
 {
@@ -21739,7 +21739,7 @@
 {
 "stem":"016_PinfeatherEnter4",
 "english":"So many species can't fly. Why would nature do that to them?",
-"chinese":"很多物种都不会飞。大自然为什么要这样对他们？",
+"chinese":"这么多物种不会飞。大自然为什么要这样对它们？",
 "durationSeconds":4.7
 },
 {
@@ -21751,7 +21751,7 @@
 {
 "stem":"018_PinfeatherFreeExit2",
 "english":"Sometimes I'm happy I don't sell any. I kind of want to keep them.",
-"chinese":"有时我很高兴我没有卖掉任何东西。我有点想保留它们。",
+"chinese":"有时候卖不出去我还挺开心的。我其实想留着它们。",
 "durationSeconds":3.97
 },
 {
@@ -21763,7 +21763,7 @@
 {
 "stem":"020_PinfeatherBuyExit3",
 "english":"If it breaks, bring it back. I love fixing almost as much as building.",
-"chinese":"如果坏了，就把它带回来。我几乎和建筑一样喜欢修理。",
+"chinese":"如果坏了就拿回来。我喜欢修东西，几乎和喜欢造东西一样。",
 "durationSeconds":4.34
 },
 {
@@ -21775,7 +21775,7 @@
 {
 "stem":"022_PinfeatherMultiClick3",
 "english":"He knows everything about vehicles, but he doesn't really get the stuff I build.",
-"chinese":"他了解有关车辆的一切，但他并不真正了解我制造的东西。",
+"chinese":"他懂所有载具，但不太懂我造的这些东西。",
 "durationSeconds":4.9
 },
 {
@@ -21793,7 +21793,7 @@
 {
 "stem":"025_PinfeatherEnter1",
 "english":"You can't fly? Well, that's so sad. But I can help.",
-"chinese":"你不会飞吗？嗯，那太悲伤了。但我可以帮忙。",
+"chinese":"你不会飞？唉，那也太难过了。不过我能帮忙。",
 "durationSeconds":4.78
 },
 {
@@ -21805,7 +21805,7 @@
 {
 "stem":"027_PinfeatherEnter3",
 "english":"My dad flew all around the Foundation with Sky Patrol. I mostly stick to my workshop.",
-"chinese":"我爸爸带着空巡队绕着基底飞来飞去。我大部分时间都呆在我的工作室里。",
+"chinese":"我爸爸以前跟着天空巡逻队飞遍基底。我大多只待在自己的工坊里。",
 "durationSeconds":5.73
 },
 {
@@ -21841,19 +21841,19 @@
 {
 "stem":"005_PipEnter4_FX",
 "english":"Don't let my youth worry you! The guys who trained me were very old.",
-"chinese":"别让我的青春让你担心！训练我的人都很老了。",
+"chinese":"别因为我年轻就担心！训练我的那些人都很老。",
 "durationSeconds":4.34
 },
 {
 "stem":"006_PipExitNoSkill1_FX",
 "english":"You might prefer Argenta's training. She is amazing.",
-"chinese":"您可能更喜欢阿根塔的训练。她太棒了。",
+"chinese":"你也许更适合阿根塔的训练。她超厉害。",
 "durationSeconds":4.19
 },
 {
 "stem":"007_PipExitNoSkill3_FX",
 "english":"If you are not ready for my training, I am not sure where else to send you.",
-"chinese":"如果您还没有准备好接受我的培训，我不知道还能送您去哪里。",
+"chinese":"如果你还没准备好接受我的训练，我也不知道还能把你送去谁那儿。",
 "durationSeconds":4.41
 },
 {
@@ -21871,7 +21871,7 @@
 {
 "stem":"010_PipChooseSkillandExit4_FX",
 "english":"When you've learned all you can from me, see Argenta. She's wonderful.",
-"chinese":"当你从我这里学到了所有的知识后，就来看看阿根塔吧。她很棒。",
+"chinese":"等你从我这里学完所有能学的，就去找阿根塔。她很棒。",
 "durationSeconds":6.01
 },
 {
@@ -21907,19 +21907,19 @@
 {
 "stem":"016_PipChooseSkillandExit1_FX",
 "english":"It takes real confidence to let a kid train you. I'm impressed.",
-"chinese":"让孩子训练你需要真正的信心。我印象深刻。",
+"chinese":"敢让小孩训练你，真的很有自信。我佩服。",
 "durationSeconds":4.22
 },
 {
 "stem":"017_PipIde2_FX",
 "english":"Orlin and Adira are all about stillness too. Maybe it's easier when you're ancient.",
-"chinese":"奥林和艾迪拉也都是关于静止的。也许当你老了的时候会更容易。",
+"chinese":"奥林和艾迪拉也讲究静止。也许年纪大了会容易些。",
 "durationSeconds":4.49
 },
 {
 "stem":"018_PipMultiClick4_FX",
 "english":"The monks tried to stop me from joining the migration, but I knew I needed more out of life.",
-"chinese":"僧侣们试图阻止我加入迁徙，但我知道我需要更多的生活。",
+"chinese":"僧侣们试图阻止我加入迁徙，但我知道自己的人生还需要更多。",
 "durationSeconds":5.09
 },
 {
@@ -22321,7 +22321,7 @@
 {
 "stem":"006_PrDuelistVictory4",
 "english":"Get an education and perhaps then we can have a duel.",
-"chinese":"接受教育，也许我们就可以决斗了。",
+"chinese":"先去读个书。也许以后你才有资格和我决斗。",
 "durationSeconds":4.86
 },
 {
@@ -22387,7 +22387,7 @@
 {
 "stem":"018_PrDuelistVictory3",
 "english":"I love putting the uneducated in their place.",
-"chinese":"我喜欢把没有受过教育的人放在他们的位置上。",
+"chinese":"我最喜欢教没念过书的人做人。",
 "durationSeconds":4.87
 },
 {
@@ -22441,7 +22441,7 @@
 {
 "stem":"007_DemonstratorEnterFight5",
 "english":"Tantius is more than just airships. Allow me to demonstrate.",
-"chinese":"坦提乌斯不仅仅是飞艇。请允许我演示一下。",
+"chinese":"坦提乌斯可不只有飞艇。让我演示一下。",
 "durationSeconds":3.8
 },
 {
@@ -22573,7 +22573,7 @@
 {
 "stem":"007_PropertyBaronEnterFight5",
 "english":"Mmm, I might have something in your budget, in the scrap fields.",
-"chinese":"嗯，我可能在你的预算中，在废料场里有一些东西。",
+"chinese":"嗯……我这儿可能确实有些符合你预算的东西，不过你得去废料场找找。",
 "durationSeconds":6.81
 },
 {
@@ -22765,7 +22765,7 @@
 {
 "stem":"017_ProsperoMultiClick2",
 "english":"I came up in Roughtown selling junk armor to junk people, but there is always a ladder up.",
-"chinese":"我从拉夫镇起家，向垃圾人出售垃圾盔甲，但总有一个梯子可以上去。",
+"chinese":"我从拉夫镇起家，把垃圾盔甲卖给垃圾人，但总有梯子可以往上爬。",
 "durationSeconds":6.29
 },
 {
@@ -22825,25 +22825,25 @@
 {
 "stem":"027_ProsperoEnter5",
 "english":"I know you, Mr. Pygmalien, as shrewd as you are handsome.",
-"chinese":"我了解您，皮格马利翁先生，您和英俊一样精明。",
+"chinese":"我了解您，皮格马利翁先生，您既精明又英俊。",
 "durationSeconds":4.5
 },
 {
 "stem":"001_PygmalienNoBuySpace5_ALT01",
 "english":"Well, time to make some sales.",
-"chinese":"好吧，是时候进行一些销售了。",
+"chinese":"好吧，是时候卖点东西了。",
 "durationSeconds":2.78
 },
 {
 "stem":"002_PygmalienCombatPosExclam3",
 "english":"I'm gonna serve you some TOUGH pork! Ha ha ha! Weeee!",
-"chinese":"我要给你吃一些坚韧的猪肉！哈哈哈！哎呀！",
+"chinese":"我要让你见识一下硬气猪肉！哈哈哈！哎嘿！",
 "durationSeconds":6.17
 },
 {
 "stem":"003_PygmalienCharacterSelect4_ALT01",
 "english":"Success isn't about money. It's about lots of money!",
-"chinese":"成功与金钱无关。这涉及很多钱！",
+"chinese":"成功不拘小利，但这可是大钱！",
 "durationSeconds":5.17
 },
 {
@@ -22855,7 +22855,7 @@
 {
 "stem":"005_PygmalienIdle3_ALT01",
 "english":"Entrepreneurs don't take lunch breaks. Where's your hustle?",
-"chinese":"企业家不午休。你的喧嚣在哪里？",
+"chinese":"创业者可不午休。你的干劲呢？",
 "durationSeconds":4.48
 },
 {
@@ -22873,61 +22873,61 @@
 {
 "stem":"008_PygmalienNoBuySpace4_ALT01",
 "english":"Need to move some inventory.",
-"chinese":"需要转移一些库存。",
+"chinese":"得清清库存了。",
 "durationSeconds":2.22
 },
 {
 "stem":"009_PygmalienMultiClick1_ALT01",
 "english":"Life on Jabali is simple. Pick some fruit, go to sleep, repeat.",
-"chinese":"贾巴利的生活很简单。摘一些水果，睡觉，重复。",
+"chinese":"贾巴利的生活很简单。摘点水果，睡一觉，然后重复。",
 "durationSeconds":5.83
 },
 {
 "stem":"010_PygmalienIdle4_ALT01",
 "english":"I paid for the Express Ship to get here, and now we're… waiting?",
-"chinese":"我支付了到达这里的特快船费用，现在我们正在……等待？",
+"chinese":"我可是花钱坐快船来的，结果现在我们在……等？",
 "durationSeconds":4.84
 },
 {
 "stem":"011_PygmalienMultiClick5_ALT01",
 "english":"Someday, I'll return and show them what I've found here. Maybe then, they'll understand.",
-"chinese":"有一天，我会回来并向他们展示我在这里发现的东西。也许到那时，他们就会明白。",
+"chinese":"总有一天，我会回去给他们看看我在这里发现的一切。也许到那时，他们就会明白。",
 "durationSeconds":7.26
 },
 {
 "stem":"012_PygmalienLevelUp1_ALT01",
 "english":"Now that's givin' him the business! Haha!",
-"chinese":"现在这生意就交给他了！哈哈！",
+"chinese":"这才叫给他点厉害瞧瞧！哈哈！",
 "durationSeconds":3.2
 },
 {
 "stem":"013_PygmalienPvEVictory1_ALT01",
 "english":"Believe you'll win and you'll win, but not against me!",
-"chinese":"相信你会赢，你会赢，但不是跟我斗！",
+"chinese":"相信自己会赢，你就会赢，但对上我不行！",
 "durationSeconds":4.99
 },
 {
 "stem":"014_PygmalienLevelUp5_ALT01",
 "english":"Ah, the joy of more!",
-"chinese":"啊，更多的快乐！",
+"chinese":"啊，更多就是快乐！",
 "durationSeconds":3.81
 },
 {
 "stem":"015_PygmalienMultiClick4_ALT01",
 "english":"The Elder said my ideas were dangerous, that I'd bring ruin to Jabalia. So, I left.",
-"chinese":"长老说我的想法很危险，我会给贾巴利亚带来毁灭。于是，我离开了。",
+"chinese":"长老说我的想法很危险，会给贾巴族带来毁灭。于是，我离开了。",
 "durationSeconds":8.28
 },
 {
 "stem":"016_PygmalienMultiClick3_ALT01",
 "english":"I wanted work. I wanted to build my life. I wanted more.",
-"chinese":"我想要工作。我想建立我的生活。我想要更多。",
+"chinese":"我想工作。我想打造自己的人生。我想要更多。",
 "durationSeconds":6.98
 },
 {
 "stem":"017_PygmalienLevelUp2_ALT01",
 "english":"If you're not growing, you're failing.",
-"chinese":"如果你不成长，你就失败了。",
+"chinese":"不成长，就是在失败。",
 "durationSeconds":3.2
 },
 {
@@ -22939,13 +22939,13 @@
 {
 "stem":"019_PygmalienNoBuySpace2_ALT01",
 "english":"Looks like I'm overstocked.",
-"chinese":"看来我存货太多了",
+"chinese":"看来我存货太多了。",
 "durationSeconds":2.57
 },
 {
 "stem":"020_PygmalienPvEVictory4_ALT01",
 "english":"You seem like a nice person, maybe too nice.",
-"chinese":"你看起来是一个好人，也许太好了。",
+"chinese":"你看起来是个好人，也许好过头了。",
 "durationSeconds":4.84
 },
 {
@@ -22999,7 +22999,7 @@
 {
 "stem":"009_Qomatz_Defeat_05",
 "english":"Take our history. Share it with your world.",
-"chinese":"以我们的历史为例。与您的世界分享。",
+"chinese":"带走我们的历史，分享给你的世界。",
 "durationSeconds":5.9
 },
 {
@@ -23017,19 +23017,19 @@
 {
 "stem":"013_Qomatz_Victory_03",
 "english":"One day, a worthy inheritor will come. One day.",
-"chinese":"总有一天，一位称职的继承者将会到来。一天。",
+"chinese":"总有一天，一位称职的继承者将会到来。总有一天。",
 "durationSeconds":6.78
 },
 {
 "stem":"014_Qomatz_Victory_04",
 "english":"I scoured the lies from you. You are not ready for what's beyond.",
-"chinese":"我从你身上搜出了谎言。你还没有准备好迎接未来。",
+"chinese":"我从你身上识别出了谎言。你还没有准备好迎接未来。",
 "durationSeconds":6.83
 },
 {
 "stem":"015_Qomatz_Portrait_Click_01",
 "english":"Before the frogs, before the serpents, we came.",
-"chinese":"在青蛙之前，在蛇之前，我们就来了。",
+"chinese":"在青蛙之前，在虺蛇之前，我们就来了。",
 "durationSeconds":6.03
 },
 {
@@ -23065,13 +23065,13 @@
 {
 "stem":"023_Qomatz_Defeat_04",
 "english":"What lies beyond will give you great power. Do not let it consume you.",
-"chinese":"超越的事物会给你巨大的力量。不要让它消耗你。",
+"chinese":"超脱的事物会给你巨大的力量。不要让它消磨你。",
 "durationSeconds":6.78
 },
 {
 "stem":"001_QuixelMultiClick1",
 "english":"I am the only Pixite in the Bazaar. I do not feel lonely. I feel special.",
-"chinese":"我是大巴扎里唯一的皮克赛特。我不觉得孤单，我觉得特别。",
+"chinese":"我是大巴扎里唯一的皮克赛特人。我不觉得孤单，我觉得特别。",
 "durationSeconds":5.13
 },
 {
@@ -23089,13 +23089,13 @@
 {
 "stem":"004_QuixelIde4",
 "english":"You might actually be slower than Midsworth!",
-"chinese":"你实际上可能比米兹沃斯慢！",
+"chinese":"你实际上可能比米兹沃斯还慢！",
 "durationSeconds":3.42
 },
 {
 "stem":"005_QuixelSellItem1",
 "english":"I'll take it! I guess?",
-"chinese":"我要买它！我猜？",
+"chinese":"我要买它！我猜是吧？",
 "durationSeconds":1.75
 },
 {
@@ -23137,13 +23137,13 @@
 {
 "stem":"012_QuixelMultiClick4",
 "english":"Midsworth says he might fire me if I don't try harder. Is he even our boss?",
-"chinese":"米兹沃斯说，如果我不更加努力，他可能会解雇我。他还是我们的老板吗？",
+"chinese":"米兹沃斯说，如果我不更加努力，他可能会解雇我。难道他是我们的老板吗？",
 "durationSeconds":4.91
 },
 {
 "stem":"013_QuixelSellSizedItem4",
 "english":"Take this stupid gold and give me that!",
-"chinese":"把这愚蠢的金子拿给我吧！",
+"chinese":"收下这愚蠢的金子，把那玩意拿来！",
 "durationSeconds":1.9
 },
 {
@@ -23155,7 +23155,7 @@
 {
 "stem":"015_QuixelEnter4",
 "english":"Send me your huge items! Price? Do not care!",
-"chinese":"把你的大件物品寄给我！价格？不在乎！",
+"chinese":"把你的大件物品寄给我！价格？别管它！",
 "durationSeconds":3.71
 },
 {
@@ -23173,7 +23173,7 @@
 {
 "stem":"018_QuixelFreeExit5",
 "english":"Did you know sale and fail rhyme? Sale, fail, fail, sale!",
-"chinese":"你知道销售和失败韵吗？出售，失败，失败，出售！",
+"chinese":"你知道售卖和失败押韵吗？售卖，失败，失败，售卖！",
 "durationSeconds":4.93
 },
 {
@@ -23197,7 +23197,7 @@
 {
 "stem":"022_QuixelEnter2",
 "english":"You're huge! Do you have any huge items?",
-"chinese":"你真伟大！你有什么大件物品吗？",
+"chinese":"你真大只！你有什么大件物品吗？",
 "durationSeconds":3.44
 },
 {
@@ -23209,7 +23209,7 @@
 {
 "stem":"024_QuixelMultiClick3",
 "english":"Grand Society of Master Merchants! The only true word there is \"of.\"",
-"chinese":"大师商人总会！这里面唯一真实的词只有一个“的”字。",
+"chinese":"大师商人总会！这句话里唯一真实的只有一个“的”字。",
 "durationSeconds":6.21
 },
 {
@@ -23311,7 +23311,7 @@
 {
 "stem":"006_RadCorsairVictory3",
 "english":"I am feared from here to Pelago!",
-"chinese":"从这里到波拉戈，人人都怕我！",
+"chinese":"从这里到佩拉戈，人人都怕我！",
 "durationSeconds":2.96
 },
 {
@@ -23335,7 +23335,7 @@
 {
 "stem":"012_RadCorsairEnterFight1",
 "english":"Avast, featherless worm!",
-"chinese":"巨大的、无羽毛的蠕虫！",
+"chinese":"巨大的、无毛的蠕虫！",
 "durationSeconds":2.23
 },
 {
@@ -23401,7 +23401,7 @@
 {
 "stem":"001_RegenaldExitNoSkill3_FX",
 "english":"I'm telling you, anyone can regenerate, but you have to believe.",
-"chinese":"我告诉你，任何人都可以重生，但你必须相信。",
+"chinese":"我告诉你，任何人都能脱胎换骨，前提是你必须坚信这一点。",
 "durationSeconds":5.51
 },
 {
@@ -23419,19 +23419,19 @@
 {
 "stem":"004_RegenaldMultiClick5_FX",
 "english":"No one has to live in pain. No matter what species, all of us can heal.",
-"chinese":"没有人必须生活在痛苦之中。无论什么物种，我们所有人都可以治愈。",
+"chinese":"免受痛苦是每个生命的权利。无论何种生灵，我们皆可得到救赎与治愈。",
 "durationSeconds":6.9
 },
 {
 "stem":"005_RegenaldMultiClick4_FX",
 "english":"I came here to prove my theories, but also to spread the word.",
-"chinese":"我来这里是为了证明我的理论，同时也是为了传播信息。",
+"chinese":"我来这里是为了证明我的理论，同时也是为了传播信义。",
 "durationSeconds":6.09
 },
 {
 "stem":"006_RegenaldExitNoSkill5_FX",
 "english":"That's okay, kid. Come back when you're ready to push your limits.",
-"chinese":"没关系，孩子。当您准备好挑战自己的极限时，请回来。",
+"chinese":"没关系，孩子。等你准备好挑战极限了再回来。",
 "durationSeconds":4.8
 },
 {
@@ -23443,13 +23443,13 @@
 {
 "stem":"008_RegenaldEnter1_FX",
 "english":"Regeneration is more than biology, it can be learned.",
-"chinese":"再生不仅仅是生物学，它是可以学习的。",
+"chinese":"再生不仅仅是生物学，它是一门可学习的技能。",
 "durationSeconds":5.49
 },
 {
 "stem":"009_RegenaldIde4_FX",
 "english":"Your energy wants to help, but it's not smart. You gotta guide it.",
-"chinese":"你的能量想要提供帮助，但这并不聪明。你得引导它。",
+"chinese":"你的能量想帮助你，但它还不够聪明。你得引导它。",
 "durationSeconds":5.76
 },
 {
@@ -23461,7 +23461,7 @@
 {
 "stem":"011_RegenaldEnter4_FX",
 "english":"Training your body to do the impossible isn't going to be comfortable, okay?",
-"chinese":"训练你的身体去完成不可能的事情并不舒服，好吗？",
+"chinese":"训练你的身体来挑战不可能，这并不舒服，好吗？",
 "durationSeconds":5.23
 },
 {
@@ -23497,13 +23497,13 @@
 {
 "stem":"017_RegenaldIde5_FX",
 "english":"Focus on the logjam, and your energy will gather there. Gather enough and it pushes right through.",
-"chinese":"专注于僵局，你的能量就会聚集在那里。收集得足够多，它就会直接穿过。",
+"chinese":"专注于阻碍，你的能量就会聚集在那里。收集得足够多，你终将畅通无阻。",
 "durationSeconds":10.12
 },
 {
 "stem":"018_RegenaldMultiClick2_FX",
 "english":"We have an intuition for it, but anyone can learn it. Even robots.",
-"chinese":"我们对此有直觉，但任何人都可以学习。甚至机器人。",
+"chinese":"我们对此有直觉，但任何人都可以学习它。甚至机器人。",
 "durationSeconds":5.01
 },
 {
@@ -23527,8 +23527,8 @@
 {
 "stem":"022_RegenaldExitNoSkill2_FX",
 "english":"Healing is something you do. Regen is something you are.",
-"chinese":"治愈是你要做的事情。再生就是你。",
-"durationSeconds":6.84
+"chinese":"治愈是你要做的事情。再生就是你的本能。",
+"durationSeconds":6.85
 },
 {
 "stem":"023_RegenaldChooseSkillandExit1_FX",
@@ -23540,7 +23540,7 @@
 "stem":"024_RegenaldChooseSkillandExit2_FX",
 "english":"You learn quick, which dramatically increases your chance of surviving.",
 "chinese":"你学得很快，这大大增加了你的生存机会。",
-"durationSeconds":3.64
+"durationSeconds":3.65
 },
 {
 "stem":"025_RegenaldEnter5_FX",
@@ -23641,7 +23641,7 @@
 {
 "stem":"018_RetireeEnterFight3",
 "english":"You young punks are soft! I'll show you how it's done!",
-"chinese":"你们这些小混混好软啊！我将向您展示它是如何完成的！",
+"chinese":"你们这些小混混太嫩了！看我教你们怎么打！",
 "durationSeconds":4.52
 },
 {
@@ -23659,7 +23659,7 @@
 {
 "stem":"022_RetireeVictory4",
 "english":"That little J.J. gives them Phibics a bad name! He is a tadpole!",
-"chinese":"那个小J.J.给他们菲比克人带来了坏名声！他是一只蝌蚪！",
+"chinese":"那个小杰杰给他们菲比克人带来了坏名声！他是一只蝌蚪！",
 "durationSeconds":4.67
 },
 {
@@ -23690,7 +23690,7 @@
 "stem":"004_RiggleIde3_FX",
 "english":"Now, obviously, one toxic unit is equal to the EC50 for a given endpoint for biological effect over a given amount of time. However...",
 "chinese":"现在，显然，一个毒性单位等于特定时间内某一生物效应终点的 EC50。然而……",
-"durationSeconds":8.04
+"durationSeconds":8.05
 },
 {
 "stem":"005_RiggleExitNoSkill5_FX",
@@ -23719,7 +23719,7 @@
 {
 "stem":"009_RiggleChooseSkillandExit2_FX",
 "english":"There are so many misconceptions about poison. I'm glad you can see past them.",
-"chinese":"人们对毒有很多误解。我很高兴你能看穿他们。",
+"chinese":"人们对毒有许多误解。很高兴你能看穿这些偏见。",
 "durationSeconds":5.44
 },
 {
@@ -23731,25 +23731,25 @@
 {
 "stem":"011_RiggleIde1_FX",
 "english":"Oh good, you've stopped talking. Now maybe you're ready to learn.",
-"chinese":"哦，太好了，你不说话了。现在也许您已经准备好学习了。",
+"chinese":"哦，太好了，你不说话了。现在也许准备好学习了。",
 "durationSeconds":4.75
 },
 {
 "stem":"012_RiggleEnter5_FX",
 "english":"I am sorry. Cute? I am a professor of the toxic arts.",
-"chinese":"对不起。可爱的？我是有毒艺术的教授。",
-"durationSeconds":4.24
+"chinese":"抱歉，可爱？我是毒艺教授。",
+"durationSeconds":4.25
 },
 {
 "stem":"013_RiggleChooseSkillandExit1_FX",
 "english":"It is my pleasure to educate you in the toxic arts.",
-"chinese":"我很高兴向您传授有毒艺术的知识。",
+"chinese":"很荣幸向你传授毒艺。",
 "durationSeconds":4.66
 },
 {
 "stem":"014_RiggleExitNoSkill3_FX",
 "english":"Nightshade sells poisons, but does he understand them?",
-"chinese":"茄属卖毒，他懂毒吗？",
+"chinese":"癫茄卖毒，可他懂毒吗？",
 "durationSeconds":4.1
 },
 {
@@ -23767,7 +23767,7 @@
 {
 "stem":"017_RiggleMultiClick4_FX",
 "english":"I certainly hope you don't intend such vulgar usage. I have expelled too many students already.",
-"chinese":"我当然希望您不要使用这种粗俗的用法。我已经开除了太多学生了。",
+"chinese":"我当然希望你不会打算这么粗俗地使用它。我已经开除太多学生了。",
 "durationSeconds":7.85
 },
 {
@@ -23797,13 +23797,13 @@
 {
 "stem":"022_RiggleExitNoSkill4_FX",
 "english":"If you are looking for bottles with skulls on them, look elsewhere. I deal in knowledge.",
-"chinese":"如果您正在寻找带有头骨的瓶子，请去别处寻找。我经营的是知识。",
+"chinese":"你要找画着骷髅头的瓶子，就去别处。我经营的是知识。",
 "durationSeconds":6.05
 },
 {
 "stem":"023_RiggleMultiClick5_FX",
 "english":"Whatever you do with my training, just don't tell me about it. Allow me my delusions.",
-"chinese":"无论你对我的训练做什么，都不要告诉我。请允许我的妄想。",
+"chinese":"无论你怎么利用我的训练，别告诉我。让我保留点幻想。",
 "durationSeconds":7.05
 },
 {
@@ -24157,13 +24157,13 @@
 {
 "stem":"006_SandwichArtistPortraitClick_02",
 "english":"They didn't appreciate my attempts to educate the customers!",
-"chinese":"他们不欣赏我教育客户的努力！",
+"chinese":"他们不欣赏我教育顾客的努力！",
 "durationSeconds":3.97
 },
 {
 "stem":"007_SandwichArtistVictory_01",
 "english":"If you think that was painful, try crafting food art for cretins!",
-"chinese":"如果您认为这很痛苦，请尝试为白痴制作食物艺术！",
+"chinese":"如果你觉得刚才疼，试试给蠢货做食物艺术吧！",
 "durationSeconds":4.83
 },
 {
@@ -24241,7 +24241,7 @@
 {
 "stem":"022_SandwichArtistVictory_03",
 "english":"The sandwich belongs to the artist, not the eater!",
-"chinese":"三明治属于艺术家，而不是吃者！",
+"chinese":"三明治属于艺术家，而不是食客！",
 "durationSeconds":4.38
 },
 {
@@ -24349,7 +24349,7 @@
 {
 "stem":"020_ScoutTrooperPortraitClick3",
 "english":"Boss Harrow, don't vex the big man ting.",
-"chinese":"哈洛老大，可别惹大人物那一套。",
+"chinese":"哈洛老大，可别惹这位大人物。",
 "durationSeconds":3.03
 },
 {
@@ -24374,7 +24374,7 @@
 "stem":"002_ScovylePortraitClick4",
 "english":"Have you tried brimstone peppers? Try one!",
 "chinese":"你尝过硫磺辣椒吗？尝一个吧！",
-"durationSeconds":3.82
+"durationSeconds":3.83
 },
 {
 "stem":"003_ScovyleDefeat3",
@@ -24476,7 +24476,7 @@
 "stem":"022_ScovyleVictory3",
 "english":"Wait! Come back! I just wanted to cook for you!",
 "chinese":"等等！回来！我只是想给你做饭！",
-"durationSeconds":4.16
+"durationSeconds":4.17
 },
 {
 "stem":"023_ScovyleEnterFight2",
@@ -24973,13 +24973,13 @@
 {
 "stem":"010_SilviaMultiClick5",
 "english":"Now I'm just an old lady sipping Pelago Punch on the beach, and I've never been happier.",
-"chinese":"如今我只是个在海滩上啜饮佩拉戈潘趣酒的老太太，而我从没这么开心过。",
+"chinese":"如今我只是个在海滩上啜饮佩拉戈潘趣酒的老太太，却从没这么开心过。",
 "durationSeconds":7.78
 },
 {
 "stem":"011_SilviaFreeExit4",
 "english":"Then if you don't mind, I'll get back to my Pelago Punch.",
-"chinese":"那你不介意的话，我要继续喝我的佩拉戈潘趣了。",
+"chinese":"那你不介意的话，我要继续喝我的佩拉戈潘趣酒了。",
 "durationSeconds":4.04
 },
 {
@@ -25123,19 +25123,19 @@
 {
 "stem":"010_SlohmorEnter1_FX",
 "english":"At last, you have come to the long time.",
-"chinese":"终于，你来到了漫长时光。",
+"chinese":"终于，你来到了这漫长的时光。",
 "durationSeconds":7.25
 },
 {
 "stem":"011_SlohmorEnter5_FX",
 "english":"I will teach you to swim this river of time.",
-"chinese":"我会教你在这条时间之河中游泳。",
+"chinese":"我会教你在这条时间之河中遨游。",
 "durationSeconds":8.51
 },
 {
 "stem":"012_SlohmorExitNoSkill2_FX",
 "english":"If others learn what you do not, I will see you in the long time.",
-"chinese":"若别人学会了你未学会的，我会在漫长时光里见到你。",
+"chinese":"若别人学会了你未学会的，我会在漫长时光里来见你。",
 "durationSeconds":9.81
 },
 {
@@ -25213,7 +25213,7 @@
 {
 "stem":"025_SlohmorMultiClick3_FX",
 "english":"This shop. My home for this era. I will stay. I will teach.",
-"chinese":"这间店。此纪元我的家。我会留下。我会教导。",
+"chinese":"这间店。我在这个纪元的家。我会留下。我会教导。",
 "durationSeconds":11.81
 },
 {
@@ -25321,13 +25321,13 @@
 {
 "stem":"020_SommelierPortraitClick5",
 "english":"They call me a snob. But when you experience such beauty, how can you allow others to miss it?",
-"chinese":"他们说我势利。可当你体验过这样的美，怎能容许别人错过？",
+"chinese":"他们说我自诩识货。可当你体验过这样的美，怎能容许别人错过？",
 "durationSeconds":7.67
 },
 {
 "stem":"021_SommelierVictory4",
 "english":"You taste grapes. I taste cloves, pipe smoke, and leather!",
-"chinese":"你只尝到葡萄。我尝到丁香、烟斗烟气和皮革！",
+"chinese":"你只尝到葡萄。我尝到丁香、烟草和皮革的香气！",
 "durationSeconds":7.13
 },
 {
@@ -25615,7 +25615,7 @@
 {
 "stem":"011_StelleMultiClick04",
 "english":"They were selling my work to Cloudtops, Enexians, all kinds of militant scum. I had to leave.",
-"chinese":"他们把我的成果卖给云顶人、恩尼克斯人，还有各种军阀败类。我只能离开。",
+"chinese":"他们把我的成果卖给云顶人、埃克西昂，还有各种军阀混账。我只能离开。",
 "durationSeconds":7.54
 },
 {
@@ -25909,7 +25909,7 @@
 {
 "stem":"006_StewVictory5",
 "english":"Salt, garlic powder, ahh, rat poison!",
-"chinese":"盐、蒜粉，啊，还有鼠药！",
+"chinese":"盐、蒜粉，啊，还有老鼠药！",
 "durationSeconds":4.34
 },
 {
@@ -26011,7 +26011,7 @@
 {
 "stem":"003_StreetGamerPortraitClick5",
 "english":"It's all in the wrist, or something.",
-"chinese":"全靠手腕，差不多吧。",
+"chinese":"全是手法，差不多吧。",
 "durationSeconds":2.46
 },
 {
@@ -26353,7 +26353,7 @@
 {
 "stem":"021_SurlyPortraitClick3",
 "english":"So you haul that wreck in here and want ol' Surly to turn scrap into gold.",
-"chinese":"所以你把那堆破烂拖进来，想让老萨利把废铁变成金子。",
+"chinese":"所以你把那堆破烂拖进来，想让老暴躁把废铁变成金子。",
 "durationSeconds":4.93
 },
 {
@@ -27061,7 +27061,7 @@
 {
 "stem":"023_TinkerIdle1",
 "english":"Whenever you don't say anything, I know you're thinking something wise.",
-"chinese":"每当您什么都不说，我就知道您在思考睿智的事。",
+"chinese":"每次你沉默，我就知道你在想很有智慧的事。",
 "durationSeconds":4.22
 },
 {
@@ -27103,7 +27103,7 @@
 {
 "stem":"003_ToksFreeExit1_FX",
 "english":"Ha! Do I move too fast for you? Go chat with Slohmor!",
-"chinese":"哈！我对你来说太快了吗？去找斯洛摩聊天吧！",
+"chinese":"哈！我对你来说太快了吗？去找斯洛摩尔聊天吧！",
 "durationSeconds":3.08
 },
 {
@@ -27518,7 +27518,7 @@
 "stem":"005_TuskariMultiClick1",
 "english":"You are always a good student, Pygmalien. Sometimes too good.",
 "chinese":"你一直是个好学生，皮格马利翁。有时甚至好过头了。",
-"durationSeconds":4.44
+"durationSeconds":4.45
 },
 {
 "stem":"006_TuskariChooseSkillandExit4",
@@ -27793,7 +27793,7 @@
 {
 "stem":"026_UncleOdiMultiClick2",
 "english":"My turboprop got resold so many times, it ended up in the Infernal's dreadnoughts.",
-"chinese":"我的涡桨被转卖了太多次，最后装进了地狱大魔神的无畏舰。",
+"chinese":"我的涡桨被转卖了太多次，最后装进了炼狱之主的无畏舰。",
 "durationSeconds":6.66
 },
 {
@@ -28141,7 +28141,7 @@
 {
 "stem":"028_VanessaMultiClick1",
 "english":"Pelago was a world of freedom. We forged our own destinies on open seas.",
-"chinese":"波拉戈曾是自由的世界。我们在公海上锻造自己的命运。",
+"chinese":"佩拉戈曾是自由的世界。我们在公海上锻造自己的命运。",
 "durationSeconds":5.83
 },
 {
@@ -28334,7 +28334,7 @@
 "stem":"012_VermirChooseSkillandExit4_FX",
 "english":"Life force flows in rivers, and now you know how to dam them.",
 "chinese":"生命力如河流般奔涌，而现在你知道如何筑坝截流了。",
-"durationSeconds":4.84
+"durationSeconds":4.85
 },
 {
 "stem":"013_VermirChooseSkillandExit1_FX",
@@ -28358,7 +28358,7 @@
 "stem":"016_VermirExitNoSkill4_FX",
 "english":"Watch your back, especially the T12 vertebra.",
 "chinese":"小心你的背，尤其是第十二胸椎。",
-"durationSeconds":3.64
+"durationSeconds":3.65
 },
 {
 "stem":"017_VermirMultiClick4_FX",
@@ -28400,7 +28400,7 @@
 "stem":"023_VermirExitNoSkill2_FX",
 "english":"If you do not seek the way of the needle, it will seek you.",
 "chinese":"若你不寻求针之道，针之道便会来寻你。",
-"durationSeconds":4.14
+"durationSeconds":4.15
 },
 {
 "stem":"024_VermirExitNoSkill1_FX",
@@ -28453,7 +28453,7 @@
 {
 "stem":"010_Vessel_Victory_01",
 "english":"Return to your bazaar and continue your lives. My designers enjoy them.",
-"chinese":"回到你们的大巴扎，继续你们的生活。我的设计者喜欢这些生活。",
+"chinese":"回到你们的大巴扎，继续你们的生活。我的设计者们喜欢这些。",
 "durationSeconds":6.47
 },
 {
@@ -28537,7 +28537,7 @@
 {
 "stem":"001_VoidKnightEnterFight1",
 "english":"Our columns were insufficient. Now we are here.",
-"chinese":"我们的柱列不够。于是我们来到了这里。",
+"chinese":"方阵已然残缺，故我们降临此间。",
 "durationSeconds":6.17
 },
 {
@@ -28561,7 +28561,7 @@
 {
 "stem":"006_VoidKnightEnterFight3",
 "english":"Destroy a kingdom here. Create one in the void.",
-"chinese":"在此毁灭一个王国。在虚空中创造一个王国。",
+"chinese":"在此处毁灭一个王国。在虚空中创造一个王国。",
 "durationSeconds":5.75
 },
 {
@@ -28579,7 +28579,7 @@
 {
 "stem":"009_VoidKnightPortraitClick3",
 "english":"A silhouette against shadows, blacker still.",
-"chinese":"阴影中的剪影，比黑暗更黑。",
+"chinese":"一道映于暗影的剪影，比暗影更为深邃。",
 "durationSeconds":4.1
 },
 {
@@ -28615,7 +28615,7 @@
 {
 "stem":"015_VoidKnightPortraitClick5",
 "english":"We behold the void's beauty. We feel nothing and rejoice.",
-"chinese":"我们凝望虚空的美。我们毫无感觉，并为此欢欣。",
+"chinese":"我们凝视虚空之美。无感，而欣悦。",
 "durationSeconds":9.05
 },
 {
@@ -28639,13 +28639,13 @@
 {
 "stem":"020_VoidKnightDefeat4",
 "english":"We will return to the void, then we will return to you.",
-"chinese":"我们终将归于虚空，而我们终将归于你。",
+"chinese":"我们将归于虚空。而后重返于你。",
 "durationSeconds":6.75
 },
 {
 "stem":"021_VoidKnightVictory1",
 "english":"Your passion is shameful. Be and feel nothing.",
-"chinese":"你的热情令人羞耻。存在吧，然后什么也别感受。",
+"chinese":"你的执念可耻。无我，无感。",
 "durationSeconds":6.93
 },
 {
@@ -28675,7 +28675,7 @@
 {
 "stem":"004_VolkasEnforcerVictory1",
 "english":"Target down. Objective complete.",
-"chinese":"目标倒下。任务完成。",
+"chinese":"目标已制服。任务完成。",
 "durationSeconds":2.98
 },
 {
@@ -28717,7 +28717,7 @@
 {
 "stem":"012_VolkasEnforcerDefeat3",
 "english":"Disregard intel. Target threat level 8.",
-"chinese":"忽略情报。目标威胁等级八。",
+"chinese":"原情报作废。目标威胁等级上调至八级。",
 "durationSeconds":4.71
 },
 {
@@ -28837,7 +28837,7 @@
 {
 "stem":"011_WildmanDefeat2",
 "english":"They sent you, the user.",
-"chinese":"他们派你来了，那个使用者。",
+"chinese":"他们派你来了，用户。",
 "durationSeconds":5.64
 },
 {
@@ -29077,7 +29077,7 @@
 {
 "stem":"005_YerdanVictory4",
 "english":"Thanks for the game, man. That was pretty close.",
-"chinese":"谢了，兄弟。这局挺接近的。",
+"chinese":"多谢指教，哥们儿。那一局还挺接近的。",
 "durationSeconds":2.11
 },
 {
@@ -29113,7 +29113,7 @@
 {
 "stem":"011_YerdanVictory2",
 "english":"When I first started, I lost all my Piggles games too.",
-"chinese":"我刚开始时，也输光过所有小圆猪局。",
+"chinese":"我刚开始玩的时候，小圆猪也是把把都输。",
 "durationSeconds":3.06
 },
 {
@@ -29161,7 +29161,7 @@
 {
 "stem":"019_YerdanEnterFight3",
 "english":"Gentlemen, the game is Higgles.",
-"chinese":"先生们，这局玩的是圆猪变体。",
+"chinese":"先生们，这局玩的是圆猪新玩法。",
 "durationSeconds":3.26
 },
 {
@@ -29179,7 +29179,7 @@
 {
 "stem":"001_ZaneMultiClick5",
 "english":"If those tides ever turn, the Black Shark will sail for Pelago, I give you my word.",
-"chinese":"若有一天潮向逆转，黑鲨号会驶向波拉戈，我向你保证。",
+"chinese":"若有一天潮向逆转，黑鲨号会驶向佩拉戈，我向你保证。",
 "durationSeconds":6.78
 },
 {
@@ -29191,8 +29191,8 @@
 {
 "stem":"003_ZaneIde3",
 "english":"I see the accusation. Well you can stuff it right back in your keg.",
-"chinese":"我看得出你眼里的指责。行吧，把它塞回你的酒桶里去。",
-"durationSeconds":4.54
+"chinese":"我看得出你眼里的指责。省省吧，这些话你自己留着听吧。",
+"durationSeconds":4.55
 },
 {
 "stem":"004_ZaneChooseSkillandExit3",
@@ -29240,7 +29240,7 @@
 "stem":"011_ZaneExitNoSkill2",
 "english":"All that bluster and she just leaves.",
 "chinese":"满嘴虚张声势，结果她就这么走了。",
-"durationSeconds":2.64
+"durationSeconds":2.65
 },
 {
 "stem":"012_ZaneChooseSkillandExit1",
@@ -29293,8 +29293,8 @@
 {
 "stem":"020_ZaneEnter3",
 "english":"I told you. I'm done with Pelago. The Bazaar is the only sea I sail.",
-"chinese":"我告诉过你。我和波拉戈早就分道扬镳。大巴扎是我如今唯一航行的海。",
-"durationSeconds":5.24
+"chinese":"我告诉过你。我和佩拉戈早就分道扬镳。大巴扎是我如今唯一航行的海。",
+"durationSeconds":5.25
 },
 {
 "stem":"021_ZaneIde5",
@@ -29305,19 +29305,19 @@
 {
 "stem":"022_ZaneEnter4",
 "english":"The tyrant can keep the ten seas, and may his bones sink to the bottom.",
-"chinese":"暴君可以留着十海，愿他的骨头沉到海底。",
+"chinese":"暴君可以享有十海，愿他的骨头沉到海底。",
 "durationSeconds":5.61
 },
 {
 "stem":"023_ZaneExitNoSkill3",
 "english":"Hmph. Guess I'm not the only one with a sense to walk away.",
-"chinese":"哼。看来有脑子走开的人不止我一个。",
+"chinese":"哼。看来有脑子离开的人不止我一个。",
 "durationSeconds":4.57
 },
 {
 "stem":"024_ZaneMultiClick3",
 "english":"If a man pokes a bear, is he brave or a fool? There is no winning that war.",
-"chinese":"一个人去捅熊，他是勇敢还是愚蠢？那场战争赢不了。",
+"chinese":"一个人去捅熊，他是勇敢还是愚蠢？这是必输的战争。",
 "durationSeconds":4.77
 },
 {
@@ -29365,7 +29365,7 @@
 {
 "stem":"007_ZaraMultiClick3",
 "english":"If you're reading the right book when that happens, well, some strange magic kicks in.",
-"chinese":"如果那时你读的是对的书，那么，某种奇怪的魔法就会启动。",
+"chinese":"如果那时你读对了书，那么，某种奇怪的魔法就会启动。",
 "durationSeconds":5.99
 },
 {
@@ -29659,7 +29659,7 @@
 {
 "stem":"011_ZosimaMultiClick3",
 "english":"I've seen so many lives crumble, so many destinies wasted. I wish better for you.",
-"chinese":"我见过太多生命崩塌，太多命运被浪费。我希望你有更好的结局。",
+"chinese":"我见过太多生命死去，太多命运被浪费。我希望你有更好的结局。",
 "durationSeconds":8.7
 },
 {
@@ -29677,7 +29677,7 @@
 {
 "stem":"014_ZosimaExitNoSkill5",
 "english":"I know your goal is noble, but you must make time to be human.",
-"chinese":"我知道你的目标很高尚，但你必须留出时间做人。",
+"chinese":"我知道你的目标很高尚，但你必须留出做普通人的时间。",
 "durationSeconds":5.21
 },
 {
@@ -29827,7 +29827,7 @@
 {
 "stem":"014_ZurphinSafariChoiceA8",
 "english":"This one might teach you the Get Eaten technique. Hahahaha!",
-"chinese":"这一只也许能教你“被吃掉”技巧。哈哈哈哈！",
+"chinese":"这一只也许能教你“被吃掉”的技巧。哈哈哈哈！",
 "durationSeconds":4.95
 },
 {
@@ -29845,7 +29845,7 @@
 {
 "stem":"017_ZurphinSafariIdle1",
 "english":"When the Outlands shift, do the animals shift too? Are they as confused as us?",
-"chinese":"当荒原位移时，动物也会跟着变化吗？它们也和我们一样困惑吗？",
+"chinese":"当荒原位移时，动物也会跟着移动吗？它们也和我们一样困惑吗？",
 "durationSeconds":7.33
 },
 {
@@ -29929,7 +29929,7 @@
 {
 "stem":"012_PrivatePitchforkMultiClick5",
 "english":"My real name's Darla Jean, by the way. Don't know why they call me Pitchfork. But I like it!",
-"chinese":"顺便说一句，我真名叫达拉·吉恩。不知道他们为什么叫我草叉，但我喜欢！",
+"chinese":"顺便说一句，我真名叫黛拉·简。不知道他们为什么叫我草叉，但我喜欢！",
 "durationSeconds":6.68
 },
 {
@@ -29941,7 +29941,7 @@
 {
 "stem":"014_PrivatePitchforkReroll1",
 "english":"Sure, I got lots of other junk. I mean equipment.",
-"chinese":"当然，我还有一堆别的破烂。我的意思是装备。",
+"chinese":"当然，我还有一堆别的破烂。我是说，装备。",
 "durationSeconds":3.73
 },
 {
@@ -29976,14 +29976,14 @@
 },
 {
 "stem":"020_PrivatePitchforkEnter3",
-"english":"The Defense Corps was hibernating a while, but those Anaxians poked the bear!",
-"chinese":"防卫军本来蛰伏了一阵子，可那些统合自治领的人偏要惹我们！",
+"english":"The Defense Corps was hibernating a while, but those Annexians poked the bear!",
+"chinese":"防卫军本来蛰伏了一阵子，可那些统合自治领人偏要把我们戳醒！",
 "durationSeconds":6.31
 },
 {
 "stem":"021_PrivatePitchforkReroll2",
 "english":"Let me go check in the dumpster. I mean the supply reserves.",
-"chinese":"我去垃圾箱里找找。我的意思是，去补给储备里找找。",
+"chinese":"我去垃圾箱里找找。我是说，去补给储备里找找。",
 "durationSeconds":4.35
 },
 {
@@ -30024,7 +30024,7 @@
 },
 {
 "stem":"028_PrivatePitchforkBuyExit7",
-"english":"The Anaxians, the Saurians, the Void... We gotta stay sharp!",
+"english":"The Annexians, the Saurians, the Void... We gotta stay sharp!",
 "chinese":"统合自治领人、索里安人、虚空……我们得保持警惕！",
 "durationSeconds":7.07
 },
