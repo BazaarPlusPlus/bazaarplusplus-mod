@@ -18,7 +18,8 @@ public static class ItemEnchantPreviewFormatting
     private const int EffectSizePercent = 55;
     private const string PreviewLineHeight = "<line-height=2.1em>";
     private const string PreviewLineHeightEnd = "</line-height>";
-    private const string EntryBreak = "<size=55%><line-height=2.1em>\n</line-height></size>";
+    private static readonly string EntryBreak =
+        $"<size={EffectSizePercent}%>{PreviewLineHeight}\n{PreviewLineHeightEnd}</size>";
 
     private static readonly Regex SizeTagRegex = new Regex(
         "<size=(\\d+)%>",

@@ -74,7 +74,7 @@ public sealed class LoggingGovernanceTests
             ["Game/EventPreview/EventPreviewPlanController.cs"] =
                 "64:Warn,110:Info,147:Error,154:Info,165:Error",
             ["Game/Input/BppHotkeyService.cs"] = "85:Warn,97:Warn,304:Info",
-            ["Game/ItemEnchantPreview/ItemEnchantPreviewFormatting.cs"] = "93:Debug",
+            ["Game/ItemEnchantPreview/ItemEnchantPreviewFormatting.cs"] = "94:Debug",
             ["Game/ItemEnchantPreview/Preview/ItemEnchantPreviewRenderer.cs"] =
                 "72:Debug,91:Debug,158:Debug",
             ["Game/Lobby/MainMenuVersionCheckController.cs"] =
