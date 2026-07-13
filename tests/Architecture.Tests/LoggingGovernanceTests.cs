@@ -32,6 +32,16 @@ public sealed class LoggingGovernanceTests
         RegexOptions.CultureInvariant
     );
 
+    private static readonly Regex LegacyBppLogFacadeMember = new(
+        @"\bstatic\s+(?:string|void)\s+(?:Format|FormatError|Debug|Info|Warn|Error)\s*\(",
+        RegexOptions.CultureInvariant
+    );
+
+    private static readonly Regex BppLogShimClass = new(
+        @"\bstatic\s+class\s+BppLog\b",
+        RegexOptions.CultureInvariant
+    );
+
     private static readonly Regex LogShapedCall = new(
         @"\.(?<member>Log|LogDebug|LogInfo|LogWarning|LogError|LogFatal|LogMessage)\s*\(",
         RegexOptions.CultureInvariant
@@ -61,54 +71,83 @@ public sealed class LoggingGovernanceTests
         RegexOptions.Singleline | RegexOptions.CultureInvariant
     );
 
-    // Transitional expand-contract ratchets. Values are exact line+member fingerprints so a
-    // one-for-one replacement cannot hide behind an unchanged per-file count. Each migration
-    // removes its converted entries; #60 leaves every map empty.
-    private static readonly IReadOnlyDictionary<string, string> ExpectedLegacyCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
-    private static readonly IReadOnlyDictionary<string, string> ExpectedVoiceSubtitlesMembers =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
-    private static readonly IReadOnlyDictionary<string, string> ExpectedAgentLoggerCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
-    private static readonly IReadOnlyDictionary<string, string> ExpectedHostAgentLoggerCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
-    private static readonly IReadOnlyDictionary<string, string> ExpectedStorageLoggerCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
     private static readonly HashSet<string> ApprovedBepInExAdapters = new(StringComparer.Ordinal)
     {
         "BazaarPlusPlus/Infrastructure/BppLog.cs",
         "BazaarPlusPlus.BazaarAgentHost/BazaarAgentBepInExLogger.cs",
     };
 
-    private static readonly IReadOnlyDictionary<string, string> ExpectedNonAdapterLogShapedCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
     [Fact]
-    public void Legacy_free_text_BppLog_calls_match_the_shrinking_allowlist()
+    public void Legacy_free_text_BppLog_calls_are_absent()
     {
         var root = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus");
-        AssertFingerprintsEqual(
-            ExpectedLegacyCalls,
+        AssertNoFingerprints(
             FingerprintMatches(root, LegacyBppLogCall, relativeTo: root),
-            "Legacy BppLog calls changed. Migrations must shrink ExpectedLegacyCalls in the same "
-                + "commit; new free-text calls are prohibited."
+            "Legacy BppLog free-text calls are prohibited."
         );
     }
 
     [Fact]
-    public void VoiceSubtitles_wrapper_surface_matches_the_shrinking_allowlist()
+    public void Legacy_facade_suppressor_and_exe_runner_BppLog_shims_are_absent()
+    {
+        var repoRoot = RepoRoot();
+        var infrastructureRoot = Path.Combine(repoRoot, "src", "BazaarPlusPlus", "Infrastructure");
+        var facade = File.ReadAllText(Path.Combine(infrastructureRoot, "BppLog.cs"));
+
+        Assert.False(File.Exists(Path.Combine(infrastructureRoot, "LogRepeatSuppressor.cs")));
+        Assert.DoesNotContain("LogRepeatSuppressor", facade, StringComparison.Ordinal);
+        Assert.DoesNotContain("Suppressor", facade, StringComparison.Ordinal);
+        Assert.DoesNotMatch(LegacyBppLogFacadeMember, facade);
+        Assert.DoesNotContain("private static void Emit(", facade, StringComparison.Ordinal);
+
+        var violations = Directory
+            .EnumerateFiles(
+                Path.Combine(repoRoot, "tests"),
+                "*.csproj",
+                SearchOption.AllDirectories
+            )
+            .Where(project =>
+                !File.ReadAllText(project)
+                    .Contains("Microsoft.NET.Test.Sdk", StringComparison.Ordinal)
+            )
+            .SelectMany(project => ProductionFiles(Path.GetDirectoryName(project)!))
+            .Where(file => BppLogShimClass.IsMatch(File.ReadAllText(file)))
+            .Select(file => Path.GetRelativePath(repoRoot, file).Replace('\\', '/'))
+            .ToArray();
+
+        Assert.True(
+            violations.Length == 0,
+            "Exe-runner projects must consume production structured logging seams instead of "
+                + "declaring BppLog compatibility shims:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
+    [Theory]
+    [InlineData("public static void Info(string component, string message)")]
+    [InlineData("internal static void Warn(string component, string message)")]
+    [InlineData("private static string Format(string component, string message)")]
+    public void Legacy_facade_ratchet_is_independent_of_access_modifier(string source)
+    {
+        Assert.Matches(LegacyBppLogFacadeMember, source);
+    }
+
+    [Theory]
+    [InlineData("public static class BppLog")]
+    [InlineData("internal static class BppLog")]
+    [InlineData("static class BppLog")]
+    public void Exe_runner_shim_ratchet_is_independent_of_access_modifier(string source)
+    {
+        Assert.Matches(BppLogShimClass, source);
+    }
+
+    [Fact]
+    public void VoiceSubtitles_wrapper_surface_is_absent()
     {
         var root = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus");
-        AssertFingerprintsEqual(
-            ExpectedVoiceSubtitlesMembers,
+        AssertNoFingerprints(
             FingerprintMatches(root, LegacyVoiceSubtitlesMember, relativeTo: root),
-            "The legacy VoiceSubtitles wrappers and helper members are frozen until #56 removes "
-                + "them. New uses are prohibited."
+            "Legacy VoiceSubtitles wrappers and helper members are prohibited."
         );
     }
 
@@ -187,26 +226,23 @@ public sealed class LoggingGovernanceTests
     }
 
     [Fact]
-    public void Agent_and_Storage_free_text_ports_match_the_shrinking_allowlists()
+    public void Agent_and_Storage_free_text_ports_are_absent()
     {
         var agentRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.BazaarAgent");
         var hostRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.BazaarAgentHost");
         var storageRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.Storage");
 
-        AssertFingerprintsEqual(
-            ExpectedAgentLoggerCalls,
+        AssertNoFingerprints(
             FingerprintMatches(agentRoot, LegacyAgentLoggerCall, relativeTo: agentRoot),
-            "The BazaarAgent free-text logger surface is frozen until #54 replaces it."
+            "The BazaarAgent free-text logger surface is prohibited."
         );
-        AssertFingerprintsEqual(
-            ExpectedHostAgentLoggerCalls,
+        AssertNoFingerprints(
             FingerprintMatches(hostRoot, LegacyHostAgentLoggerCall, relativeTo: hostRoot),
-            "The BazaarAgent Host free-text logger surface was removed by #54 and must stay empty."
+            "The BazaarAgent Host free-text logger surface is prohibited."
         );
-        AssertFingerprintsEqual(
-            ExpectedStorageLoggerCalls,
+        AssertNoFingerprints(
             FingerprintMatches(storageRoot, LegacyStorageLoggerCall, relativeTo: storageRoot),
-            "The Storage free-text logger surface is frozen until #53 replaces it."
+            "The Storage free-text logger surface is prohibited."
         );
     }
 
@@ -260,7 +296,7 @@ public sealed class LoggingGovernanceTests
     }
 
     [Fact]
-    public void Log_shaped_calls_exist_only_in_approved_adapters_or_the_exact_legacy_allowlist()
+    public void Log_shaped_calls_exist_only_in_approved_adapters()
     {
         var sourceRoot = Path.Combine(RepoRoot(), "src");
         var actual = FingerprintMatches(
@@ -270,12 +306,10 @@ public sealed class LoggingGovernanceTests
             excluded: ApprovedBepInExAdapters
         );
 
-        AssertFingerprintsEqual(
-            ExpectedNonAdapterLogShapedCalls,
+        AssertNoFingerprints(
             actual,
-            "Direct BepInEx writes are restricted to approved adapters. The broad .Log scan also "
-                + "pins known non-BepInEx calls so generic ManualLogSource receiver names cannot "
-                + "escape the boundary."
+            "Direct BepInEx writes are restricted to approved adapters; generic log-shaped calls "
+                + "outside those adapters are prohibited."
         );
     }
 
@@ -500,30 +534,17 @@ public sealed class LoggingGovernanceTests
         return line;
     }
 
-    private static void AssertFingerprintsEqual(
-        IReadOnlyDictionary<string, string> expected,
+    private static void AssertNoFingerprints(
         IReadOnlyDictionary<string, string> actual,
         string message
     )
     {
-        var differences = expected
-            .Keys.Union(actual.Keys, StringComparer.Ordinal)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .Where(path =>
-                !expected.TryGetValue(path, out var expectedValue)
-                || !actual.TryGetValue(path, out var actualValue)
-                || !string.Equals(expectedValue, actualValue, StringComparison.Ordinal)
-            )
-            .Select(path =>
-                path
-                + ": expected="
-                + (expected.TryGetValue(path, out var expectedValue) ? expectedValue : "<absent>")
-                + " actual="
-                + (actual.TryGetValue(path, out var actualValue) ? actualValue : "<absent>")
-            )
+        var violations = actual
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => pair.Key + ":" + pair.Value)
             .ToArray();
 
-        Assert.True(differences.Length == 0, message + "\n" + string.Join("\n", differences));
+        Assert.True(violations.Length == 0, message + "\n" + string.Join("\n", violations));
     }
 
     private static string RepoRoot([CallerFilePath] string thisFile = "")

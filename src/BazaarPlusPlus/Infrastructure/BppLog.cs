@@ -12,14 +12,8 @@ namespace BazaarPlusPlus.Infrastructure;
 
 internal static class BppLog
 {
-    private const string Prefix = "[BPP]";
-
     private static ManualLogSource? _logger;
     private static readonly BppLogEmitter StructuredEmitter = new();
-    private static readonly LogRepeatSuppressor Suppressor = new LogRepeatSuppressor(
-        writeSink: WriteToLogger,
-        formatSummary: (text, _) => Format("Logger", text)
-    );
 
     public static void Install(ManualLogSource logger)
     {
@@ -43,18 +37,6 @@ internal static class BppLog
         }
     }
 
-    public static string Format(string component, string message) =>
-        $"{Prefix}[{component}] {message}";
-
-    public static string FormatError(string component, string message, Exception ex) =>
-        $"{Format(component, message)}{Environment.NewLine}{SafeExceptionText(ex)}";
-
-    [Conditional("DEBUG")]
-    public static void Debug(string component, string message)
-    {
-        Emit(LogLevel.Debug, Format(component, message));
-    }
-
     [Conditional("DEBUG")]
     public static void DebugEvent(
         BppLogEventDefinition definition,
@@ -67,18 +49,6 @@ internal static class BppLog
         Exception exception,
         Func<BppLogFieldValue[]> valuesFactory
     ) => StructuredEmitter.Debug(definition, exception, valuesFactory);
-
-    public static void Info(string component, string message) =>
-        Emit(LogLevel.Info, Format(component, message));
-
-    public static void Warn(string component, string message) =>
-        Emit(LogLevel.Warning, Format(component, message));
-
-    public static void Error(string component, string message) =>
-        Emit(LogLevel.Error, Format(component, message));
-
-    public static void Error(string component, string message, Exception ex) =>
-        Emit(LogLevel.Error, FormatError(component, message, ex));
 
     public static void InfoEvent(
         BppLogEventDefinition definition,
@@ -115,49 +85,7 @@ internal static class BppLog
         params BppLogFieldValue[] values
     ) => StructuredEmitter.RecoverStorm(definition, values);
 
-    public static void Flush()
-    {
-        try
-        {
-            Suppressor.Flush();
-        }
-        catch
-        {
-            // The BepInEx listener may already be unavailable during shutdown.
-        }
-        StructuredEmitter.Flush();
-    }
-
-    private static void Emit(LogLevel level, string message)
-    {
-        try
-        {
-            if (Volatile.Read(ref _logger) == null)
-                return;
-            Suppressor.Write((int)level, message);
-        }
-        catch
-        {
-            // Legacy calls remain best effort during the expand phase.
-        }
-    }
-
-    private static void WriteToLogger(int level, string message)
-    {
-        var logger = Volatile.Read(ref _logger);
-        if (logger == null)
-            return;
-
-        try
-        {
-            var bepLevel = (LogLevel)level;
-            WriteToLoggerCore(logger, bepLevel, message);
-        }
-        catch
-        {
-            // Never recursively report a listener failure.
-        }
-    }
+    public static void Flush() => StructuredEmitter.Flush();
 
     private static void WriteStructuredToLogger(BppLogSeverity severity, string message)
     {
@@ -231,28 +159,6 @@ internal static class BppLog
         catch
         {
             return null;
-        }
-    }
-
-    private static string SafeExceptionText(Exception? exception)
-    {
-        if (exception == null)
-            return "<exception-unavailable>";
-
-        try
-        {
-            return exception.ToString();
-        }
-        catch
-        {
-            try
-            {
-                return exception.GetType().FullName ?? "<exception-unavailable>";
-            }
-            catch
-            {
-                return "<exception-unavailable>";
-            }
         }
     }
 }

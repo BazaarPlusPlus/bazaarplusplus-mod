@@ -1569,13 +1569,9 @@ public class CoreLayeringTests
         var install = awakeSource.IndexOf("BppLog.Install(", StringComparison.Ordinal);
         var firstEmission = new[]
         {
-            "BppLog.Debug(",
             "BppLog.DebugEvent(",
-            "BppLog.Info(",
             "BppLog.InfoEvent(",
-            "BppLog.Warn(",
             "BppLog.WarnEvent(",
-            "BppLog.Error(",
             "BppLog.ErrorEvent(",
         }
             .Select(token => awakeSource.IndexOf(token, StringComparison.Ordinal))
@@ -1620,30 +1616,23 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void BppLog_Debug_facade_keeps_compile_time_guards_and_lazy_fields()
+    public void BppLog_structured_Debug_facade_keeps_compile_time_guards_and_lazy_fields()
     {
         var source = File.ReadAllText(
             Path.Combine(MainSourceRoot(RepoRoot()), "Infrastructure", "BppLog.cs")
-        );
-        var legacySignature = source.IndexOf(
-            "public static void Debug(string component, string message)",
-            StringComparison.Ordinal
         );
         var structuredSignature = source.IndexOf(
             "public static void DebugEvent(\n        BppLogEventDefinition definition",
             StringComparison.Ordinal
         );
 
-        Assert.True(legacySignature >= 0 && structuredSignature >= 0);
-        Assert.Contains(
-            "[Conditional(\"DEBUG\")]",
-            source.Substring(Math.Max(0, legacySignature - 80), 80)
-        );
+        Assert.True(structuredSignature >= 0);
         Assert.Contains(
             "[Conditional(\"DEBUG\")]",
             source.Substring(Math.Max(0, structuredSignature - 80), 80)
         );
         Assert.Contains("Func<BppLogFieldValue[]> valuesFactory", source);
+        Assert.DoesNotContain("public static void Debug(string component", source);
     }
 
     [Fact]
