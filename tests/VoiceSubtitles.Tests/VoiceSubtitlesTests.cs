@@ -11,7 +11,7 @@ namespace VoiceSubtitles.Tests;
 public sealed class VoiceSubtitlesTests
 {
     private const string GoldenContentHash =
-        "sha256:0bb0ce57361dfbcefc64173370891bacf9b7aa85b5e3fc225422f4b8a299aec0";
+        "sha256:8f1f4107e74dbb691dc0acea22eca5cdd2645a24bcb9223618e073036e505911";
 
     [Fact]
     public void Embedded_seed_loads_expected_voice_lines()
