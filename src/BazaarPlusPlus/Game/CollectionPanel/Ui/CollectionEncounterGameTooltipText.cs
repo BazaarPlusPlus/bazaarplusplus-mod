@@ -60,7 +60,7 @@ internal static class CollectionEncounterGameTooltipText
             {
                 var flat = string.IsNullOrWhiteSpace(result)
                     ? choice.DisplayName
-                    : $"{choice.DisplayName}: {result}";
+                    : CollectionPanelText.JoinTooltipLabel(choice.DisplayName, result);
                 lines.Add(
                     new CollectionTooltipMarkup.Paragraph(
                         $"<color={IneligibleColor}>{flat}</color>",
@@ -74,7 +74,11 @@ internal static class CollectionEncounterGameTooltipText
                 new CollectionTooltipMarkup.Paragraph(
                     string.IsNullOrWhiteSpace(result)
                         ? $"<color={AccentColor}>{choice.DisplayName}</color>"
-                        : $"<color={AccentColor}>{choice.DisplayName}:</color> {Colorize(result)}"
+                        : CollectionPanelText.JoinColoredTooltipLabel(
+                            choice.DisplayName,
+                            Colorize(result),
+                            AccentColor
+                        )
                 )
             );
         }
@@ -175,7 +179,11 @@ internal static class CollectionEncounterGameTooltipText
                     string.IsNullOrWhiteSpace(result)
                         ? $"<color={AccentColor}>{entry.DisplayName}</color>"
                     : string.IsNullOrWhiteSpace(entry.DisplayName) ? colorize(result)
-                    : $"<color={AccentColor}>{entry.DisplayName}:</color> {colorize(result)}"
+                    : CollectionPanelText.JoinColoredTooltipLabel(
+                        entry.DisplayName,
+                        colorize(result),
+                        AccentColor
+                    )
                 )
             );
         }
@@ -198,7 +206,7 @@ internal static class CollectionEncounterGameTooltipText
             return detail.DisplayName;
         return string.IsNullOrWhiteSpace(detail.DisplayName)
             ? colorize(result)
-            : $"{detail.DisplayName}: {colorize(result)}";
+            : CollectionPanelText.JoinTooltipLabel(detail.DisplayName, colorize(result));
     }
 
     // Flattens embedded newlines (descriptions render as list entries) and appends
@@ -212,7 +220,9 @@ internal static class CollectionEncounterGameTooltipText
         if (string.IsNullOrWhiteSpace(result))
             return string.Empty;
 
-        result = CollapseWhitespace(result.Replace("\r", string.Empty).Replace('\n', ' '));
+        result = CollectionPanelText.NormalizeRewardSpacing(
+            CollapseWhitespace(result.Replace("\r", string.Empty).Replace('\n', ' '))
+        );
         var suffix = DayTierSuffix(choice, dayTierCeiling);
         if (suffix == null)
             return result;

@@ -15,7 +15,10 @@ public sealed class QuestRewardPreviewTextTests
             string.Empty
         );
 
-        Assert.Equal("Sell 20 Food\n<size=55%>This has +1 Multicast</size>", text);
+        Assert.Equal(
+            "Sell 20 Food\n<size=76%>This has +1 Multicast</size>",
+            text
+        );
     }
 
     [Fact]
@@ -28,7 +31,7 @@ public sealed class QuestRewardPreviewTextTests
         );
 
         Assert.Equal(
-            "Sell 10 Food\n<size=55%>This item's Cooldown is reduced by 2 seconds</size>",
+            "Sell 10 Food\n<size=76%>This item's Cooldown is reduced by 2 seconds</size>",
             text
         );
     }
@@ -43,7 +46,7 @@ public sealed class QuestRewardPreviewTextTests
         );
 
         Assert.Equal(
-            "Sell 8 Food\n<size=55%>This has +<size=66%>50%</size> Crit Chance</size>",
+            "Sell 8 Food\n<size=76%>This has +<size=91%>50%</size> Crit Chance</size>",
             text
         );
     }
@@ -58,7 +61,7 @@ public sealed class QuestRewardPreviewTextTests
         );
 
         Assert.Equal(
-            "Sell 8 Food\n<size=55%>This has +<size=66%>50%</size> Crit Chance</size>",
+            "Sell 8 Food\n<size=76%>This has +<size=91%>50%</size> Crit Chance</size>",
             text
         );
     }
@@ -68,12 +71,12 @@ public sealed class QuestRewardPreviewTextTests
     {
         var text = BppQuestRewardPreviewText.AppendRewardPreview(
             "Sell 8 Food",
-            "This has +<size=121%>50%</size> Crit Chance",
-            "This has +<size=122%>50%</size> Crit Chance"
+            "This has +<size=122%>50%</size> Crit Chance",
+            "This has +<size=123%>50%</size> Crit Chance"
         );
 
         Assert.Equal(
-            "Sell 8 Food\n<size=55%>This has +<size=67%>50%</size> Crit Chance</size>",
+            "Sell 8 Food\n<size=76%>This has +<size=93%>50%</size> Crit Chance</size>",
             text
         );
     }
@@ -88,5 +91,21 @@ public sealed class QuestRewardPreviewTextTests
         );
 
         Assert.Equal("Sell 10 Food", text);
+    }
+
+    [Theory]
+    [InlineData("Trigger <sprite name=Poison> Poison 30 times", "", true)]
+    [InlineData("Deal Burn", "<sprite index=4> 6 Burn", true)]
+    [InlineData("Sell 10 Food", "This has +1 Multicast", false)]
+    public void ContainsInlineSprite_recognizes_tmp_sprite_markup(
+        string questText,
+        string rewardText,
+        bool expected
+    )
+    {
+        Assert.Equal(
+            expected,
+            BppQuestRewardPreviewText.ContainsInlineSprite(questText, rewardText)
+        );
     }
 }

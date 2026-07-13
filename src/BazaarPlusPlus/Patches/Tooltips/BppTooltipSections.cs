@@ -12,7 +12,8 @@ namespace BazaarPlusPlus.Patches.Tooltips;
 // Manages BPP-owned text sections cloned into the pooled native tooltip. Each section
 // is a clone of the tooltip's passive-text block, keyed per controller + purpose,
 // inserted after a caller-supplied anchor sibling. Native typography is preserved
-// unless BPP-authored content contains CJK text, which uses the embedded TMP font.
+// unless the caller opts into the selected BPP UI font, or other BPP-authored CJK
+// content needs the embedded TMP font.
 internal static class BppTooltipSections
 {
     // Clearly below the native body size so appended blocks read as secondary info.
@@ -34,9 +35,11 @@ internal static class BppTooltipSections
         public bool MirrorSourceTopPaddingToBottom { get; init; }
         public float? SectionTopPaddingScale { get; init; }
         public float? SectionBottomPaddingScale { get; init; }
+        public float? NativeSectionBottomPaddingScale { get; init; }
         public float? SourceBottomPaddingScale { get; init; }
         public float? ParagraphSpacing { get; init; }
         public float FontScale { get; init; } = DefaultFontScale;
+        public bool UseUiFont { get; init; }
         public bool ShowNativeDivider { get; init; }
         public float DividerHorizontalInset { get; init; }
     }
@@ -64,7 +67,10 @@ internal static class BppTooltipSections
             return false;
 
         ApplySourcePadding(section, style);
-        BppTmpFont.TryApply(section.Text.textObject, content);
+        if (style?.UseUiFont == true)
+            BppTmpFont.TryApplyUiFont(section.Text.textObject, content);
+        else
+            BppTmpFont.TryApply(section.Text.textObject, content);
         section.Text.SetText(content);
         var siblingIndex = anchor.transform.GetSiblingIndex() + 1;
         if (section.Divider != null)
@@ -200,11 +206,16 @@ internal static class BppTooltipSections
         if (blockClone.GetComponent<UnityEngine.UI.LayoutGroup>() is { } layoutGroup)
         {
             var sourceTopPadding = layoutGroup.padding.top;
+            var nativeBottomPadding = layoutGroup.padding.bottom;
             if (style?.SectionTopPaddingScale is { } topScale)
                 layoutGroup.padding.top = Mathf.RoundToInt(sourceTopPadding * topScale);
             else if (style?.ClearTopPadding ?? true)
                 layoutGroup.padding.top = 0;
-            if (style?.SectionBottomPaddingScale is { } bottomScale)
+            if (style?.NativeSectionBottomPaddingScale is { } nativeBottomScale)
+                layoutGroup.padding.bottom = Mathf.RoundToInt(
+                    nativeBottomPadding * nativeBottomScale
+                );
+            else if (style?.SectionBottomPaddingScale is { } bottomScale)
                 layoutGroup.padding.bottom = Mathf.RoundToInt(sourceTopPadding * bottomScale);
             else if (style?.MirrorSourceTopPaddingToBottom == true)
                 layoutGroup.padding.bottom = sourceTopPadding;

@@ -1133,7 +1133,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Ui_font_selection_install_keeps_tmp_font_on_lxgw()
+    public void Ui_font_selection_install_supports_selected_font_for_opt_in_tmp_text()
     {
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
@@ -1156,7 +1156,8 @@ public class CoreLayeringTests
         Assert.Contains("services.Config.UiFontKindConfig?.Value", pluginSource);
         Assert.Contains("BppConfig.DefaultUiFontKind", pluginSource);
         Assert.Contains("BppUiFont.LxgwWenKai", tmpFontSource);
-        Assert.DoesNotContain("BppUiFont.Default", tmpFontSource);
+        Assert.Contains("public static bool TryApplyUiFont", tmpFontSource);
+        Assert.Contains("BppUiFont.Default", tmpFontSource);
     }
 
     [Fact]
@@ -1696,7 +1697,18 @@ public class CoreLayeringTests
         )
         {
             var source = File.ReadAllText(Path.Combine(tooltipPatches, patchName));
-            Assert.Contains("BppTooltipSections.MarkupControlledStyle", source);
+            Assert.Contains("UseUiFont = true", source);
+            Assert.Contains("ParagraphSpacing = 0f", source);
+
+            if (patchName == "EncounterEventTooltipPatch.cs")
+            {
+                Assert.Contains("SourceBottomPaddingScale = 0.6f", source);
+                Assert.Contains("NativeSectionBottomPaddingScale = 1.2f", source);
+            }
+            else
+            {
+                Assert.Contains("SectionTopPaddingScale = 1f", source);
+            }
         }
     }
 

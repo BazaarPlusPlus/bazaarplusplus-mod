@@ -28,6 +28,13 @@ namespace BazaarPlusPlus.Patches.Tooltips;
 internal static class EncounterEventTooltipPatch
 {
     private const string SectionKey = "encounter";
+    private static readonly BppTooltipSections.Style SectionStyle = new()
+    {
+        ParagraphSpacing = 0f,
+        SourceBottomPaddingScale = 0.6f,
+        NativeSectionBottomPaddingScale = 1.2f,
+        UseUiFont = true,
+    };
 
     [HarmonyPostfix]
     private static void Postfix(CardTooltipController __instance, string text)
@@ -53,7 +60,7 @@ internal static class EncounterEventTooltipPatch
                     SectionKey,
                     __instance.passiveEffectParent,
                     content!,
-                    BppTooltipSections.MarkupControlledStyle
+                    SectionStyle
                 )
             )
                 return;

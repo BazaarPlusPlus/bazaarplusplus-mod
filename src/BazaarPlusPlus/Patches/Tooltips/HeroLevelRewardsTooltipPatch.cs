@@ -24,6 +24,12 @@ namespace BazaarPlusPlus.Patches.Tooltips;
 internal static class HeroLevelRewardsTooltipPatch
 {
     internal const string SectionKey = "level-rewards";
+    private static readonly BppTooltipSections.Style SectionStyle = new()
+    {
+        ParagraphSpacing = 0f,
+        SectionTopPaddingScale = 1f,
+        UseUiFont = true,
+    };
 
     [HarmonyPostfix]
     private static void Postfix(
@@ -92,7 +98,7 @@ internal static class HeroLevelRewardsTooltipPatch
                 SectionKey,
                 anchor,
                 content,
-                BppTooltipSections.MarkupControlledStyle
+                SectionStyle
             );
             ReportObserved(
                 shown
