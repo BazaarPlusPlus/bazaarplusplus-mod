@@ -455,30 +455,93 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void SettingsDockOrder_is_unique_and_keeps_bilingual_names_after_quest_preview()
+    public void SettingsDockOrder_pins_complete_presented_sequence_and_toggle_pairings()
     {
-        var ordered = new[]
+        var configPath = Path.Combine(
+            Path.GetTempPath(),
+            $"bpp-settings-dock-order-{Guid.NewGuid():N}.cfg"
+        );
+        try
         {
-            ("NameOverride", BppSettingsDockOrder.NameOverride),
-            ("LegendaryPosition", BppSettingsDockOrder.LegendaryPosition),
-            ("EnchantPreview", BppSettingsDockOrder.EnchantPreview),
-            ("EventPreview", BppSettingsDockOrder.EventPreview),
-            ("QuestPreview", BppSettingsDockOrder.QuestPreview),
-            ("CombatStatusBar", BppSettingsDockOrder.CombatStatusBar),
-            ("BilingualItemNames", BppSettingsDockOrder.BilingualItemNames),
-            ("ChineseLocaleMode", BppSettingsDockOrder.ChineseLocaleMode),
-            ("FixedSupporterList", BppSettingsDockOrder.FixedSupporterList),
-            ("VoiceSubtitles", BppSettingsDockOrder.VoiceSubtitles),
-            ("VoiceSubtitlesPosition", BppSettingsDockOrder.VoiceSubtitlesPosition),
-            ("VoiceSubtitlesEnglishFontScale", BppSettingsDockOrder.VoiceSubtitlesEnglishFontScale),
-            ("VoiceSubtitlesChineseFontScale", BppSettingsDockOrder.VoiceSubtitlesChineseFontScale),
-            ("EndOfRunScreenshot", BppSettingsDockOrder.EndOfRunScreenshot),
-            ("GameHistory", BppSettingsDockOrder.GameHistory),
-            ("BazaarDbUpload", BppSettingsDockOrder.BazaarDbUpload),
-        };
+            var config = new BppConfig();
+            config.Initialize(new ConfigFile(configPath, saveOnInit: false));
+            var registry = new SettingsDockEntryRegistry();
+            registry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create());
+            registry.Register(FixedSupporterListSettingsDockEntry.Create());
+            VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
+            registry.Register(ChineseLocaleModeSettingsDockEntry.Create(new InMemoryBppEventBus()));
+            registry.Register(CombatStatusBarSettingsDockEntry.Create());
+            registry.Register(BilingualItemNamesSettingsDockEntry.Create());
+            registry.Register(new EndOfRunScreenshotSettingsDockEntry());
+            registry.Register(new HistoryPanelSettingsDockEntry());
+            registry.Register(ItemEnchantPreviewSettingsDockEntry.Create());
+            registry.Register(EventPreviewSettingsDockEntry.Create());
+            registry.Register(QuestPreviewSettingsDockEntry.Create(() => { }));
+            registry.Register(LegendaryPositionSettingsDockEntry.Create(() => { }));
+            registry.Register(NameOverrideSettingsDockEntry.Create(() => { }));
 
-        Assert.Equal(Enumerable.Range(0, ordered.Length), ordered.Select(item => item.Item2));
-        Assert.Contains(ordered, item => item.Item1 == "BilingualItemNames");
+            var presented = registry
+                .MaterializeWithOrder(config)
+                .OrderBy(entry => entry.Order)
+                .ToArray();
+
+            Assert.Equal(Enumerable.Range(0, 16), presented.Select(entry => entry.Order));
+            Assert.Equal(
+                new[]
+                {
+                    "NameOverride",
+                    "StreamMode",
+                    "CombatStatusBar",
+                    "BilingualItemNames",
+                    "EventPreview",
+                    "QuestPreview",
+                    "EndOfRunScreenshot",
+                    "BazaarDbUpload",
+                    "EnchantPreview",
+                    "LegendaryPositionDisplay",
+                    "ChineseLocaleMode",
+                    "VoiceSubtitles",
+                    "VoiceSubtitlesPosition",
+                    "VoiceSubtitlesEnglishFontScale",
+                    "VoiceSubtitlesChineseFontScale",
+                    "GameHistory",
+                },
+                presented.Select(entry => entry.Definition.Key)
+            );
+
+            var groups = BppNativeSettingsSectionController.PlanToggleRowGroups(
+                presented.Select(entry => entry.Definition.ControlKind).ToArray()
+            );
+            Assert.Equal(
+                new[]
+                {
+                    (Left: "NameOverride", Right: "StreamMode"),
+                    (Left: "CombatStatusBar", Right: "BilingualItemNames"),
+                    (Left: "EventPreview", Right: "QuestPreview"),
+                    (Left: "EndOfRunScreenshot", Right: "BazaarDbUpload"),
+                },
+                groups.Select(group =>
+                    (
+                        Left: presented[group.LeftIndex].Definition.Key,
+                        Right: presented[group.RightIndex!.Value].Definition.Key
+                    )
+                )
+            );
+            Assert.All(
+                presented.Take(8),
+                entry => Assert.Equal(BppSettingsControlKind.Toggle, entry.Definition.ControlKind)
+            );
+            Assert.All(
+                presented.Skip(8).Take(7),
+                entry => Assert.Equal(BppSettingsControlKind.Choice, entry.Definition.ControlKind)
+            );
+            Assert.Equal(BppSettingsControlKind.Action, presented[^1].Definition.ControlKind);
+        }
+        finally
+        {
+            if (File.Exists(configPath))
+                File.Delete(configPath);
+        }
     }
 
     [Fact]
@@ -1254,7 +1317,7 @@ public class SettingsDockRegistryTests
         };
 
     [Fact]
-    public void SettingsDockCatalog_sorts_stream_mode_after_chinese_locale()
+    public void SettingsDockCatalog_sorts_partial_registry_by_global_semantic_order()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
         var registry = new SettingsDockEntryRegistry();
@@ -1272,15 +1335,15 @@ public class SettingsDockRegistryTests
             Assert.Equal(
                 new[]
                 {
-                    "ChineseLocaleMode",
                     "StreamMode",
+                    "EndOfRunScreenshot",
+                    "BazaarDbUpload",
+                    "ChineseLocaleMode",
                     "VoiceSubtitles",
                     "VoiceSubtitlesPosition",
                     "VoiceSubtitlesEnglishFontScale",
                     "VoiceSubtitlesChineseFontScale",
-                    "EndOfRunScreenshot",
                     "GameHistory",
-                    "BazaarDbUpload",
                 },
                 BppSettingsDockCatalog.Definitions.Select(d => d.Key)
             );
