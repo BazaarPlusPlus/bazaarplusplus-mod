@@ -37,6 +37,9 @@ public enum BazaarAgentLogReasonCode
     ActionProcessingException,
     ReplaySinkException,
     ReplayProcessorException,
+    ReplayInvalidPayload,
+    ReplayRejected,
+    ReplayUnavailable,
     HttpHandlerException,
     HttpRequestBodyReadException,
     HttpErrorResponseWriteException,
@@ -724,7 +727,7 @@ public static class BazaarAgentLogEvents
         BazaarAgentReplayControlKind actionKind,
         string? battleId,
         BazaarAgentLogReasonCode reasonCode,
-        Exception exception
+        Exception? exception
     ) =>
         new(
             ReplayRequestFailedDefinition,

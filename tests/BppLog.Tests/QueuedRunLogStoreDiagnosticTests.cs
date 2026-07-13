@@ -38,6 +38,7 @@ public sealed class QueuedRunLogStoreDiagnosticTests
             {
                 entered.Set();
                 release.Wait(TimeSpan.FromSeconds(5));
+                throw new InvalidOperationException("write aborted after shutdown timeout");
             },
         };
         var store = new QueuedRunLogStore(inner, TimeSpan.FromMilliseconds(25), logger);
@@ -55,6 +56,7 @@ public sealed class QueuedRunLogStoreDiagnosticTests
 
         release.Set();
         await store.WorkerCompletion.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Single(logger.Diagnostics);
     }
 
     [Fact]
@@ -82,13 +84,27 @@ public sealed class QueuedRunLogStoreDiagnosticTests
 
     private sealed class CapturingRunLogStoreLogger : IRunLogStoreLogger
     {
+        private readonly List<RunLogStoreDiagnostic> _diagnostics = new();
         private readonly TaskCompletionSource<RunLogStoreDiagnostic> _next = new(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
 
         internal Task<RunLogStoreDiagnostic> Next => _next.Task;
+        internal IReadOnlyList<RunLogStoreDiagnostic> Diagnostics
+        {
+            get
+            {
+                lock (_diagnostics)
+                    return _diagnostics.ToArray();
+            }
+        }
 
-        public void Emit(RunLogStoreDiagnostic diagnostic) => _next.TrySetResult(diagnostic);
+        public void Emit(RunLogStoreDiagnostic diagnostic)
+        {
+            lock (_diagnostics)
+                _diagnostics.Add(diagnostic);
+            _next.TrySetResult(diagnostic);
+        }
     }
 
     private sealed class DelegatingRunLogStore : IRunLogStore

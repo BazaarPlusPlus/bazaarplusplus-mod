@@ -19,14 +19,20 @@ internal sealed class BazaarAgentBepInExLogger : IBazaarAgentLogger, IDisposable
     private readonly ManualLogSource _log;
     private readonly BazaarAgentLogRenderer _renderer = new();
     private readonly BazaarAgentLogStormGuard _stormGuard;
+    private readonly Action _flushSinks;
 
     public BazaarAgentBepInExLogger(ManualLogSource log)
         : this(log, clock: null) { }
 
-    internal BazaarAgentBepInExLogger(ManualLogSource log, Func<DateTimeOffset>? clock)
+    internal BazaarAgentBepInExLogger(
+        ManualLogSource log,
+        Func<DateTimeOffset>? clock,
+        Action? flushSinks = null
+    )
     {
         _log = log ?? throw new ArgumentNullException(nameof(log));
         _stormGuard = new BazaarAgentLogStormGuard(WriteSink, _renderer.Render, clock);
+        _flushSinks = flushSinks ?? FlushDiskLogListeners;
     }
 
     public void Emit(BazaarAgentLogEvent logEvent)
@@ -44,7 +50,41 @@ internal sealed class BazaarAgentBepInExLogger : IBazaarAgentLogger, IDisposable
         }
     }
 
-    public void Dispose() => _stormGuard.Flush();
+    public void Dispose()
+    {
+        try
+        {
+            _stormGuard.Flush();
+        }
+        finally
+        {
+            try
+            {
+                _flushSinks();
+            }
+            catch
+            {
+                // Shutdown logging is best effort and must not break plugin teardown.
+            }
+        }
+    }
+
+    private static void FlushDiskLogListeners()
+    {
+        foreach (var listener in Logger.Listeners)
+        {
+            if (listener is not DiskLogListener disk)
+                continue;
+            try
+            {
+                disk.LogWriter?.Flush();
+            }
+            catch
+            {
+                // Keep flushing the remaining sinks; disposal must never throw.
+            }
+        }
+    }
 
     private bool WriteSink(BazaarAgentLogSeverity severity, string text)
     {

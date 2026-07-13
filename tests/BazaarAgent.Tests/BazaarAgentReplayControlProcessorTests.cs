@@ -111,15 +111,32 @@ public class BazaarAgentReplayControlProcessorTests
         using var queue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(5000);
         var sink = new RecordingSink { NextOutcome = new(status, "why it failed", null) };
 
+        var logger = new CapturingBazaarAgentLogger();
         var task = queue.EnqueueAndAwaitAsync(
             RequestId,
             new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, new byte[] { 1 }, null)
         );
-        var res = await RunAsync(queue, task, sink);
+        var res = await RunAsync(queue, task, sink, logger);
 
         Assert.Equal(expectedHttp, res.HttpStatus);
         Assert.Contains($"\"error\":\"{expectedCode}\"", res.JsonBody);
         Assert.Contains("why it failed", res.JsonBody);
+        var logEvent = Assert.Single(logger.Events);
+        Assert.Equal(BazaarAgentLogSeverity.Error, logEvent.Definition.Severity);
+        Assert.Equal("agent.replay_request.failed", logEvent.Definition.EventId);
+        Assert.Equal(RequestId, logEvent.Values[0].Value);
+        Assert.Null(logEvent.Values[2].Value);
+        Assert.Equal(
+            status switch
+            {
+                BazaarAgentReplayControlStatus.InvalidPayload =>
+                    BazaarAgentLogReasonCode.ReplayInvalidPayload,
+                BazaarAgentReplayControlStatus.Rejected =>
+                    BazaarAgentLogReasonCode.ReplayRejected,
+                _ => BazaarAgentLogReasonCode.ReplayUnavailable,
+            },
+            logEvent.Values[3].Value
+        );
     }
 
     [Fact]

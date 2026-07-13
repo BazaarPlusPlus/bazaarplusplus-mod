@@ -153,6 +153,32 @@ public class BazaarAgentHttpServerTests
     }
 
     [Fact]
+    public void Failed_start_cleanup_does_not_report_a_second_stop_failure()
+    {
+        using var portOwner = new System.Net.Sockets.TcpListener(
+            System.Net.IPAddress.Loopback,
+            0
+        );
+        portOwner.Start();
+        var port = ((System.Net.IPEndPoint)portOwner.LocalEndpoint).Port;
+        using var queue = new BazaarAgentCommandQueue<BazaarAgentAction>(5000);
+        using var replayQueue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(5000);
+        using var server = new BazaarAgentHttpServer(
+            port,
+            () => null,
+            queue,
+            replayQueue,
+            new CapturingBazaarAgentLogger()
+        );
+
+        Assert.ThrowsAny<Exception>(() => server.Start());
+        var report = server.Stop();
+
+        Assert.Equal(0, report.FailedPhaseCount);
+        Assert.False(server.IsRunning);
+    }
+
+    [Fact]
     public async Task Handler_and_fallback_write_failures_emit_one_write_owned_terminal()
     {
         var handlerException = new InvalidOperationException("snapshot failed");

@@ -22,6 +22,7 @@ public sealed class QueuedRunLogStore : IRunLogStore, IDisposable
     private int _stopAcceptingNewWork;
     private int _disposeStarted;
     private int _activeWrites;
+    private int _shutdownDrainTimedOut;
 
     public QueuedRunLogStore(IRunLogStore innerStore, IRunLogStoreLogger? logger = null)
         : this(innerStore, DefaultShutdownDrainTimeout, logger) { }
@@ -106,6 +107,10 @@ public sealed class QueuedRunLogStore : IRunLogStore, IDisposable
 
         if (!_worker.Wait(_shutdownDrainTimeout))
         {
+            // The timeout is the authoritative shutdown terminal. Any active write or worker
+            // exception that follows (Mono aborts background threads during process exit) is a
+            // consequence of this same episode and must not emit a second terminal record.
+            Volatile.Write(ref _shutdownDrainTimedOut, 1);
             _logger?.Emit(
                 RunLogStoreDiagnostic.ShutdownDrainTimedOut(
                     _shutdownDrainTimeout,
@@ -165,9 +170,12 @@ public sealed class QueuedRunLogStore : IRunLogStore, IDisposable
                     }
                     catch (Exception ex)
                     {
-                        _logger?.Emit(
-                            RunLogStoreDiagnostic.WriteFailed(write.Operation, write.RunId, ex)
-                        );
+                        if (Volatile.Read(ref _shutdownDrainTimedOut) == 0)
+                        {
+                            _logger?.Emit(
+                                RunLogStoreDiagnostic.WriteFailed(write.Operation, write.RunId, ex)
+                            );
+                        }
                     }
                     finally
                     {
@@ -183,7 +191,8 @@ public sealed class QueuedRunLogStore : IRunLogStore, IDisposable
         }
         catch (Exception ex)
         {
-            _logger?.Emit(RunLogStoreDiagnostic.WorkerFailed(PendingWriteCount(), ex));
+            if (Volatile.Read(ref _shutdownDrainTimedOut) == 0)
+                _logger?.Emit(RunLogStoreDiagnostic.WorkerFailed(PendingWriteCount(), ex));
             throw;
         }
     }

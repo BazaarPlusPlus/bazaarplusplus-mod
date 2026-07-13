@@ -51,7 +51,21 @@ public static class BazaarAgentReplayControlProcessor
             return;
         }
 
+        // Complete the HTTP response before logging: the logger itself may throw, and every
+        // claimed command must still receive exactly one response.
         pending.SetResponse(MapOutcome(command.Kind, outcome));
+        if (outcome.Status != BazaarAgentReplayControlStatus.Accepted)
+        {
+            logger.TryEmit(
+                BazaarAgentLogEvents.ReplayRequestFailed(
+                    pending.RequestId,
+                    command.Kind,
+                    outcome.BattleId,
+                    MapFailureReason(outcome.Status),
+                    exception: null
+                )
+            );
+        }
     }
 
     public static BazaarAgentServerResponse MapOutcome(
@@ -105,4 +119,15 @@ public static class BazaarAgentReplayControlProcessor
             envelope["details"] = details;
         return JsonConvert.SerializeObject(envelope);
     }
+
+    private static BazaarAgentLogReasonCode MapFailureReason(
+        BazaarAgentReplayControlStatus status
+    ) =>
+        status switch
+        {
+            BazaarAgentReplayControlStatus.InvalidPayload =>
+                BazaarAgentLogReasonCode.ReplayInvalidPayload,
+            BazaarAgentReplayControlStatus.Rejected => BazaarAgentLogReasonCode.ReplayRejected,
+            _ => BazaarAgentLogReasonCode.ReplayUnavailable,
+        };
 }

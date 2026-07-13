@@ -228,6 +228,37 @@ public sealed class BazaarAgentBepInExLoggerTests
     }
 
     [Fact]
+    public void Adapter_dispose_flushes_disk_sinks_after_the_storm_summary()
+    {
+        using var source = new ManualLogSource("test");
+        var captured = new List<LogEventArgs>();
+        source.LogEvent += (_, args) => captured.Add(args);
+        var countWhenFlushed = -1;
+        var adapter = new BazaarAgentBepInExLogger(
+            source,
+            () => DateTimeOffset.UnixEpoch,
+            () => countWhenFlushed = captured.Count
+        );
+        adapter.Emit(
+            BazaarAgentLogEvents.ListenerDegraded(
+                47900,
+                new InvalidOperationException("first bind failure")
+            )
+        );
+        adapter.Emit(
+            BazaarAgentLogEvents.ListenerDegraded(
+                47900,
+                new InvalidOperationException("second bind failure")
+            )
+        );
+
+        adapter.Dispose();
+
+        Assert.Equal(2, captured.Count);
+        Assert.Equal(captured.Count, countWhenFlushed);
+    }
+
+    [Fact]
     public void Adapter_error_key_uses_full_correlation_and_exception_fingerprint()
     {
         using var source = new ManualLogSource("test");

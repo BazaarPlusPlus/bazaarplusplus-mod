@@ -95,9 +95,21 @@ public sealed class BazaarAgentHttpServer : IDisposable
             return;
         Volatile.Write(ref _cleanupStarted, 0);
 
-        _listener = new HttpListener();
-        _listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
-        _listener.Start();
+        try
+        {
+            _listener = new HttpListener();
+            _listener.Prefixes.Add($"http://127.0.0.1:{Port}/");
+            _listener.Start();
+        }
+        catch
+        {
+            // A failed HttpListener.Start can leave a partially initialized listener behind.
+            // It was never running, so cleanup must Close it without calling Stop: Mono's
+            // HttpListener.Stop repeats the failed bind and throws the same SocketException,
+            // which would turn one start-degradation episode into a second stop warning.
+            Interlocked.Exchange(ref _started, 0);
+            throw;
+        }
 
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
@@ -107,11 +119,12 @@ public sealed class BazaarAgentHttpServer : IDisposable
     public BazaarAgentListenerStopReport Stop()
     {
         var report = new BazaarAgentListenerStopReport();
-        Interlocked.Exchange(ref _started, 0);
+        var wasStarted = Interlocked.Exchange(ref _started, 0) == 1;
         if (Interlocked.Exchange(ref _cleanupStarted, 1) == 1)
             return report;
         report.Capture(BazaarAgentListenerStopPhase.Cancellation, () => _cts?.Cancel());
-        report.Capture(BazaarAgentListenerStopPhase.ListenerStop, () => _listener?.Stop());
+        if (wasStarted)
+            report.Capture(BazaarAgentListenerStopPhase.ListenerStop, () => _listener?.Stop());
         report.Capture(BazaarAgentListenerStopPhase.ListenerClose, () => _listener?.Close());
         _cts = null;
         _listener = null;
