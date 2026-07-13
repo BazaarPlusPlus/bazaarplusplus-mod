@@ -272,6 +272,7 @@ internal static class BppTooltipSections
         key switch
         {
             "enchant-preview-with-native" => TooltipSectionId.EnchantPreview,
+            "enchant-preview-after-quest" => TooltipSectionId.EnchantPreview,
             "enchant-preview-without-native" => TooltipSectionId.EnchantPreview,
             "quest-reward-preview" => TooltipSectionId.QuestRewardPreview,
             "aggregate-missing-types" => TooltipSectionId.AggregateMissingTypes,

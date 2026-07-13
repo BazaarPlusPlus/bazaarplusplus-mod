@@ -156,6 +156,29 @@ Assert(
     "An otherwise empty native block should not add a divider above enchant previews."
 );
 
+var questSectionLayout = BppTooltipSectionRenderPatch.ResolveSectionLayout(
+    passiveText: "",
+    questGroupCount: 1
+);
+Assert(
+    questSectionLayout.SectionKey == BppTooltipSectionRenderPatch.EnchantAfterQuestSectionKey,
+    "Quest-only tooltips should use their own cached section layout."
+);
+Assert(
+    questSectionLayout.Style.SectionTopPaddingScale == 0f,
+    "Quest rows already provide the native section seam, so the enchant clone must not add top padding."
+);
+
+var passiveTextSectionLayout = BppTooltipSectionRenderPatch.ResolveSectionLayout(
+    passiveText: "Passive effect",
+    questGroupCount: 1
+);
+Assert(
+    passiveTextSectionLayout.SectionKey == BppTooltipSectionRenderPatch.EnchantWithNativeSectionKey
+        && passiveTextSectionLayout.Style.SectionTopPaddingScale == 1f,
+    "Passive text should retain its existing native-content spacing even when quest rows also exist."
+);
+
 Assert(
     ItemEnchantPreviewTooltipLayerPolicy.ElevatedSortingOrder(150) == 151,
     "Enchant preview elevation should sit one step above the tooltip clone's own sorting order, not an absolute layer."
