@@ -50,21 +50,30 @@ internal static class CardTooltipDataFactory
 
     private static bool _reportedUnavailable;
 
-    internal static CardTooltipData Create(Card card, CardTooltipData source)
+    internal static CardTooltipData Create(
+        Card card,
+        CardTooltipData source,
+        TooltipPreviewRefreshMode mode
+    )
     {
         if (source == null)
             throw new ArgumentNullException(nameof(source));
 
         if (!CanCloneTooltipData(out var reason))
         {
-            LogUnavailable(reason);
+            LogUnavailable(reason, mode);
             return source;
         }
 
-        return Create(card, source, MonsterField!.GetValue(source) as TMonster);
+        return Create(card, source, MonsterField!.GetValue(source) as TMonster, mode);
     }
 
-    private static CardTooltipData Create(Card card, CardTooltipData source, TMonster? monster)
+    private static CardTooltipData Create(
+        Card card,
+        CardTooltipData source,
+        TMonster? monster,
+        TooltipPreviewRefreshMode mode
+    )
     {
         if (card == null)
             throw new ArgumentNullException(nameof(card));
@@ -72,7 +81,7 @@ internal static class CardTooltipDataFactory
             throw new ArgumentNullException(nameof(source));
         if (!CanCloneTooltipData(out var reason))
         {
-            LogUnavailable(reason);
+            LogUnavailable(reason, mode);
             return source;
         }
 
@@ -126,12 +135,18 @@ internal static class CardTooltipDataFactory
         return false;
     }
 
-    private static void LogUnavailable(string reason)
+    private static void LogUnavailable(string reason, TooltipPreviewRefreshMode mode)
     {
         if (_reportedUnavailable)
             return;
 
         _reportedUnavailable = true;
-        BppLog.Warn("CardTooltipDataFactory", $"{reason} Tooltip refresh will use source data.");
+        BppLog.WarnEvent(
+            TooltipLogEvents.PreviewRefreshDegraded,
+            TooltipLogEvents.PreviewRefreshReasonCode.Bind(
+                TooltipLogReasonCode.ReflectionUnavailable
+            ),
+            TooltipLogEvents.PreviewRefreshMode.Bind(mode)
+        );
     }
 }

@@ -12,6 +12,7 @@ using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.Localization;
 using BazaarPlusPlus.Infrastructure;
@@ -42,28 +43,41 @@ public class Plugin : BaseUnityPlugin
     protected virtual void Awake()
     {
         BppLog.Install(Logger);
+        var phase = PluginInitializationPhase.PluginVersion;
         try
         {
-            BppLog.Info("Plugin", $"Plugin {MyPluginInfo.PLUGIN_GUID} loaded");
             BppPluginVersion.Initialize(Info.Location);
 
             var configFile = CreatePluginConfigFile();
 
+            phase = PluginInitializationPhase.Composition;
             var gameBuild = GameBuildInfoResolver.Resolve();
             _composition = new BppComposition(Logger, configFile, gameBuild);
 
             var services = _composition.Services;
             BppPatchHost.Install(services);
 
-            BppLog.Info("Plugin", $"Game build: '{gameBuild.RawVersion}' → {gameBuild.Channel}");
             if (gameBuild.DetectionWarning != null)
-                BppLog.Warn("Plugin", gameBuild.DetectionWarning);
+            {
+                BppLog.WarnEvent(
+                    PluginLogEvents.GameBuildDegraded,
+                    PluginLogEvents.GameBuildDegradedGameBuild.Bind(gameBuild.RawVersion),
+                    PluginLogEvents.GameBuildDegradedBuildChannel.Bind(gameBuild.Channel),
+                    PluginLogEvents.GameBuildDegradedReasonCode.Bind(
+                        string.IsNullOrWhiteSpace(gameBuild.RawVersion)
+                            ? PluginLogReasonCode.VersionUnreadable
+                            : PluginLogReasonCode.DetectionSignalsDisagree
+                    )
+                );
+            }
 
+            phase = PluginInitializationPhase.StaticUtilities;
             InstallStaticUtilities(services, _composition.SettingsDockRegistry);
 
+            phase = PluginInitializationPhase.HarmonyPatches;
             ApplyHarmonyPatches();
 
-            BppLog.Info("Plugin", "Adding CombatReplayRuntime");
+            phase = PluginInitializationPhase.ReplayRuntime;
             // CombatReplayRuntime is constructed before composition.Start() because RunLifecycle
             // and several features take a reference through CombatReplayModule. Not a mountable.
             var combatReplayRuntime = gameObject.AddComponent<CombatReplayRuntime>();
@@ -74,21 +88,35 @@ public class Plugin : BaseUnityPlugin
             );
             _composition.AttachCombatReplayRuntime(combatReplayRuntime);
 
+            phase = PluginInitializationPhase.Features;
             _composition.Start();
 
+            phase = PluginInitializationPhase.OnlineServices;
             BuildOnlineServices();
             _composition.AttachOnlineClient(_onlineClient);
             _composition.AttachAccountLinkClient(_bazaarDbLinkClient);
 
-            BppLog.Info("Plugin", "Attaching runtime components");
+            phase = PluginInitializationPhase.Mountables;
             _composition.Mountables.MountAll(gameObject, services);
-            BppLog.Info("Plugin", "Runtime components attached");
-
-            BppLog.Info("Plugin", "Plugin initialization completed");
+            BppLog.InfoEvent(
+                PluginLogEvents.InitializationSucceeded,
+                PluginLogEvents.InitializationSucceededPluginVersion.Bind(
+                    MyPluginInfo.PLUGIN_VERSION
+                ),
+                PluginLogEvents.InitializationSucceededGameBuild.Bind(gameBuild.RawVersion),
+                PluginLogEvents.InitializationSucceededBuildChannel.Bind(gameBuild.Channel)
+            );
         }
         catch (Exception ex)
         {
-            BppLog.Error("Plugin", "Plugin initialization failed", ex);
+            BppLog.ErrorEvent(
+                PluginLogEvents.InitializationFailed,
+                ex,
+                PluginLogEvents.InitializationFailedPhase.Bind(phase),
+                PluginLogEvents.InitializationFailedReasonCode.Bind(
+                    PluginLogReasonCode.InitializationException
+                )
+            );
             CleanupFailedInitialization();
             throw;
         }
@@ -105,55 +133,48 @@ public class Plugin : BaseUnityPlugin
             return;
         _teardownStarted = true;
 
-        RunTeardownSteps();
-        RunTeardownStep("flush logs", BppLog.Flush);
-        RunTeardownStep("reset patch host", BppPatchHost.Reset);
+        var failures = new PluginTeardownAccumulator();
+        RunTeardownSteps(failures);
+        failures.Run(PluginTeardownStep.ResetPatchHost, BppPatchHost.Reset);
+        if (failures.FailedStepCount > 0)
+        {
+            BppLog.WarnEvent(
+                PluginLogEvents.ShutdownDegraded,
+                failures.FirstException!,
+                PluginLogEvents.ShutdownDegradedFailedStepCount.Bind(failures.FailedStepCount),
+                PluginLogEvents.ShutdownDegradedFirstFailedStep.Bind(failures.FirstFailedStep),
+                PluginLogEvents.ShutdownDegradedReasonCode.Bind(
+                    PluginLogReasonCode.TeardownStepFailed
+                )
+            );
+        }
+        BppLog.Flush();
     }
 
     // Every step runs in isolation and Harmony is unpatched first: a throw in any single
     // step must never strand the "patches applied but static utilities uninstalled"
     // zombie state (patched game code rebuilding UI from reset catalogs).
-    private void RunTeardownSteps()
+    private void RunTeardownSteps(PluginTeardownAccumulator failures)
     {
-        RunTeardownStep("unpatch Harmony", UnpatchHarmony);
-        RunTeardownStep(
-            "unmount components",
+        failures.Run(PluginTeardownStep.UnpatchHarmony, UnpatchHarmony);
+        failures.Run(
+            PluginTeardownStep.UnmountComponents,
             () => _composition?.Mountables.UnmountAll(gameObject)
         );
-        RunTeardownStep(
-            "destroy CombatReplayRuntime",
+        failures.Run(
+            PluginTeardownStep.DestroyCombatReplayRuntime,
             DestroyComponentIfPresent<CombatReplayRuntime>
         );
-        RunTeardownStep(
-            "dispose composition",
+        failures.Run(
+            PluginTeardownStep.DisposeComposition,
             () =>
             {
                 _composition?.Dispose();
                 _composition = null;
             }
         );
-        RunTeardownStep("dispose online services", DisposeOnlineServices);
-        RunTeardownStep("uninstall static utilities", UninstallStaticUtilities);
-    }
-
-    private static void RunTeardownStep(string name, Action step)
-    {
-        try
-        {
-            step();
-        }
-        catch (Exception ex)
-        {
-            try
-            {
-                BppLog.Error("Plugin", $"Teardown step failed: {name}", ex);
-            }
-            catch
-            {
-                // Logging must never break teardown isolation (the log listener may
-                // already be disposed during application quit).
-            }
-        }
+        failures.Run(PluginTeardownStep.DisposeOnlineServices, DisposeOnlineServices);
+        failures.Run(PluginTeardownStep.UninstallStaticUtilities, UninstallStaticUtilities);
     }
 
     private ConfigFile CreatePluginConfigFile()
@@ -183,8 +204,11 @@ public class Plugin : BaseUnityPlugin
         L.Reset();
         BppUiFont.Reset();
         BppSettingsDockCatalog.Reset();
+        NativeSettingsLogState.Reset();
         BPPSupporterCatalog.Reset();
         BppHotkeyService.Reset();
+        TooltipEncounterProbeReader.Reset();
+        BppTooltipSectionRenderPatch.ResetEncounterHealth();
         ChineseTranslationCatalog.Reset();
         NativeChineseFontFallback.Reset();
     }
@@ -208,7 +232,13 @@ public class Plugin : BaseUnityPlugin
         var routes = ModApiRoutes.TryCreate(ModApiUploadDefaults.ApiBaseUrl);
         if (routes == null)
         {
-            BppLog.Warn("Plugin", "ModApi base URL invalid; online services will be inactive.");
+            BppLog.WarnEvent(
+                PluginLogEvents.OnlineServicesDegraded,
+                PluginLogEvents.OnlineServicesDegradedReasonCode.Bind(
+                    PluginLogReasonCode.InvalidBaseUrl
+                ),
+                PluginLogEvents.OnlineServicesDegradedEndpoint.Bind(PluginOnlineEndpoint.ModApi)
+            );
             return;
         }
 
@@ -218,12 +248,10 @@ public class Plugin : BaseUnityPlugin
             timeout: TimeSpan.FromSeconds(Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds))
         );
         _onlineClient = new ModOnlineClient(httpClient, routes);
-        BppLog.Info("Plugin", "Online client ready.");
     }
 
     private void ApplyHarmonyPatches()
     {
-        BppLog.Info("Plugin", "Applying Harmony patches");
         // Patch classes are applied one by one instead of PatchAll(): PatchAll aborts at
         // the first failing class, leaving earlier classes applied and later ones not —
         // one broken game target (e.g. after a game update or on the PTR branch) must
@@ -243,16 +271,30 @@ public class Plugin : BaseUnityPlugin
             catch (Exception ex)
             {
                 failedClasses++;
-                BppLog.Error("Plugin", $"Harmony patch class failed: {type.FullName}", ex);
+                BppLog.DebugEvent(
+                    PluginLogEvents.PatchApplyFailed,
+                    ex,
+                    () =>
+                        [
+                            PluginLogEvents.PatchApplyFailedPatchType.Bind(
+                                type.FullName ?? type.Name
+                            ),
+                            PluginLogEvents.PatchApplyFailedReasonCode.Bind(
+                                PluginLogReasonCode.PatchClassException
+                            ),
+                        ]
+                );
             }
         }
 
         if (failedClasses > 0)
-            BppLog.Warn(
-                "Plugin",
-                $"{failedClasses} Harmony patch class(es) failed to apply; the affected features are degraded, everything else continues."
+            BppLog.WarnEvent(
+                PluginLogEvents.PatchesDegraded,
+                PluginLogEvents.PatchesDegradedFailedPatchCount.Bind(failedClasses),
+                PluginLogEvents.PatchesDegradedReasonCode.Bind(
+                    PluginLogReasonCode.PatchClassesFailed
+                )
             );
-        BppLog.Info("Plugin", "Harmony patches applied");
     }
 
     private void CleanupFailedInitialization()

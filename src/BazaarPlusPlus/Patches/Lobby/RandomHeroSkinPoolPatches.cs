@@ -29,8 +29,16 @@ internal static class RandomHeroSkinPoolFetchPatch
         }
         catch (Exception ex)
         {
-            __state = default;
-            BppLog.Warn("RandomHeroSkinPool", $"Failed to begin native collectible session: {ex}");
+            __state = new RandomHeroSkinPoolNativeController.FetchScope(
+                null,
+                null,
+                LobbyLogWriter.CollectionKind(cosmeticType)
+            );
+            LobbyLogWriter.ReportCollectiblePoolDegraded(
+                CollectiblePoolOperation.BeginFetch,
+                __state.CollectionKind,
+                ex
+            );
         }
     }
 
@@ -43,7 +51,12 @@ internal static class RandomHeroSkinPoolFetchPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroSkinPool", $"Failed to project native collectible cards: {ex}");
+            var collectionKind = RandomHeroSkinPoolPatchLogContext.CollectionKindOf(__state);
+            LobbyLogWriter.ReportCollectiblePoolDegraded(
+                CollectiblePoolOperation.ProjectFetch,
+                collectionKind,
+                ex
+            );
         }
     }
 
@@ -59,7 +72,12 @@ internal static class RandomHeroSkinPoolFetchPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroSkinPool", $"Failed to close native collectible session: {ex}");
+            var collectionKind = RandomHeroSkinPoolPatchLogContext.CollectionKindOf(__state);
+            LobbyLogWriter.ReportCollectiblePoolDegraded(
+                CollectiblePoolOperation.EndFetch,
+                collectionKind,
+                ex
+            );
         }
         return __exception;
     }
@@ -77,9 +95,31 @@ internal static class RandomHeroSkinPoolSetDataPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroSkinPool", $"Failed to register native collectible card: {ex}");
+            LobbyLogWriter.ReportCollectiblePoolDegraded(
+                CollectiblePoolOperation.RegisterCard,
+                RandomHeroSkinPoolPatchLogContext.CollectionKindOf(data),
+                ex
+            );
         }
     }
+}
+
+internal static class RandomHeroSkinPoolPatchLogContext
+{
+    internal static CollectiblePoolKind CollectionKindOf(
+        RandomHeroSkinPoolNativeController.FetchScope scope
+    ) => scope.CollectionKind;
+
+    internal static CollectiblePoolKind CollectionKindOf(BazaarSaleItem? data) =>
+        data == null
+            ? CollectiblePoolKind.Unknown
+            : LobbyLogWriter.CollectionKind(data.Value.CollectionType);
+
+    internal static CollectiblePoolKind CollectionKindOf(EquipableItem item) =>
+        CollectionKindOf(item.itemData);
+
+    internal static CollectiblePoolKind CollectionKindOf(CosmeticItem? item) =>
+        item == null ? CollectiblePoolKind.Unknown : CollectionKindOf(item.EquipableItem);
 }
 
 [HarmonyPatch(typeof(CosmeticItem), "SetEquipState")]
@@ -94,7 +134,11 @@ internal static class RandomHeroSkinPoolSetEquipStatePatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroSkinPool", $"Failed to project native collectible visual: {ex}");
+            LobbyLogWriter.ReportCollectiblePoolDegraded(
+                CollectiblePoolOperation.ProjectVisual,
+                RandomHeroSkinPoolPatchLogContext.CollectionKindOf(__instance),
+                ex
+            );
         }
     }
 }
@@ -120,7 +164,15 @@ internal static class RandomHeroSkinPoolEquipItemPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroSkinPool", $"Failed to route native collectible click: {ex}");
+            var kind =
+                __args.Length > 0 && __args[0] is EquipableItem failedItem
+                    ? RandomHeroSkinPoolPatchLogContext.CollectionKindOf(failedItem)
+                    : CollectiblePoolKind.Unknown;
+            LobbyLogWriter.ReportCollectiblePoolDegraded(
+                CollectiblePoolOperation.RouteClick,
+                kind,
+                ex
+            );
             return true;
         }
     }
@@ -146,9 +198,10 @@ internal static class RandomHeroSkinPoolEquipItemPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "RandomHeroSkinPool",
-                $"Failed to keep the normally equipped collectible in its random pool: {ex}"
+            LobbyLogWriter.ReportCollectiblePoolDegraded(
+                CollectiblePoolOperation.PreserveEquipped,
+                RandomHeroSkinPoolPatchLogContext.CollectionKindOf(item),
+                ex
             );
         }
     }
@@ -170,9 +223,10 @@ internal static class RandomHeroSkinPoolTogglePatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "RandomHeroSkinPool",
-                $"Failed to restore native collectible visuals: {ex}"
+            LobbyLogWriter.ReportCollectiblePoolDegraded(
+                CollectiblePoolOperation.RestoreVisuals,
+                CollectiblePoolKind.All,
+                ex
             );
         }
     }
@@ -195,9 +249,10 @@ internal static class RandomHeroSkinPoolGetRandomizedLoadoutPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "RandomHeroSkinPool",
-                $"Failed to apply random collectible pool selection: {ex}"
+            LobbyLogWriter.ReportCollectiblePoolDegraded(
+                CollectiblePoolOperation.ApplyRandomizedLoadout,
+                CollectiblePoolKind.All,
+                ex
             );
         }
     }

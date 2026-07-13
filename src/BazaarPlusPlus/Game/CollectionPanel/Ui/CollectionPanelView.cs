@@ -368,13 +368,13 @@ internal sealed partial class CollectionPanelView : IDisposable
         }
         foreach (var pair in _tagChips)
         {
-            var display = NativeTagTypography.Resolve(pair.Key);
+            var display = ResolveTagDisplay(pair.Key);
             ApplyTagChipContent(pair.Value, display);
             RefreshChip(pair.Value, model.SelectedTags.Contains(pair.Key), display.AccentColor);
         }
         foreach (var pair in _keywordChips)
         {
-            var display = NativeTagTypography.Resolve(pair.Key);
+            var display = ResolveTagDisplay(pair.Key);
             ApplyTagChipContent(pair.Value, display);
             RefreshChip(pair.Value, model.SelectedKeywords.Contains(pair.Key), display.AccentColor);
         }

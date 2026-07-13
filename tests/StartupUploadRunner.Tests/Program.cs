@@ -252,8 +252,7 @@ static void DetailedPayloadOutcomeAndFailureGateAreStable()
             root,
             ".payload",
             payload => payload.Bytes,
-            TryDeserialize,
-            "TestPayload"
+            TryDeserialize
         );
         Assert(
             store.LoadDetailed("battle-missing").Status == FileBackedPayloadLoadStatus.Missing,
@@ -266,8 +265,7 @@ static void DetailedPayloadOutcomeAndFailureGateAreStable()
             missingRoot,
             ".payload",
             payload => payload.Bytes,
-            TryDeserialize,
-            "TestPayload"
+            TryDeserialize
         );
         Directory.Delete(missingRoot);
         Assert(
@@ -292,6 +290,10 @@ static void DetailedPayloadOutcomeAndFailureGateAreStable()
                 && string.Equals(first.Fingerprint, repeated.Fingerprint, StringComparison.Ordinal),
             "Unchanged corrupt bytes should retain one fingerprint."
         );
+        Assert(
+            store.Load("battle-corrupt") == null,
+            "The compatibility load facade should preserve its null fallback."
+        );
         File.WriteAllBytes(path, [3, 2, 1]);
         var changed = store.LoadDetailed("battle-corrupt");
         Assert(
@@ -302,6 +304,10 @@ static void DetailedPayloadOutcomeAndFailureGateAreStable()
         Assert(
             capture.Count("event=upload.bundle.build_failed") == 0,
             "The typed payload helper must not log before its owner decides."
+        );
+        Assert(
+            !capture.Contains(root),
+            "The compatibility load facade must remain silent and omit local paths."
         );
 
         var gate = new UploadPayloadFailureLogGate();

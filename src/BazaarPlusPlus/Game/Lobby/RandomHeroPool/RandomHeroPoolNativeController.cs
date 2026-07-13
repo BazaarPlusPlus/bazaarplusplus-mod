@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.UI;
@@ -12,8 +11,6 @@ namespace BazaarPlusPlus.Game.Lobby.RandomHeroPool;
 
 internal sealed class RandomHeroPoolNativeController : MonoBehaviour
 {
-    private const string LogCategory = "RandomHeroPool";
-
     private static readonly System.Reflection.FieldInfo? HeroItemViewsField = AccessTools.Field(
         typeof(HeroSelectButtonsView),
         "HeroItemViews"
@@ -61,9 +58,9 @@ internal sealed class RandomHeroPoolNativeController : MonoBehaviour
             if (HeroSelectButtonsView.IsRandomHeroEnabled && !_warnedMissingOwner)
             {
                 _warnedMissingOwner = true;
-                BppLog.Warn(
-                    LogCategory,
-                    "A native hero card had no owning selection view; leaving its click unchanged."
+                LobbyLogWriter.ReportHeroPoolDegraded(
+                    HeroPoolOperation.ResolveOwner,
+                    LobbyLogReasonCode.OwnerUnavailable
                 );
             }
             return NativePoolInteractionRoute.NativeAction;
@@ -219,9 +216,9 @@ internal sealed class RandomHeroPoolNativeController : MonoBehaviour
             return;
 
         _warnedMissingFields = true;
-        BppLog.Warn(
-            LogCategory,
-            "Native hero-card fields were unavailable; leaving the game's native interaction unchanged."
+        LobbyLogWriter.ReportHeroPoolDegraded(
+            HeroPoolOperation.ResolveNativeFields,
+            LobbyLogReasonCode.ReflectionUnavailable
         );
     }
 

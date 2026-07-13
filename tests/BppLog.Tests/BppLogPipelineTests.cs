@@ -195,13 +195,43 @@ public sealed class BppLogPipelineTests
     }
 
     [Fact]
-    public void Error_without_declared_correlation_fails_open()
+    public void Error_without_declared_correlation_uses_exception_fingerprint()
     {
         var (pipeline, output, _) = CreatePipeline();
         var exception = new InvalidOperationException("same failure");
 
         pipeline.Emit(BppLogSeverity.Error, GuardedErrorWithoutCorrelation, exception: exception);
         pipeline.Emit(BppLogSeverity.Error, GuardedErrorWithoutCorrelation, exception: exception);
+        pipeline.Flush();
+
+        Assert.Equal(2, output.Count);
+        Assert.Contains("suppressed_count=1", output[1].Message);
+    }
+
+    [Fact]
+    public void Error_without_declared_correlation_or_exception_fails_open()
+    {
+        var (pipeline, output, _) = CreatePipeline();
+
+        pipeline.Emit(BppLogSeverity.Error, GuardedErrorWithoutCorrelation);
+        pipeline.Emit(BppLogSeverity.Error, GuardedErrorWithoutCorrelation);
+        pipeline.Flush();
+
+        Assert.Equal(2, output.Count);
+        Assert.DoesNotContain(
+            output,
+            record => record.Message.Contains("logging.storm.suppressed", StringComparison.Ordinal)
+        );
+    }
+
+    [Fact]
+    public void Error_with_missing_declared_correlation_fails_open()
+    {
+        var (pipeline, output, _) = CreatePipeline();
+        var exception = new InvalidOperationException("same failure");
+
+        pipeline.Emit(BppLogSeverity.Error, GuardedError, exception: exception);
+        pipeline.Emit(BppLogSeverity.Error, GuardedError, exception: exception);
         pipeline.Flush();
 
         Assert.Equal(2, output.Count);

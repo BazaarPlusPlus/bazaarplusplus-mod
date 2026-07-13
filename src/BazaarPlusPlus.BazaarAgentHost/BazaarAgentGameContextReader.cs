@@ -10,6 +10,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarPlusPlus.BazaarAgent;
+using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.GameInterop;
 using TheBazaar;
 using TheBazaar.AppFramework;
@@ -125,8 +126,28 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         bool canReroll =
             canHandleOp(StateOps.Reroll) && rerollsRemaining > 0 && playerGold >= rerollCost;
 
-        var encounterIds = gameProbe.GetEncounterIds();
-        var targeting = gameProbe.GetTargetingState();
+        var encounterIdsOutcome = gameProbe is IBazaarAgentTypedGameProbe typedGameProbe
+            ? typedGameProbe.GetEncounterIdsOutcome()
+            : BazaarAgentGameProbeOutcome<EncounterIdsSnapshot>.Success(
+                gameProbe.GetEncounterIds()
+            );
+        if (!encounterIdsOutcome.IsSuccess)
+            throw new InvalidOperationException(
+                "The encounter-id probe degraded while building agent context.",
+                encounterIdsOutcome.Exception
+            );
+        var targetingOutcome = gameProbe is IBazaarAgentTypedGameProbe typedTargetingProbe
+            ? typedTargetingProbe.GetTargetingStateOutcome()
+            : BazaarAgentGameProbeOutcome<EncounterTargetingSnapshot>.Success(
+                gameProbe.GetTargetingState()
+            );
+        if (!targetingOutcome.IsSuccess)
+            throw new InvalidOperationException(
+                "The encounter-targeting probe degraded while building agent context.",
+                targetingOutcome.Exception
+            );
+        var encounterIds = encounterIdsOutcome.Snapshot;
+        var targeting = targetingOutcome.Snapshot;
 
         string? currentEncounterId = encounterIds.CurrentEncounterId;
         string? currentEncounterType = gameProbe.ResolveEncounterType(currentEncounterId);

@@ -1,5 +1,7 @@
 #nullable enable
 
+using System;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 
 namespace BazaarPlusPlus.GameInterop.ItemBoardPreview;
@@ -41,7 +43,11 @@ internal sealed class ItemBoardPreviewOptions
 
     public bool UseCanvasGroup { get; init; }
 
-    public string LogComponent { get; init; } = "ItemBoardPreviewSurface";
+    public Action<NativeCardPreviewFailure>? CardPreviewFailureReporter { get; init; }
+
+    public Action<NativeCardPreviewFailure>? HoverFailureReporter { get; init; }
+
+    public Action<ItemBoardPreviewFailure>? ItemBoardFailureReporter { get; init; }
 
     public float SlotGridHorizontalInsetPixels { get; init; } = 8f;
 
@@ -50,4 +56,42 @@ internal sealed class ItemBoardPreviewOptions
     public float SlotGridMaxHeightRatio { get; init; } = DefaultSlotGridMaxHeightRatio;
 
     public float SlotGridMaxScale { get; init; } = 10f;
+}
+
+internal enum ItemBoardPreviewOperation
+{
+    ResolveSpan,
+    ResolvePlacement,
+    CreateAggregate,
+    CreateCard,
+}
+
+internal enum ItemBoardPreviewFailureReason
+{
+    SpanUnavailable,
+    PlacementUnavailable,
+    AggregateException,
+    HandleUnavailable,
+    CardException,
+}
+
+internal sealed class ItemBoardPreviewFailure
+{
+    internal ItemBoardPreviewFailure(
+        ItemBoardPreviewOperation operation,
+        ItemBoardPreviewFailureReason reason,
+        System.Guid? templateId,
+        Exception? exception = null
+    )
+    {
+        Operation = operation;
+        Reason = reason;
+        TemplateId = templateId;
+        Exception = exception;
+    }
+
+    internal ItemBoardPreviewOperation Operation { get; }
+    internal ItemBoardPreviewFailureReason Reason { get; }
+    internal System.Guid? TemplateId { get; }
+    internal Exception? Exception { get; }
 }

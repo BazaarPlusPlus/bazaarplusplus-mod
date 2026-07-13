@@ -2,6 +2,7 @@
 #pragma warning disable CS0436
 using System;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -137,7 +138,11 @@ internal static class CollectionItemLoadArtPatch
         {
             if (acquiredNewArtRef && !committedNewArtRef && !string.IsNullOrEmpty(acquiredArtKey))
                 cacheSession.ArtCache.Release(acquiredArtKey!);
-            BppLog.Warn("CollectionItemLoadArtPatch", $"Cached LoadArt failed: {ex.Message}");
+            cacheSession.ArtCache.ReportDegraded(
+                CollectionPanelLogReasonCode.CachedLoadFailed,
+                acquiredArtKey ?? marker.CurrentArtKey,
+                ex
+            );
         }
     }
 

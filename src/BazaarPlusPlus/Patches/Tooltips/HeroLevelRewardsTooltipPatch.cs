@@ -3,6 +3,7 @@
 using System;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.EventPreview;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -45,7 +46,12 @@ internal static class HeroLevelRewardsTooltipPatch
 
             if (tooltipData is not HeroLevelTooltipData heroLevelTooltipData)
             {
-                BppLog.Debug("LevelTooltip", "Skipped: not hero level data");
+                ReportObserved(
+                    TooltipLevelRewardsOutcome.Skipped,
+                    TooltipLogReasonCode.NotHeroLevelData,
+                    level: 0,
+                    contentLength: 0
+                );
                 return;
             }
 
@@ -77,7 +83,12 @@ internal static class HeroLevelRewardsTooltipPatch
             );
             if (string.IsNullOrEmpty(content))
             {
-                BppLog.Debug("LevelTooltip", $"No content: level={currentLevel}");
+                ReportObserved(
+                    TooltipLevelRewardsOutcome.Skipped,
+                    TooltipLogReasonCode.NoContent,
+                    currentLevel,
+                    contentLength: 0
+                );
                 return;
             }
 
@@ -89,9 +100,13 @@ internal static class HeroLevelRewardsTooltipPatch
                 content,
                 SectionStyle
             );
-            BppLog.Debug(
-                "LevelTooltip",
-                $"content={content.Length}ch anchor={(anchor == null ? "null" : anchor.name)} shown={shown}"
+            ReportObserved(
+                shown
+                    ? TooltipLevelRewardsOutcome.Rendered
+                    : TooltipLevelRewardsOutcome.SectionUnavailable,
+                shown ? TooltipLogReasonCode.Rendered : TooltipLogReasonCode.SectionUnavailable,
+                currentLevel,
+                content.Length
             );
             if (!shown)
                 return;
@@ -101,7 +116,31 @@ internal static class HeroLevelRewardsTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("LevelTooltip", "Failed to render level-up rewards section", ex);
+            BppLog.WarnEvent(
+                TooltipLogEvents.LevelRewardsDegraded,
+                ex,
+                TooltipLogEvents.LevelRewardsOutcome.Bind(TooltipLevelRewardsOutcome.Failed),
+                TooltipLogEvents.LevelRewardsReasonCode.Bind(TooltipLogReasonCode.RenderException),
+                TooltipLogEvents.LevelRewardsLevel.Bind(0),
+                TooltipLogEvents.LevelRewardsContentLength.Bind(0)
+            );
         }
     }
+
+    private static void ReportObserved(
+        TooltipLevelRewardsOutcome outcome,
+        TooltipLogReasonCode reasonCode,
+        int level,
+        int contentLength
+    ) =>
+        BppLog.DebugEvent(
+            TooltipLogEvents.LevelRewardsRenderedOrSkipped,
+            () =>
+                [
+                    TooltipLogEvents.LevelRewardsOutcome.Bind(outcome),
+                    TooltipLogEvents.LevelRewardsReasonCode.Bind(reasonCode),
+                    TooltipLogEvents.LevelRewardsLevel.Bind(level),
+                    TooltipLogEvents.LevelRewardsContentLength.Bind(contentLength),
+                ]
+        );
 }

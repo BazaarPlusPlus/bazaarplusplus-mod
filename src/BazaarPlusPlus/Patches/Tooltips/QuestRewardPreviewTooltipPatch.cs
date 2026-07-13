@@ -8,6 +8,7 @@ using System.Runtime.CompilerServices;
 using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.QuestRewardPreview;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
@@ -25,8 +26,10 @@ internal static class QuestRewardPreviewTooltipPatch
         typeof(TooltipQuestEntry),
         "_descriptionText"
     );
-    private static readonly ConditionalWeakTable<TMP_Text, TextLayoutBaseline>
-        DescriptionLayoutBaselines = new();
+    private static readonly ConditionalWeakTable<
+        TMP_Text,
+        TextLayoutBaseline
+    > DescriptionLayoutBaselines = new();
 
     [HarmonyPostfix]
     private static void Postfix(
@@ -90,14 +93,11 @@ internal static class QuestRewardPreviewTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.ErrorEvent(QuestRewardPreviewLogEvents.AppendFailed, ex);
+            ReportDegraded(ex);
         }
     }
 
-    private static void ApplyPreviewTextLayout(
-        TMP_Text descriptionText,
-        bool hasInlineSprite
-    )
+    private static void ApplyPreviewTextLayout(TMP_Text descriptionText, bool hasInlineSprite)
     {
         var baseline = DescriptionLayoutBaselines.GetValue(
             descriptionText,
@@ -134,6 +134,14 @@ internal static class QuestRewardPreviewTooltipPatch
         internal Vector4 Margin { get; } = margin;
         internal float LineSpacing { get; } = lineSpacing;
     }
+
+    internal static void ReportDegraded(Exception exception) =>
+        BppLog.WarnEvent(
+            TooltipLogEvents.SectionDegraded,
+            exception,
+            TooltipLogEvents.SectionDegradedSectionId.Bind(TooltipSectionId.QuestRewardPreview),
+            TooltipLogEvents.SectionDegradedReasonCode.Bind(TooltipLogReasonCode.RenderException)
+        );
 }
 
 // QuestDisplayService only rebuilds the outer quest-group parent after populating its rows.
@@ -153,7 +161,7 @@ internal static class QuestRewardPreviewQuestGroupLayoutPatch
         }
         catch (Exception ex)
         {
-            BppLog.ErrorEvent(QuestRewardPreviewLogEvents.LayoutRebuildFailed, ex);
+            QuestRewardPreviewTooltipPatch.ReportDegraded(ex);
         }
     }
 }
@@ -187,10 +195,7 @@ internal static class BppQuestRewardPreviewText
     {
         foreach (var value in values)
         {
-            if (
-                value?.IndexOf(SpriteMarkupPrefix, StringComparison.OrdinalIgnoreCase)
-                >= 0
-            )
+            if (value?.IndexOf(SpriteMarkupPrefix, StringComparison.OrdinalIgnoreCase) >= 0)
                 return true;
         }
 

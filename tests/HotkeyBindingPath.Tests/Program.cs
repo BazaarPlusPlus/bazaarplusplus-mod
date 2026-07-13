@@ -3,6 +3,7 @@ using BazaarPlusPlus.Game.Input;
 var failures = new List<string>();
 
 CheckPrefixConstants();
+CheckBindingFailureGate();
 
 void Check(bool condition, string message)
 {
@@ -32,6 +33,29 @@ void CheckPrefixConstants()
 {
     CheckEqual("<Keyboard>/", HotkeyBindingPathCore.KeyboardPrefix, "Keyboard prefix constant");
     CheckEqual("<Mouse>/", HotkeyBindingPathCore.MousePrefix, "Mouse prefix constant");
+}
+
+void CheckBindingFailureGate()
+{
+    var gate = new HotkeyBindingFailureGate<string>();
+    var action = BppHotkeyActionId.ToggleHistoryPanel;
+
+    Check(gate.ShouldReport(action, "invalid-a", "invalid"), "first binding failure reports");
+    Check(!gate.ShouldReport(action, "invalid-a", "invalid"), "same binding failure is suppressed");
+    Check(
+        gate.ShouldReport(action, "invalid-b", "invalid"),
+        "changed binding reopens the failure gate"
+    );
+    Check(
+        gate.ShouldReport(action, "invalid-b", "unresolved"),
+        "changed reason reopens the failure gate"
+    );
+
+    gate.Clear();
+    Check(
+        gate.ShouldReport(action, "invalid-a", "invalid"),
+        "cleared lifecycle reopens the failure gate"
+    );
 }
 
 var normalizeCases = new (string? Input, string Expected, string Name)[]

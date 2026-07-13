@@ -101,6 +101,12 @@ internal enum HistoryPanelPreviewReasonCode
     StaticDataUnavailable,
 }
 
+internal enum HistoryPanelPreviewPayloadReasonCode
+{
+    PayloadInvalid,
+    PayloadUnreadable,
+}
+
 internal enum HistoryPanelRowReasonCode
 {
     SnapshotDeserializeFailed,

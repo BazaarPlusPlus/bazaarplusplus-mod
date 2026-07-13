@@ -405,6 +405,19 @@ internal sealed class CollectionGridVirtualizer
                 );
             }
 
+            var binding = bindResult.Binding;
+            var staleOrCanceled =
+                pending.IsCanceled
+                || pending.Generation != _generation
+                || _visible.Count <= pending.Index
+                || !ReferenceEquals(_visible[pending.Index], pending.Vm);
+            if (staleOrCanceled)
+            {
+                if (binding.HasValue)
+                    _factory.Return(binding.Value.Card, binding.Value.Kind);
+                return;
+            }
+
             if (bindResult.Degradation is { } degradation)
             {
                 var fields = new[]
@@ -425,19 +438,6 @@ internal sealed class CollectionGridVirtualizer
                         fields
                     );
                 }
-            }
-
-            var binding = bindResult.Binding;
-            var staleOrCanceled =
-                pending.IsCanceled
-                || pending.Generation != _generation
-                || _visible.Count <= pending.Index
-                || !ReferenceEquals(_visible[pending.Index], pending.Vm);
-            if (staleOrCanceled)
-            {
-                if (binding.HasValue)
-                    _factory.Return(binding.Value.Card, binding.Value.Kind);
-                return;
             }
 
             _firstWindowDiagnostics?.RecordBind(pending.Index, pending.BindStartedAt, binding);
@@ -873,11 +873,28 @@ internal sealed class CollectionGridVirtualizer
         try
         {
             cell.Card.gameObject.SetActive(true);
-            NativeCardPreviewRuntime.Show(
-                cell.Card,
-                show: true,
-                logComponent: "CollectionGridVirtualizer"
-            );
+            var showFailure = _factory.Show(cell.Card, cell.Vm.Id);
+            if (showFailure != null)
+            {
+                var fields = new[]
+                {
+                    CollectionPanelLogEvents.CardBindDegradedStage.Bind(
+                        CollectionCardBindStage.Bind
+                    ),
+                    CollectionPanelLogEvents.CardBindDegradedTemplateId.Bind(cell.Vm.Id),
+                    CollectionPanelLogEvents.CardBindDegradedReasonCode.Bind(
+                        CollectionPanelLogReasonCode.NativePreviewRuntimeFailed
+                    ),
+                };
+                if (showFailure.Exception == null)
+                    BppLog.WarnEvent(CollectionPanelLogEvents.CardBindDegraded, fields);
+                else
+                    BppLog.WarnEvent(
+                        CollectionPanelLogEvents.CardBindDegraded,
+                        showFailure.Exception,
+                        fields
+                    );
+            }
             ApplyCellScale(cell.Index, cell);
             Reposition(cell.Index, cell);
             // Show(true) re-activates _cardImage / _frameContainer; the CanvasGroup at the

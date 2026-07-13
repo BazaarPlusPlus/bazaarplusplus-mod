@@ -98,9 +98,16 @@ internal static class BazaarAgentReplayRecorderWiring
         if (!runtime.ReplayImportedBattle(manifest, payload, recordVideo: true))
             return BppReplayControlResult.Rejected("Replay runtime rejected the imported battle.");
 
-        BppLog.Info(
-            "BazaarAgentReplayRecorder",
-            $"Accepted external record request for battle {battleId}."
+        BppLog.DebugEvent(
+            CombatReplayLogEvents.ExternalRecordAccepted,
+            () =>
+                [
+                    CombatReplayLogEvents.ExternalRecordAcceptedRequestId.Bind(requestId),
+                    CombatReplayLogEvents.ExternalRecordAcceptedBattleId.Bind(battleId),
+                    CombatReplayLogEvents.ExternalRecordAcceptedSource.Bind(
+                        ReplayExternalRecordSource.Agent
+                    ),
+                ]
         );
         return BppReplayControlResult.Accepted(battleId);
     }

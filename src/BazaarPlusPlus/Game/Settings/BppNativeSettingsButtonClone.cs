@@ -9,8 +9,6 @@ internal interface IBppNativeSettingsButtonCloneOwner;
 
 internal static class BppNativeSettingsButtonClone
 {
-    private const string LogCategory = "BppNativeSettingsButtonClone";
-
     internal static RectTransform? FindOrCreate(
         Button anchorButton,
         BppSettingsDockPlacement placement
@@ -69,12 +67,9 @@ internal static class BppNativeSettingsButtonClone
 
         ConfigureRect(rect, anchorButton.transform as RectTransform);
 
-        BppLog.Debug(
-            LogCategory,
-            $"Clone '{placement.Key}': hasCloneOwner={HasCloneOwner(cloneObject)}, "
-                + $"hasBazaarButtonController={cloneObject.GetComponent<BazaarButtonController>() != null}, "
-                + $"hasButtonCustom={cloneObject.GetComponent<ButtonCustom>() != null}, "
-                + $"localScale={rect.localScale}, lossyScale={rect.lossyScale}"
+        BppLog.DebugEvent(
+            SettingsLogEvents.NativeButtonCloned,
+            () => [SettingsLogEvents.NativeButtonClonedButtonId.Bind(placement.ButtonId)]
         );
 
         return rect;

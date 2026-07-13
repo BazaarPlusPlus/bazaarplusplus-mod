@@ -54,6 +54,12 @@ internal enum LiveBuildCacheWriteReasonCode
     WriteFailed,
 }
 
+internal enum LiveBuildSnapshotReasonCode
+{
+    ReadException,
+    InvalidPlacement,
+}
+
 [BppLogEventSource]
 internal static class LiveBuildPanelLogEvents
 {
@@ -247,6 +253,98 @@ internal static class LiveBuildPanelLogEvents
         "live_build_panel.corpus.cache_write_degraded",
         [CacheWriteDegradedPath, CacheWriteDegradedReasonCode],
         new BppLogStormPolicy([CacheWriteDegradedReasonCode])
+    );
+
+    internal static readonly BppLogFieldDefinition LiveSnapshotDegradedSection = Public(
+        0,
+        "section",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition LiveSnapshotDegradedReasonCode = Public(
+        1,
+        "reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition LiveSnapshotDegradedTemplateId = Public(
+        2,
+        "template_id",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition LiveSnapshotDegradedSocketId = Public(
+        3,
+        "socket_id",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition LiveSnapshotDegradedItemSize = Public(
+        4,
+        "item_size",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogEventDefinition LiveSnapshotDegraded = new(
+        BppLogFeatureScope.LiveBuildPanel,
+        "live_build_panel.live_snapshot.degraded",
+        [
+            LiveSnapshotDegradedSection,
+            LiveSnapshotDegradedReasonCode,
+            LiveSnapshotDegradedTemplateId,
+            LiveSnapshotDegradedSocketId,
+            LiveSnapshotDegradedItemSize,
+        ],
+        new BppLogStormPolicy([LiveSnapshotDegradedSection, LiveSnapshotDegradedReasonCode])
+    );
+
+    internal static readonly BppLogFieldDefinition CardPreviewDegradedOperation = Public(
+        0,
+        "operation",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition CardPreviewDegradedReasonCode = Public(
+        1,
+        "reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition CardPreviewDegradedTemplateId = Public(
+        2,
+        "template_id",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogEventDefinition CardPreviewDegraded = new(
+        BppLogFeatureScope.LiveBuildPanel,
+        "live_build_panel.card_preview.degraded",
+        [
+            CardPreviewDegradedOperation,
+            CardPreviewDegradedReasonCode,
+            CardPreviewDegradedTemplateId,
+        ],
+        new BppLogStormPolicy([CardPreviewDegradedOperation, CardPreviewDegradedReasonCode])
+    );
+    internal static readonly BppLogFieldDefinition ItemBoardPreviewDegradedOperation = Public(
+        0,
+        "operation",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition ItemBoardPreviewDegradedReasonCode = Public(
+        1,
+        "reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition ItemBoardPreviewDegradedTemplateId = Public(
+        2,
+        "template_id",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogEventDefinition ItemBoardPreviewDegraded = new(
+        BppLogFeatureScope.LiveBuildPanel,
+        "live_build_panel.item_board_preview.degraded",
+        [
+            ItemBoardPreviewDegradedOperation,
+            ItemBoardPreviewDegradedReasonCode,
+            ItemBoardPreviewDegradedTemplateId,
+        ],
+        new BppLogStormPolicy([
+            ItemBoardPreviewDegradedOperation,
+            ItemBoardPreviewDegradedReasonCode,
+        ])
     );
 
     private static BppLogFieldDefinition Public(

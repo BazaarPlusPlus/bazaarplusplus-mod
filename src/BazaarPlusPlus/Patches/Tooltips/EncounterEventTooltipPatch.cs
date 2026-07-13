@@ -7,6 +7,7 @@ using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.EventPreview;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -67,7 +68,13 @@ internal static class EncounterEventTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("EncounterTooltip", "Failed to render encounter event section", ex);
+            BppLog.WarnEvent(
+                TooltipLogEvents.EncounterSectionDegraded,
+                ex,
+                TooltipLogEvents.EncounterSectionReasonCode.Bind(
+                    TooltipLogReasonCode.RenderException
+                )
+            );
         }
     }
 
@@ -141,7 +148,13 @@ internal static class EncounterEventTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("EncounterTooltip", $"Inventory read failed: {ex.Message}");
+            BppLog.WarnEvent(
+                TooltipLogEvents.EncounterInventoryDegraded,
+                ex,
+                TooltipLogEvents.EncounterInventoryReasonCode.Bind(
+                    TooltipLogReasonCode.InventoryReadException
+                )
+            );
             return null;
         }
     }

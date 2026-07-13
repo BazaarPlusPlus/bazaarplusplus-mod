@@ -97,7 +97,7 @@ internal sealed class CollectionCardFactory
     )
     {
         var spec = BuildSpec(vm);
-        var handle = await _nativeFactory.CreateAsync(
+        var outcome = await _nativeFactory.CreateAsync(
             template,
             spec,
             _parent,
@@ -105,6 +105,18 @@ internal sealed class CollectionCardFactory
             token,
             PrepareCollectionCardForBind
         );
+        if (outcome.Failure != null)
+        {
+            return CollectionCardBindResult.Degraded(
+                CollectionCardBindStatus.NotReady,
+                new CollectionCardBindDegradation(
+                    CollectionCardBindStage.Bind,
+                    MapFailureReason(outcome.Failure),
+                    outcome.Failure.Exception
+                )
+            );
+        }
+        var handle = outcome.Handle;
         if (handle == null)
             return CollectionCardBindResult.NotReady();
 
@@ -115,6 +127,25 @@ internal sealed class CollectionCardFactory
             new CollectionCardBinding(handle.Card, handle.Kind, Task.CompletedTask)
         );
     }
+
+    private static CollectionPanelLogReasonCode MapFailureReason(
+        NativeCardPreviewFailure failure
+    ) =>
+        failure.Reason switch
+        {
+            NativeCardPreviewFailureReason.StaticDataUnavailable =>
+                CollectionPanelLogReasonCode.StaticDataNotReady,
+            NativeCardPreviewFailureReason.TemplateUnavailable =>
+                CollectionPanelLogReasonCode.TemplateLookupFailed,
+            NativeCardPreviewFailureReason.SetUpException
+            or NativeCardPreviewFailureReason.ResizeException
+            or NativeCardPreviewFailureReason.ShowException =>
+                CollectionPanelLogReasonCode.NativePreviewRuntimeFailed,
+            _ => CollectionPanelLogReasonCode.NativePreviewUnavailable,
+        };
+
+    internal NativeCardPreviewFailure? Show(Component card, Guid templateId) =>
+        NativeCardPreviewRuntime.Show(card, show: true, templateId);
 
     public void Return(Component? card, NativeCardPreviewKind kind)
     {

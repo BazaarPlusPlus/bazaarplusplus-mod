@@ -16,6 +16,9 @@ internal enum RunLoggingReasonCode
     ReplayDrainHandlingException,
     ReplayDrainTimeout,
     ShutdownForced,
+    QueueShutdownDrainTimeout,
+    QueueWriteException,
+    QueueWorkerTerminatedUnexpectedly,
 }
 
 internal enum RunLoggingTransition
@@ -102,6 +105,62 @@ internal static class RunLoggingLogEvents
         BppLogCardinality.Low
     );
 
+    internal static readonly BppLogFieldDefinition QueueShutdownTimeoutMilliseconds = new(
+        0,
+        "timeout_ms",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.Low
+    );
+
+    internal static readonly BppLogFieldDefinition QueueShutdownPendingCount = new(
+        1,
+        "pending_count",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.High
+    );
+
+    internal static readonly BppLogFieldDefinition QueueShutdownReasonCode = new(
+        2,
+        "reason_code",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.Low
+    );
+
+    internal static readonly BppLogFieldDefinition QueueWriteOperation = new(
+        1,
+        "operation",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.Low
+    );
+
+    internal static readonly BppLogFieldDefinition QueueWriteReasonCode = new(
+        2,
+        "reason_code",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.Low
+    );
+
+    internal static readonly BppLogFieldDefinition QueueWorkerPendingCount = new(
+        0,
+        "pending_count",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.High
+    );
+
+    internal static readonly BppLogFieldDefinition QueueWorkerReasonCode = new(
+        1,
+        "reason_code",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.Low
+    );
+
     internal static readonly BppLogEventDefinition StoreReady = new(
         BppLogFeatureScope.RunLogging,
         "run_logging.store.ready",
@@ -148,5 +207,31 @@ internal static class RunLoggingLogEvents
         "run_logging.run.completion_degraded",
         new[] { RunId, CompletionDegradedReasonCode, GraceMilliseconds },
         new BppLogStormPolicy(new[] { CompletionDegradedReasonCode })
+    );
+
+    internal static readonly BppLogEventDefinition QueueShutdownDegraded = new(
+        BppLogFeatureScope.RunLogging,
+        "run_logging.queue.shutdown_degraded",
+        new[]
+        {
+            QueueShutdownTimeoutMilliseconds,
+            QueueShutdownPendingCount,
+            QueueShutdownReasonCode,
+        },
+        new BppLogStormPolicy(new[] { QueueShutdownReasonCode })
+    );
+
+    internal static readonly BppLogEventDefinition QueueWriteFailed = new(
+        BppLogFeatureScope.RunLogging,
+        "run_logging.queue.write_failed",
+        new[] { RunId, QueueWriteOperation, QueueWriteReasonCode },
+        new BppLogStormPolicy(Array.Empty<BppLogFieldDefinition>())
+    );
+
+    internal static readonly BppLogEventDefinition QueueWorkerFailed = new(
+        BppLogFeatureScope.RunLogging,
+        "run_logging.queue.worker_failed",
+        new[] { QueueWorkerPendingCount, QueueWorkerReasonCode },
+        new BppLogStormPolicy(Array.Empty<BppLogFieldDefinition>())
     );
 }

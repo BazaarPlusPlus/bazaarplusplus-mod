@@ -11,8 +11,6 @@ namespace BazaarPlusPlus.Game.Settings;
 
 internal static class BppDockButtonSpriteProvider
 {
-    private const string LogCategory = "BppDockButtonSprite";
-
     private const string IconResourceSuffix = "Resources.DockButtons.collection-panel-icon.png";
 
     private static Sprite? _cachedSprite;
@@ -38,13 +36,16 @@ internal static class BppDockButtonSpriteProvider
             );
         if (resourceName == null)
         {
-            BppLog.Warn(LogCategory, $"Embedded sprite resource not found suffix={resourceSuffix}");
+            ReportDegraded(SettingsLogReasonCode.ResourceMissing);
             return null;
         }
 
         using var stream = assembly.GetManifestResourceStream(resourceName);
         if (stream == null)
+        {
+            ReportDegraded(SettingsLogReasonCode.ResourceStreamUnavailable);
             return null;
+        }
 
         using var bytes = new MemoryStream();
         stream.CopyTo(bytes);
@@ -59,7 +60,7 @@ internal static class BppDockButtonSpriteProvider
         if (!texture.LoadImage(bytes.ToArray(), markNonReadable: false))
         {
             UnityEngine.Object.Destroy(texture);
-            BppLog.Warn(LogCategory, $"Failed to decode embedded sprite resource {resourceName}");
+            ReportDegraded(SettingsLogReasonCode.ResourceDecodeFailed);
             return null;
         }
 
@@ -75,4 +76,13 @@ internal static class BppDockButtonSpriteProvider
         sprite.name = $"BPP_{spriteName}_Sprite";
         return sprite;
     }
+
+    private static void ReportDegraded(SettingsLogReasonCode reasonCode) =>
+        BppLog.WarnEvent(
+            SettingsLogEvents.DockSpriteDegraded,
+            SettingsLogEvents.DockSpriteDegradedReasonCode.Bind(reasonCode),
+            SettingsLogEvents.DockSpriteDegradedResourceId.Bind(
+                SettingsDockSpriteResourceId.CollectionPanelIcon
+            )
+        );
 }

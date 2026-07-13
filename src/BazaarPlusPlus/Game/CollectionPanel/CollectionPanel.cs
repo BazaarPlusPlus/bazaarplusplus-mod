@@ -642,10 +642,9 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         _pool = new NativeCardPreviewPool(
             CollectionGridOverlay.DefaultLayer,
-            requireSockets: false,
-            "CollectionCardPool"
+            requireSockets: false
         );
-        var nativeFactory = new NativeCardPreviewFactory(_pool, "CollectionCardFactory");
+        var nativeFactory = new NativeCardPreviewFactory(_pool);
         _factory = new CollectionCardFactory(nativeFactory, _overlay.BoardRoot!, _cacheSession);
         _virtualizer = new CollectionGridVirtualizer(_overlay, _factory);
     }

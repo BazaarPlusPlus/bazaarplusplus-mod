@@ -35,6 +35,35 @@ internal enum CollectionPanelLogReasonCode
     LocaleChange,
     RuntimeDispose,
     StaticDataManagerChanged,
+    TierTooltipMergeException,
+    CachedLoadFailed,
+    NativePreviewUnavailable,
+    NativePreviewRuntimeFailed,
+}
+
+internal enum CollectionTierField
+{
+    Active,
+    Passive,
+    Cooldown,
+}
+
+internal enum CollectionPortraitReasonCode
+{
+    CollectionManagerUnavailable,
+    DefaultSkinUnavailable,
+    PortraitUnavailable,
+    LoadException,
+    ArtKeyUnavailable,
+    AssetLoaderUnavailable,
+    EncounterAssetUnavailable,
+}
+
+internal enum CollectionTypographyReasonCode
+{
+    IconResolveException,
+    ConfigurationMethodUnavailable,
+    ConfigurationInvocationException,
 }
 
 internal enum CollectionPanelSelectionProbe
@@ -513,6 +542,109 @@ internal static class CollectionPanelLogEvents
         "collection_panel.card_art.degraded",
         [CardArtDegradedReasonCode, CardArtDegradedStatus, CardArtDegradedArtKey],
         new BppLogStormPolicy([CardArtDegradedReasonCode])
+    );
+
+    internal static readonly BppLogFieldDefinition TierTooltipDegradedTierField = Public(
+        0,
+        "tier_field",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition TierTooltipDegradedReasonCode = Public(
+        1,
+        "reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogEventDefinition TierTooltipDegraded = new(
+        BppLogFeatureScope.CollectionPanel,
+        "collection_panel.tier_tooltip.degraded",
+        [TierTooltipDegradedTierField, TierTooltipDegradedReasonCode],
+        new BppLogStormPolicy([TierTooltipDegradedTierField, TierTooltipDegradedReasonCode])
+    );
+
+    internal static readonly BppLogFieldDefinition HeroPortraitDegradedHero = Public(
+        0,
+        "hero",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition HeroPortraitDegradedReasonCode = Public(
+        1,
+        "reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogEventDefinition HeroPortraitDegraded = new(
+        BppLogFeatureScope.CollectionPanel,
+        "collection_panel.hero_portrait.degraded",
+        [HeroPortraitDegradedHero, HeroPortraitDegradedReasonCode],
+        new BppLogStormPolicy([HeroPortraitDegradedReasonCode])
+    );
+    internal static readonly BppLogFieldDefinition HeroPortraitFallbackHero = Public(
+        0,
+        "hero",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition HeroPortraitFallbackReasonCode = Public(
+        1,
+        "reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogEventDefinition HeroPortraitFallbackObserved = new(
+        BppLogFeatureScope.CollectionPanel,
+        "collection_panel.hero_portrait.fallback_observed",
+        [HeroPortraitFallbackHero, HeroPortraitFallbackReasonCode]
+    );
+
+    internal static readonly BppLogFieldDefinition EncounterPortraitDegradedTemplateId = Public(
+        0,
+        "template_id",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition EncounterPortraitDegradedReasonCode = Public(
+        1,
+        "reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition EncounterPortraitDegradedArtKey = Untrusted(
+        2,
+        "art_key",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogEventDefinition EncounterPortraitDegraded = new(
+        BppLogFeatureScope.CollectionPanel,
+        "collection_panel.encounter_portrait.degraded",
+        [
+            EncounterPortraitDegradedTemplateId,
+            EncounterPortraitDegradedReasonCode,
+            EncounterPortraitDegradedArtKey,
+        ],
+        new BppLogStormPolicy([EncounterPortraitDegradedReasonCode])
+    );
+
+    internal static readonly BppLogFieldDefinition KeywordIconDegradedReasonCode = Public(
+        0,
+        "reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition KeywordIconDegradedIconName = Untrusted(
+        1,
+        "icon_name",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogEventDefinition KeywordIconDegraded = new(
+        BppLogFeatureScope.CollectionPanel,
+        "collection_panel.keyword_icon.degraded",
+        [KeywordIconDegradedReasonCode, KeywordIconDegradedIconName],
+        new BppLogStormPolicy([KeywordIconDegradedReasonCode])
+    );
+    internal static readonly BppLogFieldDefinition TagTypographyDegradedReasonCode = Public(
+        0,
+        "reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogEventDefinition TagTypographyDegraded = new(
+        BppLogFeatureScope.CollectionPanel,
+        "collection_panel.tag_typography.degraded",
+        [TagTypographyDegradedReasonCode],
+        new BppLogStormPolicy([TagTypographyDegradedReasonCode])
     );
 
     internal static readonly BppLogFieldDefinition CacheCleanupFailedCache = Public(

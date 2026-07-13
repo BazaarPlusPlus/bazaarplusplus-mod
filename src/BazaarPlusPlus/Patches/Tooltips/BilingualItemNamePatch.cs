@@ -55,7 +55,13 @@ internal static class BilingualItemNamePatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("BilingualNames", "Failed to append the Chinese item name", ex);
+            BppLog.WarnEvent(
+                BilingualItemNamesLogEvents.TooltipDegraded,
+                ex,
+                BilingualItemNamesLogEvents.TooltipDegradedReasonCode.Bind(
+                    BilingualLogReasonCode.TooltipPatchException
+                )
+            );
         }
     }
 }

@@ -3,7 +3,6 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
-using BazaarPlusPlus.Infrastructure;
 using TheBazaar.AppFramework;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -12,31 +11,25 @@ namespace BazaarPlusPlus.GameInterop.CardPreview;
 
 internal sealed class NativeCardPreviewAssetLoader
 {
-    private readonly string _logComponent;
-
-    public NativeCardPreviewAssetLoader(string logComponent)
-    {
-        _logComponent = string.IsNullOrWhiteSpace(logComponent)
-            ? "NativeCardPreviewAssetLoader"
-            : logComponent;
-    }
-
-    public async Task<Component?> InstantiateReadyCardAsync(
+    public async Task<NativeCardPreviewInstantiateOutcome> InstantiateReadyCardAsync(
         TCardInstance instance,
         Transform parent,
         CancellationToken token = default
     )
     {
         if (instance == null || parent == null)
-            return null;
+            return default;
 
         if (!Services.TryGet<AssetLoader>(out var assetLoader) || assetLoader == null)
         {
-            BppLog.Warn(
-                _logComponent,
-                "AssetLoader unavailable; native card preview cannot instantiate UI card."
+            return new NativeCardPreviewInstantiateOutcome(
+                null,
+                new NativeCardPreviewFailure(
+                    NativeCardPreviewOperation.Instantiate,
+                    NativeCardPreviewFailureReason.AssetLoaderUnavailable,
+                    instance.TemplateId
+                )
             );
-            return null;
         }
 
         try
@@ -51,43 +44,62 @@ internal sealed class NativeCardPreviewAssetLoader
                 CancellationToken.None
             );
             if (gameObject == null)
-                return null;
+            {
+                return new NativeCardPreviewInstantiateOutcome(
+                    null,
+                    new NativeCardPreviewFailure(
+                        NativeCardPreviewOperation.Instantiate,
+                        NativeCardPreviewFailureReason.PreviewComponentUnavailable,
+                        instance.TemplateId
+                    )
+                );
+            }
 
             var cardPreviewBaseType = NativeCardPreviewReflection.CardPreviewBaseType;
             if (cardPreviewBaseType == null)
             {
                 Object.Destroy(gameObject);
-                BppLog.Warn(
-                    _logComponent,
-                    $"CardPreviewBase type unavailable for template={instance.TemplateId}; destroyed AssetLoader preview."
+                return new NativeCardPreviewInstantiateOutcome(
+                    null,
+                    new NativeCardPreviewFailure(
+                        NativeCardPreviewOperation.ResolvePreviewType,
+                        NativeCardPreviewFailureReason.PreviewTypeUnavailable,
+                        instance.TemplateId
+                    )
                 );
-                return null;
             }
 
             var card = gameObject.GetComponent(cardPreviewBaseType);
             if (card == null)
             {
                 Object.Destroy(gameObject);
-                BppLog.Warn(
-                    _logComponent,
-                    $"AssetLoader UI card missing CardPreviewBase template={instance.TemplateId}; destroyed preview."
+                return new NativeCardPreviewInstantiateOutcome(
+                    null,
+                    new NativeCardPreviewFailure(
+                        NativeCardPreviewOperation.ResolvePreviewComponent,
+                        NativeCardPreviewFailureReason.PreviewComponentUnavailable,
+                        instance.TemplateId
+                    )
                 );
-                return null;
             }
 
-            return card;
+            return new NativeCardPreviewInstantiateOutcome(card, null);
         }
         catch (OperationCanceledException)
         {
-            return null;
+            return default;
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                _logComponent,
-                $"AssetLoader UI card instantiate failed template={instance.TemplateId}: {ex.Message}"
+            return new NativeCardPreviewInstantiateOutcome(
+                null,
+                new NativeCardPreviewFailure(
+                    NativeCardPreviewOperation.Instantiate,
+                    NativeCardPreviewFailureReason.InstantiateException,
+                    instance.TemplateId,
+                    ex
+                )
             );
-            return null;
         }
     }
 }

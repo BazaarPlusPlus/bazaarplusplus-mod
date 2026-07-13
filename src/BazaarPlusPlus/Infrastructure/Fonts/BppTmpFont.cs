@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Runtime.CompilerServices;
+using BazaarPlusPlus.Game.Settings;
 using TMPro;
 using UnityEngine;
 using UnityEngine.TextCore;
@@ -10,7 +11,6 @@ namespace BazaarPlusPlus.Infrastructure.Fonts;
 
 internal static class BppTmpFont
 {
-    private const string Component = "TmpFont";
     private const int SamplingPointSize = 90;
     private const int AtlasPadding = 9;
     private const int AtlasSize = 2048;
@@ -80,18 +80,25 @@ internal static class BppTmpFont
             );
             if (fontAsset == null)
             {
-                LogLoadFailure("CreateFontAsset returned null.");
+                LogLoadFailure(SettingsLogReasonCode.FontAssetUnavailable, null);
                 return null;
             }
 
             fontAsset.name = "BPP LXGWWenKai TMP";
             _default = fontAsset;
-            BppLog.Info(Component, $"Loaded TMP UI font '{fontAsset.name}'.");
+            BppLog.DebugEvent(
+                SettingsLogEvents.UiFontLoaded,
+                () =>
+                    [
+                        SettingsLogEvents.UiFontLoadedFontKind.Bind(SettingsUiFontKind.TmpCjk),
+                        SettingsLogEvents.UiFontLoadedPath.Bind(null),
+                    ]
+            );
             return _default;
         }
         catch (Exception ex)
         {
-            LogLoadFailure(ex.Message);
+            LogLoadFailure(SettingsLogReasonCode.FontLoadException, ex);
             return null;
         }
     }
@@ -124,7 +131,7 @@ internal static class BppTmpFont
             );
             if (fontAsset == null)
             {
-                LogLoadFailure($"CreateFontAsset returned null for '{assetName}'.");
+                LogLoadFailure(SettingsLogReasonCode.FontAssetUnavailable, null);
                 return null;
             }
 
@@ -133,7 +140,7 @@ internal static class BppTmpFont
         }
         catch (Exception ex)
         {
-            LogLoadFailure($"{assetName}: {ex.Message}");
+            LogLoadFailure(SettingsLogReasonCode.FontLoadException, ex);
             return null;
         }
     }
@@ -149,7 +156,15 @@ internal static class BppTmpFont
         }
         catch (Exception ex)
         {
-            BppLog.Debug(Component, $"Failed to warm TMP glyphs: {ex.Message}");
+            BppLog.WarnEvent(
+                SettingsLogEvents.UiFontDegraded,
+                ex,
+                SettingsLogEvents.UiFontDegradedFontKind.Bind(SettingsUiFontKind.TmpCjk),
+                SettingsLogEvents.UiFontDegradedReasonCode.Bind(
+                    SettingsLogReasonCode.GlyphWarmupException
+                ),
+                SettingsLogEvents.UiFontDegradedPath.Bind(null)
+            );
         }
     }
 
@@ -175,13 +190,22 @@ internal static class BppTmpFont
             text.fontSharedMaterial = snapshot.SharedMaterial;
     }
 
-    private static void LogLoadFailure(string reason)
+    private static void LogLoadFailure(SettingsLogReasonCode reasonCode, Exception? exception)
     {
         if (_loadFailureLogged)
             return;
 
         _loadFailureLogged = true;
-        BppLog.Warn(Component, $"Failed to load embedded TMP UI font. {reason}");
+        var fields = new[]
+        {
+            SettingsLogEvents.UiFontDegradedFontKind.Bind(SettingsUiFontKind.TmpCjk),
+            SettingsLogEvents.UiFontDegradedReasonCode.Bind(reasonCode),
+            SettingsLogEvents.UiFontDegradedPath.Bind(null),
+        };
+        if (exception == null)
+            BppLog.WarnEvent(SettingsLogEvents.UiFontDegraded, fields);
+        else
+            BppLog.WarnEvent(SettingsLogEvents.UiFontDegraded, exception, fields);
     }
 
     private sealed class FontSnapshot

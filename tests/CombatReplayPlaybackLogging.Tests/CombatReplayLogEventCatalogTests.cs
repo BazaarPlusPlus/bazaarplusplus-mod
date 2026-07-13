@@ -22,6 +22,8 @@ public sealed class CombatReplayLogEventCatalogTests
                 "run_id:Public:High:Short|reason_code:Public:Low:None",
             ["combat_replay.playback.request_rejected"] =
                 "source:Public:Low:None|reason_code:Public:Low:None|battle_id:Public:High:Short",
+            ["combat_replay.external_record.accepted"] =
+                "request_id:Public:High:Short|battle_id:Public:High:Short|source:Public:Low:None",
             ["combat_replay.playback.started"] =
                 "battle_id:Public:High:Short|source:Public:Low:None|record_video:Public:Low:None",
             ["combat_replay.playback.succeeded"] = PlaybackTerminalSchema,

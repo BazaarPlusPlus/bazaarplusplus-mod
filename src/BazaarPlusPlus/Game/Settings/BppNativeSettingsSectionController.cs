@@ -14,7 +14,6 @@ namespace BazaarPlusPlus.Game.Settings;
 
 internal sealed class BppNativeSettingsSectionController : MonoBehaviour
 {
-    private const string LogCategory = "NativeSettings";
     private const string SectionObjectName = "BPP_SettingsSection";
     private const string NavigationObjectName = "BPP_SettingsNavigationToggle";
     private const string RowObjectPrefix = "BPP_SettingsRow_";
@@ -74,6 +73,7 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         ScrollSpyEntry[]? originalEntries = null;
         IReadOnlyList<FooterMutation>? footerMutations = null;
         var entriesCommitted = false;
+        var logAttempt = new NativeSettingsInstallLogAttempt();
         try
         {
             var entries = EntriesField.GetValue(scrollSpy) as ScrollSpyEntry[];
@@ -92,9 +92,9 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
                 || choiceDonor == null
             )
             {
-                BppLog.Warn(
-                    LogCategory,
-                    "Native settings donors were incomplete; install skipped."
+                NativeSettingsLogState.ReportInstallFailure(
+                    SettingsNativeSectionStage.BuildSection,
+                    SettingsLogReasonCode.SupportSectionUnavailable
                 );
                 return;
             }
@@ -106,14 +106,20 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             );
             if (supportSection == null)
             {
-                BppLog.Warn(LogCategory, "Could not resolve the native support section.");
+                NativeSettingsLogState.ReportInstallFailure(
+                    SettingsNativeSectionStage.ResolveSupportSection,
+                    SettingsLogReasonCode.SupportSectionUnavailable
+                );
                 return;
             }
 
             var supportIndex = FindEntryIndex(entries, supportSection);
             if (supportIndex < 0 || entries[supportIndex].NavButtonRoot == null)
             {
-                BppLog.Warn(LogCategory, "Could not match the native support ScrollSpy entry.");
+                NativeSettingsLogState.ReportInstallFailure(
+                    SettingsNativeSectionStage.ResolveScrollSpyEntry,
+                    SettingsLogReasonCode.ScrollSpyEntryUnavailable
+                );
                 return;
             }
 
@@ -141,7 +147,7 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
                 toggleDonor,
                 choiceDonor
             );
-            footerMutations = controller.HideNativeFooter(supportSection);
+            footerMutations = controller.HideNativeFooter(supportSection, logAttempt);
 
             var expandedEntries = new ScrollSpyEntry[entries.Length + 1];
             Array.Copy(entries, 0, expandedEntries, 0, supportIndex + 1);
@@ -166,11 +172,7 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             stagedNavigation.gameObject.SetActive(true);
             controller.RebuildLayout();
             controller.RefreshView(force: true);
-
-            BppLog.Info(
-                LogCategory,
-                $"Installed native settings section: scroll='{BuildPath(scrollRect.transform)}', support='{BuildPath(supportSection)}', section='{BuildPath(stagedSection)}', nav='{BuildPath(stagedNavigation)}'."
-            );
+            logAttempt.CommitSuccess();
             stagedSection = null;
             stagedNavigation = null;
         }
@@ -191,7 +193,11 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             var controller = optionsDialog.GetComponent<BppNativeSettingsSectionController>();
             if (controller != null)
                 DestroyImmediate(controller);
-            BppLog.Error(LogCategory, "Failed to install native settings section", ex);
+            NativeSettingsLogState.ReportInstallFailure(
+                SettingsNativeSectionStage.Install,
+                SettingsLogReasonCode.InstallException,
+                ex
+            );
         }
     }
 
@@ -431,7 +437,10 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         }
     }
 
-    private IReadOnlyList<FooterMutation> HideNativeFooter(RectTransform supportSection)
+    private IReadOnlyList<FooterMutation> HideNativeFooter(
+        RectTransform supportSection,
+        NativeSettingsInstallLogAttempt logAttempt
+    )
     {
         var mutations = new List<FooterMutation>();
         if (_optionsDialog == null)
@@ -442,9 +451,17 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             _optionsDialog.transform.Find("ScalerOffset/SplitContainer") as RectTransform;
         if (dialogRoot == null || splitContainer == null)
         {
-            BppLog.Warn(LogCategory, "Native settings footer geometry was unavailable.");
+            logAttempt.ObserveLayoutFailure(
+                SettingsNativeLayoutOperation.FooterGeometry,
+                SettingsLogReasonCode.GeometryUnavailable
+            );
             return mutations;
         }
+        logAttempt.ObserveLayoutSuccess(
+            SettingsNativeLayoutOperation.FooterGeometry,
+            SettingsNativeLayoutOutcome.Applied,
+            affectedCount: 1
+        );
 
         var scalerOffset = splitContainer.parent;
         var footerLabel = scalerOffset?.Find("Notice_ChangeAuto")?.gameObject;
@@ -457,16 +474,17 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         var footerMutationCount = mutations.Count;
         if (footerMutationCount == 0)
         {
-            BppLog.Warn(
-                LogCategory,
-                $"Could not resolve native footer siblings under '{BuildPath(splitContainer)}'."
+            logAttempt.ObserveLayoutFailure(
+                SettingsNativeLayoutOperation.FooterSiblings,
+                SettingsLogReasonCode.GeometryUnavailable
             );
         }
         else
         {
-            BppLog.Info(
-                LogCategory,
-                $"Hid native auto-save footer objects: {string.Join(", ", BuildMutationPaths(mutations))}."
+            logAttempt.ObserveLayoutSuccess(
+                SettingsNativeLayoutOperation.FooterSiblings,
+                SettingsNativeLayoutOutcome.Applied,
+                footerMutationCount
             );
         }
 
@@ -474,29 +492,41 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         if (supportBuffer != null)
         {
             HideFooterObject(supportBuffer, mutations);
-            BppLog.Info(
-                LogCategory,
-                $"Hid native support bottom buffer: {BuildPath(supportBuffer.transform)}."
+            logAttempt.ObserveLayoutSuccess(
+                SettingsNativeLayoutOperation.SupportBottomBuffer,
+                SettingsNativeLayoutOutcome.Applied,
+                affectedCount: 1
             );
         }
         else
         {
-            BppLog.Warn(LogCategory, "Could not resolve native support bottom buffer.");
+            logAttempt.ObserveLayoutFailure(
+                SettingsNativeLayoutOperation.SupportBottomBuffer,
+                SettingsLogReasonCode.SupportBufferUnavailable
+            );
         }
 
-        ExpandSplitContainer(splitContainer, footerLabel, divider);
+        var expansion = ExpandSplitContainer(splitContainer, footerLabel, divider);
+        logAttempt.ObserveLayoutSuccess(
+            SettingsNativeLayoutOperation.SplitContainer,
+            expansion.Applied
+                ? SettingsNativeLayoutOutcome.Applied
+                : SettingsNativeLayoutOutcome.Skipped,
+            expansion.Applied ? 1 : 0,
+            expansion.GrowthUnits
+        );
         LayoutRebuilder.ForceRebuildLayoutImmediate(dialogRoot);
         return mutations;
     }
 
-    private static void ExpandSplitContainer(
+    private static SplitContainerExpansion ExpandSplitContainer(
         RectTransform splitContainer,
         GameObject? footerLabel,
         GameObject? divider
     )
     {
         if (splitContainer.parent is not RectTransform parent)
-            return;
+            return default;
 
         var targetBottomY = float.PositiveInfinity;
         foreach (var footerObject in new[] { footerLabel, divider })
@@ -512,14 +542,14 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
         }
 
         if (!float.IsFinite(targetBottomY))
-            return;
+            return default;
 
         var corners = new Vector3[4];
         splitContainer.GetWorldCorners(corners);
         var currentBottomY = parent.InverseTransformPoint(corners[0]).y;
         var releasedHeight = currentBottomY - targetBottomY;
         if (releasedHeight <= 0f)
-            return;
+            return default;
 
         var totalGrowth = releasedHeight + SplitContainerExtraHeight;
         var halfGrowth = totalGrowth * 0.5f;
@@ -532,11 +562,10 @@ internal sealed class BppNativeSettingsSectionController : MonoBehaviour
             splitContainer.offsetMax.y + halfGrowth
         );
         splitContainer.anchoredPosition = new Vector2(splitContainer.anchoredPosition.x, 0f);
-        BppLog.Info(
-            LogCategory,
-            $"Expanded and vertically centered native SplitContainer by {totalGrowth:0.##} local units."
-        );
+        return new SplitContainerExpansion(true, totalGrowth);
     }
+
+    private readonly record struct SplitContainerExpansion(bool Applied, float GrowthUnits);
 
     private void RebuildLayout()
     {

@@ -32,6 +32,16 @@ public sealed class LoggingGovernanceTests
         RegexOptions.CultureInvariant
     );
 
+    private static readonly Regex LegacyBppLogFacadeMember = new(
+        @"\bstatic\s+(?:string|void)\s+(?:Format|FormatError|Debug|Info|Warn|Error)\s*\(",
+        RegexOptions.CultureInvariant
+    );
+
+    private static readonly Regex BppLogShimClass = new(
+        @"\bstatic\s+class\s+BppLog\b",
+        RegexOptions.CultureInvariant
+    );
+
     private static readonly Regex LogShapedCall = new(
         @"\.(?<member>Log|LogDebug|LogInfo|LogWarning|LogError|LogFatal|LogMessage)\s*\(",
         RegexOptions.CultureInvariant
@@ -61,136 +71,83 @@ public sealed class LoggingGovernanceTests
         RegexOptions.Singleline | RegexOptions.CultureInvariant
     );
 
-    // Transitional expand-contract ratchets. Values are exact line+member fingerprints so a
-    // one-for-one replacement cannot hide behind an unchanged per-file count. Each migration
-    // removes its converted entries; #60 leaves every map empty.
-    private static readonly IReadOnlyDictionary<string, string> ExpectedLegacyCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["BazaarAgentReplayRecorderWiring.cs"] = "101:Info",
-            ["Core/Events/InMemoryBppEventBus.cs"] = "69:Error",
-            ["Core/Runtime/BppFeatureRegistry.cs"] = "26:Error,45:Error",
-            ["Game/CombatStatusBar/CombatStatusBar.Config.cs"] = "22:Info",
-            ["Game/EventPreview/EventPreviewPlanController.cs"] =
-                "64:Warn,110:Info,147:Error,154:Info,165:Error",
-            ["Game/Input/BppHotkeyService.cs"] = "85:Warn,97:Warn,304:Info",
-            ["Game/ItemEnchantPreview/ItemEnchantPreviewFormatting.cs"] = "117:Debug",
-            ["Game/ItemEnchantPreview/Preview/ItemEnchantPreviewRenderer.cs"] =
-                "72:Debug,91:Debug,158:Debug",
-            ["Game/Lobby/MainMenuVersionCheckController.cs"] =
-                "80:Warn,101:Warn,113:Warn,122:Info,130:Warn,137:Warn",
-            ["Game/Lobby/RandomHeroPool/RandomHeroPoolNativeController.cs"] = "64:Warn,222:Warn",
-            ["Game/Lobby/RandomPoolPrefsHelpers.cs"] = "31:Warn,64:Warn",
-            ["Game/PvpBattles/PvpBattleSnapshotCollector.cs"] =
-                "226:Warn,242:Warn,324:Warn,343:Warn,364:Warn,408:Warn",
-            ["Game/RunLogging/RunLogStoreLoggerBridge.cs"] = "10:Warn,13:Error",
-            ["Game/Settings/BppDockButtonSpriteProvider.cs"] = "41:Warn,62:Warn",
-            ["Game/Settings/BppNativeSettingsButtonClone.cs"] = "72:Debug",
-            ["Game/Settings/BppNativeSettingsSectionController.cs"] =
-                "95:Warn,109:Warn,116:Warn,170:Info,194:Error,445:Warn,460:Warn,467:Info,477:Info,484:Warn,535:Info",
-            ["Game/Supporters/BPPSupporterCatalog.cs"] =
-                "118:Info,125:Warn,163:Info,170:Warn,186:Warn",
-            ["Game/Tooltips/CardTooltipDataFactory.cs"] = "135:Warn",
-            ["Game/Tooltips/TooltipModifierRefreshController.cs"] = "59:Error,163:Debug",
-            ["Game/Tooltips/TooltipPreviewTargetResolver.cs"] =
-                "50:Debug,60:Debug,70:Debug,79:Debug,87:Debug",
-            ["GameInterop/BppClientCacheBridge.cs"] = "51:Debug,153:Debug",
-            ["GameInterop/CardPreview/NativeCardPreviewAssetLoader.cs"] =
-                "35:Warn,60:Warn,71:Warn,86:Warn",
-            ["GameInterop/CardPreview/NativeCardPreviewFactory.cs"] = "72:Warn,146:Debug,153:Warn",
-            ["GameInterop/CardPreview/NativeCardPreviewHoverRelay.cs"] = "80:Debug,88:Debug",
-            ["GameInterop/CardPreview/NativeCardPreviewReflection.cs"] =
-                "131:Debug,139:Debug,146:Debug",
-            ["GameInterop/CardPreview/NativeCardPreviewRuntime.cs"] =
-                "52:Warn,68:Warn,101:Warn,109:Warn",
-            ["GameInterop/Encounter/EncounterStateProbe.cs"] = "32:Error,174:Error",
-            ["GameInterop/Encounter/InteractionFilterProbe.cs"] = "34:Info,53:Error",
-            ["GameInterop/Encounter/PedestalEligibilityProbe.cs"] = "41:Info,46:Info,69:Info",
-            ["GameInterop/EncounterPortraits/EncounterPortraitSpriteProvider.cs"] =
-                "48:Warn,57:Warn,70:Warn,82:Warn",
-            ["GameInterop/HeroPortraits/HeroPortraitSpriteProvider.cs"] =
-                "46:Warn,57:Warn,66:Debug,74:Warn",
-            ["GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs"] = "526:Warn,549:Warn",
-            ["GameInterop/LiveCards/LiveCardSnapshotReader.cs"] = "40:Warn,87:Warn",
-            ["GameInterop/Localization/ChineseTranslationCatalog.cs"] = "105:Info,135:Warn",
-            ["GameInterop/Localization/NativeChineseFontFallback.cs"] =
-                "81:Warn,141:Warn,192:Warn,202:Info,218:Warn",
-            ["GameInterop/TagTypography/KeywordIconSpriteProvider.cs"] = "62:Warn",
-            ["GameInterop/TagTypography/NativeTagTypography.cs"] = "255:Warn",
-            ["Infrastructure/FileBackedPayloadStore.cs"] = "118:Warn,124:Warn",
-            ["Infrastructure/Fonts/BppTmpFont.cs"] = "89:Info,152:Debug,184:Warn",
-            ["Infrastructure/Fonts/BppUiFont.cs"] = "67:Info,76:Warn,83:Info",
-            ["Patches/CollectionPanel/CollectionItemLoadArtPatch.cs"] = "140:Warn",
-            ["Patches/CollectionPanel/CollectionTierTooltipPatch.cs"] =
-                "29:Error,53:Error,87:Error",
-            ["Patches/Lobby/MainMenuVersionLabelPatches.cs"] = "31:Warn",
-            ["Patches/Lobby/RandomHeroPoolPatches.cs"] =
-                "29:Warn,106:Warn,123:Warn,142:Warn,168:Warn",
-            ["Patches/Lobby/RandomHeroSkinPoolPatches.cs"] =
-                "33:Warn,46:Warn,62:Warn,80:Warn,97:Warn,123:Warn,149:Warn,173:Warn,198:Warn",
-            ["Patches/NameOverride/NameOverridePatches.cs"] =
-                "43:Debug,76:Debug,112:Debug,128:Debug",
-            ["Patches/Settings/BppKeybindSettingsPatch.cs"] = "59:Warn,213:Error,271:Error",
-            ["Patches/Settings/BppNativeSettingsSectionPatch.cs"] = "23:Error",
-            ["Patches/Settings/BppSettingsDockPatch.cs"] = "37:Error,82:Error",
-            ["Patches/Settings/OptionsDialogLanguageRefreshPatch.cs"] = "25:Error",
-            ["Patches/Settings/SettingsMenuToggleInstaller.cs"] = "37:Debug,62:Info",
-            ["Patches/Tooltips/AggregateItemMissingTypesTooltipPatch.cs"] = "47:Error",
-            ["Patches/Tooltips/BilingualItemNamePatch.cs"] = "58:Error",
-            ["Patches/Tooltips/BppTooltipSections.cs"] = "142:Info,183:Info",
-            ["Patches/Tooltips/EncounterEventTooltipPatch.cs"] = "70:Error,144:Warn",
-            ["Patches/Tooltips/HeroLevelRewardsTooltipPatch.cs"] =
-                "48:Debug,80:Debug,92:Debug,104:Error",
-            ["Patches/Tooltips/ItemEnchantPreviewPatch.cs"] = "87:Error",
-            ["Plugin.cs"] =
-                "47:Info,58:Info,60:Warn,66:Info,83:Info,85:Info,87:Info,91:Error,149:Error,211:Warn,221:Info,226:Info,246:Error,251:Warn,255:Info",
-        };
-
-    private static readonly IReadOnlyDictionary<string, string> ExpectedVoiceSubtitlesMembers =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
-    private static readonly IReadOnlyDictionary<string, string> ExpectedAgentLoggerCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
-    private static readonly IReadOnlyDictionary<string, string> ExpectedHostAgentLoggerCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
-    private static readonly IReadOnlyDictionary<string, string> ExpectedStorageLoggerCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["RunLog/Replication/QueuedRunLogStore.cs"] = "91:Warn,147:Error,159:Error",
-        };
-
     private static readonly HashSet<string> ApprovedBepInExAdapters = new(StringComparer.Ordinal)
     {
         "BazaarPlusPlus/Infrastructure/BppLog.cs",
         "BazaarPlusPlus.BazaarAgentHost/BazaarAgentBepInExLogger.cs",
     };
 
-    private static readonly IReadOnlyDictionary<string, string> ExpectedNonAdapterLogShapedCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal);
-
     [Fact]
-    public void Legacy_free_text_BppLog_calls_match_the_shrinking_allowlist()
+    public void Legacy_free_text_BppLog_calls_are_absent()
     {
         var root = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus");
-        AssertFingerprintsEqual(
-            ExpectedLegacyCalls,
+        AssertNoFingerprints(
             FingerprintMatches(root, LegacyBppLogCall, relativeTo: root),
-            "Legacy BppLog calls changed. Migrations must shrink ExpectedLegacyCalls in the same "
-                + "commit; new free-text calls are prohibited."
+            "Legacy BppLog free-text calls are prohibited."
         );
     }
 
     [Fact]
-    public void VoiceSubtitles_wrapper_surface_matches_the_shrinking_allowlist()
+    public void Legacy_facade_suppressor_and_exe_runner_BppLog_shims_are_absent()
+    {
+        var repoRoot = RepoRoot();
+        var infrastructureRoot = Path.Combine(repoRoot, "src", "BazaarPlusPlus", "Infrastructure");
+        var facade = File.ReadAllText(Path.Combine(infrastructureRoot, "BppLog.cs"));
+
+        Assert.False(File.Exists(Path.Combine(infrastructureRoot, "LogRepeatSuppressor.cs")));
+        Assert.DoesNotContain("LogRepeatSuppressor", facade, StringComparison.Ordinal);
+        Assert.DoesNotContain("Suppressor", facade, StringComparison.Ordinal);
+        Assert.DoesNotMatch(LegacyBppLogFacadeMember, facade);
+        Assert.DoesNotContain("private static void Emit(", facade, StringComparison.Ordinal);
+
+        var violations = Directory
+            .EnumerateFiles(
+                Path.Combine(repoRoot, "tests"),
+                "*.csproj",
+                SearchOption.AllDirectories
+            )
+            .Where(project =>
+                !File.ReadAllText(project)
+                    .Contains("Microsoft.NET.Test.Sdk", StringComparison.Ordinal)
+            )
+            .SelectMany(project => ProductionFiles(Path.GetDirectoryName(project)!))
+            .Where(file => BppLogShimClass.IsMatch(File.ReadAllText(file)))
+            .Select(file => Path.GetRelativePath(repoRoot, file).Replace('\\', '/'))
+            .ToArray();
+
+        Assert.True(
+            violations.Length == 0,
+            "Exe-runner projects must consume production structured logging seams instead of "
+                + "declaring BppLog compatibility shims:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
+    [Theory]
+    [InlineData("public static void Info(string component, string message)")]
+    [InlineData("internal static void Warn(string component, string message)")]
+    [InlineData("private static string Format(string component, string message)")]
+    public void Legacy_facade_ratchet_is_independent_of_access_modifier(string source)
+    {
+        Assert.Matches(LegacyBppLogFacadeMember, source);
+    }
+
+    [Theory]
+    [InlineData("public static class BppLog")]
+    [InlineData("internal static class BppLog")]
+    [InlineData("static class BppLog")]
+    public void Exe_runner_shim_ratchet_is_independent_of_access_modifier(string source)
+    {
+        Assert.Matches(BppLogShimClass, source);
+    }
+
+    [Fact]
+    public void VoiceSubtitles_wrapper_surface_is_absent()
     {
         var root = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus");
-        AssertFingerprintsEqual(
-            ExpectedVoiceSubtitlesMembers,
+        AssertNoFingerprints(
             FingerprintMatches(root, LegacyVoiceSubtitlesMember, relativeTo: root),
-            "The legacy VoiceSubtitles wrappers and helper members are frozen until #56 removes "
-                + "them. New uses are prohibited."
+            "Legacy VoiceSubtitles wrappers and helper members are prohibited."
         );
     }
 
@@ -269,26 +226,49 @@ public sealed class LoggingGovernanceTests
     }
 
     [Fact]
-    public void Agent_and_Storage_free_text_ports_match_the_shrinking_allowlists()
+    public void Agent_and_Storage_free_text_ports_are_absent()
     {
         var agentRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.BazaarAgent");
         var hostRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.BazaarAgentHost");
         var storageRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.Storage");
 
-        AssertFingerprintsEqual(
-            ExpectedAgentLoggerCalls,
+        AssertNoFingerprints(
             FingerprintMatches(agentRoot, LegacyAgentLoggerCall, relativeTo: agentRoot),
-            "The BazaarAgent free-text logger surface is frozen until #54 replaces it."
+            "The BazaarAgent free-text logger surface is prohibited."
         );
-        AssertFingerprintsEqual(
-            ExpectedHostAgentLoggerCalls,
+        AssertNoFingerprints(
             FingerprintMatches(hostRoot, LegacyHostAgentLoggerCall, relativeTo: hostRoot),
-            "The BazaarAgent Host free-text logger surface was removed by #54 and must stay empty."
+            "The BazaarAgent Host free-text logger surface is prohibited."
         );
-        AssertFingerprintsEqual(
-            ExpectedStorageLoggerCalls,
+        AssertNoFingerprints(
             FingerprintMatches(storageRoot, LegacyStorageLoggerCall, relativeTo: storageRoot),
-            "The Storage free-text logger surface is frozen until #53 replaces it."
+            "The Storage free-text logger surface is prohibited."
+        );
+    }
+
+    [Fact]
+    public void Storage_logging_port_and_project_stay_free_of_BepInEx()
+    {
+        var storageRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.Storage");
+        var violations = Directory
+            .EnumerateFiles(storageRoot, "*", SearchOption.AllDirectories)
+            .Where(path =>
+                path.EndsWith(".cs", StringComparison.Ordinal)
+                || path.EndsWith(".csproj", StringComparison.Ordinal)
+            )
+            .Where(path => File.ReadAllText(path).Contains("BepInEx", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(storageRoot, path).Replace('\\', '/'))
+            .ToArray();
+
+        Assert.Empty(violations);
+
+        var compiledReferences = typeof(BazaarPlusPlus.Storage.RunLog.IRunLogStore)
+            .Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name ?? string.Empty)
+            .ToArray();
+        Assert.DoesNotContain(
+            compiledReferences,
+            reference => reference.StartsWith("BepInEx", StringComparison.OrdinalIgnoreCase)
         );
     }
 
@@ -316,7 +296,7 @@ public sealed class LoggingGovernanceTests
     }
 
     [Fact]
-    public void Log_shaped_calls_exist_only_in_approved_adapters_or_the_exact_legacy_allowlist()
+    public void Log_shaped_calls_exist_only_in_approved_adapters()
     {
         var sourceRoot = Path.Combine(RepoRoot(), "src");
         var actual = FingerprintMatches(
@@ -326,12 +306,10 @@ public sealed class LoggingGovernanceTests
             excluded: ApprovedBepInExAdapters
         );
 
-        AssertFingerprintsEqual(
-            ExpectedNonAdapterLogShapedCalls,
+        AssertNoFingerprints(
             actual,
-            "Direct BepInEx writes are restricted to approved adapters. The broad .Log scan also "
-                + "pins known non-BepInEx calls so generic ManualLogSource receiver names cannot "
-                + "escape the boundary."
+            "Direct BepInEx writes are restricted to approved adapters; generic log-shaped calls "
+                + "outside those adapters are prohibited."
         );
     }
 
@@ -426,6 +404,35 @@ public sealed class LoggingGovernanceTests
                 continue;
             Assert.DoesNotContain("new BppLogFeatureScope", File.ReadAllText(file));
         }
+    }
+
+    [Fact]
+    public void Production_helpers_do_not_accept_dynamic_log_scope_parameters()
+    {
+        var dynamicLogParameter = new Regex(
+            @"\bstring\s+log(?:Tag|Component|Scope)\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant
+        );
+        var violations = ProductionFiles(Path.Combine(RepoRoot(), "src", "BazaarPlusPlus"))
+            .Where(file => dynamicLogParameter.IsMatch(File.ReadAllText(file)))
+            .Select(file => Path.GetRelativePath(RepoRoot(), file))
+            .ToArray();
+
+        Assert.True(
+            violations.Length == 0,
+            "Dynamic log scope parameters are prohibited:\n" + string.Join("\n", violations)
+        );
+    }
+
+    [Fact]
+    public void Plugin_teardown_resets_static_encounter_health_owners()
+    {
+        var plugin = File.ReadAllText(
+            Path.Combine(RepoRoot(), "src", "BazaarPlusPlus", "Plugin.cs")
+        );
+
+        Assert.Contains("TooltipEncounterProbeReader.Reset();", plugin);
+        Assert.Contains("BppTooltipSectionRenderPatch.ResetEncounterHealth();", plugin);
     }
 
     [Fact]
@@ -527,30 +534,17 @@ public sealed class LoggingGovernanceTests
         return line;
     }
 
-    private static void AssertFingerprintsEqual(
-        IReadOnlyDictionary<string, string> expected,
+    private static void AssertNoFingerprints(
         IReadOnlyDictionary<string, string> actual,
         string message
     )
     {
-        var differences = expected
-            .Keys.Union(actual.Keys, StringComparer.Ordinal)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .Where(path =>
-                !expected.TryGetValue(path, out var expectedValue)
-                || !actual.TryGetValue(path, out var actualValue)
-                || !string.Equals(expectedValue, actualValue, StringComparison.Ordinal)
-            )
-            .Select(path =>
-                path
-                + ": expected="
-                + (expected.TryGetValue(path, out var expectedValue) ? expectedValue : "<absent>")
-                + " actual="
-                + (actual.TryGetValue(path, out var actualValue) ? actualValue : "<absent>")
-            )
+        var violations = actual
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => pair.Key + ":" + pair.Value)
             .ToArray();
 
-        Assert.True(differences.Length == 0, message + "\n" + string.Join("\n", differences));
+        Assert.True(violations.Length == 0, message + "\n" + string.Join("\n", violations));
     }
 
     private static string RepoRoot([CallerFilePath] string thisFile = "")

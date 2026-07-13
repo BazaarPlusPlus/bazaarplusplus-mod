@@ -1,4 +1,5 @@
 #nullable enable
+using System;
 using BazaarPlusPlus.Core.GameState;
 
 namespace BazaarPlusPlus.GameInterop;
@@ -21,4 +22,35 @@ public interface IBazaarAgentGameProbe
     /// <summary>Resolves the encounter type (merchant/trainer/event/...) for an encounter id,
     /// or <c>null</c> when it cannot be classified.</summary>
     string? ResolveEncounterType(string? encounterId);
+}
+
+public interface IBazaarAgentTypedGameProbe
+{
+    BazaarAgentGameProbeOutcome<EncounterIdsSnapshot> GetEncounterIdsOutcome();
+
+    BazaarAgentGameProbeOutcome<EncounterTargetingSnapshot> GetTargetingStateOutcome();
+}
+
+public readonly struct BazaarAgentGameProbeOutcome<TSnapshot>
+{
+    private BazaarAgentGameProbeOutcome(bool isSuccess, TSnapshot snapshot, Exception? exception)
+    {
+        IsSuccess = isSuccess;
+        Snapshot = snapshot;
+        Exception = exception;
+    }
+
+    public bool IsSuccess { get; }
+
+    public TSnapshot Snapshot { get; }
+
+    public Exception? Exception { get; }
+
+    public static BazaarAgentGameProbeOutcome<TSnapshot> Success(TSnapshot snapshot) =>
+        new(true, snapshot, null);
+
+    public static BazaarAgentGameProbeOutcome<TSnapshot> Failure(
+        TSnapshot fallback,
+        Exception? exception
+    ) => new(false, fallback, exception);
 }

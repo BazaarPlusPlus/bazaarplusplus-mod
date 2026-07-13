@@ -6,3 +6,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("ItemEnchantPreview.Tests")]
 [assembly: InternalsVisibleTo("StartupUploadRunner.Tests")]
 [assembly: InternalsVisibleTo("VoiceSubtitles.Tests")]
+[assembly: InternalsVisibleTo("CollectionSourceFiltering.Tests")]

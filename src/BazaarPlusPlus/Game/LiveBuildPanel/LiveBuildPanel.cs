@@ -16,6 +16,7 @@ using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.LiveCards;
+using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -111,10 +112,39 @@ internal sealed class LiveBuildPanel : MonoBehaviour
             _buildRefreshError = string.Empty;
             _buildRefreshSucceeded = false;
         }
-        _liveSnapshot = _reader.Read();
+        var snapshotOutcome = _reader.Read();
+        _liveSnapshot = snapshotOutcome.Snapshot;
+        ReportLiveSnapshotIssues(snapshotOutcome.Issues);
         RefreshRecommendations();
         RefreshViewAndPreview();
         _view?.SetVisible(true);
+    }
+
+    private static void ReportLiveSnapshotIssues(IReadOnlyList<LiveCardSnapshotIssue> issues)
+    {
+        foreach (var issue in issues)
+        {
+            var fields = new[]
+            {
+                LiveBuildPanelLogEvents.LiveSnapshotDegradedSection.Bind(issue.Section),
+                LiveBuildPanelLogEvents.LiveSnapshotDegradedReasonCode.Bind(
+                    issue.Reason == LiveCardSnapshotFailureReason.InvalidPlacement
+                        ? LiveBuildSnapshotReasonCode.InvalidPlacement
+                        : LiveBuildSnapshotReasonCode.ReadException
+                ),
+                LiveBuildPanelLogEvents.LiveSnapshotDegradedTemplateId.Bind(issue.TemplateId),
+                LiveBuildPanelLogEvents.LiveSnapshotDegradedSocketId.Bind(issue.SocketId),
+                LiveBuildPanelLogEvents.LiveSnapshotDegradedItemSize.Bind(issue.ItemSize),
+            };
+            if (issue.Exception == null)
+                BppLog.WarnEvent(LiveBuildPanelLogEvents.LiveSnapshotDegraded, fields);
+            else
+                BppLog.WarnEvent(
+                    LiveBuildPanelLogEvents.LiveSnapshotDegraded,
+                    issue.Exception,
+                    fields
+                );
+        }
     }
 
     private void Close()

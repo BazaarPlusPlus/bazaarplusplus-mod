@@ -16,6 +16,15 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
 
 internal sealed partial class CollectionPanelView
 {
+    private static readonly CollectionPortraitFailureGate<
+        EHero,
+        CollectionPortraitReasonCode
+    > HeroPortraitFailures = new();
+    private static readonly CollectionPortraitFailureGate<
+        Guid,
+        CollectionPortraitReasonCode
+    > EncounterPortraitFailures = new();
+
     private void EnsureHeroChips(IReadOnlyList<EHero> heroes)
     {
         if (_heroChipRow == null)
@@ -139,7 +148,7 @@ internal sealed partial class CollectionPanelView
             {
                 var captured = tag;
                 var chip = CreateTagFacetChipButton(() => _commands.ToggleTag(captured));
-                ApplyTagChipContent(chip, NativeTagTypography.Resolve(captured));
+                ApplyTagChipContent(chip, ResolveTagDisplay(captured));
                 _tagChips[captured] = chip;
                 _tagChipOrder.Add(captured);
                 _tagChipRow.Add(chip);
@@ -166,7 +175,7 @@ internal sealed partial class CollectionPanelView
 
                 var captured = keyword;
                 var chip = CreateTagFacetChipButton(() => _commands.ToggleKeyword(captured));
-                ApplyTagChipContent(chip, NativeTagTypography.Resolve(captured));
+                ApplyTagChipContent(chip, ResolveTagDisplay(captured));
                 _keywordChips[captured] = chip;
                 _keywordChipOrder.Add(captured);
                 _keywordChipRow.Add(chip);
@@ -442,10 +451,21 @@ internal sealed partial class CollectionPanelView
         if (icon == null)
             return;
 
-        var sprite = KeywordIconSpriteProvider.Resolve(display.IconName);
-        if (sprite != null)
+        var outcome = KeywordIconSpriteProvider.Resolve(display.IconName);
+        if (outcome.IsDegraded)
         {
-            icon.style.backgroundImage = new StyleBackground(sprite);
+            BppLog.WarnEvent(
+                CollectionPanelLogEvents.KeywordIconDegraded,
+                outcome.Exception!,
+                CollectionPanelLogEvents.KeywordIconDegradedReasonCode.Bind(
+                    CollectionTypographyReasonCode.IconResolveException
+                ),
+                CollectionPanelLogEvents.KeywordIconDegradedIconName.Bind(outcome.IconName)
+            );
+        }
+        if (outcome.Sprite != null)
+        {
+            icon.style.backgroundImage = new StyleBackground(outcome.Sprite);
             icon.style.display = DisplayStyle.Flex;
             icon.MarkDirtyRepaint();
             return;
@@ -453,6 +473,42 @@ internal sealed partial class CollectionPanelView
 
         icon.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
         icon.style.display = DisplayStyle.None;
+    }
+
+    private static NativeTagDisplay ResolveTagDisplay(ECardTag tag)
+    {
+        var display = NativeTagTypography.Resolve(tag);
+        ReportTagTypographyFailure();
+        return display;
+    }
+
+    private static NativeTagDisplay ResolveTagDisplay(EHiddenTag tag)
+    {
+        var display = NativeTagTypography.Resolve(tag);
+        ReportTagTypographyFailure();
+        return display;
+    }
+
+    private static void ReportTagTypographyFailure()
+    {
+        if (!NativeTagTypography.TryTakeFailure(out var failure))
+            return;
+        var reasonCode =
+            failure.Reason == NativeTagTypographyFailureReason.ConfigurationMethodUnavailable
+                ? CollectionTypographyReasonCode.ConfigurationMethodUnavailable
+                : CollectionTypographyReasonCode.ConfigurationInvocationException;
+        var fields = new[]
+        {
+            CollectionPanelLogEvents.TagTypographyDegradedReasonCode.Bind(reasonCode),
+        };
+        if (failure.Exception == null)
+            BppLog.WarnEvent(CollectionPanelLogEvents.TagTypographyDegraded, fields);
+        else
+            BppLog.WarnEvent(
+                CollectionPanelLogEvents.TagTypographyDegraded,
+                failure.Exception,
+                fields
+            );
     }
 
     private Button CreateHeroChipButton(EHero hero, Action onClick)
@@ -651,7 +707,8 @@ internal sealed partial class CollectionPanelView
 
         if (HeroPortraitSpriteProvider.TryGetCached(hero, out var cached))
         {
-            ApplyHeroChipIcon(icon, cached);
+            ReportHeroPortraitOutcome(hero, cached);
+            ApplyHeroChipIcon(icon, cached?.Sprite);
             return;
         }
 
@@ -669,7 +726,8 @@ internal sealed partial class CollectionPanelView
 
         if (EncounterPortraitSpriteProvider.TryGetCached(representativeTemplateId, out var cached))
         {
-            ApplySourceChipIcon(icon, cached);
+            ReportEncounterPortraitOutcome(representativeTemplateId, cached);
+            ApplySourceChipIcon(icon, cached?.Sprite);
             return;
         }
 
@@ -682,10 +740,11 @@ internal sealed partial class CollectionPanelView
         VisualElement icon
     )
     {
-        var sprite = await HeroPortraitSpriteProvider.LoadDefaultPortraitAsync(hero);
+        var outcome = await HeroPortraitSpriteProvider.LoadDefaultPortraitAsync(hero);
         if (!Equals(icon.userData, hero))
             return;
-        ApplyHeroChipIcon(icon, sprite);
+        ReportHeroPortraitOutcome(hero, outcome);
+        ApplyHeroChipIcon(icon, outcome?.Sprite);
     }
 
     private static async System.Threading.Tasks.Task ApplySourceChipIconWhenLoadedAsync(
@@ -694,12 +753,104 @@ internal sealed partial class CollectionPanelView
         VisualElement icon
     )
     {
-        var sprite = await EncounterPortraitSpriteProvider.LoadPortraitAsync(
+        var outcome = await EncounterPortraitSpriteProvider.LoadPortraitAsync(
             representativeTemplateId
         );
         if (!Equals(icon.userData, sourceKey))
             return;
-        ApplySourceChipIcon(icon, sprite);
+        ReportEncounterPortraitOutcome(representativeTemplateId, outcome);
+        ApplySourceChipIcon(icon, outcome?.Sprite);
+    }
+
+    private static void ReportHeroPortraitOutcome(EHero hero, HeroPortraitLoadOutcome? outcome)
+    {
+        if (outcome == null)
+            return;
+        if (!outcome.IsDegraded)
+        {
+            HeroPortraitFailures.Clear(hero);
+            return;
+        }
+        var reasonCode = outcome.Reason switch
+        {
+            HeroPortraitFailureReason.CollectionManagerUnavailable =>
+                CollectionPortraitReasonCode.CollectionManagerUnavailable,
+            HeroPortraitFailureReason.DefaultSkinUnavailable =>
+                CollectionPortraitReasonCode.DefaultSkinUnavailable,
+            HeroPortraitFailureReason.PortraitUnavailable =>
+                CollectionPortraitReasonCode.PortraitUnavailable,
+            _ => CollectionPortraitReasonCode.LoadException,
+        };
+        if (!HeroPortraitFailures.ShouldReport(hero, reasonCode))
+            return;
+        if (outcome.Reason == HeroPortraitFailureReason.PortraitUnavailable)
+        {
+            BppLog.DebugEvent(
+                CollectionPanelLogEvents.HeroPortraitFallbackObserved,
+                () =>
+                    [
+                        CollectionPanelLogEvents.HeroPortraitFallbackHero.Bind(hero),
+                        CollectionPanelLogEvents.HeroPortraitFallbackReasonCode.Bind(reasonCode),
+                    ]
+            );
+            return;
+        }
+
+        var fields = new[]
+        {
+            CollectionPanelLogEvents.HeroPortraitDegradedHero.Bind(hero),
+            CollectionPanelLogEvents.HeroPortraitDegradedReasonCode.Bind(reasonCode),
+        };
+        if (outcome.Exception == null)
+            BppLog.WarnEvent(CollectionPanelLogEvents.HeroPortraitDegraded, fields);
+        else
+            BppLog.WarnEvent(
+                CollectionPanelLogEvents.HeroPortraitDegraded,
+                outcome.Exception,
+                fields
+            );
+    }
+
+    private static void ReportEncounterPortraitOutcome(
+        Guid templateId,
+        EncounterPortraitLoadOutcome? outcome
+    )
+    {
+        if (outcome == null)
+            return;
+        if (!outcome.IsDegraded)
+        {
+            EncounterPortraitFailures.Clear(templateId);
+            return;
+        }
+        var reasonCode = outcome.Reason switch
+        {
+            EncounterPortraitFailureReason.ArtKeyUnavailable =>
+                CollectionPortraitReasonCode.ArtKeyUnavailable,
+            EncounterPortraitFailureReason.AssetLoaderUnavailable =>
+                CollectionPortraitReasonCode.AssetLoaderUnavailable,
+            EncounterPortraitFailureReason.EncounterAssetUnavailable =>
+                CollectionPortraitReasonCode.EncounterAssetUnavailable,
+            EncounterPortraitFailureReason.PortraitUnavailable =>
+                CollectionPortraitReasonCode.PortraitUnavailable,
+            _ => CollectionPortraitReasonCode.LoadException,
+        };
+        if (!EncounterPortraitFailures.ShouldReport(templateId, reasonCode))
+            return;
+        var fields = new[]
+        {
+            CollectionPanelLogEvents.EncounterPortraitDegradedTemplateId.Bind(templateId),
+            CollectionPanelLogEvents.EncounterPortraitDegradedReasonCode.Bind(reasonCode),
+            CollectionPanelLogEvents.EncounterPortraitDegradedArtKey.Bind(outcome.ArtKey),
+        };
+        if (outcome.Exception == null)
+            BppLog.WarnEvent(CollectionPanelLogEvents.EncounterPortraitDegraded, fields);
+        else
+            BppLog.WarnEvent(
+                CollectionPanelLogEvents.EncounterPortraitDegraded,
+                outcome.Exception,
+                fields
+            );
     }
 
     private static void ApplyHeroChipIcon(VisualElement icon, Sprite? sprite)

@@ -34,6 +34,12 @@ public sealed class LiveBuildPanelLogEventCatalogTests
                 "endpoint:Public:Low:None|build_count:Public:High:None",
             ["live_build_panel.corpus.cache_write_degraded"] =
                 "path:LocalPath:High:None|reason_code:Public:Low:None",
+            ["live_build_panel.live_snapshot.degraded"] =
+                "section:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None|socket_id:Public:High:None|item_size:Public:Low:None",
+            ["live_build_panel.card_preview.degraded"] =
+                "operation:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None",
+            ["live_build_panel.item_board_preview.degraded"] =
+                "operation:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None",
         };
 
         Assert.Equal(expected, actual);
@@ -53,6 +59,27 @@ public sealed class LiveBuildPanelLogEventCatalogTests
         Assert.Equal(
             [LiveBuildPanelLogEvents.CacheWriteDegradedReasonCode],
             LiveBuildPanelLogEvents.CacheWriteDegraded.StormPolicy!.KeyFields
+        );
+        Assert.Equal(
+            [
+                LiveBuildPanelLogEvents.LiveSnapshotDegradedSection,
+                LiveBuildPanelLogEvents.LiveSnapshotDegradedReasonCode,
+            ],
+            LiveBuildPanelLogEvents.LiveSnapshotDegraded.StormPolicy!.KeyFields
+        );
+        Assert.Equal(
+            [
+                LiveBuildPanelLogEvents.CardPreviewDegradedOperation,
+                LiveBuildPanelLogEvents.CardPreviewDegradedReasonCode,
+            ],
+            LiveBuildPanelLogEvents.CardPreviewDegraded.StormPolicy!.KeyFields
+        );
+        Assert.Equal(
+            [
+                LiveBuildPanelLogEvents.ItemBoardPreviewDegradedOperation,
+                LiveBuildPanelLogEvents.ItemBoardPreviewDegradedReasonCode,
+            ],
+            LiveBuildPanelLogEvents.ItemBoardPreviewDegraded.StormPolicy!.KeyFields
         );
         var validation = BppLogEventCatalog.FromDefinitions(Definitions().ToArray()).Validate();
         Assert.True(

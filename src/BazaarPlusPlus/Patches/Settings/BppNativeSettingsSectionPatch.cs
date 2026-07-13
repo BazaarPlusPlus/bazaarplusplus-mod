@@ -20,7 +20,14 @@ internal static class BppNativeSettingsScrollSpyAwakePatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("NativeSettings", "ScrollSpy settings injection failed", ex);
+            BppLog.WarnEvent(
+                SettingsLogEvents.PatchDegraded,
+                ex,
+                SettingsLogEvents.PatchDegradedOperation.Bind(
+                    SettingsPatchOperation.NativeSectionInstall
+                ),
+                SettingsLogEvents.PatchDegradedReasonCode.Bind(SettingsLogReasonCode.PatchException)
+            );
         }
     }
 }

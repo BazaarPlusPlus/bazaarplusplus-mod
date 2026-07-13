@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using System.Reflection;
-using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 
 namespace BazaarPlusPlus.GameInterop.CardPreview;
@@ -13,16 +12,12 @@ internal sealed class NativeCardPreviewHoverRelay
     private static readonly MethodInfo? OnHoverOutMethod =
         NativeCardPreviewReflection.ResolvePublicInstanceMethod("OnHoverOut");
 
-    private readonly string _logComponent;
+    private readonly Action<NativeCardPreviewFailure>? _reportFailure;
     private Component? _card;
     private bool _hovered;
 
-    public NativeCardPreviewHoverRelay(string logComponent)
-    {
-        _logComponent = string.IsNullOrWhiteSpace(logComponent)
-            ? "NativeCardPreviewHoverRelay"
-            : logComponent;
-    }
+    public NativeCardPreviewHoverRelay(Action<NativeCardPreviewFailure>? reportFailure = null) =>
+        _reportFailure = reportFailure;
 
     public void Bind(Component? card)
     {
@@ -46,7 +41,7 @@ internal sealed class NativeCardPreviewHoverRelay
         if (_hovered)
             return true;
 
-        if (!InvokeSafe(_card, OnHoverMethod, "OnHover"))
+        if (!InvokeSafe(_card, OnHoverMethod, NativeCardPreviewOperation.InvokeHover))
             return false;
 
         _hovered = true;
@@ -59,16 +54,36 @@ internal sealed class NativeCardPreviewHoverRelay
         if (_card == null || !_hovered)
             return;
 
-        var invoked = InvokeSafe(_card, OnHoverOutMethod, "OnHoverOut");
+        var invoked = InvokeSafe(
+            _card,
+            OnHoverOutMethod,
+            NativeCardPreviewOperation.InvokeHoverOut
+        );
         _hovered = false;
         if (invoked)
             NativeCardPreviewHoverTracker.NotifyHoverOut(_card);
     }
 
-    private bool InvokeSafe(Component target, MethodInfo? method, string label)
+    private bool InvokeSafe(
+        Component target,
+        MethodInfo? method,
+        NativeCardPreviewOperation operation
+    )
     {
         if (target == null || method == null)
+        {
+            if (method == null)
+            {
+                _reportFailure?.Invoke(
+                    new NativeCardPreviewFailure(
+                        operation,
+                        NativeCardPreviewFailureReason.ReflectionUnavailable,
+                        templateId: null
+                    )
+                );
+            }
             return false;
+        }
 
         try
         {
@@ -77,15 +92,26 @@ internal sealed class NativeCardPreviewHoverRelay
         }
         catch (TargetInvocationException ex)
         {
-            BppLog.Debug(
-                _logComponent,
-                $"{label} threw: {ex.InnerException?.Message ?? ex.Message}"
+            _reportFailure?.Invoke(
+                new NativeCardPreviewFailure(
+                    operation,
+                    NativeCardPreviewFailureReason.ReflectionException,
+                    templateId: null,
+                    ex.InnerException ?? ex
+                )
             );
             return false;
         }
         catch (Exception ex)
         {
-            BppLog.Debug(_logComponent, $"{label} invocation failed: {ex.Message}");
+            _reportFailure?.Invoke(
+                new NativeCardPreviewFailure(
+                    operation,
+                    NativeCardPreviewFailureReason.ReflectionException,
+                    templateId: null,
+                    ex
+                )
+            );
             return false;
         }
     }

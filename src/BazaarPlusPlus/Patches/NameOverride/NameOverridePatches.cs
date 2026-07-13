@@ -40,9 +40,17 @@ internal static class NameOverrideHelper
         var profileName = BppClientCacheBridge.TryGetProfileUsername();
         if (string.IsNullOrEmpty(profileName))
         {
-            BppLog.Debug(
-                "NameOverride",
-                "Skipping replacement because profile username is unavailable"
+            BppLog.DebugEvent(
+                NameOverrideLogEvents.ValueSkipped,
+                () =>
+                    [
+                        NameOverrideLogEvents.ValueSkippedOperation.Bind(
+                            NameOverrideOperation.ResolveProfile
+                        ),
+                        NameOverrideLogEvents.ValueSkippedReasonCode.Bind(
+                            NameOverrideReasonCode.ProfileUnavailable
+                        ),
+                    ]
             );
             return false;
         }
@@ -73,9 +81,17 @@ public static class PlayerProfileGetDisplayUsernamePatch
             return;
 
         __result = replacementName!;
-        BppLog.Debug(
-            "NameOverride",
-            $"GetDisplayUsername replaced display username with {replacementName}"
+        BppLog.DebugEvent(
+            NameOverrideLogEvents.ValueApplied,
+            () =>
+                [
+                    NameOverrideLogEvents.ValueAppliedOperation.Bind(
+                        NameOverrideOperation.DisplayUsername
+                    ),
+                    NameOverrideLogEvents.ValueAppliedReasonCode.Bind(
+                        NameOverrideReasonCode.Replaced
+                    ),
+                ]
         );
     }
 }
@@ -109,7 +125,18 @@ public static class UpdatePlayerPatch
 
         userName = replacementName!;
         nameId = 0;
-        BppLog.Debug("NameOverride", $"UpdatePlayer replaced username with {replacementName}");
+        BppLog.DebugEvent(
+            NameOverrideLogEvents.ValueApplied,
+            () =>
+                [
+                    NameOverrideLogEvents.ValueAppliedOperation.Bind(
+                        NameOverrideOperation.UpdatePlayer
+                    ),
+                    NameOverrideLogEvents.ValueAppliedReasonCode.Bind(
+                        NameOverrideReasonCode.Replaced
+                    ),
+                ]
+        );
         return true;
     }
 }
@@ -125,7 +152,18 @@ public static class SetHeroNamePatch
 
         newName = replacementName!;
         usernameId = 0;
-        BppLog.Debug("NameOverride", $"SetHeroName replaced username with {replacementName}");
+        BppLog.DebugEvent(
+            NameOverrideLogEvents.ValueApplied,
+            () =>
+                [
+                    NameOverrideLogEvents.ValueAppliedOperation.Bind(
+                        NameOverrideOperation.SetHeroName
+                    ),
+                    NameOverrideLogEvents.ValueAppliedReasonCode.Bind(
+                        NameOverrideReasonCode.Replaced
+                    ),
+                ]
+        );
         return true;
     }
 }
