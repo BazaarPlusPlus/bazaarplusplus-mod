@@ -48,7 +48,8 @@ internal sealed partial class CollectionPanelView
         titleRow.style.alignItems = Align.Center;
         rail.Add(titleRow);
 
-        _title = CreateLabel(Sizes.FontTitle, FontStyle.Bold, Colors.HistoryTitleText);
+        _title = CreateLabel(Sizes.FontTitle, FontStyle.Normal, Colors.GameTitleText);
+        _title.style.unityFont = _titleFont;
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
         _title.style.minWidth = 0f;

@@ -392,10 +392,9 @@ internal sealed partial class CollectionPanelView
         );
         if (fillRow)
         {
-            chip.style.flexBasis = 0f;
+            // Preserve the content-based flex basis so shorter labels yield room to longer ones.
             chip.style.flexGrow = 1f;
             chip.style.flexShrink = 1f;
-            chip.style.minWidth = 0f;
         }
         chip.style.marginRight = fillRow ? 0f : UiSpacing.Sm;
         chip.style.marginBottom = UiSpacing.Xs;
@@ -1005,6 +1004,7 @@ internal sealed partial class CollectionPanelView
         button.style.justifyContent = Justify.Center;
         button.style.alignItems = Align.Center;
         button.style.overflow = Overflow.Hidden;
+        button.style.whiteSpace = WhiteSpace.NoWrap;
         UiStyle.Padding(button.style, UiSpacing.None);
         button.style.backgroundColor = Colors.HistoryButtonBackground;
         button.style.color = Colors.White;

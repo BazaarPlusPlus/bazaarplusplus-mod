@@ -1194,6 +1194,65 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Collection_quality_chips_use_content_basis_and_never_wrap()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "Ui",
+                "CollectionPanelView.Filters.cs"
+            )
+        );
+        var createChipButton = MethodSource(
+            source,
+            "private Button CreateChipButton",
+            "private static Button CreateTagFacetChipButton"
+        );
+        var createButton = MethodSource(
+            source,
+            "private static Button CreateButton",
+            "private static void StyleButton"
+        );
+
+        Assert.DoesNotContain("chip.style.flexBasis = 0f", createChipButton);
+        Assert.DoesNotContain("chip.style.minWidth = 0f", createChipButton);
+        Assert.Contains("button.style.whiteSpace = WhiteSpace.NoWrap", createButton);
+    }
+
+    [Fact]
+    public void Collection_title_uses_native_game_heading_typography()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var viewSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Ui", "CollectionPanelView.cs")
+        );
+        var treeSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Ui", "CollectionPanelView.Tree.cs")
+        );
+        var adapterSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
+        );
+        var colorsSource = File.ReadAllText(
+            Path.Combine(mainSource, "Infrastructure", "UiTokens", "Colors.cs")
+        );
+        var ensureCreated = MethodSource(
+            viewSource,
+            "public void EnsureCreated",
+            "public void SetVisible"
+        );
+        var titleStyle = MethodSource(treeSource, "_title = CreateLabel", "titleRow.Add(_title);");
+
+        Assert.Contains("NativeGameFonts.TryGetSerifSourceFont(out _titleFont)", ensureCreated);
+        Assert.Contains("internal static bool TryGetSerifSourceFont", adapterSource);
+        Assert.Contains("FontStyle.Normal", titleStyle);
+        Assert.Contains("Colors.GameTitleText", titleStyle);
+        Assert.Contains("_title.style.unityFont = _titleFont", titleStyle);
+        Assert.Contains("GameTitleText => Rgba(1f, 0.8352941f, 0.6745098f, 1f)", colorsSource);
+    }
+
+    [Fact]
     public void Bilingual_item_names_use_the_games_native_chinese_serif_fallback()
     {
         var mainSource = MainSourceRoot(RepoRoot());
@@ -1743,6 +1802,16 @@ public class CoreLayeringTests
             if (line.StartsWith("using BazaarPlusPlus.BazaarAgent", StringComparison.Ordinal))
                 violations.Add($"{relative}: {line}");
         }
+    }
+
+    private static string MethodSource(string source, string startMarker, string endMarker)
+    {
+        var start = source.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Could not find method marker '{startMarker}'.");
+
+        var end = source.IndexOf(endMarker, start, StringComparison.Ordinal);
+        Assert.True(end > start, $"Could not find method boundary '{endMarker}'.");
+        return source.Substring(start, end - start);
     }
 
     private static string? Attribute(XElement element, string name) =>

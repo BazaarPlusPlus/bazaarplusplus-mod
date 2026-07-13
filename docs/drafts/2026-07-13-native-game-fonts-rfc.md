@@ -12,7 +12,7 @@
 
 1. 删除 BPP 内嵌的 LXGW WenKai、所有 Unity `LegacyRuntime.ttf` / OS 字体路径、运行时自建 TMP 字体和 `Appearance.UiFont` 设置项。
 2. 游戏原生 TMP 表面保留 donor primary font 与材质；当 BPP 在非中文游戏 locale 主动输出 CJK 时，只给 donor clone 挂载游戏 `zh-CN` Static → SecondSet → Dynamic fallback 链，不替换成 BPP 字体。
-3. BPP 自建 UI Toolkit / uGUI 表面（包括 Combat Status Bar 与 Voice Subtitles 中文行）使用游戏 Noto Sans Dynamic 资产所引用的 `UnityEngine.Font`。
+3. BPP 自建 UI Toolkit / uGUI 表面（包括 Combat Status Bar 与 Voice Subtitles 中文行）默认使用游戏 Noto Sans Dynamic 资产所引用的 `UnityEngine.Font`；Collection Panel 顶层标题按游戏 screen-title 规则单独使用 Noto Serif。
 4. 把 `NativeChineseFontFallback` 的游戏资产加载与 TMP donor fallback 安装能力抽成共享 seam；双语名称、BPP 原生 tooltip CJK 和 Main Menu label 复用同一条游戏字体链。
 5. BPP 自建 UI Toolkit panel 使用受控 `PanelTextSettings`，显式清空默认、普通 fallback、Emoji fallback 与 OS fallback，避免缺字时静默切到系统字体。
 6. 外部动态文本先按实际游戏 `UnityEngine.Font` 覆盖范围校验。当前赞助名单完整覆盖；未来缺字的名字不改写、不落回 BPP/OS 字体，而是从轮播样本中跳过并记录缺失 code point。
@@ -124,6 +124,7 @@ code point 全覆盖同样不能证明台湾地区字形风格正确；源字体
 - `NotoSansSC-Bold-Dynamic SDF.m_SourceFontFile` 指向包内 `NotoSansSC-Bold` `UnityEngine.Font`；
 - `NotoSerifSC-SemiBold-Dynamic SDF.m_SourceFontFile` 指向包内 `NotoSerifSC-SemiBold` `UnityEngine.Font`；
 - 两个 Dynamic TMP atlas 均为 1024×1024、padding 8、未启用 multi-atlas；前两级静态 atlas 均为 2048×2048。
+- Collections 原生场景的 heading 样本 `Label`（`Ringside\nChampion`）序列化为 `NotoSerif`、`m_fontStyle = 0`、`m_fontColor = #FFD5AC`；Collection Panel 顶层标题沿用这组语义，正文和控件仍使用 Sans。
 
 UI Toolkit 的 `FontDefinition.FromSDFFont(...)` 接收 `UnityEngine.TextCore.Text.FontAsset`，不能直接接收 `TMPro.TMP_FontAsset`。可行路径是从游戏 Dynamic `TMP_FontAsset.sourceFontFile` 取得上述 `UnityEngine.Font`，再通过 `unityFont` / `FontDefinition.FromFont(...)` 设置到 BPP UI。该路径不创建 BPP TMP atlas。
 
@@ -236,7 +237,7 @@ OS fallback 列表没有公共 setter；实现必须把“能够可靠清空并�
 | Voice Subtitles | 删除 `ResolveSystemChineseUiFont` 与 OS font candidates；TMP 英文/combined label 保留 donor，uGUI 中文行使用游戏 Sans SC `UnityEngine.Font` |
 | Combat Status Bar | 删除 `GetBuiltinResource<Font>("LegacyRuntime.ttf")`；所有 uGUI `Text` 使用同一个游戏 Sans SC `UnityEngine.Font` |
 | 双语名称 | 保留 donor clone + 游戏 `zh-CN` fallback 行为；切到共享 loader，不改变产品行为 |
-| Collection / History / Live Build 根节点 | 统一绑定游戏 Sans SC `UnityEngine.Font` 与专用 `PanelTextSettings` |
+| Collection / History / Live Build 根节点 | 统一绑定游戏 Sans SC `UnityEngine.Font` 与专用 `PanelTextSettings`；Collection 顶层标题覆盖为游戏 Serif SC source font、normal style 与原生 heading 色 `#FFD5AC` |
 | TextField / Button 内部 text element | 清除分散的 `BppUiFont.Default`，继承根字体；只有 Unity 继承失效的控件保留显式游戏字体绑定 |
 | 赞助用户名 | 显示前校验；只处理当前实际显示文本，不预热整个远端名单 |
 | Collection source badge (`UnityEngine.UI.Text`) | 使用同一个游戏 `UnityEngine.Font` |

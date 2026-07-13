@@ -48,6 +48,7 @@ internal static class NativeGameFonts
 
     private static TMP_FontAsset[]? _serifFallbacks;
     private static TMP_FontAsset[]? _sansFallbacks;
+    private static Font? _serifSourceFont;
     private static Font? _sansSourceFont;
     private static bool _readyReported;
 
@@ -93,15 +94,25 @@ internal static class NativeGameFonts
         return true;
     }
 
-    internal static bool TryGetSansSourceFont(out Font? sourceFont)
+    internal static bool TryGetSansSourceFont(out Font? sourceFont) =>
+        TryGetSourceFont(preferSerif: false, ref _sansSourceFont, out sourceFont);
+
+    internal static bool TryGetSerifSourceFont(out Font? sourceFont) =>
+        TryGetSourceFont(preferSerif: true, ref _serifSourceFont, out sourceFont);
+
+    private static bool TryGetSourceFont(
+        bool preferSerif,
+        ref Font? cachedSourceFont,
+        out Font? sourceFont
+    )
     {
-        if (_sansSourceFont != null)
+        if (cachedSourceFont != null)
         {
-            sourceFont = _sansSourceFont;
+            sourceFont = cachedSourceFont;
             return true;
         }
 
-        var attempt = ResolveFallbacks(preferSerif: false);
+        var attempt = ResolveFallbacks(preferSerif);
         if (attempt.Fonts.Length == 0)
         {
             Observe(attempt);
@@ -132,7 +143,7 @@ internal static class NativeGameFonts
                 return false;
             }
 
-            _sansSourceFont = candidate;
+            cachedSourceFont = candidate;
             sourceFont = candidate;
             ReportSuccess(attempt.Fonts, candidate);
             return true;
@@ -293,6 +304,7 @@ internal static class NativeGameFonts
 
         _serifFallbacks = null;
         _sansFallbacks = null;
+        _serifSourceFont = null;
         _sansSourceFont = null;
         Health.Reset();
         _readyReported = false;

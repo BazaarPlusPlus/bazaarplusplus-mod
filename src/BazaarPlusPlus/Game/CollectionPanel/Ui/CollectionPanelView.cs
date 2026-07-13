@@ -80,6 +80,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private GameObject? _rootObject;
     private UIDocument? _document;
     private PanelSettings? _panelSettings;
+    private Font? _titleFont;
     private Font? _uiFont;
     private VisualElement? _root;
     private Label? _title;
@@ -173,8 +174,14 @@ internal sealed partial class CollectionPanelView : IDisposable
         _panelSettings.match = 1f;
         _panelSettings.clearColor = false;
         _panelSettings.targetDisplay = 0;
-        if (!NativeGameFonts.TryConfigurePanel(_panelSettings, out _uiFont) || _uiFont == null)
+        if (
+            !NativeGameFonts.TryConfigurePanel(_panelSettings, out _uiFont)
+            || _uiFont == null
+            || !NativeGameFonts.TryGetSerifSourceFont(out _titleFont)
+            || _titleFont == null
+        )
         {
+            NativeGameFonts.ReleasePanelTextSettings(_panelSettings);
             UnityEngine.Object.DestroyImmediate(_panelSettings);
             _panelSettings = null;
             return;
@@ -552,6 +559,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _rootObject = null;
         _document = null;
         _panelSettings = null;
+        _titleFont = null;
         _uiFont = null;
         _root = null;
         _controlsScrollView = null;
