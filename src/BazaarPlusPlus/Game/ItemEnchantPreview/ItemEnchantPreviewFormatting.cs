@@ -5,8 +5,6 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
-using BazaarPlusPlus.Localization;
 using TheBazaar.Tooltips;
 using TheBazaar.Utilities;
 
@@ -16,51 +14,29 @@ public static class ItemEnchantPreviewFormatting
 {
     private const int PrefixSizePercent = 60;
     private const int EffectSizePercent = 55;
-    private const string DefaultEntryBreakLineHeight = "<line-height=2.1em>";
-    private const string CjkWrappedLineHeight = DefaultEntryBreakLineHeight;
-    private const string CjkEntryBreakLineHeight = "<line-height=2.3em>";
-    private const string EnglishWrappedLineHeight = "<line-height=1.9em>";
+    private const string NativeLineHeight = "<line-height=1.6em>";
+    private const string WrappedLineHeight = "<line-height=1.9em>";
+    private const string EntryBreakLineHeight = "<line-height=2.1em>";
     private const string LineHeightEnd = "</line-height>";
-    private static readonly string DefaultEntryBreak = BuildEntryBreak(DefaultEntryBreakLineHeight);
-    private static readonly string CjkEntryBreak = BuildEntryBreak(CjkEntryBreakLineHeight);
+    private static readonly string EntryBreak = BuildEntryBreak(EntryBreakLineHeight);
 
     private static readonly Regex SizeTagRegex = new Regex(
         "<size=(\\d+)%>",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant
-    );
-    private static readonly Regex NativeLineHeightRegex = new Regex(
-        "<line-height=1\\.6em>",
         RegexOptions.Compiled | RegexOptions.CultureInvariant
     );
 
     public static TooltipSegment CreateSegment(
         EEnchantmentType enchantmentType,
         string renderedText
-    ) => CreateSegment(enchantmentType, renderedText, L.CurrentLanguageCode);
-
-    internal static TooltipSegment CreateSegment(
-        EEnchantmentType enchantmentType,
-        string renderedText,
-        string languageCode
     )
     {
         var enchantmentLabel = GetEnchantmentLabel(enchantmentType);
         var colorHex = GetEnchantmentColorHex(enchantmentType);
-        var usesCjkFont = BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(renderedText);
-        var wrappedLineHeight =
-            usesCjkFont ? CjkWrappedLineHeight
-            : LanguageCodeMatcher.IsEnglish(languageCode) ? EnglishWrappedLineHeight
-            : null;
-        var normalizedText =
-            wrappedLineHeight == null
-                ? renderedText
-                : NativeLineHeightRegex.Replace(renderedText, wrappedLineHeight);
+        var normalizedText = renderedText.Replace(NativeLineHeight, WrappedLineHeight);
         var scaledText = ScaleInlineSizes(normalizedText, EffectSizePercent / 100f);
-        var lineHeightStart = usesCjkFont ? CjkWrappedLineHeight : string.Empty;
-        var lineHeightEnd = usesCjkFont ? LineHeightEnd : string.Empty;
 
         return new TooltipSegment(
-            $"<size={PrefixSizePercent}%><color=#{colorHex}>{enchantmentLabel}</color>: </size><size={EffectSizePercent}%>{lineHeightStart}{scaledText}{lineHeightEnd}</size>",
+            $"<size={PrefixSizePercent}%><color=#{colorHex}>{enchantmentLabel}</color>: </size><size={EffectSizePercent}%>{WrappedLineHeight}{scaledText}{LineHeightEnd}</size>",
             null,
             null,
             -1
@@ -75,10 +51,7 @@ public static class ItemEnchantPreviewFormatting
         var lines = segments
             .Where(segment => !string.IsNullOrWhiteSpace(segment.Text))
             .Select(segment => NormalizeEntryLineEndings(segment.Text));
-        var entryBreak = lines.Any(BppTmpFontPolicy.ShouldUseEmbeddedCjkFont)
-            ? CjkEntryBreak
-            : DefaultEntryBreak;
-        return string.Join(entryBreak, lines);
+        return string.Join(EntryBreak, lines);
     }
 
     private static string BuildEntryBreak(string lineHeight) =>
