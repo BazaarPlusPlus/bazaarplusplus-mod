@@ -2,6 +2,7 @@
 #pragma warning disable CS0436
 using System;
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarPlusPlus.Game.QuestPreview;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop.LiveCards;
 using BazaarPlusPlus.GameInterop.StaticCards;
@@ -27,6 +28,9 @@ internal static class AggregateItemMissingTypesTooltipPatch
         try
         {
             BppTooltipSections.Hide(__instance, SectionKey);
+            if (!QuestPreviewGate.IsEnabled())
+                return;
+
             var content = string.IsNullOrEmpty(text) ? null : BuildContent(__instance);
             if (string.IsNullOrEmpty(content))
                 return;
@@ -56,6 +60,8 @@ internal static class AggregateItemMissingTypesTooltipPatch
             );
         }
     }
+
+    internal static void ClearPooledPresentation() => BppTooltipSections.HideAll(SectionKey);
 
     private static string? BuildContent(CardTooltipController controller)
     {

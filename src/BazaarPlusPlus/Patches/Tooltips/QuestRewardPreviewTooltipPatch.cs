@@ -7,7 +7,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
-using BazaarPlusPlus.Game.QuestRewardPreview;
+using BazaarPlusPlus.Game.QuestPreview;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -30,6 +30,7 @@ internal static class QuestRewardPreviewTooltipPatch
         TMP_Text,
         TextLayoutBaseline
     > DescriptionLayoutBaselines = new();
+    private static readonly List<ActivePreviewPresentation> ActivePreviewPresentations = new();
 
     [HarmonyPostfix]
     private static void Postfix(
@@ -45,7 +46,7 @@ internal static class QuestRewardPreviewTooltipPatch
             if (DescriptionTextField?.GetValue(__instance) is not TMP_Text descriptionText)
                 return;
 
-            if (!QuestRewardPreviewGate.IsEnabled())
+            if (!QuestPreviewGate.IsEnabled())
             {
                 RestoreNativeTextLayout(descriptionText);
                 return;
@@ -88,6 +89,7 @@ internal static class QuestRewardPreviewTooltipPatch
                 activeRewardText
             );
             ApplyPreviewTextLayout(descriptionText, hasInlineSprite);
+            TrackPreviewPresentation(descriptionText, questText);
             descriptionText.text = text;
             descriptionText.ForceMeshUpdate();
         }
@@ -117,6 +119,12 @@ internal static class QuestRewardPreviewTooltipPatch
 
     private static void RestoreNativeTextLayout(TMP_Text descriptionText)
     {
+        RestoreNativeTextLayoutCore(descriptionText);
+        ForgetPreviewPresentation(descriptionText);
+    }
+
+    private static void RestoreNativeTextLayoutCore(TMP_Text descriptionText)
+    {
         if (
             DescriptionLayoutBaselines.TryGetValue(descriptionText, out var baseline)
             && descriptionText.margin != baseline.Margin
@@ -129,10 +137,69 @@ internal static class QuestRewardPreviewTooltipPatch
             descriptionText.lineSpacing = baseline.LineSpacing;
     }
 
+    private static void TrackPreviewPresentation(TMP_Text descriptionText, string nativeText)
+    {
+        for (var index = ActivePreviewPresentations.Count - 1; index >= 0; index--)
+        {
+            var presentation = ActivePreviewPresentations[index];
+            if (!presentation.Description.TryGetTarget(out var trackedDescription))
+            {
+                ActivePreviewPresentations.RemoveAt(index);
+                continue;
+            }
+
+            if (!ReferenceEquals(trackedDescription, descriptionText))
+                continue;
+
+            presentation.NativeText = nativeText;
+            return;
+        }
+
+        ActivePreviewPresentations.Add(new ActivePreviewPresentation(descriptionText, nativeText));
+    }
+
+    private static void ForgetPreviewPresentation(TMP_Text descriptionText)
+    {
+        for (var index = ActivePreviewPresentations.Count - 1; index >= 0; index--)
+        {
+            if (
+                !ActivePreviewPresentations[index]
+                    .Description.TryGetTarget(out var trackedDescription)
+                || ReferenceEquals(trackedDescription, descriptionText)
+            )
+                ActivePreviewPresentations.RemoveAt(index);
+        }
+    }
+
+    internal static void ClearPooledPresentation()
+    {
+        foreach (var presentation in ActivePreviewPresentations)
+        {
+            if (
+                !presentation.Description.TryGetTarget(out var descriptionText)
+                || descriptionText == null
+            )
+                continue;
+
+            descriptionText.text = presentation.NativeText;
+            RestoreNativeTextLayoutCore(descriptionText);
+            descriptionText.ForceMeshUpdate();
+            descriptionText.GetComponentInParent<TooltipQuestGroup>()?.ForceRebuildLayout();
+        }
+
+        ActivePreviewPresentations.Clear();
+    }
+
     private sealed class TextLayoutBaseline(Vector4 margin, float lineSpacing)
     {
         internal Vector4 Margin { get; } = margin;
         internal float LineSpacing { get; } = lineSpacing;
+    }
+
+    private sealed class ActivePreviewPresentation(TMP_Text description, string nativeText)
+    {
+        internal WeakReference<TMP_Text> Description { get; } = new(description);
+        internal string NativeText { get; set; } = nativeText;
     }
 
     internal static void ReportDegraded(Exception exception) =>

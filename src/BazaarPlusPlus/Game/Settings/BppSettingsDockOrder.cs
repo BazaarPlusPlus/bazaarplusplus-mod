@@ -8,7 +8,7 @@ internal static class BppSettingsDockOrder
     internal const int LegendaryPosition = 1;
     internal const int EnchantPreview = 2;
     internal const int EventPreview = 3;
-    internal const int QuestRewardPreview = 4;
+    internal const int QuestPreview = 4;
     internal const int CombatStatusBar = 5;
     internal const int BilingualItemNames = 6;
     internal const int ChineseLocaleMode = 7;

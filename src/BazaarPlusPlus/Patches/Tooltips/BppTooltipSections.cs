@@ -106,6 +106,24 @@ internal static class BppTooltipSections
         section.Block.SetActive(false);
     }
 
+    internal static void HideAll(string key)
+    {
+        List<CardTooltipController>? owners = null;
+        foreach (var entry in Sections)
+        {
+            if (!string.Equals(entry.Key.Item2, key, System.StringComparison.Ordinal))
+                continue;
+
+            owners ??= new List<CardTooltipController>();
+            owners.Add(entry.Key.Item1);
+        }
+
+        if (owners == null)
+            return;
+        foreach (var owner in owners)
+            Hide(owner, key);
+    }
+
     public static void ReleaseAll(CardTooltipController controller)
     {
         List<(CardTooltipController, string)>? owned = null;

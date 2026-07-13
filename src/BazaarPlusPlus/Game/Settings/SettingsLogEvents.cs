@@ -88,7 +88,7 @@ internal enum SettingsRowId
     LiveBuildPanel,
     ItemEnchantPreview,
     EventPreview,
-    QuestRewardPreview,
+    QuestPreview,
     CombatStatusBar,
     VoiceSubtitles,
 }

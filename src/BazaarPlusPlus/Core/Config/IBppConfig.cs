@@ -12,7 +12,7 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? EnableEventPreviewConfig { get; }
 
-    ConfigEntry<bool>? EnableQuestRewardPreviewConfig { get; }
+    ConfigEntry<bool>? EnableQuestPreviewConfig { get; }
 
     ConfigEntry<bool>? EnableCombatStatusBarConfig { get; }
 

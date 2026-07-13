@@ -1928,6 +1928,32 @@ public class CoreLayeringTests
         }
     }
 
+    [Fact]
+    public void Quest_tooltip_implementations_share_one_gate_and_keep_separate_cleanup_paths()
+    {
+        var tooltipPatches = Path.Combine(MainSourceRoot(RepoRoot()), "Patches", "Tooltips");
+        var questRewardSource = File.ReadAllText(
+            Path.Combine(tooltipPatches, "QuestRewardPreviewTooltipPatch.cs")
+        );
+        var aggregateSource = File.ReadAllText(
+            Path.Combine(tooltipPatches, "AggregateItemMissingTypesTooltipPatch.cs")
+        );
+        var cleanupSource = File.ReadAllText(
+            Path.Combine(tooltipPatches, "QuestPreviewPooledTooltipCleanup.cs")
+        );
+
+        Assert.Contains("QuestPreviewGate.IsEnabled()", questRewardSource);
+        Assert.Contains("QuestPreviewGate.IsEnabled()", aggregateSource);
+        Assert.Contains("descriptionText.text = presentation.NativeText", questRewardSource);
+        Assert.Contains("RestoreNativeTextLayoutCore(descriptionText)", questRewardSource);
+        Assert.Contains("BppTooltipSections.HideAll(SectionKey)", aggregateSource);
+        Assert.Contains("QuestRewardPreviewTooltipPatch.ClearPooledPresentation()", cleanupSource);
+        Assert.Contains(
+            "AggregateItemMissingTypesTooltipPatch.ClearPooledPresentation()",
+            cleanupSource
+        );
+    }
+
     private static void ScanForAgentImports(string file, string baseDir, List<string> violations)
     {
         var relative = Path.GetRelativePath(baseDir, file).Replace('\\', '/');
