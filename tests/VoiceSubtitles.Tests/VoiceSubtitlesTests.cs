@@ -30,7 +30,7 @@ public sealed class VoiceSubtitlesTests
     }
 
     [Fact]
-    public void Embedded_seed_content_hash_is_verified_by_the_catalog_parser()
+    public void Embedded_seed_computed_content_hash_uses_sha256_format()
     {
         var repositoryType = GetRequiredType(
             "BazaarPlusPlus.Game.VoiceSubtitles.VoiceLinesRepository"
@@ -42,7 +42,7 @@ public sealed class VoiceSubtitlesTests
 
         var contentHash = Assert.IsType<string>(computeContentHash.Invoke(null, [lines]));
 
-        Assert.True(contentHash.StartsWith("sha256:", StringComparison.Ordinal));
+        Assert.StartsWith("sha256:", contentHash, StringComparison.Ordinal);
         Assert.Equal(71, contentHash.Length);
     }
 

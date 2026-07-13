@@ -39,20 +39,23 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 
 ```bash
 ./run.sh build          # Debug 构建
-./run.sh all            # Debug + Release
 ./run.sh test           # 全部测试
+./run.sh fetch-data     # 手动强制刷新远端嵌入数据
+./run.sh publish        # 生产发布：刷新数据、种子门禁、安装器资源与 BepInEx.zip
 dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 ```
 
 构建行为：
 
-- 每次构建都会从 `https://bazaarline-installer.bazaarplusplus.com/data/voice-lines.json` 下载并嵌入最新的语音字幕目录；该文件不存入仓库。下载失败会让构建失败，需恢复网络后重试。
+- `run.sh` 默认为其启动的 .NET 进程设置 `DOTNET_SYSTEM_NET_DISABLEIPV6=1`，避免系统中失效的 IPv6 隧道路由阻塞远端数据下载；调用方可显式设置该环境变量来覆盖默认值。
+- `voice-lines.json` 与 `tenwin_builds.json` 不存入仓库，构建从共享的 `src/BazaarPlusPlus/obj/remote-data/` 副本嵌入。普通构建已有副本时完全不联网；全新工作区缺失副本时自动下载一次，失败信息会提示恢复网络或运行 `./run.sh fetch-data`。
+- `./run.sh fetch-data` 只强制刷新并校验两份远端数据，不编译、不测试、不写安装器目录；`./run.sh publish` 会强制刷新一次，并在打包前运行语音字幕与终局 build 的嵌入种子门禁。
 - Debug 构建在识别到本地游戏目录时自动复制插件到 `BepInEx/plugins/`。
-- Release 构建在相邻 `../bazaarplusplus-installer` 仓库存在时，把产物复制到安装器资源目录。
+- 普通 Release 只编译；只有 `./run.sh publish` 会写入相邻 installer 仓库并生成 `BepInEx.zip`。
 
 ## 数据与网络行为
 
-- run logging、战斗回放和终局截图在本地保存 SQLite 数据、replay payload 与截图文件；云同步本身不携带任何鉴权凭证。语音字幕目录在构建时从 BazaarLine 发布端下载并嵌入，运行时仍会在本地缓存过期后后台刷新。
+- run logging、战斗回放和终局截图在本地保存 SQLite 数据、replay payload 与截图文件；云同步本身不携带任何鉴权凭证。语音字幕目录和 analyzer-v4 终局 build 种子由构建管线从各自发布端获取并嵌入，运行时仍会在本地缓存过期后后台刷新。
 - 后台上传只在非 live run 状态下执行上传扫描。
 - 云端后端（上传、ghost battles、replay 链接、BazaarDB 快照投递）在独立仓库 `bazaarplusplus-server`，部署于 `mod-api-v4.bazaarplusplus.com`；mod 侧 HTTP 客户端在 `src/BazaarPlusPlus.ModApi/`。
 
