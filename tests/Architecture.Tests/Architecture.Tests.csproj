@@ -39,6 +39,10 @@
     />
     <Compile Include="../../src/BazaarPlusPlus/PluginLogEvents.cs" Link="PluginLogEvents.cs" />
     <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/Fonts/NativeGameFontsLogEvents.cs"
+      Link="NativeGameFontsLogEvents.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/PluginTeardownAccumulator.cs"
       Link="PluginTeardownAccumulator.cs"
     />

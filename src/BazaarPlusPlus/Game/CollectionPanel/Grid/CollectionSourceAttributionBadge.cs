@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
-using BazaarPlusPlus.Infrastructure.Fonts;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,6 +22,8 @@ internal static class CollectionSourceAttributionBadge
     )
     {
         var badge = EnsureBadge(host);
+        if (badge == null)
+            return;
         var text = AttributionText(sourceMatches);
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -35,11 +37,13 @@ internal static class CollectionSourceAttributionBadge
             label.text = text;
     }
 
-    private static GameObject EnsureBadge(GameObject host)
+    private static GameObject? EnsureBadge(GameObject host)
     {
         var existing = host.transform.Find(BadgeName);
         if (existing != null)
             return existing.gameObject;
+        if (!NativeGameFonts.TryGetSansSourceFont(out var uiFont) || uiFont == null)
+            return null;
 
         var badge = new GameObject(BadgeName, typeof(RectTransform), typeof(Image));
         badge.transform.SetParent(host.transform, worldPositionStays: false);
@@ -68,7 +72,7 @@ internal static class CollectionSourceAttributionBadge
         labelRect.localScale = Vector3.one;
 
         var label = labelObject.GetComponent<Text>();
-        label.font = BppUiFont.Default;
+        label.font = uiFont;
         label.fontSize = Mathf.RoundToInt(12f * BadgeRootHeightScale);
         label.fontStyle = FontStyle.Bold;
         label.alignment = TextAnchor.MiddleCenter;

@@ -9,12 +9,12 @@
 
   <ItemGroup>
     <Compile
-      Include="../../src/BazaarPlusPlus/Infrastructure/Fonts/EmbeddedFontFile.cs"
-      Link="EmbeddedFontFile.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/Fonts/UnicodeFontCoverage.cs"
+      Link="UnicodeFontCoverage.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Infrastructure/Fonts/BppTmpFontPolicy.cs"
-      Link="BppTmpFontPolicy.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/Fonts/NativeGameFontSelection.cs"
+      Link="NativeGameFontSelection.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Infrastructure/StablePanelText.cs"
@@ -26,7 +26,6 @@
     />
     <Compile Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/Sizes.cs" Link="Sizes.cs" />
     <Compile Include="Program.cs" />
-    <EmbeddedResource Include="Resources/embedded-font-test.txt" />
   </ItemGroup>
 
   <ItemGroup>

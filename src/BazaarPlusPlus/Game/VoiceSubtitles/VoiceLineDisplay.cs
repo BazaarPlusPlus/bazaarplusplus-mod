@@ -17,6 +17,7 @@ internal static class VoiceLineDisplay
     private const float ScaleComparisonTolerance = 0.0001f;
     private const float BilingualChineseScaleMultiplier = 1.08f;
     private const float CenteredChineseTrailingPunctuationWidthRatio = 0.5f;
+    internal const int MaxQueuedShows = 8;
 
     private static GameObject? _labelRoot;
     private static TextMeshProUGUI? _combinedLabel;
@@ -166,16 +167,69 @@ internal static class VoiceLineDisplay
         if (!VoiceSubtitlesGate.IsEnabled())
             return;
 
+        EnqueueQueuedShow(cue);
+    }
+
+    internal static void EnqueueQueuedShow(VoiceSubtitleCue cue)
+    {
         QueuedShows.Enqueue(cue);
+        while (QueuedShows.Count > MaxQueuedShows)
+            if (!QueuedShows.TryDequeue(out _))
+                break;
     }
 
     public static void ProcessQueuedShows()
     {
-        if (QueuedShows.IsEmpty)
+        if (!VoiceSubtitlesGate.IsEnabled())
+        {
+            while (QueuedShows.TryDequeue(out _)) { }
             return;
+        }
+
+        ProcessQueuedShows(IsMountedFromVersionLabel, Show);
+    }
+
+    internal static void ProcessQueuedShows(bool isMounted, Action<VoiceSubtitleCue> showQueuedCue)
+    {
+        if (showQueuedCue == null)
+            throw new ArgumentNullException(nameof(showQueuedCue));
+
+        if (!isMounted)
+        {
+            while (
+                QueuedShows.TryPeek(out var queued)
+                && ShouldDiscardQueuedCue(queued)
+                && QueuedShows.TryDequeue(out _)
+            ) { }
+            return;
+        }
 
         while (QueuedShows.TryDequeue(out var queued))
-            Show(queued);
+            if (!ShouldDiscardQueuedCue(queued))
+                showQueuedCue(queued);
+    }
+
+    private static bool ShouldDiscardQueuedCue(VoiceSubtitleCue cue)
+    {
+        try
+        {
+            return cue.IsPlaybackStoppedOrStopping?.Invoke() == true;
+        }
+        catch (Exception ex)
+        {
+            BppLog.WarnEvent(
+                VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegraded,
+                ex,
+                VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegradedDisplayId.Bind(null),
+                VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegradedAttemptId.Bind(
+                    cue.AttemptId
+                ),
+                VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegradedReasonCode.Bind(
+                    VoiceSubtitlesLogReasonCode.PlaybackQueryException
+                )
+            );
+            return true;
+        }
     }
 
     public static void Reset()
@@ -441,7 +495,7 @@ internal static class VoiceLineDisplay
 
         if (chineseUi != null)
         {
-            chineseUi.font = FontDiagnostics.ResolveSystemChineseUiFont() ?? chineseUi.font;
+            chineseUi.font = FontDiagnostics.ResolveGameChineseUiFont() ?? chineseUi.font;
             chineseUi.fontStyle = FontStyle.Bold;
             chineseUi.alignment = settings.Position switch
             {
@@ -484,7 +538,7 @@ internal static class VoiceLineDisplay
 
     private static Text? CreateChineseUiLabel(Transform parent)
     {
-        var uiFont = FontDiagnostics.ResolveSystemChineseUiFont();
+        var uiFont = FontDiagnostics.ResolveGameChineseUiFont();
         if (uiFont == null)
             return null;
 

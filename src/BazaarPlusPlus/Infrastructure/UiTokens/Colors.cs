@@ -12,6 +12,7 @@ internal static class Colors
     public static Color HistorySectionBackground => Rgba(0.11f, 0.13f, 0.18f, 0.98f);
     public static Color HistoryListFrameBackground => Rgba(0.09f, 0.11f, 0.15f, 0.96f);
     public static Color HistoryListFrameBorder => Rgba(0.24f, 0.29f, 0.38f, 0.55f);
+    public static Color GameTitleText => Rgba(1f, 0.8352941f, 0.6745098f, 1f);
     public static Color HistoryTitleText => Rgba(0.97f, 0.85f, 0.57f, 1f);
     public static Color HistorySubtitleText => Rgba(0.82f, 0.86f, 0.91f, 0.94f);
     public static Color HistorySectionTitleText => Rgba(0.76f, 0.91f, 1f, 1f);

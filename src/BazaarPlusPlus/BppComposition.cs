@@ -119,7 +119,6 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(_settingsDockRegistry);
         _settingsDockRegistry.Register(ChineseLocaleModeSettingsDockEntry.Create(_eventBus));
-        _settingsDockRegistry.Register(UiFontSettingsDockEntry.Create());
         _settingsDockRegistry.Register(CombatStatusBarSettingsDockEntry.Create());
         _settingsDockRegistry.Register(BilingualItemNamesSettingsDockEntry.Create());
         _settingsDockRegistry.Register(new EndOfRunScreenshotSettingsDockEntry());
@@ -134,18 +133,21 @@ internal sealed class BppComposition : IDisposable
         var encounterPreviewCachePath = System.IO.Path.Combine(
             System.IO.Path.GetDirectoryName(
                 _paths.RunLogDatabasePath
-                    ?? throw new InvalidOperationException("Run log database path is not initialized.")
+                    ?? throw new InvalidOperationException(
+                        "Run log database path is not initialized."
+                    )
             )!,
             "EncounterPreview",
             "preview-plans.json"
         );
         _mountables.Register(
-            new ComponentMount<EventPreviewPlanController>((controller, services) =>
-                controller.Initialize(
-                    services,
-                    _staticCardMapProvider,
-                    encounterPreviewCachePath
-                )
+            new ComponentMount<EventPreviewPlanController>(
+                (controller, services) =>
+                    controller.Initialize(
+                        services,
+                        _staticCardMapProvider,
+                        encounterPreviewCachePath
+                    )
             )
         );
         // The overlay host must mount before every Main Overlay Panel mount below: panels
@@ -153,10 +155,7 @@ internal sealed class BppComposition : IDisposable
         var overlayPanelHostMount = new OverlayPanelHostMount();
         _mountables.Register(overlayPanelHostMount);
         _mountables.Register(
-            new CollectionPanelMount(
-                () => overlayPanelHostMount.Host,
-                _staticCardMapProvider
-            )
+            new CollectionPanelMount(() => overlayPanelHostMount.Host, _staticCardMapProvider)
         );
         _mountables.Register(
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))

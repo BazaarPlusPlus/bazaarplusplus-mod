@@ -1,7 +1,7 @@
 #nullable enable
 using System.Collections.Generic;
 using System.Linq;
-using BazaarPlusPlus.Infrastructure.Fonts;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using TheBazaar;
 using UnityEngine;
@@ -27,33 +27,30 @@ internal static class BPPSupporterAttributionRow
     public static void Bind(
         VisualElement row,
         IReadOnlyList<BPPSupporterSample> supporters,
-        string fallbackText
+        string fallbackText,
+        Font uiFont
     )
     {
         row.Clear();
 
         var languageCode = GetLanguageCode();
         var sponsorText = BPPSupporterAttributionText.FormatSponsorAction(languageCode);
-        var samples = supporters.Where(sample => sample.HasValue).Take(4).ToList();
+        var samples = supporters
+            .Where(sample =>
+                sample.HasValue
+                && NativeGameFonts.IsTextSupported(uiFont, sample.Name, "supporter_attribution")
+            )
+            .Take(4)
+            .ToList();
         if (samples.Count == 0)
         {
             row.Add(CreateFallbackLabel(fallbackText));
             row.Add(CreateSponsorButton(sponsorText));
-            WarmFont(fallbackText + sponsorText + SponsorIcon);
             return;
         }
 
         var prefix = BPPSupporterAttributionText.FormatSupportedByPrefix(languageCode);
         var suffix = BPPSupporterAttributionText.FormatSupportedBySuffix(languageCode);
-        WarmFont(
-            prefix
-                + suffix
-                + sponsorText
-                + SponsorIcon
-                + string.Concat(samples.Select(sample => sample.Name))
-                + "·"
-        );
-
         row.Add(CreatePrefixLabel(prefix));
         for (var index = 0; index < samples.Count; index++)
         {
@@ -73,7 +70,6 @@ internal static class BPPSupporterAttributionRow
     {
         var label = new Label(text);
         label.style.fontSize = Sizes.FontSmall;
-        label.style.unityFont = BppUiFont.Default;
         label.style.unityFontStyleAndWeight = FontStyle.Normal;
         label.style.color = Colors.HistorySubtitleText;
         label.style.unityTextAlign = TextAnchor.MiddleLeft;
@@ -120,7 +116,6 @@ internal static class BPPSupporterAttributionRow
         var label = new Label(sample.Name);
         label.tooltip = sample.Name;
         label.style.fontSize = Sizes.SupporterAttributionNameFont;
-        label.style.unityFont = BppUiFont.Default;
         label.style.unityFontStyleAndWeight = FontStyle.Bold;
         label.style.maxWidth = Sizes.SupporterAttributionNameMaxWidth;
         label.style.flexShrink = 1f;
@@ -154,7 +149,6 @@ internal static class BPPSupporterAttributionRow
         button.style.marginLeft = UiSpacing.Sm;
         button.style.marginBottom = UiSpacing.Xs;
         button.style.fontSize = Sizes.FontSmall;
-        button.style.unityFont = BppUiFont.Default;
         button.style.unityFontStyleAndWeight = FontStyle.Bold;
         button.style.unityTextAlign = TextAnchor.MiddleCenter;
         button.style.justifyContent = Justify.Center;
@@ -169,20 +163,6 @@ internal static class BPPSupporterAttributionRow
             Colors.WithAlpha(Colors.OutcomeGoldBorder, 0.58f)
         );
         return button;
-    }
-
-    private static void WarmFont(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-            return;
-
-        BppUiFont.RequestCharactersInTexture(text, Sizes.FontSmall, FontStyle.Normal);
-        BppUiFont.RequestCharactersInTexture(text, Sizes.FontSmall, FontStyle.Bold);
-        BppUiFont.RequestCharactersInTexture(
-            text,
-            Sizes.SupporterAttributionNameFont,
-            FontStyle.Bold
-        );
     }
 
     private static void OpenSupportPage()

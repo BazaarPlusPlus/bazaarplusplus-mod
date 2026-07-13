@@ -30,8 +30,6 @@ internal interface IBppConfig
 
     ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; }
 
-    ConfigEntry<BppUiFontKind>? UiFontKindConfig { get; }
-
     ConfigEntry<bool>? EndOfRunScreenshotEnabledConfig { get; }
 
     ConfigEntry<string>? EnchantPreviewHotkeyPathConfig { get; }

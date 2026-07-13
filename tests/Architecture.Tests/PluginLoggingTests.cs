@@ -1,5 +1,6 @@
 #nullable enable
 using System.Reflection;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.Logging;
 using Xunit;
 
@@ -32,6 +33,14 @@ public sealed class PluginLoggingTests
                 "feature:Public:Low:None|reason_code:Public:Low:None",
             ["plugin.feature_stop.degraded"] =
                 "feature:Public:Low:None|reason_code:Public:Low:None",
+            ["plugin.native_game_fonts.degraded"] =
+                "stage:Public:Low:None|reason_code:Public:Low:None",
+            ["plugin.native_game_fonts.loaded"] =
+                "font_count:Public:High:None|font_names:UntrustedText:High:None|source_font:UntrustedText:High:None",
+            ["plugin.native_game_fonts.recovered"] = "font_count:Public:High:None",
+            ["plugin.native_game_fonts.cleanup_failed"] = "stage:Public:Low:None",
+            ["plugin.native_game_fonts.text_rejected"] =
+                "surface:Public:Low:None|code_point:Public:High:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -55,6 +64,8 @@ public sealed class PluginLoggingTests
         AssertStorm(PluginLogEvents.EventHandlerDegraded, "event_id", "handler_id");
         AssertStorm(PluginLogEvents.FeatureStartDegraded, "feature", "reason_code");
         AssertStorm(PluginLogEvents.FeatureStopDegraded, "feature", "reason_code");
+        AssertStorm(NativeGameFontsLogEvents.Degraded, "stage", "reason_code");
+        AssertStorm(NativeGameFontsLogEvents.TextRejected, "surface");
     }
 
     [Fact]
@@ -132,8 +143,12 @@ public sealed class PluginLoggingTests
     }
 
     private static IEnumerable<BppLogEventDefinition> Definitions() =>
-        typeof(PluginLogEvents)
-            .GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+        new[] { typeof(PluginLogEvents), typeof(NativeGameFontsLogEvents) }
+            .SelectMany(type =>
+                type.GetFields(
+                    BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.DeclaredOnly
+                )
+            )
             .Where(field => field.FieldType == typeof(BppLogEventDefinition))
             .Select(field => (BppLogEventDefinition)field.GetValue(null)!);
 

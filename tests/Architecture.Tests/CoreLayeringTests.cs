@@ -1133,31 +1133,149 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Ui_font_selection_install_supports_selected_font_for_opt_in_tmp_text()
+    public void Bpp_ui_surfaces_use_only_the_games_native_font_assets()
     {
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
-        var uiFontSource = File.ReadAllText(
-            Path.Combine(mainSource, "Infrastructure", "Fonts", "BppUiFont.cs")
-        );
-        var tmpFontSource = File.ReadAllText(
-            Path.Combine(mainSource, "Infrastructure", "Fonts", "BppTmpFont.cs")
+        var adapterSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
         );
         var pluginSource = File.ReadAllText(Path.Combine(mainSource, "Plugin.cs"));
-
-        Assert.Contains(
-            "public static void Install(Func<BppUiFontKind> kindProvider)",
-            uiFontSource
+        var productionSource = string.Join(
+            "\n",
+            Directory
+                .EnumerateFiles(mainSource, "*.cs", SearchOption.AllDirectories)
+                .Select(File.ReadAllText)
         );
-        Assert.Contains("public static Font LxgwWenKai", uiFontSource);
-        Assert.Contains("Resources.GetBuiltinResource<Font>(SansSerifResourceName)", uiFontSource);
-        Assert.Contains("LegacyRuntime.ttf", uiFontSource);
-        Assert.Contains("BppUiFont.Install(", pluginSource);
-        Assert.Contains("services.Config.UiFontKindConfig?.Value", pluginSource);
-        Assert.Contains("BppConfig.DefaultUiFontKind", pluginSource);
-        Assert.Contains("BppUiFont.LxgwWenKai", tmpFontSource);
-        Assert.Contains("public static bool TryApplyUiFont", tmpFontSource);
-        Assert.Contains("BppUiFont.Default", tmpFontSource);
+        var projectSource = File.ReadAllText(Path.Combine(mainSource, "BazaarPlusPlus.csproj"));
+
+        Assert.Contains("NotoFontFallbackRuntime._configuration", adapterSource);
+        Assert.Contains("NotoSansFallbacksOrdered", adapterSource);
+        Assert.Contains("NotoSerifFallbacksOrdered", adapterSource);
+        Assert.Contains("sourceFontFile", adapterSource);
+        Assert.Contains("ScriptableObject.CreateInstance<PanelTextSettings>()", adapterSource);
+        Assert.Contains("textSettings.defaultFontAsset = null", adapterSource);
+        Assert.Contains(
+            "textSettings.fallbackFontAssets = new List<TextCoreFontAsset>()",
+            adapterSource
+        );
+        Assert.Contains("EmojiSupportField!.SetValue(textSettings, false)", adapterSource);
+        Assert.Contains(
+            "SetEmptyCollection(textSettings, EmojiFallbackTextAssetsField!)",
+            adapterSource
+        );
+        Assert.Contains(
+            "SetEmptyCollection(textSettings, OsFallbackFontAssetsField!)",
+            adapterSource
+        );
+        Assert.Contains("if (!IsIsolated(textSettings))", adapterSource);
+        Assert.Contains("NativeGameFonts.Reset()", pluginSource);
+        Assert.DoesNotContain("BppUiFont", productionSource);
+        Assert.DoesNotContain("BppTmpFont", productionSource);
+        Assert.DoesNotContain("UseUiFont", productionSource);
+        Assert.DoesNotContain("GetBuiltinResource<Font>", productionSource);
+        Assert.DoesNotContain("CreateDynamicFontFromOSFont", productionSource);
+        Assert.DoesNotContain("TMP_FontAsset.CreateFontAsset", productionSource);
+        Assert.DoesNotContain("FontEngine.LoadFontFace", productionSource);
+        Assert.DoesNotContain("new Font(", productionSource);
+        Assert.DoesNotContain("LXGWWenKai", projectSource);
+        var fontResourceDirectory = Path.Combine(mainSource, "Resources", "Fonts");
+        var fontResources = Directory.Exists(fontResourceDirectory)
+            ? Directory.EnumerateFiles(fontResourceDirectory).Select(Path.GetFileName).ToArray()
+            : Array.Empty<string?>();
+        Assert.DoesNotContain(
+            fontResources,
+            file => file?.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) == true
+        );
+        Assert.DoesNotContain(
+            fontResources,
+            file => file?.Contains("LXGWWenKai", StringComparison.OrdinalIgnoreCase) == true
+        );
+    }
+
+    [Fact]
+    public void Collection_quality_chips_use_content_basis_and_never_wrap()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "Ui",
+                "CollectionPanelView.Filters.cs"
+            )
+        );
+        var createChipButton = MethodSource(
+            source,
+            "private Button CreateChipButton",
+            "private static Button CreateTagFacetChipButton"
+        );
+        var createButton = MethodSource(
+            source,
+            "private static Button CreateButton",
+            "private static void StyleButton"
+        );
+
+        Assert.DoesNotContain("chip.style.flexBasis = 0f", createChipButton);
+        Assert.DoesNotContain("chip.style.minWidth = 0f", createChipButton);
+        Assert.Contains("button.style.whiteSpace = WhiteSpace.NoWrap", createButton);
+    }
+
+    [Fact]
+    public void Collection_title_uses_native_game_heading_typography()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var viewSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Ui", "CollectionPanelView.cs")
+        );
+        var treeSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Ui", "CollectionPanelView.Tree.cs")
+        );
+        var adapterSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
+        );
+        var colorsSource = File.ReadAllText(
+            Path.Combine(mainSource, "Infrastructure", "UiTokens", "Colors.cs")
+        );
+        var ensureCreated = MethodSource(
+            viewSource,
+            "public void EnsureCreated",
+            "public void SetVisible"
+        );
+        var titleStyle = MethodSource(treeSource, "_title = CreateLabel", "titleRow.Add(_title);");
+
+        Assert.Contains("NativeGameFonts.TryGetSerifSourceFont(out _titleFont)", ensureCreated);
+        Assert.Contains("internal static bool TryGetSerifSourceFont", adapterSource);
+        Assert.Contains("FontStyle.Normal", titleStyle);
+        Assert.Contains("Colors.GameTitleText", titleStyle);
+        Assert.Contains("_title.style.unityFont = _titleFont", titleStyle);
+        Assert.Contains("GameTitleText => Rgba(1f, 0.8352941f, 0.6745098f, 1f)", colorsSource);
+    }
+
+    [Fact]
+    public void LiveBuild_title_uses_native_game_heading_typography()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "LiveBuildPanel",
+                "Ui",
+                "LiveBuildPanelView.cs"
+            )
+        );
+        var ensureCreated = MethodSource(
+            source,
+            "public void EnsureCreated",
+            "public void SetVisible"
+        );
+        var titleStyle = MethodSource(source, "_title = CreateLabel", "titleRow.Add(_title);");
+
+        Assert.Contains("NativeGameFonts.TryGetSerifSourceFont(out _titleFont)", ensureCreated);
+        Assert.Contains("Sizes.FontTitle", titleStyle);
+        Assert.Contains("FontStyle.Normal", titleStyle);
+        Assert.Contains("Colors.GameTitleText", titleStyle);
+        Assert.Contains("_title.style.unityFont = _titleFont", titleStyle);
     }
 
     [Fact]
@@ -1167,14 +1285,26 @@ public class CoreLayeringTests
         var patchSource = File.ReadAllText(
             Path.Combine(mainSource, "Patches", "Tooltips", "BilingualItemNamePatch.cs")
         );
+        var eligibilitySource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "BilingualItemNames",
+                "BilingualNameCardEligibility.cs"
+            )
+        );
         var providerSource = File.ReadAllText(
-            Path.Combine(mainSource, "GameInterop", "Localization", "NativeChineseFontFallback.cs")
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
         );
 
-        Assert.Contains("NativeChineseFontFallback.TryInstall", patchSource);
-        Assert.Contains("&& !NativeChineseFontFallback.TryInstall", patchSource);
-        Assert.Contains("ECardType.Item", patchSource);
-        Assert.Contains("ECardType.EventEncounter", patchSource);
+        Assert.Contains("NativeGameFonts.TryInstallFallback", patchSource);
+        Assert.Contains("&& !NativeGameFonts.TryInstallFallback", patchSource);
+        Assert.Contains("BilingualNameCardEligibility.IsSupported", patchSource);
+        Assert.Contains("ECardType.Item", eligibilitySource);
+        Assert.Contains("ECardType.Skill", eligibilitySource);
+        Assert.Contains("ECardType.EncounterStep", eligibilitySource);
+        Assert.Contains("ECardType.EventEncounter", eligibilitySource);
+        Assert.DoesNotContain("ECardType.SocketEffect", eligibilitySource);
         Assert.Contains("NotoFontFallbackRuntime", providerSource);
         Assert.Contains("NotoSerifFallbacksOrdered", providerSource);
         Assert.Contains("Object.Instantiate(primary)", providerSource);
@@ -1783,7 +1913,7 @@ public class CoreLayeringTests
         )
         {
             var source = File.ReadAllText(Path.Combine(tooltipPatches, patchName));
-            Assert.Contains("UseUiFont = true", source);
+            Assert.DoesNotContain("UseUiFont", source);
             Assert.Contains("ParagraphSpacing = 0f", source);
 
             if (patchName == "EncounterEventTooltipPatch.cs")
@@ -1807,6 +1937,16 @@ public class CoreLayeringTests
             if (line.StartsWith("using BazaarPlusPlus.BazaarAgent", StringComparison.Ordinal))
                 violations.Add($"{relative}: {line}");
         }
+    }
+
+    private static string MethodSource(string source, string startMarker, string endMarker)
+    {
+        var start = source.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Could not find method marker '{startMarker}'.");
+
+        var end = source.IndexOf(endMarker, start, StringComparison.Ordinal);
+        Assert.True(end > start, $"Could not find method boundary '{endMarker}'.");
+        return source.Substring(start, end - start);
     }
 
     private static string? Attribute(XElement element, string name) =>

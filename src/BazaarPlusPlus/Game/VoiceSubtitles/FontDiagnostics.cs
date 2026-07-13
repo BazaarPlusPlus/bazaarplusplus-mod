@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
@@ -12,90 +13,18 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 internal static class FontDiagnostics
 {
     private const string ChineseSample = "中文字体测试商人英雄价格";
-    private static readonly string[] MacChineseFontNames =
-    {
-        "Hiragino Sans GB W6",
-        "PingFang SC Heavy",
-        "PingFang SC Semibold",
-        "PingFang SC Medium",
-        "PingFang SC",
-        "Hiragino Sans GB",
-        "STHeiti",
-        "Heiti SC",
-        "Arial Unicode MS",
-    };
-
-    private static readonly string[] WindowsChineseFontNames =
-    {
-        "Microsoft YaHei UI Bold",
-        "Microsoft YaHei Bold",
-        "Microsoft YaHei UI",
-        "Microsoft YaHei",
-        "SimHei",
-        "SimSun",
-    };
-
-    private static readonly string[] FallbackChineseFontNames =
-    {
-        "Noto Sans CJK SC",
-        "Noto Sans SC",
-        "Source Han Sans SC",
-        "Arial Unicode MS",
-        "PingFang SC",
-        "Microsoft YaHei",
-    };
-
-    private static Font? _systemChineseUiFont;
-    private static bool _systemChineseUiFontAttempted;
     private static bool _logged;
-    private static readonly VoiceSubtitlesFontFailureLogState FontFailureLogState = new();
 
     public static bool HasChineseCoverage(TMP_FontAsset? font)
     {
         return HasFullChineseCoverage(font);
     }
 
-    public static Font? ResolveSystemChineseUiFont()
+    public static bool IsGameChineseUiFontReady => NativeGameFonts.IsConfigurationReady;
+
+    public static Font? ResolveGameChineseUiFont()
     {
-        if (_systemChineseUiFontAttempted)
-            return _systemChineseUiFont;
-
-        _systemChineseUiFontAttempted = true;
-
-        try
-        {
-            var candidates = GetSystemChineseFontNames();
-            _systemChineseUiFont = Font.CreateDynamicFontFromOSFont(candidates, 24);
-            if (_systemChineseUiFont == null)
-            {
-                FontFailureLogState.Report(VoiceSubtitlesLogReasonCode.FontUnavailable);
-                return null;
-            }
-
-            BppLog.DebugEvent(
-                VoiceSubtitlesDisplayLogEvents.FontSelected,
-                () =>
-                    [
-                        VoiceSubtitlesDisplayLogEvents.FontSelectedName.Bind(
-                            _systemChineseUiFont.name
-                        ),
-                        VoiceSubtitlesDisplayLogEvents.FontSelectedResolvedNames.Bind(
-                            _systemChineseUiFont.fontNames == null
-                                ? null
-                                : string.Join(", ", _systemChineseUiFont.fontNames)
-                        ),
-                        VoiceSubtitlesDisplayLogEvents.FontSelectedCandidateNames.Bind(
-                            string.Join(", ", candidates)
-                        ),
-                    ]
-            );
-            return _systemChineseUiFont;
-        }
-        catch (Exception ex)
-        {
-            FontFailureLogState.Report(VoiceSubtitlesLogReasonCode.FontCreationException, ex);
-            return null;
-        }
+        return NativeGameFonts.TryGetSansSourceFont(out var font) ? font : null;
     }
 
     public static void LogOnce(TextMeshProUGUI sourceLabel)
@@ -210,23 +139,6 @@ internal static class FontDiagnostics
     private static bool HasFullChineseCoverage(TMP_FontAsset? font)
     {
         return font != null && ChineseCoverageCount(font) == ChineseSample.Length;
-    }
-
-    private static string[] GetSystemChineseFontNames()
-    {
-        return SystemInfo.operatingSystemFamily switch
-        {
-            OperatingSystemFamily.MacOSX => MacChineseFontNames
-                .Concat(FallbackChineseFontNames)
-                .ToArray(),
-            OperatingSystemFamily.Windows => WindowsChineseFontNames
-                .Concat(FallbackChineseFontNames)
-                .ToArray(),
-            _ => FallbackChineseFontNames
-                .Concat(MacChineseFontNames)
-                .Concat(WindowsChineseFontNames)
-                .ToArray(),
-        };
     }
 
     private static string BuildPath(Transform transform)

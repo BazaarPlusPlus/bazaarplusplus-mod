@@ -164,7 +164,10 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private void EnsureView()
     {
         if (_view != null)
+        {
+            _view.EnsureCreated();
             return;
+        }
 
         _view = new LiveBuildPanelView(
             transform,

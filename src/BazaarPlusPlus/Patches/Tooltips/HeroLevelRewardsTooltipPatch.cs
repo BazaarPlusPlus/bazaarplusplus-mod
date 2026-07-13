@@ -28,7 +28,6 @@ internal static class HeroLevelRewardsTooltipPatch
     {
         ParagraphSpacing = 0f,
         SectionTopPaddingScale = 1f,
-        UseUiFont = true,
     };
 
     [HarmonyPostfix]

@@ -636,6 +636,26 @@ Coverage: 173 direct `BppLog` calls across the remainder.
 | `Patches/Tooltips/QuestRewardPreviewTooltipPatch.cs` | 1 |
 | `Plugin.cs` | 15 |
 
+## 2026-07-13 native game-font follow-up
+
+The native game-font migration supersedes the font-specific rows B-F1, B-F2, E27, and E28 above. Those rows remain in the historical implementation-lock snapshot, but their events and source owners are retired:
+
+- `voice_subtitles.font.failed` and `voice_subtitles.font.selected` were removed with operating-system font creation. The B-F3/B-F4 Debug-only environment and inventory diagnostics remain.
+- `bilingual_item_names.font_fallback.*` was removed with `NativeChineseFontFallback`.
+- `settings.ui_font.*` was removed with `BppUiFont`, `BppTmpFont`, and the UI-font setting.
+
+All surviving font lifecycle reporting is owned by `GameInterop/Fonts/NativeGameFontsLogEvents.cs`:
+
+| Event | Level / transition | Ordered fields | Storm policy |
+|---|---|---|---|
+| `plugin.native_game_fonts.degraded` | Warning on healthy→degraded | `stage:Public:Low:None`; `reason_code:Public:Low:None` | `stage + reason_code` |
+| `plugin.native_game_fonts.recovered` | Info only after a prior degraded episode | `font_count:Public:High:None` | state transition |
+| `plugin.native_game_fonts.loaded` | Debug on successful source resolution | `font_count:Public:High:None`; `font_names:UntrustedText:High:None`; `source_font:UntrustedText:High:None` | none |
+| `plugin.native_game_fonts.cleanup_failed` | Debug for teardown detail | `stage:Public:Low:None` plus exception projection | none |
+| `plugin.native_game_fonts.text_rejected` | Warning when an external string contains an unsupported code point | `surface:Public:Low:None`; `code_point:Public:High:None` | `surface` |
+
+Configuration-not-ready is not a degraded episode: callers that mount before the game's localization font configuration exists delay and retry. This follow-up does not add a healthy-startup Info record, so the budget below is unchanged.
+
 ## Healthy startup Info budget
 
 The #47 acceptance scenario is a healthy main-menu startup/shutdown with the optional Agent

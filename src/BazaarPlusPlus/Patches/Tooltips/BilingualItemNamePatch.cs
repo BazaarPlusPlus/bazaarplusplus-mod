@@ -2,6 +2,7 @@
 using System;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.BilingualItemNames;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.Localization;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
@@ -27,8 +28,7 @@ internal static class BilingualItemNamePatch
             var enabled =
                 BppPatchHost.Services.Config.EnableBilingualItemNamesConfig?.Value ?? false;
             var currentLanguageIsChinese = LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode);
-            var supportedCard =
-                card?.Type == ECardType.Item || card?.Type == ECardType.EventEncounter;
+            var supportedCard = card != null && BilingualNameCardEligibility.IsSupported(card.Type);
             if (!enabled || !supportedCard)
                 return;
 
@@ -48,7 +48,7 @@ internal static class BilingualItemNamePatch
 
             if (
                 !currentLanguageIsChinese
-                && !NativeChineseFontFallback.TryInstall(controller.headerText, secondaryTitle)
+                && !NativeGameFonts.TryInstallFallback(controller.headerText, secondaryTitle)
             )
                 return;
             controller.headerText.TrySetText(title);

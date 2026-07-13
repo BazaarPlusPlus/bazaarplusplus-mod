@@ -33,7 +33,6 @@ internal static class EncounterEventTooltipPatch
         ParagraphSpacing = 0f,
         SourceBottomPaddingScale = 0.6f,
         NativeSectionBottomPaddingScale = 1.2f,
-        UseUiFont = true,
     };
 
     [HarmonyPostfix]

@@ -42,6 +42,14 @@ internal sealed class VersionLabelScanner : MonoBehaviour
 
         if (versionLabel != null)
         {
+            if (
+                ShouldDelayMount(
+                    FontDiagnostics.HasChineseCoverage(versionLabel.font),
+                    FontDiagnostics.IsGameChineseUiFontReady
+                )
+            )
+                return;
+
             VoiceLineDisplay.MountFromVersionLabel(versionLabel);
             if (VoiceLineDisplay.IsMountedFromVersionLabel)
             {
@@ -54,6 +62,11 @@ internal sealed class VersionLabelScanner : MonoBehaviour
         if (usedFullScan)
             RecordFullScanMiss();
     }
+
+    internal static bool ShouldDelayMount(
+        bool anchorHasChineseCoverage,
+        bool gameChineseUiFontReady
+    ) => !anchorHasChineseCoverage && !gameChineseUiFontReady;
 
     private TextMeshProUGUI? FindCachedVersionLabel()
     {

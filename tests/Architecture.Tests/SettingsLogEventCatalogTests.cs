@@ -40,9 +40,6 @@ public sealed class SettingsLogEventCatalogTests
             ["settings.patch.degraded"] = "operation:Public:Low:None|reason_code:Public:Low:None",
             ["settings.row.layout_applied"] =
                 "layout_mode:Public:Low:None|row_id:Public:Low:None|additional_index:Public:High:None|step_px:Public:High:None|position_x_px:Public:High:None|position_y_px:Public:High:None",
-            ["settings.ui_font.loaded"] = "font_kind:Public:Low:None|path:LocalPath:High:None",
-            ["settings.ui_font.degraded"] =
-                "font_kind:Public:Low:None|reason_code:Public:Low:None|path:LocalPath:High:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -61,7 +58,6 @@ public sealed class SettingsLogEventCatalogTests
         AssertStorm(SettingsLogEvents.NativeSectionLayoutDegraded, "operation", "reason_code");
         AssertStorm(SettingsLogEvents.KeybindRowsDegraded, "reason_code");
         AssertStorm(SettingsLogEvents.PatchDegraded, "operation", "reason_code");
-        AssertStorm(SettingsLogEvents.UiFontDegraded, "font_kind", "reason_code");
     }
 
     [Fact]

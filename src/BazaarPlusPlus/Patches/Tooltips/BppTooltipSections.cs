@@ -2,8 +2,8 @@
 #pragma warning disable CS0436
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.Tooltips;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
 
@@ -11,9 +11,8 @@ namespace BazaarPlusPlus.Patches.Tooltips;
 
 // Manages BPP-owned text sections cloned into the pooled native tooltip. Each section
 // is a clone of the tooltip's passive-text block, keyed per controller + purpose,
-// inserted after a caller-supplied anchor sibling. Native typography is preserved
-// unless the caller opts into the selected BPP UI font, or other BPP-authored CJK
-// content needs the embedded TMP font.
+// inserted after a caller-supplied anchor sibling. Native typography is preserved;
+// BPP-authored CJK content receives the game's own zh-CN fallback chain.
 internal static class BppTooltipSections
 {
     // Clearly below the native body size so appended blocks read as secondary info.
@@ -42,7 +41,6 @@ internal static class BppTooltipSections
         public float? QuestGroupBottomPaddingScale { get; init; }
         public float? ParagraphSpacing { get; init; }
         public float FontScale { get; init; } = DefaultFontScale;
-        public bool UseUiFont { get; init; }
         public bool ShowNativeDivider { get; init; }
         public float DividerHorizontalInset { get; init; }
     }
@@ -70,10 +68,14 @@ internal static class BppTooltipSections
             return false;
 
         ApplyHostPadding(section, style);
-        if (style?.UseUiFont == true)
-            BppTmpFont.TryApplyUiFont(section.Text.textObject, content);
-        else
-            BppTmpFont.TryApply(section.Text.textObject, content);
+        if (
+            UnicodeFontCoverage.ContainsCjk(content)
+            && !NativeGameFonts.TryInstallFallback(section.Text.textObject, content)
+        )
+        {
+            Hide(controller, key);
+            return false;
+        }
         section.Text.SetText(content);
         var siblingIndex = anchor.transform.GetSiblingIndex() + 1;
         if (section.Divider != null)
