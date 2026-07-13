@@ -128,7 +128,7 @@
   <Target
     Name="CopyHostToInstallerSource"
     AfterTargets="Build"
-    Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)')"
+    Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)') and '$(BuildProductionPackage)' == 'true'"
   >
     <Message Text="[BazaarAgentHost] Copying host plugin to installer source" Importance="high" />
     <ItemGroup>
