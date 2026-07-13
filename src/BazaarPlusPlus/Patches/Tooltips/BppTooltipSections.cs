@@ -26,6 +26,8 @@ internal static class BppTooltipSections
         public GameObject? Divider;
         public UnityEngine.UI.LayoutGroup? SourceLayout;
         public int SourceBottomPadding;
+        public UnityEngine.UI.LayoutGroup? QuestGroupLayout;
+        public int QuestGroupBottomPadding;
     }
 
     internal sealed class Style
@@ -37,6 +39,7 @@ internal static class BppTooltipSections
         public float? SectionBottomPaddingScale { get; init; }
         public float? NativeSectionBottomPaddingScale { get; init; }
         public float? SourceBottomPaddingScale { get; init; }
+        public float? QuestGroupBottomPaddingScale { get; init; }
         public float? ParagraphSpacing { get; init; }
         public float FontScale { get; init; } = DefaultFontScale;
         public bool UseUiFont { get; init; }
@@ -66,7 +69,7 @@ internal static class BppTooltipSections
         if (section == null)
             return false;
 
-        ApplySourcePadding(section, style);
+        ApplyHostPadding(section, style);
         if (style?.UseUiFont == true)
             BppTmpFont.TryApplyUiFont(section.Text.textObject, content);
         else
@@ -97,7 +100,7 @@ internal static class BppTooltipSections
         }
         if (section.Divider != null)
             section.Divider.SetActive(false);
-        RestoreSourcePadding(section);
+        RestoreHostPadding(section);
         section.Block.SetActive(false);
     }
 
@@ -110,7 +113,7 @@ internal static class BppTooltipSections
                 continue;
             owned ??= new List<(CardTooltipController, string)>();
             owned.Add(entry.Key);
-            RestoreSourcePadding(entry.Value);
+            RestoreHostPadding(entry.Value);
             if (entry.Value.Divider != null)
                 Object.Destroy(entry.Value.Divider);
             if (entry.Value.Block != null)
@@ -148,6 +151,14 @@ internal static class BppTooltipSections
         blockClone.name = $"BppTooltipSection_{key}";
         var sourceLayout = anchor.GetComponent<UnityEngine.UI.LayoutGroup>();
         var sourceBottomPadding = sourceLayout?.padding.bottom ?? 0;
+        // Quest rows sit inside the source block but carry their own trailing padding.
+        // Cache both baselines so a quest-only section can trim the stacked gap and
+        // pooled tooltips still restore the native layout when the section is hidden.
+        var questGroupLayout =
+            style?.QuestGroupBottomPaddingScale == null
+                ? null
+                : controller.QuestGroupParent?.GetComponent<UnityEngine.UI.LayoutGroup>();
+        var questGroupBottomPadding = questGroupLayout?.padding.bottom ?? 0;
 
         GameObject? dividerClone = null;
         if (style?.ShowNativeDivider == true && controller.dividerParent != null)
@@ -256,6 +267,8 @@ internal static class BppTooltipSections
             Divider = dividerClone,
             SourceLayout = sourceLayout,
             SourceBottomPadding = sourceBottomPadding,
+            QuestGroupLayout = questGroupLayout,
+            QuestGroupBottomPadding = questGroupBottomPadding,
         };
         Sections[(controller, key)] = section;
         return section;
@@ -272,6 +285,7 @@ internal static class BppTooltipSections
         key switch
         {
             "enchant-preview-with-native" => TooltipSectionId.EnchantPreview,
+            "enchant-preview-after-quest" => TooltipSectionId.EnchantPreview,
             "enchant-preview-without-native" => TooltipSectionId.EnchantPreview,
             "quest-reward-preview" => TooltipSectionId.QuestRewardPreview,
             "aggregate-missing-types" => TooltipSectionId.AggregateMissingTypes,
@@ -280,17 +294,27 @@ internal static class BppTooltipSections
             _ => TooltipSectionId.Unknown,
         };
 
-    private static void ApplySourcePadding(Section section, Style? style)
+    private static void ApplyHostPadding(Section section, Style? style)
     {
-        if (section.SourceLayout == null || style?.SourceBottomPaddingScale is not { } scale)
-            return;
-        section.SourceLayout.padding.bottom = Mathf.RoundToInt(section.SourceBottomPadding * scale);
+        if (section.SourceLayout != null && style?.SourceBottomPaddingScale is { } sourceScale)
+            section.SourceLayout.padding.bottom = Mathf.RoundToInt(
+                section.SourceBottomPadding * sourceScale
+            );
+        if (
+            section.QuestGroupLayout != null
+            && style?.QuestGroupBottomPaddingScale is { } questScale
+        )
+            section.QuestGroupLayout.padding.bottom = Mathf.RoundToInt(
+                section.QuestGroupBottomPadding * questScale
+            );
     }
 
-    private static void RestoreSourcePadding(Section section)
+    private static void RestoreHostPadding(Section section)
     {
         if (section.SourceLayout != null)
             section.SourceLayout.padding.bottom = section.SourceBottomPadding;
+        if (section.QuestGroupLayout != null)
+            section.QuestGroupLayout.padding.bottom = section.QuestGroupBottomPadding;
     }
 
     private static void InsetDividerImage(

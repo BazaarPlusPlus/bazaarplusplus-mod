@@ -22,18 +22,18 @@ namespace BazaarPlusPlus.Patches.Tooltips;
 internal static class BppTooltipSectionRenderPatch
 {
     internal const string EnchantWithNativeSectionKey = "enchant-preview-with-native";
+    internal const string EnchantAfterQuestSectionKey = "enchant-preview-after-quest";
     internal const string EnchantWithoutNativeSectionKey = "enchant-preview-without-native";
 
-    private static readonly BppTooltipSections.Style EnchantWithNativeStyle = new()
-    {
-        SectionTopPaddingScale = 1f,
-        SectionBottomPaddingScale = 1.75f,
-        SourceBottomPaddingScale = 0.5f,
-        ParagraphSpacing = 4f,
-        FontScale = 1.2f,
-        ShowNativeDivider = true,
-        DividerHorizontalInset = 12f,
-    };
+    private static readonly BppTooltipSections.Style EnchantWithNativeStyle =
+        CreateEnchantWithNativeStyle(sectionTopPaddingScale: 1f, sourceBottomPaddingScale: 0.5f);
+
+    private static readonly BppTooltipSections.Style EnchantAfterQuestStyle =
+        CreateEnchantWithNativeStyle(
+            sectionTopPaddingScale: 0f,
+            sourceBottomPaddingScale: 0f,
+            questGroupBottomPaddingScale: 0f
+        );
 
     private static readonly BppTooltipSections.Style EnchantWithoutNativeStyle = new()
     {
@@ -68,13 +68,7 @@ internal static class BppTooltipSectionRenderPatch
             if (string.IsNullOrEmpty(enchantContent))
                 return;
 
-            var hasNativeContent = HasNativeContent(text, questData.Count);
-            var sectionKey = hasNativeContent
-                ? EnchantWithNativeSectionKey
-                : EnchantWithoutNativeSectionKey;
-            var sectionStyle = hasNativeContent
-                ? EnchantWithNativeStyle
-                : EnchantWithoutNativeStyle;
+            var (sectionKey, sectionStyle) = ResolveSectionLayout(text, questData.Count);
 
             if (
                 BppTooltipSections.TryShow(
@@ -95,6 +89,35 @@ internal static class BppTooltipSectionRenderPatch
 
     internal static bool HasNativeContent(string passiveText, int questGroupCount) =>
         !string.IsNullOrWhiteSpace(passiveText) || questGroupCount > 0;
+
+    internal static (string SectionKey, BppTooltipSections.Style Style) ResolveSectionLayout(
+        string passiveText,
+        int questGroupCount
+    )
+    {
+        if (!string.IsNullOrWhiteSpace(passiveText))
+            return (EnchantWithNativeSectionKey, EnchantWithNativeStyle);
+        if (questGroupCount > 0)
+            return (EnchantAfterQuestSectionKey, EnchantAfterQuestStyle);
+        return (EnchantWithoutNativeSectionKey, EnchantWithoutNativeStyle);
+    }
+
+    private static BppTooltipSections.Style CreateEnchantWithNativeStyle(
+        float sectionTopPaddingScale,
+        float sourceBottomPaddingScale,
+        float? questGroupBottomPaddingScale = null
+    ) =>
+        new()
+        {
+            SectionTopPaddingScale = sectionTopPaddingScale,
+            SectionBottomPaddingScale = 1.75f,
+            SourceBottomPaddingScale = sourceBottomPaddingScale,
+            QuestGroupBottomPaddingScale = questGroupBottomPaddingScale,
+            ParagraphSpacing = 4f,
+            FontScale = 1.2f,
+            ShowNativeDivider = true,
+            DividerHorizontalInset = 12f,
+        };
 
     internal static void ResetEncounterHealth() => EncounterHealth.Reset();
 
@@ -247,6 +270,10 @@ internal static class ItemEnchantPreviewTooltipLifecycle
         BppTooltipSections.Hide(
             controller,
             BppTooltipSectionRenderPatch.EnchantWithNativeSectionKey
+        );
+        BppTooltipSections.Hide(
+            controller,
+            BppTooltipSectionRenderPatch.EnchantAfterQuestSectionKey
         );
         BppTooltipSections.Hide(
             controller,
