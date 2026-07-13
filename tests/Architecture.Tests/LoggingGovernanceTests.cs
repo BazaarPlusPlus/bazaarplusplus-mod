@@ -142,7 +142,6 @@ public sealed class LoggingGovernanceTests
             ["Patches/Tooltips/HeroLevelRewardsTooltipPatch.cs"] =
                 "42:Debug,74:Debug,86:Debug,98:Error",
             ["Patches/Tooltips/ItemEnchantPreviewPatch.cs"] = "87:Error",
-            ["Patches/Tooltips/QuestRewardPreviewTooltipPatch.cs"] = "71:Error",
             ["Plugin.cs"] =
                 "47:Info,58:Info,60:Warn,66:Info,83:Info,85:Info,87:Info,91:Error,149:Error,211:Warn,221:Info,226:Info,246:Error,251:Warn,255:Info",
         };
