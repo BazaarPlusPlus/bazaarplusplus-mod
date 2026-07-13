@@ -1253,6 +1253,32 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void LiveBuild_title_uses_native_game_heading_typography()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "LiveBuildPanel",
+                "Ui",
+                "LiveBuildPanelView.cs"
+            )
+        );
+        var ensureCreated = MethodSource(
+            source,
+            "public void EnsureCreated",
+            "public void SetVisible"
+        );
+        var titleStyle = MethodSource(source, "_title = CreateLabel", "titleRow.Add(_title);");
+
+        Assert.Contains("NativeGameFonts.TryGetSerifSourceFont(out _titleFont)", ensureCreated);
+        Assert.Contains("Sizes.FontTitle", titleStyle);
+        Assert.Contains("FontStyle.Normal", titleStyle);
+        Assert.Contains("Colors.GameTitleText", titleStyle);
+        Assert.Contains("_title.style.unityFont = _titleFont", titleStyle);
+    }
+
+    [Fact]
     public void Bilingual_item_names_use_the_games_native_chinese_serif_fallback()
     {
         var mainSource = MainSourceRoot(RepoRoot());

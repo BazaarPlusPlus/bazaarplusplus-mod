@@ -42,6 +42,7 @@ internal sealed class LiveBuildPanelView : IDisposable
     private GameObject? _foregroundRootObject;
     private UIDocument? _foregroundDocument;
     private PanelSettings? _foregroundPanelSettings;
+    private Font? _titleFont;
     private Font? _uiFont;
     private VisualElement? _foregroundRoot;
     private VisualElement? _root;
@@ -90,7 +91,12 @@ internal sealed class LiveBuildPanelView : IDisposable
             return;
 
         _panelSettings = CreatePanelSettings(BppOverlaySorting.PanelUiToolkit);
-        if (!NativeGameFonts.TryConfigurePanel(_panelSettings, out _uiFont) || _uiFont == null)
+        if (
+            !NativeGameFonts.TryConfigurePanel(_panelSettings, out _uiFont)
+            || _uiFont == null
+            || !NativeGameFonts.TryGetSerifSourceFont(out _titleFont)
+            || _titleFont == null
+        )
         {
             AbandonPanelSettingsCreation();
             return;
@@ -315,6 +321,7 @@ internal sealed class LiveBuildPanelView : IDisposable
         _foregroundRootObject = null;
         _foregroundDocument = null;
         _foregroundPanelSettings = null;
+        _titleFont = null;
         _uiFont = null;
         _foregroundRoot = null;
         _root = null;
@@ -330,6 +337,7 @@ internal sealed class LiveBuildPanelView : IDisposable
             UnityEngine.Object.DestroyImmediate(_foregroundPanelSettings);
         _panelSettings = null;
         _foregroundPanelSettings = null;
+        _titleFont = null;
         _uiFont = null;
     }
 
@@ -470,7 +478,8 @@ internal sealed class LiveBuildPanelView : IDisposable
         titleRow.style.alignItems = Align.Center;
         rail.Add(titleRow);
 
-        _title = CreateLabel(28, FontStyle.Bold, Colors.HistoryTitleText);
+        _title = CreateLabel(Sizes.FontTitle, FontStyle.Normal, Colors.GameTitleText);
+        _title.style.unityFont = _titleFont;
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
         _title.style.minWidth = 0f;
