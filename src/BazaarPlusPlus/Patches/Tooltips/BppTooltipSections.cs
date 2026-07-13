@@ -72,7 +72,10 @@ internal static class BppTooltipSections
             UnicodeFontCoverage.ContainsCjk(content)
             && !NativeGameFonts.TryInstallFallback(section.Text.textObject, content)
         )
+        {
+            Hide(controller, key);
             return false;
+        }
         section.Text.SetText(content);
         var siblingIndex = anchor.transform.GetSiblingIndex() + 1;
         if (section.Divider != null)
