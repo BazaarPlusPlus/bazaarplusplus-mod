@@ -7,7 +7,6 @@ using BazaarPlusPlus.GameInterop.EncounterPortraits;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -426,7 +425,6 @@ internal sealed partial class CollectionPanelView
 
         var label = new Label { name = TagChipLabelName, pickingMode = PickingMode.Ignore };
         label.style.fontSize = Sizes.FontSmall;
-        label.style.unityFont = BppUiFont.Default;
         label.style.unityFontStyleAndWeight = FontStyle.Normal;
         label.style.unityTextAlign = TextAnchor.MiddleCenter;
         label.style.flexShrink = 1f;
@@ -983,7 +981,6 @@ internal sealed partial class CollectionPanelView
     {
         var label = new Label();
         label.style.fontSize = fontSize;
-        label.style.unityFont = BppUiFont.Default;
         label.style.unityFontStyleAndWeight = fontStyle;
         label.style.color = color;
         label.style.unityTextAlign = TextAnchor.MiddleLeft;
@@ -1004,7 +1001,6 @@ internal sealed partial class CollectionPanelView
         button.style.height = height;
         button.style.flexGrow = 0f;
         button.style.flexShrink = 0f;
-        button.style.unityFont = BppUiFont.Default;
         button.style.unityTextAlign = TextAnchor.MiddleCenter;
         button.style.justifyContent = Justify.Center;
         button.style.alignItems = Align.Center;
@@ -1024,7 +1020,6 @@ internal sealed partial class CollectionPanelView
             textElement.style.minWidth = 0f;
             textElement.style.whiteSpace = WhiteSpace.NoWrap;
             textElement.style.overflow = Overflow.Hidden;
-            textElement.style.unityFont = BppUiFont.Default;
         }
         button.tooltip = text;
         UiHover.ApplyButtonPalette(button, Colors.HistoryButtonBackground, Colors.White);

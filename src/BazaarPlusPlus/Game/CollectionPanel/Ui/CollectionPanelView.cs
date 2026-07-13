@@ -7,9 +7,9 @@ using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -80,6 +80,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private GameObject? _rootObject;
     private UIDocument? _document;
     private PanelSettings? _panelSettings;
+    private Font? _uiFont;
     private VisualElement? _root;
     private Label? _title;
     private VisualElement? _subtitle;
@@ -165,8 +166,6 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (_rootObject != null)
             return;
 
-        _rootObject = new GameObject("CollectionPanelUiToolkitRoot");
-        _rootObject.transform.SetParent(_parent, false);
         _panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
         _panelSettings.sortingOrder = BppOverlaySorting.PanelUiToolkit;
         _panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
@@ -174,7 +173,15 @@ internal sealed partial class CollectionPanelView : IDisposable
         _panelSettings.match = 1f;
         _panelSettings.clearColor = false;
         _panelSettings.targetDisplay = 0;
+        if (!NativeGameFonts.TryConfigurePanel(_panelSettings, out _uiFont) || _uiFont == null)
+        {
+            UnityEngine.Object.DestroyImmediate(_panelSettings);
+            _panelSettings = null;
+            return;
+        }
 
+        _rootObject = new GameObject("CollectionPanelUiToolkitRoot");
+        _rootObject.transform.SetParent(_parent, false);
         _document = _rootObject.AddComponent<UIDocument>();
         _document.panelSettings = _panelSettings;
         _root = _document.rootVisualElement;
@@ -185,30 +192,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _root.style.top = 0f;
         _root.style.bottom = 0f;
         _root.style.display = DisplayStyle.None;
-        BppUiFont.RequestCharactersInTexture(
-            CollectionPanelText.Title()
-                + CollectionPanelText.Subtitle()
-                + CollectionPanelText.ItemsTab()
-                + CollectionPanelText.SkillsTab()
-                + CollectionPanelText.Close()
-                + CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.Any)
-                + CollectionPanelText.FacetMatchMode(CollectionFacetMatchMode.All)
-                + CollectionPanelText.TagMatchModeTooltip(CollectionFacetMatchMode.Any)
-                + CollectionPanelText.TagMatchModeTooltip(CollectionFacetMatchMode.All)
-                + CollectionPanelText.KeywordMatchModeTooltip(CollectionFacetMatchMode.Any)
-                + CollectionPanelText.KeywordMatchModeTooltip(CollectionFacetMatchMode.All)
-                + CollectionPanelText.SortHeader()
-                + CollectionPanelText.SortQuality()
-                + CollectionPanelText.SortSize()
-                + CollectionPanelText.TierHeader()
-                + CollectionPanelText.NoMatches()
-                + CollectionPanelText.SourceDisclaimer()
-                + CollectionPanelText.DayHeader()
-                + "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ -_:/?()[]%+,.!|#\\",
-            Sizes.FontButton,
-            FontStyle.Normal
-        );
-        _root.style.unityFont = BppUiFont.Default;
+        _root.style.unityFont = _uiFont;
         _root.pickingMode = PickingMode.Position;
 
         BuildTree(_root);
@@ -311,7 +295,7 @@ internal sealed partial class CollectionPanelView : IDisposable
             return;
 
         _title!.text = model.Title;
-        BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle);
+        BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle, _uiFont!);
         _countLabel!.text = model.CountText;
         _statusLabel!.text = StablePanelText.Compact(model.StatusMessage, 150);
         _statusLabel.tooltip = model.StatusMessage ?? string.Empty;
@@ -562,11 +546,13 @@ internal sealed partial class CollectionPanelView : IDisposable
     {
         if (_rootObject != null)
             UnityEngine.Object.Destroy(_rootObject);
+        NativeGameFonts.ReleasePanelTextSettings(_panelSettings);
         if (_panelSettings != null)
             UnityEngine.Object.Destroy(_panelSettings);
         _rootObject = null;
         _document = null;
         _panelSettings = null;
+        _uiFont = null;
         _root = null;
         _controlsScrollView = null;
     }

@@ -29,9 +29,6 @@ public sealed class VoiceSubtitlesLoggingTests
                 "display_id:Public:High:Full|attempt_id:Public:High:Full|stem:Public:High:None|event_duration_ms:Public:High:None|line_duration_ms:Public:High:None|display_duration_ms:Public:High:None|renderer:UntrustedText:High:None|active_before:Public:Low:None|playback_state:UntrustedText:Low:None|english_text:UntrustedText:High:None|chinese_text:UntrustedText:High:None",
             ["voice_subtitles.display.skipped"] =
                 "display_id:Public:High:Full|attempt_id:Public:High:Full|stem:Public:High:None|reason_code:Public:Low:None",
-            ["voice_subtitles.font.failed"] = "reason_code:Public:Low:None",
-            ["voice_subtitles.font.selected"] =
-                "font_name:UntrustedText:High:None|resolved_names:UntrustedText:High:None|candidate_names:UntrustedText:High:None",
             ["voice_subtitles.font_environment.observed"] =
                 "reason_code:Public:Low:None|anchor_path:UntrustedText:High:None|source_font:UntrustedText:High:None|source_coverage:Public:Low:None|default_font:UntrustedText:High:None|fallback_fonts:UntrustedText:High:None",
             ["voice_subtitles.font_inventory.observed"] =
@@ -93,23 +90,6 @@ public sealed class VoiceSubtitlesLoggingTests
         );
 
         Assert.Equal(2, capture.Count("event=voice_subtitles.settings.degraded"));
-    }
-
-    [Fact]
-    public void Font_failure_is_one_error_for_the_process_owner()
-    {
-        using var capture = new LogCapture();
-        var state = new VoiceSubtitlesFontFailureLogState();
-
-        state.Report(VoiceSubtitlesLogReasonCode.FontUnavailable);
-        state.Report(
-            VoiceSubtitlesLogReasonCode.FontCreationException,
-            new InvalidOperationException("repeated")
-        );
-
-        Assert.Equal(1, capture.Count("event=voice_subtitles.font.failed"));
-        Assert.True(capture.Contains("reason_code=font_unavailable"));
-        Assert.Null(VoiceSubtitlesDisplayLogEvents.FontFailed.StormPolicy);
     }
 
     private static string DescribeFields(BppLogEventDefinition definition) =>

@@ -3,8 +3,8 @@ using System;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -42,6 +42,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private GameObject? _rootObject;
     private UIDocument? _document;
     private PanelSettings? _panelSettings;
+    private Font? _uiFont;
     private VisualElement? _root;
     private Label? _title;
     private VisualElement? _subtitle;
@@ -148,8 +149,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         if (_rootObject != null)
             return;
 
-        _rootObject = new GameObject("HistoryPanelUiToolkitRoot");
-        _rootObject.transform.SetParent(_parent, false);
         _panelSettings = ScriptableObject.CreateInstance<PanelSettings>();
         _panelSettings.sortingOrder = BppOverlaySorting.PanelUiToolkit;
         _panelSettings.scaleMode = PanelScaleMode.ScaleWithScreenSize;
@@ -160,7 +159,15 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _panelSettings.match = 1f;
         _panelSettings.clearColor = false;
         _panelSettings.targetDisplay = 0;
+        if (!NativeGameFonts.TryConfigurePanel(_panelSettings, out _uiFont) || _uiFont == null)
+        {
+            UnityEngine.Object.DestroyImmediate(_panelSettings);
+            _panelSettings = null;
+            return;
+        }
 
+        _rootObject = new GameObject("HistoryPanelUiToolkitRoot");
+        _rootObject.transform.SetParent(_parent, false);
         _document = _rootObject.AddComponent<UIDocument>();
         _document.panelSettings = _panelSettings;
         _root = _document.rootVisualElement;
@@ -171,9 +178,6 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _root.style.top = 0f;
         _root.style.bottom = 0f;
         _root.style.display = DisplayStyle.None;
-        var fontAtlasSample = HistoryPanelText.FontAtlasSample();
-        BppUiFont.RequestCharactersInTexture(fontAtlasSample, Sizes.FontButton, FontStyle.Normal);
-        BppUiFont.RequestCharactersInTexture(fontAtlasSample, Sizes.FontButton, FontStyle.Bold);
         _root.style.unityFont = GetUiFont();
         _root.pickingMode = PickingMode.Position;
 
@@ -255,7 +259,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 
         _title!.text = model.Title;
         _closeButton!.text = HistoryPanelText.Close();
-        BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle);
+        BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle, _uiFont!);
         _countChip!.text = model.CountChipText;
         _battleChip!.text = model.BattleChipText;
         ApplyDatabaseChipSeverity(
@@ -503,12 +507,14 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         if (_rootObject != null)
             UnityEngine.Object.Destroy(_rootObject);
 
+        NativeGameFonts.ReleasePanelTextSettings(_panelSettings);
         if (_panelSettings != null)
             UnityEngine.Object.Destroy(_panelSettings);
 
         _rootObject = null;
         _document = null;
         _panelSettings = null;
+        _uiFont = null;
         _root = null;
     }
 }

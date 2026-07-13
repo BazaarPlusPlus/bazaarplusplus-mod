@@ -621,7 +621,10 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void EnsureView()
     {
         if (_view != null)
+        {
+            _view.EnsureCreated();
             return;
+        }
 
         _view = new CollectionPanelView(transform, new PanelCommands(this));
 

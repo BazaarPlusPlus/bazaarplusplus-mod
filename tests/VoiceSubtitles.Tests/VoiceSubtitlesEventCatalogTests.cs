@@ -23,13 +23,13 @@ public sealed class VoiceSubtitlesEventCatalogTests
     ];
 
     [Fact]
-    public void Event_catalog_has_exactly_36_unique_voice_subtitle_definitions()
+    public void Event_catalog_has_exactly_34_unique_voice_subtitle_definitions()
     {
         var definitions = EventSources.SelectMany(Definitions).ToArray();
 
-        Assert.Equal(36, definitions.Length);
+        Assert.Equal(34, definitions.Length);
         Assert.Equal(
-            36,
+            34,
             definitions
                 .Select(definition => definition.EventId)
                 .Distinct(StringComparer.Ordinal)

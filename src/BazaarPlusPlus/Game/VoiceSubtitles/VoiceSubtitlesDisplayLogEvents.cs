@@ -7,8 +7,6 @@ namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
 internal enum VoiceSubtitlesLogReasonCode
 {
-    FontUnavailable,
-    FontCreationException,
     Mount,
     MountException,
     EmptyText,
@@ -27,38 +25,6 @@ internal enum VoiceSubtitlesSettingsPhase
 [BppLogEventSource]
 internal static class VoiceSubtitlesDisplayLogEvents
 {
-    internal static readonly BppLogFieldDefinition FontFailedReasonCode = PublicField(
-        0,
-        "reason_code",
-        BppLogCardinality.Low
-    );
-    internal static readonly BppLogEventDefinition FontFailed = new(
-        BppLogFeatureScope.VoiceSubtitles,
-        "voice_subtitles.font.failed",
-        [FontFailedReasonCode]
-    );
-
-    internal static readonly BppLogFieldDefinition FontSelectedName = UntrustedField(
-        0,
-        "font_name",
-        BppLogCardinality.High
-    );
-    internal static readonly BppLogFieldDefinition FontSelectedResolvedNames = UntrustedField(
-        1,
-        "resolved_names",
-        BppLogCardinality.High
-    );
-    internal static readonly BppLogFieldDefinition FontSelectedCandidateNames = UntrustedField(
-        2,
-        "candidate_names",
-        BppLogCardinality.High
-    );
-    internal static readonly BppLogEventDefinition FontSelected = new(
-        BppLogFeatureScope.VoiceSubtitles,
-        "voice_subtitles.font.selected",
-        [FontSelectedName, FontSelectedResolvedNames, FontSelectedCandidateNames]
-    );
-
     internal static readonly BppLogFieldDefinition FontEnvironmentReasonCode = PublicField(
         0,
         "reason_code",
@@ -446,23 +412,5 @@ internal sealed class VoiceSubtitlesSettingsLogState
             VoiceSubtitlesDisplayLogEvents.SettingsRecovered,
             VoiceSubtitlesDisplayLogEvents.SettingsRecoveredPhase.Bind(phase)
         );
-    }
-}
-
-internal sealed class VoiceSubtitlesFontFailureLogState
-{
-    private bool _reported;
-
-    internal void Report(VoiceSubtitlesLogReasonCode reasonCode, Exception? exception = null)
-    {
-        if (_reported)
-            return;
-
-        _reported = true;
-        var fields = new[] { VoiceSubtitlesDisplayLogEvents.FontFailedReasonCode.Bind(reasonCode) };
-        if (exception == null)
-            BppLog.ErrorEvent(VoiceSubtitlesDisplayLogEvents.FontFailed, fields);
-        else
-            BppLog.ErrorEvent(VoiceSubtitlesDisplayLogEvents.FontFailed, exception, fields);
     }
 }

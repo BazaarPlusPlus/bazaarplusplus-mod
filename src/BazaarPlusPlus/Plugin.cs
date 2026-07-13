@@ -14,9 +14,9 @@ using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.Localization;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Localization;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
@@ -190,9 +190,6 @@ public class Plugin : BaseUnityPlugin
         LegendaryPositionDisplayFormatter.Install(services.Config);
         L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config));
         CollectionLocalizationResolver.AttributeUnitLocalizer = BppTooltipText.TryLocalizeKeyword;
-        BppUiFont.Install(() =>
-            services.Config.UiFontKindConfig?.Value ?? BppConfig.DefaultUiFontKind
-        );
         BppSettingsDockCatalog.Install(services.Config, settingsDockRegistry);
         BPPSupporterCatalog.Install(services.Config);
         BppHotkeyService.Install(services.Config);
@@ -202,7 +199,6 @@ public class Plugin : BaseUnityPlugin
     {
         LegendaryPositionDisplayFormatter.Reset();
         L.Reset();
-        BppUiFont.Reset();
         BppSettingsDockCatalog.Reset();
         NativeSettingsLogState.Reset();
         BPPSupporterCatalog.Reset();
@@ -210,7 +206,7 @@ public class Plugin : BaseUnityPlugin
         TooltipEncounterProbeReader.Reset();
         BppTooltipSectionRenderPatch.ResetEncounterHealth();
         ChineseTranslationCatalog.Reset();
-        NativeChineseFontFallback.Reset();
+        NativeGameFonts.Reset();
     }
 
     private void BuildOnlineServices()

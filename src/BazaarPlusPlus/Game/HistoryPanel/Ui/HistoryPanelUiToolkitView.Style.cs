@@ -1,7 +1,6 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -76,7 +75,6 @@ internal sealed partial class HistoryPanelUiToolkitView
     {
         var label = new Label();
         label.style.fontSize = fontSize;
-        label.style.unityFont = GetUiFont();
         label.style.unityFontStyleAndWeight = fontStyle;
         label.style.color = color;
         label.style.unityTextAlign = TextAnchor.MiddleLeft;
@@ -102,7 +100,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         button.style.height = height;
         button.style.flexGrow = fixedWidth ? 0f : 1f;
         button.style.flexShrink = fixedWidth ? 0f : 1f;
-        button.style.unityFont = GetUiFont();
         button.style.unityTextAlign = TextAnchor.MiddleCenter;
         button.style.justifyContent = Justify.Center;
         button.style.alignItems = Align.Center;
@@ -121,7 +118,6 @@ internal sealed partial class HistoryPanelUiToolkitView
             textElement.style.minWidth = 0f;
             textElement.style.whiteSpace = WhiteSpace.NoWrap;
             textElement.style.overflow = Overflow.Hidden;
-            textElement.style.unityFont = GetUiFont();
         }
         button.tooltip = text;
         button.style.overflow = Overflow.Hidden;
@@ -136,7 +132,6 @@ internal sealed partial class HistoryPanelUiToolkitView
         button.style.height = Sizes.ButtonFooterHeight;
         button.style.flexGrow = 0f;
         button.style.flexShrink = 0f;
-        button.style.unityFont = GetUiFont();
         button.style.unityTextAlign = TextAnchor.MiddleCenter;
         button.style.justifyContent = Justify.Center;
         button.style.alignItems = Align.Center;
@@ -155,7 +150,6 @@ internal sealed partial class HistoryPanelUiToolkitView
             textElement.style.minWidth = 0f;
             textElement.style.whiteSpace = WhiteSpace.NoWrap;
             textElement.style.overflow = Overflow.Hidden;
-            textElement.style.unityFont = GetUiFont();
         }
         button.tooltip = text;
         button.style.overflow = Overflow.Hidden;
@@ -177,10 +171,11 @@ internal sealed partial class HistoryPanelUiToolkitView
         UiHover.ApplyButtonPalette(button, background, textColor);
     }
 
-    private static Font GetUiFont() => BppUiFont.Default;
+    private Font GetUiFont() =>
+        _uiFont ?? throw new InvalidOperationException("Native game UI font is unavailable.");
 
     // Styles one segmented code cell so it reads as a single clean box with a centered glyph in the
-    // mod UI font. The game's USS gives the inner 'unity-text-input' explicit font/align/chrome that
+    // game UI font. The game's USS gives the inner 'unity-text-input' explicit font/align/chrome that
     // beats the inherited cascade, so de-chrome the root AND re-apply the text props on the queried
     // inner element (which then re-inherits to its 'unity-text-element' child). Call after the field
     // is attached so Q(...) resolves a non-null inner element.

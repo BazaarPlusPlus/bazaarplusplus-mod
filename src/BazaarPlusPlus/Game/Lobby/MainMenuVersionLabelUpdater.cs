@@ -1,6 +1,6 @@
 #nullable enable
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using TMPro;
 using UnityEngine;
 
@@ -21,8 +21,12 @@ internal static class MainMenuVersionLabelUpdater
             BppPluginVersion.Current,
             MainMenuVersionUpdateState.Current.UpdateAvailable
         );
+        if (
+            UnicodeFontCoverage.ContainsCjk(text)
+            && !NativeGameFonts.TryInstallFallback(versionLabel, text)
+        )
+            return;
         versionLabel.text = text;
-        BppTmpFont.TryApply(versionLabel, text);
     }
 
     public static void RefreshCurrent()

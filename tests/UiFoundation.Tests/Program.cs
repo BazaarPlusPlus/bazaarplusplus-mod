@@ -1,94 +1,66 @@
 using BazaarPlusPlus.Game.BilingualItemNames;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 
-TestEmbeddedFontExtractionWritesResourceBytes();
-TestEmbeddedFontExtractionFailsForMissingResource();
-TestTmpFontPolicyDetectsCjkText();
+TestUnicodeFontCoverage();
+TestNativeGameFontSelection();
 TestBilingualItemNamePresentation();
 TestStablePanelTextCompactionKeepsStableSlots();
 TestCollectionSortButtonWidthIsCompact();
 
 Console.WriteLine("UiFoundation checks passed.");
 
-static void TestEmbeddedFontExtractionWritesResourceBytes()
+static void TestUnicodeFontCoverage()
 {
-    var cacheRoot = CreateTempDirectory();
-    try
-    {
-        var path = EmbeddedFontFile.Extract(
-            typeof(Program).Assembly,
-            "UiFoundation.Tests.Resources.embedded-font-test.txt",
-            "sample-font.txt",
-            cacheRoot
-        );
+    Assert(
+        UnicodeFontCoverage.ContainsCjk("由 Alice 支持"),
+        "CJK detection should include mixed Chinese text."
+    );
+    Assert(UnicodeFontCoverage.ContainsCjk("㐀"), "CJK detection should include Extension A.");
+    Assert(
+        !UnicodeFontCoverage.ContainsCjk("Supported by Alice"),
+        "CJK detection should leave pure Latin text alone."
+    );
 
-        Assert(path == Path.Combine(cacheRoot, "sample-font.txt"), "Unexpected extracted path.");
-        Assert(
-            File.ReadAllText(path) == "font-bytes-for-test\n",
-            "Extracted file content must match the embedded resource."
-        );
-    }
-    finally
-    {
-        TryDeleteDirectory(cacheRoot);
-    }
+    var missing = UnicodeFontCoverage.TryFindMissingCodePoint(
+        "A俱B",
+        character => character != '俱',
+        out var missingCodePoint
+    );
+    Assert(missing && missingCodePoint == '俱', "BMP coverage should report the missing glyph.");
+
+    missing = UnicodeFontCoverage.TryFindMissingCodePoint("A𠀀B", _ => true, out missingCodePoint);
+    Assert(
+        missing && missingCodePoint == 0x20000,
+        "Supplementary-plane text should be rejected with the complete code point."
+    );
 }
 
-static void TestEmbeddedFontExtractionFailsForMissingResource()
+static void TestNativeGameFontSelection()
 {
-    var cacheRoot = CreateTempDirectory();
-    try
+    var candidates = new[]
     {
-        try
-        {
-            EmbeddedFontFile.Extract(
-                typeof(Program).Assembly,
-                "UiFoundation.Tests.Resources.missing-font.txt",
-                "missing-font.txt",
-                cacheRoot
-            );
-        }
-        catch (FileNotFoundException ex)
-        {
-            Assert(
-                ex.Message.Contains(
-                    "UiFoundation.Tests.Resources.missing-font.txt",
-                    StringComparison.Ordinal
-                ),
-                "Missing-resource error should include the manifest resource name."
-            );
-            return;
-        }
-
-        throw new InvalidOperationException("Missing resource should throw FileNotFoundException.");
-    }
-    finally
-    {
-        TryDeleteDirectory(cacheRoot);
-    }
-}
-
-static void TestTmpFontPolicyDetectsCjkText()
-{
+        new FontCandidate("Static", false),
+        new FontCandidate("SecondSet", false),
+        new FontCandidate("Dynamic", true),
+    };
     Assert(
-        BppTmpFontPolicy.ShouldUseEmbeddedCjkFont("由 Alice 支持"),
-        "TMP font policy should use the embedded CJK font for Chinese sponsor text."
+        NativeGameFontSelection.FindLastIndexWithSource(candidates, item => item.HasSource) == 2,
+        "The adapter must select the Dynamic asset with a source font."
     );
     Assert(
-        BppTmpFontPolicy.ShouldUseEmbeddedCjkFont(
-            "Card Set Selection: 点击物品加入/移除，CapsLock 退出"
-        ),
-        "TMP font policy should use the embedded CJK font for mixed Chinese mode text."
+        NativeGameFontSelection.FindLastIndexWithSource(candidates[..2], item => item.HasSource)
+            == -1,
+        "Static and SecondSet assets must not be treated as a source font."
     );
     Assert(
-        !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont("Supported by Alice"),
-        "TMP font policy should leave pure Latin text on the existing TMP font."
+        !NativeGameFontSelection.HasCompleteChain(candidates.Length, candidates.Length - 1),
+        "A partial Static/SecondSet chain must not be accepted when Dynamic failed to load."
     );
     Assert(
-        !BppTmpFontPolicy.ShouldUseEmbeddedCjkFont("㐀"),
-        "TMP font policy should leave Extension A characters on the existing TMP fallback chain."
+        NativeGameFontSelection.HasCompleteChain(candidates.Length, candidates.Length),
+        "The complete Static/SecondSet/Dynamic chain should be accepted."
     );
 }
 
@@ -191,28 +163,10 @@ static void TestCollectionSortButtonWidthIsCompact()
     );
 }
 
-static string CreateTempDirectory()
-{
-    var path = Path.Combine(Path.GetTempPath(), $"bpp-ui-foundation-{Guid.NewGuid():N}");
-    Directory.CreateDirectory(path);
-    return path;
-}
-
-static void TryDeleteDirectory(string path)
-{
-    try
-    {
-        if (Directory.Exists(path))
-            Directory.Delete(path, recursive: true);
-    }
-    catch
-    {
-        // Best-effort cleanup for temp test directories.
-    }
-}
-
 static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
 }
+
+internal readonly record struct FontCandidate(string Name, bool HasSource);

@@ -93,13 +93,6 @@ internal enum SettingsRowId
     VoiceSubtitles,
 }
 
-internal enum SettingsUiFontKind
-{
-    LxgwWenKai,
-    SansSerif,
-    TmpCjk,
-}
-
 [BppLogEventSource]
 internal static class SettingsLogEvents
 {
@@ -292,29 +285,6 @@ internal static class SettingsLogEvents
             RowLayoutAppliedPositionXPx,
             RowLayoutAppliedPositionYPx,
         ]
-    );
-
-    internal static readonly BppLogFieldDefinition UiFontLoadedFontKind = PublicLow(0, "font_kind");
-    internal static readonly BppLogFieldDefinition UiFontLoadedPath = LocalPath(1, "path");
-    internal static readonly BppLogEventDefinition UiFontLoaded = new(
-        BppLogFeatureScope.Settings,
-        "settings.ui_font.loaded",
-        [UiFontLoadedFontKind, UiFontLoadedPath]
-    );
-    internal static readonly BppLogFieldDefinition UiFontDegradedFontKind = PublicLow(
-        0,
-        "font_kind"
-    );
-    internal static readonly BppLogFieldDefinition UiFontDegradedReasonCode = PublicLow(
-        1,
-        "reason_code"
-    );
-    internal static readonly BppLogFieldDefinition UiFontDegradedPath = LocalPath(2, "path");
-    internal static readonly BppLogEventDefinition UiFontDegraded = new(
-        BppLogFeatureScope.Settings,
-        "settings.ui_font.degraded",
-        [UiFontDegradedFontKind, UiFontDegradedReasonCode, UiFontDegradedPath],
-        new BppLogStormPolicy([UiFontDegradedFontKind, UiFontDegradedReasonCode])
     );
 
     private static BppLogFieldDefinition PublicLow(int order, string name) =>

@@ -2,6 +2,7 @@
 using System;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.BilingualItemNames;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.Localization;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
@@ -48,7 +49,7 @@ internal static class BilingualItemNamePatch
 
             if (
                 !currentLanguageIsChinese
-                && !NativeChineseFontFallback.TryInstall(controller.headerText, secondaryTitle)
+                && !NativeGameFonts.TryInstallFallback(controller.headerText, secondaryTitle)
             )
                 return;
             controller.headerText.TrySetText(title);

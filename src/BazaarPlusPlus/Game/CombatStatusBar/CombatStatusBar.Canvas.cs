@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UI;
@@ -100,6 +101,8 @@ internal sealed partial class CombatStatusBar
     private void EnsureUi()
     {
         if (_canvasObject != null)
+            return;
+        if (!NativeGameFonts.TryGetSansSourceFont(out _uiFont) || _uiFont == null)
             return;
 
         _canvasObject = new GameObject(
@@ -203,7 +206,10 @@ internal sealed partial class CombatStatusBar
     private void DisposeUi()
     {
         if (_canvasObject == null)
+        {
+            _uiFont = null;
             return;
+        }
 
         Destroy(_canvasObject);
         _canvasObject = null;
@@ -234,6 +240,7 @@ internal sealed partial class CombatStatusBar
         _renderedTimeLabel = null;
         _renderedTimeText = null;
         _renderedPauseButtonText = null;
+        _uiFont = null;
         // EnsureUi rebuilds elements with placeholder colors, so force a full repaint.
         _hasAppliedVisualColors = false;
     }
@@ -742,7 +749,8 @@ internal sealed partial class CombatStatusBar
 
     private static Font GetUiFont()
     {
-        return _uiFont ??= Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        return _uiFont
+            ?? throw new InvalidOperationException("Native game UI font is unavailable.");
     }
 
     private static Sprite GetRoundedSprite()

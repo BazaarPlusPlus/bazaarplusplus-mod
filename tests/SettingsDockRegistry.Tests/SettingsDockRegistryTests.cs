@@ -428,7 +428,6 @@ public class SettingsDockRegistryTests
             ("CombatStatusBar", BppSettingsDockOrder.CombatStatusBar),
             ("BilingualItemNames", BppSettingsDockOrder.BilingualItemNames),
             ("ChineseLocaleMode", BppSettingsDockOrder.ChineseLocaleMode),
-            ("UiFont", BppSettingsDockOrder.UiFont),
             ("FixedSupporterList", BppSettingsDockOrder.FixedSupporterList),
             ("VoiceSubtitles", BppSettingsDockOrder.VoiceSubtitles),
             ("VoiceSubtitlesPosition", BppSettingsDockOrder.VoiceSubtitlesPosition),
@@ -553,115 +552,6 @@ public class SettingsDockRegistryTests
 
             Assert.Equal(BppChineseLocaleMode.Mainland, config.ChineseLocaleModeConfig.Value);
             Assert.Equal(3, changedCount);
-        }
-        finally
-        {
-            if (File.Exists(configPath))
-                File.Delete(configPath);
-        }
-    }
-
-    [Fact]
-    public void UiFontDockEntry_defaults_to_sans_serif_and_is_inactive()
-    {
-        var configPath = Path.Combine(
-            Path.GetTempPath(),
-            $"bpp-ui-font-dock-default-{Guid.NewGuid():N}.cfg"
-        );
-        try
-        {
-            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
-            var configFile = new ConfigFile(configPath, saveOnInit: false);
-            var config = new BppConfig();
-            config.Initialize(configFile);
-            var entry = UiFontSettingsDockEntry.Create();
-
-            var definition = entry.Build(config);
-
-            Assert.Equal(BppSettingsDockOrder.UiFont, entry.Order);
-            Assert.Equal("UiFont", definition.Key);
-            Assert.Equal(BppConfig.DefaultUiFontKind, config.UiFontKindConfig!.Value);
-            Assert.Equal("UI Font", definition.ResolveLabel("en"));
-            Assert.Equal("界面字体", definition.ResolveLabel("zh-CN"));
-            var englishState = definition.ResolveChoiceState!("en");
-            Assert.Equal("SANS", englishState.Options[englishState.SelectedIndex]);
-            var chineseState = definition.ResolveChoiceState("zh-CN");
-            Assert.Equal("黑体", chineseState.Options[chineseState.SelectedIndex]);
-            Assert.False(definition.IsActive());
-            Assert.False(definition.CollapseAfterActivate);
-        }
-        finally
-        {
-            if (File.Exists(configPath))
-                File.Delete(configPath);
-        }
-    }
-
-    [Fact]
-    public void UiFontDockEntry_selects_between_lxgw_wenkai_and_sans_serif()
-    {
-        var configPath = Path.Combine(
-            Path.GetTempPath(),
-            $"bpp-ui-font-dock-cycle-{Guid.NewGuid():N}.cfg"
-        );
-        try
-        {
-            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
-            var configFile = new ConfigFile(configPath, saveOnInit: false);
-            var config = new BppConfig();
-            config.Initialize(configFile);
-            var definition = UiFontSettingsDockEntry.Create().Build(config);
-
-            definition.SelectStandardChoice!(1);
-
-            Assert.Equal(BppUiFontKind.LxgwWenKai, config.UiFontKindConfig!.Value);
-            var state = definition.ResolveChoiceState!("en");
-            Assert.Equal("KAI", state.Options[state.SelectedIndex]);
-            var chineseState = definition.ResolveChoiceState("zh-CN");
-            Assert.Equal("楷体", chineseState.Options[chineseState.SelectedIndex]);
-            Assert.True(definition.IsActive());
-
-            definition.SelectStandardChoice(0);
-
-            Assert.Equal(BppUiFontKind.SansSerif, config.UiFontKindConfig.Value);
-            state = definition.ResolveChoiceState("en");
-            Assert.Equal("SANS", state.Options[state.SelectedIndex]);
-            Assert.False(definition.IsActive());
-        }
-        finally
-        {
-            if (File.Exists(configPath))
-                File.Delete(configPath);
-        }
-    }
-
-    [Fact]
-    public void UiFontDockEntry_treats_unknown_value_as_default_then_selects_lxgw_wenkai()
-    {
-        var configPath = Path.Combine(
-            Path.GetTempPath(),
-            $"bpp-ui-font-dock-invalid-{Guid.NewGuid():N}.cfg"
-        );
-        try
-        {
-            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
-            var configFile = new ConfigFile(configPath, saveOnInit: false);
-            var config = new BppConfig();
-            config.Initialize(configFile);
-            var definition = UiFontSettingsDockEntry.Create().Build(config);
-
-            config.UiFontKindConfig!.Value = (BppUiFontKind)99;
-
-            var state = definition.ResolveChoiceState!("en");
-            Assert.Equal("SANS", state.Options[state.SelectedIndex]);
-            Assert.False(definition.IsActive());
-
-            definition.SelectStandardChoice!(1);
-
-            Assert.Equal(BppUiFontKind.LxgwWenKai, config.UiFontKindConfig.Value);
-            state = definition.ResolveChoiceState("en");
-            Assert.Equal("KAI", state.Options[state.SelectedIndex]);
-            Assert.True(definition.IsActive());
         }
         finally
         {
@@ -1167,14 +1057,6 @@ public class SettingsDockRegistryTests
         "false>true>false"
     )]
     [InlineData(
-        "UiFont",
-        BppSettingsDockOrder.UiFont,
-        "UI Font",
-        "界面字体",
-        "SANS>KAI>SANS",
-        "false>true>false"
-    )]
-    [InlineData(
         "StreamMode",
         BppSettingsDockOrder.FixedSupporterList,
         "Stream Mode",
@@ -1321,7 +1203,6 @@ public class SettingsDockRegistryTests
             "ChineseLocaleMode" => ChineseLocaleModeSettingsDockEntry.Create(
                 new InMemoryBppEventBus()
             ),
-            "UiFont" => UiFontSettingsDockEntry.Create(),
             "StreamMode" => FixedSupporterListSettingsDockEntry.Create(),
             "VoiceSubtitles" => VoiceSubtitlesSettingsDockEntry.Create(),
             "VoiceSubtitlesPosition" => VoiceSubtitlesPositionSettingsDockEntry.Create(),
@@ -1334,7 +1215,7 @@ public class SettingsDockRegistryTests
         };
 
     [Fact]
-    public void SettingsDockCatalog_sorts_ui_font_adjacent_to_chinese_locale()
+    public void SettingsDockCatalog_sorts_stream_mode_after_chinese_locale()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
         var registry = new SettingsDockEntryRegistry();
@@ -1343,7 +1224,6 @@ public class SettingsDockRegistryTests
         VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
         registry.Register(new EndOfRunScreenshotSettingsDockEntry());
         registry.Register(new HistoryPanelSettingsDockEntry());
-        registry.Register(UiFontSettingsDockEntry.Create());
         registry.Register(ChineseLocaleModeSettingsDockEntry.Create(new InMemoryBppEventBus()));
 
         try
@@ -1354,7 +1234,6 @@ public class SettingsDockRegistryTests
                 new[]
                 {
                     "ChineseLocaleMode",
-                    "UiFont",
                     "StreamMode",
                     "VoiceSubtitles",
                     "VoiceSubtitlesPosition",

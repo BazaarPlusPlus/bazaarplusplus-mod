@@ -55,13 +55,6 @@ public sealed class ContentLogEventCatalogTests
                 "locale:Public:Low:None|reason_code:Public:Low:None",
             ["bilingual_item_names.catalog.recovered"] = "locale:Public:Low:None",
             ["bilingual_item_names.catalog.loaded"] = "locale:Public:Low:None",
-            ["bilingual_item_names.font_fallback.degraded"] =
-                "stage:Public:Low:None|reason_code:Public:Low:None",
-            ["bilingual_item_names.font_fallback.recovered"] =
-                "font_count:Public:High:None|font_names:UntrustedText:High:None",
-            ["bilingual_item_names.font_fallback.loaded"] =
-                "font_count:Public:High:None|font_names:UntrustedText:High:None",
-            ["bilingual_item_names.font_fallback.cleanup_failed"] = "stage:Public:Low:None",
             ["bilingual_item_names.tooltip.degraded"] = "reason_code:Public:Low:None",
             ["name_override.value.applied"] =
                 "operation:Public:Low:None|reason_code:Public:Low:None",

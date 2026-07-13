@@ -441,7 +441,7 @@ internal static class VoiceLineDisplay
 
         if (chineseUi != null)
         {
-            chineseUi.font = FontDiagnostics.ResolveSystemChineseUiFont() ?? chineseUi.font;
+            chineseUi.font = FontDiagnostics.ResolveGameChineseUiFont() ?? chineseUi.font;
             chineseUi.fontStyle = FontStyle.Bold;
             chineseUi.alignment = settings.Position switch
             {
@@ -484,7 +484,7 @@ internal static class VoiceLineDisplay
 
     private static Text? CreateChineseUiLabel(Transform parent)
     {
-        var uiFont = FontDiagnostics.ResolveSystemChineseUiFont();
+        var uiFont = FontDiagnostics.ResolveGameChineseUiFont();
         if (uiFont == null)
             return null;
 

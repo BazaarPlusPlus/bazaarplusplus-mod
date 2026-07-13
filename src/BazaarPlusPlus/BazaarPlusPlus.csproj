@@ -24,8 +24,6 @@
     <EmbeddedResource Include="Data\CollectionSources\collection-sources.json" />
     <EmbeddedResource Include="Data\VoiceSubtitles\voice-lines.json" />
     <EmbeddedResource Include="Resources\DockButtons\collection-panel-icon.png" />
-    <EmbeddedResource Include="Resources\Fonts\LXGWWenKai-Regular.ttf" />
-    <EmbeddedResource Include="Resources\Fonts\LXGWWenKai-LICENSE.txt" />
   </ItemGroup>
 
   <!-- Project paths -->

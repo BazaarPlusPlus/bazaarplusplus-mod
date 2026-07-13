@@ -7,10 +7,10 @@ using System.Linq;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Infrastructure.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -42,6 +42,7 @@ internal sealed class LiveBuildPanelView : IDisposable
     private GameObject? _foregroundRootObject;
     private UIDocument? _foregroundDocument;
     private PanelSettings? _foregroundPanelSettings;
+    private Font? _uiFont;
     private VisualElement? _foregroundRoot;
     private VisualElement? _root;
     private Label? _title;
@@ -88,30 +89,39 @@ internal sealed class LiveBuildPanelView : IDisposable
         if (_rootObject != null)
             return;
 
+        _panelSettings = CreatePanelSettings(BppOverlaySorting.PanelUiToolkit);
+        if (!NativeGameFonts.TryConfigurePanel(_panelSettings, out _uiFont) || _uiFont == null)
+        {
+            AbandonPanelSettingsCreation();
+            return;
+        }
+
+        _foregroundPanelSettings = CreatePanelSettings(BppOverlaySorting.PanelForeground);
+        if (
+            !NativeGameFonts.TryConfigurePanel(_foregroundPanelSettings, out var foregroundFont)
+            || foregroundFont == null
+        )
+        {
+            AbandonPanelSettingsCreation();
+            return;
+        }
+
         _rootObject = new GameObject("LiveBuildPanelUiToolkitRoot");
         _rootObject.transform.SetParent(_parent, false);
-        _panelSettings = CreatePanelSettings(BppOverlaySorting.PanelUiToolkit);
-
         _document = _rootObject.AddComponent<UIDocument>();
         _document.panelSettings = _panelSettings;
         _root = _document.rootVisualElement;
         ConfigureDocumentRoot(_root, PickingMode.Position);
-        _root.style.unityFont = BppUiFont.Default;
+        _root.style.unityFont = _uiFont;
 
         _foregroundRootObject = new GameObject("LiveBuildPanelForegroundUiToolkitRoot");
         _foregroundRootObject.transform.SetParent(_parent, false);
-        _foregroundPanelSettings = CreatePanelSettings(BppOverlaySorting.PanelForeground);
         _foregroundDocument = _foregroundRootObject.AddComponent<UIDocument>();
         _foregroundDocument.panelSettings = _foregroundPanelSettings;
         _foregroundRoot = _foregroundDocument.rootVisualElement;
         ConfigureDocumentRoot(_foregroundRoot, PickingMode.Ignore);
-        _foregroundRoot.style.unityFont = BppUiFont.Default;
+        _foregroundRoot.style.unityFont = foregroundFont;
 
-        BppUiFont.RequestCharactersInTexture(
-            LiveBuildPanelText.FontAtlasSample(),
-            Sizes.FontButton,
-            FontStyle.Normal
-        );
         BuildTree(_root);
     }
 
@@ -133,7 +143,8 @@ internal sealed class LiveBuildPanelView : IDisposable
         BPPSupporterAttributionRow.Bind(
             _subtitle!,
             snapshot.Supporters,
-            LiveBuildPanelText.Subtitle()
+            LiveBuildPanelText.Subtitle(),
+            _uiFont!
         );
         _corpusCardTitle!.text = LiveBuildPanelText.CorpusCardTitle();
         _finalBuildRefreshButton!.text = snapshot.FinalBuildRefreshButtonText;
@@ -288,10 +299,12 @@ internal sealed class LiveBuildPanelView : IDisposable
     {
         if (_rootObject != null)
             UnityEngine.Object.Destroy(_rootObject);
+        NativeGameFonts.ReleasePanelTextSettings(_panelSettings);
         if (_panelSettings != null)
             UnityEngine.Object.Destroy(_panelSettings);
         if (_foregroundRootObject != null)
             UnityEngine.Object.Destroy(_foregroundRootObject);
+        NativeGameFonts.ReleasePanelTextSettings(_foregroundPanelSettings);
         if (_foregroundPanelSettings != null)
             UnityEngine.Object.Destroy(_foregroundPanelSettings);
 
@@ -302,8 +315,22 @@ internal sealed class LiveBuildPanelView : IDisposable
         _foregroundRootObject = null;
         _foregroundDocument = null;
         _foregroundPanelSettings = null;
+        _uiFont = null;
         _foregroundRoot = null;
         _root = null;
+    }
+
+    private void AbandonPanelSettingsCreation()
+    {
+        NativeGameFonts.ReleasePanelTextSettings(_panelSettings);
+        NativeGameFonts.ReleasePanelTextSettings(_foregroundPanelSettings);
+        if (_panelSettings != null)
+            UnityEngine.Object.DestroyImmediate(_panelSettings);
+        if (_foregroundPanelSettings != null)
+            UnityEngine.Object.DestroyImmediate(_foregroundPanelSettings);
+        _panelSettings = null;
+        _foregroundPanelSettings = null;
+        _uiFont = null;
     }
 
     private void BuildTree(VisualElement root)
@@ -786,7 +813,6 @@ internal sealed class LiveBuildPanelView : IDisposable
     {
         var label = new Label();
         label.style.fontSize = fontSize;
-        label.style.unityFont = BppUiFont.Default;
         label.style.unityFontStyleAndWeight = fontStyle;
         label.style.color = color;
         label.style.unityTextAlign = TextAnchor.MiddleLeft;
@@ -799,7 +825,6 @@ internal sealed class LiveBuildPanelView : IDisposable
         button.style.height = 40f;
         button.style.minWidth = 0f;
         button.style.flexShrink = 1f;
-        button.style.unityFont = BppUiFont.Default;
         button.style.unityTextAlign = TextAnchor.MiddleCenter;
         button.style.justifyContent = Justify.Center;
         button.style.alignItems = Align.Center;
@@ -817,7 +842,6 @@ internal sealed class LiveBuildPanelView : IDisposable
             textElement.style.minWidth = 0f;
             textElement.style.whiteSpace = WhiteSpace.NoWrap;
             textElement.style.overflow = Overflow.Hidden;
-            textElement.style.unityFont = BppUiFont.Default;
         }
         button.tooltip = text;
         return button;
