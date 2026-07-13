@@ -562,7 +562,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void UiFontDockEntry_defaults_to_lxgw_wenkai_and_is_inactive()
+    public void UiFontDockEntry_defaults_to_sans_serif_and_is_inactive()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -584,9 +584,9 @@ public class SettingsDockRegistryTests
             Assert.Equal("UI Font", definition.ResolveLabel("en"));
             Assert.Equal("界面字体", definition.ResolveLabel("zh-CN"));
             var englishState = definition.ResolveChoiceState!("en");
-            Assert.Equal("KAI", englishState.Options[englishState.SelectedIndex]);
+            Assert.Equal("SANS", englishState.Options[englishState.SelectedIndex]);
             var chineseState = definition.ResolveChoiceState("zh-CN");
-            Assert.Equal("楷体", chineseState.Options[chineseState.SelectedIndex]);
+            Assert.Equal("黑体", chineseState.Options[chineseState.SelectedIndex]);
             Assert.False(definition.IsActive());
             Assert.False(definition.CollapseAfterActivate);
         }
@@ -614,18 +614,18 @@ public class SettingsDockRegistryTests
 
             definition.SelectStandardChoice!(1);
 
-            Assert.Equal(BppUiFontKind.SansSerif, config.UiFontKindConfig!.Value);
+            Assert.Equal(BppUiFontKind.LxgwWenKai, config.UiFontKindConfig!.Value);
             var state = definition.ResolveChoiceState!("en");
-            Assert.Equal("SANS", state.Options[state.SelectedIndex]);
+            Assert.Equal("KAI", state.Options[state.SelectedIndex]);
             var chineseState = definition.ResolveChoiceState("zh-CN");
-            Assert.Equal("黑体", chineseState.Options[chineseState.SelectedIndex]);
+            Assert.Equal("楷体", chineseState.Options[chineseState.SelectedIndex]);
             Assert.True(definition.IsActive());
 
             definition.SelectStandardChoice(0);
 
-            Assert.Equal(BppUiFontKind.LxgwWenKai, config.UiFontKindConfig.Value);
+            Assert.Equal(BppUiFontKind.SansSerif, config.UiFontKindConfig.Value);
             state = definition.ResolveChoiceState("en");
-            Assert.Equal("KAI", state.Options[state.SelectedIndex]);
+            Assert.Equal("SANS", state.Options[state.SelectedIndex]);
             Assert.False(definition.IsActive());
         }
         finally
@@ -636,7 +636,7 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
-    public void UiFontDockEntry_treats_unknown_value_as_default_then_selects_sans_serif()
+    public void UiFontDockEntry_treats_unknown_value_as_default_then_selects_lxgw_wenkai()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -653,14 +653,14 @@ public class SettingsDockRegistryTests
             config.UiFontKindConfig!.Value = (BppUiFontKind)99;
 
             var state = definition.ResolveChoiceState!("en");
-            Assert.Equal("KAI", state.Options[state.SelectedIndex]);
+            Assert.Equal("SANS", state.Options[state.SelectedIndex]);
             Assert.False(definition.IsActive());
 
             definition.SelectStandardChoice!(1);
 
-            Assert.Equal(BppUiFontKind.SansSerif, config.UiFontKindConfig.Value);
+            Assert.Equal(BppUiFontKind.LxgwWenKai, config.UiFontKindConfig.Value);
             state = definition.ResolveChoiceState("en");
-            Assert.Equal("SANS", state.Options[state.SelectedIndex]);
+            Assert.Equal("KAI", state.Options[state.SelectedIndex]);
             Assert.True(definition.IsActive());
         }
         finally
@@ -1171,7 +1171,7 @@ public class SettingsDockRegistryTests
         BppSettingsDockOrder.UiFont,
         "UI Font",
         "界面字体",
-        "KAI>SANS>KAI",
+        "SANS>KAI>SANS",
         "false>true>false"
     )]
     [InlineData(

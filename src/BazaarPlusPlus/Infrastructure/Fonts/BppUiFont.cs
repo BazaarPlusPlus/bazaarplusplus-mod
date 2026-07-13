@@ -44,7 +44,7 @@ internal static class BppUiFont
 
     private static Font ResolveDefault()
     {
-        var kind = _kindProvider?.Invoke() ?? BppUiFontKind.LxgwWenKai;
+        var kind = _kindProvider?.Invoke() ?? BppUiFontKind.SansSerif;
         return kind switch
         {
             BppUiFontKind.SansSerif => SansSerif,

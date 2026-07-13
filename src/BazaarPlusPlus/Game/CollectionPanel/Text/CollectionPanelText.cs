@@ -1,4 +1,5 @@
 #nullable enable
+using System.Text;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Infrastructure;
@@ -86,9 +87,9 @@ internal static class CollectionPanelText
         "（{0}）"
     );
     private static readonly LocalizedTextSet LevelUpMaxHealthText = new(
-        "+{0} Max Health",
-        "+{0} 生命上限",
-        "+{0} 生命上限"
+        "+ {0} Max Health",
+        "+ {0} 生命上限",
+        "+ {0} 生命上限"
     );
     private static readonly LocalizedTextSet LevelUpRandomPoolText = new(
         "{0}× random reward ({1} options)",
@@ -141,9 +142,9 @@ internal static class CollectionPanelText
         "獲得技能：{0}"
     );
     private static readonly LocalizedTextSet LevelUpBoardSlotsText = new(
-        "+{0} board slots",
-        "+{0} 个摊位格子",
-        "+{0} 個攤位格子"
+        "+ {0} board slots",
+        "+ {0} 个摊位格子",
+        "+ {0} 個攤位格子"
     );
 
     private static readonly LocalizedTextSet CatalogLoadingText = new(
@@ -255,6 +256,60 @@ internal static class CollectionPanelText
 
     internal static string LevelUpBoardSlots(int count) =>
         string.Format(Resolve(LevelUpBoardSlotsText), count);
+
+    internal static string JoinTooltipLabel(string label, string detail) =>
+        LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode)
+            ? $"{label}：{detail}"
+            : $"{label}: {detail}";
+
+    internal static string JoinColoredTooltipLabel(string label, string detail, string color) =>
+        LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode)
+            ? $"<color={color}>{label}：</color>{detail}"
+            : $"<color={color}>{label}:</color> {detail}";
+
+    internal static string NormalizeRewardSpacing(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return text;
+
+        var needsChange = false;
+        for (var index = 0; index + 1 < text.Length; index++)
+        {
+            if (NeedsSpaceAfterPlus(text, index))
+            {
+                needsChange = true;
+                break;
+            }
+        }
+
+        if (!needsChange)
+            return text;
+
+        var builder = new StringBuilder(text.Length + 4);
+        for (var index = 0; index < text.Length; index++)
+        {
+            builder.Append(text[index]);
+            if (NeedsSpaceAfterPlus(text, index))
+                builder.Append(' ');
+        }
+        return builder.ToString();
+    }
+
+    private static bool NeedsSpaceAfterPlus(string text, int plusIndex)
+    {
+        if (
+            plusIndex < 0
+            || plusIndex + 1 >= text.Length
+            || text[plusIndex] != '+'
+            || !char.IsDigit(text[plusIndex + 1])
+        )
+            return false;
+
+        var cursor = plusIndex + 2;
+        while (cursor < text.Length && char.IsDigit(text[cursor]))
+            cursor++;
+        return cursor < text.Length && char.IsWhiteSpace(text[cursor]);
+    }
 
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 

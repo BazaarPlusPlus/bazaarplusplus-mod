@@ -34,7 +34,7 @@ public class BppConfigTests
     }
 
     [Fact]
-    public void UiFontConfig_defaults_to_lxgw_and_uses_appearance_key()
+    public void UiFontConfig_defaults_to_sans_serif_and_uses_appearance_key()
     {
         var configPath = Path.Combine(
             Path.GetTempPath(),
@@ -50,10 +50,13 @@ public class BppConfigTests
             var entry = config.UiFontKindConfig;
             Assert.NotNull(entry);
             Assert.Equal(BppConfig.DefaultUiFontKind, entry.Value);
-            Assert.Equal(BppUiFontKind.LxgwWenKai, entry.Value);
+            Assert.Equal(BppUiFontKind.SansSerif, entry.Value);
             Assert.Equal("Appearance", entry.Definition.Section);
             Assert.Equal("UiFont", entry.Definition.Key);
-            Assert.Contains("Font for BazaarPlusPlus panels", entry.Description.Description);
+            Assert.Contains(
+                "Font for BazaarPlusPlus panels and preview tooltip sections",
+                entry.Description.Description
+            );
             Assert.Contains(
                 "SansSerif = Unity built-in sans with OS fallback for CJK",
                 entry.Description.Description

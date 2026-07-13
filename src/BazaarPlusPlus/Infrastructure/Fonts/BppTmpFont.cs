@@ -15,6 +15,7 @@ internal static class BppTmpFont
     private const int AtlasPadding = 9;
     private const int AtlasSize = 2048;
     private static TMP_FontAsset? _default;
+    private static TMP_FontAsset? _sansSerif;
     private static bool _loadFailureLogged;
     private static readonly ConditionalWeakTable<TMP_Text, FontSnapshot> OriginalFonts = new();
 
@@ -30,6 +31,24 @@ internal static class BppTmpFont
         }
 
         var fontAsset = ResolveDefault();
+        if (fontAsset == null)
+            return false;
+
+        CaptureOriginal(text);
+        text.font = fontAsset;
+        if (fontAsset.material != null)
+            text.fontSharedMaterial = fontAsset.material;
+
+        WarmCharacters(fontAsset, sampleText);
+        return true;
+    }
+
+    public static bool TryApplyUiFont(TMP_Text? text, string? sampleText)
+    {
+        if (text == null)
+            return false;
+
+        var fontAsset = ResolveUiFont();
         if (fontAsset == null)
             return false;
 
@@ -73,6 +92,48 @@ internal static class BppTmpFont
         catch (Exception ex)
         {
             LogLoadFailure(ex.Message);
+            return null;
+        }
+    }
+
+    private static TMP_FontAsset? ResolveUiFont()
+    {
+        if (ReferenceEquals(BppUiFont.Default, BppUiFont.LxgwWenKai))
+            return ResolveDefault();
+
+        if (_sansSerif != null)
+            return _sansSerif;
+
+        _sansSerif = CreateFontAsset(BppUiFont.Default, "BPP Sans Serif TMP");
+        return _sansSerif;
+    }
+
+    private static TMP_FontAsset? CreateFontAsset(Font font, string assetName)
+    {
+        try
+        {
+            var fontAsset = TMP_FontAsset.CreateFontAsset(
+                font,
+                SamplingPointSize,
+                AtlasPadding,
+                GlyphRenderMode.SDFAA,
+                AtlasSize,
+                AtlasSize,
+                AtlasPopulationMode.Dynamic,
+                enableMultiAtlasSupport: true
+            );
+            if (fontAsset == null)
+            {
+                LogLoadFailure($"CreateFontAsset returned null for '{assetName}'.");
+                return null;
+            }
+
+            fontAsset.name = assetName;
+            return fontAsset;
+        }
+        catch (Exception ex)
+        {
+            LogLoadFailure($"{assetName}: {ex.Message}");
             return null;
         }
     }

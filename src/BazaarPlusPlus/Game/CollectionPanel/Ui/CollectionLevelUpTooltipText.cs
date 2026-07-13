@@ -202,11 +202,19 @@ internal static class CollectionLevelUpTooltipText
                     new CollectionTooltipMarkup.ListItem($"<color={AccentColor}>{title}</color>")
                 );
             else if (string.IsNullOrWhiteSpace(title))
-                candidates.Add(new CollectionTooltipMarkup.ListItem(colorize(description!)));
+                candidates.Add(
+                    new CollectionTooltipMarkup.ListItem(
+                        colorize(CollectionPanelText.NormalizeRewardSpacing(description!))
+                    )
+                );
             else
                 candidates.Add(
                     new CollectionTooltipMarkup.ListItem(
-                        $"<color={AccentColor}>{title}:</color> {colorize(description!)}"
+                        CollectionPanelText.JoinColoredTooltipLabel(
+                            title!,
+                            colorize(CollectionPanelText.NormalizeRewardSpacing(description!)),
+                            AccentColor
+                        )
                     )
                 );
             return;
@@ -240,7 +248,13 @@ internal static class CollectionLevelUpTooltipText
                     new CollectionTooltipMarkup.ListItem(
                         string.IsNullOrWhiteSpace(entryDescription)
                             ? $"<color={AccentColor}>{entryTitle}</color>"
-                            : $"<color={AccentColor}>{entryTitle}:</color> {colorize(entryDescription!)}"
+                            : CollectionPanelText.JoinColoredTooltipLabel(
+                                entryTitle!,
+                                colorize(
+                                    CollectionPanelText.NormalizeRewardSpacing(entryDescription!)
+                                ),
+                                AccentColor
+                            )
                     )
                 );
             }
