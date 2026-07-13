@@ -21,6 +21,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/BazaarPlusPlus.Storage/BazaarPlusPlus.Storage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile
       Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogSchema.cs"
       Link="Logging/Core/BppLogSchema.cs"

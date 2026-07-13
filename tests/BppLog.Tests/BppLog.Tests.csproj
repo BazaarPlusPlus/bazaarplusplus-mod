@@ -25,6 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../../src/BazaarPlusPlus.Storage/BazaarPlusPlus.Storage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile
       Include="..\..\src\BazaarPlusPlus\Infrastructure\Logging\Core\*.cs"
       Link="Logging\Core\%(Filename)%(Extension)"
@@ -32,6 +36,14 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\Infrastructure\LogRepeatSuppressor.cs"
       Link="LogRepeatSuppressor.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\RunLogging\RunLoggingLogEvents.cs"
+      Link="RunLoggingLogEvents.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\RunLogging\RunLogStoreLoggerBridge.cs"
+      Link="RunLogStoreLoggerBridge.cs"
     />
   </ItemGroup>
 </Project>

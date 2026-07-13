@@ -280,8 +280,6 @@ internal sealed class BppLogPipeline
                 correlationFields.Add(field);
         }
         correlationFields.Sort((left, right) => left.Order.CompareTo(right.Order));
-        if (correlationFields.Count == 0)
-            return false;
 
         for (var index = 0; index < correlationFields.Count; index++)
         {

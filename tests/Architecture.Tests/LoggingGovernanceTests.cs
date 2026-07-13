@@ -65,10 +65,7 @@ public sealed class LoggingGovernanceTests
     // one-for-one replacement cannot hide behind an unchanged per-file count. Each migration
     // removes its converted entries; #60 leaves every map empty.
     private static readonly IReadOnlyDictionary<string, string> ExpectedLegacyCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["Game/RunLogging/RunLogStoreLoggerBridge.cs"] = "10:Warn,13:Error",
-        };
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     private static readonly IReadOnlyDictionary<string, string> ExpectedVoiceSubtitlesMembers =
         new Dictionary<string, string>(StringComparer.Ordinal);
@@ -80,10 +77,7 @@ public sealed class LoggingGovernanceTests
         new Dictionary<string, string>(StringComparer.Ordinal);
 
     private static readonly IReadOnlyDictionary<string, string> ExpectedStorageLoggerCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["RunLog/Replication/QueuedRunLogStore.cs"] = "91:Warn,147:Error,159:Error",
-        };
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     private static readonly HashSet<string> ApprovedBepInExAdapters = new(StringComparer.Ordinal)
     {
@@ -213,6 +207,32 @@ public sealed class LoggingGovernanceTests
             ExpectedStorageLoggerCalls,
             FingerprintMatches(storageRoot, LegacyStorageLoggerCall, relativeTo: storageRoot),
             "The Storage free-text logger surface is frozen until #53 replaces it."
+        );
+    }
+
+    [Fact]
+    public void Storage_logging_port_and_project_stay_free_of_BepInEx()
+    {
+        var storageRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus.Storage");
+        var violations = Directory
+            .EnumerateFiles(storageRoot, "*", SearchOption.AllDirectories)
+            .Where(path =>
+                path.EndsWith(".cs", StringComparison.Ordinal)
+                || path.EndsWith(".csproj", StringComparison.Ordinal)
+            )
+            .Where(path => File.ReadAllText(path).Contains("BepInEx", StringComparison.Ordinal))
+            .Select(path => Path.GetRelativePath(storageRoot, path).Replace('\\', '/'))
+            .ToArray();
+
+        Assert.Empty(violations);
+
+        var compiledReferences = typeof(BazaarPlusPlus.Storage.RunLog.IRunLogStore)
+            .Assembly.GetReferencedAssemblies()
+            .Select(reference => reference.Name ?? string.Empty)
+            .ToArray();
+        Assert.DoesNotContain(
+            compiledReferences,
+            reference => reference.StartsWith("BepInEx", StringComparison.OrdinalIgnoreCase)
         );
     }
 
