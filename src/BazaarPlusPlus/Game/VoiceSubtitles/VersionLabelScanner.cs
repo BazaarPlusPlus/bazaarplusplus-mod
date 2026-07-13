@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
 
@@ -110,8 +111,15 @@ internal sealed class VersionLabelScanner : MonoBehaviour
         }
 
         if (best != null)
-            VoiceSubtitlesLog.Info(
-                $"Found visible version label at '{BuildPath(best.transform)}' text='{best.text}'"
+            BppLog.DebugEvent(
+                VoiceSubtitlesDisplayLogEvents.MountAnchorSelected,
+                () =>
+                    [
+                        VoiceSubtitlesDisplayLogEvents.MountAnchorPath.Bind(
+                            BuildPath(best.transform)
+                        ),
+                        VoiceSubtitlesDisplayLogEvents.MountAnchorLabelText.Bind(best.text),
+                    ]
             );
 
         return best;

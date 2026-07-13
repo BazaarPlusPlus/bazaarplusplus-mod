@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.VoiceSubtitles;
@@ -44,17 +45,6 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
         _attemptId = attemptId;
         _stem = stem;
         enabled = true;
-        if (VoiceSubtitlesLog.Verbose)
-        {
-            VoiceSubtitlesLog.Debug(
-                "Subtitle lifetime start "
-                    + $"display={_displayId} "
-                    + $"attempt={_attemptId} "
-                    + $"stem={_stem} "
-                    + $"fallbackDuration={Mathf.Max(0.2f, fallbackDurationSeconds):F3}s "
-                    + $"playbackState={PlaybackStateText()}"
-            );
-        }
     }
 
     private void Update()
@@ -77,43 +67,38 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
 
     private void HidePlaybackStopped()
     {
-        if (VoiceSubtitlesLog.Verbose)
-        {
-            Hide("playback-" + PlaybackStateText());
-            return;
-        }
-
-        Hide();
+        Hide(VoiceSubtitlesLogReasonCode.PlaybackStopped);
     }
 
     private void HideFallbackTimeout()
     {
-        if (VoiceSubtitlesLog.Verbose)
-        {
-            Hide("fallback-timeout");
-            return;
-        }
-
-        Hide();
+        Hide(VoiceSubtitlesLogReasonCode.FallbackTimeout);
     }
 
-    private void Hide(string? reason = null)
+    private void Hide(VoiceSubtitlesLogReasonCode reasonCode)
     {
         if (_labelObject != null)
             _labelObject.SetActive(false);
-        if (VoiceSubtitlesLog.Verbose && reason != null)
-        {
-            var elapsedSeconds = Mathf.Max(0f, Time.unscaledTime - _shownAt);
-            VoiceSubtitlesLog.Debug(
-                "Subtitle hidden "
-                    + $"display={_displayId} "
-                    + $"attempt={_attemptId} "
-                    + $"stem={_stem} "
-                    + $"reason={reason} "
-                    + $"elapsed={elapsedSeconds:F3}s "
-                    + $"playbackState={PlaybackStateText()}"
-            );
-        }
+        BppLog.DebugEvent(
+            VoiceSubtitlesDisplayLogEvents.DisplayHidden,
+            () =>
+                [
+                    VoiceSubtitlesDisplayLogEvents.DisplayHiddenDisplayId.Bind(_displayId),
+                    VoiceSubtitlesDisplayLogEvents.DisplayHiddenAttemptId.Bind(_attemptId),
+                    VoiceSubtitlesDisplayLogEvents.DisplayHiddenStem.Bind(_stem),
+                    VoiceSubtitlesDisplayLogEvents.DisplayHiddenReasonCode.Bind(reasonCode),
+                    VoiceSubtitlesDisplayLogEvents.DisplayHiddenElapsedMs.Bind(
+                        (long)
+                            Math.Round(
+                                Mathf.Max(0f, Time.unscaledTime - _shownAt) * 1000f,
+                                MidpointRounding.AwayFromZero
+                            )
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.DisplayHiddenPlaybackState.Bind(
+                        PlaybackStateText()
+                    ),
+                ]
+        );
         _isPlaybackStoppedOrStopping = null;
         _playbackStateText = null;
         enabled = false;
@@ -127,7 +112,15 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
         }
         catch (Exception ex)
         {
-            VoiceSubtitlesLog.Warn($"Failed to query VO playback state: {ex.Message}");
+            BppLog.WarnEvent(
+                VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegraded,
+                ex,
+                VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegradedDisplayId.Bind(_displayId),
+                VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegradedAttemptId.Bind(_attemptId),
+                VoiceSubtitlesDisplayLogEvents.PlaybackTrackingDegradedReasonCode.Bind(
+                    VoiceSubtitlesLogReasonCode.PlaybackQueryException
+                )
+            );
             return false;
         }
     }
@@ -138,9 +131,8 @@ internal sealed class VoiceLineOverlayLifetime : MonoBehaviour
         {
             return _playbackStateText?.Invoke() ?? "<none>";
         }
-        catch (Exception ex)
+        catch
         {
-            VoiceSubtitlesLog.Warn($"Failed to format VO playback state: {ex.Message}");
             return "<error>";
         }
     }

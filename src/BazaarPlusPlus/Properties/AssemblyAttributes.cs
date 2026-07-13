@@ -5,3 +5,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("CompositionRuntime.Tests")]
 [assembly: InternalsVisibleTo("ItemEnchantPreview.Tests")]
 [assembly: InternalsVisibleTo("StartupUploadRunner.Tests")]
+[assembly: InternalsVisibleTo("VoiceSubtitles.Tests")]

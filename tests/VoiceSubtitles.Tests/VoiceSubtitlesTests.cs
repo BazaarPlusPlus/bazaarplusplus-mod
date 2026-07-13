@@ -1,6 +1,9 @@
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using BazaarPlusPlus.Game.VoiceSubtitles;
+using BazaarPlusPlus.Infrastructure.Logging;
+using BepInEx.Logging;
 using Xunit;
 
 namespace VoiceSubtitles.Tests;
@@ -57,7 +60,7 @@ public sealed class VoiceSubtitlesTests
         );
 
         var ex = Assert.Throws<TargetInvocationException>(() =>
-            parse.Invoke(null, [json, "count-test"])
+            parse.Invoke(null, [json, VoiceCatalogSource.Embedded])
         );
         Assert.Contains("count", ex.InnerException?.Message);
     }
@@ -74,7 +77,7 @@ public sealed class VoiceSubtitlesTests
         );
 
         var ex = Assert.Throws<TargetInvocationException>(() =>
-            parse.Invoke(null, [json, "hash-test"])
+            parse.Invoke(null, [json, VoiceCatalogSource.Embedded])
         );
         Assert.Contains("contentHash", ex.InnerException?.Message);
     }
@@ -128,6 +131,242 @@ public sealed class VoiceSubtitlesTests
                 Assert.False(downloadCalled());
                 Assert.Empty(queuedRefreshes);
             }
+        );
+    }
+
+    [Fact]
+    public void Fresh_catalog_warm_up_emits_one_structured_ready_event()
+    {
+        WithRepositoryCache(
+            cacheAge: TimeSpan.FromHours(1),
+            (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
+            {
+                using var capture = new LogCapture();
+
+                GetRequiredInstanceMethod(repositoryType, "LoadVoiceLinesInBackground")
+                    .Invoke(repository, null);
+
+                var ready = Assert.Single(capture.Events("voice_subtitles.catalog.ready"));
+                Assert.Equal(LogLevel.Info, ready.Level);
+                Assert.Contains("source=cache", ready.Data?.ToString());
+                Assert.Contains("line_count=5032", ready.Data?.ToString());
+                Assert.DoesNotContain(cachePath, ready.Data?.ToString());
+                Assert.Empty(capture.Events("voice_subtitles.catalog.degraded"));
+                Assert.Empty(capture.Events("voice_subtitles.catalog.failed"));
+            }
+        );
+    }
+
+    [Fact]
+    public void Catalog_event_catalog_matches_the_locked_manifest()
+    {
+        var actual = typeof(VoiceCatalogLogEvents)
+            .GetFields(BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+            .Where(field => field.FieldType == typeof(BppLogEventDefinition))
+            .Select(field => (BppLogEventDefinition)field.GetValue(null)!)
+            .ToDictionary(
+                definition => definition.EventId,
+                definition =>
+                    string.Join(
+                        "|",
+                        definition.Fields.Select(field =>
+                            $"{field.Name}:{field.Privacy}:{field.Cardinality}:{field.Correlation}"
+                        )
+                    ),
+                StringComparer.Ordinal
+            );
+
+        Assert.Equal(
+            new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["voice_subtitles.catalog.started"] = "",
+                ["voice_subtitles.catalog.ready"] =
+                    "source:Public:Low:None|line_count:Public:High:None",
+                ["voice_subtitles.catalog.degraded"] =
+                    "reason_code:Public:Low:None|source:Public:Low:None|endpoint:Public:Low:None",
+                ["voice_subtitles.catalog.failed"] =
+                    "reason_code:Public:Low:None|source:Public:Low:None",
+                ["voice_subtitles.catalog_refresh.started"] =
+                    "reason_code:Public:Low:None|endpoint:Public:Low:None",
+                ["voice_subtitles.catalog.recovered"] =
+                    "reason_code:Public:Low:None|source:Public:Low:None|line_count:Public:High:None",
+                ["voice_subtitles.catalog_cache.degraded"] = "reason_code:Public:Low:None",
+                ["voice_subtitles.catalog_row.skipped"] =
+                    "source:Public:Low:None|row_number:Public:High:None|reason_code:Public:Low:None|stem:UntrustedText:High:None",
+            },
+            actual
+        );
+        Assert.Equal(
+            ["reason_code", "source"],
+            VoiceCatalogLogEvents.CatalogDegraded.StormPolicy!.KeyFields.Select(field => field.Name)
+        );
+        Assert.Equal(
+            ["reason_code"],
+            VoiceCatalogLogEvents.CatalogCacheDegraded.StormPolicy!.KeyFields.Select(field =>
+                field.Name
+            )
+        );
+    }
+
+    [Fact]
+    public void Stale_catalog_emits_one_degradation_then_one_remote_recovery()
+    {
+        WithRepositoryCache(
+            cacheAge: TimeSpan.FromHours(21),
+            (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
+            {
+                using var capture = new LogCapture();
+
+                GetRequiredInstanceMethod(repositoryType, "LoadVoiceLinesInBackground")
+                    .Invoke(repository, null);
+
+                var degraded = Assert.Single(capture.Events("voice_subtitles.catalog.degraded"));
+                Assert.Equal(LogLevel.Warning, degraded.Level);
+                Assert.Contains("reason_code=cache_stale", degraded.Data?.ToString());
+                Assert.Contains("source=cache", degraded.Data?.ToString());
+                Assert.Contains("endpoint=voice_catalog", degraded.Data?.ToString());
+                Assert.Empty(capture.Events("voice_subtitles.catalog.ready"));
+                Assert.DoesNotContain(cachePath, degraded.Data?.ToString());
+                Assert.DoesNotContain("expiresAtUtc", degraded.Data?.ToString());
+
+                Assert.Single(queuedRefreshes)().GetAwaiter().GetResult();
+
+                var recovered = Assert.Single(capture.Events("voice_subtitles.catalog.recovered"));
+                Assert.Equal(LogLevel.Info, recovered.Level);
+                Assert.Contains("reason_code=cache_stale", recovered.Data?.ToString());
+                Assert.Contains("source=cache", recovered.Data?.ToString());
+                Assert.Contains("line_count=5032", recovered.Data?.ToString());
+                Assert.DoesNotContain("http", recovered.Data?.ToString());
+                Assert.True(downloadCalled());
+            }
+        );
+    }
+
+    [Fact]
+    public void No_usable_catalog_emits_one_terminal_failed_event()
+    {
+        var repositoryType = typeof(VoiceLinesRepository);
+        var repository = new VoiceLinesRepository();
+        var now = new DateTime(2026, 7, 3, 12, 0, 0, DateTimeKind.Utc);
+        var cachePath = Path.Combine(Path.GetTempPath(), $"voice-lines-{Guid.NewGuid():N}.json");
+        var queuedRefreshes = new List<Func<Task>>();
+        GetRequiredInstanceMethod(repositoryType, "ConfigureVoiceLinesSourcesForTests")
+            .Invoke(
+                repository,
+                [
+                    cachePath,
+                    (Func<DateTime>)(() => now),
+                    (Func<string, Task<string>>)(_ => Task.FromResult(string.Empty)),
+                    (Func<string?>)(() => null),
+                    (Action<Func<Task>>)(refresh => queuedRefreshes.Add(refresh)),
+                ]
+            );
+        using var capture = new LogCapture();
+
+        GetRequiredInstanceMethod(repositoryType, "LoadVoiceLinesInBackground")
+            .Invoke(repository, null);
+
+        var failed = Assert.Single(capture.Events("voice_subtitles.catalog.failed"));
+        Assert.Equal(LogLevel.Error, failed.Level);
+        Assert.Contains("reason_code=no_usable_catalog", failed.Data?.ToString());
+        Assert.Contains("source=embedded", failed.Data?.ToString());
+        Assert.Empty(capture.Events("voice_subtitles.catalog.ready"));
+        Assert.Empty(capture.Events("voice_subtitles.catalog.degraded"));
+        Assert.Single(queuedRefreshes);
+    }
+
+    [Fact]
+    public async Task Cache_write_failure_is_independent_from_catalog_health()
+    {
+        var repositoryType = typeof(VoiceLinesRepository);
+        var repository = new VoiceLinesRepository();
+        var embeddedJson = Assert.IsType<string>(
+            GetRequiredStaticMethod(repositoryType, "ReadEmbeddedSeedJsonForTests")
+                .Invoke(null, null)
+        );
+        var cacheDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"voice-lines-cache-directory-{Guid.NewGuid():N}"
+        );
+        Directory.CreateDirectory(cacheDirectory);
+        var queuedRefreshes = new List<Func<Task>>();
+        try
+        {
+            GetRequiredInstanceMethod(repositoryType, "ConfigureVoiceLinesSourcesForTests")
+                .Invoke(
+                    repository,
+                    [
+                        cacheDirectory,
+                        (Func<DateTime>)(() => DateTime.UtcNow),
+                        (Func<string, Task<string>>)(_ => Task.FromResult(embeddedJson)),
+                        (Func<string?>)(() => embeddedJson),
+                        (Action<Func<Task>>)(refresh => queuedRefreshes.Add(refresh)),
+                    ]
+                );
+            using var capture = new LogCapture();
+
+            GetRequiredInstanceMethod(repositoryType, "LoadVoiceLinesInBackground")
+                .Invoke(repository, null);
+            await Assert.Single(queuedRefreshes)();
+
+            var cacheDegraded = Assert.Single(
+                capture.Events("voice_subtitles.catalog_cache.degraded")
+            );
+            Assert.Equal(LogLevel.Warning, cacheDegraded.Level);
+            Assert.Contains("reason_code=write_failed", cacheDegraded.Data?.ToString());
+            Assert.DoesNotContain(cacheDirectory, cacheDegraded.Data?.ToString());
+            Assert.Empty(capture.Events("voice_subtitles.catalog.degraded"));
+            Assert.Empty(capture.Events("voice_subtitles.catalog.recovered"));
+            Assert.Single(capture.Events("voice_subtitles.catalog.ready"));
+        }
+        finally
+        {
+            Directory.Delete(cacheDirectory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Malformed_rows_emit_typed_debug_skips_without_operational_warnings()
+    {
+        var documentType = typeof(VoiceLinesDocument);
+        var parse = GetRequiredStaticMethod(documentType, "Parse");
+        var json = BuildVoiceLinesJson(
+            count: 1,
+            contentHash: ContentHashFor(("valid", "English", "中文", 1.25)),
+            ("", "missing", "缺失", 1),
+            ("valid", "English", "中文", 1.25),
+            ("valid", "duplicate", "重复", 1),
+            ("empty", "", "", 1)
+        );
+        using var capture = new LogCapture();
+
+        var lines = Assert.IsAssignableFrom<Array>(
+            parse.Invoke(null, [json, VoiceCatalogSource.Remote])
+        );
+
+        Assert.Single(lines);
+#if DEBUG
+        var skipped = capture.Events("voice_subtitles.catalog_row.skipped");
+        Assert.Equal(3, skipped.Count);
+        Assert.All(skipped, entry => Assert.Equal(LogLevel.Debug, entry.Level));
+        Assert.Contains(
+            skipped,
+            entry => entry.Data?.ToString()?.Contains("reason_code=missing_stem") == true
+        );
+        Assert.Contains(
+            skipped,
+            entry => entry.Data?.ToString()?.Contains("reason_code=duplicate_stem") == true
+        );
+        Assert.Contains(
+            skipped,
+            entry => entry.Data?.ToString()?.Contains("reason_code=empty_text") == true
+        );
+#else
+        Assert.Empty(capture.Events("voice_subtitles.catalog_row.skipped"));
+#endif
+        Assert.DoesNotContain(
+            capture.All,
+            entry => entry.Level is LogLevel.Warning or LogLevel.Error
         );
     }
 
@@ -527,5 +766,36 @@ public sealed class VoiceSubtitlesTests
     private static float GetStaticSingle(Type type, string name)
     {
         return Assert.IsType<float>(GetRequiredStaticField(type, name).GetValue(null));
+    }
+
+    private sealed class LogCapture : IDisposable
+    {
+        private readonly ManualLogSource _source = new("VoiceSubtitles.Tests");
+        private readonly List<LogEventArgs> _events = [];
+
+        internal LogCapture()
+        {
+            _source.LogEvent += OnLogEvent;
+            var bppLogType = GetRequiredType("BazaarPlusPlus.Infrastructure.BppLog");
+            GetRequiredStaticMethod(bppLogType, "Install").Invoke(null, [_source]);
+        }
+
+        internal IReadOnlyList<LogEventArgs> Events(string eventId) =>
+            _events
+                .Where(entry =>
+                    entry.Data?.ToString()?.Contains("event=" + eventId, StringComparison.Ordinal)
+                    == true
+                )
+                .ToArray();
+
+        internal IReadOnlyList<LogEventArgs> All => _events;
+
+        public void Dispose()
+        {
+            _source.LogEvent -= OnLogEvent;
+            _source.Dispose();
+        }
+
+        private void OnLogEvent(object? sender, LogEventArgs args) => _events.Add(args);
     }
 }

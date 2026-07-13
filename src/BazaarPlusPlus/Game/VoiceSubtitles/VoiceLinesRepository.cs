@@ -30,6 +30,8 @@ internal sealed class VoiceLinesRepository
     private bool _hasLoadedCatalog;
     private Task? _warmUpTask;
     private string? _cacheFilePath;
+    private VoiceCatalogState _catalogState = VoiceCatalogState.Loading;
+    private VoiceCatalogDegradation? _activeDegradation;
     private Func<DateTime> _utcNow = () => DateTime.UtcNow;
     private Func<string, Task<string>> _downloadJsonAsync = DownloadJsonAsync;
     private Func<string?> _loadEmbeddedJson = LoadEmbeddedSeedJson;
@@ -42,10 +44,12 @@ internal sealed class VoiceLinesRepository
             if (_attemptedLoad || _warmUpTask != null)
                 return;
 
+            _catalogState = VoiceCatalogState.Loading;
+            _activeDegradation = null;
             _warmUpTask = Task.Run(LoadVoiceLinesInBackground);
         }
 
-        VoiceSubtitlesLog.Debug("Voice subtitle catalog warm-up task started.");
+        BppLog.DebugEvent(VoiceCatalogLogEvents.CatalogStarted, static () => []);
     }
 
     internal static VoiceLine[] LoadEmbeddedSeed()
@@ -55,76 +59,97 @@ internal sealed class VoiceLinesRepository
             ?? throw new FileNotFoundException(
                 $"Embedded voice subtitle seed '{EmbeddedResourceName}' was not found."
             );
-        var lines = VoiceLinesDocument.Parse(json, EmbeddedResourceName);
-        VoiceSubtitlesLog.Info($"Loaded {lines.Length} embedded voice subtitle lines.");
-        return lines;
+        return VoiceLinesDocument.Parse(json, VoiceCatalogSource.Embedded);
     }
 
     private void LoadVoiceLinesInBackground()
     {
-        LoadedVoiceLines? loaded;
-        bool shouldRefreshInBackground;
         try
         {
-            loaded = LoadVoiceLines(out shouldRefreshInBackground);
+            var outcome = LoadInitialCatalog();
+            if (!ApplyInitialOutcome(outcome))
+                return;
+
+            if (outcome.ShouldRefresh)
+                TryQueueRefreshFromRemote(GetRefreshReason(outcome));
         }
         catch (Exception ex)
         {
-            lock (_syncRoot)
-            {
-                _warmUpTask = null;
-            }
-            VoiceSubtitlesLog.Warn($"Voice subtitle catalog warm-up failed: {ex.Message}");
-            return;
+            ReportUnexpectedWarmUpFailure(ex);
         }
-
-        ApplyLoadedVoiceLines(loaded);
-        VoiceSubtitlesLog.Info(
-            "Voice subtitle catalog warm-up complete: "
-                + (
-                    loaded != null
-                        ? $"{loaded.Value.Lines.Length} lines source={loaded.Value.CatalogName}"
-                        : "no catalog"
-                )
-        );
-
-        if (shouldRefreshInBackground)
-            TryQueueRefreshFromRemote("cache_stale_or_missing");
     }
 
-    private LoadedVoiceLines? LoadVoiceLines(out bool shouldRefreshInBackground)
+    private VoiceCatalogLoadOutcome LoadInitialCatalog()
     {
-        shouldRefreshInBackground = false;
-
-        if (TryLoadCache(allowExpired: false, out var freshLines))
-            return freshLines;
-
-        if (TryLoadCache(allowExpired: true, out var staleLines))
+        var cache = LoadCache();
+        if (cache.Kind == VoiceCatalogSourceOutcomeKind.Fresh)
         {
-            shouldRefreshInBackground = true;
-            VoiceSubtitlesLog.Info(
-                "Using expired voice subtitle cache; remote refresh was queued in the background."
+            return VoiceCatalogLoadOutcome.Ready(
+                cache.Lines!,
+                VoiceCatalogSource.Cache,
+                shouldRefresh: false
             );
-            return staleLines;
         }
 
-        shouldRefreshInBackground = true;
-        var embeddedJson = _loadEmbeddedJson();
-        return string.IsNullOrWhiteSpace(embeddedJson)
-            ? null
-            : DeserializeVoiceLines(embeddedJson!, "embedded");
+        if (cache.Kind == VoiceCatalogSourceOutcomeKind.Stale)
+        {
+            return VoiceCatalogLoadOutcome.Degraded(
+                cache.Lines!,
+                VoiceCatalogSource.Cache,
+                VoiceCatalogSource.Cache,
+                VoiceCatalogReasonCode.CacheStale,
+                exception: null,
+                shouldRefresh: true
+            );
+        }
+
+        var embedded = LoadEmbedded();
+        if (embedded.Kind == VoiceCatalogSourceOutcomeKind.Fresh)
+        {
+            if (cache.Kind == VoiceCatalogSourceOutcomeKind.Rejected)
+            {
+                return VoiceCatalogLoadOutcome.Degraded(
+                    embedded.Lines!,
+                    VoiceCatalogSource.Embedded,
+                    VoiceCatalogSource.Cache,
+                    cache.ReasonCode ?? VoiceCatalogReasonCode.SourceRejected,
+                    cache.Exception,
+                    shouldRefresh: true
+                );
+            }
+
+            return VoiceCatalogLoadOutcome.Ready(
+                embedded.Lines!,
+                VoiceCatalogSource.Embedded,
+                shouldRefresh: true
+            );
+        }
+
+        var terminal =
+            embedded.Kind == VoiceCatalogSourceOutcomeKind.Rejected ? embedded
+            : cache.Kind == VoiceCatalogSourceOutcomeKind.Rejected ? cache
+            : VoiceCatalogSourceOutcome.Rejected(
+                VoiceCatalogSource.Embedded,
+                VoiceCatalogReasonCode.NoUsableCatalog
+            );
+        return VoiceCatalogLoadOutcome.Failed(
+            terminal.Source,
+            terminal.ReasonCode ?? VoiceCatalogReasonCode.NoUsableCatalog,
+            terminal.Exception,
+            shouldRefresh: true
+        );
     }
 
-    private void ApplyLoadedVoiceLines(LoadedVoiceLines? loaded)
+    private bool ApplyInitialOutcome(VoiceCatalogLoadOutcome outcome)
     {
         lock (_syncRoot)
         {
             if (_attemptedLoad)
-                return;
+                return false;
 
-            if (loaded != null)
+            if (outcome.Lines != null)
             {
-                VoiceLineCatalog.ReplaceCatalog(loaded.Value.Lines, loaded.Value.CatalogName);
+                VoiceLineCatalog.ReplaceCatalog(outcome.Lines, CatalogName(outcome.CatalogSource));
                 _hasLoadedCatalog = true;
             }
             else
@@ -133,103 +158,179 @@ internal sealed class VoiceLinesRepository
                 _hasLoadedCatalog = false;
             }
 
+            _catalogState = outcome.Kind switch
+            {
+                VoiceCatalogLoadOutcomeKind.Ready => VoiceCatalogState.Ready,
+                VoiceCatalogLoadOutcomeKind.Degraded => VoiceCatalogState.Degraded,
+                VoiceCatalogLoadOutcomeKind.Failed => VoiceCatalogState.Failed,
+                _ => VoiceCatalogState.Failed,
+            };
+            _activeDegradation =
+                outcome.Kind == VoiceCatalogLoadOutcomeKind.Degraded
+                    ? new VoiceCatalogDegradation(
+                        outcome.ReasonCode ?? VoiceCatalogReasonCode.SourceRejected,
+                        outcome.EventSource
+                    )
+                    : null;
             _attemptedLoad = true;
         }
+
+        switch (outcome.Kind)
+        {
+            case VoiceCatalogLoadOutcomeKind.Ready:
+                BppLog.InfoEvent(
+                    VoiceCatalogLogEvents.CatalogReady,
+                    VoiceCatalogLogEvents.CatalogReadySource.Bind(outcome.CatalogSource),
+                    VoiceCatalogLogEvents.CatalogReadyLineCount.Bind(outcome.Lines?.Length ?? 0)
+                );
+                break;
+            case VoiceCatalogLoadOutcomeKind.Degraded:
+                EmitCatalogDegraded(
+                    outcome.ReasonCode ?? VoiceCatalogReasonCode.SourceRejected,
+                    outcome.EventSource,
+                    outcome.Exception
+                );
+                break;
+            case VoiceCatalogLoadOutcomeKind.Failed:
+                EmitCatalogFailed(
+                    outcome.ReasonCode ?? VoiceCatalogReasonCode.NoUsableCatalog,
+                    outcome.EventSource,
+                    outcome.Exception
+                );
+                break;
+        }
+
+        return true;
     }
 
-    private bool TryLoadCache(bool allowExpired, out LoadedVoiceLines? loaded)
+    private VoiceCatalogSourceOutcome LoadCache()
     {
-        loaded = null;
-
         try
         {
             var cacheFilePath = ResolveCacheFilePath();
             if (!File.Exists(cacheFilePath))
-                return false;
+                return VoiceCatalogSourceOutcome.Missing(VoiceCatalogSource.Cache);
 
-            var lastWriteUtc = File.GetLastWriteTimeUtc(cacheFilePath);
-            var expiresAtUtc = lastWriteUtc.Add(VoiceLinesCacheDuration);
-            if (!allowExpired && _utcNow() >= expiresAtUtc)
-                return false;
-
+            var now = _utcNow();
+            var expiresAtUtc = File.GetLastWriteTimeUtc(cacheFilePath).Add(VoiceLinesCacheDuration);
             var json = File.ReadAllText(cacheFilePath, new UTF8Encoding(false));
-            loaded = DeserializeVoiceLines(json, "cache");
-            if (loaded == null)
-                return false;
+            var parsed = DeserializeVoiceLines(json, VoiceCatalogSource.Cache);
+            if (parsed.Kind == VoiceCatalogSourceOutcomeKind.Rejected)
+                return parsed;
 
-            VoiceSubtitlesLog.Info(
-                $"Loaded voice subtitles from cache path={cacheFilePath} "
-                    + $"expired={_utcNow() >= expiresAtUtc} expiresAtUtc={expiresAtUtc:O}"
-            );
-            return true;
+            return now >= expiresAtUtc
+                ? VoiceCatalogSourceOutcome.Stale(VoiceCatalogSource.Cache, parsed.Lines!)
+                : VoiceCatalogSourceOutcome.Fresh(VoiceCatalogSource.Cache, parsed.Lines!);
         }
         catch (Exception ex)
         {
-            VoiceSubtitlesLog.Warn(
-                $"Failed to read voice subtitles cache {ResolveCacheFilePath()}: {ex.Message}"
+            return VoiceCatalogSourceOutcome.Rejected(
+                VoiceCatalogSource.Cache,
+                VoiceCatalogReasonCode.SourceRejected,
+                ex
             );
-            return false;
         }
     }
 
-    private async Task<(LoadedVoiceLines? Loaded, string? Error)> LoadRemoteAsync()
+    private VoiceCatalogSourceOutcome LoadEmbedded()
+    {
+        try
+        {
+            var json = _loadEmbeddedJson();
+            return string.IsNullOrWhiteSpace(json)
+                ? VoiceCatalogSourceOutcome.Missing(VoiceCatalogSource.Embedded)
+                : DeserializeVoiceLines(json!, VoiceCatalogSource.Embedded);
+        }
+        catch (Exception ex)
+        {
+            return VoiceCatalogSourceOutcome.Rejected(
+                VoiceCatalogSource.Embedded,
+                VoiceCatalogReasonCode.SourceRejected,
+                ex
+            );
+        }
+    }
+
+    private async Task<VoiceCatalogRemoteOutcome> LoadRemoteAsync()
     {
         try
         {
             var json = await _downloadJsonAsync(VoiceLinesRemoteUrl).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(json))
-                return (null, "empty_response");
+            {
+                return new VoiceCatalogRemoteOutcome(
+                    VoiceCatalogSourceOutcome.Rejected(
+                        VoiceCatalogSource.Remote,
+                        VoiceCatalogReasonCode.EmptyResponse
+                    ),
+                    null
+                );
+            }
 
-            var loaded = DeserializeVoiceLines(json, "remote");
-            if (loaded == null)
-                return (null, "invalid_response");
+            var loaded = DeserializeVoiceLines(json, VoiceCatalogSource.Remote);
+            if (loaded.Kind == VoiceCatalogSourceOutcomeKind.Rejected)
+                return new VoiceCatalogRemoteOutcome(loaded, null);
 
-            TryWriteCache(json);
-            VoiceSubtitlesLog.Info(
-                $"Loaded voice subtitles from remote url={VoiceLinesRemoteUrl} count={loaded.Value.Lines.Length}"
-            );
-            return (loaded, null);
+            return new VoiceCatalogRemoteOutcome(loaded, TryWriteCache(json));
         }
         catch (Exception ex)
         {
-            VoiceSubtitlesLog.Warn(
-                $"Failed to refresh voice subtitles from {VoiceLinesRemoteUrl}: {ex.Message}"
+            return new VoiceCatalogRemoteOutcome(
+                VoiceCatalogSourceOutcome.Rejected(
+                    VoiceCatalogSource.Remote,
+                    VoiceCatalogReasonCode.RemoteFailed,
+                    ex
+                ),
+                null
             );
-            return (null, ex.Message);
         }
     }
 
-    private static LoadedVoiceLines? DeserializeVoiceLines(string json, string source)
+    private static VoiceCatalogSourceOutcome DeserializeVoiceLines(
+        string json,
+        VoiceCatalogSource source
+    )
     {
         try
         {
-            var lines = VoiceLinesDocument.Parse(json, source);
-            return new LoadedVoiceLines(lines, source);
+            return VoiceCatalogSourceOutcome.Fresh(source, VoiceLinesDocument.Parse(json, source));
         }
         catch (Exception ex)
         {
-            VoiceSubtitlesLog.Warn(
-                $"Voice subtitle JSON from {source} was missing or malformed: {ex.Message}"
+            return VoiceCatalogSourceOutcome.Rejected(
+                source,
+                VoiceCatalogReasonCode.SourceRejected,
+                ex
             );
-            return null;
         }
     }
 
-    private void TryQueueRefreshFromRemote(string reason)
+    private void TryQueueRefreshFromRemote(VoiceCatalogReasonCode reasonCode)
     {
         if (!TryBeginBackgroundRefresh())
             return;
 
         try
         {
-            _queueBackgroundRefresh(() => RefreshFromRemoteInBackgroundAsync(reason));
-            VoiceSubtitlesLog.Info($"Queued background voice subtitles refresh reason={reason}.");
+            _queueBackgroundRefresh(RefreshFromRemoteInBackgroundAsync);
+            BppLog.DebugEvent(
+                VoiceCatalogLogEvents.CatalogRefreshStarted,
+                () =>
+                    [
+                        VoiceCatalogLogEvents.CatalogRefreshStartedReasonCode.Bind(reasonCode),
+                        VoiceCatalogLogEvents.CatalogRefreshStartedEndpoint.Bind(
+                            VoiceCatalogEndpoint.VoiceCatalog
+                        ),
+                    ]
+            );
         }
         catch (Exception ex)
         {
             EndBackgroundRefresh();
-            VoiceSubtitlesLog.Warn(
-                $"Failed to queue background voice subtitles refresh reason={reason}: {ex.Message}"
+            ReportCatalogDegraded(
+                VoiceCatalogReasonCode.RefreshQueueFailed,
+                VoiceCatalogSource.Remote,
+                ex
             );
         }
     }
@@ -254,28 +355,27 @@ internal sealed class VoiceLinesRepository
         }
     }
 
-    private async Task RefreshFromRemoteInBackgroundAsync(string reason)
+    private async Task RefreshFromRemoteInBackgroundAsync()
     {
         try
         {
-            var (loaded, error) = await LoadRemoteAsync().ConfigureAwait(false);
-            if (loaded != null)
-            {
-                lock (_syncRoot)
-                {
-                    VoiceLineCatalog.ReplaceCatalog(loaded.Value.Lines, loaded.Value.CatalogName);
-                    _attemptedLoad = true;
-                    _hasLoadedCatalog = true;
-                }
+            var remote = await LoadRemoteAsync().ConfigureAwait(false);
+            if (remote.CacheWriteException != null)
+                ReportCacheWriteDegraded(remote.CacheWriteException);
 
-                VoiceSubtitlesLog.Info(
-                    $"Background voice subtitles refresh succeeded reason={reason}."
-                );
+            if (
+                remote.SourceOutcome.Kind == VoiceCatalogSourceOutcomeKind.Fresh
+                && remote.SourceOutcome.Lines != null
+            )
+            {
+                ApplyRemoteCatalog(remote.SourceOutcome.Lines);
                 return;
             }
 
-            VoiceSubtitlesLog.Warn(
-                $"Background voice subtitles refresh failed reason={reason} error={error ?? "unknown"}."
+            ReportCatalogDegraded(
+                remote.SourceOutcome.ReasonCode ?? VoiceCatalogReasonCode.RemoteFailed,
+                VoiceCatalogSource.Remote,
+                remote.SourceOutcome.Exception
             );
         }
         finally
@@ -287,12 +387,132 @@ internal sealed class VoiceLinesRepository
                 {
                     _attemptedLoad = false;
                     _warmUpTask = null;
+                    _catalogState = VoiceCatalogState.Loading;
+                    _activeDegradation = null;
                 }
             }
         }
     }
 
-    private void TryWriteCache(string json)
+    private void ApplyRemoteCatalog(VoiceLine[] lines)
+    {
+        VoiceCatalogDegradation? recovered;
+        lock (_syncRoot)
+        {
+            VoiceLineCatalog.ReplaceCatalog(lines, CatalogName(VoiceCatalogSource.Remote));
+            _attemptedLoad = true;
+            _hasLoadedCatalog = true;
+            recovered = _catalogState == VoiceCatalogState.Degraded ? _activeDegradation : null;
+            _catalogState = VoiceCatalogState.Ready;
+            _activeDegradation = null;
+        }
+
+        if (!recovered.HasValue)
+            return;
+
+        BppLog.RecoverStorm(
+            VoiceCatalogLogEvents.CatalogDegraded,
+            VoiceCatalogLogEvents.CatalogDegradedReasonCode.Bind(recovered.Value.ReasonCode),
+            VoiceCatalogLogEvents.CatalogDegradedSource.Bind(recovered.Value.Source)
+        );
+        BppLog.InfoEvent(
+            VoiceCatalogLogEvents.CatalogRecovered,
+            VoiceCatalogLogEvents.CatalogRecoveredReasonCode.Bind(recovered.Value.ReasonCode),
+            VoiceCatalogLogEvents.CatalogRecoveredSource.Bind(recovered.Value.Source),
+            VoiceCatalogLogEvents.CatalogRecoveredLineCount.Bind(lines.Length)
+        );
+    }
+
+    private void ReportCatalogDegraded(
+        VoiceCatalogReasonCode reasonCode,
+        VoiceCatalogSource source,
+        Exception? exception
+    )
+    {
+        lock (_syncRoot)
+        {
+            if (
+                _catalogState == VoiceCatalogState.Degraded
+                || _catalogState == VoiceCatalogState.Failed
+            )
+            {
+                return;
+            }
+
+            _catalogState = VoiceCatalogState.Degraded;
+            _activeDegradation = new VoiceCatalogDegradation(reasonCode, source);
+        }
+
+        EmitCatalogDegraded(reasonCode, source, exception);
+    }
+
+    private static void EmitCatalogDegraded(
+        VoiceCatalogReasonCode reasonCode,
+        VoiceCatalogSource source,
+        Exception? exception
+    )
+    {
+        var fields = new[]
+        {
+            VoiceCatalogLogEvents.CatalogDegradedReasonCode.Bind(reasonCode),
+            VoiceCatalogLogEvents.CatalogDegradedSource.Bind(source),
+            VoiceCatalogLogEvents.CatalogDegradedEndpoint.Bind(VoiceCatalogEndpoint.VoiceCatalog),
+        };
+        if (exception == null)
+            BppLog.WarnEvent(VoiceCatalogLogEvents.CatalogDegraded, fields);
+        else
+            BppLog.WarnEvent(VoiceCatalogLogEvents.CatalogDegraded, exception, fields);
+    }
+
+    private static void EmitCatalogFailed(
+        VoiceCatalogReasonCode reasonCode,
+        VoiceCatalogSource source,
+        Exception? exception
+    )
+    {
+        var fields = new[]
+        {
+            VoiceCatalogLogEvents.CatalogFailedReasonCode.Bind(reasonCode),
+            VoiceCatalogLogEvents.CatalogFailedSource.Bind(source),
+        };
+        if (exception == null)
+            BppLog.ErrorEvent(VoiceCatalogLogEvents.CatalogFailed, fields);
+        else
+            BppLog.ErrorEvent(VoiceCatalogLogEvents.CatalogFailed, exception, fields);
+    }
+
+    private void ReportUnexpectedWarmUpFailure(Exception exception)
+    {
+        lock (_syncRoot)
+        {
+            if (_catalogState == VoiceCatalogState.Failed && _attemptedLoad)
+                return;
+
+            _catalogState = VoiceCatalogState.Failed;
+            _activeDegradation = null;
+            _hasLoadedCatalog = false;
+            _attemptedLoad = true;
+        }
+
+        EmitCatalogFailed(
+            VoiceCatalogReasonCode.WarmUpException,
+            VoiceCatalogSource.None,
+            exception
+        );
+    }
+
+    private static void ReportCacheWriteDegraded(Exception exception)
+    {
+        BppLog.WarnEvent(
+            VoiceCatalogLogEvents.CatalogCacheDegraded,
+            exception,
+            VoiceCatalogLogEvents.CatalogCacheDegradedReasonCode.Bind(
+                VoiceCatalogReasonCode.WriteFailed
+            )
+        );
+    }
+
+    private Exception? TryWriteCache(string json)
     {
         try
         {
@@ -303,12 +523,11 @@ internal sealed class VoiceLinesRepository
 
             File.WriteAllText(cacheFilePath, json, new UTF8Encoding(false));
             File.SetLastWriteTimeUtc(cacheFilePath, _utcNow());
+            return null;
         }
         catch (Exception ex)
         {
-            VoiceSubtitlesLog.Warn(
-                $"Failed to write voice subtitles cache {ResolveCacheFilePath()}: {ex.Message}"
-            );
+            return ex;
         }
     }
 
@@ -321,6 +540,23 @@ internal sealed class VoiceLinesRepository
     {
         return Path.Combine(gameRootPath, "BazaarPlusPlusV4", VoiceLinesCacheFileName);
     }
+
+    private static string CatalogName(VoiceCatalogSource source) =>
+        source switch
+        {
+            VoiceCatalogSource.Cache => "cache",
+            VoiceCatalogSource.Embedded => "embedded",
+            VoiceCatalogSource.Remote => "remote",
+            _ => "none",
+        };
+
+    private static VoiceCatalogReasonCode GetRefreshReason(VoiceCatalogLoadOutcome outcome) =>
+        outcome.ReasonCode
+        ?? (
+            outcome.CatalogSource == VoiceCatalogSource.Embedded
+                ? VoiceCatalogReasonCode.CacheMissing
+                : VoiceCatalogReasonCode.NoUsableCatalog
+        );
 
     private static Task<string> DownloadJsonAsync(string url)
     {
@@ -349,8 +585,12 @@ internal sealed class VoiceLinesRepository
 
     private (int Count, string Source, bool ShouldRefresh) LoadVoiceLinesForTests()
     {
-        var loaded = LoadVoiceLines(out var shouldRefresh);
-        return (loaded?.Lines.Length ?? 0, loaded?.CatalogName ?? "none", shouldRefresh);
+        var outcome = LoadInitialCatalog();
+        return (
+            outcome.Lines?.Length ?? 0,
+            CatalogName(outcome.CatalogSource),
+            outcome.ShouldRefresh
+        );
     }
 
     private static string? ReadEmbeddedSeedJsonForTests() => LoadEmbeddedSeedJson();
@@ -362,6 +602,23 @@ internal sealed class VoiceLinesRepository
         Action<Func<Task>> queueBackgroundRefresh
     )
     {
+        ConfigureVoiceLinesSourcesForTests(
+            cacheFilePath,
+            utcNow,
+            downloadJsonAsync,
+            LoadEmbeddedSeedJson,
+            queueBackgroundRefresh
+        );
+    }
+
+    private void ConfigureVoiceLinesSourcesForTests(
+        string cacheFilePath,
+        Func<DateTime> utcNow,
+        Func<string, Task<string>> downloadJsonAsync,
+        Func<string?> loadEmbeddedJson,
+        Action<Func<Task>> queueBackgroundRefresh
+    )
+    {
         lock (_syncRoot)
         {
             _attemptedLoad = false;
@@ -369,23 +626,12 @@ internal sealed class VoiceLinesRepository
             _hasLoadedCatalog = false;
             _warmUpTask = null;
             _cacheFilePath = cacheFilePath;
+            _catalogState = VoiceCatalogState.Loading;
+            _activeDegradation = null;
             _utcNow = utcNow;
             _downloadJsonAsync = downloadJsonAsync;
-            _loadEmbeddedJson = LoadEmbeddedSeedJson;
+            _loadEmbeddedJson = loadEmbeddedJson ?? LoadEmbeddedSeedJson;
             _queueBackgroundRefresh = queueBackgroundRefresh ?? QueueBackgroundRefresh;
         }
-    }
-
-    private readonly struct LoadedVoiceLines
-    {
-        public LoadedVoiceLines(VoiceLine[] lines, string catalogName)
-        {
-            Lines = lines;
-            CatalogName = catalogName;
-        }
-
-        public VoiceLine[] Lines { get; }
-
-        public string CatalogName { get; }
     }
 }

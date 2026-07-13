@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using BazaarPlusPlus.Infrastructure;
 using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.Game.VoiceSubtitles;
@@ -27,14 +28,14 @@ internal sealed class VoiceLinesDocument
     [JsonProperty("lines")]
     public VoiceLineEntry[]? Lines { get; set; }
 
-    internal static VoiceLine[] Parse(string json, string sourceName)
+    internal static VoiceLine[] Parse(string json, VoiceCatalogSource source)
     {
         var document =
             JsonConvert.DeserializeObject<VoiceLinesDocument>(json)
-            ?? throw new InvalidOperationException($"Voice line JSON '{sourceName}' is empty.");
+            ?? throw new InvalidOperationException($"Voice line JSON '{source}' is empty.");
         if (document.SchemaVersion != SupportedSchemaVersion)
             throw new InvalidOperationException(
-                $"Voice line JSON '{sourceName}' has unsupported schemaVersion {document.SchemaVersion}."
+                $"Voice line JSON '{source}' has unsupported schemaVersion {document.SchemaVersion}."
             );
 
         var entries = document.Lines ?? Array.Empty<VoiceLineEntry>();
@@ -47,17 +48,13 @@ internal sealed class VoiceLinesDocument
             var stem = entry.Stem?.Trim();
             if (string.IsNullOrEmpty(stem))
             {
-                VoiceSubtitlesLog.Warn(
-                    $"Skipping voice line JSON row {i + 1} from {sourceName}: missing stem."
-                );
+                ReportSkippedRow(source, i + 1, VoiceCatalogRowSkipReason.MissingStem, stem);
                 continue;
             }
 
             if (!seen.Add(stem))
             {
-                VoiceSubtitlesLog.Warn(
-                    $"Skipping voice line JSON row {i + 1} from {sourceName}: duplicate stem {stem}."
-                );
+                ReportSkippedRow(source, i + 1, VoiceCatalogRowSkipReason.DuplicateStem, stem);
                 continue;
             }
 
@@ -65,9 +62,7 @@ internal sealed class VoiceLinesDocument
             var chinese = entry.Chinese ?? string.Empty;
             if (string.IsNullOrWhiteSpace(english) && string.IsNullOrWhiteSpace(chinese))
             {
-                VoiceSubtitlesLog.Warn(
-                    $"Skipping voice line JSON row {i + 1} from {sourceName}: empty subtitle text."
-                );
+                ReportSkippedRow(source, i + 1, VoiceCatalogRowSkipReason.EmptyText, stem);
                 continue;
             }
 
@@ -79,7 +74,7 @@ internal sealed class VoiceLinesDocument
         var result = lines.ToArray();
         if (document.Count != result.Length)
             throw new InvalidOperationException(
-                $"Voice line JSON '{sourceName}' count mismatch: count={document.Count} lines={result.Length}."
+                $"Voice line JSON '{source}' count mismatch: count={document.Count} lines={result.Length}."
             );
 
         var actualContentHash = ComputeContentHash(result);
@@ -93,12 +88,31 @@ internal sealed class VoiceLinesDocument
         )
         {
             throw new InvalidOperationException(
-                $"Voice line JSON '{sourceName}' contentHash mismatch: "
+                $"Voice line JSON '{source}' contentHash mismatch: "
                     + $"expected={document.ContentHash ?? "<missing>"} actual={actualContentHash}."
             );
         }
 
         return result;
+    }
+
+    private static void ReportSkippedRow(
+        VoiceCatalogSource source,
+        int rowNumber,
+        VoiceCatalogRowSkipReason reasonCode,
+        string? stem
+    )
+    {
+        BppLog.DebugEvent(
+            VoiceCatalogLogEvents.CatalogRowSkipped,
+            () =>
+                [
+                    VoiceCatalogLogEvents.CatalogRowSkippedSource.Bind(source),
+                    VoiceCatalogLogEvents.CatalogRowSkippedRowNumber.Bind(rowNumber),
+                    VoiceCatalogLogEvents.CatalogRowSkippedReasonCode.Bind(reasonCode),
+                    VoiceCatalogLogEvents.CatalogRowSkippedStem.Bind(stem),
+                ]
+        );
     }
 
     internal static string ComputeContentHash(IReadOnlyList<VoiceLine> lines)

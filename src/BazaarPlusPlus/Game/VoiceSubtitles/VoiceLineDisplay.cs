@@ -4,6 +4,8 @@ using System;
 using System.Collections.Concurrent;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.VoiceSubtitles.Settings;
+using BazaarPlusPlus.GameInterop.VoiceSubtitles;
+using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -28,6 +30,7 @@ internal static class VoiceLineDisplay
     private static RectTransform? _sourceRect;
     private static TextMeshProUGUI? _sourceLabel;
     private static readonly ConcurrentQueue<VoiceSubtitleCue> QueuedShows = new();
+    private static readonly VoiceSubtitlesSettingsLogState SettingsLogState = new();
 
     public static bool IsMountedFromVersionLabel =>
         _mountedFromVersionLabel && CurrentLabelObject != null;
@@ -66,7 +69,7 @@ internal static class VoiceLineDisplay
             stage = "store-source-label";
             _sourceRect = versionLabel.rectTransform;
             _sourceLabel = versionLabel;
-            FontDiagnostics.LogOnce(versionLabel, "mount");
+            FontDiagnostics.LogOnce(versionLabel);
 
             stage = "add-subtitle-renderer";
             _labelRoot = labelObject;
@@ -84,8 +87,6 @@ internal static class VoiceLineDisplay
                 return;
             }
 
-            VoiceSubtitlesLog.Info("Subtitle renderers selected " + RendererDescription());
-
             stage = "add-lifetime";
             _lifetime = labelObject.AddComponent<VoiceLineOverlayLifetime>();
             _lifetime.Initialize(labelObject);
@@ -93,19 +94,36 @@ internal static class VoiceLineDisplay
             _mountedFromVersionLabel = true;
 
             stage = "apply-settings";
-            TryApplySettingsToLabel("mount");
-            VoiceSubtitlesLog.Info(
-                $"Subtitle label mounted from version label source='{BuildPath(versionLabel.transform)}'"
+            TryApplySettingsToLabel(VoiceSubtitlesSettingsPhase.Mount);
+            BppLog.DebugEvent(
+                VoiceSubtitlesDisplayLogEvents.OverlayMounted,
+                () =>
+                    [
+                        VoiceSubtitlesDisplayLogEvents.OverlayMountedRenderer.Bind(
+                            RendererDescription()
+                        ),
+                        VoiceSubtitlesDisplayLogEvents.OverlayMountedAnchorPath.Bind(
+                            BuildPath(versionLabel.transform)
+                        ),
+                    ]
             );
         }
         catch (Exception ex)
         {
             DestroyCurrentLabel();
-            VoiceSubtitlesLog.Warn(
-                "Failed to mount subtitle label "
-                    + $"stage={stage} "
-                    + $"source={DescribeVersionLabel(versionLabel)} "
-                    + $"error={ex.GetType().Name}: {ex.Message}\n{ex}"
+            BppLog.ErrorEvent(
+                VoiceSubtitlesDisplayLogEvents.OverlayFailed,
+                ex,
+                VoiceSubtitlesDisplayLogEvents.OverlayFailedStage.Bind(stage),
+                VoiceSubtitlesDisplayLogEvents.OverlayFailedAnchorPath.Bind(
+                    SafeAnchorPath(versionLabel)
+                ),
+                VoiceSubtitlesDisplayLogEvents.OverlayFailedAnchorText.Bind(
+                    SafeAnchorText(versionLabel)
+                ),
+                VoiceSubtitlesDisplayLogEvents.OverlayFailedReasonCode.Bind(
+                    VoiceSubtitlesLogReasonCode.MountException
+                )
             );
         }
     }
@@ -120,15 +138,18 @@ internal static class VoiceLineDisplay
         var text = BuildDisplayText(line);
         if (text.IsEmpty)
         {
-            if (VoiceSubtitlesLog.Verbose)
-            {
-                VoiceSubtitlesLog.Debug(
-                    "Subtitle show skipped because resolved text is empty "
-                        + $"display={displayId} "
-                        + $"attempt={cue.AttemptId} "
-                        + $"stem={line.Stem}"
-                );
-            }
+            BppLog.DebugEvent(
+                VoiceSubtitlesDisplayLogEvents.DisplaySkipped,
+                () =>
+                    [
+                        VoiceSubtitlesDisplayLogEvents.DisplaySkippedDisplayId.Bind(displayId),
+                        VoiceSubtitlesDisplayLogEvents.DisplaySkippedAttemptId.Bind(cue.AttemptId),
+                        VoiceSubtitlesDisplayLogEvents.DisplaySkippedStem.Bind(line.Stem),
+                        VoiceSubtitlesDisplayLogEvents.DisplaySkippedReasonCode.Bind(
+                            VoiceSubtitlesLogReasonCode.EmptyText
+                        ),
+                    ]
+            );
             return;
         }
 
@@ -136,21 +157,6 @@ internal static class VoiceLineDisplay
             cue.EventDurationSeconds > 0f
                 ? cue.EventDurationSeconds + 0.15f
                 : Math.Max(1f, line.DurationSeconds + 0.15f);
-
-        if (VoiceSubtitlesLog.Verbose)
-        {
-            VoiceSubtitlesLog.Debug(
-                "Subtitle show request "
-                    + $"display={displayId} "
-                    + $"attempt={cue.AttemptId} "
-                    + $"stem={line.Stem} "
-                    + $"eventDuration={cue.EventDurationSeconds:F3}s "
-                    + $"lineDuration={line.DurationSeconds:F3}s "
-                    + $"lifetime={fallbackDuration:F3}s "
-                    + $"english={VoiceSubtitlesLog.Field(text.English)} "
-                    + $"chinese={VoiceSubtitlesLog.Field(text.Chinese)}"
-            );
-        }
 
         ShowRaw(text, cue, fallbackDuration, displayId, line.Stem);
     }
@@ -206,32 +212,22 @@ internal static class VoiceLineDisplay
         var labelObject = CurrentLabelObject;
         if (labelObject == null || _lifetime == null)
         {
-            VoiceSubtitlesLog.Warn(
-                "Subtitle show skipped because label is unavailable "
-                    + $"display={displayId} "
-                    + $"attempt={cue.AttemptId} "
-                    + $"stem={stem}"
+            BppLog.ErrorEvent(
+                VoiceSubtitleDisplayLogEvents.DisplayFailed,
+                VoiceSubtitleDisplayLogEvents.DisplayId.Bind(displayId),
+                VoiceSubtitleDisplayLogEvents.AttemptId.Bind(cue.AttemptId),
+                VoiceSubtitleDisplayLogEvents.Stem.Bind(stem),
+                VoiceSubtitleDisplayLogEvents.ReasonCode.Bind(
+                    VoiceSubtitleDisplayLogReasonCode.LabelUnavailable
+                )
             );
             return;
         }
 
         var activeBefore = labelObject.activeSelf;
-        TryApplySettingsToLabel("show", text);
+        TryApplySettingsToLabel(VoiceSubtitlesSettingsPhase.Show, text);
         ApplyText(text);
         labelObject.SetActive(true);
-        if (VoiceSubtitlesLog.Verbose)
-        {
-            VoiceSubtitlesLog.Debug(
-                "Subtitle label updated "
-                    + $"display={displayId} "
-                    + $"attempt={cue.AttemptId} "
-                    + $"stem={stem} "
-                    + $"mountedFromVersionLabel={IsMountedFromVersionLabel} "
-                    + $"activeBefore={activeBefore} "
-                    + $"renderer={RendererDescription()} "
-                    + $"duration={durationSeconds:F3}s"
-            );
-        }
         _lifetime.ShowUntilVoiceStops(
             cue.IsPlaybackStoppedOrStopping,
             cue.PlaybackStateText,
@@ -239,6 +235,33 @@ internal static class VoiceLineDisplay
             displayId,
             cue.AttemptId,
             stem
+        );
+        BppLog.DebugEvent(
+            VoiceSubtitlesDisplayLogEvents.DisplayRendered,
+            () =>
+                [
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedDisplayId.Bind(displayId),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedAttemptId.Bind(cue.AttemptId),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedStem.Bind(stem),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedEventDurationMs.Bind(
+                        ToMilliseconds(cue.EventDurationSeconds)
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedLineDurationMs.Bind(
+                        ToMilliseconds(cue.Line.DurationSeconds)
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedDisplayDurationMs.Bind(
+                        ToMilliseconds(durationSeconds)
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedRenderer.Bind(
+                        RendererDescription()
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedActiveBefore.Bind(activeBefore),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedPlaybackState.Bind(
+                        SafePlaybackStateText(cue.PlaybackStateText)
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedEnglishText.Bind(text.English),
+                    VoiceSubtitlesDisplayLogEvents.DisplayRenderedChineseText.Bind(text.Chinese),
+                ]
         );
     }
 
@@ -270,7 +293,10 @@ internal static class VoiceLineDisplay
             );
     }
 
-    private static bool TryApplySettingsToLabel(string reason, DisplayText? currentText = null)
+    private static bool TryApplySettingsToLabel(
+        VoiceSubtitlesSettingsPhase phase,
+        DisplayText? currentText = null
+    )
     {
         if (CurrentLabelObject == null || _sourceRect == null || _sourceLabel == null)
             return false;
@@ -289,15 +315,12 @@ internal static class VoiceLineDisplay
                     settings,
                     currentText
                 );
+            SettingsLogState.ReportSucceeded(phase);
             return true;
         }
         catch (Exception ex)
         {
-            VoiceSubtitlesLog.Warn(
-                "Failed to apply subtitle label settings "
-                    + $"reason={reason} "
-                    + $"error={ex.GetType().Name}: {ex.Message}\n{ex}"
-            );
+            SettingsLogState.ReportDegraded(phase, ex);
             return false;
         }
     }
@@ -642,13 +665,50 @@ internal static class VoiceLineDisplay
     private static bool AreScalesEquivalent(float left, float right) =>
         Math.Abs(left - right) <= ScaleComparisonTolerance;
 
-    private static string DescribeVersionLabel(TextMeshProUGUI? label)
+    private static string? SafeAnchorPath(TextMeshProUGUI? label)
     {
         if (label == null)
-            return "<null>";
+            return null;
 
-        return $"'{BuildPath(label.transform)}' text={VoiceSubtitlesLog.Field(label.text)}";
+        try
+        {
+            return BuildPath(label.transform);
+        }
+        catch
+        {
+            return null;
+        }
     }
+
+    private static string? SafeAnchorText(TextMeshProUGUI? label)
+    {
+        if (label == null)
+            return null;
+
+        try
+        {
+            return label.text;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string SafePlaybackStateText(Func<string>? playbackStateText)
+    {
+        try
+        {
+            return playbackStateText?.Invoke() ?? "<none>";
+        }
+        catch
+        {
+            return "<error>";
+        }
+    }
+
+    private static long ToMilliseconds(float seconds) =>
+        (long)Math.Round(seconds * 1000f, MidpointRounding.AwayFromZero);
 
     private static string BuildPath(Transform transform)
     {

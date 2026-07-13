@@ -5,10 +5,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
+using BazaarPlusPlus.Infrastructure;
 using FMOD.Studio;
 using FMODUnity;
 using HarmonyLib;
-using VoiceSubtitlesLog = BazaarPlusPlus.GameInterop.VoiceSubtitles.VoiceSubtitlesInteropLog;
 
 namespace BazaarPlusPlus.Patches.VoiceSubtitles;
 
@@ -22,9 +22,15 @@ internal static class SoundManagerInitializedPatch
         {
             VoiceLineVoObserverBridge.Install(__instance.VOPlayer);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            VoiceSubtitlesLog.Warn($"Failed to install VO observer: {ex.Message}");
+            BppLog.ErrorEvent(
+                VoicePatchLogEvents.ObserverFailed,
+                exception,
+                VoicePatchLogEvents.ObserverFailedReasonCode.Bind(
+                    VoicePatchLogReasonCode.ObserverInstallFailed
+                )
+            );
         }
     }
 }
@@ -33,6 +39,7 @@ internal static class SoundManagerInitializedPatch
 internal static class VOPlayerPlayVOPatch
 {
     private const int StoppedCallbackMask = 0x20;
+    private const int ExpectedPatchCount = 1;
 
     [HarmonyPrefix]
     private static void Prefix(
@@ -52,7 +59,7 @@ internal static class VOPlayerPlayVOPatch
     [HarmonyPostfix]
     private static void Postfix()
     {
-        VoiceLineVoObserverBridge.ClearVoiceAttempt("PlayVO postfix");
+        VoiceLineVoObserverBridge.ClearVoiceAttempt(VoiceObserverLogReasonCode.PlayVoCompleted);
     }
 
     [HarmonyTranspiler]
@@ -68,9 +75,7 @@ internal static class VOPlayerPlayVOPatch
         );
         if (setCallback == null)
         {
-            VoiceSubtitlesLog.Warn(
-                "VOPlayer.PlayVO callback mask patch skipped: EventInstance.setCallback not found"
-            );
+            ReportPatchDegraded(VoicePatchLogReasonCode.CallbackApiUnavailable, actualCount: 0);
             return codes;
         }
 
@@ -79,17 +84,12 @@ internal static class VOPlayerPlayVOPatch
 
         for (var i = 0; i < codes.Count; i++)
         {
-            if (!codes[i].Calls(setCallback) || i == 0)
+            if (
+                !codes[i].Calls(setCallback)
+                || i == 0
+                || !codes[i - 1].LoadsConstant(StoppedCallbackMask)
+            )
                 continue;
-
-            if (!codes[i - 1].LoadsConstant(StoppedCallbackMask))
-            {
-                VoiceSubtitlesLog.Warn(
-                    "VOPlayer.PlayVO callback mask candidate skipped because previous instruction "
-                        + $"does not load STOPPED=0x20 index={i - 1} instruction={codes[i - 1]}"
-                );
-                continue;
-            }
 
             var replacement = new CodeInstruction(OpCodes.Ldc_I4, callbackMask);
             replacement.labels.AddRange(codes[i - 1].labels);
@@ -98,13 +98,37 @@ internal static class VOPlayerPlayVOPatch
             patched++;
         }
 
-        if (patched == 1)
-            VoiceSubtitlesLog.Info($"VOPlayer.PlayVO callback mask patched count={patched}");
-        else
-            VoiceSubtitlesLog.Warn(
-                $"VOPlayer.PlayVO callback mask patched count={patched}, expected=1"
+        if (patched == ExpectedPatchCount)
+        {
+#if DEBUG
+            BppLog.DebugEvent(
+                VoicePatchLogEvents.CallbackPatchReady,
+                () =>
+                    [
+                        VoicePatchLogEvents.CallbackPatchReadyActualCount.Bind(patched),
+                        VoicePatchLogEvents.CallbackPatchReadyExpectedCount.Bind(
+                            ExpectedPatchCount
+                        ),
+                    ]
             );
+#endif
+        }
+        else
+        {
+            ReportPatchDegraded(VoicePatchLogReasonCode.PatchCountMismatch, patched);
+        }
+
         return codes;
+    }
+
+    private static void ReportPatchDegraded(VoicePatchLogReasonCode reasonCode, int actualCount)
+    {
+        BppLog.WarnEvent(
+            VoicePatchLogEvents.CallbackPatchDegraded,
+            VoicePatchLogEvents.CallbackPatchDegradedReasonCode.Bind(reasonCode),
+            VoicePatchLogEvents.CallbackPatchDegradedActualCount.Bind(actualCount),
+            VoicePatchLogEvents.CallbackPatchDegradedExpectedCount.Bind(ExpectedPatchCount)
+        );
     }
 }
 
@@ -131,7 +155,9 @@ internal static class VOPlayerPlayTutorialVOPatch
     [HarmonyPostfix]
     private static void Postfix()
     {
-        VoiceLineVoObserverBridge.ClearVoiceAttempt("PlayTutorialVO postfix");
+        VoiceLineVoObserverBridge.ClearVoiceAttempt(
+            VoiceObserverLogReasonCode.PlayTutorialVoCompleted
+        );
     }
 }
 

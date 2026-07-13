@@ -3,6 +3,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
 
@@ -47,6 +48,7 @@ internal static class FontDiagnostics
     private static Font? _systemChineseUiFont;
     private static bool _systemChineseUiFontAttempted;
     private static bool _logged;
+    private static readonly VoiceSubtitlesFontFailureLogState FontFailureLogState = new();
 
     public static bool HasChineseCoverage(TMP_FontAsset? font)
     {
@@ -66,74 +68,93 @@ internal static class FontDiagnostics
             _systemChineseUiFont = Font.CreateDynamicFontFromOSFont(candidates, 24);
             if (_systemChineseUiFont == null)
             {
-                VoiceSubtitlesLog.Warn("Failed to create UI system font for Chinese subtitles");
+                FontFailureLogState.Report(VoiceSubtitlesLogReasonCode.FontUnavailable);
                 return null;
             }
 
-            var resolvedFontNames =
-                _systemChineseUiFont.fontNames == null
-                    ? "<none>"
-                    : string.Join(", ", _systemChineseUiFont.fontNames);
-            VoiceSubtitlesLog.Info(
-                "Created UI system font for Chinese subtitles "
-                    + $"font='{_systemChineseUiFont.name}' "
-                    + $"resolvedNames={VoiceSubtitlesLog.Field(resolvedFontNames)} "
-                    + $"candidates={VoiceSubtitlesLog.Field(string.Join(", ", candidates))}"
+            BppLog.DebugEvent(
+                VoiceSubtitlesDisplayLogEvents.FontSelected,
+                () =>
+                    [
+                        VoiceSubtitlesDisplayLogEvents.FontSelectedName.Bind(
+                            _systemChineseUiFont.name
+                        ),
+                        VoiceSubtitlesDisplayLogEvents.FontSelectedResolvedNames.Bind(
+                            _systemChineseUiFont.fontNames == null
+                                ? null
+                                : string.Join(", ", _systemChineseUiFont.fontNames)
+                        ),
+                        VoiceSubtitlesDisplayLogEvents.FontSelectedCandidateNames.Bind(
+                            string.Join(", ", candidates)
+                        ),
+                    ]
             );
             return _systemChineseUiFont;
         }
         catch (Exception ex)
         {
-            VoiceSubtitlesLog.Warn(
-                $"Failed to create UI system font for Chinese subtitles: {ex.GetType().Name}: {ex.Message}\n{ex}"
-            );
+            FontFailureLogState.Report(VoiceSubtitlesLogReasonCode.FontCreationException, ex);
             return null;
         }
     }
 
-    public static void LogOnce(TextMeshProUGUI sourceLabel, string reason)
+    public static void LogOnce(TextMeshProUGUI sourceLabel)
     {
         if (_logged)
             return;
 
         _logged = true;
 
-        try
-        {
-            var sourceFont = sourceLabel.font;
-            VoiceSubtitlesLog.Info(
-                "TMP font diagnostics "
-                    + $"reason={reason} "
-                    + $"sourceLabel='{BuildPath(sourceLabel.transform)}' "
-                    + $"sourceFont={DescribeFont(sourceFont)} "
-                    + $"sourceCoverage={DescribeCoverage(sourceFont)} "
-                    + $"globalDefault={DescribeFont(TMP_Settings.defaultFontAsset)} "
-                    + $"globalFallbacks={DescribeFontList(TMP_Settings.fallbackFontAssets)}"
-            );
-
-            var loadedFonts = Resources
-                .FindObjectsOfTypeAll<TMP_FontAsset>()
-                .Where(font => font != null)
-                .GroupBy(font => font.GetInstanceID())
-                .Select(group => group.First())
-                .OrderByDescending(ChineseCoverageCount)
-                .ThenBy(font => font.name, StringComparer.OrdinalIgnoreCase)
-                .Take(24)
-                .ToArray();
-
-            VoiceSubtitlesLog.Info(
-                "Loaded TMP fonts with best Chinese coverage "
-                    + $"sample={VoiceSubtitlesLog.Field(ChineseSample)} "
-                    + $"count={loadedFonts.Length} "
-                    + $"fonts={DescribeScoredFonts(loadedFonts)}"
-            );
-        }
-        catch (Exception ex)
-        {
-            VoiceSubtitlesLog.Warn(
-                $"Failed to log TMP font diagnostics: {ex.GetType().Name}: {ex.Message}\n{ex}"
-            );
-        }
+        BppLog.DebugEvent(
+            VoiceSubtitlesDisplayLogEvents.FontEnvironmentObserved,
+            () =>
+            {
+                var sourceFont = sourceLabel.font;
+                return
+                [
+                    VoiceSubtitlesDisplayLogEvents.FontEnvironmentReasonCode.Bind(
+                        VoiceSubtitlesLogReasonCode.Mount
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.FontEnvironmentAnchorPath.Bind(
+                        BuildPath(sourceLabel.transform)
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.FontEnvironmentSourceFont.Bind(
+                        DescribeFont(sourceFont)
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.FontEnvironmentSourceCoverage.Bind(
+                        DescribeCoverage(sourceFont)
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.FontEnvironmentDefaultFont.Bind(
+                        DescribeFont(TMP_Settings.defaultFontAsset)
+                    ),
+                    VoiceSubtitlesDisplayLogEvents.FontEnvironmentFallbackFonts.Bind(
+                        DescribeFontList(TMP_Settings.fallbackFontAssets)
+                    ),
+                ];
+            }
+        );
+        BppLog.DebugEvent(
+            VoiceSubtitlesDisplayLogEvents.FontInventoryObserved,
+            () =>
+            {
+                var loadedFonts = Resources
+                    .FindObjectsOfTypeAll<TMP_FontAsset>()
+                    .Where(font => font != null)
+                    .GroupBy(font => font.GetInstanceID())
+                    .Select(group => group.First())
+                    .OrderByDescending(ChineseCoverageCount)
+                    .ThenBy(font => font.name, StringComparer.OrdinalIgnoreCase)
+                    .Take(24)
+                    .ToArray();
+                return
+                [
+                    VoiceSubtitlesDisplayLogEvents.FontInventoryCount.Bind(loadedFonts.Length),
+                    VoiceSubtitlesDisplayLogEvents.FontInventoryFonts.Bind(
+                        DescribeScoredFonts(loadedFonts)
+                    ),
+                ];
+            }
+        );
     }
 
     private static string DescribeScoredFonts(IReadOnlyList<TMP_FontAsset> fonts)

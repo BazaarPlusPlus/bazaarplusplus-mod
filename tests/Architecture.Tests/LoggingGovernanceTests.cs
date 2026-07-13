@@ -177,7 +177,6 @@ public sealed class LoggingGovernanceTests
             ["Game/Tooltips/TooltipModifierRefreshController.cs"] = "59:Error,163:Debug",
             ["Game/Tooltips/TooltipPreviewTargetResolver.cs"] =
                 "50:Debug,60:Debug,70:Debug,79:Debug,87:Debug",
-            ["Game/VoiceSubtitles/VoiceSubtitlesLog.cs"] = "16:Info,18:Debug,20:Warn,22:Error",
             ["GameInterop/BppClientCacheBridge.cs"] = "51:Debug,153:Debug",
             ["GameInterop/CardPreview/NativeCardPreviewAssetLoader.cs"] =
                 "35:Warn,60:Warn,71:Warn,86:Warn",
@@ -201,7 +200,6 @@ public sealed class LoggingGovernanceTests
                 "81:Warn,141:Warn,192:Warn,202:Info,218:Warn",
             ["GameInterop/TagTypography/KeywordIconSpriteProvider.cs"] = "62:Warn",
             ["GameInterop/TagTypography/NativeTagTypography.cs"] = "255:Warn",
-            ["GameInterop/VoiceSubtitles/VoiceSubtitlesInteropLog.cs"] = "16:Info,18:Debug,20:Warn",
             ["Infrastructure/FileBackedPayloadStore.cs"] = "118:Warn,124:Warn",
             ["Infrastructure/Fonts/BppTmpFont.cs"] = "70:Info,91:Debug,123:Warn",
             ["Infrastructure/Fonts/BppUiFont.cs"] = "67:Info,76:Warn,83:Info",
@@ -233,23 +231,7 @@ public sealed class LoggingGovernanceTests
         };
 
     private static readonly IReadOnlyDictionary<string, string> ExpectedVoiceSubtitlesMembers =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["Game/VoiceSubtitles/FontDiagnostics.cs"] =
-                "69:Warn,77:Info,80:Field,81:Field,87:Warn,104:Info,124:Info,126:Field,133:Warn",
-            ["Game/VoiceSubtitles/VersionLabelScanner.cs"] = "113:Info",
-            ["Game/VoiceSubtitles/VoiceLineDisplay.cs"] =
-                "87:Info,97:Info,104:Warn,123:Verbose,125:Debug,140:Verbose,142:Debug,150:Field,151:Field,209:Warn,222:Verbose,224:Debug,296:Warn,650:Field",
-            ["Game/VoiceSubtitles/VoiceLineOverlayLifetime.cs"] =
-                "47:Verbose,49:Debug,80:Verbose,91:Verbose,104:Verbose,107:Debug,130:Warn,143:Warn",
-            ["Game/VoiceSubtitles/VoiceLinesDocument.cs"] = "50:Warn,58:Warn,68:Warn",
-            ["Game/VoiceSubtitles/VoiceLinesRepository.cs"] =
-                "48:Debug,59:Info,77:Warn,82:Info,105:Info,160:Info,168:Warn,188:Info,195:Warn,211:Warn,226:Info,231:Warn,271:Info,277:Warn,309:Warn",
-            ["GameInterop/VoiceSubtitles/VoiceLineVoObserverBridge.cs"] =
-                "40:Info,41:ObjectId,48:Verbose,50:Debug,54:ObjectId,57:Field,58:Field,87:Warn,118:Warn,140:Verbose,142:Debug,176:Warn,178:ObjectId,197:Verbose,199:Debug,202:ObjectId,203:ObjectId,206:Field,208:Field,214:Verbose,216:Debug,221:Field,228:Verbose,230:Debug,235:Field,242:Field,243:Field,251:Verbose,253:Debug,256:ObjectId,272:Warn,274:Field,283:Verbose,286:Debug,294:Field,295:Field,296:Field,307:Verbose,309:Debug,314:Field,319:Field,320:Field,326:Verbose,328:Debug,342:Verbose,344:Debug,371:Verbose,393:Warn,408:Warn,458:Warn,471:Warn,484:Warn",
-            ["Patches/VoiceSubtitles/VOPlayerPatches.cs"] =
-                "27:Warn,71:Warn,87:Warn,102:Info,104:Warn",
-        };
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     private static readonly IReadOnlyDictionary<string, string> ExpectedAgentLoggerCalls =
         new Dictionary<string, string>(StringComparer.Ordinal);
@@ -300,6 +282,35 @@ public sealed class LoggingGovernanceTests
             "The legacy VoiceSubtitles wrappers and helper members are frozen until #56 removes "
                 + "them. New uses are prohibited."
         );
+    }
+
+    [Fact]
+    public void VoiceSubtitles_free_text_wrappers_and_aliases_are_absent()
+    {
+        var root = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus");
+        Assert.False(
+            File.Exists(
+                Path.Combine(root, "Game", "VoiceSubtitles", "VoiceSubtitlesLog.cs")
+            )
+        );
+        Assert.False(
+            File.Exists(
+                Path.Combine(
+                    root,
+                    "GameInterop",
+                    "VoiceSubtitles",
+                    "VoiceSubtitlesInteropLog.cs"
+                )
+            )
+        );
+
+        foreach (var file in ProductionFiles(root))
+        {
+            var source = File.ReadAllText(file);
+            Assert.DoesNotContain("VoiceSubtitlesLog.", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("VoiceSubtitlesInteropLog", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("using VoiceSubtitlesLog", source, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

@@ -796,8 +796,17 @@ public class CoreLayeringTests
         var beforeGuard = source[..guardIndex];
 
         Assert.Contains("private const int StoppedCallbackMask = 0x20;", source);
+        Assert.Contains("private const int ExpectedPatchCount = 1;", source);
         Assert.Contains("codes[i - 1].LoadsConstant(StoppedCallbackMask)", source);
-        Assert.Contains("expected=1", source);
+        Assert.Contains(
+            "VoicePatchLogEvents.CallbackPatchDegradedActualCount.Bind(actualCount)",
+            source
+        );
+        Assert.Contains(
+            "VoicePatchLogEvents.CallbackPatchDegradedExpectedCount.Bind(ExpectedPatchCount)",
+            source
+        );
+        Assert.DoesNotContain("expected=1", source);
         Assert.DoesNotContain("opcode == OpCodes.Ldc_I4", source);
         Assert.DoesNotContain("OpCodes.Ldc_I4,", beforeGuard);
     }
