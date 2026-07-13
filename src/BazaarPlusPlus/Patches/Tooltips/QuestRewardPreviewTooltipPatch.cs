@@ -7,6 +7,7 @@ using System.Reflection;
 using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.QuestRewardPreview;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
@@ -68,7 +69,14 @@ internal static class QuestRewardPreviewTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("QuestTooltip", "Failed to append quest reward preview", ex);
+            BppLog.WarnEvent(
+                TooltipLogEvents.SectionDegraded,
+                ex,
+                TooltipLogEvents.SectionDegradedSectionId.Bind(TooltipSectionId.QuestRewardPreview),
+                TooltipLogEvents.SectionDegradedReasonCode.Bind(
+                    TooltipLogReasonCode.RenderException
+                )
+            );
         }
     }
 }

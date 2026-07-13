@@ -44,7 +44,16 @@ internal static class AggregateItemMissingTypesTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("AggregateTypesTooltip", "Failed to render missing item types", ex);
+            BppLog.WarnEvent(
+                TooltipLogEvents.SectionDegraded,
+                ex,
+                TooltipLogEvents.SectionDegradedSectionId.Bind(
+                    TooltipSectionId.AggregateMissingTypes
+                ),
+                TooltipLogEvents.SectionDegradedReasonCode.Bind(
+                    TooltipLogReasonCode.RenderException
+                )
+            );
         }
     }
 

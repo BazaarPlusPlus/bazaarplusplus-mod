@@ -12,30 +12,31 @@ namespace BazaarPlusPlus.GameInterop.HeroPortraits;
 
 internal static class HeroPortraitSpriteProvider
 {
-    private const string LogComponent = "HeroPortrait";
-
-    private static readonly AsyncLoadCache<EHero, Sprite> Portraits = new(LoadPortraitCoreAsync);
+    private static readonly AsyncLoadCache<EHero, HeroPortraitLoadOutcome> Portraits = new(
+        LoadPortraitCoreAsync
+    );
 
     internal static bool IsRenderableHero(EHero hero) =>
         hero != EHero.Common && !string.Equals(hero.ToString(), "Hero8", StringComparison.Ordinal);
 
-    internal static bool TryGetCached(EHero hero, out Sprite? sprite)
+    internal static bool TryGetCached(EHero hero, out HeroPortraitLoadOutcome? outcome)
     {
-        sprite = null;
-        return IsRenderableHero(hero) && Portraits.TryGetCached(hero, out sprite);
+        outcome = null;
+        return IsRenderableHero(hero) && Portraits.TryGetCached(hero, out outcome);
     }
 
-    internal static Task<Sprite?> LoadDefaultPortraitAsync(EHero hero)
+    internal static Task<HeroPortraitLoadOutcome?> LoadDefaultPortraitAsync(EHero hero)
     {
         if (!IsRenderableHero(hero))
-            return Task.FromResult<Sprite?>(null);
+            return Task.FromResult<HeroPortraitLoadOutcome?>(null);
 
         return Portraits.GetOrLoadAsync(hero);
     }
 
-    private static async Task<AsyncLoadResult<Sprite>> LoadPortraitCoreAsync(EHero hero)
+    private static async Task<AsyncLoadResult<HeroPortraitLoadOutcome>> LoadPortraitCoreAsync(
+        EHero hero
+    )
     {
-        Sprite? result = null;
         var shouldCache = false;
 
         try
@@ -43,39 +44,78 @@ internal static class HeroPortraitSpriteProvider
             Services.TryGet<CollectionManager>(out var collectionManager);
             if (collectionManager == null)
             {
-                BppLog.Warn(
-                    LogComponent,
-                    $"CollectionManager unavailable for hero={hero}; using text fallback."
+                return new AsyncLoadResult<HeroPortraitLoadOutcome>(
+                    HeroPortraitLoadOutcome.Degraded(
+                        HeroPortraitFailureReason.CollectionManagerUnavailable
+                    ),
+                    shouldCache
                 );
-                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
             SkinAssetDataSO? skin = collectionManager.GetDefaultHeroSkin(hero);
             shouldCache = true;
             if (skin == null)
             {
-                BppLog.Warn(
-                    LogComponent,
-                    $"No default hero skin for hero={hero}; using text fallback."
+                return new AsyncLoadResult<HeroPortraitLoadOutcome>(
+                    HeroPortraitLoadOutcome.Degraded(
+                        HeroPortraitFailureReason.DefaultSkinUnavailable
+                    ),
+                    shouldCache
                 );
-                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
-            result = await skin.LoadPortraitSpriteAsync();
-            if (result == null)
-                BppLog.Debug(
-                    LogComponent,
-                    $"No static portrait sprite for hero={hero}; using text fallback."
-                );
-            return new AsyncLoadResult<Sprite>(result, shouldCache);
+            var result = await skin.LoadPortraitSpriteAsync();
+            return new AsyncLoadResult<HeroPortraitLoadOutcome>(
+                result == null
+                    ? HeroPortraitLoadOutcome.Degraded(
+                        HeroPortraitFailureReason.PortraitUnavailable
+                    )
+                    : HeroPortraitLoadOutcome.Ready(result),
+                shouldCache
+            );
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                LogComponent,
-                $"Failed to load hero portrait for hero={hero}: {ex.Message}"
+            return new AsyncLoadResult<HeroPortraitLoadOutcome>(
+                HeroPortraitLoadOutcome.Degraded(HeroPortraitFailureReason.LoadException, ex),
+                shouldCache
             );
-            return new AsyncLoadResult<Sprite>(null, shouldCache);
         }
     }
+}
+
+internal enum HeroPortraitFailureReason
+{
+    None,
+    CollectionManagerUnavailable,
+    DefaultSkinUnavailable,
+    PortraitUnavailable,
+    LoadException,
+}
+
+internal sealed class HeroPortraitLoadOutcome
+{
+    private HeroPortraitLoadOutcome(
+        Sprite? sprite,
+        HeroPortraitFailureReason reason,
+        Exception? exception
+    )
+    {
+        Sprite = sprite;
+        Reason = reason;
+        Exception = exception;
+    }
+
+    internal Sprite? Sprite { get; }
+    internal HeroPortraitFailureReason Reason { get; }
+    internal Exception? Exception { get; }
+    internal bool IsDegraded => Reason != HeroPortraitFailureReason.None;
+
+    internal static HeroPortraitLoadOutcome Ready(Sprite sprite) =>
+        new(sprite, HeroPortraitFailureReason.None, null);
+
+    internal static HeroPortraitLoadOutcome Degraded(
+        HeroPortraitFailureReason reason,
+        Exception? exception = null
+    ) => new(null, reason, exception);
 }

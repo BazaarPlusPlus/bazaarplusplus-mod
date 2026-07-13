@@ -1,5 +1,6 @@
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 
 TestSignatureGate_NullAggregate_DoesNotCache();
@@ -10,6 +11,7 @@ TestSignatureGate_CompletedSuccessfully_Caches();
 TestGenerationGuard_FreshSnapshotIsCurrent();
 TestGenerationGuard_BumpInvalidatesPriorSnapshot();
 TestGenerationGuard_ParallelBumpsAreSerialised();
+TestInitialization_MissingSetUpReportsCallerOwnedFailure();
 TestSocketResolver_HonoursRequestedIndex();
 TestSocketResolver_FallsBackWhenNoRequest();
 TestSocketResolver_ClampsIntoRange();
@@ -35,6 +37,24 @@ TestSlotGridTargetHeight_UsesBoardFitScaleInTallContainer();
 TestSlotGridTargetHeight_ClampsToSlotHeightInShortContainer();
 
 Console.WriteLine("HistoryPanelPreview checks passed.");
+
+static void TestInitialization_MissingSetUpReportsCallerOwnedFailure()
+{
+    NativeCardPreviewFailure? failure = null;
+
+    Assert(
+        !ItemBoardPreviewInitialization.CanInitialize(
+            setUpMethod: null,
+            reported => failure = reported
+        ),
+        "Missing native SetUp reflection must reject ItemBoard initialization."
+    );
+    Assert(
+        failure?.Operation == NativeCardPreviewOperation.SetUp
+            && failure.Reason == NativeCardPreviewFailureReason.ReflectionUnavailable,
+        "Missing native SetUp reflection must reach the caller-owned card-preview reporter."
+    );
+}
 
 static void TestSignatureGate_NullAggregate_DoesNotCache()
 {
@@ -324,6 +344,9 @@ static void TestPreviewMapper_CarriesDisplaySpan()
 
 static void TestOptionsForwarder_PreservesSlotGridLayoutMode()
 {
+    Action<NativeCardPreviewFailure> cardPreviewFailureReporter = _ => { };
+    Action<NativeCardPreviewFailure> hoverFailureReporter = _ => { };
+    Action<ItemBoardPreviewFailure> itemBoardFailureReporter = _ => { };
     var options = new ItemBoardPreviewOptions
     {
         Layer = 7,
@@ -331,7 +354,9 @@ static void TestOptionsForwarder_PreservesSlotGridLayoutMode()
         LayoutMode = ItemBoardPreviewLayoutMode.SlotGrid,
         ShowHover = false,
         UseCanvasGroup = true,
-        LogComponent = "test",
+        CardPreviewFailureReporter = cardPreviewFailureReporter,
+        HoverFailureReporter = hoverFailureReporter,
+        ItemBoardFailureReporter = itemBoardFailureReporter,
         SlotGridHorizontalInsetPixels = 11f,
         SlotGridVerticalInsetPixels = 12f,
         SlotGridMaxHeightRatio = 0.75f,
@@ -348,7 +373,18 @@ static void TestOptionsForwarder_PreservesSlotGridLayoutMode()
     Assert(forwarded.SortingOrder == 8, "Sorting order must forward.");
     Assert(!forwarded.ShowHover, "Hover option must forward.");
     Assert(forwarded.UseCanvasGroup, "CanvasGroup option must forward.");
-    Assert(forwarded.LogComponent == "test", "Log component must forward.");
+    Assert(
+        ReferenceEquals(forwarded.CardPreviewFailureReporter, cardPreviewFailureReporter),
+        "Card-preview failure reporter must forward."
+    );
+    Assert(
+        ReferenceEquals(forwarded.HoverFailureReporter, hoverFailureReporter),
+        "Hover failure reporter must forward."
+    );
+    Assert(
+        ReferenceEquals(forwarded.ItemBoardFailureReporter, itemBoardFailureReporter),
+        "Item-board failure reporter must forward."
+    );
     Assert(
         forwarded.SlotGridHorizontalInsetPixels == 11f,
         "SlotGrid horizontal inset must forward."

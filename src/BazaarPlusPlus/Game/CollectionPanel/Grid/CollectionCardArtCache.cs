@@ -42,6 +42,18 @@ internal sealed class CollectionCardArtCache
 
     public Task<CardAssetDataSO?> Acquire(string artKey) => GetCore(artKey, acquireRef: true);
 
+    internal void ReportDegraded(
+        CollectionPanelLogReasonCode reasonCode,
+        string? artKey,
+        Exception exception
+    ) =>
+        _logState.ReportDegraded(
+            reasonCode,
+            CollectionCardArtStatus.ArtUnavailable,
+            artKey,
+            exception
+        );
+
     private async Task<CardAssetDataSO?> GetCore(string artKey, bool acquireRef)
     {
         if (string.IsNullOrEmpty(artKey))

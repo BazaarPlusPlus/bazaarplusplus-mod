@@ -126,7 +126,11 @@ internal static class UpgradeTooltipScheduler
         if (tooltipParent.GetCardTooltipController(card) == null)
             return;
 
-        var refreshedTooltipData = CardTooltipDataFactory.Create(card, tooltipData);
+        var refreshedTooltipData = CardTooltipDataFactory.Create(
+            card,
+            tooltipData,
+            TooltipPreviewRefreshMode.Upgrade
+        );
         tooltipParent.HideCardTooltipController();
 
         if (

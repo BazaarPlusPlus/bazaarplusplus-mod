@@ -13,21 +13,16 @@ internal sealed class NativeCardPreviewPool
     private const int DefaultMaxPoolSizePerKind = 30;
 
     private readonly int _layer;
-    private readonly string _logComponent;
     private readonly int _maxPoolSizePerKind;
     private readonly Dictionary<NativeCardPreviewKind, Queue<Component>> _pool = new();
 
     public NativeCardPreviewPool(
         int layer,
         bool requireSockets,
-        string logComponent,
         int maxPoolSizePerKind = DefaultMaxPoolSizePerKind
     )
     {
         _layer = layer;
-        _logComponent = string.IsNullOrWhiteSpace(logComponent)
-            ? "NativeCardPreviewPool"
-            : logComponent;
         _maxPoolSizePerKind = Math.Max(1, maxPoolSizePerKind);
     }
 
@@ -87,7 +82,6 @@ internal sealed class NativeCardPreviewPool
         card.transform.localRotation = Quaternion.identity;
         card.gameObject.SetActive(true);
         NativeCardPreviewReflection.ApplyLayerRecursive(card.gameObject, _layer);
-        NativeCardPreviewRuntime.Resize(card, _logComponent);
         return new NativeCardPreviewLease(card, kind, alreadySetUp);
     }
 

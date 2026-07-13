@@ -34,10 +34,16 @@ public sealed class HistoryPanelLogCatalogTests
             ["history_panel.preview.socket_effect_degraded"] =
                 "template_id:Public:High:None|reason_code:Public:Low:None",
             ["history_panel.preview.static_data_degraded"] = "reason_code:Public:Low:None",
+            ["history_panel.preview.payload_degraded"] =
+                "battle_id:Public:High:Short|reason_code:Public:Low:None",
             ["history_panel.row.skipped"] =
                 "battle_id:Public:High:Short|reason_code:Public:Low:None",
             ["history_panel.open.failed"] = "reason_code:Public:Low:None",
             ["history_panel.open.skipped"] = "reason_code:Public:Low:None",
+            ["history_panel.card_preview.degraded"] =
+                "operation:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None",
+            ["history_panel.item_board_preview.degraded"] =
+                "operation:Public:Low:None|reason_code:Public:Low:None|template_id:Public:High:None",
         };
 
         Assert.Equal(expected.Count, actual.Count);
@@ -49,7 +55,7 @@ public sealed class HistoryPanelLogCatalogTests
     }
 
     [Fact]
-    public void Only_preview_and_row_degradations_have_reason_only_storm_keys()
+    public void Degradation_storm_keys_use_only_low_cardinality_fields()
     {
         var stormed = Definitions()
             .Where(definition => definition.StormPolicy != null)
@@ -58,6 +64,9 @@ public sealed class HistoryPanelLogCatalogTests
         Assert.Equal(
             new[]
             {
+                "history_panel.card_preview.degraded",
+                "history_panel.item_board_preview.degraded",
+                "history_panel.preview.payload_degraded",
                 "history_panel.preview.socket_effect_degraded",
                 "history_panel.preview.static_data_degraded",
                 "history_panel.row.skipped",
@@ -68,10 +77,15 @@ public sealed class HistoryPanelLogCatalogTests
             stormed.Values,
             definition =>
             {
-                var key = Assert.Single(definition.StormPolicy!.KeyFields);
-                Assert.Equal("reason_code", key.Name);
-                Assert.Equal(BppLogCardinality.Low, key.Cardinality);
-                Assert.Equal(BppLogCorrelationPolicy.None, key.Correlation);
+                Assert.All(
+                    definition.StormPolicy!.KeyFields,
+                    key =>
+                    {
+                        Assert.Contains(key.Name, new[] { "operation", "reason_code" });
+                        Assert.Equal(BppLogCardinality.Low, key.Cardinality);
+                        Assert.Equal(BppLogCorrelationPolicy.None, key.Correlation);
+                    }
+                );
             }
         );
     }

@@ -8,6 +8,7 @@ using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Logging;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.EventPreview;
@@ -23,6 +24,7 @@ internal sealed class EventPreviewPlanController : MonoBehaviour
     private string _buildChannel = string.Empty;
     private object? _observedSource;
     private bool _initialized;
+    private int _healthDegraded;
 
     public void Initialize(
         IBppServices services,
@@ -61,9 +63,16 @@ internal sealed class EventPreviewPlanController : MonoBehaviour
         var sourceInfo = BppStaticDataAccess.TryCaptureGameDataSourceInfo(source);
         if (sourceInfo == null)
         {
-            BppLog.Warn(
-                "EncounterPreviewPlan",
-                "GameData source paths unavailable; preview plans remain inactive."
+            ReportTerminal(
+                EventPreviewLogEvents.PlansLoadFailed,
+                EventPreviewPlanSource.Unknown,
+                EventPreviewPlanReasonCode.SourceInfoUnavailable,
+                snapshot: null,
+                sizeBytes: 0,
+                loadDurationMs: 0,
+                compileDurationMs: 0,
+                writeDurationMs: 0,
+                exception: null
             );
             return;
         }
@@ -107,9 +116,14 @@ internal sealed class EventPreviewPlanController : MonoBehaviour
             {
                 if (_registry.TryPublish(source, generation, loadResult.Snapshot))
                 {
-                    BppLog.Info(
-                        "EncounterPreviewPlan",
-                        $"Cache hit: events={loadResult.Snapshot.EventCount} levelUps={loadResult.Snapshot.LevelUpCount} templates={loadResult.Snapshot.TemplateCount} unsupportedLevelUpParts={loadResult.Snapshot.Coverage.UnsupportedLevelUpPartCount} missingTemplates={loadResult.Snapshot.Coverage.MissingReferencedTemplateCount} bytes={TryGetCacheBytes()} load={loadResult.CacheReadMilliseconds:F2}ms."
+                    ReportPublishedTerminal(
+                        EventPreviewPlanSource.Cache,
+                        loadResult.Snapshot,
+                        persistError: null,
+                        TryGetCacheBytes(),
+                        loadResult.CacheReadMilliseconds,
+                        compileDurationMs: 0,
+                        writeDurationMs: 0
                     );
                 }
                 return;
@@ -142,18 +156,14 @@ internal sealed class EventPreviewPlanController : MonoBehaviour
             if (!published)
                 return;
 
-            if (persistError != null)
-            {
-                BppLog.Error(
-                    "EncounterPreviewPlan",
-                    "Preview plans are active in memory, but the persistent cache write failed.",
-                    persistError
-                );
-            }
-
-            BppLog.Info(
-                "EncounterPreviewPlan",
-                $"Cache rebuilt: reason={loadResult.CacheMissReason} events={compileResult.Snapshot.EventCount} levelUps={compileResult.Snapshot.LevelUpCount} templates={compileResult.Snapshot.TemplateCount} eventFailures={compileResult.Snapshot.Coverage.EventFailureCount} levelUpFailures={compileResult.Snapshot.Coverage.LevelUpFailureCount} unsupportedLevelUpParts={compileResult.Snapshot.Coverage.UnsupportedLevelUpPartCount} missingTemplates={compileResult.Snapshot.Coverage.MissingReferencedTemplateCount} bytes={(persisted ? TryGetCacheBytes() : 0)} compile={loadResult.CompileMilliseconds:F2}ms write={writeMs:F2}ms."
+            ReportPublishedTerminal(
+                EventPreviewPlanSource.Rebuild,
+                compileResult.Snapshot,
+                persistError,
+                persisted ? TryGetCacheBytes() : 0,
+                loadResult.CacheReadMilliseconds,
+                loadResult.CompileMilliseconds,
+                writeMs
             );
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -162,9 +172,137 @@ internal sealed class EventPreviewPlanController : MonoBehaviour
         }
         catch (Exception ex)
         {
-            BppLog.Error("EncounterPreviewPlan", "Failed to load or build preview plans.", ex);
+            if (!_registry.IsCurrent(source, generation))
+                return;
+            ReportTerminal(
+                EventPreviewLogEvents.PlansLoadFailed,
+                EventPreviewPlanSource.Unknown,
+                EventPreviewPlanReasonCode.LoadException,
+                snapshot: null,
+                sizeBytes: 0,
+                loadDurationMs: 0,
+                compileDurationMs: 0,
+                writeDurationMs: 0,
+                ex
+            );
         }
     }
+
+    private void ReportPublishedTerminal(
+        EventPreviewPlanSource source,
+        CollectionEncounterPreviewSnapshot snapshot,
+        Exception? persistError,
+        long sizeBytes,
+        double loadDurationMs,
+        double compileDurationMs,
+        double writeDurationMs
+    )
+    {
+        var coverage = snapshot.Coverage;
+        var hasPartialCoverage =
+            coverage.EventFailureCount > 0
+            || coverage.LevelUpFailureCount > 0
+            || coverage.UnsupportedLevelUpPartCount > 0
+            || coverage.MissingReferencedTemplateCount > 0;
+        if (persistError != null || hasPartialCoverage)
+        {
+            Interlocked.Exchange(ref _healthDegraded, 1);
+            ReportTerminal(
+                EventPreviewLogEvents.PlansDegraded,
+                source,
+                persistError != null
+                    ? EventPreviewPlanReasonCode.CacheWriteException
+                    : EventPreviewPlanReasonCode.PartialCoverage,
+                snapshot,
+                sizeBytes,
+                loadDurationMs,
+                compileDurationMs,
+                writeDurationMs,
+                persistError
+            );
+            return;
+        }
+
+        var recovered = Interlocked.Exchange(ref _healthDegraded, 0) != 0;
+        if (recovered)
+            BppLog.RecoverStorm(EventPreviewLogEvents.PlansDegraded);
+        ReportTerminal(
+            recovered ? EventPreviewLogEvents.PlansRecovered : EventPreviewLogEvents.PlansReady,
+            source,
+            EventPreviewPlanReasonCode.None,
+            snapshot,
+            sizeBytes,
+            loadDurationMs,
+            compileDurationMs,
+            writeDurationMs,
+            exception: null
+        );
+    }
+
+    private void ReportTerminal(
+        BppLogEventDefinition definition,
+        EventPreviewPlanSource source,
+        EventPreviewPlanReasonCode reasonCode,
+        CollectionEncounterPreviewSnapshot? snapshot,
+        long sizeBytes,
+        double loadDurationMs,
+        double compileDurationMs,
+        double writeDurationMs,
+        Exception? exception
+    )
+    {
+        if (
+            ReferenceEquals(definition, EventPreviewLogEvents.PlansLoadFailed)
+            || ReferenceEquals(definition, EventPreviewLogEvents.PlansDegraded)
+        )
+        {
+            Interlocked.Exchange(ref _healthDegraded, 1);
+        }
+
+        var coverage = snapshot?.Coverage;
+        var fields = new[]
+        {
+            EventPreviewLogEvents.Source.Bind(source),
+            EventPreviewLogEvents.ReasonCode.Bind(reasonCode),
+            EventPreviewLogEvents.EventCount.Bind(snapshot?.EventCount ?? 0),
+            EventPreviewLogEvents.LevelUpCount.Bind(snapshot?.LevelUpCount ?? 0),
+            EventPreviewLogEvents.TemplateCount.Bind(snapshot?.TemplateCount ?? 0),
+            EventPreviewLogEvents.EventFailureCount.Bind(coverage?.EventFailureCount ?? 0),
+            EventPreviewLogEvents.LevelUpFailureCount.Bind(coverage?.LevelUpFailureCount ?? 0),
+            EventPreviewLogEvents.UnsupportedLevelUpPartCount.Bind(
+                coverage?.UnsupportedLevelUpPartCount ?? 0
+            ),
+            EventPreviewLogEvents.MissingTemplateCount.Bind(
+                coverage?.MissingReferencedTemplateCount ?? 0
+            ),
+            EventPreviewLogEvents.SizeBytes.Bind(Math.Max(0, sizeBytes)),
+            EventPreviewLogEvents.LoadDurationMs.Bind(ToMilliseconds(loadDurationMs)),
+            EventPreviewLogEvents.CompileDurationMs.Bind(ToMilliseconds(compileDurationMs)),
+            EventPreviewLogEvents.WriteDurationMs.Bind(ToMilliseconds(writeDurationMs)),
+            EventPreviewLogEvents.CachePath.Bind(_cacheStore.CachePath),
+        };
+        if (ReferenceEquals(definition, EventPreviewLogEvents.PlansLoadFailed))
+        {
+            if (exception == null)
+                BppLog.ErrorEvent(definition, fields);
+            else
+                BppLog.ErrorEvent(definition, exception, fields);
+            return;
+        }
+        if (ReferenceEquals(definition, EventPreviewLogEvents.PlansDegraded))
+        {
+            if (exception == null)
+                BppLog.WarnEvent(definition, fields);
+            else
+                BppLog.WarnEvent(definition, exception, fields);
+            return;
+        }
+
+        BppLog.InfoEvent(definition, fields);
+    }
+
+    private static int ToMilliseconds(double value) =>
+        double.IsNaN(value) || double.IsInfinity(value) ? 0 : Math.Max(0, (int)Math.Round(value));
 
     private long TryGetCacheBytes()
     {
@@ -190,5 +328,6 @@ internal sealed class EventPreviewPlanController : MonoBehaviour
         EventPreviewPlanRuntime.Reset(_registry);
         _shutdown.Dispose();
         _initialized = false;
+        Interlocked.Exchange(ref _healthDegraded, 0);
     }
 }

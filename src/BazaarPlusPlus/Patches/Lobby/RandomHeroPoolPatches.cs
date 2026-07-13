@@ -26,7 +26,11 @@ internal static class RandomHeroPoolAwakePatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroPool", $"Failed to attach native hero-pool routing: {ex}");
+            LobbyLogWriter.ReportHeroPoolDegraded(
+                HeroPoolOperation.Attach,
+                LobbyLogReasonCode.OperationException,
+                ex
+            );
         }
     }
 }
@@ -103,7 +107,11 @@ internal static class RandomHeroPoolHeroItemStartPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroPool", $"Failed to project initial hero-pool visual: {ex}");
+            LobbyLogWriter.ReportHeroPoolDegraded(
+                HeroPoolOperation.ProjectInitialVisual,
+                LobbyLogReasonCode.OperationException,
+                ex
+            );
         }
     }
 }
@@ -120,7 +128,11 @@ internal static class RandomHeroPoolHeroItemUpdateViewPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroPool", $"Failed to project hero-pool visual update: {ex}");
+            LobbyLogWriter.ReportHeroPoolDegraded(
+                HeroPoolOperation.ProjectVisualUpdate,
+                LobbyLogReasonCode.OperationException,
+                ex
+            );
             return true;
         }
     }
@@ -139,7 +151,11 @@ internal static class RandomHeroPoolHeroItemSelectedPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroPool", $"Failed to route native hero-card click: {ex}");
+            LobbyLogWriter.ReportHeroPoolDegraded(
+                HeroPoolOperation.RouteCardClick,
+                LobbyLogReasonCode.OperationException,
+                ex
+            );
             return true;
         }
     }
@@ -165,7 +181,11 @@ internal static class RandomHeroPoolSelectRandomHeroImmediatePatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("RandomHeroPool", $"Failed to route random hero selection: {ex}");
+            LobbyLogWriter.ReportHeroPoolDegraded(
+                HeroPoolOperation.RouteRandomSelection,
+                LobbyLogReasonCode.OperationException,
+                ex
+            );
             return true;
         }
     }

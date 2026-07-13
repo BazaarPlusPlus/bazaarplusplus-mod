@@ -25,31 +25,34 @@ internal static class CollectionPanelDockButtonAwakePatch
         {
             AttachButton(
                 MainMenuSettingOptionButtonField?.GetValue(__instance) as Button,
-                "MainMenu"
+                "MainMenu",
+                SettingsNativeButtonId.MainMenu
             );
             AttachButton(
                 HeroSelectSettingOptionButtonField?.GetValue(__instance) as Button,
-                "HeroSelect"
+                "HeroSelect",
+                SettingsNativeButtonId.HeroSelect
             );
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                "CollectionPanelDockButton",
-                "Failed to attach collection dock button",
-                ex
+            BppLog.WarnEvent(
+                SettingsLogEvents.PatchDegraded,
+                ex,
+                SettingsLogEvents.PatchDegradedOperation.Bind(SettingsPatchOperation.DockAwake),
+                SettingsLogEvents.PatchDegradedReasonCode.Bind(SettingsLogReasonCode.PatchException)
             );
         }
     }
 
-    private static void AttachButton(Button? button, string key)
+    private static void AttachButton(Button? button, string key, SettingsNativeButtonId buttonId)
     {
         if (button == null)
             return;
 
         CollectionPanelDockButtonController.Attach(
             button,
-            BppSettingsDockPlacement.ForButton($"CollectionPanel_{key}")
+            BppSettingsDockPlacement.ForButton($"CollectionPanel_{key}", buttonId)
         );
     }
 }
@@ -73,16 +76,20 @@ internal static class CollectionPanelDockButtonFightMenuPatch
             {
                 CollectionPanelDockButtonController.Attach(
                     button,
-                    BppSettingsDockPlacement.ForButton("CollectionPanel_FightMenu")
+                    BppSettingsDockPlacement.ForButton(
+                        "CollectionPanel_FightMenu",
+                        SettingsNativeButtonId.FightMenu
+                    )
                 );
             }
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                "CollectionPanelDockButton",
-                "Failed to attach collection dock button in fight menu",
-                ex
+            BppLog.WarnEvent(
+                SettingsLogEvents.PatchDegraded,
+                ex,
+                SettingsLogEvents.PatchDegradedOperation.Bind(SettingsPatchOperation.DockOpen),
+                SettingsLogEvents.PatchDegradedReasonCode.Bind(SettingsLogReasonCode.PatchException)
             );
         }
     }

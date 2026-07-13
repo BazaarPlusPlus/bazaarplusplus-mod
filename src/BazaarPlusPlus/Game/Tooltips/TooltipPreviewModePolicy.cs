@@ -31,7 +31,7 @@ internal static class TooltipPreviewModePolicy
     )
     {
         var choicePedestal = ShouldReadChoicePedestal(config, holdUpgrade, holdEnchant)
-            ? encounterState?.GetChoicePedestal()
+            ? TooltipEncounterProbeReader.ReadChoice(encounterState)
             : null;
         return Resolve(config, choicePedestal, holdUpgrade, holdEnchant);
     }

@@ -20,10 +20,17 @@ internal interface IEncounterStateProbe
 
 /// <summary>
 /// Optional diagnostic-preserving encounter-ID read. Existing callers keep using
-/// <see cref="IEncounterStateProbe.GetEncounterIds"/>; CollectionPanel opts into this seam so a
-/// fallback empty snapshot cannot be mistaken for a complete selection read.
+/// <see cref="IEncounterStateProbe.GetEncounterIds"/>; operational owners opt into this seam so
+/// a fallback empty snapshot cannot be mistaken for a complete selection read.
 /// </summary>
 internal interface ITypedEncounterIdsProbe
 {
     EncounterIdsProbeOutcome GetEncounterIdsOutcome();
+}
+
+internal interface ITypedEncounterStateProbe : ITypedEncounterIdsProbe
+{
+    ChoicePedestalProbeOutcome GetChoicePedestalOutcome();
+
+    EncounterTargetingProbeOutcome GetTargetingStateOutcome();
 }

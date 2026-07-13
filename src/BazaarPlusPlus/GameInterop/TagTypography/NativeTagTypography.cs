@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 using HarmonyLib;
 using TheBazaar;
@@ -57,6 +56,7 @@ internal static class NativeTagTypography
     // One-time fail-closed switch for the reflection path (game update renamed the member or
     // changed its shape): labels keep flowing through the game string table, colors are lost.
     private static bool _configurationPathBroken;
+    private static NativeTagTypographyFailure? _pendingFailure;
 
     /// <summary>True once the game's async typography registration has completed (or after a
     /// locale change rebuilt the instance). While false, <see cref="Resolve(string)"/> degrades
@@ -81,6 +81,13 @@ internal static class NativeTagTypography
 
     public static NativeTagDisplay Resolve(string key) =>
         Resolve(key, aliasKey: null, overrideConfigurationStyle: false);
+
+    internal static bool TryTakeFailure(out NativeTagTypographyFailure failure)
+    {
+        failure = _pendingFailure!;
+        _pendingFailure = null;
+        return failure != null;
+    }
 
     private static NativeTagDisplay Resolve(
         string key,
@@ -229,7 +236,8 @@ internal static class NativeTagTypography
         if (GetConfigurationMethod == null)
         {
             ReportConfigurationPathBroken(
-                "TooltipTypography.GetConfiguration(string) was not found via reflection."
+                NativeTagTypographyFailureReason.ConfigurationMethodUnavailable,
+                exception: null
             );
             return null;
         }
@@ -242,20 +250,21 @@ internal static class NativeTagTypography
         catch (Exception ex)
         {
             ReportConfigurationPathBroken(
-                $"TooltipTypography.GetConfiguration(string) invocation failed: {ex.Message}"
+                NativeTagTypographyFailureReason.ConfigurationInvocationException,
+                ex
             );
             return null;
         }
     }
 
     // Only reachable while the broken flag is still unset, so this warns exactly once.
-    private static void ReportConfigurationPathBroken(string reason)
+    private static void ReportConfigurationPathBroken(
+        NativeTagTypographyFailureReason reason,
+        Exception? exception
+    )
     {
         _configurationPathBroken = true;
-        BppLog.Warn(
-            "NativeTagTypography",
-            $"{reason} Tag labels fall back to the game string table without keyword colors."
-        );
+        _pendingFailure = new NativeTagTypographyFailure(reason, exception);
     }
 
     private static string LocalizeConfiguredText(
@@ -288,4 +297,25 @@ internal static class NativeTagTypography
             return key;
         }
     }
+}
+
+internal enum NativeTagTypographyFailureReason
+{
+    ConfigurationMethodUnavailable,
+    ConfigurationInvocationException,
+}
+
+internal sealed class NativeTagTypographyFailure
+{
+    internal NativeTagTypographyFailure(
+        NativeTagTypographyFailureReason reason,
+        Exception? exception
+    )
+    {
+        Reason = reason;
+        Exception = exception;
+    }
+
+    internal NativeTagTypographyFailureReason Reason { get; }
+    internal Exception? Exception { get; }
 }

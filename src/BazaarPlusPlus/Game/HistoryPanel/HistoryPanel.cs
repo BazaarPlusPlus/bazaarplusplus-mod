@@ -8,6 +8,7 @@ using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
@@ -24,6 +25,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     internal static HistoryPanel? Instance { get; private set; }
 
     private readonly HistoryPanelState _state = new();
+    private readonly HistoryPanelPayloadFailureLogGate _payloadFailureLogGate = new();
     private HistoryPanelDependencies? _dependencies;
     private HistoryPanelCoordinator? _coordinator;
     private HistoryPanelDataService _dataService = null!;
@@ -286,7 +288,34 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         var ghostPayloadStore = new GhostBattlePayloadStore(
             GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
         );
-        var ghostPayload = ghostPayloadStore.Load(battle.BattleId);
+        var ghostPayloadResult = ghostPayloadStore.LoadDetailed(battle.BattleId);
+        if (ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Invalid)
+        {
+            _payloadFailureLogGate.Report(
+                battle.BattleId,
+                ghostPayloadResult.Fingerprint ?? "unavailable",
+                HistoryPanelPreviewPayloadReasonCode.PayloadInvalid,
+                ghostPayloadResult.Exception
+            );
+            return HistoryBattlePreviewProjection.BuildEmpty(signature);
+        }
+        if (ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Unreadable)
+        {
+            _payloadFailureLogGate.Report(
+                battle.BattleId,
+                ghostPayloadResult.Fingerprint ?? "unavailable",
+                HistoryPanelPreviewPayloadReasonCode.PayloadUnreadable,
+                ghostPayloadResult.Exception
+            );
+            return HistoryBattlePreviewProjection.BuildEmpty(signature);
+        }
+
+        if (
+            ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Missing
+            || ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Loaded
+        )
+            _payloadFailureLogGate.Clear(battle.BattleId);
+        var ghostPayload = ghostPayloadResult.Payload;
         var snapshots = ghostPayload?.BattleManifest?.Snapshots;
         if (snapshots == null)
             return HistoryBattlePreviewProjection.BuildEmpty(signature);
@@ -347,7 +376,9 @@ internal sealed partial class HistoryPanel : MonoBehaviour
                 SortingOrder = BppOverlaySorting.NativeCardPreview,
                 LayoutMode = ItemBoardPreviewLayoutMode.SlotGrid,
                 ShowHover = true,
-                LogComponent = "HistoryPanelPreview",
+                CardPreviewFailureReporter = HistoryPanelPreviewLogWriter.ReportCardPreview,
+                HoverFailureReporter = TooltipCardPreviewLogWriter.Reporter,
+                ItemBoardFailureReporter = HistoryPanelPreviewLogWriter.ReportItemBoard,
                 // The ~2:1 preview container always lands in the board-cap regime, where the
                 // default ratio reproduces the native board's frame interleaving; this panel
                 // reads that as overlap, so it opts into full frame-border separation.

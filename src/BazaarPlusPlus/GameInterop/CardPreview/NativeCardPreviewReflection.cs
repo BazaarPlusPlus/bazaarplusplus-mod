@@ -2,7 +2,6 @@
 using System;
 using System.Reflection;
 using BazaarGameClient.Domain.Models.Cards;
-using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.Tooltips;
 using UnityEngine;
@@ -52,11 +51,18 @@ internal static class NativeCardPreviewReflection
         );
     }
 
-    public static bool TryGetTooltipData(Component cardPreview, out CardTooltipData tooltipData)
+    public static bool TryGetTooltipData(
+        Component cardPreview,
+        out CardTooltipData tooltipData,
+        Action<NativeCardPreviewFailure>? reportFailure = null
+    )
     {
         tooltipData = null!;
         if (!IsCardPreview(cardPreview) || TooltipDataField == null)
+        {
+            ReportUnavailable(reportFailure, NativeCardPreviewOperation.GetTooltipData);
             return false;
+        }
 
         try
         {
@@ -68,16 +74,23 @@ internal static class NativeCardPreviewReflection
         }
         catch (Exception ex)
         {
-            LogReflectionFailure("get _tooltipData", ex);
+            ReportException(reportFailure, NativeCardPreviewOperation.GetTooltipData, ex);
             return false;
         }
     }
 
-    public static bool TryGetClientCard(Component cardPreview, out Card card)
+    public static bool TryGetClientCard(
+        Component cardPreview,
+        out Card card,
+        Action<NativeCardPreviewFailure>? reportFailure = null
+    )
     {
         card = null!;
         if (!IsCardPreview(cardPreview) || ClientCardField == null)
+        {
+            ReportUnavailable(reportFailure, NativeCardPreviewOperation.GetClientCard);
             return false;
+        }
 
         try
         {
@@ -89,15 +102,22 @@ internal static class NativeCardPreviewReflection
         }
         catch (Exception ex)
         {
-            LogReflectionFailure("get _clientCard", ex);
+            ReportException(reportFailure, NativeCardPreviewOperation.GetClientCard, ex);
             return false;
         }
     }
 
-    public static bool TrySetTooltipData(Component cardPreview, CardTooltipData tooltipData)
+    public static bool TrySetTooltipData(
+        Component cardPreview,
+        CardTooltipData tooltipData,
+        Action<NativeCardPreviewFailure>? reportFailure = null
+    )
     {
         if (!IsCardPreview(cardPreview) || TooltipDataField == null || tooltipData == null)
+        {
+            ReportUnavailable(reportFailure, NativeCardPreviewOperation.SetTooltipData);
             return false;
+        }
 
         try
         {
@@ -106,7 +126,7 @@ internal static class NativeCardPreviewReflection
         }
         catch (Exception ex)
         {
-            LogReflectionFailure("set _tooltipData", ex);
+            ReportException(reportFailure, NativeCardPreviewOperation.SetTooltipData, ex);
             return false;
         }
     }
@@ -116,10 +136,16 @@ internal static class NativeCardPreviewReflection
         return IsCardPreview(cardPreview) && OnHoverMethod != null;
     }
 
-    public static bool TryInvokeOnHover(Component cardPreview)
+    public static bool TryInvokeOnHover(
+        Component cardPreview,
+        Action<NativeCardPreviewFailure>? reportFailure = null
+    )
     {
         if (!IsCardPreview(cardPreview) || OnHoverMethod is not { } method)
+        {
+            ReportUnavailable(reportFailure, NativeCardPreviewOperation.InvokeHover);
             return false;
+        }
 
         try
         {
@@ -128,26 +154,45 @@ internal static class NativeCardPreviewReflection
         }
         catch (TargetInvocationException ex)
         {
-            BppLog.Debug(
-                "TooltipPreview",
-                $"Preview OnHover threw: {ex.InnerException?.Message ?? ex.Message}"
+            ReportException(
+                reportFailure,
+                NativeCardPreviewOperation.InvokeHover,
+                ex.InnerException ?? ex
             );
             return false;
         }
         catch (Exception ex)
         {
-            BppLog.Debug("TooltipPreview", $"Preview OnHover invocation failed: {ex.Message}");
+            ReportException(reportFailure, NativeCardPreviewOperation.InvokeHover, ex);
             return false;
         }
     }
 
-    private static void LogReflectionFailure(string operation, Exception ex)
-    {
-        BppLog.Debug(
-            "TooltipPreview",
-            $"CardPreview reflection failed operation={operation}: {ex.Message}"
+    private static void ReportUnavailable(
+        Action<NativeCardPreviewFailure>? reportFailure,
+        NativeCardPreviewOperation operation
+    ) =>
+        reportFailure?.Invoke(
+            new NativeCardPreviewFailure(
+                operation,
+                NativeCardPreviewFailureReason.ReflectionUnavailable,
+                templateId: null
+            )
         );
-    }
+
+    private static void ReportException(
+        Action<NativeCardPreviewFailure>? reportFailure,
+        NativeCardPreviewOperation operation,
+        Exception exception
+    ) =>
+        reportFailure?.Invoke(
+            new NativeCardPreviewFailure(
+                operation,
+                NativeCardPreviewFailureReason.ReflectionException,
+                templateId: null,
+                exception
+            )
+        );
 
     public static void ApplyLayerRecursive(GameObject root, int layer)
     {

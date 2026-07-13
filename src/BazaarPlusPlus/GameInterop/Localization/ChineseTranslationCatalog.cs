@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using BazaarGameShared.Domain.Core;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Logging;
 using Microsoft.Data.Sqlite;
 using TheBazaar.DataManagement;
 
@@ -18,7 +19,6 @@ namespace BazaarPlusPlus.GameInterop.Localization;
 /// </summary>
 internal static class ChineseTranslationCatalog
 {
-    private const string Component = "BilingualNames";
     private const string Locale = "zh-CN";
     private static readonly object Sync = new();
     private static readonly Dictionary<string, string?> Cache = new(StringComparer.Ordinal);
@@ -26,7 +26,8 @@ internal static class ChineseTranslationCatalog
     private static string? _databasePath;
     private static long _databaseLength;
     private static long _databaseWriteTicks;
-    private static string? _loggedFailure;
+    private static readonly OperationalHealthTracker<string, BilingualLogReasonCode> Health = new();
+    private static bool _readyReported;
 
     internal static string? TryResolve(TLocalizableText? text)
     {
@@ -51,11 +52,12 @@ internal static class ChineseTranslationCatalog
                 if (string.IsNullOrWhiteSpace(translation))
                     translation = null;
                 Cache[source!] = translation;
+                ReportSuccess();
                 return translation;
             }
             catch (Exception ex)
             {
-                LogFailure(ex.Message);
+                ReportFailure(BilingualLogReasonCode.QueryException, ex);
                 CloseConnection();
                 return null;
             }
@@ -67,7 +69,8 @@ internal static class ChineseTranslationCatalog
         lock (Sync)
         {
             CloseConnection();
-            _loggedFailure = null;
+            Health.Reset();
+            _readyReported = false;
         }
     }
 
@@ -76,7 +79,7 @@ internal static class ChineseTranslationCatalog
         var path = Path.Combine(DataManifestActions.Translations.GetCachePath(), $"{Locale}.bytes");
         if (!File.Exists(path))
         {
-            LogFailure($"Official {Locale} translation database is not available at '{path}'.");
+            ReportFailure(BilingualLogReasonCode.DatabaseUnavailable);
             return false;
         }
 
@@ -101,8 +104,6 @@ internal static class ChineseTranslationCatalog
         _databasePath = path;
         _databaseLength = info.Length;
         _databaseWriteTicks = writeTicks;
-        _loggedFailure = null;
-        BppLog.Info(Component, $"Loaded official {Locale} item-name translations.");
         return true;
     }
 
@@ -126,12 +127,48 @@ internal static class ChineseTranslationCatalog
         Cache.Clear();
     }
 
-    private static void LogFailure(string reason)
+    private static void ReportFailure(
+        BilingualLogReasonCode reasonCode,
+        Exception? exception = null
+    )
     {
-        if (string.Equals(_loggedFailure, reason, StringComparison.Ordinal))
+        _readyReported = false;
+        if (!Health.ObserveFailure(Locale, reasonCode))
             return;
 
-        _loggedFailure = reason;
-        BppLog.Warn(Component, reason);
+        var fields = new[]
+        {
+            BilingualItemNamesLogEvents.CatalogDegradedLocale.Bind(Locale),
+            BilingualItemNamesLogEvents.CatalogDegradedReasonCode.Bind(reasonCode),
+        };
+        if (exception == null)
+            BppLog.WarnEvent(BilingualItemNamesLogEvents.CatalogDegraded, fields);
+        else
+            BppLog.WarnEvent(BilingualItemNamesLogEvents.CatalogDegraded, exception, fields);
+    }
+
+    private static void ReportSuccess()
+    {
+        if (Health.ObserveSuccess(Locale, out var reasonCode))
+        {
+            _readyReported = true;
+            BppLog.RecoverStorm(
+                BilingualItemNamesLogEvents.CatalogDegraded,
+                BilingualItemNamesLogEvents.CatalogDegradedReasonCode.Bind(reasonCode)
+            );
+            BppLog.InfoEvent(
+                BilingualItemNamesLogEvents.CatalogRecovered,
+                BilingualItemNamesLogEvents.CatalogRecoveredLocale.Bind(Locale)
+            );
+            return;
+        }
+
+        if (_readyReported)
+            return;
+        _readyReported = true;
+        BppLog.DebugEvent(
+            BilingualItemNamesLogEvents.CatalogLoaded,
+            () => [BilingualItemNamesLogEvents.CatalogLoadedLocale.Bind(Locale)]
+        );
     }
 }

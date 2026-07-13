@@ -23,8 +23,7 @@ internal sealed class CombatReplayPayloadStore
             rootPath,
             FileSuffix,
             PvpReplayPayloadCodec.Serialize,
-            PvpReplayPayloadCodec.TryDeserialize,
-            "CombatReplayPayloadStore"
+            PvpReplayPayloadCodec.TryDeserialize
         );
     }
 

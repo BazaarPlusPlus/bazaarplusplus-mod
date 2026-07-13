@@ -61,6 +61,11 @@ internal enum ReplayCaptureReasonCode
     CaptureOrEnqueueException,
 }
 
+internal enum ReplayExternalRecordSource
+{
+    Agent,
+}
+
 internal enum ReplayPersistenceReasonCode
 {
     Persisted,
@@ -125,6 +130,33 @@ internal static class CombatReplayLogEvents
         BppLogFeatureScope.CombatReplay,
         "combat_replay.playback.request_rejected",
         [RequestRejectedSource, RequestRejectedReasonCode, RequestRejectedBattleId]
+    );
+
+    internal static readonly BppLogFieldDefinition ExternalRecordAcceptedRequestId = Public(
+        0,
+        "request_id",
+        BppLogCardinality.High,
+        BppLogCorrelationPolicy.Short
+    );
+    internal static readonly BppLogFieldDefinition ExternalRecordAcceptedBattleId = Public(
+        1,
+        "battle_id",
+        BppLogCardinality.High,
+        BppLogCorrelationPolicy.Short
+    );
+    internal static readonly BppLogFieldDefinition ExternalRecordAcceptedSource = Public(
+        2,
+        "source",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogEventDefinition ExternalRecordAccepted = new(
+        BppLogFeatureScope.CombatReplay,
+        "combat_replay.external_record.accepted",
+        [
+            ExternalRecordAcceptedRequestId,
+            ExternalRecordAcceptedBattleId,
+            ExternalRecordAcceptedSource,
+        ]
     );
 
     internal static readonly BppLogFieldDefinition PlaybackStartedBattleId = Public(

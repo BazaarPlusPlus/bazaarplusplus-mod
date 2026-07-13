@@ -22,10 +22,13 @@ internal static class OptionsDialogLanguageRefreshPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                "SettingsMenu",
-                "Failed to refresh custom settings after language changed",
-                ex
+            BppLog.WarnEvent(
+                SettingsLogEvents.PatchDegraded,
+                ex,
+                SettingsLogEvents.PatchDegradedOperation.Bind(
+                    SettingsPatchOperation.LanguageRefresh
+                ),
+                SettingsLogEvents.PatchDegradedReasonCode.Bind(SettingsLogReasonCode.PatchException)
             );
         }
     }

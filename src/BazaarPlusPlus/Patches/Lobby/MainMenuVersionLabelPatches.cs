@@ -28,7 +28,13 @@ internal static class MainMenuVersionLabelBuildPatch
         }
         catch (Exception ex)
         {
-            BppLog.Warn("MainMenuVersionLabel", $"Failed to refresh version label: {ex.Message}");
+            BppLog.WarnEvent(
+                LobbyLogEvents.VersionLabelDegraded,
+                ex,
+                LobbyLogEvents.VersionLabelDegradedReasonCode.Bind(
+                    LobbyLogReasonCode.LabelRefreshException
+                )
+            );
         }
     }
 }

@@ -1569,9 +1569,13 @@ public class CoreLayeringTests
         var firstEmission = new[]
         {
             "BppLog.Debug(",
+            "BppLog.DebugEvent(",
             "BppLog.Info(",
+            "BppLog.InfoEvent(",
             "BppLog.Warn(",
+            "BppLog.WarnEvent(",
             "BppLog.Error(",
+            "BppLog.ErrorEvent(",
         }
             .Select(token => awakeSource.IndexOf(token, StringComparison.Ordinal))
             .Where(index => index >= 0)
@@ -1593,14 +1597,14 @@ public class CoreLayeringTests
             StringComparison.Ordinal
         );
         var teardownEnd = pluginSource.IndexOf(
-            "private void RunTeardownSteps()",
+            "private void RunTeardownSteps(PluginTeardownAccumulator failures)",
             teardownStart,
             StringComparison.Ordinal
         );
         var teardownSource = pluginSource.Substring(teardownStart, teardownEnd - teardownStart);
 
         Assert.True(
-            teardownSource.IndexOf("RunTeardownSteps();", StringComparison.Ordinal)
+            teardownSource.IndexOf("RunTeardownSteps(failures);", StringComparison.Ordinal)
                 < teardownSource.IndexOf("BppLog.Flush", StringComparison.Ordinal),
             "Registered teardown hooks must run before pending storm summaries are flushed."
         );

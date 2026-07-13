@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
@@ -26,7 +27,7 @@ internal static class CollectionTierActiveTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("CollectionTierTooltip", "Failed to merge active tier values.", ex);
+            CollectionTierTooltipLog.ReportDegraded(CollectionTierField.Active, ex);
         }
     }
 }
@@ -50,7 +51,7 @@ internal static class CollectionTierPassiveTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("CollectionTierTooltip", "Failed to merge passive tier values.", ex);
+            CollectionTierTooltipLog.ReportDegraded(CollectionTierField.Passive, ex);
         }
     }
 }
@@ -84,7 +85,20 @@ internal static class CollectionTierCooldownTooltipPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("CollectionTierTooltip", "Failed to merge cooldown tier values.", ex);
+            CollectionTierTooltipLog.ReportDegraded(CollectionTierField.Cooldown, ex);
         }
     }
+}
+
+internal static class CollectionTierTooltipLog
+{
+    internal static void ReportDegraded(CollectionTierField tierField, Exception exception) =>
+        BppLog.WarnEvent(
+            CollectionPanelLogEvents.TierTooltipDegraded,
+            exception,
+            CollectionPanelLogEvents.TierTooltipDegradedTierField.Bind(tierField),
+            CollectionPanelLogEvents.TierTooltipDegradedReasonCode.Bind(
+                CollectionPanelLogReasonCode.TierTooltipMergeException
+            )
+        );
 }

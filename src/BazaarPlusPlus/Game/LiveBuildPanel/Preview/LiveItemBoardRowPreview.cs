@@ -1,6 +1,7 @@
 #nullable enable
 
 using System.Collections;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using UnityEngine;
 
@@ -21,7 +22,9 @@ internal sealed class LiveItemBoardRowPreview
                 SortingOrder = sortingOrder,
                 LayoutMode = ItemBoardPreviewLayoutMode.SlotGrid,
                 ShowHover = true,
-                LogComponent = $"LiveBuildPanel:{id}",
+                CardPreviewFailureReporter = LiveBuildPreviewLogWriter.ReportCardPreview,
+                HoverFailureReporter = TooltipCardPreviewLogWriter.Reporter,
+                ItemBoardFailureReporter = LiveBuildPreviewLogWriter.ReportItemBoard,
             }
         );
     }

@@ -1,6 +1,7 @@
 #nullable enable
 #pragma warning disable CS0436
 using System.Collections.Generic;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Fonts;
 using TheBazaar.UI.Tooltips;
@@ -133,7 +134,7 @@ internal static class BppTooltipSections
         var passiveBlock = controller.passiveEffectParent;
         if (passiveBlock == null)
         {
-            BppLog.Info("TooltipSection", $"Ensure({key}) failed: passiveEffectParent null");
+            ReportHostDegraded(key, TooltipLogReasonCode.PassiveEffectParentUnavailable);
             return null;
         }
 
@@ -174,7 +175,7 @@ internal static class BppTooltipSections
         );
         if (textController == null)
         {
-            BppLog.Info("TooltipSection", $"Ensure({key}) failed: no text controller in clone");
+            ReportHostDegraded(key, TooltipLogReasonCode.TextControllerUnavailable);
             if (dividerClone != null)
                 Object.Destroy(dividerClone);
             Object.Destroy(blockClone);
@@ -248,6 +249,25 @@ internal static class BppTooltipSections
         Sections[(controller, key)] = section;
         return section;
     }
+
+    private static void ReportHostDegraded(string key, TooltipLogReasonCode reasonCode) =>
+        BppLog.WarnEvent(
+            TooltipLogEvents.SectionHostDegraded,
+            TooltipLogEvents.SectionHostDegradedSectionId.Bind(ResolveSectionId(key)),
+            TooltipLogEvents.SectionHostDegradedReasonCode.Bind(reasonCode)
+        );
+
+    private static TooltipSectionId ResolveSectionId(string key) =>
+        key switch
+        {
+            "enchant-preview-with-native" => TooltipSectionId.EnchantPreview,
+            "enchant-preview-without-native" => TooltipSectionId.EnchantPreview,
+            "quest-reward-preview" => TooltipSectionId.QuestRewardPreview,
+            "aggregate-missing-types" => TooltipSectionId.AggregateMissingTypes,
+            "encounter" => TooltipSectionId.EncounterPreview,
+            "level-rewards" => TooltipSectionId.HeroLevelRewards,
+            _ => TooltipSectionId.Unknown,
+        };
 
     private static void ApplySourcePadding(Section section, Style? style)
     {

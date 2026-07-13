@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Logging;
 using TheBazaar.Localization;
 using TMPro;
 using UnityEngine.AddressableAssets;
@@ -16,14 +17,14 @@ namespace BazaarPlusPlus.GameInterop.Localization;
 /// </summary>
 internal static class NativeChineseFontFallback
 {
-    private const string Component = "BilingualNames";
     private const string ChineseLocale = "zh-CN";
+    private const int HealthKey = 0;
     private static readonly List<AsyncOperationHandle<TMP_FontAsset>> Handles = new();
     private static readonly List<FontBinding> Bindings = new();
     private static TMP_FontAsset[]? _serifFallbacks;
     private static TMP_FontAsset[]? _sansFallbacks;
-    private static bool _configurationWarningLogged;
-    private static bool _loadWarningLogged;
+    private static readonly OperationalHealthTracker<int, BilingualLogReasonCode> Health = new();
+    private static bool _readyReported;
 
     internal static bool TryInstall(TMP_Text? text, string? sampleText)
     {
@@ -31,9 +32,21 @@ internal static class NativeChineseFontFallback
             return false;
 
         var preferSerif = text.font.name.IndexOf("Serif", StringComparison.OrdinalIgnoreCase) >= 0;
-        var fallbacks = ResolveFallbacks(preferSerif);
-        if (fallbacks.Length == 0 && preferSerif)
-            fallbacks = ResolveFallbacks(preferSerif: false);
+        var attempt = ResolveFallbacks(preferSerif);
+        if (attempt.Fonts.Length == 0 && preferSerif)
+        {
+            var sansAttempt = ResolveFallbacks(preferSerif: false);
+            attempt =
+                sansAttempt.Fonts.Length > 0 ? sansAttempt : attempt.MergeFailure(sansAttempt);
+        }
+        var fallbacks = attempt.Fonts;
+        if (attempt.WasAttempted)
+        {
+            if (fallbacks.Length > 0)
+                ReportSuccess(fallbacks);
+            else
+                ReportFailure(attempt.Stage, attempt.ReasonCode, attempt.Exception);
+        }
         if (fallbacks.Length == 0)
             return false;
 
@@ -78,7 +91,16 @@ internal static class NativeChineseFontFallback
                 }
                 catch (Exception ex)
                 {
-                    BppLog.Warn(Component, $"Failed to restore a tooltip font: {ex.Message}");
+                    BppLog.DebugEvent(
+                        BilingualItemNamesLogEvents.FontFallbackCleanupFailed,
+                        ex,
+                        () =>
+                            [
+                                BilingualItemNamesLogEvents.FontFallbackCleanupFailedStage.Bind(
+                                    BilingualFontStage.RestoreBinding
+                                ),
+                            ]
+                    );
                 }
                 finally
                 {
@@ -97,8 +119,8 @@ internal static class NativeChineseFontFallback
 
         _serifFallbacks = null;
         _sansFallbacks = null;
-        _configurationWarningLogged = false;
-        _loadWarningLogged = false;
+        Health.Reset();
+        _readyReported = false;
     }
 
     private static FontBinding? FindOrCreateBinding(TMP_Text text)
@@ -123,11 +145,11 @@ internal static class NativeChineseFontFallback
         return created;
     }
 
-    private static TMP_FontAsset[] ResolveFallbacks(bool preferSerif)
+    private static FontLoadAttempt ResolveFallbacks(bool preferSerif)
     {
         var cached = preferSerif ? _serifFallbacks : _sansFallbacks;
         if (cached != null)
-            return cached;
+            return FontLoadAttempt.Cached(cached);
 
         var configuration = NotoFontFallbackRuntime._configuration;
         if (
@@ -135,41 +157,43 @@ internal static class NativeChineseFontFallback
             || !configuration.TryGetRuleForLocale(ChineseLocale, out var rule)
         )
         {
-            if (!_configurationWarningLogged)
-            {
-                _configurationWarningLogged = true;
-                BppLog.Warn(
-                    Component,
-                    "The game's zh-CN font fallback configuration is not ready."
-                );
-            }
-            return Array.Empty<TMP_FontAsset>();
+            return FontLoadAttempt.Failed(
+                BilingualFontStage.ResolveConfiguration,
+                BilingualLogReasonCode.ConfigurationUnavailable
+            );
         }
 
         var references = preferSerif
             ? rule.NotoSerifFallbacksOrdered
             : rule.NotoSansFallbacksOrdered;
-        var loaded = LoadReferences(references);
-        if (loaded.Length > 0)
+        var attempt = LoadReferences(references);
+        if (attempt.Fonts.Length > 0)
         {
             if (preferSerif)
-                _serifFallbacks = loaded;
+                _serifFallbacks = attempt.Fonts;
             else
-                _sansFallbacks = loaded;
+                _sansFallbacks = attempt.Fonts;
         }
-        return loaded;
+        return attempt;
     }
 
-    private static TMP_FontAsset[] LoadReferences(AssetReferenceT<TMP_FontAsset>[]? references)
+    private static FontLoadAttempt LoadReferences(AssetReferenceT<TMP_FontAsset>[]? references)
     {
         if (references == null || references.Length == 0)
-            return Array.Empty<TMP_FontAsset>();
+            return FontLoadAttempt.Failed(
+                BilingualFontStage.LoadFonts,
+                BilingualLogReasonCode.FontReferencesUnavailable
+            );
 
         var loaded = new List<TMP_FontAsset>(references.Length);
+        Exception? firstException = null;
+        var sawLoadFailure = false;
+        var sawValidReference = false;
         foreach (var reference in references)
         {
             if (reference == null || !reference.RuntimeKeyIsValid())
                 continue;
+            sawValidReference = true;
 
             AsyncOperationHandle<TMP_FontAsset> handle = default;
             try
@@ -177,7 +201,10 @@ internal static class NativeChineseFontFallback
                 handle = Addressables.LoadAssetAsync<TMP_FontAsset>(reference.RuntimeKey);
                 var font = handle.WaitForCompletion();
                 if (handle.Status != AsyncOperationStatus.Succeeded || font == null)
+                {
+                    sawLoadFailure = true;
                     continue;
+                }
 
                 font.ReadFontAssetDefinition();
                 loaded.Add(font);
@@ -186,11 +213,8 @@ internal static class NativeChineseFontFallback
             }
             catch (Exception ex)
             {
-                if (!_loadWarningLogged)
-                {
-                    _loadWarningLogged = true;
-                    BppLog.Warn(Component, $"Failed to load the game's zh-CN font: {ex.Message}");
-                }
+                sawLoadFailure = true;
+                firstException ??= ex;
             }
             finally
             {
@@ -199,11 +223,15 @@ internal static class NativeChineseFontFallback
         }
 
         if (loaded.Count > 0)
-            BppLog.Info(
-                Component,
-                $"Loaded the game's native zh-CN font fallback: {string.Join(", ", loaded.ConvertAll(font => font.name))}."
-            );
-        return loaded.ToArray();
+            return FontLoadAttempt.Succeeded(loaded.ToArray());
+        return FontLoadAttempt.Failed(
+            BilingualFontStage.LoadFonts,
+            sawLoadFailure
+                ? BilingualLogReasonCode.FontLoadFailed
+                : BilingualLogReasonCode.FontReferencesUnavailable,
+            firstException,
+            wasAttempted: sawValidReference || references.Length > 0
+        );
     }
 
     private static void TryRelease(AsyncOperationHandle<TMP_FontAsset> handle)
@@ -215,8 +243,108 @@ internal static class NativeChineseFontFallback
         }
         catch (Exception ex)
         {
-            BppLog.Warn(Component, $"Failed to release a zh-CN font handle: {ex.Message}");
+            BppLog.DebugEvent(
+                BilingualItemNamesLogEvents.FontFallbackCleanupFailed,
+                ex,
+                () =>
+                    [
+                        BilingualItemNamesLogEvents.FontFallbackCleanupFailedStage.Bind(
+                            BilingualFontStage.ReleaseHandle
+                        ),
+                    ]
+            );
         }
+    }
+
+    private static void ReportFailure(
+        BilingualFontStage stage,
+        BilingualLogReasonCode reasonCode,
+        Exception? exception
+    )
+    {
+        _readyReported = false;
+        if (!Health.ObserveFailure(HealthKey, reasonCode))
+            return;
+        var fields = new[]
+        {
+            BilingualItemNamesLogEvents.FontFallbackDegradedStage.Bind(stage),
+            BilingualItemNamesLogEvents.FontFallbackDegradedReasonCode.Bind(reasonCode),
+        };
+        if (exception == null)
+            BppLog.WarnEvent(BilingualItemNamesLogEvents.FontFallbackDegraded, fields);
+        else
+            BppLog.WarnEvent(BilingualItemNamesLogEvents.FontFallbackDegraded, exception, fields);
+    }
+
+    private static void ReportSuccess(TMP_FontAsset[] fonts)
+    {
+        if (Health.ObserveSuccess(HealthKey, out _))
+        {
+            _readyReported = true;
+            BppLog.RecoverStorm(BilingualItemNamesLogEvents.FontFallbackDegraded);
+            BppLog.InfoEvent(
+                BilingualItemNamesLogEvents.FontFallbackRecovered,
+                BilingualItemNamesLogEvents.FontFallbackRecoveredFontCount.Bind(fonts.Length),
+                BilingualItemNamesLogEvents.FontFallbackRecoveredFontNames.Bind(
+                    string.Join(",", Array.ConvertAll(fonts, font => font.name))
+                )
+            );
+            return;
+        }
+
+        if (_readyReported)
+            return;
+        _readyReported = true;
+        BppLog.DebugEvent(
+            BilingualItemNamesLogEvents.FontFallbackLoaded,
+            () =>
+                [
+                    BilingualItemNamesLogEvents.FontFallbackLoadedFontCount.Bind(fonts.Length),
+                    BilingualItemNamesLogEvents.FontFallbackLoadedFontNames.Bind(
+                        string.Join(",", Array.ConvertAll(fonts, font => font.name))
+                    ),
+                ]
+        );
+    }
+
+    private readonly struct FontLoadAttempt
+    {
+        private FontLoadAttempt(
+            TMP_FontAsset[] fonts,
+            bool wasAttempted,
+            BilingualFontStage stage,
+            BilingualLogReasonCode reasonCode,
+            Exception? exception
+        )
+        {
+            Fonts = fonts;
+            WasAttempted = wasAttempted;
+            Stage = stage;
+            ReasonCode = reasonCode;
+            Exception = exception;
+        }
+
+        internal TMP_FontAsset[] Fonts { get; }
+        internal bool WasAttempted { get; }
+        internal BilingualFontStage Stage { get; }
+        internal BilingualLogReasonCode ReasonCode { get; }
+        internal Exception? Exception { get; }
+
+        internal static FontLoadAttempt Cached(TMP_FontAsset[] fonts) =>
+            new(fonts, false, default, default, null);
+
+        internal static FontLoadAttempt Succeeded(TMP_FontAsset[] fonts) =>
+            new(fonts, true, default, default, null);
+
+        internal static FontLoadAttempt Failed(
+            BilingualFontStage stage,
+            BilingualLogReasonCode reasonCode,
+            Exception? exception = null,
+            bool wasAttempted = true
+        ) => new(Array.Empty<TMP_FontAsset>(), wasAttempted, stage, reasonCode, exception);
+
+        internal FontLoadAttempt MergeFailure(FontLoadAttempt later) =>
+            later.WasAttempted ? later : this;
     }
 
     private sealed class FontBinding

@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;
@@ -29,16 +28,20 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
     {
         public FetchScope(
             RandomHeroSkinPoolNativeController? controller,
-            RandomHeroSkinPoolNativeController? previousController
+            RandomHeroSkinPoolNativeController? previousController,
+            CollectiblePoolKind collectionKind
         )
         {
             Controller = controller;
             PreviousController = previousController;
+            CollectionKind = collectionKind;
         }
 
         public RandomHeroSkinPoolNativeController? Controller { get; }
 
         public RandomHeroSkinPoolNativeController? PreviousController { get; }
+
+        public CollectiblePoolKind CollectionKind { get; }
     }
 
     internal static FetchScope BeginFetch(
@@ -53,7 +56,11 @@ internal sealed class RandomHeroSkinPoolNativeController : MonoBehaviour
 
         controller.Register();
         controller.BeginSession(collectionType, hero);
-        var scope = new FetchScope(controller, _activeFetchController);
+        var scope = new FetchScope(
+            controller,
+            _activeFetchController,
+            LobbyLogWriter.CollectionKind(collectionType)
+        );
         _activeFetchController = controller;
         return scope;
     }

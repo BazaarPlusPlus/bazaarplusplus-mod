@@ -13,13 +13,11 @@ namespace BazaarPlusPlus.Game.ItemEnchantPreview;
 
 public static class ItemEnchantPreviewFormatting
 {
-    private const string LogComponent = "ItemEnchantPreview";
     private const int PrefixSizePercent = 60;
     private const int EffectSizePercent = 55;
     private const string CjkLineHeight = "<line-height=2.1em>";
     private const string CjkLineHeightEnd = "</line-height>";
-    private const string EntryBreak =
-        "<size=55%><line-height=2.1em>\n</line-height></size>";
+    private const string EntryBreak = "<size=55%><line-height=2.1em>\n</line-height></size>";
 
     private static readonly Regex SizeTagRegex = new Regex(
         "<size=(\\d+)%>",
@@ -93,9 +91,16 @@ public static class ItemEnchantPreviewFormatting
         }
         catch (Exception ex)
         {
-            BppLog.Debug(
-                LogComponent,
-                $"GetEnchantmentLabel: localization failed for enchant '{enchantmentType}', using raw name: {ex.Message}"
+            BppLog.WarnEvent(
+                ItemEnchantPreviewLogEvents.RenderDegraded,
+                ex,
+                ItemEnchantPreviewLogEvents.RenderDegradedStage.Bind(
+                    ItemEnchantRenderStage.Localization
+                ),
+                ItemEnchantPreviewLogEvents.RenderDegradedReasonCode.Bind(
+                    ItemEnchantLogReasonCode.LocalizationFallback
+                ),
+                ItemEnchantPreviewLogEvents.RenderDegradedEnchantment.Bind(enchantmentType)
             );
             return enchantmentType.ToString();
         }

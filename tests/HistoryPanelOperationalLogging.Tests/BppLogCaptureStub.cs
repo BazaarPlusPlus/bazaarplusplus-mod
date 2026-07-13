@@ -58,4 +58,9 @@ internal static class BppLog
         Exception exception,
         params BppLogFieldValue[] values
     ) => Captured.Add(new("Error", definition, values, exception));
+
+    public static void RecoverStorm(
+        BppLogEventDefinition definition,
+        params BppLogFieldValue[] values
+    ) { }
 }

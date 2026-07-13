@@ -31,8 +31,7 @@ internal sealed class GhostBattlePayloadStore
             rootPath,
             FileSuffix,
             GhostBattlePayloadCodec.Serialize,
-            GhostBattlePayloadCodec.TryDeserialize,
-            "GhostBattlePayloadStore"
+            GhostBattlePayloadCodec.TryDeserialize
         );
     }
 

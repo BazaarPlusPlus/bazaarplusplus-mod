@@ -6,7 +6,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 
 namespace BazaarPlusPlus.GameInterop.CardPreview;
@@ -41,23 +40,43 @@ internal static class NativeCardPreviewRuntime
         return ECardSize.Small;
     }
 
-    public static void Resize(Component card, string logComponent)
+    public static NativeCardPreviewFailure? Resize(Component card, Guid? templateId)
     {
+        var method = NativeCardPreviewReflection.ResizeMethod;
+        if (method == null)
+            return new NativeCardPreviewFailure(
+                NativeCardPreviewOperation.Resize,
+                NativeCardPreviewFailureReason.ReflectionUnavailable,
+                templateId
+            );
+
         try
         {
-            NativeCardPreviewReflection.ResizeMethod?.Invoke(card, Array.Empty<object>());
+            method.Invoke(card, Array.Empty<object>());
         }
         catch (Exception ex)
         {
-            BppLog.Warn(logComponent, $"CardPreviewBase.Resize threw: {ex.Message}");
+            return new NativeCardPreviewFailure(
+                NativeCardPreviewOperation.Resize,
+                NativeCardPreviewFailureReason.ResizeException,
+                templateId,
+                ex
+            );
         }
+        return null;
     }
 
-    public static void Show(Component card, bool show, string logComponent)
+    public static NativeCardPreviewFailure? Show(Component card, bool show, Guid? templateId)
     {
         var method = NativeCardPreviewReflection.ShowMethod;
         if (method == null || card == null)
-            return;
+            return method == null
+                ? new NativeCardPreviewFailure(
+                    NativeCardPreviewOperation.Show,
+                    NativeCardPreviewFailureReason.ReflectionUnavailable,
+                    templateId
+                )
+                : null;
 
         try
         {
@@ -65,27 +84,37 @@ internal static class NativeCardPreviewRuntime
         }
         catch (Exception ex)
         {
-            BppLog.Warn(logComponent, $"CardPreviewBase.Show threw: {ex.Message}");
+            return new NativeCardPreviewFailure(
+                NativeCardPreviewOperation.Show,
+                NativeCardPreviewFailureReason.ShowException,
+                templateId,
+                ex
+            );
         }
+        return null;
     }
 
-    public static async Task InvokeSetUpSafe(
+    public static async Task<NativeCardPreviewFailure?> InvokeSetUpSafe(
         Component card,
         TCardBase template,
         TCardInstance instance,
-        string logComponent,
         CancellationToken token = default
     )
     {
         var method = NativeCardPreviewReflection.SetUpMethod;
         if (method == null)
-            return;
+            return new NativeCardPreviewFailure(
+                NativeCardPreviewOperation.SetUp,
+                NativeCardPreviewFailureReason.ReflectionUnavailable,
+                template?.Id
+            );
 
         try
         {
             var raw = method.Invoke(card, new object[] { template, false, instance, token });
             if (raw is Task task)
                 await task;
+            return null;
         }
         catch (OperationCanceledException)
         {
@@ -98,19 +127,21 @@ internal static class NativeCardPreviewRuntime
         }
         catch (TargetInvocationException ex)
         {
-            BppLog.Warn(
-                logComponent,
-                $"CardPreviewBase.SetUp threw for template={template?.Id}: {ex.InnerException?.Message ?? ex.Message}"
+            return new NativeCardPreviewFailure(
+                NativeCardPreviewOperation.SetUp,
+                NativeCardPreviewFailureReason.SetUpException,
+                template?.Id,
+                ex.InnerException ?? ex
             );
-            throw;
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                logComponent,
-                $"CardPreviewBase.SetUp invocation failed for template={template?.Id}: {ex.Message}"
+            return new NativeCardPreviewFailure(
+                NativeCardPreviewOperation.SetUp,
+                NativeCardPreviewFailureReason.SetUpException,
+                template?.Id,
+                ex
             );
-            throw;
         }
     }
 }

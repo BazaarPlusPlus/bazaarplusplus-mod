@@ -11,28 +11,32 @@ namespace BazaarPlusPlus.GameInterop.EncounterPortraits;
 
 internal static class EncounterPortraitSpriteProvider
 {
-    private const string LogComponent = "EncounterPortrait";
+    private static readonly AsyncLoadCache<Guid, EncounterPortraitLoadOutcome> Portraits = new(
+        LoadPortraitCoreAsync
+    );
 
-    private static readonly AsyncLoadCache<Guid, Sprite> Portraits = new(LoadPortraitCoreAsync);
-
-    internal static bool TryGetCached(Guid sourceTemplateId, out Sprite? sprite)
+    internal static bool TryGetCached(
+        Guid sourceTemplateId,
+        out EncounterPortraitLoadOutcome? outcome
+    )
     {
-        sprite = null;
+        outcome = null;
         return sourceTemplateId != Guid.Empty
-            && Portraits.TryGetCached(sourceTemplateId, out sprite);
+            && Portraits.TryGetCached(sourceTemplateId, out outcome);
     }
 
-    internal static Task<Sprite?> LoadPortraitAsync(Guid sourceTemplateId)
+    internal static Task<EncounterPortraitLoadOutcome?> LoadPortraitAsync(Guid sourceTemplateId)
     {
         if (sourceTemplateId == Guid.Empty)
-            return Task.FromResult<Sprite?>(null);
+            return Task.FromResult<EncounterPortraitLoadOutcome?>(null);
 
         return Portraits.GetOrLoadAsync(sourceTemplateId);
     }
 
-    private static async Task<AsyncLoadResult<Sprite>> LoadPortraitCoreAsync(Guid sourceTemplateId)
+    private static async Task<AsyncLoadResult<EncounterPortraitLoadOutcome>> LoadPortraitCoreAsync(
+        Guid sourceTemplateId
+    )
     {
-        Sprite? result = null;
         var shouldCache = false;
         try
         {
@@ -45,20 +49,24 @@ internal static class EncounterPortraitSpriteProvider
             )
             {
                 shouldCache = staticData != null;
-                BppLog.Warn(
-                    LogComponent,
-                    $"No encounter art key sourceTemplateId={sourceTemplateId}; using text fallback."
+                return new AsyncLoadResult<EncounterPortraitLoadOutcome>(
+                    EncounterPortraitLoadOutcome.Degraded(
+                        EncounterPortraitFailureReason.ArtKeyUnavailable,
+                        template?.ArtKey
+                    ),
+                    shouldCache
                 );
-                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
             if (!Services.TryGet<AssetLoader>(out var assetLoader) || assetLoader == null)
             {
-                BppLog.Warn(
-                    LogComponent,
-                    $"AssetLoader unavailable sourceTemplateId={sourceTemplateId}; using text fallback."
+                return new AsyncLoadResult<EncounterPortraitLoadOutcome>(
+                    EncounterPortraitLoadOutcome.Degraded(
+                        EncounterPortraitFailureReason.AssetLoaderUnavailable,
+                        template.ArtKey
+                    ),
+                    shouldCache
                 );
-                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
             shouldCache = true;
@@ -67,23 +75,77 @@ internal static class EncounterPortraitSpriteProvider
             );
             if (encounterData == null)
             {
-                BppLog.Warn(
-                    LogComponent,
-                    $"Encounter asset unavailable artKey={template.ArtKey}; using text fallback."
+                return new AsyncLoadResult<EncounterPortraitLoadOutcome>(
+                    EncounterPortraitLoadOutcome.Degraded(
+                        EncounterPortraitFailureReason.EncounterAssetUnavailable,
+                        template.ArtKey
+                    ),
+                    shouldCache
                 );
-                return new AsyncLoadResult<Sprite>(null, shouldCache);
             }
 
-            result = await encounterData.LoadPortraitSpriteAsync();
-            return new AsyncLoadResult<Sprite>(result, shouldCache);
+            var result = await encounterData.LoadPortraitSpriteAsync();
+            return new AsyncLoadResult<EncounterPortraitLoadOutcome>(
+                result == null
+                    ? EncounterPortraitLoadOutcome.Degraded(
+                        EncounterPortraitFailureReason.PortraitUnavailable,
+                        template.ArtKey
+                    )
+                    : EncounterPortraitLoadOutcome.Ready(result, template.ArtKey),
+                shouldCache
+            );
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                LogComponent,
-                $"Failed to load encounter portrait sourceTemplateId={sourceTemplateId}: {ex.Message}"
+            return new AsyncLoadResult<EncounterPortraitLoadOutcome>(
+                EncounterPortraitLoadOutcome.Degraded(
+                    EncounterPortraitFailureReason.LoadException,
+                    artKey: null,
+                    ex
+                ),
+                shouldCache
             );
-            return new AsyncLoadResult<Sprite>(null, shouldCache);
         }
     }
+}
+
+internal enum EncounterPortraitFailureReason
+{
+    None,
+    ArtKeyUnavailable,
+    AssetLoaderUnavailable,
+    EncounterAssetUnavailable,
+    PortraitUnavailable,
+    LoadException,
+}
+
+internal sealed class EncounterPortraitLoadOutcome
+{
+    private EncounterPortraitLoadOutcome(
+        Sprite? sprite,
+        EncounterPortraitFailureReason reason,
+        string? artKey,
+        Exception? exception
+    )
+    {
+        Sprite = sprite;
+        Reason = reason;
+        ArtKey = artKey;
+        Exception = exception;
+    }
+
+    internal Sprite? Sprite { get; }
+    internal EncounterPortraitFailureReason Reason { get; }
+    internal string? ArtKey { get; }
+    internal Exception? Exception { get; }
+    internal bool IsDegraded => Reason != EncounterPortraitFailureReason.None;
+
+    internal static EncounterPortraitLoadOutcome Ready(Sprite sprite, string artKey) =>
+        new(sprite, EncounterPortraitFailureReason.None, artKey, null);
+
+    internal static EncounterPortraitLoadOutcome Degraded(
+        EncounterPortraitFailureReason reason,
+        string? artKey,
+        Exception? exception = null
+    ) => new(null, reason, artKey, exception);
 }

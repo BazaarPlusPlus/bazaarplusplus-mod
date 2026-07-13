@@ -19,5 +19,9 @@
       Include="..\..\src\BazaarPlusPlus\Game\Input\BppHotkeyActionId.cs"
       Link="BppHotkeyActionId.cs"
     />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\Input\HotkeyBindingFailureGate.cs"
+      Link="HotkeyBindingFailureGate.cs"
+    />
   </ItemGroup>
 </Project>

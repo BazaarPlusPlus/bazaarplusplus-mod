@@ -9,7 +9,6 @@ using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.StaticCards;
-using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 
 namespace BazaarPlusPlus.GameInterop.CardPreview;
@@ -18,30 +17,30 @@ internal sealed class NativeCardPreviewFactory
 {
     private readonly NativeCardPreviewPool _pool;
     private readonly NativeCardPreviewAssetLoader _assetLoader;
-    private readonly string _logComponent;
 
-    public NativeCardPreviewFactory(NativeCardPreviewPool pool, string logComponent)
+    public NativeCardPreviewFactory(NativeCardPreviewPool pool)
     {
         _pool = pool ?? throw new ArgumentNullException(nameof(pool));
-        _logComponent = string.IsNullOrWhiteSpace(logComponent)
-            ? "NativeCardPreviewFactory"
-            : logComponent;
-        _assetLoader = new NativeCardPreviewAssetLoader(_logComponent);
+        _assetLoader = new NativeCardPreviewAssetLoader();
     }
 
     public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
 
-    public bool TryResolveSpan(NativeCardPreviewSpec? spec, out int span)
+    public bool TryResolveSpan(
+        NativeCardPreviewSpec? spec,
+        out int span,
+        out NativeCardPreviewFailure? failure
+    )
     {
         span = 1;
-        if (!TryResolveTemplate(spec, out var template))
+        if (!TryResolveTemplate(spec, out var template, out failure))
             return false;
 
         span = CardSizeSpan.Resolve(template.Size);
         return true;
     }
 
-    public Task<NativeCardPreviewHandle?> CreateAsync(
+    public Task<NativeCardPreviewCreateOutcome> CreateAsync(
         NativeCardPreviewSpec? spec,
         Transform parent,
         int instanceIndex,
@@ -49,13 +48,21 @@ internal sealed class NativeCardPreviewFactory
         Action<Component>? prepareBeforeActivate = null
     )
     {
-        if (parent == null || !TryResolveTemplate(spec, out var template) || spec == null)
-            return Task.FromResult<NativeCardPreviewHandle?>(null);
+        if (parent == null || spec == null)
+            return Task.FromResult(NativeCardPreviewCreateOutcome.Unavailable());
+        if (!TryResolveTemplate(spec, out var template, out var failure))
+        {
+            return Task.FromResult(
+                failure == null
+                    ? NativeCardPreviewCreateOutcome.Unavailable()
+                    : NativeCardPreviewCreateOutcome.Degraded(failure)
+            );
+        }
 
         return CreateAsync(template, spec, parent, instanceIndex, token, prepareBeforeActivate);
     }
 
-    public async Task<NativeCardPreviewHandle?> CreateAsync(
+    public async Task<NativeCardPreviewCreateOutcome> CreateAsync(
         TCardBase template,
         NativeCardPreviewSpec spec,
         Transform parent,
@@ -65,27 +72,39 @@ internal sealed class NativeCardPreviewFactory
     )
     {
         if (template == null || spec == null || parent == null)
-            return null;
+            return NativeCardPreviewCreateOutcome.Unavailable();
 
         if (!TryResolveKind(template, out var kind))
         {
-            BppLog.Warn(
-                _logComponent,
-                $"Unsupported card preview type={template.Type} size={template.Size} template={template.Id}."
+            return NativeCardPreviewCreateOutcome.Degraded(
+                new NativeCardPreviewFailure(
+                    NativeCardPreviewOperation.ResolveKind,
+                    NativeCardPreviewFailureReason.UnsupportedCardType,
+                    template.Id
+                )
             );
-            return null;
         }
 
         var instance = BuildSyntheticInstance(spec, kind, instanceIndex);
+        NativeCardPreviewFailure? instantiateFailure = null;
         var lease = await _pool.TakeAsync(
             kind,
             parent,
-            () => _assetLoader.InstantiateReadyCardAsync(instance, parent, token),
+            async () =>
+            {
+                var outcome = await _assetLoader.InstantiateReadyCardAsync(instance, parent, token);
+                instantiateFailure = outcome.Failure;
+                return outcome.Card;
+            },
             token,
             prepareBeforeActivate
         );
         if (!lease.HasValue)
-            return null;
+        {
+            return instantiateFailure == null
+                ? NativeCardPreviewCreateOutcome.Unavailable()
+                : NativeCardPreviewCreateOutcome.Degraded(instantiateFailure);
+        }
 
         var leased = lease.Value;
         var card = leased.Card;
@@ -94,27 +113,42 @@ internal sealed class NativeCardPreviewFactory
         {
             if (!leased.AlreadySetUp)
             {
-                await NativeCardPreviewRuntime.InvokeSetUpSafe(
+                var setUpFailure = await NativeCardPreviewRuntime.InvokeSetUpSafe(
                     card,
                     template,
                     instance,
-                    _logComponent,
                     token
                 );
+                if (setUpFailure != null)
+                    return NativeCardPreviewCreateOutcome.Degraded(setUpFailure);
             }
 
             token.ThrowIfCancellationRequested();
 
+            var resizeFailure = NativeCardPreviewRuntime.Resize(card, template.Id);
+            if (resizeFailure != null)
+                return NativeCardPreviewCreateOutcome.Degraded(resizeFailure);
+
             var rect = card.transform as RectTransform ?? card.GetComponent<RectTransform>();
             if (rect == null)
-                return null;
+            {
+                return NativeCardPreviewCreateOutcome.Degraded(
+                    new NativeCardPreviewFailure(
+                        NativeCardPreviewOperation.ResolveRect,
+                        NativeCardPreviewFailureReason.RectUnavailable,
+                        template.Id
+                    )
+                );
+            }
 
             ownsCard = false;
-            return new NativeCardPreviewHandle(card, rect, kind, Task.CompletedTask, spec);
+            return NativeCardPreviewCreateOutcome.Ready(
+                new NativeCardPreviewHandle(card, rect, kind, Task.CompletedTask, spec)
+            );
         }
         catch (OperationCanceledException)
         {
-            return null;
+            return NativeCardPreviewCreateOutcome.Unavailable();
         }
         finally
         {
@@ -123,34 +157,47 @@ internal sealed class NativeCardPreviewFactory
         }
     }
 
-    public void Show(NativeCardPreviewHandle? handle, bool show = true)
+    public NativeCardPreviewFailure? Show(NativeCardPreviewHandle? handle, bool show = true)
     {
         if (handle == null)
-            return;
-        NativeCardPreviewRuntime.Show(handle.Card, show, _logComponent);
+            return null;
+        return NativeCardPreviewRuntime.Show(handle.Card, show, handle.Spec.TemplateId);
     }
 
     public void Return(NativeCardPreviewHandle? handle) => _pool.Return(handle);
 
     public void DestroyAll() => _pool.DestroyAll();
 
-    private bool TryResolveTemplate(NativeCardPreviewSpec? spec, out TCardBase template)
+    private bool TryResolveTemplate(
+        NativeCardPreviewSpec? spec,
+        out TCardBase template,
+        out NativeCardPreviewFailure? failure
+    )
     {
         template = null!;
+        failure = null;
         if (spec == null || spec.TemplateId == Guid.Empty)
             return false;
 
         var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
         if (staticData == null)
         {
-            BppLog.Debug(_logComponent, "Static data unavailable for native card preview.");
+            failure = new NativeCardPreviewFailure(
+                NativeCardPreviewOperation.ResolveTemplate,
+                NativeCardPreviewFailureReason.StaticDataUnavailable,
+                spec.TemplateId
+            );
             return false;
         }
 
         var resolved = BppStaticDataAccess.GetCardTemplate(staticData, spec.TemplateId);
         if (resolved == null)
         {
-            BppLog.Warn(_logComponent, $"Template lookup failed for id={spec.TemplateId}.");
+            failure = new NativeCardPreviewFailure(
+                NativeCardPreviewOperation.ResolveTemplate,
+                NativeCardPreviewFailureReason.TemplateUnavailable,
+                spec.TemplateId
+            );
             return false;
         }
 

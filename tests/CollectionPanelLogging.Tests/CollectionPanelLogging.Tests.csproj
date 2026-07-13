@@ -66,6 +66,10 @@
       Link="CollectionPanelLoadDiagnostics.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPortraitFailureGate.cs"
+      Link="CollectionPortraitFailureGate.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionCatalogLogState.cs"
       Link="CollectionCatalogLogState.cs"
     />

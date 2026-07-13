@@ -6,6 +6,7 @@ using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Logging;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
@@ -41,6 +42,10 @@ internal static class BppTooltipSectionRenderPatch
         ParagraphSpacing = 4f,
         FontScale = 1.2f,
     };
+    private static readonly OperationalHealthTracker<
+        ItemEnchantEncounterProbe,
+        EncounterProbeFailureReason
+    > EncounterHealth = new();
 
     [HarmonyPostfix]
     [HarmonyPriority(Priority.Last)]
@@ -84,12 +89,22 @@ internal static class BppTooltipSectionRenderPatch
         }
         catch (Exception ex)
         {
-            BppLog.Error("TooltipSection", "Failed to render BPP tooltip section", ex);
+            ReportSectionDegraded(TooltipSectionId.EnchantPreview, ex);
         }
     }
 
     internal static bool HasNativeContent(string passiveText, int questGroupCount) =>
         !string.IsNullOrWhiteSpace(passiveText) || questGroupCount > 0;
+
+    internal static void ResetEncounterHealth() => EncounterHealth.Reset();
+
+    private static void ReportSectionDegraded(TooltipSectionId sectionId, Exception exception) =>
+        BppLog.WarnEvent(
+            TooltipLogEvents.SectionDegraded,
+            exception,
+            TooltipLogEvents.SectionDegradedSectionId.Bind(sectionId),
+            TooltipLogEvents.SectionDegradedReasonCode.Bind(TooltipLogReasonCode.RenderException)
+        );
 
     private static string? BuildEnchantContent(CardTooltipController controller)
     {
@@ -97,10 +112,11 @@ internal static class BppTooltipSectionRenderPatch
             return null;
 
         var services = BppPatchHost.Services;
-        ChoicePedestalSnapshot? choicePedestal =
-            TooltipPreviewModePolicy.ShouldReadChoicePedestal(services.Config)
-                ? services.EncounterState?.GetChoicePedestal()
-                : null;
+        ChoicePedestalSnapshot? choicePedestal = TooltipPreviewModePolicy.ShouldReadChoicePedestal(
+            services.Config
+        )
+            ? ReadChoicePedestal(services.EncounterState)
+            : null;
         if (
             TooltipPreviewModePolicy.Resolve(services.Config, choicePedestal)
             != TooltipPreviewMode.Enchant
@@ -116,6 +132,72 @@ internal static class BppTooltipSectionRenderPatch
             restrictTo
         );
         return ItemEnchantPreviewFormatting.BuildSectionText(segments);
+    }
+
+    private static ChoicePedestalSnapshot? ReadChoicePedestal(IEncounterStateProbe? probe)
+    {
+        if (probe == null)
+            return null;
+        if (probe is not ITypedEncounterStateProbe typed)
+        {
+            ReportEncounterSuccess();
+            return probe.GetChoicePedestal();
+        }
+
+        var outcome = typed.GetChoicePedestalOutcome();
+        if (outcome.IsSuccess)
+        {
+            ReportEncounterSuccess();
+            return outcome.Snapshot;
+        }
+
+        if (
+            EncounterHealth.ObserveFailure(
+                ItemEnchantEncounterProbe.Encounter,
+                outcome.FailureReason
+            )
+        )
+        {
+            var fields = new[]
+            {
+                ItemEnchantPreviewLogEvents.EncounterProbeDegradedProbe.Bind(
+                    ItemEnchantEncounterProbe.Encounter
+                ),
+                ItemEnchantPreviewLogEvents.EncounterProbeDegradedReasonCode.Bind(
+                    outcome.FailureReason
+                ),
+            };
+            if (outcome.Exception == null)
+                BppLog.WarnEvent(ItemEnchantPreviewLogEvents.EncounterProbeDegraded, fields);
+            else
+                BppLog.WarnEvent(
+                    ItemEnchantPreviewLogEvents.EncounterProbeDegraded,
+                    outcome.Exception,
+                    fields
+                );
+        }
+        return outcome.Snapshot;
+    }
+
+    private static void ReportEncounterSuccess()
+    {
+        if (
+            !EncounterHealth.ObserveSuccess(ItemEnchantEncounterProbe.Encounter, out var reasonCode)
+        )
+            return;
+        BppLog.RecoverStorm(
+            ItemEnchantPreviewLogEvents.EncounterProbeDegraded,
+            ItemEnchantPreviewLogEvents.EncounterProbeDegradedProbe.Bind(
+                ItemEnchantEncounterProbe.Encounter
+            ),
+            ItemEnchantPreviewLogEvents.EncounterProbeDegradedReasonCode.Bind(reasonCode)
+        );
+        BppLog.InfoEvent(
+            ItemEnchantPreviewLogEvents.EncounterProbeRecovered,
+            ItemEnchantPreviewLogEvents.EncounterProbeRecoveredProbe.Bind(
+                ItemEnchantEncounterProbe.Encounter
+            )
+        );
     }
 }
 

@@ -41,6 +41,17 @@ public sealed class CollectionPanelLogEventCatalogTests
                 "phase:Public:Low:None|first_index:Public:High:None|last_index:Public:High:None|window_count:Public:High:None|visible_count:Public:High:None|shelf_count:Public:High:None|attempt_count:Public:High:None|bound_count:Public:High:None|failed_bind_count:Public:High:None|bind_duration_ms:Public:High:None|elapsed_ms:Public:High:None|faulted_count:Public:High:None|canceled_count:Public:High:None",
             ["collection_panel.card_art.degraded"] =
                 "reason_code:Public:Low:None|status:Public:Low:None|art_key:UntrustedText:High:None",
+            ["collection_panel.tier_tooltip.degraded"] =
+                "tier_field:Public:Low:None|reason_code:Public:Low:None",
+            ["collection_panel.hero_portrait.degraded"] =
+                "hero:Public:Low:None|reason_code:Public:Low:None",
+            ["collection_panel.hero_portrait.fallback_observed"] =
+                "hero:Public:Low:None|reason_code:Public:Low:None",
+            ["collection_panel.encounter_portrait.degraded"] =
+                "template_id:Public:High:None|reason_code:Public:Low:None|art_key:UntrustedText:High:None",
+            ["collection_panel.keyword_icon.degraded"] =
+                "reason_code:Public:Low:None|icon_name:UntrustedText:High:None",
+            ["collection_panel.tag_typography.degraded"] = "reason_code:Public:Low:None",
             ["collection_panel.cache.cleanup_failed"] =
                 "cache:Public:Low:None|stage:Public:Low:None|art_key:UntrustedText:High:None",
             ["collection_panel.hover.invoke_failed"] = "operation:Public:Low:None",
@@ -85,6 +96,11 @@ public sealed class CollectionPanelLogEventCatalogTests
         AssertStorm(CollectionPanelLogEvents.CardBindDegraded, "stage", "reason_code");
         AssertStorm(CollectionPanelLogEvents.DockLayoutDegraded, "reason_code");
         AssertStorm(CollectionPanelLogEvents.CardArtDegraded, "reason_code");
+        AssertStorm(CollectionPanelLogEvents.TierTooltipDegraded, "tier_field", "reason_code");
+        AssertStorm(CollectionPanelLogEvents.HeroPortraitDegraded, "reason_code");
+        AssertStorm(CollectionPanelLogEvents.EncounterPortraitDegraded, "reason_code");
+        AssertStorm(CollectionPanelLogEvents.KeywordIconDegraded, "reason_code");
+        AssertStorm(CollectionPanelLogEvents.TagTypographyDegraded, "reason_code");
         AssertStorm(CollectionPanelLogEvents.HeroPreferenceDegraded, "reason_code");
         AssertStorm(CollectionPanelLogEvents.HeroPreferenceScopeDegraded, "reason_code");
         AssertStorm(CollectionPanelLogEvents.CatalogDegraded, "reason_code");

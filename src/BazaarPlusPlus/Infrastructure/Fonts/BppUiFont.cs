@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using BepInEx;
 using UnityEngine;
@@ -11,7 +12,6 @@ namespace BazaarPlusPlus.Infrastructure.Fonts;
 
 internal static class BppUiFont
 {
-    private const string Component = "UiFont";
     private const string FontFileName = "LXGWWenKai-Regular.ttf";
     private const string ResourceName = "BazaarPlusPlus.Resources.Fonts.LXGWWenKai-Regular.ttf";
     private const string SansSerifResourceName = "LegacyRuntime.ttf";
@@ -64,7 +64,14 @@ internal static class BppUiFont
             cacheRoot
         );
         var font = new Font(fontPath);
-        BppLog.Info(Component, $"Loaded UI font '{FontFileName}' from '{fontPath}'.");
+        BppLog.DebugEvent(
+            SettingsLogEvents.UiFontLoaded,
+            () =>
+                [
+                    SettingsLogEvents.UiFontLoadedFontKind.Bind(SettingsUiFontKind.LxgwWenKai),
+                    SettingsLogEvents.UiFontLoadedPath.Bind(fontPath),
+                ]
+        );
         return font;
     }
 
@@ -73,14 +80,25 @@ internal static class BppUiFont
         var font = Resources.GetBuiltinResource<Font>(SansSerifResourceName);
         if (font == null)
         {
-            BppLog.Warn(
-                Component,
-                $"Failed to load built-in UI font '{SansSerifResourceName}'; falling back to '{FontFileName}'."
+            BppLog.WarnEvent(
+                SettingsLogEvents.UiFontDegraded,
+                SettingsLogEvents.UiFontDegradedFontKind.Bind(SettingsUiFontKind.SansSerif),
+                SettingsLogEvents.UiFontDegradedReasonCode.Bind(
+                    SettingsLogReasonCode.FontAssetUnavailable
+                ),
+                SettingsLogEvents.UiFontDegradedPath.Bind(null)
             );
             return LxgwWenKai;
         }
 
-        BppLog.Info(Component, $"Loaded built-in UI font '{SansSerifResourceName}'.");
+        BppLog.DebugEvent(
+            SettingsLogEvents.UiFontLoaded,
+            () =>
+                [
+                    SettingsLogEvents.UiFontLoadedFontKind.Bind(SettingsUiFontKind.SansSerif),
+                    SettingsLogEvents.UiFontLoadedPath.Bind(null),
+                ]
+        );
         return font;
     }
 

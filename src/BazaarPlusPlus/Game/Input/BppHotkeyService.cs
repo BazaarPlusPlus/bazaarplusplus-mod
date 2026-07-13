@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using UnityEngine.InputSystem;
@@ -29,8 +30,7 @@ internal static class BppHotkeyService
             action.Dispose();
         }
         CachedActions.Clear();
-        LoggedInvalidBindingPaths.Clear();
-        LoggedUnresolvedBindingPaths.Clear();
+        BindingFailureGate.Clear();
         LoggedModifierDisagreements.Clear();
     }
 
@@ -53,12 +53,8 @@ internal static class BppHotkeyService
     private static readonly Dictionary<string, InputAction> CachedActions = new(
         StringComparer.OrdinalIgnoreCase
     );
-    private static readonly HashSet<string> LoggedInvalidBindingPaths = new(
-        StringComparer.OrdinalIgnoreCase
-    );
-    private static readonly HashSet<string> LoggedUnresolvedBindingPaths = new(
-        StringComparer.OrdinalIgnoreCase
-    );
+    private static readonly HotkeyBindingFailureGate<SettingsLogReasonCode> BindingFailureGate =
+        new();
     private static readonly HashSet<string> LoggedModifierDisagreements = new(
         StringComparer.OrdinalIgnoreCase
     );
@@ -72,34 +68,16 @@ internal static class BppHotkeyService
         keyboard ??= Keyboard.current;
         mouse ??= Mouse.current;
 
-        return IsPressed(GetBindingPath(actionId), keyboard, mouse);
+        var path = GetBindingPath(actionId);
+        ReportUnresolvedControls(actionId, path);
+        return IsPressed(path, keyboard, mouse);
     }
 
-    internal static bool WasPressedThisFrame(string bindingPath)
+    internal static bool WasPressedThisFrame(BppHotkeyActionId actionId)
     {
-        var normalized = HotkeyBindingPathCore.Normalize(bindingPath);
-        if (string.IsNullOrWhiteSpace(normalized))
-        {
-            if (LoggedInvalidBindingPaths.Add(bindingPath ?? string.Empty))
-            {
-                BppLog.Warn(
-                    "BppHotkeyService",
-                    $"Rejected hotkey binding path '{bindingPath ?? "<null>"}' because it could not be normalized."
-                );
-            }
-
-            return false;
-        }
-
+        var normalized = GetBindingPath(actionId);
+        ReportUnresolvedControls(actionId, normalized);
         var action = GetOrCreateAction(normalized);
-        if (action.controls.Count == 0 && LoggedUnresolvedBindingPaths.Add(normalized))
-        {
-            BppLog.Warn(
-                "BppHotkeyService",
-                $"Hotkey binding '{normalized}' resolved to zero input controls after enabling its InputAction."
-            );
-        }
-
         return action.WasPressedThisFrame();
     }
 
@@ -115,7 +93,7 @@ internal static class BppHotkeyService
             return false;
 
         var path = GetBindingPath(actionId);
-        if (!WasPressedThisFrame(path))
+        if (!WasPressedThisFrame(actionId))
             return false;
 
         if (HotkeyBindingPathCore.IsModifierPath(path))
@@ -177,10 +155,13 @@ internal static class BppHotkeyService
             return cached.Resolved;
 
         var normalized = HotkeyBindingPathCore.Normalize(raw);
-        var resolved = string.IsNullOrWhiteSpace(normalized)
-            ? HotkeyBindingPathCore.GetDefault(actionId)
-            : normalized;
+        var invalid = string.IsNullOrWhiteSpace(normalized);
+        var resolved = invalid ? HotkeyBindingPathCore.GetDefault(actionId) : normalized;
         CachedBindingPaths[actionId] = (raw, resolved);
+        if (invalid)
+        {
+            ReportBindingFailure(actionId, raw, SettingsLogReasonCode.InvalidBindingPath);
+        }
         return resolved;
     }
 
@@ -301,13 +282,45 @@ internal static class BppHotkeyService
             && LoggedModifierDisagreements.Add(normalizedBindingPath)
         )
         {
-            BppLog.Info(
-                "BppHotkeyService",
-                $"Modifier disagreement binding={normalizedBindingPath} legacy={legacyPressed} action={actionPressed}"
+            BppLog.DebugEvent(
+                SettingsLogEvents.HotkeyModifierDisagreementObserved,
+                () =>
+                    [
+                        SettingsLogEvents.HotkeyModifierBindingPath.Bind(normalizedBindingPath),
+                        SettingsLogEvents.HotkeyModifierLegacyPressed.Bind(legacyPressed),
+                        SettingsLogEvents.HotkeyModifierActionPressed.Bind(actionPressed),
+                    ]
             );
         }
 
         return legacyPressed || actionPressed;
+    }
+
+    private static void ReportUnresolvedControls(BppHotkeyActionId actionId, string normalizedPath)
+    {
+        if (GetOrCreateAction(normalizedPath).controls.Count != 0)
+            return;
+
+        ReportBindingFailure(actionId, normalizedPath, SettingsLogReasonCode.NoResolvedControls);
+    }
+
+    private static void ReportBindingFailure(
+        BppHotkeyActionId actionId,
+        string? bindingPath,
+        SettingsLogReasonCode reasonCode
+    )
+    {
+        if (!BindingFailureGate.ShouldReport(actionId, bindingPath, reasonCode))
+            return;
+
+        var reasonField = SettingsLogEvents.HotkeyDegradedReasonCode.Bind(reasonCode);
+        BppLog.RecoverStorm(SettingsLogEvents.HotkeyDegraded, reasonField);
+        BppLog.WarnEvent(
+            SettingsLogEvents.HotkeyDegraded,
+            SettingsLogEvents.HotkeyDegradedActionId.Bind(actionId),
+            SettingsLogEvents.HotkeyDegradedBindingPath.Bind(bindingPath),
+            reasonField
+        );
     }
 
     private static bool TryFindSupportedMouseButton(
