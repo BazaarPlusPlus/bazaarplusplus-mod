@@ -16,17 +16,47 @@
     <NoWarn>CS0436</NoWarn>
     <BuildProductionPackage Condition="'$(BuildProductionPackage)' == ''"
       >false</BuildProductionPackage>
+    <!--
+      Voice-line data is authored and published outside this repository. Download it into
+      the per-configuration intermediate directory so every build embeds the current
+      published catalog without creating an untracked source file.
+    -->
+    <VoiceLinesRemoteUrl
+      >https://bazaarline-installer.bazaarplusplus.com/data/voice-lines.json</VoiceLinesRemoteUrl>
+    <VoiceLinesBuildDirectory
+      >$(BaseIntermediateOutputPath)$(Configuration)/$(TargetFramework)/VoiceSubtitles</VoiceLinesBuildDirectory>
+    <VoiceLinesBuildPath>$(VoiceLinesBuildDirectory)/voice-lines.json</VoiceLinesBuildPath>
   </PropertyGroup>
 
   <!-- Embedded resources -->
   <ItemGroup>
     <EmbeddedResource Include="Data\BuildRecommendations\tenwin_builds.json" />
     <EmbeddedResource Include="Data\CollectionSources\collection-sources.json" />
-    <EmbeddedResource Include="Data\VoiceSubtitles\voice-lines.json" />
+    <EmbeddedResource
+      Include="$(VoiceLinesBuildPath)"
+      LogicalName="BazaarPlusPlus.Data.VoiceSubtitles.voice-lines.json"
+    />
     <EmbeddedResource Include="Resources\DockButtons\collection-panel-icon.png" />
     <EmbeddedResource Include="Resources\Fonts\LXGWWenKai-Regular.ttf" />
     <EmbeddedResource Include="Resources\Fonts\LXGWWenKai-LICENSE.txt" />
   </ItemGroup>
+
+  <Target Name="DownloadVoiceSubtitleCatalog" BeforeTargets="AssignTargetPaths">
+    <MakeDir Directories="$(VoiceLinesBuildDirectory)" />
+    <!-- Never permit a previous build's catalog to be reused when this download fails. -->
+    <Delete Files="$(VoiceLinesBuildPath)" />
+    <Message
+      Text="[BazaarPlusPlus] Downloading the voice subtitle catalog from $(VoiceLinesRemoteUrl)"
+      Importance="high"
+    />
+    <DownloadFile SourceUrl="$(VoiceLinesRemoteUrl)" DestinationFolder="$(VoiceLinesBuildDirectory)">
+      <Output TaskParameter="DownloadedFile" ItemName="DownloadedVoiceSubtitleCatalog" />
+    </DownloadFile>
+    <Error
+      Condition="'@(DownloadedVoiceSubtitleCatalog)' == '' or !Exists('$(VoiceLinesBuildPath)')"
+      Text="[BazaarPlusPlus] Voice subtitle catalog download did not produce $(VoiceLinesBuildPath)."
+    />
+  </Target>
 
   <!-- Project paths -->
   <PropertyGroup>

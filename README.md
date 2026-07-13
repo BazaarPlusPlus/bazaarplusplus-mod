@@ -46,12 +46,13 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/Th
 
 构建行为：
 
+- 每次构建都会从 `https://bazaarline-installer.bazaarplusplus.com/data/voice-lines.json` 下载并嵌入最新的语音字幕目录；该文件不存入仓库。下载失败会让构建失败，需恢复网络后重试。
 - Debug 构建在识别到本地游戏目录时自动复制插件到 `BepInEx/plugins/`。
 - Release 构建在相邻 `../bazaarplusplus-installer` 仓库存在时，把产物复制到安装器资源目录。
 
 ## 数据与网络行为
 
-- run logging、战斗回放和终局截图在本地保存 SQLite 数据、replay payload 与截图文件；云同步本身不携带任何鉴权凭证。
+- run logging、战斗回放和终局截图在本地保存 SQLite 数据、replay payload 与截图文件；云同步本身不携带任何鉴权凭证。语音字幕目录在构建时从 BazaarLine 发布端下载并嵌入，运行时仍会在本地缓存过期后后台刷新。
 - 后台上传只在非 live run 状态下执行上传扫描。
 - 云端后端（上传、ghost battles、replay 链接、BazaarDB 快照投递）在独立仓库 `bazaarplusplus-server`，部署于 `mod-api-v4.bazaarplusplus.com`；mod 侧 HTTP 客户端在 `src/BazaarPlusPlus.ModApi/`。
 
