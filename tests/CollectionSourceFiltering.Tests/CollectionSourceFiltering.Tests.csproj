@@ -25,6 +25,22 @@
 
   <ItemGroup>
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Infrastructure\Logging\Core\BppLogSchema.cs"
+      Link="BppLogSchema.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Infrastructure\Logging\Core\BppLogSchemaRules.cs"
+      Link="BppLogSchemaRules.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Infrastructure\Logging\Core\BppLogEventCatalog.cs"
+      Link="BppLogEventCatalog.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\CollectionPanelLogEvents.cs"
+      Link="CollectionPanelLogEvents.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceCatalog.cs"
       Link="CollectionSourceCatalog.cs"
     />

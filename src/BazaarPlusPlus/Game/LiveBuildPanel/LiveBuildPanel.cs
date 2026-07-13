@@ -16,7 +16,6 @@ using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.LiveCards;
-using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -196,10 +195,16 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         _buildRefreshError = string.Empty;
         _buildRefreshSucceeded = false;
         RefreshRailView();
-        _ = RefreshFinalBuildsAsync(_buildRefreshOperationVersion);
+        _ = RefreshFinalBuildsAsync(
+            _buildRefreshOperationVersion,
+            new LiveBuildRefreshLogOperation(Guid.NewGuid())
+        );
     }
 
-    private async Task RefreshFinalBuildsAsync(int operationVersion)
+    private async Task RefreshFinalBuildsAsync(
+        int operationVersion,
+        LiveBuildRefreshLogOperation logOperation
+    )
     {
         BuildRecommendationRefreshResult result;
         try
@@ -208,7 +213,27 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         }
         catch (Exception ex)
         {
-            result = BuildRecommendationRefreshResult.Failure(ex.Message);
+            result = BuildRecommendationRefreshResult.Failure(
+                LiveBuildRefreshFailureReasonCode.RefreshException,
+                ex.Message,
+                ex
+            );
+        }
+
+        if (result.Succeeded)
+        {
+            logOperation.TrySucceed(
+                result.Outcome == BuildRecommendationRefreshOutcome.NoChange
+                    ? LiveBuildRefreshResultCode.NoChange
+                    : LiveBuildRefreshResultCode.Updated
+            );
+        }
+        else
+        {
+            logOperation.TryFail(
+                result.FailureReason ?? LiveBuildRefreshFailureReasonCode.RefreshException,
+                result.Exception
+            );
         }
 
         // Stale continuation guard: a destroyed panel bumped the version; the corpus update (if
@@ -223,7 +248,6 @@ internal sealed class LiveBuildPanel : MonoBehaviour
             // and the success severity tints it for this session.
             _buildRefreshError = string.Empty;
             _buildRefreshSucceeded = true;
-            BppLog.Info("LiveBuildPanel", "Manual ten-win builds refresh succeeded.");
         }
         else
         {
@@ -231,10 +255,6 @@ internal sealed class LiveBuildPanel : MonoBehaviour
                 ? LiveBuildPanelText.Unknown()
                 : result.Error!;
             _buildRefreshSucceeded = false;
-            BppLog.Warn(
-                "LiveBuildPanel",
-                $"Manual ten-win builds refresh failed error={_buildRefreshError}."
-            );
         }
 
         if (!_isVisible || _view == null)

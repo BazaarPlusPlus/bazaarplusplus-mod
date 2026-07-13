@@ -36,14 +36,21 @@ internal sealed class HistoryPanelMount : IBppMountable
         var combatReplayRuntime = _combatReplayRuntime();
         if (combatReplayRuntime == null)
         {
-            BppLog.Warn("HistoryPanelMount", "CombatReplayRuntime unavailable; skipping mount.");
+            LogMissingDependency(HistoryPanelMountDependency.CombatReplayRuntime);
             return;
         }
 
         var overlayHost = _overlayHost();
         if (overlayHost == null)
         {
-            BppLog.Warn("HistoryPanelMount", "Overlay panel host unavailable; skipping mount.");
+            LogMissingDependency(HistoryPanelMountDependency.OverlayPanelHost);
+            return;
+        }
+
+        var onlineClient = _onlineClient();
+        if (onlineClient == null)
+        {
+            LogMissingDependency(HistoryPanelMountDependency.OnlineClient);
             return;
         }
 
@@ -56,16 +63,6 @@ internal sealed class HistoryPanelMount : IBppMountable
             services.Paths.PluginsDirectoryPath,
             () => combatReplayRuntime
         );
-
-        var onlineClient = _onlineClient();
-        if (onlineClient == null)
-        {
-            BppLog.Warn(
-                "HistoryPanelMount",
-                "Online client unavailable; HistoryPanel left unconfigured."
-            );
-            return;
-        }
 
         panel.Configure(
             HistoryPanelFactory.Create(
@@ -85,6 +82,17 @@ internal sealed class HistoryPanelMount : IBppMountable
 
         _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(_ =>
             HistoryPanel.RefreshLocalization()
+        );
+    }
+
+    private static void LogMissingDependency(HistoryPanelMountDependency dependency)
+    {
+        BppLog.ErrorEvent(
+            HistoryPanelLogEvents.MountFailed,
+            HistoryPanelLogEvents.MountDependency.Bind(dependency),
+            HistoryPanelLogEvents.MountReasonCode.Bind(
+                HistoryPanelMountReasonCode.DependencyUnavailable
+            )
         );
     }
 

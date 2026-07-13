@@ -120,7 +120,11 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             SetStatusMessage(statusMessage);
             if (error != null)
             {
-                BppLog.Error("HistoryPanel", "Failed to load history page data", error);
+                BppLog.ErrorEvent(
+                    HistoryPanelLogEvents.DataLoadFailed,
+                    error,
+                    HistoryPanelLogEvents.DataDataset.Bind(HistoryPanelDataset.RecentRuns)
+                );
                 _requestUiRefresh();
                 _requestPreviewRefresh();
                 return;
@@ -158,7 +162,11 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             SetStatusMessage(statusMessage);
             if (error != null)
             {
-                BppLog.Error("HistoryPanel", "Failed to load ghost battle data", error);
+                BppLog.ErrorEvent(
+                    HistoryPanelLogEvents.DataLoadFailed,
+                    error,
+                    HistoryPanelLogEvents.DataDataset.Bind(HistoryPanelDataset.GhostBattles)
+                );
                 _requestUiRefresh();
                 _requestPreviewRefresh();
                 return;
@@ -342,79 +350,122 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
+        var logOperation = new HistoryPanelReplayLogOperation(
+            Guid.NewGuid().ToString("N"),
+            battle.BattleId,
+            recordVideo
+        );
+
         // Recording must be feasible before a record-and-replay request proceeds; otherwise we
         // surface the reason and refuse rather than silently starting a no-video replay.
         if (recordVideo)
         {
-            var canRecord = CanRecordSelectedBattle(battle, out var recordUnavailableReason);
-            BppLog.Info(
-                "HistoryPanel",
-                $"Record-and-replay requested battle={battle.BattleId} canRecord={canRecord}"
-                    + (canRecord ? string.Empty : $" reason={recordUnavailableReason}")
+            var canRecord = _replayService.CanRecordReplay(
+                battle,
+                out var recordUnavailableReason,
+                out var recordingReasonCode
             );
+            if (
+                logOperation.TryRecordPreflight(
+                    canRecord,
+                    recordingReasonCode,
+                    out var preflightResult
+                )
+            )
+                HistoryPanelLogWriter.EmitReplayPreflight(preflightResult);
             if (!canRecord)
             {
                 SetStatusMessage(recordUnavailableReason);
+                if (logOperation.TryFail(recordingReasonCode, exception: null, out var failure))
+                    HistoryPanelLogWriter.EmitReplayFailed(failure);
                 _requestUiRefresh();
                 return;
             }
         }
 
         _state.ReplayActionInProgress = true;
+        var sessionVersion = _session.Version;
         SetStatusMessage(
             battle.Source == HistoryBattleSource.Ghost && !battle.ReplayDownloaded
                 ? HistoryPanelText.DownloadingGhostReplay()
                 : HistoryPanelText.StartingReplay(),
             StatusSeverity.Pending
         );
-        _requestUiRefresh();
-
-        var sessionVersion = _session.Version;
         HistoryPanelReplayAttemptResult replayResult;
         try
         {
+            _requestUiRefresh();
             replayResult = await _replayService.ReplayBattleAsync(
                 battle,
                 recordVideo,
                 _session.Token
             );
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
-            if (!_session.IsCurrent(sessionVersion))
+            var cancellation = HistoryPanelCancellationRouter.Resolve(
+                _session.IsCurrent(sessionVersion)
+            );
+            if (cancellation == HistoryPanelCancellationDisposition.AbandonStaleRequest)
+            {
+                logOperation.Abandon();
                 return;
+            }
 
             _state.ReplayActionInProgress = false;
-            SetStatusMessage(null);
+            if (logOperation.TryFail(HistoryPanelReplayReasonCode.Canceled, ex, out var failure))
+                HistoryPanelLogWriter.EmitReplayFailed(failure);
+            SetStatusMessage(HistoryPanelText.ReplayFailed(ex.Message), StatusSeverity.Failure);
             _requestUiRefresh();
             return;
         }
         catch (Exception ex)
         {
             if (!_session.IsCurrent(sessionVersion))
+            {
+                logOperation.Abandon();
                 return;
+            }
 
             _state.ReplayActionInProgress = false;
             SetStatusMessage(HistoryPanelText.ReplayFailed(ex.Message), StatusSeverity.Failure);
-            BppLog.Error("HistoryPanel", "Failed to replay selected battle", ex);
+            if (
+                logOperation.TryFail(
+                    HistoryPanelReplayReasonCode.UnexpectedException,
+                    ex,
+                    out var failure
+                )
+            )
+                HistoryPanelLogWriter.EmitReplayFailed(failure);
             _requestUiRefresh();
             return;
         }
 
         if (!_session.IsCurrent(sessionVersion))
+        {
+            logOperation.Abandon();
             return;
+        }
 
         _state.ReplayActionInProgress = false;
-        SetStatusMessage(
-            replayResult.StatusMessage,
-            replayResult.Succeeded ? StatusSeverity.Success : StatusSeverity.Failure
-        );
         if (!replayResult.Succeeded)
         {
+            if (
+                logOperation.TryFail(
+                    replayResult.ReasonCode,
+                    replayResult.Exception,
+                    out var failure
+                )
+            )
+                HistoryPanelLogWriter.EmitReplayFailed(failure);
+            SetStatusMessage(replayResult.StatusMessage, StatusSeverity.Failure);
             _requestUiRefresh();
             return;
         }
 
+        if (logOperation.TryAccept(out var accepted))
+            HistoryPanelLogWriter.EmitReplayAccepted(accepted);
+        SetStatusMessage(replayResult.StatusMessage, StatusSeverity.Success);
         _requestVisibilityChange(false);
     }
 
@@ -446,22 +497,58 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
         ClearDeleteRunConfirmation();
 
+        var logOperation = new HistoryPanelRunDeleteLogOperation(
+            Guid.NewGuid().ToString("N"),
+            run.RunId
+        );
+
         if (!_dataService.TryDeleteRun(run.RunId, out var battleIds, out var error))
         {
             SetStatusMessage(
                 HistoryPanelText.RunDeleteFailed(error?.Message ?? HistoryPanelText.Unknown()),
                 StatusSeverity.Failure
             );
-            BppLog.Error(
-                "HistoryPanel",
-                $"Failed to delete run {run.RunId}",
-                error ?? new InvalidOperationException("Unknown run delete failure.")
-            );
+            if (
+                logOperation.TryComplete(
+                    HistoryPanelRunDeleteTerminalStatus.Failed,
+                    battleIds.Count,
+                    cleanupFailedCount: 0,
+                    HistoryPanelRunDeleteReasonCode.PrimaryDeleteFailed,
+                    error ?? new InvalidOperationException("Unknown run delete failure."),
+                    out var failed
+                )
+            )
+                HistoryPanelLogWriter.EmitRunDeleteTerminal(failed);
             _requestUiRefresh();
             return;
         }
 
-        _replayService.CleanupReplayPayloads(battleIds);
+        var cleanupResult = _replayService.CleanupReplayPayloads(battleIds);
+        if (cleanupResult.FailedBattleCount > 0)
+        {
+            if (
+                logOperation.TryComplete(
+                    HistoryPanelRunDeleteTerminalStatus.Degraded,
+                    battleIds.Count,
+                    cleanupResult.FailedBattleCount,
+                    HistoryPanelRunDeleteReasonCode.ReplayPayloadCleanupFailed,
+                    cleanupResult.Exception,
+                    out var degraded
+                )
+            )
+                HistoryPanelLogWriter.EmitRunDeleteTerminal(degraded);
+        }
+        else if (
+            logOperation.TryComplete(
+                HistoryPanelRunDeleteTerminalStatus.Succeeded,
+                battleIds.Count,
+                cleanupFailedCount: 0,
+                HistoryPanelRunDeleteReasonCode.Completed,
+                exception: null,
+                out var succeeded
+            )
+        )
+            HistoryPanelLogWriter.EmitRunDeleteTerminal(succeeded);
         var deletedMessage = HistoryPanelText.DeletedRun(
             HistoryPanelFormatter.ShortenRunId(run.RunId),
             battleIds.Count
@@ -501,65 +588,109 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
+        var logOperation = new HistoryPanelServerHealthLogOperation(Guid.NewGuid().ToString("N"));
+
         _state.ServerHealthProbeInProgress = true;
+        var sessionVersion = _session.Version;
         var checking = HistoryPanelServerHealthFormatter.Checking();
         SetStatusMessage(checking.StatusMessage, StatusSeverity.Pending);
-        _requestUiRefresh();
 
-        var sessionVersion = _session.Version;
         ModApiHealthProbeResult result;
         try
         {
+            _requestUiRefresh();
             result = await _serverHealthProbe.ProbeAsync(_session.Token);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
-            if (!_session.IsCurrent(sessionVersion))
+            var cancellation = HistoryPanelCancellationRouter.Resolve(
+                _session.IsCurrent(sessionVersion)
+            );
+            if (cancellation == HistoryPanelCancellationDisposition.AbandonStaleRequest)
+            {
+                logOperation.Abandon();
                 return;
+            }
 
             _state.ServerHealthProbeInProgress = false;
-            SetStatusMessage(null);
+            if (
+                logOperation.TryComplete(
+                    HistoryPanelServerHealthTerminalStatus.Failed,
+                    HistoryPanelServerHealthReasonCode.Canceled,
+                    ex,
+                    out var terminal
+                )
+            )
+                HistoryPanelLogWriter.EmitServerHealthTerminal(terminal);
+            SetStatusMessage(
+                HistoryPanelText.ServerHealthFailed(0, ex.Message),
+                StatusSeverity.Failure
+            );
             _requestUiRefresh();
             return;
         }
         catch (Exception ex)
         {
             if (!_session.IsCurrent(sessionVersion))
+            {
+                logOperation.Abandon();
                 return;
+            }
 
             _state.ServerHealthProbeInProgress = false;
             SetStatusMessage(
                 HistoryPanelText.ServerHealthFailed(0, ex.Message),
                 StatusSeverity.Failure
             );
-            BppLog.Error("HistoryPanel", "Failed to check server health", ex);
+            if (
+                logOperation.TryComplete(
+                    HistoryPanelServerHealthTerminalStatus.Failed,
+                    HistoryPanelServerHealthReasonCode.UnexpectedException,
+                    ex,
+                    out var terminal
+                )
+            )
+                HistoryPanelLogWriter.EmitServerHealthTerminal(terminal);
             _requestUiRefresh();
             return;
         }
 
         if (!_session.IsCurrent(sessionVersion))
+        {
+            logOperation.Abandon();
             return;
+        }
 
         _state.ServerHealthProbeInProgress = false;
+        if (result.Succeeded)
+        {
+            if (
+                logOperation.TryComplete(
+                    HistoryPanelServerHealthTerminalStatus.Succeeded,
+                    HistoryPanelServerHealthReasonCode.Completed,
+                    exception: null,
+                    out var terminal
+                )
+            )
+                HistoryPanelLogWriter.EmitServerHealthTerminal(terminal);
+        }
+        else
+        {
+            if (
+                logOperation.TryComplete(
+                    HistoryPanelServerHealthTerminalStatus.Failed,
+                    HistoryPanelServerHealthReasonClassifier.Classify(result.Error),
+                    exception: null,
+                    out var terminal
+                )
+            )
+                HistoryPanelLogWriter.EmitServerHealthTerminal(terminal);
+        }
         var display = HistoryPanelServerHealthFormatter.FromProbeResult(result);
         SetStatusMessage(
             display.StatusMessage,
             result.Succeeded ? StatusSeverity.Success : StatusSeverity.Failure
         );
-        if (result.Succeeded)
-        {
-            BppLog.Info(
-                "HistoryPanel",
-                $"Server health check succeeded rttMs={result.RoundTripMilliseconds}"
-            );
-        }
-        else
-        {
-            BppLog.Warn(
-                "HistoryPanel",
-                $"Server health check failed rttMs={result.RoundTripMilliseconds} error={result.Error}"
-            );
-        }
         _requestUiRefresh();
     }
 
@@ -814,53 +945,79 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
-        _state.GhostSyncInProgress = true;
-        SetStatusMessage(HistoryPanelText.SyncingGhostBattles(), StatusSeverity.Pending);
-        _requestUiRefresh();
+        var logOperation = new HistoryPanelGhostSyncLogOperation(Guid.NewGuid().ToString("N"));
 
+        _state.GhostSyncInProgress = true;
         var sessionVersion = _session.Version;
+        SetStatusMessage(HistoryPanelText.SyncingGhostBattles(), StatusSeverity.Pending);
+
         HistoryPanelAttemptResult syncResult;
         try
         {
+            _requestUiRefresh();
             syncResult = await _dataService.SyncGhostBattlesAsync(_session.Token);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException ex)
         {
-            if (!_session.IsCurrent(sessionVersion))
+            var cancellation = HistoryPanelCancellationRouter.Resolve(
+                _session.IsCurrent(sessionVersion)
+            );
+            if (cancellation == HistoryPanelCancellationDisposition.AbandonStaleRequest)
+            {
+                logOperation.Abandon();
                 return;
+            }
 
             _state.GhostSyncInProgress = false;
-            SetStatusMessage(null);
+            if (
+                logOperation.TryFail(HistoryPanelGhostSyncReasonCode.Canceled, ex, out var terminal)
+            )
+                HistoryPanelLogWriter.EmitGhostSyncTerminal(terminal);
+            SetStatusMessage(HistoryPanelText.GhostSyncFailed(ex.Message), StatusSeverity.Failure);
             _requestUiRefresh();
             return;
         }
         catch (Exception ex)
         {
             if (!_session.IsCurrent(sessionVersion))
+            {
+                logOperation.Abandon();
                 return;
+            }
 
             _state.GhostSyncInProgress = false;
             SetStatusMessage(HistoryPanelText.GhostSyncFailed(ex.Message), StatusSeverity.Failure);
-            BppLog.Error("HistoryPanel", "Failed to sync ghost battles", ex);
+            if (
+                logOperation.TryFail(
+                    HistoryPanelGhostSyncReasonCode.UnexpectedException,
+                    ex,
+                    out var terminal
+                )
+            )
+                HistoryPanelLogWriter.EmitGhostSyncTerminal(terminal);
             _requestUiRefresh();
             return;
         }
 
         if (!_session.IsCurrent(sessionVersion))
+        {
+            logOperation.Abandon();
             return;
+        }
 
         _state.GhostSyncInProgress = false;
-        SetStatusMessage(
-            syncResult.StatusMessage,
-            syncResult.Succeeded ? StatusSeverity.Success : StatusSeverity.Failure
-        );
         if (!syncResult.Succeeded)
         {
-            if (syncResult.Error != null)
-                BppLog.Error("HistoryPanel", "Failed to sync ghost battles", syncResult.Error);
+            if (logOperation.TryFail(syncResult.ReasonCode, syncResult.Error, out var terminal))
+                HistoryPanelLogWriter.EmitGhostSyncTerminal(terminal);
+            SetStatusMessage(syncResult.StatusMessage, StatusSeverity.Failure);
             _requestUiRefresh();
             return;
         }
+
+        if (logOperation.TrySucceed(syncResult.ImportedCount, out var succeeded))
+            HistoryPanelLogWriter.EmitGhostSyncTerminal(succeeded);
+        SetStatusMessage(syncResult.StatusMessage, StatusSeverity.Success);
 
         if (_state.SectionMode == HistorySectionMode.Ghost)
         {
@@ -930,7 +1087,12 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (error != null && run != null)
         {
             SetStatusMessage(HistoryPanelText.BattleLoadFailed(error.Message));
-            BppLog.Error("HistoryPanel", $"Failed to load battles for run {run.RunId}", error);
+            BppLog.ErrorEvent(
+                HistoryPanelLogEvents.DataLoadFailed,
+                error,
+                HistoryPanelLogEvents.DataDataset.Bind(HistoryPanelDataset.SelectedRunBattles),
+                HistoryPanelLogEvents.DataRunId.Bind(run.RunId)
+            );
         }
     }
 

@@ -35,7 +35,7 @@ internal sealed class CollectionCardHoverRelay
     {
         if (_card == null)
             return;
-        if (InvokeSafe(_card, OnHoverMethod, "OnHover"))
+        if (InvokeSafe(_card, OnHoverMethod, CollectionHoverOperation.OnHover))
             NativeCardPreviewHoverTracker.NotifyHover(_card);
     }
 
@@ -43,7 +43,7 @@ internal sealed class CollectionCardHoverRelay
     {
         if (_card == null)
             return;
-        if (InvokeSafe(_card, OnHoverOutMethod, "OnHoverOut"))
+        if (InvokeSafe(_card, OnHoverOutMethod, CollectionHoverOperation.OnHoverOut))
             NativeCardPreviewHoverTracker.NotifyHoverOut(_card);
     }
 
@@ -51,7 +51,7 @@ internal sealed class CollectionCardHoverRelay
     {
         if (_card == null)
             return;
-        if (InvokeSafe(_card, OnHoverOutMethod, "OnHoverOut"))
+        if (InvokeSafe(_card, OnHoverOutMethod, CollectionHoverOperation.OnHoverOut))
             NativeCardPreviewHoverTracker.NotifyHoverOut(_card);
     }
 
@@ -60,7 +60,11 @@ internal sealed class CollectionCardHoverRelay
         return NativeCardPreviewReflection.ResolvePublicInstanceMethod(name);
     }
 
-    private static bool InvokeSafe(Component target, MethodInfo? method, string label)
+    private static bool InvokeSafe(
+        Component target,
+        MethodInfo? method,
+        CollectionHoverOperation operation
+    )
     {
         if (target == null || method == null)
             return false;
@@ -71,15 +75,21 @@ internal sealed class CollectionCardHoverRelay
         }
         catch (TargetInvocationException ex)
         {
-            BppLog.Debug(
-                "CollectionCardHoverRelay",
-                $"{label} threw: {ex.InnerException?.Message ?? ex.Message}"
+            var projected = ex.InnerException ?? ex;
+            BppLog.DebugEvent(
+                CollectionPanelLogEvents.HoverInvokeFailed,
+                projected,
+                () => [CollectionPanelLogEvents.HoverInvokeFailedOperation.Bind(operation)]
             );
             return false;
         }
         catch (Exception ex)
         {
-            BppLog.Debug("CollectionCardHoverRelay", $"{label} invocation failed: {ex.Message}");
+            BppLog.DebugEvent(
+                CollectionPanelLogEvents.HoverInvokeFailed,
+                ex,
+                () => [CollectionPanelLogEvents.HoverInvokeFailedOperation.Bind(operation)]
+            );
             return false;
         }
     }

@@ -78,11 +78,13 @@ internal sealed class CollectionCardFactory
         var template = _templateResolver(nativeStaticData, vm.Id);
         if (template == null)
         {
-            BppLog.Warn(
-                "CollectionCardFactory",
-                $"Template lookup failed for id={vm.Id} ({vm.InternalName})."
+            return CollectionCardBindResult.HardMiss(
+                new CollectionCardBindDegradation(
+                    CollectionCardBindStage.TemplateLookup,
+                    CollectionPanelLogReasonCode.TemplateLookupFailed,
+                    null
+                )
             );
-            return CollectionCardBindResult.HardMiss();
         }
 
         return await BindAsync(vm, template, token);
@@ -127,9 +129,15 @@ internal sealed class CollectionCardFactory
             return;
         }
 
-        BppLog.Debug(
-            "CollectionCardFactory",
-            $"Return skipped for untracked collection card kind={kind}."
+        BppLog.DebugEvent(
+            CollectionPanelLogEvents.CardReturnSkipped,
+            () =>
+                [
+                    CollectionPanelLogEvents.CardReturnSkippedKind.Bind(kind),
+                    CollectionPanelLogEvents.CardReturnSkippedReasonCode.Bind(
+                        CollectionPanelLogReasonCode.Untracked
+                    ),
+                ]
         );
     }
 
@@ -195,22 +203,37 @@ internal readonly struct CollectionCardBindResult
 {
     private CollectionCardBindResult(
         CollectionCardBindStatus status,
-        CollectionCardBinding? binding
+        CollectionCardBinding? binding,
+        CollectionCardBindDegradation? degradation
     )
     {
         Status = status;
         Binding = binding;
+        Degradation = degradation;
     }
 
     public CollectionCardBindStatus Status { get; }
     public CollectionCardBinding? Binding { get; }
+    public CollectionCardBindDegradation? Degradation { get; }
 
     public static CollectionCardBindResult Bound(CollectionCardBinding binding) =>
-        new(CollectionCardBindStatus.Bound, binding);
+        new(CollectionCardBindStatus.Bound, binding, null);
 
-    public static CollectionCardBindResult HardMiss() =>
-        new(CollectionCardBindStatus.HardMiss, null);
+    public static CollectionCardBindResult HardMiss(
+        CollectionCardBindDegradation? degradation = null
+    ) => new(CollectionCardBindStatus.HardMiss, null, degradation);
 
     public static CollectionCardBindResult NotReady() =>
-        new(CollectionCardBindStatus.NotReady, null);
+        new(CollectionCardBindStatus.NotReady, null, null);
+
+    public static CollectionCardBindResult Degraded(
+        CollectionCardBindStatus status,
+        CollectionCardBindDegradation degradation
+    ) => new(status, null, degradation);
 }
+
+internal readonly record struct CollectionCardBindDegradation(
+    CollectionCardBindStage Stage,
+    CollectionPanelLogReasonCode ReasonCode,
+    Exception? Exception
+);

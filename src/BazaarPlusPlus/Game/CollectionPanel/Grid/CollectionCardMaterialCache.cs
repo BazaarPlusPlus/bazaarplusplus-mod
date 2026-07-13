@@ -79,9 +79,19 @@ internal sealed class CollectionCardMaterialCache
             }
             catch (System.Exception ex)
             {
-                BppLog.Debug(
-                    "CollectionCardMaterialCache",
-                    $"Destroy failed for artKey='{pair.Key}': {ex.Message}"
+                BppLog.DebugEvent(
+                    CollectionPanelLogEvents.CacheCleanupFailed,
+                    ex,
+                    () =>
+                        [
+                            CollectionPanelLogEvents.CacheCleanupFailedCache.Bind(
+                                CollectionCacheKind.Material
+                            ),
+                            CollectionPanelLogEvents.CacheCleanupFailedStage.Bind(
+                                CollectionCacheCleanupStage.Destroy
+                            ),
+                            CollectionPanelLogEvents.CacheCleanupFailedArtKey.Bind(pair.Key),
+                        ]
                 );
             }
         }
@@ -103,9 +113,19 @@ internal sealed class CollectionCardMaterialCache
             }
             catch (System.Exception ex)
             {
-                BppLog.Debug(
-                    "CollectionCardMaterialCache",
-                    $"Evict Destroy failed for artKey='{artKey}': {ex.Message}"
+                BppLog.DebugEvent(
+                    CollectionPanelLogEvents.CacheCleanupFailed,
+                    ex,
+                    () =>
+                        [
+                            CollectionPanelLogEvents.CacheCleanupFailedCache.Bind(
+                                CollectionCacheKind.Material
+                            ),
+                            CollectionPanelLogEvents.CacheCleanupFailedStage.Bind(
+                                CollectionCacheCleanupStage.EvictDestroy
+                            ),
+                            CollectionPanelLogEvents.CacheCleanupFailedArtKey.Bind(artKey),
+                        ]
                 );
             }
         }

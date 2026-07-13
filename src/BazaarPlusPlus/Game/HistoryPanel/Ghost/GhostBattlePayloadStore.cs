@@ -51,6 +51,11 @@ internal sealed class GhostBattlePayloadStore
         return _store.Load(battleId);
     }
 
+    internal FileBackedPayloadLoadResult<GhostBattlePayload> LoadDetailed(string battleId)
+    {
+        return _store.LoadDetailed(battleId);
+    }
+
     public void Delete(string battleId)
     {
         _store.Delete(battleId);

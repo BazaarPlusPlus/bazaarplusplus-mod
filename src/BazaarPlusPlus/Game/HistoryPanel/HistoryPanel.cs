@@ -12,9 +12,7 @@ using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
 using Coroutine = UnityEngine.Coroutine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -22,12 +20,6 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed partial class HistoryPanel : MonoBehaviour
 {
     private const string OverlayPanelId = "HistoryPanel";
-    private static readonly HashSet<string> UiDiagnosticScenes = new(StringComparer.Ordinal)
-    {
-        "CollectionUIScene",
-        "CollectionWheelScene",
-        "ChestSelectScene",
-    };
 
     internal static HistoryPanel? Instance { get; private set; }
 
@@ -41,9 +33,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private Coroutine? _previewCoroutine;
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
     private IOverlayPanelHandle? _overlayHandle;
-    private string _lastSceneToken = string.Empty;
     private bool _initialized;
-    private bool _uiFontPrewarmedForScene;
 
     public static bool IsVisible { get; private set; }
 
@@ -63,12 +53,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void Awake()
     {
-        EnsureInitialized("Awake");
+        EnsureInitialized();
     }
 
     internal void Configure(HistoryPanelDependencies dependencies)
     {
-        EnsureInitialized("Configure");
+        EnsureInitialized();
         _dependencies = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
         _runtime = dependencies.Runtime;
         _dataService = dependencies.DataService;
@@ -148,7 +138,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         if (Instance == null)
         {
-            BppLog.Warn("HistoryPanel", "Dock entry requested while HistoryPanel is unavailable.");
+            BppLog.ErrorEvent(
+                HistoryPanelLogEvents.OpenFailed,
+                HistoryPanelLogEvents.OpenReasonCode.Bind(
+                    HistoryPanelOpenReasonCode.InstanceUnavailable
+                )
+            );
             return;
         }
 
@@ -170,20 +165,53 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void OpenFromDockEntryInternal()
     {
-        EnsureInitialized("OpenFromDockEntry");
+        EnsureInitialized();
 
         try
         {
-            var outcome = _overlayHandle?.RequestOpen();
-            if (outcome == OverlayRequestOutcome.SuppressedByCombat)
-                BppLog.Warn(
-                    "HistoryPanel",
-                    "Ignored History Review open request because combat is active."
+            if (_overlayHandle == null)
+            {
+                BppLog.ErrorEvent(
+                    HistoryPanelLogEvents.OpenFailed,
+                    HistoryPanelLogEvents.OpenReasonCode.Bind(
+                        HistoryPanelOpenReasonCode.OverlayHandleUnavailable
+                    )
                 );
+                return;
+            }
+
+            var outcome = _overlayHandle.RequestOpen();
+            if (outcome == OverlayRequestOutcome.SuppressedByCombat)
+            {
+                BppLog.DebugEvent(
+                    HistoryPanelLogEvents.OpenSkipped,
+                    () =>
+                        [
+                            HistoryPanelLogEvents.OpenReasonCode.Bind(
+                                HistoryPanelOpenReasonCode.CombatActive
+                            ),
+                        ]
+                );
+            }
+            else if (outcome == OverlayRequestOutcome.UnknownPanel)
+            {
+                BppLog.ErrorEvent(
+                    HistoryPanelLogEvents.OpenFailed,
+                    HistoryPanelLogEvents.OpenReasonCode.Bind(
+                        HistoryPanelOpenReasonCode.UnknownPanel
+                    )
+                );
+            }
         }
         catch (Exception ex)
         {
-            BppLog.Error("HistoryPanel", "OpenFromDockEntry failed", ex);
+            BppLog.ErrorEvent(
+                HistoryPanelLogEvents.OpenFailed,
+                ex,
+                HistoryPanelLogEvents.OpenReasonCode.Bind(
+                    HistoryPanelOpenReasonCode.RequestException
+                )
+            );
         }
     }
 
@@ -370,15 +398,13 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         _battleBoardPreview?.PollHover(mouse.position.ReadValue());
     }
 
-    private void EnsureInitialized(string source)
+    private void EnsureInitialized()
     {
         if (_initialized)
             return;
 
         _initialized = true;
         Instance = this;
-        _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
-        PrewarmUiFontState($"init:{source}");
     }
 
     internal void AttachToOverlayHost(OverlayPanelHost overlayHost)
@@ -406,10 +432,6 @@ internal sealed partial class HistoryPanel : MonoBehaviour
 
     private void OnOverlaySceneChanged()
     {
-        _lastSceneToken = GetSceneToken(SceneManager.GetActiveScene());
-        _uiFontPrewarmedForScene = false;
-        PrewarmUiFontState("scene-change");
-        LogEventSystemDiagnostics(SceneManager.GetActiveScene());
         // The preview renderer is scene-bound; it is lazily recreated by the next
         // RefreshSelectedBattlePreview when the panel stays open (non-combat scene change).
         DisposePreviewRenderer();
@@ -423,69 +445,5 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private IReadOnlyList<HistoryRunRecord> GetFilteredRuns()
     {
         return _coordinator?.GetFilteredRuns() ?? Array.Empty<HistoryRunRecord>();
-    }
-
-    private static string GetSceneToken(Scene scene)
-    {
-        return $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
-    }
-
-    private void PrewarmUiFontState(string reason)
-    {
-        if (_uiFontPrewarmedForScene)
-            return;
-
-        BppLog.Info(
-            "HistoryPanel",
-            $"[UiToolkit] PrewarmUiFontState noop reason={reason} scene='{_lastSceneToken}'."
-        );
-        _uiFontPrewarmedForScene = true;
-    }
-
-    private static void LogEventSystemDiagnostics(Scene scene)
-    {
-        if (!UiDiagnosticScenes.Contains(scene.name))
-            return;
-
-        try
-        {
-            var eventSystems = Resources.FindObjectsOfTypeAll<EventSystem>();
-            if (eventSystems == null || eventSystems.Length == 0)
-            {
-                BppLog.Warn(
-                    "HistoryPanel",
-                    $"[Diag][EventSystem] scene='{GetSceneToken(scene)}' found no EventSystem instances."
-                );
-                return;
-            }
-
-            var summaries = eventSystems.Select(
-                (eventSystem, index) => DescribeEventSystem(eventSystem, index)
-            );
-            var currentSummary = DescribeEventSystem(EventSystem.current, null);
-            BppLog.Info(
-                "HistoryPanel",
-                $"[Diag][EventSystem] scene='{GetSceneToken(scene)}' count={eventSystems.Length} current={currentSummary} entries={string.Join(" || ", summaries)}"
-            );
-        }
-        catch (Exception ex)
-        {
-            BppLog.Error("HistoryPanel", "[Diag][EventSystem] Enumeration failed", ex);
-        }
-    }
-
-    private static string DescribeEventSystem(EventSystem? eventSystem, int? index)
-    {
-        var prefix = index.HasValue ? $"#{index.Value}:" : string.Empty;
-        if (eventSystem == null)
-            return $"{prefix}<null>";
-
-        var modules = eventSystem
-            .GetComponents<BaseInputModule>()
-            .Select(module =>
-                $"{module.GetType().Name}(enabled={module.enabled},active={module.isActiveAndEnabled})"
-            );
-
-        return $"{prefix}{eventSystem.GetType().Name}(name='{eventSystem.name}',activeSelf={eventSystem.gameObject.activeSelf},activeInHierarchy={eventSystem.gameObject.activeInHierarchy},enabled={eventSystem.enabled},isCurrent={ReferenceEquals(EventSystem.current, eventSystem)},scene='{eventSystem.gameObject.scene.name}',modules=[{string.Join(", ", modules)}])";
     }
 }

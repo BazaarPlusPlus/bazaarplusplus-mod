@@ -40,12 +40,14 @@ internal sealed class BuildRecommendationRepository
         timeout: TimeSpan.FromSeconds(10)
     );
     private readonly object _syncRoot = new();
+    private BuildRecommendationCorpusLogState _corpusLogState = new();
     private TenWinBuildCorpus? _corpus;
+    private LiveBuildCorpusSource _corpusSource = LiveBuildCorpusSource.Unavailable;
     private bool _attemptedLoad;
     private string? _cacheFilePath;
     private Func<DateTime> _utcNow = () => DateTime.UtcNow;
     private Func<string, Task<string>> _downloadJsonAsync = DownloadJsonAsync;
-    private Func<string?> _loadEmbeddedJson = LoadEmbeddedTenWinJson;
+    private Func<CorpusTextLoadResult> _loadEmbeddedJson = LoadEmbeddedTenWinJson;
     private Action<Func<Task>> _queueBackgroundRefresh = QueueBackgroundRefresh;
     private bool _backgroundRefreshInProgress;
     private Task? _warmUpTask;
@@ -229,16 +231,15 @@ internal sealed class BuildRecommendationRepository
 
             _warmUpTask = Task.Run(LoadCorpusInBackground);
         }
-        BppLog.Debug("BuildRecommendationRepository", "Corpus warm-up task started.");
+        _corpusLogState.ReportWarmupStarted();
     }
 
     private void LoadCorpusInBackground()
     {
-        TenWinBuildCorpus? corpus;
-        bool shouldRefreshInBackground;
+        CorpusLoadResult result;
         try
         {
-            corpus = LoadCorpus(out shouldRefreshInBackground);
+            result = LoadCorpus();
         }
         catch (Exception ex)
         {
@@ -250,26 +251,37 @@ internal sealed class BuildRecommendationRepository
             {
                 _warmUpTask = null;
             }
-            BppLog.Warn("BuildRecommendationRepository", $"Corpus warm-up failed: {ex.Message}");
+            _corpusLogState.ReportDegraded(
+                new CorpusDegradation(
+                    LiveBuildCorpusReasonCode.WarmupFailed,
+                    LiveBuildCorpusSource.Unavailable,
+                    0,
+                    Expired: false,
+                    CachePath: null,
+                    ex
+                )
+            );
             return;
         }
 
+        var installed = false;
         lock (_syncRoot)
         {
             if (!_attemptedLoad)
             {
-                _corpus = corpus;
+                _corpus = result.Corpus;
+                _corpusSource = result.Source;
                 _attemptedLoad = true;
+                installed = true;
             }
         }
 
-        BppLog.Info(
-            "BuildRecommendationRepository",
-            $"Corpus warm-up complete: {(corpus != null ? $"{corpus.BuildCount} builds" : "no corpus")}."
-        );
+        if (!installed)
+            return;
 
-        if (shouldRefreshInBackground)
-            TryQueueRefreshFromRemote("cache_stale_or_missing");
+        ReportInitialLoad(result, synchronousFallback: false);
+        if (result.ShouldRefreshInBackground)
+            TryQueueRefreshFromRemote(result.ReasonCode!.Value);
     }
 
     private void EnsureLoaded()
@@ -282,53 +294,64 @@ internal sealed class BuildRecommendationRepository
         }
 
         // BeginCorpusLoad() was never called (unexpected path). Load synchronously as a
-        // last-resort fallback — log a warning so it shows up during testing.
-        BppLog.Warn(
-            "BuildRecommendationRepository",
-            "EnsureLoaded reached synchronous fallback; BeginCorpusLoad was not called."
-        );
-
-        var corpus = LoadCorpus(out var shouldRefreshInBackground);
+        // last-resort fallback.
+        var result = LoadCorpus();
+        var installed = false;
         lock (_syncRoot)
         {
             if (!_attemptedLoad)
             {
-                _corpus = corpus;
+                _corpus = result.Corpus;
+                _corpusSource = result.Source;
                 _attemptedLoad = true;
+                installed = true;
             }
         }
 
-        if (shouldRefreshInBackground)
-            TryQueueRefreshFromRemote("cache_stale_or_missing");
+        if (!installed)
+            return;
+
+        ReportInitialLoad(result, synchronousFallback: true);
+        if (result.ShouldRefreshInBackground)
+            TryQueueRefreshFromRemote(result.ReasonCode!.Value);
     }
 
-    private TenWinBuildCorpus? LoadCorpus(out bool shouldRefreshInBackground)
+    private CorpusLoadResult LoadCorpus()
     {
-        shouldRefreshInBackground = false;
-
-        if (TryLoadCache(allowExpired: false, out var freshCorpus))
-            return freshCorpus;
-
-        if (TryLoadCache(allowExpired: true, out var staleCorpus))
+        var cache = TryLoadCache();
+        if (cache.Status == CorpusCacheLoadStatus.Loaded && cache.Corpus != null)
         {
-            shouldRefreshInBackground = true;
-            BppLog.Info(
-                "BuildRecommendationRepository",
-                "Using expired ten-win builds cache; remote refresh was queued in the background."
+            _corpusLogState.ReportCacheLoaded(cache.Corpus.BuildCount, cache.Expired, cache.Path!);
+            return BuildRecommendationCorpusLoadSelector.Select(
+                cache,
+                CorpusTextLoadResult.Missing(),
+                embeddedCorpus: null
             );
-            return staleCorpus;
         }
 
         // Cold start with no cache: seed from the bundled corpus (same compact format, same parser)
         // so the panel is never empty offline, and still queue a remote refresh.
-        shouldRefreshInBackground = true;
-        var embeddedJson = _loadEmbeddedJson();
-        return string.IsNullOrWhiteSpace(embeddedJson)
-            ? null
-            : DeserializeCorpus(embeddedJson!, "embedded");
+        var embedded = _loadEmbeddedJson();
+        TenWinBuildCorpus? embeddedCorpus = null;
+        if (
+            embedded.Status == CorpusTextLoadStatus.Loaded
+            && !string.IsNullOrWhiteSpace(embedded.Text)
+        )
+        {
+            try
+            {
+                embeddedCorpus = TenWinBuildCorpus.Parse(embedded.Text!);
+            }
+            catch (Exception ex)
+            {
+                embedded = CorpusTextLoadResult.Failed(ex);
+            }
+        }
+
+        return BuildRecommendationCorpusLoadSelector.Select(cache, embedded, embeddedCorpus);
     }
 
-    private static string? LoadEmbeddedTenWinJson()
+    private static CorpusTextLoadResult LoadEmbeddedTenWinJson()
     {
         try
         {
@@ -339,65 +362,101 @@ internal sealed class BuildRecommendationRepository
                     name.EndsWith(TenWinBuildsCacheFileName, StringComparison.OrdinalIgnoreCase)
                 );
             if (resourceName == null)
-            {
-                BppLog.Warn(
-                    "BuildRecommendationRepository",
-                    "Embedded ten-win builds seed resource was not found."
-                );
-                return null;
-            }
+                return CorpusTextLoadResult.Missing();
 
             using var stream = assembly.GetManifestResourceStream(resourceName);
             if (stream == null)
-                return null;
+                return CorpusTextLoadResult.Missing();
 
             using var reader = new StreamReader(stream);
-            return reader.ReadToEnd();
+            return CorpusTextLoadResult.Loaded(reader.ReadToEnd());
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to load embedded ten-win builds seed: {ex.Message}"
-            );
-            return null;
+            return CorpusTextLoadResult.Failed(ex);
         }
     }
 
-    internal async Task<(bool Succeeded, string? Error)> TryRefreshFinalBuildsFromRemoteAsync()
+    internal async Task<BuildRecommendationRemoteRefreshResult> TryRefreshFinalBuildsFromRemoteAsync()
     {
-        var (remoteCorpus, error) = await LoadRemoteAsync().ConfigureAwait(false);
-        if (remoteCorpus == null)
-            return (false, error);
+        var result = await LoadRemoteAsync().ConfigureAwait(false);
+        if (result.Corpus == null)
+        {
+            return BuildRecommendationRemoteRefreshResult.Failure(
+                result.FailureReason ?? LiveBuildRefreshFailureReasonCode.RefreshException,
+                result.Error,
+                result.Exception
+            );
+        }
 
         lock (_syncRoot)
         {
-            _corpus = remoteCorpus;
+            _corpus = result.Corpus;
+            _corpusSource = LiveBuildCorpusSource.Remote;
             _attemptedLoad = true;
         }
+        // D46 is the sole Info/Error owner for a manual refresh. Clear any corpus degradation
+        // episode and central storm keys without also emitting corpus.recovered.
+        _corpusLogState.ResetDegradedSilently();
 
-        return (true, null);
+        return BuildRecommendationRemoteRefreshResult.Success();
     }
 
-    private void TryQueueRefreshFromRemote(string reason)
+    private void ReportInitialLoad(CorpusLoadResult result, bool synchronousFallback)
+    {
+        if (result.ReasonCode.HasValue)
+        {
+            _corpusLogState.ReportDegraded(result.ToDegradation());
+            return;
+        }
+
+        if (synchronousFallback)
+        {
+            _corpusLogState.ReportDegraded(
+                new CorpusDegradation(
+                    LiveBuildCorpusReasonCode.SynchronousFallback,
+                    result.Source,
+                    result.BuildCount,
+                    result.Expired,
+                    result.CachePath,
+                    result.Exception
+                )
+            );
+            return;
+        }
+
+        _corpusLogState.ReportReady(result.Source, result.BuildCount);
+    }
+
+    private void TryQueueRefreshFromRemote(LiveBuildCorpusReasonCode reason)
     {
         if (!TryBeginBackgroundRefresh())
             return;
 
         try
         {
-            _queueBackgroundRefresh(() => RefreshFromRemoteInBackgroundAsync(reason));
-            BppLog.Info(
-                "BuildRecommendationRepository",
-                $"Queued background ten-win builds refresh reason={reason}."
-            );
+            _queueBackgroundRefresh(RefreshFromRemoteInBackgroundAsync);
+            _corpusLogState.ReportRefreshQueued(reason);
         }
         catch (Exception ex)
         {
             EndBackgroundRefresh();
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to queue background ten-win builds refresh reason={reason}: {ex.Message}"
+            LiveBuildCorpusSource source;
+            int buildCount;
+            lock (_syncRoot)
+            {
+                source = _corpusSource;
+                buildCount = _corpus?.BuildCount ?? 0;
+            }
+            _corpusLogState.ReportDegraded(
+                new CorpusDegradation(
+                    LiveBuildCorpusReasonCode.RefreshQueueFailed,
+                    source,
+                    buildCount,
+                    Expired: false,
+                    CachePath: null,
+                    ex
+                )
             );
         }
     }
@@ -422,29 +481,43 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    private async Task RefreshFromRemoteInBackgroundAsync(string reason)
+    private async Task RefreshFromRemoteInBackgroundAsync()
     {
         try
         {
-            var (remoteCorpus, error) = await LoadRemoteAsync().ConfigureAwait(false);
-            if (remoteCorpus != null)
+            var result = await LoadRemoteAsync().ConfigureAwait(false);
+            if (result.Corpus != null)
             {
                 lock (_syncRoot)
                 {
-                    _corpus = remoteCorpus;
+                    _corpus = result.Corpus;
+                    _corpusSource = LiveBuildCorpusSource.Remote;
                     _attemptedLoad = true;
                 }
 
-                BppLog.Info(
-                    "BuildRecommendationRepository",
-                    $"Background ten-win builds refresh succeeded reason={reason}."
+                _corpusLogState.ReportRecovered(
+                    LiveBuildCorpusSource.Remote,
+                    result.Corpus.BuildCount
                 );
                 return;
             }
 
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Background ten-win builds refresh failed reason={reason} error={error ?? "unknown"}."
+            LiveBuildCorpusSource source;
+            int buildCount;
+            lock (_syncRoot)
+            {
+                source = _corpusSource;
+                buildCount = _corpus?.BuildCount ?? 0;
+            }
+            _corpusLogState.ReportDegraded(
+                new CorpusDegradation(
+                    LiveBuildCorpusReasonCode.RemoteRefreshFailed,
+                    source,
+                    buildCount,
+                    Expired: false,
+                    CachePath: null,
+                    result.Exception
+                )
             );
         }
         finally
@@ -467,104 +540,111 @@ internal sealed class BuildRecommendationRepository
         }
     }
 
-    private bool TryLoadCache(bool allowExpired, out TenWinBuildCorpus? corpus)
+    private CorpusCacheLoadResult TryLoadCache()
     {
-        corpus = null;
-
+        string? cacheFilePath = null;
         try
         {
-            var cacheFilePath = ResolveCacheFilePath();
+            cacheFilePath = ResolveCacheFilePath();
             if (!File.Exists(cacheFilePath))
-                return false;
+            {
+                return new CorpusCacheLoadResult(
+                    CorpusCacheLoadStatus.Missing,
+                    Corpus: null,
+                    Expired: false,
+                    cacheFilePath,
+                    Exception: null
+                );
+            }
 
             var lastWriteUtc = File.GetLastWriteTimeUtc(cacheFilePath);
             var expiresAtUtc = lastWriteUtc.Add(TenWinBuildsCacheDuration);
-            if (!allowExpired && _utcNow() >= expiresAtUtc)
-                return false;
-
             var json = File.ReadAllText(cacheFilePath);
-            corpus = DeserializeCorpus(json, "cache");
+            var corpus = TenWinBuildCorpus.Parse(json);
             if (corpus == null)
-                return false;
+            {
+                return new CorpusCacheLoadResult(
+                    CorpusCacheLoadStatus.Invalid,
+                    Corpus: null,
+                    Expired: false,
+                    cacheFilePath,
+                    Exception: null
+                );
+            }
 
-            BppLog.Info(
-                "BuildRecommendationRepository",
-                $"Loaded ten-win builds from cache path={cacheFilePath} "
-                    + $"expired={_utcNow() >= expiresAtUtc} expiresAtUtc={expiresAtUtc:O}"
+            return new CorpusCacheLoadResult(
+                CorpusCacheLoadStatus.Loaded,
+                corpus,
+                Expired: _utcNow() >= expiresAtUtc,
+                cacheFilePath,
+                Exception: null
             );
-            return true;
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to read ten-win builds cache {ResolveCacheFilePath()}: {ex.Message}"
+            return new CorpusCacheLoadResult(
+                CorpusCacheLoadStatus.Failed,
+                Corpus: null,
+                Expired: false,
+                cacheFilePath,
+                ex
             );
-            return false;
         }
     }
 
-    private async Task<(TenWinBuildCorpus? Corpus, string? Error)> LoadRemoteAsync()
+    private async Task<BuildRecommendationRemoteLoadResult> LoadRemoteAsync()
     {
         try
         {
             var json = await _downloadJsonAsync(TenWinBuildsRemoteUrl).ConfigureAwait(false);
             if (string.IsNullOrWhiteSpace(json))
-                return (null, "empty_response");
+            {
+                return BuildRecommendationRemoteLoadResult.Failure(
+                    LiveBuildRefreshFailureReasonCode.RemoteEmptyResponse,
+                    "empty_response"
+                );
+            }
 
-            var corpus = DeserializeCorpus(json, "remote");
+            var corpus = TenWinBuildCorpus.Parse(json);
             if (corpus == null)
-                return (null, "invalid_response");
+            {
+                return BuildRecommendationRemoteLoadResult.Failure(
+                    LiveBuildRefreshFailureReasonCode.RemoteInvalidResponse,
+                    "invalid_response"
+                );
+            }
 
             TryWriteCache(json);
-            BppLog.Info(
-                "BuildRecommendationRepository",
-                $"Loaded ten-win builds from remote url={TenWinBuildsRemoteUrl}"
-            );
-            return (corpus, null);
+            _corpusLogState.ReportRemoteLoaded(corpus.BuildCount);
+            return BuildRecommendationRemoteLoadResult.Success(corpus);
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to refresh ten-win builds from {TenWinBuildsRemoteUrl}: {ex.Message}"
-            );
-            return (null, ex.Message);
-        }
-    }
-
-    private static TenWinBuildCorpus? DeserializeCorpus(string json, string source)
-    {
-        var corpus = TenWinBuildCorpus.Parse(json);
-        if (corpus == null)
-        {
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Ten-win builds JSON from {source} was missing or malformed."
+            return BuildRecommendationRemoteLoadResult.Failure(
+                LiveBuildRefreshFailureReasonCode.RemoteRequestFailed,
+                ex.Message,
+                ex
             );
         }
-
-        return corpus;
     }
 
     private void TryWriteCache(string json)
     {
+        string? cacheFilePath = null;
         try
         {
-            var cacheFilePath = ResolveCacheFilePath();
+            cacheFilePath = ResolveCacheFilePath();
             var cacheDirectory = Path.GetDirectoryName(cacheFilePath);
             if (!string.IsNullOrWhiteSpace(cacheDirectory))
                 Directory.CreateDirectory(cacheDirectory);
 
             File.WriteAllText(cacheFilePath, json);
             File.SetLastWriteTimeUtc(cacheFilePath, _utcNow());
+            _corpusLogState.ReportCacheWriteRecovered();
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "BuildRecommendationRepository",
-                $"Failed to write ten-win builds cache {ResolveCacheFilePath()}: {ex.Message}"
-            );
+            _corpusLogState.ReportCacheWriteDegraded(cacheFilePath, ex);
         }
     }
 
@@ -599,14 +679,16 @@ internal sealed class BuildRecommendationRepository
         lock (_syncRoot)
         {
             _corpus = null;
+            _corpusSource = LiveBuildCorpusSource.Unavailable;
             _attemptedLoad = false;
             _backgroundRefreshInProgress = false;
             _warmUpTask = null;
             _cacheFilePath = cacheFilePath;
             _utcNow = utcNow;
             _downloadJsonAsync = downloadJsonAsync;
-            _loadEmbeddedJson = () => null;
+            _loadEmbeddedJson = CorpusTextLoadResult.Missing;
             _queueBackgroundRefresh = QueueBackgroundRefresh;
+            _corpusLogState = new BuildRecommendationCorpusLogState();
         }
     }
 
@@ -620,27 +702,44 @@ internal sealed class BuildRecommendationRepository
         lock (_syncRoot)
         {
             _corpus = null;
+            _corpusSource = LiveBuildCorpusSource.Unavailable;
             _attemptedLoad = false;
             _backgroundRefreshInProgress = false;
             _warmUpTask = null;
             _cacheFilePath = cacheFilePath;
             _utcNow = utcNow;
             _downloadJsonAsync = downloadJsonAsync;
-            _loadEmbeddedJson = () => null;
+            _loadEmbeddedJson = CorpusTextLoadResult.Missing;
             _queueBackgroundRefresh = queueBackgroundRefresh ?? QueueBackgroundRefresh;
+            _corpusLogState = new BuildRecommendationCorpusLogState();
         }
     }
 
-    private static string? ReadEmbeddedSeedForTests() => LoadEmbeddedTenWinJson();
+    private static string? ReadEmbeddedSeedForTests() => LoadEmbeddedTenWinJson().Text;
 
     private void SetEmbeddedJsonForTests(Func<string?> loadEmbeddedJson)
     {
         lock (_syncRoot)
         {
             _corpus = null;
+            _corpusSource = LiveBuildCorpusSource.Unavailable;
             _attemptedLoad = false;
             _warmUpTask = null;
-            _loadEmbeddedJson = loadEmbeddedJson ?? (() => null);
+            _loadEmbeddedJson = () =>
+            {
+                try
+                {
+                    var json = loadEmbeddedJson?.Invoke();
+                    return json == null
+                        ? CorpusTextLoadResult.Missing()
+                        : CorpusTextLoadResult.Loaded(json);
+                }
+                catch (Exception ex)
+                {
+                    return CorpusTextLoadResult.Failed(ex);
+                }
+            };
+            _corpusLogState = new BuildRecommendationCorpusLogState();
         }
     }
 
@@ -649,6 +748,7 @@ internal sealed class BuildRecommendationRepository
         lock (_syncRoot)
         {
             _corpus = null;
+            _corpusSource = LiveBuildCorpusSource.Unavailable;
             _attemptedLoad = false;
             _backgroundRefreshInProgress = false;
             _warmUpTask = null;
@@ -657,6 +757,7 @@ internal sealed class BuildRecommendationRepository
             _downloadJsonAsync = DownloadJsonAsync;
             _loadEmbeddedJson = LoadEmbeddedTenWinJson;
             _queueBackgroundRefresh = QueueBackgroundRefresh;
+            _corpusLogState = new BuildRecommendationCorpusLogState();
         }
     }
 }

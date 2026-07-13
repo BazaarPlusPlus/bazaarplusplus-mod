@@ -14,6 +14,7 @@ internal sealed class CollectionCatalog
     private IReadOnlyList<CollectionCardVm>? _cache;
     private object? _cacheSource;
     private int _cacheSourceTemplateCount;
+    private readonly CollectionCatalogLogState _logState = new();
 
     public CollectionCatalog(BppStaticCardMapProvider cardMapProvider)
     {
@@ -30,7 +31,7 @@ internal sealed class CollectionCatalog
 
         if (!ReferenceEquals(source, _cacheSource))
         {
-            InvalidateCache("static-data-manager-changed");
+            InvalidateCache(CollectionPanelLogReasonCode.StaticDataManagerChanged);
             return false;
         }
 
@@ -41,10 +42,6 @@ internal sealed class CollectionCatalog
             _cache.Count,
             Math.Max(0, _cacheSourceTemplateCount - _cache.Count),
             wasCacheHit: true
-        );
-        BppLog.Info(
-            "CollectionCatalog",
-            $"Catalog cache hit: {result.AcceptedCount} cards from {result.SourceTemplateCount} templates."
         );
         return true;
     }
@@ -69,37 +66,42 @@ internal sealed class CollectionCatalog
     /// <summary>
     /// Builds a catalog session from a card map already materialised by
     /// <see cref="BeginCardMapLoad"/> (kept off the main thread). The session then enumerates the
-    /// map on the time-sliced build loop. Exceptions from the off-thread load are surfaced by the
-    /// caller via the Task; a null <paramref name="map"/> yields an unavailable reason here.
+    /// map on the time-sliced build loop. <paramref name="outcome"/> retains any off-thread
+    /// failure so this catalog remains the sole owner of the unavailable-state transition.
     /// </summary>
     public bool TryCreateBuildSession(
-        object? source,
-        Dictionary<Guid, ITCard>? map,
+        CollectionCardMapLoadOutcome outcome,
         out CollectionCatalogBuildSession? session,
-        out string unavailableReason
+        out CollectionPanelLogReasonCode? unavailableReason
     )
     {
         session = null;
-        unavailableReason = string.Empty;
+        unavailableReason = outcome.FailureReason;
 
-        if (source == null)
+        if (outcome.Source == null)
         {
-            unavailableReason = "static-data-not-ready";
-            BppLog.Debug(
-                "CollectionCatalog",
-                "Static data manager not yet ready; catalog build deferred."
+            unavailableReason = CollectionPanelLogReasonCode.StaticDataNotReady;
+            BppLog.DebugEvent(
+                CollectionPanelLogEvents.CatalogBuildDeferred,
+                static () =>
+                    [
+                        CollectionPanelLogEvents.CatalogBuildDeferredReasonCode.Bind(
+                            CollectionPanelLogReasonCode.StaticDataNotReady
+                        ),
+                    ]
             );
             return false;
         }
 
-        if (map == null)
+        if (!outcome.IsAvailable || outcome.Map == null)
         {
-            unavailableReason = "card-map-null";
-            BppLog.Warn("CollectionCatalog", "GetCardMap() returned null.");
+            var reason = outcome.FailureReason ?? CollectionPanelLogReasonCode.CardMapNull;
+            unavailableReason = reason;
+            _logState.ReportDegraded(reason, outcome.Exception);
             return false;
         }
 
-        session = new CollectionCatalogBuildSession(source, map);
+        session = new CollectionCatalogBuildSession(outcome.Source, outcome.Map);
         return true;
     }
 
@@ -122,17 +124,18 @@ internal sealed class CollectionCatalog
             session.RejectedCount,
             wasCacheHit: false
         );
-        BppLog.Info(
-            "CollectionCatalog",
-            $"Catalog built: {result.AcceptedCount} cards from {result.SourceTemplateCount} templates, rejected={result.RejectedCount}."
+        _logState.ReportBuilt(
+            result.AcceptedCount,
+            result.RejectedCount,
+            result.SourceTemplateCount
         );
         return result;
     }
 
-    public void InvalidateCache(string reason)
+    public void InvalidateCache(CollectionPanelLogReasonCode reasonCode)
     {
         if (_cache != null)
-            BppLog.Info("CollectionCatalog", $"Catalog cache invalidated: reason={reason}.");
+            _logState.ReportInvalidated(reasonCode);
         _cache = null;
         _cacheSource = null;
         _cacheSourceTemplateCount = 0;

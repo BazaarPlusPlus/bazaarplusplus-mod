@@ -33,7 +33,10 @@ internal sealed class GhostBattleSyncService
     {
         var playerAccountId = ResolvePlayerAccountId();
         if (string.IsNullOrWhiteSpace(playerAccountId))
-            return GhostBattleSyncResult.Failure("player_account_id_unavailable");
+            return GhostBattleSyncResult.Failure(
+                "player_account_id_unavailable",
+                HistoryPanelGhostSyncReasonCode.IdentityUnavailable
+            );
 
         var apiClient = new GhostBattleClient(_onlineClient.HttpClient, _onlineClient.Routes);
         var syncStartedAtUtc = DateTimeOffset.UtcNow;
@@ -44,13 +47,27 @@ internal sealed class GhostBattleSyncService
         );
         if (!queryResult.Succeeded)
         {
-            return GhostBattleSyncResult.Failure(queryResult.Error ?? "ghost_sync_failed");
+            return GhostBattleSyncResult.Failure(
+                queryResult.Error ?? "ghost_sync_failed",
+                HistoryPanelGhostSyncReasonCode.QueryFailed
+            );
         }
 
-        _repository.UpsertGhostBattles(playerAccountId!, queryResult.Battles);
-        _repository.MarkOldUndownloadedGhostBattlesDeleted(syncStartedAtUtc);
-        if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit))
-            _repository.SaveGhostSyncCheckpointUtc(playerAccountId!, syncStartedAtUtc);
+        try
+        {
+            _repository.UpsertGhostBattles(playerAccountId!, queryResult.Battles);
+            _repository.MarkOldUndownloadedGhostBattlesDeleted(syncStartedAtUtc);
+            if (ShouldAdvanceCheckpoint(queryResult.Battles.Count, MaxSyncBattleLimit))
+                _repository.SaveGhostSyncCheckpointUtc(playerAccountId!, syncStartedAtUtc);
+        }
+        catch (Exception ex)
+        {
+            return GhostBattleSyncResult.Failure(
+                "ghost_sync_repository_failed",
+                HistoryPanelGhostSyncReasonCode.RepositoryFailed,
+                ex
+            );
+        }
         return GhostBattleSyncResult.Success(queryResult.Battles.Count);
     }
 
@@ -61,9 +78,15 @@ internal sealed class GhostBattleSyncService
     )
     {
         if (string.IsNullOrWhiteSpace(battleId))
-            return GhostBattleReplayDownloadResult.Failure("battle_id_required");
+            return GhostBattleReplayDownloadResult.Failure(
+                "battle_id_required",
+                HistoryPanelReplayReasonCode.ReplayUnavailable
+            );
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
-            return GhostBattleReplayDownloadResult.Failure("replay_directory_required");
+            return GhostBattleReplayDownloadResult.Failure(
+                "replay_directory_required",
+                HistoryPanelReplayReasonCode.ReplayDirectoryUnavailable
+            );
 
         var apiClient = new GhostBattleClient(_onlineClient.HttpClient, _onlineClient.Routes);
         var linkResult = await apiClient.RequestReplayDownloadLinkAsync(
@@ -73,7 +96,8 @@ internal sealed class GhostBattleSyncService
         if (!linkResult.Succeeded)
         {
             return GhostBattleReplayDownloadResult.Failure(
-                linkResult.Error ?? "ghost_replay_link_failed"
+                linkResult.Error ?? "ghost_replay_link_failed",
+                HistoryPanelReplayReasonCode.GhostDownloadLinkFailed
             );
         }
 
@@ -84,19 +108,28 @@ internal sealed class GhostBattleSyncService
         if (!bytesResult.Succeeded || bytesResult.Bytes == null)
         {
             return GhostBattleReplayDownloadResult.Failure(
-                bytesResult.Error ?? "ghost_replay_payload_failed"
+                bytesResult.Error ?? "ghost_replay_payload_failed",
+                HistoryPanelReplayReasonCode.GhostDownloadFailed
             );
         }
 
-        var payload = TryExtractPayloadFromArtifact(battleId, bytesResult.Bytes);
-        if (!IsValidGhostBattlePayload(payload))
+        var extraction = ExtractPayloadFromArtifact(battleId, bytesResult.Bytes);
+        var payload = extraction.Payload;
+        if (!extraction.Succeeded || !IsValidGhostBattlePayload(payload))
         {
-            return GhostBattleReplayDownloadResult.Failure("replay_payload_missing");
+            return GhostBattleReplayDownloadResult.Failure(
+                "replay_payload_missing",
+                extraction.ReasonCode,
+                extraction.Exception
+            );
         }
 
         if (!string.Equals(payload!.ReplayPayload!.BattleId, battleId, StringComparison.Ordinal))
         {
-            return GhostBattleReplayDownloadResult.Failure("ghost_replay_battle_id_mismatch");
+            return GhostBattleReplayDownloadResult.Failure(
+                "ghost_replay_battle_id_mismatch",
+                HistoryPanelReplayReasonCode.GhostBattleMismatch
+            );
         }
 
         var payloadStore = new GhostBattlePayloadStore(
@@ -115,9 +148,15 @@ internal sealed class GhostBattleSyncService
         }
         catch (Exception ex)
         {
-            BppLog.Debug(
-                "GhostBattleSync",
-                $"ResolvePlayerAccountId failed: {ex.GetType().Name}: {ex.Message}"
+            BppLog.DebugEvent(
+                HistoryPanelLogEvents.GhostIdentityReadFailed,
+                ex,
+                () =>
+                    [
+                        HistoryPanelLogEvents.GhostIdentityReasonCode.Bind(
+                            HistoryPanelGhostIdentityReasonCode.ClientCacheReadFailed
+                        ),
+                    ]
             );
             return null;
         }
@@ -135,7 +174,14 @@ internal sealed class GhostBattleSyncService
             && !string.IsNullOrWhiteSpace(payload.ReplayPayload.BattleId);
     }
 
+    // Compatibility seam retained for the existing artifact fidelity tests. The replay workflow
+    // consumes the typed result below so a malformed artifact reaches its single request owner.
     private static GhostBattlePayload? TryExtractPayloadFromArtifact(
+        string battleId,
+        byte[] responseBytes
+    ) => ExtractPayloadFromArtifact(battleId, responseBytes).Payload;
+
+    private static GhostBattleArtifactExtractionResult ExtractPayloadFromArtifact(
         string battleId,
         byte[] responseBytes
     )
@@ -145,34 +191,34 @@ internal sealed class GhostBattleSyncService
             || responseBytes == null
             || responseBytes.Length == 0
         )
-            return null;
+            return GhostBattleArtifactExtractionResult.Failure(
+                HistoryPanelReplayReasonCode.GhostArtifactInvalid
+            );
 
         try
         {
             if (
-                !RunBundleArtifactCodec.TryDeserialize(
-                    responseBytes,
-                    out var artifact,
-                    out var artifactError
-                )
+                !RunBundleArtifactCodec.TryDeserialize(responseBytes, out var artifact, out _)
                 || artifact == null
             )
             {
-                BppLog.Warn(
-                    "GhostBattleSync",
-                    $"Failed to deserialize replay artifact for battle '{battleId}': {artifactError ?? "unknown_error"}"
+                return GhostBattleArtifactExtractionResult.Failure(
+                    HistoryPanelReplayReasonCode.GhostArtifactInvalid
                 );
-                return null;
             }
 
             var battle = artifact.Battles?.FirstOrDefault(candidate =>
                 string.Equals(candidate.BattleId, battleId, StringComparison.Ordinal)
             );
             if (battle == null)
-                return null;
+                return GhostBattleArtifactExtractionResult.Failure(
+                    HistoryPanelReplayReasonCode.GhostArtifactInvalid
+                );
 
             if (battle.ReplayPayload == null)
-                return null;
+                return GhostBattleArtifactExtractionResult.Failure(
+                    HistoryPanelReplayReasonCode.GhostArtifactInvalid
+                );
 
             var replayPayload = new PvpReplayPayload
             {
@@ -188,26 +234,31 @@ internal sealed class GhostBattleSyncService
                 || replayPayload.CombatMessageBytes.Length == 0
                 || replayPayload.DespawnMessageBytes.Length == 0
             )
-                return null;
+                return GhostBattleArtifactExtractionResult.Failure(
+                    HistoryPanelReplayReasonCode.GhostArtifactInvalid
+                );
 
             var battleManifest = BuildBattleManifest(artifact, battleId, battle);
             if (battleManifest == null)
-                return null;
+                return GhostBattleArtifactExtractionResult.Failure(
+                    HistoryPanelReplayReasonCode.GhostArtifactInvalid
+                );
 
-            return new GhostBattlePayload
-            {
-                BattleId = battleId,
-                BattleManifest = battleManifest,
-                ReplayPayload = replayPayload,
-            };
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(
-                "GhostBattleSync",
-                $"Failed to extract replay artifact for battle '{battleId}': {ex.Message}"
+            return GhostBattleArtifactExtractionResult.Success(
+                new GhostBattlePayload
+                {
+                    BattleId = battleId,
+                    BattleManifest = battleManifest,
+                    ReplayPayload = replayPayload,
+                }
             );
-            return null;
+        }
+        catch (Exception)
+        {
+            // Artifact content is untrusted; parser exception prose may echo private payload data.
+            return GhostBattleArtifactExtractionResult.Failure(
+                HistoryPanelReplayReasonCode.GhostArtifactInvalid
+            );
         }
     }
 
@@ -320,11 +371,19 @@ internal sealed class GhostBattleSyncService
 
 internal readonly struct GhostBattleSyncResult
 {
-    private GhostBattleSyncResult(bool succeeded, int importedCount, string? error)
+    private GhostBattleSyncResult(
+        bool succeeded,
+        int importedCount,
+        string? error,
+        HistoryPanelGhostSyncReasonCode reasonCode,
+        Exception? exception
+    )
     {
         Succeeded = succeeded;
         ImportedCount = importedCount;
         Error = error;
+        ReasonCode = reasonCode;
+        Exception = exception;
     }
 
     public bool Succeeded { get; }
@@ -332,26 +391,73 @@ internal readonly struct GhostBattleSyncResult
     public int ImportedCount { get; }
 
     public string? Error { get; }
+    public HistoryPanelGhostSyncReasonCode ReasonCode { get; }
+    public Exception? Exception { get; }
 
     public static GhostBattleSyncResult Success(int importedCount) =>
-        new(true, importedCount, null);
+        new(true, importedCount, null, HistoryPanelGhostSyncReasonCode.Completed, null);
 
-    public static GhostBattleSyncResult Failure(string error) => new(false, 0, error);
+    public static GhostBattleSyncResult Failure(
+        string error,
+        HistoryPanelGhostSyncReasonCode reasonCode,
+        Exception? exception = null
+    ) => new(false, 0, error, reasonCode, exception);
 }
 
 internal readonly struct GhostBattleReplayDownloadResult
 {
-    private GhostBattleReplayDownloadResult(bool succeeded, string? error)
+    private GhostBattleReplayDownloadResult(
+        bool succeeded,
+        string? error,
+        HistoryPanelReplayReasonCode reasonCode,
+        Exception? exception
+    )
     {
         Succeeded = succeeded;
         Error = error;
+        ReasonCode = reasonCode;
+        Exception = exception;
     }
 
     public bool Succeeded { get; }
 
     public string? Error { get; }
+    public HistoryPanelReplayReasonCode ReasonCode { get; }
+    public Exception? Exception { get; }
 
-    public static GhostBattleReplayDownloadResult Success() => new(true, null);
+    public static GhostBattleReplayDownloadResult Success() =>
+        new(true, null, HistoryPanelReplayReasonCode.Completed, null);
 
-    public static GhostBattleReplayDownloadResult Failure(string error) => new(false, error);
+    public static GhostBattleReplayDownloadResult Failure(
+        string error,
+        HistoryPanelReplayReasonCode reasonCode,
+        Exception? exception = null
+    ) => new(false, error, reasonCode, exception);
+}
+
+internal readonly struct GhostBattleArtifactExtractionResult
+{
+    private GhostBattleArtifactExtractionResult(
+        GhostBattlePayload? payload,
+        HistoryPanelReplayReasonCode reasonCode,
+        Exception? exception
+    )
+    {
+        Payload = payload;
+        ReasonCode = reasonCode;
+        Exception = exception;
+    }
+
+    internal bool Succeeded => Payload != null;
+    internal GhostBattlePayload? Payload { get; }
+    internal HistoryPanelReplayReasonCode ReasonCode { get; }
+    internal Exception? Exception { get; }
+
+    internal static GhostBattleArtifactExtractionResult Success(GhostBattlePayload payload) =>
+        new(payload, HistoryPanelReplayReasonCode.Completed, null);
+
+    internal static GhostBattleArtifactExtractionResult Failure(
+        HistoryPanelReplayReasonCode reasonCode,
+        Exception? exception = null
+    ) => new(null, reasonCode, exception);
 }

@@ -22,9 +22,9 @@ internal sealed class CollectionPanelDockButtonController
     private readonly BppScreenResizeSyncTracker _screenResizeSync = new(ScreenResizeSyncFrameCount);
     private readonly BppDockLayoutSyncTracker _layoutSync = new(LayoutImmediateSyncFrameCount);
     private readonly BppDockButtonScreenLayout _screenLayout = new();
+    private readonly CollectionPanelDockLayoutLogState _layoutLogState = new();
     private bool _hasAvailableDockLayout;
     private int _screenshotSuppressionCount;
-    private string? _lastLayoutLogKey;
 
     internal RectTransform? DockButtonRect => _dockButtonRect;
 
@@ -82,7 +82,13 @@ internal sealed class CollectionPanelDockButtonController
         _dockButton = dockButton.GetComponent<Button>();
         if (_dockButton == null)
         {
-            BppLog.Warn(LogCategory, $"Clone '{placement.Key}' has no neutral Button.");
+            BppLog.ErrorEvent(
+                CollectionPanelLogEvents.DockButtonSetupFailed,
+                CollectionPanelLogEvents.DockButtonSetupFailedPlacement.Bind(placement.Key),
+                CollectionPanelLogEvents.DockButtonSetupFailedReasonCode.Bind(
+                    CollectionPanelLogReasonCode.ButtonMissing
+                )
+            );
             return;
         }
 
@@ -119,19 +125,44 @@ internal sealed class CollectionPanelDockButtonController
             out var blockerName
         );
         SetLayoutAvailable(available);
+        _layoutLogState.Observe(ToLayoutObservation(available, blockerName));
+    }
 
-        var logKey = $"{available}:{blockerName}";
-        if (string.Equals(_lastLayoutLogKey, logKey, StringComparison.Ordinal))
-            return;
-
-        _lastLayoutLogKey = logKey;
+    private static CollectionPanelDockLayoutObservation ToLayoutObservation(
+        bool available,
+        string? blockerName
+    )
+    {
         if (available)
-            BppLog.Debug(LogCategory, "Collection dock layout is available.");
-        else
-            BppLog.Warn(
-                LogCategory,
-                $"Collection dock layout is unavailable; blocker='{blockerName ?? "measurement"}'."
-            );
+            return CollectionPanelDockLayoutObservation.Available();
+
+        return blockerName switch
+        {
+            "missing-collection-button" => CollectionPanelDockLayoutObservation.Degraded(
+                CollectionPanelLogReasonCode.MissingCollectionButton,
+                null
+            ),
+            "gear-footprint-unavailable" => CollectionPanelDockLayoutObservation.Degraded(
+                CollectionPanelLogReasonCode.GearFootprintUnavailable,
+                null
+            ),
+            "collection-footprint-unavailable" => CollectionPanelDockLayoutObservation.Degraded(
+                CollectionPanelLogReasonCode.CollectionFootprintUnavailable,
+                null
+            ),
+            "anchor-canvas-unavailable" => CollectionPanelDockLayoutObservation.Degraded(
+                CollectionPanelLogReasonCode.AnchorCanvasUnavailable,
+                null
+            ),
+            "target-local-position-unavailable" => CollectionPanelDockLayoutObservation.Degraded(
+                CollectionPanelLogReasonCode.TargetLocalPositionUnavailable,
+                null
+            ),
+            _ => CollectionPanelDockLayoutObservation.Degraded(
+                CollectionPanelLogReasonCode.PlacementBlocked,
+                blockerName
+            ),
+        };
     }
 
     private IDisposable BeginInstanceScreenshotSuppression()

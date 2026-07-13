@@ -22,13 +22,17 @@ internal sealed class LiveBuildPanelMount : IBppMountable
         var overlayHost = _overlayHost();
         if (overlayHost == null)
         {
-            BppLog.Warn("LiveBuildPanelMount", "Overlay panel host unavailable; skipping mount.");
+            BppLog.ErrorEvent(
+                LiveBuildPanelLogEvents.MountFailed,
+                LiveBuildPanelLogEvents.MountFailedReasonCode.Bind(
+                    LiveBuildMountFailureReasonCode.OverlayHostUnavailable
+                )
+            );
             return;
         }
 
         var panel = host.AddComponent<LiveBuildPanel>();
         panel.AttachToOverlayHost(overlayHost);
-        BppLog.Info("LiveBuildPanelMount", "LiveBuildPanel mounted.");
     }
 
     public void Unmount(GameObject host)

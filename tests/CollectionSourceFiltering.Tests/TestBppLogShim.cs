@@ -1,12 +1,25 @@
 using System;
+using System.Diagnostics;
+using BazaarPlusPlus.Infrastructure.Logging;
 
 namespace BazaarPlusPlus.Infrastructure;
 
 internal static class BppLog
 {
-    public static void Info(string component, string message) { }
+    [Conditional("DEBUG")]
+    public static void DebugEvent(
+        BppLogEventDefinition definition,
+        Func<BppLogFieldValue[]> valuesFactory
+    ) { }
 
-    public static void Warn(string component, string message) { }
+    public static void ErrorEvent(
+        BppLogEventDefinition definition,
+        params BppLogFieldValue[] values
+    ) { }
 
-    public static void Error(string component, string message, Exception ex) { }
+    public static void ErrorEvent(
+        BppLogEventDefinition definition,
+        Exception exception,
+        params BppLogFieldValue[] values
+    ) { }
 }

@@ -11,24 +11,39 @@ namespace BazaarPlusPlus.GameInterop.Encounter;
 
 /// <summary>Read-only encounter state module. Keep the id and choice reads cheap;
 /// target-selection reads are isolated behind <see cref="GetTargetingState"/>.</summary>
-internal sealed class EncounterStateProbe : IEncounterStateProbe
+internal sealed class EncounterStateProbe : IEncounterStateProbe, ITypedEncounterIdsProbe
 {
     private int _encounterIdsFrame = int.MinValue;
     private int _choicePedestalFrame = int.MinValue;
     private int _targetingFrame = int.MinValue;
-    private EncounterIdsSnapshot _encounterIdsSnapshot = EncounterIdsSnapshot.Empty;
+    private EncounterIdsProbeOutcome _encounterIdsOutcome = EncounterIdsProbeOutcome.Success(
+        EncounterIdsSnapshot.Empty
+    );
+    private bool _legacyEncounterIdsFailureLogged;
     private ChoicePedestalSnapshot _choicePedestalSnapshot = ChoicePedestalSnapshot.Empty;
     private EncounterTargetingSnapshot _targetingSnapshot = EncounterTargetingSnapshot.Empty;
 
     public EncounterIdsSnapshot GetEncounterIds()
     {
+        var outcome = GetEncounterIdsOutcome();
+        if (!outcome.IsSuccess && !_legacyEncounterIdsFailureLogged && outcome.Exception != null)
+        {
+            _legacyEncounterIdsFailureLogged = true;
+            BppLog.Error("Encounter", "ReadEncounterIds failed", outcome.Exception);
+        }
+        return outcome.Snapshot;
+    }
+
+    public EncounterIdsProbeOutcome GetEncounterIdsOutcome()
+    {
         var frame = Time.frameCount;
         if (_encounterIdsFrame == frame)
-            return _encounterIdsSnapshot;
+            return _encounterIdsOutcome;
 
-        _encounterIdsSnapshot = ReadEncounterIds();
+        _encounterIdsOutcome = ReadEncounterIds();
+        _legacyEncounterIdsFailureLogged = false;
         _encounterIdsFrame = frame;
-        return _encounterIdsSnapshot;
+        return _encounterIdsOutcome;
     }
 
     public ChoicePedestalSnapshot GetChoicePedestal()
@@ -71,7 +86,7 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
         return _targetingSnapshot;
     }
 
-    private static EncounterIdsSnapshot ReadEncounterIds()
+    private static EncounterIdsProbeOutcome ReadEncounterIds()
     {
         try
         {
@@ -90,15 +105,17 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
                 || runState.SelectionSet.Count == 0
             )
             {
-                return new EncounterIdsSnapshot
-                {
-                    CurrentEncounterId = currentEncounterId,
-                    CurrentEncounterTemplateId = currentEncounterTemplateId,
-                    IsChoiceState = isChoiceState,
-                    IsSelectionState = isSelectionState,
-                    ChoiceSelectionEntryIds = Array.Empty<string>(),
-                    ChoiceSelectionTemplateIds = Array.Empty<Guid>(),
-                };
+                return EncounterIdsProbeOutcome.Success(
+                    new EncounterIdsSnapshot
+                    {
+                        CurrentEncounterId = currentEncounterId,
+                        CurrentEncounterTemplateId = currentEncounterTemplateId,
+                        IsChoiceState = isChoiceState,
+                        IsSelectionState = isSelectionState,
+                        ChoiceSelectionEntryIds = Array.Empty<string>(),
+                        ChoiceSelectionTemplateIds = Array.Empty<Guid>(),
+                    }
+                );
             }
 
             var entryIds = new List<string>(runState.SelectionSet.Count);
@@ -114,22 +131,23 @@ internal sealed class EncounterStateProbe : IEncounterStateProbe
                     templateIds.Add(templateId.Value);
             }
 
-            return new EncounterIdsSnapshot
-            {
-                CurrentEncounterId = currentEncounterId,
-                CurrentEncounterTemplateId = currentEncounterTemplateId,
-                IsChoiceState = isChoiceState,
-                IsSelectionState = true,
-                ChoiceSelectionEntryIds =
-                    entryIds.Count == 0 ? Array.Empty<string>() : entryIds.ToArray(),
-                ChoiceSelectionTemplateIds =
-                    templateIds.Count == 0 ? Array.Empty<Guid>() : templateIds.ToArray(),
-            };
+            return EncounterIdsProbeOutcome.Success(
+                new EncounterIdsSnapshot
+                {
+                    CurrentEncounterId = currentEncounterId,
+                    CurrentEncounterTemplateId = currentEncounterTemplateId,
+                    IsChoiceState = isChoiceState,
+                    IsSelectionState = true,
+                    ChoiceSelectionEntryIds =
+                        entryIds.Count == 0 ? Array.Empty<string>() : entryIds.ToArray(),
+                    ChoiceSelectionTemplateIds =
+                        templateIds.Count == 0 ? Array.Empty<Guid>() : templateIds.ToArray(),
+                }
+            );
         }
         catch (Exception ex)
         {
-            BppLog.Error("Encounter", "ReadEncounterIds failed", ex);
-            return EncounterIdsSnapshot.Empty;
+            return EncounterIdsProbeOutcome.Failure(ex);
         }
     }
 

@@ -3,7 +3,6 @@
 using System;
 using System.Collections.Generic;
 using BazaarPlusPlus.Game.Input;
-using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -15,9 +14,8 @@ namespace BazaarPlusPlus.Game.OverlayPanels;
 // callbacks to the registered Main Overlay Panels.
 internal sealed class OverlayPanelHost : MonoBehaviour
 {
-    private const string LogCategory = "OverlayPanelHost";
-
     private readonly OverlayLifecycleCore _core = new();
+    private readonly OverlayPanelHostLogState _logState = new();
     private readonly List<OverlayPanelRegistration> _registrations = new();
 
     public IOverlayPanelHandle Register(OverlayPanelRegistration registration)
@@ -47,20 +45,14 @@ internal sealed class OverlayPanelHost : MonoBehaviour
         var openPanelId = _core.OpenPanelId;
         foreach (var registration in _registrations)
         {
-            try
-            {
-                registration.Tick(
-                    dt,
-                    string.Equals(registration.PanelId, openPanelId, StringComparison.Ordinal)
-                );
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    LogCategory,
-                    $"Panel '{registration.PanelId}' tick failed: {ex.Message}"
-                );
-            }
+            _logState.ExecuteTick(
+                registration.PanelId,
+                () =>
+                    registration.Tick(
+                        dt,
+                        string.Equals(registration.PanelId, openPanelId, StringComparison.Ordinal)
+                    )
+            );
         }
     }
 
@@ -91,28 +83,26 @@ internal sealed class OverlayPanelHost : MonoBehaviour
             if (registration == null)
                 continue;
 
-            try
-            {
-                switch (directive.Kind)
+            _logState.ExecuteDirective(
+                Guid.NewGuid(),
+                directive.PanelId,
+                directive.Kind,
+                () =>
                 {
-                    case OverlayDirectiveKind.Close:
-                        registration.OnClose();
-                        break;
-                    case OverlayDirectiveKind.NotifySceneChanged:
-                        registration.OnSceneChanged?.Invoke();
-                        break;
-                    case OverlayDirectiveKind.Open:
-                        registration.OnOpen();
-                        break;
+                    switch (directive.Kind)
+                    {
+                        case OverlayDirectiveKind.Close:
+                            registration.OnClose();
+                            break;
+                        case OverlayDirectiveKind.NotifySceneChanged:
+                            registration.OnSceneChanged?.Invoke();
+                            break;
+                        case OverlayDirectiveKind.Open:
+                            registration.OnOpen();
+                            break;
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                BppLog.Warn(
-                    LogCategory,
-                    $"Panel '{directive.PanelId}' {directive.Kind} failed: {ex.Message}"
-                );
-            }
+            );
         }
     }
 
@@ -130,23 +120,14 @@ internal sealed class OverlayPanelHost : MonoBehaviour
     private void Unregister(string panelId)
     {
         _core.UnregisterPanel(panelId);
+        _logState.ForgetPanel(panelId);
         _registrations.RemoveAll(registration =>
             string.Equals(registration.PanelId, panelId, StringComparison.Ordinal)
         );
     }
 
-    private static bool ReadIsInCombat()
-    {
-        try
-        {
-            return TheBazaar.Data.IsInCombat;
-        }
-        catch (Exception ex)
-        {
-            BppLog.Warn(LogCategory, $"Combat state read failed: {ex.Message}");
-            return false;
-        }
-    }
+    private bool ReadIsInCombat() =>
+        _logState.ReadIsInCombat(static () => TheBazaar.Data.IsInCombat);
 
     private static string GetSceneToken(Scene scene) =>
         $"{scene.name}|{scene.path}|{scene.buildIndex}|{scene.isLoaded}";
@@ -169,7 +150,7 @@ internal sealed class OverlayPanelHost : MonoBehaviour
         {
             var outcome = _host._core.ExecuteOpenRequest(
                 _panelId,
-                ReadIsInCombat(),
+                _host.ReadIsInCombat(),
                 out var directives
             );
             _host.ExecuteDirectives(directives);

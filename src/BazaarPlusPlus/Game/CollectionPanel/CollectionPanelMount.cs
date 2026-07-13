@@ -33,10 +33,30 @@ internal sealed class CollectionPanelMount : IBppMountable
         if (services == null)
             throw new ArgumentNullException(nameof(services));
 
-        var overlayHost = _overlayHost();
+        OverlayPanelHost? overlayHost;
+        try
+        {
+            overlayHost = _overlayHost();
+        }
+        catch (Exception ex)
+        {
+            BppLog.ErrorEvent(
+                CollectionPanelLogEvents.MountFailed,
+                ex,
+                CollectionPanelLogEvents.MountFailedReasonCode.Bind(
+                    CollectionPanelLogReasonCode.OverlayHostUnavailable
+                )
+            );
+            return;
+        }
         if (overlayHost == null)
         {
-            BppLog.Warn("CollectionPanelMount", "Overlay panel host unavailable; skipping mount.");
+            BppLog.ErrorEvent(
+                CollectionPanelLogEvents.MountFailed,
+                CollectionPanelLogEvents.MountFailedReasonCode.Bind(
+                    CollectionPanelLogReasonCode.OverlayHostUnavailable
+                )
+            );
             return;
         }
 
@@ -47,7 +67,6 @@ internal sealed class CollectionPanelMount : IBppMountable
         _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(_ =>
             CollectionPanel.NotifyLocaleChanged()
         );
-        BppLog.Info("CollectionPanelMount", "CollectionPanel mounted.");
     }
 
     public void Unmount(GameObject host)

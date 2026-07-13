@@ -1,7 +1,6 @@
 #nullable enable
 
 using BazaarPlusPlus.Core.Runtime;
-using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.OverlayPanels;
@@ -15,7 +14,6 @@ internal sealed class OverlayPanelHostMount : IBppMountable
     public void Mount(GameObject host, IBppServices services)
     {
         Host = host.AddComponent<OverlayPanelHost>();
-        BppLog.Info("OverlayPanelHostMount", "OverlayPanelHost mounted.");
     }
 
     public void Unmount(GameObject host)

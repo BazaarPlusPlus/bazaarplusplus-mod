@@ -316,9 +316,13 @@ internal static class HistoryBattlePreviewProjection
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "HistoryPanel",
-                $"Failed to resolve socket-effect attribute type for {snapshot.TemplateId}: {ex.Message}"
+            BppLog.WarnEvent(
+                HistoryPanelLogEvents.PreviewSocketEffectDegraded,
+                ex,
+                HistoryPanelLogEvents.PreviewTemplateId.Bind(snapshot.TemplateId),
+                HistoryPanelLogEvents.PreviewSocketReasonCode.Bind(
+                    HistoryPanelPreviewReasonCode.SocketEffectLookupFailed
+                )
             );
         }
 
@@ -341,10 +345,12 @@ internal static class HistoryBattlePreviewProjection
         }
         catch (Exception ex)
         {
-            BppLog.Error(
-                "HistoryBattlePreviewProjection",
-                "Failed to load static game data for battle preview filtering",
-                ex
+            BppLog.WarnEvent(
+                HistoryPanelLogEvents.PreviewStaticDataDegraded,
+                ex,
+                HistoryPanelLogEvents.PreviewStaticDataReasonCode.Bind(
+                    HistoryPanelPreviewReasonCode.StaticDataAccessFailed
+                )
             );
             return null;
         }
@@ -360,7 +366,15 @@ internal static class HistoryBattlePreviewProjection
 
         var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
         if (staticData == null)
+        {
+            BppLog.WarnEvent(
+                HistoryPanelLogEvents.PreviewStaticDataDegraded,
+                HistoryPanelLogEvents.PreviewStaticDataReasonCode.Bind(
+                    HistoryPanelPreviewReasonCode.StaticDataUnavailable
+                )
+            );
             return null;
+        }
 
         lock (SocketEffectTemplateLock)
         {

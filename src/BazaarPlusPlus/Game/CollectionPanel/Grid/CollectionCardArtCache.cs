@@ -29,6 +29,7 @@ internal sealed class CollectionCardArtCache
         StringComparer.Ordinal
     );
     private readonly HashSet<string> _failedKeys = new(StringComparer.Ordinal);
+    private readonly CollectionCardArtLogState _logState = new();
 
     public CollectionCardArtCache(int capacity = DefaultCapacity)
     {
@@ -65,9 +66,11 @@ internal sealed class CollectionCardArtCache
         }
         catch (Exception ex)
         {
-            BppLog.Warn(
-                "CollectionCardArtCache",
-                $"Addressables.LoadAssetAsync threw for artKey='{artKey}': {ex.Message}"
+            _logState.ReportDegraded(
+                CollectionPanelLogReasonCode.AddressablesLoadException,
+                CollectionCardArtStatus.ArtUnavailable,
+                artKey,
+                ex
             );
             _failedKeys.Add(artKey);
             return null;
@@ -75,9 +78,11 @@ internal sealed class CollectionCardArtCache
 
         if (handle.Status != AsyncOperationStatus.Succeeded)
         {
-            BppLog.Warn(
-                "CollectionCardArtCache",
-                $"Addressables load failed for artKey='{artKey}' status={handle.Status}."
+            _logState.ReportDegraded(
+                CollectionPanelLogReasonCode.AddressablesLoadFailed,
+                CollectionCardArtStatus.ArtUnavailable,
+                artKey,
+                null
             );
             try
             {
@@ -141,9 +146,19 @@ internal sealed class CollectionCardArtCache
             }
             catch (Exception ex)
             {
-                BppLog.Debug(
-                    "CollectionCardArtCache",
-                    $"Release failed for artKey='{pair.Key}': {ex.Message}"
+                BppLog.DebugEvent(
+                    CollectionPanelLogEvents.CacheCleanupFailed,
+                    ex,
+                    () =>
+                        [
+                            CollectionPanelLogEvents.CacheCleanupFailedCache.Bind(
+                                CollectionCacheKind.Art
+                            ),
+                            CollectionPanelLogEvents.CacheCleanupFailedStage.Bind(
+                                CollectionCacheCleanupStage.Release
+                            ),
+                            CollectionPanelLogEvents.CacheCleanupFailedArtKey.Bind(pair.Key),
+                        ]
                 );
             }
         }
@@ -188,9 +203,19 @@ internal sealed class CollectionCardArtCache
                 }
                 catch (Exception ex)
                 {
-                    BppLog.Debug(
-                        "CollectionCardArtCache",
-                        $"Evict Release failed for artKey='{evictKey}': {ex.Message}"
+                    BppLog.DebugEvent(
+                        CollectionPanelLogEvents.CacheCleanupFailed,
+                        ex,
+                        () =>
+                            [
+                                CollectionPanelLogEvents.CacheCleanupFailedCache.Bind(
+                                    CollectionCacheKind.Art
+                                ),
+                                CollectionPanelLogEvents.CacheCleanupFailedStage.Bind(
+                                    CollectionCacheCleanupStage.EvictRelease
+                                ),
+                                CollectionPanelLogEvents.CacheCleanupFailedArtKey.Bind(evictKey),
+                            ]
                     );
                 }
             }

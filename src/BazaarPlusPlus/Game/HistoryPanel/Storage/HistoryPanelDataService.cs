@@ -150,24 +150,35 @@ internal sealed class HistoryPanelDataService
     )
     {
         if (_ghostSyncService == null)
-            return HistoryPanelAttemptResult.Failure(HistoryPanelText.GhostSyncUnavailable());
+            return HistoryPanelAttemptResult.Failure(
+                HistoryPanelText.GhostSyncUnavailable(),
+                HistoryPanelGhostSyncReasonCode.SyncUnavailable
+            );
 
         try
         {
             var result = await _ghostSyncService.SyncRecentBattlesAsync(cancellationToken);
             if (!result.Succeeded)
                 return HistoryPanelAttemptResult.Failure(
-                    HistoryPanelText.GhostSyncFailed(result.Error ?? HistoryPanelText.Unknown())
+                    HistoryPanelText.GhostSyncFailed(result.Error ?? HistoryPanelText.Unknown()),
+                    result.ReasonCode,
+                    result.Exception
                 );
 
             return HistoryPanelAttemptResult.Success(
-                HistoryPanelText.GhostSyncSucceeded(result.ImportedCount)
+                HistoryPanelText.GhostSyncSucceeded(result.ImportedCount),
+                result.ImportedCount
             );
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
             return HistoryPanelAttemptResult.Failure(
                 HistoryPanelText.GhostSyncFailed(ex.Message),
+                HistoryPanelGhostSyncReasonCode.UnexpectedException,
                 ex
             );
         }
@@ -176,24 +187,35 @@ internal sealed class HistoryPanelDataService
 
 internal readonly struct HistoryPanelAttemptResult
 {
-    private HistoryPanelAttemptResult(bool succeeded, string statusMessage, Exception? error)
+    private HistoryPanelAttemptResult(
+        bool succeeded,
+        string statusMessage,
+        int importedCount,
+        HistoryPanelGhostSyncReasonCode reasonCode,
+        Exception? error
+    )
     {
         Succeeded = succeeded;
         StatusMessage = statusMessage;
+        ImportedCount = importedCount;
+        ReasonCode = reasonCode;
         Error = error;
     }
 
     public bool Succeeded { get; }
 
     public string StatusMessage { get; }
+    public int ImportedCount { get; }
+    public HistoryPanelGhostSyncReasonCode ReasonCode { get; }
 
     public Exception? Error { get; }
 
-    public static HistoryPanelAttemptResult Success(string statusMessage) =>
-        new(true, statusMessage, null);
+    public static HistoryPanelAttemptResult Success(string statusMessage, int importedCount) =>
+        new(true, statusMessage, importedCount, HistoryPanelGhostSyncReasonCode.Completed, null);
 
     public static HistoryPanelAttemptResult Failure(
         string statusMessage,
+        HistoryPanelGhostSyncReasonCode reasonCode,
         Exception? error = null
-    ) => new(false, statusMessage, error);
+    ) => new(false, statusMessage, 0, reasonCode, error);
 }

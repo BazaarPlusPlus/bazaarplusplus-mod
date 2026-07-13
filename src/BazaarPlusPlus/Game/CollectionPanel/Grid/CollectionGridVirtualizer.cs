@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
@@ -396,11 +395,36 @@ internal sealed class CollectionGridVirtualizer
             }
             catch (Exception ex)
             {
-                BppLog.Warn(
-                    "CollectionGridVirtualizer",
-                    $"Async bind for {pending.Vm.Id} failed: {ex.Message}"
+                bindResult = CollectionCardBindResult.Degraded(
+                    CollectionCardBindStatus.NotReady,
+                    new CollectionCardBindDegradation(
+                        CollectionCardBindStage.Bind,
+                        CollectionPanelLogReasonCode.BindException,
+                        ex
+                    )
                 );
-                bindResult = CollectionCardBindResult.NotReady();
+            }
+
+            if (bindResult.Degradation is { } degradation)
+            {
+                var fields = new[]
+                {
+                    CollectionPanelLogEvents.CardBindDegradedStage.Bind(degradation.Stage),
+                    CollectionPanelLogEvents.CardBindDegradedTemplateId.Bind(pending.Vm.Id),
+                    CollectionPanelLogEvents.CardBindDegradedReasonCode.Bind(
+                        degradation.ReasonCode
+                    ),
+                };
+                if (degradation.Exception == null)
+                    BppLog.WarnEvent(CollectionPanelLogEvents.CardBindDegraded, fields);
+                else
+                {
+                    BppLog.WarnEvent(
+                        CollectionPanelLogEvents.CardBindDegraded,
+                        degradation.Exception,
+                        fields
+                    );
+                }
             }
 
             var binding = bindResult.Binding;
@@ -823,9 +847,16 @@ internal sealed class CollectionGridVirtualizer
         }
         catch (Exception ex)
         {
-            BppLog.Debug(
-                "CollectionGridVirtualizer",
-                $"SetUp task for {cell.Vm.Id} faulted: {ex.Message}"
+            BppLog.DebugEvent(
+                CollectionPanelLogEvents.CardDisplayFailed,
+                ex,
+                () =>
+                    [
+                        CollectionPanelLogEvents.CardDisplayFailedStage.Bind(
+                            CollectionCardDisplayStage.Setup
+                        ),
+                        CollectionPanelLogEvents.CardDisplayFailedTemplateId.Bind(cell.Vm.Id),
+                    ]
             );
         }
 
@@ -858,9 +889,16 @@ internal sealed class CollectionGridVirtualizer
         }
         catch (Exception ex)
         {
-            BppLog.Debug(
-                "CollectionGridVirtualizer",
-                $"Show invocation for {cell.Vm.Id} failed: {ex.Message}"
+            BppLog.DebugEvent(
+                CollectionPanelLogEvents.CardDisplayFailed,
+                ex,
+                () =>
+                    [
+                        CollectionPanelLogEvents.CardDisplayFailedStage.Bind(
+                            CollectionCardDisplayStage.Show
+                        ),
+                        CollectionPanelLogEvents.CardDisplayFailedTemplateId.Bind(cell.Vm.Id),
+                    ]
             );
         }
     }
@@ -1255,18 +1293,26 @@ internal sealed class CollectionGridVirtualizer
 
             _bindingLogged = true;
             var elapsedMs = ElapsedMs(_startedAt, Stopwatch.GetTimestamp());
-            BppLog.Debug(
-                "CollectionGridVirtualizer",
-                "firstWindowBind "
-                    + $"range={_firstIndex}-{_lastIndex} "
-                    + $"window={WindowSize} "
-                    + $"visible={_visibleCount} "
-                    + $"shelves={_shelfCount} "
-                    + $"attempts={_attempts} "
-                    + $"bound={_bound} "
-                    + $"failed={_failed} "
-                    + $"bindMs={FormatMs(_bindMs)} "
-                    + $"elapsedMs={FormatMs(elapsedMs)}"
+            BppLog.DebugEvent(
+                CollectionPanelLogEvents.GridPerformanceObserved,
+                () =>
+                    [
+                        CollectionPanelLogEvents.GridPerformancePhase.Bind(
+                            CollectionGridPerformancePhase.FirstWindowBind
+                        ),
+                        CollectionPanelLogEvents.GridPerformanceFirstIndex.Bind(_firstIndex),
+                        CollectionPanelLogEvents.GridPerformanceLastIndex.Bind(_lastIndex),
+                        CollectionPanelLogEvents.GridPerformanceWindowCount.Bind(WindowSize),
+                        CollectionPanelLogEvents.GridPerformanceVisibleCount.Bind(_visibleCount),
+                        CollectionPanelLogEvents.GridPerformanceShelfCount.Bind(_shelfCount),
+                        CollectionPanelLogEvents.GridPerformanceAttemptCount.Bind(_attempts),
+                        CollectionPanelLogEvents.GridPerformanceBoundCount.Bind(_bound),
+                        CollectionPanelLogEvents.GridPerformanceFailedBindCount.Bind(_failed),
+                        CollectionPanelLogEvents.GridPerformanceBindDurationMs.Bind(_bindMs),
+                        CollectionPanelLogEvents.GridPerformanceElapsedMs.Bind(elapsedMs),
+                        CollectionPanelLogEvents.GridPerformanceFaultedCount.Bind(null),
+                        CollectionPanelLogEvents.GridPerformanceCanceledCount.Bind(null),
+                    ]
             );
 
             if (_setUpTasks.Count > 0 && !_setUpLogStarted)
@@ -1275,7 +1321,11 @@ internal sealed class CollectionGridVirtualizer
                 _ = LogSetUpCompletionAsync(
                     _setUpTasks.ToArray(),
                     _startedAt,
+                    _firstIndex,
+                    _lastIndex,
                     WindowSize,
+                    _visibleCount,
+                    _shelfCount,
                     _bound,
                     _failed
                 );
@@ -1290,7 +1340,11 @@ internal sealed class CollectionGridVirtualizer
         private static async Task LogSetUpCompletionAsync(
             Task[] tasks,
             long startedAt,
+            int firstIndex,
+            int lastIndex,
             int windowSize,
+            int visibleCount,
+            int shelfCount,
             int bound,
             int failedBinds
         )
@@ -1314,22 +1368,32 @@ internal sealed class CollectionGridVirtualizer
                     canceled++;
             }
 
-            BppLog.Debug(
-                "CollectionGridVirtualizer",
-                "firstWindowSetUp "
-                    + $"window={windowSize} "
-                    + $"bound={bound} "
-                    + $"failedBinds={failedBinds} "
-                    + $"faulted={faulted} "
-                    + $"canceled={canceled} "
-                    + $"artAndSetupElapsedMs={FormatMs(ElapsedMs(startedAt, Stopwatch.GetTimestamp()))}"
+            BppLog.DebugEvent(
+                CollectionPanelLogEvents.GridPerformanceObserved,
+                () =>
+                    [
+                        CollectionPanelLogEvents.GridPerformancePhase.Bind(
+                            CollectionGridPerformancePhase.FirstWindowSetup
+                        ),
+                        CollectionPanelLogEvents.GridPerformanceFirstIndex.Bind(firstIndex),
+                        CollectionPanelLogEvents.GridPerformanceLastIndex.Bind(lastIndex),
+                        CollectionPanelLogEvents.GridPerformanceWindowCount.Bind(windowSize),
+                        CollectionPanelLogEvents.GridPerformanceVisibleCount.Bind(visibleCount),
+                        CollectionPanelLogEvents.GridPerformanceShelfCount.Bind(shelfCount),
+                        CollectionPanelLogEvents.GridPerformanceAttemptCount.Bind(null),
+                        CollectionPanelLogEvents.GridPerformanceBoundCount.Bind(bound),
+                        CollectionPanelLogEvents.GridPerformanceFailedBindCount.Bind(failedBinds),
+                        CollectionPanelLogEvents.GridPerformanceBindDurationMs.Bind(null),
+                        CollectionPanelLogEvents.GridPerformanceElapsedMs.Bind(
+                            ElapsedMs(startedAt, Stopwatch.GetTimestamp())
+                        ),
+                        CollectionPanelLogEvents.GridPerformanceFaultedCount.Bind(faulted),
+                        CollectionPanelLogEvents.GridPerformanceCanceledCount.Bind(canceled),
+                    ]
             );
         }
 
         private static double ElapsedMs(long start, long end) =>
             (end - start) * 1000.0 / Stopwatch.Frequency;
-
-        private static string FormatMs(double value) =>
-            value.ToString("0.0", CultureInfo.InvariantCulture);
     }
 }

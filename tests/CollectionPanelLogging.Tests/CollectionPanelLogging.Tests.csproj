@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>12</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogSchema.cs"
+      Link="Logging/Core/BppLogSchema.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogEventCatalog.cs"
+      Link="Logging/Core/BppLogEventCatalog.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogSchemaRules.cs"
+      Link="Logging/Core/BppLogSchemaRules.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogRedactionRoots.cs"
+      Link="Logging/Core/BppLogRedactionRoots.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogRedactor.cs"
+      Link="Logging/Core/BppLogRedactor.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogValueFormatter.cs"
+      Link="Logging/Core/BppLogValueFormatter.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogExceptionProjector.cs"
+      Link="Logging/Core/BppLogExceptionProjector.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogEventRenderer.cs"
+      Link="Logging/Core/BppLogEventRenderer.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanelLogEvents.cs"
+      Link="CollectionPanelLogEvents.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanelSelectionLogState.cs"
+      Link="CollectionPanelSelectionLogState.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanelDockLayoutLogState.cs"
+      Link="CollectionPanelDockLayoutLogState.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionPanelLoadDiagnostics.cs"
+      Link="CollectionPanelLoadDiagnostics.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CollectionPanel/Data/CollectionCatalogLogState.cs"
+      Link="CollectionCatalogLogState.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CollectionPanel/Grid/CollectionCardArtLogState.cs"
+      Link="CollectionCardArtLogState.cs"
+    />
+  </ItemGroup>
+</Project>

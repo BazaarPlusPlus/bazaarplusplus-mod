@@ -198,9 +198,13 @@ internal sealed partial class HistoryPanelRepository
             }
             catch (Exception ex)
             {
-                BppLog.Warn(
-                    "HistoryPanelRepository",
-                    $"Skipping unreadable battle history row '{battleId}': {ex.Message}"
+                BppLog.WarnEvent(
+                    HistoryPanelLogEvents.RowSkipped,
+                    ex,
+                    HistoryPanelLogEvents.RowBattleId.Bind(battleId),
+                    HistoryPanelLogEvents.RowReasonCode.Bind(
+                        HistoryPanelRowReasonCode.SnapshotDeserializeFailed
+                    )
                 );
             }
         }

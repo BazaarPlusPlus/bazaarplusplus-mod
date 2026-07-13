@@ -70,53 +70,17 @@ public sealed class LoggingGovernanceTests
             ["BazaarAgentReplayRecorderWiring.cs"] = "101:Info",
             ["Core/Events/InMemoryBppEventBus.cs"] = "69:Error",
             ["Core/Runtime/BppFeatureRegistry.cs"] = "26:Error,45:Error",
-            ["Game/CollectionPanel/CollectionPanel.cs"] =
-                "174:Warn,180:Info,200:Debug,236:Warn,256:Warn,269:Warn,282:Warn,303:Info,550:Warn,797:Error",
-            ["Game/CollectionPanel/CollectionPanelDockButtonController.cs"] =
-                "85:Warn,129:Debug,131:Warn",
-            ["Game/CollectionPanel/CollectionPanelHeroPreferenceStore.cs"] =
-                "32:Warn,42:Warn,69:Warn",
-            ["Game/CollectionPanel/CollectionPanelLoadDiagnostics.cs"] = "30:Info",
-            ["Game/CollectionPanel/CollectionPanelMount.cs"] = "39:Warn,50:Info",
-            ["Game/CollectionPanel/Data/CollectionCatalog.cs"] =
-                "45:Info,88:Debug,98:Warn,125:Info,135:Info",
-            ["Game/CollectionPanel/Grid/CollectionCardArtCache.cs"] =
-                "68:Warn,78:Warn,144:Debug,191:Debug",
-            ["Game/CollectionPanel/Grid/CollectionCardFactory.cs"] = "81:Warn,130:Debug",
-            ["Game/CollectionPanel/Grid/CollectionCardHoverRelay.cs"] = "74:Debug,82:Debug",
-            ["Game/CollectionPanel/Grid/CollectionCardMaterialCache.cs"] = "82:Debug,106:Debug",
-            ["Game/CollectionPanel/Grid/CollectionGridVirtualizer.cs"] =
-                "399:Warn,826:Debug,861:Debug,1258:Debug,1317:Debug",
-            ["Game/CollectionPanel/Sources/CollectionSourceCatalog.cs"] =
-                "79:Info,87:Error,486:Warn",
             ["Game/CombatStatusBar/CombatStatusBar.Config.cs"] = "22:Info",
             ["Game/EventPreview/EventPreviewPlanController.cs"] =
                 "64:Warn,110:Info,147:Error,154:Info,165:Error",
-            ["Game/HistoryPanel/Data/HistoryBattlePreviewProjection.cs"] = "319:Warn,344:Error",
-            ["Game/HistoryPanel/Ghost/GhostBattleSyncService.cs"] = "118:Debug,161:Warn,206:Warn",
-            ["Game/HistoryPanel/HistoryPanel.cs"] =
-                "151:Warn,179:Warn,186:Error,438:Info,455:Warn,466:Info,473:Error",
-            ["Game/HistoryPanel/HistoryPanelCoordinator.cs"] =
-                "123:Error,161:Error,350:Info,399:Error,455:Error,535:Error,551:Info,558:Warn,844:Error,860:Error,933:Error",
-            ["Game/HistoryPanel/HistoryPanelMount.cs"] = "39:Warn,46:Warn,63:Warn",
-            ["Game/HistoryPanel/HistoryPanelReplayService.cs"] = "245:Warn",
-            ["Game/HistoryPanel/Storage/HistoryPanelRepository.cs"] = "201:Warn",
             ["Game/Input/BppHotkeyService.cs"] = "85:Warn,97:Warn,304:Info",
             ["Game/ItemEnchantPreview/ItemEnchantPreviewFormatting.cs"] = "96:Debug",
             ["Game/ItemEnchantPreview/Preview/ItemEnchantPreviewRenderer.cs"] =
                 "72:Debug,91:Debug,158:Debug",
-            ["Game/LiveBuildPanel/LiveBuildPanel.cs"] = "226:Info,234:Warn",
-            ["Game/LiveBuildPanel/LiveBuildPanelMount.cs"] = "25:Warn,31:Info",
-            ["Game/LiveBuildPanel/Recommendations/BuildRecommendationRefreshService.cs"] =
-                "32:Info",
-            ["Game/LiveBuildPanel/Recommendations/BuildRecommendationRepository.cs"] =
-                "232:Debug,253:Warn,266:Info,286:Warn,315:Info,343:Warn,359:Warn,390:Info,398:Warn,438:Info,445:Warn,490:Info,499:Warn,520:Info,528:Warn,541:Warn,564:Warn",
             ["Game/Lobby/MainMenuVersionCheckController.cs"] =
                 "80:Warn,101:Warn,113:Warn,122:Info,130:Warn,137:Warn",
             ["Game/Lobby/RandomHeroPool/RandomHeroPoolNativeController.cs"] = "64:Warn,222:Warn",
             ["Game/Lobby/RandomPoolPrefsHelpers.cs"] = "31:Warn,64:Warn",
-            ["Game/OverlayPanels/OverlayPanelHost.cs"] = "59:Warn,111:Warn,146:Warn",
-            ["Game/OverlayPanels/OverlayPanelHostMount.cs"] = "18:Info",
             ["Game/PvpBattles/PvpBattleSnapshotCollector.cs"] =
                 "226:Warn,242:Warn,324:Warn,343:Warn,364:Warn,408:Warn",
             ["Game/RunLogging/RunLogStoreLoggerBridge.cs"] = "10:Warn,13:Error",
@@ -139,7 +103,7 @@ public sealed class LoggingGovernanceTests
                 "131:Debug,139:Debug,146:Debug",
             ["GameInterop/CardPreview/NativeCardPreviewRuntime.cs"] =
                 "52:Warn,68:Warn,101:Warn,109:Warn",
-            ["GameInterop/Encounter/EncounterStateProbe.cs"] = "131:Error,156:Error",
+            ["GameInterop/Encounter/EncounterStateProbe.cs"] = "32:Error,174:Error",
             ["GameInterop/Encounter/InteractionFilterProbe.cs"] = "34:Info,53:Error",
             ["GameInterop/Encounter/PedestalEligibilityProbe.cs"] = "41:Info,46:Info,69:Info",
             ["GameInterop/EncounterPortraits/EncounterPortraitSpriteProvider.cs"] =
@@ -204,14 +168,8 @@ public sealed class LoggingGovernanceTests
         "BazaarPlusPlus.BazaarAgentHost/BazaarAgentBepInExLogger.cs",
     };
 
-    // The host entry is the #54 sink bypass. CollectionPanel's call is a non-BepInEx Log-shaped
-    // method; pinning it here lets the broad generic .Log scan catch any new ManualLogSource
-    // receiver name without misclassifying this known call.
     private static readonly IReadOnlyDictionary<string, string> ExpectedNonAdapterLogShapedCalls =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["BazaarPlusPlus/Game/CollectionPanel/CollectionPanel.cs"] = "862:Log",
-        };
+        new Dictionary<string, string>(StringComparer.Ordinal);
 
     [Fact]
     public void Legacy_free_text_BppLog_calls_match_the_shrinking_allowlist()
@@ -280,6 +238,33 @@ public sealed class LoggingGovernanceTests
         Assert.True(
             violations.Length == 0,
             "CombatReplay/Screenshots migrations must not retain free-text BppLog calls:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
+    [Fact]
+    public void Panel_domains_free_text_logging_is_absent()
+    {
+        var gameRoot = Path.Combine(RepoRoot(), "src", "BazaarPlusPlus", "Game");
+        var migratedRoots = new[]
+        {
+            Path.Combine(gameRoot, "CollectionPanel"),
+            Path.Combine(gameRoot, "HistoryPanel"),
+            Path.Combine(gameRoot, "LiveBuildPanel"),
+            Path.Combine(gameRoot, "OverlayPanels"),
+        };
+        var violations = migratedRoots
+            .SelectMany(ProductionFiles)
+            .SelectMany(file =>
+                LegacyBppLogCall
+                    .Matches(File.ReadAllText(file))
+                    .Select(match => $"{Path.GetRelativePath(gameRoot, file)}:{match.Value}")
+            )
+            .ToArray();
+
+        Assert.True(
+            violations.Length == 0,
+            "Panel domain migrations must not retain free-text BppLog calls:\n"
                 + string.Join("\n", violations)
         );
     }
