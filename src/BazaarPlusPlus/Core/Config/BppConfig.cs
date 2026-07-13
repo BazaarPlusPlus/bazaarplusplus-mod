@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.Core.Config;
 internal sealed class BppConfig : IBppConfig
 {
     internal const PreviewVisibilityMode DefaultEnchantPreviewMode = PreviewVisibilityMode.Always;
-    internal const BppUiFontKind DefaultUiFontKind = BppUiFontKind.LxgwWenKai;
+    internal const BppUiFontKind DefaultUiFontKind = BppUiFontKind.SansSerif;
     internal const SubtitlePosition DefaultVoiceSubtitlesPosition = SubtitlePosition.TopCenter;
 
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
@@ -144,7 +144,7 @@ internal sealed class BppConfig : IBppConfig
             "Appearance",
             "UiFont",
             DefaultUiFontKind,
-            "Font for BazaarPlusPlus panels (history, collection, live build, supporters). LxgwWenKai = embedded kai-style font. SansSerif = Unity built-in sans with OS fallback for CJK. Panels already opened this session fully apply after a game restart."
+            "Font for BazaarPlusPlus panels and preview tooltip sections. LxgwWenKai = embedded kai-style font. SansSerif = Unity built-in sans with OS fallback for CJK. Panels already opened this session fully apply after a game restart."
         );
         EndOfRunScreenshotEnabledConfig = config.Bind(
             "Screenshots",

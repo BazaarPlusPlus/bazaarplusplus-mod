@@ -118,7 +118,7 @@ public sealed class LoggingGovernanceTests
             ["GameInterop/TagTypography/KeywordIconSpriteProvider.cs"] = "62:Warn",
             ["GameInterop/TagTypography/NativeTagTypography.cs"] = "255:Warn",
             ["Infrastructure/FileBackedPayloadStore.cs"] = "118:Warn,124:Warn",
-            ["Infrastructure/Fonts/BppTmpFont.cs"] = "70:Info,91:Debug,123:Warn",
+            ["Infrastructure/Fonts/BppTmpFont.cs"] = "89:Info,152:Debug,184:Warn",
             ["Infrastructure/Fonts/BppUiFont.cs"] = "67:Info,76:Warn,83:Info",
             ["Patches/CollectionPanel/CollectionItemLoadArtPatch.cs"] = "140:Warn",
             ["Patches/CollectionPanel/CollectionTierTooltipPatch.cs"] =
@@ -137,10 +137,10 @@ public sealed class LoggingGovernanceTests
             ["Patches/Settings/SettingsMenuToggleInstaller.cs"] = "37:Debug,62:Info",
             ["Patches/Tooltips/AggregateItemMissingTypesTooltipPatch.cs"] = "47:Error",
             ["Patches/Tooltips/BilingualItemNamePatch.cs"] = "58:Error",
-            ["Patches/Tooltips/BppTooltipSections.cs"] = "136:Info,177:Info",
-            ["Patches/Tooltips/EncounterEventTooltipPatch.cs"] = "63:Error,137:Warn",
+            ["Patches/Tooltips/BppTooltipSections.cs"] = "142:Info,183:Info",
+            ["Patches/Tooltips/EncounterEventTooltipPatch.cs"] = "70:Error,144:Warn",
             ["Patches/Tooltips/HeroLevelRewardsTooltipPatch.cs"] =
-                "42:Debug,74:Debug,86:Debug,98:Error",
+                "48:Debug,80:Debug,92:Debug,104:Error",
             ["Patches/Tooltips/ItemEnchantPreviewPatch.cs"] = "87:Error",
             ["Plugin.cs"] =
                 "47:Info,58:Info,60:Warn,66:Info,83:Info,85:Info,87:Info,91:Error,149:Error,211:Warn,221:Info,226:Info,246:Error,251:Warn,255:Info",

@@ -14,6 +14,46 @@ public sealed class CollectionEncounterGameTooltipTextTests
     }
 
     [Fact]
+    public void Build_uses_chinese_punctuation_and_spaces_numeric_reward_prefixes()
+    {
+        L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-0000000000f1"),
+                "闪亮!",
+                "获得+10 生命上限",
+                rewardFilter: null,
+                isSourceMatch: false
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(option);
+
+        Assert.Contains("<color=#FFD37E>闪亮!：</color>获得+ 10 生命上限", text);
+        Assert.DoesNotContain("： ", text);
+    }
+
+    [Fact]
+    public void Build_keeps_compact_numeric_reward_prefix_compact()
+    {
+        L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-0000000000f2"),
+                "收下",
+                "+10生命上限",
+                rewardFilter: null,
+                isSourceMatch: false
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(option);
+
+        Assert.Contains("收下：</color>+10生命上限", text);
+        Assert.DoesNotContain("+ 10生命上限", text);
+    }
+
+    [Fact]
     public void Build_renders_one_compact_line_per_choice_without_meta_brackets()
     {
         var option = CreateOption(

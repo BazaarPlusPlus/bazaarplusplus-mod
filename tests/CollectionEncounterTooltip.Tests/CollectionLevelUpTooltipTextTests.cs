@@ -85,8 +85,8 @@ public sealed class CollectionLevelUpTooltipTextTests
             currentLevel: 2
         );
 
-        Assert.Contains("«+150 Max Health»", text);
-        Assert.Contains("«+2 board slots»", text);
+        Assert.Contains("«+ 150 Max Health»", text);
+        Assert.Contains("«+ 2 board slots»", text);
         Assert.Contains("3× random reward (25 options)", text);
         Assert.Contains("<line-height=1.9em>\n<line-height=1.4em>", text);
         Assert.DoesNotContain("<line-height=1.6em>«", text);
@@ -101,6 +101,30 @@ public sealed class CollectionLevelUpTooltipTextTests
             string.Empty,
             CollectionLevelUpTooltipText.Build(null, _ => null, EHero.Vanessa)
         );
+    }
+
+    [Fact]
+    public void Build_uses_chinese_colon_without_a_following_space()
+    {
+        L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
+        var rewardId = Guid.Parse("30000000-0000-0000-0000-0000000000f1");
+        var levelUp = new TLevelUp
+        {
+            Level = 3,
+            Rewards = new TSpawnContextQuery
+            {
+                Groups = { Group(new[] { rewardId }, limit: 1) },
+            },
+        };
+
+        var text = CollectionLevelUpTooltipText.Build(
+            Plan(levelUp),
+            _ => Preview(Step("闪亮!", "选择一件+10 生命的物品")),
+            currentHero: null
+        );
+
+        Assert.Contains("<color=#FFD37E>闪亮!：</color>选择一件+ 10 生命的物品", text);
+        Assert.DoesNotContain("： ", text);
     }
 
     [Fact]
@@ -247,10 +271,14 @@ public sealed class CollectionLevelUpTooltipTextTests
         Assert.DoesNotContain("one of", text);
     }
 
-    private static TCardEncounterStep Step(string title) =>
+    private static TCardEncounterStep Step(string title, string? description = null) =>
         new()
         {
-            Localization = new TCardLocalization { Title = new TLocalizableText { Text = title } },
+            Localization = new TCardLocalization
+            {
+                Title = new TLocalizableText { Text = title },
+                Description = new TLocalizableText { Text = description },
+            },
         };
 
     private static CollectionLevelUpPreviewPlan Plan(TLevelUp levelUp)
@@ -328,9 +356,9 @@ public sealed class CollectionLevelUpTooltipTextTests
             Prerequisites = prerequisites.Length == 0 ? null : prerequisites.ToList(),
         };
 
-    private sealed class TestLanguageProvider : ILanguageProvider
+    private sealed class TestLanguageProvider(string languageCode = "en") : ILanguageProvider
     {
-        public string CurrentLanguageCode => "en";
+        public string CurrentLanguageCode { get; } = languageCode;
     }
 
     private sealed class TestLocaleModeProvider : ILocaleModeProvider

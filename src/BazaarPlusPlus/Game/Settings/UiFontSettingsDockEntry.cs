@@ -15,7 +15,7 @@ internal static class UiFontSettingsDockEntry
             BppSettingsDockOrder.UiFont,
             "UiFont",
             ResolveLabel,
-            new[] { BppUiFontKind.LxgwWenKai, BppUiFontKind.SansSerif },
+            new[] { BppUiFontKind.SansSerif, BppUiFontKind.LxgwWenKai },
             ReadKind,
             (config, kind) =>
             {
@@ -31,8 +31,8 @@ internal static class UiFontSettingsDockEntry
         Label.Resolve(languageCode, L.CurrentMode);
 
     private static BppUiFontKind ReadKind(IBppConfig config) =>
-        config.UiFontKindConfig?.Value == BppUiFontKind.SansSerif
-            ? BppUiFontKind.SansSerif
+        config.UiFontKindConfig?.Value == BppUiFontKind.LxgwWenKai
+            ? BppUiFontKind.LxgwWenKai
             : BppConfig.DefaultUiFontKind;
 
     private static string ResolveStatus(BppUiFontKind kind, string languageCode)
