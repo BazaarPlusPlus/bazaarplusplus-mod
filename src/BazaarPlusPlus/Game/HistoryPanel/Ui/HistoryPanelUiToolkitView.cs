@@ -42,7 +42,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private GameObject? _rootObject;
     private UIDocument? _document;
     private PanelSettings? _panelSettings;
-    private Font? _uiFont;
+    private NativeGameTypography.PanelScope? _typography;
     private VisualElement? _root;
     private Label? _title;
     private VisualElement? _subtitle;
@@ -159,7 +159,11 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _panelSettings.match = 1f;
         _panelSettings.clearColor = false;
         _panelSettings.targetDisplay = 0;
-        if (!NativeGameFonts.TryConfigurePanel(_panelSettings, out _uiFont) || _uiFont == null)
+        if (
+            NativeGameTypography.TryAttachPanel(_panelSettings, out _typography)
+                != NativeGameTypography.Outcome.Ready
+            || _typography == null
+        )
         {
             UnityEngine.Object.DestroyImmediate(_panelSettings);
             _panelSettings = null;
@@ -178,7 +182,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _root.style.top = 0f;
         _root.style.bottom = 0f;
         _root.style.display = DisplayStyle.None;
-        _root.style.unityFont = GetUiFont();
+        _typography.Apply(_root);
         _root.pickingMode = PickingMode.Position;
 
         BuildTree(_root);
@@ -259,7 +263,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
 
         _title!.text = model.Title;
         _closeButton!.text = HistoryPanelText.Close();
-        BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle, _uiFont!);
+        BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle, _typography!);
         _countChip!.text = model.CountChipText;
         _battleChip!.text = model.BattleChipText;
         ApplyDatabaseChipSeverity(
@@ -507,14 +511,14 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         if (_rootObject != null)
             UnityEngine.Object.Destroy(_rootObject);
 
-        NativeGameFonts.ReleasePanelTextSettings(_panelSettings);
+        _typography?.Dispose();
         if (_panelSettings != null)
             UnityEngine.Object.Destroy(_panelSettings);
 
         _rootObject = null;
         _document = null;
         _panelSettings = null;
-        _uiFont = null;
+        _typography = null;
         _root = null;
     }
 }

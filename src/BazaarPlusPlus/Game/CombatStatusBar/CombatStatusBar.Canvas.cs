@@ -3,6 +3,7 @@
 using System;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -54,7 +55,7 @@ internal sealed partial class CombatStatusBar
     private static readonly Color SpeedDotFullColor = new(0.42f, 0.78f, 0.36f, 0.98f);
 
     private static Sprite? _roundedSprite;
-    private static Font? _uiFont;
+    private static NativeGameTypography.OwnedTextPreparation? _uiTypography;
 
     private GameObject? _canvasObject;
     private Canvas? _canvas;
@@ -63,23 +64,23 @@ internal sealed partial class CombatStatusBar
     private Image? _barGlow;
     private Outline? _barOutline;
 
-    private Text? _timeLabel;
-    private Text? _timeValue;
+    private TextMeshProUGUI? _timeLabel;
+    private TextMeshProUGUI? _timeValue;
     private Image? _timeBackground;
 
-    private Text? _speedLabel;
+    private TextMeshProUGUI? _speedLabel;
     private Button? _decrementButton;
-    private Text? _decrementButtonText;
+    private TextMeshProUGUI? _decrementButtonText;
     private Image? _decrementButtonBackground;
     private Button? _incrementButton;
-    private Text? _incrementButtonText;
+    private TextMeshProUGUI? _incrementButtonText;
     private Image? _incrementButtonBackground;
     private Image? _speedDot;
     private Image? _speedBackground;
 
-    private Text? _pauseLabel;
+    private TextMeshProUGUI? _pauseLabel;
     private Button? _pauseButton;
-    private Text? _pauseButtonText;
+    private TextMeshProUGUI? _pauseButtonText;
     private Image? _pauseButtonBackground;
     private Image? _pauseBackground;
 
@@ -102,7 +103,11 @@ internal sealed partial class CombatStatusBar
     {
         if (_canvasObject != null)
             return;
-        if (!NativeGameFonts.TryGetSansSourceFont(out _uiFont) || _uiFont == null)
+        if (
+            NativeGameTypography.PrepareOwnedText(out _uiTypography)
+                != NativeGameTypography.Outcome.Ready
+            || _uiTypography == null
+        )
             return;
 
         _canvasObject = new GameObject(
@@ -207,7 +212,7 @@ internal sealed partial class CombatStatusBar
     {
         if (_canvasObject == null)
         {
-            _uiFont = null;
+            _uiTypography = null;
             return;
         }
 
@@ -240,7 +245,7 @@ internal sealed partial class CombatStatusBar
         _renderedTimeLabel = null;
         _renderedTimeText = null;
         _renderedPauseButtonText = null;
-        _uiFont = null;
+        _uiTypography = null;
         // EnsureUi rebuilds elements with placeholder colors, so force a full repaint.
         _hasAppliedVisualColors = false;
     }
@@ -483,17 +488,16 @@ internal sealed partial class CombatStatusBar
         Transform parent,
         float width,
         out Image background,
-        out Text label,
-        out Text value
+        out TextMeshProUGUI label,
+        out TextMeshProUGUI value
     )
     {
         var segment = CreateSegmentShell(name, parent, width, out background);
         var stack = CreateSegmentStack(segment);
-        label = CreateText("Label", stack, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
+        label = CreateText("Label", stack, 10, FontStyles.Normal, TextAlignmentOptions.Center);
         AddFixedLayout(label.rectTransform, 12f);
 
-        value = CreateText("Value", stack, 15, FontStyle.Bold, TextAnchor.MiddleCenter);
-        value.verticalOverflow = VerticalWrapMode.Overflow;
+        value = CreateText("Value", stack, 15, FontStyles.Bold, TextAlignmentOptions.Center);
         AddFixedLayout(value.rectTransform, 18f);
         return segment;
     }
@@ -503,12 +507,12 @@ internal sealed partial class CombatStatusBar
         Transform parent,
         float width,
         out Image background,
-        out Text label
+        out TextMeshProUGUI label
     )
     {
         var segment = CreateSegmentShell(name, parent, width, out background);
         var stack = CreateSegmentStack(segment);
-        label = CreateText("Label", stack, 10, FontStyle.Normal, TextAnchor.MiddleCenter);
+        label = CreateText("Label", stack, 10, FontStyles.Normal, TextAlignmentOptions.Center);
         AddFixedLayout(label.rectTransform, 12f);
 
         var content = CreateRect("Content", stack);
@@ -564,7 +568,7 @@ internal sealed partial class CombatStatusBar
         return image;
     }
 
-    private (Button button, Image background, Text label) CreateButton(
+    private (Button button, Image background, TextMeshProUGUI label) CreateButton(
         string name,
         Transform parent,
         string text,
@@ -587,7 +591,13 @@ internal sealed partial class CombatStatusBar
         button.transition = Selectable.Transition.ColorTint;
         button.colors = BuildColorBlock(Color.white, Color.white, Color.white);
 
-        var label = CreateText("Label", buttonRect, 16, FontStyle.Bold, TextAnchor.MiddleCenter);
+        var label = CreateText(
+            "Label",
+            buttonRect,
+            16,
+            FontStyles.Bold,
+            TextAlignmentOptions.Center
+        );
         label.raycastTarget = false;
         StretchToParent(label.rectTransform, 0f, 0f, 0f, 0f);
         label.text = text;
@@ -643,23 +653,24 @@ internal sealed partial class CombatStatusBar
         return image;
     }
 
-    private static Text CreateText(
+    private static TextMeshProUGUI CreateText(
         string name,
         Transform parent,
         int fontSize,
-        FontStyle fontStyle,
-        TextAnchor alignment
+        FontStyles fontStyle,
+        TextAlignmentOptions alignment
     )
     {
         var rect = CreateRect(name, parent);
-        var text = rect.gameObject.AddComponent<Text>();
-        text.font = GetUiFont();
+        var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+        if (GetUiTypography().Apply(text) != NativeGameTypography.Outcome.Applied)
+            throw new InvalidOperationException("Native game typography became unavailable.");
         text.fontSize = fontSize;
         text.fontStyle = fontStyle;
         text.alignment = alignment;
-        text.horizontalOverflow = HorizontalWrapMode.Overflow;
-        text.verticalOverflow = VerticalWrapMode.Truncate;
-        text.supportRichText = false;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.richText = false;
         text.raycastTarget = false;
         return text;
     }
@@ -680,7 +691,7 @@ internal sealed partial class CombatStatusBar
     private static void ApplyButtonColors(
         Button? button,
         Image? background,
-        Text? label,
+        TextMeshProUGUI? label,
         CombatStatusBarButtonKind kind,
         bool interactable,
         Color normalColor,
@@ -729,7 +740,7 @@ internal sealed partial class CombatStatusBar
             image.color = color;
     }
 
-    private static void SetTextColor(Text? text, Color color)
+    private static void SetTextColor(TextMeshProUGUI? text, Color color)
     {
         if (text != null)
             text.color = color;
@@ -741,15 +752,15 @@ internal sealed partial class CombatStatusBar
             outline.effectColor = color;
     }
 
-    private static void SetLabel(Text? label, string content)
+    private static void SetLabel(TextMeshProUGUI? label, string content)
     {
         if (label != null)
             label.text = content;
     }
 
-    private static Font GetUiFont()
+    private static NativeGameTypography.OwnedTextPreparation GetUiTypography()
     {
-        return _uiFont
+        return _uiTypography
             ?? throw new InvalidOperationException("Native game UI font is unavailable.");
     }
 

@@ -28,7 +28,7 @@ internal static class BPPSupporterAttributionRow
         VisualElement row,
         IReadOnlyList<BPPSupporterSample> supporters,
         string fallbackText,
-        Font uiFont
+        NativeGameTypography.PanelScope typography
     )
     {
         row.Clear();
@@ -38,37 +38,39 @@ internal static class BPPSupporterAttributionRow
         var samples = supporters
             .Where(sample =>
                 sample.HasValue
-                && NativeGameFonts.IsTextSupported(uiFont, sample.Name, "supporter_attribution")
+                && typography.CheckExternalText(sample.Name, "supporter_attribution")
+                    == NativeGameTypography.ExternalTextSupport.Supported
             )
             .Take(4)
             .ToList();
         if (samples.Count == 0)
         {
-            row.Add(CreateFallbackLabel(fallbackText));
-            row.Add(CreateSponsorButton(sponsorText));
+            row.Add(CreateFallbackLabel(fallbackText, typography));
+            row.Add(CreateSponsorButton(sponsorText, typography));
             return;
         }
 
         var prefix = BPPSupporterAttributionText.FormatSupportedByPrefix(languageCode);
         var suffix = BPPSupporterAttributionText.FormatSupportedBySuffix(languageCode);
-        row.Add(CreatePrefixLabel(prefix));
+        row.Add(CreatePrefixLabel(prefix, typography));
         for (var index = 0; index < samples.Count; index++)
         {
             if (index > 0)
-                row.Add(CreateSeparatorLabel());
+                row.Add(CreateSeparatorLabel(typography));
 
-            row.Add(CreateSupporterName(samples[index]));
+            row.Add(CreateSupporterName(samples[index], typography));
         }
 
         if (!string.IsNullOrWhiteSpace(suffix))
-            row.Add(CreateSuffixLabel(suffix));
+            row.Add(CreateSuffixLabel(suffix, typography));
 
-        row.Add(CreateSponsorButton(sponsorText));
+        row.Add(CreateSponsorButton(sponsorText, typography));
     }
 
-    private static Label CreatePlainLabel(string text)
+    private static Label CreatePlainLabel(string text, NativeGameTypography.PanelScope typography)
     {
         var label = new Label(text);
+        typography.Apply(label);
         label.style.fontSize = Sizes.FontSmall;
         label.style.unityFontStyleAndWeight = FontStyle.Normal;
         label.style.color = Colors.HistorySubtitleText;
@@ -79,44 +81,51 @@ internal static class BPPSupporterAttributionRow
         return label;
     }
 
-    private static Label CreateFallbackLabel(string text)
+    private static Label CreateFallbackLabel(
+        string text,
+        NativeGameTypography.PanelScope typography
+    )
     {
-        var label = CreatePlainLabel(text);
+        var label = CreatePlainLabel(text, typography);
         label.style.whiteSpace = WhiteSpace.Normal;
         label.style.marginRight = 0f;
         return label;
     }
 
-    private static Label CreatePrefixLabel(string text)
+    private static Label CreatePrefixLabel(string text, NativeGameTypography.PanelScope typography)
     {
-        var label = CreatePlainLabel(text);
+        var label = CreatePlainLabel(text, typography);
         label.style.marginRight = UiSpacing.Sm;
         return label;
     }
 
-    private static Label CreateSuffixLabel(string text)
+    private static Label CreateSuffixLabel(string text, NativeGameTypography.PanelScope typography)
     {
-        var label = CreatePlainLabel(text);
+        var label = CreatePlainLabel(text, typography);
         label.style.marginLeft = UiSpacing.Sm;
         label.style.marginRight = 0f;
         return label;
     }
 
-    private static Label CreateSeparatorLabel()
+    private static Label CreateSeparatorLabel(NativeGameTypography.PanelScope typography)
     {
-        var label = CreatePlainLabel("·");
+        var label = CreatePlainLabel("·", typography);
         label.style.color = Colors.WithAlpha(Colors.HistorySubtitleText, 0.56f);
         label.style.marginLeft = UiSpacing.Xs;
         label.style.marginRight = UiSpacing.Xs;
         return label;
     }
 
-    private static Label CreateSupporterName(BPPSupporterSample sample)
+    private static Label CreateSupporterName(
+        BPPSupporterSample sample,
+        NativeGameTypography.PanelScope typography
+    )
     {
         var label = new Label(sample.Name);
+        typography.Apply(label);
         label.tooltip = sample.Name;
         label.style.fontSize = Sizes.SupporterAttributionNameFont;
-        label.style.unityFontStyleAndWeight = FontStyle.Bold;
+        label.style.unityFontStyleAndWeight = FontStyle.Normal;
         label.style.maxWidth = Sizes.SupporterAttributionNameMaxWidth;
         label.style.flexShrink = 1f;
         label.style.whiteSpace = WhiteSpace.NoWrap;
@@ -138,9 +147,13 @@ internal static class BPPSupporterAttributionRow
         };
     }
 
-    private static Button CreateSponsorButton(string text)
+    private static Button CreateSponsorButton(
+        string text,
+        NativeGameTypography.PanelScope typography
+    )
     {
         var button = new Button(OpenSupportPage) { text = $"{SponsorIcon} {text}" };
+        typography.Apply(button);
         button.tooltip = BPPSupporterLinks.ResolveSponsorUrl(GetLanguageCode());
         button.style.height = Sizes.SupporterAttributionHeight;
         button.style.minWidth = Sizes.SupporterActionMinWidth;

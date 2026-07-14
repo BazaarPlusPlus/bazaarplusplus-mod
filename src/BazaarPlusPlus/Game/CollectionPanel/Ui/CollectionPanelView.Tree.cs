@@ -4,6 +4,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.Supporters.Ui;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -49,7 +50,6 @@ internal sealed partial class CollectionPanelView
         rail.Add(titleRow);
 
         _title = CreateLabel(Sizes.FontTitle, FontStyle.Normal, Colors.GameTitleText);
-        _title.style.unityFont = _titleFont;
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
         _title.style.minWidth = 0f;
@@ -292,8 +292,7 @@ internal sealed partial class CollectionPanelView
         field.style.height = Length.Percent(100f);
         field.style.backgroundColor = Color.clear;
         field.style.color = Colors.HistoryChipText;
-        field.style.unityFont = _uiFont;
-        field.style.unityFontDefinition = FontDefinition.FromFont(_uiFont);
+        _typography!.Apply(field);
         field.style.fontSize = Sizes.FontSmall;
         field.style.borderLeftWidth = 0f;
         field.style.borderRightWidth = 0f;
@@ -366,8 +365,7 @@ internal sealed partial class CollectionPanelView
             input.style.alignSelf = Align.Stretch;
             input.style.backgroundColor = Color.clear;
             input.style.color = Colors.HistoryChipText;
-            input.style.unityFont = _uiFont;
-            input.style.unityFontDefinition = FontDefinition.FromFont(_uiFont);
+            _typography!.Apply(input);
             input.style.fontSize = Sizes.FontSmall;
             input.style.unityTextAlign = TextAnchor.MiddleLeft;
             input.style.borderLeftWidth = 0f;
@@ -388,8 +386,7 @@ internal sealed partial class CollectionPanelView
             text.style.height = Length.Percent(100f);
             text.style.alignSelf = Align.Stretch;
             text.style.color = Colors.HistoryChipText;
-            text.style.unityFont = _uiFont;
-            text.style.unityFontDefinition = FontDefinition.FromFont(_uiFont);
+            _typography!.Apply(text);
             text.style.fontSize = Sizes.FontSmall;
             text.style.unityTextAlign = TextAnchor.MiddleLeft;
         }

@@ -12,7 +12,7 @@
 
 1. 删除 BPP 内嵌的 LXGW WenKai、所有 Unity `LegacyRuntime.ttf` / OS 字体路径、运行时自建 TMP 字体和 `Appearance.UiFont` 设置项。
 2. 游戏原生 TMP 表面保留 donor primary font 与材质；当 BPP 在非中文游戏 locale 主动输出 CJK 时，只给 donor clone 挂载游戏 `zh-CN` Static → SecondSet → Dynamic fallback 链，不替换成 BPP 字体。
-3. BPP 自建 UI Toolkit / uGUI 表面（包括 Combat Status Bar 与 Voice Subtitles 中文行）默认使用游戏 Noto Sans Dynamic 资产所引用的 `UnityEngine.Font`；Collection Panel 顶层标题和 Live Build 终局阵容标题按游戏 screen-title 规则单独使用 Noto Serif。
+3. BPP 自建 UI Toolkit 表面默认使用游戏 Noto Sans Dynamic 资产所引用的 `UnityEngine.Font`；BPP 自建 uGUI 表面改用 `TextMeshProUGUI`，以游戏 sans primary clone 挂载完整 `zh-CN` Static → SecondSet → Dynamic 链。Collection Panel 顶层标题和 Live Build 终局阵容标题按游戏 screen-title 规则单独使用 Noto Serif。
 4. 把 `NativeChineseFontFallback` 的游戏资产加载与 TMP donor fallback 安装能力抽成共享 seam；双语名称与 BPP 原生 tooltip CJK 复用同一条游戏字体链；Main Menu 版本文本保持 ASCII donor。
 5. BPP 自建 UI Toolkit panel 使用受控 `PanelTextSettings`，显式清空默认、普通 fallback、Emoji fallback 与 OS fallback，避免缺字时静默切到系统字体。
 6. 外部动态文本先按实际游戏 `UnityEngine.Font` 覆盖范围校验。当前赞助名单完整覆盖；未来缺字的名字不改写、不落回 BPP/OS 字体，而是从轮播样本中跳过并记录缺失 code point。
@@ -167,13 +167,15 @@ flowchart TD
     Native["原生 TMP 扩展\ndonor clone + 游戏 chain"]
     Bilingual["双语名称\ndonor clone + 游戏 chain"]
     PanelPolicy["专用 PanelTextSettings\n禁用 default / Emoji / OS fallback"]
-    Toolkit["BPP UI Toolkit / uGUI\n显式使用游戏 sourceFontFile"]
+    Toolkit["BPP UI Toolkit\n显式使用游戏 sourceFontFile"]
+    BppUgui["BPP uGUI / TextMeshProUGUI\nsans primary clone + 完整 chain"]
     External["外部动态文本\n用户名等"]
     Validate["Font.HasCharacter 覆盖校验\nBMP；补充平面保守拒绝"]
 
     Config --> Chain
     Chain --> Native
     Chain --> Bilingual
+    Chain --> BppUgui
     Chain --> Source
     Source --> Toolkit
     PanelPolicy --> Toolkit
@@ -185,14 +187,16 @@ flowchart TD
 
 ### 5.1 游戏字体资产适配器
 
-在 `GameInterop` 增加一个只负责游戏资产访问与生命周期的共享适配器（暂名 `NativeGameFonts`）：
+在 `GameInterop` 增加单一共享适配器 `NativeGameTypography`，负责游戏资产访问、renderer-specific 绑定与生命周期：
 
 - 只在 `NotoFontFallbackRuntime.HasConfiguration` 为 true 后，从游戏已经初始化的 `_configuration` 读取 `zh-CN` Sans / Serif 有序链；BPP 不抢先加载配置，也不调用游戏 initializer；
 - 加载并持有 Addressables handles；
 - 从链中选择 `sourceFontFile != null` 的 Dynamic 资产；
 - 不得把 Static + SecondSet 当作完整中文覆盖：当前固定 `zh-Hant` Han 字符有 145 / 346 依赖 Dynamic；
-- 向 UI Toolkit / `UnityEngine.UI.Text` 调用方暴露只读 `UnityEngine.Font`；
-- 向原生 TMP 调用方提供“clone donor primary + 追加游戏 fallback chain”的安装能力，不替换 donor primary/material；
+- 不向 feature 暴露 `UnityEngine.Font`、`TMP_FontAsset`、fallback chain 或 `PanelTextSettings`；
+- `PrepareOwnedText` 返回 opaque binding，在创建整棵 BPP uGUI 之前原子准备“游戏 sans primary clone + 完整 fallback chain”；禁止直接把 1024×1024、未启用 multi-atlas 的 Dynamic fallback 当作 primary；
+- `EnsureNativeTextCoverage` 接收原生 TMP donor 和待显示文本，内部完成 donor clone + game chain，不替换 donor primary/material；
+- `TryAttachPanel` 按 `BodyOnly` / `BodyAndHeading` 一次解析 panel 所需全部字体，再原子安装 panel-local scope；scope 统一设置 `unityFont` + `unityFontDefinition` 并按实际 role 检查外部文本覆盖；
 - 覆盖校验按 Unicode code point 枚举：BMP 调用实际渲染 `UnityEngine.Font.HasCharacter(char)`；当前两个 SC 源字体不含补充平面字符，因此 surrogate pair 直接判为 unsupported 并报告完整 code point；
 - 禁止调用 `FontEngine.LoadFontFace`：它会切换进程共享的 active face，可能与游戏 Dynamic TMP glyph population 交错；
 - 资产与 handles 在首次成功加载后存活整个 plugin session；locale 切换和场景切换不得释放，只有 plugin unload 才统一恢复 donor binding、销毁 clone 并释放自有 handles；
@@ -209,9 +213,23 @@ flowchart TD
 - Supporter row：`font=NotoSansSC-Bold; dynamic=True; han=True; unsupported_rejected=True; missing=U+20000; panels_isolated=True`；画面中 `俱` 正常显示，U+20000 只显示 missing glyph。
 - `BppTooltipSections`：`donor=NotoSans`，安装后为 donor clone，`material_preserved=True`，`chain_has_han=True`，实际 mesh 的 `俱` 来自 `NotoSansSC-Bold-Dynamic SDF`。
 
-这不否定字体选择与 fallback 方案，但说明 Voice Subtitles 没必要在游戏初始化期间抢先创建 renderer，故 Phase A 仍未完成。经产品取舍，修订方案改为延迟挂载：`VersionLabelScanner` 仍按现有节奏查找原生 version label，但当该 label 自身不覆盖中文时，只有 `NotoFontFallbackRuntime.HasConfiguration` 为 true 才调用 `VoiceLineDisplay.MountFromVersionLabel`。游戏配置未就绪是预期的 bootstrap 状态，不触发字体解析、不记录 `configuration_unavailable`，scanner 继续检查；游戏配置就绪后再创建 split renderer。BPP 不主动加载 `ConfigurationAddress`，不调用或等待游戏 async initializer，也不后退到 OS / Unity built-in 字体。
+这不否定字体选择与 fallback 方案，但说明 Voice Subtitles 没必要在游戏初始化期间抢先创建 renderer，故 Phase A 仍未完成。经产品取舍，修订方案改为延迟挂载：`VersionLabelScanner` 仍按现有节奏查找原生 version label；当该 label 自身不覆盖中文时，通过 `NativeGameTypography.PrepareOwnedText` 的 `Waiting` 结果决定是否延迟，不再读取 `HasConfiguration` 这一实现细节。准备成功后再创建 split renderer；`Unavailable` 会让本次 mount 原子失败并由 scanner 重试。BPP 不主动加载 `ConfigurationAddress`，不调用或等待游戏 async initializer，也不后退到 OS / Unity built-in 字体。
 
 选择延迟挂载的依据是字幕实际首次显示晚于游戏 LocalizationService 初始化；相比让 BPP 额外持有一份配置 handle，这一方案让配置生命周期继续完全由游戏拥有。若 version label 自带完整中文覆盖，则 combined TMP 路径不依赖这份配置，可以直接挂载。dispatcher 在 renderer 挂载前保留仍在播放的 cue，淘汰已停止的头部 cue；播放状态查询异常的 cue 记录现有、按 reason code 去重的 `playback_tracking.degraded` warning 后按不可追踪处理并淘汰，避免延迟挂载后闪现可能已过期的字幕。队列限制为最新 8 条，既避免初始化窗口永久丢弃首条字幕，也避免字体配置永久失败时无界增长。修复后必须从冷启动重跑 tracer，并证明初始化期间没有 `configuration_unavailable`、配置就绪后 split renderer 成功挂载、第一条实际字幕没有因延迟挂载而丢失。
+
+#### 5.1.2 实机发现：Dynamic fallback 不能直接作为 BPP uGUI primary
+
+2026-07-14 将 BPP 自建 uGUI 从 legacy `UnityEngine.UI.Text` 迁到 `TextMeshProUGUI` 后，首版实现直接绑定了 fallback 链末尾的 `NotoSansSC-Bold-Dynamic SDF`。连续显示字幕后，`不要太小，不要太大。中庸之道最妙。` 中的 `之`、`道`、`妙` 变成 missing-glyph 方块。
+
+离线检查安装包确认：`NotoSansSC-Bold` source font 的 cmap 实际包含上述全部字符；缺字不是文案或 source font 覆盖问题。失败资产只有一个 1024×1024 atlas、padding 8、`m_IsMultiAtlasTexturesEnabled = false`，且初始 character/glyph table 为空。直接把 Dynamic fallback 当 primary 会让所有常用字符都消耗这个小 atlas；它填满后无法再生成新字形。游戏原生设计用前两级 2048×2048 Static / SecondSet 承担常用字符，只让 Dynamic 处理静态表未覆盖的尾部字符。
+
+因此 BPP 自建 uGUI 的固定规则是：clone 游戏 `_loadedSansPrimary`，保留其现有 fallback，并追加完整有序 `zh-CN` Static → SecondSet → Dynamic chain。Dynamic asset 只在链末兜底，禁止直接赋给 BPP `TextMeshProUGUI.font`。UI Toolkit 不消费 TMP atlas，仍使用 Dynamic 的 `sourceFontFile`，不受此限制。
+
+#### 5.1.3 统一 typography seam
+
+2026-07-14 的后续实机验证暴露出策略虽然集中在同一文件，调用方仍分别获取 `TMP_FontAsset`、`UnityEngine.Font`、Serif source font，并自行管理 `PanelTextSettings`、覆盖检查和双字体属性。这样的 shallow adapter 允许 renderer 策略再次分叉。
+
+最终结构改为单一 `NativeGameTypography` facade：BPP-owned TMP 使用 opaque preparation，native donor TMP 使用 coverage operation，UI Toolkit 使用 panel-local scope。调用方只表达目标 surface 与 Body / Heading role，不知道 primary、Dynamic、source font 或 chain。Panel scope 接受 `VisualElement`，覆盖 root、`TextField` 内层和普通 `TextElement`；attach 在修改 `PanelSettings` 前解析 requirements 要求的全部角色，scope dispose 与全局 reset 均幂等。字体 family/coverage 归 adapter，Normal/Bold 等视觉 weight 仍归 feature 样式，避免双重所有权。
 
 ### 5.2 UI Toolkit fallback 隔离
 
@@ -221,8 +239,8 @@ flowchart TD
 - `fallbackFontAssets` 设为空列表；
 - `enableEmojiSupport = false`，Emoji fallback 设为空；
 - Unity 内部的 OS fallback 列表显式初始化为空，禁止其 lazy 枚举系统字体；
-- root 与需要显式覆盖的内部 text element 只绑定 `NativeGameFonts` 暴露的游戏 `UnityEngine.Font`；
-- panel 销毁时同时销毁这份 `PanelTextSettings`，不得共享或修改游戏自己的全局 text settings。
+- root 与需要显式覆盖的内部 `VisualElement` 只通过 `NativeGameTypography.PanelScope.Apply` 绑定游戏字体，feature 不接触 raw font；
+- panel 销毁时 dispose scope，由 scope 清理这份 `PanelTextSettings`；不得共享或修改游戏自己的全局 text settings。
 
 OS fallback 列表没有公共 setter；实现必须把“能够可靠清空并读回为空”作为 adapter readiness 的一部分，可使用 Publicizer 暴露成员或窄范围 reflection。若 Unity 版本变化导致该约束无法验证，panel 本次不创建并记录一次明确错误，不能退回默认 `PanelTextSettings`。
 
@@ -234,13 +252,13 @@ OS fallback 列表没有公共 setter；实现必须把“能够可靠清空并�
 | 事件预览 / 英雄升级奖励 | 删除 `UseUiFont = true`；保留 donor primary/material，CJK 只追加游戏 chain |
 | 附魔预览 / aggregate missing types | 保留共享 section；验证 donor clone 的 Dynamic chain，并按 Noto 指标重新验收 CJK line-height |
 | Main Menu 版本 label | formatter 只生成 ASCII；删除 `BppTmpFont.TryApply` 后保留 donor primary/material，不安装不可达的 CJK chain |
-| Voice Subtitles | 删除 `ResolveSystemChineseUiFont` 与 OS font candidates；TMP 英文/combined label 保留 donor，uGUI 中文行使用游戏 Sans SC `UnityEngine.Font` |
-| Combat Status Bar | 删除 `GetBuiltinResource<Font>("LegacyRuntime.ttf")`；所有 uGUI `Text` 使用同一个游戏 Sans SC `UnityEngine.Font` |
+| Voice Subtitles | 删除 `ResolveSystemChineseUiFont` 与 OS font candidates；TMP 英文/combined label 保留 donor，中文行改为 `TextMeshProUGUI`，使用游戏 sans primary clone + 完整 `zh-CN` chain，Normal style 避免对 Bold 源字体二次合成加粗 |
+| Combat Status Bar | 删除 `GetBuiltinResource<Font>("LegacyRuntime.ttf")`；所有可见文字改为 `TextMeshProUGUI`，使用游戏 sans primary clone + 完整 `zh-CN` chain |
 | 双语名称 | 保留 donor clone + 游戏 `zh-CN` fallback 行为并切到共享 loader；按已确认需求把适用类型从 Item / EventEncounter 扩到 Skill / EncounterStep（技能 / 奖励） |
 | Collection / History / Live Build 根节点 | 统一绑定游戏 Sans SC `UnityEngine.Font` 与专用 `PanelTextSettings`；Collection 顶层标题和 Live Build 终局阵容标题覆盖为游戏 Serif SC source font、normal style 与原生 heading 色 `#FFD5AC` |
 | TextField / Button 内部 text element | 清除分散的 `BppUiFont.Default`，继承根字体；只有 Unity 继承失效的控件保留显式游戏字体绑定 |
 | 赞助用户名 | 显示前校验；只处理当前实际显示文本，不预热整个远端名单 |
-| Collection source badge (`UnityEngine.UI.Text`) | 使用同一个游戏 `UnityEngine.Font` |
+| Collection source badge | 改为 `TextMeshProUGUI`，使用同一个游戏 sans primary clone + 完整 `zh-CN` chain |
 
 ### 5.4 繁体中文策略
 
@@ -296,8 +314,8 @@ OS fallback 列表没有公共 setter；实现必须把“能够可靠清空并�
 - [x] 清理 `BPPSupporterAttributionRow` 的旧字体赋值与 warm 调用。
 - [x] 迁移 `CollectionSourceAttributionBadge`。
 - [x] 清理 `BppTooltipSections`、事件预览、英雄升级奖励、附魔预览、aggregate missing types；CJK 改挂游戏 chain。Main Menu 版本 label 删除旧字体调用并保留 ASCII-only donor。
-- [x] 迁移 Combat Status Bar 的全部 uGUI `Text`。
-- [x] 迁移 Voice Subtitles 的 uGUI 中文行并删除 OS font 路径。
+- [x] 迁移 Combat Status Bar 的全部 legacy uGUI `Text` 到 `TextMeshProUGUI`，使用游戏 primary + 完整 chain。
+- [x] 迁移 Voice Subtitles 的中文行到 `TextMeshProUGUI`，使用游戏 primary + 完整 chain，并删除 OS font 路径。
 
 ### 测试与文档
 
@@ -327,12 +345,14 @@ OS fallback 列表没有公共 setter；实现必须把“能够可靠清空并�
 ### Phase A：共享游戏字体 seam
 
 - [x] 把 `zh-CN` 字体引用加载从 `NativeChineseFontFallback` 提取为共享 `GameInterop` loader。
-- [x] 用纯选择逻辑测试证明只选择 `sourceFontFile != null` 的 Dynamic 资产。
+- [x] 用纯选择逻辑测试证明 UI Toolkit source font 只来自 `sourceFontFile != null` 的 Dynamic 资产；BPP uGUI 必须使用游戏 primary + 完整 chain，不能直接使用 Dynamic fallback。
 - [x] 断言 Static + SecondSet 不能作为完整链或 source font，任一引用加载失败时 adapter 不接受部分链。
 - [x] 实现字体 Addressables handle 持有与去重：首次成功加载后存活整个 plugin session，locale/scene change 不释放，unload 才释放；配置本身继续由游戏持有，BPP 不创建配置 handle。
 - [x] 抽出 donor clone + game fallback installer，供双语名称与原生 tooltip 共用；unload 恢复 binding 并销毁 clone。
 - [x] 实现 `Font.HasCharacter` 覆盖校验：BMP 精确检查，surrogate pair 按完整 code point 保守拒绝；代码不得调用 `FontEngine.LoadFontFace` 或写 TMP atlas。
 - [x] 建立专用 `PanelTextSettings` factory，并能验证 default / ordinary / Emoji / OS fallback 全空；失败时 panel fail closed。
+- [x] 深化为单一 `NativeGameTypography` seam：raw font/fallback 不再逃逸，owned TMP preparation、native donor coverage 与 panel scope 统一 readiness、绑定和生命周期。
+- [x] Panel scope 统一设置 `unityFont` + `unityFontDefinition`，按 BodyOnly / BodyAndHeading 原子准备所需 role，并负责外部文本覆盖检查。
 - [x] 首轮实际 Supporter row tracer 已证明 Dynamic Han、unsupported missing glyph 与 panel 隔离；临时 probe 已删除。
 - [x] 首轮实际 `BppTooltipSections` tracer 已证明 donor material 保持且 `俱` 由 `NotoSansSC-Bold-Dynamic SDF` 渲染；临时 probe 已删除。
 - [x] 实现 Voice Subtitles readiness gate：version label 不覆盖中文且游戏配置未就绪时不创建 renderer，由现有 scanner 延迟重试；adapter 将该状态视为 not-ready 而非 degraded。
@@ -343,9 +363,9 @@ OS fallback 列表没有公共 setter；实现必须把“能够可靠清空并�
 ### Phase B：逐表面迁移
 
 - [x] 迁移 Collection / History / Live Build 根与内部控件。
-- [x] 迁移 uGUI source badge。
-- [x] 迁移 Combat Status Bar 的全部 uGUI `Text`。
-- [x] 迁移 Voice Subtitles 中文 uGUI 行并删除 OS font path；英文/combined TMP donor 行为保持。
+- [x] 迁移 source badge 到 `TextMeshProUGUI` + 游戏 primary/完整 chain。
+- [x] 迁移 Combat Status Bar 的全部 legacy uGUI `Text` 到 `TextMeshProUGUI` + 游戏 primary/完整 chain。
+- [x] 迁移 Voice Subtitles 中文行到 `TextMeshProUGUI` + 游戏 primary/完整 chain，并删除 OS font path；英文/combined TMP donor 行为保持。
 - [x] 删除原生 tooltip / main-menu label 的 BPP 字体覆盖并保留 donor typography；原生 tooltip 的 CJK 安装游戏 chain，ASCII-only main-menu label 不安装不可达的 chain。
 - [ ] 重新验收附魔预览和 aggregate missing types 的 CJK line-height / wrapping。
 - [x] 双语名称切到共享 loader，并把适用类型从 Item / EventEncounter 扩到 Skill / EncounterStep（技能 / 奖励）。

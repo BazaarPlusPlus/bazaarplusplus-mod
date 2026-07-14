@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
 using TheBazaar.Localization;
@@ -18,11 +19,10 @@ using TextCoreFontAsset = UnityEngine.TextCore.Text.FontAsset;
 namespace BazaarPlusPlus.GameInterop.Fonts;
 
 /// <summary>
-/// Owns the game's zh-CN font references for the full plugin session. Native TMP labels keep
-/// their donor primary/material and receive only the game's fallback chain; BPP-created UI uses
-/// the Dynamic asset's packaged UnityEngine.Font.
+/// Applies the game's native typography to every BPP-owned text surface while keeping renderer-
+/// specific assets, fallback chains, coverage checks, and cleanup inside this adapter.
 /// </summary>
-internal static class NativeGameFonts
+internal static class NativeGameTypography
 {
     private const string ChineseLocale = "zh-CN";
     private const string PanelTextSettingsName = "BPP Native Game Font Text Settings";
@@ -43,25 +43,90 @@ internal static class NativeGameFonts
     private static readonly List<AsyncOperationHandle<TMP_FontAsset>> Handles = new();
     private static readonly Dictionary<object, TMP_FontAsset> LoadedByRuntimeKey = new();
     private static readonly List<FontBinding> Bindings = new();
-    private static readonly List<PanelTextSettings> PanelTextSettingsInstances = new();
+    private static readonly List<PanelScope> PanelScopes = new();
     private static readonly OperationalHealthTracker<int, NativeGameFontReasonCode> Health = new();
 
     private static TMP_FontAsset[]? _serifFallbacks;
     private static TMP_FontAsset[]? _sansFallbacks;
-    private static Font? _serifSourceFont;
+    private static TMP_FontAsset? _serifFontAsset;
+    private static TMP_FontAsset? _sansFontAsset;
+    private static TMP_FontAsset? _sansDynamicFontAsset;
     private static Font? _sansSourceFont;
     private static bool _readyReported;
+    private static int _generation;
+    private static int _mainThreadId;
 
-    internal static bool IsConfigurationReady => NotoFontFallbackRuntime.HasConfiguration;
-
-    internal static bool TryInstallFallback(TMP_Text? text, string? sampleText)
+    internal enum Outcome
     {
-        if (
-            text?.font == null
-            || string.IsNullOrWhiteSpace(sampleText)
-            || !UnicodeFontCoverage.ContainsCjk(sampleText)
-        )
-            return false;
+        Ready,
+        Applied,
+        NotNeeded,
+        Waiting,
+        Unavailable,
+    }
+
+    internal enum OwnedTextRole
+    {
+        Body,
+        Heading,
+    }
+
+    internal enum ExternalTextSupport
+    {
+        Supported,
+        Unsupported,
+        Unavailable,
+    }
+
+    internal static void InitializeForCurrentThread()
+    {
+        var currentThreadId = Environment.CurrentManagedThreadId;
+        var installedThreadId = Interlocked.CompareExchange(
+            ref _mainThreadId,
+            currentThreadId,
+            comparand: 0
+        );
+        if (installedThreadId != 0 && installedThreadId != currentThreadId)
+            throw new InvalidOperationException(
+                "Native game typography was initialized from a different thread."
+            );
+    }
+
+    internal static Outcome PrepareOwnedText(out OwnedTextPreparation? preparation) =>
+        PrepareOwnedText(OwnedTextRole.Body, out preparation);
+
+    internal static Outcome PrepareOwnedText(
+        OwnedTextRole role,
+        out OwnedTextPreparation? preparation
+    )
+    {
+        EnsureMainThread();
+        TMP_FontAsset? fontAsset;
+        var ready = role switch
+        {
+            OwnedTextRole.Body => TryGetSansFontAsset(out fontAsset),
+            OwnedTextRole.Heading => TryGetSerifFontAsset(out fontAsset),
+            _ => throw new ArgumentOutOfRangeException(nameof(role), role, null),
+        };
+        if (ready && fontAsset != null)
+        {
+            preparation = new OwnedTextPreparation(fontAsset, _generation);
+            return Outcome.Ready;
+        }
+
+        preparation = null;
+        return NotoFontFallbackRuntime.HasConfiguration ? Outcome.Unavailable : Outcome.Waiting;
+    }
+
+    internal static Outcome EnsureNativeTextCoverage(TMP_Text text, string? sampleText)
+    {
+        EnsureMainThread();
+        if (text == null)
+            throw new ArgumentNullException(nameof(text));
+        if (text.font == null)
+            return Outcome.Unavailable;
+        if (string.IsNullOrWhiteSpace(sampleText) || !UnicodeFontCoverage.ContainsCjk(sampleText))
+            return Outcome.NotNeeded;
 
         var preferSerif = text.font.name.IndexOf("Serif", StringComparison.OrdinalIgnoreCase) >= 0;
         var attempt = ResolveFallbacks(preferSerif);
@@ -73,11 +138,11 @@ internal static class NativeGameFonts
         }
         Observe(attempt);
         if (attempt.Fonts.Length == 0)
-            return false;
+            return attempt.WasAttempted ? Outcome.Unavailable : Outcome.Waiting;
 
         var binding = FindOrCreateBinding(text);
         if (binding?.Clone?.fallbackFontAssetTable == null)
-            return false;
+            return Outcome.Unavailable;
 
         var installed = false;
         foreach (var fallback in attempt.Fonts)
@@ -91,17 +156,99 @@ internal static class NativeGameFonts
 
         if (installed)
             text.ForceMeshUpdate(ignoreActiveState: true);
-        return true;
+        return Outcome.Applied;
     }
 
-    internal static bool TryGetSansSourceFont(out Font? sourceFont) =>
-        TryGetSourceFont(preferSerif: false, ref _sansSourceFont, out sourceFont);
+    private static bool TryGetSansSourceFont(out Font? sourceFont) =>
+        TryGetSourceFont(
+            preferSerif: false,
+            ref _sansDynamicFontAsset,
+            ref _sansSourceFont,
+            out sourceFont
+        );
 
-    internal static bool TryGetSerifSourceFont(out Font? sourceFont) =>
-        TryGetSourceFont(preferSerif: true, ref _serifSourceFont, out sourceFont);
+    private static bool TryGetSansFontAsset(out TMP_FontAsset? fontAsset) =>
+        TryGetOwnedFontAsset(
+            NotoFontFallbackRuntime._loadedSansPrimary,
+            preferSerif: false,
+            "BPP Game Sans",
+            ref _sansFontAsset,
+            out fontAsset
+        );
+
+    private static bool TryGetSerifFontAsset(out TMP_FontAsset? fontAsset) =>
+        TryGetOwnedFontAsset(
+            NotoFontFallbackRuntime._loadedSerifPrimary,
+            preferSerif: true,
+            "BPP Game Serif",
+            ref _serifFontAsset,
+            out fontAsset
+        );
+
+    private static bool TryGetOwnedFontAsset(
+        TMP_FontAsset? primary,
+        bool preferSerif,
+        string cloneSuffix,
+        ref TMP_FontAsset? cachedFontAsset,
+        out TMP_FontAsset? fontAsset
+    )
+    {
+        if (cachedFontAsset != null)
+        {
+            fontAsset = cachedFontAsset;
+            return true;
+        }
+
+        if (primary == null)
+        {
+            if (NotoFontFallbackRuntime.HasConfiguration)
+                ReportFailure(
+                    NativeGameFontStage.ResolveSourceFont,
+                    NativeGameFontReasonCode.SourceFontUnavailable,
+                    null
+                );
+            fontAsset = null;
+            return false;
+        }
+
+        var attempt = ResolveFallbacks(preferSerif);
+        Observe(attempt);
+        if (attempt.Fonts.Length == 0)
+        {
+            fontAsset = null;
+            return false;
+        }
+
+        try
+        {
+            var clone = Object.Instantiate(primary);
+            clone.name = $"{primary.name} ({cloneSuffix})";
+            var fallbackFontAssets = new List<TMP_FontAsset>(
+                primary.fallbackFontAssetTable ?? new List<TMP_FontAsset>()
+            );
+            foreach (var fallback in attempt.Fonts)
+                if (fallback != null && !fallbackFontAssets.Contains(fallback))
+                    fallbackFontAssets.Add(fallback);
+            clone.fallbackFontAssetTable = fallbackFontAssets;
+            cachedFontAsset = clone;
+            fontAsset = clone;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ReportFailure(
+                NativeGameFontStage.ResolveSourceFont,
+                NativeGameFontReasonCode.SourceFontUnavailable,
+                ex
+            );
+            fontAsset = null;
+            return false;
+        }
+    }
 
     private static bool TryGetSourceFont(
         bool preferSerif,
+        ref TMP_FontAsset? cachedDynamicFontAsset,
         ref Font? cachedSourceFont,
         out Font? sourceFont
     )
@@ -109,6 +256,36 @@ internal static class NativeGameFonts
         if (cachedSourceFont != null)
         {
             sourceFont = cachedSourceFont;
+            return true;
+        }
+
+        if (
+            !TryGetDynamicFontAsset(
+                preferSerif,
+                ref cachedDynamicFontAsset,
+                out var dynamicFontAsset
+            )
+            || dynamicFontAsset?.sourceFontFile == null
+        )
+        {
+            sourceFont = null;
+            return false;
+        }
+
+        cachedSourceFont = dynamicFontAsset.sourceFontFile;
+        sourceFont = cachedSourceFont;
+        return true;
+    }
+
+    private static bool TryGetDynamicFontAsset(
+        bool preferSerif,
+        ref TMP_FontAsset? cachedDynamicFontAsset,
+        out TMP_FontAsset? fontAsset
+    )
+    {
+        if (cachedDynamicFontAsset != null)
+        {
+            fontAsset = cachedDynamicFontAsset;
             return true;
         }
 
@@ -122,30 +299,33 @@ internal static class NativeGameFonts
                     NativeGameFontReasonCode.SourceFontUnavailable,
                     null
                 );
-            sourceFont = null;
+            fontAsset = null;
             return false;
         }
         var sourceIndex = NativeGameFontSelection.FindLastIndexWithSource(
             attempt.Fonts,
-            candidate => candidate?.sourceFontFile != null
+            candidate =>
+                candidate != null
+                && candidate.atlasPopulationMode == TMPro.AtlasPopulationMode.Dynamic
+                && candidate.sourceFontFile != null
         );
         if (sourceIndex >= 0)
         {
-            var candidate = attempt.Fonts[sourceIndex].sourceFontFile;
-            if (!candidate.dynamic)
+            var candidate = attempt.Fonts[sourceIndex];
+            if (!candidate.sourceFontFile.dynamic)
             {
                 ReportFailure(
                     NativeGameFontStage.ResolveSourceFont,
                     NativeGameFontReasonCode.SourceFontNotDynamic,
                     null
                 );
-                sourceFont = null;
+                fontAsset = null;
                 return false;
             }
 
-            cachedSourceFont = candidate;
-            sourceFont = candidate;
-            ReportSuccess(attempt.Fonts, candidate);
+            cachedDynamicFontAsset = candidate;
+            fontAsset = candidate;
+            ReportSuccess(attempt.Fonts, candidate.sourceFontFile);
             return true;
         }
 
@@ -154,11 +334,11 @@ internal static class NativeGameFonts
             NativeGameFontReasonCode.SourceFontUnavailable,
             null
         );
-        sourceFont = null;
+        fontAsset = null;
         return false;
     }
 
-    internal static bool TryFindMissingCodePoint(Font? font, string? text, out int missingCodePoint)
+    private static bool TryFindMissingCodePoint(Font? font, string? text, out int missingCodePoint)
     {
         if (font == null)
         {
@@ -173,28 +353,32 @@ internal static class NativeGameFonts
         );
     }
 
-    internal static bool IsTextSupported(Font? font, string? text, string surface)
+    private static ExternalTextSupport CheckExternalText(Font? font, string? text, string surface)
     {
         if (!TryFindMissingCodePoint(font, text, out var missingCodePoint))
-            return true;
+            return ExternalTextSupport.Supported;
 
         BppLog.WarnEvent(
             NativeGameFontsLogEvents.TextRejected,
             NativeGameFontsLogEvents.TextRejectedSurface.Bind(surface),
             NativeGameFontsLogEvents.TextRejectedCodePoint.Bind($"U+{missingCodePoint:X}")
         );
-        return false;
+        return ExternalTextSupport.Unsupported;
     }
 
-    internal static bool TryConfigurePanel(PanelSettings? panelSettings, out Font? sourceFont)
+    internal static Outcome TryAttachPanel(PanelSettings panelSettings, out PanelScope? scope)
     {
-        sourceFont = null;
-        if (panelSettings == null || panelSettings.textSettings != null)
-            return false;
-        if (!TryGetSansSourceFont(out sourceFont) || sourceFont == null)
-            return false;
+        EnsureMainThread();
+        if (panelSettings == null)
+            throw new ArgumentNullException(nameof(panelSettings));
+        scope = null;
+        if (panelSettings.textSettings != null)
+            return Outcome.Unavailable;
+        if (!TryGetSansSourceFont(out var bodyFont) || bodyFont == null)
+            return NotoFontFallbackRuntime.HasConfiguration ? Outcome.Unavailable : Outcome.Waiting;
 
         PanelTextSettings? textSettings = null;
+        PanelScope? createdScope = null;
         try
         {
             RequireField(OsFallbackFontAssetsField, "m_FallbackOSFontAssets");
@@ -215,21 +399,25 @@ internal static class NativeGameFonts
                     "Panel text settings retain a fallback font path."
                 );
 
+            createdScope = new PanelScope(panelSettings, textSettings, bodyFont, _generation);
+            PanelScopes.Add(createdScope);
             panelSettings.textSettings = textSettings;
-            PanelTextSettingsInstances.Add(textSettings);
-            return true;
+            scope = createdScope;
+            return Outcome.Ready;
         }
         catch (Exception ex)
         {
+            if (createdScope != null)
+                PanelScopes.Remove(createdScope);
             if (textSettings != null)
                 Object.DestroyImmediate(textSettings);
-            sourceFont = null;
+            scope = null;
             ReportFailure(
                 NativeGameFontStage.ConfigurePanelTextSettings,
                 NativeGameFontReasonCode.PanelTextSettingsUnavailable,
                 ex
             );
-            return false;
+            return Outcome.Unavailable;
         }
     }
 
@@ -272,27 +460,19 @@ internal static class NativeGameFonts
             );
     }
 
-    internal static void ReleasePanelTextSettings(PanelSettings? panelSettings)
-    {
-        if (panelSettings?.textSettings is not { } textSettings)
-            return;
-        if (!string.Equals(textSettings.name, PanelTextSettingsName, StringComparison.Ordinal))
-            return;
-
-        panelSettings.textSettings = null;
-        PanelTextSettingsInstances.Remove(textSettings);
-        Object.Destroy(textSettings);
-    }
-
     internal static void Reset()
     {
+        EnsureMainThread();
         try
         {
             RestoreBindings();
-            foreach (var textSettings in PanelTextSettingsInstances)
-                if (textSettings != null)
-                    Object.DestroyImmediate(textSettings);
-            PanelTextSettingsInstances.Clear();
+            foreach (var scope in PanelScopes.ToArray())
+                scope.DisposeFromReset();
+            PanelScopes.Clear();
+            if (_serifFontAsset != null)
+                Object.DestroyImmediate(_serifFontAsset);
+            if (_sansFontAsset != null)
+                Object.DestroyImmediate(_sansFontAsset);
         }
         finally
         {
@@ -304,10 +484,13 @@ internal static class NativeGameFonts
 
         _serifFallbacks = null;
         _sansFallbacks = null;
-        _serifSourceFont = null;
+        _serifFontAsset = null;
+        _sansFontAsset = null;
+        _sansDynamicFontAsset = null;
         _sansSourceFont = null;
         Health.Reset();
         _readyReported = false;
+        _generation++;
     }
 
     private static void RestoreBindings()
@@ -348,6 +531,7 @@ internal static class NativeGameFonts
 
     private static FontBinding? FindOrCreateBinding(TMP_Text text)
     {
+        CleanupDeadBindings();
         foreach (var binding in Bindings)
             if (binding.Text == text)
                 return binding;
@@ -368,13 +552,27 @@ internal static class NativeGameFonts
         return created;
     }
 
+    private static void CleanupDeadBindings()
+    {
+        for (var index = Bindings.Count - 1; index >= 0; index--)
+        {
+            var binding = Bindings[index];
+            if (binding.Text != null && binding.Clone != null)
+                continue;
+
+            if (binding.Clone != null)
+                Object.DestroyImmediate(binding.Clone);
+            Bindings.RemoveAt(index);
+        }
+    }
+
     private static FontLoadAttempt ResolveFallbacks(bool preferSerif)
     {
         var cached = preferSerif ? _serifFallbacks : _sansFallbacks;
         if (cached != null)
             return FontLoadAttempt.Cached(cached);
 
-        if (!IsConfigurationReady)
+        if (!NotoFontFallbackRuntime.HasConfiguration)
             return FontLoadAttempt.NotReady();
 
         var configuration = NotoFontFallbackRuntime._configuration;
@@ -546,6 +744,117 @@ internal static class NativeGameFonts
                     NativeGameFontsLogEvents.LoadedSourceFont.Bind(sourceFont?.name),
                 ]
         );
+    }
+
+    private static void EnsureMainThread()
+    {
+        var currentThreadId = Environment.CurrentManagedThreadId;
+        if (_mainThreadId == 0)
+            throw new InvalidOperationException(
+                "Native game typography must be initialized on the Unity main thread."
+            );
+        if (_mainThreadId != currentThreadId)
+            throw new InvalidOperationException(
+                "Native game typography can only be used on the Unity main thread."
+            );
+    }
+
+    internal sealed class OwnedTextPreparation
+    {
+        private readonly TMP_FontAsset _fontAsset;
+        private readonly int _preparedGeneration;
+
+        internal OwnedTextPreparation(TMP_FontAsset fontAsset, int preparedGeneration)
+        {
+            _fontAsset = fontAsset;
+            _preparedGeneration = preparedGeneration;
+        }
+
+        internal Outcome Apply(TMP_Text text)
+        {
+            EnsureMainThread();
+            if (text == null)
+                throw new ArgumentNullException(nameof(text));
+            if (_preparedGeneration != _generation || _fontAsset == null)
+                return Outcome.Unavailable;
+
+            text.font = _fontAsset;
+            return Outcome.Applied;
+        }
+    }
+
+    internal sealed class PanelScope : IDisposable
+    {
+        private readonly PanelSettings _panelSettings;
+        private readonly PanelTextSettings _textSettings;
+        private readonly Font _bodyFont;
+        private readonly int _attachedGeneration;
+        private bool _disposed;
+
+        internal PanelScope(
+            PanelSettings panelSettings,
+            PanelTextSettings textSettings,
+            Font bodyFont,
+            int attachedGeneration
+        )
+        {
+            _panelSettings = panelSettings;
+            _textSettings = textSettings;
+            _bodyFont = bodyFont;
+            _attachedGeneration = attachedGeneration;
+        }
+
+        internal Outcome Apply(VisualElement element)
+        {
+            EnsureMainThread();
+            if (element == null)
+                throw new ArgumentNullException(nameof(element));
+            if (_disposed || _attachedGeneration != _generation)
+                return Outcome.Unavailable;
+
+            element.style.unityFont = _bodyFont;
+            element.style.unityFontDefinition = FontDefinition.FromFont(_bodyFont);
+            return Outcome.Applied;
+        }
+
+        internal ExternalTextSupport CheckExternalText(string? text, string surface)
+        {
+            EnsureMainThread();
+            if (string.IsNullOrWhiteSpace(surface))
+                throw new ArgumentException("A diagnostic surface is required.", nameof(surface));
+            if (_disposed || _attachedGeneration != _generation)
+                return ExternalTextSupport.Unavailable;
+
+            return NativeGameTypography.CheckExternalText(_bodyFont, text, surface);
+        }
+
+        public void Dispose()
+        {
+            EnsureMainThread();
+            DisposeCore(immediate: false);
+        }
+
+        internal void DisposeFromReset()
+        {
+            DisposeCore(immediate: true);
+        }
+
+        private void DisposeCore(bool immediate)
+        {
+            if (_disposed)
+                return;
+            _disposed = true;
+            PanelScopes.Remove(this);
+
+            if (_panelSettings != null && _panelSettings.textSettings == _textSettings)
+                _panelSettings.textSettings = null;
+            if (_textSettings == null)
+                return;
+            if (immediate)
+                Object.DestroyImmediate(_textSettings);
+            else
+                Object.Destroy(_textSettings);
+        }
     }
 
     private readonly struct FontLoadAttempt

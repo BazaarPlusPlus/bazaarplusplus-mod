@@ -6,19 +6,19 @@ namespace VoiceSubtitles.Tests;
 public sealed class VersionLabelScannerTests
 {
     [Theory]
-    [InlineData(false, false, true)]
-    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    [InlineData(false, true, true)]
     [InlineData(true, false, false)]
     [InlineData(true, true, false)]
-    public void Mount_is_delayed_only_when_both_anchor_and_game_font_are_unavailable(
+    public void Mount_is_delayed_only_while_owned_typography_is_waiting(
         bool anchorHasChineseCoverage,
-        bool gameChineseUiFontReady,
+        bool nativeTypographyWaiting,
         bool expected
     )
     {
         Assert.Equal(
             expected,
-            VersionLabelScanner.ShouldDelayMount(anchorHasChineseCoverage, gameChineseUiFontReady)
+            VersionLabelScanner.ShouldDelayMount(anchorHasChineseCoverage, nativeTypographyWaiting)
         );
     }
 }

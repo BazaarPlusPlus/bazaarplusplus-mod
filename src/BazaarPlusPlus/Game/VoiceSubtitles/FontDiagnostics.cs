@@ -20,13 +20,6 @@ internal static class FontDiagnostics
         return HasFullChineseCoverage(font);
     }
 
-    public static bool IsGameChineseUiFontReady => NativeGameFonts.IsConfigurationReady;
-
-    public static Font? ResolveGameChineseUiFont()
-    {
-        return NativeGameFonts.TryGetSansSourceFont(out var font) ? font : null;
-    }
-
     public static void LogOnce(TextMeshProUGUI sourceLabel)
     {
         if (_logged)

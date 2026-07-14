@@ -42,8 +42,9 @@ internal sealed class LiveBuildPanelView : IDisposable
     private GameObject? _foregroundRootObject;
     private UIDocument? _foregroundDocument;
     private PanelSettings? _foregroundPanelSettings;
-    private Font? _titleFont;
-    private Font? _uiFont;
+    private NativeGameTypography.PanelScope? _typography;
+    private NativeGameTypography.PanelScope? _foregroundTypography;
+    private NativeGameTitleOverlay? _titleOverlay;
     private VisualElement? _foregroundRoot;
     private VisualElement? _root;
     private Label? _title;
@@ -92,10 +93,9 @@ internal sealed class LiveBuildPanelView : IDisposable
 
         _panelSettings = CreatePanelSettings(BppOverlaySorting.PanelUiToolkit);
         if (
-            !NativeGameFonts.TryConfigurePanel(_panelSettings, out _uiFont)
-            || _uiFont == null
-            || !NativeGameFonts.TryGetSerifSourceFont(out _titleFont)
-            || _titleFont == null
+            NativeGameTypography.TryAttachPanel(_panelSettings, out _typography)
+                != NativeGameTypography.Outcome.Ready
+            || _typography == null
         )
         {
             AbandonPanelSettingsCreation();
@@ -104,8 +104,24 @@ internal sealed class LiveBuildPanelView : IDisposable
 
         _foregroundPanelSettings = CreatePanelSettings(BppOverlaySorting.PanelForeground);
         if (
-            !NativeGameFonts.TryConfigurePanel(_foregroundPanelSettings, out var foregroundFont)
-            || foregroundFont == null
+            NativeGameTypography.TryAttachPanel(_foregroundPanelSettings, out _foregroundTypography)
+                != NativeGameTypography.Outcome.Ready
+            || _foregroundTypography == null
+        )
+        {
+            AbandonPanelSettingsCreation();
+            return;
+        }
+        if (
+            !NativeGameTitleOverlay.TryCreate(
+                "LiveBuildPanelNativeTitle",
+                _parent,
+                BppOverlaySorting.NativeCardPreview,
+                Sizes.FontTitle,
+                Colors.GameTitleText,
+                out _titleOverlay
+            )
+            || _titleOverlay == null
         )
         {
             AbandonPanelSettingsCreation();
@@ -118,7 +134,7 @@ internal sealed class LiveBuildPanelView : IDisposable
         _document.panelSettings = _panelSettings;
         _root = _document.rootVisualElement;
         ConfigureDocumentRoot(_root, PickingMode.Position);
-        _root.style.unityFont = _uiFont;
+        _typography.Apply(_root);
 
         _foregroundRootObject = new GameObject("LiveBuildPanelForegroundUiToolkitRoot");
         _foregroundRootObject.transform.SetParent(_parent, false);
@@ -126,9 +142,10 @@ internal sealed class LiveBuildPanelView : IDisposable
         _foregroundDocument.panelSettings = _foregroundPanelSettings;
         _foregroundRoot = _foregroundDocument.rootVisualElement;
         ConfigureDocumentRoot(_foregroundRoot, PickingMode.Ignore);
-        _foregroundRoot.style.unityFont = foregroundFont;
+        _foregroundTypography.Apply(_foregroundRoot);
 
         BuildTree(_root);
+        _titleOverlay.Attach(_title!);
     }
 
     public void SetVisible(bool visible)
@@ -137,6 +154,7 @@ internal sealed class LiveBuildPanelView : IDisposable
             _root.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
         if (_foregroundRoot != null)
             _foregroundRoot.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
+        _titleOverlay?.SetVisible(visible);
     }
 
     public void Refresh(LiveBuildPanelSnapshot snapshot)
@@ -145,12 +163,13 @@ internal sealed class LiveBuildPanelView : IDisposable
             return;
 
         _title!.text = LiveBuildPanelText.Title();
+        _titleOverlay?.SetText(_title.text);
         _closeButton!.text = LiveBuildPanelText.Close();
         BPPSupporterAttributionRow.Bind(
             _subtitle!,
             snapshot.Supporters,
             LiveBuildPanelText.Subtitle(),
-            _uiFont!
+            _typography!
         );
         _corpusCardTitle!.text = LiveBuildPanelText.CorpusCardTitle();
         _finalBuildRefreshButton!.text = snapshot.FinalBuildRefreshButtonText;
@@ -305,12 +324,13 @@ internal sealed class LiveBuildPanelView : IDisposable
     {
         if (_rootObject != null)
             UnityEngine.Object.Destroy(_rootObject);
-        NativeGameFonts.ReleasePanelTextSettings(_panelSettings);
+        _titleOverlay?.Dispose();
+        _typography?.Dispose();
         if (_panelSettings != null)
             UnityEngine.Object.Destroy(_panelSettings);
         if (_foregroundRootObject != null)
             UnityEngine.Object.Destroy(_foregroundRootObject);
-        NativeGameFonts.ReleasePanelTextSettings(_foregroundPanelSettings);
+        _foregroundTypography?.Dispose();
         if (_foregroundPanelSettings != null)
             UnityEngine.Object.Destroy(_foregroundPanelSettings);
 
@@ -321,24 +341,27 @@ internal sealed class LiveBuildPanelView : IDisposable
         _foregroundRootObject = null;
         _foregroundDocument = null;
         _foregroundPanelSettings = null;
-        _titleFont = null;
-        _uiFont = null;
+        _typography = null;
+        _foregroundTypography = null;
+        _titleOverlay = null;
         _foregroundRoot = null;
         _root = null;
     }
 
     private void AbandonPanelSettingsCreation()
     {
-        NativeGameFonts.ReleasePanelTextSettings(_panelSettings);
-        NativeGameFonts.ReleasePanelTextSettings(_foregroundPanelSettings);
+        _typography?.Dispose();
+        _foregroundTypography?.Dispose();
+        _titleOverlay?.Dispose();
         if (_panelSettings != null)
             UnityEngine.Object.DestroyImmediate(_panelSettings);
         if (_foregroundPanelSettings != null)
             UnityEngine.Object.DestroyImmediate(_foregroundPanelSettings);
         _panelSettings = null;
         _foregroundPanelSettings = null;
-        _titleFont = null;
-        _uiFont = null;
+        _typography = null;
+        _foregroundTypography = null;
+        _titleOverlay = null;
     }
 
     private void BuildTree(VisualElement root)
@@ -479,7 +502,6 @@ internal sealed class LiveBuildPanelView : IDisposable
         rail.Add(titleRow);
 
         _title = CreateLabel(Sizes.FontTitle, FontStyle.Normal, Colors.GameTitleText);
-        _title.style.unityFont = _titleFont;
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
         _title.style.minWidth = 0f;

@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.VoiceSubtitles.Settings;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
 using BazaarPlusPlus.Infrastructure;
 using TMPro;
@@ -22,7 +23,7 @@ internal static class VoiceLineDisplay
     private static GameObject? _labelRoot;
     private static TextMeshProUGUI? _combinedLabel;
     private static TextMeshProUGUI? _englishLabel;
-    private static Text? _chineseUiLabel;
+    private static TextMeshProUGUI? _chineseUiLabel;
     private static VoiceLineOverlayLifetime? _lifetime;
     private static bool _mountedFromVersionLabel;
     private static int _nextDisplayId;
@@ -455,7 +456,7 @@ internal static class VoiceLineDisplay
     private static void ConfigureSplitText(
         TextMeshProUGUI source,
         TextMeshProUGUI? english,
-        Text? chineseUi,
+        TextMeshProUGUI? chineseUi,
         VoiceLineSettings settings,
         DisplayText? currentText = null
     )
@@ -495,19 +496,18 @@ internal static class VoiceLineDisplay
 
         if (chineseUi != null)
         {
-            chineseUi.font = FontDiagnostics.ResolveGameChineseUiFont() ?? chineseUi.font;
-            chineseUi.fontStyle = FontStyle.Bold;
+            chineseUi.fontStyle = FontStyles.Normal;
             chineseUi.alignment = settings.Position switch
             {
-                SubtitlePosition.TopRight => TextAnchor.UpperRight,
-                SubtitlePosition.TopCenter => TextAnchor.UpperCenter,
-                _ => TextAnchor.UpperLeft,
+                SubtitlePosition.TopRight => TextAlignmentOptions.TopRight,
+                SubtitlePosition.TopCenter => TextAlignmentOptions.Top,
+                _ => TextAlignmentOptions.TopLeft,
             };
-            chineseUi.horizontalOverflow = HorizontalWrapMode.Wrap;
-            chineseUi.verticalOverflow = VerticalWrapMode.Overflow;
-            chineseUi.supportRichText = false;
+            chineseUi.textWrappingMode = TextWrappingModes.Normal;
+            chineseUi.overflowMode = TextOverflowModes.Overflow;
+            chineseUi.richText = false;
             chineseUi.raycastTarget = false;
-            chineseUi.fontSize = Math.Max((int)Math.Round(chineseFontSize), 16);
+            chineseUi.fontSize = Math.Max(chineseFontSize, 16f);
             chineseUi.lineSpacing = 1f;
             chineseUi.color = new Color(1f, 0.96f, 0.84f, 0.96f);
             chineseUi.text = string.Empty;
@@ -536,17 +536,24 @@ internal static class VoiceLineDisplay
         return label;
     }
 
-    private static Text? CreateChineseUiLabel(Transform parent)
+    private static TextMeshProUGUI? CreateChineseUiLabel(Transform parent)
     {
-        var uiFont = FontDiagnostics.ResolveGameChineseUiFont();
-        if (uiFont == null)
+        if (
+            NativeGameTypography.PrepareOwnedText(out var typography)
+                != NativeGameTypography.Outcome.Ready
+            || typography == null
+        )
             return null;
 
         var labelObject = CreateChildLabelObject(parent, "BazaarLine_ChineseSubtitle");
-        var label = labelObject.AddComponent<Text>();
-        label.font = uiFont;
-        label.fontStyle = FontStyle.Bold;
-        label.supportRichText = false;
+        var label = labelObject.AddComponent<TextMeshProUGUI>();
+        if (typography.Apply(label) != NativeGameTypography.Outcome.Applied)
+        {
+            UnityEngine.Object.Destroy(labelObject);
+            return null;
+        }
+        label.fontStyle = FontStyles.Normal;
+        label.richText = false;
         label.raycastTarget = false;
         return label;
     }
@@ -647,7 +654,7 @@ internal static class VoiceLineDisplay
     {
         if (_chineseUiLabel != null)
         {
-            return "UnityUI.Text "
+            return "TextMeshProUGUI "
                 + $"font='{_chineseUiLabel.font?.name ?? "<null>"}' "
                 + $"style={_chineseUiLabel.fontStyle}";
         }
