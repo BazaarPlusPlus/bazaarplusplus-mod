@@ -22,7 +22,7 @@ _Avoid_: run tracker、直读全局状态
 ## Overlay panels
 
 **Main Overlay Panel**:
-A full-screen mod overlay — Collection Panel, History Review, or Live Build Panel. At most one is open at a time; the Overlay Panel Host enforces the exclusivity.
+A full-screen mod overlay — Collection Panel, History Panel, or Live Build Panel. At most one is open at a time; the Overlay Panel Host enforces the exclusivity.
 _Avoid_: popup, window
 
 **Overlay Panel Host**:
