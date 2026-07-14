@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Reflection;
 using BepInEx.Logging;
 
@@ -18,6 +19,8 @@ VideoBufferPlanTests.Run();
 ReadbackLimiterTests.Run();
 CopyTimingTests.Run();
 EncoderDisposeTests.Run();
+EncoderDrainTests.Run();
+OutputFileNameTests.Run();
 ZeroDurationMuxGuardTests.Run();
 MuxerArgumentTests.Run();
 MuxerDebugStemTests.Run();
@@ -832,8 +835,7 @@ file static class CopyTimingTests
 }
 
 // ---------------------------------------------------------------------------
-// 8) Encoder cleanup: concurrent Dispose calls execute cleanup once, and the
-//    finalized happy path owns the same cleanup.
+// 8) Encoder cleanup: concurrent Dispose calls execute cleanup once.
 // ---------------------------------------------------------------------------
 file static class EncoderDisposeTests
 {
@@ -863,36 +865,234 @@ file static class EncoderDisposeTests
             (int)TestReflection.GetProp(encoderType, encoder, "DisposeExecutionCount")! == 1,
             "Encoder cleanup must execute exactly once under concurrent Dispose calls."
         );
-
-        var sessionSource = File.ReadAllText(
-            Path.Combine(
-                FindRepositoryRoot(),
-                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoCaptureSession.cs"
-            )
-        );
-        var wait = sessionSource.IndexOf("encoder.WaitForCompletion", StringComparison.Ordinal);
-        var dispose = sessionSource.IndexOf("encoder.Dispose();", wait, StringComparison.Ordinal);
-        TestReflection.Assert(
-            wait >= 0 && dispose > wait,
-            "The successful finalize path must dispose the encoder after draining it."
-        );
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var current = new DirectoryInfo(Environment.CurrentDirectory);
-        while (current != null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
-                return current.FullName;
-            current = current.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
     }
 }
 
 // ---------------------------------------------------------------------------
-// 9) ReplayVideoAudioMuxer.IsLikelyZeroDurationOutput: the gate that stops a
+// 9) ReplayVideoEncoderDrain: encoder failures retain the recorder's terminal
+//    reason-code contract when finalization moves to a background task.
+// ---------------------------------------------------------------------------
+file static class EncoderDrainTests
+{
+    private static readonly Type DrainType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoEncoderDrain"
+    );
+    private static readonly Type EncoderReasonType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegEncoderFailureReasonCode"
+    );
+    private static readonly Type RecordingReasonType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingReasonCode"
+    );
+
+    public static void Run()
+    {
+        ConcurrentCompletionDisposesOwnedEncoderOnce();
+
+        var mapReason =
+            DrainType.GetMethod(
+                "MapReason",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: new[] { EncoderReasonType },
+                modifiers: null
+            )
+            ?? throw new InvalidOperationException("ReplayVideoEncoderDrain.MapReason not found.");
+        var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["None"] = "EncoderWriterFailed",
+            ["WriterTimeout"] = "EncoderTimeout",
+            ["ProcessTimeout"] = "EncoderTimeout",
+            ["NonZeroExit"] = "EncoderNonZeroExit",
+            ["StdinUnavailable"] = "EncoderWriterFailed",
+            ["StdinWriteFailed"] = "EncoderWriterFailed",
+            ["StdinCloseFailed"] = "EncoderWriterFailed",
+            ["WriterCrashed"] = "EncoderWriterFailed",
+        };
+
+        foreach (var pair in expected)
+        {
+            var actual = mapReason.Invoke(null, new[] { Enum.Parse(EncoderReasonType, pair.Key) });
+            TestReflection.Assert(
+                Equals(actual, Enum.Parse(RecordingReasonType, pair.Value)),
+                $"Encoder reason {pair.Key} must map to {pair.Value}."
+            );
+        }
+    }
+
+    private static void ConcurrentCompletionDisposesOwnedEncoderOnce()
+    {
+        var profileType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderProfile"
+        );
+        var profile = profileType
+            .GetMethod(
+                "Libx264",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(null, null)!;
+        var encoderType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegRawVideoEncoder"
+        );
+        var requestType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureRequest"
+        );
+        var inputType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoEncoderDrainInput"
+        );
+        var outputRoot = Path.Combine(
+            Path.GetTempPath(),
+            "bpp-encoder-drain-tests",
+            Guid.NewGuid().ToString("N")
+        );
+        Directory.CreateDirectory(outputRoot);
+        try
+        {
+            var outputPath = Path.Combine(outputRoot, "drained.recording.mp4");
+            File.WriteAllBytes(outputPath, new byte[] { 1, 2, 3, 4 });
+            var encoder = Activator.CreateInstance(
+                encoderType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new object?[]
+                {
+                    "drain-test",
+                    "ffmpeg",
+                    outputPath,
+                    2,
+                    2,
+                    30,
+                    profile,
+                    2,
+                    null,
+                },
+                culture: null
+            )!;
+            var request = Activator.CreateInstance(requestType, nonPublic: true)!;
+            SetProperty(requestType, request, "VideoId", "drain-test");
+            SetProperty(requestType, request, "BattleId", "battle-test");
+            SetProperty(requestType, request, "OutputFilePath", outputPath);
+            SetProperty(requestType, request, "Width", 2);
+            SetProperty(requestType, request, "Height", 2);
+            SetProperty(requestType, request, "Fps", 30);
+            SetProperty(requestType, request, "EncoderProfile", profile);
+
+            var input = Activator.CreateInstance(
+                inputType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new object?[]
+                {
+                    encoder,
+                    request,
+                    DateTimeOffset.UtcNow.AddSeconds(-1),
+                    1,
+                    0,
+                    0,
+                    null,
+                    null,
+                    null,
+                    16,
+                    0,
+                    0,
+                    0L,
+                    0L,
+                },
+                culture: null
+            )!;
+            var drain = Activator.CreateInstance(
+                DrainType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new[] { input },
+                culture: null
+            )!;
+            var complete =
+                DrainType.GetMethod(
+                    "Complete",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                )
+                ?? throw new InvalidOperationException(
+                    "ReplayVideoEncoderDrain.Complete not found."
+                );
+            var results = new ConcurrentBag<object>();
+
+            Parallel.For(0, 64, _ => results.Add(complete.Invoke(drain, null)!));
+
+            var first = results.First();
+            TestReflection.Assert(
+                results.All(result => ReferenceEquals(first, result)),
+                "Concurrent drain completion must return the single built capture result."
+            );
+            TestReflection.Assert(
+                (int)TestReflection.GetProp(encoderType, encoder, "DisposeExecutionCount")! == 1,
+                "The drain must dispose its owned encoder exactly once."
+            );
+            TestReflection.Assert(
+                TestReflection.GetProp(first.GetType(), first, "Status")!.ToString() == "Completed",
+                "A drained non-empty capture with frames must remain completed."
+            );
+        }
+        finally
+        {
+            Directory.Delete(outputRoot, recursive: true);
+        }
+    }
+
+    private static void SetProperty(Type type, object instance, string name, object value)
+    {
+        var property =
+            type.GetProperty(
+                name,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException($"Property not found: {type.FullName}.{name}");
+        property.SetValue(instance, value);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 10) Replay output names include the recording identity, so overlapping drains
+//     for the same battle and wall-clock second cannot share either artifact.
+// ---------------------------------------------------------------------------
+file static class OutputFileNameTests
+{
+    public static void Run()
+    {
+        var type = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoOutputFileNames"
+        );
+        var create =
+            type.GetMethod(
+                "Create",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: new[] { typeof(string), typeof(string), typeof(string) },
+                modifiers: null
+            )
+            ?? throw new InvalidOperationException("ReplayVideoOutputFileNames.Create not found.");
+        var firstId = "0123456789abcdef0123456789abcdef";
+        var secondId = "fedcba9876543210fedcba9876543210";
+        var first = create.Invoke(null, new object[] { "battle", "20260715-120000", firstId })!;
+        var second = create.Invoke(null, new object[] { "battle", "20260715-120000", secondId })!;
+        var firstFinal = (string)TestReflection.GetProp(type, first, "FinalFileName")!;
+        var firstTemp = (string)TestReflection.GetProp(type, first, "TempFileName")!;
+        var secondFinal = (string)TestReflection.GetProp(type, second, "FinalFileName")!;
+        var secondTemp = (string)TestReflection.GetProp(type, second, "TempFileName")!;
+
+        TestReflection.Assert(firstFinal != secondFinal, "Final output names must be unique.");
+        TestReflection.Assert(firstTemp != secondTemp, "Temp output names must be unique.");
+        TestReflection.Assert(
+            firstFinal == $"battle.20260715-120000.{firstId}.mp4",
+            "The final name must carry the full unique recording identity."
+        );
+        TestReflection.Assert(
+            firstTemp == $"battle.20260715-120000.{firstId}.recording.mp4",
+            "The temp name must carry the same unique recording identity."
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 11) ReplayVideoAudioMuxer.IsLikelyZeroDurationOutput: the gate that stops a
 //    -shortest mux of an empty WAV (exit 0, ~hundred-byte stub) from deleting the
 //    good silent first-pass video. Reproduced sizes: a real 3s recording is
 //    multi-MB; the empty-output stub is ~261 bytes.
@@ -1396,6 +1596,7 @@ file static class RecordingOperationContractTests
 
             HostileStderrRendersAsOneBoundedTerminal(root, logs);
             ShutdownSweepClosesOrphanOnce(root, logs);
+            TrackedShutdownSweepRejectsLateCompletion(root, logs);
             LifecycleScenarioMatrix(root, logs);
         }
         finally
@@ -1656,6 +1857,92 @@ file static class RecordingOperationContractTests
             ),
             "A late mux callback must lose after the shutdown sweep."
         );
+        logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
+    }
+
+    private static void TrackedShutdownSweepRejectsLateCompletion(
+        string root,
+        StructuredLogCapture logs
+    )
+    {
+        logs.Clear();
+        var registryType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingOperationRegistry"
+        );
+        var muxerType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer"
+        );
+        var registry = Activator.CreateInstance(registryType, nonPublic: true)!;
+        var operation = CreateOperation("recording-tracked-shutdown-00000007");
+        registryType
+            .GetMethod(
+                "Register",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(registry, new[] { operation });
+        var tryComplete = registryType.GetMethod(
+            "TryComplete",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
+        var dispatch =
+            muxerType.GetMethod(
+                "DispatchTracked",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                types: new[] { typeof(Action) },
+                modifiers: null
+            ) ?? throw new InvalidOperationException("Tracked background dispatch seam not found.");
+        using var release = new ManualResetEventSlim(false);
+        var lateWon = 0;
+        var latePath = Path.Combine(root, "tracked-shutdown-late.mp4");
+        File.WriteAllBytes(latePath, new byte[] { 1 });
+        var task = (Task)
+            dispatch.Invoke(
+                null,
+                new object[]
+                {
+                    new Action(() =>
+                    {
+                        release.Wait();
+                        if (
+                            (bool)(
+                                tryComplete.Invoke(
+                                    registry,
+                                    new[]
+                                    {
+                                        operation,
+                                        Completion(latePath, "Full", "Complete", "Completed"),
+                                    }
+                                ) ?? false
+                            )
+                        )
+                        {
+                            Interlocked.Exchange(ref lateWon, 1);
+                        }
+                    }),
+                }
+            )!;
+
+        var drained = (bool)
+            muxerType
+                .GetMethod(
+                    "TryDrainPendingForShutdown",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+                )!
+                .Invoke(null, new object[] { TimeSpan.FromMilliseconds(10) })!;
+        TestReflection.Assert(!drained, "Shutdown drain must observe the tracked finalize task.");
+        registryType
+            .GetMethod(
+                "CompletePending",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(registry, new[] { Enum.Parse(ReasonType, "ShutdownTimeout") });
+        release.Set();
+        TestReflection.Assert(
+            task.Wait(TimeSpan.FromSeconds(5)),
+            "Tracked finalize task must exit."
+        );
+        TestReflection.Assert(lateWon == 0, "Late completion must lose after the shutdown sweep.");
         logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
     }
 
@@ -2187,7 +2474,7 @@ file static class AudioStopTimeoutTests
 // ---------------------------------------------------------------------------
 // 12) Locked recorder integration paths: identity/register ordering, all
 //     preflight/abort/shutdown closures, actual-start-only lifecycle, resolved
-//     final metadata, callback safety, and post-finalize failure semantics.
+//     final metadata, callback safety, and bounded external-process joins.
 // ---------------------------------------------------------------------------
 file static class RecorderIntegrationContractTests
 {
@@ -2256,8 +2543,8 @@ file static class RecorderIntegrationContractTests
                 "AbortActiveSession(\"superseded\")",
                 "AbortActiveSession(\"recorder-disabled\")",
                 "AbortActiveSession(\"recorder-destroyed\")",
-                "_operations.CompleteResolved(",
-                "_operations.CompleteMuxCallbackFailure(",
+                "recording.Operations.CompleteResolved(",
+                "recording.Operations.CompleteMuxCallbackFailure(",
                 "CompletePending(ReplayVideoRecordingReasonCode.ShutdownTimeout)",
             }
         )

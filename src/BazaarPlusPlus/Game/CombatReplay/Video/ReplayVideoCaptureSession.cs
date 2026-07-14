@@ -14,7 +14,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     private readonly ReplayVideoCaptureRequest _request;
     private readonly DateTimeOffset _startedAtUtc;
     private readonly double _frameInterval;
-    private readonly object _disposeLock = new();
+    private readonly object _finalizeLock = new();
 
     // Reused across every captured frame for the in-place vertical flip so we
     // do not allocate a fresh per-row scratch buffer on each readback. Only
@@ -53,11 +53,10 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     private bool _started;
     private bool _disposed;
     private bool _finalized;
+    private ReplayVideoEncoderDrain? _finalizeDrain;
     private ReplayVideoRecordingReasonCode? _failureReasonCode;
     private ReplayVideoRecordingReasonCode? _degradationReasonCode;
     private Exception? _failureException;
-    private int? _exitCode;
-    private string? _stderrTail;
 
     public ReplayVideoCaptureSession(ReplayVideoCaptureRequest request)
     {
@@ -274,150 +273,87 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         _droppedFrames += tick.DroppedCount;
     }
 
-    public ReplayVideoCaptureResult Finalize(string endReason)
+    public ReplayVideoEncoderDrain Finalize(string endReason)
     {
-        if (_finalized)
-            return BuildResult(endReason);
-
-        _finalized = true;
-
-        try
+        lock (_finalizeLock)
         {
-            AsyncGPUReadback.WaitAllRequests();
-        }
-        catch (Exception ex)
-        {
-            _degradationReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
-            _failureException ??= ex;
-        }
+            if (_finalizeDrain != null)
+                return _finalizeDrain;
 
-        EmitFinalFrame();
+            _finalized = true;
 
-        var encoder = _encoder;
-        var encoderFailed = false;
-        if (encoder != null)
-        {
             try
             {
-                var outcome = encoder.WaitForCompletion(TimeSpan.FromSeconds(20));
-                _exitCode = outcome.ExitCode;
-                _stderrTail = outcome.StderrTail;
-                if (!outcome.Succeeded)
-                {
-                    encoderFailed = true;
-                    _failureReasonCode ??= MapEncoderReason(outcome.ReasonCode);
-                    _failureException ??= outcome.Exception;
-                }
+                AsyncGPUReadback.WaitAllRequests();
             }
             catch (Exception ex)
             {
-                encoderFailed = true;
+                _degradationReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
+                _failureException ??= ex;
+            }
+
+            try
+            {
+                EmitFinalFrame();
+            }
+            catch (Exception ex)
+            {
+                _failureReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
+                _failureException ??= ex;
+            }
+
+            var encoder = _encoder;
+            try
+            {
+                encoder?.SignalEndOfStream();
+            }
+            catch (Exception ex)
+            {
                 _failureReasonCode ??= ReplayVideoRecordingReasonCode.EncoderWriterFailed;
                 _failureException ??= ex;
             }
             finally
             {
-                encoder.Dispose();
                 _encoder = null;
             }
 
-            if (encoderFailed && _request.EncoderProfile.HardwareAccelerated)
-            {
-                FfmpegVideoEncoderSelector.Invalidate(
-                    _request.FfmpegExecutable,
-                    _request.Width,
-                    _request.Height,
-                    _request.Fps,
-                    _request.EncoderProfile.Codec
-                );
-            }
+            ReleaseRenderTexture();
+
+            _finalizeDrain = new ReplayVideoEncoderDrain(
+                new ReplayVideoEncoderDrainInput(
+                    encoder,
+                    _request,
+                    _startedAtUtc,
+                    _capturedFrames,
+                    _droppedFrames,
+                    _repeatedFrames,
+                    _failureReasonCode,
+                    _degradationReasonCode,
+                    _failureException,
+                    _frameByteLength,
+                    _readbackBackpressureSkips,
+                    _readbackLimiter.MaxObserved,
+                    _readbackCopyTiming.P95Microseconds,
+                    _cfrCopyTiming.P95Microseconds
+                )
+            );
+            return _finalizeDrain;
         }
-
-        ReleaseRenderTexture();
-
-        var result = BuildResult(endReason);
-        BppLog.DebugEvent(
-            CombatReplayVideoLogEvents.VideoCaptureStatsObserved,
-            () =>
-                [
-                    CombatReplayVideoLogEvents.StatsRecordingId.Bind(_request.VideoId),
-                    CombatReplayVideoLogEvents.StatsStage.Bind(
-                        ReplayVideoLogStage.CaptureFinalized
-                    ),
-                    CombatReplayVideoLogEvents.StatsWidth.Bind(_request.Width),
-                    CombatReplayVideoLogEvents.StatsHeight.Bind(_request.Height),
-                    CombatReplayVideoLogEvents.StatsFps.Bind(_request.Fps),
-                    CombatReplayVideoLogEvents.StatsCapturedFrames.Bind(result.CapturedFrames),
-                    CombatReplayVideoLogEvents.StatsRepeatedFrames.Bind(_repeatedFrames),
-                    CombatReplayVideoLogEvents.StatsDroppedFrames.Bind(result.DroppedFrames),
-                    CombatReplayVideoLogEvents.StatsDurationMs.Bind(result.DurationMs),
-                    CombatReplayVideoLogEvents.StatsSizeBytes.Bind(result.FileSizeBytes),
-                    CombatReplayVideoLogEvents.StatsOutputPath.Bind(result.OutputFilePath),
-                    CombatReplayVideoLogEvents.StatsCodec.Bind(_request.EncoderProfile.Codec),
-                    CombatReplayVideoLogEvents.StatsRateControl.Bind(
-                        _request.EncoderProfile.RateControlSummary
-                    ),
-                    CombatReplayVideoLogEvents.StatsFrameBytes.Bind(_frameByteLength),
-                    CombatReplayVideoLogEvents.StatsPoolCapacity.Bind(
-                        _request.BufferPlan.PoolCapacity
-                    ),
-                    CombatReplayVideoLogEvents.StatsQueueCapacity.Bind(
-                        _request.BufferPlan.QueueCapacity
-                    ),
-                    CombatReplayVideoLogEvents.StatsPoolPayloadBytes.Bind(
-                        _request.BufferPlan.PoolPayloadBytes
-                    ),
-                    CombatReplayVideoLogEvents.StatsPoolBudgetExceeded.Bind(
-                        _request.BufferPlan.BudgetExceeded
-                    ),
-                    CombatReplayVideoLogEvents.StatsReadbackBackpressureSkips.Bind(
-                        _readbackBackpressureSkips
-                    ),
-                    CombatReplayVideoLogEvents.StatsMaxOutstandingReadbacks.Bind(
-                        _readbackLimiter.MaxObserved
-                    ),
-                    CombatReplayVideoLogEvents.StatsReadbackCopyP95Us.Bind(
-                        _readbackCopyTiming.P95Microseconds
-                    ),
-                    CombatReplayVideoLogEvents.StatsCfrCopyP95Us.Bind(
-                        _cfrCopyTiming.P95Microseconds
-                    ),
-                    CombatReplayVideoLogEvents.StatsStagingBufferBytes.Bind(_frameByteLength),
-                    CombatReplayVideoLogEvents.StatsMaxReadbackPayloadBytes.Bind(
-                        (long)_readbackLimiter.MaxObserved * _frameByteLength
-                    ),
-                    CombatReplayVideoLogEvents.StatsRenderTextureEstimatedBytes.Bind(
-                        _frameByteLength
-                    ),
-                ]
-        );
-        return result;
     }
 
     public void Dispose()
     {
-        lock (_disposeLock)
+        lock (_finalizeLock)
         {
             if (_disposed)
                 return;
             _disposed = true;
-        }
 
-        try
-        {
             if (!_finalized)
                 _failureReasonCode ??= ReplayVideoRecordingReasonCode.Aborted;
-            _encoder?.Dispose();
-        }
-        catch
-        {
-            // ignore
-        }
-        finally
-        {
-            // Encoder.Dispose is idempotent and joins its writer thread, so no
-            // further pool.Return can run after this point.
-            _encoder = null;
+
+            // A handed-off encoder may still return a frame on its writer thread. The callback reads
+            // _pool through a null-safe closure, so clearing the session reference is race-safe.
             _pool = null;
             _pacer = null;
             _latestFrameBuffer = null;
@@ -640,67 +576,4 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         if (!string.IsNullOrWhiteSpace(directory))
             Directory.CreateDirectory(directory);
     }
-
-    private ReplayVideoCaptureResult BuildResult(string endReason)
-    {
-        var endedAt = DateTimeOffset.UtcNow;
-        var durationMs = (long)Math.Max(0, (endedAt - _startedAtUtc).TotalMilliseconds);
-        var fileSize = FfmpegRawVideoEncoder.TryGetFileSize(_request.OutputFilePath);
-
-        var status =
-            _failureReasonCode.HasValue || fileSize <= 0
-                ? ReplayVideoCaptureStatus.Failed
-                : (
-                    _capturedFrames > 0
-                        ? ReplayVideoCaptureStatus.Completed
-                        : ReplayVideoCaptureStatus.Failed
-                );
-        var reasonCode =
-            _failureReasonCode
-            ?? (
-                status == ReplayVideoCaptureStatus.Failed
-                    ? ReplayVideoRecordingReasonCode.CaptureFailed
-                    : _degradationReasonCode ?? ReplayVideoRecordingReasonCode.Completed
-            );
-
-        return new ReplayVideoCaptureResult
-        {
-            VideoId = _request.VideoId,
-            BattleId = _request.BattleId,
-            Source = _request.Source,
-            OutputFilePath = _request.OutputFilePath,
-            Width = _request.Width,
-            Height = _request.Height,
-            Fps = _request.Fps,
-            Codec = _request.EncoderProfile.Codec,
-            Crf = _request.EncoderProfile.Crf,
-            Preset = _request.EncoderProfile.Preset,
-            StartedAtUtc = _startedAtUtc,
-            EndedAtUtc = endedAt,
-            DurationMs = durationMs,
-            CapturedFrames = _capturedFrames,
-            DroppedFrames = _droppedFrames,
-            FileSizeBytes = fileSize,
-            Status = status,
-            Error = status == ReplayVideoCaptureStatus.Failed ? reasonCode.ToString() : null,
-            ReasonCode = reasonCode,
-            ExitCode = _exitCode,
-            StderrTail = _stderrTail,
-            Exception = _failureException,
-            Degraded = _degradationReasonCode.HasValue,
-        };
-    }
-
-    private static ReplayVideoRecordingReasonCode MapEncoderReason(
-        FfmpegEncoderFailureReasonCode reasonCode
-    ) =>
-        reasonCode switch
-        {
-            FfmpegEncoderFailureReasonCode.NonZeroExit =>
-                ReplayVideoRecordingReasonCode.EncoderNonZeroExit,
-            FfmpegEncoderFailureReasonCode.WriterTimeout
-            or FfmpegEncoderFailureReasonCode.ProcessTimeout =>
-                ReplayVideoRecordingReasonCode.EncoderTimeout,
-            _ => ReplayVideoRecordingReasonCode.EncoderWriterFailed,
-        };
 }

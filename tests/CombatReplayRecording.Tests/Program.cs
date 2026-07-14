@@ -41,7 +41,6 @@ var audioTapStopperType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Audio.ReplayAudioTapStopper"
 );
 var muxerType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer");
-var muxResolutionType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.MuxResolution");
 var muxResultType =
     muxerType.GetNestedType("MuxResult", BindingFlags.NonPublic)
     ?? throw new InvalidOperationException("ReplayVideoAudioMuxer.MuxResult should exist.");
@@ -84,10 +83,6 @@ finally
     Directory.Delete(usableWavRoot, recursive: true);
 }
 
-var resolveHarness = new MuxResolveHarness(muxResultType);
-var onResolved = resolveHarness.CreateOnResolvedDelegate(
-    typeof(Action<>).MakeGenericType(muxResultType)
-);
 Assert(
     muxerType.GetConstructor(Type.EmptyTypes) != null,
     "ReplayVideoAudioMuxer should not require an ffmpeg executable at construction."
@@ -135,17 +130,11 @@ try
         failedTempPath,
         failedFinalPath,
         Array.Empty<string>(),
-        ffmpegExecutable: null,
-        onResolved
+        ffmpegExecutable: null
     );
-    AssertResolutionSynchronous(muxResolutionType, failedResolution, "not-completed resolution");
-    Assert(
-        resolveHarness.Results.Count == 1,
-        "Resolve should invoke the callback for not-completed recordings."
-    );
+    AssertMuxReason(muxResultType, failedResolution, "CaptureFailed");
     Assert(!File.Exists(failedTempPath), "Not-completed Resolve should delete the temp recording.");
 
-    resolveHarness.Results.Clear();
     var noAudioTempPath = Path.Combine(muxResolveRoot, "no-audio.recording.mp4");
     var noAudioFinalPath = Path.Combine(muxResolveRoot, "no-audio.mp4");
     File.WriteAllBytes(noAudioTempPath, [4, 5, 6, 7]);
@@ -156,20 +145,14 @@ try
         noAudioTempPath,
         noAudioFinalPath,
         Array.Empty<string>(),
-        ffmpegExecutable: "/should/not/be/used",
-        onResolved
+        ffmpegExecutable: "/should/not/be/used"
     );
-    AssertResolutionSynchronous(muxResolutionType, noAudioResolution, "no-audio resolution");
-    Assert(
-        resolveHarness.Results.Count == 1,
-        "Resolve should invoke the callback when promoting a completed recording with no audio."
-    );
+    AssertMuxReason(muxResultType, noAudioResolution, "NoAudio");
     Assert(
         File.Exists(noAudioFinalPath) && !File.Exists(noAudioTempPath),
-        "No-audio Resolve should promote the silent temp to the final path synchronously."
+        "No-audio Resolve should promote the silent temp to the final path inline."
     );
 
-    resolveHarness.Results.Clear();
     var noFfmpegTempPath = Path.Combine(muxResolveRoot, "no-ffmpeg.recording.mp4");
     var noFfmpegFinalPath = Path.Combine(muxResolveRoot, "no-ffmpeg.mp4");
     var wavPath = Path.Combine(muxResolveRoot, "no-ffmpeg.wav");
@@ -182,51 +165,34 @@ try
         noFfmpegTempPath,
         noFfmpegFinalPath,
         new[] { wavPath },
-        ffmpegExecutable: null,
-        onResolved
+        ffmpegExecutable: null
     );
-    AssertResolutionSynchronous(muxResolutionType, noFfmpegResolution, "no-ffmpeg resolution");
-    Assert(
-        resolveHarness.Results.Count == 1,
-        "Resolve should invoke the callback when promoting because ffmpeg was not resolved."
-    );
+    AssertMuxReason(muxResultType, noFfmpegResolution, "FfmpegUnavailable");
     Assert(
         File.Exists(noFfmpegFinalPath) && !File.Exists(noFfmpegTempPath) && !File.Exists(wavPath),
         "No-ffmpeg Resolve should promote silent video and delete the usable WAV."
     );
 
-    resolveHarness.Results.Clear();
-    var dispatchTempPath = Path.Combine(muxResolveRoot, "dispatch.recording.mp4");
-    var dispatchFinalPath = Path.Combine(muxResolveRoot, "dispatch.mp4");
-    var dispatchWavPath = Path.Combine(muxResolveRoot, "dispatch.wav");
-    File.WriteAllBytes(dispatchTempPath, [12, 13, 14, 15]);
-    File.WriteAllBytes(dispatchWavPath, [1]);
-    var dispatchResolution = InvokeResolve(
+    var muxFailureTempPath = Path.Combine(muxResolveRoot, "mux-failure.recording.mp4");
+    var muxFailureFinalPath = Path.Combine(muxResolveRoot, "mux-failure.mp4");
+    var muxFailureWavPath = Path.Combine(muxResolveRoot, "mux-failure.wav");
+    File.WriteAllBytes(muxFailureTempPath, [12, 13, 14, 15]);
+    File.WriteAllBytes(muxFailureWavPath, [1]);
+    var muxFailureResolution = InvokeResolve(
         muxerType,
         muxer,
         completedStatus,
-        dispatchTempPath,
-        dispatchFinalPath,
-        new[] { dispatchWavPath },
-        ffmpegExecutable: Path.Combine(muxResolveRoot, "missing-ffmpeg"),
-        onResolved
+        muxFailureTempPath,
+        muxFailureFinalPath,
+        new[] { muxFailureWavPath },
+        ffmpegExecutable: Path.Combine(muxResolveRoot, "missing-ffmpeg")
     );
+    AssertMuxReason(muxResultType, muxFailureResolution, "UnexpectedException");
     Assert(
-        (bool)GetProperty(muxResolutionType, dispatchResolution, "Dispatched")!,
-        "Resolve should dispatch when completed video, usable audio, and resolved ffmpeg are present."
-    );
-    var dispatchTask = GetProperty(muxResolutionType, dispatchResolution, "Task") as Task;
-    Assert(
-        dispatchTask != null
-            && GetProperty(muxResolutionType, dispatchResolution, "Synchronous") == null,
-        "Dispatched Resolve should expose only the pending Task."
-    );
-    if (dispatchTask == null)
-        throw new InvalidOperationException("Dispatch task assertion failed.");
-    Assert(dispatchTask.Wait(TimeSpan.FromSeconds(5)), "Dispatched mux task should complete.");
-    Assert(
-        resolveHarness.Results.Count == 1,
-        "Resolve should invoke the callback from the dispatched mux completion path."
+        File.Exists(muxFailureFinalPath)
+            && !File.Exists(muxFailureTempPath)
+            && !File.Exists(muxFailureWavPath),
+        "Resolve should finish its fallback inline when the mux process cannot start."
     );
 }
 finally
@@ -1424,8 +1390,7 @@ static object InvokeResolve(
     string tempVideoPath,
     string finalPath,
     IReadOnlyList<string> usableWavPaths,
-    string? ffmpegExecutable,
-    Delegate onResolved
+    string? ffmpegExecutable
 )
 {
     var method = muxerType.GetMethod(
@@ -1443,24 +1408,19 @@ static object InvokeResolve(
                 finalPath,
                 usableWavPaths,
                 ffmpegExecutable,
-                onResolved,
             }
-        ) ?? throw new InvalidOperationException("Resolve should return a MuxResolution.");
+        ) ?? throw new InvalidOperationException("Resolve should return a MuxResult.");
 }
 
-static void AssertResolutionSynchronous(Type muxResolutionType, object resolution, string label)
+static void AssertMuxReason(Type muxResultType, object result, string expectedReason)
 {
     Assert(
-        !(bool)GetProperty(muxResolutionType, resolution, "Dispatched")!,
-        $"{label} should not dispatch."
-    );
-    Assert(
-        GetProperty(muxResolutionType, resolution, "Task") == null,
-        $"{label} should have no task."
-    );
-    Assert(
-        GetProperty(muxResolutionType, resolution, "Synchronous") != null,
-        $"{label} should expose a synchronous mux result."
+        string.Equals(
+            GetFieldValue(muxResultType, result, "ReasonCode")?.ToString(),
+            expectedReason,
+            StringComparison.Ordinal
+        ),
+        $"Resolve should return reason {expectedReason}."
     );
 }
 
@@ -1912,27 +1872,5 @@ file sealed class QueuePersistenceHarness
             Expression.Convert(parameter, typeof(object))
         );
         return Expression.Lambda(delegateType, body, parameter).Compile();
-    }
-}
-
-file sealed class MuxResolveHarness(Type muxResultType)
-{
-    public List<object> Results { get; } = new();
-
-    public Delegate CreateOnResolvedDelegate(Type delegateType)
-    {
-        var parameter = Expression.Parameter(muxResultType, "result");
-        var body = Expression.Call(
-            Expression.Constant(this),
-            GetType().GetMethod(nameof(OnResolved), BindingFlags.Public | BindingFlags.Instance)
-                ?? throw new InvalidOperationException("OnResolved method not found."),
-            Expression.Convert(parameter, typeof(object))
-        );
-        return Expression.Lambda(delegateType, body, parameter).Compile();
-    }
-
-    public void OnResolved(object result)
-    {
-        Results.Add(result);
     }
 }

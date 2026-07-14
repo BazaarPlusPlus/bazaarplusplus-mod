@@ -10,15 +10,6 @@ using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
-internal readonly struct MuxResolution
-{
-    public bool Dispatched { get; init; }
-
-    public Task? Task { get; init; }
-
-    public ReplayVideoAudioMuxer.MuxResult? Synchronous { get; init; }
-}
-
 /// <summary>
 /// Second-pass muxer: combines the silent first-pass video with the captured audio WAV into the
 /// final MP4 using <c>ffmpeg -c:v copy -c:a aac</c>. Runs entirely off the main thread and never
@@ -92,149 +83,107 @@ internal sealed class ReplayVideoAudioMuxer
     }
 
     /// <summary>
-    /// Dispatches the mux as a tracked background task. The task is registered so
-    /// <see cref="TryDrainPendingForShutdown"/> can best-effort wait on it at shutdown. The optional
-    /// <paramref name="onCompleted"/> callback is invoked on the background thread after the mux
-    /// resolves (success or fallback); the recorder wires it to persist SaveFinish metadata without
-    /// coupling this muxer to the MonoBehaviour. The callback is best-effort and its exceptions are
-    /// swallowed (logged at Debug).
+    /// Resolves the mux inline on an existing background task. This method never dispatches nested
+    /// work, so an encoder drain and its mux remain one shutdown-tracked task.
     /// </summary>
-    private Task DispatchAsync(
+    internal MuxResult Resolve(
         string recordingId,
-        string silentVideoTempPath,
-        IReadOnlyList<string> wavPaths,
+        ReplayVideoCaptureStatus status,
+        string tempVideoPath,
         string finalPath,
-        string ffmpegExecutable,
-        Action<MuxResult>? onCompleted = null,
-        int audioBitrateKbps = 192
+        IReadOnlyList<string> usableWavPaths,
+        string? ffmpegExecutable
     )
     {
-        var task = Task.Run(() =>
+        try
         {
-            MuxResult result;
-            try
-            {
-                result = Mux(
+            if (
+                TryResolveWithoutMux(
                     recordingId,
+                    status,
+                    tempVideoPath,
+                    finalPath,
+                    usableWavPaths,
                     ffmpegExecutable,
-                    silentVideoTempPath,
-                    wavPaths,
-                    finalPath,
-                    audioBitrateKbps
-                );
-            }
-            catch (Exception ex)
+                    out var existingWavPaths,
+                    out var synchronous
+                )
+            )
             {
-                result = new MuxResult(
-                    MuxStatus.Failed,
-                    finalPath,
-                    0,
-                    MuxReasonCode.UnexpectedException,
-                    exception: ex
-                );
+                return synchronous;
             }
 
-            if (onCompleted != null)
-            {
-                try
-                {
-                    onCompleted(result);
-                }
-                catch (Exception ex)
-                {
-                    BppLog.DebugEvent(
-                        CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
-                        ex,
-                        () =>
-                            [
-                                CombatReplayVideoLogEvents.MuxRecordingId.Bind(recordingId),
-                                CombatReplayVideoLogEvents.MuxStage.Bind(
-                                    ReplayVideoLogStage.MuxCallback
-                                ),
-                                CombatReplayVideoLogEvents.MuxReasonCode.Bind(
-                                    ReplayVideoDiagnosticReasonCode.CallbackException
-                                ),
-                                CombatReplayVideoLogEvents.MuxPath.Bind(finalPath),
-                                CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
-                            ]
-                    );
-                }
-            }
-        });
-
-        Track(task);
-        return task;
+            return Mux(recordingId, ffmpegExecutable!, tempVideoPath, existingWavPaths, finalPath);
+        }
+        catch (Exception ex)
+        {
+            return new MuxResult(
+                MuxStatus.Failed,
+                finalPath,
+                0,
+                MuxReasonCode.UnexpectedException,
+                exception: ex
+            );
+        }
     }
 
-    internal MuxResolution Resolve(
+    private bool TryResolveWithoutMux(
         string recordingId,
         ReplayVideoCaptureStatus status,
         string tempVideoPath,
         string finalPath,
         IReadOnlyList<string> usableWavPaths,
         string? ffmpegExecutable,
-        Action<MuxResult> onResolved
+        out IReadOnlyList<string> existingWavPaths,
+        out MuxResult result
     )
     {
-        if (onResolved == null)
-            throw new ArgumentNullException(nameof(onResolved));
-
+        existingWavPaths = Array.Empty<string>();
         if (status != ReplayVideoCaptureStatus.Completed)
         {
-            var result = DeleteTempAndReport(recordingId, tempVideoPath, usableWavPaths, finalPath);
-            onResolved(result);
-            return new MuxResolution { Synchronous = result };
+            result = DeleteTempAndReport(recordingId, tempVideoPath, usableWavPaths, finalPath);
+            return true;
         }
 
-        var existingWavPaths = VideoProcessHelpers.GetExistingWavPaths(usableWavPaths);
+        existingWavPaths = VideoProcessHelpers.GetExistingWavPaths(usableWavPaths);
         if (existingWavPaths.Count == 0)
         {
-            var result = PromoteAndReport(
+            result = PromoteAndReport(
                 tempVideoPath,
                 usableWavPaths,
                 finalPath,
                 MuxStatus.FellBackToSilent,
                 MuxReasonCode.NoAudio
             );
-            onResolved(result);
-            return new MuxResolution { Synchronous = result };
+            return true;
         }
 
         if (string.IsNullOrWhiteSpace(ffmpegExecutable))
         {
-            var result = PromoteAndReport(
+            result = PromoteAndReport(
                 tempVideoPath,
                 existingWavPaths,
                 finalPath,
                 MuxStatus.FellBackToSilent,
                 MuxReasonCode.FfmpegUnavailable
             );
-            onResolved(result);
-            return new MuxResolution { Synchronous = result };
+            return true;
         }
 
         if (!HasAacEncoder(ffmpegExecutable))
         {
-            var result = PromoteAndReport(
+            result = PromoteAndReport(
                 tempVideoPath,
                 existingWavPaths,
                 finalPath,
                 MuxStatus.FellBackToSilent,
                 MuxReasonCode.AacUnavailable
             );
-            onResolved(result);
-            return new MuxResolution { Synchronous = result };
+            return true;
         }
 
-        var task = DispatchAsync(
-            recordingId,
-            tempVideoPath,
-            existingWavPaths,
-            finalPath,
-            ffmpegExecutable,
-            onResolved
-        );
-        return new MuxResolution { Dispatched = true, Task = task };
+        result = default;
+        return false;
     }
 
     /// <summary>
@@ -843,10 +792,10 @@ internal sealed class ReplayVideoAudioMuxer
     }
 
     /// <summary>
-    /// Best-effort waits for all outstanding mux tasks dispatched via <see cref="DispatchAsync"/> to
-    /// complete, up to <paramref name="timeout"/>. Intended for app shutdown so in-flight muxes get
-    /// a chance to finish; any not finished are abandoned (their temp files are reclaimed on the next
-    /// launch). Returns true if all pending tasks completed within the timeout.
+    /// Best-effort waits for all outstanding tracked finalize/mux tasks to complete, up to
+    /// <paramref name="timeout"/>. Intended for app shutdown so in-flight recordings get a chance to
+    /// finish; any tasks still running continue in the background and their operation is closed by
+    /// the recorder's shutdown sweep. Returns true if all pending tasks completed within the timeout.
     /// </summary>
     public static bool TryDrainPendingForShutdown(TimeSpan timeout)
     {
@@ -892,6 +841,16 @@ internal sealed class ReplayVideoAudioMuxer
                 return s_pendingTasks.Count;
             }
         }
+    }
+
+    internal static Task DispatchTracked(Action work)
+    {
+        if (work == null)
+            throw new ArgumentNullException(nameof(work));
+
+        var task = Task.Run(work);
+        Track(task);
+        return task;
     }
 
     private static void Track(Task task)

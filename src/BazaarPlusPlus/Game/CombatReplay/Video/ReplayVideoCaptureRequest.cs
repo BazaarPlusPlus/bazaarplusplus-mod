@@ -13,6 +13,8 @@ internal sealed class ReplayVideoCaptureRequest
 
     public string OutputFilePath { get; init; } = string.Empty;
 
+    public string FinalOutputFilePath { get; init; } = string.Empty;
+
     public string OutputDirectoryPath { get; init; } = string.Empty;
 
     public int Width { get; init; }

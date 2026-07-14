@@ -95,7 +95,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     {
         AbortActiveSession("recorder-destroyed");
 
-        // Best-effort drain of any in-flight background mux tasks so a recording
+        // Best-effort drain of any in-flight background finalize/mux tasks so a recording
         // that just ended gets a chance to produce its final file before the app
         // tears down. This is the only viable shutdown seam (no Application.quitting
         // hook); un-drained temps are acceptable and reclaimed on the next launch.
@@ -138,8 +138,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         }
         finally
         {
-            // A mux callback is best-effort inside the muxer. Sweep even after a successful
-            // drain so a callback exception can never strand a registered operation.
+            // Sweep even after a successful drain so a completion exception can never strand a
+            // registered operation.
             _operations.CompletePending(ReplayVideoRecordingReasonCode.ShutdownTimeout);
         }
     }
@@ -225,12 +225,12 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         var session = _activeSession;
         var operation = _activeOperation;
         var reason = evt.Reason ?? (evt.Failed ? "playback-failed" : "playback-ended");
-        ReplayVideoCaptureResult? result = null;
+        ReplayVideoEncoderDrain? drain = null;
 
         try
         {
             StopCaptureCoroutine();
-            result = session.Finalize(reason);
+            drain = session.Finalize(reason);
             // Closes + unlocks the WAVs before the muxer reads them, returning
             // only paths whose tap actually pushed PCM. Header-only WAVs are
             // deleted inside ReplayAudioTapStopper.
@@ -241,11 +241,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             );
             ApplyAudioStopOutcomes(audioResults, wavPaths.Count > 0);
 
-            // Capture locals before nulling instance fields: the mux runs on a
-            // background thread after this method returns, so it must not read
-            // mutable recorder state.
-            var tempVideoPath = _activeRecordingTempPath ?? result.OutputFilePath;
-            var finalPath = _activeRecordingFinalPath ?? StripTempSuffix(result.OutputFilePath);
+            // Freeze every continuation input before clearing the active recording. A superseding
+            // replay may replace all _active* fields as soon as this method returns.
+            var tempVideoPath = _activeRecordingTempPath ?? session.Request.OutputFilePath;
+            var finalPath = _activeRecordingFinalPath ?? session.Request.FinalOutputFilePath;
             var ffmpegExecutable = _activeFfmpegExecutable;
             var videoDir = _services?.Paths.CombatReplayVideoDirectoryPath;
             var store = _metadataStore;
@@ -253,54 +252,34 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             var metadataStatus = _activeMetadataStatus;
             var degradationReason = _activeDegradationReason;
             var degradationException = _activeDegradationException;
+            var operations = _operations;
+            _muxer ??= new ReplayVideoAudioMuxer();
+            var muxer = _muxer;
 
             DisposeUiState();
-            ClearActiveState();
+            session.Dispose();
 
-            _muxer ??= new ReplayVideoAudioMuxer();
-            _muxer.Resolve(
-                operation.RecordingId,
-                result.Status,
+            var recordingContext = new RecordingFinalizeContext(
+                operations,
+                operation,
+                drain,
                 tempVideoPath,
                 finalPath,
-                wavPaths,
-                ffmpegExecutable,
-                mux =>
-                {
-                    try
-                    {
-                        var resolvedMetadata = TrySaveFinishMetadataFor(
-                            store,
-                            videoDir,
-                            mux.FinalFilePath,
-                            result,
-                            mux.Status != ReplayVideoAudioMuxer.MuxStatus.Failed,
-                            mux.FileSizeBytes,
-                            metadataStatus
-                        );
-                        _operations.CompleteResolved(
-                            operation,
-                            result,
-                            mux,
-                            audioStatus,
-                            resolvedMetadata.Status,
-                            degradationReason,
-                            degradationException ?? resolvedMetadata.Exception
-                        );
-                    }
-                    catch (Exception ex)
-                    {
-                        _operations.CompleteMuxCallbackFailure(
-                            operation,
-                            result,
-                            mux,
-                            audioStatus,
-                            metadataStatus,
-                            ex
-                        );
-                    }
-                }
+                wavPaths
             );
+            var endedContext = new EndedRecordingFinalizeContext(
+                recordingContext,
+                muxer,
+                ffmpegExecutable,
+                store,
+                videoDir,
+                audioStatus,
+                metadataStatus,
+                degradationReason,
+                degradationException
+            );
+            ReplayVideoAudioMuxer.DispatchTracked(() => CompleteEndedRecording(endedContext));
+            ClearActiveState();
         }
         catch (Exception ex)
         {
@@ -310,39 +289,145 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 operation.RecordingId,
                 out _
             );
-            try
-            {
-                session.Dispose();
-            }
-            catch
-            {
-                // ignore
-            }
+            var tempPath = _activeRecordingTempPath ?? session.Request.OutputFilePath;
+            var finalPath = _activeRecordingFinalPath ?? session.Request.FinalOutputFilePath;
             DisposeUiState();
-            DeleteTempFile();
-            DeleteWavBestEffort(wavPaths);
-            var finalPath = _activeRecordingFinalPath ?? string.Empty;
+            session.Dispose();
+            var operations = _operations;
+            if (drain != null)
+            {
+                var recordingContext = new RecordingFinalizeContext(
+                    operations,
+                    operation,
+                    drain,
+                    tempPath,
+                    finalPath,
+                    wavPaths
+                );
+                ReplayVideoAudioMuxer.DispatchTracked(() =>
+                    CompleteEndedFailure(recordingContext, ex)
+                );
+                ClearActiveState();
+                return;
+            }
+
             ClearActiveState();
-            _operations.TryComplete(
+            DeleteTempFile(tempPath, operation.RecordingId);
+            DeleteWavBestEffort(wavPaths);
+            operations.TryComplete(
                 operation,
                 new ReplayVideoRecordingCompletion
                 {
                     FinalFilePath = finalPath,
-                    CapturedFrames = result?.CapturedFrames ?? 0,
-                    DroppedFrames = result?.DroppedFrames ?? 0,
                     AudioStatus = ReplayVideoAudioStatus.Failed,
                     MetadataStatus = ReplayVideoMetadataStatus.Failed,
-                    ReasonCode =
-                        result?.ReasonCode is { } resultReason
-                        && resultReason != ReplayVideoRecordingReasonCode.Completed
-                            ? resultReason
-                            : ReplayVideoRecordingReasonCode.CaptureFailed,
-                    ExitCode = result?.ExitCode,
-                    StderrTail = result?.StderrTail,
+                    ReasonCode = ReplayVideoRecordingReasonCode.CaptureFailed,
                     Exception = ex,
                 }
             );
         }
+    }
+
+    private static void CompleteEndedRecording(EndedRecordingFinalizeContext context)
+    {
+        var recording = context.Recording;
+        ReplayVideoCaptureResult? result = null;
+        try
+        {
+            result = recording.Drain.Complete();
+            var mux = context.Muxer.Resolve(
+                recording.Operation.RecordingId,
+                result.Status,
+                recording.TempVideoPath,
+                recording.FinalPath,
+                recording.WavPaths ?? Array.Empty<string>(),
+                context.FfmpegExecutable
+            );
+            try
+            {
+                var resolvedMetadata = TrySaveFinishMetadataFor(
+                    context.Store,
+                    context.VideoDir,
+                    mux.FinalFilePath,
+                    result,
+                    mux.Status != ReplayVideoAudioMuxer.MuxStatus.Failed,
+                    mux.FileSizeBytes,
+                    context.MetadataStatus
+                );
+                recording.Operations.CompleteResolved(
+                    recording.Operation,
+                    result,
+                    mux,
+                    context.AudioStatus,
+                    resolvedMetadata.Status,
+                    context.DegradationReason,
+                    context.DegradationException ?? resolvedMetadata.Exception
+                );
+            }
+            catch (Exception ex)
+            {
+                recording.Operations.CompleteMuxCallbackFailure(
+                    recording.Operation,
+                    result,
+                    mux,
+                    context.AudioStatus,
+                    context.MetadataStatus,
+                    ex
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            CompleteFailedRecording(recording, result, ex);
+        }
+    }
+
+    private static void CompleteEndedFailure(
+        RecordingFinalizeContext recording,
+        Exception exception
+    )
+    {
+        ReplayVideoCaptureResult? result = null;
+        try
+        {
+            result = recording.Drain.Complete();
+        }
+        catch (Exception drainException)
+        {
+            exception = new AggregateException(exception, drainException);
+        }
+
+        CompleteFailedRecording(recording, result, exception);
+    }
+
+    private static void CompleteFailedRecording(
+        RecordingFinalizeContext recording,
+        ReplayVideoCaptureResult? result,
+        Exception exception
+    )
+    {
+        DeleteTempFile(recording.TempVideoPath, recording.Operation.RecordingId);
+        DeleteWavBestEffort(recording.WavPaths);
+        recording.Operations.TryComplete(
+            recording.Operation,
+            new ReplayVideoRecordingCompletion
+            {
+                FinalFilePath = recording.FinalPath,
+                CapturedFrames = result?.CapturedFrames ?? 0,
+                DroppedFrames = result?.DroppedFrames ?? 0,
+                AudioStatus = ReplayVideoAudioStatus.Failed,
+                MetadataStatus = ReplayVideoMetadataStatus.Failed,
+                ReasonCode =
+                    result?.ReasonCode is { } resultReason
+                    && resultReason != ReplayVideoRecordingReasonCode.Completed
+                        ? resultReason
+                        : ReplayVideoRecordingReasonCode.CaptureFailed,
+                ExitCode = result?.ExitCode,
+                StderrTail = result?.StderrTail,
+                Exception = exception,
+                EndedAtUtc = result?.EndedAtUtc,
+            }
+        );
     }
 
     private static void DeleteWavBestEffort(string? wavPath)
@@ -447,7 +532,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         _activeOperation = operation;
         _activeSession = session;
         _activeRecordingTempPath = request.OutputFilePath;
-        _activeRecordingFinalPath = StripTempSuffix(request.OutputFilePath);
+        _activeRecordingFinalPath = request.FinalOutputFilePath;
         _activeFfmpegExecutable = request.FfmpegExecutable;
         _activeAudioStatus = ReplayVideoAudioStatus.Silent;
         _activeMetadataStatus = ReplayVideoMetadataStatus.Unavailable;
@@ -572,7 +657,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             var videoDirectoryPath = services.Paths.CombatReplayVideoDirectoryPath;
             var relativePath = ComputeRelativePath(
                 videoDirectoryPath,
-                _activeRecordingFinalPath ?? request.OutputFilePath
+                _activeRecordingFinalPath ?? request.FinalOutputFilePath
             );
 
             store.SaveStart(
@@ -604,7 +689,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     // captured on the main thread before instance fields are nulled. Safe to call on
     // a background thread because the store opens a fresh SQLite connection per call.
     // FileSizeBytes always comes from the resolved final path, never the first-pass temp.
-    private MetadataWriteOutcome TrySaveFinishMetadataFor(
+    private static MetadataWriteOutcome TrySaveFinishMetadataFor(
         CombatReplayVideoMetadataStore? store,
         string? videoDir,
         string finalPath,
@@ -715,7 +800,6 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     {
         var session = _activeSession;
         var operation = _activeOperation;
-        ReplayVideoCaptureResult? result = null;
         var terminalReason = reason switch
         {
             "superseded" => ReplayVideoRecordingReasonCode.Superseded,
@@ -739,43 +823,23 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             ApplyAudioStopOutcomes(audioResults, usable.Count > 0);
         }
 
+        // Freeze all state before dispatch. ClearActiveState runs before this method returns, and a
+        // superseding recording is then free to overwrite every _active* field.
+        var tempPath = _activeRecordingTempPath ?? session?.Request.OutputFilePath ?? string.Empty;
+        var finalPath =
+            _activeRecordingFinalPath
+            ?? (session == null ? string.Empty : session.Request.FinalOutputFilePath);
+        var store = _metadataStore;
+        var videoDir = _services?.Paths.CombatReplayVideoDirectoryPath;
+        var audioStatus = _activeAudioStatus;
+        var metadataStatus = _activeMetadataStatus;
+        var operations = _operations;
+        ReplayVideoEncoderDrain? drain = null;
         if (session != null)
         {
-            var finalResolutionSucceeded = false;
             try
             {
-                result = session.Finalize(reason);
-                var tempPath = _activeRecordingTempPath ?? result.OutputFilePath;
-                var finalPath = _activeRecordingFinalPath ?? StripTempSuffix(result.OutputFilePath);
-                if (result.Status == ReplayVideoCaptureStatus.Completed)
-                {
-                    try
-                    {
-                        ReplayVideoAudioMuxer.PromoteSilentToFinal(tempPath, finalPath);
-                        finalResolutionSucceeded = true;
-                    }
-                    catch (Exception ex)
-                    {
-                        terminalReason = ReplayVideoRecordingReasonCode.PromotionFailed;
-                        terminalException = ex;
-                    }
-                }
-                else if (!string.Equals(reason, "begin-exception", StringComparison.Ordinal))
-                {
-                    terminalReason = result.ReasonCode;
-                }
-                var finalFileSize = FfmpegRawVideoEncoder.TryGetFileSize(finalPath);
-                var metadataOutcome = TrySaveFinishMetadataFor(
-                    _metadataStore,
-                    _services?.Paths.CombatReplayVideoDirectoryPath,
-                    finalPath,
-                    result,
-                    finalResolutionSucceeded,
-                    finalFileSize,
-                    _activeMetadataStatus
-                );
-                _activeMetadataStatus = metadataOutcome.Status;
-                terminalException ??= metadataOutcome.Exception;
+                drain = session.Finalize(reason);
             }
             catch (Exception ex)
             {
@@ -796,30 +860,124 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         }
 
         DisposeUiState();
-        DeleteTempFile();
-        DeleteWavBestEffort(wavPaths);
-        var finalOutputPath = _activeRecordingFinalPath ?? string.Empty;
-        var audioStatus = _activeAudioStatus;
-        var metadataStatus = _activeMetadataStatus;
-        ClearActiveState();
-        if (operation != null)
+        if (operation == null)
         {
-            _operations.TryComplete(
-                operation,
-                new ReplayVideoRecordingCompletion
-                {
-                    FinalFilePath = finalOutputPath,
-                    CapturedFrames = result?.CapturedFrames ?? 0,
-                    DroppedFrames = result?.DroppedFrames ?? 0,
-                    AudioStatus = audioStatus,
-                    MetadataStatus = metadataStatus,
-                    ReasonCode = terminalReason,
-                    ExitCode = result?.ExitCode,
-                    StderrTail = result?.StderrTail,
-                    Exception = terminalException ?? result?.Exception,
-                }
-            );
+            ClearActiveState();
+            DeleteTempFile(tempPath, recordingId: null);
+            DeleteWavBestEffort(wavPaths);
+            return;
         }
+
+        if (drain != null)
+        {
+            var recordingContext = new RecordingFinalizeContext(
+                operations,
+                operation,
+                drain,
+                tempPath,
+                finalPath,
+                wavPaths
+            );
+            var abortedContext = new AbortedRecordingFinalizeContext(
+                recordingContext,
+                reason,
+                store,
+                videoDir,
+                audioStatus,
+                metadataStatus,
+                terminalReason,
+                terminalException
+            );
+            ReplayVideoAudioMuxer.DispatchTracked(() => CompleteAbortedRecording(abortedContext));
+            ClearActiveState();
+            return;
+        }
+
+        ClearActiveState();
+        DeleteTempFile(tempPath, operation.RecordingId);
+        DeleteWavBestEffort(wavPaths);
+        operations.TryComplete(
+            operation,
+            new ReplayVideoRecordingCompletion
+            {
+                FinalFilePath = finalPath,
+                AudioStatus = audioStatus,
+                MetadataStatus = metadataStatus,
+                ReasonCode = terminalReason,
+                Exception = terminalException,
+            }
+        );
+    }
+
+    private static void CompleteAbortedRecording(AbortedRecordingFinalizeContext context)
+    {
+        var recording = context.Recording;
+        var terminalReason = context.TerminalReason;
+        var terminalException = context.TerminalException;
+        var metadataStatus = context.MetadataStatus;
+        ReplayVideoCaptureResult? result = null;
+        var finalResolutionSucceeded = false;
+        try
+        {
+            result = recording.Drain.Complete();
+            if (result.Status == ReplayVideoCaptureStatus.Completed)
+            {
+                try
+                {
+                    ReplayVideoAudioMuxer.PromoteSilentToFinal(
+                        recording.TempVideoPath,
+                        recording.FinalPath
+                    );
+                    finalResolutionSucceeded = true;
+                }
+                catch (Exception ex)
+                {
+                    terminalReason = ReplayVideoRecordingReasonCode.PromotionFailed;
+                    terminalException = ex;
+                }
+            }
+            else if (!string.Equals(context.EndReason, "begin-exception", StringComparison.Ordinal))
+            {
+                terminalReason = result.ReasonCode;
+            }
+
+            var finalFileSize = FfmpegRawVideoEncoder.TryGetFileSize(recording.FinalPath);
+            var metadataOutcome = TrySaveFinishMetadataFor(
+                context.Store,
+                context.VideoDir,
+                recording.FinalPath,
+                result,
+                finalResolutionSucceeded,
+                finalFileSize,
+                metadataStatus
+            );
+            metadataStatus = metadataOutcome.Status;
+            terminalException ??= metadataOutcome.Exception;
+        }
+        catch (Exception ex)
+        {
+            terminalReason = ReplayVideoRecordingReasonCode.CaptureFailed;
+            terminalException = ex;
+        }
+
+        DeleteTempFile(recording.TempVideoPath, recording.Operation.RecordingId);
+        DeleteWavBestEffort(recording.WavPaths);
+        recording.Operations.TryComplete(
+            recording.Operation,
+            new ReplayVideoRecordingCompletion
+            {
+                FinalFilePath = recording.FinalPath,
+                CapturedFrames = result?.CapturedFrames ?? 0,
+                DroppedFrames = result?.DroppedFrames ?? 0,
+                AudioStatus = context.AudioStatus,
+                MetadataStatus = metadataStatus,
+                ReasonCode = terminalReason,
+                ExitCode = result?.ExitCode,
+                StderrTail = result?.StderrTail,
+                Exception = terminalException ?? result?.Exception,
+                EndedAtUtc = result?.EndedAtUtc,
+            }
+        );
     }
 
     private static IDisposable? BeginUiSuppression(string recordingId)
@@ -902,9 +1060,13 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         var stampPart = nowLocal.ToString("yyyyMMdd-HHmmss");
         var sanitizedBattleId = SanitizeForPath(evt.BattleId);
         var outputDirectory = Path.Combine(videoDirectoryPath, datePart);
-        var finalFileName = $"{sanitizedBattleId}.{stampPart}.mp4";
-        var tempFileName = $"{sanitizedBattleId}.{stampPart}.recording.mp4";
-        var outputFilePath = Path.Combine(outputDirectory, tempFileName);
+        var fileNames = ReplayVideoOutputFileNames.Create(
+            sanitizedBattleId,
+            stampPart,
+            recordingId
+        );
+        var outputFilePath = Path.Combine(outputDirectory, fileNames.TempFileName);
+        var finalOutputFilePath = Path.Combine(outputDirectory, fileNames.FinalFileName);
 
         return new ReplayVideoCaptureRequest
         {
@@ -913,6 +1075,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             Source = evt.Source,
             FfmpegExecutable = ffmpegExecutable,
             OutputFilePath = outputFilePath,
+            FinalOutputFilePath = finalOutputFilePath,
             OutputDirectoryPath = outputDirectory,
             Width = width,
             Height = height,
@@ -922,9 +1085,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         };
     }
 
-    private void DeleteTempFile()
+    private static void DeleteTempFile(string? tempPath, string? recordingId)
     {
-        var tempPath = _activeRecordingTempPath;
         if (string.IsNullOrWhiteSpace(tempPath))
             return;
 
@@ -940,9 +1102,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 ex,
                 () =>
                     [
-                        CombatReplayVideoLogEvents.CleanupRecordingId.Bind(
-                            _activeOperation?.RecordingId
-                        ),
+                        CombatReplayVideoLogEvents.CleanupRecordingId.Bind(recordingId),
                         CombatReplayVideoLogEvents.CleanupStage.Bind(
                             ReplayVideoLogStage.TempDelete
                         ),
@@ -950,15 +1110,6 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                     ]
             );
         }
-    }
-
-    private static string StripTempSuffix(string tempPath)
-    {
-        const string suffix = ".recording.mp4";
-        if (string.IsNullOrEmpty(tempPath) || !tempPath.EndsWith(suffix, StringComparison.Ordinal))
-            return tempPath;
-
-        return tempPath.Substring(0, tempPath.Length - suffix.Length) + ".mp4";
     }
 
     private static string SanitizeForPath(string value)
@@ -986,4 +1137,36 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         internal ReplayVideoMetadataStatus Status { get; }
         internal Exception? Exception { get; }
     }
+
+    private sealed record RecordingFinalizeContext(
+        ReplayVideoRecordingLifecycle Operations,
+        ReplayVideoRecordingOperation Operation,
+        ReplayVideoEncoderDrain Drain,
+        string TempVideoPath,
+        string FinalPath,
+        IReadOnlyList<string>? WavPaths
+    );
+
+    private sealed record EndedRecordingFinalizeContext(
+        RecordingFinalizeContext Recording,
+        ReplayVideoAudioMuxer Muxer,
+        string? FfmpegExecutable,
+        CombatReplayVideoMetadataStore? Store,
+        string? VideoDir,
+        ReplayVideoAudioStatus AudioStatus,
+        ReplayVideoMetadataStatus MetadataStatus,
+        ReplayVideoRecordingReasonCode? DegradationReason,
+        Exception? DegradationException
+    );
+
+    private sealed record AbortedRecordingFinalizeContext(
+        RecordingFinalizeContext Recording,
+        string EndReason,
+        CombatReplayVideoMetadataStore? Store,
+        string? VideoDir,
+        ReplayVideoAudioStatus AudioStatus,
+        ReplayVideoMetadataStatus MetadataStatus,
+        ReplayVideoRecordingReasonCode TerminalReason,
+        Exception? TerminalException
+    );
 }
