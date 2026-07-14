@@ -1206,6 +1206,18 @@ public class CoreLayeringTests
             Path.Combine("Game", "CollectionPanel", "Grid", "CollectionSourceAttributionBadge.cs"),
             Path.Combine("Game", "VoiceSubtitles", "VoiceLineDisplay.cs"),
         };
+        var legacyTextPatterns = new[]
+        {
+            "AddComponent<Text>",
+            "GetComponent<Text>",
+            "GetComponents<Text>",
+            "GetComponentInChildren<Text>",
+            "GetComponentsInChildren<Text>",
+            "GetComponentInParent<Text>",
+            "GetComponentsInParent<Text>",
+            "TryGetComponent<Text>",
+            "typeof(Text)",
+        };
 
         Assert.Contains("TryGetSansDynamicFontAsset", adapterSource);
         foreach (var relativePath in surfaces)
@@ -1213,9 +1225,8 @@ public class CoreLayeringTests
             var source = File.ReadAllText(Path.Combine(mainSource, relativePath));
             Assert.Contains("TextMeshProUGUI", source);
             Assert.Contains("TryGetSansDynamicFontAsset", source);
-            Assert.DoesNotContain("AddComponent<Text>()", source);
-            Assert.DoesNotContain("typeof(Text)", source);
-            Assert.DoesNotContain("GetComponent<Text>()", source);
+            foreach (var legacyTextPattern in legacyTextPatterns)
+                Assert.DoesNotContain(legacyTextPattern, source);
         }
     }
 
