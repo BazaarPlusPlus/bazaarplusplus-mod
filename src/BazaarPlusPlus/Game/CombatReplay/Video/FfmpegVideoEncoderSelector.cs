@@ -249,7 +249,27 @@ internal static class FfmpegVideoEncoderSelector
             }
 
             var startedProcess = process;
-            stderrThread = new Thread(() => stderr.ReadFrom(startedProcess.StandardError))
+            stderrThread = new Thread(() =>
+            {
+                try
+                {
+                    stderr.ReadFrom(startedProcess.StandardError);
+                }
+                catch (IOException)
+                {
+                    // Process exited / stderr pipe closed under the reader.
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Process (and its StandardError) disposed while the reader was still blocked
+                    // after a probe timeout + kill-resist. The stderr tail is best-effort
+                    // diagnostic, so never let it escape onto this background thread.
+                }
+                catch
+                {
+                    // Best effort: a probe reader must never crash its thread.
+                }
+            })
             {
                 IsBackground = true,
                 Name = "BPP.CombatReplayVideo.ProfileProbeStderr",

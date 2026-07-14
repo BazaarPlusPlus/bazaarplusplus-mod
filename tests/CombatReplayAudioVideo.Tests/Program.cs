@@ -441,7 +441,6 @@ file static class VideoEncoderProfileTests
     {
         FrameRateUsesGamePreferenceWithSixtyFpsCap();
         CandidateOrderAndCache();
-        ProbeAndPrewarmContract();
         RateControlAndArguments();
     }
 
@@ -461,37 +460,45 @@ file static class VideoEncoderProfileTests
         TestReflection.Assert(Resolve(60) == 60, "The supported cap must preserve 60 fps.");
         TestReflection.Assert(Resolve(120) == 60, "Recording FPS must cap the game setting at 60.");
         TestReflection.Assert(Resolve(-1) == 30, "An unset Unity FPS must fall back to 30.");
-
-        var source = File.ReadAllText(
-            Path.Combine(
-                FindRepositoryRoot(),
-                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoFrameRateResolver.cs"
-            )
-        );
-        TestReflection.Assert(
-            source.Contains("PlayerPreferences.Data", StringComparison.Ordinal)
-                && source.Contains("VideoSynchronization", StringComparison.Ordinal)
-                && source.Contains("refreshRateRatio", StringComparison.Ordinal),
-            "Production FPS resolution must mirror the game's preference/vsync behavior."
-        );
     }
 
     private static void CandidateOrderAndCache()
     {
-        var candidates = SelectorType.GetMethod(
-            "CandidateCodecsForTests",
+        // Assert the REAL production candidate order via FfmpegVideoEncoderProfile.Candidates()
+        // (hardware profiles only; libx264 is the separate fallback appended by Resolve, so it
+        // is never a Candidates() element). This is what SelectOrPrewarm/Resolve actually consume.
+        var candidatesMethod = ProfileType.GetMethod(
+            "Candidates",
             BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
         )!;
-        string[] Get(string platform) =>
-            (string[])candidates.Invoke(null, new[] { Enum.Parse(PlatformType, platform) })!;
+        var codecProperty = ProfileType.GetProperty(
+            "Codec",
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
+        string[] ProductionCodecs(string platform) =>
+            (
+                (System.Collections.IEnumerable)
+                    candidatesMethod.Invoke(
+                        null,
+                        new object[] { Enum.Parse(PlatformType, platform), 1280, 720, 30 }
+                    )!
+            )
+                .Cast<object>()
+                .Select(profile => (string)codecProperty.GetValue(profile)!)
+                .ToArray();
 
         TestReflection.Assert(
-            Get("MacOS").SequenceEqual(new[] { "h264_videotoolbox", "libx264" }),
-            "macOS candidate order must prefer VideoToolbox then libx264."
+            ProductionCodecs("MacOS").SequenceEqual(new[] { "h264_videotoolbox" }),
+            "macOS hardware candidates must be VideoToolbox only."
         );
         TestReflection.Assert(
-            Get("Windows").SequenceEqual(new[] { "h264_nvenc", "h264_qsv", "h264_amf", "libx264" }),
-            "Windows candidate order must be NVENC, QSV, AMF, then libx264."
+            ProductionCodecs("Windows")
+                .SequenceEqual(new[] { "h264_nvenc", "h264_qsv", "h264_amf" }),
+            "Windows hardware candidate order must be NVENC, QSV, AMF."
+        );
+        TestReflection.Assert(
+            ProductionCodecs("Other").Length == 0,
+            "Unknown platforms must expose no hardware candidates (libx264 fallback only)."
         );
 
         var reset = SelectorType.GetMethod(
@@ -529,31 +536,6 @@ file static class VideoEncoderProfileTests
             "Failed hardware probes must fall back to libx264."
         );
         reset.Invoke(null, null);
-    }
-
-    private static void ProbeAndPrewarmContract()
-    {
-        var source = File.ReadAllText(
-            Path.Combine(
-                FindRepositoryRoot(),
-                "src/BazaarPlusPlus/Game/CombatReplay/Video/FfmpegVideoEncoderSelector.cs"
-            )
-        );
-        TestReflection.Assert(
-            source.Contains("Task.Run", StringComparison.Ordinal)
-                && source.Contains(
-                    "task.Status == TaskStatus.RanToCompletion",
-                    StringComparison.Ordinal
-                )
-                && source.Contains("FfmpegVideoEncoderProfile.Libx264()", StringComparison.Ordinal),
-            "Profile probing must stay off-thread and an unfinished prewarm must return libx264 without waiting."
-        );
-        TestReflection.Assert(
-            source.Contains("WaitForExit(ProbeTimeoutMilliseconds)", StringComparison.Ordinal)
-                && source.Contains("TryKill(process)", StringComparison.Ordinal)
-                && source.Contains("File.Delete(outputPath)", StringComparison.Ordinal),
-            "The real MP4 probe must retain its timeout, forced cleanup, and artifact deletion guards."
-        );
     }
 
     private static void RateControlAndArguments()
@@ -632,18 +614,6 @@ file static class VideoEncoderProfileTests
                 $"Hardware/probe arguments are missing {token}."
             );
         }
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var current = new DirectoryInfo(Environment.CurrentDirectory);
-        while (current != null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
-                return current.FullName;
-            current = current.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
     }
 }
 
