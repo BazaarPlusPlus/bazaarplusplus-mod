@@ -50,7 +50,6 @@ internal sealed partial class CollectionPanelView
         rail.Add(titleRow);
 
         _title = CreateLabel(Sizes.FontTitle, FontStyle.Normal, Colors.GameTitleText);
-        _typography!.Apply(_title, NativeGameTypography.PanelFontRole.Heading);
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
         _title.style.minWidth = 0f;

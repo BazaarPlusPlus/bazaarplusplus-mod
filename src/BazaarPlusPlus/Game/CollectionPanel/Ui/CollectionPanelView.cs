@@ -81,6 +81,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private UIDocument? _document;
     private PanelSettings? _panelSettings;
     private NativeGameTypography.PanelScope? _typography;
+    private NativeGameTitleOverlay? _titleOverlay;
     private VisualElement? _root;
     private Label? _title;
     private VisualElement? _subtitle;
@@ -174,14 +175,29 @@ internal sealed partial class CollectionPanelView : IDisposable
         _panelSettings.clearColor = false;
         _panelSettings.targetDisplay = 0;
         if (
-            NativeGameTypography.TryAttachPanel(
-                _panelSettings,
-                NativeGameTypography.PanelFontRequirements.BodyAndHeading,
-                out _typography
-            ) != NativeGameTypography.Outcome.Ready
+            NativeGameTypography.TryAttachPanel(_panelSettings, out _typography)
+                != NativeGameTypography.Outcome.Ready
             || _typography == null
         )
         {
+            UnityEngine.Object.DestroyImmediate(_panelSettings);
+            _panelSettings = null;
+            return;
+        }
+        if (
+            !NativeGameTitleOverlay.TryCreate(
+                "CollectionPanelNativeTitle",
+                _parent,
+                BppOverlaySorting.NativeCardPreview,
+                Sizes.FontTitle,
+                Colors.GameTitleText,
+                out _titleOverlay
+            )
+            || _titleOverlay == null
+        )
+        {
+            _typography.Dispose();
+            _typography = null;
             UnityEngine.Object.DestroyImmediate(_panelSettings);
             _panelSettings = null;
             return;
@@ -203,6 +219,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _root.pickingMode = PickingMode.Position;
 
         BuildTree(_root);
+        _titleOverlay.Attach(_title!);
 
         _gridViewport?.RegisterCallback<GeometryChangedEvent>(OnGridViewportGeometryChanged);
     }
@@ -219,6 +236,8 @@ internal sealed partial class CollectionPanelView : IDisposable
             // pressed during an in-flight open animation).
             _root.style.display = DisplayStyle.Flex;
             _root.style.opacity = _opacity;
+            _titleOverlay?.SetVisible(true);
+            _titleOverlay?.SetAlpha(_opacity);
         }
     }
 
@@ -236,7 +255,10 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (Mathf.Approximately(_opacity, _targetOpacity))
         {
             if (_targetOpacity <= 0f && _root.style.display.value != DisplayStyle.None)
+            {
                 _root.style.display = DisplayStyle.None;
+                _titleOverlay?.SetVisible(false);
+            }
             return;
         }
         // Asymmetric tau: open is a presentation (slower, more deliberate); close is a
@@ -250,8 +272,12 @@ internal sealed partial class CollectionPanelView : IDisposable
         if (Mathf.Abs(_opacity - _targetOpacity) < 0.005f)
             _opacity = _targetOpacity;
         _root.style.opacity = _opacity;
+        _titleOverlay?.SetAlpha(_opacity);
         if (_targetOpacity <= 0f && _opacity <= 0.005f)
+        {
             _root.style.display = DisplayStyle.None;
+            _titleOverlay?.SetVisible(false);
+        }
     }
 
     public void TickLoading(float deltaSeconds)
@@ -302,6 +328,7 @@ internal sealed partial class CollectionPanelView : IDisposable
             return;
 
         _title!.text = model.Title;
+        _titleOverlay?.SetText(model.Title);
         BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle, _typography!);
         _countLabel!.text = model.CountText;
         _statusLabel!.text = StablePanelText.Compact(model.StatusMessage, 150);
@@ -553,6 +580,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     {
         if (_rootObject != null)
             UnityEngine.Object.Destroy(_rootObject);
+        _titleOverlay?.Dispose();
         _typography?.Dispose();
         if (_panelSettings != null)
             UnityEngine.Object.Destroy(_panelSettings);
@@ -560,6 +588,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _document = null;
         _panelSettings = null;
         _typography = null;
+        _titleOverlay = null;
         _root = null;
         _controlsScrollView = null;
     }

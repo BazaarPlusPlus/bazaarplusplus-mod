@@ -160,11 +160,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _panelSettings.clearColor = false;
         _panelSettings.targetDisplay = 0;
         if (
-            NativeGameTypography.TryAttachPanel(
-                _panelSettings,
-                NativeGameTypography.PanelFontRequirements.BodyOnly,
-                out _typography
-            ) != NativeGameTypography.Outcome.Ready
+            NativeGameTypography.TryAttachPanel(_panelSettings, out _typography)
+                != NativeGameTypography.Outcome.Ready
             || _typography == null
         )
         {
