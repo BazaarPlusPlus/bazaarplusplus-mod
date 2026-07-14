@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using BazaarPlusPlus.Infrastructure;
@@ -30,6 +31,9 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     // thread; everything else here runs on the Unity main thread.
     private ReplayVideoFramePool? _pool;
     private WallClockCfrPacer? _pacer;
+    private readonly ReplayVideoReadbackLimiter _readbackLimiter = new(limit: 2);
+    private readonly ReplayVideoCopyTimingAccumulator _readbackCopyTiming = new();
+    private readonly ReplayVideoCopyTimingAccumulator _cfrCopyTiming = new();
 
     // The single non-pooled staging buffer that OnReadbackComplete overwrites in
     // place. It is never enqueued and never returned to the pool; every emit
@@ -42,7 +46,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
     private double _nextCaptureTime;
     private int _issuedSequence;
-    private int _outstandingReadbackCount;
+    private int _readbackBackpressureSkips;
     private int _capturedFrames;
     private int _droppedFrames;
     private int _repeatedFrames;
@@ -97,9 +101,9 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             );
         }
 
-        _frameByteLength = _request.Width * _request.Height * 4;
+        _frameByteLength = _request.BufferPlan.FrameByteLength;
         _latestFrameBuffer = new byte[_frameByteLength];
-        _pool = new ReplayVideoFramePool(_frameByteLength, _request.MaxQueuedFrames);
+        _pool = new ReplayVideoFramePool(_frameByteLength, _request.BufferPlan.PoolCapacity);
         _pacer = new WallClockCfrPacer(_request.Fps);
 
         _encoder = new FfmpegRawVideoEncoder(
@@ -109,9 +113,8 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             _request.Width,
             _request.Height,
             _request.Fps,
-            _request.Crf,
-            _request.Preset,
-            _request.MaxQueuedFrames,
+            _request.EncoderProfile,
+            _request.BufferPlan.QueueCapacity,
             onFrameConsumed: buf => _pool?.Return(buf)
         );
 
@@ -121,6 +124,16 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
         catch
         {
+            if (_request.EncoderProfile.HardwareAccelerated)
+            {
+                FfmpegVideoEncoderSelector.Invalidate(
+                    _request.FfmpegExecutable,
+                    _request.Width,
+                    _request.Height,
+                    _request.Fps,
+                    _request.EncoderProfile.Codec
+                );
+            }
             _encoder.Dispose();
             _encoder = null;
             ReleaseRenderTexture();
@@ -145,6 +158,32 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                     CombatReplayVideoLogEvents.StatsDurationMs.Bind(0),
                     CombatReplayVideoLogEvents.StatsSizeBytes.Bind(0),
                     CombatReplayVideoLogEvents.StatsOutputPath.Bind(_request.OutputFilePath),
+                    CombatReplayVideoLogEvents.StatsCodec.Bind(_request.EncoderProfile.Codec),
+                    CombatReplayVideoLogEvents.StatsRateControl.Bind(
+                        _request.EncoderProfile.RateControlSummary
+                    ),
+                    CombatReplayVideoLogEvents.StatsFrameBytes.Bind(_frameByteLength),
+                    CombatReplayVideoLogEvents.StatsPoolCapacity.Bind(
+                        _request.BufferPlan.PoolCapacity
+                    ),
+                    CombatReplayVideoLogEvents.StatsQueueCapacity.Bind(
+                        _request.BufferPlan.QueueCapacity
+                    ),
+                    CombatReplayVideoLogEvents.StatsPoolPayloadBytes.Bind(
+                        _request.BufferPlan.PoolPayloadBytes
+                    ),
+                    CombatReplayVideoLogEvents.StatsPoolBudgetExceeded.Bind(
+                        _request.BufferPlan.BudgetExceeded
+                    ),
+                    CombatReplayVideoLogEvents.StatsReadbackBackpressureSkips.Bind(0),
+                    CombatReplayVideoLogEvents.StatsMaxOutstandingReadbacks.Bind(0),
+                    CombatReplayVideoLogEvents.StatsReadbackCopyP95Us.Bind(0),
+                    CombatReplayVideoLogEvents.StatsCfrCopyP95Us.Bind(0),
+                    CombatReplayVideoLogEvents.StatsStagingBufferBytes.Bind(_frameByteLength),
+                    CombatReplayVideoLogEvents.StatsMaxReadbackPayloadBytes.Bind(0),
+                    CombatReplayVideoLogEvents.StatsRenderTextureEstimatedBytes.Bind(
+                        _frameByteLength
+                    ),
                 ]
         );
     }
@@ -162,15 +201,10 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
 
         var now = Time.unscaledTimeAsDouble;
-        var capturesThisTick = 0;
-        const int maxCapturesPerTick = 3;
-        while (now >= _nextCaptureTime && capturesThisTick < maxCapturesPerTick)
+        if (now >= _nextCaptureTime)
         {
-            if (!TryRequestReadback())
-                break;
-
+            TryRequestReadback();
             _nextCaptureTime += _frameInterval;
-            capturesThisTick++;
         }
 
         if (now - _nextCaptureTime > _frameInterval * 5)
@@ -219,7 +253,9 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                 continue;
             }
 
+            var copyStarted = Stopwatch.GetTimestamp();
             Buffer.BlockCopy(_latestFrameBuffer!, 0, buffer, 0, _frameByteLength);
+            _cfrCopyTiming.ObserveSince(copyStarted);
 
             if (encoder.TryEnqueueFrame(buffer))
             {
@@ -258,6 +294,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         EmitFinalFrame();
 
         var encoder = _encoder;
+        var encoderFailed = false;
         if (encoder != null)
         {
             try
@@ -267,14 +304,32 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                 _stderrTail = outcome.StderrTail;
                 if (!outcome.Succeeded)
                 {
+                    encoderFailed = true;
                     _failureReasonCode ??= MapEncoderReason(outcome.ReasonCode);
                     _failureException ??= outcome.Exception;
                 }
             }
             catch (Exception ex)
             {
+                encoderFailed = true;
                 _failureReasonCode ??= ReplayVideoRecordingReasonCode.EncoderWriterFailed;
                 _failureException ??= ex;
+            }
+            finally
+            {
+                encoder.Dispose();
+                _encoder = null;
+            }
+
+            if (encoderFailed && _request.EncoderProfile.HardwareAccelerated)
+            {
+                FfmpegVideoEncoderSelector.Invalidate(
+                    _request.FfmpegExecutable,
+                    _request.Width,
+                    _request.Height,
+                    _request.Fps,
+                    _request.EncoderProfile.Codec
+                );
             }
         }
 
@@ -298,6 +353,42 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                     CombatReplayVideoLogEvents.StatsDurationMs.Bind(result.DurationMs),
                     CombatReplayVideoLogEvents.StatsSizeBytes.Bind(result.FileSizeBytes),
                     CombatReplayVideoLogEvents.StatsOutputPath.Bind(result.OutputFilePath),
+                    CombatReplayVideoLogEvents.StatsCodec.Bind(_request.EncoderProfile.Codec),
+                    CombatReplayVideoLogEvents.StatsRateControl.Bind(
+                        _request.EncoderProfile.RateControlSummary
+                    ),
+                    CombatReplayVideoLogEvents.StatsFrameBytes.Bind(_frameByteLength),
+                    CombatReplayVideoLogEvents.StatsPoolCapacity.Bind(
+                        _request.BufferPlan.PoolCapacity
+                    ),
+                    CombatReplayVideoLogEvents.StatsQueueCapacity.Bind(
+                        _request.BufferPlan.QueueCapacity
+                    ),
+                    CombatReplayVideoLogEvents.StatsPoolPayloadBytes.Bind(
+                        _request.BufferPlan.PoolPayloadBytes
+                    ),
+                    CombatReplayVideoLogEvents.StatsPoolBudgetExceeded.Bind(
+                        _request.BufferPlan.BudgetExceeded
+                    ),
+                    CombatReplayVideoLogEvents.StatsReadbackBackpressureSkips.Bind(
+                        _readbackBackpressureSkips
+                    ),
+                    CombatReplayVideoLogEvents.StatsMaxOutstandingReadbacks.Bind(
+                        _readbackLimiter.MaxObserved
+                    ),
+                    CombatReplayVideoLogEvents.StatsReadbackCopyP95Us.Bind(
+                        _readbackCopyTiming.P95Microseconds
+                    ),
+                    CombatReplayVideoLogEvents.StatsCfrCopyP95Us.Bind(
+                        _cfrCopyTiming.P95Microseconds
+                    ),
+                    CombatReplayVideoLogEvents.StatsStagingBufferBytes.Bind(_frameByteLength),
+                    CombatReplayVideoLogEvents.StatsMaxReadbackPayloadBytes.Bind(
+                        (long)_readbackLimiter.MaxObserved * _frameByteLength
+                    ),
+                    CombatReplayVideoLogEvents.StatsRenderTextureEstimatedBytes.Bind(
+                        _frameByteLength
+                    ),
                 ]
         );
         return result;
@@ -315,10 +406,8 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         try
         {
             if (!_finalized)
-            {
                 _failureReasonCode ??= ReplayVideoRecordingReasonCode.Aborted;
-                _encoder?.Dispose();
-            }
+            _encoder?.Dispose();
         }
         catch
         {
@@ -326,9 +415,8 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
         finally
         {
-            // The encoder (above) joins its writer thread on Dispose, so no
-            // further pool.Return can run after this point; dropping the pool /
-            // pacer / staging references is safe.
+            // Encoder.Dispose is idempotent and joins its writer thread, so no
+            // further pool.Return can run after this point.
             _encoder = null;
             _pool = null;
             _pacer = null;
@@ -342,17 +430,22 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         var rt = _captureRenderTexture;
         if (rt == null)
             return false;
+        if (!_readbackLimiter.TryReserve())
+        {
+            _readbackBackpressureSkips++;
+            return false;
+        }
 
         try
         {
             ScreenCapture.CaptureScreenshotIntoRenderTexture(rt);
             var sequenceNumber = Interlocked.Increment(ref _issuedSequence);
-            Interlocked.Increment(ref _outstandingReadbackCount);
             AsyncGPUReadback.Request(rt, 0, request => OnReadbackComplete(request, sequenceNumber));
             return true;
         }
         catch (Exception ex)
         {
+            _readbackLimiter.Release();
             _failureReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
             _failureException ??= ex;
             return false;
@@ -361,7 +454,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
     private void OnReadbackComplete(AsyncGPUReadbackRequest request, int sequenceNumber)
     {
-        Interlocked.Decrement(ref _outstandingReadbackCount);
+        _readbackLimiter.Release();
 
         if (_disposed)
             return;
@@ -405,7 +498,9 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             // width*height*4); we never enqueue this buffer, so reusing it is
             // safe and eliminates the per-frame allocation. Each emit copies it
             // into a fresh pooled buffer.
+            var copyStarted = Stopwatch.GetTimestamp();
             data.CopyTo(_latestFrameBuffer!);
+            _readbackCopyTiming.ObserveSince(copyStarted);
             // AsyncGPUReadback returns rows in the graphics API's native vertical order, and
             // ffmpeg's rawvideo input treats row 0 as the top of the frame. On top-origin APIs
             // (D3D/Metal/Vulkan; SystemInfo.graphicsUVStartsAtTop == true) row 0 is already the
@@ -459,7 +554,9 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             return;
         }
 
+        var copyStarted = Stopwatch.GetTimestamp();
         Buffer.BlockCopy(_latestFrameBuffer!, 0, buffer, 0, _frameByteLength);
+        _cfrCopyTiming.ObserveSince(copyStarted);
 
         if (encoder.TryEnqueueFrame(buffer))
         {
@@ -575,9 +672,9 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             Width = _request.Width,
             Height = _request.Height,
             Fps = _request.Fps,
-            Codec = "libx264",
-            Crf = _request.Crf,
-            Preset = _request.Preset,
+            Codec = _request.EncoderProfile.Codec,
+            Crf = _request.EncoderProfile.Crf,
+            Preset = _request.EncoderProfile.Preset,
             StartedAtUtc = _startedAtUtc,
             EndedAtUtc = endedAt,
             DurationMs = durationMs,

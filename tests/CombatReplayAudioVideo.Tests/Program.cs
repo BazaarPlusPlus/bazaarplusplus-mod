@@ -13,6 +13,11 @@ using BepInEx.Logging;
 WavHeaderTests.Run();
 CfrPacerTests.Run();
 FramePoolTests.Run();
+VideoEncoderProfileTests.Run();
+VideoBufferPlanTests.Run();
+ReadbackLimiterTests.Run();
+CopyTimingTests.Run();
+EncoderDisposeTests.Run();
 ZeroDurationMuxGuardTests.Run();
 MuxerArgumentTests.Run();
 MuxerDebugStemTests.Run();
@@ -417,7 +422,482 @@ file static class FramePoolTests
 }
 
 // ---------------------------------------------------------------------------
-// 4) ReplayVideoAudioMuxer.IsLikelyZeroDurationOutput: the gate that stops a
+// 4) Video encoder profiles: platform order, non-blocking selection cache,
+//    dynamic FPS cap, bitrate bounds, and exact production/probe arguments.
+// ---------------------------------------------------------------------------
+file static class VideoEncoderProfileTests
+{
+    private static readonly Type ProfileType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderProfile"
+    );
+    private static readonly Type PlatformType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.VideoEncoderPlatform"
+    );
+    private static readonly Type SelectorType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderSelector"
+    );
+
+    public static void Run()
+    {
+        FrameRateUsesGamePreferenceWithSixtyFpsCap();
+        CandidateOrderAndCache();
+        ProbeAndPrewarmContract();
+        RateControlAndArguments();
+    }
+
+    private static void FrameRateUsesGamePreferenceWithSixtyFpsCap()
+    {
+        var resolver = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoFrameRateResolver"
+        );
+        var normalize = resolver.GetMethod(
+            "Normalize",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
+        int Resolve(int value) => (int)normalize.Invoke(null, new object[] { value })!;
+
+        TestReflection.Assert(Resolve(15) == 15, "A user-selected 15 fps must be preserved.");
+        TestReflection.Assert(Resolve(30) == 30, "A user-selected 30 fps must be preserved.");
+        TestReflection.Assert(Resolve(60) == 60, "The supported cap must preserve 60 fps.");
+        TestReflection.Assert(Resolve(120) == 60, "Recording FPS must cap the game setting at 60.");
+        TestReflection.Assert(Resolve(-1) == 30, "An unset Unity FPS must fall back to 30.");
+
+        var source = File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoFrameRateResolver.cs"
+            )
+        );
+        TestReflection.Assert(
+            source.Contains("PlayerPreferences.Data", StringComparison.Ordinal)
+                && source.Contains("VideoSynchronization", StringComparison.Ordinal)
+                && source.Contains("refreshRateRatio", StringComparison.Ordinal),
+            "Production FPS resolution must mirror the game's preference/vsync behavior."
+        );
+    }
+
+    private static void CandidateOrderAndCache()
+    {
+        var candidates = SelectorType.GetMethod(
+            "CandidateCodecsForTests",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
+        string[] Get(string platform) =>
+            (string[])candidates.Invoke(null, new[] { Enum.Parse(PlatformType, platform) })!;
+
+        TestReflection.Assert(
+            Get("MacOS").SequenceEqual(new[] { "h264_videotoolbox", "libx264" }),
+            "macOS candidate order must prefer VideoToolbox then libx264."
+        );
+        TestReflection.Assert(
+            Get("Windows").SequenceEqual(new[] { "h264_nvenc", "h264_qsv", "h264_amf", "libx264" }),
+            "Windows candidate order must be NVENC, QSV, AMF, then libx264."
+        );
+
+        var reset = SelectorType.GetMethod(
+            "ResetForTests",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
+        var resolve = SelectorType.GetMethod(
+            "ResolveCodecForTests",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
+        reset.Invoke(null, null);
+        var probes = 0;
+        Func<string, bool> qsvOnly = codec =>
+        {
+            probes++;
+            return codec == "h264_qsv";
+        };
+        var windows = Enum.Parse(PlatformType, "Windows");
+        var first = (string)resolve.Invoke(null, new object[] { "same", windows, qsvOnly })!;
+        var second = (string)resolve.Invoke(null, new object[] { "same", windows, qsvOnly })!;
+        TestReflection.Assert(
+            first == "h264_qsv" && second == first,
+            "QSV must win after NVENC fails."
+        );
+        TestReflection.Assert(probes == 2, "A completed selection must be cached by key.");
+
+        Func<string, bool> none = _ => false;
+        var mac = (string)
+            resolve.Invoke(
+                null,
+                new object[] { "fallback", Enum.Parse(PlatformType, "MacOS"), none }
+            )!;
+        TestReflection.Assert(
+            mac == "libx264",
+            "Failed hardware probes must fall back to libx264."
+        );
+        reset.Invoke(null, null);
+    }
+
+    private static void ProbeAndPrewarmContract()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "src/BazaarPlusPlus/Game/CombatReplay/Video/FfmpegVideoEncoderSelector.cs"
+            )
+        );
+        TestReflection.Assert(
+            source.Contains("Task.Run", StringComparison.Ordinal)
+                && source.Contains(
+                    "task.Status == TaskStatus.RanToCompletion",
+                    StringComparison.Ordinal
+                )
+                && source.Contains("FfmpegVideoEncoderProfile.Libx264()", StringComparison.Ordinal),
+            "Profile probing must stay off-thread and an unfinished prewarm must return libx264 without waiting."
+        );
+        TestReflection.Assert(
+            source.Contains("WaitForExit(ProbeTimeoutMilliseconds)", StringComparison.Ordinal)
+                && source.Contains("TryKill(process)", StringComparison.Ordinal)
+                && source.Contains("File.Delete(outputPath)", StringComparison.Ordinal),
+            "The real MP4 probe must retain its timeout, forced cleanup, and artifact deletion guards."
+        );
+    }
+
+    private static void RateControlAndArguments()
+    {
+        var bitrate = ProfileType.GetMethod(
+            "CalculateTargetBitrateKbps",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
+        int Target(int width, int height, int fps) =>
+            (int)bitrate.Invoke(null, new object[] { width, height, fps })!;
+        TestReflection.Assert(
+            Target(640, 360, 15) == 6000,
+            "Hardware VBR must enforce 6 Mbps minimum."
+        );
+        TestReflection.Assert(
+            Target(2742, 1624, 30) == 20039,
+            "Native 30fps bitrate must follow the BPP formula."
+        );
+        TestReflection.Assert(
+            Target(2742, 1624, 60) == 24000,
+            "60fps bitrate must enforce 24 Mbps maximum."
+        );
+
+        var software = ProfileType
+            .GetMethod(
+                "Libx264",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(null, null)!;
+        var build = TestReflection
+            .RequireType("BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderArguments")
+            .GetMethod(
+                "Build",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )!;
+        string Build(object profile, int fps, int? limit = null) =>
+            (string)
+                build.Invoke(null, new object?[] { profile, 2742, 1624, fps, "out.mp4", limit })!;
+        var softwareArgs = Build(software, 30);
+        TestReflection.Assert(
+            softwareArgs
+                == "-hide_banner -loglevel warning -nostdin -y -f rawvideo -pixel_format rgba -video_size 2742x1624 -framerate 30 -i pipe:0 -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 23 -movflags +faststart out.mp4",
+            "The libx264 fallback must preserve the existing argument contract exactly."
+        );
+
+        var candidateMethod = ProfileType.GetMethod(
+            "Candidates",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
+        var macCandidates = (
+            (System.Collections.IEnumerable)
+                candidateMethod.Invoke(
+                    null,
+                    new object[] { Enum.Parse(PlatformType, "MacOS"), 2742, 1624, 60 }
+                )!
+        )
+            .Cast<object>()
+            .ToArray();
+        var hardwareArgs = Build(macCandidates[0], 60, limit: 1);
+        foreach (
+            var token in new[]
+            {
+                "-c:v h264_videotoolbox",
+                "-pix_fmt yuv420p",
+                "-realtime 1",
+                "-b:v 24000k",
+                "-maxrate 30000k",
+                "-bufsize 48000k",
+                "-frames:v 1",
+                "-movflags +faststart",
+            }
+        )
+        {
+            TestReflection.Assert(
+                hardwareArgs.Contains(token, StringComparison.Ordinal),
+                $"Hardware/probe arguments are missing {token}."
+            );
+        }
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(Environment.CurrentDirectory);
+        while (current != null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
+                return current.FullName;
+            current = current.Parent;
+        }
+        throw new InvalidOperationException("Repository root not found.");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 5) Byte budget: pool payload is bounded independently from queue references,
+//    and the writer gets one headroom slot (queue = pool - 1).
+// ---------------------------------------------------------------------------
+file static class VideoBufferPlanTests
+{
+    private static readonly Type PlanType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoBufferPlan"
+    );
+
+    public static void Run()
+    {
+        var native = Create(2742, 1624);
+        TestReflection.Assert(
+            Int(native, "FrameByteLength") == 17_812_032,
+            "Native frame bytes drifted."
+        );
+        TestReflection.Assert(Int(native, "PoolCapacity") == 7, "Native pool capacity must be 7.");
+        TestReflection.Assert(
+            Int(native, "QueueCapacity") == 6,
+            "Queue must reserve one writer slot."
+        );
+        TestReflection.Assert(
+            Long(native, "PoolPayloadBytes") == 124_684_224,
+            "Native pool payload must be ~119 MiB."
+        );
+        TestReflection.Assert(
+            !Bool(native, "BudgetExceeded"),
+            "Native pool payload must remain within 128 MiB."
+        );
+
+        var fourK = Create(3840, 2160);
+        TestReflection.Assert(Int(fourK, "PoolCapacity") == 4, "4K pool capacity must be 4.");
+        TestReflection.Assert(Int(fourK, "QueueCapacity") == 3, "4K queue capacity must be 3.");
+
+        var eightK = Create(7680, 4320);
+        TestReflection.Assert(
+            Int(eightK, "PoolCapacity") == 3,
+            "The forward-progress floor must remain 3."
+        );
+        TestReflection.Assert(
+            Bool(eightK, "BudgetExceeded"),
+            "An unavoidable minimum-capacity overrun must be explicit."
+        );
+    }
+
+    private static object Create(int width, int height) =>
+        PlanType
+            .GetMethod(
+                "Create",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(null, new object[] { width, height, 128L * 1024 * 1024 })!;
+
+    private static int Int(object value, string name) =>
+        (int)TestReflection.GetProp(PlanType, value, name)!;
+
+    private static long Long(object value, string name) =>
+        (long)TestReflection.GetProp(PlanType, value, name)!;
+
+    private static bool Bool(object value, string name) =>
+        (bool)TestReflection.GetProp(PlanType, value, name)!;
+}
+
+// ---------------------------------------------------------------------------
+// 6) Readback limiter: reservations never exceed two and a released slot can be
+//    reused without blocking the Unity main thread.
+// ---------------------------------------------------------------------------
+file static class ReadbackLimiterTests
+{
+    private static readonly Type LimiterType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoReadbackLimiter"
+    );
+
+    public static void Run()
+    {
+        var limiter = Activator.CreateInstance(
+            LimiterType,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            args: new object[] { 2 },
+            culture: null
+        )!;
+        bool Reserve() =>
+            (bool)
+                TestReflection.Invoke(
+                    LimiterType,
+                    limiter,
+                    "TryReserve",
+                    Type.EmptyTypes,
+                    Array.Empty<object>()
+                )!;
+        void Release() =>
+            TestReflection.Invoke(
+                LimiterType,
+                limiter,
+                "Release",
+                Type.EmptyTypes,
+                Array.Empty<object>()
+            );
+
+        TestReflection.Assert(
+            Reserve() && Reserve(),
+            "The first two readbacks must reserve slots."
+        );
+        TestReflection.Assert(!Reserve(), "A third in-flight readback must be rejected.");
+        TestReflection.Assert(
+            (int)TestReflection.GetProp(LimiterType, limiter, "Outstanding")! == 2,
+            "Outstanding must cap at two."
+        );
+        Release();
+        TestReflection.Assert(Reserve(), "A completed readback must free a reusable slot.");
+        TestReflection.Assert(
+            (int)TestReflection.GetProp(LimiterType, limiter, "MaxObserved")! == 2,
+            "Observed maximum must never exceed two."
+        );
+        Release();
+        Release();
+
+        var root = FindRepositoryRoot();
+        var source = File.ReadAllText(
+            Path.Combine(
+                root,
+                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoCaptureSession.cs"
+            )
+        );
+        TestReflection.Assert(
+            !source.Contains("maxCapturesPerTick", StringComparison.Ordinal)
+                && !source.Contains("while (now >= _nextCaptureTime", StringComparison.Ordinal),
+            "Production capture must issue at most one readback per rendered tick."
+        );
+        TestReflection.Assert(
+            source.Contains("_readbackLimiter.Release();", StringComparison.Ordinal)
+                && source.Contains("_readbackBackpressureSkips++", StringComparison.Ordinal),
+            "Request exceptions must release reservations and backpressure must be counted separately."
+        );
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(Environment.CurrentDirectory);
+        while (current != null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
+                return current.FullName;
+            current = current.Parent;
+        }
+        throw new InvalidOperationException("Repository root not found.");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 7) Copy timing: bounded samples produce a stable p95 for the NativeArray gate.
+// ---------------------------------------------------------------------------
+file static class CopyTimingTests
+{
+    public static void Run()
+    {
+        var type = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCopyTimingAccumulator"
+        );
+        var timing = Activator.CreateInstance(
+            type,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            args: new object[] { 5 },
+            culture: null
+        )!;
+        foreach (var value in new long[] { 1, 2, 3, 4, 100 })
+        {
+            TestReflection.Invoke(
+                type,
+                timing,
+                "ObserveMicroseconds",
+                new[] { typeof(long) },
+                new object[] { value }
+            );
+        }
+        TestReflection.Assert(
+            (int)TestReflection.GetProp(type, timing, "SampleCount")! == 5,
+            "Copy timing must retain its bounded sample count."
+        );
+        TestReflection.Assert(
+            (long)TestReflection.GetProp(type, timing, "P95Microseconds")! == 100,
+            "Copy timing p95 must select the 95th percentile sample."
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 8) Encoder cleanup: concurrent Dispose calls execute cleanup once, and the
+//    finalized happy path owns the same cleanup.
+// ---------------------------------------------------------------------------
+file static class EncoderDisposeTests
+{
+    public static void Run()
+    {
+        var profileType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderProfile"
+        );
+        var profile = profileType
+            .GetMethod(
+                "Libx264",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .Invoke(null, null)!;
+        var encoderType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegRawVideoEncoder"
+        );
+        var encoder = Activator.CreateInstance(
+            encoderType,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+            binder: null,
+            args: new object?[] { "dispose-test", "ffmpeg", "out.mp4", 2, 2, 30, profile, 2, null },
+            culture: null
+        )!;
+        Parallel.For(0, 64, _ => ((IDisposable)encoder).Dispose());
+        TestReflection.Assert(
+            (int)TestReflection.GetProp(encoderType, encoder, "DisposeExecutionCount")! == 1,
+            "Encoder cleanup must execute exactly once under concurrent Dispose calls."
+        );
+
+        var sessionSource = File.ReadAllText(
+            Path.Combine(
+                FindRepositoryRoot(),
+                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoCaptureSession.cs"
+            )
+        );
+        var wait = sessionSource.IndexOf("encoder.WaitForCompletion", StringComparison.Ordinal);
+        var dispose = sessionSource.IndexOf("encoder.Dispose();", wait, StringComparison.Ordinal);
+        TestReflection.Assert(
+            wait >= 0 && dispose > wait,
+            "The successful finalize path must dispose the encoder after draining it."
+        );
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var current = new DirectoryInfo(Environment.CurrentDirectory);
+        while (current != null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
+                return current.FullName;
+            current = current.Parent;
+        }
+        throw new InvalidOperationException("Repository root not found.");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 9) ReplayVideoAudioMuxer.IsLikelyZeroDurationOutput: the gate that stops a
 //    -shortest mux of an empty WAV (exit 0, ~hundred-byte stub) from deleting the
 //    good silent first-pass video. Reproduced sizes: a real 3s recording is
 //    multi-MB; the empty-output stub is ~261 bytes.
@@ -1492,11 +1972,11 @@ file static class MediaEventCatalogTests
         ["combat_replay.audio_capture.completed"] =
             "recording_id:Public:High:Short|backend:Public:Low:None|usable:Public:Low:None|sample_float_count:Public:High:None|rms_db:Public:High:None|peak_db:Public:High:None|size_bytes:Public:High:None|wav_path:LocalPath:High:None",
         ["combat_replay.ffmpeg.probe_completed"] =
-            "available:Public:Low:None|source:Public:Low:None|executable:LocalPath:High:None|reason_code:Public:Low:None|duration_ms:Public:High:None",
+            "available:Public:Low:None|source:Public:Low:None|executable:LocalPath:High:None|reason_code:Public:Low:None|duration_ms:Public:High:None|codec:Public:Low:None|width:Public:High:None|height:Public:High:None|fps:Public:Low:None|stderr_tail:UntrustedText:High:None",
         ["combat_replay.video_recording.lifecycle_observed"] =
             "stage:Public:Low:None|recording_id:Public:High:Short|battle_id:Public:High:Short|pending_count:Public:High:None",
         ["combat_replay.video_capture.stats_observed"] =
-            "recording_id:Public:High:Short|stage:Public:Low:None|width:Public:High:None|height:Public:High:None|fps:Public:Low:None|captured_frames:Public:High:None|repeated_frames:Public:High:None|dropped_frames:Public:High:None|duration_ms:Public:High:None|size_bytes:Public:High:None|output_path:LocalPath:High:None",
+            "recording_id:Public:High:Short|stage:Public:Low:None|width:Public:High:None|height:Public:High:None|fps:Public:Low:None|captured_frames:Public:High:None|repeated_frames:Public:High:None|dropped_frames:Public:High:None|duration_ms:Public:High:None|size_bytes:Public:High:None|output_path:LocalPath:High:None|codec:Public:Low:None|rate_control:Public:Low:None|frame_bytes:Public:High:None|pool_capacity:Public:Low:None|queue_capacity:Public:Low:None|pool_payload_bytes:Public:High:None|pool_budget_exceeded:Public:Low:None|readback_backpressure_skips:Public:High:None|max_outstanding_readbacks:Public:Low:None|readback_copy_p95_us:Public:High:None|cfr_copy_p95_us:Public:High:None|staging_buffer_bytes:Public:High:None|max_readback_payload_bytes:Public:High:None|render_texture_estimated_bytes:Public:High:None",
         ["combat_replay.video_capture.frame_degraded"] =
             "recording_id:Public:High:Short|stage:Public:Low:None|reason_code:Public:Low:None|sequence:Public:High:None",
         ["combat_replay.video_recording.cleanup_failed"] =

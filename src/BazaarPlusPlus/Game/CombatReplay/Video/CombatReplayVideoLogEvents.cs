@@ -207,6 +207,25 @@ internal static class CombatReplayVideoLogEvents
         "duration_ms",
         BppLogCardinality.High
     );
+    internal static readonly BppLogFieldDefinition FfmpegProbeCodec = Field(5, "codec");
+    internal static readonly BppLogFieldDefinition FfmpegProbeWidth = Field(
+        6,
+        "width",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition FfmpegProbeHeight = Field(
+        7,
+        "height",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition FfmpegProbeFps = Field(8, "fps");
+    internal static readonly BppLogFieldDefinition FfmpegProbeStderrTail = new(
+        9,
+        "stderr_tail",
+        BppLogFieldPrivacy.UntrustedText,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.High
+    );
     internal static readonly BppLogEventDefinition FfmpegProbeCompleted = new(
         BppLogFeatureScope.CombatReplay,
         "combat_replay.ffmpeg.probe_completed",
@@ -216,6 +235,11 @@ internal static class CombatReplayVideoLogEvents
             FfmpegProbeExecutable,
             FfmpegProbeReasonCode,
             FfmpegProbeDurationMs,
+            FfmpegProbeCodec,
+            FfmpegProbeWidth,
+            FfmpegProbeHeight,
+            FfmpegProbeFps,
+            FfmpegProbeStderrTail,
         ]
     );
 
@@ -293,6 +317,58 @@ internal static class CombatReplayVideoLogEvents
         BppLogCorrelationPolicy.None,
         BppLogCardinality.High
     );
+    internal static readonly BppLogFieldDefinition StatsCodec = Field(11, "codec");
+    internal static readonly BppLogFieldDefinition StatsRateControl = Field(12, "rate_control");
+    internal static readonly BppLogFieldDefinition StatsFrameBytes = Field(
+        13,
+        "frame_bytes",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition StatsPoolCapacity = Field(14, "pool_capacity");
+    internal static readonly BppLogFieldDefinition StatsQueueCapacity = Field(15, "queue_capacity");
+    internal static readonly BppLogFieldDefinition StatsPoolPayloadBytes = Field(
+        16,
+        "pool_payload_bytes",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition StatsPoolBudgetExceeded = Field(
+        17,
+        "pool_budget_exceeded"
+    );
+    internal static readonly BppLogFieldDefinition StatsReadbackBackpressureSkips = Field(
+        18,
+        "readback_backpressure_skips",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition StatsMaxOutstandingReadbacks = Field(
+        19,
+        "max_outstanding_readbacks"
+    );
+    internal static readonly BppLogFieldDefinition StatsReadbackCopyP95Us = Field(
+        20,
+        "readback_copy_p95_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition StatsCfrCopyP95Us = Field(
+        21,
+        "cfr_copy_p95_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition StatsStagingBufferBytes = Field(
+        22,
+        "staging_buffer_bytes",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition StatsMaxReadbackPayloadBytes = Field(
+        23,
+        "max_readback_payload_bytes",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition StatsRenderTextureEstimatedBytes = Field(
+        24,
+        "render_texture_estimated_bytes",
+        BppLogCardinality.High
+    );
     internal static readonly BppLogEventDefinition VideoCaptureStatsObserved = new(
         BppLogFeatureScope.CombatReplay,
         "combat_replay.video_capture.stats_observed",
@@ -308,6 +384,20 @@ internal static class CombatReplayVideoLogEvents
             StatsDurationMs,
             StatsSizeBytes,
             StatsOutputPath,
+            StatsCodec,
+            StatsRateControl,
+            StatsFrameBytes,
+            StatsPoolCapacity,
+            StatsQueueCapacity,
+            StatsPoolPayloadBytes,
+            StatsPoolBudgetExceeded,
+            StatsReadbackBackpressureSkips,
+            StatsMaxOutstandingReadbacks,
+            StatsReadbackCopyP95Us,
+            StatsCfrCopyP95Us,
+            StatsStagingBufferBytes,
+            StatsMaxReadbackPayloadBytes,
+            StatsRenderTextureEstimatedBytes,
         ]
     );
 

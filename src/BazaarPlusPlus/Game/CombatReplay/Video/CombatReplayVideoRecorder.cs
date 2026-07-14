@@ -39,6 +39,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     public void Initialize(IBppServices services)
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
+        ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out _);
 
         var runLogDatabasePath = services.Paths.RunLogDatabasePath;
         if (!string.IsNullOrWhiteSpace(runLogDatabasePath))
@@ -584,9 +585,9 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                     Width = request.Width,
                     Height = request.Height,
                     Fps = request.Fps,
-                    Codec = "libx264",
-                    Crf = request.Crf,
-                    Preset = request.Preset,
+                    Codec = request.EncoderProfile.Codec,
+                    Crf = request.EncoderProfile.Crf,
+                    Preset = request.EncoderProfile.Preset,
                     StartedAtUtc = DateTimeOffset.UtcNow,
                 }
             );
@@ -872,23 +873,29 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         string videoDirectoryPath
     )
     {
-        // Fixed encoder defaults (formerly the [CombatReplayVideo] cfg knobs).
-        const int fps = 30;
-        const int crf = 23;
-        const string preset = "veryfast";
-
-        var width = Screen.width;
-        var height = Screen.height;
-        if (width <= 0 || height <= 0)
+        if (!ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out var captureSettings))
             return null;
+        var fps = captureSettings.Fps;
+        var width = captureSettings.Width;
+        var height = captureSettings.Height;
 
-        // Round to even dimensions for yuv420p compatibility.
-        if ((width & 1) != 0)
-            width--;
-        if ((height & 1) != 0)
-            height--;
+        ReplayVideoBufferPlan bufferPlan;
+        try
+        {
+            bufferPlan = ReplayVideoBufferPlan.Create(width, height);
+        }
+        catch
+        {
+            return null;
+        }
 
-        const int maxQueued = 90;
+        var encoderProfile = FfmpegVideoEncoderSelector.SelectOrPrewarm(
+            ffmpegExecutable,
+            videoDirectoryPath,
+            width,
+            height,
+            fps
+        );
 
         var nowLocal = DateTimeOffset.Now;
         var datePart = nowLocal.ToString("yyyy-MM-dd");
@@ -910,9 +917,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             Width = width,
             Height = height,
             Fps = fps,
-            Crf = crf,
-            Preset = preset,
-            MaxQueuedFrames = maxQueued,
+            EncoderProfile = encoderProfile,
+            BufferPlan = bufferPlan,
         };
     }
 
