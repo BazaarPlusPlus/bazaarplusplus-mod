@@ -118,7 +118,7 @@ UI Toolkit panels receive a panel-local `PanelTextSettings` instance with OS and
 
 Supporter attribution is a game-side display module, not a generic sampling utility. `BPPSupporters.SampleMany()` and `Sample()` delegate to `BPPSupporterCatalog.GetCurrentEntries()` and `BPPSupporterSampler` (`src/BazaarPlusPlus/Game/Supporters/BPPSupporters.cs:13-31`). The catalog fetches `https://bpp-static.bazaarplusplus.com/supporter-list.json`, caches it in temp storage, and falls back to bundled placeholder entries if remote/cache reads fail (`src/BazaarPlusPlus/Game/Supporters/BPPSupporterCatalog.cs:14-25`, `src/BazaarPlusPlus/Game/Supporters/BPPSupporterCatalog.cs:47-82`).
 
-HistoryPanel, CollectionPanel, and LiveBuildPanel consume supporter samples for attribution rows. Every prefix, name, separator, suffix, and action element pins both `unityFont` and `unityFontDefinition` to the same game source font so Latin and CJK names cannot diverge through a child theme font definition (`src/BazaarPlusPlus/Game/Supporters/Ui/BPPSupporterAttributionRow.cs`). This module should stay separate from feature-specific UI behavior.
+HistoryPanel, CollectionPanel, and LiveBuildPanel consume supporter samples for attribution rows. Every prefix, name, separator, suffix, and action element pins both `unityFont` and `unityFontDefinition` to the same game source font so Latin and CJK names cannot diverge through a child theme font definition; supporter names use the font's normal weight rather than synthetic bold (`src/BazaarPlusPlus/Game/Supporters/Ui/BPPSupporterAttributionRow.cs`). This module should stay separate from feature-specific UI behavior.
 
 ## BazaarAgent Optional Host
 

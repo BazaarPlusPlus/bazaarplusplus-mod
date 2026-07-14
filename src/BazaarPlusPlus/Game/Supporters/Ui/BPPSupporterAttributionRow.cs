@@ -118,7 +118,7 @@ internal static class BPPSupporterAttributionRow
         ApplyNativeFont(label, uiFont);
         label.tooltip = sample.Name;
         label.style.fontSize = Sizes.SupporterAttributionNameFont;
-        label.style.unityFontStyleAndWeight = FontStyle.Bold;
+        label.style.unityFontStyleAndWeight = FontStyle.Normal;
         label.style.maxWidth = Sizes.SupporterAttributionNameMaxWidth;
         label.style.flexShrink = 1f;
         label.style.whiteSpace = WhiteSpace.NoWrap;

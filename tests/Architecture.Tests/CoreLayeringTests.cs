@@ -1267,6 +1267,20 @@ public class CoreLayeringTests
         );
         Assert.Contains("ApplyNativeFont(label, uiFont)", source);
         Assert.Contains("ApplyNativeFont(button, uiFont)", source);
+
+        var supporterNameStart = source.IndexOf(
+            "private static Label CreateSupporterName",
+            StringComparison.Ordinal
+        );
+        var supporterNameEnd = source.IndexOf(
+            "private static Color ResolveTierText",
+            supporterNameStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(supporterNameStart >= 0 && supporterNameEnd > supporterNameStart);
+        var supporterNameMethod = source[supporterNameStart..supporterNameEnd];
+        Assert.Contains("FontStyle.Normal", supporterNameMethod);
+        Assert.DoesNotContain("FontStyle.Bold", supporterNameMethod);
     }
 
     [Fact]
