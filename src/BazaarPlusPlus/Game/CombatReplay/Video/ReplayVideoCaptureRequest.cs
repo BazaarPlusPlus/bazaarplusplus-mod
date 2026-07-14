@@ -21,9 +21,8 @@ internal sealed class ReplayVideoCaptureRequest
 
     public int Fps { get; init; }
 
-    public int Crf { get; init; }
+    public FfmpegVideoEncoderProfile EncoderProfile { get; init; } =
+        FfmpegVideoEncoderProfile.Libx264();
 
-    public string Preset { get; init; } = "veryfast";
-
-    public int MaxQueuedFrames { get; init; }
+    public ReplayVideoBufferPlan BufferPlan { get; init; } = ReplayVideoBufferPlan.Create(2, 2);
 }

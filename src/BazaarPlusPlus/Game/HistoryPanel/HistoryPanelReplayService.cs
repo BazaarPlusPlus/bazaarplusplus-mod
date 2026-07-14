@@ -42,14 +42,33 @@ internal sealed class HistoryPanelReplayService
         _ghostSyncService = ghostSyncService;
     }
 
-    // FfmpegLocator.Resolve performs a ~2s liveness probe on its first call and caches the
-    // result process-wide. Kick that off the UI thread (panel open) so the per-refresh
-    // CanRecordReplay gate below only ever reads the warm cache. Safe off the Unity thread:
-    // Resolve does no Unity API calls.
+    // Capture the Unity-owned dimensions/FPS on the UI thread, then resolve FFmpeg and its
+    // actual-settings encoder profile in the background. Per-refresh gates only read warm state.
     public void PrewarmRecordingAvailability()
     {
         var pluginsDirectoryPath = _pluginsDirectoryPathAccessor();
-        _ = Task.Run(() => FfmpegLocator.Resolve(pluginsDirectoryPath));
+        var videoDirectoryPath = _videoDirectoryPathAccessor();
+        var hasSettings = ReplayVideoCaptureSettingsCache.TryCaptureCurrent(
+            out var captureSettings
+        );
+        _ = Task.Run(() =>
+        {
+            var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
+            if (
+                hasSettings
+                && !string.IsNullOrWhiteSpace(ffmpegExecutable)
+                && !string.IsNullOrWhiteSpace(videoDirectoryPath)
+            )
+            {
+                FfmpegVideoEncoderSelector.Prewarm(
+                    ffmpegExecutable,
+                    videoDirectoryPath,
+                    captureSettings.Width,
+                    captureSettings.Height,
+                    captureSettings.Fps
+                );
+            }
+        });
     }
 
     // Recording is feasible only when the replay itself can run AND the shared recording gate

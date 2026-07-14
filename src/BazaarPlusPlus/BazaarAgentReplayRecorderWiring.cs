@@ -189,21 +189,35 @@ internal static class BazaarAgentReplayRecorderWiring
         return new BppReplayPhaseSnapshot(BppReplayPhase.None, null);
     }
 
-    // FfmpegLocator.Resolve runs a ~2 s liveness probe on first call and caches process-wide.
-    // Kick it off-thread the first time the host actually touches the facade (phase reads happen
-    // every snapshot tick) so the CanRecordNow gate only ever reads the warm cache. Doing it here
-    // rather than at publish time keeps the cost away from installs without the host plugin.
+    // Resolve FFmpeg and the actual-dimensions encoder profile off-thread the first time the host
+    // touches the facade, so CanRecordNow and the first accepted recording only read warm caches.
     private static void PrewarmFfmpegOnce(IBppServices services)
     {
         if (Interlocked.Exchange(ref _ffmpegPrewarmKicked, 1) != 0)
             return;
 
         var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
+        var videoDirectoryPath = services.Paths.CombatReplayVideoDirectoryPath;
+        var hasSettings = ReplayVideoCaptureSettingsCache.TryGet(out var captureSettings);
         _ = Task.Run(() =>
         {
             try
             {
-                FfmpegLocator.Resolve(pluginsDirectoryPath);
+                var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
+                if (
+                    hasSettings
+                    && !string.IsNullOrWhiteSpace(ffmpegExecutable)
+                    && !string.IsNullOrWhiteSpace(videoDirectoryPath)
+                )
+                {
+                    FfmpegVideoEncoderSelector.Prewarm(
+                        ffmpegExecutable,
+                        videoDirectoryPath,
+                        captureSettings.Width,
+                        captureSettings.Height,
+                        captureSettings.Fps
+                    );
+                }
             }
             finally
             {

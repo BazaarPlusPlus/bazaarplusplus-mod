@@ -17,8 +17,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
     private readonly int _width;
     private readonly int _height;
     private readonly int _fps;
-    private readonly int _crf;
-    private readonly string _preset;
+    private readonly FfmpegVideoEncoderProfile _profile;
     private readonly BlockingCollection<byte[]> _frameQueue;
     private readonly Action<byte[]>? _onFrameConsumed;
     private readonly BoundedTextTail _stderrTail = new();
@@ -31,6 +30,8 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
     private volatile FfmpegEncoderFailureReasonCode _failureReasonCode;
     private Exception? _failureException;
     private long _bytesWritten;
+    private int _disposeState;
+    private int _disposeExecutionCount;
 
     public FfmpegRawVideoEncoder(
         string recordingId,
@@ -39,8 +40,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         int width,
         int height,
         int fps,
-        int crf,
-        string preset,
+        FfmpegVideoEncoderProfile profile,
         int maxQueuedFrames,
         Action<byte[]>? onFrameConsumed = null
     )
@@ -65,8 +65,7 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
         _width = width;
         _height = height;
         _fps = fps;
-        _crf = crf;
-        _preset = preset;
+        _profile = profile ?? throw new ArgumentNullException(nameof(profile));
         _frameQueue = new BlockingCollection<byte[]>(boundedCapacity: maxQueuedFrames);
         _onFrameConsumed = onFrameConsumed;
     }
@@ -82,6 +81,8 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
     public long BytesWritten => Interlocked.Read(ref _bytesWritten);
 
     public string StderrTail => _stderrTail.Value;
+
+    internal int DisposeExecutionCount => Volatile.Read(ref _disposeExecutionCount);
 
     public void Start()
     {
@@ -229,11 +230,30 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
 
     public void Dispose()
     {
-        SignalEndOfStream();
+        if (Interlocked.Exchange(ref _disposeState, 1) != 0)
+            return;
+        Interlocked.Increment(ref _disposeExecutionCount);
+
+        try
+        {
+            SignalEndOfStream();
+        }
+        catch
+        {
+            // best effort
+        }
+
         ForceKill();
 
-        _writerThread?.Join(TimeSpan.FromMilliseconds(500));
-        _stderrThread?.Join(TimeSpan.FromMilliseconds(500));
+        try
+        {
+            _writerThread?.Join(TimeSpan.FromMilliseconds(500));
+            _stderrThread?.Join(TimeSpan.FromMilliseconds(500));
+        }
+        catch
+        {
+            // best effort
+        }
 
         try
         {
@@ -244,26 +264,20 @@ internal sealed class FfmpegRawVideoEncoder : IDisposable
             // ignore
         }
 
-        _process?.Dispose();
+        try
+        {
+            _process?.Dispose();
+        }
+        catch
+        {
+            // best effort
+        }
         _process = null;
         _running = false;
     }
 
-    private string BuildArguments()
-    {
-        var sb = new StringBuilder();
-        sb.Append("-hide_banner -loglevel warning -nostdin -y ");
-        sb.Append("-f rawvideo -pixel_format rgba ");
-        sb.Append($"-video_size {_width}x{_height} ");
-        sb.Append($"-framerate {_fps} ");
-        sb.Append("-i pipe:0 ");
-        sb.Append("-c:v libx264 -pix_fmt yuv420p ");
-        sb.Append($"-preset {_preset} ");
-        sb.Append($"-crf {_crf} ");
-        sb.Append("-movflags +faststart ");
-        sb.Append(VideoProcessHelpers.QuoteArg(_outputFilePath));
-        return sb.ToString();
-    }
+    private string BuildArguments() =>
+        FfmpegVideoEncoderArguments.Build(_profile, _width, _height, _fps, _outputFilePath);
 
     private void WriterLoop()
     {

@@ -21,9 +21,9 @@ internal sealed class ReplayVideoCaptureResult
 
     public string Codec { get; init; } = "libx264";
 
-    public int Crf { get; init; }
+    public int? Crf { get; init; }
 
-    public string Preset { get; init; } = string.Empty;
+    public string? Preset { get; init; }
 
     public DateTimeOffset StartedAtUtc { get; init; }
 
