@@ -1231,6 +1231,23 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Chinese_voice_subtitle_does_not_synthetically_bold_the_dynamic_cjk_font()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "VoiceSubtitles",
+                "VoiceLineDisplay.cs"
+            )
+        );
+
+        Assert.Contains("chineseUi.fontStyle = FontStyles.Normal", source);
+        Assert.Contains("label.fontStyle = FontStyles.Normal", source);
+        Assert.DoesNotContain("FontStyles.Bold", source);
+    }
+
+    [Fact]
     public void Supporter_attribution_pins_one_native_font_definition_for_all_names()
     {
         var source = File.ReadAllText(

@@ -496,7 +496,7 @@ internal static class VoiceLineDisplay
 
         if (chineseUi != null)
         {
-            chineseUi.fontStyle = FontStyles.Bold;
+            chineseUi.fontStyle = FontStyles.Normal;
             chineseUi.alignment = settings.Position switch
             {
                 SubtitlePosition.TopRight => TextAlignmentOptions.TopRight,
@@ -547,7 +547,7 @@ internal static class VoiceLineDisplay
         var labelObject = CreateChildLabelObject(parent, "BazaarLine_ChineseSubtitle");
         var label = labelObject.AddComponent<TextMeshProUGUI>();
         label.font = dynamicFontAsset;
-        label.fontStyle = FontStyles.Bold;
+        label.fontStyle = FontStyles.Normal;
         label.richText = false;
         label.raycastTarget = false;
         return label;
