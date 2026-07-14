@@ -34,11 +34,10 @@ internal sealed class ReplayVideoBufferPlan
         long poolBudgetBytes = DefaultPoolBudgetBytes
     )
     {
-        if (width <= 0 || height <= 0)
-            throw new ArgumentOutOfRangeException(
-                nameof(width),
-                "Video dimensions must be positive."
-            );
+        if (width <= 0)
+            throw new ArgumentOutOfRangeException(nameof(width), "Video width must be positive.");
+        if (height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(height), "Video height must be positive.");
         if (poolBudgetBytes <= 0)
             throw new ArgumentOutOfRangeException(nameof(poolBudgetBytes));
 

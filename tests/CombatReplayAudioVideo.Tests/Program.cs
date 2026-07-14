@@ -659,6 +659,8 @@ file static class VideoBufferPlanTests
 
     public static void Run()
     {
+        InvalidDimensionsReportPreciseParameter();
+
         var native = Create(2742, 1624);
         TestReflection.Assert(
             Int(native, "FrameByteLength") == 17_812_032,
@@ -691,6 +693,29 @@ file static class VideoBufferPlanTests
             Bool(eightK, "BudgetExceeded"),
             "An unavoidable minimum-capacity overrun must be explicit."
         );
+    }
+
+    private static void InvalidDimensionsReportPreciseParameter()
+    {
+        AssertInvalidDimension(-1, 1080, "width");
+        AssertInvalidDimension(1920, 0, "height");
+    }
+
+    private static void AssertInvalidDimension(int width, int height, string expectedParameter)
+    {
+        try
+        {
+            Create(width, height);
+            throw new InvalidOperationException("Invalid video dimensions must be rejected.");
+        }
+        catch (TargetInvocationException ex)
+            when (ex.InnerException is ArgumentOutOfRangeException argumentException)
+        {
+            TestReflection.Assert(
+                argumentException.ParamName == expectedParameter,
+                $"Invalid {expectedParameter} must identify the matching parameter."
+            );
+        }
     }
 
     private static object Create(int width, int height) =>
