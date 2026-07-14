@@ -44,31 +44,32 @@ internal static class BPPSupporterAttributionRow
             .ToList();
         if (samples.Count == 0)
         {
-            row.Add(CreateFallbackLabel(fallbackText));
-            row.Add(CreateSponsorButton(sponsorText));
+            row.Add(CreateFallbackLabel(fallbackText, uiFont));
+            row.Add(CreateSponsorButton(sponsorText, uiFont));
             return;
         }
 
         var prefix = BPPSupporterAttributionText.FormatSupportedByPrefix(languageCode);
         var suffix = BPPSupporterAttributionText.FormatSupportedBySuffix(languageCode);
-        row.Add(CreatePrefixLabel(prefix));
+        row.Add(CreatePrefixLabel(prefix, uiFont));
         for (var index = 0; index < samples.Count; index++)
         {
             if (index > 0)
-                row.Add(CreateSeparatorLabel());
+                row.Add(CreateSeparatorLabel(uiFont));
 
-            row.Add(CreateSupporterName(samples[index]));
+            row.Add(CreateSupporterName(samples[index], uiFont));
         }
 
         if (!string.IsNullOrWhiteSpace(suffix))
-            row.Add(CreateSuffixLabel(suffix));
+            row.Add(CreateSuffixLabel(suffix, uiFont));
 
-        row.Add(CreateSponsorButton(sponsorText));
+        row.Add(CreateSponsorButton(sponsorText, uiFont));
     }
 
-    private static Label CreatePlainLabel(string text)
+    private static Label CreatePlainLabel(string text, Font uiFont)
     {
         var label = new Label(text);
+        ApplyNativeFont(label, uiFont);
         label.style.fontSize = Sizes.FontSmall;
         label.style.unityFontStyleAndWeight = FontStyle.Normal;
         label.style.color = Colors.HistorySubtitleText;
@@ -79,41 +80,42 @@ internal static class BPPSupporterAttributionRow
         return label;
     }
 
-    private static Label CreateFallbackLabel(string text)
+    private static Label CreateFallbackLabel(string text, Font uiFont)
     {
-        var label = CreatePlainLabel(text);
+        var label = CreatePlainLabel(text, uiFont);
         label.style.whiteSpace = WhiteSpace.Normal;
         label.style.marginRight = 0f;
         return label;
     }
 
-    private static Label CreatePrefixLabel(string text)
+    private static Label CreatePrefixLabel(string text, Font uiFont)
     {
-        var label = CreatePlainLabel(text);
+        var label = CreatePlainLabel(text, uiFont);
         label.style.marginRight = UiSpacing.Sm;
         return label;
     }
 
-    private static Label CreateSuffixLabel(string text)
+    private static Label CreateSuffixLabel(string text, Font uiFont)
     {
-        var label = CreatePlainLabel(text);
+        var label = CreatePlainLabel(text, uiFont);
         label.style.marginLeft = UiSpacing.Sm;
         label.style.marginRight = 0f;
         return label;
     }
 
-    private static Label CreateSeparatorLabel()
+    private static Label CreateSeparatorLabel(Font uiFont)
     {
-        var label = CreatePlainLabel("·");
+        var label = CreatePlainLabel("·", uiFont);
         label.style.color = Colors.WithAlpha(Colors.HistorySubtitleText, 0.56f);
         label.style.marginLeft = UiSpacing.Xs;
         label.style.marginRight = UiSpacing.Xs;
         return label;
     }
 
-    private static Label CreateSupporterName(BPPSupporterSample sample)
+    private static Label CreateSupporterName(BPPSupporterSample sample, Font uiFont)
     {
         var label = new Label(sample.Name);
+        ApplyNativeFont(label, uiFont);
         label.tooltip = sample.Name;
         label.style.fontSize = Sizes.SupporterAttributionNameFont;
         label.style.unityFontStyleAndWeight = FontStyle.Bold;
@@ -138,9 +140,10 @@ internal static class BPPSupporterAttributionRow
         };
     }
 
-    private static Button CreateSponsorButton(string text)
+    private static Button CreateSponsorButton(string text, Font uiFont)
     {
         var button = new Button(OpenSupportPage) { text = $"{SponsorIcon} {text}" };
+        ApplyNativeFont(button, uiFont);
         button.tooltip = BPPSupporterLinks.ResolveSponsorUrl(GetLanguageCode());
         button.style.height = Sizes.SupporterAttributionHeight;
         button.style.minWidth = Sizes.SupporterActionMinWidth;
@@ -163,6 +166,12 @@ internal static class BPPSupporterAttributionRow
             Colors.WithAlpha(Colors.OutcomeGoldBorder, 0.58f)
         );
         return button;
+    }
+
+    private static void ApplyNativeFont(TextElement element, Font uiFont)
+    {
+        element.style.unityFont = uiFont;
+        element.style.unityFontDefinition = FontDefinition.FromFont(uiFont);
     }
 
     private static void OpenSupportPage()

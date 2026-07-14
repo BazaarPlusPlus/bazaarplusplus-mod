@@ -1194,6 +1194,54 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Bpp_owned_ugui_text_uses_the_games_dynamic_tmp_asset()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var adapterSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
+        );
+        var surfaces = new[]
+        {
+            Path.Combine("Game", "CombatStatusBar", "CombatStatusBar.Canvas.cs"),
+            Path.Combine("Game", "CollectionPanel", "Grid", "CollectionSourceAttributionBadge.cs"),
+            Path.Combine("Game", "VoiceSubtitles", "VoiceLineDisplay.cs"),
+        };
+
+        Assert.Contains("TryGetSansDynamicFontAsset", adapterSource);
+        foreach (var relativePath in surfaces)
+        {
+            var source = File.ReadAllText(Path.Combine(mainSource, relativePath));
+            Assert.Contains("TextMeshProUGUI", source);
+            Assert.Contains("TryGetSansDynamicFontAsset", source);
+            Assert.DoesNotContain("AddComponent<Text>()", source);
+            Assert.DoesNotContain("typeof(Text)", source);
+            Assert.DoesNotContain("GetComponent<Text>()", source);
+        }
+    }
+
+    [Fact]
+    public void Supporter_attribution_pins_one_native_font_definition_for_all_names()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "Supporters",
+                "Ui",
+                "BPPSupporterAttributionRow.cs"
+            )
+        );
+
+        Assert.Contains("element.style.unityFont = uiFont", source);
+        Assert.Contains(
+            "element.style.unityFontDefinition = FontDefinition.FromFont(uiFont)",
+            source
+        );
+        Assert.Contains("ApplyNativeFont(label, uiFont)", source);
+        Assert.Contains("ApplyNativeFont(button, uiFont)", source);
+    }
+
+    [Fact]
     public void Collection_quality_chips_use_content_basis_and_never_wrap()
     {
         var source = File.ReadAllText(

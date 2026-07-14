@@ -4,6 +4,7 @@ using System.Linq;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -32,7 +33,7 @@ internal static class CollectionSourceAttributionBadge
         }
 
         badge.SetActive(true);
-        var label = badge.GetComponentInChildren<Text>(includeInactive: true);
+        var label = badge.GetComponentInChildren<TextMeshProUGUI>(includeInactive: true);
         if (label != null)
             label.text = text;
     }
@@ -42,7 +43,7 @@ internal static class CollectionSourceAttributionBadge
         var existing = host.transform.Find(BadgeName);
         if (existing != null)
             return existing.gameObject;
-        if (!NativeGameFonts.TryGetSansSourceFont(out var uiFont) || uiFont == null)
+        if (!NativeGameFonts.TryGetSansDynamicFontAsset(out var uiFont) || uiFont == null)
             return null;
 
         var badge = new GameObject(BadgeName, typeof(RectTransform), typeof(Image));
@@ -62,7 +63,7 @@ internal static class CollectionSourceAttributionBadge
         image.color = new Color(0.07f, 0.08f, 0.1f, 0.9f);
         image.raycastTarget = false;
 
-        var labelObject = new GameObject(LabelName, typeof(RectTransform), typeof(Text));
+        var labelObject = new GameObject(LabelName, typeof(RectTransform), typeof(CanvasRenderer));
         labelObject.transform.SetParent(badge.transform, worldPositionStays: false);
         var labelRect = labelObject.GetComponent<RectTransform>();
         labelRect.anchorMin = Vector2.zero;
@@ -71,14 +72,14 @@ internal static class CollectionSourceAttributionBadge
         labelRect.offsetMax = new Vector2(-6f * BadgeRootHeightScale, 0f);
         labelRect.localScale = Vector3.one;
 
-        var label = labelObject.GetComponent<Text>();
+        var label = labelObject.AddComponent<TextMeshProUGUI>();
         label.font = uiFont;
         label.fontSize = Mathf.RoundToInt(12f * BadgeRootHeightScale);
-        label.fontStyle = FontStyle.Bold;
-        label.alignment = TextAnchor.MiddleCenter;
+        label.fontStyle = FontStyles.Bold;
+        label.alignment = TextAlignmentOptions.Center;
         label.color = Colors.HistoryTitleText;
-        label.horizontalOverflow = HorizontalWrapMode.Overflow;
-        label.verticalOverflow = VerticalWrapMode.Truncate;
+        label.textWrappingMode = TextWrappingModes.NoWrap;
+        label.overflowMode = TextOverflowModes.Overflow;
         label.raycastTarget = false;
         return badge;
     }

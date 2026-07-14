@@ -48,6 +48,8 @@ internal static class NativeGameFonts
 
     private static TMP_FontAsset[]? _serifFallbacks;
     private static TMP_FontAsset[]? _sansFallbacks;
+    private static TMP_FontAsset? _serifDynamicFontAsset;
+    private static TMP_FontAsset? _sansDynamicFontAsset;
     private static Font? _serifSourceFont;
     private static Font? _sansSourceFont;
     private static bool _readyReported;
@@ -95,13 +97,27 @@ internal static class NativeGameFonts
     }
 
     internal static bool TryGetSansSourceFont(out Font? sourceFont) =>
-        TryGetSourceFont(preferSerif: false, ref _sansSourceFont, out sourceFont);
+        TryGetSourceFont(
+            preferSerif: false,
+            ref _sansDynamicFontAsset,
+            ref _sansSourceFont,
+            out sourceFont
+        );
 
     internal static bool TryGetSerifSourceFont(out Font? sourceFont) =>
-        TryGetSourceFont(preferSerif: true, ref _serifSourceFont, out sourceFont);
+        TryGetSourceFont(
+            preferSerif: true,
+            ref _serifDynamicFontAsset,
+            ref _serifSourceFont,
+            out sourceFont
+        );
+
+    internal static bool TryGetSansDynamicFontAsset(out TMP_FontAsset? fontAsset) =>
+        TryGetDynamicFontAsset(preferSerif: false, ref _sansDynamicFontAsset, out fontAsset);
 
     private static bool TryGetSourceFont(
         bool preferSerif,
+        ref TMP_FontAsset? cachedDynamicFontAsset,
         ref Font? cachedSourceFont,
         out Font? sourceFont
     )
@@ -109,6 +125,36 @@ internal static class NativeGameFonts
         if (cachedSourceFont != null)
         {
             sourceFont = cachedSourceFont;
+            return true;
+        }
+
+        if (
+            !TryGetDynamicFontAsset(
+                preferSerif,
+                ref cachedDynamicFontAsset,
+                out var dynamicFontAsset
+            )
+            || dynamicFontAsset?.sourceFontFile == null
+        )
+        {
+            sourceFont = null;
+            return false;
+        }
+
+        cachedSourceFont = dynamicFontAsset.sourceFontFile;
+        sourceFont = cachedSourceFont;
+        return true;
+    }
+
+    private static bool TryGetDynamicFontAsset(
+        bool preferSerif,
+        ref TMP_FontAsset? cachedDynamicFontAsset,
+        out TMP_FontAsset? fontAsset
+    )
+    {
+        if (cachedDynamicFontAsset != null)
+        {
+            fontAsset = cachedDynamicFontAsset;
             return true;
         }
 
@@ -122,30 +168,33 @@ internal static class NativeGameFonts
                     NativeGameFontReasonCode.SourceFontUnavailable,
                     null
                 );
-            sourceFont = null;
+            fontAsset = null;
             return false;
         }
         var sourceIndex = NativeGameFontSelection.FindLastIndexWithSource(
             attempt.Fonts,
-            candidate => candidate?.sourceFontFile != null
+            candidate =>
+                candidate != null
+                && candidate.atlasPopulationMode == TMPro.AtlasPopulationMode.Dynamic
+                && candidate.sourceFontFile != null
         );
         if (sourceIndex >= 0)
         {
-            var candidate = attempt.Fonts[sourceIndex].sourceFontFile;
-            if (!candidate.dynamic)
+            var candidate = attempt.Fonts[sourceIndex];
+            if (!candidate.sourceFontFile.dynamic)
             {
                 ReportFailure(
                     NativeGameFontStage.ResolveSourceFont,
                     NativeGameFontReasonCode.SourceFontNotDynamic,
                     null
                 );
-                sourceFont = null;
+                fontAsset = null;
                 return false;
             }
 
-            cachedSourceFont = candidate;
-            sourceFont = candidate;
-            ReportSuccess(attempt.Fonts, candidate);
+            cachedDynamicFontAsset = candidate;
+            fontAsset = candidate;
+            ReportSuccess(attempt.Fonts, candidate.sourceFontFile);
             return true;
         }
 
@@ -154,7 +203,7 @@ internal static class NativeGameFonts
             NativeGameFontReasonCode.SourceFontUnavailable,
             null
         );
-        sourceFont = null;
+        fontAsset = null;
         return false;
     }
 
@@ -304,6 +353,8 @@ internal static class NativeGameFonts
 
         _serifFallbacks = null;
         _sansFallbacks = null;
+        _serifDynamicFontAsset = null;
+        _sansDynamicFontAsset = null;
         _serifSourceFont = null;
         _sansSourceFont = null;
         Health.Reset();
