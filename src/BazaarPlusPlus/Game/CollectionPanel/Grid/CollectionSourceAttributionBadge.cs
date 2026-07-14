@@ -43,7 +43,7 @@ internal static class CollectionSourceAttributionBadge
         var existing = host.transform.Find(BadgeName);
         if (existing != null)
             return existing.gameObject;
-        if (!NativeGameFonts.TryGetSansDynamicFontAsset(out var uiFont) || uiFont == null)
+        if (!NativeGameFonts.TryGetSansFontAsset(out var uiFont) || uiFont == null)
             return null;
 
         var badge = new GameObject(BadgeName, typeof(RectTransform), typeof(Image));

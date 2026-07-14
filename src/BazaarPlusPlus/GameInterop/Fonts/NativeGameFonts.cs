@@ -48,6 +48,7 @@ internal static class NativeGameFonts
 
     private static TMP_FontAsset[]? _serifFallbacks;
     private static TMP_FontAsset[]? _sansFallbacks;
+    private static TMP_FontAsset? _sansFontAsset;
     private static TMP_FontAsset? _serifDynamicFontAsset;
     private static TMP_FontAsset? _sansDynamicFontAsset;
     private static Font? _serifSourceFont;
@@ -112,8 +113,61 @@ internal static class NativeGameFonts
             out sourceFont
         );
 
-    internal static bool TryGetSansDynamicFontAsset(out TMP_FontAsset? fontAsset) =>
-        TryGetDynamicFontAsset(preferSerif: false, ref _sansDynamicFontAsset, out fontAsset);
+    internal static bool TryGetSansFontAsset(out TMP_FontAsset? fontAsset)
+    {
+        if (_sansFontAsset != null)
+        {
+            fontAsset = _sansFontAsset;
+            return true;
+        }
+
+        var primary = NotoFontFallbackRuntime._loadedSansPrimary;
+        if (primary == null)
+        {
+            if (IsConfigurationReady)
+                ReportFailure(
+                    NativeGameFontStage.ResolveSourceFont,
+                    NativeGameFontReasonCode.SourceFontUnavailable,
+                    null
+                );
+            fontAsset = null;
+            return false;
+        }
+
+        var attempt = ResolveFallbacks(preferSerif: false);
+        Observe(attempt);
+        if (attempt.Fonts.Length == 0)
+        {
+            fontAsset = null;
+            return false;
+        }
+
+        try
+        {
+            var clone = Object.Instantiate(primary);
+            clone.name = $"{primary.name} (BPP Game Sans)";
+            var fallbackFontAssets = new List<TMP_FontAsset>(
+                primary.fallbackFontAssetTable ?? new List<TMP_FontAsset>()
+            );
+            foreach (var fallback in attempt.Fonts)
+                if (fallback != null && !fallbackFontAssets.Contains(fallback))
+                    fallbackFontAssets.Add(fallback);
+            clone.fallbackFontAssetTable = fallbackFontAssets;
+            _sansFontAsset = clone;
+            fontAsset = clone;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ReportFailure(
+                NativeGameFontStage.ResolveSourceFont,
+                NativeGameFontReasonCode.SourceFontUnavailable,
+                ex
+            );
+            fontAsset = null;
+            return false;
+        }
+    }
 
     private static bool TryGetSourceFont(
         bool preferSerif,
@@ -342,6 +396,8 @@ internal static class NativeGameFonts
                 if (textSettings != null)
                     Object.DestroyImmediate(textSettings);
             PanelTextSettingsInstances.Clear();
+            if (_sansFontAsset != null)
+                Object.DestroyImmediate(_sansFontAsset);
         }
         finally
         {
@@ -353,6 +409,7 @@ internal static class NativeGameFonts
 
         _serifFallbacks = null;
         _sansFallbacks = null;
+        _sansFontAsset = null;
         _serifDynamicFontAsset = null;
         _sansDynamicFontAsset = null;
         _serifSourceFont = null;

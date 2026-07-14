@@ -103,7 +103,7 @@ internal sealed partial class CombatStatusBar
     {
         if (_canvasObject != null)
             return;
-        if (!NativeGameFonts.TryGetSansDynamicFontAsset(out _uiFont) || _uiFont == null)
+        if (!NativeGameFonts.TryGetSansFontAsset(out _uiFont) || _uiFont == null)
             return;
 
         _canvasObject = new GameObject(

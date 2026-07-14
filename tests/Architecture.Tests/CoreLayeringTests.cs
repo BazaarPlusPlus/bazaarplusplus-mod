@@ -1194,7 +1194,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Bpp_owned_ugui_text_uses_the_games_dynamic_tmp_asset()
+    public void Bpp_owned_ugui_text_uses_the_game_primary_with_the_complete_cjk_chain()
     {
         var mainSource = MainSourceRoot(RepoRoot());
         var adapterSource = File.ReadAllText(
@@ -1219,19 +1219,22 @@ public class CoreLayeringTests
             "typeof(Text)",
         };
 
-        Assert.Contains("TryGetSansDynamicFontAsset", adapterSource);
+        Assert.Contains("TryGetSansFontAsset", adapterSource);
+        Assert.Contains("NotoFontFallbackRuntime._loadedSansPrimary", adapterSource);
+        Assert.Contains("clone.fallbackFontAssetTable", adapterSource);
         foreach (var relativePath in surfaces)
         {
             var source = File.ReadAllText(Path.Combine(mainSource, relativePath));
             Assert.Contains("TextMeshProUGUI", source);
-            Assert.Contains("TryGetSansDynamicFontAsset", source);
+            Assert.Contains("TryGetSansFontAsset", source);
+            Assert.DoesNotContain("TryGetSansDynamicFontAsset", source);
             foreach (var legacyTextPattern in legacyTextPatterns)
                 Assert.DoesNotContain(legacyTextPattern, source);
         }
     }
 
     [Fact]
-    public void Chinese_voice_subtitle_does_not_synthetically_bold_the_dynamic_cjk_font()
+    public void Chinese_voice_subtitle_does_not_synthetically_bold_the_game_cjk_font()
     {
         var source = File.ReadAllText(
             Path.Combine(
