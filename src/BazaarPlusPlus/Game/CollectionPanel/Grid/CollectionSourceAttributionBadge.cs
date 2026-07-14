@@ -43,7 +43,11 @@ internal static class CollectionSourceAttributionBadge
         var existing = host.transform.Find(BadgeName);
         if (existing != null)
             return existing.gameObject;
-        if (!NativeGameFonts.TryGetSansFontAsset(out var uiFont) || uiFont == null)
+        if (
+            NativeGameTypography.PrepareOwnedText(out var typography)
+                != NativeGameTypography.Outcome.Ready
+            || typography == null
+        )
             return null;
 
         var badge = new GameObject(BadgeName, typeof(RectTransform), typeof(Image));
@@ -73,7 +77,11 @@ internal static class CollectionSourceAttributionBadge
         labelRect.localScale = Vector3.one;
 
         var label = labelObject.AddComponent<TextMeshProUGUI>();
-        label.font = uiFont;
+        if (typography.Apply(label) != NativeGameTypography.Outcome.Applied)
+        {
+            UnityEngine.Object.Destroy(badge);
+            return null;
+        }
         label.fontSize = Mathf.RoundToInt(12f * BadgeRootHeightScale);
         label.fontStyle = FontStyles.Bold;
         label.alignment = TextAlignmentOptions.Center;

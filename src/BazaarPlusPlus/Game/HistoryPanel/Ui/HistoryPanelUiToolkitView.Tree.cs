@@ -502,7 +502,7 @@ internal sealed partial class HistoryPanelUiToolkitView
             // overrides the inherited cascade), and the inner chrome must be stripped. Defer to
             // AttachToPanelEvent so cell.Q(...) resolves a non-null inner element.
             cell.RegisterCallback<AttachToPanelEvent>(_ =>
-                StyleCodeCell(cell, GetUiFont(), Sizes.FontButton, Colors.White)
+                StyleCodeCell(cell, Sizes.FontButton, Colors.White)
             );
             cell.RegisterValueChangedCallback(evt => OnCodeCellChanged(index, evt.newValue));
             cell.RegisterCallback<KeyDownEvent>(evt => OnCodeCellKeyDown(index, evt));

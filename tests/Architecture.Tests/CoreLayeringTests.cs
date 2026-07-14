@@ -1138,7 +1138,7 @@ public class CoreLayeringTests
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
         var adapterSource = File.ReadAllText(
-            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameTypography.cs")
         );
         var pluginSource = File.ReadAllText(Path.Combine(mainSource, "Plugin.cs"));
         var productionSource = string.Join(
@@ -1169,7 +1169,21 @@ public class CoreLayeringTests
             adapterSource
         );
         Assert.Contains("if (!IsIsolated(textSettings))", adapterSource);
-        Assert.Contains("NativeGameFonts.Reset()", pluginSource);
+        Assert.Contains("NativeGameTypography.InitializeForCurrentThread()", pluginSource);
+        Assert.Contains("NativeGameTypography.Reset()", pluginSource);
+        Assert.Contains("internal static Outcome PrepareOwnedText", adapterSource);
+        Assert.Contains("internal static Outcome EnsureNativeTextCoverage", adapterSource);
+        Assert.Contains("internal static Outcome TryAttachPanel", adapterSource);
+        Assert.Contains("internal sealed class PanelScope", adapterSource);
+        Assert.Contains("internal Outcome Apply(VisualElement element", adapterSource);
+        Assert.Contains("element.style.unityFont = font", adapterSource);
+        Assert.Contains(
+            "element.style.unityFontDefinition = FontDefinition.FromFont(font)",
+            adapterSource
+        );
+        Assert.Contains("private static bool TryGetSansFontAsset", adapterSource);
+        Assert.Contains("private static bool TryGetSansSourceFont", adapterSource);
+        Assert.Contains("private static bool TryGetSerifSourceFont", adapterSource);
         Assert.DoesNotContain("BppUiFont", productionSource);
         Assert.DoesNotContain("BppTmpFont", productionSource);
         Assert.DoesNotContain("UseUiFont", productionSource);
@@ -1198,7 +1212,7 @@ public class CoreLayeringTests
     {
         var mainSource = MainSourceRoot(RepoRoot());
         var adapterSource = File.ReadAllText(
-            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameTypography.cs")
         );
         var surfaces = new[]
         {
@@ -1219,18 +1233,42 @@ public class CoreLayeringTests
             "typeof(Text)",
         };
 
-        Assert.Contains("TryGetSansFontAsset", adapterSource);
+        Assert.Contains("private static bool TryGetSansFontAsset", adapterSource);
         Assert.Contains("NotoFontFallbackRuntime._loadedSansPrimary", adapterSource);
         Assert.Contains("clone.fallbackFontAssetTable", adapterSource);
         foreach (var relativePath in surfaces)
         {
             var source = File.ReadAllText(Path.Combine(mainSource, relativePath));
             Assert.Contains("TextMeshProUGUI", source);
-            Assert.Contains("TryGetSansFontAsset", source);
+            Assert.Contains("NativeGameTypography.PrepareOwnedText", source);
+            Assert.Contains(".Apply(", source);
+            Assert.DoesNotContain("TryGetSansFontAsset", source);
             Assert.DoesNotContain("TryGetSansDynamicFontAsset", source);
             foreach (var legacyTextPattern in legacyTextPatterns)
                 Assert.DoesNotContain(legacyTextPattern, source);
         }
+    }
+
+    [Fact]
+    public void Font_strategy_does_not_escape_the_native_game_typography_layer()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var typographyDirectory = Path.Combine(mainSource, "GameInterop", "Fonts");
+        var callerSource = string.Join(
+            "\n",
+            Directory
+                .EnumerateFiles(mainSource, "*.cs", SearchOption.AllDirectories)
+                .Where(path => !path.StartsWith(typographyDirectory, StringComparison.Ordinal))
+                .Select(File.ReadAllText)
+        );
+
+        Assert.DoesNotContain("NativeGameFonts.", callerSource);
+        Assert.DoesNotContain("TryGetSansFontAsset", callerSource);
+        Assert.DoesNotContain("TryGetSansSourceFont", callerSource);
+        Assert.DoesNotContain("TryGetSerifSourceFont", callerSource);
+        Assert.DoesNotContain("TryConfigurePanel", callerSource);
+        Assert.DoesNotContain("ReleasePanelTextSettings", callerSource);
+        Assert.DoesNotContain("FontDefinition.FromFont", callerSource);
     }
 
     [Fact]
@@ -1263,13 +1301,12 @@ public class CoreLayeringTests
             )
         );
 
-        Assert.Contains("element.style.unityFont = uiFont", source);
-        Assert.Contains(
-            "element.style.unityFontDefinition = FontDefinition.FromFont(uiFont)",
-            source
-        );
-        Assert.Contains("ApplyNativeFont(label, uiFont)", source);
-        Assert.Contains("ApplyNativeFont(button, uiFont)", source);
+        Assert.Contains("NativeGameTypography.PanelScope typography", source);
+        Assert.Contains("typography.CheckExternalText", source);
+        Assert.Contains("typography.Apply(label)", source);
+        Assert.Contains("typography.Apply(button)", source);
+        Assert.DoesNotContain("Font uiFont", source);
+        Assert.DoesNotContain("FontDefinition.FromFont", source);
 
         var supporterNameStart = source.IndexOf(
             "private static Label CreateSupporterName",
@@ -1325,7 +1362,7 @@ public class CoreLayeringTests
             Path.Combine(mainSource, "Game", "CollectionPanel", "Ui", "CollectionPanelView.Tree.cs")
         );
         var adapterSource = File.ReadAllText(
-            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameTypography.cs")
         );
         var colorsSource = File.ReadAllText(
             Path.Combine(mainSource, "Infrastructure", "UiTokens", "Colors.cs")
@@ -1337,11 +1374,12 @@ public class CoreLayeringTests
         );
         var titleStyle = MethodSource(treeSource, "_title = CreateLabel", "titleRow.Add(_title);");
 
-        Assert.Contains("NativeGameFonts.TryGetSerifSourceFont(out _titleFont)", ensureCreated);
-        Assert.Contains("internal static bool TryGetSerifSourceFont", adapterSource);
+        Assert.Contains("NativeGameTypography.TryAttachPanel", ensureCreated);
+        Assert.Contains("PanelFontRequirements.BodyAndHeading", ensureCreated);
+        Assert.Contains("private static bool TryGetSerifSourceFont", adapterSource);
         Assert.Contains("FontStyle.Normal", titleStyle);
         Assert.Contains("Colors.GameTitleText", titleStyle);
-        Assert.Contains("_title.style.unityFont = _titleFont", titleStyle);
+        Assert.Contains("PanelFontRole.Heading", titleStyle);
         Assert.Contains("GameTitleText => Rgba(1f, 0.8352941f, 0.6745098f, 1f)", colorsSource);
     }
 
@@ -1364,11 +1402,12 @@ public class CoreLayeringTests
         );
         var titleStyle = MethodSource(source, "_title = CreateLabel", "titleRow.Add(_title);");
 
-        Assert.Contains("NativeGameFonts.TryGetSerifSourceFont(out _titleFont)", ensureCreated);
+        Assert.Contains("NativeGameTypography.TryAttachPanel", ensureCreated);
+        Assert.Contains("PanelFontRequirements.BodyAndHeading", ensureCreated);
         Assert.Contains("Sizes.FontTitle", titleStyle);
         Assert.Contains("FontStyle.Normal", titleStyle);
         Assert.Contains("Colors.GameTitleText", titleStyle);
-        Assert.Contains("_title.style.unityFont = _titleFont", titleStyle);
+        Assert.Contains("PanelFontRole.Heading", titleStyle);
     }
 
     [Fact]
@@ -1387,11 +1426,11 @@ public class CoreLayeringTests
             )
         );
         var providerSource = File.ReadAllText(
-            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameFonts.cs")
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameTypography.cs")
         );
 
-        Assert.Contains("NativeGameFonts.TryInstallFallback", patchSource);
-        Assert.Contains("&& !NativeGameFonts.TryInstallFallback", patchSource);
+        Assert.Contains("NativeGameTypography.EnsureNativeTextCoverage", patchSource);
+        Assert.DoesNotContain("NativeGameFonts.TryInstallFallback", patchSource);
         Assert.Contains("BilingualNameCardEligibility.IsSupported", patchSource);
         Assert.Contains("ECardType.Item", eligibilitySource);
         Assert.Contains("ECardType.Skill", eligibilitySource);

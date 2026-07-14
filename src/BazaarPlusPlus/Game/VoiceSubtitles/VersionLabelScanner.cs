@@ -1,6 +1,7 @@
 #nullable enable
 
 using System;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure;
 using TMPro;
 using UnityEngine;
@@ -42,12 +43,12 @@ internal sealed class VersionLabelScanner : MonoBehaviour
 
         if (versionLabel != null)
         {
-            if (
-                ShouldDelayMount(
-                    FontDiagnostics.HasChineseCoverage(versionLabel.font),
-                    FontDiagnostics.IsGameChineseUiFontReady
-                )
-            )
+            var anchorHasChineseCoverage = FontDiagnostics.HasChineseCoverage(versionLabel.font);
+            var typographyWaiting =
+                !anchorHasChineseCoverage
+                && NativeGameTypography.PrepareOwnedText(out _)
+                    == NativeGameTypography.Outcome.Waiting;
+            if (ShouldDelayMount(anchorHasChineseCoverage, typographyWaiting))
                 return;
 
             VoiceLineDisplay.MountFromVersionLabel(versionLabel);
@@ -65,8 +66,8 @@ internal sealed class VersionLabelScanner : MonoBehaviour
 
     internal static bool ShouldDelayMount(
         bool anchorHasChineseCoverage,
-        bool gameChineseUiFontReady
-    ) => !anchorHasChineseCoverage && !gameChineseUiFontReady;
+        bool nativeTypographyWaiting
+    ) => !anchorHasChineseCoverage && nativeTypographyWaiting;
 
     private TextMeshProUGUI? FindCachedVersionLabel()
     {

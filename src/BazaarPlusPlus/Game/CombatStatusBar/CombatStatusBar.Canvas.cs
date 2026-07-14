@@ -55,7 +55,7 @@ internal sealed partial class CombatStatusBar
     private static readonly Color SpeedDotFullColor = new(0.42f, 0.78f, 0.36f, 0.98f);
 
     private static Sprite? _roundedSprite;
-    private static TMP_FontAsset? _uiFont;
+    private static NativeGameTypography.OwnedTextPreparation? _uiTypography;
 
     private GameObject? _canvasObject;
     private Canvas? _canvas;
@@ -103,7 +103,11 @@ internal sealed partial class CombatStatusBar
     {
         if (_canvasObject != null)
             return;
-        if (!NativeGameFonts.TryGetSansFontAsset(out _uiFont) || _uiFont == null)
+        if (
+            NativeGameTypography.PrepareOwnedText(out _uiTypography)
+                != NativeGameTypography.Outcome.Ready
+            || _uiTypography == null
+        )
             return;
 
         _canvasObject = new GameObject(
@@ -208,7 +212,7 @@ internal sealed partial class CombatStatusBar
     {
         if (_canvasObject == null)
         {
-            _uiFont = null;
+            _uiTypography = null;
             return;
         }
 
@@ -241,7 +245,7 @@ internal sealed partial class CombatStatusBar
         _renderedTimeLabel = null;
         _renderedTimeText = null;
         _renderedPauseButtonText = null;
-        _uiFont = null;
+        _uiTypography = null;
         // EnsureUi rebuilds elements with placeholder colors, so force a full repaint.
         _hasAppliedVisualColors = false;
     }
@@ -659,7 +663,8 @@ internal sealed partial class CombatStatusBar
     {
         var rect = CreateRect(name, parent);
         var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
-        text.font = GetUiFont();
+        if (GetUiTypography().Apply(text) != NativeGameTypography.Outcome.Applied)
+            throw new InvalidOperationException("Native game typography became unavailable.");
         text.fontSize = fontSize;
         text.fontStyle = fontStyle;
         text.alignment = alignment;
@@ -753,9 +758,9 @@ internal sealed partial class CombatStatusBar
             label.text = content;
     }
 
-    private static TMP_FontAsset GetUiFont()
+    private static NativeGameTypography.OwnedTextPreparation GetUiTypography()
     {
-        return _uiFont
+        return _uiTypography
             ?? throw new InvalidOperationException("Native game UI font is unavailable.");
     }
 

@@ -69,8 +69,8 @@ internal static class BppTooltipSections
 
         ApplyHostPadding(section, style);
         if (
-            UnicodeFontCoverage.ContainsCjk(content)
-            && !NativeGameFonts.TryInstallFallback(section.Text.textObject, content)
+            NativeGameTypography.EnsureNativeTextCoverage(section.Text.textObject, content)
+            is not (NativeGameTypography.Outcome.Applied or NativeGameTypography.Outcome.NotNeeded)
         )
         {
             Hide(controller, key);

@@ -43,6 +43,7 @@ public class Plugin : BaseUnityPlugin
     protected virtual void Awake()
     {
         BppLog.Install(Logger);
+        NativeGameTypography.InitializeForCurrentThread();
         var phase = PluginInitializationPhase.PluginVersion;
         try
         {
@@ -206,7 +207,7 @@ public class Plugin : BaseUnityPlugin
         TooltipEncounterProbeReader.Reset();
         BppTooltipSectionRenderPatch.ResetEncounterHealth();
         ChineseTranslationCatalog.Reset();
-        NativeGameFonts.Reset();
+        NativeGameTypography.Reset();
     }
 
     private void BuildOnlineServices()

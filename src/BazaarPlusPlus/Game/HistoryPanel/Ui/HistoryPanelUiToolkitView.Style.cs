@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
+using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -171,15 +172,16 @@ internal sealed partial class HistoryPanelUiToolkitView
         UiHover.ApplyButtonPalette(button, background, textColor);
     }
 
-    private Font GetUiFont() =>
-        _uiFont ?? throw new InvalidOperationException("Native game UI font is unavailable.");
+    private NativeGameTypography.PanelScope GetTypography() =>
+        _typography
+        ?? throw new InvalidOperationException("Native game typography is unavailable.");
 
     // Styles one segmented code cell so it reads as a single clean box with a centered glyph in the
     // game UI font. The game's USS gives the inner 'unity-text-input' explicit font/align/chrome that
     // beats the inherited cascade, so de-chrome the root AND re-apply the text props on the queried
     // inner element (which then re-inherits to its 'unity-text-element' child). Call after the field
     // is attached so Q(...) resolves a non-null inner element.
-    private static void StyleCodeCell(TextField cell, Font font, int fontSize, Color textColor)
+    private void StyleCodeCell(TextField cell, int fontSize, Color textColor)
     {
         cell.style.marginLeft = 0f;
         cell.style.marginRight = 0f;
@@ -190,8 +192,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         cell.style.paddingTop = 0f;
         cell.style.paddingBottom = 0f;
 
-        cell.style.unityFont = font;
-        cell.style.unityFontDefinition = FontDefinition.FromFont(font);
+        GetTypography().Apply(cell);
         cell.style.unityTextAlign = TextAnchor.MiddleCenter;
         cell.style.fontSize = fontSize;
         cell.style.color = textColor;
@@ -215,8 +216,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         input.style.paddingTop = 0f;
         input.style.paddingBottom = 0f;
 
-        input.style.unityFont = font;
-        input.style.unityFontDefinition = FontDefinition.FromFont(font);
+        GetTypography().Apply(input);
         input.style.unityTextAlign = TextAnchor.MiddleCenter;
         input.style.fontSize = fontSize;
         input.style.color = textColor;
@@ -229,8 +229,7 @@ internal sealed partial class HistoryPanelUiToolkitView
             return;
 
         glyphs.style.flexGrow = 1f;
-        glyphs.style.unityFont = font;
-        glyphs.style.unityFontDefinition = FontDefinition.FromFont(font);
+        GetTypography().Apply(glyphs);
         glyphs.style.unityTextAlign = TextAnchor.MiddleCenter;
         glyphs.style.fontSize = fontSize;
         glyphs.style.color = textColor;

@@ -538,12 +538,20 @@ internal static class VoiceLineDisplay
 
     private static TextMeshProUGUI? CreateChineseUiLabel(Transform parent)
     {
-        if (!NativeGameFonts.TryGetSansFontAsset(out var fontAsset) || fontAsset == null)
+        if (
+            NativeGameTypography.PrepareOwnedText(out var typography)
+                != NativeGameTypography.Outcome.Ready
+            || typography == null
+        )
             return null;
 
         var labelObject = CreateChildLabelObject(parent, "BazaarLine_ChineseSubtitle");
         var label = labelObject.AddComponent<TextMeshProUGUI>();
-        label.font = fontAsset;
+        if (typography.Apply(label) != NativeGameTypography.Outcome.Applied)
+        {
+            UnityEngine.Object.Destroy(labelObject);
+            return null;
+        }
         label.fontStyle = FontStyles.Normal;
         label.richText = false;
         label.raycastTarget = false;

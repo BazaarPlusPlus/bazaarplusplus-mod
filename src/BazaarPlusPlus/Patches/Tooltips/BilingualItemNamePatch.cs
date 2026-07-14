@@ -48,7 +48,14 @@ internal static class BilingualItemNamePatch
 
             if (
                 !currentLanguageIsChinese
-                && !NativeGameFonts.TryInstallFallback(controller.headerText, secondaryTitle)
+                && NativeGameTypography.EnsureNativeTextCoverage(
+                    controller.headerText,
+                    secondaryTitle
+                )
+                    is not (
+                        NativeGameTypography.Outcome.Applied
+                        or NativeGameTypography.Outcome.NotNeeded
+                    )
             )
                 return;
             controller.headerText.TrySetText(title);
