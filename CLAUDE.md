@@ -28,18 +28,23 @@ csharpier format .
 
 `run.sh` works on macOS and Windows (Git Bash). Subcommands:
 
-- `./run.sh build [--with-bazaaragent]` — Debug build
-- `./run.sh all [--prod] [--with-bazaaragent]` — Debug + Release (BuildAll)
+- `./run.sh build [--with-bazaaragent] [--fast]` — Debug build (`--fast` skips NuGet restore)
+- `./run.sh publish [--with-bazaaragent] [-p:Name=Value ...]` — production build: fetch remote embedded data, run seed gates, then `-t:BuildAll` (Debug + Release) with installer packaging
+- `./run.sh fetch-data [-p:Name=Value ...]` — refresh remote embedded data
 - `./run.sh test` — run all test projects under `tests/`
 - `./run.sh format` — csharpier format
 - `./run.sh decompile [DllName]` — decompile a single game DLL (default: Assembly-CSharp)
 - `./run.sh decompile-all` — decompile all tracked game DLLs
+- `./run.sh decompile-ptr [DllName]` — decompile a single PTR game DLL into `decompiled-vptr/`
+- `./run.sh decompile-all-ptr` — decompile all tracked PTR game DLLs
+- `./run.sh snapshot-managed` — archive the installed Managed dir under `game-libs/`
+- `./run.sh build-matrix` — build the source tree against every archived Managed snapshot
 
 Test projects under `tests/` are split per-feature. Some use xUnit + `Microsoft.NET.Test.Sdk` (run via `dotnet test`), others are executable (run via `dotnet run --project`). Check whether the csproj has `Microsoft.NET.Test.Sdk` to determine which.
 
 ## Logs & Debugging
 
-This mod is a **BepInEx 5.x plugin** (`BepInEx.Core` 5.\*). At runtime, BepInEx writes all console output to disk at `<GameDir>\BepInEx\LogOutput.log` — the sibling of the `BepInEx\plugins\` folder the build copies into. To debug, read that file; mod log lines are prefixed `[BPP][<Component>]` (logged via `BppLog` → BepInEx `ManualLogSource`). `Debug`-level lines are only emitted from Debug builds; `Info`/`Warning`/`Error` always emit.
+This mod is a **BepInEx 5.x plugin** (`BepInEx.Core` 5.\*). At runtime, BepInEx writes all console output to disk at `<GameDir>\BepInEx\LogOutput.log` — the sibling of the `BepInEx\plugins\` folder the build copies into. To debug, read that file; mod log lines are structured events shaped `[BPP][<Scope>] event=<id> field=value ...` (logged via `BppLog` → BepInEx `ManualLogSource`). `Debug`-level events only emit from Debug builds; `Info`/`Warning`/`Error` always emit.
 
 For runtime validation that needs launching the game, always launch The Bazaar through Steam (App ID 1617400) so Steam runtime state is present. On macOS: `open "steam://run/1617400"`. On Windows: `start steam://run/1617400`. Do not launch `TheBazaar.app` directly or use `run_bepinex.sh` on macOS — these bypass Steam runtime and cause subtle failures.
 
@@ -52,7 +57,7 @@ For runtime validation that needs launching the game, always launch The Bazaar t
 - `BazaarPlusPlus.Storage.dll` — SQLite persistence layer; zero game/Unity/BepInEx references
 - `BazaarPlusPlus.Localization.dll` — localization engine; zero game/Unity/BepInEx references
 
-Two BazaarAgent assemblies ship only when `./run.sh build --with-bazaaragent` or `./run.sh all --with-bazaaragent` is used:
+Two BazaarAgent assemblies ship only when `./run.sh build --with-bazaaragent` or `./run.sh publish --with-bazaaragent` is used:
 
 - `BazaarPlusPlus.BazaarAgent.dll` — pure HTTP transport, DTO, validation, queue, and runtime controller; zero game/Unity/BepInEx references
 - `BazaarPlusPlus.BazaarAgentHost.dll` — optional BepInEx host bridge; installing the dll starts the fixed `127.0.0.1:47900` listener automatically
