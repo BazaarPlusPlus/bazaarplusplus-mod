@@ -21,9 +21,14 @@ public sealed class BilingualNameCardEligibilityTests
     }
 
     [Fact]
+    public void Supports_monster_names()
+    {
+        Assert.True(BilingualNameCardEligibility.IsSupported(ECardType.CombatEncounter));
+    }
+
+    [Fact]
     public void Leaves_unrequested_card_types_unchanged()
     {
-        Assert.False(BilingualNameCardEligibility.IsSupported(ECardType.CombatEncounter));
         Assert.False(BilingualNameCardEligibility.IsSupported(ECardType.PedestalEncounter));
         Assert.False(BilingualNameCardEligibility.IsSupported(ECardType.PvpEncounter));
         Assert.False(BilingualNameCardEligibility.IsSupported(ECardType.SocketEffect));
