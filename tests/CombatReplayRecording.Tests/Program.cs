@@ -49,6 +49,7 @@ var replayVideoCaptureStatusType = RequireType(
 );
 
 RunCurrentReplayRecordingStateChecks();
+RunCurrentReplayRecordingUiLogChecks();
 RunCurrentReplayVideoMetadataChecks();
 RunSystemFileRevealCommandChecks();
 
@@ -1446,6 +1447,39 @@ static void RunCurrentReplayRecordingStateChecks()
     Assert(
         !(bool)GetProperty(reset.GetType(), reset, "Visible")!,
         "Leaving ReplayState should remove the temporary current-battle button."
+    );
+}
+
+static void RunCurrentReplayRecordingUiLogChecks()
+{
+    var logStateType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.CurrentReplayRecordingUiLogState"
+    );
+
+    var ready = InvokeStatic(logStateType, "ResolveLayoutReason", new object?[] { true, null });
+    Assert(
+        ready?.ToString() == "None",
+        "An available current-recording layout should have no failure reason."
+    );
+
+    var missingFootprint = InvokeStatic(
+        logStateType,
+        "ResolveLayoutReason",
+        new object?[] { false, "collection-footprint-unavailable" }
+    );
+    Assert(
+        missingFootprint?.ToString() == "TargetFootprintUnavailable",
+        "A missing clone footprint should remain distinguishable in Release diagnostics."
+    );
+
+    var obstructed = InvokeStatic(
+        logStateType,
+        "ResolveLayoutReason",
+        new object?[] { false, "native-button-path" }
+    );
+    Assert(
+        obstructed?.ToString() == "Obstructed",
+        "A native layout blocker should map to the bounded obstruction reason."
     );
 }
 

@@ -23,14 +23,16 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     private TextMeshProUGUI? _glyph;
     private string? _lastGlyph;
     private readonly BppDockButtonScreenLayout _screenLayout = new();
+    private readonly CurrentReplayRecordingUiLogState _uiLogState = new();
     private bool _layoutAvailable;
+    private CurrentReplayRecordingUiLayoutReasonCode _layoutReasonCode;
 
     internal static CurrentReplayRecordingButtonController? Attach(Button settingsButton)
     {
         if (settingsButton == null || settingsButton.transform.parent is not RectTransform host)
             return null;
 
-        var existing = host.Find(CloneName)?.GetComponent<CurrentReplayRecordingButtonController>();
+        var existing = settingsButton.GetComponent<CurrentReplayRecordingButtonController>();
         if (existing != null)
         {
             existing._settingsButton = settingsButton;
@@ -39,10 +41,15 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             return existing;
         }
 
-        var clone = Instantiate(settingsButton.gameObject, host, worldPositionStays: false);
+        var existingClone = host.Find(CloneName);
+        var clone =
+            existingClone == null
+                ? Instantiate(settingsButton.gameObject, host, worldPositionStays: false)
+                : existingClone.gameObject;
         clone.name = CloneName;
         clone.SetActive(false);
-        var controller = clone.AddComponent<CurrentReplayRecordingButtonController>();
+        var controller =
+            settingsButton.gameObject.AddComponent<CurrentReplayRecordingButtonController>();
         controller.Initialize(settingsButton, clone);
         return controller;
     }
@@ -65,7 +72,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         _settingsButton = settingsButton;
         _clone = clone;
         _cloneRect = clone.transform as RectTransform;
-        StripNativeBehavior(clone);
+        var glyphHost = StripNativeBehavior(clone);
         _button = clone.GetComponent<Button>() ?? clone.AddComponent<Button>();
         _button.onClick.RemoveAllListeners();
         _button.onClick.AddListener(OnClicked);
@@ -78,7 +85,9 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         if (relay == null)
             relay = clone.AddComponent<CurrentReplayRecordingButtonHoverRelay>();
         relay.Bind(this);
-        CreateGlyph(settingsButton);
+        CreateGlyph(settingsButton, glyphHost);
+        if (_glyph != null)
+            _button.targetGraphic = _glyph;
 
         CombatReplayRuntime.Instance?.PrepareCurrentReplayRecordingAvailability();
         SyncLayout();
@@ -96,13 +105,13 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
     }
 
-    private static void StripNativeBehavior(GameObject clone)
+    private static GameObject? StripNativeBehavior(GameObject clone)
     {
         var nativeIcon = clone
             .GetComponentInChildren<BazaarButtonController>(includeInactive: true)
             ?.ButtonIcon;
         if (nativeIcon != null)
-            nativeIcon.gameObject.SetActive(false);
+            nativeIcon.enabled = false;
 
         foreach (var custom in clone.GetComponentsInChildren<ButtonCustom>(true))
             DestroyImmediate(custom);
@@ -114,24 +123,31 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         foreach (var nested in clone.GetComponentsInChildren<Button>(true))
             if (nested.gameObject != clone)
                 DestroyImmediate(nested);
+
+        return nativeIcon?.gameObject;
     }
 
-    private void CreateGlyph(Button settingsButton)
+    private void CreateGlyph(Button settingsButton, GameObject? glyphHost)
     {
         if (_clone == null)
             return;
-        var existing = _clone.transform.Find(GlyphName);
+
+        var existing = _clone.transform.Find(GlyphName)?.gameObject;
         var glyphObject =
-            existing == null
-                ? new GameObject(GlyphName, typeof(RectTransform), typeof(CanvasRenderer))
-                : existing.gameObject;
-        glyphObject.transform.SetParent(_clone.transform, worldPositionStays: false);
+            glyphHost
+            ?? existing
+            ?? new GameObject(GlyphName, typeof(RectTransform), typeof(CanvasRenderer));
+        glyphObject.name = GlyphName;
         var rect = glyphObject.GetComponent<RectTransform>();
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-        rect.localScale = Vector3.one;
+        if (glyphHost == null)
+        {
+            glyphObject.transform.SetParent(_clone.transform, worldPositionStays: false);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            rect.localScale = Vector3.one;
+        }
 
         _glyph =
             glyphObject.GetComponent<TextMeshProUGUI>()
@@ -170,7 +186,11 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             anchorButton,
             _cloneRect,
             DockButtonGap,
-            out _
+            out var blockerName
+        );
+        _layoutReasonCode = CurrentReplayRecordingUiLogState.ResolveLayoutReason(
+            _layoutAvailable,
+            blockerName
         );
     }
 
@@ -200,6 +220,13 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         var visible = snapshot.Visible && _layoutAvailable;
         if (_clone.activeSelf != visible)
             _clone.SetActive(visible);
+        _uiLogState.Observe(
+            snapshot,
+            _layoutAvailable,
+            _layoutReasonCode,
+            _clone.activeSelf,
+            _nativeReplayButton != null
+        );
         if (!visible)
             return;
 
