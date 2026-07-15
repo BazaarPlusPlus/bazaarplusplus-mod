@@ -1672,6 +1672,10 @@ public class CoreLayeringTests
         Assert.Contains("BppDockButtonScreenLayout", controllerSource);
         Assert.Contains("nativeIcon.enabled = false", controllerSource);
         Assert.Contains("CreateGlyph(settingsButton, glyphHost)", controllerSource);
+        Assert.Contains("glyphObject.transform.SetParent(glyphParent", controllerSource);
+        Assert.Contains("glyphObject.layer = glyphParent.gameObject.layer", controllerSource);
+        Assert.Contains("_cloneRect.TransformVector(", controllerSource);
+        Assert.DoesNotContain("_cloneRect.position + Vector3.up", controllerSource);
         Assert.Contains("CurrentReplayRecordingUiLogState", controllerSource);
         Assert.Contains(
             "settingsButton.gameObject.AddComponent<CurrentReplayRecordingButtonController>()",

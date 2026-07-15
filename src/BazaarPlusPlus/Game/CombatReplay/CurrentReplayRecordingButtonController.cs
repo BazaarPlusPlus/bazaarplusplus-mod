@@ -132,26 +132,29 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         if (_clone == null)
             return;
 
-        var existing = _clone.transform.Find(GlyphName)?.gameObject;
+        // A Unity UI GameObject may host only one Graphic. The cloned native icon already owns
+        // an Image, so adding TextMeshProUGUI to that same object returns null. Keep the native
+        // icon's RectTransform as the slot and render the BPP glyph on its own child object.
+        var glyphParent = glyphHost != null ? glyphHost.transform : _clone.transform;
+        var existing = glyphParent.Find(GlyphName)?.gameObject;
         var glyphObject =
-            glyphHost
-            ?? existing
-            ?? new GameObject(GlyphName, typeof(RectTransform), typeof(CanvasRenderer));
+            existing ?? new GameObject(GlyphName, typeof(RectTransform), typeof(CanvasRenderer));
         glyphObject.name = GlyphName;
+        glyphObject.layer = glyphParent.gameObject.layer;
         var rect = glyphObject.GetComponent<RectTransform>();
-        if (glyphHost == null)
-        {
-            glyphObject.transform.SetParent(_clone.transform, worldPositionStays: false);
-            rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.one;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-            rect.localScale = Vector3.one;
-        }
+        glyphObject.transform.SetParent(glyphParent, worldPositionStays: false);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.localScale = Vector3.one;
 
-        _glyph =
-            glyphObject.GetComponent<TextMeshProUGUI>()
-            ?? glyphObject.AddComponent<TextMeshProUGUI>();
+        var glyph = glyphObject.GetComponent<TextMeshProUGUI>();
+        if (glyph == null)
+            glyph = glyphObject.AddComponent<TextMeshProUGUI>();
+        if (glyph == null)
+            return;
+        _glyph = glyph;
         if (
             NativeGameTypography.PrepareOwnedText(out var typography)
                 == NativeGameTypography.Outcome.Ready
@@ -259,7 +262,12 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         var snapshot = CombatReplayRuntime.Instance?.GetCurrentReplayRecordingSnapshot() ?? default;
         if (!snapshot.Visible || _cloneRect == null)
             return;
-        var offset = _cloneRect.position + Vector3.up * Mathf.Max(_cloneRect.rect.height, 64f);
+        // AuxiliaryTooltipController adds this vector to the target transform's world position.
+        // Passing an absolute position here double-counts the button position and sends the
+        // tooltip to a screen edge after its bounds clamp.
+        var offset = _cloneRect.TransformVector(
+            Vector3.up * Mathf.Max(_cloneRect.rect.height, 64f)
+        );
         Data.TooltipParentComponent?.ShowAuxiliaryTooltipController(
             _cloneRect,
             offset,

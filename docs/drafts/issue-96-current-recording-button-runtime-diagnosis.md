@@ -8,6 +8,15 @@
 
 下文对旧 controller 行号的引用用于描述当时实机运行的 `f00a59f3`；修复后的当前源码已把 lifecycle owner 移到 settings button，并由本文件的验证项约束。
 
+## 2026-07-15 第三次实机结果
+
+`4.5.0.t20260715.180656.dev` 已证明主流程可用：按钮进入 `ready`、点击后进入 `recording`，最终产生 40.392 秒、106,368,564 字节的视频并写入数据库。不过实机同时暴露两个 UI 缺陷：
+
+1. 按钮所有状态均无图标。`LogOutput.log` 精确记录 `CreateGlyph` 调用 `NativeGameTypography.OwnedTextPreparation.Apply` 时传入了 null。实现把 `TextMeshProUGUI` 加到已经承载原生 `Image` 的同一个 GameObject；第二个 Unity UI `Graphic` 没有成功创建，但代码仍继续应用字体。修复为保留原生 icon 的 RectTransform 作为布局槽，并在其下创建独立 glyph 子对象，同时对 `AddComponent` 结果做 null guard。
+2. Tooltip 被夹到屏幕最左侧。实现传入了 `_cloneRect.position + offset`，而游戏的 `AuxiliaryTooltipController.WorldToScreenPositionAfterAFrameCoroutine` 又计算 `targetObject.position + offset`，导致按钮世界坐标被累加两次。修复为只传入由 `_cloneRect.TransformVector(...)` 得到的相对世界空间偏移。
+
+用户还反馈视频结束略早。当前录像严格在 `CombatReplayPlaybackEnded` 发布时停止，没有 post-roll；这是共享录制器的时间窗口策略，不属于 #96 的战后入口/UI 接线，留作独立后续讨论。
+
 ## 当前问题与已确认事实
 
 1. 该场战斗不是 PvE/教程边界：SQLite 最新记录为 `combat_kind=PVPCombat`、`has_local_payload=1`，exact battle payload 已落盘。
