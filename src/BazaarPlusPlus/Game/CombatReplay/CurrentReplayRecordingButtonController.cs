@@ -1,4 +1,5 @@
 #nullable enable
+using System.Collections;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.Settings;
 using TheBazaar;
@@ -19,6 +20,11 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     private GameObject? _clone;
     private Image? _icon;
     private BppDockButtonSpriteId? _lastSpriteId;
+    private Coroutine? _tooltipPositionCoroutine;
+    private bool _tooltipHovered;
+    private readonly WaitForEndOfFrame _tooltipEndOfFrame = new();
+    private readonly Vector3[] _buttonWorldCorners = new Vector3[4];
+    private readonly Vector3[] _tooltipWorldCorners = new Vector3[4];
     private readonly BppDockButtonScreenLayout _screenLayout = new();
     private readonly CurrentReplayRecordingUiLogState _uiLogState = new();
     private bool _layoutAvailable;
@@ -69,14 +75,23 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         _settingsButton = settingsButton;
         _clone = clone;
         _cloneRect = clone.transform as RectTransform;
+        var nativeButtonController = clone.GetComponent<BazaarButtonController>();
+        var nativeVisualState = BppDockButtonVisualState.Capture(
+            clone.GetComponent<Button>(),
+            nativeButtonController?.DefaultImage
+        );
         _icon = StripNativeBehavior(clone);
+        var fallbackFrame = clone.GetComponent<Image>();
+        if (fallbackFrame == null)
+        {
+            fallbackFrame = clone.AddComponent<Image>();
+            fallbackFrame.color = new Color(1f, 1f, 1f, 0f);
+        }
+        BppDockButtonVisuals.Apply(clone, _icon, freshClone: true, nativeState: nativeVisualState);
         _button = clone.GetComponent<Button>() ?? clone.AddComponent<Button>();
         _button.onClick.RemoveAllListeners();
         _button.onClick.AddListener(OnClicked);
         _button.navigation = new Navigation { mode = Navigation.Mode.None };
-        var frame = clone.GetComponent<Image>() ?? clone.AddComponent<Image>();
-        frame.raycastTarget = true;
-        _button.targetGraphic = frame;
 
         var layout = clone.GetComponent<LayoutElement>() ?? clone.AddComponent<LayoutElement>();
         layout.ignoreLayout = true;
@@ -100,7 +115,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 
     private void OnDisable()
     {
-        Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
+        HideTooltip();
     }
 
     private static Image? StripNativeBehavior(GameObject clone)
@@ -162,11 +177,13 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     {
         if (_clone == null || _button == null)
             return;
-        var runtime = CombatReplayRuntime.Instance;
-        var snapshot = runtime?.GetCurrentReplayRecordingSnapshot() ?? default;
+        var snapshot = GetDisplaySnapshot();
         var visible = snapshot.Visible && _layoutAvailable;
+        var wasActive = _clone.activeSelf;
         if (_clone.activeSelf != visible)
             _clone.SetActive(visible);
+        if (visible && !wasActive)
+            _lastSpriteId = null;
         _uiLogState.Observe(
             snapshot,
             _layoutAvailable,
@@ -199,25 +216,75 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 
     internal void ShowTooltip()
     {
-        var snapshot = CombatReplayRuntime.Instance?.GetCurrentReplayRecordingSnapshot() ?? default;
+        var snapshot = GetDisplaySnapshot();
         if (!snapshot.Visible || _cloneRect == null)
             return;
-        // AuxiliaryTooltipController adds this vector to the target transform's world position.
-        // Passing an absolute position here double-counts the button position and sends the
-        // tooltip to a screen edge after its bounds clamp.
-        var offset = _cloneRect.TransformVector(
-            Vector3.up * Mathf.Max(_cloneRect.rect.height, 64f)
-        );
+
+        _tooltipHovered = true;
+        if (_tooltipPositionCoroutine != null)
+            StopCoroutine(_tooltipPositionCoroutine);
         Data.TooltipParentComponent?.ShowAuxiliaryTooltipController(
             _cloneRect,
-            offset,
+            Vector3.zero,
             CurrentReplayRecordingText.Tooltip(snapshot)
         );
+        _tooltipPositionCoroutine = StartCoroutine(PositionTooltipBesideButton());
     }
+
+    private static CurrentReplayRecordingSnapshot GetDisplaySnapshot() =>
+        CombatReplayRuntime.Instance?.GetCurrentReplayRecordingSnapshot() ?? default;
 
     internal void HideTooltip()
     {
+        _tooltipHovered = false;
+        if (_tooltipPositionCoroutine != null)
+        {
+            StopCoroutine(_tooltipPositionCoroutine);
+            _tooltipPositionCoroutine = null;
+        }
         Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
+    }
+
+    private IEnumerator PositionTooltipBesideButton()
+    {
+        while (_tooltipHovered)
+        {
+            yield return _tooltipEndOfFrame;
+            if (!_tooltipHovered || _cloneRect == null)
+                break;
+
+            var tooltipParent = Data.TooltipParentComponent;
+            var tooltip = tooltipParent?.AuxiliaryTooltipController;
+            if (
+                tooltip == null
+                || tooltipParent == null
+                || !tooltipParent.IsAuxiliaryTooltipDisplayed
+                || tooltip._coroutine != null
+            )
+                continue;
+
+            tooltip.PositionOverUI(_cloneRect);
+            var tooltipRect = tooltip.PositioningRectTransform;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(tooltipRect);
+            _cloneRect.GetWorldCorners(_buttonWorldCorners);
+            var tooltipBoundsRect = tooltip._contentForWorldBounds ?? tooltipRect;
+            tooltipBoundsRect.GetWorldCorners(_tooltipWorldCorners);
+
+            var buttonCenterX = (_buttonWorldCorners[1].x + _buttonWorldCorners[2].x) * 0.5f;
+            var buttonTop = Mathf.Max(_buttonWorldCorners[1].y, _buttonWorldCorners[2].y);
+            var tooltipCenterX = (_tooltipWorldCorners[0].x + _tooltipWorldCorners[3].x) * 0.5f;
+            var tooltipBottom = Mathf.Min(_tooltipWorldCorners[0].y, _tooltipWorldCorners[3].y);
+            var buttonHeight = Mathf.Abs(_buttonWorldCorners[1].y - _buttonWorldCorners[0].y);
+            var gap = Mathf.Max(buttonHeight * 0.12f, 8f);
+            tooltipRect.position += new Vector3(
+                buttonCenterX - tooltipCenterX,
+                buttonTop - tooltipBottom + gap,
+                0f
+            );
+            tooltip.KeepTooltipWithinBounds();
+        }
+
+        _tooltipPositionCoroutine = null;
     }
 
     private void ApplyIcon(CurrentReplayRecordingPhase phase)

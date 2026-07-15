@@ -38,6 +38,50 @@
 - Release build 后检查五个 dock PNG 的 manifest resource name，部署前后核对产物与安装 DLL 的 SHA-256。
 - 用户实机验收：入口可见、四种状态图标可见、Tooltip 位于按钮附近、完成后可查看视频；日志中应为 `layout_available=true icon_available=true`。
 
+## 2026-07-15 第五次实机失败：圆形按钮出现白色方形底板
+
+### 已确认根因
+
+`4.5.0.t20260715.215542.dev` 中入口和导出图标均已显示，但截图明确出现一个大于圆形按钮的白色正方形底板。该白色区域不是 PNG 自带背景，而是 controller 为了稳定 footprint 执行 `clone.AddComponent<Image>()` 后留下的默认 Unity `Image`：默认 color 为不透明白色，且随后被设为 `Button.targetGraphic`。这条手写路径没有复用书本按钮的完整 native visual state 恢复流程，因此把用于点击/布局的透明 fallback frame 渲染成了可见底板。
+
+### 候选方案与决策
+
+1. **仅把新 root Image 设为透明**：可以消除静态白底，但若它继续作为 `ColorTint` 的 `targetGraphic`，Unity `Selectable` 状态转换仍可能把它改回不透明颜色，不能作为稳定方案。
+2. **采用书本按钮的完整流程（选定）**：在剥离原生 controller 前捕获 `BppDockButtonVisualState`，新建 root fallback Image 时设为透明，再调用 `BppDockButtonVisuals.Apply(...)` 恢复原生 target graphic、transition、sprite state 和圆形视觉；状态 PNG 只替换原生 icon Image。
+3. **继续手写 frame/color 状态**：会复制 `BppNativeSettingsButtonClone` 已解决的逻辑，且已连续造成 footprint 与白底两个回归，不采用。
+
+### 验证方法
+
+- 源码约束 current replay controller 必须捕获 `BppDockButtonVisualState` 并调用 `BppDockButtonVisuals.Apply`，禁止直接把新 root Image 赋给 `targetGraphic`。
+- 构建部署后，用户在当前战后界面验证：只显示与书本/齿轮同族的圆形 frame，不存在白色方形底板；导出 icon 居中，hover 不改变方形背景。
+
+## 2026-07-15 第六次实机失败：Tooltip 仍被定位到屏幕左侧
+
+### 已确认根因
+
+继续对照现有自定义按钮和反编译原生实现后，确认书本 dock 按钮本身没有 tooltip；current replay 是唯一手写 `IPointerEnterHandler + ShowAuxiliaryTooltipController` 的 dock 按钮。此前虽然把“绝对坐标 + offset”改成了 `TransformVector`，但仍在调用错误的定位入口：`AuxiliaryTooltipController.WorldToScreenPositionAfterAFrameCoroutine` 会用 `Camera.main` 把 `target.position + offset` 当作**世界坐标**转成屏幕坐标，而 settings dock 的 `RectTransform.position` 已处于 screen-space canvas。把 screen-space UI transform 送进 world-space API 会产生错误屏幕点，最终被 `KeepTooltipWithinBounds` 推到边缘。
+
+反编译的同一原生 controller 已提供专门的 `PositionOverUI(Transform uiTransform)`，它通过 tooltip rect 的本地坐标系对齐 screen-space UI，但 `TooltipParentComponent.ShowAuxiliaryTooltipController` 没有暴露该分支。
+
+### 方案决策
+
+- 保留原生 tooltip 的内容、frame、显示/隐藏生命周期；调用 Show 后在主路径 coroutine 等待原生 controller 生成并完成一帧布局。
+- 使用原生 `AuxiliaryTooltipController.PositionOverUI` 进入 UI 坐标路径，再根据 button/tooltip 的 world corners 将 tooltip 排到圆形按钮左侧，最后调用原生 `KeepTooltipWithinBounds`。
+- 不再向 world-space Show API 传入推算后的 UI offset，也不复制一套 tooltip prefab。
+
+### 验证方法
+
+- 架构测试要求使用 `PositionOverUI`，并禁止 `TransformVector` tooltip offset。
+- 实机 hover 时 tooltip 应紧邻圆形按钮左侧；窗口尺寸变化或按钮处于屏幕右下角时仍在边界内，pointer exit 后正常隐藏。
+
+### 2026-07-15 预览复测：UI 定位被原生 coroutine 覆盖
+
+`4.5.0.t20260715.231647.dev` 中首次 hover 的 Tooltip 仍落到左侧；再次 hover 后虽然移动到按钮附近，却覆盖按钮和鼠标。实现虽调用了 `PositionOverUI`，但还有两个时序错误：首次加载时原生 tooltip 异步生成可能超过 BPP 固定等待的 8 帧，BPP coroutine 先退出，错误 world-space 位置无人纠正；后续加载时 BPP 只在 fade/zoom 动画早期按较小 rect 计算一次左侧间距，随后 tooltip 放大却不再重新布局，最终向右覆盖按钮。
+
+修订为整个 hover 生命周期持续等待与布局：不设固定帧数上限；原生 `_coroutine` 活跃时等待，idle 后每个 `WaitForEndOfFrame` 都重新执行 `PositionOverUI + 相对布局 + bounds clamp`，直到 pointer exit。这样既覆盖首次异步 spawn，也跟随 fade/zoom 后的实际 tooltip corners。
+
+用户进一步明确最终位置应在被 hover 的圆形按钮**正上方**，不能覆盖 icon/button。布局因此改为读取原生 `_contentForWorldBounds` 的真实视觉边界，将 tooltip 的 bottom edge 放到 button top edge 之上并保留间距；水平方向先中心对齐，再交给原生 bounds clamp 处理右侧越界。
+
 ## 当前问题与已确认事实
 
 1. 该场战斗不是 PvE/教程边界：SQLite 最新记录为 `combat_kind=PVPCombat`、`has_local_payload=1`，exact battle payload 已落盘。

@@ -1673,9 +1673,19 @@ public class CoreLayeringTests
         Assert.Contains("BppDockButtonScreenLayout", controllerSource);
         Assert.Contains("BppDockButtonSpriteProvider.Get(spriteId)", controllerSource);
         Assert.Contains("BppDockButtonVisuals.ApplyIcon(_icon, sprite)", controllerSource);
+        Assert.Contains("BppDockButtonVisualState.Capture(", controllerSource);
+        Assert.Contains("BppDockButtonVisuals.Apply(", controllerSource);
+        Assert.Contains("fallbackFrame.color = new Color(1f, 1f, 1f, 0f)", controllerSource);
         Assert.Contains("_icon != null && _icon.sprite != null", controllerSource);
-        Assert.Contains("_button.targetGraphic = frame", controllerSource);
-        Assert.Contains("_cloneRect.TransformVector(", controllerSource);
+        Assert.Contains("tooltip.PositionOverUI(_cloneRect)", controllerSource);
+        Assert.Contains("tooltip._coroutine != null", controllerSource);
+        Assert.Contains("tooltip.KeepTooltipWithinBounds()", controllerSource);
+        Assert.Contains("GetWorldCorners(_buttonWorldCorners)", controllerSource);
+        Assert.Contains("tooltip._contentForWorldBounds ?? tooltipRect", controllerSource);
+        Assert.Contains("buttonTop - tooltipBottom + gap", controllerSource);
+        Assert.Contains("while (_tooltipHovered)", controllerSource);
+        Assert.DoesNotContain("const int maxFrames", controllerSource);
+        Assert.DoesNotContain("_cloneRect.TransformVector(", controllerSource);
         Assert.DoesNotContain("_cloneRect.position + Vector3.up", controllerSource);
         Assert.Contains("CurrentReplayRecordingUiLogState", controllerSource);
         Assert.Contains(
@@ -1687,6 +1697,7 @@ public class CoreLayeringTests
         Assert.DoesNotContain("TextMeshPro", controllerSource);
         Assert.DoesNotContain("NativeGameTypography", controllerSource);
         Assert.DoesNotContain("targetGraphic = _glyph", controllerSource);
+        Assert.DoesNotContain("_button.targetGraphic = frame", controllerSource);
         Assert.DoesNotContain("nativeIcon.enabled = false", controllerSource);
         Assert.DoesNotContain("nativeIcon.gameObject.SetActive(false)", controllerSource);
         Assert.DoesNotContain(
