@@ -9,11 +9,6 @@
 
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
-    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/BazaarGameShared.dll')">
-    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
   </PropertyGroup>
 
   <ItemGroup>

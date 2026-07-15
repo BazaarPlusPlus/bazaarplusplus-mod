@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -2048,6 +2049,103 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void ManagedPath_discovery_is_shared_by_all_projects()
+    {
+        var repoRoot = RepoRoot();
+        var directoryProps = File.ReadAllText(Path.Combine(repoRoot, "Directory.Build.props"));
+        var managedPathProps = Path.Combine(repoRoot, "build", "ManagedPath.props");
+
+        Assert.Contains("build/ManagedPath.props", directoryProps);
+        Assert.True(
+            File.Exists(managedPathProps),
+            $"Expected shared discovery at '{managedPathProps}'."
+        );
+
+        var discoverySource = File.ReadAllText(managedPathProps);
+        Assert.Contains("<WinSteamManagedC>", discoverySource);
+        Assert.Contains("<WinSteamManagedD>", discoverySource);
+        Assert.Contains("<WinSteamManagedE>", discoverySource);
+        Assert.Contains("<MacSteamManagedDefault>", discoverySource);
+        Assert.Contains("<ManagedPath>", discoverySource);
+
+        var projectOverrides = Directory
+            .EnumerateFiles(repoRoot, "*.csproj", SearchOption.AllDirectories)
+            .Where(path =>
+                File.ReadAllText(path).Contains("<ManagedPath>", StringComparison.Ordinal)
+            )
+            .Select(path => Path.GetRelativePath(repoRoot, path))
+            .ToList();
+
+        Assert.True(
+            projectOverrides.Count == 0,
+            "ManagedPath discovery belongs in build/ManagedPath.props. Project-local definitions:\n"
+                + string.Join("\n", projectOverrides)
+        );
+    }
+
+    [Fact]
+    public void ManagedPath_discovery_evaluates_candidates_and_preserves_explicit_override()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"bpp-managed-path-{Guid.NewGuid():N}");
+        var explicitManaged = Path.Combine(tempRoot, "explicit", "Managed");
+        var project = Path.Combine(
+            RepoRoot(),
+            "tests",
+            "VoiceSubtitles.Tests",
+            "VoiceSubtitles.Tests.csproj"
+        );
+
+        try
+        {
+            foreach (
+                var (managedProperty, gameProperty) in new[]
+                {
+                    ("WinSteamManagedC", "WinGamePathC"),
+                    ("WinSteamManagedD", "WinGamePathD"),
+                    ("WinSteamManagedE", "WinGamePathE"),
+                    ("MacSteamManagedDefault", "MacGamePathDefault"),
+                }
+            )
+            {
+                var candidateGame = Path.Combine(tempRoot, managedProperty);
+                var candidateManaged = Path.Combine(candidateGame, "Managed");
+                Directory.CreateDirectory(candidateManaged);
+                File.WriteAllBytes(Path.Combine(candidateManaged, "Assembly-CSharp.dll"), []);
+
+                var candidates = new Dictionary<string, string>
+                {
+                    ["WinSteamManagedC"] = Path.Combine(tempRoot, "missing-c"),
+                    ["WinSteamManagedD"] = Path.Combine(tempRoot, "missing-d"),
+                    ["WinSteamManagedE"] = Path.Combine(tempRoot, "missing-e"),
+                    ["MacSteamManagedDefault"] = Path.Combine(tempRoot, "missing-mac"),
+                    [managedProperty] = candidateManaged,
+                    [gameProperty] = candidateGame,
+                };
+                var properties = candidates.Select(pair => $"{pair.Key}={pair.Value}").ToArray();
+
+                Assert.Equal(
+                    candidateManaged,
+                    EvaluateMsBuildProperty(project, "ManagedPath", properties)
+                );
+                Assert.Equal(
+                    candidateGame,
+                    EvaluateMsBuildProperty(project, "GamePath", properties)
+                );
+            }
+
+            Assert.Equal(
+                explicitManaged,
+                EvaluateMsBuildProperty(project, "ManagedPath", $"ManagedPath={explicitManaged}")
+            );
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+                Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Structured_tooltip_sections_disable_native_paragraph_spacing()
     {
         var tooltipPatches = Path.Combine(MainSourceRoot(RepoRoot()), "Patches", "Tooltips");
@@ -2136,6 +2234,36 @@ public class CoreLayeringTests
 
     private static string? Attribute(XElement element, string name) =>
         element.Attribute(name)?.Value;
+
+    private static string EvaluateMsBuildProperty(
+        string project,
+        string propertyName,
+        params string[] properties
+    )
+    {
+        var startInfo = new ProcessStartInfo("dotnet")
+        {
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+        };
+        startInfo.ArgumentList.Add("msbuild");
+        startInfo.ArgumentList.Add(project);
+        startInfo.ArgumentList.Add($"-getProperty:{propertyName}");
+        foreach (var property in properties)
+            startInfo.ArgumentList.Add($"-p:{property}");
+
+        using var process = Process.Start(startInfo)!;
+        var standardOutput = process.StandardOutput.ReadToEndAsync();
+        var standardError = process.StandardError.ReadToEndAsync();
+        process.WaitForExit();
+
+        Assert.True(
+            process.ExitCode == 0,
+            $"MSBuild property evaluation failed ({process.ExitCode}):\n{standardError.Result}"
+        );
+        return standardOutput.Result.Trim();
+    }
 
     // Production assemblies now live under <repo>/src/<AssemblyName>/. These helpers keep the
     // layering assertions anchored to the moved source trees while RepoRoot() stays the repo root.
