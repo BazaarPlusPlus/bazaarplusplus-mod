@@ -412,7 +412,7 @@ internal sealed class SteamTimelineModule : IBppFeature
         {
             adapter.TrySetGamePhaseAttribute(
                 SteamTimelineTextFormatter.FinalDayGroup(_locale),
-                summary.Day.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                SteamTimelineTextFormatter.DayLabel(summary.Day)!,
                 SteamTimelineTextFormatter.MetadataPriority
             );
         }

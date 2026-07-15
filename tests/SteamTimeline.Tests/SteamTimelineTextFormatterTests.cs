@@ -41,7 +41,7 @@ public sealed class SteamTimelineTextFormatterTests
             SteamTimelineLocale.English
         );
 
-        Assert.Equal("Day 8 · PvP Battle", started.Title);
+        Assert.Equal("D8 · PvP Battle", started.Title);
         Assert.Equal("Vanessa vs Mak", started.Description);
         Assert.Equal("steam_combat", started.Icon);
         Assert.Equal(SteamTimelineClipPriority.Featured, started.ClipPriority);
@@ -61,8 +61,8 @@ public sealed class SteamTimelineTextFormatterTests
             SteamTimelineLocale.SimplifiedChinese
         );
 
-        Assert.Equal("升至 6 级", text.Title);
-        Assert.Equal("第 4 天 · Vanessa", text.Description);
+        Assert.Equal("UP", text.Title);
+        Assert.Equal("D4 · 6 级 · Vanessa", text.Description);
         Assert.Equal("steam_6", text.Icon);
         Assert.Equal(SteamTimelineClipPriority.None, text.ClipPriority);
     }
@@ -82,9 +82,17 @@ public sealed class SteamTimelineTextFormatterTests
             SteamTimelineLocale.TraditionalChinese
         );
 
-        Assert.Equal("第 8 天 · 玩家對戰", text.Title);
+        Assert.Equal("D8 · 玩家對戰", text.Title);
         Assert.Equal("Vanessa 對陣 Mak", text.Description);
     }
+
+    [Theory]
+    [InlineData(1, "D1")]
+    [InlineData(2, "D2")]
+    [InlineData(12, "D12")]
+    [InlineData(0, null)]
+    public void Day_labels_use_the_compact_timeline_format(int day, string? expected) =>
+        Assert.Equal(expected, SteamTimelineTextFormatter.DayLabel(day));
 
     [Fact]
     public void Dynamic_labels_drop_controls_and_are_bounded()

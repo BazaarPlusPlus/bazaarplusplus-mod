@@ -29,18 +29,14 @@ internal static class SteamTimelineTextFormatter
         SteamTimelineLocale locale
     )
     {
-        var day = battle.Day is > 0
-            ? battle.Day.Value.ToString(CultureInfo.InvariantCulture)
-            : null;
+        var day = DayLabel(battle.Day);
         var title = locale switch
         {
-            SteamTimelineLocale.SimplifiedChinese => day == null
-                ? "玩家对战"
-                : $"第 {day} 天 · 玩家对战",
+            SteamTimelineLocale.SimplifiedChinese => day == null ? "玩家对战" : $"{day} · 玩家对战",
             SteamTimelineLocale.TraditionalChinese => day == null
                 ? "玩家對戰"
-                : $"第 {day} 天 · 玩家對戰",
-            _ => day == null ? "PvP Battle" : $"Day {day} · PvP Battle",
+                : $"{day} · 玩家對戰",
+            _ => day == null ? "PvP Battle" : $"{day} · PvP Battle",
         };
         var playerHero = CleanDynamicLabel(battle.PlayerHero);
         var opponentHero = CleanDynamicLabel(battle.OpponentHero);
@@ -133,17 +129,11 @@ internal static class SteamTimelineTextFormatter
         SteamTimelineLocale locale
     )
     {
-        var title = locale switch
-        {
-            SteamTimelineLocale.SimplifiedChinese => $"升至 {level} 级",
-            SteamTimelineLocale.TraditionalChinese => $"升至 {level} 級",
-            _ => $"Level {level} reached",
-        };
         var cleanHero = CleanDynamicLabel(hero);
-        var description = BuildProgressDescription(day, cleanHero, locale);
+        var description = BuildProgressDescription(level, day, cleanHero, locale);
         var icon = level is >= 0 and <= 99 ? $"steam_{level}" : "steam_plus";
         return new SteamTimelineEventText(
-            title,
+            "UP",
             description,
             icon,
             LevelPriority,
@@ -213,6 +203,9 @@ internal static class SteamTimelineTextFormatter
 
     internal static uint MetadataPriority => PhaseMetadataPriority;
 
+    internal static string? DayLabel(int? day) =>
+        day is > 0 ? $"D{day.Value.ToString(CultureInfo.InvariantCulture)}" : null;
+
     private static string BuildMatchup(
         string? playerHero,
         string? opponentHero,
@@ -233,18 +226,23 @@ internal static class SteamTimelineTextFormatter
     }
 
     private static string BuildProgressDescription(
+        int level,
         int? day,
         string? hero,
         SteamTimelineLocale locale
     )
     {
-        var dayText = day is > 0
-            ? locale == SteamTimelineLocale.English
-                ? $"Day {day.Value}"
-                : $"第 {day.Value} 天"
-            : null;
+        var dayText = DayLabel(day);
+        var levelText = locale switch
+        {
+            SteamTimelineLocale.SimplifiedChinese => $"{level} 级",
+            SteamTimelineLocale.TraditionalChinese => $"{level} 級",
+            _ => $"Level {level}",
+        };
         if (dayText != null && hero != null)
-            return $"{dayText} · {hero}";
-        return dayText ?? hero ?? string.Empty;
+            return $"{dayText} · {levelText} · {hero}";
+        if (dayText != null)
+            return $"{dayText} · {levelText}";
+        return hero == null ? levelText : $"{levelText} · {hero}";
     }
 }
