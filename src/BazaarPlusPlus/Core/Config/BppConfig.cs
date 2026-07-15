@@ -93,7 +93,7 @@ internal sealed class BppConfig : IBppConfig
             "BilingualItemNames",
             "Enabled",
             false,
-            "Whether item, skill, monster, reward, and event tooltips show the other English/Chinese name below the current-language name."
+            "Whether item, skill, monster, pedestal, reward, and event tooltips show the other English/Chinese name below the current-language name."
         );
         EnableVoiceSubtitlesConfig = config.Bind(
             "VoiceSubtitles",

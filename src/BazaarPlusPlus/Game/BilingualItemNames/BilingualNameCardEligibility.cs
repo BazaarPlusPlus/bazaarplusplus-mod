@@ -11,5 +11,6 @@ internal static class BilingualNameCardEligibility
                 or ECardType.Skill
                 or ECardType.CombatEncounter
                 or ECardType.EncounterStep
-                or ECardType.EventEncounter;
+                or ECardType.EventEncounter
+                or ECardType.PedestalEncounter;
 }
