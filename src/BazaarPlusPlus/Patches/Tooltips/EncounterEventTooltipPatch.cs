@@ -87,9 +87,31 @@ internal static class EncounterEventTooltipPatch
             return null;
 
         var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
+        if (staticData == null)
+            return null;
+
+        var currentDay = TryReadCurrentDay();
+        var dayTierCeiling = EncounterTierRuntime.ReadDayTierCeiling(currentDay);
+        var dayTierDistribution = EncounterTierRuntime.ReadDayTierDistribution(
+            staticData,
+            currentDay
+        );
+        var template = BppStaticDataAccess.GetCardTemplate(staticData, card.TemplateId);
+        if (template?.Tags?.Contains(ECardTag.Merchant) == true)
+        {
+            var policy = CollectionMerchantTierResolver.Resolve(template);
+            if (!policy.FixedTier.HasValue && !policy.UsesDayDistribution)
+                return null;
+
+            return CollectionEncounterGameTooltipText.BuildMerchantQuality(
+                policy.UsesDayDistribution ? dayTierDistribution : null,
+                policy.FixedTier,
+                policy.UsesDayDistribution ? dayTierCeiling : null
+            );
+        }
+
         if (
-            staticData == null
-            || !EventPreviewPlanRuntime.TryGet(
+            !EventPreviewPlanRuntime.TryGet(
                 staticData,
                 card.TemplateId,
                 out var eventPlan,
@@ -103,7 +125,7 @@ internal static class EncounterEventTooltipPatch
             snapshot,
             TryReadCurrentHero(),
             TryBuildInventory(),
-            TryReadCurrentDay()
+            currentDay
         );
         if (option == null || (!option.HasChoiceDetails && !option.HasOutcomeGroups))
             return null;
@@ -111,7 +133,8 @@ internal static class EncounterEventTooltipPatch
         return CollectionEncounterGameTooltipText.Build(
             option,
             BppTooltipText.ColorKeywords,
-            TryReadDayTierCeiling()
+            dayTierCeiling,
+            dayTierDistribution
         );
     }
 
@@ -178,17 +201,51 @@ internal static class EncounterEventTooltipPatch
         }
     }
 
-    private static ETier? TryReadDayTierCeiling()
-    {
-        var day = TryReadCurrentDay();
-        return day.HasValue ? DayTierSchedule.CeilingTier(day.Value) : null;
-    }
-
     private static int? TryReadCurrentDay()
     {
         try
         {
             return (int?)Data.Run?.Day;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+}
+
+internal static class EncounterTierRuntime
+{
+    public static ETier? ReadDayTierCeiling(int? currentRunDay) =>
+        currentRunDay.HasValue ? DayTierSchedule.CeilingTier(currentRunDay.Value) : null;
+
+    public static CollectionTierDistribution? ReadDayTierDistribution(
+        object staticData,
+        int? currentRunDay
+    )
+    {
+        if (!currentRunDay.HasValue)
+            return null;
+
+        try
+        {
+            var run = Data.Run;
+            if (run == null)
+                return null;
+
+            var weights = BppStaticDataAccess.GetItemSkillSpawnTierProbabilities(
+                staticData,
+                run.GameModeId,
+                currentRunDay.Value
+            );
+            return weights == null
+                ? null
+                : CollectionTierDistribution.FromWeights(
+                    weights.Bronze,
+                    weights.Silver,
+                    weights.Gold,
+                    weights.Diamond
+                );
         }
         catch (Exception)
         {
