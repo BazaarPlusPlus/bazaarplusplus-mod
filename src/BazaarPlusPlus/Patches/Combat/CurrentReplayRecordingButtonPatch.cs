@@ -1,9 +1,11 @@
 #nullable enable
+using System;
 using System.Reflection;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar;
-using UnityEngine;
 using UnityEngine.UI;
 
 namespace BazaarPlusPlus.Patches.Combat;
@@ -18,10 +20,6 @@ internal static class CurrentReplayRecordingButtonPatch
         typeof(BoardRecapReplayButtonsController),
         "ReplayButton"
     );
-    private static readonly FieldInfo? ContainerField = AccessTools.Field(
-        typeof(BoardRecapReplayButtonsController),
-        "RecapReplayButtonContainer"
-    );
 
     [HarmonyPostfix]
     private static void Postfix(BoardRecapReplayButtonsController __instance)
@@ -29,14 +27,38 @@ internal static class CurrentReplayRecordingButtonPatch
         if (__instance == null)
             return;
         var replayButton = ReplayButtonField?.GetValue(__instance) as Button;
-        var container = ContainerField?.GetValue(__instance) as GameObject;
-        if (replayButton == null || container == null)
-            return;
+        if (replayButton != null)
+            CurrentReplayRecordingButtonController.BindNativeReplay(replayButton);
+    }
+}
 
-        var controller = __instance.GetComponent<CurrentReplayRecordingButtonController>();
-        if (controller == null)
-            controller =
-                __instance.gameObject.AddComponent<CurrentReplayRecordingButtonController>();
-        controller.Bind(replayButton, container.transform);
+[HarmonyPatch(typeof(FightMenuDialog), "Start")]
+internal static class CurrentReplayRecordingDockButtonPatch
+{
+    private static readonly FieldInfo? SettingButtonField = AccessTools.Field(
+        typeof(FightMenuDialog),
+        "SettingButton"
+    );
+
+    [HarmonyPostfix]
+    [HarmonyPriority(Priority.Low)]
+    private static void Postfix(FightMenuDialog __instance)
+    {
+        try
+        {
+            var settingButtonCustom = SettingButtonField?.GetValue(__instance) as ButtonCustom;
+            var settingsButton = settingButtonCustom?.GetButton();
+            if (settingsButton != null)
+                CurrentReplayRecordingButtonController.Attach(settingsButton);
+        }
+        catch (Exception ex)
+        {
+            BppLog.WarnEvent(
+                SettingsLogEvents.PatchDegraded,
+                ex,
+                SettingsLogEvents.PatchDegradedOperation.Bind(SettingsPatchOperation.DockOpen),
+                SettingsLogEvents.PatchDegradedReasonCode.Bind(SettingsLogReasonCode.PatchException)
+            );
+        }
     }
 }

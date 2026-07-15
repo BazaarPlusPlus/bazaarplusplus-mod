@@ -1650,6 +1650,31 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Current_replay_recording_uses_the_lower_right_settings_dock()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var controllerSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CombatReplay",
+                "CurrentReplayRecordingButtonController.cs"
+            )
+        );
+        var patchSource = File.ReadAllText(
+            Path.Combine(mainSource, "Patches", "Combat", "CurrentReplayRecordingButtonPatch.cs")
+        );
+
+        Assert.Contains("typeof(FightMenuDialog)", patchSource);
+        Assert.Contains("\"SettingButton\"", patchSource);
+        Assert.Contains("CollectionPanelDockButtonController", controllerSource);
+        Assert.Contains("BppDockButtonScreenLayout", controllerSource);
+        Assert.DoesNotContain("RecapReplayButtonContainer", patchSource);
+        Assert.DoesNotContain("_nativeRect.anchoredPosition", controllerSource);
+    }
+
+    [Fact]
     public void PvpBattles_remains_a_shared_game_module()
     {
         var repoRoot = RepoRoot();

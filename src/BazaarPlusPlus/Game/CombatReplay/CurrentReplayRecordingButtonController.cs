@@ -1,4 +1,6 @@
 #nullable enable
+using BazaarPlusPlus.Game.CollectionPanel;
+using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.GameInterop.Fonts;
 using TheBazaar;
 using TMPro;
@@ -10,29 +12,82 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 {
-    private const string CloneName = "BppCurrentReplayRecordingButton";
+    private const string CloneName = "BPP_CurrentReplayRecordingButton";
     private const string GlyphName = "BppCurrentReplayRecordingGlyph";
+    private const float DockButtonGap = BppSettingsDockPlacement.DefaultSiblingGap;
+    private Button? _settingsButton;
     private Button? _nativeReplayButton;
     private Button? _button;
-    private RectTransform? _nativeRect;
     private RectTransform? _cloneRect;
     private GameObject? _clone;
     private TextMeshProUGUI? _glyph;
     private string? _lastGlyph;
+    private readonly BppDockButtonScreenLayout _screenLayout = new();
+    private bool _layoutAvailable;
 
-    internal void Bind(Button nativeReplayButton, Transform container)
+    internal static CurrentReplayRecordingButtonController? Attach(Button settingsButton)
     {
-        _nativeReplayButton = nativeReplayButton;
-        _nativeRect = nativeReplayButton.transform as RectTransform;
-        if (_clone == null)
-            CreateClone(nativeReplayButton, container);
+        if (settingsButton == null || settingsButton.transform.parent is not RectTransform host)
+            return null;
+
+        var existing = host.Find(CloneName)?.GetComponent<CurrentReplayRecordingButtonController>();
+        if (existing != null)
+        {
+            existing._settingsButton = settingsButton;
+            existing.SyncLayout();
+            existing.Refresh();
+            return existing;
+        }
+
+        var clone = Instantiate(settingsButton.gameObject, host, worldPositionStays: false);
+        clone.name = CloneName;
+        clone.SetActive(false);
+        var controller = clone.AddComponent<CurrentReplayRecordingButtonController>();
+        controller.Initialize(settingsButton, clone);
+        return controller;
+    }
+
+    internal static void BindNativeReplay(Button nativeReplayButton)
+    {
+        foreach (
+            var controller in FindObjectsOfType<CurrentReplayRecordingButtonController>(
+                includeInactive: true
+            )
+        )
+        {
+            controller._nativeReplayButton = nativeReplayButton;
+            controller.Refresh();
+        }
+    }
+
+    private void Initialize(Button settingsButton, GameObject clone)
+    {
+        _settingsButton = settingsButton;
+        _clone = clone;
+        _cloneRect = clone.transform as RectTransform;
+        StripNativeBehavior(clone);
+        _button = clone.GetComponent<Button>() ?? clone.AddComponent<Button>();
+        _button.onClick.RemoveAllListeners();
+        _button.onClick.AddListener(OnClicked);
+        _button.navigation = new Navigation { mode = Navigation.Mode.None };
+
+        var layout = clone.GetComponent<LayoutElement>() ?? clone.AddComponent<LayoutElement>();
+        layout.ignoreLayout = true;
+
+        var relay = clone.GetComponent<CurrentReplayRecordingButtonHoverRelay>();
+        if (relay == null)
+            relay = clone.AddComponent<CurrentReplayRecordingButtonHoverRelay>();
+        relay.Bind(this);
+        CreateGlyph(settingsButton);
+
         CombatReplayRuntime.Instance?.PrepareCurrentReplayRecordingAvailability();
+        SyncLayout();
         Refresh();
     }
 
     private void LateUpdate()
     {
-        RefreshLayout();
+        SyncLayout();
         Refresh();
     }
 
@@ -41,44 +96,27 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
     }
 
-    private void CreateClone(Button nativeReplayButton, Transform container)
+    private static void StripNativeBehavior(GameObject clone)
     {
-        var existing = container.Find(CloneName);
-        _clone =
-            existing == null
-                ? Instantiate(nativeReplayButton.gameObject, container, worldPositionStays: false)
-                : existing.gameObject;
-        _clone.name = CloneName;
+        var nativeIcon = clone
+            .GetComponentInChildren<BazaarButtonController>(includeInactive: true)
+            ?.ButtonIcon;
+        if (nativeIcon != null)
+            nativeIcon.gameObject.SetActive(false);
 
-        foreach (var tooltip in _clone.GetComponentsInChildren<RecapReplayButtonController>(true))
-            DestroyImmediate(tooltip);
-        foreach (var custom in _clone.GetComponentsInChildren<ButtonCustom>(true))
+        foreach (var custom in clone.GetComponentsInChildren<ButtonCustom>(true))
             DestroyImmediate(custom);
-        foreach (var native in _clone.GetComponentsInChildren<BazaarButtonController>(true))
+        foreach (var native in clone.GetComponentsInChildren<BazaarButtonController>(true))
             DestroyImmediate(native);
-        foreach (var nested in _clone.GetComponentsInChildren<Button>(true))
-        {
-            if (nested.gameObject != _clone)
+        foreach (var owner in clone.GetComponentsInChildren<MonoBehaviour>(true))
+            if (owner is IBppNativeSettingsButtonCloneOwner)
+                DestroyImmediate(owner);
+        foreach (var nested in clone.GetComponentsInChildren<Button>(true))
+            if (nested.gameObject != clone)
                 DestroyImmediate(nested);
-        }
-
-        _button = _clone.GetComponent<Button>() ?? _clone.AddComponent<Button>();
-        _button.onClick.RemoveAllListeners();
-        _button.onClick.AddListener(OnClicked);
-        _button.navigation = new Navigation { mode = Navigation.Mode.None };
-
-        _cloneRect = _clone.transform as RectTransform;
-        var layout = _clone.GetComponent<LayoutElement>() ?? _clone.AddComponent<LayoutElement>();
-        layout.ignoreLayout = true;
-
-        var relay = _clone.GetComponent<CurrentReplayRecordingButtonHoverRelay>();
-        if (relay == null)
-            relay = _clone.AddComponent<CurrentReplayRecordingButtonHoverRelay>();
-        relay.Bind(this);
-        CreateGlyph(nativeReplayButton);
     }
 
-    private void CreateGlyph(Button nativeReplayButton)
+    private void CreateGlyph(Button settingsButton)
     {
         if (_clone == null)
             return;
@@ -108,7 +146,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         }
         else
         {
-            _glyph.font = nativeReplayButton.GetComponentInChildren<TextMeshProUGUI>(true)?.font;
+            _glyph.font = settingsButton.GetComponentInChildren<TextMeshProUGUI>(true)?.font;
         }
         _glyph.fontSize = 34f;
         _glyph.fontStyle = FontStyles.Bold;
@@ -119,22 +157,38 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         _glyph.overflowMode = TextOverflowModes.Overflow;
     }
 
-    private void RefreshLayout()
+    private void SyncLayout()
     {
-        if (_nativeRect == null || _cloneRect == null)
+        if (_settingsButton == null || _cloneRect == null)
+        {
+            _layoutAvailable = false;
             return;
+        }
 
-        var size = _nativeRect.rect.size;
-        if (size.x > 0.01f && size.y > 0.01f)
-            _cloneRect.sizeDelta = size;
-        _cloneRect.anchorMin = _nativeRect.anchorMin;
-        _cloneRect.anchorMax = _nativeRect.anchorMax;
-        _cloneRect.pivot = _nativeRect.pivot;
-        _cloneRect.localRotation = Quaternion.identity;
-        _cloneRect.anchoredPosition =
-            _nativeRect.anchoredPosition + Vector2.up * (Mathf.Max(size.y, 64f) + 12f);
-        _cloneRect.localScale =
-            _nativeRect.localScale.sqrMagnitude > 0.001f ? _nativeRect.localScale : Vector3.one;
+        var anchorButton = ResolveDockAnchorButton(_settingsButton);
+        _layoutAvailable = _screenLayout.TryResolveAndApplyCollection(
+            anchorButton,
+            _cloneRect,
+            DockButtonGap,
+            out _
+        );
+    }
+
+    private static Button ResolveDockAnchorButton(Button settingsButton)
+    {
+        var collectionRect = settingsButton
+            .GetComponent<CollectionPanelDockButtonController>()
+            ?.DockButtonRect;
+        if (
+            collectionRect != null
+            && collectionRect.gameObject.activeInHierarchy
+            && collectionRect.GetComponent<Button>() is { } collectionButton
+        )
+        {
+            return collectionButton;
+        }
+
+        return settingsButton;
     }
 
     private void Refresh()
@@ -143,9 +197,10 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             return;
         var runtime = CombatReplayRuntime.Instance;
         var snapshot = runtime?.GetCurrentReplayRecordingSnapshot() ?? default;
-        if (_clone.activeSelf != snapshot.Visible)
-            _clone.SetActive(snapshot.Visible);
-        if (!snapshot.Visible)
+        var visible = snapshot.Visible && _layoutAvailable;
+        if (_clone.activeSelf != visible)
+            _clone.SetActive(visible);
+        if (!visible)
             return;
 
         _button.interactable = snapshot.CanStart || snapshot.CanReveal;
