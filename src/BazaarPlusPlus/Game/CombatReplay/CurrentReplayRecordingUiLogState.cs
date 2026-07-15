@@ -22,7 +22,8 @@ internal readonly record struct CurrentReplayRecordingUiObservation(
     bool LayoutAvailable,
     CurrentReplayRecordingUiLayoutReasonCode LayoutReasonCode,
     bool CloneActive,
-    bool NativeReplayBound
+    bool NativeReplayBound,
+    bool IconAvailable
 );
 
 internal sealed class CurrentReplayRecordingUiLogState
@@ -34,7 +35,8 @@ internal sealed class CurrentReplayRecordingUiLogState
         bool layoutAvailable,
         CurrentReplayRecordingUiLayoutReasonCode layoutReasonCode,
         bool cloneActive,
-        bool nativeReplayBound
+        bool nativeReplayBound,
+        bool iconAvailable
     )
     {
         var observation = new CurrentReplayRecordingUiObservation(
@@ -43,7 +45,8 @@ internal sealed class CurrentReplayRecordingUiLogState
             layoutAvailable,
             layoutReasonCode,
             cloneActive,
-            nativeReplayBound
+            nativeReplayBound,
+            iconAvailable
         );
         if (_lastObservation == observation)
             return;
@@ -64,7 +67,8 @@ internal sealed class CurrentReplayRecordingUiLogState
             CombatReplayLogEvents.CurrentRecordingUiCloneActive.Bind(observation.CloneActive),
             CombatReplayLogEvents.CurrentRecordingUiNativeReplayBound.Bind(
                 observation.NativeReplayBound
-            )
+            ),
+            CombatReplayLogEvents.CurrentRecordingUiIconAvailable.Bind(observation.IconAvailable)
         );
     }
 

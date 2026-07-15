@@ -1,9 +1,7 @@
 #nullable enable
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.Settings;
-using BazaarPlusPlus.GameInterop.Fonts;
 using TheBazaar;
-using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -13,15 +11,14 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 {
     private const string CloneName = "BPP_CurrentReplayRecordingButton";
-    private const string GlyphName = "BppCurrentReplayRecordingGlyph";
     private const float DockButtonGap = BppSettingsDockPlacement.DefaultSiblingGap;
     private Button? _settingsButton;
     private Button? _nativeReplayButton;
     private Button? _button;
     private RectTransform? _cloneRect;
     private GameObject? _clone;
-    private TextMeshProUGUI? _glyph;
-    private string? _lastGlyph;
+    private Image? _icon;
+    private BppDockButtonSpriteId? _lastSpriteId;
     private readonly BppDockButtonScreenLayout _screenLayout = new();
     private readonly CurrentReplayRecordingUiLogState _uiLogState = new();
     private bool _layoutAvailable;
@@ -72,11 +69,14 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         _settingsButton = settingsButton;
         _clone = clone;
         _cloneRect = clone.transform as RectTransform;
-        var glyphHost = StripNativeBehavior(clone);
+        _icon = StripNativeBehavior(clone);
         _button = clone.GetComponent<Button>() ?? clone.AddComponent<Button>();
         _button.onClick.RemoveAllListeners();
         _button.onClick.AddListener(OnClicked);
         _button.navigation = new Navigation { mode = Navigation.Mode.None };
+        var frame = clone.GetComponent<Image>() ?? clone.AddComponent<Image>();
+        frame.raycastTarget = true;
+        _button.targetGraphic = frame;
 
         var layout = clone.GetComponent<LayoutElement>() ?? clone.AddComponent<LayoutElement>();
         layout.ignoreLayout = true;
@@ -85,9 +85,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         if (relay == null)
             relay = clone.AddComponent<CurrentReplayRecordingButtonHoverRelay>();
         relay.Bind(this);
-        CreateGlyph(settingsButton, glyphHost);
-        if (_glyph != null)
-            _button.targetGraphic = _glyph;
+        ApplyIcon(CurrentReplayRecordingPhase.Ready);
 
         CombatReplayRuntime.Instance?.PrepareCurrentReplayRecordingAvailability();
         SyncLayout();
@@ -105,14 +103,9 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
     }
 
-    private static GameObject? StripNativeBehavior(GameObject clone)
+    private static Image? StripNativeBehavior(GameObject clone)
     {
-        var nativeIcon = clone
-            .GetComponentInChildren<BazaarButtonController>(includeInactive: true)
-            ?.ButtonIcon;
-        if (nativeIcon != null)
-            nativeIcon.enabled = false;
-
+        var nativeIcon = BppDockButtonVisuals.ResolveNativeIconImage(clone);
         foreach (var custom in clone.GetComponentsInChildren<ButtonCustom>(true))
             DestroyImmediate(custom);
         foreach (var native in clone.GetComponentsInChildren<BazaarButtonController>(true))
@@ -124,56 +117,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             if (nested.gameObject != clone)
                 DestroyImmediate(nested);
 
-        return nativeIcon?.gameObject;
-    }
-
-    private void CreateGlyph(Button settingsButton, GameObject? glyphHost)
-    {
-        if (_clone == null)
-            return;
-
-        // A Unity UI GameObject may host only one Graphic. The cloned native icon already owns
-        // an Image, so adding TextMeshProUGUI to that same object returns null. Keep the native
-        // icon's RectTransform as the slot and render the BPP glyph on its own child object.
-        var glyphParent = glyphHost != null ? glyphHost.transform : _clone.transform;
-        var existing = glyphParent.Find(GlyphName)?.gameObject;
-        var glyphObject =
-            existing ?? new GameObject(GlyphName, typeof(RectTransform), typeof(CanvasRenderer));
-        glyphObject.name = GlyphName;
-        glyphObject.layer = glyphParent.gameObject.layer;
-        var rect = glyphObject.GetComponent<RectTransform>();
-        glyphObject.transform.SetParent(glyphParent, worldPositionStays: false);
-        rect.anchorMin = Vector2.zero;
-        rect.anchorMax = Vector2.one;
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-        rect.localScale = Vector3.one;
-
-        var glyph = glyphObject.GetComponent<TextMeshProUGUI>();
-        if (glyph == null)
-            glyph = glyphObject.AddComponent<TextMeshProUGUI>();
-        if (glyph == null)
-            return;
-        _glyph = glyph;
-        if (
-            NativeGameTypography.PrepareOwnedText(out var typography)
-                == NativeGameTypography.Outcome.Ready
-            && typography != null
-        )
-        {
-            typography.Apply(_glyph);
-        }
-        else
-        {
-            _glyph.font = settingsButton.GetComponentInChildren<TextMeshProUGUI>(true)?.font;
-        }
-        _glyph.fontSize = 34f;
-        _glyph.fontStyle = FontStyles.Bold;
-        _glyph.alignment = TextAlignmentOptions.Center;
-        _glyph.color = Color.white;
-        _glyph.raycastTarget = false;
-        _glyph.textWrappingMode = TextWrappingModes.NoWrap;
-        _glyph.overflowMode = TextOverflowModes.Overflow;
+        return nativeIcon;
     }
 
     private void SyncLayout()
@@ -228,18 +172,14 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             _layoutAvailable,
             _layoutReasonCode,
             _clone.activeSelf,
-            _nativeReplayButton != null
+            _nativeReplayButton != null,
+            _icon != null && _icon.sprite != null
         );
         if (!visible)
             return;
 
         _button.interactable = snapshot.CanStart || snapshot.CanReveal;
-        var glyph = Glyph(snapshot.Phase);
-        if (_glyph != null && !string.Equals(_lastGlyph, glyph, System.StringComparison.Ordinal))
-        {
-            _glyph.text = glyph;
-            _lastGlyph = glyph;
-        }
+        ApplyIcon(snapshot.Phase);
     }
 
     private void OnClicked()
@@ -280,15 +220,33 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
     }
 
-    private static string Glyph(CurrentReplayRecordingPhase phase) =>
+    private void ApplyIcon(CurrentReplayRecordingPhase phase)
+    {
+        if (_icon == null)
+            return;
+
+        var spriteId = SpriteId(phase);
+        if (_lastSpriteId == spriteId)
+            return;
+
+        var sprite = BppDockButtonSpriteProvider.Get(spriteId);
+        if (sprite == null)
+            return;
+
+        BppDockButtonVisuals.ApplyIcon(_icon, sprite);
+        _lastSpriteId = spriteId;
+    }
+
+    private static BppDockButtonSpriteId SpriteId(CurrentReplayRecordingPhase phase) =>
         phase switch
         {
-            CurrentReplayRecordingPhase.Ready => "↗",
-            CurrentReplayRecordingPhase.Armed or CurrentReplayRecordingPhase.Recording => "●",
-            CurrentReplayRecordingPhase.Succeeded or CurrentReplayRecordingPhase.Degraded => "▣",
-            CurrentReplayRecordingPhase.Failed => "↻",
-            CurrentReplayRecordingPhase.Unavailable => "×",
-            _ => "…",
+            CurrentReplayRecordingPhase.Armed or CurrentReplayRecordingPhase.Recording =>
+                BppDockButtonSpriteId.ReplayRecording,
+            CurrentReplayRecordingPhase.Succeeded or CurrentReplayRecordingPhase.Degraded =>
+                BppDockButtonSpriteId.ReplayView,
+            CurrentReplayRecordingPhase.Failed or CurrentReplayRecordingPhase.Unavailable =>
+                BppDockButtonSpriteId.ReplayRetry,
+            _ => BppDockButtonSpriteId.ReplayExport,
         };
 }
 

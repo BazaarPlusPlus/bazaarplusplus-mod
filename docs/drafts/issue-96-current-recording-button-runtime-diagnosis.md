@@ -17,6 +17,27 @@
 
 用户还反馈视频结束略早。当前录像严格在 `CombatReplayPlaybackEnded` 发布时停止，没有 post-roll；这是共享录制器的时间窗口策略，不属于 #96 的战后入口/UI 接线，留作独立后续讨论。
 
+## 2026-07-15 第四次实机失败：入口整体消失与并发部署冲突
+
+### 已确认事实
+
+1. 日志记录 `phase=ready snapshot_visible=true layout_available=false layout_reason_code=target_footprint_unavailable clone_active=false native_replay_bound=true`。状态机和原生 replay 绑定均正常，入口被布局 fail-closed 隐藏。
+2. `d7305f40` 把新建的 TMP glyph 设为 `Button.targetGraphic`，布局又从 `targetGraphic.rectTransform` 测量按钮 footprint。嵌套 glyph 的 RectTransform 无法提供有效屏幕尺寸，因此该改动本身会稳定触发 `target_footprint_unavailable`。
+3. 同时存在另一个 Codex task 在同一主 worktree 构建/部署。#96 在 18:47 部署的 DLL 为 4,332,544 字节、SHA-256 `d67fcfc…`；安装目录中的 DLL 在 19:18 被替换为 4,457,984 字节、SHA-256 `277403ee…`，但外置 `BazaarPlusPlus.version` 仍停留在 `4.5.0.t20260715.184633.dev`。因此截图版本标签不能证明实际加载 DLL 的来源，并发 task 确实造成了部署污染。
+
+### 方案决策
+
+- 不再使用 TMP glyph；复用书本按钮既有的 `BppDockButtonVisuals` / `Image sprite` 视觉链路，保留原生 settings button clone 的根 `Image` 作为 `Button.targetGraphic`。
+- 为导出、录制、查看、重试四种状态增加内嵌 PNG sprite；按钮状态变化只替换原生 icon `Image.sprite`，不改变按钮层级和 footprint。
+- current-recording UI observation 增加 `icon_available`，下一次实机可直接区分资源加载失败和布局失败。
+- 构建、测试和提交只在独立持久 worktree 中进行；部署前后校验 DLL hash，并把 DLL 来源与版本文件同时核对。
+
+### 验证方法
+
+- Architecture.Tests 强制禁止 current replay controller 引入 TMP/`NativeGameTypography` 或把 glyph 设为 `targetGraphic`，并要求使用现有 dock sprite pipeline。
+- Release build 后检查五个 dock PNG 的 manifest resource name，部署前后核对产物与安装 DLL 的 SHA-256。
+- 用户实机验收：入口可见、四种状态图标可见、Tooltip 位于按钮附近、完成后可查看视频；日志中应为 `layout_available=true icon_available=true`。
+
 ## 当前问题与已确认事实
 
 1. 该场战斗不是 PvE/教程边界：SQLite 最新记录为 `combat_kind=PVPCombat`、`has_local_payload=1`，exact battle payload 已落盘。

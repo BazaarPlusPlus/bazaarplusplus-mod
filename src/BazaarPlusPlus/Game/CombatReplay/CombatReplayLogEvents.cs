@@ -140,6 +140,11 @@ internal static class CombatReplayLogEvents
         "native_replay_bound",
         BppLogCardinality.Low
     );
+    internal static readonly BppLogFieldDefinition CurrentRecordingUiIconAvailable = Public(
+        6,
+        "icon_available",
+        BppLogCardinality.Low
+    );
     internal static readonly BppLogEventDefinition CurrentRecordingUiObserved = new(
         BppLogFeatureScope.CombatReplay,
         "combat_replay.current_recording_ui.observed",
@@ -150,6 +155,7 @@ internal static class CombatReplayLogEvents
             CurrentRecordingUiLayoutReasonCode,
             CurrentRecordingUiCloneActive,
             CurrentRecordingUiNativeReplayBound,
+            CurrentRecordingUiIconAvailable,
         ]
     );
 

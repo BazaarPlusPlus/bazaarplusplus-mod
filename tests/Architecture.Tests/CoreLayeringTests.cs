@@ -1665,15 +1665,16 @@ public class CoreLayeringTests
         var patchSource = File.ReadAllText(
             Path.Combine(mainSource, "Patches", "Combat", "CurrentReplayRecordingButtonPatch.cs")
         );
+        var projectSource = File.ReadAllText(Path.Combine(mainSource, "BazaarPlusPlus.csproj"));
 
         Assert.Contains("typeof(FightMenuDialog)", patchSource);
         Assert.Contains("\"SettingButton\"", patchSource);
         Assert.Contains("CollectionPanelDockButtonController", controllerSource);
         Assert.Contains("BppDockButtonScreenLayout", controllerSource);
-        Assert.Contains("nativeIcon.enabled = false", controllerSource);
-        Assert.Contains("CreateGlyph(settingsButton, glyphHost)", controllerSource);
-        Assert.Contains("glyphObject.transform.SetParent(glyphParent", controllerSource);
-        Assert.Contains("glyphObject.layer = glyphParent.gameObject.layer", controllerSource);
+        Assert.Contains("BppDockButtonSpriteProvider.Get(spriteId)", controllerSource);
+        Assert.Contains("BppDockButtonVisuals.ApplyIcon(_icon, sprite)", controllerSource);
+        Assert.Contains("_icon != null && _icon.sprite != null", controllerSource);
+        Assert.Contains("_button.targetGraphic = frame", controllerSource);
         Assert.Contains("_cloneRect.TransformVector(", controllerSource);
         Assert.DoesNotContain("_cloneRect.position + Vector3.up", controllerSource);
         Assert.Contains("CurrentReplayRecordingUiLogState", controllerSource);
@@ -1683,11 +1684,31 @@ public class CoreLayeringTests
         );
         Assert.DoesNotContain("RecapReplayButtonContainer", patchSource);
         Assert.DoesNotContain("_nativeRect.anchoredPosition", controllerSource);
+        Assert.DoesNotContain("TextMeshPro", controllerSource);
+        Assert.DoesNotContain("NativeGameTypography", controllerSource);
+        Assert.DoesNotContain("targetGraphic = _glyph", controllerSource);
+        Assert.DoesNotContain("nativeIcon.enabled = false", controllerSource);
         Assert.DoesNotContain("nativeIcon.gameObject.SetActive(false)", controllerSource);
         Assert.DoesNotContain(
             "clone.AddComponent<CurrentReplayRecordingButtonController>()",
             controllerSource
         );
+        foreach (
+            var iconName in new[]
+            {
+                "replay-export-icon.png",
+                "replay-recording-icon.png",
+                "replay-view-icon.png",
+                "replay-retry-icon.png",
+            }
+        )
+        {
+            Assert.True(
+                File.Exists(Path.Combine(mainSource, "Resources", "DockButtons", iconName)),
+                $"Missing dock icon '{iconName}'."
+            );
+            Assert.Contains($"BazaarPlusPlus.Resources.DockButtons.{iconName}", projectSource);
+        }
     }
 
     [Fact]
