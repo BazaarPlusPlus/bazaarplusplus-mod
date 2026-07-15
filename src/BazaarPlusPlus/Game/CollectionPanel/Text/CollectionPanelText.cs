@@ -91,20 +91,10 @@ internal static class CollectionPanelText
         "（{0}）",
         "（{0}）"
     );
-    private static readonly LocalizedTextSet EncounterMerchantDayTierText = new(
-        "Quality today: {0}",
-        "今日品质：{0}",
-        "今日品質：{0}"
-    );
-    private static readonly LocalizedTextSet EncounterMerchantDayTierCeilingText = new(
-        "Quality today: up to {0}",
-        "今日品质：最高{0}",
-        "今日品質：最高{0}"
-    );
-    private static readonly LocalizedTextSet EncounterMerchantFixedTierText = new(
-        "Item quality: {0}",
-        "商品品质：{0}",
-        "商品品質：{0}"
+    private static readonly LocalizedTextSet EncounterTierCeilingLineText = new(
+        "up to {0}",
+        "最高{0}",
+        "最高{0}"
     );
     private static readonly LocalizedTextSet LevelUpMaxHealthText = new(
         "+ {0} Max Health",
@@ -249,14 +239,8 @@ internal static class CollectionPanelText
     internal static string EncounterTierDistributionSuffix(string distribution) =>
         string.Format(Resolve(EncounterTierDistributionSuffixText), distribution);
 
-    internal static string EncounterMerchantDayTier(string distribution) =>
-        string.Format(Resolve(EncounterMerchantDayTierText), distribution);
-
-    internal static string EncounterMerchantDayTierCeiling(ETier tier) =>
-        string.Format(Resolve(EncounterMerchantDayTierCeilingText), Tier(tier));
-
-    internal static string EncounterMerchantFixedTier(string tier) =>
-        string.Format(Resolve(EncounterMerchantFixedTierText), tier);
+    internal static string EncounterTierCeilingLine(ETier tier) =>
+        string.Format(Resolve(EncounterTierCeilingLineText), Tier(tier));
 
     internal static string LevelUpMaxHealth(int amount) =>
         string.Format(Resolve(LevelUpMaxHealthText), amount);

@@ -871,6 +871,7 @@ internal static class CollectionEncounterStructuredParser
     {
         private ECardType? _cardType;
         private bool _usesDayTierTable = true;
+        private bool _usesDayTierDistribution = true;
         private readonly List<ECardSize> _sizes = new();
         private readonly List<ECardSize> _excludedSizes = new();
         private readonly List<ETier> _tiers = new();
@@ -939,6 +940,8 @@ internal static class CollectionEncounterStructuredParser
                 IntersectInto(merged._excludedTags, other._excludedTags);
                 IntersectInto(merged._excludedKeywords, other._excludedKeywords);
                 merged._usesDayTierTable = merged._usesDayTierTable && other._usesDayTierTable;
+                merged._usesDayTierDistribution =
+                    merged._usesDayTierDistribution && other._usesDayTierDistribution;
             }
             return merged;
         }
@@ -963,6 +966,7 @@ internal static class CollectionEncounterStructuredParser
             {
                 _cardType = _cardType,
                 _usesDayTierTable = _usesDayTierTable,
+                _usesDayTierDistribution = _usesDayTierDistribution,
             };
             clone._sizes.AddRange(_sizes);
             clone._excludedSizes.AddRange(_excludedSizes);
@@ -1238,7 +1242,8 @@ internal static class CollectionEncounterStructuredParser
                 summary,
                 _excludedTags,
                 _excludedKeywords,
-                _usesDayTierTable
+                _usesDayTierTable,
+                _usesDayTierDistribution
             );
         }
 
@@ -1246,27 +1251,28 @@ internal static class CollectionEncounterStructuredParser
         // day-table-driven; only an inclusive tier list pins the pool to fixed tiers.
         private void ApplyTierTableBehavior(string typeHint, JObject obj)
         {
-            if (
-                (typeHint.Contains("spawnbehaviortier") && !ReadBool(obj["IsNot"]))
-                || typeHint.Contains("downshifttier")
-                || IsEnabledIgnoreTierTable(typeHint, obj)
-                || IsEnabledInheritTier(typeHint, obj)
-            )
+            var fixedTier = typeHint.Contains("spawnbehaviortier") && !ReadBool(obj["IsNot"]);
+            var downShift = typeHint.Contains("downshifttier");
+            var ignoreDayTable = IsEnabledIgnoreTierTable(typeHint, obj);
+            var inheritTier = IsEnabledInheritTier(typeHint, obj);
+            if (fixedTier || downShift || ignoreDayTable || inheritTier)
                 _usesDayTierTable = false;
+            if (fixedTier || ignoreDayTable || inheritTier)
+                _usesDayTierDistribution = false;
         }
 
         private void ApplyRuntimeTierTableBehavior(string typeHint, object source)
         {
-            if (
-                (
-                    typeHint.Contains("spawnbehaviortier")
-                    && !ReadRuntimeBool(ReadMemberValue(source, "IsNot"))
-                )
-                || typeHint.Contains("downshifttier")
-                || IsEnabledRuntimeIgnoreTierTable(typeHint, source)
-                || IsEnabledRuntimeInheritTier(typeHint, source)
-            )
+            var fixedTier =
+                typeHint.Contains("spawnbehaviortier")
+                && !ReadRuntimeBool(ReadMemberValue(source, "IsNot"));
+            var downShift = typeHint.Contains("downshifttier");
+            var ignoreDayTable = IsEnabledRuntimeIgnoreTierTable(typeHint, source);
+            var inheritTier = IsEnabledRuntimeInheritTier(typeHint, source);
+            if (fixedTier || downShift || ignoreDayTable || inheritTier)
                 _usesDayTierTable = false;
+            if (fixedTier || ignoreDayTable || inheritTier)
+                _usesDayTierDistribution = false;
         }
 
         private static bool IsEnabledIgnoreTierTable(string typeHint, JObject obj) =>

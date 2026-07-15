@@ -22,7 +22,7 @@ public sealed class CollectionTierDistributionTests
     [InlineData(0.9f, 0.1f, 0f, 0f, "Bronze 90%", null, "Silver 10%")]
     [InlineData(0f, 0.95f, 0.05f, 0f, "Silver 95%", null, "Gold 5%")]
     [InlineData(0f, 0.45f, 0.5f, 0.05f, "Silver 45%", "Gold 50%", "Diamond 5%")]
-    public void Merchant_line_formats_daily_game_data_weights(
+    public void Quality_line_formats_daily_game_data_weights_without_a_label(
         float bronze,
         float silver,
         float gold,
@@ -34,13 +34,13 @@ public sealed class CollectionTierDistributionTests
     {
         var distribution = CollectionTierDistribution.FromWeights(bronze, silver, gold, diamond);
 
-        var text = CollectionEncounterGameTooltipText.BuildMerchantQuality(
+        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
             distribution,
             fixedTier: null,
             dayTierCeiling: ETier.Diamond
         );
 
-        Assert.Contains("Quality today:", text);
+        Assert.DoesNotContain("Quality today", text);
         Assert.Contains(expectedFirst, text);
         if (expectedMiddle != null)
             Assert.Contains(expectedMiddle, text);
@@ -52,7 +52,7 @@ public sealed class CollectionTierDistributionTests
     {
         var distribution = CollectionTierDistribution.FromWeights(0f, 0.2f, 0.55f, 0.05f);
 
-        var text = CollectionEncounterGameTooltipText.BuildMerchantQuality(
+        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
             distribution,
             fixedTier: null,
             dayTierCeiling: ETier.Diamond
@@ -92,7 +92,7 @@ public sealed class CollectionTierDistributionTests
         );
 
         var policy = CollectionMerchantTierResolver.Resolve(template);
-        var text = CollectionEncounterGameTooltipText.BuildMerchantQuality(
+        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
             CollectionTierDistribution.FromWeights(0.9f, 0.1f, 0f, 0f),
             policy.FixedTier,
             policy.UsesDayDistribution ? ETier.Silver : null
@@ -100,8 +100,8 @@ public sealed class CollectionTierDistributionTests
 
         Assert.Equal(tier, policy.FixedTier);
         Assert.False(policy.UsesDayDistribution);
-        Assert.Contains("Item quality: <color=", text);
         Assert.Contains($">{tier}</color>", text);
+        Assert.DoesNotContain("Item quality", text);
         Assert.DoesNotContain("90%", text);
     }
 
@@ -145,12 +145,11 @@ public sealed class CollectionTierDistributionTests
     }
 
     [Theory]
-    [InlineData("zh-CN", false, "今日品质：", "青铜 90%", "白银 10%")]
-    [InlineData("zh-TW", true, "今日品質：", "青銅 90%", "白銀 10%")]
-    public void Merchant_line_localizes_both_chinese_scripts(
+    [InlineData("zh-CN", false, "青铜 90%", "白银 10%")]
+    [InlineData("zh-TW", true, "青銅 90%", "白銀 10%")]
+    public void Quality_line_localizes_both_chinese_scripts(
         string language,
         bool traditional,
-        string expectedLabel,
         string expectedBronze,
         string expectedSilver
     )
@@ -158,28 +157,88 @@ public sealed class CollectionTierDistributionTests
         var localeMode = traditional ? BppChineseLocaleMode.Taiwan : BppChineseLocaleMode.Mainland;
         L.Install(new TestLanguageProvider(language), new TestLocaleModeProvider(localeMode));
 
-        var text = CollectionEncounterGameTooltipText.BuildMerchantQuality(
+        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
             CollectionTierDistribution.FromWeights(0.9f, 0.1f, 0f, 0f),
             fixedTier: null,
             dayTierCeiling: ETier.Silver
         );
 
-        Assert.Contains(expectedLabel, text);
         Assert.Contains(expectedBronze, text);
         Assert.Contains(expectedSilver, text);
+        Assert.DoesNotContain("品质：", text);
+        Assert.DoesNotContain("品質：", text);
     }
 
     [Fact]
-    public void Merchant_line_falls_back_to_the_existing_day_ceiling()
+    public void Quality_line_falls_back_to_the_existing_day_ceiling()
     {
-        var text = CollectionEncounterGameTooltipText.BuildMerchantQuality(
+        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
             dayTierDistribution: null,
             fixedTier: null,
             dayTierCeiling: ETier.Gold
         );
 
-        Assert.Contains("Quality today: up to Gold", text);
+        Assert.Contains("up to Gold", text);
+        Assert.DoesNotContain("Quality today", text);
     }
+
+    [Fact]
+    public void Encounter_step_reward_line_shows_quality_for_grab_the_loot_style_rewards()
+    {
+        var text = CollectionEncounterGameTooltipText.BuildRewardQualityLine(
+            CreateRewardFilter(usesDayTierTable: true, usesDayTierDistribution: true),
+            "Get 3 Loot items",
+            CollectionTierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
+            ETier.Silver
+        );
+
+        Assert.Contains("Bronze 70%", text);
+        Assert.Contains("Silver 30%", text);
+    }
+
+    [Fact]
+    public void Encounter_step_reward_line_shows_source_weights_for_downshift_rewards()
+    {
+        var text = CollectionEncounterGameTooltipText.BuildRewardQualityLine(
+            CreateRewardFilter(usesDayTierTable: false, usesDayTierDistribution: true),
+            "Gain 2 Gold and a Shield item from any Hero",
+            CollectionTierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
+            ETier.Silver
+        );
+
+        Assert.Contains("Bronze 70%", text);
+        Assert.Contains("Silver 30%", text);
+    }
+
+    [Fact]
+    public void Encounter_step_reward_line_skips_fixed_or_inherited_quality()
+    {
+        var text = CollectionEncounterGameTooltipText.BuildRewardQualityLine(
+            CreateRewardFilter(usesDayTierTable: false, usesDayTierDistribution: false),
+            "Get an item",
+            CollectionTierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
+            ETier.Silver
+        );
+
+        Assert.Equal(string.Empty, text);
+    }
+
+    private static CollectionEncounterRewardFilter CreateRewardFilter(
+        bool usesDayTierTable,
+        bool usesDayTierDistribution
+    ) =>
+        new(
+            ECardType.Item,
+            quantity: 1,
+            fromAnyHero: false,
+            Array.Empty<ECardSize>(),
+            new[] { ETier.Bronze, ETier.Silver, ETier.Gold, ETier.Diamond },
+            Array.Empty<ECardTag>(),
+            Array.Empty<EHiddenTag>(),
+            "Item",
+            usesDayTierTable: usesDayTierTable,
+            usesDayTierDistribution: usesDayTierDistribution
+        );
 
     private static TCardEncounterEvent CreateMerchantTemplate(params ITSpawnBehavior[] behaviors) =>
         new()

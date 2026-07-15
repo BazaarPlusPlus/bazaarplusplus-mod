@@ -45,7 +45,7 @@ internal static class EncounterEventTooltipPatch
             var content =
                 string.IsNullOrEmpty(text) || !EventPreviewGate.IsEnabled()
                     ? null
-                    : BuildContent(__instance);
+                    : BuildContent(__instance, text);
             if (string.IsNullOrEmpty(content))
             {
                 BppTooltipSections.Hide(__instance, SectionKey);
@@ -77,13 +77,16 @@ internal static class EncounterEventTooltipPatch
         }
     }
 
-    private static string? BuildContent(CardTooltipController controller)
+    private static string? BuildContent(CardTooltipController controller, string resultText)
     {
         if (Data.IsInCombat)
             return null;
 
         var card = controller._currentCard;
-        if (card == null || card.Type != ECardType.EventEncounter)
+        if (
+            card == null
+            || (card.Type != ECardType.EventEncounter && card.Type != ECardType.EncounterStep)
+        )
             return null;
 
         var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
@@ -97,13 +100,29 @@ internal static class EncounterEventTooltipPatch
             currentDay
         );
         var template = BppStaticDataAccess.GetCardTemplate(staticData, card.TemplateId);
+        if (card.Type == ECardType.EncounterStep)
+        {
+            return EventPreviewPlanRuntime.TryGetTemplate(
+                staticData,
+                card.TemplateId,
+                out var stepPlan
+            )
+                ? CollectionEncounterGameTooltipText.BuildRewardQualityLine(
+                    stepPlan.RewardFilter,
+                    resultText,
+                    dayTierDistribution,
+                    dayTierCeiling
+                )
+                : null;
+        }
+
         if (template?.Tags?.Contains(ECardTag.Merchant) == true)
         {
             var policy = CollectionMerchantTierResolver.Resolve(template);
             if (!policy.FixedTier.HasValue && !policy.UsesDayDistribution)
                 return null;
 
-            return CollectionEncounterGameTooltipText.BuildMerchantQuality(
+            return CollectionEncounterGameTooltipText.BuildQualityLine(
                 policy.UsesDayDistribution ? dayTierDistribution : null,
                 policy.FixedTier,
                 policy.UsesDayDistribution ? dayTierCeiling : null

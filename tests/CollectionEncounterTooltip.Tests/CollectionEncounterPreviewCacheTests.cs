@@ -28,6 +28,9 @@ public sealed class CollectionEncounterPreviewCacheTests : IDisposable
         Assert.True(actual.TryGetEvent(EventId, out _));
         Assert.True(actual.TryGetTemplate(StepId, out var step));
         Assert.Equal("Take the reward", step.Description.FallbackText);
+        Assert.NotNull(step.RewardFilter);
+        Assert.False(step.RewardFilter.UsesDayTierTable);
+        Assert.True(step.RewardFilter.UsesDayTierDistribution);
         Assert.True(actual.TryGetLevelUp(2, out var levelUp));
         Assert.Equal(150, levelUp.HealthIncrease);
         Assert.Equal(3, actual.Coverage.UnsupportedLevelUpPartCount);
@@ -128,7 +131,18 @@ public sealed class CollectionEncounterPreviewCacheTests : IDisposable
             new CollectionEncounterPreviewLocalizedText("step-title", "Test Step"),
             new CollectionEncounterPreviewLocalizedText("step-description", "Take the reward"),
             new Dictionary<string, CollectionEncounterPreviewAbilityValue>(),
-            rewardFilter: null
+            rewardFilter: new CollectionEncounterRewardFilter(
+                ECardType.Item,
+                quantity: 1,
+                fromAnyHero: true,
+                Array.Empty<ECardSize>(),
+                Array.Empty<ETier>(),
+                Array.Empty<ECardTag>(),
+                Array.Empty<EHiddenTag>(),
+                "Item",
+                usesDayTierTable: false,
+                usesDayTierDistribution: true
+            )
         );
         var eventPlan = new CollectionEncounterPreviewEventPlan(
             EventId,

@@ -93,7 +93,7 @@ internal static class CollectionEncounterGameTooltipText
         return CollectionTooltipMarkup.Render(lines);
     }
 
-    public static string BuildMerchantQuality(
+    public static string BuildQualityLine(
         CollectionTierDistribution? dayTierDistribution,
         ETier? fixedTier,
         ETier? dayTierCeiling
@@ -102,18 +102,15 @@ internal static class CollectionEncounterGameTooltipText
         string? line = null;
         if (fixedTier.HasValue)
         {
-            var tier = ColorizeTier(fixedTier.Value, CollectionPanelText.Tier(fixedTier.Value));
-            line = CollectionPanelText.EncounterMerchantFixedTier(tier);
+            line = ColorizeTier(fixedTier.Value, CollectionPanelText.Tier(fixedTier.Value));
         }
         else if (dayTierDistribution != null)
         {
-            line = CollectionPanelText.EncounterMerchantDayTier(
-                FormatTierDistribution(dayTierDistribution, colorizeTiers: true)
-            );
+            line = FormatTierDistribution(dayTierDistribution, colorizeTiers: true);
         }
         else if (dayTierCeiling.HasValue)
         {
-            line = CollectionPanelText.EncounterMerchantDayTierCeiling(dayTierCeiling.Value);
+            line = CollectionPanelText.EncounterTierCeilingLine(dayTierCeiling.Value);
         }
 
         return string.IsNullOrWhiteSpace(line)
@@ -121,6 +118,18 @@ internal static class CollectionEncounterGameTooltipText
             : CollectionTooltipMarkup.Render(
                 new CollectionTooltipMarkup.Block[] { new CollectionTooltipMarkup.Paragraph(line) }
             );
+    }
+
+    public static string BuildRewardQualityLine(
+        CollectionEncounterRewardFilter? reward,
+        string? resultText,
+        CollectionTierDistribution? dayTierDistribution,
+        ETier? dayTierCeiling
+    )
+    {
+        return reward != null && UsesDayTierDistribution(reward, resultText)
+            ? BuildQualityLine(dayTierDistribution, fixedTier: null, dayTierCeiling: dayTierCeiling)
+            : string.Empty;
     }
 
     // Random-outcome events: one block per rolled alternative with its normalized
@@ -302,15 +311,10 @@ internal static class CollectionEncounterGameTooltipText
         CollectionTierDistribution? dayTierDistribution
     )
     {
-        if (choice.RewardFilter is not { } reward)
-            return null;
-        if (!reward.UsesDayTierTable)
-            return null;
-
-        var tiers = reward.Tiers;
-        if (tiers.Count != 0 && tiers.Count < DealableTiers.Length)
-            return null;
-        if (HasExplicitTierDescriptor(choice.ResultText))
+        if (
+            choice.RewardFilter is not { } reward
+            || !UsesDayTierDistribution(reward, choice.ResultText)
+        )
             return null;
 
         if (dayTierDistribution != null)
@@ -332,6 +336,19 @@ internal static class CollectionEncounterGameTooltipText
         return effective.Count == 1
             ? CollectionPanelText.EncounterTierExact(effective[0])
             : CollectionPanelText.EncounterDayTierSuffix(effective[^1]);
+    }
+
+    private static bool UsesDayTierDistribution(
+        CollectionEncounterRewardFilter reward,
+        string? resultText
+    )
+    {
+        if (!reward.UsesDayTierDistribution)
+            return false;
+
+        var tiers = reward.Tiers;
+        return (tiers.Count == 0 || tiers.Count >= DealableTiers.Length)
+            && !HasExplicitTierDescriptor(resultText);
     }
 
     private static string FormatTierDistribution(
