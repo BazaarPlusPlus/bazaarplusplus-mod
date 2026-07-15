@@ -17,13 +17,19 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
     private readonly CombatReplayPayloadStore _payloadStore;
     private readonly BattleReplaySyncStateStore? _syncStateStore;
     private readonly CombatReplayPersistenceQueue _persistenceQueue;
+    private readonly Action<PvpBattleManifest, bool, Exception?>? _resultObserver;
     private readonly object _drainGate = new();
     private bool _disposed;
 
-    public ReplayPersistenceOrchestrator(IBppServices services, IPvpBattleCatalog battleCatalog)
+    public ReplayPersistenceOrchestrator(
+        IBppServices services,
+        IPvpBattleCatalog battleCatalog,
+        Action<PvpBattleManifest, bool, Exception?>? resultObserver = null
+    )
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _battleCatalog = battleCatalog ?? throw new ArgumentNullException(nameof(battleCatalog));
+        _resultObserver = resultObserver;
 
         var combatReplayDirectoryPath =
             services.Paths.CombatReplayDirectoryPath
@@ -75,6 +81,7 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                 processedAny = true;
                 if (!result.Succeeded)
                 {
+                    NotifyResultObserver(result.Manifest, succeeded: false, result.Error);
                     BppLog.ErrorEvent(
                         CombatReplayLogEvents.PersistenceFailed,
                         result.Error!,
@@ -88,6 +95,8 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                     );
                     continue;
                 }
+
+                NotifyResultObserver(result.Manifest, succeeded: true, error: null);
 
                 if (publishSideEffects)
                 {
@@ -131,6 +140,18 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                     // The queue is drained regardless of an observer failure.
                 }
             }
+        }
+    }
+
+    private void NotifyResultObserver(PvpBattleManifest manifest, bool succeeded, Exception? error)
+    {
+        try
+        {
+            _resultObserver?.Invoke(manifest, succeeded, error);
+        }
+        catch
+        {
+            // Persistence remains authoritative even if a UI-facing observer fails.
         }
     }
 

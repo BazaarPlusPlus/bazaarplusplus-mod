@@ -5,10 +5,12 @@ using System.Threading.Tasks;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay.Bootstrap;
 using BazaarPlusPlus.Game.CombatReplay.PlaybackUi;
+using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.CombatReplay.Warmup;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLifecycle;
+using BazaarPlusPlus.GameInterop.Files;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.AppFramework;
@@ -30,6 +32,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private PendingReplayMenuReturn? _pendingMenuReturn;
     private ReplayPlaybackReasonCode _startupInterruptionReason;
     private Exception? _startupInterruptionException;
+    private Func<CombatReplayVideoRecorder?>? _videoRecorder;
+    private readonly CurrentReplayRecordingState _currentRecording = new();
+    private PvpBattleManifest? _currentRecordingManifest;
+    private IDisposable? _recordingStartedSubscription;
+    private IDisposable? _recordingCompletedSubscription;
 
     private bool _returnToMenuAfterReplay;
     private bool _bootstrappedReplayActive;
@@ -108,13 +115,19 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     public void Initialize(
         IBppServices services,
         RunLifecycleModule runLifecycle,
-        IPvpBattleCatalog battleCatalog
+        IPvpBattleCatalog battleCatalog,
+        Func<CombatReplayVideoRecorder?> videoRecorder
     )
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _runLifecycle = runLifecycle ?? throw new ArgumentNullException(nameof(runLifecycle));
+        _videoRecorder = videoRecorder ?? throw new ArgumentNullException(nameof(videoRecorder));
 
-        _persistence = new ReplayPersistenceOrchestrator(_services, battleCatalog);
+        _persistence = new ReplayPersistenceOrchestrator(
+            _services,
+            battleCatalog,
+            OnReplayPersistenceCompleted
+        );
         _playbackPublisher = new ReplayPlaybackPublisher(_services);
         _portraitController = new OpponentPortraitController(Destroy);
         _captureService = new CombatReplayCaptureService();
@@ -126,6 +139,16 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         );
 
         Events.StateChanged.AddListener(OnStateChanged, this);
+        Events.ReplayStarted.AddListener(OnNativeReplayStarted, this);
+        Events.ReplayEnded.AddListener(OnNativeReplayEnded, this);
+        _recordingStartedSubscription =
+            _services.EventBus.Subscribe<CombatReplayVideoRecordingStarted>(
+                OnVideoRecordingStarted
+            );
+        _recordingCompletedSubscription =
+            _services.EventBus.Subscribe<CombatReplayVideoRecordingCompleted>(
+                OnVideoRecordingCompleted
+            );
     }
 
     private void Update()
@@ -143,6 +166,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (_currentRecording.NativeReplayStarted)
+        {
+            _playbackPublisher?.PublishEnded("runtime-destroyed", failed: true);
+            _currentRecording.MarkReplayEnded("Combat replay runtime was destroyed.");
+        }
         var operation = _activePlaybackOperation;
         if (operation != null)
         {
@@ -161,11 +189,17 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _activePlaybackOperation = null;
         _pendingMenuReturn = null;
         _persistence?.Dispose();
+        _recordingStartedSubscription?.Dispose();
+        _recordingStartedSubscription = null;
+        _recordingCompletedSubscription?.Dispose();
+        _recordingCompletedSubscription = null;
 
         if (Instance == this)
             Instance = null;
 
         Events.StateChanged.RemoveListener(OnStateChanged);
+        Events.ReplayStarted.RemoveListener(OnNativeReplayStarted);
+        Events.ReplayEnded.RemoveListener(OnNativeReplayEnded);
     }
 
     public IReadOnlyList<PvpBattleManifest> ListRecentBattles()
@@ -244,6 +278,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             if (artifact == null)
                 return;
 
+            _currentRecordingManifest = artifact.Manifest;
+            _currentRecording.LatchBattle(artifact.Manifest.BattleId);
+            PrepareCurrentReplayRecordingAvailability();
             _persistence.Enqueue(artifact.Payload, artifact.Manifest);
         }
         catch (Exception ex)
@@ -259,6 +296,152 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 )
             );
         }
+    }
+
+    internal CurrentReplayRecordingSnapshot GetCurrentReplayRecordingSnapshot()
+    {
+        RefreshCurrentReplayRecordingAvailability();
+        return _currentRecording.Snapshot();
+    }
+
+    internal void PrepareCurrentReplayRecordingAvailability()
+    {
+        var availability = _videoRecorder?.Invoke()?.PrepareCurrentReplayRecordingAvailability();
+        if (availability.HasValue)
+        {
+            _currentRecording.SetAvailability(
+                availability.Value.IsReady,
+                availability.Value.Reason
+            );
+        }
+    }
+
+    internal bool TryStartCurrentReplayRecording(Action invokeNativeReplay, out string reason)
+    {
+        if (invokeNativeReplay == null)
+            throw new ArgumentNullException(nameof(invokeNativeReplay));
+
+        RefreshCurrentReplayRecordingAvailability();
+        var snapshot = _currentRecording.Snapshot();
+        var manifest = _currentRecordingManifest;
+        var recorder = _videoRecorder?.Invoke();
+        if (!snapshot.CanStart || manifest == null || recorder == null)
+        {
+            reason = snapshot.Reason ?? "Video recording is not ready.";
+            return false;
+        }
+
+        var arm = recorder.TryArmCurrentReplay(manifest.BattleId);
+        if (!arm.Succeeded || string.IsNullOrWhiteSpace(arm.RecordingId))
+        {
+            reason = arm.Reason ?? "Video recording could not be prepared.";
+            return false;
+        }
+
+        var recordingId = arm.RecordingId;
+        if (!_currentRecording.TryArm(recordingId))
+        {
+            recorder.CancelArmedCurrentReplay(recordingId);
+            reason = "The replay recording state changed before it could start.";
+            return false;
+        }
+
+        _playbackPublisher!.BeginSession(
+            manifest.BattleId,
+            manifest,
+            CombatReplayPlaybackSource.CurrentNative,
+            recordVideo: true
+        );
+        try
+        {
+            invokeNativeReplay();
+        }
+        catch (Exception ex)
+        {
+            recorder.CancelArmedCurrentReplay(recordingId);
+            _playbackPublisher.PublishEnded("native-replay-invoke-failed", failed: true);
+            _currentRecording.RollbackArm(recordingId, ex.Message);
+            reason = ex.Message;
+            return false;
+        }
+
+        if (!_currentRecording.NativeReplayStarted)
+        {
+            recorder.CancelArmedCurrentReplay(recordingId);
+            _playbackPublisher.PublishEnded("native-replay-not-started", failed: true);
+            _currentRecording.RollbackArm(recordingId, "The native replay did not start.");
+            reason = "The native replay did not start.";
+            return false;
+        }
+
+        reason = string.Empty;
+        return true;
+    }
+
+    internal bool TryRevealCurrentReplayVideo(out string reason)
+    {
+        var snapshot = _currentRecording.Snapshot();
+        if (!snapshot.CanReveal || string.IsNullOrWhiteSpace(snapshot.FinalFilePath))
+        {
+            reason = snapshot.Reason ?? "Recorded video is unavailable.";
+            return false;
+        }
+
+        return SystemFileRevealer.TryReveal(snapshot.FinalFilePath, out reason);
+    }
+
+    private void RefreshCurrentReplayRecordingAvailability()
+    {
+        var availability = _videoRecorder?.Invoke()?.GetCurrentReplayRecordingAvailability();
+        if (!availability.HasValue)
+            return;
+
+        _currentRecording.SetAvailability(availability.Value.IsReady, availability.Value.Reason);
+    }
+
+    private void OnReplayPersistenceCompleted(
+        PvpBattleManifest manifest,
+        bool succeeded,
+        Exception? error
+    )
+    {
+        _currentRecording.MarkBattlePersistence(manifest.BattleId, succeeded, error?.Message);
+        if (succeeded)
+            PrepareCurrentReplayRecordingAvailability();
+    }
+
+    private void OnNativeReplayStarted()
+    {
+        if (!_currentRecording.MarkNativeReplayStarted())
+            return;
+
+        var outcome = _playbackPublisher?.PublishStarting();
+        if (outcome is { Succeeded: false })
+        {
+            _playbackPublisher?.PublishEnded("starting-publish-failed", failed: true);
+            _currentRecording.MarkReplayEnded(outcome.Value.Exception?.Message);
+        }
+    }
+
+    private void OnNativeReplayEnded()
+    {
+        if (!_currentRecording.NativeReplayStarted)
+            return;
+
+        var outcome = _playbackPublisher?.PublishEnded("native-replay-ended", failed: false);
+        _currentRecording.MarkReplayEnded(
+            outcome is { Succeeded: false } ? outcome.Value.Exception?.Message : null
+        );
+    }
+
+    private void OnVideoRecordingStarted(CombatReplayVideoRecordingStarted started)
+    {
+        _currentRecording.MarkRecordingStarted(started.RecordingId, started.BattleId);
+    }
+
+    private void OnVideoRecordingCompleted(CombatReplayVideoRecordingCompleted completed)
+    {
+        _currentRecording.ApplyCompletion(completed);
     }
 
     public bool ReplayLatest()
@@ -594,8 +777,27 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (data == null)
             return;
 
+        if (data.PreviousState is not ReplayState && data.CurrentState is ReplayState)
+        {
+            _currentRecording.EnterReplayState();
+            PrepareCurrentReplayRecordingAvailability();
+            return;
+        }
+
         if (data.PreviousState is not ReplayState || data.CurrentState is ReplayState)
             return;
+
+        if (_currentRecording.NativeReplayStarted)
+        {
+            var currentEnded = _playbackPublisher?.PublishEnded("replay-state-exit", failed: true);
+            _currentRecording.MarkReplayEnded(
+                currentEnded is { Succeeded: false }
+                    ? currentEnded.Value.Exception?.Message
+                    : "Replay state exited before the native replay ended."
+            );
+        }
+        _currentRecording.LeaveReplayState();
+        _currentRecordingManifest = null;
 
         var startCoordinatorOwnsTerminal =
             _savedReplayProgress

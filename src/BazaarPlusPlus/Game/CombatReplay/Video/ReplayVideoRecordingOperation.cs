@@ -60,6 +60,18 @@ internal sealed class ReplayVideoRecordingCompletion
     internal DateTimeOffset? EndedAtUtc { get; set; }
 }
 
+internal readonly record struct ReplayVideoRecordingTerminal(
+    string RecordingId,
+    string BattleId,
+    CombatReplayPlaybackSource Source,
+    string FinalFilePath,
+    bool ArtifactUsable,
+    ReplayVideoAudioStatus AudioStatus,
+    ReplayVideoMetadataStatus MetadataStatus,
+    ReplayVideoRecordingReasonCode ReasonCode,
+    string? Reason
+);
+
 internal sealed class ReplayVideoRecordingOperation
 {
     private readonly DateTimeOffset _startedAtUtc;
@@ -85,6 +97,15 @@ internal sealed class ReplayVideoRecordingOperation
 
     internal bool TryComplete(ReplayVideoRecordingCompletion completion)
     {
+        return TryComplete(completion, out _);
+    }
+
+    internal bool TryComplete(
+        ReplayVideoRecordingCompletion completion,
+        out ReplayVideoRecordingTerminal terminal
+    )
+    {
+        terminal = default;
         if (completion == null)
             throw new ArgumentNullException(nameof(completion));
         if (Interlocked.CompareExchange(ref _completed, 1, 0) != 0)
@@ -102,6 +123,17 @@ internal sealed class ReplayVideoRecordingOperation
                 ((completion.EndedAtUtc ?? DateTimeOffset.UtcNow) - _startedAtUtc).TotalMilliseconds
         );
         var common = CommonFields(completion, reason, duration, fileSize);
+        terminal = new ReplayVideoRecordingTerminal(
+            RecordingId,
+            BattleId,
+            Source,
+            completion.FinalFilePath,
+            artifactUsable,
+            completion.AudioStatus,
+            completion.MetadataStatus,
+            reason,
+            completion.Exception?.Message
+        );
 
         if (!artifactUsable)
         {
@@ -188,6 +220,17 @@ internal sealed class ReplayVideoRecordingOperationRegistry
     private readonly Dictionary<string, ReplayVideoRecordingOperation> _pending = new(
         StringComparer.Ordinal
     );
+    private readonly Action<ReplayVideoRecordingTerminal>? _completionObserver;
+
+    internal ReplayVideoRecordingOperationRegistry()
+        : this(null) { }
+
+    internal ReplayVideoRecordingOperationRegistry(
+        Action<ReplayVideoRecordingTerminal>? completionObserver
+    )
+    {
+        _completionObserver = completionObserver;
+    }
 
     internal int Count
     {
@@ -213,11 +256,20 @@ internal sealed class ReplayVideoRecordingOperationRegistry
     {
         if (operation == null)
             throw new ArgumentNullException(nameof(operation));
-        var completed = operation.TryComplete(completion);
+        var completed = operation.TryComplete(completion, out var terminal);
         if (!completed)
             return false;
         lock (_sync)
             _pending.Remove(operation.RecordingId);
+        try
+        {
+            _completionObserver?.Invoke(terminal);
+        }
+        catch
+        {
+            // A terminal observer is secondary to operation cleanup and must never strand an
+            // operation in the registry.
+        }
         return true;
     }
 
@@ -247,12 +299,19 @@ internal sealed class ReplayVideoRecordingOperationRegistry
 
 internal sealed class ReplayVideoRecordingLifecycle
 {
-    private readonly ReplayVideoRecordingOperationRegistry _registry = new();
+    private readonly ReplayVideoRecordingOperationRegistry _registry;
     private readonly Func<string> _recordingIdFactory;
 
     internal ReplayVideoRecordingLifecycle(Func<string>? recordingIdFactory = null)
+        : this(recordingIdFactory, null) { }
+
+    internal ReplayVideoRecordingLifecycle(
+        Func<string>? recordingIdFactory,
+        Action<ReplayVideoRecordingTerminal>? completionObserver
+    )
     {
         _recordingIdFactory = recordingIdFactory ?? (() => Guid.NewGuid().ToString("N"));
+        _registry = new ReplayVideoRecordingOperationRegistry(completionObserver);
     }
 
     internal int Count => _registry.Count;
