@@ -11,14 +11,6 @@
     </RestoreAdditionalProjectSources>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/BazaarGameShared.dll')">
-    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
-  </PropertyGroup>
-
   <ItemGroup>
     <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildCandidateState.cs"
