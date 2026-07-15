@@ -73,6 +73,7 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
 
     private void DrainPendingResults(bool publishSideEffects)
     {
+        List<PersistenceResultNotification>? notifications = null;
         lock (_drainGate)
         {
             var processedAny = false;
@@ -81,7 +82,17 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                 processedAny = true;
                 if (!result.Succeeded)
                 {
-                    NotifyResultObserver(result.Manifest, succeeded: false, result.Error);
+                    if (publishSideEffects)
+                    {
+                        notifications ??= new List<PersistenceResultNotification>();
+                        notifications.Add(
+                            new PersistenceResultNotification(
+                                result.Manifest,
+                                Succeeded: false,
+                                result.Error
+                            )
+                        );
+                    }
                     BppLog.ErrorEvent(
                         CombatReplayLogEvents.PersistenceFailed,
                         result.Error!,
@@ -96,7 +107,17 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                     continue;
                 }
 
-                NotifyResultObserver(result.Manifest, succeeded: true, error: null);
+                if (publishSideEffects)
+                {
+                    notifications ??= new List<PersistenceResultNotification>();
+                    notifications.Add(
+                        new PersistenceResultNotification(
+                            result.Manifest,
+                            Succeeded: true,
+                            Error: null
+                        )
+                    );
+                }
 
                 if (publishSideEffects)
                 {
@@ -140,6 +161,14 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                     // The queue is drained regardless of an observer failure.
                 }
             }
+        }
+
+        if (notifications == null)
+            return;
+        for (var index = 0; index < notifications.Count; index++)
+        {
+            var notification = notifications[index];
+            NotifyResultObserver(notification.Manifest, notification.Succeeded, notification.Error);
         }
     }
 
@@ -193,4 +222,10 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
         if (accumulator.TryBuildResult(out var result))
             ReplayPersistenceLogWriter.EmitOrphanCleanupDegraded(result);
     }
+
+    private readonly record struct PersistenceResultNotification(
+        PvpBattleManifest Manifest,
+        bool Succeeded,
+        Exception? Error
+    );
 }

@@ -37,6 +37,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private PvpBattleManifest? _currentRecordingManifest;
     private IDisposable? _recordingStartedSubscription;
     private IDisposable? _recordingCompletedSubscription;
+    private bool _destroying;
 
     private bool _returnToMenuAfterReplay;
     private bool _bootstrappedReplayActive;
@@ -166,6 +167,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void OnDestroy()
     {
+        _destroying = true;
         if (_currentRecording.NativeReplayStarted)
         {
             _playbackPublisher?.PublishEnded("runtime-destroyed", failed: true);
@@ -405,6 +407,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         Exception? error
     )
     {
+        if (_destroying)
+            return;
         _currentRecording.MarkBattlePersistence(manifest.BattleId, succeeded, error?.Message);
         if (succeeded)
             PrepareCurrentReplayRecordingAvailability();

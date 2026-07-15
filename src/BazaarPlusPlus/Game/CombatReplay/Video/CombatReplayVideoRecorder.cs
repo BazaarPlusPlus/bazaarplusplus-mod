@@ -513,6 +513,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         {
             if (prepared != null)
             {
+                TryMarkPreparedMetadataFailed(prepared, "battle-id-mismatch");
                 _operations.CompletePreflight(
                     prepared.Operation,
                     ReplayVideoRecordingReasonCode.Aborted
@@ -526,6 +527,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             var services = _services;
             if (services == null)
             {
+                TryMarkPreparedMetadataFailed(prepared, "recorder-services-unavailable");
                 _operations.CompletePreflight(
                     prepared.Operation,
                     ReplayVideoRecordingReasonCode.OutputPathUnavailable
