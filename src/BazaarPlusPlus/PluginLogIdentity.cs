@@ -21,6 +21,8 @@ internal static class PluginLogIdentity
             "PvpBattleRecorded" => PluginEventId.PvpBattleRecorded,
             "RunInitializedObserved" => PluginEventId.RunInitializedObserved,
             "RunLifecycleChanged" => PluginEventId.RunLifecycleChanged,
+            "LivePvpPlaybackStartedObserved" => PluginEventId.LivePvpPlaybackStartedObserved,
+            "LivePvpPlaybackEndedObserved" => PluginEventId.LivePvpPlaybackEndedObserved,
             _ => PluginEventId.Unknown,
         };
 
@@ -59,6 +61,8 @@ internal static class PluginLogIdentity
             return PluginHandlerId.RunLifecycleModule;
         if (OwnedBy(declaringTypeName, "BazaarPlusPlus.Game.RunLogging.RunLoggingModule"))
             return PluginHandlerId.RunLoggingModule;
+        if (OwnedBy(declaringTypeName, "BazaarPlusPlus.Game.SteamTimeline.SteamTimelineModule"))
+            return PluginHandlerId.SteamTimelineModule;
         return PluginHandlerId.Unknown;
     }
 
@@ -75,6 +79,8 @@ internal static class PluginLogIdentity
                 PluginFeatureId.VoiceSubtitlesInterop,
             "BazaarPlusPlus.Game.VoiceSubtitles.VoiceSubtitlesModule" =>
                 PluginFeatureId.VoiceSubtitles,
+            "BazaarPlusPlus.Game.SteamTimeline.SteamTimelineModule" =>
+                PluginFeatureId.SteamTimeline,
             _ => PluginFeatureId.Unknown,
         };
 

@@ -46,6 +46,8 @@ internal enum PluginEventId
     PvpBattleRecorded,
     RunInitializedObserved,
     RunLifecycleChanged,
+    LivePvpPlaybackStartedObserved,
+    LivePvpPlaybackEndedObserved,
 }
 
 internal enum PluginHandlerId
@@ -61,6 +63,7 @@ internal enum PluginHandlerId
     RunBundleUploadFeed,
     RunLifecycleModule,
     RunLoggingModule,
+    SteamTimelineModule,
 }
 
 internal enum PluginFeatureId
@@ -71,6 +74,7 @@ internal enum PluginFeatureId
     CombatStatusBar,
     VoiceSubtitlesInterop,
     VoiceSubtitles,
+    SteamTimeline,
 }
 
 [BppLogEventSource]

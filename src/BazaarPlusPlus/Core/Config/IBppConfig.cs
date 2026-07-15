@@ -20,6 +20,8 @@ internal interface IBppConfig
 
     ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; }
 
+    ConfigEntry<bool>? EnableSteamTimelineConfig { get; }
+
     ConfigEntry<SubtitlePosition>? VoiceSubtitlesPositionConfig { get; }
 
     ConfigEntry<SubtitleLanguageMode>? VoiceSubtitlesLanguageModeConfig { get; }

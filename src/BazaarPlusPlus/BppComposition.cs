@@ -24,6 +24,7 @@ using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Game.SteamTimeline;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Game.Upload;
@@ -59,6 +60,7 @@ internal sealed class BppComposition : IDisposable
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
+    private readonly SteamTimelineModule _steamTimelineModule;
     private readonly VoiceSubtitlesModule _voiceSubtitlesModule;
     private readonly VoiceSubtitlesInteropModule _voiceSubtitlesInteropModule;
     private ModOnlineClient? _onlineClientRef;
@@ -107,12 +109,14 @@ internal sealed class BppComposition : IDisposable
         _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);
         _combatReplayModule = new CombatReplayModule(_eventBus);
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
+        _steamTimelineModule = new SteamTimelineModule(_services);
         _voiceSubtitlesModule = new VoiceSubtitlesModule();
         _voiceSubtitlesInteropModule = new VoiceSubtitlesInteropModule();
 
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
         _featureRegistry.Register(_combatStatusBarModule);
+        _featureRegistry.Register(_steamTimelineModule);
         _featureRegistry.Register(_voiceSubtitlesInteropModule);
         _featureRegistry.Register(_voiceSubtitlesModule);
 
@@ -123,6 +127,9 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(CombatStatusBarSettingsDockEntry.Create());
         _settingsDockRegistry.Register(BilingualItemNamesSettingsDockEntry.Create());
         _settingsDockRegistry.Register(new EndOfRunScreenshotSettingsDockEntry());
+        _settingsDockRegistry.Register(
+            SteamTimelineSettingsDockEntry.Create(_steamTimelineModule.OnEnabledChanged)
+        );
         _settingsDockRegistry.Register(new HistoryPanelSettingsDockEntry());
         _settingsDockRegistry.Register(ItemEnchantPreviewSettingsDockEntry.Create());
         _settingsDockRegistry.Register(EventPreviewSettingsDockEntry.Create());

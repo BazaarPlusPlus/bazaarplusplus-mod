@@ -23,6 +23,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<bool>? EnableVoiceSubtitlesConfig { get; private set; }
 
+    public ConfigEntry<bool>? EnableSteamTimelineConfig { get; private set; }
+
     public ConfigEntry<SubtitlePosition>? VoiceSubtitlesPositionConfig { get; private set; }
 
     public ConfigEntry<SubtitleLanguageMode>? VoiceSubtitlesLanguageModeConfig { get; private set; }
@@ -100,6 +102,12 @@ internal sealed class BppConfig : IBppConfig
             "Enabled",
             false,
             "Whether Subtitle Mode enables voice-over subtitles. The in-game dock writes this together with VoiceSubtitles.Language."
+        );
+        EnableSteamTimelineConfig = config.Bind(
+            "SteamTimeline",
+            "Enabled",
+            true,
+            "Whether BazaarPlusPlus adds run, hero-level, and live PvP battle markers to Steam Game Recording. This does not enable recording or replace local MP4 recording."
         );
         VoiceSubtitlesPositionConfig = config.Bind(
             "VoiceSubtitles",

@@ -95,5 +95,13 @@
       Include="../../src/BazaarPlusPlus/Game/PvpBattles/PvpBattleLogEvents.cs"
       Link="PvpBattleLogEvents.cs"
     />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/SteamTimeline/SteamTimelineLogEvents.cs"
+      Link="SteamTimelineLogEvents.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/SteamTimeline/SteamTimelineAdapterTypes.cs"
+      Link="SteamTimelineAdapterTypes.cs"
+    />
   </ItemGroup>
 </Project>

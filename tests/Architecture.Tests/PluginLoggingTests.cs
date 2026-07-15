@@ -115,11 +115,23 @@ public sealed class PluginLoggingTests
             PluginEventId.RunLifecycleChanged,
             PluginLogIdentity.EventId("RunLifecycleChanged")
         );
+        Assert.Equal(
+            PluginEventId.LivePvpPlaybackStartedObserved,
+            PluginLogIdentity.EventId("LivePvpPlaybackStartedObserved")
+        );
+        Assert.Equal(
+            PluginEventId.LivePvpPlaybackEndedObserved,
+            PluginLogIdentity.EventId("LivePvpPlaybackEndedObserved")
+        );
         Assert.Equal(PluginEventId.Unknown, PluginLogIdentity.EventId("ThirdPartyEvent"));
 
         Assert.Equal(
             PluginHandlerId.RunLoggingModule,
             PluginLogIdentity.HandlerId("BazaarPlusPlus.Game.RunLogging.RunLoggingModule+<>c")
+        );
+        Assert.Equal(
+            PluginHandlerId.SteamTimelineModule,
+            PluginLogIdentity.HandlerId("BazaarPlusPlus.Game.SteamTimeline.SteamTimelineModule+<>c")
         );
         Assert.Equal(
             PluginHandlerId.Unknown,
@@ -136,6 +148,8 @@ public sealed class PluginLoggingTests
                 PluginFeatureId.VoiceSubtitlesInterop,
             ["BazaarPlusPlus.Game.VoiceSubtitles.VoiceSubtitlesModule"] =
                 PluginFeatureId.VoiceSubtitles,
+            ["BazaarPlusPlus.Game.SteamTimeline.SteamTimelineModule"] =
+                PluginFeatureId.SteamTimeline,
         };
         foreach (var pair in features)
             Assert.Equal(pair.Value, PluginLogIdentity.FeatureId(pair.Key));

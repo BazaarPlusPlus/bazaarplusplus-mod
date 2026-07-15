@@ -39,6 +39,8 @@ internal sealed class BppLogFeatureScope
     internal static BppLogFeatureScope Lobby { get; } = new("Lobby", "lobby");
     internal static BppLogFeatureScope Settings { get; } = new("Settings", "settings");
     internal static BppLogFeatureScope Supporters { get; } = new("Supporters", "supporters");
+    internal static BppLogFeatureScope SteamTimeline { get; } =
+        new("SteamTimeline", "steam_timeline");
 
     private static readonly BppLogFeatureScope[] DeclaredScopes =
     [
@@ -64,6 +66,7 @@ internal sealed class BppLogFeatureScope
         Lobby,
         Settings,
         Supporters,
+        SteamTimeline,
     ];
 
     private BppLogFeatureScope(string prefixName, string eventIdPrefix)

@@ -122,6 +122,10 @@
     <Reference Include="TheBazaarRuntime">
       <HintPath>$(ManagedPath)\TheBazaarRuntime.dll</HintPath>
     </Reference>
+    <Reference Include="com.rlabrecque.steamworks.net">
+      <HintPath>$(ManagedPath)\com.rlabrecque.steamworks.net.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
     <Reference Include="Addressables">
       <HintPath>$(ManagedPath)\Unity.Addressables.dll</HintPath>
     </Reference>
