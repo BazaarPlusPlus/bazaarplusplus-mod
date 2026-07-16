@@ -79,6 +79,7 @@ internal static class ReplayBootstrap
         Func<ReplayPlaybackPublishOutcome>? publishStarting = null
     )
     {
+        ReplaySavedStateNormalizer.Normalize(manifest, sequence);
         ObserveQualityStep(
             () => PlayerAttributeRepairer.EnsureSequencePlayerAttributes(sequence, outcome),
             outcome,
@@ -118,6 +119,17 @@ internal static class ReplayBootstrap
             outcome,
             ReplayPlaybackReasonCode.OpponentSkillsUnavailable
         );
+        await ObserveQualityStepAsync(
+            () =>
+                ReplayOpeningStateRestorer.RestoreBeforeReplayAsync(
+                    bootstrapContext.GameSimHandler,
+                    sequence.SpawnMessage,
+                    manifest,
+                    outcome
+                ),
+            outcome,
+            ReplayPlaybackReasonCode.PresentationWarmupFailed
+        );
         SnapshotRehydrator.SanitizeSpawnEvents(sequence, outcome.BattleId);
         await AppStateHandlerInstaller.RebuildSkillPresentationAsync();
         bootstrapContext.TriggerCombatSequenceCreated();
@@ -137,6 +149,16 @@ internal static class ReplayBootstrap
         await AppStateHandlerInstaller.WaitForPresentationReadyAsync();
         await ObserveQualityStepAsync(
             () => PresentationWarmer.WarmPresentationAssetsAsync(manifest, sequence, outcome),
+            outcome,
+            ReplayPlaybackReasonCode.PresentationWarmupFailed
+        );
+        ObserveQualityStep(
+            () => ReplayPresentationRestorer.Refresh(manifest, sequence, outcome),
+            outcome,
+            ReplayPlaybackReasonCode.PresentationWarmupFailed
+        );
+        ObserveQualityStep(
+            () => ReplayOpeningStateRestorer.FinalizeAfterWarmup(outcome),
             outcome,
             ReplayPlaybackReasonCode.PresentationWarmupFailed
         );
@@ -202,6 +224,7 @@ internal static class ReplayBootstrap
         try
         {
             Exception? cleanupFailure = null;
+            ReplayOpeningStateRestorer.Cleanup();
             AppState.Reset();
             Data.ResetRunData();
             var socketCleanup = SocketBehaviorBridge.DisposeSocketBehavior(outcome);

@@ -47,6 +47,20 @@ var muxResultType =
 var replayVideoCaptureStatusType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureStatus"
 );
+var replaySavedStateNormalizerType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Bootstrap.ReplaySavedStateNormalizer"
+);
+var replayOpeningStateRestorerType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Bootstrap.ReplayOpeningStateRestorer"
+);
+var snapshotRehydratorType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Bootstrap.SnapshotRehydrator"
+);
+
+RunReplaySavedStateNormalizationChecks(replaySavedStateNormalizerType, manifestType);
+RunReplayOpeningStateSelectionChecks(replayOpeningStateRestorerType);
+RunReplayPresentationRestorationChecks(replaySavedStateNormalizerType);
+RunReplaySpawnSanitizationChecks(snapshotRehydratorType);
 
 RunCurrentReplayRecordingStateChecks();
 RunCurrentReplayRecordingUiLogChecks();
@@ -967,19 +981,41 @@ try
         encounterId: "encounter-pve",
         opponentName: "PvE Opponent"
     );
+    var openingSocketEffects = new[]
+    {
+        new ReplaySocketFixture(
+            "socket-player-heat",
+            "template-player-heat",
+            "Player",
+            "Hand",
+            "Socket_2"
+        ),
+        new ReplaySocketFixture(
+            "socket-opponent-chill",
+            "template-opponent-chill",
+            "Opponent",
+            "Hand",
+            "Socket_7"
+        ),
+    };
     var combatStart = CreateGameSimMessage(
         "PVPCombat",
         day: 3,
         hour: 4,
         encounterId: "encounter-live",
-        opponentName: "Rival"
+        opponentName: "Rival",
+        playerLevel: 7,
+        opponentLevel: 9,
+        socketEffects: openingSocketEffects
     );
     var combatEnd = CreateGameSimMessage(
         "Encounter",
         day: 3,
         hour: 5,
         encounterId: null,
-        opponentName: null
+        opponentName: null,
+        playerLevel: 7,
+        opponentLevel: 9
     );
 
     var ignoredResult = Invoke(
@@ -1186,6 +1222,34 @@ try
         GetFieldValue(loadedSequence!.GetType(), loadedSequence, "DespawnMessage") != null,
         "Loaded replay sequences should include the closing GameSim."
     );
+    var loadedSpawnMessage = GetFieldValue(
+        loadedSequence.GetType(),
+        loadedSequence,
+        "SpawnMessage"
+    )!;
+    var loadedDespawnMessage = GetFieldValue(
+        loadedSequence.GetType(),
+        loadedSequence,
+        "DespawnMessage"
+    )!;
+    AssertReplaySavedState(
+        loadedSpawnMessage,
+        expectedDay: 3,
+        expectedHour: 4,
+        expectedPlayerLevel: 7,
+        expectedOpponentLevel: 9,
+        failureMessage: "Capture -> payload -> loader should preserve the opening saved state."
+    );
+    AssertReplaySavedState(
+        loadedDespawnMessage,
+        expectedDay: 3,
+        expectedHour: 5,
+        expectedPlayerLevel: 7,
+        expectedOpponentLevel: 9,
+        failureMessage: "Capture -> payload -> loader should preserve the closing saved state."
+    );
+    foreach (var socketEffect in openingSocketEffects)
+        AssertSocketEffectSpawnPreserved(loadedSpawnMessage, socketEffect);
 
     Invoke(payloadStoreType, payloadStore!, "Save", new object?[] { completedPayload! });
     Invoke(catalogType, battleCatalog!, "Save", new object?[] { completedManifest! });
@@ -1366,6 +1430,414 @@ static Type RequireType(string fullName)
 {
     return Type.GetType($"{fullName}, BazaarPlusPlus")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static void RunReplaySavedStateNormalizationChecks(Type normalizerType, Type manifestType)
+{
+    Assert(
+        Equals(InvokeStatic(normalizerType, "ResolvePositiveUInt", new object?[] { 8u, 3 }), 8u)
+            && Equals(
+                InvokeStatic(normalizerType, "ResolvePositiveUInt", new object?[] { 0u, 3 }),
+                3u
+            )
+            && Equals(
+                InvokeStatic(normalizerType, "ResolvePositiveUInt", new object?[] { 0u, null }),
+                0u
+            ),
+        "Replay saved-state normalization should prefer a positive raw value and only then use the manifest fallback."
+    );
+    Assert(
+        Equals(InvokeStatic(normalizerType, "ResolveLevel", new object?[] { 10, 5 }), 10)
+            && Equals(InvokeStatic(normalizerType, "ResolveLevel", new object?[] { 0, 5 }), 5)
+            && Equals(
+                InvokeStatic(normalizerType, "ResolveLevel", new object?[] { null, null }),
+                1
+            ),
+        "Replay level normalization should prefer positive raw data, use manifest metadata as a fallback, and finally use level one."
+    );
+
+    var normalizeMethod = normalizerType.GetMethod(
+        "Normalize",
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(normalizeMethod != null, "ReplaySavedStateNormalizer.Normalize should exist.");
+    var sequenceType = normalizeMethod!.GetParameters()[1].ParameterType;
+    var manifest = CreateReplayStateManifest(
+        manifestType,
+        day: 3,
+        hour: 4,
+        playerLevel: 5,
+        opponentLevel: 6
+    );
+
+    var validRawSequence = CreateCombatSequence(
+        sequenceType,
+        CreateGameSimMessage(
+            "PVPCombat",
+            day: 8,
+            hour: 9,
+            encounterId: "normalizer-valid-spawn",
+            opponentName: "Valid Opponent",
+            playerLevel: 10,
+            opponentLevel: 11
+        ),
+        CreateGameSimMessage(
+            "Encounter",
+            day: 12,
+            hour: 13,
+            encounterId: null,
+            opponentName: null,
+            playerLevel: 14,
+            opponentLevel: 15
+        )
+    );
+    InvokeStatic(normalizerType, "Normalize", new[] { manifest, validRawSequence });
+    AssertSequenceSavedState(
+        validRawSequence,
+        spawnDay: 8,
+        spawnHour: 9,
+        spawnPlayerLevel: 10,
+        spawnOpponentLevel: 11,
+        despawnDay: 12,
+        despawnHour: 13,
+        despawnPlayerLevel: 14,
+        despawnOpponentLevel: 15,
+        message: "Positive raw replay state should win over manifest metadata for both saved messages."
+    );
+
+    var fallbackSequence = CreateCombatSequence(
+        sequenceType,
+        CreateGameSimMessage(
+            "PVPCombat",
+            day: 0,
+            hour: 0,
+            encounterId: "normalizer-fallback-spawn",
+            opponentName: "Fallback Opponent",
+            playerLevel: null,
+            opponentLevel: 0
+        ),
+        CreateGameSimMessage(
+            "Encounter",
+            day: 0,
+            hour: 0,
+            encounterId: null,
+            opponentName: null,
+            playerLevel: -2,
+            opponentLevel: null
+        )
+    );
+    InvokeStatic(normalizerType, "Normalize", new[] { manifest, fallbackSequence });
+    AssertSequenceSavedState(
+        fallbackSequence,
+        spawnDay: 3,
+        spawnHour: 4,
+        spawnPlayerLevel: 5,
+        spawnOpponentLevel: 6,
+        despawnDay: 3,
+        despawnHour: 4,
+        despawnPlayerLevel: 5,
+        despawnOpponentLevel: 6,
+        message: "Manifest state should repair missing or invalid values in both saved replay messages."
+    );
+
+    var legacySequence = CreateCombatSequence(
+        sequenceType,
+        CreateGameSimMessage(
+            "PVPCombat",
+            day: 0,
+            hour: 0,
+            encounterId: "normalizer-legacy-spawn",
+            opponentName: "Legacy Opponent"
+        ),
+        CreateGameSimMessage("Encounter", day: 0, hour: 0, encounterId: null, opponentName: null)
+    );
+    InvokeStatic(normalizerType, "Normalize", new object?[] { null, legacySequence });
+    AssertSequenceSavedState(
+        legacySequence,
+        spawnDay: 0,
+        spawnHour: 0,
+        spawnPlayerLevel: 1,
+        spawnOpponentLevel: 1,
+        despawnDay: 0,
+        despawnHour: 0,
+        despawnPlayerLevel: 1,
+        despawnOpponentLevel: 1,
+        message: "A legacy replay without manifest metadata should remain loadable and receive safe level defaults."
+    );
+    InvokeStatic(normalizerType, "Normalize", new object?[] { manifest, null });
+}
+
+static void RunReplayOpeningStateSelectionChecks(Type restorerType)
+{
+    var playerInitialized = CreatePlayerInitializedEvent("Player", "Vanessa");
+    var socketsUnlocked = CreateSocketsUnlockedEvent("Hand", "Socket_2");
+    var firstPlayerSocket = CreateCardSpawnEvent(
+        "opening-player-socket",
+        "opening-player-heat",
+        "SocketEffect",
+        "Player",
+        "Hand",
+        "Socket_2"
+    );
+    var duplicatePlayerSocket = CreateCardSpawnEvent(
+        "opening-player-socket",
+        "opening-player-duplicate",
+        "SocketEffect",
+        "Player",
+        "Hand",
+        "Socket_3"
+    );
+    var opponentSocket = CreateCardSpawnEvent(
+        "opening-opponent-socket",
+        "opening-opponent-chill",
+        "SocketEffect",
+        "Opponent",
+        "Stash",
+        "Socket_7"
+    );
+    var ordinaryItem = CreateCardSpawnEvent(
+        "opening-ordinary-item",
+        "opening-ordinary-template",
+        "Item",
+        "Opponent",
+        "Hand",
+        "Socket_4"
+    );
+    var events = CreateGameSimEventList(
+        playerInitialized,
+        socketsUnlocked,
+        firstPlayerSocket,
+        duplicatePlayerSocket,
+        opponentSocket,
+        ordinaryItem
+    );
+
+    var selectedOpeningEvents = AsObjects(
+        InvokeStatic(restorerType, "SelectOpeningEvents", new[] { events })
+    );
+    Assert(
+        selectedOpeningEvents.Count == 2
+            && selectedOpeningEvents.Any(value =>
+                value.GetType().Name == "GameSimEventPlayerInitialized"
+            )
+            && selectedOpeningEvents.Any(value =>
+                value.GetType().Name == "GameSimEventSocketsUnlocked"
+            ),
+        "Replay opening-state restoration should select only the native initialization events."
+    );
+
+    var selectedSocketEvents = AsObjects(
+        InvokeStatic(restorerType, "SelectSocketEffectSpawnEvents", new[] { events })
+    );
+    Assert(
+        selectedSocketEvents.Count == 2,
+        "Replay socket restoration should select one spawn event per socket-effect instance across both combatants."
+    );
+    var selectedPlayerSocket = selectedSocketEvents.Single(value =>
+        string.Equals(
+            GetProperty(value.GetType(), value, "InstanceId")?.ToString(),
+            "opening-player-socket",
+            StringComparison.Ordinal
+        )
+    );
+    Assert(
+        string.Equals(
+            GetProperty(selectedPlayerSocket.GetType(), selectedPlayerSocket, "TemplateId")
+                ?.ToString(),
+            "opening-player-heat",
+            StringComparison.Ordinal
+        ),
+        "Replay socket selection should keep the first complete event when duplicate instance ids appear."
+    );
+    Assert(
+        AsObjects(
+            InvokeStatic(restorerType, "SelectSocketEffectSpawnEvents", new object?[] { null })
+        ).Count == 0,
+        "Replay socket selection should accept missing opening event lists from legacy payloads."
+    );
+
+    var snapshotManifest = CreateSocketEffectSnapshotManifest(
+        playerSnapshots:
+        [
+            new ReplaySocketFixture(
+                "opening-snapshot-only",
+                "opening-snapshot-only-heat",
+                "Player",
+                "Hand",
+                "Socket_1"
+            ),
+            new ReplaySocketFixture(
+                "opening-player-socket",
+                "opening-player-snapshot-source",
+                "Player",
+                "Hand",
+                "Socket_2"
+            ),
+        ],
+        opponentSnapshots:
+        [
+            new ReplaySocketFixture(
+                "opening-player-socket",
+                "opening-opponent-duplicate-source",
+                "Opponent",
+                "Hand",
+                "Socket_5"
+            ),
+            new ReplaySocketFixture(
+                "opening-opponent-snapshot",
+                "opening-opponent-snapshot-chill",
+                "Opponent",
+                "Hand",
+                "Socket_7"
+            ),
+        ]
+    );
+    var selectedSocketSnapshots = AsObjects(
+        InvokeStatic(restorerType, "SelectSocketEffectSnapshots", new[] { snapshotManifest })
+    );
+    var selectedSnapshotIds = selectedSocketSnapshots
+        .Select(value => GetProperty(value.GetType(), value, "InstanceId")?.ToString())
+        .ToList();
+    Assert(
+        selectedSnapshotIds.Count == 3
+            && selectedSnapshotIds.Any(value =>
+                string.Equals(value, "opening-snapshot-only", StringComparison.Ordinal)
+            )
+            && selectedSnapshotIds.Any(value =>
+                string.Equals(value, "opening-player-socket", StringComparison.Ordinal)
+            )
+            && selectedSnapshotIds.Any(value =>
+                string.Equals(value, "opening-opponent-snapshot", StringComparison.Ordinal)
+            ),
+        "Replay socket restoration should select snapshot-only effects from both hand captures and deduplicate instance ids."
+    );
+    var selectedRawDuplicateSnapshot = selectedSocketSnapshots.Single(value =>
+        string.Equals(
+            GetProperty(value.GetType(), value, "InstanceId")?.ToString(),
+            "opening-player-socket",
+            StringComparison.Ordinal
+        )
+    );
+    Assert(
+        selectedSocketEvents.Any(value =>
+            string.Equals(
+                GetProperty(value.GetType(), value, "InstanceId")?.ToString(),
+                "opening-player-socket",
+                StringComparison.Ordinal
+            )
+        )
+            && string.Equals(
+                GetProperty(
+                    selectedRawDuplicateSnapshot.GetType(),
+                    selectedRawDuplicateSnapshot,
+                    "TemplateId"
+                )
+                    ?.ToString(),
+                "opening-player-snapshot-source",
+                StringComparison.Ordinal
+            ),
+        "Snapshot selection should retain the first PlayerHand source when a raw event and the opponent snapshot duplicate the same instance id."
+    );
+    Assert(
+        AsObjects(
+            InvokeStatic(restorerType, "SelectSocketEffectSnapshots", new object?[] { null })
+        ).Count == 0,
+        "Replay socket snapshot selection should accept legacy manifests without snapshots."
+    );
+}
+
+static void RunReplayPresentationRestorationChecks(Type normalizerType)
+{
+    Assert(
+        Equals(InvokeStatic(normalizerType, "ResolveOpeningLevel", new object?[] { 7, 8 }), 7),
+        "Replay presentation should restore a valid opening level instead of the closing level."
+    );
+    Assert(
+        Equals(InvokeStatic(normalizerType, "ResolveOpeningLevel", new object?[] { 0, 8 }), 8)
+            && Equals(
+                InvokeStatic(normalizerType, "ResolveOpeningLevel", new object?[] { -1, 8 }),
+                8
+            )
+            && Equals(
+                InvokeStatic(normalizerType, "ResolveOpeningLevel", new object?[] { null, 8 }),
+                8
+            ),
+        "Replay presentation should preserve the current level when the opening level is missing or invalid."
+    );
+}
+
+static void RunReplaySpawnSanitizationChecks(Type snapshotRehydratorType)
+{
+    var sanitizeMethod = snapshotRehydratorType.GetMethod(
+        "SanitizeSpawnEvents",
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(sanitizeMethod != null, "SnapshotRehydrator.SanitizeSpawnEvents should exist.");
+    var sequenceType = sanitizeMethod!.GetParameters()[0].ParameterType;
+    var spawnMessage = CreateGameSimMessage(
+        "PVPCombat",
+        day: 3,
+        hour: 4,
+        encounterId: "sanitizer-socket-preservation",
+        opponentName: "Sanitizer Opponent"
+    );
+    AddGameSimEvent(
+        spawnMessage,
+        CreateCardSpawnEvent(
+            "sanitizer-player-socket",
+            "sanitizer-player-heat",
+            "SocketEffect",
+            "Player",
+            "Stash",
+            "Socket_2"
+        )
+    );
+    AddGameSimEvent(
+        spawnMessage,
+        CreateCardSpawnEvent(
+            "sanitizer-opponent-socket",
+            "sanitizer-opponent-chill",
+            "SocketEffect",
+            "Opponent",
+            "Stash",
+            "Socket_7"
+        )
+    );
+    AddGameSimEvent(
+        spawnMessage,
+        CreateCardSpawnEvent(
+            "sanitizer-opponent-skill",
+            "sanitizer-opponent-skill-template",
+            "Skill",
+            "Opponent",
+            "Stash",
+            null
+        )
+    );
+    var sequence = CreateCombatSequence(
+        sequenceType,
+        spawnMessage,
+        CreateGameSimMessage("Encounter", day: 3, hour: 5, encounterId: null, opponentName: null)
+    );
+
+    InvokeStatic(
+        snapshotRehydratorType,
+        "SanitizeSpawnEvents",
+        new object?[] { sequence, "sanitizer-test" }
+    );
+    var remainingIds = ReadGameSimEvents(spawnMessage)
+        .Where(value => value.GetType().Name == "GameSimEventCardSpawned")
+        .Select(value => GetProperty(value.GetType(), value, "InstanceId")?.ToString())
+        .ToHashSet(StringComparer.Ordinal);
+    Assert(
+        remainingIds.Contains("sanitizer-player-socket")
+            && remainingIds.Contains("sanitizer-opponent-socket"),
+        "Spawn sanitization must preserve player and opponent socket-effect data even outside the hand section."
+    );
+    Assert(
+        !remainingIds.Contains("sanitizer-opponent-skill"),
+        "Spawn sanitization should continue removing unrelated opponent non-hand spawns."
+    );
 }
 
 static void RunCurrentReplayRecordingStateChecks()
@@ -1689,6 +2161,95 @@ static object? GetFieldValue(Type type, object instance, string name)
     return field!.GetValue(instance);
 }
 
+static object CreateSocketEffectSnapshotManifest(
+    IReadOnlyList<ReplaySocketFixture> playerSnapshots,
+    IReadOnlyList<ReplaySocketFixture> opponentSnapshots
+)
+{
+    var manifestType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifest");
+    var snapshotsType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleSnapshots");
+    var cardSetCaptureType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSetCapture");
+    var captureStatusType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureStatus");
+    var captureSourceType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureSource");
+    var snapshots = Activator.CreateInstance(snapshotsType)!;
+    SetProperty(
+        snapshotsType,
+        snapshots,
+        "PlayerHand",
+        CreateCardSetCapture(
+            cardSetCaptureType,
+            captureStatusType,
+            captureSourceType,
+            "Captured",
+            "OpeningMessage",
+            CreateSocketSnapshotList(playerSnapshots)
+        )
+    );
+    SetProperty(
+        snapshotsType,
+        snapshots,
+        "OpponentHand",
+        CreateCardSetCapture(
+            cardSetCaptureType,
+            captureStatusType,
+            captureSourceType,
+            "Captured",
+            "LiveRetry",
+            CreateSocketSnapshotList(opponentSnapshots)
+        )
+    );
+
+    var manifest = Activator.CreateInstance(manifestType)!;
+    SetProperty(manifestType, manifest, "Snapshots", snapshots);
+    return manifest;
+}
+
+static object CreateSocketSnapshotList(IReadOnlyList<ReplaySocketFixture> fixtures)
+{
+    var snapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSnapshot");
+    var listType = typeof(List<>).MakeGenericType(snapshotType);
+    var list = Activator.CreateInstance(listType)!;
+    foreach (var fixture in fixtures)
+    {
+        var snapshot = Activator.CreateInstance(snapshotType)!;
+        SetProperty(snapshotType, snapshot, "InstanceId", fixture.InstanceId);
+        SetProperty(snapshotType, snapshot, "TemplateId", fixture.TemplateId);
+        SetProperty(
+            snapshotType,
+            snapshot,
+            "Type",
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.ECardType",
+                "BazaarGameShared",
+                "SocketEffect"
+            )
+        );
+        SetProperty(
+            snapshotType,
+            snapshot,
+            "Section",
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.EInventorySection",
+                "BazaarGameShared",
+                fixture.Section
+            )
+        );
+        SetProperty(
+            snapshotType,
+            snapshot,
+            "Socket",
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.EContainerSocketId",
+                "BazaarGameShared",
+                fixture.Socket
+            )
+        );
+        Invoke(listType, list, "Add", new[] { snapshot });
+    }
+
+    return list;
+}
+
 static object CreateSnapshotList(string instanceId, string templateId)
 {
     var snapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSnapshot");
@@ -1911,7 +2472,10 @@ static object CreateGameSimMessage(
     uint day,
     uint hour,
     string? encounterId,
-    string? opponentName
+    string? opponentName,
+    int? playerLevel = null,
+    int? opponentLevel = null,
+    IReadOnlyList<ReplaySocketFixture>? socketEffects = null
 )
 {
     var gameSimType = RequireExternalType(
@@ -1948,6 +2512,27 @@ static object CreateGameSimMessage(
     SetField(simUpdateRunType, run, "Day", day);
     SetField(simUpdateRunType, run, "Hour", hour);
     SetField(gameSimType, gameSim, "Run", run);
+
+    SetGameSimPlayerLevel(gameSimType, gameSim, "Player", playerLevel);
+    SetGameSimPlayerLevel(gameSimType, gameSim, "Opponent", opponentLevel);
+    if (socketEffects != null)
+    {
+        foreach (var socketEffect in socketEffects)
+        {
+            AddGameSimEventToData(
+                gameSimType,
+                gameSim,
+                CreateCardSpawnEvent(
+                    socketEffect.InstanceId,
+                    socketEffect.TemplateId,
+                    "SocketEffect",
+                    socketEffect.CombatantId,
+                    socketEffect.Section,
+                    socketEffect.Socket
+                )
+            );
+        }
+    }
 
     var runState = Activator.CreateInstance(simUpdateRunStateType)!;
     SetField(
@@ -2005,6 +2590,318 @@ static object CreatePvpOpponent(Type simPvpOpponentType, Type loadoutType, strin
     )!;
 }
 
+static object CreateReplayStateManifest(
+    Type manifestType,
+    int day,
+    int hour,
+    int? playerLevel,
+    int? opponentLevel
+)
+{
+    var participantsType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleParticipants");
+    var participants = Activator.CreateInstance(participantsType)!;
+    SetProperty(participantsType, participants, "PlayerLevel", playerLevel);
+    SetProperty(participantsType, participants, "OpponentLevel", opponentLevel);
+
+    var manifest = Activator.CreateInstance(manifestType)!;
+    SetProperty(manifestType, manifest, "Day", day);
+    SetProperty(manifestType, manifest, "Hour", hour);
+    SetProperty(manifestType, manifest, "Participants", participants);
+    return manifest;
+}
+
+static object CreateCombatSequence(Type sequenceType, object spawnMessage, object despawnMessage)
+{
+    return Activator.CreateInstance(
+            sequenceType,
+            spawnMessage,
+            despawnMessage,
+            CreateCombatSimMessage()
+        ) ?? throw new InvalidOperationException("CombatSequenceMessages should be constructible.");
+}
+
+static void AssertSequenceSavedState(
+    object sequence,
+    uint spawnDay,
+    uint spawnHour,
+    int spawnPlayerLevel,
+    int spawnOpponentLevel,
+    uint despawnDay,
+    uint despawnHour,
+    int despawnPlayerLevel,
+    int despawnOpponentLevel,
+    string message
+)
+{
+    var sequenceType = sequence.GetType();
+    var spawnMessage = GetFieldValue(sequenceType, sequence, "SpawnMessage")!;
+    var despawnMessage = GetFieldValue(sequenceType, sequence, "DespawnMessage")!;
+    AssertReplaySavedState(
+        spawnMessage,
+        spawnDay,
+        spawnHour,
+        spawnPlayerLevel,
+        spawnOpponentLevel,
+        message
+    );
+    AssertReplaySavedState(
+        despawnMessage,
+        despawnDay,
+        despawnHour,
+        despawnPlayerLevel,
+        despawnOpponentLevel,
+        message
+    );
+}
+
+static void AssertReplaySavedState(
+    object netMessage,
+    uint expectedDay,
+    uint expectedHour,
+    int expectedPlayerLevel,
+    int expectedOpponentLevel,
+    string failureMessage
+)
+{
+    var gameSim = GetGameSimData(netMessage);
+    var gameSimType = gameSim.GetType();
+    var run = GetFieldValue(gameSimType, gameSim, "Run")!;
+    var runType = run.GetType();
+    Assert(
+        Equals(GetFieldValue(runType, run, "Day"), expectedDay)
+            && Equals(GetFieldValue(runType, run, "Hour"), expectedHour)
+            && ReadGameSimPlayerLevel(gameSim, "Player") == expectedPlayerLevel
+            && ReadGameSimPlayerLevel(gameSim, "Opponent") == expectedOpponentLevel,
+        failureMessage
+    );
+}
+
+static void AssertSocketEffectSpawnPreserved(object message, ReplaySocketFixture expected)
+{
+    var socketEvent = ReadGameSimEvents(message)
+        .SingleOrDefault(value =>
+            value.GetType().Name == "GameSimEventCardSpawned"
+            && string.Equals(
+                GetProperty(value.GetType(), value, "InstanceId")?.ToString(),
+                expected.InstanceId,
+                StringComparison.Ordinal
+            )
+        );
+    Assert(socketEvent != null, $"Socket-effect spawn should preserve {expected.InstanceId}.");
+    var eventType = socketEvent!.GetType();
+    Assert(
+        string.Equals(
+            GetProperty(eventType, socketEvent, "TemplateId")?.ToString(),
+            expected.TemplateId,
+            StringComparison.Ordinal
+        )
+            && string.Equals(
+                GetProperty(eventType, socketEvent, "Type")?.ToString(),
+                "SocketEffect",
+                StringComparison.Ordinal
+            )
+            && string.Equals(
+                GetProperty(eventType, socketEvent, "CombatantId")?.ToString(),
+                expected.CombatantId,
+                StringComparison.Ordinal
+            )
+            && string.Equals(
+                GetProperty(eventType, socketEvent, "Section")?.ToString(),
+                expected.Section,
+                StringComparison.Ordinal
+            )
+            && string.Equals(
+                GetProperty(eventType, socketEvent, "Socket")?.ToString(),
+                expected.Socket,
+                StringComparison.Ordinal
+            ),
+        $"Socket-effect spawn {expected.InstanceId} should preserve template, combatant, section, and socket."
+    );
+}
+
+static object GetGameSimData(object message)
+{
+    return GetProperty(message.GetType(), message, "Data")
+        ?? throw new InvalidOperationException("NetMessageGameSim should expose Data.");
+}
+
+static int? ReadGameSimPlayerLevel(object gameSim, string playerFieldName)
+{
+    var player = GetFieldValue(gameSim.GetType(), gameSim, playerFieldName)!;
+    var attributes = (System.Collections.IDictionary?)GetFieldValue(
+        player.GetType(),
+        player,
+        "Attributes"
+    );
+    var levelType = ParseEnum(
+        "BazaarGameShared.Domain.Core.Types.EPlayerAttributeType",
+        "BazaarGameShared",
+        "Level"
+    );
+    return attributes != null && attributes.Contains(levelType)
+        ? Convert.ToInt32(attributes[levelType])
+        : null;
+}
+
+static void SetGameSimPlayerLevel(
+    Type gameSimType,
+    object gameSim,
+    string playerFieldName,
+    int? level
+)
+{
+    if (!level.HasValue)
+        return;
+
+    var player = GetFieldValue(gameSimType, gameSim, playerFieldName)!;
+    var attributes = (System.Collections.IDictionary?)GetFieldValue(
+        player.GetType(),
+        player,
+        "Attributes"
+    );
+    Assert(attributes != null, "SimUpdatePlayer should expose an attributes dictionary.");
+    attributes![
+        ParseEnum(
+            "BazaarGameShared.Domain.Core.Types.EPlayerAttributeType",
+            "BazaarGameShared",
+            "Level"
+        )
+    ] = level.Value;
+}
+
+static object CreatePlayerInitializedEvent(string combatantId, string hero)
+{
+    var eventType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.GameSimEventPlayerInitialized",
+        "BazaarGameShared"
+    );
+    var value = Activator.CreateInstance(eventType)!;
+    SetField(
+        eventType,
+        value,
+        "CombatantId",
+        ParseEnum(
+            "BazaarGameShared.Domain.Core.Types.ECombatantId",
+            "BazaarGameShared",
+            combatantId
+        )
+    );
+    SetField(
+        eventType,
+        value,
+        "Hero",
+        ParseEnum("BazaarGameShared.Domain.Core.Types.EHero", "BazaarGameShared", hero)
+    );
+    return value;
+}
+
+static object CreateSocketsUnlockedEvent(string section, string socket)
+{
+    var eventType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.GameSimEventSocketsUnlocked",
+        "BazaarGameShared"
+    );
+    var socketType = RequireExternalType(
+        "BazaarGameShared.Domain.Core.Types.EContainerSocketId",
+        "BazaarGameShared"
+    );
+    var socketSetType = typeof(HashSet<>).MakeGenericType(socketType);
+    var socketSet = Activator.CreateInstance(socketSetType)!;
+    Invoke(socketSetType, socketSet, "Add", new[] { Enum.Parse(socketType, socket) });
+    return Activator.CreateInstance(
+            eventType,
+            socketSet,
+            (ushort)1,
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.EInventorySection",
+                "BazaarGameShared",
+                section
+            )
+        )
+        ?? throw new InvalidOperationException(
+            "GameSimEventSocketsUnlocked should be constructible."
+        );
+}
+
+static object CreateCardSpawnEvent(
+    string instanceId,
+    string templateId,
+    string cardType,
+    string combatantId,
+    string? section,
+    string? socket
+)
+{
+    var eventType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.GameSimEventCardSpawned",
+        "BazaarGameShared"
+    );
+    return Activator.CreateInstance(
+            eventType,
+            instanceId,
+            templateId,
+            ParseEnum("BazaarGameShared.Domain.Core.Types.ECardType", "BazaarGameShared", cardType),
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.ECombatantId",
+                "BazaarGameShared",
+                combatantId
+            ),
+            section == null
+                ? null
+                : ParseEnum(
+                    "BazaarGameShared.Domain.Core.Types.EInventorySection",
+                    "BazaarGameShared",
+                    section
+                ),
+            socket == null
+                ? null
+                : ParseEnum(
+                    "BazaarGameShared.Domain.Core.Types.EContainerSocketId",
+                    "BazaarGameShared",
+                    socket
+                )
+        )
+        ?? throw new InvalidOperationException("GameSimEventCardSpawned should be constructible.");
+}
+
+static object CreateGameSimEventList(params object[] events)
+{
+    var eventInterface = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.IGameSimEvent",
+        "BazaarGameShared"
+    );
+    var listType = typeof(List<>).MakeGenericType(eventInterface);
+    var list = (System.Collections.IList?)Activator.CreateInstance(listType);
+    Assert(list != null, "GameSim event list should be constructible.");
+    foreach (var value in events)
+        list!.Add(value);
+    return list!;
+}
+
+static void AddGameSimEvent(object message, object gameSimEvent)
+{
+    var gameSim = GetGameSimData(message);
+    AddGameSimEventToData(gameSim.GetType(), gameSim, gameSimEvent);
+}
+
+static void AddGameSimEventToData(Type gameSimType, object gameSim, object gameSimEvent)
+{
+    var events = (System.Collections.IList?)GetFieldValue(gameSimType, gameSim, "Events");
+    Assert(events != null, "GameSim should expose an event list.");
+    events!.Add(gameSimEvent);
+}
+
+static List<object> ReadGameSimEvents(object message)
+{
+    var gameSim = GetGameSimData(message);
+    return AsObjects(GetFieldValue(gameSim.GetType(), gameSim, "Events"));
+}
+
+static List<object> AsObjects(object? values)
+{
+    return ((System.Collections.IEnumerable?)values)?.Cast<object>().ToList() ?? [];
+}
+
 static Type RequireExternalType(string fullName, string assemblyName)
 {
     return Type.GetType($"{fullName}, {assemblyName}")
@@ -2026,6 +2923,14 @@ static void SetField(Type type, object instance, string name, object? value)
     Assert(field != null, $"Field not found: {type.FullName}.{name}");
     field!.SetValue(instance, value);
 }
+
+file sealed record ReplaySocketFixture(
+    string InstanceId,
+    string TemplateId,
+    string CombatantId,
+    string Section,
+    string Socket
+);
 
 file sealed class QueuePersistenceHarness
 {
