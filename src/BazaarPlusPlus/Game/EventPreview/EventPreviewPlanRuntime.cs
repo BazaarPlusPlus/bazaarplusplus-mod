@@ -61,4 +61,22 @@ internal static class EventPreviewPlanRuntime
         snapshot = null!;
         return false;
     }
+
+    public static bool TryGetTemplate(
+        object source,
+        Guid templateId,
+        out CollectionEncounterPreviewTemplatePlan templatePlan
+    )
+    {
+        var registry = Volatile.Read(ref _registry);
+        if (
+            registry != null
+            && registry.TryGet(source, out var snapshot)
+            && snapshot.TryGetTemplate(templateId, out templatePlan)
+        )
+            return true;
+
+        templatePlan = null!;
+        return false;
+    }
 }

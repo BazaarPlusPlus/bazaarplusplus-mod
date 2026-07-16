@@ -125,7 +125,7 @@ internal static class CollectionTierTooltipTextMerger
             if (index > 0)
                 output.Append(separator);
             output.Append("<color=#");
-            output.Append(TierColor(variants[index].Tier));
+            output.Append(TierColorHex(variants[index].Tier));
             output.Append('>');
             output.Append(parsed[index].Values[valueIndex]);
             output.Append("</color>");
@@ -195,7 +195,7 @@ internal static class CollectionTierTooltipTextMerger
             && char.IsDigit(text[index + 1]);
     }
 
-    private static string TierColor(ETier tier) =>
+    internal static string TierColorHex(ETier tier) =>
         tier switch
         {
             ETier.Bronze => "B46241",

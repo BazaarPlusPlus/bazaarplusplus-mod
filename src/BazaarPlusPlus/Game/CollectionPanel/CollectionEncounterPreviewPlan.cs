@@ -457,7 +457,8 @@ internal static class CollectionEncounterPreviewPlanCopies
             filter.FilterSummary,
             CopyList(filter.ExcludedTags),
             CopyList(filter.ExcludedKeywords),
-            filter.UsesDayTierTable
+            filter.UsesDayTierTable,
+            filter.UsesDayTierDistribution
         );
     }
 

@@ -18,7 +18,8 @@ internal sealed class CollectionEncounterRewardFilter
         string filterSummary,
         IReadOnlyList<ECardTag>? excludedTags = null,
         IReadOnlyList<EHiddenTag>? excludedKeywords = null,
-        bool usesDayTierTable = true
+        bool usesDayTierTable = true,
+        bool? usesDayTierDistribution = null
     )
     {
         CardType = cardType;
@@ -32,6 +33,7 @@ internal sealed class CollectionEncounterRewardFilter
         ExcludedTags = excludedTags ?? Array.Empty<ECardTag>();
         ExcludedKeywords = excludedKeywords ?? Array.Empty<EHiddenTag>();
         UsesDayTierTable = usesDayTierTable;
+        UsesDayTierDistribution = usesDayTierDistribution ?? usesDayTierTable;
     }
 
     public ECardType CardType { get; }
@@ -56,6 +58,11 @@ internal sealed class CollectionEncounterRewardFilter
 
     public bool UsesDayTierTable { get; }
 
+    // DownShiftTier still starts from the daily table, but changes the final tier after
+    // the roll. The tooltip intentionally shows only the source distribution, so this
+    // remains true for downshift rewards while fixed/ignored/inherited tiers set it false.
+    public bool UsesDayTierDistribution { get; }
+
     public bool HasTierGateOverride => Tiers.Count > 0;
 
     public CollectionEncounterRewardFilter WithFromAnyHero(bool fromAnyHero)
@@ -74,7 +81,8 @@ internal sealed class CollectionEncounterRewardFilter
             FilterSummary,
             ExcludedTags,
             ExcludedKeywords,
-            UsesDayTierTable
+            UsesDayTierTable,
+            UsesDayTierDistribution
         );
     }
 }
