@@ -143,6 +143,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void OnDestroy()
     {
+        ReplayOpeningStateRestorer.Cleanup();
         var operation = _activePlaybackOperation;
         if (operation != null)
         {
@@ -478,6 +479,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         {
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
+            ReplayOpeningStateRestorer.Cleanup();
             _portraitController!.Cleanup(battleId);
             _portraitController.ApplySelectedHeroOverride(manifest);
             Data.ResetRunData();
@@ -540,7 +542,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 new ReplayPlaybackCleanupStep(
                     "hero_restore",
                     () => _portraitController!.RestoreSelectedHeroOverride()
-                )
+                ),
+                new ReplayPlaybackCleanupStep("opening_state", ReplayOpeningStateRestorer.Cleanup)
             );
             var failureReason =
                 ex is ReplayPlaybackPublishException publishException ? publishException.ReasonCode
@@ -630,7 +633,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             new ReplayPlaybackCleanupStep(
                 "playback_ui",
                 PlaybackUiState.InitializedBoardUiControllers.Clear
-            )
+            ),
+            new ReplayPlaybackCleanupStep("opening_state", ReplayOpeningStateRestorer.Cleanup)
         );
 
         if (startCoordinatorOwnsTerminal)
@@ -738,7 +742,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             new ReplayPlaybackCleanupStep(
                 "playback_ui",
                 PlaybackUiState.InitializedBoardUiControllers.Clear
-            )
+            ),
+            new ReplayPlaybackCleanupStep("opening_state", ReplayOpeningStateRestorer.Cleanup)
         );
 
         if (operation != null)

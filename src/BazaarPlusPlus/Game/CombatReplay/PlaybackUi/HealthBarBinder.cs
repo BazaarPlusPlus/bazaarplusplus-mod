@@ -104,7 +104,7 @@ internal static class HealthBarBinder
             .Where(controller => controller != null && controller.gameObject.scene.rootCount > 0);
     }
 
-    private static ReplayBoardUiBindings ResolveBoardUiControllers()
+    internal static ReplayBoardUiBindings ResolveBoardUiControllers()
     {
         var controllers = GetSceneBoardUiControllers().ToList();
         return new ReplayBoardUiBindings(

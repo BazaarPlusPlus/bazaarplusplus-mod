@@ -111,6 +111,7 @@ internal static class SnapshotRehydrator
             is GameSimEventCardSpawned
             {
                 CombatantId: ECombatantId.Opponent,
+                Type: not ECardType.SocketEffect,
                 Section: not EInventorySection.Hand,
             };
     }
