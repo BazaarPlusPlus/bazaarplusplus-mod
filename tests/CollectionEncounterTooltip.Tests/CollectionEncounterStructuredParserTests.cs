@@ -396,6 +396,7 @@ public sealed class CollectionEncounterStructuredParserTests
         Assert.Equal(new[] { ECardTag.Food }, reward.Tags);
         Assert.Equal("Diamond Food", reward.FilterSummary);
         Assert.False(reward.UsesDayTierTable);
+        Assert.False(reward.UsesDayTierDistribution);
     }
 
     // An exclusion-only tier behavior ("any tier except X") leaves the pool governed by
@@ -442,6 +443,7 @@ public sealed class CollectionEncounterStructuredParserTests
             reward.Tiers
         );
         Assert.True(reward.UsesDayTierTable);
+        Assert.True(reward.UsesDayTierDistribution);
     }
 
     [Fact]
@@ -543,6 +545,7 @@ public sealed class CollectionEncounterStructuredParserTests
         Assert.Equal(new[] { ETier.Diamond }, reward.Tiers);
         Assert.Equal(new[] { ECardTag.Food }, reward.Tags);
         Assert.False(reward.UsesDayTierTable);
+        Assert.False(reward.UsesDayTierDistribution);
     }
 
     [Fact]
@@ -639,6 +642,51 @@ public sealed class CollectionEncounterStructuredParserTests
         Assert.Equal(1, reward.Quantity);
         Assert.Equal(new[] { ECardTag.Weapon }, reward.Tags);
         Assert.False(reward.UsesDayTierTable);
+        Assert.False(reward.UsesDayTierDistribution);
+    }
+
+    [Fact]
+    public void TryParseRewardFilter_keeps_source_day_distribution_for_downshift_rewards()
+    {
+        var json = """
+            {
+              "$type": "TCardEncounterStep",
+              "Abilities": {
+                "0": {
+                  "Action": {
+                    "$type": "TActionGameDealCards",
+                    "SpawnContext": {
+                      "$type": "TSpawnContextQuery",
+                      "Limit": { "$type": "TFixedValue", "Value": 1.0 },
+                      "Groups": [
+                        {
+                          "Filters": [
+                            {
+                              "Constraints": [
+                                { "$type": "ConstraintCardType", "Types": ["Item"] },
+                                { "$type": "ConstraintHiddenTag", "HiddenTags": ["Shield"] }
+                              ]
+                            }
+                          ]
+                        }
+                      ],
+                      "Behaviors": [
+                        { "$type": "TSpawnBehaviorDownShiftTier" },
+                        { "$type": "TSpawnBehaviorInheritTier", "Inherits": false }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+            """;
+
+        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+
+        Assert.NotNull(reward);
+        Assert.Equal(ECardType.Item, reward.CardType);
+        Assert.False(reward.UsesDayTierTable);
+        Assert.True(reward.UsesDayTierDistribution);
     }
 
     [Fact]
@@ -694,6 +742,7 @@ public sealed class CollectionEncounterStructuredParserTests
         Assert.Equal(ECardType.Skill, reward.CardType);
         Assert.Equal(1, reward.Quantity);
         Assert.False(reward.UsesDayTierTable);
+        Assert.False(reward.UsesDayTierDistribution);
     }
 
     [Fact]

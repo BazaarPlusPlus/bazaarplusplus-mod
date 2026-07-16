@@ -13,7 +13,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel;
 
 internal sealed class CollectionEncounterPreviewCacheStore
 {
-    public const int SchemaVersion = 2;
+    public const int SchemaVersion = 3;
     internal const int MaxCacheFileBytes = 32 * 1024 * 1024;
 
     private static readonly UTF8Encoding Utf8NoBom = new(
@@ -593,6 +593,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
                 ExcludedTags = filter.ExcludedTags.Select(value => (int)value).ToList(),
                 ExcludedKeywords = filter.ExcludedKeywords.Select(value => (int)value).ToList(),
                 UsesDayTierTable = filter.UsesDayTierTable,
+                UsesDayTierDistribution = filter.UsesDayTierDistribution,
             };
 
     private static CollectionEncounterRewardFilter? FromWire(RewardFilterWire? filter)
@@ -626,7 +627,8 @@ internal sealed class CollectionEncounterPreviewCacheStore
                     ReadEnum<EHiddenTag>(value, "excluded hidden tag")
                 )
                 .ToArray(),
-            filter.UsesDayTierTable
+            filter.UsesDayTierTable,
+            filter.UsesDayTierDistribution
         );
     }
 
@@ -926,5 +928,8 @@ internal sealed class CollectionEncounterPreviewCacheStore
 
         [JsonProperty("usesDayTierTable", Order = 10)]
         public bool UsesDayTierTable { get; set; }
+
+        [JsonProperty("usesDayTierDistribution", Order = 11)]
+        public bool UsesDayTierDistribution { get; set; }
     }
 }

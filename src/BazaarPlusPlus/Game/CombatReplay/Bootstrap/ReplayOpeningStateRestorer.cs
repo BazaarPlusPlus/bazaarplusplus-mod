@@ -161,6 +161,8 @@ internal static class ReplayOpeningStateRestorer
 
             try
             {
+                controller.gameObject.SetActive(true);
+                controller.ShowCard(show: true);
                 controller.MoveToSocket();
                 controller.CheckInitialSocketState();
             }
@@ -207,10 +209,21 @@ internal static class ReplayOpeningStateRestorer
         IReplayPlaybackOutcomeSink outcome
     )
     {
+        List<Exception>? failures = null;
         var eventsWithoutControllers = new List<GameSimEventCardSpawned>();
         foreach (var spawnEvent in socketSpawnEvents)
         {
-            var existingCard = TryGetCard(spawnEvent.InstanceId);
+            Card? existingCard;
+            try
+            {
+                existingCard = PreferRawSocketIdentity(spawnEvent);
+            }
+            catch (Exception ex)
+            {
+                (failures ??= new List<Exception>()).Add(ex);
+                existingCard = TryGetCard(spawnEvent.InstanceId);
+            }
+
             var existingController = TryGetSocketController(existingCard);
             if (existingCard != null && existingController != null)
                 continue;
@@ -229,7 +242,6 @@ internal static class ReplayOpeningStateRestorer
         var candidateIds = cards
             .Select(card => card.InstanceId.Value)
             .ToHashSet(StringComparer.Ordinal);
-        List<Exception>? failures = null;
         foreach (var snapshotCard in snapshotSocketCards)
         {
             if (candidateIds.Add(snapshotCard.InstanceId.Value))
@@ -277,6 +289,8 @@ internal static class ReplayOpeningStateRestorer
                     );
                 }
 
+                socketController.gameObject.SetActive(true);
+                socketController.ShowCard(show: false);
                 TrackedSocketControllers[instanceId] = socketController;
             }
             catch (Exception ex)
@@ -335,6 +349,49 @@ internal static class ReplayOpeningStateRestorer
         }
 
         return cards;
+    }
+
+    private static Card? PreferRawSocketIdentity(GameSimEventCardSpawned spawnEvent)
+    {
+        var existingCard = TryGetCard(spawnEvent.InstanceId);
+        if (existingCard == null)
+            return null;
+
+        if (
+            existingCard.Type == spawnEvent.Type
+            && Guid.TryParse(spawnEvent.TemplateId, out var rawTemplateId)
+            && rawTemplateId != Guid.Empty
+            && existingCard.TemplateId == rawTemplateId
+        )
+        {
+            return existingCard;
+        }
+
+        if (
+            !Guid.TryParse(spawnEvent.TemplateId, out rawTemplateId)
+            || rawTemplateId == Guid.Empty
+            || TryGetSocketController(existingCard) != null
+        )
+        {
+            return existingCard;
+        }
+
+        var rawCard = DTOUtils.CreateCard(
+            spawnEvent.InstanceId,
+            spawnEvent.TemplateId,
+            spawnEvent.Type
+        );
+        if (existingCard.GetType() == rawCard.GetType())
+        {
+            existingCard.TemplateId = rawCard.TemplateId;
+            existingCard.Template = rawCard.Template;
+            existingCard.Type = rawCard.Type;
+            return existingCard;
+        }
+
+        existingCard.TryRemoveFromContainer();
+        Data.Entities[rawCard.InstanceId] = rawCard;
+        return rawCard;
     }
 
     private static Card? TryGetCard(string instanceId)

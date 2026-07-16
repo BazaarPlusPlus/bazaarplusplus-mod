@@ -38,12 +38,16 @@ internal static class ReplayPresentationRestorer
             return;
 
         var openingRun = sequence.SpawnMessage?.Data?.Run;
-        var day = ResolvePositiveUInt(openingRun?.Day ?? 0, manifest.Day);
-        var hour = ResolvePositiveUInt(openingRun?.Hour ?? 0, manifest.Hour);
-        if (day > 0)
-            run.Day = day;
-        if (hour > 0)
-            run.Hour = hour;
+        var day = ReplaySavedStateNormalizer.ResolvePositiveUInt(
+            openingRun?.Day ?? 0,
+            manifest.Day
+        );
+        var hour = ReplaySavedStateNormalizer.ResolvePositiveUInt(
+            openingRun?.Hour ?? 0,
+            manifest.Hour
+        );
+        run.Day = day;
+        run.Hour = hour;
 
         RestoreOpeningLevel(sequence.SpawnMessage?.Data?.Player, run.Player);
         RestoreOpeningLevel(sequence.SpawnMessage?.Data?.Opponent, run.Opponent);
@@ -130,14 +134,6 @@ internal static class ReplayPresentationRestorer
         return UnityEngine
             .Object.FindObjectsOfType<T>(true)
             .Where(component => component != null && component.gameObject.scene.rootCount > 0);
-    }
-
-    internal static uint ResolvePositiveUInt(uint rawValue, int? fallback)
-    {
-        if (rawValue > 0)
-            return rawValue;
-
-        return fallback is > 0 ? unchecked((uint)fallback.Value) : 0;
     }
 
     private static void RunStep(Action action, IReplayPlaybackOutcomeSink outcome, string stage)

@@ -1650,6 +1650,79 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Current_replay_recording_uses_the_lower_right_settings_dock()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var controllerSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CombatReplay",
+                "CurrentReplayRecordingButtonController.cs"
+            )
+        );
+        var patchSource = File.ReadAllText(
+            Path.Combine(mainSource, "Patches", "Combat", "CurrentReplayRecordingButtonPatch.cs")
+        );
+        var projectSource = File.ReadAllText(Path.Combine(mainSource, "BazaarPlusPlus.csproj"));
+
+        Assert.Contains("typeof(FightMenuDialog)", patchSource);
+        Assert.Contains("\"SettingButton\"", patchSource);
+        Assert.Contains("CollectionPanelDockButtonController", controllerSource);
+        Assert.Contains("BppDockButtonScreenLayout", controllerSource);
+        Assert.Contains("BppDockButtonSpriteProvider.Get(spriteId)", controllerSource);
+        Assert.Contains("BppDockButtonVisuals.ApplyIcon(_icon, sprite)", controllerSource);
+        Assert.Contains("BppDockButtonVisualState.Capture(", controllerSource);
+        Assert.Contains("BppDockButtonVisuals.Apply(", controllerSource);
+        Assert.Contains("fallbackFrame.color = new Color(1f, 1f, 1f, 0f)", controllerSource);
+        Assert.Contains("_icon != null && _icon.sprite != null", controllerSource);
+        Assert.Contains("tooltip.PositionOverUI(_cloneRect)", controllerSource);
+        Assert.Contains("tooltip._coroutine != null", controllerSource);
+        Assert.Contains("tooltip.KeepTooltipWithinBounds()", controllerSource);
+        Assert.Contains("GetWorldCorners(_buttonWorldCorners)", controllerSource);
+        Assert.Contains("tooltip._contentForWorldBounds ?? tooltipRect", controllerSource);
+        Assert.Contains("buttonTop - tooltipBottom + gap", controllerSource);
+        Assert.Contains("while (_tooltipHovered)", controllerSource);
+        Assert.DoesNotContain("const int maxFrames", controllerSource);
+        Assert.DoesNotContain("_cloneRect.TransformVector(", controllerSource);
+        Assert.DoesNotContain("_cloneRect.position + Vector3.up", controllerSource);
+        Assert.Contains("CurrentReplayRecordingUiLogState", controllerSource);
+        Assert.Contains(
+            "settingsButton.gameObject.AddComponent<CurrentReplayRecordingButtonController>()",
+            controllerSource
+        );
+        Assert.DoesNotContain("RecapReplayButtonContainer", patchSource);
+        Assert.DoesNotContain("_nativeRect.anchoredPosition", controllerSource);
+        Assert.DoesNotContain("TextMeshPro", controllerSource);
+        Assert.DoesNotContain("NativeGameTypography", controllerSource);
+        Assert.DoesNotContain("targetGraphic = _glyph", controllerSource);
+        Assert.DoesNotContain("_button.targetGraphic = frame", controllerSource);
+        Assert.DoesNotContain("nativeIcon.enabled = false", controllerSource);
+        Assert.DoesNotContain("nativeIcon.gameObject.SetActive(false)", controllerSource);
+        Assert.DoesNotContain(
+            "clone.AddComponent<CurrentReplayRecordingButtonController>()",
+            controllerSource
+        );
+        foreach (
+            var iconName in new[]
+            {
+                "replay-export-icon.png",
+                "replay-recording-icon.png",
+                "replay-view-icon.png",
+                "replay-retry-icon.png",
+            }
+        )
+        {
+            Assert.True(
+                File.Exists(Path.Combine(mainSource, "Resources", "DockButtons", iconName)),
+                $"Missing dock icon '{iconName}'."
+            );
+            Assert.Contains($"BazaarPlusPlus.Resources.DockButtons.{iconName}", projectSource);
+        }
+    }
+
+    [Fact]
     public void PvpBattles_remains_a_shared_game_module()
     {
         var repoRoot = RepoRoot();

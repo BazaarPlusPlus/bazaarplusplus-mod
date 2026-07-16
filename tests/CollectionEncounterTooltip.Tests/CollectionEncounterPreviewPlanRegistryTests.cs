@@ -1,5 +1,6 @@
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel;
+using BazaarPlusPlus.Game.EventPreview;
 using Xunit;
 
 namespace CollectionEncounterTooltip.Tests;
@@ -69,6 +70,29 @@ public sealed class CollectionEncounterPreviewPlanRegistryTests
         Assert.Equal(1, commits);
     }
 
+    [Fact]
+    public void Runtime_exposes_compiled_encounter_step_templates_for_pedestal_tooltips()
+    {
+        var registry = new CollectionEncounterPreviewPlanRegistry();
+        var source = new object();
+        var eventId = Guid.Parse("40000000-0000-0000-0000-000000000003");
+        var stepId = Guid.Parse("40000000-0000-0000-0000-000000000004");
+        var snapshot = Snapshot(eventId, stepId);
+        var generation = registry.BeginGeneration(source);
+        Assert.True(registry.TryPublish(source, generation, snapshot));
+
+        EventPreviewPlanRuntime.Install(registry);
+        try
+        {
+            Assert.True(EventPreviewPlanRuntime.TryGetTemplate(source, stepId, out var step));
+            Assert.Equal(CollectionEncounterPreviewTemplateKind.EncounterStep, step.Kind);
+        }
+        finally
+        {
+            EventPreviewPlanRuntime.Reset(registry);
+        }
+    }
+
     private static CollectionEncounterPreviewSnapshot Snapshot(Guid eventId)
     {
         var template = new CollectionEncounterPreviewTemplatePlan(
@@ -90,5 +114,47 @@ public sealed class CollectionEncounterPreviewPlanRegistryTests
             Array.Empty<CollectionEncounterChoiceGroupData>()
         );
         return new CollectionEncounterPreviewSnapshot(new[] { plan }, new[] { template });
+    }
+
+    private static CollectionEncounterPreviewSnapshot Snapshot(Guid eventId, Guid stepId)
+    {
+        var eventTemplate = new CollectionEncounterPreviewTemplatePlan(
+            eventId,
+            CollectionEncounterPreviewTemplateKind.Event,
+            Array.Empty<EHero>(),
+            "Event",
+            new CollectionEncounterPreviewLocalizedText(string.Empty, "Event"),
+            new CollectionEncounterPreviewLocalizedText(string.Empty, "Event"),
+            new Dictionary<string, CollectionEncounterPreviewAbilityValue>(),
+            rewardFilter: null
+        );
+        var stepTemplate = new CollectionEncounterPreviewTemplatePlan(
+            stepId,
+            CollectionEncounterPreviewTemplateKind.EncounterStep,
+            Array.Empty<EHero>(),
+            "Step",
+            new CollectionEncounterPreviewLocalizedText(string.Empty, "Step"),
+            new CollectionEncounterPreviewLocalizedText(string.Empty, "Get an item"),
+            new Dictionary<string, CollectionEncounterPreviewAbilityValue>(),
+            rewardFilter: null
+        );
+        var plan = new CollectionEncounterPreviewEventPlan(
+            eventId,
+            isRandomSelectionEvent: false,
+            suppressRandomOutcome: false,
+            choiceLimit: 1,
+            Array.Empty<CollectionEncounterOutcomeGroupData>(),
+            new[]
+            {
+                new CollectionEncounterChoiceGroupData(
+                    isRandomPool: false,
+                    new[] { new CollectionEncounterStepReference(stepId) }
+                ),
+            }
+        );
+        return new CollectionEncounterPreviewSnapshot(
+            new[] { plan },
+            new[] { eventTemplate, stepTemplate }
+        );
     }
 }

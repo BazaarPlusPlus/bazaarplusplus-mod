@@ -26,6 +26,10 @@ internal enum SettingsLogReasonCode
 internal enum SettingsDockSpriteResourceId
 {
     CollectionPanelIcon,
+    ReplayExportIcon,
+    ReplayRecordingIcon,
+    ReplayViewIcon,
+    ReplayRetryIcon,
 }
 
 internal enum SettingsNativeSectionStage

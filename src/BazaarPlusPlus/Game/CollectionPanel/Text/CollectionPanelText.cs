@@ -86,6 +86,16 @@ internal static class CollectionPanelText
         "（{0}）",
         "（{0}）"
     );
+    private static readonly LocalizedTextSet EncounterTierDistributionSuffixText = new(
+        "({0})",
+        "（{0}）",
+        "（{0}）"
+    );
+    private static readonly LocalizedTextSet EncounterTierCeilingLineText = new(
+        "up to {0}",
+        "最高{0}",
+        "最高{0}"
+    );
     private static readonly LocalizedTextSet LevelUpMaxHealthText = new(
         "+ {0} Max Health",
         "+ {0} 生命上限",
@@ -225,6 +235,12 @@ internal static class CollectionPanelText
 
     internal static string EncounterTierExact(ETier tier) =>
         string.Format(Resolve(EncounterTierExactText), Tier(tier));
+
+    internal static string EncounterTierDistributionSuffix(string distribution) =>
+        string.Format(Resolve(EncounterTierDistributionSuffixText), distribution);
+
+    internal static string EncounterTierCeilingLine(ETier tier) =>
+        string.Format(Resolve(EncounterTierCeilingLineText), Tier(tier));
 
     internal static string LevelUpMaxHealth(int amount) =>
         string.Format(Resolve(LevelUpMaxHealthText), amount);

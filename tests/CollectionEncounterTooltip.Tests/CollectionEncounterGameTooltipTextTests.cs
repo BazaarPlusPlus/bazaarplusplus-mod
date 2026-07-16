@@ -1,5 +1,6 @@
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel;
+using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Localization;
 using Xunit;
@@ -90,7 +91,7 @@ public sealed class CollectionEncounterGameTooltipTextTests
     }
 
     [Fact]
-    public void Build_appends_day_tier_only_for_day_driven_card_rewards()
+    public void Build_appends_day_tier_distribution_only_for_day_driven_card_rewards()
     {
         var option = CreateOption(
             new CollectionEncounterChoiceDetail(
@@ -119,13 +120,52 @@ public sealed class CollectionEncounterGameTooltipTextTests
         var text = CollectionEncounterGameTooltipText.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Silver
+            dayTierCeiling: ETier.Silver,
+            dayTierDistribution: CollectionTierDistribution.FromWeights(0.9f, 0.1f, 0, 0)
         );
 
-        Assert.Contains("Get a Medium item (up to Silver)", text);
+        Assert.Contains("Get a Medium item (", text);
+        Assert.Contains("Bronze 90%", text);
+        Assert.Contains("Silver 10%", text);
+        Assert.DoesNotContain("up to Silver", text);
         Assert.Contains("Get a Silver-tier Reagent", text);
-        Assert.DoesNotContain("Get a Silver-tier Reagent (up to", text);
-        Assert.DoesNotContain("Gain 4 Gold (up to", text);
+        Assert.DoesNotContain("Get a Silver-tier Reagent (<color", text);
+        Assert.DoesNotContain("Gain 4 Gold (<color", text);
+    }
+
+    [Theory]
+    [InlineData("zh-CN", false, "（青铜 90% · 白银 10%）")]
+    [InlineData("zh-TW", true, "（青銅 90% · 白銀 10%）")]
+    public void Build_localizes_day_tier_distribution_suffix(
+        string language,
+        bool traditional,
+        string expected
+    )
+    {
+        L.Install(
+            new TestLanguageProvider(language),
+            new TestLocaleModeProvider(
+                traditional ? BppChineseLocaleMode.Taiwan : BppChineseLocaleMode.Mainland
+            )
+        );
+        var option = CreateOption(
+            new CollectionEncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-000000000005"),
+                "打开它",
+                "获得一件中型物品",
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Medium Item"),
+                isSourceMatch: false
+            )
+        );
+
+        var text = CollectionEncounterGameTooltipText.Build(
+            option,
+            colorizeResult: null,
+            dayTierCeiling: ETier.Silver,
+            dayTierDistribution: CollectionTierDistribution.FromWeights(0.9f, 0.1f, 0, 0)
+        );
+
+        Assert.Contains(expected, text);
     }
 
     [Fact]
