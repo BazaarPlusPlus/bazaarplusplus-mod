@@ -48,6 +48,11 @@ var replayVideoCaptureStatusType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureStatus"
 );
 
+RunCurrentReplayRecordingStateChecks();
+RunCurrentReplayRecordingUiLogChecks();
+RunCurrentReplayVideoMetadataChecks();
+RunSystemFileRevealCommandChecks();
+
 Assert(
     (bool)InvokeStatic(audioTapStopperType, "IsUsable", new object?[] { false, "present.wav" })!
         == false,
@@ -1361,6 +1366,223 @@ static Type RequireType(string fullName)
 {
     return Type.GetType($"{fullName}, BazaarPlusPlus")
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
+}
+
+static void RunCurrentReplayRecordingStateChecks()
+{
+    var stateType = RequireType("BazaarPlusPlus.Game.CombatReplay.CurrentReplayRecordingState");
+    var completedType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.CombatReplayVideoRecordingCompleted"
+    );
+    var sourceType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPlaybackSource");
+    var metadataType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoMetadataStatus"
+    );
+    var reasonType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingReasonCode"
+    );
+    var state = Activator.CreateInstance(stateType, nonPublic: true)!;
+
+    Invoke(stateType, state, "LatchBattle", new object?[] { "battle-current" });
+    Invoke(stateType, state, "EnterReplayState", Array.Empty<object?>());
+    Invoke(stateType, state, "MarkBattlePersistence", new object?[] { "battle-stale", true, null });
+    var awaiting = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        GetProperty(awaiting.GetType(), awaiting, "Phase")!.ToString()
+            == "AwaitingBattlePersistence",
+        "A stale persistence completion must not unlock the current battle."
+    );
+
+    Invoke(
+        stateType,
+        state,
+        "MarkBattlePersistence",
+        new object?[] { "battle-current", true, null }
+    );
+    Invoke(stateType, state, "SetAvailability", new object?[] { true, null });
+    var ready = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        (bool)GetProperty(ready.GetType(), ready, "CanStart")!,
+        "A persisted current battle with a ready recorder should become recordable."
+    );
+
+    Assert(
+        (bool)Invoke(stateType, state, "TryArm", new object?[] { "recording-current" })!,
+        "The ready current battle should arm once."
+    );
+    Assert(
+        !(bool)Invoke(stateType, state, "TryArm", new object?[] { "recording-second" })!,
+        "A current battle must reject a second arm while the first is active."
+    );
+    Assert(
+        (bool)Invoke(stateType, state, "MarkNativeReplayStarted", Array.Empty<object?>())!,
+        "The native replay start should bind to the armed recording."
+    );
+    Invoke(
+        stateType,
+        state,
+        "MarkRecordingStarted",
+        new object?[] { "recording-current", "battle-current" }
+    );
+    Invoke(stateType, state, "MarkReplayEnded", new object?[] { null });
+
+    var completed = Activator.CreateInstance(completedType, nonPublic: true)!;
+    SetProperty(completedType, completed, "RecordingId", "recording-current");
+    SetProperty(completedType, completed, "BattleId", "battle-current");
+    SetProperty(completedType, completed, "Source", Enum.Parse(sourceType, "CurrentNative"));
+    SetProperty(completedType, completed, "FinalFilePath", "/tmp/current-replay.mp4");
+    SetProperty(completedType, completed, "ArtifactUsable", true);
+    SetProperty(completedType, completed, "MetadataStatus", Enum.Parse(metadataType, "Complete"));
+    SetProperty(completedType, completed, "ReasonCode", Enum.Parse(reasonType, "Completed"));
+    Invoke(stateType, state, "ApplyCompletion", new object?[] { completed });
+    Invoke(stateType, state, "SetAvailability", new object?[] { true, null });
+    var succeeded = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        (bool)GetProperty(succeeded.GetType(), succeeded, "CanReveal")!,
+        "A usable completed artifact should turn the button into reveal-video mode."
+    );
+
+    Invoke(stateType, state, "LeaveReplayState", Array.Empty<object?>());
+    var reset = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        !(bool)GetProperty(reset.GetType(), reset, "Visible")!,
+        "Leaving ReplayState should remove the temporary current-battle button."
+    );
+}
+
+static void RunCurrentReplayRecordingUiLogChecks()
+{
+    var logStateType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.CurrentReplayRecordingUiLogState"
+    );
+
+    var ready = InvokeStatic(logStateType, "ResolveLayoutReason", new object?[] { true, null });
+    Assert(
+        ready?.ToString() == "None",
+        "An available current-recording layout should have no failure reason."
+    );
+
+    var missingFootprint = InvokeStatic(
+        logStateType,
+        "ResolveLayoutReason",
+        new object?[] { false, "collection-footprint-unavailable" }
+    );
+    Assert(
+        missingFootprint?.ToString() == "TargetFootprintUnavailable",
+        "A missing clone footprint should remain distinguishable in Release diagnostics."
+    );
+
+    var obstructed = InvokeStatic(
+        logStateType,
+        "ResolveLayoutReason",
+        new object?[] { false, "native-button-path" }
+    );
+    Assert(
+        obstructed?.ToString() == "Obstructed",
+        "A native layout blocker should map to the bounded obstruction reason."
+    );
+}
+
+static void RunSystemFileRevealCommandChecks()
+{
+    var revealerType = RequireType("BazaarPlusPlus.GameInterop.Files.SystemFileRevealer");
+    var platformType = RequireType("BazaarPlusPlus.GameInterop.Files.SystemFileRevealPlatform");
+    foreach (var platformName in new[] { "MacOS", "Windows", "Linux" })
+    {
+        var command = InvokeStatic(
+            revealerType,
+            "BuildCommand",
+            new object?[] { Enum.Parse(platformType, platformName), "/tmp/video file.mp4" }
+        )!;
+        var commandType = command.GetType();
+        var fileName = (string)GetProperty(commandType, command, "FileName")!;
+        var arguments = (string)GetProperty(commandType, command, "Arguments")!;
+        Assert(
+            !string.IsNullOrWhiteSpace(fileName),
+            $"{platformName} reveal command needs an executable."
+        );
+        Assert(
+            arguments.Contains('"'),
+            $"{platformName} reveal command must quote paths with spaces."
+        );
+    }
+}
+
+static void RunCurrentReplayVideoMetadataChecks()
+{
+    var storeType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.CombatReplayVideoMetadataStore"
+    );
+    var startedType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.VideoRecordingStarted");
+    var finishedType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.VideoRecordingFinished");
+    var root = Path.Combine(
+        Path.GetTempPath(),
+        "bpp-current-replay-video-metadata-tests",
+        Guid.NewGuid().ToString("N")
+    );
+    Directory.CreateDirectory(root);
+    var databasePath = Path.Combine(root, "run.db");
+    try
+    {
+        var store = Activator.CreateInstance(storeType, databasePath)!;
+        var started = Activator.CreateInstance(startedType, nonPublic: true)!;
+        SetProperty(startedType, started, "VideoId", "video-current");
+        SetProperty(startedType, started, "BattleId", "battle-current");
+        SetProperty(startedType, started, "Source", "CurrentNative");
+        SetProperty(startedType, started, "VideoRelativePath", "2026-07-15/battle-current.mp4");
+        SetProperty(startedType, started, "Width", 1920);
+        SetProperty(startedType, started, "Height", 1080);
+        SetProperty(startedType, started, "Fps", 60);
+        SetProperty(startedType, started, "Codec", "h264_videotoolbox");
+        SetProperty(startedType, started, "StartedAtUtc", DateTimeOffset.UtcNow);
+        Invoke(storeType, store, "SaveStart", new object?[] { started });
+
+        var finished = Activator.CreateInstance(finishedType, nonPublic: true)!;
+        SetProperty(finishedType, finished, "VideoId", "video-current");
+        SetProperty(finishedType, finished, "VideoRelativePath", "2026-07-15/battle-current.mp4");
+        SetProperty(finishedType, finished, "EndedAtUtc", DateTimeOffset.UtcNow);
+        SetProperty(finishedType, finished, "DurationMs", 1234L);
+        SetProperty(finishedType, finished, "CapturedFrames", 60);
+        SetProperty(finishedType, finished, "DroppedFrames", 0);
+        SetProperty(finishedType, finished, "FileSizeBytes", 4096L);
+        SetProperty(finishedType, finished, "Status", "COMPLETED");
+        Invoke(storeType, store, "SaveFinish", new object?[] { finished });
+
+        using var connection = new SqliteConnection($"Data Source={databasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT battle_id, source, video_relative_path, fps, status
+            FROM combat_replay_videos
+            WHERE video_id = 'video-current';
+            """;
+        using var reader = command.ExecuteReader();
+        Assert(reader.Read(), "The current replay recording should create a database row.");
+        Assert(
+            reader.GetString(0) == "battle-current",
+            "The video row must keep the exact battle id."
+        );
+        Assert(
+            reader.GetString(1) == "CurrentNative",
+            "The video row must identify the current native replay source."
+        );
+        Assert(
+            reader.GetString(2).EndsWith("battle-current.mp4", StringComparison.Ordinal),
+            "The video row must retain the exported file path."
+        );
+        Assert(
+            reader.GetInt32(3) == 60,
+            "The video row must retain the resolved recording frame rate."
+        );
+        Assert(
+            reader.GetString(4) == "COMPLETED",
+            "Completed current replay videos must be listable by the Tauri query."
+        );
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
 }
 
 static object? Invoke(Type type, object instance, string methodName, object?[] args)

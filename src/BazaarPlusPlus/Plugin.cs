@@ -85,7 +85,8 @@ public class Plugin : BaseUnityPlugin
             combatReplayRuntime.Initialize(
                 services,
                 _composition.RunLifecycle,
-                _composition.PvpBattleCatalog
+                _composition.PvpBattleCatalog,
+                () => gameObject.GetComponent<Game.CombatReplay.Video.CombatReplayVideoRecorder>()
             );
             _composition.AttachCombatReplayRuntime(combatReplayRuntime);
 
