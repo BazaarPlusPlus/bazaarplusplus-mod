@@ -234,8 +234,69 @@ try
         "ReplaceGhostBattles should preserve replay_downloaded for ghost battles already fetched locally."
     );
     Assert(
+        (int)
+            downloadedGhost.GetType().GetProperty("PlayerHandItemCount")!.GetValue(downloadedGhost)!
+            == 7
+            && (int)
+                downloadedGhost
+                    .GetType()
+                    .GetProperty("PlayerSkillCount")!
+                    .GetValue(downloadedGhost)! == 3
+            && (int)
+                downloadedGhost
+                    .GetType()
+                    .GetProperty("OpponentHandItemCount")!
+                    .GetValue(downloadedGhost)! == 2
+            && (int)
+                downloadedGhost
+                    .GetType()
+                    .GetProperty("OpponentSkillCount")!
+                    .GetValue(downloadedGhost)! == 1,
+        "Ghost battle list rows should project remote summary counts into local-player perspective."
+    );
+    Assert(
         downloadedGhost.GetType().GetProperty("Snapshots")!.GetValue(downloadedGhost) is null,
-        "Ghost battle list rows should not depend on remote snapshot payloads for their counts."
+        "Ghost battle list rows should not depend on remote snapshot payloads to display summary counts."
+    );
+
+    replaceGhostBattles.Invoke(
+        repository,
+        [
+            "player-account-a",
+            CreateGhostImportsWithoutCounts(
+                ghostImportType,
+                "ghost-1",
+                nowUtc.AddMinutes(-45).ToString("o")
+            ),
+        ]
+    );
+    downloadedGhost = (
+        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!
+    )
+        .Cast<object>()
+        .Single(record =>
+            (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
+        );
+    Assert(
+        (int)
+            downloadedGhost.GetType().GetProperty("PlayerHandItemCount")!.GetValue(downloadedGhost)!
+            == 7
+            && (int)
+                downloadedGhost
+                    .GetType()
+                    .GetProperty("PlayerSkillCount")!
+                    .GetValue(downloadedGhost)! == 3
+            && (int)
+                downloadedGhost
+                    .GetType()
+                    .GetProperty("OpponentHandItemCount")!
+                    .GetValue(downloadedGhost)! == 2
+            && (int)
+                downloadedGhost
+                    .GetType()
+                    .GetProperty("OpponentSkillCount")!
+                    .GetValue(downloadedGhost)! == 1,
+        "Ghost sync rows with missing summary counts should not clear counts already cached locally."
     );
 
     replaceGhostBattles.Invoke(
@@ -514,6 +575,16 @@ static void InsertBattle(
 
 static object CreateGhostImports(Type ghostImportType, params string[] battlePairs)
 {
+    return CreateGhostImportsCore(ghostImportType, includeCounts: true, battlePairs);
+}
+
+static object CreateGhostImportsWithoutCounts(Type ghostImportType, params string[] battlePairs)
+{
+    return CreateGhostImportsCore(ghostImportType, includeCounts: false, battlePairs);
+}
+
+static object CreateGhostImportsCore(Type ghostImportType, bool includeCounts, params string[] battlePairs)
+{
     var listType = typeof(List<>).MakeGenericType(ghostImportType);
     var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
     for (var i = 0; i < battlePairs.Length; i += 2)
@@ -525,7 +596,17 @@ static object CreateGhostImports(Type ghostImportType, params string[] battlePai
             .SetValue(battle, DateTimeOffset.Parse(battlePairs[i + 1]));
         ghostImportType.GetProperty("CombatKind")!.SetValue(battle, "PVPCombat");
         ghostImportType.GetProperty("PlayerHero")!.SetValue(battle, "Dooley");
+        if (includeCounts)
+        {
+            ghostImportType.GetProperty("PlayerHandItemCount")!.SetValue(battle, 2);
+            ghostImportType.GetProperty("PlayerSkillCount")!.SetValue(battle, 1);
+        }
         ghostImportType.GetProperty("OpponentName")!.SetValue(battle, "Me");
+        if (includeCounts)
+        {
+            ghostImportType.GetProperty("OpponentHandItemCount")!.SetValue(battle, 7);
+            ghostImportType.GetProperty("OpponentSkillCount")!.SetValue(battle, 3);
+        }
         ghostImportType.GetProperty("ReplayAvailable")!.SetValue(battle, true);
         ghostImportType.GetProperty("ReplayDownloaded")!.SetValue(battle, false);
         ghostImportType.GetProperty("LastSyncedAtUtc")!.SetValue(battle, DateTimeOffset.UtcNow);

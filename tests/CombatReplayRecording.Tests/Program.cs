@@ -53,12 +53,16 @@ var replaySavedStateNormalizerType = RequireType(
 var replayOpeningStateRestorerType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Bootstrap.ReplayOpeningStateRestorer"
 );
+var replayRunEconomyFallbackType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Bootstrap.ReplayRunEconomyFallback"
+);
 var snapshotRehydratorType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Bootstrap.SnapshotRehydrator"
 );
 
 RunReplaySavedStateNormalizationChecks(replaySavedStateNormalizerType, manifestType);
 RunReplayOpeningStateSelectionChecks(replayOpeningStateRestorerType);
+RunReplayRunEconomyFallbackChecks(replayRunEconomyFallbackType, manifestType);
 RunReplayPresentationRestorationChecks(replaySavedStateNormalizerType);
 RunReplaySpawnSanitizationChecks(snapshotRehydratorType);
 
@@ -546,6 +550,8 @@ try
         playerName: "Local Player",
         playerAccountId: "player-account-001",
         playerPrestige: 18,
+        playerIncome: 11,
+        playerGold: 99,
         playerVictories: 3,
         opponentName: "Test Opponent",
         opponentHero: "Vanessa",
@@ -597,6 +603,8 @@ try
     var battleProjectionType = battleProjection.GetType();
     Assert(
         Equals(GetProperty(battleProjectionType, battleProjection, "PlayerPrestige"), 18)
+            && Equals(GetProperty(battleProjectionType, battleProjection, "PlayerIncome"), 11)
+            && Equals(GetProperty(battleProjectionType, battleProjection, "PlayerGold"), 99)
             && Equals(GetProperty(battleProjectionType, battleProjection, "PlayerVictories"), 3)
             && Equals(GetProperty(battleProjectionType, battleProjection, "OpponentPrestige"), 12)
             && Equals(GetProperty(battleProjectionType, battleProjection, "OpponentVictories"), 6),
@@ -616,6 +624,11 @@ try
     var artifactParticipantsType = artifactParticipants.GetType();
     Assert(
         Equals(GetProperty(artifactParticipantsType, artifactParticipants, "PlayerPrestige"), 18)
+            && Equals(
+                GetProperty(artifactParticipantsType, artifactParticipants, "PlayerIncome"),
+                11
+            )
+            && Equals(GetProperty(artifactParticipantsType, artifactParticipants, "PlayerGold"), 99)
             && Equals(
                 GetProperty(artifactParticipantsType, artifactParticipants, "PlayerVictories"),
                 3
@@ -652,6 +665,8 @@ try
     var loadedParticipantsType = loadedParticipants.GetType();
     Assert(
         Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerPrestige"), 18)
+            && Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerIncome"), 11)
+            && Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerGold"), 99)
             && Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerVictories"), 3)
             && Equals(
                 GetProperty(loadedParticipantsType, loadedParticipants, "OpponentPrestige"),
@@ -706,6 +721,22 @@ try
                 "battle-001"
             ) == 18,
             "battles should persist the player prestige."
+        );
+        Assert(
+            GetInt32(
+                connection,
+                "SELECT player_income FROM battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 11,
+            "battles should persist the player income."
+        );
+        Assert(
+            GetInt32(
+                connection,
+                "SELECT player_gold FROM battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 99,
+            "battles should persist the player gold."
         );
         Assert(
             GetInt32(
@@ -1157,6 +1188,8 @@ try
     SetProperty(candidateType, participantCandidate!, "PlayerRank", "Legendary 5");
     SetProperty(candidateType, participantCandidate!, "PlayerRating", 502);
     SetProperty(candidateType, participantCandidate!, "PlayerPrestige", 18);
+    SetProperty(candidateType, participantCandidate!, "PlayerIncome", 11);
+    SetProperty(candidateType, participantCandidate!, "PlayerGold", 99);
     SetProperty(candidateType, participantCandidate!, "PlayerVictories", 3);
     SetProperty(candidateType, participantCandidate!, "OpponentName", "Snapshot Opponent");
     SetProperty(candidateType, participantCandidate!, "OpponentHero", "Vanessa");
@@ -1184,8 +1217,10 @@ try
     );
     Assert(
         Equals(GetProperty(participantsType, participants, "PlayerPrestige"), 18)
+            && Equals(GetProperty(participantsType, participants, "PlayerIncome"), 11)
+            && Equals(GetProperty(participantsType, participants, "PlayerGold"), 99)
             && Equals(GetProperty(participantsType, participants, "PlayerVictories"), 3),
-        "BuildParticipants should preserve player prestige and victories captured on the opening candidate."
+        "BuildParticipants should preserve player economy, prestige, and victories captured on the opening candidate."
     );
     Assert(
         string.Equals(
@@ -1271,6 +1306,8 @@ try
         playerName: "Local Player",
         playerAccountId: "player-account-001",
         playerPrestige: 18,
+        playerIncome: 11,
+        playerGold: 99,
         playerVictories: 3,
         opponentName: "Missing Payload Opponent",
         opponentHero: "Pygmalien",
@@ -1565,6 +1602,103 @@ static void RunReplaySavedStateNormalizationChecks(Type normalizerType, Type man
         message: "A legacy replay without manifest metadata should remain loadable and receive safe level defaults."
     );
     InvokeStatic(normalizerType, "Normalize", new object?[] { manifest, null });
+}
+
+static void RunReplayRunEconomyFallbackChecks(Type fallbackType, Type manifestType)
+{
+    var tempRoot = Path.Combine(
+        Path.GetTempPath(),
+        "bpp-replay-run-economy-fallback-tests",
+        Guid.NewGuid().ToString("N")
+    );
+    Directory.CreateDirectory(tempRoot);
+    var dbPath = Path.Combine(tempRoot, "bazaarplusplus.db");
+    try
+    {
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            var schemaType =
+                Type.GetType("BazaarPlusPlus.Storage.RunLog.RunLogSchema, BazaarPlusPlus.Storage")
+                ?? throw new InvalidOperationException("RunLogSchema should be loadable.");
+            InvokeStatic(schemaType, "EnsureInitialized", new object?[] { connection });
+
+            using var insert = connection.CreateCommand();
+            insert.CommandText = """
+                INSERT INTO runs (
+                    run_id,
+                    started_at_utc,
+                    last_seen_at_utc,
+                    status,
+                    completed,
+                    hero,
+                    game_mode,
+                    income,
+                    gold,
+                    last_seq
+                ) VALUES (
+                    'run-economy-001',
+                    '2026-07-17T01:00:00.0000000+00:00',
+                    '2026-07-17T01:00:00.0000000+00:00',
+                    'active',
+                    0,
+                    'Jules',
+                    'Ranked',
+                    5,
+                    21,
+                    0
+                );
+                """;
+            insert.ExecuteNonQuery();
+        }
+
+        var missingEconomyManifest = Activator.CreateInstance(manifestType)!;
+        SetProperty(manifestType, missingEconomyManifest, "RunId", "run-economy-001");
+        var missingParticipants =
+            GetProperty(manifestType, missingEconomyManifest, "Participants")
+            ?? throw new InvalidOperationException("Manifest should include participants.");
+        var participantsType = missingParticipants.GetType();
+
+        InvokeStatic(
+            fallbackType,
+            "ApplyMissingRunEconomy",
+            new object?[] { missingEconomyManifest, dbPath, null }
+        );
+        Assert(
+            Equals(GetProperty(participantsType, missingParticipants, "PlayerIncome"), 5)
+                && Equals(GetProperty(participantsType, missingParticipants, "PlayerGold"), 21),
+            "Replay run economy fallback should fill missing legacy manifest income/gold from the run row."
+        );
+
+        var preciseEconomyManifest = Activator.CreateInstance(manifestType)!;
+        SetProperty(manifestType, preciseEconomyManifest, "RunId", "run-economy-001");
+        var preciseParticipants =
+            GetProperty(manifestType, preciseEconomyManifest, "Participants")
+            ?? throw new InvalidOperationException("Manifest should include participants.");
+        SetProperty(preciseParticipants.GetType(), preciseParticipants, "PlayerIncome", 11);
+        SetProperty(preciseParticipants.GetType(), preciseParticipants, "PlayerGold", 99);
+        InvokeStatic(
+            fallbackType,
+            "ApplyMissingRunEconomy",
+            new object?[] { preciseEconomyManifest, dbPath, null }
+        );
+        Assert(
+            Equals(
+                GetProperty(preciseParticipants.GetType(), preciseParticipants, "PlayerIncome"),
+                11
+            )
+                && Equals(
+                    GetProperty(preciseParticipants.GetType(), preciseParticipants, "PlayerGold"),
+                    99
+                ),
+            "Replay run economy fallback should not overwrite precise battle-level income/gold."
+        );
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+            Directory.Delete(tempRoot, recursive: true);
+    }
 }
 
 static void RunReplayOpeningStateSelectionChecks(Type restorerType)
@@ -2328,6 +2462,8 @@ static object CreateManifestFixture(
     string playerName,
     string playerAccountId,
     int playerPrestige,
+    int playerIncome,
+    int playerGold,
     int playerVictories,
     string opponentName,
     string opponentHero,
@@ -2354,6 +2490,8 @@ static object CreateManifestFixture(
     SetProperty(participantsType, participants, "PlayerName", playerName);
     SetProperty(participantsType, participants, "PlayerAccountId", playerAccountId);
     SetProperty(participantsType, participants, "PlayerPrestige", playerPrestige);
+    SetProperty(participantsType, participants, "PlayerIncome", playerIncome);
+    SetProperty(participantsType, participants, "PlayerGold", playerGold);
     SetProperty(participantsType, participants, "PlayerVictories", playerVictories);
     SetProperty(participantsType, participants, "OpponentName", opponentName);
     SetProperty(participantsType, participants, "OpponentHero", opponentHero);

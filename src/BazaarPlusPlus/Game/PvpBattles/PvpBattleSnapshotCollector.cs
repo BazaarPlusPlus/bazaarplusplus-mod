@@ -24,6 +24,8 @@ internal sealed class PvpBattleSnapshotCollector
         var playerHero = TryGetPlayerHeroSafe();
         var playerLevel = TryGetPlayerLevelSafe();
         var playerPrestige = TryGetPlayerPrestigeSafe();
+        var playerIncome = TryGetPlayerIncomeSafe();
+        var playerGold = TryGetPlayerGoldSafe();
         var playerVictories = TryGetPlayerVictoriesSafe();
         var (
             opponentName,
@@ -43,6 +45,8 @@ internal sealed class PvpBattleSnapshotCollector
             PlayerRating = playerRating,
             PlayerLevel = playerLevel,
             PlayerPrestige = playerPrestige,
+            PlayerIncome = playerIncome,
+            PlayerGold = playerGold,
             PlayerVictories = playerVictories,
             OpponentName = opponentName,
             OpponentHero = opponentHero,
@@ -105,6 +109,8 @@ internal sealed class PvpBattleSnapshotCollector
             PlayerRating = candidate.PlayerRating,
             PlayerLevel = candidate.PlayerLevel,
             PlayerPrestige = candidate.PlayerPrestige,
+            PlayerIncome = candidate.PlayerIncome,
+            PlayerGold = candidate.PlayerGold,
             PlayerVictories = candidate.PlayerVictories,
             OpponentName = candidate.OpponentName,
             OpponentHero = candidate.OpponentHero,
@@ -542,6 +548,18 @@ internal sealed class PvpBattleSnapshotCollector
     private static int? TryGetPlayerPrestigeSafe() =>
         Safe<int?>(
             () => Data.Run?.Player?.GetAttributeValue(EPlayerAttributeType.Prestige),
+            fallback: null
+        );
+
+    private static int? TryGetPlayerIncomeSafe() =>
+        Safe<int?>(
+            () => Data.Run?.Player?.GetAttributeValue(EPlayerAttributeType.Income),
+            fallback: null
+        );
+
+    private static int? TryGetPlayerGoldSafe() =>
+        Safe<int?>(
+            () => Data.Run?.Player?.GetAttributeValue(EPlayerAttributeType.Gold),
             fallback: null
         );
 

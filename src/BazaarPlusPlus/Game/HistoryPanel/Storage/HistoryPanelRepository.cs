@@ -38,7 +38,7 @@ internal sealed partial class HistoryPanelRepository
         if (!DatabaseExists)
             return Array.Empty<HistoryRunRecord>();
 
-        using var connection = OpenConnection();
+        using var connection = OpenConnection(ensureSchema: true);
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
@@ -119,7 +119,7 @@ internal sealed partial class HistoryPanelRepository
         if (!DatabaseExists || string.IsNullOrWhiteSpace(runId))
             return Array.Empty<HistoryBattleRecord>();
 
-        using var connection = OpenConnection();
+        using var connection = OpenConnection(ensureSchema: true);
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
         command.CommandText = $"""
@@ -238,6 +238,8 @@ internal sealed partial class HistoryPanelRepository
                 player_level,
                 player_prestige,
                 player_victories,
+                player_hand_item_count,
+                player_skill_count,
                 opponent_name,
                 opponent_hero,
                 opponent_rank,
@@ -245,6 +247,8 @@ internal sealed partial class HistoryPanelRepository
                 opponent_level,
                 opponent_prestige,
                 opponent_victories,
+                opponent_hand_item_count,
+                opponent_skill_count,
                 opponent_account_id,
                 combat_kind,
                 result,
@@ -314,6 +318,8 @@ internal sealed partial class HistoryPanelRepository
                     player_level,
                     player_prestige,
                     player_victories,
+                    player_hand_item_count,
+                    player_skill_count,
                     opponent_name,
                     opponent_hero,
                     opponent_rank,
@@ -321,6 +327,8 @@ internal sealed partial class HistoryPanelRepository
                     opponent_level,
                     opponent_prestige,
                     opponent_victories,
+                    opponent_hand_item_count,
+                    opponent_skill_count,
                     opponent_account_id,
                     combat_kind,
                     result,
@@ -347,6 +355,8 @@ internal sealed partial class HistoryPanelRepository
                     $playerLevel,
                     $playerPrestige,
                     $playerVictories,
+                    $playerHandItemCount,
+                    $playerSkillCount,
                     $opponentName,
                     $opponentHero,
                     $opponentRank,
@@ -354,6 +364,8 @@ internal sealed partial class HistoryPanelRepository
                     $opponentLevel,
                     $opponentPrestige,
                     $opponentVictories,
+                    $opponentHandItemCount,
+                    $opponentSkillCount,
                     $opponentAccountId,
                     $combatKind,
                     $result,
@@ -380,6 +392,14 @@ internal sealed partial class HistoryPanelRepository
                     player_level = excluded.player_level,
                     player_prestige = excluded.player_prestige,
                     player_victories = excluded.player_victories,
+                    player_hand_item_count = COALESCE(
+                        excluded.player_hand_item_count,
+                        {RunLogSchema.BattlesTableName}.player_hand_item_count
+                    ),
+                    player_skill_count = COALESCE(
+                        excluded.player_skill_count,
+                        {RunLogSchema.BattlesTableName}.player_skill_count
+                    ),
                     opponent_name = excluded.opponent_name,
                     opponent_hero = excluded.opponent_hero,
                     opponent_rank = excluded.opponent_rank,
@@ -387,6 +407,14 @@ internal sealed partial class HistoryPanelRepository
                     opponent_level = excluded.opponent_level,
                     opponent_prestige = excluded.opponent_prestige,
                     opponent_victories = excluded.opponent_victories,
+                    opponent_hand_item_count = COALESCE(
+                        excluded.opponent_hand_item_count,
+                        {RunLogSchema.BattlesTableName}.opponent_hand_item_count
+                    ),
+                    opponent_skill_count = COALESCE(
+                        excluded.opponent_skill_count,
+                        {RunLogSchema.BattlesTableName}.opponent_skill_count
+                    ),
                     opponent_account_id = excluded.opponent_account_id,
                     combat_kind = excluded.combat_kind,
                     result = excluded.result,
@@ -453,6 +481,14 @@ internal sealed partial class HistoryPanelRepository
                 (object?)battle.PlayerVictories ?? DBNull.Value
             );
             insertCommand.Parameters.AddWithValue(
+                "$playerHandItemCount",
+                (object?)battle.PlayerHandItemCount ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$playerSkillCount",
+                (object?)battle.PlayerSkillCount ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
                 "$opponentName",
                 (object?)battle.OpponentName ?? DBNull.Value
             );
@@ -479,6 +515,14 @@ internal sealed partial class HistoryPanelRepository
             insertCommand.Parameters.AddWithValue(
                 "$opponentVictories",
                 (object?)battle.OpponentVictories ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentHandItemCount",
+                (object?)battle.OpponentHandItemCount ?? DBNull.Value
+            );
+            insertCommand.Parameters.AddWithValue(
+                "$opponentSkillCount",
+                (object?)battle.OpponentSkillCount ?? DBNull.Value
             );
             insertCommand.Parameters.AddWithValue(
                 "$opponentAccountId",
@@ -586,7 +630,13 @@ internal sealed partial class HistoryPanelRepository
         command.ExecuteNonQuery();
     }
 
-    public void MarkGhostReplayDownloaded(string battleId)
+    public void MarkGhostReplayDownloaded(string battleId) =>
+        MarkGhostReplayDownloaded(battleId, rawSnapshotCounts: null);
+
+    public void MarkGhostReplayDownloaded(
+        string battleId,
+        HistoryBattleSnapshotCounts? rawSnapshotCounts
+    )
     {
         if (string.IsNullOrWhiteSpace(battleId))
             return;
@@ -594,13 +644,36 @@ internal sealed partial class HistoryPanelRepository
         using var connection = OpenConnection(ensureSchema: true);
         using var command = connection.CreateCommand();
         command.CommandTimeout = 2;
-        command.CommandText = $"""
+        var hasCounts = rawSnapshotCounts?.HasAnyRecordedCard == true;
+        command.CommandText = hasCounts
+            ? $"""
+            UPDATE {RunLogSchema.BattlesTableName}
+            SET replay_downloaded = 1,
+                player_hand_item_count = $playerHandItemCount,
+                player_skill_count = $playerSkillCount,
+                opponent_hand_item_count = $opponentHandItemCount,
+                opponent_skill_count = $opponentSkillCount
+            WHERE source = 'GHOST'
+              AND battle_id = $battleId;
+            """
+            : $"""
             UPDATE {RunLogSchema.BattlesTableName}
             SET replay_downloaded = 1
             WHERE source = 'GHOST'
               AND battle_id = $battleId;
             """;
         command.Parameters.AddWithValue("$battleId", battleId);
+        if (hasCounts)
+        {
+            var counts = rawSnapshotCounts.GetValueOrDefault();
+            command.Parameters.AddWithValue("$playerHandItemCount", counts.PlayerHandItemCount);
+            command.Parameters.AddWithValue("$playerSkillCount", counts.PlayerSkillCount);
+            command.Parameters.AddWithValue(
+                "$opponentHandItemCount",
+                counts.OpponentHandItemCount
+            );
+            command.Parameters.AddWithValue("$opponentSkillCount", counts.OpponentSkillCount);
+        }
         command.ExecuteNonQuery();
     }
 
@@ -661,6 +734,30 @@ internal sealed partial class HistoryPanelRepository
                 RunLogSchema.BattlesTableName,
                 "is_final_battle",
                 "INTEGER NOT NULL DEFAULT 0"
+            );
+            EnsureColumnExists(
+                connection,
+                RunLogSchema.BattlesTableName,
+                "player_hand_item_count",
+                "INTEGER NULL"
+            );
+            EnsureColumnExists(
+                connection,
+                RunLogSchema.BattlesTableName,
+                "player_skill_count",
+                "INTEGER NULL"
+            );
+            EnsureColumnExists(
+                connection,
+                RunLogSchema.BattlesTableName,
+                "opponent_hand_item_count",
+                "INTEGER NULL"
+            );
+            EnsureColumnExists(
+                connection,
+                RunLogSchema.BattlesTableName,
+                "opponent_skill_count",
+                "INTEGER NULL"
             );
             _schemaEnsured = true;
         }

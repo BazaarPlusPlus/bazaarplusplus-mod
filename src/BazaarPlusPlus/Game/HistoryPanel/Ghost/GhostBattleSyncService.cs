@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.GameInterop;
@@ -136,7 +137,15 @@ internal sealed class GhostBattleSyncService
             GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
         );
         payloadStore.Save(payload);
-        _repository.MarkGhostReplayDownloaded(battleId);
+        _repository.MarkGhostReplayDownloaded(
+            battleId,
+            HistoryBattlePreviewProjection.CountSnapshots(
+                payload.BattleManifest!.Snapshots.PlayerHand,
+                payload.BattleManifest.Snapshots.PlayerSkills,
+                payload.BattleManifest.Snapshots.OpponentHand,
+                payload.BattleManifest.Snapshots.OpponentSkills
+            )
+        );
         return GhostBattleReplayDownloadResult.Success();
     }
 
@@ -289,6 +298,8 @@ internal sealed class GhostBattleSyncService
                 PlayerRating = battle.Participants.PlayerRating,
                 PlayerLevel = battle.Participants.PlayerLevel,
                 PlayerPrestige = battle.Participants.PlayerPrestige,
+                PlayerIncome = battle.Participants.PlayerIncome,
+                PlayerGold = battle.Participants.PlayerGold,
                 PlayerVictories = battle.Participants.PlayerVictories,
                 OpponentName = battle.Participants.OpponentName,
                 OpponentAccountId = battle.Participants.OpponentAccountId,

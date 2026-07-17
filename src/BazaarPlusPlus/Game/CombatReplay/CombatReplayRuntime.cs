@@ -691,6 +691,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                     ex
                 );
             }
+            ReplayRunEconomyFallback.ApplyMissingRunEconomy(
+                manifest,
+                _services?.Paths.RunLogDatabasePath,
+                operation
+            );
             await ReplayBootstrap.InjectSavedReplayAsync(
                 bootstrapContext,
                 manifest,
