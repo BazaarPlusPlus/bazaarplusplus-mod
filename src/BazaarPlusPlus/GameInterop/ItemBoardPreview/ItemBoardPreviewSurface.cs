@@ -14,12 +14,12 @@ namespace BazaarPlusPlus.GameInterop.ItemBoardPreview;
 
 internal sealed class ItemBoardPreviewSurface : IDisposable
 {
+    private readonly INativeCardPreviewHost _previewHost;
     private readonly ItemBoardPreviewGenerationGuard _generation = new();
-    private readonly List<NativeCardPreviewHandle> _active = new();
+    private readonly List<ActiveCard> _active = new();
 
     private ItemBoardPreviewOptions _options = new();
     private CancellationTokenSource? _loadCancellation;
-    private RuntimeCreationTracker? _runtimeTracker;
     private GameObject? _root;
     private Canvas? _canvas;
     private CanvasGroup? _canvasGroup;
@@ -27,10 +27,8 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
     private RectTransform? _clipRect;
     private RectTransform? _boardRect;
     private RectTransform[]? _sockets;
-    private NativeCardPreviewPool? _pool;
-    private NativeCardPreviewFactory? _factory;
-    private NativeCardPreviewHoverRelay? _hoverRelay;
-    private NativeCardPreviewHandle? _hoveredHandle;
+    private INativeCardPreviewScope? _scope;
+    private INativeCardPreviewSession? _hoveredSession;
     private string? _renderedSignature;
     private Vector2 _position = Vector2.zero;
     private Vector2 _clipSize = new(
@@ -39,6 +37,9 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
     );
     private float _cardScale = 1f;
     private int _runtimeLayer = int.MinValue;
+
+    internal ItemBoardPreviewSurface(INativeCardPreviewHost previewHost) =>
+        _previewHost = previewHost ?? throw new ArgumentNullException(nameof(previewHost));
 
     public bool EnsureInitialized()
     {
@@ -92,7 +93,7 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
     }
 
     public IEnumerator Render(
-        IReadOnlyList<NativeCardPreviewSpec>? cards,
+        IReadOnlyList<NativeCardPreviewSubject>? cards,
         ItemBoardPreviewOptions options,
         string? signature = null,
         Action<ItemBoardPreviewPhase>? onPhase = null,
@@ -140,19 +141,9 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
         ApplyTransform();
         ReturnActiveCardsToPool();
-        var factory = _factory!;
+        var scope = _scope!;
         var sockets = _sockets!;
-        var tracker = _runtimeTracker!;
-        var operation = tracker.RegisterOperation();
-        var aggregate = CreateCardsForRenderAsync(
-            cards,
-            factory,
-            sockets,
-            snapshot,
-            token,
-            tracker,
-            operation
-        );
+        var aggregate = CreateCardsForRenderAsync(cards, scope, sockets, snapshot, token);
         var claimed = false;
         var completedLoad = false;
 
@@ -171,11 +162,8 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
                 yield break;
 
             var creation = aggregate.GetAwaiter().GetResult();
-            if (!operation.TryClaim())
-                yield break;
-
             claimed = true;
-            _active.AddRange(creation.Handles);
+            _active.AddRange(creation.Cards);
             if (_active.Count == 0)
             {
                 onPhase?.Invoke(ItemBoardPreviewPhase.Empty);
@@ -219,8 +207,8 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
                 }
                 else
                 {
-                    operation.Abandon();
                     CancelAndDisposeLoad(loadCancellation);
+                    _ = DisposeCreationWhenReadyAsync(aggregate);
                 }
             }
         }
@@ -241,18 +229,16 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
             return;
         }
 
-        var next = FindHoveredHandle(mousePixels);
-        if (ReferenceEquals(next, _hoveredHandle))
+        var next = FindHoveredSession(mousePixels);
+        if (ReferenceEquals(next, _hoveredSession))
             return;
 
         DispatchHoverOut();
         if (next == null)
             return;
 
-        _hoveredHandle = next;
-        _hoverRelay ??= new NativeCardPreviewHoverRelay(_options.HoverFailureReporter);
-        _hoverRelay.Bind(next.Card);
-        _hoverRelay.InvokeHover();
+        _hoveredSession = next;
+        next.HoverEnter();
     }
 
     public void Hide()
@@ -274,7 +260,6 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
         if (cancellation != null)
             CancelAndDispose(cancellation);
 
-        _runtimeTracker?.AbandonOperations();
         DispatchHoverOut();
     }
 
@@ -288,21 +273,10 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
     private bool EnsureInitialized(ItemBoardPreviewOptions options)
     {
-        if (
-            !ItemBoardPreviewInitialization.CanInitialize(
-                NativeCardPreviewReflection.SetUpMethod,
-                options.CardPreviewFailureReporter
-            )
-        )
-            return false;
-
         if (_runtimeLayer != int.MinValue && _runtimeLayer != options.Layer)
             DisposeRuntimeObjects();
 
         _runtimeLayer = options.Layer;
-        _pool ??= new NativeCardPreviewPool(options.Layer, requireSockets: true);
-        _factory ??= new NativeCardPreviewFactory(_pool);
-        _hoverRelay ??= new NativeCardPreviewHoverRelay(options.HoverFailureReporter);
 
         if (
             _root != null
@@ -315,15 +289,14 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
         {
             ApplyOptions(options);
             ApplyTransform();
-            _runtimeTracker ??= new RuntimeCreationTracker(_root, _factory);
+            _scope ??= _previewHost.OpenScope(
+                new ItemBoardNativeCardPreviewOwner(_sockets, options)
+            );
             return true;
         }
 
         DisposeRuntimeObjects();
         _runtimeLayer = options.Layer;
-        _pool = new NativeCardPreviewPool(options.Layer, requireSockets: true);
-        _factory = new NativeCardPreviewFactory(_pool);
-        _hoverRelay = new NativeCardPreviewHoverRelay(options.HoverFailureReporter);
 
         _root = new GameObject("BppItemBoardPreviewSurface", typeof(RectTransform), typeof(Canvas));
         _root.layer = options.Layer;
@@ -351,7 +324,7 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
             options.Layer,
             "BppItemBoardPreviewSocket"
         );
-        _runtimeTracker = new RuntimeCreationTracker(_root, _factory);
+        _scope = _previewHost.OpenScope(new ItemBoardNativeCardPreviewOwner(_sockets, options));
 
         ApplyTransform();
         return true;
@@ -422,48 +395,51 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
     }
 
     private async Task<CardCreationCollection> CreateCardsForRenderAsync(
-        IReadOnlyList<NativeCardPreviewSpec> cards,
-        NativeCardPreviewFactory factory,
+        IReadOnlyList<NativeCardPreviewSubject> cards,
+        INativeCardPreviewScope scope,
         RectTransform[] sockets,
         int snapshot,
-        CancellationToken token,
-        RuntimeCreationTracker tracker,
-        CardCreationOperation operation
+        CancellationToken token
     )
     {
-        var creation = await SpawnCardsAsync(cards, factory, sockets, token);
+        var creation = await SpawnCardsAsync(cards, scope, sockets, token);
         var staleOrCanceled =
             !_generation.IsCurrent(snapshot)
             || token.IsCancellationRequested
-            || !ReferenceEquals(_runtimeTracker, tracker);
+            || !ReferenceEquals(_scope, scope);
 
-        return operation.CompleteCreation(creation, staleOrCanceled);
+        if (!staleOrCanceled)
+            return creation;
+
+        DisposeCards(creation.Cards);
+        return creation.WithoutSessions();
     }
 
     private async Task<CardCreationCollection> SpawnCardsAsync(
-        IReadOnlyList<NativeCardPreviewSpec> cards,
-        NativeCardPreviewFactory factory,
+        IReadOnlyList<NativeCardPreviewSubject> cards,
+        INativeCardPreviewScope scope,
         RectTransform[] sockets,
         CancellationToken token
     )
     {
-        var tasks = new List<Task<CardCreationResult>>();
+        var subjects = new List<NativeCardPreviewSubject>();
         var fallbackIndex = 0;
         var hadPreflightFailures = false;
-        foreach (var spec in cards)
+        foreach (var subject in cards)
         {
-            if (!factory.TryResolveSpan(spec, out var span, out var spanFailure))
+            var measurement = _previewHost.Measure(subject);
+            if (measurement.Status != NativeCardMeasureStatus.Measured)
             {
                 hadPreflightFailures = true;
-                if (spanFailure != null)
-                    _options.CardPreviewFailureReporter?.Invoke(spanFailure);
+                if (measurement.Failure != null)
+                    _options.CardPreviewFailureReporter?.Invoke(measurement.Failure);
                 else
                 {
                     _options.ItemBoardFailureReporter?.Invoke(
                         new ItemBoardPreviewFailure(
                             ItemBoardPreviewOperation.ResolveSpan,
                             ItemBoardPreviewFailureReason.SpanUnavailable,
-                            spec.TemplateId
+                            subject.TemplateId
                         )
                     );
                 }
@@ -472,9 +448,9 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
             var socketIndex = ItemBoardSocketResolver.ResolveIndex(
                 sockets.Length,
-                spec.SocketId.HasValue ? (int)spec.SocketId.Value : (int?)null,
+                subject.SocketId.HasValue ? (int)subject.SocketId.Value : (int?)null,
                 fallbackIndex,
-                span
+                measurement.Span
             );
             if (socketIndex < 0)
             {
@@ -483,63 +459,33 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
                     new ItemBoardPreviewFailure(
                         ItemBoardPreviewOperation.ResolvePlacement,
                         ItemBoardPreviewFailureReason.PlacementUnavailable,
-                        spec.TemplateId
+                        subject.TemplateId
                     )
                 );
                 continue;
             }
 
-            tasks.Add(
-                CreateCardHandleAsync(factory, spec, sockets[socketIndex], fallbackIndex, token)
-            );
+            subjects.Add(WithSocket(subject, socketIndex));
             fallbackIndex++;
         }
 
         var aggregate =
-            tasks.Count == 0
-                ? Task.FromResult(Array.Empty<CardCreationResult>())
-                : Task.WhenAll(tasks);
+            subjects.Count == 0
+                ? Task.FromResult(Array.Empty<ItemBoardPreviewAcquireResult>())
+                : ItemBoardPreviewBatchAcquirer.AcquireAsync(scope, subjects, token);
 
-        var collection = await CollectCreatedHandlesAsync(aggregate, token);
+        var collection = await CollectCreatedSessionsAsync(aggregate, token);
         return hadPreflightFailures ? collection.WithFailure() : collection;
     }
 
-    private async Task<CardCreationResult> CreateCardHandleAsync(
-        NativeCardPreviewFactory factory,
-        NativeCardPreviewSpec spec,
-        RectTransform socket,
-        int fallbackIndex,
+    private async Task<CardCreationCollection> CollectCreatedSessionsAsync(
+        Task<ItemBoardPreviewAcquireResult[]> aggregate,
         CancellationToken token
     )
     {
-        try
-        {
-            var outcome = await factory.CreateAsync(spec, socket, fallbackIndex, token);
-            if (outcome.Handle != null)
-                return CardCreationResult.Success(outcome.Handle);
-
-            return token.IsCancellationRequested
-                ? CardCreationResult.FromCanceled(spec, fallbackIndex)
-                : CardCreationResult.Failed(spec, fallbackIndex, exception: null, outcome.Failure);
-        }
-        catch (OperationCanceledException)
-        {
-            return CardCreationResult.FromCanceled(spec, fallbackIndex);
-        }
-        catch (Exception ex)
-        {
-            return CardCreationResult.Failed(spec, fallbackIndex, ex, nativeFailure: null);
-        }
-    }
-
-    private async Task<CardCreationCollection> CollectCreatedHandlesAsync(
-        Task<CardCreationResult[]> aggregate,
-        CancellationToken token
-    )
-    {
-        var created = new List<NativeCardPreviewHandle>();
+        var created = new List<ActiveCard>();
         var hadFailures = false;
-        CardCreationResult[] results;
+        ItemBoardPreviewAcquireResult[] results;
         try
         {
             results = await aggregate;
@@ -564,9 +510,9 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
         foreach (var result in results)
         {
-            if (result.Handle != null)
+            if (result.Session != null)
             {
-                created.Add(result.Handle);
+                created.Add(new ActiveCard(result.Session, result.Subject));
                 continue;
             }
 
@@ -575,15 +521,12 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
             hadFailures = true;
             if (result.NativeFailure != null)
-            {
-                _options.CardPreviewFailureReporter?.Invoke(result.NativeFailure);
                 continue;
-            }
             _options.ItemBoardFailureReporter?.Invoke(
                 new ItemBoardPreviewFailure(
                     ItemBoardPreviewOperation.CreateCard,
                     result.Exception == null
-                        ? ItemBoardPreviewFailureReason.HandleUnavailable
+                        ? ItemBoardPreviewFailureReason.SessionUnavailable
                         : ItemBoardPreviewFailureReason.CardException,
                     result.TemplateId,
                     result.Exception
@@ -594,14 +537,38 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
         return new CardCreationCollection(created, hadFailures);
     }
 
-    private static void ReturnHandles(
-        NativeCardPreviewFactory factory,
-        IReadOnlyList<NativeCardPreviewHandle> handles
-    )
+    private static void DisposeCards(IReadOnlyList<ActiveCard> cards)
     {
-        foreach (var handle in handles)
-            factory.Return(handle);
+        foreach (var card in cards)
+            card.Session.Dispose();
     }
+
+    private static async Task DisposeCreationWhenReadyAsync(Task<CardCreationCollection> creation)
+    {
+        try
+        {
+            DisposeCards((await creation).Cards);
+        }
+        catch
+        {
+            // Each acquisition owns its own failure cleanup; there is no delivered session here.
+        }
+    }
+
+    private static NativeCardPreviewSubject WithSocket(
+        NativeCardPreviewSubject subject,
+        int socketIndex
+    ) =>
+        new()
+        {
+            TemplateId = subject.TemplateId,
+            Tier = subject.Tier,
+            SocketId = (BazaarGameShared.Domain.Core.Types.EContainerSocketId)socketIndex,
+            DisplaySpan = subject.DisplaySpan,
+            EnchantmentType = subject.EnchantmentType,
+            Attributes = subject.Attributes,
+            InstanceIdPrefix = subject.InstanceIdPrefix,
+        };
 
     private void CompleteLoad(CancellationTokenSource cancellation)
     {
@@ -636,21 +603,12 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
     private bool ShowSetUpCards()
     {
-        if (_factory == null)
-            return false;
-
         var hadFailures = false;
-        foreach (var handle in _active)
+        foreach (var card in _active)
         {
-            if (handle.SetUpTask.IsCompletedSuccessfully)
-            {
-                var failure = _factory.Show(handle);
-                if (failure != null)
-                {
-                    hadFailures = true;
-                    _options.CardPreviewFailureReporter?.Invoke(failure);
-                }
-            }
+            var result = card.Session.Show();
+            if (result.Status == NativePreviewActionStatus.Failed)
+                hadFailures = true;
         }
         return hadFailures;
     }
@@ -662,15 +620,16 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
         var corners = new Vector3[4];
         var laid = new List<(Transform card, float frameLeft, float frameWidth)>();
-        foreach (var handle in _active)
+        foreach (var card in _active)
         {
-            if (!handle.SetUpTask.IsCompletedSuccessfully || handle.Card == null)
+            var root = card.Session.Root;
+            if (root == null)
                 continue;
 
-            var root = handle.Rect;
-            var frame = FindDescendant(root, "FrameContainer") ?? root;
+            var rect = card.Session.Rect;
+            var frame = FindDescendant(rect, "FrameContainer") ?? rect;
             frame.GetWorldCorners(corners);
-            laid.Add((handle.Card.transform, corners[0].x, corners[2].x - corners[0].x));
+            laid.Add((root.transform, corners[0].x, corners[2].x - corners[0].x));
         }
 
         if (laid.Count == 0)
@@ -696,26 +655,27 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
             return;
 
         var corners = new Vector3[4];
-        foreach (var handle in _active)
+        foreach (var card in _active)
         {
-            if (!handle.SetUpTask.IsCompletedSuccessfully || handle.Card == null)
+            var root = card.Session.Root;
+            if (root == null)
                 continue;
-            if (!handle.Card.gameObject.activeInHierarchy)
+            if (!root.activeInHierarchy)
                 continue;
 
-            var frame = FindDescendant(handle.Rect, "FrameContainer") ?? handle.Rect;
+            var frame = FindDescendant(card.Session.Rect, "FrameContainer") ?? card.Session.Rect;
             frame.GetWorldCorners(corners);
             var frameWidth = corners[2].x - corners[0].x;
             var frameHeight = corners[2].y - corners[0].y;
             if (frameWidth <= 0f || frameHeight <= 0f)
                 continue;
 
-            var socketIndex = handle.Spec.SocketId.HasValue ? (int)handle.Spec.SocketId.Value : 0;
+            var socketIndex = card.Subject.SocketId.HasValue ? (int)card.Subject.SocketId.Value : 0;
             var occupied = ItemBoardSlotGridGeometry.ResolveOccupiedRect(
                 _clipSize.x,
                 _clipSize.y,
                 socketIndex,
-                handle.Spec.DisplaySpan,
+                card.Subject.DisplaySpan,
                 _options.SlotGridHorizontalInsetPixels,
                 _options.SlotGridVerticalInsetPixels
             );
@@ -731,7 +691,7 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
                 _options.SlotGridMaxScale
             );
 
-            var cardTransform = handle.Card.transform;
+            var cardTransform = root.transform;
             cardTransform.localScale = new Vector3(
                 cardTransform.localScale.x * scale,
                 cardTransform.localScale.y * scale,
@@ -755,17 +715,18 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
         }
     }
 
-    private NativeCardPreviewHandle? FindHoveredHandle(Vector2 mousePixels)
+    private INativeCardPreviewSession? FindHoveredSession(Vector2 mousePixels)
     {
         var corners = new Vector3[4];
-        foreach (var handle in _active)
+        foreach (var card in _active)
         {
-            if (!handle.SetUpTask.IsCompletedSuccessfully || handle.Card == null)
+            var root = card.Session.Root;
+            if (root == null)
                 continue;
-            if (!handle.Card.gameObject.activeInHierarchy)
+            if (!root.activeInHierarchy)
                 continue;
 
-            handle.Rect.GetWorldCorners(corners);
+            card.Session.Rect.GetWorldCorners(corners);
             var rect = new Rect(
                 corners[0].x,
                 corners[0].y,
@@ -773,7 +734,7 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
                 corners[2].y - corners[0].y
             );
             if (rect.Contains(mousePixels))
-                return handle;
+                return card.Session;
         }
 
         return null;
@@ -781,39 +742,57 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
 
     private void DispatchHoverOut()
     {
-        _hoverRelay?.Clear();
-        _hoveredHandle = null;
+        _hoveredSession?.HoverExit();
+        _hoveredSession = null;
     }
 
     private void ReturnActiveCardsToPool()
     {
         DispatchHoverOut();
-        if (_factory != null)
-        {
-            foreach (var handle in _active)
-                _factory.Return(handle);
-        }
-
+        DisposeCards(_active);
         _active.Clear();
     }
 
     private void DisposeRuntimeObjects()
     {
         ReturnActiveCardsToPool();
-        var tracker = _runtimeTracker ?? new RuntimeCreationTracker(_root, _factory);
-        tracker.RequestCleanup();
+        var scope = _scope;
+        var root = _root;
+        if (root != null)
+            root.SetActive(false);
+        if (scope != null || root != null)
+            _ = DisposeScopeAndRootAsync(scope, root);
 
-        _factory = null;
-        _pool = null;
+        _scope = null;
         _sockets = null;
-        _runtimeTracker = null;
         _root = null;
         _canvas = null;
         _canvasGroup = null;
         _rootRect = null;
         _clipRect = null;
         _boardRect = null;
-        _hoverRelay = null;
+    }
+
+    private static async Task DisposeScopeAndRootAsync(
+        INativeCardPreviewScope? scope,
+        GameObject? root
+    )
+    {
+        try
+        {
+            if (scope != null)
+                await scope.DisposeAsync();
+        }
+        catch
+        {
+            // Scope/owner cleanup already reports typed failures. Keep fire-and-forget teardown
+            // from publishing an unobserved task exception, and always destroy the canvas root.
+        }
+        finally
+        {
+            if (root != null)
+                Object.Destroy(root);
+        }
     }
 
     private static RectTransform? FindDescendant(Transform root, string childName)
@@ -826,232 +805,69 @@ internal sealed class ItemBoardPreviewSurface : IDisposable
         return null;
     }
 
-    private readonly struct CardCreationResult
-    {
-        private CardCreationResult(
-            NativeCardPreviewHandle? handle,
-            NativeCardPreviewSpec spec,
-            int fallbackIndex,
-            Exception? exception,
-            NativeCardPreviewFailure? nativeFailure,
-            bool canceled
-        )
-        {
-            Handle = handle;
-            TemplateId = spec.TemplateId;
-            FallbackIndex = fallbackIndex;
-            Exception = exception;
-            NativeFailure = nativeFailure;
-            Canceled = canceled;
-        }
-
-        public NativeCardPreviewHandle? Handle { get; }
-        public Guid TemplateId { get; }
-        public int FallbackIndex { get; }
-        public Exception? Exception { get; }
-        public NativeCardPreviewFailure? NativeFailure { get; }
-        public bool Canceled { get; }
-
-        public static CardCreationResult Success(NativeCardPreviewHandle handle) =>
-            new(handle, handle.Spec, -1, null, null, canceled: false);
-
-        public static CardCreationResult Failed(
-            NativeCardPreviewSpec spec,
-            int fallbackIndex,
-            Exception? exception,
-            NativeCardPreviewFailure? nativeFailure
-        ) => new(null, spec, fallbackIndex, exception, nativeFailure, canceled: false);
-
-        public static CardCreationResult FromCanceled(
-            NativeCardPreviewSpec spec,
-            int fallbackIndex
-        ) => new(null, spec, fallbackIndex, null, null, canceled: true);
-    }
-
     private readonly struct CardCreationCollection
     {
-        public CardCreationCollection(
-            IReadOnlyList<NativeCardPreviewHandle> handles,
-            bool hadFailures
-        )
+        public CardCreationCollection(IReadOnlyList<ActiveCard> cards, bool hadFailures)
         {
-            Handles = handles;
+            Cards = cards;
             HadFailures = hadFailures;
         }
 
-        public IReadOnlyList<NativeCardPreviewHandle> Handles { get; }
+        public IReadOnlyList<ActiveCard> Cards { get; }
         public bool HadFailures { get; }
 
-        public CardCreationCollection WithoutHandles() =>
-            new(Array.Empty<NativeCardPreviewHandle>(), HadFailures);
+        public CardCreationCollection WithoutSessions() =>
+            new(Array.Empty<ActiveCard>(), HadFailures);
 
-        public CardCreationCollection WithFailure() => new(Handles, hadFailures: true);
+        public CardCreationCollection WithFailure() => new(Cards, hadFailures: true);
     }
 
-    private sealed class RuntimeCreationTracker
+    private readonly record struct ActiveCard(
+        INativeCardPreviewSession Session,
+        NativeCardPreviewSubject Subject
+    );
+
+    private sealed class ItemBoardNativeCardPreviewOwner : INativeCardPreviewOwner
     {
-        private readonly object _syncRoot = new();
-        private readonly HashSet<CardCreationOperation> _operations = new();
-        private bool _cleanupRequested;
-        private bool _destroyed;
+        private readonly RectTransform[] _sockets;
+        private readonly ItemBoardPreviewOptions _options;
 
-        public RuntimeCreationTracker(GameObject? root, NativeCardPreviewFactory? factory)
-        {
-            Root = root;
-            Factory = factory;
-        }
-
-        public GameObject? Root { get; }
-        public NativeCardPreviewFactory? Factory { get; }
-
-        public bool CleanupRequested
-        {
-            get
-            {
-                lock (_syncRoot)
-                    return _cleanupRequested;
-            }
-        }
-
-        public CardCreationOperation RegisterOperation()
-        {
-            var operation = new CardCreationOperation(this);
-            lock (_syncRoot)
-                _operations.Add(operation);
-
-            return operation;
-        }
-
-        public void OperationSettled(CardCreationOperation operation)
-        {
-            lock (_syncRoot)
-                _operations.Remove(operation);
-
-            DestroyIfReady();
-        }
-
-        public void RequestCleanup()
-        {
-            if (Root != null)
-                Root.SetActive(false);
-
-            List<CardCreationOperation> operations;
-            lock (_syncRoot)
-            {
-                _cleanupRequested = true;
-                operations = new List<CardCreationOperation>(_operations);
-            }
-
-            foreach (var operation in operations)
-                operation.Abandon();
-
-            DestroyIfReady();
-        }
-
-        public void AbandonOperations()
-        {
-            List<CardCreationOperation> operations;
-            lock (_syncRoot)
-                operations = new List<CardCreationOperation>(_operations);
-
-            foreach (var operation in operations)
-                operation.Abandon();
-        }
-
-        private void DestroyIfReady()
-        {
-            var destroyNow = false;
-            lock (_syncRoot)
-            {
-                if (!_cleanupRequested || _operations.Count != 0 || _destroyed)
-                    return;
-
-                _destroyed = true;
-                destroyNow = true;
-            }
-
-            if (!destroyNow)
-                return;
-
-            Factory?.DestroyAll();
-            if (Root != null)
-                Object.Destroy(Root);
-        }
-    }
-
-    private sealed class CardCreationOperation
-    {
-        private readonly RuntimeCreationTracker _tracker;
-        private readonly object _syncRoot = new();
-        private CardCreationCollection? _published;
-        private bool _creationCompleted;
-        private bool _abandoned;
-        private bool _claimed;
-
-        public CardCreationOperation(RuntimeCreationTracker tracker)
-        {
-            _tracker = tracker;
-        }
-
-        public CardCreationCollection CompleteCreation(
-            CardCreationCollection creation,
-            bool staleOrCanceled
+        internal ItemBoardNativeCardPreviewOwner(
+            RectTransform[] sockets,
+            ItemBoardPreviewOptions options
         )
         {
-            var shouldReturn = false;
-            lock (_syncRoot)
-            {
-                _creationCompleted = true;
-                shouldReturn =
-                    staleOrCanceled || _abandoned || _claimed || _tracker.CleanupRequested;
-                if (!shouldReturn)
-                    _published = creation;
-            }
-
-            if (shouldReturn)
-                ReturnHandles(_tracker.Factory!, creation.Handles);
-
-            if (shouldReturn)
-                _tracker.OperationSettled(this);
-
-            return shouldReturn ? creation.WithoutHandles() : creation;
+            _sockets = sockets ?? throw new ArgumentNullException(nameof(sockets));
+            _options = options ?? throw new ArgumentNullException(nameof(options));
         }
 
-        public bool TryClaim()
+        public int Layer => _options.Layer;
+
+        public Transform? ResolveParent(NativeCardPreviewSubject subject)
         {
-            lock (_syncRoot)
-            {
-                if (_abandoned || _claimed || !_published.HasValue)
-                    return false;
+            if (!subject.SocketId.HasValue)
+                return null;
 
-                _published = null;
-                _claimed = true;
-            }
-
-            _tracker.OperationSettled(this);
-            return true;
+            var index = (int)subject.SocketId.Value;
+            return index >= 0 && index < _sockets.Length ? _sockets[index] : null;
         }
 
-        public void Abandon()
+        public void PrepareWhileInactive(NativeCardPreviewOwnerContext context) { }
+
+        public void OnAcquired(NativeCardPreviewOwnerContext context) { }
+
+        public void BeforeRelease(NativeCardPreviewOwnerContext context) { }
+
+        public void ReportFailure(NativeCardPreviewFailure failure)
         {
-            CardCreationCollection? abandoned;
-            var settled = false;
-            lock (_syncRoot)
-            {
-                if (_abandoned || _claimed)
-                    return;
-
-                _abandoned = true;
-                abandoned = _published;
-                _published = null;
-                settled = _creationCompleted;
-            }
-
-            if (abandoned.HasValue)
-                ReturnHandles(_tracker.Factory!, abandoned.Value.Handles);
-
-            if (settled)
-                _tracker.OperationSettled(this);
+            if (
+                failure.Operation
+                is NativeCardPreviewOperation.InvokeHover
+                    or NativeCardPreviewOperation.InvokeHoverOut
+            )
+                _options.HoverFailureReporter?.Invoke(failure);
+            else
+                _options.CardPreviewFailureReporter?.Invoke(failure);
         }
     }
 }

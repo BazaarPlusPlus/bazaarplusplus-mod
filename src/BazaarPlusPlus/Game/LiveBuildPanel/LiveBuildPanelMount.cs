@@ -4,6 +4,7 @@ using System;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.Game.OverlayPanels;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 
@@ -13,14 +14,18 @@ internal sealed class LiveBuildPanelMount : IBppMountable
 {
     private readonly Func<OverlayPanelHost?> _overlayHost;
     private readonly BuildRecommendationRepository _recommendations;
+    private readonly INativeCardPreviewHost _nativeCardPreviewHost;
 
     public LiveBuildPanelMount(
         Func<OverlayPanelHost?> overlayHost,
-        BuildRecommendationRepository recommendations
+        BuildRecommendationRepository recommendations,
+        INativeCardPreviewHost nativeCardPreviewHost
     )
     {
         _overlayHost = overlayHost;
         _recommendations = recommendations;
+        _nativeCardPreviewHost =
+            nativeCardPreviewHost ?? throw new ArgumentNullException(nameof(nativeCardPreviewHost));
     }
 
     public void Mount(GameObject host, IBppServices services)
@@ -38,7 +43,7 @@ internal sealed class LiveBuildPanelMount : IBppMountable
         }
 
         var panel = host.AddComponent<LiveBuildPanel>();
-        panel.Initialize(_recommendations, overlayHost);
+        panel.Initialize(_recommendations, overlayHost, _nativeCardPreviewHost);
     }
 
     public void Unmount(GameObject host)

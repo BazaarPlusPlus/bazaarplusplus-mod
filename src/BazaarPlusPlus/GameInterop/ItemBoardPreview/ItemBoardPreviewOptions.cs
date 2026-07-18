@@ -71,7 +71,7 @@ internal enum ItemBoardPreviewFailureReason
     SpanUnavailable,
     PlacementUnavailable,
     AggregateException,
-    HandleUnavailable,
+    SessionUnavailable,
     CardException,
 }
 

@@ -343,7 +343,7 @@ public class CoreLayeringTests
         Assert.Contains("if (!cell.IsShown)", virtualizerSource);
         Assert.Contains("ReferenceEquals(cell.Vm, nextVisible[newIndex])", virtualizerSource);
         Assert.Contains("cell.Index = newIndex;", virtualizerSource);
-        Assert.Contains("cell.HoverRelay?.Bind(cell.Card);", virtualizerSource);
+        Assert.Contains("cell.HoverRelay?.Bind(cell.Session);", virtualizerSource);
         Assert.Contains("Reposition(newIndex, cell);", virtualizerSource);
     }
 
@@ -363,8 +363,14 @@ public class CoreLayeringTests
                 "CollectionTierTooltipPreview.cs"
             )
         );
-        var factorySource = File.ReadAllText(
-            Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "CollectionCardFactory.cs")
+        var ownerSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CollectionPanel",
+                "Grid",
+                "CollectionNativeCardPreviewOwner.cs"
+            )
         );
         var destroyPatchSource = File.ReadAllText(
             Path.Combine(
@@ -379,9 +385,9 @@ public class CoreLayeringTests
         Assert.Contains("nameof(CardTooltipData.GetPassiveTooltipBlock)", patchSource);
         Assert.Contains("nameof(CooldownRenderer.RenderFromTooltip)", patchSource);
         Assert.Contains("CollectionTierTooltipRegistry.Contains", previewSource);
-        Assert.Contains("CollectionTierTooltipRegistry.Register", factorySource);
-        Assert.Contains("CollectionTierTooltipRegistry.Unregister", factorySource);
-        Assert.Contains("CollectionTierTooltipRegistry.Unregister", destroyPatchSource);
+        Assert.Contains("CollectionTierTooltipRegistry.Register", ownerSource);
+        Assert.Contains("CollectionTierTooltipRegistry.Unregister", ownerSource);
+        Assert.Contains("PreviewOwner?.OnNativeDestroyed", destroyPatchSource);
         Assert.Contains("CardExtensions.BuildAttributeDictionaryForTier", previewSource);
         Assert.Contains("CollectionTierTooltipTextMerger.Merge", previewSource);
         Assert.Contains("TryGetTierAttributeValues", previewSource);

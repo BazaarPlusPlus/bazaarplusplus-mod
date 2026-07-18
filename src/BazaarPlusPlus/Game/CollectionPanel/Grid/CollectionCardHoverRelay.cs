@@ -1,96 +1,28 @@
 #nullable enable
-using System;
-using System.Reflection;
 using BazaarPlusPlus.GameInterop.CardPreview;
-using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
-// Tiny IPointerEnter/Exit relay attached to the per-cell transparent hit Image. The native
-// CardPreviewBase exposes OnHover() / OnHoverOut() as [UsedImplicitly] public methods, so
-// it never receives pointer events on its own; this relay forwards them. We resolve the
-// methods through reflection once at startup so the call site does not need a compile-time
-// reference to TheBazaar.UI.CardPreviewBase.
 internal sealed class CollectionCardHoverRelay
     : MonoBehaviour,
         IPointerEnterHandler,
         IPointerExitHandler
 {
-    private static readonly MethodInfo? OnHoverMethod = ResolveHoverMethod("OnHover");
-    private static readonly MethodInfo? OnHoverOutMethod = ResolveHoverMethod("OnHoverOut");
+    private INativeCardPreviewSession? _session;
 
-    private Component? _card;
-
-    public void Bind(Component card) => _card = card;
+    public void Bind(INativeCardPreviewSession session) => _session = session;
 
     public void Clear()
     {
         TryInvokeHoverOut();
-        _card = null;
+        _session = null;
     }
 
-    public void OnPointerEnter(PointerEventData _)
-    {
-        if (_card == null)
-            return;
-        if (InvokeSafe(_card, OnHoverMethod, CollectionHoverOperation.OnHover))
-            NativeCardPreviewHoverTracker.NotifyHover(_card);
-    }
+    public void OnPointerEnter(PointerEventData _) => _session?.HoverEnter();
 
-    public void OnPointerExit(PointerEventData _)
-    {
-        if (_card == null)
-            return;
-        if (InvokeSafe(_card, OnHoverOutMethod, CollectionHoverOperation.OnHoverOut))
-            NativeCardPreviewHoverTracker.NotifyHoverOut(_card);
-    }
+    public void OnPointerExit(PointerEventData _) => _session?.HoverExit();
 
-    public void TryInvokeHoverOut()
-    {
-        if (_card == null)
-            return;
-        if (InvokeSafe(_card, OnHoverOutMethod, CollectionHoverOperation.OnHoverOut))
-            NativeCardPreviewHoverTracker.NotifyHoverOut(_card);
-    }
-
-    private static MethodInfo? ResolveHoverMethod(string name)
-    {
-        return NativeCardPreviewReflection.ResolvePublicInstanceMethod(name);
-    }
-
-    private static bool InvokeSafe(
-        Component target,
-        MethodInfo? method,
-        CollectionHoverOperation operation
-    )
-    {
-        if (target == null || method == null)
-            return false;
-        try
-        {
-            method.Invoke(target, Array.Empty<object>());
-            return true;
-        }
-        catch (TargetInvocationException ex)
-        {
-            var projected = ex.InnerException ?? ex;
-            BppLog.DebugEvent(
-                CollectionPanelLogEvents.HoverInvokeFailed,
-                projected,
-                () => [CollectionPanelLogEvents.HoverInvokeFailedOperation.Bind(operation)]
-            );
-            return false;
-        }
-        catch (Exception ex)
-        {
-            BppLog.DebugEvent(
-                CollectionPanelLogEvents.HoverInvokeFailed,
-                ex,
-                () => [CollectionPanelLogEvents.HoverInvokeFailedOperation.Bind(operation)]
-            );
-            return false;
-        }
-    }
+    public void TryInvokeHoverOut() => _session?.HoverExit();
 }
