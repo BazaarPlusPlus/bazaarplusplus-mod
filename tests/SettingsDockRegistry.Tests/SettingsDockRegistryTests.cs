@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
@@ -28,18 +29,6 @@ namespace BazaarPlusPlus.Tests.SettingsDockRegistry;
 
 public class SettingsDockRegistryTests
 {
-    private sealed class StubEncounterPreviewModule : IEncounterPreviewModule
-    {
-        public EncounterPreviewResult ResolveEvent(EventPreviewQuery query) =>
-            new(EventPreviewAvailability.Unavailable, null);
-
-        public EncounterStepPreviewResult ResolveStep(EncounterStepPreviewQuery query) =>
-            new(EventPreviewAvailability.Unavailable, null);
-
-        public LevelUpPreviewResult ResolveLevelUp(LevelUpPreviewQuery query) =>
-            new(EventPreviewAvailability.Unavailable, null);
-    }
-
     private sealed class FakeEntry : ISettingsDockEntry
     {
         public string Key { get; }
@@ -449,7 +438,7 @@ public class SettingsDockRegistryTests
             config.Initialize(new ConfigFile(configPath, saveOnInit: false));
             BppPatchHost.Install(
                 new ContractTestServices(config),
-                new BppPatchFeatures(new StubEncounterPreviewModule())
+                (BppPatchFeatures)RuntimeHelpers.GetUninitializedObject(typeof(BppPatchFeatures))
             );
 
             Assert.False(QuestPreviewGate.IsEnabled());
