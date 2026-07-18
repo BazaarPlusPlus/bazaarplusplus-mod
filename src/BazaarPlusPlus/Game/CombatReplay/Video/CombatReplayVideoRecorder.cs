@@ -324,8 +324,11 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         }
     }
 
-    internal void CancelArmedCurrentReplay(string recordingId)
+    internal void CancelArmedCurrentReplay(string recordingId, string reason)
     {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A cancellation reason is required.", nameof(reason));
+
         var prepared = _preparedCurrentReplay;
         if (
             prepared == null
@@ -336,8 +339,12 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         }
 
         _preparedCurrentReplay = null;
-        TryMarkPreparedMetadataFailed(prepared, "native-replay-cancelled");
-        _operations.CompletePreflight(prepared.Operation, ReplayVideoRecordingReasonCode.Aborted);
+        TryMarkPreparedMetadataFailed(prepared, reason);
+        _operations.CompletePreflight(
+            prepared.Operation,
+            ReplayVideoRecordingReasonCode.Aborted,
+            reason: reason
+        );
     }
 
     private void OnEnable()

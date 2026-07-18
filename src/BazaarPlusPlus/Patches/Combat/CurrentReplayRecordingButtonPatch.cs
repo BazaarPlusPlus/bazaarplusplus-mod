@@ -20,6 +20,14 @@ internal static class CurrentReplayRecordingButtonPatch
         typeof(BoardRecapReplayButtonsController),
         "ReplayButton"
     );
+    private static readonly FieldInfo? RecapButtonField = AccessTools.Field(
+        typeof(BoardRecapReplayButtonsController),
+        "RecapButton"
+    );
+    private static readonly FieldInfo? BackButtonField = AccessTools.Field(
+        typeof(BoardRecapReplayButtonsController),
+        "BackButton"
+    );
 
     [HarmonyPostfix]
     private static void Postfix(BoardRecapReplayButtonsController __instance)
@@ -27,8 +35,16 @@ internal static class CurrentReplayRecordingButtonPatch
         if (__instance == null)
             return;
         var replayButton = ReplayButtonField?.GetValue(__instance) as Button;
-        if (replayButton != null)
-            CurrentReplayRecordingButtonController.BindNativeReplay(replayButton);
+        var recapButton = RecapButtonField?.GetValue(__instance) as Button;
+        var backButton = BackButtonField?.GetValue(__instance) as Button;
+        if (replayButton != null && recapButton != null && backButton != null)
+        {
+            CurrentReplayRecordingButtonController.BindNativeActions(
+                replayButton,
+                recapButton,
+                backButton
+            );
+        }
     }
 }
 

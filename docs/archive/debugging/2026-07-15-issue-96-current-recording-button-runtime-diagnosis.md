@@ -88,6 +88,19 @@ superseded-by: code (PR #105, CurrentReplayRecordingButtonController) + docs/MEM
 
 用户进一步明确最终位置应在被 hover 的圆形按钮**正上方**，不能覆盖 icon/button。布局因此改为读取原生 `_contentForWorldBounds` 的真实视觉边界，将 tooltip 的 bottom edge 放到 button top edge 之上并保留间距；水平方向先中心对齐，再交给原生 bounds clamp 处理右侧越界。
 
+## 2026-07-18 录制与 Recap 状态不同步
+
+### 已确认根因
+
+反编译确认，`ReplayState.Replay()` 播放完毕只恢复 Replay/Recap/Continue 按钮并触发 `Events.ReplayEnded`，不会自动进入 Recap（`decompiled/TheBazaarRuntime/TheBazaar/ReplayState.cs:246-284`）；进入 Recap 的完整原生链路由 `BoardRecapReplayButtonsController.Recap()` 发出事件，再依次调用 `ReplayState.Recap()` 与 `BoardManager.ShowRecapView()`（`decompiled/TheBazaarRuntime/TheBazaar/BoardRecapReplayButtonsController.cs:159-166`、`decompiled/TheBazaarRuntime/BoardManager.cs:3656-3660`）。另一方面，原生 Replay 入口只调用 `ReplayState.Replay()` 并隐藏按钮（`decompiled/TheBazaarRuntime/BoardManager.cs:3649-3653`），不会先走 Back 所调用的 `HideRecapView()` / `ReplayState.RecapBack()`（`decompiled/TheBazaarRuntime/BoardManager.cs:3630-3637`）。于是 current-recording 直接复用 Replay 按钮时存在两个确定行为缺口：录完停留在普通回放面；从 Recap 内起录会让 Recap 的翻板协程与 Replay 的翻板流程重叠。
+
+### 修复决策与验证
+
+- 继续复用游戏的原生按钮动作：patch 同时绑定 Replay、Recap、Back 三个按钮，不复制 `ShowRecapView` / `HideRecapView` 的私有实现。
+- 普通状态起录仍同步触发 Replay；Recap 状态起录先触发原生 Back，再等待 `IsRecapViewOpen == false && StorageMoving == false`，之后才触发 Replay，避免两套翻板动画并发。
+- current-native 录制收到 `Events.ReplayEnded` 时先触发原生 Recap，继续捕获 3 秒后再发布 recorder 的 ended 事件；这 3 秒作为固定 post-roll，明确包含 Recap 切换与停留画面。post-roll 期间程序化 Continue 会被拒绝，避免自动流程提前退出 ReplayState、截断视频尾部。
+- Architecture.Tests 固定三按钮接线、Recap 关闭等待条件和录制结束后的原生 Recap 调用；实机验证需覆盖「普通状态录制后自动进 Recap」与「Recap 状态点击录制时先完整翻回、再开始回放」两条路径。
+
 ## 当前问题与已确认事实
 
 1. 该场战斗不是 PvE/教程边界：SQLite 最新记录为 `combat_kind=PVPCombat`、`has_local_payload=1`，exact battle payload 已落盘。

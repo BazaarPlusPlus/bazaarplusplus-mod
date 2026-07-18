@@ -67,6 +67,7 @@ RunReplayPresentationRestorationChecks(replaySavedStateNormalizerType);
 RunReplaySpawnSanitizationChecks(snapshotRehydratorType);
 
 RunCurrentReplayRecordingStateChecks();
+RunReplayVideoPreflightReasonChecks();
 RunCurrentReplayRecordingUiLogChecks();
 RunCurrentReplayVideoMetadataChecks();
 RunSystemFileRevealCommandChecks();
@@ -2053,6 +2054,65 @@ static void RunCurrentReplayRecordingStateChecks()
     Assert(
         !(bool)GetProperty(reset.GetType(), reset, "Visible")!,
         "Leaving ReplayState should remove the temporary current-battle button."
+    );
+}
+
+static void RunReplayVideoPreflightReasonChecks()
+{
+    var operationType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingOperation"
+    );
+    var completionType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingCompletion"
+    );
+    var terminalType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingTerminal"
+    );
+    var sourceType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPlaybackSource");
+    var reasonType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingReasonCode"
+    );
+    var operation = Activator.CreateInstance(
+        operationType,
+        BindingFlags.Instance | BindingFlags.NonPublic,
+        binder: null,
+        args:
+        [
+            "recording-preflight-reason",
+            "battle-preflight-reason",
+            Enum.Parse(sourceType, "CurrentNative"),
+            DateTimeOffset.UtcNow,
+        ],
+        culture: null
+    )!;
+    var completion = Activator.CreateInstance(completionType, nonPublic: true)!;
+    SetProperty(completionType, completion, "ReasonCode", Enum.Parse(reasonType, "Aborted"));
+    SetProperty(completionType, completion, "Reason", "native-recap-close-timeout");
+
+    var tryComplete =
+        operationType.GetMethod(
+            "TryComplete",
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            types: [completionType, terminalType.MakeByRefType()],
+            modifiers: null
+        )
+        ?? throw new InvalidOperationException(
+            "ReplayVideoRecordingOperation.TryComplete should expose its terminal result."
+        );
+    object?[] arguments = [completion, null];
+    Assert(
+        (bool)tryComplete.Invoke(operation, arguments)!,
+        "A preflight cancellation should complete its recording operation."
+    );
+    var terminal = arguments[1]!;
+    Assert(
+        string.Equals(
+            GetProperty(terminalType, terminal, "Reason")?.ToString(),
+            "native-recap-close-timeout",
+            StringComparison.Ordinal
+        ),
+        "A preflight cancellation should preserve its specific ended reason for downstream diagnostics."
     );
 }
 
