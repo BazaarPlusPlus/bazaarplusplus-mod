@@ -29,16 +29,19 @@ public sealed class CenteredChinesePunctuationTests
     }
 
     [Theory]
-    [InlineData(SubtitlePosition.TopLeft, "字幕。")]
-    [InlineData(SubtitlePosition.TopRight, "字幕！")]
-    [InlineData(SubtitlePosition.TopCenter, "字幕")]
-    [InlineData(SubtitlePosition.TopCenter, "字幕，")]
-    [InlineData(SubtitlePosition.TopCenter, "「字幕」")]
-    public void Noneligible_line_keeps_its_original_text(SubtitlePosition position, string source)
+    [InlineData(0, "字幕。")]
+    [InlineData(1, "字幕！")]
+    [InlineData(2, "字幕")]
+    [InlineData(2, "字幕，")]
+    [InlineData(2, "「字幕」")]
+    public void Noneligible_line_keeps_its_original_text(int position, string source)
     {
         Assert.Equal(
             source,
-            VoiceLineDisplay.ConvertCenteredChineseTrailingPunctuation(source, position)
+            VoiceLineDisplay.ConvertCenteredChineseTrailingPunctuation(
+                source,
+                (SubtitlePosition)position
+            )
         );
     }
 }
