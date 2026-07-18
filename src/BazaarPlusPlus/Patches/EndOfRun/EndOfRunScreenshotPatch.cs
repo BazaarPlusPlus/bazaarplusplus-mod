@@ -1,6 +1,5 @@
 #pragma warning disable CS0436
 #nullable enable
-using BazaarPlusPlus.Game.Screenshots;
 using HarmonyLib;
 using TheBazaar.UI.EndOfRun;
 
@@ -12,6 +11,14 @@ internal static class EndOfRunScreenshotPatch
     [HarmonyPrefix]
     private static bool Prefix(EndOfRunScreenController __instance)
     {
-        return !EndOfRunScreenshotController.ShouldBlockContinueUntilCapture(__instance);
+        try
+        {
+            return !BppPatchHost.TryGetFeatures(out var features)
+                || !features!.EndOfRunCaptureWorkflow.ShouldBlockContinue(__instance);
+        }
+        catch
+        {
+            return true;
+        }
     }
 }

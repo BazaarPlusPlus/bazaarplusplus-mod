@@ -66,6 +66,7 @@ internal sealed class BppComposition : IDisposable
     private readonly RunLoggingModule _runLoggingModule;
     private readonly EncounterPreviewModule _encounterPreviewModule;
     private readonly INativeCardPreviewHost _nativeCardPreviewHost;
+    private readonly EndOfRunCaptureWorkflow _endOfRunCaptureWorkflow;
     private readonly BppPatchFeatures _patchFeatures;
     private readonly VoiceSubtitlesModule _voiceSubtitlesModule;
     private readonly VoiceSubtitlesInteropModule _voiceSubtitlesInteropModule;
@@ -140,7 +141,8 @@ internal sealed class BppComposition : IDisposable
             _staticCardMapProvider,
             encounterPreviewCachePath
         );
-        _patchFeatures = new BppPatchFeatures(_encounterPreviewModule);
+        _endOfRunCaptureWorkflow = new EndOfRunCaptureWorkflow(_services);
+        _patchFeatures = new BppPatchFeatures(_encounterPreviewModule, _endOfRunCaptureWorkflow);
         _runLoggingModule = new RunLoggingModule(
             _services,
             PvpBattleCatalog,
@@ -196,7 +198,9 @@ internal sealed class BppComposition : IDisposable
         );
         _mountables.Register(new ComponentMount<CombatStatusBar>((c, s) => c.Initialize(s)));
         _mountables.Register(
-            new ComponentMount<EndOfRunScreenshotController>((c, s) => c.Initialize(s))
+            new ComponentMount<EndOfRunCaptureDriver>(
+                (driver, services) => driver.Initialize(_endOfRunCaptureWorkflow, services)
+            )
         );
         _mountables.Register(
             new ComponentMount<MainMenuVersionCheckController>((c, _) => c.Initialize())
@@ -253,6 +257,7 @@ internal sealed class BppComposition : IDisposable
         BazaarAgentGameBridge.Current = null;
         BazaarAgentGameBridge.CurrentRecorder = null;
         _featureRegistry.Stop();
+        _endOfRunCaptureWorkflow.Dispose();
         _encounterPreviewModule.Dispose();
         _buildRecommendationCatalog.Dispose();
     }

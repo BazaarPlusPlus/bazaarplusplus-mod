@@ -1579,7 +1579,7 @@ public class CoreLayeringTests
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
         var screenshotSource = File.ReadAllText(
-            Path.Combine(mainSource, "Game", "Screenshots", "EndOfRunScreenshotController.cs")
+            Path.Combine(mainSource, "Game", "Screenshots", "EndOfRunCaptureDriver.cs")
         );
         var recorderSource = File.ReadAllText(
             Path.Combine(

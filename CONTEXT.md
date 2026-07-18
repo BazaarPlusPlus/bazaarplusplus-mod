@@ -31,6 +31,10 @@ _Avoid_: RunLoggingController, run logger MonoBehaviour
 The feature-owned query boundary for event cards, encounter-step rewards, and hero level rewards. Callers supply a typed query containing only a stable template id/current level and native text they already hold; the module owns static-plan generation, cache/compile/publication, live hero/day/inventory reads, and final presentation.
 _Avoid_: plan runtime facade, Collection encounter helper, patch-built run snapshot
 
+**End-of-Run Capture Workflow（局末截图工作流）**:
+The single run-scoped state machine that owns end-of-run screenshot readiness, bounded attempts and timeouts, artifact validation, metadata persistence, late-artifact cleanup, Continue blocking, and fail-open terminal outcomes. Harmony patches expose only Continue and reveal-start intents through `IEndOfRunCaptureWorkflow`; the private Unity driver supplies frame scheduling, native-screen access, chrome suppression, and capture initiation.
+_Avoid_: screenshot gate, capture operation facade, patch-to-driver calls
+
 **Ghost Battle**:
 A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). `GhostBattleSyncService` imports these battles, flips them into local-player perspective, and HistoryPanel's Ghosts tab lists and replays them.
 _Avoid_: remote battle, opponent battle
