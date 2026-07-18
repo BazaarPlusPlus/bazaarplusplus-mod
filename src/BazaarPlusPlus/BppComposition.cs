@@ -30,6 +30,7 @@ using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.GameInterop.RunSnapshot;
 using BazaarPlusPlus.GameInterop.StaticCards;
@@ -64,6 +65,7 @@ internal sealed class BppComposition : IDisposable
     private readonly CombatStatusBarModule _combatStatusBarModule;
     private readonly RunLoggingModule _runLoggingModule;
     private readonly EncounterPreviewModule _encounterPreviewModule;
+    private readonly INativeCardPreviewHost _nativeCardPreviewHost;
     private readonly BppPatchFeatures _patchFeatures;
     private readonly VoiceSubtitlesModule _voiceSubtitlesModule;
     private readonly VoiceSubtitlesInteropModule _voiceSubtitlesInteropModule;
@@ -118,6 +120,7 @@ internal sealed class BppComposition : IDisposable
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
         _voiceSubtitlesModule = new VoiceSubtitlesModule();
         _voiceSubtitlesInteropModule = new VoiceSubtitlesInteropModule();
+        _nativeCardPreviewHost = new NativeCardPreviewHost(new NativeTooltipDataFactoryAdapter());
         _buildRecommendationCatalog = TenWinBuildCatalogFactory.Create(BepInEx.Paths.GameRootPath);
         _buildRecommendationRepository = new BuildRecommendationRepository(
             _buildRecommendationCatalog
@@ -182,7 +185,11 @@ internal sealed class BppComposition : IDisposable
         var overlayPanelHostMount = new OverlayPanelHostMount();
         _mountables.Register(overlayPanelHostMount);
         _mountables.Register(
-            new CollectionPanelMount(() => overlayPanelHostMount.Host, _staticCardMapProvider)
+            new CollectionPanelMount(
+                () => overlayPanelHostMount.Host,
+                _staticCardMapProvider,
+                _nativeCardPreviewHost
+            )
         );
         _mountables.Register(
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
@@ -199,20 +206,22 @@ internal sealed class BppComposition : IDisposable
                 combatReplayRuntime: () => _combatReplayModule.Runtime,
                 onlineClient: () => _onlineClientRef,
                 accountLinkClient: () => _accountLinkClientRef,
-                overlayHost: () => overlayPanelHostMount.Host
+                overlayHost: () => overlayPanelHostMount.Host,
+                nativeCardPreviewHost: _nativeCardPreviewHost
             )
         );
         _mountables.Register(
             new LiveBuildPanelMount(
                 () => overlayPanelHostMount.Host,
-                _buildRecommendationRepository
+                _buildRecommendationRepository,
+                _nativeCardPreviewHost
             )
         );
         _mountables.Register(new ComponentMount<VoiceLineDisplayDispatcher>());
         _mountables.Register(new ComponentMount<VersionLabelScanner>());
         _mountables.Register(
             new ComponentMount<TooltipModifierRefreshController>(
-                (c, s) => c.Initialize(s.Config, s.EncounterState)
+                (c, s) => c.Initialize(s.Config, s.EncounterState, _nativeCardPreviewHost)
             )
         );
 

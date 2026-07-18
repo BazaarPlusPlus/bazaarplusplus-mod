@@ -45,6 +45,14 @@ _Avoid_: popup, window
 The single module that owns main-overlay-panel lifecycle: mutual exclusion, scene-change policy, combat gating, hotkey and escape routing, and the per-frame tick. Panels register content callbacks with the host instead of re-implementing the lifecycle.
 _Avoid_: panel mutex (the deleted `BppOverlayPanelMutex` predecessor)
 
+**Native Card Preview Host（原生卡牌预览宿主）**:
+`GameInterop/CardPreview` 对游戏原生卡牌 prefab、setup/resize、完整可见性（含 native Show 未覆盖的 item gem）、reflection、hover、tooltip 替换、pool 与销毁的唯一 owning module。Collection 与 ItemBoard 只通过 host 打开各自 scope，不直接持有 runtime/reflection/pool。
+_Avoid_: card factory facade, global preview pool
+
+**Native Card Preview Scope / Session**:
+Scope 是一个真实 UI owner 的资源边界，拥有独立 pool 并在关闭时 cancel/settle acquisition、销毁 active 与 idle 对象。Session 是单张已完成 setup 的 opaque lease，只暴露布局 root/rect 和 show/hide/hover intent；caller 不保存 native component、kind 或 setup task。
+_Avoid_: preview handle, setup-task lease, cross-owner session
+
 ## Fonts
 
 **Native Game Typography**:

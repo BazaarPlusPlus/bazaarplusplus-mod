@@ -114,6 +114,7 @@ internal static class NativeCardPreviewRuntime
             var raw = method.Invoke(card, new object[] { template, false, instance, token });
             if (raw is Task task)
                 await task;
+            token.ThrowIfCancellationRequested();
             return null;
         }
         catch (OperationCanceledException)

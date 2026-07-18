@@ -6,7 +6,7 @@ using BazaarGameShared.Domain.Core.Types;
 
 namespace BazaarPlusPlus.GameInterop.CardPreview;
 
-internal sealed class NativeCardPreviewSpec
+internal sealed class NativeCardPreviewSubject
 {
     public Guid TemplateId { get; init; }
 

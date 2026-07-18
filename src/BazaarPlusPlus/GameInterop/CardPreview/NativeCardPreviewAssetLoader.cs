@@ -1,85 +1,104 @@
 #nullable enable
 using System;
+using System.Reflection;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Core.Types;
+using HarmonyLib;
 using TheBazaar.AppFramework;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
 namespace BazaarPlusPlus.GameInterop.CardPreview;
 
+internal readonly record struct NativeCardPreviewInstantiateOutcome(
+    Component? Card,
+    NativeCardPreviewFailure? Failure
+);
+
 internal sealed class NativeCardPreviewAssetLoader
 {
-    public async Task<NativeCardPreviewInstantiateOutcome> InstantiateReadyCardAsync(
-        TCardInstance instance,
+    private static readonly MethodInfo? InstantiateAssetMethod = AccessTools.Method(
+        typeof(AssetLoader),
+        "InstantiateAssetAsyncByReference"
+    );
+    private static readonly FieldInfo? SmallItemAsset = AccessTools.Field(
+        typeof(AssetLoader),
+        "SmallCardUIAssetRef"
+    );
+    private static readonly FieldInfo? MediumItemAsset = AccessTools.Field(
+        typeof(AssetLoader),
+        "MediumCardUIAssetRef"
+    );
+    private static readonly FieldInfo? LargeItemAsset = AccessTools.Field(
+        typeof(AssetLoader),
+        "LargeCardUIAssetRef"
+    );
+    private static readonly FieldInfo? SkillAsset = AccessTools.Field(
+        typeof(AssetLoader),
+        "SkillUIAssetRef"
+    );
+
+    internal async Task<NativeCardPreviewInstantiateOutcome> InstantiateInactiveCardAsync(
+        TCardBase template,
         Transform parent,
         CancellationToken token = default
     )
     {
-        if (instance == null || parent == null)
+        if (template == null || parent == null)
             return default;
 
         if (!Services.TryGet<AssetLoader>(out var assetLoader) || assetLoader == null)
         {
-            return new NativeCardPreviewInstantiateOutcome(
-                null,
-                new NativeCardPreviewFailure(
-                    NativeCardPreviewOperation.Instantiate,
-                    NativeCardPreviewFailureReason.AssetLoaderUnavailable,
-                    instance.TemplateId
-                )
-            );
+            return Failed(template.Id, NativeCardPreviewFailureReason.AssetLoaderUnavailable);
         }
 
+        var assetField = ResolveAssetField(template);
+        if (InstantiateAssetMethod == null || assetField == null)
+        {
+            return Failed(template.Id, NativeCardPreviewFailureReason.ReflectionUnavailable);
+        }
+
+        GameObject? root = null;
         try
         {
             token.ThrowIfCancellationRequested();
+            var assetReference = assetField.GetValue(assetLoader);
+            if (assetReference == null)
+                return Failed(template.Id, NativeCardPreviewFailureReason.PreviewTypeUnavailable);
 
-            // Native AssetLoader checks cancellation after instantiation, so let it finish and
-            // keep cleanup inside our return/destroy ownership path.
-            var gameObject = await assetLoader.InstantiateUICardAsync(
-                instance,
-                parent,
-                CancellationToken.None
-            );
-            if (gameObject == null)
+            var raw = InstantiateAssetMethod.Invoke(assetLoader, new[] { assetReference });
+            if (raw is not Task<GameObject> task)
+                return Failed(template.Id, NativeCardPreviewFailureReason.ReflectionUnavailable);
+
+            root = await task;
+            token.ThrowIfCancellationRequested();
+            if (root == null)
             {
-                return new NativeCardPreviewInstantiateOutcome(
-                    null,
-                    new NativeCardPreviewFailure(
-                        NativeCardPreviewOperation.Instantiate,
-                        NativeCardPreviewFailureReason.PreviewComponentUnavailable,
-                        instance.TemplateId
-                    )
+                return Failed(
+                    template.Id,
+                    NativeCardPreviewFailureReason.PreviewComponentUnavailable
                 );
             }
 
+            root.SetActive(false);
+            root.transform.SetParent(parent, worldPositionStays: false);
             var cardPreviewBaseType = NativeCardPreviewReflection.CardPreviewBaseType;
             if (cardPreviewBaseType == null)
             {
-                Object.Destroy(gameObject);
-                return new NativeCardPreviewInstantiateOutcome(
-                    null,
-                    new NativeCardPreviewFailure(
-                        NativeCardPreviewOperation.ResolvePreviewType,
-                        NativeCardPreviewFailureReason.PreviewTypeUnavailable,
-                        instance.TemplateId
-                    )
-                );
+                Object.Destroy(root);
+                return Failed(template.Id, NativeCardPreviewFailureReason.PreviewTypeUnavailable);
             }
 
-            var card = gameObject.GetComponent(cardPreviewBaseType);
+            var card = root.GetComponent(cardPreviewBaseType);
             if (card == null)
             {
-                Object.Destroy(gameObject);
-                return new NativeCardPreviewInstantiateOutcome(
-                    null,
-                    new NativeCardPreviewFailure(
-                        NativeCardPreviewOperation.ResolvePreviewComponent,
-                        NativeCardPreviewFailureReason.PreviewComponentUnavailable,
-                        instance.TemplateId
-                    )
+                Object.Destroy(root);
+                return Failed(
+                    template.Id,
+                    NativeCardPreviewFailureReason.PreviewComponentUnavailable
                 );
             }
 
@@ -87,19 +106,49 @@ internal sealed class NativeCardPreviewAssetLoader
         }
         catch (OperationCanceledException)
         {
-            return default;
+            if (root != null)
+                Object.Destroy(root);
+            throw;
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is OperationCanceledException)
+        {
+            if (root != null)
+                Object.Destroy(root);
+            ExceptionDispatchInfo.Capture(ex.InnerException!).Throw();
+            throw;
         }
         catch (Exception ex)
         {
+            if (root != null)
+                Object.Destroy(root);
             return new NativeCardPreviewInstantiateOutcome(
                 null,
                 new NativeCardPreviewFailure(
                     NativeCardPreviewOperation.Instantiate,
                     NativeCardPreviewFailureReason.InstantiateException,
-                    instance.TemplateId,
+                    template.Id,
                     ex
                 )
             );
         }
     }
+
+    private static FieldInfo? ResolveAssetField(TCardBase template) =>
+        template.Type switch
+        {
+            ECardType.Skill => SkillAsset,
+            ECardType.Item when template.Size == ECardSize.Small => SmallItemAsset,
+            ECardType.Item when template.Size == ECardSize.Medium => MediumItemAsset,
+            ECardType.Item when template.Size == ECardSize.Large => LargeItemAsset,
+            _ => null,
+        };
+
+    private static NativeCardPreviewInstantiateOutcome Failed(
+        Guid templateId,
+        NativeCardPreviewFailureReason reason
+    ) =>
+        new(
+            null,
+            new NativeCardPreviewFailure(NativeCardPreviewOperation.Instantiate, reason, templateId)
+        );
 }
