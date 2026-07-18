@@ -8,3 +8,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("VoiceSubtitles.Tests")]
 [assembly: InternalsVisibleTo("CollectionSourceFiltering.Tests")]
 [assembly: InternalsVisibleTo("LiveBuildRecommendations.Tests")]
+[assembly: InternalsVisibleTo("RunLoggingModule.Tests")]

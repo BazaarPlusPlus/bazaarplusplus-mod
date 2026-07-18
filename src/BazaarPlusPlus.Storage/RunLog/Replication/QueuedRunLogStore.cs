@@ -105,7 +105,20 @@ public sealed class QueuedRunLogStore : IRunLogStore, IDisposable
             _signal.Release();
         }
 
-        if (!_worker.Wait(_shutdownDrainTimeout))
+        var workerCompleted = false;
+        try
+        {
+            workerCompleted = _worker.Wait(_shutdownDrainTimeout);
+        }
+        catch (AggregateException) when (_worker.IsCompleted)
+        {
+            // ProcessLoopAsync already emitted the authoritative typed worker diagnostic. Dispose
+            // still owns the synchronization primitive and must finish cleanup without surfacing a
+            // second terminal failure to the feature teardown path.
+            workerCompleted = true;
+        }
+
+        if (!workerCompleted)
         {
             // The timeout is the authoritative shutdown terminal. Any active write or worker
             // exception that follows (Mono aborts background threads during process exit) is a
@@ -116,6 +129,13 @@ public sealed class QueuedRunLogStore : IRunLogStore, IDisposable
                     _shutdownDrainTimeout,
                     PendingWriteCount()
                 )
+            );
+            _ = _worker.ContinueWith(
+                static (_, state) => ((SemaphoreSlim)state!).Dispose(),
+                _signal,
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default
             );
             return;
         }
