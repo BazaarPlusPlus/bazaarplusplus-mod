@@ -1551,6 +1551,7 @@ file static class RecordingOperationContractTests
                 "CompletePreflight",
                 operation,
                 Enum.Parse(ReasonType, reason),
+                null,
                 null
             );
             logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
