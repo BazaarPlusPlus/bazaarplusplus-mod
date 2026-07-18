@@ -164,16 +164,16 @@ public class Plugin : BaseUnityPlugin
             () => _composition?.Mountables.UnmountAll(gameObject)
         );
         failures.Run(
-            PluginTeardownStep.DestroyCombatReplayRuntime,
-            DestroyComponentIfPresent<CombatReplayRuntime>
-        );
-        failures.Run(
             PluginTeardownStep.DisposeComposition,
             () =>
             {
                 _composition?.Dispose();
                 _composition = null;
             }
+        );
+        failures.Run(
+            PluginTeardownStep.DestroyCombatReplayRuntime,
+            DestroyComponentIfPresent<CombatReplayRuntime>
         );
         failures.Run(PluginTeardownStep.DisposeOnlineServices, DisposeOnlineServices);
         failures.Run(PluginTeardownStep.UninstallStaticUtilities, UninstallStaticUtilities);

@@ -80,6 +80,9 @@ public sealed class QueuedRunLogStoreDiagnosticTests
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await store.WorkerCompletion
         );
+        var disposeFailure = Record.Exception(store.Dispose);
+        Assert.Null(disposeFailure);
+        store.Dispose();
     }
 
     private sealed class CapturingRunLogStoreLogger : IRunLogStoreLogger

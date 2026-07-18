@@ -23,6 +23,10 @@ _Avoid_: run tracker、直读全局状态
 The classification of the running client as `Online`, `Ptr`, or `Unknown` (resolved once at startup by `GameBuildInfoResolver`; disagreement between signals resolves to `Ptr`). It gates uploads (`channel != Ptr`) and is stamped on recorded runs, isolating PTR data from the production dataset.
 _Avoid_: environment, server flag
 
+**Run Logging Intake（对局日志入口）**:
+The pure `IBppFeature` that owns run-log subscriptions, session transitions, persistence/checkpoint ordering, and deferred completion. It consumes event-bus inputs and the shared PvP battle catalog; it is not a mounted Unity controller and does not own a run timeline.
+_Avoid_: RunLoggingController, run logger MonoBehaviour
+
 **Ghost Battle**:
 A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). `GhostBattleSyncService` imports these battles, flips them into local-player perspective, and HistoryPanel's Ghosts tab lists and replays them.
 _Avoid_: remote battle, opponent battle

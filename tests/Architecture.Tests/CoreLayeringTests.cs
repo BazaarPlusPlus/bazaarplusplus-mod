@@ -1769,6 +1769,61 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Run_logging_is_a_feature_owned_event_intake_not_a_mounted_controller()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var moduleSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "RunLogging", "RunLoggingModule.cs")
+        );
+        var compositionSource = File.ReadAllText(Path.Combine(mainSource, "BppComposition.cs"));
+        var pluginSource = File.ReadAllText(Path.Combine(mainSource, "Plugin.cs"));
+
+        Assert.Contains("sealed class RunLoggingModule : IBppFeature", moduleSource);
+        Assert.False(
+            File.Exists(Path.Combine(mainSource, "Game", "RunLogging", "RunLoggingController.cs"))
+        );
+        Assert.False(
+            File.Exists(Path.Combine(mainSource, "Game", "RunLogging", "RunLogCaptureService.cs"))
+        );
+        Assert.DoesNotContain("RunLoggingControllerCore", moduleSource);
+        Assert.DoesNotContain("RunLogPvpBattleInput", moduleSource);
+        Assert.DoesNotContain("ComponentMount<RunLoggingController>", compositionSource);
+        Assert.Contains("_featureRegistry.Register(_runLoggingModule);", compositionSource);
+        Assert.Contains("_featureRegistry.Stop();", compositionSource);
+        Assert.Contains("() => CreateStore(services)", moduleSource);
+
+        var combatReplayRegistration = compositionSource.IndexOf(
+            "_featureRegistry.Register(_combatReplayModule);",
+            StringComparison.Ordinal
+        );
+        var runLoggingRegistration = compositionSource.IndexOf(
+            "_featureRegistry.Register(_runLoggingModule);",
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            combatReplayRegistration >= 0 && runLoggingRegistration > combatReplayRegistration,
+            "Reverse feature Stop must settle RunLogging before stopping CombatReplay."
+        );
+
+        var unmount = pluginSource.IndexOf(
+            "PluginTeardownStep.UnmountComponents",
+            StringComparison.Ordinal
+        );
+        var disposeComposition = pluginSource.IndexOf(
+            "PluginTeardownStep.DisposeComposition",
+            StringComparison.Ordinal
+        );
+        var destroyReplay = pluginSource.IndexOf(
+            "PluginTeardownStep.DestroyCombatReplayRuntime",
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            unmount >= 0 && disposeComposition > unmount && destroyReplay > disposeComposition,
+            "Teardown must unmount, stop features, then destroy CombatReplayRuntime."
+        );
+    }
+
+    [Fact]
     public void Run_script_exposes_only_the_canonical_bazaaragent_flag()
     {
         var repoRoot = RepoRoot();

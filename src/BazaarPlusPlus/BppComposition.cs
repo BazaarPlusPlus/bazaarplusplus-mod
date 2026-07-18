@@ -61,6 +61,7 @@ internal sealed class BppComposition : IDisposable
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
+    private readonly RunLoggingModule _runLoggingModule;
     private readonly VoiceSubtitlesModule _voiceSubtitlesModule;
     private readonly VoiceSubtitlesInteropModule _voiceSubtitlesInteropModule;
     private readonly IRemoteEmbeddedCatalog<TenWinBuildCorpus> _buildRecommendationCatalog;
@@ -117,12 +118,18 @@ internal sealed class BppComposition : IDisposable
         _buildRecommendationRepository = new BuildRecommendationRepository(
             _buildRecommendationCatalog
         );
+        _runLoggingModule = new RunLoggingModule(
+            _services,
+            PvpBattleCatalog,
+            () => _combatReplayModule.Runtime?.HasPendingPersistence == true
+        );
 
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
         _featureRegistry.Register(_combatStatusBarModule);
         _featureRegistry.Register(_voiceSubtitlesInteropModule);
         _featureRegistry.Register(_voiceSubtitlesModule);
+        _featureRegistry.Register(_runLoggingModule);
 
         _settingsDockRegistry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create());
         _settingsDockRegistry.Register(FixedSupporterListSettingsDockEntry.Create());
@@ -198,9 +205,6 @@ internal sealed class BppComposition : IDisposable
         );
         _mountables.Register(new ComponentMount<VoiceLineDisplayDispatcher>());
         _mountables.Register(new ComponentMount<VersionLabelScanner>());
-        _mountables.Register(
-            new ComponentMount<RunLoggingController>((c, s) => c.Initialize(s, PvpBattleCatalog))
-        );
         _mountables.Register(
             new ComponentMount<TooltipModifierRefreshController>(
                 (c, s) => c.Initialize(s.Config, s.EncounterState)
