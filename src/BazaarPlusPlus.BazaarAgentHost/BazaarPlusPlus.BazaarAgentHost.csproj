@@ -12,10 +12,6 @@
     <BepInExPluginName>BazaarPlusPlus BazaarAgent Host</BepInExPluginName>
     <BepInExPluginVersion>$(BppVersion)</BepInExPluginVersion>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <RestoreAdditionalProjectSources>
-      https://api.nuget.org/v3/index.json;
-      https://nuget.bepinex.dev/v3/index.json;
-    </RestoreAdditionalProjectSources>
     <NoWarn>CS0436</NoWarn>
   </PropertyGroup>
 

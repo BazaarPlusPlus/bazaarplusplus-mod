@@ -5,10 +5,6 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <AssemblyName>VoiceSubtitles.Tests</AssemblyName>
-    <RestoreAdditionalProjectSources>
-      https://api.nuget.org/v3/index.json;
-      https://nuget.bepinex.dev/v3/index.json;
-    </RestoreAdditionalProjectSources>
   </PropertyGroup>
 
   <PropertyGroup>
