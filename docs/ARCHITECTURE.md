@@ -42,7 +42,7 @@ Architecture tests ratchet these boundaries, including `Core/` layering, shared 
 
 Runtime data that BazaarPlusPlus owns is rooted under the game directory's `BazaarPlusPlusV4` folder. `BepInExPathProvider.Initialize()` sets the SQLite database path, combat replay payload directory, screenshot directory, combat replay video directory, and plugin directory (`src/BazaarPlusPlus/Core/Paths/BepInExPathProvider.cs:18-41`).
 
-The local SQLite schema is versioned in `RunLogSchema`. The current local database schema version is `17` (v17 added the `build_channel` run column for PTR isolation), row schema version is `11`, and upload payload schema version is `5` (`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs:10-14`). The schema creates runs, run events, battles, battle snapshots, run screenshots, combat replay videos, sync cursors, run sync state, and BazaarDB snapshot upload state plus indexes (`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs:57-263`).
+The local SQLite schema is versioned in `RunLogSchema`. The current local database schema version is `18` (v18 added replay battle item/skill counts plus player income/gold), row schema version is `11`, and upload payload schema version is `6` (`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs:10-14`). The schema creates runs, run events, battles, battle snapshots, run screenshots, combat replay videos, sync cursors, run sync state, and BazaarDB snapshot upload state plus indexes (`src/BazaarPlusPlus.Storage/RunLog/RunLogSchema.cs:57-263`).
 
 ## Event Flow
 

@@ -115,6 +115,12 @@ internal static class HistoryPanelRowMapper
             GetNullableString(reader, "result"),
             GetNullableString(reader, "winner_combatant_id"),
             GetNullableString(reader, "loser_combatant_id"),
+            new HistoryBattleSnapshotCounts(
+                GetNullableInt32(reader, "player_hand_item_count") ?? 0,
+                GetNullableInt32(reader, "player_skill_count") ?? 0,
+                GetNullableInt32(reader, "opponent_hand_item_count") ?? 0,
+                GetNullableInt32(reader, "opponent_skill_count") ?? 0
+            ),
             isFinalBattle: GetNullableInt32(reader, "is_final_battle") == 1,
             replayAvailable: GetNullableInt32(reader, "replay_available") == 1,
             replayDownloaded: GetNullableInt32(reader, "replay_downloaded") == 1

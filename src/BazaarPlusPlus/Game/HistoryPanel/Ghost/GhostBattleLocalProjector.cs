@@ -30,6 +30,7 @@ internal static class GhostBattleLocalProjector
         string? rawResult,
         string? rawWinnerCombatantId,
         string? rawLoserCombatantId,
+        HistoryBattleSnapshotCounts rawSnapshotCounts,
         bool isFinalBattle,
         bool replayAvailable,
         bool replayDownloaded
@@ -60,12 +61,24 @@ internal static class GhostBattleLocalProjector
             ProjectResultToLocal(rawResult),
             ProjectCombatantIdToLocal(rawWinnerCombatantId),
             ProjectCombatantIdToLocal(rawLoserCombatantId),
-            HistoryBattleSnapshotCounts.Empty,
+            ProjectSnapshotCountsToLocal(rawSnapshotCounts),
             snapshots: null,
             isFinalBattle,
             source: HistoryBattleSource.Ghost,
             replayAvailable,
             replayDownloaded
+        );
+    }
+
+    private static HistoryBattleSnapshotCounts ProjectSnapshotCountsToLocal(
+        HistoryBattleSnapshotCounts rawCounts
+    )
+    {
+        return new HistoryBattleSnapshotCounts(
+            rawCounts.OpponentHandItemCount,
+            rawCounts.OpponentSkillCount,
+            rawCounts.PlayerHandItemCount,
+            rawCounts.PlayerSkillCount
         );
     }
 

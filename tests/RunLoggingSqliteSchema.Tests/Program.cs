@@ -4,11 +4,11 @@ using System.Reflection;
 var schemaType = RequireType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
 
 Assert(
-    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 17,
+    GetStaticValue<int>(schemaType, "LocalDatabaseSchemaVersion") == 18,
     "Local database schema version mismatch."
 );
 Assert(
-    GetStaticValue<int>(schemaType, "UploadPayloadSchemaVersion") == 5,
+    GetStaticValue<int>(schemaType, "UploadPayloadSchemaVersion") == 6,
     "Upload payload schema version mismatch."
 );
 Assert(
@@ -40,7 +40,7 @@ Assert(
     "Bootstrap SQL should create tables."
 );
 Assert(
-    bootstrapSql.Contains("PRAGMA user_version = 17;", StringComparison.Ordinal),
+    bootstrapSql.Contains("PRAGMA user_version = 18;", StringComparison.Ordinal),
     "Bootstrap SQL should set the SQLite user_version."
 );
 Assert(
