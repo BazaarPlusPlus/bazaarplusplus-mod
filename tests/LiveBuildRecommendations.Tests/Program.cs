@@ -1,12 +1,17 @@
 using System.Collections;
 using System.Reflection;
+using BazaarPlusPlus.Game.LiveBuildPanel;
+using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
+using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 
 // Behavior tests for the analyzer-v4 ten-win build corpus consumed by LiveBuildPanel.
 // The payload is the compact string-table + schema-driven array-row format emitted by
 // bazaarplusplus-analyzers/src/bpp/stages/analyze/mod_builds.py at
 // analyzer-v4/mod/tenwin_builds.json. Every assertion drives the public
 // BuildRecommendationRepository.FindRecommendations surface (parse + recall + scoring +
-// board projection) or the per-instance cache/remote hooks, via reflection over the internal type.
+// board projection). Catalog lifecycle is tested through IRemoteEmbeddedCatalog in the dedicated
+// RemoteEmbeddedCatalog.Tests project; this feature project keeps parser/query/summary and manual
+// refresh product policy coverage.
 
 TenWinBuildTests.Run();
 
@@ -31,13 +36,8 @@ internal static class TenWinBuildTests
         TestLiveStateRankingOutranksScore();
         TestBoardContractMapsTierEnchantSize();
         TestNullSlotAndTierDoNotCrash();
-        TestFreshCacheIsUsedWithoutRemoteDownload();
-        TestStaleCacheUsesStaleAndQueuesBackgroundRefresh();
-        TestManualRefreshBypassesFreshCache();
-        TestRefreshServiceWrapsManualRefreshOutcome();
-        TestRefreshServiceLimitsToOnePullPerSession();
-        TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh();
-        TestColdStartFallsBackToEmbeddedThenRemote();
+        TestRefreshServicePreservesSessionProductSemantics();
+        TestPanelInvalidationRejectsUiContinuationWithoutCancelingCatalogRefresh();
         TestEmbeddedSeedResourceIsBundledAndParses();
         TestCorpusSummaryIncludesPerHeroBuildCounts();
 
@@ -86,22 +86,97 @@ internal static class TenWinBuildTests
 
     private static void TestDefaultCachePathUsesTenwinBuildsFileName()
     {
-        var repositoryType = GetRepositoryType();
-        var buildPathMethod = repositoryType.GetMethod(
-            "BuildDefaultTenWinCacheFilePath",
-            BindingFlags.NonPublic | BindingFlags.Static
-        );
-        Assert(
-            buildPathMethod != null,
-            "Repository should expose default ten-win cache path construction."
-        );
-
         var gameRootPath = Path.Combine(Path.GetTempPath(), $"bpp-game-root-{Guid.NewGuid():N}");
-        var cachePath = (string)buildPathMethod!.Invoke(null, [gameRootPath])!;
+        var cachePath = TenWinBuildCatalogFactory.BuildCacheFilePath(gameRootPath);
 
         Assert(
             cachePath == Path.Combine(gameRootPath, "BazaarPlusPlusV4", "tenwin_builds.json"),
             "Ten-win build cache should live under GameRoot/BazaarPlusPlusV4/tenwin_builds.json."
+        );
+    }
+
+    private static void TestRefreshServicePreservesSessionProductSemantics()
+    {
+        var corpus = TenWinBuildCorpus.Parse(ScorePayload("CacheHero", 333))!;
+        using var catalog = new StubCatalog(corpus);
+        var repository = new BuildRecommendationRepository(catalog);
+        var service = new BuildRecommendationRefreshService();
+
+        catalog.Enqueue(
+            CatalogRefreshResult<TenWinBuildCorpus>.Failure(
+                new CatalogIssue(
+                    CatalogIssueKind.RemoteDownloadFailed,
+                    new InvalidOperationException("refresh-boom")
+                )
+            )
+        );
+        var failure = service
+            .RefreshAsync(repository, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert(!failure.Succeeded, "A failed pull should surface as a product failure.");
+        Assert(
+            failure.Error?.Contains("refresh-boom") == true,
+            "The failure should retain its typed diagnostic detail."
+        );
+
+        catalog.Enqueue(
+            CatalogRefreshResult<TenWinBuildCorpus>.Published(
+                Snapshot(corpus, CatalogSource.Remote),
+                degraded: false
+            )
+        );
+        var firstSuccess = service
+            .RefreshAsync(repository, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert(
+            firstSuccess.Outcome == BuildRecommendationRefreshOutcome.Updated,
+            "The first successful remote pull must be Updated even when the payload is identical."
+        );
+        Assert(catalog.RefreshCount == 2, "Failure must not consume the session pull allowance.");
+
+        var gated = service
+            .RefreshAsync(repository, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert(
+            gated.Outcome == BuildRecommendationRefreshOutcome.NoChange,
+            "Only a session-gated pull should report NoChange."
+        );
+        Assert(catalog.RefreshCount == 2, "The gated pull must perform zero downloads.");
+    }
+
+    private static void TestPanelInvalidationRejectsUiContinuationWithoutCancelingCatalogRefresh()
+    {
+        var initialCorpus = TenWinBuildCorpus.Parse(ScorePayload("InitialHero", 111))!;
+        var refreshedCorpus = TenWinBuildCorpus.Parse(ScorePayload("RefreshedHero", 222))!;
+        using var catalog = new BlockingCatalog(initialCorpus);
+        var repository = new BuildRecommendationRepository(catalog);
+        var service = new BuildRecommendationRefreshService();
+        var continuation = new LiveBuildRefreshContinuationGate();
+        var operationVersion = continuation.Capture();
+
+        var refresh = service.RefreshAsync(repository, CancellationToken.None);
+        catalog.Started.GetAwaiter().GetResult();
+        continuation.Invalidate();
+        catalog.Complete(refreshedCorpus);
+
+        var result = refresh.GetAwaiter().GetResult();
+        Assert(
+            result.Succeeded,
+            "The plugin-lifetime catalog refresh should finish after panel loss."
+        );
+        Assert(
+            !continuation.IsCurrent(operationVersion),
+            "The destroyed panel must reject its stale UI continuation."
+        );
+        var summary = repository.GetCorpusSummary();
+        Assert(summary.HasValue, "The shared repository should retain the refreshed snapshot.");
+        var loadedSummary = summary.GetValueOrDefault();
+        Assert(
+            loadedSummary.HeroBuildCounts.Any(row => row.Hero == "RefreshedHero"),
+            "The shared snapshot should publish even though the initiating panel was destroyed."
         );
     }
 
@@ -320,399 +395,26 @@ internal static class TenWinBuildTests
         );
     }
 
-    private static void TestFreshCacheIsUsedWithoutRemoteDownload()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-        File.WriteAllText(cachePath, ScorePayload("CacheHero", 111));
-        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-19));
-
-        Configure(
-            repository,
-            cachePath,
-            now,
-            _ => throw new InvalidOperationException("Fresh cache should not download.")
-        );
-        try
-        {
-            var scores = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                scores.SequenceEqual([111L]),
-                "Fresh cache should answer recommendations without a download."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static void TestStaleCacheUsesStaleAndQueuesBackgroundRefresh()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-        File.WriteAllText(cachePath, ScorePayload("CacheHero", 111));
-        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-21));
-
-        var downloaded = false;
-        Func<Task>? queuedRefresh = null;
-        var queuedRefreshCount = 0;
-        var remotePayload = ScorePayload("CacheHero", 222);
-        ConfigureWithBackgroundRefresh(
-            repository,
-            cachePath,
-            now,
-            _ =>
-            {
-                downloaded = true;
-                return remotePayload;
-            },
-            refresh =>
-            {
-                queuedRefreshCount++;
-                queuedRefresh = refresh;
-            }
-        );
-
-        try
-        {
-            var stale = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(!downloaded, "Stale cache should not block on a synchronous download.");
-            Assert(
-                queuedRefreshCount == 1,
-                "Stale cache should queue exactly one background refresh."
-            );
-            Assert(queuedRefresh != null, "The queued refresh should be executable.");
-            Assert(
-                stale.SequenceEqual([111L]),
-                "Stale cache data should answer until the refresh completes."
-            );
-            Assert(
-                File.ReadAllText(cachePath) != remotePayload,
-                "Normal loading should not rewrite the disk cache."
-            );
-
-            queuedRefresh!().GetAwaiter().GetResult();
-            var refreshed = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(downloaded, "The queued refresh should download remote data.");
-            Assert(
-                refreshed.SequenceEqual([222L]),
-                "The background refresh should replace the in-memory corpus."
-            );
-            Assert(
-                File.ReadAllText(cachePath) == remotePayload,
-                "The background refresh should replace the disk cache."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static void TestManualRefreshBypassesFreshCache()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-        File.WriteAllText(cachePath, ScorePayload("CacheHero", 111));
-        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
-
-        var downloaded = false;
-        var remotePayload = ScorePayload("CacheHero", 222);
-        Configure(
-            repository,
-            cachePath,
-            now,
-            _ =>
-            {
-                downloaded = true;
-                return remotePayload;
-            }
-        );
-
-        try
-        {
-            var cached = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                cached.SequenceEqual([111L]),
-                "Fresh cache should load before a manual refresh."
-            );
-            Assert(!downloaded, "Loading a fresh cache should not download.");
-
-            var refreshed = ManualRefresh(repository, out var error);
-            Assert(refreshed, $"Manual refresh should succeed: {error}");
-            Assert(downloaded, "Manual refresh should download remote data.");
-
-            var after = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                after.SequenceEqual([222L]),
-                "Manual refresh should replace the in-memory corpus."
-            );
-            Assert(
-                File.ReadAllText(cachePath) == remotePayload,
-                "Manual refresh should replace the disk cache."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    // The LiveBuildPanel manual pull consumes the shared refresh service; its result wrapper must
-    // surface the repository's failure detail instead of swallowing it.
-    private static void TestRefreshServiceWrapsManualRefreshOutcome()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath(); // no cache on disk; downloads drive the outcome.
-
-        Configure(
-            repository,
-            cachePath,
-            now,
-            _ => throw new InvalidOperationException("refresh-boom")
-        );
-
-        try
-        {
-            var failure = RunRefreshService(repositoryType, repository);
-            Assert(!GetResultSucceeded(failure), "A throwing download should fail the refresh.");
-            Assert(
-                GetResultError(failure)?.Contains("refresh-boom") == true,
-                "The refresh failure should carry the underlying error detail."
-            );
-
-            Configure(repository, cachePath, now, _ => ScorePayload("CacheHero", 333));
-            var success = RunRefreshService(repositoryType, repository);
-            Assert(GetResultSucceeded(success), "A valid download should succeed the refresh.");
-            Assert(
-                GetResultError(success) == null,
-                "A successful refresh should not carry an error."
-            );
-
-            var after = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                after.SequenceEqual([333L]),
-                "A successful service refresh should update the repository corpus."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static void TestRefreshServiceLimitsToOnePullPerSession()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-
-        var serviceType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildRecommendationRefreshService"
-        );
-        Assert(serviceType != null, "BuildRecommendationRefreshService should exist.");
-        var service =
-            Activator.CreateInstance(serviceType!)
-            ?? throw new InvalidOperationException("Refresh service should be constructible.");
-        var refreshAsync = serviceType!.GetMethod("RefreshAsync")!;
-
-        try
-        {
-            // The first manual pull of the session really downloads and succeeds.
-            Configure(repository, cachePath, now, _ => ScorePayload("CacheHero", 333));
-            var first = InvokeRefreshService(refreshAsync, service, repository);
-            Assert(GetResultSucceeded(first), "The first session pull should really succeed.");
-
-            // The download would now throw, but the once-per-session limit short-circuits to a
-            // synthetic success without touching the repository again.
-            Configure(
-                repository,
-                cachePath,
-                now,
-                _ => throw new InvalidOperationException("must-not-redownload")
-            );
-            var second = InvokeRefreshService(refreshAsync, service, repository);
-            Assert(
-                GetResultSucceeded(second),
-                "A second session pull should fake-succeed without re-downloading."
-            );
-            Assert(
-                GetResultError(second) == null,
-                "A rate-limited pull should not carry an error."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static object InvokeRefreshService(
-        MethodInfo refreshAsync,
-        object service,
-        object repository
-    )
-    {
-        var task = (System.Threading.Tasks.Task)
-            refreshAsync.Invoke(service, [repository, System.Threading.CancellationToken.None])!;
-        task.GetAwaiter().GetResult();
-        return task.GetType().GetProperty("Result")!.GetValue(task)!;
-    }
-
-    private static object RunRefreshService(Type repositoryType, object repository)
-    {
-        var serviceType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildRecommendationRefreshService"
-        );
-        Assert(serviceType != null, "BuildRecommendationRefreshService should exist.");
-        var service =
-            Activator.CreateInstance(serviceType!)
-            ?? throw new InvalidOperationException("Refresh service should be constructible.");
-        var refreshAsync = serviceType!.GetMethod("RefreshAsync");
-        Assert(refreshAsync != null, "Refresh service should expose RefreshAsync.");
-
-        var task = (System.Threading.Tasks.Task)
-            refreshAsync!.Invoke(service, [repository, System.Threading.CancellationToken.None])!;
-        task.GetAwaiter().GetResult();
-        return task.GetType().GetProperty("Result")!.GetValue(task)!;
-    }
-
-    private static bool GetResultSucceeded(object result) =>
-        (bool)result.GetType().GetProperty("Succeeded")!.GetValue(result)!;
-
-    private static string? GetResultError(object result) =>
-        (string?)result.GetType().GetProperty("Error")!.GetValue(result);
-
-    private static void TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath(); // never created on disk -> cold start.
-
-        Func<Task>? queuedRefresh = null;
-        var queuedRefreshCount = 0;
-        var remotePayload = ScorePayload("CacheHero", 222);
-        ConfigureWithBackgroundRefresh(
-            repository,
-            cachePath,
-            now,
-            _ => remotePayload,
-            refresh =>
-            {
-                queuedRefreshCount++;
-                queuedRefresh = refresh;
-            }
-        );
-        SetEmbedded(repository, () => null); // no embedded seed available either.
-
-        try
-        {
-            var cold = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                cold.Count == 0,
-                "A cold start with no cache and no embedded seed should return no recommendation."
-            );
-            Assert(queuedRefreshCount == 1, "A cold start should queue a background refresh.");
-
-            queuedRefresh!().GetAwaiter().GetResult();
-            var afterRefresh = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                afterRefresh.SequenceEqual([222L]),
-                "After the cold-start refresh the corpus should populate."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static void TestColdStartFallsBackToEmbeddedThenRemote()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath(); // never created on disk -> cold start.
-
-        Func<Task>? queuedRefresh = null;
-        var remotePayload = ScorePayload("CacheHero", 222);
-        ConfigureWithBackgroundRefresh(
-            repository,
-            cachePath,
-            now,
-            _ => remotePayload,
-            refresh => queuedRefresh = refresh
-        );
-        SetEmbedded(repository, () => ScorePayload("CacheHero", 555));
-
-        try
-        {
-            // No cache on disk: the bundled seed answers immediately while a refresh is queued.
-            var cold = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                cold.SequenceEqual([555L]),
-                "A cold start with no cache should fall back to the embedded seed."
-            );
-
-            queuedRefresh!().GetAwaiter().GetResult();
-            var afterRefresh = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                afterRefresh.SequenceEqual([222L]),
-                "The background refresh should replace the embedded seed with remote data."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
     private static void TestEmbeddedSeedResourceIsBundledAndParses()
     {
-        var repositoryType = GetRepositoryType();
-        var readSeed = repositoryType.GetMethod(
-            "ReadEmbeddedSeedForTests",
-            BindingFlags.NonPublic | BindingFlags.Static
+        var source = new AssemblyResourceCatalogSource(
+            typeof(TenWinBuildCorpus).Assembly,
+            TenWinBuildCatalogFactory.EmbeddedResourceName
         );
-        Assert(readSeed != null, "Repository should expose the embedded seed reader.");
-        var json = (string?)readSeed!.Invoke(null, null);
+        var json = source.ReadAsync(CancellationToken.None).AsTask().GetAwaiter().GetResult();
         Assert(
             !string.IsNullOrWhiteSpace(json),
             "The bundled tenwin_builds.json seed should be embedded in the assembly."
         );
 
-        var corpusType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.TenWinBuildCorpus"
-        )!;
-        var parse = corpusType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static)!;
-        var corpus = parse.Invoke(null, [json]);
+        var corpus = TenWinBuildCorpus.Parse(json);
         Assert(corpus != null, "The bundled seed should parse with the production corpus parser.");
-        var heroCount = (int)corpusType.GetProperty("HeroCount")!.GetValue(corpus)!;
-        Assert(heroCount > 0, "The bundled seed should contain at least one hero.");
+        Assert(corpus!.HeroCount > 0, "The bundled seed should contain at least one hero.");
         Assert(
-            corpusType.GetProperty("GeneratedAtUtc")!.GetValue(corpus) != null,
+            corpus.GeneratedAtUtc != null,
             "The bundled seed should carry a parseable generatedAt timestamp."
         );
-        var buildCount = (int)corpusType.GetProperty("BuildCount")!.GetValue(corpus)!;
-        Assert(buildCount > 0, "The bundled seed should count at least one build.");
+        Assert(corpus.BuildCount > 0, "The bundled seed should count at least one build.");
     }
 
     private static void TestCorpusSummaryIncludesPerHeroBuildCounts()
@@ -868,32 +570,119 @@ internal static class TenWinBuildTests
         )!;
     }
 
-    private static object NewRepository(Type repositoryType) =>
-        Activator.CreateInstance(repositoryType)!;
-
     private static void WithCorpus(string payload, Action<Type, object> body)
     {
         var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-        File.WriteAllText(cachePath, payload);
-        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
-        Configure(
-            repository,
-            cachePath,
-            now,
-            _ => throw new InvalidOperationException("Fresh cache should not download.")
+        var corpus = TenWinBuildCorpus.Parse(payload)!;
+        using var catalog = new StubCatalog(corpus);
+        body(repositoryType, new BuildRecommendationRepository(catalog));
+    }
+
+    private static CatalogSnapshot<TenWinBuildCorpus> Snapshot(
+        TenWinBuildCorpus corpus,
+        CatalogSource source
+    ) =>
+        new(
+            corpus,
+            source,
+            new DateTime(2026, 7, 18, 12, 0, 0, DateTimeKind.Utc),
+            IsStale: false,
+            Issue: null
         );
-        try
+
+    private sealed class StubCatalog : IRemoteEmbeddedCatalog<TenWinBuildCorpus>
+    {
+        private readonly Queue<CatalogRefreshResult<TenWinBuildCorpus>> _refreshes = new();
+        private CatalogSnapshot<TenWinBuildCorpus>? _snapshot;
+
+        internal StubCatalog(TenWinBuildCorpus corpus)
         {
-            body(repositoryType, repository);
+            _snapshot = Snapshot(corpus, CatalogSource.Cache);
         }
-        finally
+
+        internal int RefreshCount { get; private set; }
+
+        internal void Enqueue(CatalogRefreshResult<TenWinBuildCorpus> result) =>
+            _refreshes.Enqueue(result);
+
+        public bool TryGet(out CatalogSnapshot<TenWinBuildCorpus> snapshot)
         {
-            Reset(repository);
-            TryDelete(cachePath);
+            if (_snapshot.HasValue)
+            {
+                snapshot = _snapshot.Value;
+                return true;
+            }
+
+            snapshot = default;
+            return false;
         }
+
+        public ValueTask WarmAsync(CancellationToken cancellationToken = default) => default;
+
+        public ValueTask<CatalogRefreshResult<TenWinBuildCorpus>> RefreshAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            RefreshCount++;
+            var result = _refreshes.Dequeue();
+            if (result.Snapshot.HasValue)
+                _snapshot = result.Snapshot.Value;
+            return ValueTask.FromResult(result);
+        }
+
+        public void Dispose() => _snapshot = null;
+    }
+
+    private sealed class BlockingCatalog : IRemoteEmbeddedCatalog<TenWinBuildCorpus>
+    {
+        private readonly TaskCompletionSource<bool> _started = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource<CatalogRefreshResult<TenWinBuildCorpus>> _refresh =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private CatalogSnapshot<TenWinBuildCorpus>? _snapshot;
+
+        internal BlockingCatalog(TenWinBuildCorpus corpus)
+        {
+            _snapshot = Snapshot(corpus, CatalogSource.Cache);
+        }
+
+        internal Task Started => _started.Task;
+
+        internal void Complete(TenWinBuildCorpus corpus) =>
+            _refresh.SetResult(
+                CatalogRefreshResult<TenWinBuildCorpus>.Published(
+                    Snapshot(corpus, CatalogSource.Remote),
+                    degraded: false
+                )
+            );
+
+        public bool TryGet(out CatalogSnapshot<TenWinBuildCorpus> snapshot)
+        {
+            if (_snapshot.HasValue)
+            {
+                snapshot = _snapshot.Value;
+                return true;
+            }
+
+            snapshot = default;
+            return false;
+        }
+
+        public ValueTask WarmAsync(CancellationToken cancellationToken = default) => default;
+
+        public async ValueTask<CatalogRefreshResult<TenWinBuildCorpus>> RefreshAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            _started.TrySetResult(true);
+            var result = await _refresh.Task.ConfigureAwait(false);
+            if (result.Snapshot.HasValue)
+                _snapshot = result.Snapshot.Value;
+            return result;
+        }
+
+        public void Dispose() => _snapshot = null;
     }
 
     private static IEnumerable Find(
@@ -935,88 +724,6 @@ internal static class TenWinBuildTests
 
     private static object? Prop(object target, string name) =>
         target.GetType().GetProperty(name)!.GetValue(target);
-
-    private static string TempCachePath() =>
-        Path.Combine(Path.GetTempPath(), $"bpp-tenwin-{Guid.NewGuid():N}.json");
-
-    private static void Configure(
-        object repository,
-        string cachePath,
-        DateTime utcNow,
-        Func<string, string> downloadJson
-    ) =>
-        Invoke(
-            repository,
-            "ConfigureTenWinRemoteForTests",
-            cachePath,
-            (Func<DateTime>)(() => utcNow),
-            WrapDownload(downloadJson)
-        );
-
-    private static void ConfigureWithBackgroundRefresh(
-        object repository,
-        string cachePath,
-        DateTime utcNow,
-        Func<string, string> downloadJson,
-        Action<Func<Task>> queueBackgroundRefresh
-    ) =>
-        Invoke(
-            repository,
-            "ConfigureTenWinRemoteForTests",
-            cachePath,
-            (Func<DateTime>)(() => utcNow),
-            WrapDownload(downloadJson),
-            queueBackgroundRefresh
-        );
-
-    private static Func<string, Task<string>> WrapDownload(Func<string, string> downloadJson) =>
-        url => Task.FromResult(downloadJson(url));
-
-    private static void Reset(object repository) => Invoke(repository, "ResetTenWinRemoteForTests");
-
-    private static void SetEmbedded(object repository, Func<string?> loader) =>
-        Invoke(repository, "SetEmbeddedJsonForTests", loader);
-
-    private static bool ManualRefresh(object repository, out string? error)
-    {
-        var method = repository
-            .GetType()
-            .GetMethod(
-                "TryRefreshFinalBuildsFromRemoteAsync",
-                BindingFlags.NonPublic | BindingFlags.Instance
-            );
-        Assert(method != null, "Repository should expose a manual remote refresh.");
-        var task = (System.Threading.Tasks.Task)method!.Invoke(repository, null)!;
-        task.GetAwaiter().GetResult();
-        var result = task.GetType().GetProperty("Result")!.GetValue(task)!;
-        error = (string?)result.GetType().GetField("Item2")!.GetValue(result);
-        return (bool)result.GetType().GetField("Item1")!.GetValue(result)!;
-    }
-
-    private static void Invoke(object target, string methodName, params object[] parameters)
-    {
-        var method = target
-            .GetType()
-            .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
-            .FirstOrDefault(m =>
-                m.Name == methodName && m.GetParameters().Length == parameters.Length
-            );
-        Assert(
-            method != null,
-            $"Expected {target.GetType().FullName}.{methodName} ({parameters.Length} args) to exist."
-        );
-        method!.Invoke(target, parameters);
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-        catch { }
-    }
 
     private static void Assert(bool condition, string message)
     {

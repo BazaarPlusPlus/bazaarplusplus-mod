@@ -88,22 +88,19 @@ public sealed class BuildRecommendationCorpusLogStateTests : IDisposable
     }
 
     [Fact]
-    public void Invalid_cache_and_invalid_seed_choose_one_deepest_initial_warning()
+    public void Embedded_invalid_is_reported_as_the_single_initial_warning()
     {
         var state = new BuildRecommendationCorpusLogState();
-        var selection = BuildRecommendationCorpusLoadSelector.Select(
-            new CorpusCacheLoadResult(
-                CorpusCacheLoadStatus.Invalid,
-                Corpus: null,
+        state.ReportDegraded(
+            new CorpusDegradation(
+                LiveBuildCorpusReasonCode.EmbeddedInvalid,
+                LiveBuildCorpusSource.Embedded,
+                BuildCount: 0,
                 Expired: false,
-                Path: "/tmp/tenwin_builds.json",
+                CachePath: null,
                 Exception: null
-            ),
-            CorpusTextLoadResult.Loaded("invalid seed"),
-            embeddedCorpus: null
+            )
         );
-
-        state.ReportDegraded(selection.ToDegradation());
 
         var warning = Assert.Single(BppLog.Events);
         Assert.Equal("Warning", warning.Severity);

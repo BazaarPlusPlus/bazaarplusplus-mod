@@ -29,7 +29,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 
     private static LiveBuildPanel? _instance;
     private readonly LiveCardSnapshotReader _reader = new();
-    private readonly BuildRecommendationRepository _recommendations = new();
+    private BuildRecommendationRepository? _recommendations;
     private readonly BuildRecommendationRefreshService _refreshService = new();
     private readonly LiveBuildCandidateState _candidateState = new();
     private readonly LiveBuildPreviewRenderer _previewRenderer = new();
@@ -44,13 +44,26 @@ internal sealed class LiveBuildPanel : MonoBehaviour
     private bool _buildRefreshInProgress;
     private string _buildRefreshError = string.Empty;
     private bool _buildRefreshSucceeded;
-    private int _buildRefreshOperationVersion;
+    private readonly LiveBuildRefreshContinuationGate _buildRefreshContinuation = new();
 
     public static bool IsVisible => _instance?._isVisible == true;
 
     private void Awake()
     {
         _instance = this;
+    }
+
+    internal void Initialize(
+        BuildRecommendationRepository recommendations,
+        OverlayPanelHost overlayHost
+    )
+    {
+        if (_recommendations != null)
+            return;
+
+        _recommendations =
+            recommendations ?? throw new ArgumentNullException(nameof(recommendations));
+        AttachToOverlayHost(overlayHost);
         _recommendations.BeginCorpusLoad();
     }
 
@@ -77,7 +90,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 
         // Invalidate any in-flight manual refresh so its continuation never touches the
         // destroyed view (the repository corpus update itself is allowed to finish in the background).
-        _buildRefreshOperationVersion++;
+        _buildRefreshContinuation.Invalidate();
         _overlayHandle?.Dispose();
         _overlayHandle = null;
         StopRender();
@@ -229,7 +242,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         _buildRefreshSucceeded = false;
         RefreshRailView();
         _ = RefreshFinalBuildsAsync(
-            _buildRefreshOperationVersion,
+            _buildRefreshContinuation.Capture(),
             new LiveBuildRefreshLogOperation(Guid.NewGuid())
         );
     }
@@ -242,7 +255,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         BuildRecommendationRefreshResult result;
         try
         {
-            result = await _refreshService.RefreshAsync(_recommendations, CancellationToken.None);
+            result = await _refreshService.RefreshAsync(_recommendations!, CancellationToken.None);
         }
         catch (Exception ex)
         {
@@ -271,7 +284,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
 
         // Stale continuation guard: a destroyed panel bumped the version; the corpus update (if
         // any) already landed in the repository and must not touch this UI.
-        if (operationVersion != _buildRefreshOperationVersion)
+        if (!_buildRefreshContinuation.IsCurrent(operationVersion))
             return;
 
         _buildRefreshInProgress = false;
@@ -321,7 +334,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
         _matches =
             string.IsNullOrWhiteSpace(hero) || !_candidateState.HasCandidates
                 ? Array.Empty<BuildRecommendation>()
-                : _recommendations.FindRecommendations(
+                : _recommendations!.FindRecommendations(
                     hero,
                     _candidateState.TemplateIds,
                     ResolveLiveState()
@@ -441,7 +454,7 @@ internal sealed class LiveBuildPanel : MonoBehaviour
                 LiveBuildRefreshSeverity.Pending
             );
 
-        var summary = _recommendations.GetCorpusSummary();
+        var summary = _recommendations?.GetCorpusSummary();
         var tooltip = summary.HasValue
             ? LiveBuildPanelText.CorpusSummaryTooltip(summary.Value)
             : string.Empty;
