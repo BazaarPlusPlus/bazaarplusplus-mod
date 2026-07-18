@@ -1,7 +1,7 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.CollectionPanel.Data;
+namespace BazaarPlusPlus.Game.Encounters;
 
 // Hardcoded approximation of the game's per-day tier-probability table (tierManager.json, loaded
 // by StaticDataTierRepository and consumed by BazaarCardDealer.GetProbabilitiesByDay). The real
@@ -28,7 +28,6 @@ internal static class DayTierSchedule
     public static bool AllowsStartingTier(ETier startingTier, int day)
     {
         var effective = startingTier == ETier.Legendary ? ETier.Diamond : startingTier;
-        return CollectionCardFacetRanks.TierRank(effective)
-            <= CollectionCardFacetRanks.TierRank(CeilingTier(day));
+        return TierOrder.Rank(effective) <= TierOrder.Rank(CeilingTier(day));
     }
 }

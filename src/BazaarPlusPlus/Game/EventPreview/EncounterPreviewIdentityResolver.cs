@@ -4,11 +4,11 @@ using System.IO;
 using System.Security.Cryptography;
 using Newtonsoft.Json.Linq;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal static class CollectionEncounterPreviewIdentityResolver
+internal static class EncounterPreviewIdentityResolver
 {
-    public static CollectionEncounterPreviewCacheIdentity Resolve(
+    public static EncounterPreviewCacheIdentity Resolve(
         string manifestPath,
         string databasePath,
         string dataBaseUrl,
@@ -19,7 +19,7 @@ internal static class CollectionEncounterPreviewIdentityResolver
         var resource = $"{(dataBaseUrl ?? string.Empty).TrimEnd('/')}/GameData.db.zip";
         if (TryReadGameDataEtag(manifestPath, out var etag))
         {
-            return new CollectionEncounterPreviewCacheIdentity(
+            return new EncounterPreviewCacheIdentity(
                 "etag",
                 resource,
                 etag,
@@ -35,7 +35,7 @@ internal static class CollectionEncounterPreviewIdentityResolver
             );
         }
 
-        return new CollectionEncounterPreviewCacheIdentity(
+        return new EncounterPreviewCacheIdentity(
             "sha256",
             resource,
             ComputeSha256(databasePath),

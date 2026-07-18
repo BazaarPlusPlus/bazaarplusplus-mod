@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal enum CollectionEncounterPreviewTemplateKind
+internal enum EncounterPreviewTemplateKind
 {
     Other = 0,
     Event = 1,
@@ -16,9 +16,9 @@ internal enum CollectionEncounterPreviewTemplateKind
     Item = 5,
 }
 
-internal sealed class CollectionEncounterPreviewLocalizedText
+internal sealed class EncounterPreviewLocalizedText
 {
-    public CollectionEncounterPreviewLocalizedText(string? key, string? fallbackText)
+    public EncounterPreviewLocalizedText(string? key, string? fallbackText)
     {
         Key = key;
         FallbackText = fallbackText;
@@ -29,9 +29,9 @@ internal sealed class CollectionEncounterPreviewLocalizedText
     public string? FallbackText { get; }
 }
 
-internal sealed class CollectionEncounterPreviewAbilityValue
+internal sealed class EncounterPreviewAbilityValue
 {
-    public CollectionEncounterPreviewAbilityValue(string valueText, string? unit = null)
+    public EncounterPreviewAbilityValue(string valueText, string? unit = null)
     {
         ValueText = valueText ?? string.Empty;
         Unit = unit;
@@ -42,47 +42,44 @@ internal sealed class CollectionEncounterPreviewAbilityValue
     public string? Unit { get; }
 }
 
-internal sealed class CollectionEncounterPreviewTemplatePlan
+internal sealed class EncounterPreviewTemplatePlan
 {
-    public CollectionEncounterPreviewTemplatePlan(
+    public EncounterPreviewTemplatePlan(
         Guid templateId,
-        CollectionEncounterPreviewTemplateKind kind,
+        EncounterPreviewTemplateKind kind,
         IReadOnlyCollection<EHero>? heroes,
         string? internalName,
-        CollectionEncounterPreviewLocalizedText? title,
-        CollectionEncounterPreviewLocalizedText? description,
-        IReadOnlyDictionary<string, CollectionEncounterPreviewAbilityValue>? abilityValues,
-        CollectionEncounterRewardFilter? rewardFilter
+        EncounterPreviewLocalizedText? title,
+        EncounterPreviewLocalizedText? description,
+        IReadOnlyDictionary<string, EncounterPreviewAbilityValue>? abilityValues,
+        EncounterRewardFilter? rewardFilter
     )
     {
         TemplateId = templateId;
         Kind = kind;
         Heroes = CopyHeroes(heroes);
         InternalName = internalName ?? string.Empty;
-        Title = title ?? new CollectionEncounterPreviewLocalizedText(null, null);
-        Description = description ?? new CollectionEncounterPreviewLocalizedText(null, null);
+        Title = title ?? new EncounterPreviewLocalizedText(null, null);
+        Description = description ?? new EncounterPreviewLocalizedText(null, null);
         AbilityValues = CopyAbilityValues(abilityValues);
-        RewardFilter = CollectionEncounterPreviewPlanCopies.CopyRewardFilter(rewardFilter);
+        RewardFilter = EncounterPreviewPlanCopies.CopyRewardFilter(rewardFilter);
     }
 
     public Guid TemplateId { get; }
 
-    public CollectionEncounterPreviewTemplateKind Kind { get; }
+    public EncounterPreviewTemplateKind Kind { get; }
 
     public IReadOnlyList<EHero> Heroes { get; }
 
     public string InternalName { get; }
 
-    public CollectionEncounterPreviewLocalizedText Title { get; }
+    public EncounterPreviewLocalizedText Title { get; }
 
-    public CollectionEncounterPreviewLocalizedText Description { get; }
+    public EncounterPreviewLocalizedText Description { get; }
 
-    public IReadOnlyDictionary<
-        string,
-        CollectionEncounterPreviewAbilityValue
-    > AbilityValues { get; }
+    public IReadOnlyDictionary<string, EncounterPreviewAbilityValue> AbilityValues { get; }
 
-    public CollectionEncounterRewardFilter? RewardFilter { get; }
+    public EncounterRewardFilter? RewardFilter { get; }
 
     private static IReadOnlyList<EHero> CopyHeroes(IReadOnlyCollection<EHero>? heroes)
     {
@@ -96,23 +93,18 @@ internal sealed class CollectionEncounterPreviewTemplatePlan
         return Array.AsReadOnly(result);
     }
 
-    private static IReadOnlyDictionary<
-        string,
-        CollectionEncounterPreviewAbilityValue
-    > CopyAbilityValues(
-        IReadOnlyDictionary<string, CollectionEncounterPreviewAbilityValue>? abilityValues
+    private static IReadOnlyDictionary<string, EncounterPreviewAbilityValue> CopyAbilityValues(
+        IReadOnlyDictionary<string, EncounterPreviewAbilityValue>? abilityValues
     )
     {
         if (abilityValues == null || abilityValues.Count == 0)
         {
-            return new ReadOnlyDictionary<string, CollectionEncounterPreviewAbilityValue>(
-                new Dictionary<string, CollectionEncounterPreviewAbilityValue>(
-                    StringComparer.Ordinal
-                )
+            return new ReadOnlyDictionary<string, EncounterPreviewAbilityValue>(
+                new Dictionary<string, EncounterPreviewAbilityValue>(StringComparer.Ordinal)
             );
         }
 
-        var result = new Dictionary<string, CollectionEncounterPreviewAbilityValue>(
+        var result = new Dictionary<string, EncounterPreviewAbilityValue>(
             abilityValues.Count,
             StringComparer.Ordinal
         );
@@ -120,33 +112,33 @@ internal sealed class CollectionEncounterPreviewTemplatePlan
         {
             if (string.IsNullOrEmpty(pair.Key) || pair.Value == null)
                 continue;
-            result[pair.Key] = new CollectionEncounterPreviewAbilityValue(
+            result[pair.Key] = new EncounterPreviewAbilityValue(
                 pair.Value.ValueText,
                 pair.Value.Unit
             );
         }
 
-        return new ReadOnlyDictionary<string, CollectionEncounterPreviewAbilityValue>(result);
+        return new ReadOnlyDictionary<string, EncounterPreviewAbilityValue>(result);
     }
 }
 
-internal sealed class CollectionEncounterPreviewEventPlan
+internal sealed class EncounterPreviewEventPlan
 {
-    public CollectionEncounterPreviewEventPlan(
+    public EncounterPreviewEventPlan(
         Guid templateId,
         bool isRandomSelectionEvent,
         bool suppressRandomOutcome,
         int? choiceLimit,
-        IReadOnlyList<CollectionEncounterOutcomeGroupData>? outcomeGroups,
-        IReadOnlyList<CollectionEncounterChoiceGroupData>? choiceGroups
+        IReadOnlyList<EncounterOutcomeGroupData>? outcomeGroups,
+        IReadOnlyList<EncounterChoiceGroupData>? choiceGroups
     )
     {
         TemplateId = templateId;
         IsRandomSelectionEvent = isRandomSelectionEvent;
         SuppressRandomOutcome = suppressRandomOutcome;
         ChoiceLimit = choiceLimit;
-        OutcomeGroups = CollectionEncounterPreviewPlanCopies.CopyOutcomeGroups(outcomeGroups);
-        ChoiceGroups = CollectionEncounterPreviewPlanCopies.CopyChoiceGroups(choiceGroups);
+        OutcomeGroups = EncounterPreviewPlanCopies.CopyOutcomeGroups(outcomeGroups);
+        ChoiceGroups = EncounterPreviewPlanCopies.CopyChoiceGroups(choiceGroups);
     }
 
     public Guid TemplateId { get; }
@@ -157,14 +149,14 @@ internal sealed class CollectionEncounterPreviewEventPlan
 
     public int? ChoiceLimit { get; }
 
-    public IReadOnlyList<CollectionEncounterOutcomeGroupData> OutcomeGroups { get; }
+    public IReadOnlyList<EncounterOutcomeGroupData> OutcomeGroups { get; }
 
-    public IReadOnlyList<CollectionEncounterChoiceGroupData> ChoiceGroups { get; }
+    public IReadOnlyList<EncounterChoiceGroupData> ChoiceGroups { get; }
 }
 
-internal sealed class CollectionLevelUpPreviewHeroCondition
+internal sealed class LevelUpPreviewHeroCondition
 {
-    public CollectionLevelUpPreviewHeroCondition(
+    public LevelUpPreviewHeroCondition(
         IReadOnlyCollection<EHero>? heroes,
         string? comparisonOperator
     )
@@ -178,20 +170,20 @@ internal sealed class CollectionLevelUpPreviewHeroCondition
     public string ComparisonOperator { get; }
 }
 
-internal sealed class CollectionLevelUpPreviewGroup
+internal sealed class LevelUpPreviewGroup
 {
-    public CollectionLevelUpPreviewGroup(
+    public LevelUpPreviewGroup(
         uint randomWeight,
         int limit,
         IReadOnlyCollection<Guid>? templateIds,
-        IReadOnlyCollection<CollectionLevelUpPreviewHeroCondition>? heroConditions
+        IReadOnlyCollection<LevelUpPreviewHeroCondition>? heroConditions
     )
     {
         RandomWeight = randomWeight;
         Limit = Math.Max(1, limit);
         TemplateIds = new List<Guid>(templateIds ?? Array.Empty<Guid>()).AsReadOnly();
-        HeroConditions = new List<CollectionLevelUpPreviewHeroCondition>(
-            heroConditions ?? Array.Empty<CollectionLevelUpPreviewHeroCondition>()
+        HeroConditions = new List<LevelUpPreviewHeroCondition>(
+            heroConditions ?? Array.Empty<LevelUpPreviewHeroCondition>()
         ).AsReadOnly();
     }
 
@@ -201,23 +193,23 @@ internal sealed class CollectionLevelUpPreviewGroup
 
     public IReadOnlyList<Guid> TemplateIds { get; }
 
-    public IReadOnlyList<CollectionLevelUpPreviewHeroCondition> HeroConditions { get; }
+    public IReadOnlyList<LevelUpPreviewHeroCondition> HeroConditions { get; }
 }
 
-internal sealed class CollectionLevelUpPreviewPlan
+internal sealed class LevelUpPreviewPlan
 {
-    public CollectionLevelUpPreviewPlan(
+    public LevelUpPreviewPlan(
         int level,
         int healthIncrease,
         bool isRandomSelection,
-        IReadOnlyCollection<CollectionLevelUpPreviewGroup>? groups
+        IReadOnlyCollection<LevelUpPreviewGroup>? groups
     )
     {
         Level = level;
         HealthIncrease = healthIncrease;
         IsRandomSelection = isRandomSelection;
-        Groups = new List<CollectionLevelUpPreviewGroup>(
-            groups ?? Array.Empty<CollectionLevelUpPreviewGroup>()
+        Groups = new List<LevelUpPreviewGroup>(
+            groups ?? Array.Empty<LevelUpPreviewGroup>()
         ).AsReadOnly();
     }
 
@@ -227,12 +219,12 @@ internal sealed class CollectionLevelUpPreviewPlan
 
     public bool IsRandomSelection { get; }
 
-    public IReadOnlyList<CollectionLevelUpPreviewGroup> Groups { get; }
+    public IReadOnlyList<LevelUpPreviewGroup> Groups { get; }
 }
 
-internal sealed class CollectionPreviewCoverage
+internal sealed class EventPreviewCoverage
 {
-    public CollectionPreviewCoverage(
+    public EventPreviewCoverage(
         int eventFailureCount,
         int levelUpFailureCount,
         int unsupportedLevelUpPartCount,
@@ -254,24 +246,24 @@ internal sealed class CollectionPreviewCoverage
     public int MissingReferencedTemplateCount { get; }
 }
 
-internal sealed class CollectionEncounterPreviewSnapshot
+internal sealed class EncounterPreviewSnapshot
 {
-    private readonly Dictionary<Guid, CollectionEncounterPreviewEventPlan> _eventsById;
-    private readonly Dictionary<int, CollectionLevelUpPreviewPlan> _levelUpsByLevel;
-    private readonly Dictionary<Guid, CollectionEncounterPreviewTemplatePlan> _templatesById;
+    private readonly Dictionary<Guid, EncounterPreviewEventPlan> _eventsById;
+    private readonly Dictionary<int, LevelUpPreviewPlan> _levelUpsByLevel;
+    private readonly Dictionary<Guid, EncounterPreviewTemplatePlan> _templatesById;
 
-    public CollectionEncounterPreviewSnapshot(
-        IEnumerable<CollectionEncounterPreviewEventPlan>? events,
-        IEnumerable<CollectionEncounterPreviewTemplatePlan>? templates,
-        IEnumerable<CollectionLevelUpPreviewPlan>? levelUps = null,
-        CollectionPreviewCoverage? coverage = null
+    public EncounterPreviewSnapshot(
+        IEnumerable<EncounterPreviewEventPlan>? events,
+        IEnumerable<EncounterPreviewTemplatePlan>? templates,
+        IEnumerable<LevelUpPreviewPlan>? levelUps = null,
+        EventPreviewCoverage? coverage = null
     )
     {
-        _eventsById = new Dictionary<Guid, CollectionEncounterPreviewEventPlan>();
-        _levelUpsByLevel = new Dictionary<int, CollectionLevelUpPreviewPlan>();
-        _templatesById = new Dictionary<Guid, CollectionEncounterPreviewTemplatePlan>();
+        _eventsById = new Dictionary<Guid, EncounterPreviewEventPlan>();
+        _levelUpsByLevel = new Dictionary<int, LevelUpPreviewPlan>();
+        _templatesById = new Dictionary<Guid, EncounterPreviewTemplatePlan>();
 
-        var eventList = new List<CollectionEncounterPreviewEventPlan>();
+        var eventList = new List<EncounterPreviewEventPlan>();
         if (events != null)
         {
             foreach (var eventPlan in events)
@@ -289,7 +281,7 @@ internal sealed class CollectionEncounterPreviewSnapshot
             }
         }
 
-        var levelUpList = new List<CollectionLevelUpPreviewPlan>();
+        var levelUpList = new List<LevelUpPreviewPlan>();
         if (levelUps != null)
         {
             foreach (var levelUpPlan in levelUps)
@@ -307,7 +299,7 @@ internal sealed class CollectionEncounterPreviewSnapshot
             }
         }
 
-        var templateList = new List<CollectionEncounterPreviewTemplatePlan>();
+        var templateList = new List<EncounterPreviewTemplatePlan>();
         if (templates != null)
         {
             foreach (var templatePlan in templates)
@@ -328,16 +320,16 @@ internal sealed class CollectionEncounterPreviewSnapshot
         Events = eventList.AsReadOnly();
         LevelUps = levelUpList.AsReadOnly();
         Templates = templateList.AsReadOnly();
-        Coverage = coverage ?? new CollectionPreviewCoverage(0, 0, 0, 0);
+        Coverage = coverage ?? new EventPreviewCoverage(0, 0, 0, 0);
     }
 
-    public IReadOnlyList<CollectionEncounterPreviewEventPlan> Events { get; }
+    public IReadOnlyList<EncounterPreviewEventPlan> Events { get; }
 
-    public IReadOnlyList<CollectionEncounterPreviewTemplatePlan> Templates { get; }
+    public IReadOnlyList<EncounterPreviewTemplatePlan> Templates { get; }
 
-    public IReadOnlyList<CollectionLevelUpPreviewPlan> LevelUps { get; }
+    public IReadOnlyList<LevelUpPreviewPlan> LevelUps { get; }
 
-    public CollectionPreviewCoverage Coverage { get; }
+    public EventPreviewCoverage Coverage { get; }
 
     public int EventCount => _eventsById.Count;
 
@@ -345,22 +337,19 @@ internal sealed class CollectionEncounterPreviewSnapshot
 
     public int LevelUpCount => _levelUpsByLevel.Count;
 
-    public bool TryGetEvent(Guid templateId, out CollectionEncounterPreviewEventPlan eventPlan) =>
+    public bool TryGetEvent(Guid templateId, out EncounterPreviewEventPlan eventPlan) =>
         _eventsById.TryGetValue(templateId, out eventPlan!);
 
-    public bool TryGetTemplate(
-        Guid templateId,
-        out CollectionEncounterPreviewTemplatePlan templatePlan
-    ) => _templatesById.TryGetValue(templateId, out templatePlan!);
+    public bool TryGetTemplate(Guid templateId, out EncounterPreviewTemplatePlan templatePlan) =>
+        _templatesById.TryGetValue(templateId, out templatePlan!);
 
-    public bool TryGetLevelUp(int level, out CollectionLevelUpPreviewPlan levelUpPlan) =>
+    public bool TryGetLevelUp(int level, out LevelUpPreviewPlan levelUpPlan) =>
         _levelUpsByLevel.TryGetValue(level, out levelUpPlan!);
 }
 
-internal sealed class CollectionEncounterPreviewCacheIdentity
-    : IEquatable<CollectionEncounterPreviewCacheIdentity>
+internal sealed class EncounterPreviewCacheIdentity : IEquatable<EncounterPreviewCacheIdentity>
 {
-    public CollectionEncounterPreviewCacheIdentity(
+    public EncounterPreviewCacheIdentity(
         string kind,
         string resource,
         string value,
@@ -385,7 +374,7 @@ internal sealed class CollectionEncounterPreviewCacheIdentity
 
     public string BuildChannel { get; }
 
-    public bool Equals(CollectionEncounterPreviewCacheIdentity? other) =>
+    public bool Equals(EncounterPreviewCacheIdentity? other) =>
         other != null
         && string.Equals(Kind, other.Kind, StringComparison.Ordinal)
         && string.Equals(Resource, other.Resource, StringComparison.Ordinal)
@@ -394,7 +383,7 @@ internal sealed class CollectionEncounterPreviewCacheIdentity
         && string.Equals(BuildChannel, other.BuildChannel, StringComparison.Ordinal);
 
     public override bool Equals(object? obj) =>
-        obj is CollectionEncounterPreviewCacheIdentity other && Equals(other);
+        obj is EncounterPreviewCacheIdentity other && Equals(other);
 
     public override int GetHashCode()
     {
@@ -411,42 +400,40 @@ internal sealed class CollectionEncounterPreviewCacheIdentity
     }
 }
 
-internal static class CollectionEncounterPreviewPlanCopies
+internal static class EncounterPreviewPlanCopies
 {
-    public static IReadOnlyList<CollectionEncounterOutcomeGroupData> CopyOutcomeGroups(
-        IReadOnlyList<CollectionEncounterOutcomeGroupData>? groups
+    public static IReadOnlyList<EncounterOutcomeGroupData> CopyOutcomeGroups(
+        IReadOnlyList<EncounterOutcomeGroupData>? groups
     )
     {
         if (groups == null || groups.Count == 0)
-            return Array.Empty<CollectionEncounterOutcomeGroupData>();
+            return Array.Empty<EncounterOutcomeGroupData>();
 
-        var result = new CollectionEncounterOutcomeGroupData[groups.Count];
+        var result = new EncounterOutcomeGroupData[groups.Count];
         for (var i = 0; i < groups.Count; i++)
             result[i] = CopyOutcomeGroup(groups[i]);
         return Array.AsReadOnly(result);
     }
 
-    public static IReadOnlyList<CollectionEncounterChoiceGroupData> CopyChoiceGroups(
-        IReadOnlyList<CollectionEncounterChoiceGroupData>? groups
+    public static IReadOnlyList<EncounterChoiceGroupData> CopyChoiceGroups(
+        IReadOnlyList<EncounterChoiceGroupData>? groups
     )
     {
         if (groups == null || groups.Count == 0)
-            return Array.Empty<CollectionEncounterChoiceGroupData>();
+            return Array.Empty<EncounterChoiceGroupData>();
 
-        var result = new CollectionEncounterChoiceGroupData[groups.Count];
+        var result = new EncounterChoiceGroupData[groups.Count];
         for (var i = 0; i < groups.Count; i++)
             result[i] = CopyChoiceGroup(groups[i]);
         return Array.AsReadOnly(result);
     }
 
-    public static CollectionEncounterRewardFilter? CopyRewardFilter(
-        CollectionEncounterRewardFilter? filter
-    )
+    public static EncounterRewardFilter? CopyRewardFilter(EncounterRewardFilter? filter)
     {
         if (filter == null)
             return null;
 
-        return new CollectionEncounterRewardFilter(
+        return new EncounterRewardFilter(
             filter.CardType,
             filter.Quantity,
             filter.FromAnyHero,
@@ -462,34 +449,32 @@ internal static class CollectionEncounterPreviewPlanCopies
         );
     }
 
-    public static IReadOnlyList<CollectionEncounterCardRequirement> CopyRequirements(
-        IReadOnlyList<CollectionEncounterCardRequirement>? requirements
+    public static IReadOnlyList<EncounterCardRequirement> CopyRequirements(
+        IReadOnlyList<EncounterCardRequirement>? requirements
     )
     {
         if (requirements == null || requirements.Count == 0)
-            return Array.Empty<CollectionEncounterCardRequirement>();
+            return Array.Empty<EncounterCardRequirement>();
 
-        var result = new CollectionEncounterCardRequirement[requirements.Count];
+        var result = new EncounterCardRequirement[requirements.Count];
         for (var i = 0; i < requirements.Count; i++)
             result[i] = CopyRequirement(requirements[i]);
         return Array.AsReadOnly(result);
     }
 
-    private static CollectionEncounterOutcomeGroupData CopyOutcomeGroup(
-        CollectionEncounterOutcomeGroupData group
-    )
+    private static EncounterOutcomeGroupData CopyOutcomeGroup(EncounterOutcomeGroupData group)
     {
-        var queryPools = new CollectionEncounterOutcomeQueryPool[group.QueryPools.Count];
+        var queryPools = new EncounterOutcomeQueryPool[group.QueryPools.Count];
         for (var i = 0; i < queryPools.Length; i++)
         {
             var pool = group.QueryPools[i];
-            queryPools[i] = new CollectionEncounterOutcomeQueryPool(
+            queryPools[i] = new EncounterOutcomeQueryPool(
                 CopyRewardFilter(pool.Filter),
                 pool.Quantity
             );
         }
 
-        return new CollectionEncounterOutcomeGroupData(
+        return new EncounterOutcomeGroupData(
             group.Weight,
             CopyList(group.Ids),
             Array.AsReadOnly(queryPools),
@@ -498,36 +483,32 @@ internal static class CollectionEncounterPreviewPlanCopies
         );
     }
 
-    private static CollectionEncounterChoiceGroupData CopyChoiceGroup(
-        CollectionEncounterChoiceGroupData group
-    )
+    private static EncounterChoiceGroupData CopyChoiceGroup(EncounterChoiceGroupData group)
     {
-        var members = new CollectionEncounterStepReference[group.Members.Count];
+        var members = new EncounterStepReference[group.Members.Count];
         for (var i = 0; i < members.Length; i++)
         {
             var member = group.Members[i];
-            members[i] = new CollectionEncounterStepReference(
+            members[i] = new EncounterStepReference(
                 member.TemplateId,
                 CopyRequirements(member.Requirements)
             );
         }
 
-        return new CollectionEncounterChoiceGroupData(
+        return new EncounterChoiceGroupData(
             group.IsRandomPool,
             Array.AsReadOnly(members),
             CopyDayCondition(group.DayCondition)
         );
     }
 
-    private static CollectionEncounterCardRequirement CopyRequirement(
-        CollectionEncounterCardRequirement requirement
-    )
+    private static EncounterCardRequirement CopyRequirement(EncounterCardRequirement requirement)
     {
         var tagGroups = new IReadOnlyList<string>[requirement.TagCandidateGroups.Count];
         for (var i = 0; i < tagGroups.Length; i++)
             tagGroups[i] = CopyList(requirement.TagCandidateGroups[i]);
 
-        return new CollectionEncounterCardRequirement(
+        return new EncounterCardRequirement(
             CopyList(requirement.Ids),
             Array.AsReadOnly(tagGroups),
             requirement.TagOperator,
@@ -536,12 +517,8 @@ internal static class CollectionEncounterPreviewPlanCopies
         );
     }
 
-    private static CollectionEncounterDayCondition? CopyDayCondition(
-        CollectionEncounterDayCondition? condition
-    ) =>
-        condition is { } value
-            ? new CollectionEncounterDayCondition(value.Day, value.Comparison)
-            : null;
+    private static EncounterDayCondition? CopyDayCondition(EncounterDayCondition? condition) =>
+        condition is { } value ? new EncounterDayCondition(value.Day, value.Comparison) : null;
 
     private static IReadOnlyList<T> CopyList<T>(IReadOnlyList<T> values)
     {

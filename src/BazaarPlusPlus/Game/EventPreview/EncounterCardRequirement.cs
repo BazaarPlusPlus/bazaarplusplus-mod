@@ -2,16 +2,16 @@
 using System;
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
 // One TPrerequisiteCardCount: the number of owned cards matching the conditional is
 // compared against Amount. The dominant shape in random-outcome groups is
 // "Equal 0" (the outcome only rolls while you do NOT own the card — e.g. Farai's
 // Package results), so ownership can never be read as plain "must have";
 // choice steps also use count thresholds ("GreaterThanOrEqual 12").
-internal sealed class CollectionEncounterCardRequirement
+internal sealed class EncounterCardRequirement
 {
-    public CollectionEncounterCardRequirement(
+    public EncounterCardRequirement(
         IReadOnlyList<Guid> ids,
         IReadOnlyList<IReadOnlyList<string>> tagCandidateGroups,
         string tagOperator,
@@ -42,7 +42,7 @@ internal sealed class CollectionEncounterCardRequirement
 
     public int Amount { get; }
 
-    public bool Matches(CollectionEncounterInventory inventory)
+    public bool Matches(EncounterInventory inventory)
     {
         var count =
             Ids.Count > 0

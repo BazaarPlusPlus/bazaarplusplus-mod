@@ -2,14 +2,14 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionEncounterRewardParserTests
+public sealed class EncounterRewardParserTests
 {
     [Fact]
     public void TryParse_extracts_item_pool_from_event_result_text()
     {
-        var reward = CollectionEncounterRewardParser.TryParse(
+        var reward = EncounterRewardParser.TryParse(
             "(if you are Dooley or Stelle) Get a Small Silver-tier Tool from any Hero"
         );
 
@@ -27,7 +27,7 @@ public sealed class CollectionEncounterRewardParserTests
     [Fact]
     public void TryParse_extracts_skill_pool_from_event_result_text()
     {
-        var reward = CollectionEncounterRewardParser.TryParse("Learn 1 Freeze skill");
+        var reward = EncounterRewardParser.TryParse("Learn 1 Freeze skill");
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Skill, reward.CardType);
@@ -42,7 +42,7 @@ public sealed class CollectionEncounterRewardParserTests
     [Fact]
     public void TryParse_ignores_non_card_player_stat_results()
     {
-        var reward = CollectionEncounterRewardParser.TryParse("Permanently gain 3 Regen");
+        var reward = EncounterRewardParser.TryParse("Permanently gain 3 Regen");
 
         Assert.Null(reward);
     }

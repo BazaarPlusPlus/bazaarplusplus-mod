@@ -5,11 +5,11 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Spawning.SpawnBehaviors;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal readonly struct CollectionMerchantTierPolicy
+internal readonly struct EncounterMerchantTierPolicy
 {
-    public CollectionMerchantTierPolicy(ETier? fixedTier, bool usesDayDistribution)
+    public EncounterMerchantTierPolicy(ETier? fixedTier, bool usesDayDistribution)
     {
         FixedTier = fixedTier;
         UsesDayDistribution = usesDayDistribution;
@@ -20,20 +20,20 @@ internal readonly struct CollectionMerchantTierPolicy
     public bool UsesDayDistribution { get; }
 }
 
-internal static class CollectionMerchantTierResolver
+internal static class EncounterMerchantTierResolver
 {
-    public static CollectionMerchantTierPolicy Resolve(TCardBase? template)
+    public static EncounterMerchantTierPolicy Resolve(TCardBase? template)
     {
         if (
             template is not TCardEncounterEvent eventTemplate
             || eventTemplate.SelectionContext?.SpawnContext is not TSpawnContextQuery spawnContext
         )
-            return new CollectionMerchantTierPolicy(fixedTier: null, usesDayDistribution: true);
+            return new EncounterMerchantTierPolicy(fixedTier: null, usesDayDistribution: true);
 
         ETier? fixedTier = null;
         var ignoresDayTable = false;
         if (spawnContext.Behaviors == null)
-            return new CollectionMerchantTierPolicy(fixedTier: null, usesDayDistribution: true);
+            return new EncounterMerchantTierPolicy(fixedTier: null, usesDayDistribution: true);
 
         foreach (var behavior in spawnContext.Behaviors)
         {
@@ -51,8 +51,8 @@ internal static class CollectionMerchantTierResolver
         }
 
         return fixedTier.HasValue
-            ? new CollectionMerchantTierPolicy(fixedTier, usesDayDistribution: false)
-            : new CollectionMerchantTierPolicy(
+            ? new EncounterMerchantTierPolicy(fixedTier, usesDayDistribution: false)
+            : new EncounterMerchantTierPolicy(
                 fixedTier: null,
                 usesDayDistribution: !ignoresDayTable
             );

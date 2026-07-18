@@ -4,9 +4,9 @@ using System.Linq;
 using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public class CollectionEncounterRequirementTests
+public class EncounterRequirementTests
 {
     private static readonly Guid PackageId = Guid.Parse("b0000000-0000-0000-0000-000000000001");
 
@@ -15,7 +15,7 @@ public class CollectionEncounterRequirementTests
     [Fact]
     public void Equal_zero_requirement_is_met_only_without_the_card()
     {
-        var requirement = new CollectionEncounterCardRequirement(
+        var requirement = new EncounterCardRequirement(
             new[] { PackageId },
             Array.Empty<IReadOnlyList<string>>(),
             tagOperator: "Any",
@@ -30,7 +30,7 @@ public class CollectionEncounterRequirementTests
     [Fact]
     public void Count_threshold_requirements_count_duplicates()
     {
-        var requirement = new CollectionEncounterCardRequirement(
+        var requirement = new EncounterCardRequirement(
             new[] { PackageId },
             Array.Empty<IReadOnlyList<string>>(),
             tagOperator: "Any",
@@ -45,7 +45,7 @@ public class CollectionEncounterRequirementTests
     [Fact]
     public void Tag_requirement_with_equal_zero_inverts_on_hidden_tag_ownership()
     {
-        var requirement = new CollectionEncounterCardRequirement(
+        var requirement = new EncounterCardRequirement(
             Array.Empty<Guid>(),
             new IReadOnlyList<string>[] { new[] { "Package" } },
             tagOperator: "Any",
@@ -99,9 +99,7 @@ public class CollectionEncounterRequirementTests
             }
             """;
 
-        Assert.True(
-            CollectionEncounterStructuredParser.TryParseEventOutcomeGroups(json, out var groups)
-        );
+        Assert.True(EncounterStructuredParser.TryParseEventOutcomeGroups(json, out var groups));
 
         Assert.Equal(2, groups.Count);
         Assert.Equal(1u, groups[0].Weight);
@@ -130,7 +128,7 @@ public class CollectionEncounterRequirementTests
             ]
             """;
 
-        var requirements = CollectionEncounterStructuredParser.ReadCardRequirements(
+        var requirements = EncounterStructuredParser.ReadCardRequirements(
             Newtonsoft.Json.Linq.JToken.Parse(json)
         );
 
@@ -163,16 +161,13 @@ public class CollectionEncounterRequirementTests
             """;
 
         Assert.Empty(
-            CollectionEncounterStructuredParser.ReadCardRequirements(
-                Newtonsoft.Json.Linq.JToken.Parse(json)
-            )
+            EncounterStructuredParser.ReadCardRequirements(Newtonsoft.Json.Linq.JToken.Parse(json))
         );
     }
 
-    private static CollectionEncounterInventory Inventory(
-        params CollectionEncounterInventoryCard[] cards
-    ) => new(cards.ToList());
+    private static EncounterInventory Inventory(params EncounterInventoryCard[] cards) =>
+        new(cards.ToList());
 
-    private static CollectionEncounterInventoryCard Card(Guid templateId, params string[] tags) =>
+    private static EncounterInventoryCard Card(Guid templateId, params string[] tags) =>
         new(templateId, new HashSet<string>(tags, StringComparer.Ordinal));
 }

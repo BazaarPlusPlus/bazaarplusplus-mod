@@ -2,17 +2,16 @@
 using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.CollectionPanel.Data;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal static class CollectionEncounterEventDetailResolver
+internal static class EncounterEventDetailResolver
 {
-    public static CollectionEncounterOption? TryResolve(
-        CollectionEncounterPreviewEventPlan? eventPlan,
-        CollectionEncounterPreviewSnapshot snapshot,
+    public static EncounterOption? TryResolve(
+        EncounterPreviewEventPlan? eventPlan,
+        EncounterPreviewSnapshot snapshot,
         EHero? currentHero,
-        CollectionEncounterInventory? inventory = null,
+        EncounterInventory? inventory = null,
         int? currentDay = null
     )
     {
@@ -20,12 +19,11 @@ internal static class CollectionEncounterEventDetailResolver
             eventPlan == null
             || snapshot == null
             || !snapshot.TryGetTemplate(eventPlan.TemplateId, out var eventTemplate)
-            || eventTemplate.Kind != CollectionEncounterPreviewTemplateKind.Event
+            || eventTemplate.Kind != EncounterPreviewTemplateKind.Event
         )
             return null;
 
-        var resultText =
-            CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty;
+        var resultText = EventPreviewLocalization.ResolveDescription(eventTemplate) ?? string.Empty;
         var rewardFilter = ResolveRewardFilter(eventTemplate, resultText);
         var outcomeGroups = ResolveOutcomeGroups(
             eventPlan,
@@ -37,13 +35,13 @@ internal static class CollectionEncounterEventDetailResolver
 
         // A suppressed random-selection event (shop stock generation) must not fall
         // back to rendering its spawn groups as choices either.
-        var choiceDetails = outcomeGroups != null || eventPlan.IsRandomSelectionEvent
-            ? Array.Empty<CollectionEncounterChoiceDetail>()
-            : ResolveChoiceDetails(eventPlan, snapshot, currentHero, inventory, currentDay);
-        return new CollectionEncounterOption(
+        var choiceDetails =
+            outcomeGroups != null || eventPlan.IsRandomSelectionEvent
+                ? Array.Empty<EncounterChoiceDetail>()
+                : ResolveChoiceDetails(eventPlan, snapshot, currentHero, inventory, currentDay);
+        return new EncounterOption(
             eventTemplate.TemplateId,
-            CollectionLocalizationResolver.ResolveTitle(eventTemplate)
-                ?? eventTemplate.InternalName,
+            EventPreviewLocalization.ResolveTitle(eventTemplate) ?? eventTemplate.InternalName,
             sourceKey: null,
             sourceKind: null,
             eventTemplate.TemplateId,
@@ -57,18 +55,18 @@ internal static class CollectionEncounterEventDetailResolver
     // Random-outcome events roll one weighted group: percentages normalize over the
     // groups actually in the roll (day condition matching, ownership prerequisites
     // met); prerequisite-unmet groups render dimmed without a percentage.
-    private static IReadOnlyList<CollectionEncounterOutcomeView>? ResolveOutcomeGroups(
-        CollectionEncounterPreviewEventPlan eventPlan,
-        CollectionEncounterPreviewSnapshot snapshot,
+    private static IReadOnlyList<EncounterOutcomeView>? ResolveOutcomeGroups(
+        EncounterPreviewEventPlan eventPlan,
+        EncounterPreviewSnapshot snapshot,
         EHero? currentHero,
-        CollectionEncounterInventory? inventory,
+        EncounterInventory? inventory,
         int? currentDay
     )
     {
         if (!eventPlan.IsRandomSelectionEvent || eventPlan.SuppressRandomOutcome)
             return null;
 
-        var active = new List<(CollectionEncounterOutcomeGroupData Group, bool Eligible)>();
+        var active = new List<(EncounterOutcomeGroupData Group, bool Eligible)>();
         uint totalWeight = 0;
         foreach (var group in eventPlan.OutcomeGroups)
         {
@@ -91,7 +89,7 @@ internal static class CollectionEncounterEventDetailResolver
         var resolutions = new List<OutcomeGroupResolution>();
         foreach (var (group, eligible) in active)
         {
-            var details = new List<CollectionEncounterChoiceDetail>();
+            var details = new List<EncounterChoiceDetail>();
             var combatIds = new HashSet<Guid>();
             var resolvedCount = 0;
             foreach (var id in group.Ids)
@@ -99,22 +97,21 @@ internal static class CollectionEncounterEventDetailResolver
                 if (!snapshot.TryGetTemplate(id, out var template))
                     continue;
                 resolvedCount++;
-                if (template.Kind == CollectionEncounterPreviewTemplateKind.CombatEncounter)
+                if (template.Kind == EncounterPreviewTemplateKind.CombatEncounter)
                 {
                     combatIds.Add(template.TemplateId);
                     continue;
                 }
-                if (!CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
+                if (!EncounterHeroEligibility.Matches(template.Heroes, currentHero))
                     continue;
-                if (template.Kind == CollectionEncounterPreviewTemplateKind.Skill)
+                if (template.Kind == EncounterPreviewTemplateKind.Skill)
                 {
                     var skillName =
-                        CollectionLocalizationResolver.ResolveTitle(template)
-                        ?? template.InternalName;
+                        EventPreviewLocalization.ResolveTitle(template) ?? template.InternalName;
                     details.Add(
-                        new CollectionEncounterChoiceDetail(
+                        new EncounterChoiceDetail(
                             template.TemplateId,
-                            CollectionPanelText.OutcomeGainSkill(skillName),
+                            EncounterPreviewText.OutcomeGainSkill(skillName),
                             resultText: string.Empty,
                             rewardFilter: null,
                             isSourceMatch: false
@@ -130,7 +127,7 @@ internal static class CollectionEncounterEventDetailResolver
             foreach (var pool in group.QueryPools)
             {
                 details.Add(
-                    new CollectionEncounterChoiceDetail(
+                    new EncounterChoiceDetail(
                         Guid.Empty,
                         displayName: string.Empty,
                         resultText: QueryPoolResultText(pool),
@@ -163,7 +160,7 @@ internal static class CollectionEncounterEventDetailResolver
     // real alternatives to explain — a single view, or nothing but nameless random
     // pools — the breakdown is stock composition noise, not outcome odds.
     internal static bool ShouldSuppressOutcomeViews(
-        IReadOnlyList<CollectionEncounterOutcomeView> views,
+        IReadOnlyList<EncounterOutcomeView> views,
         int spawnLimit
     )
     {
@@ -183,19 +180,19 @@ internal static class CollectionEncounterEventDetailResolver
         return true;
     }
 
-    private static string QueryPoolResultText(CollectionEncounterOutcomeQueryPool pool)
+    private static string QueryPoolResultText(EncounterOutcomeQueryPool pool)
     {
         var baseText = pool.Filter?.CardType switch
         {
-            ECardType.Skill => CollectionPanelText.OutcomeRandomSkill(),
-            ECardType.Item => CollectionPanelText.OutcomeRandomItem(),
-            _ => CollectionPanelText.OutcomeRandomReward(),
+            ECardType.Skill => EncounterPreviewText.OutcomeRandomSkill(),
+            ECardType.Item => EncounterPreviewText.OutcomeRandomItem(),
+            _ => EncounterPreviewText.OutcomeRandomReward(),
         };
         var quantity = pool.Quantity ?? pool.Filter?.Quantity;
         return quantity is > 1 ? $"{quantity}× {baseText}" : baseText;
     }
 
-    private static void DedupeDetails(List<CollectionEncounterChoiceDetail> details)
+    private static void DedupeDetails(List<EncounterChoiceDetail> details)
     {
         for (var i = details.Count - 1; i > 0; i--)
         {
@@ -228,7 +225,7 @@ internal static class CollectionEncounterEventDetailResolver
             bool eligible,
             bool isCombatPool,
             HashSet<Guid> combatIds,
-            List<CollectionEncounterChoiceDetail> details
+            List<EncounterChoiceDetail> details
         )
         {
             Weight = weight;
@@ -242,17 +239,17 @@ internal static class CollectionEncounterEventDetailResolver
         public bool Eligible { get; }
         public bool IsCombatPool { get; }
         public HashSet<Guid> CombatIds { get; }
-        public List<CollectionEncounterChoiceDetail> Details { get; }
+        public List<EncounterChoiceDetail> Details { get; }
     }
 
     // Same-shaped outcome groups are merged after current-locale text resolution so
     // locale changes never require rebuilding the static plan.
-    internal static List<CollectionEncounterOutcomeView> BuildOutcomeViews(
+    internal static List<EncounterOutcomeView> BuildOutcomeViews(
         List<OutcomeGroupResolution> resolutions,
         uint totalWeight
     )
     {
-        var views = new List<CollectionEncounterOutcomeView>();
+        var views = new List<EncounterOutcomeView>();
         var combatSlots = new Dictionary<bool, int>();
         var combatWeights = new Dictionary<bool, uint>();
         var combatIds = new Dictionary<bool, HashSet<Guid>>();
@@ -279,12 +276,12 @@ internal static class CollectionEncounterEventDetailResolver
                     combatWeights[resolution.Eligible] = resolution.Weight;
                     combatIds[resolution.Eligible] = new HashSet<Guid>(resolution.CombatIds);
                     views.Add(
-                        new CollectionEncounterOutcomeView(
+                        new EncounterOutcomeView(
                             null,
                             resolution.Eligible,
                             isCombatPool: true,
                             optionCount: 0,
-                            Array.Empty<CollectionEncounterChoiceDetail>()
+                            Array.Empty<EncounterChoiceDetail>()
                         )
                     );
                 }
@@ -303,7 +300,7 @@ internal static class CollectionEncounterEventDetailResolver
             contentSlots[signature] = views.Count;
             contentWeights[signature] = resolution.Weight;
             views.Add(
-                new CollectionEncounterOutcomeView(
+                new EncounterOutcomeView(
                     null,
                     resolution.Eligible,
                     isCombatPool: false,
@@ -315,12 +312,12 @@ internal static class CollectionEncounterEventDetailResolver
 
         foreach (var (eligible, slot) in combatSlots)
         {
-            views[slot] = new CollectionEncounterOutcomeView(
+            views[slot] = new EncounterOutcomeView(
                 Percent(eligible, combatWeights[eligible]),
                 eligible,
                 isCombatPool: true,
                 combatIds[eligible].Count,
-                Array.Empty<CollectionEncounterChoiceDetail>()
+                Array.Empty<EncounterChoiceDetail>()
             );
         }
 
@@ -328,7 +325,7 @@ internal static class CollectionEncounterEventDetailResolver
         foreach (var (signature, slot) in contentSlots)
         {
             var view = views[slot];
-            views[slot] = new CollectionEncounterOutcomeView(
+            views[slot] = new EncounterOutcomeView(
                 Percent(view.IsEligible, contentWeights[signature]),
                 view.IsEligible,
                 isCombatPool: false,
@@ -362,12 +359,12 @@ internal static class CollectionEncounterEventDetailResolver
             uint pooledWeight = 0;
             foreach (var (_, weight) in titleOnlySlots)
                 pooledWeight += weight;
-            views[titleOnlySlots[0].Slot] = new CollectionEncounterOutcomeView(
+            views[titleOnlySlots[0].Slot] = new EncounterOutcomeView(
                 Percent(eligible, pooledWeight),
                 eligible,
                 isCombatPool: false,
                 titleOnlySlots.Count,
-                Array.Empty<CollectionEncounterChoiceDetail>()
+                Array.Empty<EncounterChoiceDetail>()
             );
             for (var i = 1; i < titleOnlySlots.Count; i++)
                 slotsToRemove.Add(titleOnlySlots[i].Slot);
@@ -394,8 +391,8 @@ internal static class CollectionEncounterEventDetailResolver
     }
 
     private static bool MeetsOutcomePrerequisites(
-        CollectionEncounterOutcomeGroupData group,
-        CollectionEncounterInventory? inventory
+        EncounterOutcomeGroupData group,
+        EncounterInventory? inventory
     )
     {
         if (inventory == null)
@@ -407,21 +404,18 @@ internal static class CollectionEncounterEventDetailResolver
         return true;
     }
 
-    private static IReadOnlyList<CollectionEncounterChoiceDetail> ResolveChoiceDetails(
-        CollectionEncounterPreviewEventPlan eventPlan,
-        CollectionEncounterPreviewSnapshot snapshot,
+    private static IReadOnlyList<EncounterChoiceDetail> ResolveChoiceDetails(
+        EncounterPreviewEventPlan eventPlan,
+        EncounterPreviewSnapshot snapshot,
         EHero? currentHero,
-        CollectionEncounterInventory? inventory,
+        EncounterInventory? inventory,
         int? currentDay
     )
     {
-        var candidates = new List<(
-            CollectionEncounterPreviewTemplatePlan Step,
-            bool MeetsPrerequisites
-        )>();
-        var pools = new List<CollectionEncounterChoiceDetail>();
+        var candidates = new List<(EncounterPreviewTemplatePlan Step, bool MeetsPrerequisites)>();
+        var pools = new List<EncounterChoiceDetail>();
         var eventDescription = snapshot.TryGetTemplate(eventPlan.TemplateId, out var eventTemplate)
-            ? CollectionLocalizationResolver.ResolveDescription(eventTemplate) ?? string.Empty
+            ? EventPreviewLocalization.ResolveDescription(eventTemplate) ?? string.Empty
             : string.Empty;
         foreach (var group in eventPlan.ChoiceGroups)
         {
@@ -435,8 +429,8 @@ internal static class CollectionEncounterEventDetailResolver
             if (group.IsRandomPool)
             {
                 if (
-                    ResolveChoicePool(group, snapshot, currentHero, inventory, eventDescription)
-                    is { } pool
+                    ResolveChoicePool(group, snapshot, currentHero, inventory, eventDescription) is
+                    { } pool
                 )
                     pools.Add(pool);
                 continue;
@@ -446,8 +440,8 @@ internal static class CollectionEncounterEventDetailResolver
             {
                 if (
                     !snapshot.TryGetTemplate(reference.TemplateId, out var step)
-                    || step.Kind != CollectionEncounterPreviewTemplateKind.EncounterStep
-                    || !CollectionEncounterHeroEligibility.Matches(step.Heroes, currentHero)
+                    || step.Kind != EncounterPreviewTemplateKind.EncounterStep
+                    || !EncounterHeroEligibility.Matches(step.Heroes, currentHero)
                 )
                     continue;
 
@@ -460,13 +454,13 @@ internal static class CollectionEncounterEventDetailResolver
         foreach (var (step, meetsPrerequisites) in candidates)
             titled.Add(
                 (
-                    CollectionLocalizationResolver.ResolveTitle(step) ?? step.InternalName,
+                    EventPreviewLocalization.ResolveTitle(step) ?? step.InternalName,
                     meetsPrerequisites
                 )
             );
         var dispositions = ResolvePresentation(titled, choiceLimit);
-        var presented = new List<CollectionEncounterChoiceDetail>();
-        var dimmed = new List<CollectionEncounterChoiceDetail>();
+        var presented = new List<EncounterChoiceDetail>();
+        var dimmed = new List<EncounterChoiceDetail>();
         for (var i = 0; i < candidates.Count; i++)
         {
             switch (dispositions[i])
@@ -525,15 +519,15 @@ internal static class CollectionEncounterEventDetailResolver
         return result;
     }
 
-    private static CollectionEncounterChoiceDetail? ResolveChoicePool(
-        CollectionEncounterChoiceGroupData group,
-        CollectionEncounterPreviewSnapshot snapshot,
+    private static EncounterChoiceDetail? ResolveChoicePool(
+        EncounterChoiceGroupData group,
+        EncounterPreviewSnapshot snapshot,
         EHero? currentHero,
-        CollectionEncounterInventory? inventory,
+        EncounterInventory? inventory,
         string eventDescription
     )
     {
-        var entries = new List<CollectionEncounterChoiceDetail>();
+        var entries = new List<EncounterChoiceDetail>();
         var combatIds = new HashSet<Guid>();
         var resolvedCount = 0;
         foreach (var member in group.Members)
@@ -541,23 +535,23 @@ internal static class CollectionEncounterEventDetailResolver
             if (!snapshot.TryGetTemplate(member.TemplateId, out var template))
                 continue;
             resolvedCount++;
-            if (template.Kind == CollectionEncounterPreviewTemplateKind.CombatEncounter)
+            if (template.Kind == EncounterPreviewTemplateKind.CombatEncounter)
             {
                 combatIds.Add(template.TemplateId);
                 continue;
             }
-            if (!CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
+            if (!EncounterHeroEligibility.Matches(template.Heroes, currentHero))
                 continue;
             if (!MeetsOwnershipPrerequisites(member, inventory))
                 continue;
-            if (template.Kind == CollectionEncounterPreviewTemplateKind.Skill)
+            if (template.Kind == EncounterPreviewTemplateKind.Skill)
             {
                 var skillName =
-                    CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName;
+                    EventPreviewLocalization.ResolveTitle(template) ?? template.InternalName;
                 entries.Add(
-                    new CollectionEncounterChoiceDetail(
+                    new EncounterChoiceDetail(
                         template.TemplateId,
-                        CollectionPanelText.OutcomeGainSkill(skillName),
+                        EncounterPreviewText.OutcomeGainSkill(skillName),
                         resultText: string.Empty,
                         rewardFilter: null,
                         isSourceMatch: false
@@ -572,10 +566,10 @@ internal static class CollectionEncounterEventDetailResolver
 
         if (combatIds.Count * 2 > resolvedCount && combatIds.Count > 0)
             return PoolDetail(
-                new CollectionEncounterChoicePool(
+                new EncounterChoicePool(
                     isCombat: true,
                     combatIds.Count,
-                    Array.Empty<CollectionEncounterChoiceDetail>()
+                    Array.Empty<EncounterChoiceDetail>()
                 )
             );
 
@@ -596,17 +590,15 @@ internal static class CollectionEncounterEventDetailResolver
 
         // Small pools expand into their entries; large ones stay a count summary.
         return PoolDetail(
-            new CollectionEncounterChoicePool(
+            new EncounterChoicePool(
                 isCombat: false,
                 entries.Count,
-                entries.Count <= 8 ? entries : Array.Empty<CollectionEncounterChoiceDetail>()
+                entries.Count <= 8 ? entries : Array.Empty<EncounterChoiceDetail>()
             )
         );
     }
 
-    private static CollectionEncounterChoiceDetail PoolDetail(
-        CollectionEncounterChoicePool pool
-    ) =>
+    private static EncounterChoiceDetail PoolDetail(EncounterChoicePool pool) =>
         new(
             Guid.Empty,
             displayName: string.Empty,
@@ -617,8 +609,8 @@ internal static class CollectionEncounterEventDetailResolver
         );
 
     private static bool MeetsOwnershipPrerequisites(
-        CollectionEncounterStepReference reference,
-        CollectionEncounterInventory? inventory
+        EncounterStepReference reference,
+        EncounterInventory? inventory
     )
     {
         if (inventory == null)
@@ -631,17 +623,16 @@ internal static class CollectionEncounterEventDetailResolver
     }
 
     private static void AddChoiceDetail(
-        List<CollectionEncounterChoiceDetail> result,
-        CollectionEncounterPreviewTemplatePlan template,
+        List<EncounterChoiceDetail> result,
+        EncounterPreviewTemplatePlan template,
         bool isEligible
     )
     {
-        var resultText =
-            CollectionLocalizationResolver.ResolveDescription(template) ?? string.Empty;
+        var resultText = EventPreviewLocalization.ResolveDescription(template) ?? string.Empty;
         result.Add(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 template.TemplateId,
-                CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName,
+                EventPreviewLocalization.ResolveTitle(template) ?? template.InternalName,
                 StripHeroConditionPrefix(resultText, template.Heroes),
                 ResolveRewardFilter(template, resultText),
                 isSourceMatch: false,
@@ -651,10 +642,7 @@ internal static class CollectionEncounterEventDetailResolver
         );
     }
 
-    private static string StripHeroConditionPrefix(
-        string text,
-        IReadOnlyCollection<EHero> heroes
-    )
+    private static string StripHeroConditionPrefix(string text, IReadOnlyCollection<EHero> heroes)
     {
         if (string.IsNullOrEmpty(text) || !IsHeroRestricted(heroes))
             return text;
@@ -690,8 +678,8 @@ internal static class CollectionEncounterEventDetailResolver
         return true;
     }
 
-    private static CollectionEncounterRewardFilter? ResolveRewardFilter(
-        CollectionEncounterPreviewTemplatePlan template,
+    private static EncounterRewardFilter? ResolveRewardFilter(
+        EncounterPreviewTemplatePlan template,
         string resultText
     )
     {
@@ -699,7 +687,7 @@ internal static class CollectionEncounterEventDetailResolver
         if (rewardFilter == null)
             return null;
 
-        var textRewardFilter = CollectionEncounterRewardParser.TryParse(resultText);
+        var textRewardFilter = EncounterRewardParser.TryParse(resultText);
         return textRewardFilter?.FromAnyHero == true
             ? rewardFilter.WithFromAnyHero(true)
             : rewardFilter;

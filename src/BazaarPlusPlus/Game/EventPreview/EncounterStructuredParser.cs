@@ -5,18 +5,17 @@ using System.Collections.Generic;
 using System.Reflection;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Spawning;
+using BazaarPlusPlus.Game.Encounters;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal static class CollectionEncounterStructuredParser
+internal static class EncounterStructuredParser
 {
-    public static IReadOnlyList<CollectionEncounterStepReference> TryParseEventStepReferences(
-        object? source
-    )
+    public static IReadOnlyList<EncounterStepReference> TryParseEventStepReferences(object? source)
     {
-        var result = new List<CollectionEncounterStepReference>();
+        var result = new List<EncounterStepReference>();
         foreach (var group in TryParseEventChoiceGroups(source))
             result.AddRange(group.Members);
         return result;
@@ -26,16 +25,14 @@ internal static class CollectionEncounterStructuredParser
     // SelectionMethod=Random is a pool the event rolls members from (Advanced
     // Training's 16 trainings, Epic Battle's 14 monsters) rather than a fixed list
     // of always-offered steps.
-    public static IReadOnlyList<CollectionEncounterChoiceGroupData> TryParseEventChoiceGroups(
-        object? source
-    )
+    public static IReadOnlyList<EncounterChoiceGroupData> TryParseEventChoiceGroups(object? source)
     {
         var token = ToToken(source);
         if (token == null)
-            return Array.Empty<CollectionEncounterChoiceGroupData>();
+            return Array.Empty<EncounterChoiceGroupData>();
 
         var spawnContext = token.SelectToken("SelectionContext.SpawnContext") ?? token;
-        var result = new List<CollectionEncounterChoiceGroupData>();
+        var result = new List<EncounterChoiceGroupData>();
         var seen = new HashSet<Guid>();
         foreach (var groupsToken in FindProperties(spawnContext, "Groups"))
         {
@@ -43,7 +40,7 @@ internal static class CollectionEncounterStructuredParser
                 continue;
             foreach (var group in groups)
             {
-                var members = new List<CollectionEncounterStepReference>();
+                var members = new List<EncounterStepReference>();
                 AppendStepReferencesFromGroup(group, members, seen);
                 if (members.Count == 0)
                     continue;
@@ -56,7 +53,7 @@ internal static class CollectionEncounterStructuredParser
                     )
                     && selectionMethod == ESpawnSelectionMethod.Random;
                 result.Add(
-                    new CollectionEncounterChoiceGroupData(
+                    new EncounterChoiceGroupData(
                         isRandomPool,
                         members,
                         ReadDayCondition(group["Prerequisites"])
@@ -68,12 +65,12 @@ internal static class CollectionEncounterStructuredParser
         return result;
     }
 
-    public static CollectionEncounterRewardFilter? TryParseRewardFilter(object? source)
+    public static EncounterRewardFilter? TryParseRewardFilter(object? source)
     {
         return TryParseRewardFilterCore(source, () => ToToken(source));
     }
 
-    internal static CollectionEncounterRewardFilter? TryParseRewardFilterWithPreparedToken(
+    internal static EncounterRewardFilter? TryParseRewardFilterWithPreparedToken(
         object? source,
         JToken? preparedToken
     )
@@ -83,7 +80,7 @@ internal static class CollectionEncounterStructuredParser
 
     internal static JToken? TryPrepareToken(object? source) => ToToken(source);
 
-    private static CollectionEncounterRewardFilter? TryParseRewardFilterCore(
+    private static EncounterRewardFilter? TryParseRewardFilterCore(
         object? source,
         Func<JToken?> fallbackToken
     )
@@ -173,10 +170,10 @@ internal static class CollectionEncounterStructuredParser
     // instead of presenting choices; returns the group data for probability display.
     public static bool TryParseEventOutcomeGroups(
         object? source,
-        out IReadOnlyList<CollectionEncounterOutcomeGroupData> groups
+        out IReadOnlyList<EncounterOutcomeGroupData> groups
     )
     {
-        groups = Array.Empty<CollectionEncounterOutcomeGroupData>();
+        groups = Array.Empty<EncounterOutcomeGroupData>();
         var token = ToToken(source);
         if (token == null)
             return false;
@@ -195,13 +192,13 @@ internal static class CollectionEncounterStructuredParser
         )
             return false;
 
-        var result = new List<CollectionEncounterOutcomeGroupData>();
+        var result = new List<EncounterOutcomeGroupData>();
         if (spawnContext["Groups"] is JArray groupArray)
         {
             foreach (var group in groupArray)
             {
                 var ids = new List<Guid>();
-                var queryPools = new List<CollectionEncounterOutcomeQueryPool>();
+                var queryPools = new List<EncounterOutcomeQueryPool>();
                 if (group["Filters"] is JArray filters)
                     foreach (var filter in filters)
                     {
@@ -225,7 +222,7 @@ internal static class CollectionEncounterStructuredParser
                                     constraints.AddTokenConstraintObject(constraintObject);
                             var quantity = ReadQuantity(group);
                             queryPools.Add(
-                                new CollectionEncounterOutcomeQueryPool(
+                                new EncounterOutcomeQueryPool(
                                     constraints.ToRewardFilter(quantity),
                                     quantity
                                 )
@@ -237,7 +234,7 @@ internal static class CollectionEncounterStructuredParser
 
                 var weight = ReadUInt(group["RandomWeight"]);
                 result.Add(
-                    new CollectionEncounterOutcomeGroupData(
+                    new EncounterOutcomeGroupData(
                         weight,
                         ids,
                         queryPools,
@@ -255,7 +252,7 @@ internal static class CollectionEncounterStructuredParser
     private static uint ReadUInt(JToken? token) =>
         token != null && uint.TryParse(token.ToString(), out var value) ? value : 0;
 
-    private static CollectionEncounterDayCondition? ReadDayCondition(JToken? token)
+    private static EncounterDayCondition? ReadDayCondition(JToken? token)
     {
         if (token == null || token.Type == JTokenType.Null)
             return null;
@@ -273,14 +270,14 @@ internal static class CollectionEncounterStructuredParser
             )
                 ? parsedComparison.ToString()
                 : "Equal";
-            return new CollectionEncounterDayCondition(day, comparison);
+            return new EncounterDayCondition(day, comparison);
         }
         return null;
     }
 
     private static void AppendStepReferencesFromGroup(
         JToken group,
-        List<CollectionEncounterStepReference> result,
+        List<EncounterStepReference> result,
         HashSet<Guid> seen
     )
     {
@@ -291,14 +288,14 @@ internal static class CollectionEncounterStructuredParser
 
         foreach (var filter in filters)
         {
-            var requirements = new List<CollectionEncounterCardRequirement>(groupRequirements);
+            var requirements = new List<EncounterCardRequirement>(groupRequirements);
             requirements.AddRange(ReadCardRequirements(filter["Prerequisites"]));
 
             foreach (var id in ReadGuids(filter["Ids"]))
             {
                 if (!seen.Add(id))
                     continue;
-                result.Add(new CollectionEncounterStepReference(id, requirements));
+                result.Add(new EncounterStepReference(id, requirements));
             }
         }
     }
@@ -308,14 +305,12 @@ internal static class CollectionEncounterStructuredParser
     // yield nothing here; shapes that cannot be evaluated against the inventory
     // snapshot (negated or tier-based conditionals) are skipped entirely — an
     // unknown prerequisite must count as met, never as a guess.
-    internal static IReadOnlyList<CollectionEncounterCardRequirement> ReadCardRequirements(
-        JToken? token
-    )
+    internal static IReadOnlyList<EncounterCardRequirement> ReadCardRequirements(JToken? token)
     {
         if (token == null || token.Type == JTokenType.Null)
-            return Array.Empty<CollectionEncounterCardRequirement>();
+            return Array.Empty<EncounterCardRequirement>();
 
-        var requirements = new List<CollectionEncounterCardRequirement>();
+        var requirements = new List<EncounterCardRequirement>();
         if (token is JArray prerequisites)
         {
             foreach (var prerequisite in prerequisites)
@@ -329,7 +324,7 @@ internal static class CollectionEncounterStructuredParser
         return requirements;
     }
 
-    private static CollectionEncounterCardRequirement? TryReadCardRequirement(JToken entry)
+    private static EncounterCardRequirement? TryReadCardRequirement(JToken entry)
     {
         if (entry is not JObject obj)
             return null;
@@ -395,7 +390,7 @@ internal static class CollectionEncounterStructuredParser
         if (ids.Count > 0 && tagGroups.Count > 0)
             return null;
 
-        return new CollectionEncounterCardRequirement(
+        return new EncounterCardRequirement(
             ids,
             tagGroups,
             tagOperator,
@@ -428,13 +423,13 @@ internal static class CollectionEncounterStructuredParser
         return candidates;
     }
 
-    private static CollectionEncounterRewardFilter? TryParseTokenSpawnContext(JToken spawnContext)
+    private static EncounterRewardFilter? TryParseTokenSpawnContext(JToken spawnContext)
     {
         var merged = SpawnConstraints.TryMergeCompatible(ParseTokenSpawnConstraints(spawnContext));
         return merged?.ToRewardFilter(ReadQuantity(spawnContext));
     }
 
-    private static CollectionEncounterRewardFilter? TryParseRuntimeDealCardAction(object action)
+    private static EncounterRewardFilter? TryParseRuntimeDealCardAction(object action)
     {
         var spawnContext = ReadMemberValue(action, "SpawnContext");
         if (spawnContext == null)
@@ -1212,7 +1207,7 @@ internal static class CollectionEncounterStructuredParser
             }
         }
 
-        public CollectionEncounterRewardFilter? ToRewardFilter(int? quantity)
+        public EncounterRewardFilter? ToRewardFilter(int? quantity)
         {
             var cardType = _cardType ?? InferCardType();
             if (cardType == null)
@@ -1231,7 +1226,7 @@ internal static class CollectionEncounterStructuredParser
                 _excludedTags,
                 _excludedKeywords
             );
-            return new CollectionEncounterRewardFilter(
+            return new EncounterRewardFilter(
                 cardType.Value,
                 quantity,
                 fromAnyHero: false,
@@ -1508,7 +1503,7 @@ internal static class CollectionEncounterStructuredParser
         if (tiers.Count == 1)
             return tiers[0].ToString();
         var ordered = new List<ETier>(tiers);
-        ordered.Sort((left, right) => TierRank(left).CompareTo(TierRank(right)));
+        ordered.Sort((left, right) => TierOrder.Rank(left).CompareTo(TierOrder.Rank(right)));
         if (IsContiguous(ordered))
             return $"{ordered[0]}-{ordered[^1]}";
         return string.Join("/", ordered);
@@ -1517,21 +1512,10 @@ internal static class CollectionEncounterStructuredParser
     private static bool IsContiguous(IReadOnlyList<ETier> tiers)
     {
         for (var i = 1; i < tiers.Count; i++)
-            if (TierRank(tiers[i]) != TierRank(tiers[i - 1]) + 1)
+            if (TierOrder.Rank(tiers[i]) != TierOrder.Rank(tiers[i - 1]) + 1)
                 return false;
         return true;
     }
-
-    private static int TierRank(ETier tier) =>
-        tier switch
-        {
-            ETier.Bronze => 0,
-            ETier.Silver => 1,
-            ETier.Gold => 2,
-            ETier.Diamond => 3,
-            ETier.Legendary => 4,
-            _ => 99,
-        };
 
     private sealed class ReferenceEqualityComparer : IEqualityComparer<object>
     {

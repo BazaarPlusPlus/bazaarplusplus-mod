@@ -2,9 +2,9 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionEncounterPreviewEvaluatorTests
+public sealed class EncounterPreviewEvaluatorTests
 {
     private static readonly Guid EventId = Guid.Parse("30000000-0000-0000-0000-000000000001");
     private static readonly Guid StepId = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -15,21 +15,21 @@ public sealed class CollectionEncounterPreviewEvaluatorTests
     [Fact]
     public void Same_static_plan_re_evaluates_hero_day_and_inventory()
     {
-        var requirement = new CollectionEncounterCardRequirement(
+        var requirement = new EncounterCardRequirement(
             new[] { RequiredItemId },
             Array.Empty<IReadOnlyList<string>>(),
             "Any",
             "GreaterThanOrEqual",
             1
         );
-        var group = new CollectionEncounterChoiceGroupData(
+        var group = new EncounterChoiceGroupData(
             isRandomPool: false,
-            new[] { new CollectionEncounterStepReference(StepId, new[] { requirement }) },
-            new CollectionEncounterDayCondition(day: 3, comparison: "GreaterThanOrEqual")
+            new[] { new EncounterStepReference(StepId, new[] { requirement }) },
+            new EncounterDayCondition(day: 3, comparison: "GreaterThanOrEqual")
         );
         var (snapshot, plan) = Plan(group);
 
-        var wrongHero = CollectionEncounterEventDetailResolver.TryResolve(
+        var wrongHero = EncounterEventDetailResolver.TryResolve(
             plan,
             snapshot,
             EHero.Vanessa,
@@ -39,7 +39,7 @@ public sealed class CollectionEncounterPreviewEvaluatorTests
         Assert.NotNull(wrongHero);
         Assert.Empty(wrongHero.ChoiceDetails);
 
-        var wrongDay = CollectionEncounterEventDetailResolver.TryResolve(
+        var wrongDay = EncounterEventDetailResolver.TryResolve(
             plan,
             snapshot,
             EHero.Jules,
@@ -49,26 +49,24 @@ public sealed class CollectionEncounterPreviewEvaluatorTests
         Assert.NotNull(wrongDay);
         Assert.Empty(wrongDay.ChoiceDetails);
 
-        var missingItem = CollectionEncounterEventDetailResolver.TryResolve(
+        var missingItem = EncounterEventDetailResolver.TryResolve(
             plan,
             snapshot,
             EHero.Jules,
             Inventory(),
             currentDay: 3
         );
-        var dimmed = Assert.Single(
-            Assert.IsType<CollectionEncounterOption>(missingItem).ChoiceDetails
-        );
+        var dimmed = Assert.Single(Assert.IsType<EncounterOption>(missingItem).ChoiceDetails);
         Assert.False(dimmed.IsEligible);
 
-        var eligible = CollectionEncounterEventDetailResolver.TryResolve(
+        var eligible = EncounterEventDetailResolver.TryResolve(
             plan,
             snapshot,
             EHero.Jules,
             Inventory(RequiredItemId),
             currentDay: 3
         );
-        var shown = Assert.Single(Assert.IsType<CollectionEncounterOption>(eligible).ChoiceDetails);
+        var shown = Assert.Single(Assert.IsType<EncounterOption>(eligible).ChoiceDetails);
         Assert.True(shown.IsEligible);
         Assert.Equal("Jules Step", shown.DisplayName);
         Assert.Equal("Take it", shown.ResultText);
@@ -77,7 +75,7 @@ public sealed class CollectionEncounterPreviewEvaluatorTests
     [Fact]
     public void Outcome_percentages_are_recomputed_after_dynamic_requirements()
     {
-        var requirement = new CollectionEncounterCardRequirement(
+        var requirement = new EncounterCardRequirement(
             new[] { RequiredItemId },
             Array.Empty<IReadOnlyList<string>>(),
             "Any",
@@ -86,14 +84,14 @@ public sealed class CollectionEncounterPreviewEvaluatorTests
         );
         var root = Template(
             EventId,
-            CollectionEncounterPreviewTemplateKind.Event,
+            EncounterPreviewTemplateKind.Event,
             Array.Empty<EHero>(),
             "Event",
             "Event result"
         );
         var rewardA = Template(
             StepId,
-            CollectionEncounterPreviewTemplateKind.EncounterStep,
+            EncounterPreviewTemplateKind.EncounterStep,
             new[] { EHero.Common },
             "A",
             "Gain A"
@@ -101,41 +99,41 @@ public sealed class CollectionEncounterPreviewEvaluatorTests
         var rewardBId = Guid.Parse("30000000-0000-0000-0000-000000000004");
         var rewardB = Template(
             rewardBId,
-            CollectionEncounterPreviewTemplateKind.EncounterStep,
+            EncounterPreviewTemplateKind.EncounterStep,
             new[] { EHero.Common },
             "B",
             "Gain B"
         );
-        var plan = new CollectionEncounterPreviewEventPlan(
+        var plan = new EncounterPreviewEventPlan(
             EventId,
             isRandomSelectionEvent: true,
             suppressRandomOutcome: false,
             choiceLimit: 1,
             outcomeGroups: new[]
             {
-                new CollectionEncounterOutcomeGroupData(
+                new EncounterOutcomeGroupData(
                     50,
                     new[] { StepId },
-                    Array.Empty<CollectionEncounterOutcomeQueryPool>(),
-                    Array.Empty<CollectionEncounterCardRequirement>(),
+                    Array.Empty<EncounterOutcomeQueryPool>(),
+                    Array.Empty<EncounterCardRequirement>(),
                     dayCondition: null
                 ),
-                new CollectionEncounterOutcomeGroupData(
+                new EncounterOutcomeGroupData(
                     50,
                     new[] { rewardBId },
-                    Array.Empty<CollectionEncounterOutcomeQueryPool>(),
+                    Array.Empty<EncounterOutcomeQueryPool>(),
                     new[] { requirement },
                     dayCondition: null
                 ),
             },
-            choiceGroups: Array.Empty<CollectionEncounterChoiceGroupData>()
+            choiceGroups: Array.Empty<EncounterChoiceGroupData>()
         );
-        var snapshot = new CollectionEncounterPreviewSnapshot(
+        var snapshot = new EncounterPreviewSnapshot(
             new[] { plan },
             new[] { root, rewardA, rewardB }
         );
 
-        var withoutItem = CollectionEncounterEventDetailResolver.TryResolve(
+        var withoutItem = EncounterEventDetailResolver.TryResolve(
             plan,
             snapshot,
             EHero.Jules,
@@ -146,7 +144,7 @@ public sealed class CollectionEncounterPreviewEvaluatorTests
         Assert.Null(withoutItem.OutcomeGroups[1].Percent);
         Assert.False(withoutItem.OutcomeGroups[1].IsEligible);
 
-        var withItem = CollectionEncounterEventDetailResolver.TryResolve(
+        var withItem = EncounterEventDetailResolver.TryResolve(
             plan,
             snapshot,
             EHero.Jules,
@@ -156,39 +154,38 @@ public sealed class CollectionEncounterPreviewEvaluatorTests
         Assert.Equal(new int?[] { 50, 50 }, withItem!.OutcomeGroups!.Select(x => x.Percent));
     }
 
-    private static (
-        CollectionEncounterPreviewSnapshot Snapshot,
-        CollectionEncounterPreviewEventPlan Plan
-    ) Plan(CollectionEncounterChoiceGroupData group)
+    private static (EncounterPreviewSnapshot Snapshot, EncounterPreviewEventPlan Plan) Plan(
+        EncounterChoiceGroupData group
+    )
     {
         var root = Template(
             EventId,
-            CollectionEncounterPreviewTemplateKind.Event,
+            EncounterPreviewTemplateKind.Event,
             Array.Empty<EHero>(),
             "Event",
             "Pick one"
         );
         var step = Template(
             StepId,
-            CollectionEncounterPreviewTemplateKind.EncounterStep,
+            EncounterPreviewTemplateKind.EncounterStep,
             new[] { EHero.Jules },
             "Jules Step",
             "Take it"
         );
-        var plan = new CollectionEncounterPreviewEventPlan(
+        var plan = new EncounterPreviewEventPlan(
             EventId,
             isRandomSelectionEvent: false,
             suppressRandomOutcome: false,
             choiceLimit: 1,
-            outcomeGroups: Array.Empty<CollectionEncounterOutcomeGroupData>(),
+            outcomeGroups: Array.Empty<EncounterOutcomeGroupData>(),
             choiceGroups: new[] { group }
         );
-        return (new CollectionEncounterPreviewSnapshot(new[] { plan }, new[] { root, step }), plan);
+        return (new EncounterPreviewSnapshot(new[] { plan }, new[] { root, step }), plan);
     }
 
-    private static CollectionEncounterPreviewTemplatePlan Template(
+    private static EncounterPreviewTemplatePlan Template(
         Guid id,
-        CollectionEncounterPreviewTemplateKind kind,
+        EncounterPreviewTemplateKind kind,
         IReadOnlyList<EHero> heroes,
         string title,
         string description
@@ -198,15 +195,12 @@ public sealed class CollectionEncounterPreviewEvaluatorTests
             kind,
             heroes,
             title,
-            new CollectionEncounterPreviewLocalizedText(string.Empty, title),
-            new CollectionEncounterPreviewLocalizedText(string.Empty, description),
-            new Dictionary<string, CollectionEncounterPreviewAbilityValue>(),
+            new EncounterPreviewLocalizedText(string.Empty, title),
+            new EncounterPreviewLocalizedText(string.Empty, description),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
             rewardFilter: null
         );
 
-    private static CollectionEncounterInventory Inventory(params Guid[] ids) =>
-        new(
-            ids.Select(id => new CollectionEncounterInventoryCard(id, Array.Empty<string>()))
-                .ToArray()
-        );
+    private static EncounterInventory Inventory(params Guid[] ids) =>
+        new(ids.Select(id => new EncounterInventoryCard(id, Array.Empty<string>())).ToArray());
 }

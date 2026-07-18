@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
+using BazaarPlusPlus.Game.Encounters;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 

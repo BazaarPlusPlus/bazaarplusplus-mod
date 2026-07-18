@@ -3,9 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.CollectionPanel.Data;
 
-namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
+namespace BazaarPlusPlus.Game.EventPreview;
 
 // Content for the BPP section appended below the native "next level rewards" tooltip:
 // the max-health gain plus the rewards the player can actually receive, resolved from
@@ -13,7 +12,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
 // they collapse into one "One of: A / B" sentence instead of one line each; random
 // pools become a count summary. Board-conditional bonus groups (e.g. "Inspired by ..."
 // skills gated on specific board cards) are omitted.
-internal static class CollectionLevelUpTooltipText
+internal static class LevelUpPreviewTextFormatter
 {
     private const string AccentColor = "#FFD37E";
 
@@ -24,8 +23,8 @@ internal static class CollectionLevelUpTooltipText
     private const int LastBoardSlotLevel = 4;
 
     public static string Build(
-        CollectionLevelUpPreviewPlan? levelUp,
-        Func<Guid, CollectionEncounterPreviewTemplatePlan?> resolveTemplate,
+        LevelUpPreviewPlan? levelUp,
+        Func<Guid, EncounterPreviewTemplatePlan?> resolveTemplate,
         EHero? currentHero,
         Func<string, string>? colorizeResult = null,
         int? currentLevel = null
@@ -35,20 +34,19 @@ internal static class CollectionLevelUpTooltipText
             return string.Empty;
 
         var rawColorize = colorizeResult ?? (text => text);
-        string Colorize(string text) =>
-            CollectionTooltipMarkup.NormalizeInlineFragment(rawColorize(text));
+        string Colorize(string text) => TooltipMarkup.NormalizeInlineFragment(rawColorize(text));
 
-        var lines = new List<CollectionTooltipMarkup.Block>();
+        var lines = new List<TooltipMarkup.Block>();
         if (levelUp.HealthIncrease > 0)
             lines.Add(
-                new CollectionTooltipMarkup.Paragraph(
-                    Colorize(CollectionPanelText.LevelUpMaxHealth((int)levelUp.HealthIncrease))
+                new TooltipMarkup.Paragraph(
+                    Colorize(EncounterPreviewText.LevelUpMaxHealth((int)levelUp.HealthIncrease))
                 )
             );
         if (currentLevel.HasValue && currentLevel.Value < LastBoardSlotLevel)
             lines.Add(
-                new CollectionTooltipMarkup.Paragraph(
-                    Colorize(CollectionPanelText.LevelUpBoardSlots(BoardSlotsPerLevel))
+                new TooltipMarkup.Paragraph(
+                    Colorize(EncounterPreviewText.LevelUpBoardSlots(BoardSlotsPerLevel))
                 )
             );
 
@@ -56,7 +54,7 @@ internal static class CollectionLevelUpTooltipText
         // SelectItem/SelectSkill/SelectEncounter): every spawned group contributes
         // candidates and the player picks one — the native pack icon's "1". Render all
         // candidates as one "Choose one:" list; random pools contribute a count entry.
-        var candidates = new List<CollectionTooltipMarkup.ListItem>();
+        var candidates = new List<TooltipMarkup.ListItem>();
         if (levelUp.Groups.Count > 0)
         {
             // Random selection (levels 9/18): groups whose weight equals their card
@@ -95,13 +93,10 @@ internal static class CollectionLevelUpTooltipText
         var seen = new HashSet<string>(StringComparer.Ordinal);
         candidates.RemoveAll(candidate =>
             !seen.Add(
-                CollectionTooltipMarkup.Render(
-                    new CollectionTooltipMarkup.Block[]
+                TooltipMarkup.Render(
+                    new TooltipMarkup.Block[]
                     {
-                        new CollectionTooltipMarkup.ListBlock(
-                            candidate.Content,
-                            candidate.Children
-                        ),
+                        new TooltipMarkup.ListBlock(candidate.Content, candidate.Children),
                     }
                 )
             )
@@ -112,26 +107,21 @@ internal static class CollectionLevelUpTooltipText
             var candidate = candidates[0];
             lines.Add(
                 candidate.Children.Count == 0
-                    ? new CollectionTooltipMarkup.Paragraph(candidate.Content)
-                    : new CollectionTooltipMarkup.ListBlock(candidate.Content, candidate.Children)
+                    ? new TooltipMarkup.Paragraph(candidate.Content)
+                    : new TooltipMarkup.ListBlock(candidate.Content, candidate.Children)
             );
         }
         else if (candidates.Count > 1)
         {
-            lines.Add(
-                new CollectionTooltipMarkup.ListBlock(
-                    CollectionPanelText.LevelUpOneOf(),
-                    candidates
-                )
-            );
+            lines.Add(new TooltipMarkup.ListBlock(EncounterPreviewText.LevelUpOneOf(), candidates));
         }
 
-        return CollectionTooltipMarkup.Render(lines);
+        return TooltipMarkup.Render(lines);
     }
 
     // A weighted group whose weight equals its card count: every card is a uniform
     // roll for the same offered slot, so such groups merge into one pool.
-    private static List<Guid>? UniformPoolIds(CollectionLevelUpPreviewGroup group)
+    private static List<Guid>? UniformPoolIds(LevelUpPreviewGroup group)
     {
         if (group.RandomWeight == 0)
             return null;
@@ -141,9 +131,9 @@ internal static class CollectionLevelUpTooltipText
     }
 
     private static void CollectGroup(
-        List<CollectionTooltipMarkup.ListItem> candidates,
-        CollectionLevelUpPreviewGroup group,
-        Func<Guid, CollectionEncounterPreviewTemplatePlan?> resolveTemplate,
+        List<TooltipMarkup.ListItem> candidates,
+        LevelUpPreviewGroup group,
+        Func<Guid, EncounterPreviewTemplatePlan?> resolveTemplate,
         EHero? currentHero,
         Func<string, string> colorize
     )
@@ -160,10 +150,10 @@ internal static class CollectionLevelUpTooltipText
     }
 
     private static void CollectCandidates(
-        List<CollectionTooltipMarkup.ListItem> candidates,
+        List<TooltipMarkup.ListItem> candidates,
         List<Guid> ids,
         int limit,
-        Func<Guid, CollectionEncounterPreviewTemplatePlan?> resolveTemplate,
+        Func<Guid, EncounterPreviewTemplatePlan?> resolveTemplate,
         EHero? currentHero,
         Func<string, string> colorize
     )
@@ -172,14 +162,14 @@ internal static class CollectionLevelUpTooltipText
         // run prerequisite alone is coarser: e.g. "Core Initialization" sits in a
         // Dooley-or-Jules group but the card itself is Dooley-only). Unresolvable
         // templates cannot be judged and stay counted.
-        var eligible = new List<CollectionEncounterPreviewTemplatePlan>();
+        var eligible = new List<EncounterPreviewTemplatePlan>();
         var unresolved = 0;
         foreach (var id in ids)
         {
             var template = resolveTemplate(id);
             if (template == null)
                 unresolved++;
-            else if (CollectionEncounterHeroEligibility.Matches(template.Heroes, currentHero))
+            else if (EncounterHeroEligibility.Matches(template.Heroes, currentHero))
                 eligible.Add(template);
         }
 
@@ -191,28 +181,25 @@ internal static class CollectionLevelUpTooltipText
                 return;
 
             var template = eligible[0];
-            var title =
-                CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName;
-            var description = CollectionLocalizationResolver.ResolveDescription(template);
+            var title = EventPreviewLocalization.ResolveTitle(template) ?? template.InternalName;
+            var description = EventPreviewLocalization.ResolveDescription(template);
             if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(description))
                 return;
 
             if (string.IsNullOrWhiteSpace(description))
-                candidates.Add(
-                    new CollectionTooltipMarkup.ListItem($"<color={AccentColor}>{title}</color>")
-                );
+                candidates.Add(new TooltipMarkup.ListItem($"<color={AccentColor}>{title}</color>"));
             else if (string.IsNullOrWhiteSpace(title))
                 candidates.Add(
-                    new CollectionTooltipMarkup.ListItem(
-                        colorize(CollectionPanelText.NormalizeRewardSpacing(description!))
+                    new TooltipMarkup.ListItem(
+                        colorize(EncounterPreviewText.NormalizeRewardSpacing(description!))
                     )
                 );
             else
                 candidates.Add(
-                    new CollectionTooltipMarkup.ListItem(
-                        CollectionPanelText.JoinColoredTooltipLabel(
+                    new TooltipMarkup.ListItem(
+                        EncounterPreviewText.JoinColoredTooltipLabel(
                             title!,
-                            colorize(CollectionPanelText.NormalizeRewardSpacing(description!)),
+                            colorize(EncounterPreviewText.NormalizeRewardSpacing(description!)),
                             AccentColor
                         )
                     )
@@ -233,40 +220,40 @@ internal static class CollectionLevelUpTooltipText
         {
             var header =
                 draws == 1
-                    ? CollectionPanelText.OutcomeSubPool(eligible.Count)
-                    : CollectionPanelText.LevelUpRandomPool(draws, eligible.Count);
-            var entries = new List<CollectionTooltipMarkup.ListItem>();
+                    ? EncounterPreviewText.OutcomeSubPool(eligible.Count)
+                    : EncounterPreviewText.LevelUpRandomPool(draws, eligible.Count);
+            var entries = new List<TooltipMarkup.ListItem>();
             foreach (var template in eligible)
             {
                 var entryTitle =
-                    CollectionLocalizationResolver.ResolveTitle(template) ?? template.InternalName;
-                var entryDescription = CollectionLocalizationResolver
+                    EventPreviewLocalization.ResolveTitle(template) ?? template.InternalName;
+                var entryDescription = EventPreviewLocalization
                     .ResolveDescription(template)
                     ?.Replace("\r", string.Empty)
                     .Replace('\n', ' ');
                 entries.Add(
-                    new CollectionTooltipMarkup.ListItem(
+                    new TooltipMarkup.ListItem(
                         string.IsNullOrWhiteSpace(entryDescription)
                             ? $"<color={AccentColor}>{entryTitle}</color>"
-                            : CollectionPanelText.JoinColoredTooltipLabel(
+                            : EncounterPreviewText.JoinColoredTooltipLabel(
                                 entryTitle!,
                                 colorize(
-                                    CollectionPanelText.NormalizeRewardSpacing(entryDescription!)
+                                    EncounterPreviewText.NormalizeRewardSpacing(entryDescription!)
                                 ),
                                 AccentColor
                             )
                     )
                 );
             }
-            candidates.Add(new CollectionTooltipMarkup.ListItem(header, entries));
+            candidates.Add(new TooltipMarkup.ListItem(header, entries));
             return;
         }
 
         candidates.Add(
-            new CollectionTooltipMarkup.ListItem(
+            new TooltipMarkup.ListItem(
                 draws == 1
-                    ? CollectionPanelText.LevelUpRandomPoolSingle(optionCount)
-                    : CollectionPanelText.LevelUpRandomPool(draws, optionCount)
+                    ? EncounterPreviewText.LevelUpRandomPoolSingle(optionCount)
+                    : EncounterPreviewText.LevelUpRandomPool(draws, optionCount)
             )
         );
     }
@@ -274,7 +261,7 @@ internal static class CollectionLevelUpTooltipText
     // Only hero conditions are evaluated; groups gated on board state ("Inspired by"
     // bonus skills) are omitted, and unknown run conditions — including an unknown
     // current hero — keep the group visible rather than silently dropping rewards.
-    private static bool PassesPrerequisites(CollectionLevelUpPreviewGroup group, EHero? currentHero)
+    private static bool PassesPrerequisites(LevelUpPreviewGroup group, EHero? currentHero)
     {
         foreach (var condition in group.HeroConditions)
             if (!PassesHeroCondition(condition, currentHero))
@@ -284,12 +271,12 @@ internal static class CollectionLevelUpTooltipText
     }
 
     private static bool PassesHeroCondition(
-        CollectionLevelUpPreviewHeroCondition condition,
+        LevelUpPreviewHeroCondition condition,
         EHero? currentHero
     )
     {
         // Hero detection failed: keep hero-gated groups visible (consistent with
-        // CollectionEncounterHeroEligibility) instead of hiding them all.
+        // EncounterHeroEligibility) instead of hiding them all.
         if (currentHero == null)
             return true;
 

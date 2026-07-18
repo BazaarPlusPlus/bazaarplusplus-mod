@@ -10,7 +10,7 @@ using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Localization;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
 public sealed class AggregateItemMissingTypesTextTests
 {

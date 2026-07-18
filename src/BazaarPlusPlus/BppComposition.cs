@@ -36,6 +36,7 @@ using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
 using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 using BazaarPlusPlus.ModApi.Clients;
+using BazaarPlusPlus.Patches;
 using BazaarPlusPlus.Patches.Tooltips;
 using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
@@ -62,6 +63,8 @@ internal sealed class BppComposition : IDisposable
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
     private readonly RunLoggingModule _runLoggingModule;
+    private readonly EncounterPreviewModule _encounterPreviewModule;
+    private readonly BppPatchFeatures _patchFeatures;
     private readonly VoiceSubtitlesModule _voiceSubtitlesModule;
     private readonly VoiceSubtitlesInteropModule _voiceSubtitlesInteropModule;
     private readonly IRemoteEmbeddedCatalog<TenWinBuildCorpus> _buildRecommendationCatalog;
@@ -81,6 +84,7 @@ internal sealed class BppComposition : IDisposable
 
     public BppMountableRegistry Mountables => _mountables;
     public SettingsDockEntryRegistry SettingsDockRegistry => _settingsDockRegistry;
+    public BppPatchFeatures PatchFeatures => _patchFeatures;
     public ModOnlineClient? OnlineClient => _onlineClientRef;
     public BazaarDbLinkClient? AccountLinkClient => _accountLinkClientRef;
 
@@ -118,6 +122,22 @@ internal sealed class BppComposition : IDisposable
         _buildRecommendationRepository = new BuildRecommendationRepository(
             _buildRecommendationCatalog
         );
+        var encounterPreviewCachePath = System.IO.Path.Combine(
+            System.IO.Path.GetDirectoryName(
+                _paths.RunLogDatabasePath
+                    ?? throw new InvalidOperationException(
+                        "Run log database path is not initialized."
+                    )
+            )!,
+            "EncounterPreview",
+            "preview-plans.json"
+        );
+        _encounterPreviewModule = new EncounterPreviewModule(
+            _services,
+            _staticCardMapProvider,
+            encounterPreviewCachePath
+        );
+        _patchFeatures = new BppPatchFeatures(_encounterPreviewModule);
         _runLoggingModule = new RunLoggingModule(
             _services,
             PvpBattleCatalog,
@@ -152,24 +172,9 @@ internal sealed class BppComposition : IDisposable
         _settingsDockRegistry.Register(NameOverrideSettingsDockEntry.Create());
 
         _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
-        var encounterPreviewCachePath = System.IO.Path.Combine(
-            System.IO.Path.GetDirectoryName(
-                _paths.RunLogDatabasePath
-                    ?? throw new InvalidOperationException(
-                        "Run log database path is not initialized."
-                    )
-            )!,
-            "EncounterPreview",
-            "preview-plans.json"
-        );
         _mountables.Register(
-            new ComponentMount<EventPreviewPlanController>(
-                (controller, services) =>
-                    controller.Initialize(
-                        services,
-                        _staticCardMapProvider,
-                        encounterPreviewCachePath
-                    )
+            new ComponentMount<EventPreviewStaticDataObserver>(
+                (observer, _) => observer.Initialize(_encounterPreviewModule)
             )
         );
         // The overlay host must mount before every Main Overlay Panel mount below: panels
@@ -239,6 +244,7 @@ internal sealed class BppComposition : IDisposable
         BazaarAgentGameBridge.Current = null;
         BazaarAgentGameBridge.CurrentRecorder = null;
         _featureRegistry.Stop();
+        _encounterPreviewModule.Dispose();
         _buildRecommendationCatalog.Dispose();
     }
 }

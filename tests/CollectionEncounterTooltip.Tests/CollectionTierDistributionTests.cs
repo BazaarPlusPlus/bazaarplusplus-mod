@@ -9,11 +9,11 @@ using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Localization;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionTierDistributionTests
+public sealed class TierDistributionTests
 {
-    public CollectionTierDistributionTests()
+    public TierDistributionTests()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
     }
@@ -32,9 +32,9 @@ public sealed class CollectionTierDistributionTests
         string expectedLast
     )
     {
-        var distribution = CollectionTierDistribution.FromWeights(bronze, silver, gold, diamond);
+        var distribution = TierDistribution.FromWeights(bronze, silver, gold, diamond);
 
-        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
+        var text = EncounterPreviewTextFormatter.BuildQualityLine(
             distribution,
             fixedTier: null,
             dayTierCeiling: ETier.Diamond
@@ -50,9 +50,9 @@ public sealed class CollectionTierDistributionTests
     [Fact]
     public void Distribution_normalizes_positive_weights_instead_of_assuming_total_is_one()
     {
-        var distribution = CollectionTierDistribution.FromWeights(0f, 0.2f, 0.55f, 0.05f);
+        var distribution = TierDistribution.FromWeights(0f, 0.2f, 0.55f, 0.05f);
 
-        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
+        var text = EncounterPreviewTextFormatter.BuildQualityLine(
             distribution,
             fixedTier: null,
             dayTierCeiling: ETier.Diamond
@@ -66,13 +66,13 @@ public sealed class CollectionTierDistributionTests
     [Fact]
     public void Distribution_ignores_non_positive_weights_and_rejects_an_empty_table()
     {
-        var distribution = CollectionTierDistribution.FromWeights(-1f, 0f, 2f, float.NaN);
+        var distribution = TierDistribution.FromWeights(-1f, 0f, 2f, float.NaN);
 
         Assert.NotNull(distribution);
         Assert.Single(distribution!.Entries);
         Assert.Equal(ETier.Gold, distribution.Entries[0].Tier);
         Assert.Equal(100d, distribution.Entries[0].Percent);
-        Assert.Null(CollectionTierDistribution.FromWeights(0f, -1f, float.NaN, 0f));
+        Assert.Null(TierDistribution.FromWeights(0f, -1f, float.NaN, 0f));
     }
 
     [Theory]
@@ -91,9 +91,9 @@ public sealed class CollectionTierDistributionTests
             new TSpawnBehaviorIgnoreTierTable { IgnoreTierTable = true }
         );
 
-        var policy = CollectionMerchantTierResolver.Resolve(template);
-        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
-            CollectionTierDistribution.FromWeights(0.9f, 0.1f, 0f, 0f),
+        var policy = EncounterMerchantTierResolver.Resolve(template);
+        var text = EncounterPreviewTextFormatter.BuildQualityLine(
+            TierDistribution.FromWeights(0.9f, 0.1f, 0f, 0f),
             policy.FixedTier,
             policy.UsesDayDistribution ? ETier.Silver : null
         );
@@ -116,7 +116,7 @@ public sealed class CollectionTierDistributionTests
             }
         );
 
-        var policy = CollectionMerchantTierResolver.Resolve(template);
+        var policy = EncounterMerchantTierResolver.Resolve(template);
 
         Assert.Equal(ETier.Bronze, policy.FixedTier);
         Assert.False(policy.UsesDayDistribution);
@@ -125,7 +125,7 @@ public sealed class CollectionTierDistributionTests
     [Fact]
     public void Downshift_merchants_still_show_the_raw_daily_weights()
     {
-        var policy = CollectionMerchantTierResolver.Resolve(
+        var policy = EncounterMerchantTierResolver.Resolve(
             CreateMerchantTemplate(new TSpawnBehaviorDownShiftTier())
         );
 
@@ -136,7 +136,7 @@ public sealed class CollectionTierDistributionTests
     [Fact]
     public void Ignore_tier_table_without_a_fixed_tier_suppresses_the_daily_line()
     {
-        var policy = CollectionMerchantTierResolver.Resolve(
+        var policy = EncounterMerchantTierResolver.Resolve(
             CreateMerchantTemplate(new TSpawnBehaviorIgnoreTierTable { IgnoreTierTable = true })
         );
 
@@ -157,8 +157,8 @@ public sealed class CollectionTierDistributionTests
         var localeMode = traditional ? BppChineseLocaleMode.Taiwan : BppChineseLocaleMode.Mainland;
         L.Install(new TestLanguageProvider(language), new TestLocaleModeProvider(localeMode));
 
-        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
-            CollectionTierDistribution.FromWeights(0.9f, 0.1f, 0f, 0f),
+        var text = EncounterPreviewTextFormatter.BuildQualityLine(
+            TierDistribution.FromWeights(0.9f, 0.1f, 0f, 0f),
             fixedTier: null,
             dayTierCeiling: ETier.Silver
         );
@@ -172,7 +172,7 @@ public sealed class CollectionTierDistributionTests
     [Fact]
     public void Quality_line_falls_back_to_the_existing_day_ceiling()
     {
-        var text = CollectionEncounterGameTooltipText.BuildQualityLine(
+        var text = EncounterPreviewTextFormatter.BuildQualityLine(
             dayTierDistribution: null,
             fixedTier: null,
             dayTierCeiling: ETier.Gold
@@ -185,10 +185,10 @@ public sealed class CollectionTierDistributionTests
     [Fact]
     public void Encounter_step_reward_line_shows_quality_for_grab_the_loot_style_rewards()
     {
-        var text = CollectionEncounterGameTooltipText.BuildRewardQualityLine(
+        var text = EncounterPreviewTextFormatter.BuildRewardQualityLine(
             CreateRewardFilter(usesDayTierTable: true, usesDayTierDistribution: true),
             "Get 3 Loot items",
-            CollectionTierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
+            TierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
             ETier.Silver
         );
 
@@ -199,10 +199,10 @@ public sealed class CollectionTierDistributionTests
     [Fact]
     public void Encounter_step_reward_line_shows_source_weights_for_downshift_rewards()
     {
-        var text = CollectionEncounterGameTooltipText.BuildRewardQualityLine(
+        var text = EncounterPreviewTextFormatter.BuildRewardQualityLine(
             CreateRewardFilter(usesDayTierTable: false, usesDayTierDistribution: true),
             "Gain 2 Gold and a Shield item from any Hero",
-            CollectionTierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
+            TierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
             ETier.Silver
         );
 
@@ -213,17 +213,17 @@ public sealed class CollectionTierDistributionTests
     [Fact]
     public void Encounter_step_reward_line_skips_fixed_or_inherited_quality()
     {
-        var text = CollectionEncounterGameTooltipText.BuildRewardQualityLine(
+        var text = EncounterPreviewTextFormatter.BuildRewardQualityLine(
             CreateRewardFilter(usesDayTierTable: false, usesDayTierDistribution: false),
             "Get an item",
-            CollectionTierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
+            TierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
             ETier.Silver
         );
 
         Assert.Equal(string.Empty, text);
     }
 
-    private static CollectionEncounterRewardFilter CreateRewardFilter(
+    private static EncounterRewardFilter CreateRewardFilter(
         bool usesDayTierTable,
         bool usesDayTierDistribution
     ) =>

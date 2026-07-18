@@ -11,15 +11,14 @@ using BazaarGameShared.Domain.Spawning;
 using BazaarGameShared.Domain.Spawning.SpawnFilters;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
 using BazaarGameShared.Domain.Values;
-using BazaarPlusPlus.Game.CollectionPanel.Data;
 using Newtonsoft.Json.Linq;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal sealed class CollectionEncounterPreviewCompileResult
+internal sealed class EncounterPreviewCompileResult
 {
-    public CollectionEncounterPreviewCompileResult(
-        CollectionEncounterPreviewSnapshot snapshot,
+    public EncounterPreviewCompileResult(
+        EncounterPreviewSnapshot snapshot,
         IReadOnlyList<Guid> failedTemplateIds
     )
     {
@@ -27,7 +26,7 @@ internal sealed class CollectionEncounterPreviewCompileResult
         FailedTemplateIds = failedTemplateIds;
     }
 
-    public CollectionEncounterPreviewSnapshot Snapshot { get; }
+    public EncounterPreviewSnapshot Snapshot { get; }
 
     public IReadOnlyList<Guid> FailedTemplateIds { get; }
 
@@ -36,23 +35,22 @@ internal sealed class CollectionEncounterPreviewCompileResult
     public int LevelUpFailureCount => Snapshot.Coverage.LevelUpFailureCount;
 }
 
-internal sealed class CollectionEncounterPreviewPlanCompiler
+internal sealed class EncounterPreviewPlanCompiler
 {
     private readonly Func<object, JToken?> _prepareToken;
 
-    public CollectionEncounterPreviewPlanCompiler()
-        : this(CollectionEncounterStructuredParser.TryPrepareToken) { }
+    public EncounterPreviewPlanCompiler()
+        : this(EncounterStructuredParser.TryPrepareToken) { }
 
-    internal CollectionEncounterPreviewPlanCompiler(Func<object, JToken?> prepareToken)
+    internal EncounterPreviewPlanCompiler(Func<object, JToken?> prepareToken)
     {
         _prepareToken = prepareToken ?? throw new ArgumentNullException(nameof(prepareToken));
     }
 
-    public CollectionEncounterPreviewCompileResult Compile(
-        IReadOnlyDictionary<Guid, ITCard> cardMap
-    ) => Compile(cardMap, new Dictionary<int, TLevelUp>());
+    public EncounterPreviewCompileResult Compile(IReadOnlyDictionary<Guid, ITCard> cardMap) =>
+        Compile(cardMap, new Dictionary<int, TLevelUp>());
 
-    public CollectionEncounterPreviewCompileResult Compile(
+    public EncounterPreviewCompileResult Compile(
         IReadOnlyDictionary<Guid, ITCard> cardMap,
         IReadOnlyDictionary<int, TLevelUp> levelUpMap
     )
@@ -62,8 +60,8 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
         if (levelUpMap == null)
             throw new ArgumentNullException(nameof(levelUpMap));
 
-        var events = new List<CollectionEncounterPreviewEventPlan>();
-        var templates = new Dictionary<Guid, CollectionEncounterPreviewTemplatePlan>();
+        var events = new List<EncounterPreviewEventPlan>();
+        var templates = new Dictionary<Guid, EncounterPreviewTemplatePlan>();
         var failures = new HashSet<Guid>();
         var missingReferencedTemplates = new HashSet<Guid>();
         var eventTemplates = cardMap
@@ -86,17 +84,14 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
                 if (!TryAddTemplate(eventTemplate, token, templates, failures))
                     continue;
 
-                var isRandomSelectionEvent =
-                    CollectionEncounterStructuredParser.TryParseEventOutcomeGroups(
-                        token,
-                        out var outcomeGroups
-                    );
-                var choiceGroups = isRandomSelectionEvent
-                    ? Array.Empty<CollectionEncounterChoiceGroupData>()
-                    : CollectionEncounterStructuredParser.TryParseEventChoiceGroups(token);
-                var choiceLimit = CollectionEncounterStructuredParser.TryParseEventChoiceLimit(
-                    token
+                var isRandomSelectionEvent = EncounterStructuredParser.TryParseEventOutcomeGroups(
+                    token,
+                    out var outcomeGroups
                 );
+                var choiceGroups = isRandomSelectionEvent
+                    ? Array.Empty<EncounterChoiceGroupData>()
+                    : EncounterStructuredParser.TryParseEventChoiceGroups(token);
+                var choiceLimit = EncounterStructuredParser.TryParseEventChoiceLimit(token);
 
                 foreach (var group in outcomeGroups)
                 foreach (var id in group.Ids)
@@ -118,7 +113,7 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
                     );
 
                 events.Add(
-                    new CollectionEncounterPreviewEventPlan(
+                    new EncounterPreviewEventPlan(
                         eventTemplate.Id,
                         isRandomSelectionEvent,
                         suppressRandomOutcome: eventTemplate.Tags?.Contains(ECardTag.Merchant)
@@ -146,27 +141,24 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
             out var unsupportedLevelUpPartCount
         );
 
-        var snapshot = new CollectionEncounterPreviewSnapshot(
+        var snapshot = new EncounterPreviewSnapshot(
             events.OrderBy(plan => plan.TemplateId),
             templates.Values.OrderBy(plan => plan.TemplateId),
             levelUps.OrderBy(plan => plan.Level),
-            new CollectionPreviewCoverage(
+            new EventPreviewCoverage(
                 eventFailureCount,
                 levelUpFailureCount,
                 unsupportedLevelUpPartCount,
                 missingReferencedTemplates.Count
             )
         );
-        return new CollectionEncounterPreviewCompileResult(
-            snapshot,
-            failures.OrderBy(id => id).ToArray()
-        );
+        return new EncounterPreviewCompileResult(snapshot, failures.OrderBy(id => id).ToArray());
     }
 
     private void TryAddReferencedTemplate(
         Guid templateId,
         IReadOnlyDictionary<Guid, ITCard> cardMap,
-        Dictionary<Guid, CollectionEncounterPreviewTemplatePlan> templates,
+        Dictionary<Guid, EncounterPreviewTemplatePlan> templates,
         HashSet<Guid> failures,
         HashSet<Guid> missingReferencedTemplates
     )
@@ -200,7 +192,7 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
     private void TryAddLevelUpReferencedTemplate(
         Guid templateId,
         IReadOnlyDictionary<Guid, ITCard> cardMap,
-        Dictionary<Guid, CollectionEncounterPreviewTemplatePlan> templates,
+        Dictionary<Guid, EncounterPreviewTemplatePlan> templates,
         HashSet<Guid> failures,
         HashSet<Guid> missingReferencedTemplates
     ) =>
@@ -212,17 +204,17 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
             missingReferencedTemplates
         );
 
-    private List<CollectionLevelUpPreviewPlan> CompileLevelUps(
+    private List<LevelUpPreviewPlan> CompileLevelUps(
         IReadOnlyDictionary<int, TLevelUp> levelUpMap,
         IReadOnlyDictionary<Guid, ITCard> cardMap,
-        Dictionary<Guid, CollectionEncounterPreviewTemplatePlan> templates,
+        Dictionary<Guid, EncounterPreviewTemplatePlan> templates,
         HashSet<Guid> failures,
         HashSet<Guid> missingReferencedTemplates,
         out int levelUpFailureCount,
         out int unsupportedPartCount
     )
     {
-        var plans = new List<CollectionLevelUpPreviewPlan>();
+        var plans = new List<LevelUpPreviewPlan>();
         levelUpFailureCount = 0;
         unsupportedPartCount = 0;
 
@@ -237,14 +229,14 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
                     continue;
                 }
 
-                var groups = new List<CollectionLevelUpPreviewGroup>();
+                var groups = new List<LevelUpPreviewGroup>();
                 var isRandomSelection = false;
                 if (levelUp.Rewards is TSpawnContextQuery query)
                 {
                     isRandomSelection = query.SelectionMethod == ESpawnSelectionMethod.Random;
                     foreach (var group in query.Groups)
                     {
-                        var heroConditions = new List<CollectionLevelUpPreviewHeroCondition>();
+                        var heroConditions = new List<LevelUpPreviewHeroCondition>();
                         var skipBoardConditionalGroup = false;
                         if (group.Prerequisites != null)
                         {
@@ -261,7 +253,7 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
                                         Conditions: TRunConditionalPlayerHero heroCondition
                                     }:
                                         heroConditions.Add(
-                                            new CollectionLevelUpPreviewHeroCondition(
+                                            new LevelUpPreviewHeroCondition(
                                                 heroCondition.Heroes,
                                                 heroCondition.Operator.ToString()
                                             )
@@ -304,12 +296,7 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
                             );
                         }
                         groups.Add(
-                            new CollectionLevelUpPreviewGroup(
-                                group.RandomWeight,
-                                limit,
-                                ids,
-                                heroConditions
-                            )
+                            new LevelUpPreviewGroup(group.RandomWeight, limit, ids, heroConditions)
                         );
                     }
                 }
@@ -322,7 +309,7 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
                     unsupportedPartCount++;
 
                 plans.Add(
-                    new CollectionLevelUpPreviewPlan(
+                    new LevelUpPreviewPlan(
                         level,
                         checked((int)levelUp.HealthIncrease),
                         isRandomSelection,
@@ -342,7 +329,7 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
     private static bool TryAddTemplate(
         TCardBase template,
         JToken? preparedToken,
-        Dictionary<Guid, CollectionEncounterPreviewTemplatePlan> templates,
+        Dictionary<Guid, EncounterPreviewTemplatePlan> templates,
         HashSet<Guid> failures
     )
     {
@@ -351,36 +338,35 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
 
         try
         {
-            CollectionEncounterRewardFilter? rewardFilter = null;
+            EncounterRewardFilter? rewardFilter = null;
             if (
                 template.Type == ECardType.EventEncounter
                 || template.Type == ECardType.EncounterStep
             )
             {
-                rewardFilter =
-                    CollectionEncounterStructuredParser.TryParseRewardFilterWithPreparedToken(
-                        template,
-                        preparedToken
-                    );
+                rewardFilter = EncounterStructuredParser.TryParseRewardFilterWithPreparedToken(
+                    template,
+                    preparedToken
+                );
             }
 
             var localization = template.Localization;
             templates.Add(
                 template.Id,
-                new CollectionEncounterPreviewTemplatePlan(
+                new EncounterPreviewTemplatePlan(
                     template.Id,
                     Classify(template.Type),
                     template.Heroes?.OrderBy(hero => (int)hero).ToArray() ?? Array.Empty<EHero>(),
                     template.InternalName,
-                    new CollectionEncounterPreviewLocalizedText(
+                    new EncounterPreviewLocalizedText(
                         localization?.Title?.Key,
                         localization?.Title?.Text
                     ),
-                    new CollectionEncounterPreviewLocalizedText(
+                    new EncounterPreviewLocalizedText(
                         localization?.Description?.Key,
                         localization?.Description?.Text
                     ),
-                    CollectionLocalizationResolver.CaptureAbilityValues(template),
+                    EventPreviewLocalization.CaptureAbilityValues(template),
                     rewardFilter
                 )
             );
@@ -393,14 +379,14 @@ internal sealed class CollectionEncounterPreviewPlanCompiler
         }
     }
 
-    private static CollectionEncounterPreviewTemplateKind Classify(ECardType type) =>
+    private static EncounterPreviewTemplateKind Classify(ECardType type) =>
         type switch
         {
-            ECardType.EventEncounter => CollectionEncounterPreviewTemplateKind.Event,
-            ECardType.EncounterStep => CollectionEncounterPreviewTemplateKind.EncounterStep,
-            ECardType.CombatEncounter => CollectionEncounterPreviewTemplateKind.CombatEncounter,
-            ECardType.Skill => CollectionEncounterPreviewTemplateKind.Skill,
-            ECardType.Item => CollectionEncounterPreviewTemplateKind.Item,
-            _ => CollectionEncounterPreviewTemplateKind.Other,
+            ECardType.EventEncounter => EncounterPreviewTemplateKind.Event,
+            ECardType.EncounterStep => EncounterPreviewTemplateKind.EncounterStep,
+            ECardType.CombatEncounter => EncounterPreviewTemplateKind.CombatEncounter,
+            ECardType.Skill => EncounterPreviewTemplateKind.Skill,
+            ECardType.Item => EncounterPreviewTemplateKind.Item,
+            _ => EncounterPreviewTemplateKind.Other,
         };
 }

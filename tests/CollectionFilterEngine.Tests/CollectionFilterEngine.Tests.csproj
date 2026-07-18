@@ -80,8 +80,12 @@
       Link="CollectionFilterState.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\DayTierSchedule.cs"
+      Include="..\..\src\BazaarPlusPlus\Game\Encounters\DayTierSchedule.cs"
       Link="DayTierSchedule.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\Encounters\TierOrder.cs"
+      Link="TierOrder.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionPanelSelectionState.cs"
@@ -126,6 +130,10 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\PackageIdentity.cs"
       Link="PackageIdentity.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\CardAbilityValueReader.cs"
+      Link="CardAbilityValueReader.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CardTags\PlayerFacingCardTags.cs"

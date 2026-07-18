@@ -3,16 +3,15 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Tooltips;
+using BazaarPlusPlus.Game.Encounters;
 
-namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
+namespace BazaarPlusPlus.Game.EventPreview;
 
 // Content for the BPP section cloned into the native encounter tooltip: one line per
 // choice, accent-colored name plus the game's own result text (run through the
 // supplied colorizer for native keyword coloring). Card rewards whose pool tier is
 // day-driven get the current GameData tier distribution appended to the text.
-internal static class CollectionEncounterGameTooltipText
+internal static class EncounterPreviewTextFormatter
 {
     private const string AccentColor = "#FFD37E";
     private const string IneligibleColor = "#8F8268";
@@ -26,18 +25,17 @@ internal static class CollectionEncounterGameTooltipText
     };
 
     public static string Build(
-        CollectionEncounterOption option,
+        EncounterOption option,
         Func<string, string>? colorizeResult = null,
         ETier? dayTierCeiling = null,
-        CollectionTierDistribution? dayTierDistribution = null
+        TierDistribution? dayTierDistribution = null
     )
     {
         if (option == null)
             return string.Empty;
 
         var rawColorize = colorizeResult ?? (text => text);
-        string Colorize(string text) =>
-            CollectionTooltipMarkup.NormalizeInlineFragment(rawColorize(text));
+        string Colorize(string text) => TooltipMarkup.NormalizeInlineFragment(rawColorize(text));
 
         if (option.HasOutcomeGroups)
             return BuildOutcomes(
@@ -49,7 +47,7 @@ internal static class CollectionEncounterGameTooltipText
         if (!option.HasChoiceDetails)
             return string.Empty;
 
-        var lines = new List<CollectionTooltipMarkup.Block>();
+        var lines = new List<TooltipMarkup.Block>();
         foreach (var choice in option.ChoiceDetails)
         {
             // Rolled pools ("Advanced Training" trainings, "Epic Battle" monsters)
@@ -68,9 +66,9 @@ internal static class CollectionEncounterGameTooltipText
             {
                 var flat = string.IsNullOrWhiteSpace(result)
                     ? choice.DisplayName
-                    : CollectionPanelText.JoinTooltipLabel(choice.DisplayName, result);
+                    : EncounterPreviewText.JoinTooltipLabel(choice.DisplayName, result);
                 lines.Add(
-                    new CollectionTooltipMarkup.Paragraph(
+                    new TooltipMarkup.Paragraph(
                         $"<color={IneligibleColor}>{flat}</color>",
                         fontSizePercent: 85
                     )
@@ -79,10 +77,10 @@ internal static class CollectionEncounterGameTooltipText
             }
 
             lines.Add(
-                new CollectionTooltipMarkup.Paragraph(
+                new TooltipMarkup.Paragraph(
                     string.IsNullOrWhiteSpace(result)
                         ? $"<color={AccentColor}>{choice.DisplayName}</color>"
-                        : CollectionPanelText.JoinColoredTooltipLabel(
+                        : EncounterPreviewText.JoinColoredTooltipLabel(
                             choice.DisplayName,
                             Colorize(result),
                             AccentColor
@@ -90,11 +88,11 @@ internal static class CollectionEncounterGameTooltipText
                 )
             );
         }
-        return CollectionTooltipMarkup.Render(lines);
+        return TooltipMarkup.Render(lines);
     }
 
     public static string BuildQualityLine(
-        CollectionTierDistribution? dayTierDistribution,
+        TierDistribution? dayTierDistribution,
         ETier? fixedTier,
         ETier? dayTierCeiling
     )
@@ -102,7 +100,7 @@ internal static class CollectionEncounterGameTooltipText
         string? line = null;
         if (fixedTier.HasValue)
         {
-            line = ColorizeTier(fixedTier.Value, CollectionPanelText.Tier(fixedTier.Value));
+            line = ColorizeTier(fixedTier.Value, EncounterPreviewText.Tier(fixedTier.Value));
         }
         else if (dayTierDistribution != null)
         {
@@ -110,20 +108,18 @@ internal static class CollectionEncounterGameTooltipText
         }
         else if (dayTierCeiling.HasValue)
         {
-            line = CollectionPanelText.EncounterTierCeilingLine(dayTierCeiling.Value);
+            line = EncounterPreviewText.EncounterTierCeilingLine(dayTierCeiling.Value);
         }
 
         return string.IsNullOrWhiteSpace(line)
             ? string.Empty
-            : CollectionTooltipMarkup.Render(
-                new CollectionTooltipMarkup.Block[] { new CollectionTooltipMarkup.Paragraph(line) }
-            );
+            : TooltipMarkup.Render(new TooltipMarkup.Block[] { new TooltipMarkup.Paragraph(line) });
     }
 
     public static string BuildRewardQualityLine(
-        CollectionEncounterRewardFilter? reward,
+        EncounterRewardFilter? reward,
         string? resultText,
-        CollectionTierDistribution? dayTierDistribution,
+        TierDistribution? dayTierDistribution,
         ETier? dayTierCeiling
     )
     {
@@ -135,25 +131,25 @@ internal static class CollectionEncounterGameTooltipText
     // Random-outcome events: one block per rolled alternative with its normalized
     // probability; prerequisite-unmet groups render dimmed without a percentage.
     private static string BuildOutcomes(
-        IReadOnlyList<CollectionEncounterOutcomeView> outcomes,
+        IReadOnlyList<EncounterOutcomeView> outcomes,
         Func<string, string> colorize,
         ETier? dayTierCeiling,
-        CollectionTierDistribution? dayTierDistribution
+        TierDistribution? dayTierDistribution
     )
     {
-        var items = new List<CollectionTooltipMarkup.ListItem>();
+        var items = new List<TooltipMarkup.ListItem>();
         foreach (var outcome in outcomes)
         {
             string content;
-            IReadOnlyList<CollectionTooltipMarkup.ListItem>? children = null;
+            IReadOnlyList<TooltipMarkup.ListItem>? children = null;
             if (outcome.IsCombatPool)
             {
-                content = CollectionPanelText.OutcomeCombatPool(outcome.OptionCount);
+                content = EncounterPreviewText.OutcomeCombatPool(outcome.OptionCount);
             }
             else if (outcome.Details.Count == 0)
             {
                 // Collapsed same-shaped cluster (Farai's NPC packages): count only.
-                content = CollectionPanelText.LevelUpRandomPoolSingle(outcome.OptionCount);
+                content = EncounterPreviewText.LevelUpRandomPoolSingle(outcome.OptionCount);
             }
             else if (outcome.Details.Count == 1)
             {
@@ -166,11 +162,11 @@ internal static class CollectionEncounterGameTooltipText
             }
             else
             {
-                content = CollectionPanelText.OutcomeSubPool(outcome.Details.Count);
-                var entries = new List<CollectionTooltipMarkup.ListItem>();
+                content = EncounterPreviewText.OutcomeSubPool(outcome.Details.Count);
+                var entries = new List<TooltipMarkup.ListItem>();
                 foreach (var detail in outcome.Details)
                     entries.Add(
-                        new CollectionTooltipMarkup.ListItem(
+                        new TooltipMarkup.ListItem(
                             DetailLine(detail, colorize, dayTierCeiling, dayTierDistribution)
                         )
                     );
@@ -182,7 +178,7 @@ internal static class CollectionEncounterGameTooltipText
             if (!outcome.IsEligible)
             {
                 items.Add(
-                    new CollectionTooltipMarkup.ListItem(
+                    new TooltipMarkup.ListItem(
                         content,
                         children,
                         fontSizePercent: 85,
@@ -195,45 +191,45 @@ internal static class CollectionEncounterGameTooltipText
             var prefix = outcome.Percent.HasValue
                 ? $"<color={AccentColor}>{outcome.Percent.Value}%</color> "
                 : string.Empty;
-            items.Add(new CollectionTooltipMarkup.ListItem($"{prefix}{content}", children));
+            items.Add(new TooltipMarkup.ListItem($"{prefix}{content}", children));
         }
-        return CollectionTooltipMarkup.Render(
-            new CollectionTooltipMarkup.Block[]
+        return TooltipMarkup.Render(
+            new TooltipMarkup.Block[]
             {
-                new CollectionTooltipMarkup.ListBlock(CollectionPanelText.OutcomesHeader(), items),
+                new TooltipMarkup.ListBlock(EncounterPreviewText.OutcomesHeader(), items),
             }
         );
     }
 
     // One rolled-pool choice line: combat roll, small expandable entry list (with
     // accent-colored names to match sibling choice lines), or a bare option count.
-    private static CollectionTooltipMarkup.Block ChoicePoolBlock(
-        CollectionEncounterChoicePool pool,
+    private static TooltipMarkup.Block ChoicePoolBlock(
+        EncounterChoicePool pool,
         Func<string, string> colorize,
         ETier? dayTierCeiling,
-        CollectionTierDistribution? dayTierDistribution
+        TierDistribution? dayTierDistribution
     )
     {
         if (pool.IsCombat)
-            return new CollectionTooltipMarkup.Paragraph(
-                $"<color={AccentColor}>{CollectionPanelText.OutcomeCombatPool(pool.OptionCount)}</color>"
+            return new TooltipMarkup.Paragraph(
+                $"<color={AccentColor}>{EncounterPreviewText.OutcomeCombatPool(pool.OptionCount)}</color>"
             );
 
         if (pool.Entries.Count == 0)
-            return new CollectionTooltipMarkup.Paragraph(
-                CollectionPanelText.LevelUpRandomPoolSingle(pool.OptionCount)
+            return new TooltipMarkup.Paragraph(
+                EncounterPreviewText.LevelUpRandomPoolSingle(pool.OptionCount)
             );
 
-        var entries = new List<CollectionTooltipMarkup.ListItem>();
+        var entries = new List<TooltipMarkup.ListItem>();
         foreach (var entry in pool.Entries)
         {
             var result = ChoiceResultText(entry, dayTierCeiling, dayTierDistribution);
             entries.Add(
-                new CollectionTooltipMarkup.ListItem(
+                new TooltipMarkup.ListItem(
                     string.IsNullOrWhiteSpace(result)
                         ? $"<color={AccentColor}>{entry.DisplayName}</color>"
                     : string.IsNullOrWhiteSpace(entry.DisplayName) ? colorize(result)
-                    : CollectionPanelText.JoinColoredTooltipLabel(
+                    : EncounterPreviewText.JoinColoredTooltipLabel(
                         entry.DisplayName,
                         colorize(result),
                         AccentColor
@@ -241,8 +237,8 @@ internal static class CollectionEncounterGameTooltipText
                 )
             );
         }
-        return new CollectionTooltipMarkup.ListBlock(
-            CollectionPanelText.OutcomeSubPool(pool.Entries.Count),
+        return new TooltipMarkup.ListBlock(
+            EncounterPreviewText.OutcomeSubPool(pool.Entries.Count),
             entries
         );
     }
@@ -250,10 +246,10 @@ internal static class CollectionEncounterGameTooltipText
     // One outcome entry: "Name: result", bare name, or bare result — query-pool
     // summaries have no card name, so their result text stands alone.
     private static string DetailLine(
-        CollectionEncounterChoiceDetail detail,
+        EncounterChoiceDetail detail,
         Func<string, string> colorize,
         ETier? dayTierCeiling,
-        CollectionTierDistribution? dayTierDistribution
+        TierDistribution? dayTierDistribution
     )
     {
         var result = ChoiceResultText(detail, dayTierCeiling, dayTierDistribution);
@@ -261,22 +257,22 @@ internal static class CollectionEncounterGameTooltipText
             return detail.DisplayName;
         return string.IsNullOrWhiteSpace(detail.DisplayName)
             ? colorize(result)
-            : CollectionPanelText.JoinTooltipLabel(detail.DisplayName, colorize(result));
+            : EncounterPreviewText.JoinTooltipLabel(detail.DisplayName, colorize(result));
     }
 
     // Flattens embedded newlines (descriptions render as list entries) and appends
     // the day-tier suffix where the pool is day-driven.
     private static string ChoiceResultText(
-        CollectionEncounterChoiceDetail choice,
+        EncounterChoiceDetail choice,
         ETier? dayTierCeiling,
-        CollectionTierDistribution? dayTierDistribution
+        TierDistribution? dayTierDistribution
     )
     {
         var result = choice.ResultText;
         if (string.IsNullOrWhiteSpace(result))
             return string.Empty;
 
-        result = CollectionPanelText.NormalizeRewardSpacing(
+        result = EncounterPreviewText.NormalizeRewardSpacing(
             CollapseWhitespace(result.Replace("\r", string.Empty).Replace('\n', ' '))
         );
         var suffix = DayTierSuffix(choice, dayTierCeiling, dayTierDistribution);
@@ -306,9 +302,9 @@ internal static class CollectionEncounterGameTooltipText
     // show the runtime GameData distribution when available, otherwise retain the old
     // ceiling summary as a fallback. Narrow constraints already state the tier explicitly.
     private static string? DayTierSuffix(
-        CollectionEncounterChoiceDetail choice,
+        EncounterChoiceDetail choice,
         ETier? dayTierCeiling,
-        CollectionTierDistribution? dayTierDistribution
+        TierDistribution? dayTierDistribution
     )
     {
         if (
@@ -318,30 +314,27 @@ internal static class CollectionEncounterGameTooltipText
             return null;
 
         if (dayTierDistribution != null)
-            return CollectionPanelText.EncounterTierDistributionSuffix(
+            return EncounterPreviewText.EncounterTierDistributionSuffix(
                 FormatTierDistribution(dayTierDistribution, colorizeTiers: false)
             );
 
         if (!dayTierCeiling.HasValue)
             return null;
 
-        var ceilingRank = CollectionCardFacetRanks.TierRank(dayTierCeiling.Value);
+        var ceilingRank = TierOrder.Rank(dayTierCeiling.Value);
         var effective = new List<ETier>();
         foreach (var tier in DealableTiers)
-            if (CollectionCardFacetRanks.TierRank(tier) <= ceilingRank)
+            if (TierOrder.Rank(tier) <= ceilingRank)
                 effective.Add(tier);
 
         if (effective.Count == 0)
             return null;
         return effective.Count == 1
-            ? CollectionPanelText.EncounterTierExact(effective[0])
-            : CollectionPanelText.EncounterDayTierSuffix(effective[^1]);
+            ? EncounterPreviewText.EncounterTierExact(effective[0])
+            : EncounterPreviewText.EncounterDayTierSuffix(effective[^1]);
     }
 
-    private static bool UsesDayTierDistribution(
-        CollectionEncounterRewardFilter reward,
-        string? resultText
-    )
+    private static bool UsesDayTierDistribution(EncounterRewardFilter reward, string? resultText)
     {
         if (!reward.UsesDayTierDistribution)
             return false;
@@ -351,23 +344,20 @@ internal static class CollectionEncounterGameTooltipText
             && !HasExplicitTierDescriptor(resultText);
     }
 
-    private static string FormatTierDistribution(
-        CollectionTierDistribution distribution,
-        bool colorizeTiers
-    )
+    private static string FormatTierDistribution(TierDistribution distribution, bool colorizeTiers)
     {
         var entries = new List<string>(distribution.Entries.Count);
         foreach (var entry in distribution.Entries)
         {
             var text =
-                $"{CollectionPanelText.Tier(entry.Tier)} {entry.Percent.ToString("0.##", CultureInfo.InvariantCulture)}%";
+                $"{EncounterPreviewText.Tier(entry.Tier)} {entry.Percent.ToString("0.##", CultureInfo.InvariantCulture)}%";
             entries.Add(colorizeTiers ? ColorizeTier(entry.Tier, text) : text);
         }
         return string.Join(" · ", entries);
     }
 
     private static string ColorizeTier(ETier tier, string text) =>
-        $"<color=#{CollectionTierTooltipTextMerger.TierColorHex(tier)}>{text}</color>";
+        $"<color=#{EncounterPreviewText.TierColorHex(tier)}>{text}</color>";
 
     private static bool HasExplicitTierDescriptor(string? text)
     {
@@ -393,7 +383,7 @@ internal static class CollectionEncounterGameTooltipText
 
         // The result text is written in the game language's script, which is independent
         // of the BPP locale mode, so both Chinese variants are always tested.
-        var (_, chineseMainland, chineseTraditional) = CollectionPanelText.TierForms(tier);
+        var (_, chineseMainland, chineseTraditional) = EncounterPreviewText.TierForms(tier);
         return HasChineseTierDescriptor(text, chineseMainland)
             || HasChineseTierDescriptor(text, chineseTraditional);
     }

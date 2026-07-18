@@ -3,11 +3,11 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.CollectionPanel.Data;
+namespace BazaarPlusPlus.Game.Encounters;
 
-internal readonly struct CollectionTierProbability
+internal readonly struct TierProbability
 {
-    public CollectionTierProbability(ETier tier, double percent)
+    public TierProbability(ETier tier, double percent)
     {
         Tier = tier;
         Percent = percent;
@@ -21,16 +21,16 @@ internal readonly struct CollectionTierProbability
 // Normalized view of the positive weights consumed by the game's TierTable.Roll.
 // GameData weights are not required to add up to one (Day 12 currently totals 0.8),
 // so tooltip percentages must be calculated from their positive-weight sum.
-internal sealed class CollectionTierDistribution
+internal sealed class TierDistribution
 {
-    private CollectionTierDistribution(IReadOnlyList<CollectionTierProbability> entries)
+    private TierDistribution(IReadOnlyList<TierProbability> entries)
     {
         Entries = entries;
     }
 
-    public IReadOnlyList<CollectionTierProbability> Entries { get; }
+    public IReadOnlyList<TierProbability> Entries { get; }
 
-    public static CollectionTierDistribution? FromWeights(
+    public static TierDistribution? FromWeights(
         float bronze,
         float silver,
         float gold,
@@ -53,15 +53,15 @@ internal sealed class CollectionTierDistribution
         if (total <= 0 || double.IsNaN(total) || double.IsInfinity(total))
             return null;
 
-        var normalized = new List<CollectionTierProbability>(weights.Length);
+        var normalized = new List<TierProbability>(weights.Length);
         foreach (var entry in weights)
         {
             if (!IsUsable(entry.Weight))
                 continue;
-            normalized.Add(new CollectionTierProbability(entry.Tier, entry.Weight / total * 100d));
+            normalized.Add(new TierProbability(entry.Tier, entry.Weight / total * 100d));
         }
 
-        return normalized.Count == 0 ? null : new CollectionTierDistribution(normalized.ToArray());
+        return normalized.Count == 0 ? null : new TierDistribution(normalized.ToArray());
     }
 
     private static bool IsUsable(float weight) =>

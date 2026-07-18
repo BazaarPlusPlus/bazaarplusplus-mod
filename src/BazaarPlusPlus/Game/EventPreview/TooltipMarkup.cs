@@ -3,11 +3,11 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
+namespace BazaarPlusPlus.Game.EventPreview;
 
 // TMP has no CSS box model, so model prose semantics first and translate them here.
 // Callers describe paragraphs and lists; only this renderer owns vertical rhythm.
-internal static class CollectionTooltipMarkup
+internal static class TooltipMarkup
 {
     private const string ProseLine = "<line-height=1.4em>";
     private const string ParagraphGap = "<line-height=1.9em>\n";

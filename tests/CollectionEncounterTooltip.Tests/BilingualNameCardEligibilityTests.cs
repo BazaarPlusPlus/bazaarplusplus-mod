@@ -2,7 +2,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.BilingualItemNames;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
 public sealed class BilingualNameCardEligibilityTests
 {

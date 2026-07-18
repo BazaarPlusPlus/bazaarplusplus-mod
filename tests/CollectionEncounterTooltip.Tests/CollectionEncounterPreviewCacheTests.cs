@@ -3,9 +3,9 @@ using BazaarPlusPlus.Game.CollectionPanel;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionEncounterPreviewCacheTests : IDisposable
+public sealed class EncounterPreviewCacheTests : IDisposable
 {
     private readonly string _directory = Path.Combine(
         Path.GetTempPath(),
@@ -47,7 +47,7 @@ public sealed class CollectionEncounterPreviewCacheTests : IDisposable
 
         Assert.False(
             store.TryLoad(
-                new CollectionEncounterPreviewCacheIdentity(
+                new EncounterPreviewCacheIdentity(
                     "etag",
                     "https://example.invalid/GameData.db.zip",
                     "etag-a",
@@ -69,7 +69,7 @@ public sealed class CollectionEncounterPreviewCacheTests : IDisposable
         store.Save(identity, Snapshot());
 
         var document = JObject.Parse(File.ReadAllText(store.CachePath));
-        document["schemaVersion"] = CollectionEncounterPreviewCacheStore.SchemaVersion + 1;
+        document["schemaVersion"] = EncounterPreviewCacheStore.SchemaVersion + 1;
         File.WriteAllText(store.CachePath, document.ToString());
 
         Assert.False(store.TryLoad(identity, out _, out var schemaReason));
@@ -105,33 +105,33 @@ public sealed class CollectionEncounterPreviewCacheTests : IDisposable
         Assert.True(store.TryLoad(Identity(etag: "etag-b"), out _, out _));
     }
 
-    private CollectionEncounterPreviewCacheStore Store() =>
+    private EncounterPreviewCacheStore Store() =>
         new(Path.Combine(_directory, "preview-plans.json"));
 
     private static readonly Guid EventId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid StepId = Guid.Parse("20000000-0000-0000-0000-000000000001");
 
-    private static CollectionEncounterPreviewSnapshot Snapshot()
+    private static EncounterPreviewSnapshot Snapshot()
     {
-        var eventTemplate = new CollectionEncounterPreviewTemplatePlan(
+        var eventTemplate = new EncounterPreviewTemplatePlan(
             EventId,
-            CollectionEncounterPreviewTemplateKind.Event,
+            EncounterPreviewTemplateKind.Event,
             Array.Empty<EHero>(),
             "Test Event",
-            new CollectionEncounterPreviewLocalizedText("event-title", "Test Event"),
-            new CollectionEncounterPreviewLocalizedText("event-description", "Pick one"),
-            new Dictionary<string, CollectionEncounterPreviewAbilityValue>(),
+            new EncounterPreviewLocalizedText("event-title", "Test Event"),
+            new EncounterPreviewLocalizedText("event-description", "Pick one"),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
             rewardFilter: null
         );
-        var stepTemplate = new CollectionEncounterPreviewTemplatePlan(
+        var stepTemplate = new EncounterPreviewTemplatePlan(
             StepId,
-            CollectionEncounterPreviewTemplateKind.EncounterStep,
+            EncounterPreviewTemplateKind.EncounterStep,
             new[] { EHero.Jules },
             "Test Step",
-            new CollectionEncounterPreviewLocalizedText("step-title", "Test Step"),
-            new CollectionEncounterPreviewLocalizedText("step-description", "Take the reward"),
-            new Dictionary<string, CollectionEncounterPreviewAbilityValue>(),
-            rewardFilter: new CollectionEncounterRewardFilter(
+            new EncounterPreviewLocalizedText("step-title", "Test Step"),
+            new EncounterPreviewLocalizedText("step-description", "Take the reward"),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
+            rewardFilter: new EncounterRewardFilter(
                 ECardType.Item,
                 quantity: 1,
                 fromAnyHero: true,
@@ -144,51 +144,45 @@ public sealed class CollectionEncounterPreviewCacheTests : IDisposable
                 usesDayTierDistribution: true
             )
         );
-        var eventPlan = new CollectionEncounterPreviewEventPlan(
+        var eventPlan = new EncounterPreviewEventPlan(
             EventId,
             isRandomSelectionEvent: false,
             suppressRandomOutcome: false,
             choiceLimit: 1,
-            outcomeGroups: Array.Empty<CollectionEncounterOutcomeGroupData>(),
+            outcomeGroups: Array.Empty<EncounterOutcomeGroupData>(),
             choiceGroups: new[]
             {
-                new CollectionEncounterChoiceGroupData(
+                new EncounterChoiceGroupData(
                     isRandomPool: false,
-                    new[] { new CollectionEncounterStepReference(StepId) }
+                    new[] { new EncounterStepReference(StepId) }
                 ),
             }
         );
-        return new CollectionEncounterPreviewSnapshot(
+        return new EncounterPreviewSnapshot(
             new[] { eventPlan },
             new[] { eventTemplate, stepTemplate },
             new[]
             {
-                new CollectionLevelUpPreviewPlan(
+                new LevelUpPreviewPlan(
                     2,
                     150,
                     isRandomSelection: false,
                     new[]
                     {
-                        new CollectionLevelUpPreviewGroup(
+                        new LevelUpPreviewGroup(
                             randomWeight: 0,
                             limit: 1,
                             new[] { StepId },
-                            new[]
-                            {
-                                new CollectionLevelUpPreviewHeroCondition(
-                                    new[] { EHero.Jules },
-                                    "Any"
-                                ),
-                            }
+                            new[] { new LevelUpPreviewHeroCondition(new[] { EHero.Jules }, "Any") }
                         ),
                     }
                 ),
             },
-            new CollectionPreviewCoverage(0, 0, 3, 1)
+            new EventPreviewCoverage(0, 0, 3, 1)
         );
     }
 
-    private static CollectionEncounterPreviewCacheIdentity Identity(string etag) =>
+    private static EncounterPreviewCacheIdentity Identity(string etag) =>
         new("etag", "https://example.invalid/GameData.db.zip", etag, "build-a", "Online");
 
     public void Dispose()

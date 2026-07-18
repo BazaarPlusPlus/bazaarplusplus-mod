@@ -27,6 +27,10 @@ _Avoid_: environment, server flag
 The pure `IBppFeature` that owns run-log subscriptions, session transitions, persistence/checkpoint ordering, and deferred completion. It consumes event-bus inputs and the shared PvP battle catalog; it is not a mounted Unity controller and does not own a run timeline.
 _Avoid_: RunLoggingController, run logger MonoBehaviour
 
+**Encounter Preview Module（事件预览模块）**:
+The feature-owned query boundary for event cards, encounter-step rewards, and hero level rewards. Callers supply a typed query containing only a stable template id/current level and native text they already hold; the module owns static-plan generation, cache/compile/publication, live hero/day/inventory reads, and final presentation.
+_Avoid_: plan runtime facade, Collection encounter helper, patch-built run snapshot
+
 **Ghost Battle**:
 A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). `GhostBattleSyncService` imports these battles, flips them into local-player perspective, and HistoryPanel's Ghosts tab lists and replays them.
 _Avoid_: remote battle, opponent battle

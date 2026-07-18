@@ -1,19 +1,19 @@
 #nullable enable
 using System;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal sealed class CollectionEncounterChoiceDetail
+internal sealed class EncounterChoiceDetail
 {
-    public CollectionEncounterChoiceDetail(
+    public EncounterChoiceDetail(
         Guid templateId,
         string displayName,
         string resultText,
-        CollectionEncounterRewardFilter? rewardFilter,
+        EncounterRewardFilter? rewardFilter,
         bool isSourceMatch,
         string prerequisiteSummary = "",
         bool isEligible = true,
-        CollectionEncounterChoicePool? pool = null
+        EncounterChoicePool? pool = null
     )
     {
         TemplateId = templateId;
@@ -32,7 +32,7 @@ internal sealed class CollectionEncounterChoiceDetail
 
     public string ResultText { get; }
 
-    public CollectionEncounterRewardFilter? RewardFilter { get; }
+    public EncounterRewardFilter? RewardFilter { get; }
 
     public bool IsSourceMatch { get; }
 
@@ -45,17 +45,17 @@ internal sealed class CollectionEncounterChoiceDetail
     // Set when this "choice" is really a random pool (a Random-selection spawn group
     // inside a choice event, e.g. Advanced Training's 16 trainings or Epic Battle's
     // 14 monsters); the line renders as a pool summary instead of one card.
-    public CollectionEncounterChoicePool? Pool { get; }
+    public EncounterChoicePool? Pool { get; }
 }
 
 // A random pool presented as one choice line: a combat roll, an expandable entry
 // list (small pools), or a bare option count (large pools, where Entries is empty).
-internal sealed class CollectionEncounterChoicePool
+internal sealed class EncounterChoicePool
 {
-    public CollectionEncounterChoicePool(
+    public EncounterChoicePool(
         bool isCombat,
         int optionCount,
-        System.Collections.Generic.IReadOnlyList<CollectionEncounterChoiceDetail> entries
+        System.Collections.Generic.IReadOnlyList<EncounterChoiceDetail> entries
     )
     {
         IsCombat = isCombat;
@@ -67,5 +67,5 @@ internal sealed class CollectionEncounterChoicePool
 
     public int OptionCount { get; }
 
-    public System.Collections.Generic.IReadOnlyList<CollectionEncounterChoiceDetail> Entries { get; }
+    public System.Collections.Generic.IReadOnlyList<EncounterChoiceDetail> Entries { get; }
 }
