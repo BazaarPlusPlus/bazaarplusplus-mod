@@ -1,15 +1,17 @@
-# Use an on-demand encounter status probe, not a run-timeline tracker
+# ADR-0001: Query current encounter state; do not record a timeline
 
-We expose the player's current run/encounter state through an on-demand, pull-based probe (`IEncounterStateProbe`) and deliberately do **not** record an event-sourced timeline of a run's decision flow. The probe is split by read cost: lightweight encounter ids, choice-screen pedestal classification, and heavier target-selection legality.
+Status: Accepted
 
-## Context
+## Decision
 
-A full "EncounterTracker" was designed and adversarially reviewed: a live tracker fed by the `GameSimEvent` funnel that would record an ordered timeline of every encounter, acquisition, mutation, and outcome into `run_events` for local run-path reconstruction. We rejected it.
+Expose current encounter state through the pull-based `IEncounterStateProbe`: cheap encounter ids, choice/pedestal classification, and a separate targeting-legality read. Do not turn this seam into an event-sourced run timeline.
 
-It required a large amount of fragile capture code — PVPCombat attribution carve-out, loot/interrupt attribution edges, reroll divergence, transform/fuse item lineage, gap-detection/`resynced` markers — to serve a reconstruction consumer that **does not exist**: the local exporter (`scripts/export_run_log.py`) was never written (its test skips when the script is absent), and uploading the timeline to the server was out of scope. The status probe already serves the only live consumer (the upgrade/enchant preview "smart" mode) with none of that machinery.
+## Why
 
-## Consequences
+A timeline needs fragile attribution for rerolls, interrupts, PVP combat, item transforms, and recovery gaps. The original proposal had no shipping consumer; current UI and agent consumers need only “what is true now.” A future choice timeline is tracked separately in [#33](https://github.com/cauyxy/bazaarplusplus-mod/issues/33) and must revisit this decision instead of overloading the live probe.
 
-- Encounter state is queryable as **"now"**, not as history. If a real timeline consumer ever materializes (e.g. server-side run-path reconstruction or analytics on decision chains), reopen this decision.
-- The dead encounter-selection scaffolding in `Storage/RunLog` — `RunLogOptionSnapshot`, `RunLogPendingSelectionState`, and `RunLogEvent`'s selection fields (`Options`, `SelectionSeq`, `SelectionFingerprint`, `SelectionContextRules`, `Selected*`) — is removed rather than wired up.
-- Subsystems that need current encounter facts read the narrow probe snapshot they need, or — for message-bound readers like PvpBattles whose data is a per-battle network-message snapshot, not "now" — share the probe's pure resolvers (id resolution, the PVPCombat carve-out rule) rather than reading the probe directly.
+## Guardrails
+
+- Keep reads split by cost and main-thread only; the implementation caches each result per frame ([interface](../../src/BazaarPlusPlus/Core/GameState/IEncounterStateProbe.cs#L5-L18), [implementation](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L27-L112)).
+- Consumers may share pure identity resolvers, but must not infer historical ordering from probe snapshots.
+- Reopen only for a concrete persisted or uploaded timeline consumer with explicit attribution and recovery semantics.

@@ -76,7 +76,7 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/Th
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)：当前实现的 living architecture（按主题组织，带代码证据）。
 - [docs/adr/](docs/adr/)：设计决策记录。
 - [GitHub Issues](https://github.com/cauyxy/bazaarplusplus-mod/issues)：后续工作、需求与 bug 追踪。
-- [docs/archive/](docs/archive/)：历史参考文档，不再作为当前实现说明。
+- 历史设计与调试材料保留在 git history；当前代码事实只进入 ARCHITECTURE、ADR 与 MEMORY。
 
 ## License
 
