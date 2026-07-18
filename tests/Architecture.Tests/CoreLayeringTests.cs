@@ -218,7 +218,7 @@ public class CoreLayeringTests
             StringComparison.Ordinal
         );
         var liveBuildIndex = compositionSource.IndexOf(
-            "_mountables.Register(new LiveBuildPanelMount",
+            "new LiveBuildPanelMount(",
             StringComparison.Ordinal
         );
 
@@ -604,7 +604,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void LiveBuildPanel_owns_build_recommendations()
+    public void LiveBuildPanel_owns_build_recommendation_implementation()
     {
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
@@ -648,12 +648,18 @@ public class CoreLayeringTests
         var liveBuildPanelFile = Path.GetFullPath(
             Path.Combine(mainSource, "Game", "LiveBuildPanel", "LiveBuildPanel.cs")
         );
+        var liveBuildPanelMountFile = Path.GetFullPath(
+            Path.Combine(mainSource, "Game", "LiveBuildPanel", "LiveBuildPanelMount.cs")
+        );
+        var compositionFile = Path.GetFullPath(Path.Combine(mainSource, "BppComposition.cs"));
 
         bool IsAllowedRecommendationConsumer(string file)
         {
             var fullPath = Path.GetFullPath(file);
             return fullPath.StartsWith(recommendationsRoot, StringComparison.Ordinal)
-                || string.Equals(fullPath, liveBuildPanelFile, StringComparison.Ordinal);
+                || string.Equals(fullPath, liveBuildPanelFile, StringComparison.Ordinal)
+                || string.Equals(fullPath, liveBuildPanelMountFile, StringComparison.Ordinal)
+                || string.Equals(fullPath, compositionFile, StringComparison.Ordinal);
         }
 
         var disallowedImports = sourceFiles
@@ -681,7 +687,8 @@ public class CoreLayeringTests
 
         Assert.True(
             disallowedImports.Count == 0,
-            "Only LiveBuildPanel may import its recommendation internals. Offending imports:\n"
+            "Recommendation internals may only be used by the owning panel, its mount adapter, "
+                + "and the composition root that owns their plugin-lifetime catalog. Offending imports:\n"
                 + string.Join("\n", disallowedImports)
         );
     }

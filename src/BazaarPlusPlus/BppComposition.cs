@@ -14,6 +14,7 @@ using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.LiveBuildPanel;
+using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.OverlayPanels;
@@ -33,6 +34,7 @@ using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.GameInterop.RunSnapshot;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
+using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Patches.Tooltips;
 using BazaarPlusPlus.Storage.Paths;
@@ -61,6 +63,8 @@ internal sealed class BppComposition : IDisposable
     private readonly CombatStatusBarModule _combatStatusBarModule;
     private readonly VoiceSubtitlesModule _voiceSubtitlesModule;
     private readonly VoiceSubtitlesInteropModule _voiceSubtitlesInteropModule;
+    private readonly IRemoteEmbeddedCatalog<TenWinBuildCorpus> _buildRecommendationCatalog;
+    private readonly BuildRecommendationRepository _buildRecommendationRepository;
     private ModOnlineClient? _onlineClientRef;
     private BazaarDbLinkClient? _accountLinkClientRef;
     private PvpBattleCatalog? _pvpBattleCatalog;
@@ -109,6 +113,10 @@ internal sealed class BppComposition : IDisposable
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
         _voiceSubtitlesModule = new VoiceSubtitlesModule();
         _voiceSubtitlesInteropModule = new VoiceSubtitlesInteropModule();
+        _buildRecommendationCatalog = TenWinBuildCatalogFactory.Create(BepInEx.Paths.GameRootPath);
+        _buildRecommendationRepository = new BuildRecommendationRepository(
+            _buildRecommendationCatalog
+        );
 
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
@@ -182,7 +190,12 @@ internal sealed class BppComposition : IDisposable
                 overlayHost: () => overlayPanelHostMount.Host
             )
         );
-        _mountables.Register(new LiveBuildPanelMount(() => overlayPanelHostMount.Host));
+        _mountables.Register(
+            new LiveBuildPanelMount(
+                () => overlayPanelHostMount.Host,
+                _buildRecommendationRepository
+            )
+        );
         _mountables.Register(new ComponentMount<VoiceLineDisplayDispatcher>());
         _mountables.Register(new ComponentMount<VersionLabelScanner>());
         _mountables.Register(
@@ -222,5 +235,6 @@ internal sealed class BppComposition : IDisposable
         BazaarAgentGameBridge.Current = null;
         BazaarAgentGameBridge.CurrentRecorder = null;
         _featureRegistry.Stop();
+        _buildRecommendationCatalog.Dispose();
     }
 }

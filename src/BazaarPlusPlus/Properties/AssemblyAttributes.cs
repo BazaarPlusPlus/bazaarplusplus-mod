@@ -7,3 +7,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("StartupUploadRunner.Tests")]
 [assembly: InternalsVisibleTo("VoiceSubtitles.Tests")]
 [assembly: InternalsVisibleTo("CollectionSourceFiltering.Tests")]
+[assembly: InternalsVisibleTo("LiveBuildRecommendations.Tests")]

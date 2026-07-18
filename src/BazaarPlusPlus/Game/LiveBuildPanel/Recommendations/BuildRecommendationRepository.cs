@@ -1,56 +1,37 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Net.Http;
-using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
-using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 using BazaarPlusPlus.Localization;
-using BazaarPlusPlus.ModApi.Http;
 
 namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 
 /// <summary>
-/// Loads the analyzer-v4 ten-win build corpus (cached locally with a background remote refresh),
-/// answers recommendation queries against the live state, and projects matched builds onto
-/// renderable item boards. The corpus is a static package — recommendation queries are answered
-/// from the local copy and never hit the server.
+/// Consumes the analyzer-v4 ten-win build catalog, answers recommendation queries against the live
+/// state, and projects matched builds onto renderable item boards. The corpus is a static package —
+/// recommendation queries read the catalog snapshot and never hit the server.
 /// </summary>
 internal sealed class BuildRecommendationRepository
 {
-    private const string TenWinBuildsRemoteUrl =
-        "https://bpp-metrics.bazaarplusplus.com/analyzer-v4/mod/tenwin_builds.json";
-    private const string TenWinBuildsCacheFileName = "tenwin_builds.json";
     private static readonly LocalizedTextSet FinalBuildLabel = new(
         "Ten-Win Build",
         "十胜阵容",
         "十勝陣容"
     );
-    private static readonly TimeSpan TenWinBuildsCacheDuration = TimeSpan.FromHours(20);
-    private static readonly HttpClient TenWinHttpClient = BppHttpClientFactory.Create(
-        productVersion: BppPluginVersion.Current,
-        userAgentSuffix: "TenWinBuildRepository",
-        timeout: TimeSpan.FromSeconds(10)
-    );
-    private readonly object _syncRoot = new();
-    private BuildRecommendationCorpusLogState _corpusLogState = new();
-    private TenWinBuildCorpus? _corpus;
-    private LiveBuildCorpusSource _corpusSource = LiveBuildCorpusSource.Unavailable;
-    private bool _attemptedLoad;
-    private string? _cacheFilePath;
-    private Func<DateTime> _utcNow = () => DateTime.UtcNow;
-    private Func<string, Task<string>> _downloadJsonAsync = DownloadJsonAsync;
-    private Func<CorpusTextLoadResult> _loadEmbeddedJson = LoadEmbeddedTenWinJson;
-    private Action<Func<Task>> _queueBackgroundRefresh = QueueBackgroundRefresh;
-    private bool _backgroundRefreshInProgress;
-    private Task? _warmUpTask;
+    private readonly IRemoteEmbeddedCatalog<TenWinBuildCorpus> _catalog;
+
+    internal BuildRecommendationRepository(IRemoteEmbeddedCatalog<TenWinBuildCorpus> catalog)
+    {
+        _catalog = catalog ?? throw new ArgumentNullException(nameof(catalog));
+    }
 
     public IReadOnlyList<BuildRecommendation> FindRecommendations(
         string? hero,
@@ -209,555 +190,40 @@ internal sealed class BuildRecommendationRepository
             );
     }
 
-    // ---- Corpus loading / cache / remote refresh --------------------------
-
     private TenWinBuildCorpus? EnsureCorpus()
     {
-        EnsureLoaded();
-        return _corpus;
+        if (_catalog.TryGet(out var snapshot))
+            return snapshot.Value;
+
+        BeginCorpusLoad();
+        return null;
     }
 
-    /// <summary>
-    /// Starts loading the ten-win build corpus on a background thread so the first panel open
-    /// does not block the Unity main thread on file I/O and JSON parsing. Idempotent.
-    /// Call from the panel's Awake() / Initialize() as early as possible.
-    /// </summary>
     public void BeginCorpusLoad()
     {
-        lock (_syncRoot)
-        {
-            if (_attemptedLoad || _warmUpTask != null)
-                return;
-
-            _warmUpTask = Task.Run(LoadCorpusInBackground);
-        }
-        _corpusLogState.ReportWarmupStarted();
-    }
-
-    private void LoadCorpusInBackground()
-    {
-        CorpusLoadResult result;
-        try
-        {
-            result = LoadCorpus();
-        }
-        catch (Exception ex)
-        {
-            // This runs in a never-awaited Task: an unhandled throw would fault _warmUpTask and,
-            // because both load guards short-circuit on "_warmUpTask != null", silently brick the
-            // corpus for the whole session. Clear the marker so EnsureLoaded's synchronous fallback
-            // (or a later cold-start re-arm) can still recover.
-            lock (_syncRoot)
-            {
-                _warmUpTask = null;
-            }
-            _corpusLogState.ReportDegraded(
-                new CorpusDegradation(
-                    LiveBuildCorpusReasonCode.WarmupFailed,
-                    LiveBuildCorpusSource.Unavailable,
-                    0,
-                    Expired: false,
-                    CachePath: null,
-                    ex
-                )
-            );
-            return;
-        }
-
-        var installed = false;
-        lock (_syncRoot)
-        {
-            if (!_attemptedLoad)
-            {
-                _corpus = result.Corpus;
-                _corpusSource = result.Source;
-                _attemptedLoad = true;
-                installed = true;
-            }
-        }
-
-        if (!installed)
-            return;
-
-        ReportInitialLoad(result, synchronousFallback: false);
-        if (result.ShouldRefreshInBackground)
-            TryQueueRefreshFromRemote(result.ReasonCode!.Value);
-    }
-
-    private void EnsureLoaded()
-    {
-        lock (_syncRoot)
-        {
-            // Warm-up task running or already finished — either way, don't block.
-            if (_attemptedLoad || _warmUpTask != null)
-                return;
-        }
-
-        // BeginCorpusLoad() was never called (unexpected path). Load synchronously as a
-        // last-resort fallback.
-        var result = LoadCorpus();
-        var installed = false;
-        lock (_syncRoot)
-        {
-            if (!_attemptedLoad)
-            {
-                _corpus = result.Corpus;
-                _corpusSource = result.Source;
-                _attemptedLoad = true;
-                installed = true;
-            }
-        }
-
-        if (!installed)
-            return;
-
-        ReportInitialLoad(result, synchronousFallback: true);
-        if (result.ShouldRefreshInBackground)
-            TryQueueRefreshFromRemote(result.ReasonCode!.Value);
-    }
-
-    private CorpusLoadResult LoadCorpus()
-    {
-        var cache = TryLoadCache();
-        if (cache.Status == CorpusCacheLoadStatus.Loaded && cache.Corpus != null)
-        {
-            _corpusLogState.ReportCacheLoaded(cache.Corpus.BuildCount, cache.Expired, cache.Path!);
-            return BuildRecommendationCorpusLoadSelector.Select(
-                cache,
-                CorpusTextLoadResult.Missing(),
-                embeddedCorpus: null
-            );
-        }
-
-        // Cold start with no cache: seed from the bundled corpus (same compact format, same parser)
-        // so the panel is never empty offline, and still queue a remote refresh.
-        var embedded = _loadEmbeddedJson();
-        TenWinBuildCorpus? embeddedCorpus = null;
-        if (
-            embedded.Status == CorpusTextLoadStatus.Loaded
-            && !string.IsNullOrWhiteSpace(embedded.Text)
-        )
-        {
-            try
-            {
-                embeddedCorpus = TenWinBuildCorpus.Parse(embedded.Text!);
-            }
-            catch (Exception ex)
-            {
-                embedded = CorpusTextLoadResult.Failed(ex);
-            }
-        }
-
-        return BuildRecommendationCorpusLoadSelector.Select(cache, embedded, embeddedCorpus);
-    }
-
-    private static CorpusTextLoadResult LoadEmbeddedTenWinJson()
-    {
-        try
-        {
-            var assembly = Assembly.GetExecutingAssembly();
-            var resourceName = assembly
-                .GetManifestResourceNames()
-                .FirstOrDefault(name =>
-                    name.EndsWith(TenWinBuildsCacheFileName, StringComparison.OrdinalIgnoreCase)
-                );
-            if (resourceName == null)
-                return CorpusTextLoadResult.Missing();
-
-            using var stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream == null)
-                return CorpusTextLoadResult.Missing();
-
-            using var reader = new StreamReader(stream);
-            return CorpusTextLoadResult.Loaded(reader.ReadToEnd());
-        }
-        catch (Exception ex)
-        {
-            return CorpusTextLoadResult.Failed(ex);
-        }
+        _ = _catalog.WarmAsync(CancellationToken.None).AsTask();
     }
 
     internal async Task<BuildRecommendationRemoteRefreshResult> TryRefreshFinalBuildsFromRemoteAsync()
     {
-        var result = await LoadRemoteAsync().ConfigureAwait(false);
-        if (result.Corpus == null)
+        var result = await _catalog.RefreshAsync(CancellationToken.None).ConfigureAwait(false);
+        if (result.Succeeded)
+            return BuildRecommendationRemoteRefreshResult.Success();
+
+        var issue = result.Issue;
+        var reason = issue?.Kind switch
         {
-            return BuildRecommendationRemoteRefreshResult.Failure(
-                result.FailureReason ?? LiveBuildRefreshFailureReasonCode.RefreshException,
-                result.Error,
-                result.Exception
-            );
-        }
-
-        lock (_syncRoot)
-        {
-            _corpus = result.Corpus;
-            _corpusSource = LiveBuildCorpusSource.Remote;
-            _attemptedLoad = true;
-        }
-        // D46 is the sole Info/Error owner for a manual refresh. Clear any corpus degradation
-        // episode and central storm keys without also emitting corpus.recovered.
-        _corpusLogState.ResetDegradedSilently();
-
-        return BuildRecommendationRemoteRefreshResult.Success();
-    }
-
-    private void ReportInitialLoad(CorpusLoadResult result, bool synchronousFallback)
-    {
-        if (result.ReasonCode.HasValue)
-        {
-            _corpusLogState.ReportDegraded(result.ToDegradation());
-            return;
-        }
-
-        if (synchronousFallback)
-        {
-            _corpusLogState.ReportDegraded(
-                new CorpusDegradation(
-                    LiveBuildCorpusReasonCode.SynchronousFallback,
-                    result.Source,
-                    result.BuildCount,
-                    result.Expired,
-                    result.CachePath,
-                    result.Exception
-                )
-            );
-            return;
-        }
-
-        _corpusLogState.ReportReady(result.Source, result.BuildCount);
-    }
-
-    private void TryQueueRefreshFromRemote(LiveBuildCorpusReasonCode reason)
-    {
-        if (!TryBeginBackgroundRefresh())
-            return;
-
-        try
-        {
-            _queueBackgroundRefresh(RefreshFromRemoteInBackgroundAsync);
-            _corpusLogState.ReportRefreshQueued(reason);
-        }
-        catch (Exception ex)
-        {
-            EndBackgroundRefresh();
-            LiveBuildCorpusSource source;
-            int buildCount;
-            lock (_syncRoot)
-            {
-                source = _corpusSource;
-                buildCount = _corpus?.BuildCount ?? 0;
-            }
-            _corpusLogState.ReportDegraded(
-                new CorpusDegradation(
-                    LiveBuildCorpusReasonCode.RefreshQueueFailed,
-                    source,
-                    buildCount,
-                    Expired: false,
-                    CachePath: null,
-                    ex
-                )
-            );
-        }
-    }
-
-    private bool TryBeginBackgroundRefresh()
-    {
-        lock (_syncRoot)
-        {
-            if (_backgroundRefreshInProgress)
-                return false;
-
-            _backgroundRefreshInProgress = true;
-            return true;
-        }
-    }
-
-    private void EndBackgroundRefresh()
-    {
-        lock (_syncRoot)
-        {
-            _backgroundRefreshInProgress = false;
-        }
-    }
-
-    private async Task RefreshFromRemoteInBackgroundAsync()
-    {
-        try
-        {
-            var result = await LoadRemoteAsync().ConfigureAwait(false);
-            if (result.Corpus != null)
-            {
-                lock (_syncRoot)
-                {
-                    _corpus = result.Corpus;
-                    _corpusSource = LiveBuildCorpusSource.Remote;
-                    _attemptedLoad = true;
-                }
-
-                _corpusLogState.ReportRecovered(
-                    LiveBuildCorpusSource.Remote,
-                    result.Corpus.BuildCount
-                );
-                return;
-            }
-
-            LiveBuildCorpusSource source;
-            int buildCount;
-            lock (_syncRoot)
-            {
-                source = _corpusSource;
-                buildCount = _corpus?.BuildCount ?? 0;
-            }
-            _corpusLogState.ReportDegraded(
-                new CorpusDegradation(
-                    LiveBuildCorpusReasonCode.RemoteRefreshFailed,
-                    source,
-                    buildCount,
-                    Expired: false,
-                    CachePath: null,
-                    result.Exception
-                )
-            );
-        }
-        finally
-        {
-            // Atomically clear the in-progress flag and, on a cold start with no usable corpus,
-            // re-arm the one-shot load so a later query retries (and can re-queue) the fetch.
-            // Doing both under one lock avoids a window where a racing query re-arms the load
-            // while the refresh is still marked in-progress and so suppresses its own re-queue.
-            lock (_syncRoot)
-            {
-                _backgroundRefreshInProgress = false;
-                if (_corpus == null)
-                {
-                    _attemptedLoad = false;
-                    // Clear the warm-up marker too; otherwise both load guards keep short-circuiting
-                    // on "_warmUpTask != null" and this re-arm can never actually retry the load.
-                    _warmUpTask = null;
-                }
-            }
-        }
-    }
-
-    private CorpusCacheLoadResult TryLoadCache()
-    {
-        string? cacheFilePath = null;
-        try
-        {
-            cacheFilePath = ResolveCacheFilePath();
-            if (!File.Exists(cacheFilePath))
-            {
-                return new CorpusCacheLoadResult(
-                    CorpusCacheLoadStatus.Missing,
-                    Corpus: null,
-                    Expired: false,
-                    cacheFilePath,
-                    Exception: null
-                );
-            }
-
-            var lastWriteUtc = File.GetLastWriteTimeUtc(cacheFilePath);
-            var expiresAtUtc = lastWriteUtc.Add(TenWinBuildsCacheDuration);
-            var json = File.ReadAllText(cacheFilePath);
-            var corpus = TenWinBuildCorpus.Parse(json);
-            if (corpus == null)
-            {
-                return new CorpusCacheLoadResult(
-                    CorpusCacheLoadStatus.Invalid,
-                    Corpus: null,
-                    Expired: false,
-                    cacheFilePath,
-                    Exception: null
-                );
-            }
-
-            return new CorpusCacheLoadResult(
-                CorpusCacheLoadStatus.Loaded,
-                corpus,
-                Expired: _utcNow() >= expiresAtUtc,
-                cacheFilePath,
-                Exception: null
-            );
-        }
-        catch (Exception ex)
-        {
-            return new CorpusCacheLoadResult(
-                CorpusCacheLoadStatus.Failed,
-                Corpus: null,
-                Expired: false,
-                cacheFilePath,
-                ex
-            );
-        }
-    }
-
-    private async Task<BuildRecommendationRemoteLoadResult> LoadRemoteAsync()
-    {
-        try
-        {
-            var json = await _downloadJsonAsync(TenWinBuildsRemoteUrl).ConfigureAwait(false);
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return BuildRecommendationRemoteLoadResult.Failure(
-                    LiveBuildRefreshFailureReasonCode.RemoteEmptyResponse,
-                    "empty_response"
-                );
-            }
-
-            var corpus = TenWinBuildCorpus.Parse(json);
-            if (corpus == null)
-            {
-                return BuildRecommendationRemoteLoadResult.Failure(
-                    LiveBuildRefreshFailureReasonCode.RemoteInvalidResponse,
-                    "invalid_response"
-                );
-            }
-
-            TryWriteCache(json);
-            _corpusLogState.ReportRemoteLoaded(corpus.BuildCount);
-            return BuildRecommendationRemoteLoadResult.Success(corpus);
-        }
-        catch (Exception ex)
-        {
-            return BuildRecommendationRemoteLoadResult.Failure(
+            CatalogIssueKind.RemoteEmpty => LiveBuildRefreshFailureReasonCode.RemoteEmptyResponse,
+            CatalogIssueKind.RemoteInvalid =>
+                LiveBuildRefreshFailureReasonCode.RemoteInvalidResponse,
+            CatalogIssueKind.RemoteDownloadFailed =>
                 LiveBuildRefreshFailureReasonCode.RemoteRequestFailed,
-                ex.Message,
-                ex
-            );
-        }
-    }
-
-    private void TryWriteCache(string json)
-    {
-        string? cacheFilePath = null;
-        try
-        {
-            cacheFilePath = ResolveCacheFilePath();
-            var cacheDirectory = Path.GetDirectoryName(cacheFilePath);
-            if (!string.IsNullOrWhiteSpace(cacheDirectory))
-                Directory.CreateDirectory(cacheDirectory);
-
-            File.WriteAllText(cacheFilePath, json);
-            File.SetLastWriteTimeUtc(cacheFilePath, _utcNow());
-            _corpusLogState.ReportCacheWriteRecovered();
-        }
-        catch (Exception ex)
-        {
-            _corpusLogState.ReportCacheWriteDegraded(cacheFilePath, ex);
-        }
-    }
-
-    private string ResolveCacheFilePath()
-    {
-        return _cacheFilePath ?? BuildDefaultTenWinCacheFilePath(BepInEx.Paths.GameRootPath);
-    }
-
-    private static string BuildDefaultTenWinCacheFilePath(string gameRootPath)
-    {
-        return Path.Combine(gameRootPath, "BazaarPlusPlusV4", TenWinBuildsCacheFileName);
-    }
-
-    private static Task<string> DownloadJsonAsync(string url)
-    {
-        return TenWinHttpClient.GetStringAsync(url);
-    }
-
-    private static void QueueBackgroundRefresh(Func<Task> refresh)
-    {
-        _ = Task.Run(refresh);
-    }
-
-    // ---- Test hooks -------------------------------------------------------
-
-    private void ConfigureTenWinRemoteForTests(
-        string cacheFilePath,
-        Func<DateTime> utcNow,
-        Func<string, Task<string>> downloadJsonAsync
-    )
-    {
-        lock (_syncRoot)
-        {
-            _corpus = null;
-            _corpusSource = LiveBuildCorpusSource.Unavailable;
-            _attemptedLoad = false;
-            _backgroundRefreshInProgress = false;
-            _warmUpTask = null;
-            _cacheFilePath = cacheFilePath;
-            _utcNow = utcNow;
-            _downloadJsonAsync = downloadJsonAsync;
-            _loadEmbeddedJson = CorpusTextLoadResult.Missing;
-            _queueBackgroundRefresh = QueueBackgroundRefresh;
-            _corpusLogState = new BuildRecommendationCorpusLogState();
-        }
-    }
-
-    private void ConfigureTenWinRemoteForTests(
-        string cacheFilePath,
-        Func<DateTime> utcNow,
-        Func<string, Task<string>> downloadJsonAsync,
-        Action<Func<Task>> queueBackgroundRefresh
-    )
-    {
-        lock (_syncRoot)
-        {
-            _corpus = null;
-            _corpusSource = LiveBuildCorpusSource.Unavailable;
-            _attemptedLoad = false;
-            _backgroundRefreshInProgress = false;
-            _warmUpTask = null;
-            _cacheFilePath = cacheFilePath;
-            _utcNow = utcNow;
-            _downloadJsonAsync = downloadJsonAsync;
-            _loadEmbeddedJson = CorpusTextLoadResult.Missing;
-            _queueBackgroundRefresh = queueBackgroundRefresh ?? QueueBackgroundRefresh;
-            _corpusLogState = new BuildRecommendationCorpusLogState();
-        }
-    }
-
-    private static string? ReadEmbeddedSeedForTests() => LoadEmbeddedTenWinJson().Text;
-
-    private void SetEmbeddedJsonForTests(Func<string?> loadEmbeddedJson)
-    {
-        lock (_syncRoot)
-        {
-            _corpus = null;
-            _corpusSource = LiveBuildCorpusSource.Unavailable;
-            _attemptedLoad = false;
-            _warmUpTask = null;
-            _loadEmbeddedJson = () =>
-            {
-                try
-                {
-                    var json = loadEmbeddedJson?.Invoke();
-                    return json == null
-                        ? CorpusTextLoadResult.Missing()
-                        : CorpusTextLoadResult.Loaded(json);
-                }
-                catch (Exception ex)
-                {
-                    return CorpusTextLoadResult.Failed(ex);
-                }
-            };
-            _corpusLogState = new BuildRecommendationCorpusLogState();
-        }
-    }
-
-    private void ResetTenWinRemoteForTests()
-    {
-        lock (_syncRoot)
-        {
-            _corpus = null;
-            _corpusSource = LiveBuildCorpusSource.Unavailable;
-            _attemptedLoad = false;
-            _backgroundRefreshInProgress = false;
-            _warmUpTask = null;
-            _cacheFilePath = null;
-            _utcNow = () => DateTime.UtcNow;
-            _downloadJsonAsync = DownloadJsonAsync;
-            _loadEmbeddedJson = LoadEmbeddedTenWinJson;
-            _queueBackgroundRefresh = QueueBackgroundRefresh;
-            _corpusLogState = new BuildRecommendationCorpusLogState();
-        }
+            _ => LiveBuildRefreshFailureReasonCode.RefreshException,
+        };
+        return BuildRecommendationRemoteRefreshResult.Failure(
+            reason,
+            issue?.Detail ?? issue?.Exception?.Message,
+            issue?.Exception
+        );
     }
 }

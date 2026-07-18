@@ -58,3 +58,9 @@ The set of card templates a source can offer, expressed through structured rules
 
 **Collection Source Kind**:
 The source category used by CollectionPanel source chips. `CollectionSourceKind.Merchant` maps to Item sources and `CollectionSourceKind.Trainer` maps to Skill sources; this replaced the older tag-like merchant-kind filtering path.
+
+## Remote embedded data
+
+**Remote Embedded Catalog**:
+The shared runtime lifecycle for data shipped as an embedded seed, cached under `<GameRoot>/BazaarPlusPlusV4/`, and refreshed from a remote source. `IRemoteEmbeddedCatalog<T>` exposes only current-snapshot lookup, warm-up, explicit refresh, and disposal; feature modules keep their own parser, logging, and user-facing refresh policy. Warm-up resolves fresh cache first, otherwise publishes stale cache or the embedded seed immediately and refreshes in the background.
+_Avoid_: feature repository loader, dual catalog state machine
