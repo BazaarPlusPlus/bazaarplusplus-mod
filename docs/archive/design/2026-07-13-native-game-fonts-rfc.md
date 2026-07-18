@@ -1,3 +1,10 @@
+---
+status: implemented
+archived: 2026-07-18
+superseded-by: docs/ARCHITECTURE.md §Localization And Fonts + docs/MEMORY.md
+note: retained for the §3 font-coverage audit tables (Steam build 24001960 code-point evidence), which are re-derivation-expensive
+---
+
 # RFC：移除 BPP 自定义 UI 字体，统一使用游戏字体
 
 - 状态：实现中；自动化验证通过，实机矩阵待人工补充

@@ -19,6 +19,14 @@ _Avoid_: encounter tracker, run timeline (deliberately not built — see [ADR-00
 对「当前 run 的可记录事实」（天数/小时/胜负/英雄/模式、玩家五属性、段位、排行榜名次）的按需拉取读取。消费方把快照映射成自己的记录，不直读游戏全局。
 _Avoid_: run tracker、直读全局状态
 
+**Game Build Channel**:
+The classification of the running client as `Online`, `Ptr`, or `Unknown` (resolved once at startup by `GameBuildInfoResolver`; disagreement between signals resolves to `Ptr`). It gates uploads (`channel != Ptr`) and is stamped on recorded runs, isolating PTR data from the production dataset.
+_Avoid_: environment, server flag
+
+**Ghost Battle**:
+A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). `GhostBattleSyncService` imports these battles, flips them into local-player perspective, and HistoryPanel's Ghosts tab lists and replays them.
+_Avoid_: remote battle, opponent battle
+
 ## Overlay panels
 
 **Main Overlay Panel**:
@@ -28,6 +36,12 @@ _Avoid_: popup, window
 **Overlay Panel Host**:
 The single module that owns main-overlay-panel lifecycle: mutual exclusion, scene-change policy, combat gating, hotkey and escape routing, and the per-frame tick. Panels register content callbacks with the host instead of re-implementing the lifecycle.
 _Avoid_: panel mutex (the deleted `BppOverlayPanelMutex` predecessor)
+
+## Fonts
+
+**Native Game Typography**:
+The single adapter (`GameInterop/Fonts/NativeGameTypography`) through which every BPP surface gets text rendering: it reuses the game's own font assets and zh-CN fallback chains and never exposes a raw `Font`/`TMP_FontAsset`. BPP embeds no fonts of its own; CJK tofu is fixed by routing through this adapter, never by editing copy.
+_Avoid_: custom font, font selector
 
 ## Settings dock
 

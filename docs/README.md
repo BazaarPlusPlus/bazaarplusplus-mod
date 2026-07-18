@@ -28,7 +28,7 @@ This repo keeps the existing ADR convention instead of adding a duplicate `decis
 
 Task plans, feature requests, and bugs are tracked as **GitHub issues** (see [agents/issue-tracker.md](agents/issue-tracker.md)), not repo docs. The former `docs/plans/` directory was retired on 2026-07-11; its two remaining plans migrated verbatim to [#32](https://github.com/cauyxy/bazaarplusplus-mod/issues/32) (HistoryPanel hero portrait badges, `ready-for-agent`) and [#33](https://github.com/cauyxy/bazaarplusplus-mod/issues/33) (choice timeline in run bundles, `needs-info` pending §11 sign-off).
 
-`drafts/` remains the write buffer for **knowledge documents only** — design records, root-cause analyses, decision/option analyses produced mid-session. Task plans do not go there. Consolidation runs sweep drafts into MEMORY/ADR/archive, so the directory only exists while unswept drafts are pending (its `.gitkeep` placeholder was dropped on 2026-07-11 — just create the directory when writing a draft). (Sweeps: 2026-07-11, 2026-07-10, 2026-06-12.)
+`drafts/` remains the write buffer for **knowledge documents only** — design records, root-cause analyses, decision/option analyses produced mid-session. Task plans do not go there. Consolidation runs sweep drafts into MEMORY/ADR/archive, so the directory only exists while unswept drafts are pending (its `.gitkeep` placeholder was dropped on 2026-07-11 — just create the directory when writing a draft). (Sweeps: 2026-07-18, 2026-07-11, 2026-07-10, 2026-06-12.)
 
 ## Archive (`archive/`, frozen — never current)
 
@@ -39,9 +39,9 @@ Cleanup on 2026-07-11: 71 low-value archived docs were **deleted** (executor pro
 | Subtree | Contents |
 |---|---|
 | [archive/plans/](archive/plans/) | plans retained for their root-cause records, decision registers, or MEMORY citations (e.g. PTR 216-API diff base, shader-keyword flicker root cause, five-deepening refactors verdicts) |
-| [archive/design/](archive/design/) | design specs retained for decompiled-evidence and rejected-approach analysis (incl. the 2026-07-11 architecture-review batch and the PR#17 search/cooldown records); see [archive/design/README.md](archive/design/README.md) |
+| [archive/design/](archive/design/) | design specs retained for decompiled-evidence and rejected-approach analysis (incl. the 2026-07-11 architecture-review batch, the PR#17 search/cooldown records, and the 2026-07-13 native-game-fonts RFC with its font-coverage audit tables); see [archive/design/README.md](archive/design/README.md) |
 | [archive/audits/](archive/audits/) | ADR-pinned feasibility audit + the 2026-07-08 performance audit (open GC backlog + probe-refuted items) |
-| [archive/debugging/](archive/debugging/) | root-cause debugging records (tooltip-overlay third recurrence, enchant auto-preview state detection) |
+| [archive/debugging/](archive/debugging/) | root-cause debugging records (tooltip-overlay third recurrence, enchant auto-preview state detection, end-of-run raw-reveal-graph screenshot regression, remote-data IPv6 download stall, issue-96 recording-button diagnosis) |
 | [archive/features/](archive/features/) | ADR-pinned feature overviews + the ghost-battle cross-repo data-flow trace |
 | [archive/reference/](archive/reference/) | BazaarAgent HTTP API v1 snapshot (ADR-0007) |
 | [archive/reverse-engineering/](archive/reverse-engineering/) | decompile & protocol notes; shop-entry series 1–5 (old client dealer RE); parked offline-run / predefined-match proposals — most re-derivation-expensive class, kept whole |

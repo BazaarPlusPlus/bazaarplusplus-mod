@@ -1,3 +1,9 @@
+---
+status: implemented
+archived: 2026-07-18
+superseded-by: code (EndOfRunRawRevealCompletionPatch) + docs/MEMORY.md gotcha
+---
+
 # End-of-run screenshot / run-record regression diagnosis
 
 ## Background

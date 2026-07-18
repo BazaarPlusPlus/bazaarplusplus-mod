@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Operating rules for AI agents working in this repository (`AGENTS.md` is a symlink to this file). Process rules live here; durable knowledge in `docs/MEMORY.md`, structure in `docs/ARCHITECTURE.md`.
 
 ## Build & Test Commands
 
@@ -50,50 +50,12 @@ For runtime validation that needs launching the game, always launch The Bazaar t
 
 ## Architecture
 
-**Four assemblies** ship unconditionally as the mod:
+Structure lives in `docs/ARCHITECTURE.md`; durable knowledge in `docs/MEMORY.md` (load first); vocabulary in `CONTEXT.md`; rationale in `docs/adr/`. This section keeps only the layering rules — traps, not maps:
 
-- `BazaarPlusPlus.dll` — the main BepInEx plugin; references game DLLs, Unity, BepInEx
-- `BazaarPlusPlus.ModApi.dll` — HTTP client + DTOs for the cloud backend; zero game/Unity/BepInEx references
-- `BazaarPlusPlus.Storage.dll` — SQLite persistence layer; zero game/Unity/BepInEx references
-- `BazaarPlusPlus.Localization.dll` — localization engine; zero game/Unity/BepInEx references
-
-Two BazaarAgent assemblies ship only when `./run.sh build --with-bazaaragent` or `./run.sh publish --with-bazaaragent` is used:
-
-- `BazaarPlusPlus.BazaarAgent.dll` — pure HTTP transport, DTO, validation, queue, and runtime controller; zero game/Unity/BepInEx references
-- `BazaarPlusPlus.BazaarAgentHost.dll` — optional BepInEx host bridge; installing the dll starts the fixed `127.0.0.1:47900` listener automatically
-
-All six projects live under `src/<AssemblyName>/`, each in its own directory so its default compile cone is its own source (no shared root-level globbing). The main plugin is `src/BazaarPlusPlus/` (`Plugin.cs`, `BppComposition.cs`, and the `Core/`, `Game/`, `GameInterop/`, `Infrastructure/`, `Patches/` layers); the five child assemblies are `src/BazaarPlusPlus.ModApi/`, `src/BazaarPlusPlus.Storage/`, `src/BazaarPlusPlus.Localization/`, `src/BazaarPlusPlus.BazaarAgent/`, and `src/BazaarPlusPlus.BazaarAgentHost/`. The root `Directory.Build.props` carries shared build configuration and imports `build/ManagedPath.props` for game-install discovery; each project gets its own `obj/`/`bin/` under its own directory.
-
-**Plugin lifecycle** — `Plugin.cs` (BepInEx entry) → `BppComposition` (the manual composition root, no DI container). BppComposition wires:
-
-1. **Features** (`IBppFeature`) — non-Unity logic modules registered via `BppFeatureRegistry`. Started/stopped with the plugin.
-2. **Mountables** (`IBppMountable`) — Unity-aware components attached to the plugin's `GameObject` via `BppMountableRegistry`. Most use the generic `ComponentMount<T>` adapter.
-3. **Settings dock entries** (`ISettingsDockEntry`) — in-game settings UI entries registered via `SettingsDockEntryRegistry`.
-
-**Layer boundaries:**
-
-- `Core/` — pure abstractions (config, event bus, paths, runtime interfaces). Zero game DLL references.
-- `GameInterop/` — game DLL coupling layer (`BppClientCacheBridge`, `GameStateProbe`, `RunContextStore`, `IRunContext`, game-typed events like `CombatSimObserved`/`NetMessageObserved`, shared native adapters like encounter reads, static card data, card preview prefabs, hero portrait assets, and `EncounterPortraits/` — merchant/trainer encounter portrait sprite provider, `LiveCards/` — live-run card snapshot reads (used by LiveBuildPanel), and `BazaarAgent/` — the public cross-plugin facade (BazaarAgentGameBridge / IBazaarAgentGameProbe) consumed by the separate BazaarAgentHost plugin).
-- `Game/` — feature implementations organized by subdirectory (CombatReplay, HistoryPanel, RunLogging, Screenshots, Tooltips, etc.).
-- `Patches/` — Harmony patches, organized by feature area. `BppPatchHost` provides the static service locator that patches use to reach `IBppServices`.
-- `Infrastructure/` — cross-cutting utilities (logging, fonts, UI design tokens).
-- `Localization/` — zero-dependency localization engine extracted from `Game/Settings`. The `L` facade is installed at plugin startup with `L.Install(ILanguageProvider, ILocaleModeProvider)`, then owns string lookup, locale switching, and language-code / Chinese-mode resolution. Runtime providers live at the game/plugin edge (`GameLanguageProvider`, `ChineseLocaleModeProvider`); the localization assembly itself stays free of game, Unity, and BepInEx references.
-
-**Architecture layering rules:**
-
-- Put reusable adapters over The Bazaar/Unity runtime surfaces in `GameInterop/`: `AppState`/`Data` status reads, `ClientCache` reflection, static card data, native card-preview prefabs/reflection, shared game asset lookup, and game-typed event payloads.
-- Keep feature workflows, UI state, product policy, filtering/classification rules, upload decisions, and storage orchestration in `Game/`. Do not move logic into `GameInterop/` only because it mentions game enums or DTOs.
+- Put reusable adapters over The Bazaar/Unity runtime surfaces in `GameInterop/`. Keep feature workflows, UI state, product policy, filtering/classification rules, upload decisions, and storage orchestration in `Game/`. Do not move logic into `GameInterop/` only because it mentions game enums or DTOs.
 - If two features need the same runtime/prefab/static-data behavior, extract the adapter to `GameInterop/<Concept>/` and have both features consume that seam. Do not make one feature import another feature's internal implementation only to reuse a game-runtime adapter.
-- Patches may target feature services through `BppPatchHost`, but shared Harmony reflection helpers or native runtime adapters should live in `GameInterop/` or `Infrastructure/`, not inside a feature directory.
+- Patches may target feature services through `BppPatchHost` (the static service locator; never constructor injection), but shared Harmony reflection helpers or native runtime adapters live in `GameInterop/` or `Infrastructure/`, not inside a feature directory.
 - Add or extend architecture tests when establishing a new boundary that the compiler cannot enforce.
-
-**Key patterns:**
-
-- Game assemblies are publicized at build time (`<PublicizeAll>true</PublicizeAll>` via Krafs.Publicizer), so all `internal` game types/members are accessible.
-- `decompiled/` contains ILSpy output of game DLLs — read-only reference, never edited.
-- Harmony patches reach mod services through the static `BppPatchHost` (installed once at startup), not through constructor injection.
-- The event bus (`IBppEventBus`) is in-memory pub/sub used for decoupling features (combat frame events, run lifecycle changes, replay persistence signals).
-- `IEncounterStateProbe` is a pull-based status query ("where is the player now"), deliberately not a timeline tracker (see ADR-0001).
 
 # Project Rules
 

@@ -1,3 +1,9 @@
+---
+status: implemented
+archived: 2026-07-18
+superseded-by: code (PR #105, CurrentReplayRecordingButtonController) + docs/MEMORY.md gotcha
+---
+
 # Issue #96 战后录制按钮二次实机失败诊断
 
 ## 背景

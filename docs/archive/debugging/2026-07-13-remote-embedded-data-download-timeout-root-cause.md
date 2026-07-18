@@ -1,3 +1,9 @@
+---
+status: implemented
+archived: 2026-07-18
+superseded-by: code (run.sh DOTNET_SYSTEM_NET_DISABLEIPV6 default) + docs/MEMORY.md gotcha
+---
+
 # Remote Embedded Data Download Timeout — Root-Cause Analysis
 
 ## Background
