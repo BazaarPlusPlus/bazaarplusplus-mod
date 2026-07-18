@@ -12,6 +12,7 @@
     <BepInExPluginName>BazaarPlusPlus BazaarAgent Host</BepInExPluginName>
     <BepInExPluginVersion>$(BppVersion)</BepInExPluginVersion>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <NoWarn>CS0436</NoWarn>
   </PropertyGroup>
 

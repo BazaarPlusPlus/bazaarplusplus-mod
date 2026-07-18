@@ -39,6 +39,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 
 ```bash
 ./run.sh build          # Debug 构建
+./run.sh restore-locked # 校验六个发布程序集的 NuGet 锁文件
 ./run.sh test           # 全部测试
 ./run.sh fetch-data     # 手动强制刷新远端嵌入数据
 ./run.sh publish        # 生产发布：刷新数据、种子门禁、安装器资源与 BepInEx.zip
@@ -50,6 +51,7 @@ dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/Th
 - `run.sh` 默认为其启动的 .NET 进程设置 `DOTNET_SYSTEM_NET_DISABLEIPV6=1`，避免系统中失效的 IPv6 隧道路由阻塞远端数据下载；调用方可显式设置该环境变量来覆盖默认值。
 - `voice-lines.json` 与 `tenwin_builds.json` 不存入仓库，构建从共享的 `src/BazaarPlusPlus/obj/remote-data/` 副本嵌入。普通构建已有副本时完全不联网；全新工作区缺失副本时自动下载一次，失败信息会提示恢复网络或运行 `./run.sh fetch-data`。
 - `./run.sh fetch-data` 只强制刷新并校验两份远端数据，不编译、不测试、不写安装器目录；`./run.sh publish` 会强制刷新一次，并在打包前运行语音字幕与终局 build 的嵌入种子门禁。
+- 直接依赖版本集中在 `Directory.Packages.props`。修改后运行 `./run.sh restore-locks` 刷新六个发布程序集的 `packages.lock.json`，审查锁文件后用 `./run.sh restore-locked` 校验；测试项目不提交锁文件。
 - Debug 构建在识别到本地游戏目录时自动复制插件到 `BepInEx/plugins/`。
 - 普通 Release 只编译；只有 `./run.sh publish` 会写入相邻 installer 仓库并生成 `BepInEx.zip`。
 

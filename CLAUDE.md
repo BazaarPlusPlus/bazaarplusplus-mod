@@ -31,6 +31,8 @@ dotnet run --project tests\ChoiceScreenPedestalResolver.Tests\ChoiceScreenPedest
 - `./run.sh build [--with-bazaaragent] [--fast]` — Debug build (`--fast` skips NuGet restore)
 - `./run.sh publish [--with-bazaaragent] [-p:Name=Value ...]` — production build: fetch remote embedded data, run seed gates, then `-t:BuildAll` (Debug + Release) with installer packaging
 - `./run.sh fetch-data [-p:Name=Value ...]` — refresh remote embedded data
+- `./run.sh restore-locks` — refresh committed NuGet lock files for the six published assemblies
+- `./run.sh restore-locked` — validate published-assembly restores in locked mode without updating lock files
 - `./run.sh test` — run all test projects under `tests/`
 - `./run.sh format` — restore the repo-pinned CSharpier tool and format the source tree
 - `./run.sh format-check` — restore the repo-pinned CSharpier tool and fail on unformatted files
@@ -42,6 +44,8 @@ dotnet run --project tests\ChoiceScreenPedestalResolver.Tests\ChoiceScreenPedest
 - `./run.sh build-matrix` — build the source tree against every archived Managed snapshot
 
 Test projects under `tests/` are split per-feature. Some use xUnit + `Microsoft.NET.Test.Sdk` (run via `dotnet test`), others are executable (run via `dotnet run --project`). Check whether the csproj has `Microsoft.NET.Test.Sdk` to determine which.
+
+When changing a direct dependency, edit `Directory.Packages.props`, run `./run.sh restore-locks`, and review the six changed `src/**/packages.lock.json` files with the version change. Do not generate lock files for test projects. Before committing, run `./run.sh restore-locked` so dependency graph drift fails locally, then run the standard build and test commands.
 
 ## Logs & Debugging
 

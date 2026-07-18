@@ -9,6 +9,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TargetFramework>netstandard2.1</TargetFramework>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <NoWarn>CS0436</NoWarn>
     <BuildProductionPackage Condition="'$(BuildProductionPackage)' == ''"
       >false</BuildProductionPackage>
