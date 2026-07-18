@@ -72,6 +72,7 @@ Structure lives in `docs/ARCHITECTURE.md`; durable knowledge in `docs/MEMORY.md`
 - When CJK text renders as tofu boxes, route the text to a CJK-capable font; do not "fix" it by editing the copy
 - Touch only the named target of a delete/change request; do not opportunistically widen scope or adjust unrelated config
 - Reuse the game's native UI components and the codebase's established prior-art patterns  instead of hand-rolling a new render/upload chain
+- After invoking a native Unity `Button.onClick` programmatically, verify the expected game-state transition before treating the action as successful — native listeners may return silently through interaction gates such as `AllowInteraction` without throwing
 - On completion, follow the settled wrap-up: review your own diff, commit, merge the working branch to `master`, push, then delete branches already merged; do not commit before reviewing or when not asked
 - Keep commits scoped: when `./run.sh format`/csharpier reformats files outside your change.
 - A long-running automation task must self-heal — auto-relaunch the game process on crash/exit and continue until the goal is met, rather than stopping on the first failure
@@ -122,4 +123,3 @@ Rules emerge from validated patterns, not one-off observations. The workflow is:
 1. Agent notes a pattern during a session
 2. Team validates the pattern in code review
 3. A dedicated commit adds the rule with context on why it exists
-
