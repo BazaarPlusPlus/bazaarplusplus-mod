@@ -1694,6 +1694,7 @@ public class CoreLayeringTests
         Assert.Contains("BindNativeActions(", controllerSource);
         Assert.Contains("nativeRecapButton.onClick.Invoke", controllerSource);
         Assert.Contains("nativeRecapBackButton.onClick.Invoke", controllerSource);
+        Assert.Contains("_button.interactable = nativeActionsBound", controllerSource);
         Assert.Contains("\"RecapButton\"", patchSource);
         Assert.Contains("\"BackButton\"", patchSource);
         Assert.Contains("StartCurrentReplayAfterRecapClosed", runtimeSource);
@@ -1701,11 +1702,14 @@ public class CoreLayeringTests
             "boardManager.IsRecapViewOpen || boardManager.StorageMoving",
             runtimeSource
         );
+        Assert.Contains("invokeNativeRecapBack();", runtimeSource);
         Assert.Contains(
             "!boardManager.IsRecapViewOpen && !boardManager.StorageMoving",
             runtimeSource
         );
         Assert.Contains("invokeNativeRecap?.Invoke()", runtimeSource);
+        Assert.Contains("\"native-replay-invoke-failed\"", runtimeSource);
+        Assert.Contains("\"native-recap-close-timeout\"", runtimeSource);
         Assert.Contains(
             "settingsButton.gameObject.AddComponent<CurrentReplayRecordingButtonController>()",
             controllerSource

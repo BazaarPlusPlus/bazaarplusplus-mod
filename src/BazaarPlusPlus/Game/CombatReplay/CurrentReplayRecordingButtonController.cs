@@ -203,7 +203,11 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         if (!visible)
             return;
 
-        _button.interactable = snapshot.CanStart || snapshot.CanReveal;
+        var nativeActionsBound =
+            _nativeReplayButton != null
+            && _nativeRecapButton != null
+            && _nativeRecapBackButton != null;
+        _button.interactable = nativeActionsBound && (snapshot.CanStart || snapshot.CanReveal);
         ApplyIcon(snapshot.Phase);
     }
 

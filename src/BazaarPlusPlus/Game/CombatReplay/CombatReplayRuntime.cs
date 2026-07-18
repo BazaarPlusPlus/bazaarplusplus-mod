@@ -172,7 +172,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         ReplayOpeningStateRestorer.Cleanup();
         _destroying = true;
-        CancelPendingCurrentReplayStart("Combat replay runtime was destroyed.");
+        CancelPendingCurrentReplayStart(
+            "native-replay-runtime-destroyed-before-start",
+            "Combat replay runtime was destroyed."
+        );
         if (_currentRecording.NativeReplayStarted)
         {
             _playbackPublisher?.PublishEnded("runtime-destroyed", failed: true);
@@ -375,17 +378,23 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         {
             try
             {
-                if (boardManager.IsRecapViewOpen)
-                    invokeNativeRecapBack();
                 _pendingCurrentReplayStart = StartCoroutine(
-                    StartCurrentReplayAfterRecapClosed(recordingId, invokeNativeReplay)
+                    StartCurrentReplayAfterRecapClosed(
+                        recordingId,
+                        invokeNativeReplay,
+                        invokeNativeRecapBack
+                    )
                 );
                 reason = string.Empty;
                 return true;
             }
             catch (Exception ex)
             {
-                FailCurrentReplayStart(recordingId, ex.Message);
+                FailCurrentReplayStart(
+                    recordingId,
+                    "native-recap-transition-start-failed",
+                    ex.Message
+                );
                 reason = ex.Message;
                 return false;
             }
@@ -396,7 +405,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private IEnumerator StartCurrentReplayAfterRecapClosed(
         string recordingId,
-        Action invokeNativeReplay
+        Action invokeNativeReplay,
+        Action invokeNativeRecapBack
     )
     {
         const float recapCloseTimeoutSeconds = 10f;
@@ -408,6 +418,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 _pendingCurrentReplayStart = null;
                 FailCurrentReplayStart(
                     recordingId,
+                    "native-replay-state-exited-before-start",
                     "Replay state exited while the recap view was closing."
                 );
                 yield break;
@@ -417,8 +428,30 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             if (boardManager == null)
             {
                 _pendingCurrentReplayStart = null;
-                FailCurrentReplayStart(recordingId, "The combat board is unavailable.");
+                FailCurrentReplayStart(
+                    recordingId,
+                    "native-replay-board-unavailable",
+                    "The combat board is unavailable."
+                );
                 yield break;
+            }
+
+            if (boardManager.IsRecapViewOpen && !boardManager.StorageMoving && !AppState.BlockInput)
+            {
+                try
+                {
+                    invokeNativeRecapBack();
+                }
+                catch (Exception ex)
+                {
+                    _pendingCurrentReplayStart = null;
+                    FailCurrentReplayStart(
+                        recordingId,
+                        "native-recap-back-invoke-failed",
+                        ex.Message
+                    );
+                    yield break;
+                }
             }
 
             if (!boardManager.IsRecapViewOpen && !boardManager.StorageMoving)
@@ -427,7 +460,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             if (Time.realtimeSinceStartup >= timeoutAt)
             {
                 _pendingCurrentReplayStart = null;
-                FailCurrentReplayStart(recordingId, "The recap view did not finish closing.");
+                FailCurrentReplayStart(
+                    recordingId,
+                    "native-recap-close-timeout",
+                    "The recap view did not finish closing."
+                );
                 yield break;
             }
 
@@ -450,14 +487,18 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
         catch (Exception ex)
         {
-            FailCurrentReplayStart(recordingId, ex.Message);
+            FailCurrentReplayStart(recordingId, "native-replay-invoke-failed", ex.Message);
             reason = ex.Message;
             return false;
         }
 
         if (!_currentRecording.NativeReplayStarted)
         {
-            FailCurrentReplayStart(recordingId, "The native replay did not start.");
+            FailCurrentReplayStart(
+                recordingId,
+                "native-replay-not-started",
+                "The native replay did not start."
+            );
             reason = "The native replay did not start.";
             return false;
         }
@@ -466,15 +507,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         return true;
     }
 
-    private void FailCurrentReplayStart(string recordingId, string reason)
+    private void FailCurrentReplayStart(string recordingId, string endReason, string reason)
     {
         _videoRecorder?.Invoke()?.CancelArmedCurrentReplay(recordingId);
-        _playbackPublisher?.PublishEnded("native-replay-not-started", failed: true);
+        _playbackPublisher?.PublishEnded(endReason, failed: true);
         _currentRecording.RollbackArm(recordingId, reason);
         _invokeCurrentRecordingRecap = null;
     }
 
-    private void CancelPendingCurrentReplayStart(string reason)
+    private void CancelPendingCurrentReplayStart(string endReason, string reason)
     {
         var pending = _pendingCurrentReplayStart;
         if (pending == null)
@@ -484,7 +525,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         StopCoroutine(pending);
         var recordingId = _currentRecording.RecordingId;
         if (!string.IsNullOrWhiteSpace(recordingId))
-            FailCurrentReplayStart(recordingId, reason);
+            FailCurrentReplayStart(recordingId, endReason, reason);
     }
 
     internal bool TryRevealCurrentReplayVideo(out string reason)
@@ -904,6 +945,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return;
 
         CancelPendingCurrentReplayStart(
+            "native-replay-state-exited-before-start",
             "Replay state exited before the native replay could start."
         );
         if (_currentRecording.NativeReplayStarted)
