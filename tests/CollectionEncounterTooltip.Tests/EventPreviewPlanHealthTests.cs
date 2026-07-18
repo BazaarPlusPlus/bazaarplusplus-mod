@@ -2,23 +2,21 @@ using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.EventPreview;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
 public sealed class EventPreviewPlanHealthTests
 {
     [Fact]
     public void Expected_source_limitations_do_not_degrade_runtime_health()
     {
-        var coverage = new CollectionPreviewCoverage(
+        var coverage = new EventPreviewCoverage(
             eventFailureCount: 0,
             levelUpFailureCount: 0,
             unsupportedLevelUpPartCount: 107,
             missingReferencedTemplateCount: 28
         );
 
-        Assert.False(
-            EventPreviewPlanController.EventPreviewPlanHealth.HasDegradedCoverage(coverage)
-        );
+        Assert.False(EncounterPreviewModule.EventPreviewPlanHealth.HasDegradedCoverage(coverage));
     }
 
     [Theory]
@@ -29,15 +27,13 @@ public sealed class EventPreviewPlanHealthTests
         int levelUpFailureCount
     )
     {
-        var coverage = new CollectionPreviewCoverage(
+        var coverage = new EventPreviewCoverage(
             eventFailureCount,
             levelUpFailureCount,
             unsupportedLevelUpPartCount: 0,
             missingReferencedTemplateCount: 0
         );
 
-        Assert.True(
-            EventPreviewPlanController.EventPreviewPlanHealth.HasDegradedCoverage(coverage)
-        );
+        Assert.True(EncounterPreviewModule.EventPreviewPlanHealth.HasDegradedCoverage(coverage));
     }
 }

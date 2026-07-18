@@ -1,29 +1,33 @@
 #nullable enable
 using System;
-using UnityEngine;
 
 namespace BazaarPlusPlus.GameInterop.CardPreview;
 
 internal enum NativeCardPreviewOperation
 {
+    Acquire,
     ResolveTemplate,
     ResolveKind,
     Instantiate,
-    ResolvePreviewType,
-    ResolvePreviewComponent,
     SetUp,
     ResolveRect,
     Resize,
     Show,
     GetTooltipData,
     GetClientCard,
+    CreateTooltipData,
     SetTooltipData,
     InvokeHover,
     InvokeHoverOut,
+    Release,
+    OwnerPrepare,
+    OwnerAcquired,
+    OwnerRelease,
 }
 
 internal enum NativeCardPreviewFailureReason
 {
+    Unexpected,
     StaticDataUnavailable,
     TemplateUnavailable,
     UnsupportedCardType,
@@ -37,6 +41,7 @@ internal enum NativeCardPreviewFailureReason
     ShowException,
     ReflectionUnavailable,
     ReflectionException,
+    OwnerHookException,
 }
 
 internal sealed class NativeCardPreviewFailure
@@ -60,37 +65,15 @@ internal sealed class NativeCardPreviewFailure
     internal Exception? Exception { get; }
 }
 
-internal readonly struct NativeCardPreviewCreateOutcome
+internal enum NativePreviewActionStatus
 {
-    internal NativeCardPreviewCreateOutcome(
-        NativeCardPreviewHandle? handle,
-        NativeCardPreviewFailure? failure
-    )
-    {
-        Handle = handle;
-        Failure = failure;
-    }
-
-    internal NativeCardPreviewHandle? Handle { get; }
-    internal NativeCardPreviewFailure? Failure { get; }
-
-    internal static NativeCardPreviewCreateOutcome Ready(NativeCardPreviewHandle handle) =>
-        new(handle, null);
-
-    internal static NativeCardPreviewCreateOutcome Degraded(NativeCardPreviewFailure failure) =>
-        new(null, failure);
-
-    internal static NativeCardPreviewCreateOutcome Unavailable() => new(null, null);
+    Applied,
+    AlreadyApplied,
+    Released,
+    Failed,
 }
 
-internal readonly struct NativeCardPreviewInstantiateOutcome
-{
-    internal NativeCardPreviewInstantiateOutcome(Component? card, NativeCardPreviewFailure? failure)
-    {
-        Card = card;
-        Failure = failure;
-    }
-
-    internal Component? Card { get; }
-    internal NativeCardPreviewFailure? Failure { get; }
-}
+internal readonly record struct NativePreviewActionResult(
+    NativePreviewActionStatus Status,
+    NativeCardPreviewFailure? Failure
+);

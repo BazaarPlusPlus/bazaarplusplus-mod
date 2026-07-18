@@ -93,6 +93,11 @@ internal static class ReplayBootstrap
             ReplayPlaybackReasonCode.PlayerAttributesUnavailable
         );
         ObserveQualityStep(
+            () => PlayerAttributeRepairer.RestoreRecordedPlayerAttributes(manifest, outcome),
+            outcome,
+            ReplayPlaybackReasonCode.PlayerAttributesUnavailable
+        );
+        ObserveQualityStep(
             () => SnapshotRehydrator.RehydratePlayerCards(manifest, sequence.SpawnMessage, outcome),
             outcome,
             ReplayPlaybackReasonCode.PlayerSnapshotUnavailable

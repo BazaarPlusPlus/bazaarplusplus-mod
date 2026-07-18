@@ -11,6 +11,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
+using BazaarPlusPlus.Game.Encounters;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
@@ -76,10 +77,10 @@ internal sealed class CollectionPanel : MonoBehaviour
     private readonly CollectionPanelSelectionLogState _selectionLogState = new();
 
     private IBppConfig _config = null!;
+    private INativeCardPreviewHost _nativeCardPreviewHost = null!;
     private CollectionPanelView? _view;
     private CollectionGridOverlay? _overlay;
-    private NativeCardPreviewPool? _pool;
-    private CollectionCardFactory? _factory;
+    private INativeCardPreviewScope? _previewScope;
     private CollectionGridVirtualizer? _virtualizer;
     private CollectionCardArtCache? _artCache;
     private CollectionCardMaterialCache? _materialCache;
@@ -121,7 +122,11 @@ internal sealed class CollectionPanel : MonoBehaviour
     // DayTierSchedule.OutOfRunDay. Recomputed on every open.
     private int? _currentRunDay;
 
-    public void Initialize(IBppServices services, BppStaticCardMapProvider cardMapProvider)
+    public void Initialize(
+        IBppServices services,
+        BppStaticCardMapProvider cardMapProvider,
+        INativeCardPreviewHost nativeCardPreviewHost
+    )
     {
         if (_initialized)
             return;
@@ -129,11 +134,14 @@ internal sealed class CollectionPanel : MonoBehaviour
             throw new ArgumentNullException(nameof(services));
         if (cardMapProvider == null)
             throw new ArgumentNullException(nameof(cardMapProvider));
+        if (nativeCardPreviewHost == null)
+            throw new ArgumentNullException(nameof(nativeCardPreviewHost));
 
         _initialized = true;
         _instance = this;
         _services = services;
         _config = services.Config;
+        _nativeCardPreviewHost = nativeCardPreviewHost;
         _catalog = new CollectionCatalog(cardMapProvider);
     }
 
@@ -538,7 +546,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         CancelPanelLoad();
         var virtualizer = _virtualizer;
         var overlay = _overlay;
-        var pool = _pool;
+        var previewScope = _previewScope;
         var artCache = _artCache;
         var materialCache = _materialCache;
         var cacheSession = _cacheSession;
@@ -548,8 +556,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         overlay?.SetVisible(false);
 
         _virtualizer = null;
-        _pool = null;
-        _factory = null;
+        _previewScope = null;
         _overlay = null;
         _view?.Dispose();
         _view = null;
@@ -557,17 +564,20 @@ internal sealed class CollectionPanel : MonoBehaviour
         _artCache = null;
         _cacheSession = null;
 
-        var pendingBinds = virtualizer?.WhenPendingBindsSettled ?? Task.CompletedTask;
-        if (pendingBinds.IsCompleted)
+        var previewCleanup = previewScope?.DisposeAsync().AsTask() ?? Task.CompletedTask;
+        var cleanupBarrier = Task.WhenAll(
+            virtualizer?.WhenPendingBindsSettled ?? Task.CompletedTask,
+            previewCleanup
+        );
+        if (cleanupBarrier.IsCompletedSuccessfully)
         {
-            DestroyCollectionRuntimeObjects(overlay, pool, cacheSession, artCache, materialCache);
+            DestroyCollectionRuntimeObjects(overlay, cacheSession, artCache, materialCache);
             return;
         }
 
         _ = DestroyCollectionRuntimeObjectsWhenReadyAsync(
-            pendingBinds,
+            cleanupBarrier,
             overlay,
-            pool,
             cacheSession,
             artCache,
             materialCache
@@ -575,9 +585,8 @@ internal sealed class CollectionPanel : MonoBehaviour
     }
 
     private static async Task DestroyCollectionRuntimeObjectsWhenReadyAsync(
-        Task pendingBinds,
+        Task cleanupBarrier,
         CollectionGridOverlay? overlay,
-        NativeCardPreviewPool? pool,
         CollectionCardCacheSession? cacheSession,
         CollectionCardArtCache? artCache,
         CollectionCardMaterialCache? materialCache
@@ -585,7 +594,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         try
         {
-            await pendingBinds;
+            await cleanupBarrier;
         }
         catch (Exception ex)
         {
@@ -598,20 +607,18 @@ internal sealed class CollectionPanel : MonoBehaviour
             );
         }
 
-        DestroyCollectionRuntimeObjects(overlay, pool, cacheSession, artCache, materialCache);
+        DestroyCollectionRuntimeObjects(overlay, cacheSession, artCache, materialCache);
     }
 
     private static void DestroyCollectionRuntimeObjects(
         CollectionGridOverlay? overlay,
-        NativeCardPreviewPool? pool,
         CollectionCardCacheSession? cacheSession,
         CollectionCardArtCache? artCache,
         CollectionCardMaterialCache? materialCache
     )
     {
-        // Destroy card GameObjects first so their patched OnDestroy can null _cardMaterial
-        // and Release art-cache refcounts BEFORE we tear the caches down.
-        pool?.DestroyAll();
+        // Scope disposal synchronously releases each card's feature-owned tooltip/art/material
+        // state before scheduling its GameObject destruction, so cache teardown is now safe.
         overlay?.Dispose();
         CollectionCardCacheHost.Uninstall(cacheSession);
         materialCache?.DisposeAll();
@@ -643,13 +650,9 @@ internal sealed class CollectionPanel : MonoBehaviour
         _materialCache = new CollectionCardMaterialCache();
         _cacheSession = CollectionCardCacheHost.Install(_artCache, _materialCache);
 
-        _pool = new NativeCardPreviewPool(
-            CollectionGridOverlay.DefaultLayer,
-            requireSockets: false
-        );
-        var nativeFactory = new NativeCardPreviewFactory(_pool);
-        _factory = new CollectionCardFactory(nativeFactory, _overlay.BoardRoot!, _cacheSession);
-        _virtualizer = new CollectionGridVirtualizer(_overlay, _factory);
+        var previewOwner = new CollectionNativeCardPreviewOwner(_overlay.BoardRoot!, _cacheSession);
+        _previewScope = _nativeCardPreviewHost.OpenScope(previewOwner);
+        _virtualizer = new CollectionGridVirtualizer(_overlay, _previewScope);
     }
 
     private static CollectionFacetMatchMode ToggleMatchMode(CollectionFacetMatchMode mode) =>

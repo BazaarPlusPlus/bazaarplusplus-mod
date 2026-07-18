@@ -20,6 +20,8 @@ public sealed class CombatReplayLogEventCatalogTests
         {
             ["combat_replay.capture.failed"] =
                 "run_id:Public:High:Short|reason_code:Public:Low:None",
+            ["combat_replay.current_recording_ui.observed"] =
+                "phase:Public:Low:None|snapshot_visible:Public:Low:None|layout_available:Public:Low:None|layout_reason_code:Public:Low:None|clone_active:Public:Low:None|native_replay_bound:Public:Low:None|icon_available:Public:Low:None",
             ["combat_replay.playback.request_rejected"] =
                 "source:Public:Low:None|reason_code:Public:Low:None|battle_id:Public:High:Short",
             ["combat_replay.external_record.accepted"] =

@@ -2,7 +2,7 @@
 using BazaarPlusPlus.Patches.Tooltips;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
 public sealed class QuestRewardPreviewTextTests
 {
@@ -15,10 +15,7 @@ public sealed class QuestRewardPreviewTextTests
             string.Empty
         );
 
-        Assert.Equal(
-            "Sell 20 Food\n<size=76%>This has +1 Multicast</size>",
-            text
-        );
+        Assert.Equal("Sell 20 Food\n<size=76%>This has +1 Multicast</size>", text);
     }
 
     [Fact]

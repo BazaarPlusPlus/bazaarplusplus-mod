@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.GameState;
@@ -435,7 +436,10 @@ public class SettingsDockRegistryTests
         {
             var config = new BppConfig();
             config.Initialize(new ConfigFile(configPath, saveOnInit: false));
-            BppPatchHost.Install(new ContractTestServices(config));
+            BppPatchHost.Install(
+                new ContractTestServices(config),
+                (BppPatchFeatures)RuntimeHelpers.GetUninitializedObject(typeof(BppPatchFeatures))
+            );
 
             Assert.False(QuestPreviewGate.IsEnabled());
 

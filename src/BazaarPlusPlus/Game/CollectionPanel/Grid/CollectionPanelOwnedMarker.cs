@@ -14,9 +14,11 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // itself: false means native created it and native OnDestroy must still destroy it.
 internal sealed class CollectionPanelOwnedMarker : MonoBehaviour
 {
+    public CollectionNativeCardPreviewOwner? PreviewOwner;
     public CollectionCardCacheSession? CacheOwner;
     public string? CurrentArtKey;
     public bool CardMaterialOwnedByCache;
+    public bool TooltipRegistered;
 
     public void ReleaseCurrentArtKey()
     {

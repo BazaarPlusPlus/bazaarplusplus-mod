@@ -242,6 +242,8 @@ battleParticipantsArtifactType.GetProperty("PlayerRank")!.SetValue(participantsA
 battleParticipantsArtifactType.GetProperty("PlayerRating")!.SetValue(participantsArtifact, 1200);
 battleParticipantsArtifactType.GetProperty("PlayerLevel")!.SetValue(participantsArtifact, 9);
 battleParticipantsArtifactType.GetProperty("PlayerPrestige")!.SetValue(participantsArtifact, 18);
+battleParticipantsArtifactType.GetProperty("PlayerIncome")!.SetValue(participantsArtifact, 11);
+battleParticipantsArtifactType.GetProperty("PlayerGold")!.SetValue(participantsArtifact, 99);
 battleParticipantsArtifactType.GetProperty("PlayerVictories")!.SetValue(participantsArtifact, 3);
 battleParticipantsArtifactType
     .GetProperty("OpponentName")!
@@ -378,6 +380,12 @@ Assert(
     (int?)extractedParticipantsType.GetProperty("PlayerPrestige")?.GetValue(extractedParticipants)
         == 18
         && (int?)
+            extractedParticipantsType.GetProperty("PlayerIncome")?.GetValue(extractedParticipants)
+            == 11
+        && (int?)
+            extractedParticipantsType.GetProperty("PlayerGold")?.GetValue(extractedParticipants)
+            == 99
+        && (int?)
             extractedParticipantsType
                 .GetProperty("PlayerVictories")
                 ?.GetValue(extractedParticipants) == 3
@@ -389,7 +397,7 @@ Assert(
             extractedParticipantsType
                 .GetProperty("OpponentVictories")
                 ?.GetValue(extractedParticipants) == 6,
-    "Artifact extraction should preserve participant prestige and victories."
+    "Artifact extraction should preserve participant economy, prestige, and victories."
 );
 
 var ghostPayloadStorePath = Path.Combine(
@@ -494,12 +502,16 @@ var rawBattlePayload = JObject.Parse(
       "player_level": 9,
       "player_prestige": 18,
       "player_victories": 3,
+      "player_hand_item_count": 2,
+      "player_skill_count": 1,
       "opponent_hero": "Vanessa",
       "opponent_rank": "Legendary",
       "opponent_rating": 1500,
       "opponent_level": 12,
       "opponent_prestige": 12,
       "opponent_victories": 6,
+      "opponent_hand_item_count": 7,
+      "opponent_skill_count": 3,
       "opponent_account_id": "local-account-001",
       "combat_kind": "PVPCombat",
       "result": "Won",
@@ -570,6 +582,13 @@ Assert(
         && (int?)importRecordType.GetProperty("OpponentPrestige")?.GetValue(importRecord) == 12
         && (int?)importRecordType.GetProperty("OpponentVictories")?.GetValue(importRecord) == 6,
     "Ghost import should preserve participant prestige and victories."
+);
+Assert(
+    (int?)importRecordType.GetProperty("PlayerHandItemCount")?.GetValue(importRecord) == 2
+        && (int?)importRecordType.GetProperty("PlayerSkillCount")?.GetValue(importRecord) == 1
+        && (int?)importRecordType.GetProperty("OpponentHandItemCount")?.GetValue(importRecord) == 7
+        && (int?)importRecordType.GetProperty("OpponentSkillCount")?.GetValue(importRecord) == 3,
+    "Ghost import should preserve participant item and skill summary counts."
 );
 
 var localWinRecordedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-4).ToString("o");
@@ -664,6 +683,17 @@ try
             && (int?)battleRecordType.GetProperty("OpponentVictories")?.GetValue(projectedBattle)
                 == 3,
         "Ghost repository reads should project participant prestige and victories into local-player perspective."
+    );
+    Assert(
+        (int)battleRecordType.GetProperty("PlayerHandItemCount")!.GetValue(projectedBattle)! == 7
+            && (int)battleRecordType.GetProperty("PlayerSkillCount")!.GetValue(projectedBattle)!
+                == 3
+            && (int)
+                battleRecordType.GetProperty("OpponentHandItemCount")!.GetValue(projectedBattle)!
+                == 2
+            && (int)battleRecordType.GetProperty("OpponentSkillCount")!.GetValue(projectedBattle)!
+                == 1,
+        "Ghost repository reads should project participant item and skill counts into local-player perspective."
     );
     Assert(
         (bool)isGhostOpponentEliminated!.Invoke(null, [projectedBattle])! is false,

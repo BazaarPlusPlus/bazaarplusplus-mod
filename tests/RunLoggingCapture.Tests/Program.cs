@@ -1,47 +1,7 @@
 #nullable enable
 using System.Reflection;
 using BazaarPlusPlus.Core.GameState;
-using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Storage.RunLog;
-
-var captureServiceType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogCaptureService");
-var pvpBattleInputType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogPvpBattleInput");
-var service =
-    Activator.CreateInstance(captureServiceType)
-    ?? throw new InvalidOperationException("RunLogCaptureService should be constructible.");
-
-var pvpBattleInput =
-    Activator.CreateInstance(pvpBattleInputType)
-    ?? throw new InvalidOperationException("RunLogPvpBattleInput should be constructible.");
-SetProperty(pvpBattleInputType, pvpBattleInput, "BattleId", "battle-123");
-SetProperty(pvpBattleInputType, pvpBattleInput, "CombatKind", "PVPCombat");
-SetProperty(pvpBattleInputType, pvpBattleInput, "Day", 4);
-SetProperty(pvpBattleInputType, pvpBattleInput, "Hour", 6);
-SetProperty(pvpBattleInputType, pvpBattleInput, "EncounterId", "encounter-pvp-1");
-SetProperty(pvpBattleInputType, pvpBattleInput, "OpponentName", "Rival");
-
-var combatReplayEvent = Invoke<RunLogEvent>(
-    captureServiceType,
-    service,
-    "BuildPvpBattleRecordedEvent",
-    [pvpBattleInput]
-);
-Assert(
-    combatReplayEvent.Kind == "pvp_combat_recorded",
-    "Combat replays should map to a pvp_combat_recorded event."
-);
-Assert(
-    combatReplayEvent.CombatKind == "PVPCombat",
-    "Combat replay events should preserve the combat kind."
-);
-Assert(
-    combatReplayEvent.BattleId == "battle-123",
-    "Combat replay events should preserve the battle id."
-);
-Assert(
-    combatReplayEvent.OpponentName == "Rival",
-    "Combat replay events should preserve opponent metadata."
-);
 
 var basicsType = RequireType("BazaarPlusPlus.Core.GameState.RunBasicsSnapshot");
 var mapperType = RequireType("BazaarPlusPlus.Game.RunLogging.RunLogRecordMapper");
@@ -157,11 +117,11 @@ Assert(
     "A non-interrupted exit should map to completed, and missing stats should map to null fields while basics survive."
 );
 
-Console.WriteLine("RunLogging capture checks passed.");
+Console.WriteLine("RunLogging record mapping checks passed.");
 
 static Type RequireType(string fullName)
 {
-    var assembly = typeof(RunLogCaptureService).Assembly;
+    var assembly = Assembly.Load("BazaarPlusPlus");
     return assembly.GetType(fullName, throwOnError: false)
         ?? assembly
             .GetTypes()

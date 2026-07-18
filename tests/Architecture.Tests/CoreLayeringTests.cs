@@ -218,7 +218,7 @@ public class CoreLayeringTests
             StringComparison.Ordinal
         );
         var liveBuildIndex = compositionSource.IndexOf(
-            "_mountables.Register(new LiveBuildPanelMount",
+            "new LiveBuildPanelMount(",
             StringComparison.Ordinal
         );
 
@@ -343,7 +343,7 @@ public class CoreLayeringTests
         Assert.Contains("if (!cell.IsShown)", virtualizerSource);
         Assert.Contains("ReferenceEquals(cell.Vm, nextVisible[newIndex])", virtualizerSource);
         Assert.Contains("cell.Index = newIndex;", virtualizerSource);
-        Assert.Contains("cell.HoverRelay?.Bind(cell.Card);", virtualizerSource);
+        Assert.Contains("cell.HoverRelay?.Bind(cell.Session);", virtualizerSource);
         Assert.Contains("Reposition(newIndex, cell);", virtualizerSource);
     }
 
@@ -363,8 +363,14 @@ public class CoreLayeringTests
                 "CollectionTierTooltipPreview.cs"
             )
         );
-        var factorySource = File.ReadAllText(
-            Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "CollectionCardFactory.cs")
+        var ownerSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CollectionPanel",
+                "Grid",
+                "CollectionNativeCardPreviewOwner.cs"
+            )
         );
         var destroyPatchSource = File.ReadAllText(
             Path.Combine(
@@ -379,9 +385,9 @@ public class CoreLayeringTests
         Assert.Contains("nameof(CardTooltipData.GetPassiveTooltipBlock)", patchSource);
         Assert.Contains("nameof(CooldownRenderer.RenderFromTooltip)", patchSource);
         Assert.Contains("CollectionTierTooltipRegistry.Contains", previewSource);
-        Assert.Contains("CollectionTierTooltipRegistry.Register", factorySource);
-        Assert.Contains("CollectionTierTooltipRegistry.Unregister", factorySource);
-        Assert.Contains("CollectionTierTooltipRegistry.Unregister", destroyPatchSource);
+        Assert.Contains("CollectionTierTooltipRegistry.Register", ownerSource);
+        Assert.Contains("CollectionTierTooltipRegistry.Unregister", ownerSource);
+        Assert.Contains("PreviewOwner?.OnNativeDestroyed", destroyPatchSource);
         Assert.Contains("CardExtensions.BuildAttributeDictionaryForTier", previewSource);
         Assert.Contains("CollectionTierTooltipTextMerger.Merge", previewSource);
         Assert.Contains("TryGetTierAttributeValues", previewSource);
@@ -604,7 +610,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void LiveBuildPanel_owns_build_recommendations()
+    public void LiveBuildPanel_owns_build_recommendation_implementation()
     {
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
@@ -648,12 +654,18 @@ public class CoreLayeringTests
         var liveBuildPanelFile = Path.GetFullPath(
             Path.Combine(mainSource, "Game", "LiveBuildPanel", "LiveBuildPanel.cs")
         );
+        var liveBuildPanelMountFile = Path.GetFullPath(
+            Path.Combine(mainSource, "Game", "LiveBuildPanel", "LiveBuildPanelMount.cs")
+        );
+        var compositionFile = Path.GetFullPath(Path.Combine(mainSource, "BppComposition.cs"));
 
         bool IsAllowedRecommendationConsumer(string file)
         {
             var fullPath = Path.GetFullPath(file);
             return fullPath.StartsWith(recommendationsRoot, StringComparison.Ordinal)
-                || string.Equals(fullPath, liveBuildPanelFile, StringComparison.Ordinal);
+                || string.Equals(fullPath, liveBuildPanelFile, StringComparison.Ordinal)
+                || string.Equals(fullPath, liveBuildPanelMountFile, StringComparison.Ordinal)
+                || string.Equals(fullPath, compositionFile, StringComparison.Ordinal);
         }
 
         var disallowedImports = sourceFiles
@@ -681,7 +693,8 @@ public class CoreLayeringTests
 
         Assert.True(
             disallowedImports.Count == 0,
-            "Only LiveBuildPanel may import its recommendation internals. Offending imports:\n"
+            "Recommendation internals may only be used by the owning panel, its mount adapter, "
+                + "and the composition root that owns their plugin-lifetime catalog. Offending imports:\n"
                 + string.Join("\n", disallowedImports)
         );
     }
@@ -1566,7 +1579,7 @@ public class CoreLayeringTests
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
         var screenshotSource = File.ReadAllText(
-            Path.Combine(mainSource, "Game", "Screenshots", "EndOfRunScreenshotController.cs")
+            Path.Combine(mainSource, "Game", "Screenshots", "EndOfRunCaptureDriver.cs")
         );
         var recorderSource = File.ReadAllText(
             Path.Combine(
@@ -1796,6 +1809,138 @@ public class CoreLayeringTests
         Assert.Contains("using BazaarPlusPlus.Game.PvpBattles;", combatReplaySource);
         Assert.Contains("using BazaarPlusPlus.Game.PvpBattles;", historyProjectionSource);
         Assert.Contains("using BazaarPlusPlus.Game.PvpBattles;", runLoggingSource);
+    }
+
+    [Fact]
+    public void Run_logging_is_a_feature_owned_event_intake_not_a_mounted_controller()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var moduleSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "RunLogging", "RunLoggingModule.cs")
+        );
+        var compositionSource = File.ReadAllText(Path.Combine(mainSource, "BppComposition.cs"));
+        var pluginSource = File.ReadAllText(Path.Combine(mainSource, "Plugin.cs"));
+
+        Assert.Contains("sealed class RunLoggingModule : IBppFeature", moduleSource);
+        Assert.False(
+            File.Exists(Path.Combine(mainSource, "Game", "RunLogging", "RunLoggingController.cs"))
+        );
+        Assert.False(
+            File.Exists(Path.Combine(mainSource, "Game", "RunLogging", "RunLogCaptureService.cs"))
+        );
+        Assert.DoesNotContain("RunLoggingControllerCore", moduleSource);
+        Assert.DoesNotContain("RunLogPvpBattleInput", moduleSource);
+        Assert.DoesNotContain("ComponentMount<RunLoggingController>", compositionSource);
+        Assert.Contains("_featureRegistry.Register(_runLoggingModule);", compositionSource);
+        Assert.Contains("_featureRegistry.Stop();", compositionSource);
+        Assert.Contains("() => CreateStore(services)", moduleSource);
+
+        var combatReplayRegistration = compositionSource.IndexOf(
+            "_featureRegistry.Register(_combatReplayModule);",
+            StringComparison.Ordinal
+        );
+        var runLoggingRegistration = compositionSource.IndexOf(
+            "_featureRegistry.Register(_runLoggingModule);",
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            combatReplayRegistration >= 0 && runLoggingRegistration > combatReplayRegistration,
+            "Reverse feature Stop must settle RunLogging before stopping CombatReplay."
+        );
+
+        var unmount = pluginSource.IndexOf(
+            "PluginTeardownStep.UnmountComponents",
+            StringComparison.Ordinal
+        );
+        var disposeComposition = pluginSource.IndexOf(
+            "PluginTeardownStep.DisposeComposition",
+            StringComparison.Ordinal
+        );
+        var destroyReplay = pluginSource.IndexOf(
+            "PluginTeardownStep.DestroyCombatReplayRuntime",
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            unmount >= 0 && disposeComposition > unmount && destroyReplay > disposeComposition,
+            "Teardown must unmount, stop features, then destroy CombatReplayRuntime."
+        );
+    }
+
+    [Fact]
+    public void Event_preview_owns_queries_plans_evaluation_and_presentation()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var eventPreviewRoot = Path.Combine(mainSource, "Game", "EventPreview");
+        var collectionRoot = Path.Combine(mainSource, "Game", "CollectionPanel");
+        var tooltipPatches = Path.Combine(mainSource, "Patches", "Tooltips");
+        var moduleSource = File.ReadAllText(
+            Path.Combine(eventPreviewRoot, "EncounterPreviewModule.cs")
+        );
+        var eventLocalizationSource = File.ReadAllText(
+            Path.Combine(eventPreviewRoot, "EventPreviewLocalization.cs")
+        );
+        var collectionLocalizationSource = File.ReadAllText(
+            Path.Combine(collectionRoot, "Data", "CollectionLocalizationResolver.cs")
+        );
+        var abilityReaderSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Cards", "CardAbilityValueReader.cs")
+        );
+
+        Assert.Contains("interface IEncounterPreviewModule", moduleSource);
+        Assert.Contains(
+            "EncounterPreviewResult ResolveEvent(EventPreviewQuery query)",
+            moduleSource
+        );
+        Assert.Contains(
+            "EncounterStepPreviewResult ResolveStep(EncounterStepPreviewQuery query)",
+            moduleSource
+        );
+        Assert.Contains(
+            "LevelUpPreviewResult ResolveLevelUp(LevelUpPreviewQuery query)",
+            moduleSource
+        );
+        Assert.Contains("class CardAbilityValueReader", abilityReaderSource);
+        Assert.DoesNotContain("GetProperty(\"Abilities\")", eventLocalizationSource);
+        Assert.DoesNotContain("GetProperty(\"Abilities\")", collectionLocalizationSource);
+
+        foreach (var file in Directory.EnumerateFiles(eventPreviewRoot, "*.cs"))
+            Assert.DoesNotContain("Game.CollectionPanel", File.ReadAllText(file));
+        foreach (
+            var file in new[]
+            {
+                Path.Combine(tooltipPatches, "EncounterEventTooltipPatch.cs"),
+                Path.Combine(tooltipPatches, "HeroLevelRewardsTooltipPatch.cs"),
+            }
+        )
+        {
+            var source = File.ReadAllText(file);
+            Assert.DoesNotContain("Game.CollectionPanel", source);
+            Assert.DoesNotContain("EventPreviewPlanRuntime", source);
+            Assert.DoesNotContain("TryBuildInventory", source);
+            Assert.DoesNotContain("EncounterTierRuntime", source);
+        }
+
+        Assert.Empty(Directory.EnumerateFiles(collectionRoot, "CollectionEncounter*.cs"));
+        Assert.False(
+            File.Exists(Path.Combine(collectionRoot, "CollectionMerchantTierResolver.cs"))
+        );
+        Assert.False(
+            File.Exists(
+                Path.Combine(
+                    collectionRoot,
+                    "Data",
+                    "CollectionLocalizationResolver.PreviewPlans.cs"
+                )
+            )
+        );
+        foreach (
+            var file in Directory.EnumerateFiles(
+                collectionRoot,
+                "*.cs",
+                SearchOption.AllDirectories
+            )
+        )
+            Assert.DoesNotContain("Game.EventPreview", File.ReadAllText(file));
     }
 
     [Fact]

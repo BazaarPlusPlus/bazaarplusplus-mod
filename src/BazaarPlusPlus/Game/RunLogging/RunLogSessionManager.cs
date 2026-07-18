@@ -5,7 +5,7 @@ using BazaarPlusPlus.Storage.RunLog;
 
 namespace BazaarPlusPlus.Game.RunLogging;
 
-public sealed class RunLogSessionManager
+internal sealed class RunLogSessionManager
 {
     private readonly IRunLogStore _store;
     private readonly Func<DateTimeOffset> _utcNow;

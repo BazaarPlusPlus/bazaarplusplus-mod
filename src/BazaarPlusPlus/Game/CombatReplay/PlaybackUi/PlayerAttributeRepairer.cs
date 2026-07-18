@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.TempoNet.Models;
+using BazaarPlusPlus.Game.PvpBattles;
 using TheBazaar;
 using TheBazaar.UI.Components;
 
@@ -35,6 +36,60 @@ internal static class PlayerAttributeRepairer
     {
         EnsurePlayerAttributes(Data.Run?.Player, ECombatantId.Player, outcome);
         EnsurePlayerAttributes(Data.Run?.Opponent, ECombatantId.Opponent, outcome);
+    }
+
+    internal static void RestoreRecordedPlayerAttributes(
+        PvpBattleManifest manifest,
+        IReplayPlaybackOutcomeSink? outcome = null
+    )
+    {
+        if (manifest == null)
+            return;
+
+        var player = Data.Run?.Player;
+        if (player == null)
+            return;
+
+        try
+        {
+            var attributesProperty = player
+                .GetType()
+                .GetProperty(
+                    "Attributes",
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                );
+            if (
+                attributesProperty?.GetValue(player)
+                is not System.Collections.IDictionary attributes
+            )
+                return;
+
+            ApplyRecordedAttribute(
+                attributes,
+                EPlayerAttributeType.Level,
+                manifest.Participants.PlayerLevel
+            );
+            ApplyRecordedAttribute(
+                attributes,
+                EPlayerAttributeType.Prestige,
+                manifest.Participants.PlayerPrestige
+            );
+            ApplyRecordedAttribute(
+                attributes,
+                EPlayerAttributeType.Income,
+                manifest.Participants.PlayerIncome
+            );
+            ApplyRecordedAttribute(
+                attributes,
+                EPlayerAttributeType.Gold,
+                manifest.Participants.PlayerGold
+            );
+            RefreshRecordedAttributePresentation();
+        }
+        catch (Exception ex)
+        {
+            outcome?.ReportDegradation(ReplayPlaybackReasonCode.PlayerAttributesUnavailable, ex);
+        }
     }
 
     internal static void RecalculateHealthBarDividers(BoardUIController controller, object? player)
@@ -187,6 +242,32 @@ internal static class PlayerAttributeRepairer
     {
         if (!attributes.Contains(attributeType))
             attributes[attributeType] = defaultValue;
+    }
+
+    private static void ApplyRecordedAttribute(
+        System.Collections.IDictionary attributes,
+        EPlayerAttributeType attributeType,
+        int? value
+    )
+    {
+        if (!value.HasValue)
+            return;
+
+        attributes[attributeType] = value.Value;
+    }
+
+    private static void RefreshRecordedAttributePresentation()
+    {
+        foreach (var prestigeBar in UnityEngine.Object.FindObjectsOfType<PrestigeBarController>())
+        {
+            prestigeBar?.ImmediateUpdate();
+        }
+
+        var updateUiFlags = BindingFlags.Instance | BindingFlags.NonPublic;
+        foreach (var bank in UnityEngine.Object.FindObjectsOfType<BankToyController>())
+        {
+            bank?.GetType().GetMethod("UpdateUI", updateUiFlags)?.Invoke(bank, null);
+        }
     }
 
     private static void ApplyHealthBarMaxValue(object healthBar, object player)

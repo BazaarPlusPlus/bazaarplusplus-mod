@@ -42,14 +42,6 @@
       Link="BuildRecommendationCorpusLogState.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/BuildRecommendationCorpusLoadResult.cs"
-      Link="BuildRecommendationCorpusLoadResult.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/BuildRecommendationCorpusLoadSelector.cs"
-      Link="BuildRecommendationCorpusLoadSelector.cs"
-    />
-    <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Recommendations/BuildRecommendationRefreshService.cs"
       Link="BuildRecommendationRefreshService.cs"
     />

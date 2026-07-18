@@ -4,6 +4,7 @@ using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.OverlayPanels;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Clients;
 using UnityEngine;
@@ -16,19 +17,23 @@ internal sealed class HistoryPanelMount : IBppMountable
     private readonly Func<ModOnlineClient?> _onlineClient;
     private readonly Func<BazaarDbLinkClient?> _accountLinkClient;
     private readonly Func<OverlayPanelHost?> _overlayHost;
+    private readonly INativeCardPreviewHost _nativeCardPreviewHost;
     private IDisposable? _localeChangedSubscription;
 
     public HistoryPanelMount(
         Func<CombatReplayRuntime?> combatReplayRuntime,
         Func<ModOnlineClient?> onlineClient,
         Func<BazaarDbLinkClient?> accountLinkClient,
-        Func<OverlayPanelHost?> overlayHost
+        Func<OverlayPanelHost?> overlayHost,
+        INativeCardPreviewHost nativeCardPreviewHost
     )
     {
         _combatReplayRuntime = combatReplayRuntime;
         _onlineClient = onlineClient;
         _accountLinkClient = accountLinkClient;
         _overlayHost = overlayHost;
+        _nativeCardPreviewHost =
+            nativeCardPreviewHost ?? throw new ArgumentNullException(nameof(nativeCardPreviewHost));
     }
 
     public void Mount(GameObject host, IBppServices services)
@@ -74,7 +79,8 @@ internal sealed class HistoryPanelMount : IBppMountable
                         services.Config.BazaarDbUploadEnabled?.Value ?? false,
                         services.GameBuild.Channel
                     )
-            )
+            ),
+            _nativeCardPreviewHost
         );
         // Register with the host only once fully configured; an unconfigured panel (skip paths
         // above) must stay invisible to overlay lifecycle routing.
