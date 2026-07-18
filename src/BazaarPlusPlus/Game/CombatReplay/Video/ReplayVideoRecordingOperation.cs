@@ -57,6 +57,7 @@ internal sealed class ReplayVideoRecordingCompletion
     internal int? ExitCode { get; set; }
     internal string? StderrTail { get; set; }
     internal Exception? Exception { get; set; }
+    internal string? Reason { get; set; }
     internal DateTimeOffset? EndedAtUtc { get; set; }
 }
 
@@ -132,7 +133,7 @@ internal sealed class ReplayVideoRecordingOperation
             completion.AudioStatus,
             completion.MetadataStatus,
             reason,
-            completion.Exception?.Message
+            completion.Reason ?? completion.Exception?.Message
         );
 
         if (!artifactUsable)
@@ -335,7 +336,8 @@ internal sealed class ReplayVideoRecordingLifecycle
     internal bool CompletePreflight(
         ReplayVideoRecordingOperation operation,
         ReplayVideoRecordingReasonCode reasonCode,
-        Exception? exception = null
+        Exception? exception = null,
+        string? reason = null
     ) =>
         TryComplete(
             operation,
@@ -345,6 +347,7 @@ internal sealed class ReplayVideoRecordingLifecycle
                 AudioStatus = ReplayVideoAudioStatus.Silent,
                 MetadataStatus = ReplayVideoMetadataStatus.Unavailable,
                 Exception = exception,
+                Reason = reason,
             }
         );
 

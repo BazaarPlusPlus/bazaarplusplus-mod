@@ -192,21 +192,21 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             _clone.SetActive(visible);
         if (visible && !wasActive)
             _lastSpriteId = null;
+        var nativeActionsBound =
+            _nativeReplayButton != null
+            && _nativeRecapButton != null
+            && _nativeRecapBackButton != null;
         _uiLogState.Observe(
             snapshot,
             _layoutAvailable,
             _layoutReasonCode,
             _clone.activeSelf,
-            _nativeReplayButton != null,
+            nativeActionsBound,
             _icon != null && _icon.sprite != null
         );
         if (!visible)
             return;
 
-        var nativeActionsBound =
-            _nativeReplayButton != null
-            && _nativeRecapButton != null
-            && _nativeRecapBackButton != null;
         _button.interactable = nativeActionsBound && (snapshot.CanStart || snapshot.CanReveal);
         ApplyIcon(snapshot.Phase);
     }

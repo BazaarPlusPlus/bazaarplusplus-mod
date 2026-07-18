@@ -364,7 +364,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         var recordingId = arm.RecordingId;
         if (!_currentRecording.TryArm(recordingId))
         {
-            recorder.CancelArmedCurrentReplay(recordingId);
+            recorder.CancelArmedCurrentReplay(
+                recordingId,
+                "native-replay-state-changed-before-arm"
+            );
             reason = "The replay recording state changed before it could start.";
             return false;
         }
@@ -513,7 +516,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void FailCurrentReplayStart(string recordingId, string endReason, string reason)
     {
-        _videoRecorder?.Invoke()?.CancelArmedCurrentReplay(recordingId);
+        _videoRecorder?.Invoke()?.CancelArmedCurrentReplay(recordingId, endReason);
         _playbackPublisher?.PublishEnded(endReason, failed: true);
         _currentRecording.RollbackArm(recordingId, reason);
         _invokeCurrentRecordingRecap = null;
@@ -599,6 +602,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         try
         {
             invokeNativeRecap();
+            if (Singleton<BoardManager>.Instance?.IsRecapViewOpen != true)
+            {
+                CompleteCurrentReplayRecording(
+                    "native-recap-not-started",
+                    failed: true,
+                    "The native recap did not start."
+                );
+                return;
+            }
             _pendingCurrentReplayRecapPostRoll = StartCoroutine(
                 CompleteCurrentReplayRecordingAfterRecapPostRoll()
             );

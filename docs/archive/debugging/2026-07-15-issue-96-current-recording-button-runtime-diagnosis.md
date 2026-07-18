@@ -92,7 +92,7 @@ superseded-by: code (PR #105, CurrentReplayRecordingButtonController) + docs/MEM
 
 ### 已确认根因
 
-反编译确认，`ReplayState.Replay()` 播放完毕只恢复 Replay/Recap/Continue 按钮并触发 `Events.ReplayEnded`，不会自动进入 Recap；进入 Recap 的完整原生链路只存在于 `BoardRecapReplayButtonsController.RecapButton`（`ReplayState.Recap()` + `BoardManager.ShowRecapView()`）。另一方面，原生 Replay 按钮只调用 `ReplayState.Replay()` 并隐藏按钮，不会先关闭已经打开的 Recap。于是 current-recording 直接复用 Replay 按钮时存在两个确定行为缺口：录完停留在普通回放面；从 Recap 内起录会让 Recap 的翻板协程与 Replay 的翻板流程重叠。
+反编译确认，`ReplayState.Replay()` 播放完毕只恢复 Replay/Recap/Continue 按钮并触发 `Events.ReplayEnded`，不会自动进入 Recap（`decompiled/TheBazaarRuntime/TheBazaar/ReplayState.cs:246-284`）；进入 Recap 的完整原生链路由 `BoardRecapReplayButtonsController.Recap()` 发出事件，再依次调用 `ReplayState.Recap()` 与 `BoardManager.ShowRecapView()`（`decompiled/TheBazaarRuntime/TheBazaar/BoardRecapReplayButtonsController.cs:159-166`、`decompiled/TheBazaarRuntime/BoardManager.cs:3656-3660`）。另一方面，原生 Replay 入口只调用 `ReplayState.Replay()` 并隐藏按钮（`decompiled/TheBazaarRuntime/BoardManager.cs:3649-3653`），不会先走 Back 所调用的 `HideRecapView()` / `ReplayState.RecapBack()`（`decompiled/TheBazaarRuntime/BoardManager.cs:3630-3637`）。于是 current-recording 直接复用 Replay 按钮时存在两个确定行为缺口：录完停留在普通回放面；从 Recap 内起录会让 Recap 的翻板协程与 Replay 的翻板流程重叠。
 
 ### 修复决策与验证
 

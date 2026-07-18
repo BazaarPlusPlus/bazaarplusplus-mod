@@ -1721,8 +1721,11 @@ public class CoreLayeringTests
             runtimeSource
         );
         Assert.Contains("invokeNativeRecap();", runtimeSource);
+        Assert.Contains("Singleton<BoardManager>.Instance?.IsRecapViewOpen != true", runtimeSource);
+        Assert.Contains("\"native-recap-not-started\"", runtimeSource);
         Assert.Contains("\"native-replay-invoke-failed\"", runtimeSource);
         Assert.Contains("\"native-recap-close-timeout\"", runtimeSource);
+        Assert.Contains("CancelArmedCurrentReplay(recordingId, endReason)", runtimeSource);
         Assert.Contains("CurrentReplayRecapPostRollSeconds = 3f", runtimeSource);
         Assert.Contains(
             "new WaitForSecondsRealtime(CurrentReplayRecapPostRollSeconds)",
