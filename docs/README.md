@@ -1,6 +1,6 @@
 # BazaarPlusPlus Docs
 
-The code is the source of truth. Current implementation guidance lives in one architecture document plus compact decision records. Historical working documents live in git history, not in the active tree. This file is the single documentation map (it absorbed the former `INDEX.md` on 2026-07-11).
+The code is the source of truth. Current implementation guidance lives in one architecture document plus compact decision records. Historical working documents live in git history, not in the active tree. This file is the single documentation map.
 
 ## Current Docs
 
@@ -12,7 +12,7 @@ The code is the source of truth. Current implementation guidance lives in one ar
 
 ## Decision records (`adr/`)
 
-ADRs retain only the decision, its load-bearing rationale, guardrails, and current code evidence. They may be corrected or compressed during consolidation when the code has drifted. ADR-0005 (AutoBazaar transport-only core, superseded) was collapsed into ADR-0006 on 2026-07-11; its file remains recoverable from git history and numbering is never reused.
+ADRs retain only the decision, its load-bearing rationale, guardrails, and current code evidence. They may be corrected or compressed during consolidation when the code has drifted. Superseded ADRs are collapsed into their successors (ADR-0005 lives on inside ADR-0006); retired files remain recoverable from git history and numbering is never reused.
 
 | Path | Topic | Status |
 |---|---|---|
@@ -27,13 +27,13 @@ ADRs retain only the decision, its load-bearing rationale, guardrails, and curre
 
 ## Future Work
 
-Task plans, feature requests, and bugs are tracked as **GitHub issues** (see [agents/issue-tracker.md](agents/issue-tracker.md)), not repo docs. The former `docs/plans/` directory was retired on 2026-07-11; its two remaining plans migrated verbatim to [#32](https://github.com/cauyxy/bazaarplusplus-mod/issues/32) (HistoryPanel hero portrait badges, `ready-for-agent`) and [#33](https://github.com/cauyxy/bazaarplusplus-mod/issues/33) (choice timeline in run bundles, `needs-info` pending §11 sign-off).
+Task plans, feature requests, and bugs are tracked as **GitHub issues** (see [agents/issue-tracker.md](agents/issue-tracker.md)), not repo docs.
 
-`drafts/` remains the write buffer for **knowledge documents only** — design records, root-cause analyses, and decision/option analyses produced mid-session. Task plans do not go there. Consolidation promotes durable outcomes into MEMORY/ADR/ARCHITECTURE, moves actionable work to GitHub Issues, and deletes the spent draft; the directory therefore exists only while unswept drafts are pending. (Sweeps: 2026-07-19, 2026-07-18, 2026-07-11, 2026-07-10, 2026-06-12.)
+`drafts/` is the write buffer for **knowledge documents only** — design records, root-cause analyses, and decision/option analyses produced mid-session. Task plans do not go there. Consolidation promotes durable outcomes into MEMORY/ADR/ARCHITECTURE, moves actionable work to GitHub Issues, and deletes the spent draft; the directory therefore exists only while unswept drafts are pending.
 
 ## Historical material
 
-`docs/archive/` was removed from the active tree on 2026-07-19 after current decisions and operational traps were consolidated above. The last complete archive tree is recoverable at commit `82412f0c` (for example, `git show 82412f0c:docs/archive/<path>`). Historical claims must be rechecked against current code before use.
+Retired documents live only in git history. The last complete `docs/archive/` tree is recoverable at commit `82412f0c` (for example, `git show 82412f0c:docs/archive/<path>`). Historical claims must be rechecked against current code before use.
 
 ## Agent Rules
 
