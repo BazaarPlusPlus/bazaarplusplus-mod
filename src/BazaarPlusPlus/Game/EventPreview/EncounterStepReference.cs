@@ -2,17 +2,17 @@
 using System;
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal sealed class CollectionEncounterStepReference
+internal sealed class EncounterStepReference
 {
-    public CollectionEncounterStepReference(
+    public EncounterStepReference(
         Guid templateId,
-        IReadOnlyList<CollectionEncounterCardRequirement>? requirements = null
+        IReadOnlyList<EncounterCardRequirement>? requirements = null
     )
     {
         TemplateId = templateId;
-        Requirements = requirements ?? Array.Empty<CollectionEncounterCardRequirement>();
+        Requirements = requirements ?? Array.Empty<EncounterCardRequirement>();
     }
 
     public Guid TemplateId { get; }
@@ -20,17 +20,17 @@ internal sealed class CollectionEncounterStepReference
     // Card-count ownership prerequisites; all must be satisfied for the step to be
     // offered ("if you have Powder Keg or the Big One" is one requirement whose ids
     // are alternatives).
-    public IReadOnlyList<CollectionEncounterCardRequirement> Requirements { get; }
+    public IReadOnlyList<EncounterCardRequirement> Requirements { get; }
 }
 
 // One spawn group of a choice event: fixed always-offered steps, or — when the
 // group itself selects randomly — a pool the event rolls members from.
-internal sealed class CollectionEncounterChoiceGroupData
+internal sealed class EncounterChoiceGroupData
 {
-    public CollectionEncounterChoiceGroupData(
+    public EncounterChoiceGroupData(
         bool isRandomPool,
-        IReadOnlyList<CollectionEncounterStepReference> members,
-        CollectionEncounterDayCondition? dayCondition = null
+        IReadOnlyList<EncounterStepReference> members,
+        EncounterDayCondition? dayCondition = null
     )
     {
         IsRandomPool = isRandomPool;
@@ -40,9 +40,9 @@ internal sealed class CollectionEncounterChoiceGroupData
 
     public bool IsRandomPool { get; }
 
-    public IReadOnlyList<CollectionEncounterStepReference> Members { get; }
+    public IReadOnlyList<EncounterStepReference> Members { get; }
 
     // Day-gated groups (Wishing Fountain carries one price tier per day); inactive
     // groups are not offered at all, so they must not render as choices.
-    public CollectionEncounterDayCondition? DayCondition { get; }
+    public EncounterDayCondition? DayCondition { get; }
 }

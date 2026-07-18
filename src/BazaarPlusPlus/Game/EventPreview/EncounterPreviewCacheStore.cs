@@ -9,9 +9,9 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Infrastructure;
 using Newtonsoft.Json;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal sealed class CollectionEncounterPreviewCacheStore
+internal sealed class EncounterPreviewCacheStore
 {
     public const int SchemaVersion = 3;
     internal const int MaxCacheFileBytes = 32 * 1024 * 1024;
@@ -33,7 +33,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
 
     private readonly object _syncRoot = new();
 
-    public CollectionEncounterPreviewCacheStore(string cachePath)
+    public EncounterPreviewCacheStore(string cachePath)
     {
         CachePath = !string.IsNullOrWhiteSpace(cachePath)
             ? cachePath
@@ -42,10 +42,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
 
     public string CachePath { get; }
 
-    public void Save(
-        CollectionEncounterPreviewCacheIdentity identity,
-        CollectionEncounterPreviewSnapshot snapshot
-    )
+    public void Save(EncounterPreviewCacheIdentity identity, EncounterPreviewSnapshot snapshot)
     {
         if (identity == null)
             throw new ArgumentNullException(nameof(identity));
@@ -70,8 +67,8 @@ internal sealed class CollectionEncounterPreviewCacheStore
     }
 
     public bool TryLoad(
-        CollectionEncounterPreviewCacheIdentity identity,
-        out CollectionEncounterPreviewSnapshot? snapshot,
+        EncounterPreviewCacheIdentity identity,
+        out EncounterPreviewSnapshot? snapshot,
         out string missReason
     )
     {
@@ -150,7 +147,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
                 return false;
             }
 
-            CollectionEncounterPreviewCacheIdentity storedIdentity;
+            EncounterPreviewCacheIdentity storedIdentity;
             try
             {
                 storedIdentity = FromWire(document.Identity);
@@ -215,8 +212,8 @@ internal sealed class CollectionEncounterPreviewCacheStore
     }
 
     private static CacheDocumentWire ToWire(
-        CollectionEncounterPreviewCacheIdentity identity,
-        CollectionEncounterPreviewSnapshot snapshot
+        EncounterPreviewCacheIdentity identity,
+        EncounterPreviewSnapshot snapshot
     )
     {
         return new CacheDocumentWire
@@ -236,7 +233,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
         };
     }
 
-    private static CollectionEncounterPreviewSnapshot FromWire(CacheDocumentWire document)
+    private static EncounterPreviewSnapshot FromWire(CacheDocumentWire document)
     {
         if (
             document.Events == null
@@ -246,19 +243,19 @@ internal sealed class CollectionEncounterPreviewCacheStore
         )
             throw new FormatException("Encounter-preview cache payload arrays are missing.");
 
-        var events = new CollectionEncounterPreviewEventPlan[document.Events.Count];
+        var events = new EncounterPreviewEventPlan[document.Events.Count];
         for (var i = 0; i < events.Length; i++)
             events[i] = FromWire(Required(document.Events[i], "event plan"));
 
-        var templates = new CollectionEncounterPreviewTemplatePlan[document.Templates.Count];
+        var templates = new EncounterPreviewTemplatePlan[document.Templates.Count];
         for (var i = 0; i < templates.Length; i++)
             templates[i] = FromWire(Required(document.Templates[i], "template plan"));
 
-        var levelUps = new CollectionLevelUpPreviewPlan[document.LevelUps.Count];
+        var levelUps = new LevelUpPreviewPlan[document.LevelUps.Count];
         for (var i = 0; i < levelUps.Length; i++)
             levelUps[i] = FromWire(Required(document.LevelUps[i], "level-up plan"));
 
-        return new CollectionEncounterPreviewSnapshot(
+        return new EncounterPreviewSnapshot(
             events,
             templates,
             levelUps,
@@ -266,7 +263,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
         );
     }
 
-    private static CacheIdentityWire ToWire(CollectionEncounterPreviewCacheIdentity identity) =>
+    private static CacheIdentityWire ToWire(EncounterPreviewCacheIdentity identity) =>
         new()
         {
             Kind = identity.Kind,
@@ -276,7 +273,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
             BuildChannel = identity.BuildChannel,
         };
 
-    private static CollectionEncounterPreviewCacheIdentity FromWire(CacheIdentityWire identity) =>
+    private static EncounterPreviewCacheIdentity FromWire(CacheIdentityWire identity) =>
         new(
             Required(identity.Kind, "identity kind"),
             Required(identity.Resource, "identity resource"),
@@ -285,7 +282,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
             Required(identity.BuildChannel, "identity build channel")
         );
 
-    private static EventPlanWire ToWire(CollectionEncounterPreviewEventPlan plan) =>
+    private static EventPlanWire ToWire(EncounterPreviewEventPlan plan) =>
         new()
         {
             TemplateId = FormatGuid(plan.TemplateId),
@@ -296,12 +293,12 @@ internal sealed class CollectionEncounterPreviewCacheStore
             ChoiceGroups = plan.ChoiceGroups.Select(ToWire).ToList(),
         };
 
-    private static CollectionEncounterPreviewEventPlan FromWire(EventPlanWire plan)
+    private static EncounterPreviewEventPlan FromWire(EventPlanWire plan)
     {
         if (plan.OutcomeGroups == null || plan.ChoiceGroups == null)
             throw new FormatException("Event-plan groups are missing.");
 
-        return new CollectionEncounterPreviewEventPlan(
+        return new EncounterPreviewEventPlan(
             ParseGuid(plan.TemplateId, "event template id"),
             plan.IsRandomSelectionEvent,
             plan.SuppressRandomOutcome,
@@ -312,7 +309,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
         );
     }
 
-    private static LevelUpPlanWire ToWire(CollectionLevelUpPreviewPlan plan) =>
+    private static LevelUpPlanWire ToWire(LevelUpPreviewPlan plan) =>
         new()
         {
             Level = plan.Level,
@@ -321,11 +318,11 @@ internal sealed class CollectionEncounterPreviewCacheStore
             Groups = plan.Groups.Select(ToWire).ToList(),
         };
 
-    private static CollectionLevelUpPreviewPlan FromWire(LevelUpPlanWire plan)
+    private static LevelUpPreviewPlan FromWire(LevelUpPlanWire plan)
     {
         if (plan.Groups == null)
             throw new FormatException("Level-up groups are missing.");
-        return new CollectionLevelUpPreviewPlan(
+        return new LevelUpPreviewPlan(
             plan.Level,
             plan.HealthIncrease,
             plan.IsRandomSelection,
@@ -333,7 +330,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
         );
     }
 
-    private static LevelUpGroupWire ToWire(CollectionLevelUpPreviewGroup group) =>
+    private static LevelUpGroupWire ToWire(LevelUpPreviewGroup group) =>
         new()
         {
             RandomWeight = group.RandomWeight,
@@ -342,11 +339,11 @@ internal sealed class CollectionEncounterPreviewCacheStore
             HeroConditions = group.HeroConditions.Select(ToWire).ToList(),
         };
 
-    private static CollectionLevelUpPreviewGroup FromWire(LevelUpGroupWire group)
+    private static LevelUpPreviewGroup FromWire(LevelUpGroupWire group)
     {
         if (group.TemplateIds == null || group.HeroConditions == null)
             throw new FormatException("Level-up group collections are missing.");
-        return new CollectionLevelUpPreviewGroup(
+        return new LevelUpPreviewGroup(
             group.RandomWeight,
             group.Limit,
             group.TemplateIds.Select(value => ParseGuid(value, "level-up template id")).ToArray(),
@@ -356,28 +353,24 @@ internal sealed class CollectionEncounterPreviewCacheStore
         );
     }
 
-    private static LevelUpHeroConditionWire ToWire(
-        CollectionLevelUpPreviewHeroCondition condition
-    ) =>
+    private static LevelUpHeroConditionWire ToWire(LevelUpPreviewHeroCondition condition) =>
         new()
         {
             Heroes = condition.Heroes.Select(hero => (int)hero).ToList(),
             ComparisonOperator = condition.ComparisonOperator,
         };
 
-    private static CollectionLevelUpPreviewHeroCondition FromWire(
-        LevelUpHeroConditionWire condition
-    )
+    private static LevelUpPreviewHeroCondition FromWire(LevelUpHeroConditionWire condition)
     {
         if (condition.Heroes == null)
             throw new FormatException("Level-up hero condition heroes are missing.");
-        return new CollectionLevelUpPreviewHeroCondition(
+        return new LevelUpPreviewHeroCondition(
             condition.Heroes.Select(value => ReadEnum<EHero>(value, "hero")).ToArray(),
             Required(condition.ComparisonOperator, "hero comparison operator")
         );
     }
 
-    private static CoverageWire ToWire(CollectionPreviewCoverage coverage) =>
+    private static CoverageWire ToWire(EventPreviewCoverage coverage) =>
         new()
         {
             EventFailureCount = coverage.EventFailureCount,
@@ -386,7 +379,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
             MissingReferencedTemplateCount = coverage.MissingReferencedTemplateCount,
         };
 
-    private static CollectionPreviewCoverage FromWire(CoverageWire coverage) =>
+    private static EventPreviewCoverage FromWire(CoverageWire coverage) =>
         new(
             coverage.EventFailureCount,
             coverage.LevelUpFailureCount,
@@ -394,7 +387,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
             coverage.MissingReferencedTemplateCount
         );
 
-    private static TemplatePlanWire ToWire(CollectionEncounterPreviewTemplatePlan plan) =>
+    private static TemplatePlanWire ToWire(EncounterPreviewTemplatePlan plan) =>
         new()
         {
             TemplateId = FormatGuid(plan.TemplateId),
@@ -415,14 +408,14 @@ internal sealed class CollectionEncounterPreviewCacheStore
             RewardFilter = ToWire(plan.RewardFilter),
         };
 
-    private static CollectionEncounterPreviewTemplatePlan FromWire(TemplatePlanWire plan)
+    private static EncounterPreviewTemplatePlan FromWire(TemplatePlanWire plan)
     {
         if (plan.Heroes == null || plan.AbilityValues == null)
             throw new FormatException("Template-plan collections are missing.");
-        if (!Enum.IsDefined(typeof(CollectionEncounterPreviewTemplateKind), plan.Kind))
+        if (!Enum.IsDefined(typeof(EncounterPreviewTemplateKind), plan.Kind))
             throw new FormatException($"Unknown template kind '{plan.Kind}'.");
 
-        var abilityValues = new Dictionary<string, CollectionEncounterPreviewAbilityValue>(
+        var abilityValues = new Dictionary<string, EncounterPreviewAbilityValue>(
             plan.AbilityValues.Count,
             StringComparer.Ordinal
         );
@@ -433,7 +426,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
             if (
                 !abilityValues.TryAdd(
                     key,
-                    new CollectionEncounterPreviewAbilityValue(
+                    new EncounterPreviewAbilityValue(
                         Required(required.ValueText, "ability value text"),
                         required.Unit
                     )
@@ -442,9 +435,9 @@ internal sealed class CollectionEncounterPreviewCacheStore
                 throw new FormatException($"Duplicate ability key '{key}'.");
         }
 
-        return new CollectionEncounterPreviewTemplatePlan(
+        return new EncounterPreviewTemplatePlan(
             ParseGuid(plan.TemplateId, "template id"),
-            (CollectionEncounterPreviewTemplateKind)plan.Kind,
+            (EncounterPreviewTemplateKind)plan.Kind,
             plan.Heroes.Select(value => ReadEnum<EHero>(value, "hero")).ToArray(),
             plan.InternalName,
             FromWire(plan.Title),
@@ -454,15 +447,15 @@ internal sealed class CollectionEncounterPreviewCacheStore
         );
     }
 
-    private static LocalizedTextWire ToWire(CollectionEncounterPreviewLocalizedText text) =>
+    private static LocalizedTextWire ToWire(EncounterPreviewLocalizedText text) =>
         new() { Key = text.Key, FallbackText = text.FallbackText };
 
-    private static CollectionEncounterPreviewLocalizedText FromWire(LocalizedTextWire? text) =>
+    private static EncounterPreviewLocalizedText FromWire(LocalizedTextWire? text) =>
         text == null
-            ? new CollectionEncounterPreviewLocalizedText(null, null)
-            : new CollectionEncounterPreviewLocalizedText(text.Key, text.FallbackText);
+            ? new EncounterPreviewLocalizedText(null, null)
+            : new EncounterPreviewLocalizedText(text.Key, text.FallbackText);
 
-    private static OutcomeGroupWire ToWire(CollectionEncounterOutcomeGroupData group) =>
+    private static OutcomeGroupWire ToWire(EncounterOutcomeGroupData group) =>
         new()
         {
             Weight = group.Weight,
@@ -472,12 +465,12 @@ internal sealed class CollectionEncounterPreviewCacheStore
             DayCondition = ToWire(group.DayCondition),
         };
 
-    private static CollectionEncounterOutcomeGroupData FromWire(OutcomeGroupWire group)
+    private static EncounterOutcomeGroupData FromWire(OutcomeGroupWire group)
     {
         if (group.Ids == null || group.QueryPools == null || group.Requirements == null)
             throw new FormatException("Outcome-group collections are missing.");
 
-        return new CollectionEncounterOutcomeGroupData(
+        return new EncounterOutcomeGroupData(
             group.Weight,
             group.Ids.Select(value => ParseGuid(value, "outcome template id")).ToArray(),
             group.QueryPools.Select(pool => FromWire(Required(pool, "query pool"))).ToArray(),
@@ -486,13 +479,13 @@ internal sealed class CollectionEncounterPreviewCacheStore
         );
     }
 
-    private static QueryPoolWire ToWire(CollectionEncounterOutcomeQueryPool pool) =>
+    private static QueryPoolWire ToWire(EncounterOutcomeQueryPool pool) =>
         new() { Filter = ToWire(pool.Filter), Quantity = pool.Quantity };
 
-    private static CollectionEncounterOutcomeQueryPool FromWire(QueryPoolWire pool) =>
+    private static EncounterOutcomeQueryPool FromWire(QueryPoolWire pool) =>
         new(FromWire(pool.Filter), pool.Quantity);
 
-    private static ChoiceGroupWire ToWire(CollectionEncounterChoiceGroupData group) =>
+    private static ChoiceGroupWire ToWire(EncounterChoiceGroupData group) =>
         new()
         {
             IsRandomPool = group.IsRandomPool,
@@ -500,31 +493,31 @@ internal sealed class CollectionEncounterPreviewCacheStore
             DayCondition = ToWire(group.DayCondition),
         };
 
-    private static CollectionEncounterChoiceGroupData FromWire(ChoiceGroupWire group)
+    private static EncounterChoiceGroupData FromWire(ChoiceGroupWire group)
     {
         if (group.Members == null)
             throw new FormatException("Choice-group members are missing.");
 
-        return new CollectionEncounterChoiceGroupData(
+        return new EncounterChoiceGroupData(
             group.IsRandomPool,
             group.Members.Select(member => FromWire(Required(member, "step reference"))).ToArray(),
             FromWire(group.DayCondition)
         );
     }
 
-    private static StepReferenceWire ToWire(CollectionEncounterStepReference reference) =>
+    private static StepReferenceWire ToWire(EncounterStepReference reference) =>
         new()
         {
             TemplateId = FormatGuid(reference.TemplateId),
             Requirements = reference.Requirements.Select(ToWire).ToList(),
         };
 
-    private static CollectionEncounterStepReference FromWire(StepReferenceWire reference)
+    private static EncounterStepReference FromWire(StepReferenceWire reference)
     {
         if (reference.Requirements == null)
             throw new FormatException("Step-reference requirements are missing.");
 
-        return new CollectionEncounterStepReference(
+        return new EncounterStepReference(
             ParseGuid(reference.TemplateId, "step template id"),
             reference
                 .Requirements.Select(value => FromWire(Required(value, "requirement")))
@@ -532,7 +525,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
         );
     }
 
-    private static RequirementWire ToWire(CollectionEncounterCardRequirement requirement) =>
+    private static RequirementWire ToWire(EncounterCardRequirement requirement) =>
         new()
         {
             Ids = requirement.Ids.Select(FormatGuid).ToList(),
@@ -544,12 +537,12 @@ internal sealed class CollectionEncounterPreviewCacheStore
             Amount = requirement.Amount,
         };
 
-    private static CollectionEncounterCardRequirement FromWire(RequirementWire requirement)
+    private static EncounterCardRequirement FromWire(RequirementWire requirement)
     {
         if (requirement.Ids == null || requirement.TagCandidateGroups == null)
             throw new FormatException("Requirement collections are missing.");
 
-        return new CollectionEncounterCardRequirement(
+        return new EncounterCardRequirement(
             requirement.Ids.Select(value => ParseGuid(value, "requirement template id")).ToArray(),
             requirement
                 .TagCandidateGroups.Select(group =>
@@ -564,20 +557,20 @@ internal sealed class CollectionEncounterPreviewCacheStore
         );
     }
 
-    private static DayConditionWire? ToWire(CollectionEncounterDayCondition? condition) =>
+    private static DayConditionWire? ToWire(EncounterDayCondition? condition) =>
         condition is { } value
             ? new DayConditionWire { Day = value.Day, Comparison = value.Comparison }
             : null;
 
-    private static CollectionEncounterDayCondition? FromWire(DayConditionWire? condition) =>
+    private static EncounterDayCondition? FromWire(DayConditionWire? condition) =>
         condition == null
             ? null
-            : new CollectionEncounterDayCondition(
+            : new EncounterDayCondition(
                 condition.Day,
                 Required(condition.Comparison, "day comparison")
             );
 
-    private static RewardFilterWire? ToWire(CollectionEncounterRewardFilter? filter) =>
+    private static RewardFilterWire? ToWire(EncounterRewardFilter? filter) =>
         filter == null
             ? null
             : new RewardFilterWire
@@ -596,7 +589,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
                 UsesDayTierDistribution = filter.UsesDayTierDistribution,
             };
 
-    private static CollectionEncounterRewardFilter? FromWire(RewardFilterWire? filter)
+    private static EncounterRewardFilter? FromWire(RewardFilterWire? filter)
     {
         if (filter == null)
             return null;
@@ -610,7 +603,7 @@ internal sealed class CollectionEncounterPreviewCacheStore
         )
             throw new FormatException("Reward-filter collections are missing.");
 
-        return new CollectionEncounterRewardFilter(
+        return new EncounterRewardFilter(
             ReadEnum<ECardType>(filter.CardType, "card type"),
             filter.Quantity,
             filter.FromAnyHero,

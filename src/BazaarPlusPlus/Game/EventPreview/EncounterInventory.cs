@@ -2,13 +2,13 @@
 using System;
 using System.Collections.Generic;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
 // One owned card in the inventory snapshot: template id plus the names of its tags
 // (ECardTag + EHiddenTag, compared by name).
-internal sealed class CollectionEncounterInventoryCard
+internal sealed class EncounterInventoryCard
 {
-    public CollectionEncounterInventoryCard(Guid templateId, IReadOnlyCollection<string> tagNames)
+    public EncounterInventoryCard(Guid templateId, IReadOnlyCollection<string> tagNames)
     {
         TemplateId = templateId;
         TagNames = tagNames;
@@ -23,11 +23,11 @@ internal sealed class CollectionEncounterInventoryCard
 // evaluate encounter ownership prerequisites. Kept per-card so count comparisons
 // ("Equal 0", "GreaterThanOrEqual 12") and per-card tag operators (Any/All/None)
 // evaluate exactly rather than over a deduplicated union.
-internal sealed class CollectionEncounterInventory
+internal sealed class EncounterInventory
 {
-    private readonly IReadOnlyList<CollectionEncounterInventoryCard> _cards;
+    private readonly IReadOnlyList<EncounterInventoryCard> _cards;
 
-    public CollectionEncounterInventory(IReadOnlyList<CollectionEncounterInventoryCard> cards)
+    public EncounterInventory(IReadOnlyList<EncounterInventoryCard> cards)
     {
         _cards = cards;
     }
@@ -92,10 +92,7 @@ internal sealed class CollectionEncounterInventory
         return count;
     }
 
-    private static bool CardHasAnyTag(
-        CollectionEncounterInventoryCard card,
-        IReadOnlyList<string> candidates
-    )
+    private static bool CardHasAnyTag(EncounterInventoryCard card, IReadOnlyList<string> candidates)
     {
         foreach (var candidate in candidates)
         foreach (var tag in card.TagNames)

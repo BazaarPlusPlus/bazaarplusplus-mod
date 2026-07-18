@@ -7,6 +7,7 @@ using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.CardTags;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
+using BazaarPlusPlus.Game.Encounters;
 using BazaarPlusPlus.GameInterop.TagTypography;
 
 var searchRefreshGate = new CollectionSearchRefreshGate(0.16f);

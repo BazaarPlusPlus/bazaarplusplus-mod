@@ -2,9 +2,9 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionEncounterStructuredParserTests
+public sealed class EncounterStructuredParserTests
 {
     [Fact]
     public void TryParseEventStepReferences_reads_step_ids_from_spawn_group_filters()
@@ -47,7 +47,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var references = CollectionEncounterStructuredParser.TryParseEventStepReferences(json);
+        var references = EncounterStructuredParser.TryParseEventStepReferences(json);
 
         Assert.Equal(
             new[] { brewId, tradeId },
@@ -106,9 +106,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reference = Assert.Single(
-            CollectionEncounterStructuredParser.TryParseEventStepReferences(json)
-        );
+        var reference = Assert.Single(EncounterStructuredParser.TryParseEventStepReferences(json));
 
         Assert.Equal(stepId, reference.TemplateId);
         Assert.Equal(2, reference.Requirements.Count);
@@ -166,7 +164,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Item, reward.CardType);
@@ -221,7 +219,7 @@ public sealed class CollectionEncounterStructuredParserTests
             },
         };
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(step);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(step);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Skill, reward.CardType);
@@ -293,7 +291,7 @@ public sealed class CollectionEncounterStructuredParserTests
             },
         };
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(step);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(step);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Item, reward.CardType);
@@ -337,7 +335,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Item, reward.CardType);
@@ -387,7 +385,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Item, reward.CardType);
@@ -435,7 +433,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(
@@ -485,7 +483,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(new[] { ETier.Diamond }, reward.Tiers);
@@ -538,7 +536,7 @@ public sealed class CollectionEncounterStructuredParserTests
             },
         };
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(step);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(step);
 
         Assert.NotNull(reward);
         Assert.Equal(2, reward.Quantity);
@@ -588,7 +586,7 @@ public sealed class CollectionEncounterStructuredParserTests
             },
         };
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(step);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(step);
 
         Assert.NotNull(reward);
         Assert.Equal(
@@ -636,7 +634,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(1, reward.Quantity);
@@ -681,7 +679,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Item, reward.CardType);
@@ -736,7 +734,7 @@ public sealed class CollectionEncounterStructuredParserTests
             },
         };
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(step);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(step);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Skill, reward.CardType);
@@ -794,7 +792,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Item, reward.CardType);
@@ -837,7 +835,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Item, reward.CardType);
@@ -887,7 +885,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Item, reward!.CardType);
@@ -931,7 +929,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.Null(reward);
     }
@@ -975,7 +973,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var reward = CollectionEncounterStructuredParser.TryParseRewardFilter(json);
+        var reward = EncounterStructuredParser.TryParseRewardFilter(json);
 
         Assert.NotNull(reward);
         Assert.Equal(ECardType.Skill, reward.CardType);
@@ -1116,7 +1114,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var groups = CollectionEncounterStructuredParser.TryParseEventChoiceGroups(json);
+        var groups = EncounterStructuredParser.TryParseEventChoiceGroups(json);
 
         Assert.Equal(2, groups.Count);
         Assert.True(groups[0].IsRandomPool);
@@ -1159,7 +1157,7 @@ public sealed class CollectionEncounterStructuredParserTests
             }
             """;
 
-        var references = CollectionEncounterStructuredParser.TryParseEventStepReferences(json);
+        var references = EncounterStructuredParser.TryParseEventStepReferences(json);
 
         var reference = Assert.Single(references);
         var requirement = Assert.Single(reference.Requirements);
@@ -1169,6 +1167,6 @@ public sealed class CollectionEncounterStructuredParserTests
         Assert.Equal("Any", requirement.TagOperator);
         Assert.Equal("GreaterThanOrEqual", requirement.Comparison);
         Assert.Equal(1, requirement.Amount);
-        Assert.Equal(3, CollectionEncounterStructuredParser.TryParseEventChoiceLimit(json));
+        Assert.Equal(3, EncounterStructuredParser.TryParseEventChoiceLimit(json));
     }
 }

@@ -1824,6 +1824,83 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Event_preview_owns_queries_plans_evaluation_and_presentation()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var eventPreviewRoot = Path.Combine(mainSource, "Game", "EventPreview");
+        var collectionRoot = Path.Combine(mainSource, "Game", "CollectionPanel");
+        var tooltipPatches = Path.Combine(mainSource, "Patches", "Tooltips");
+        var moduleSource = File.ReadAllText(
+            Path.Combine(eventPreviewRoot, "EncounterPreviewModule.cs")
+        );
+        var eventLocalizationSource = File.ReadAllText(
+            Path.Combine(eventPreviewRoot, "EventPreviewLocalization.cs")
+        );
+        var collectionLocalizationSource = File.ReadAllText(
+            Path.Combine(collectionRoot, "Data", "CollectionLocalizationResolver.cs")
+        );
+        var abilityReaderSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Cards", "CardAbilityValueReader.cs")
+        );
+
+        Assert.Contains("interface IEncounterPreviewModule", moduleSource);
+        Assert.Contains(
+            "EncounterPreviewResult ResolveEvent(EventPreviewQuery query)",
+            moduleSource
+        );
+        Assert.Contains(
+            "EncounterStepPreviewResult ResolveStep(EncounterStepPreviewQuery query)",
+            moduleSource
+        );
+        Assert.Contains(
+            "LevelUpPreviewResult ResolveLevelUp(LevelUpPreviewQuery query)",
+            moduleSource
+        );
+        Assert.Contains("class CardAbilityValueReader", abilityReaderSource);
+        Assert.DoesNotContain("GetProperty(\"Abilities\")", eventLocalizationSource);
+        Assert.DoesNotContain("GetProperty(\"Abilities\")", collectionLocalizationSource);
+
+        foreach (var file in Directory.EnumerateFiles(eventPreviewRoot, "*.cs"))
+            Assert.DoesNotContain("Game.CollectionPanel", File.ReadAllText(file));
+        foreach (
+            var file in new[]
+            {
+                Path.Combine(tooltipPatches, "EncounterEventTooltipPatch.cs"),
+                Path.Combine(tooltipPatches, "HeroLevelRewardsTooltipPatch.cs"),
+            }
+        )
+        {
+            var source = File.ReadAllText(file);
+            Assert.DoesNotContain("Game.CollectionPanel", source);
+            Assert.DoesNotContain("EventPreviewPlanRuntime", source);
+            Assert.DoesNotContain("TryBuildInventory", source);
+            Assert.DoesNotContain("EncounterTierRuntime", source);
+        }
+
+        Assert.Empty(Directory.EnumerateFiles(collectionRoot, "CollectionEncounter*.cs"));
+        Assert.False(
+            File.Exists(Path.Combine(collectionRoot, "CollectionMerchantTierResolver.cs"))
+        );
+        Assert.False(
+            File.Exists(
+                Path.Combine(
+                    collectionRoot,
+                    "Data",
+                    "CollectionLocalizationResolver.PreviewPlans.cs"
+                )
+            )
+        );
+        foreach (
+            var file in Directory.EnumerateFiles(
+                collectionRoot,
+                "*.cs",
+                SearchOption.AllDirectories
+            )
+        )
+            Assert.DoesNotContain("Game.EventPreview", File.ReadAllText(file));
+    }
+
+    [Fact]
     public void Run_script_exposes_only_the_canonical_bazaaragent_flag()
     {
         var repoRoot = RepoRoot();

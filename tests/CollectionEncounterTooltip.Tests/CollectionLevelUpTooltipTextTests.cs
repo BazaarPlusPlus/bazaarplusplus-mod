@@ -15,11 +15,11 @@ using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Localization;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionLevelUpTooltipTextTests
+public sealed class LevelUpPreviewTextFormatterTests
 {
-    public CollectionLevelUpTooltipTextTests()
+    public LevelUpPreviewTextFormatterTests()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
     }
@@ -77,7 +77,7 @@ public sealed class CollectionLevelUpTooltipTextTests
             },
         };
 
-        var text = CollectionLevelUpTooltipText.Build(
+        var text = LevelUpPreviewTextFormatter.Build(
             Plan(levelUp),
             resolveTemplate: _ => null,
             currentHero: EHero.Vanessa,
@@ -99,7 +99,7 @@ public sealed class CollectionLevelUpTooltipTextTests
     {
         Assert.Equal(
             string.Empty,
-            CollectionLevelUpTooltipText.Build(null, _ => null, EHero.Vanessa)
+            LevelUpPreviewTextFormatter.Build(null, _ => null, EHero.Vanessa)
         );
     }
 
@@ -111,13 +111,10 @@ public sealed class CollectionLevelUpTooltipTextTests
         var levelUp = new TLevelUp
         {
             Level = 3,
-            Rewards = new TSpawnContextQuery
-            {
-                Groups = { Group(new[] { rewardId }, limit: 1) },
-            },
+            Rewards = new TSpawnContextQuery { Groups = { Group(new[] { rewardId }, limit: 1) } },
         };
 
-        var text = CollectionLevelUpTooltipText.Build(
+        var text = LevelUpPreviewTextFormatter.Build(
             Plan(levelUp),
             _ => Preview(Step("闪亮!", "选择一件+10 生命的物品")),
             currentHero: null
@@ -157,7 +154,7 @@ public sealed class CollectionLevelUpTooltipTextTests
             },
         };
 
-        var text = CollectionLevelUpTooltipText.Build(Plan(levelUp), _ => null, currentHero: null);
+        var text = LevelUpPreviewTextFormatter.Build(Plan(levelUp), _ => null, currentHero: null);
 
         Assert.Contains("Random reward (10 options)", text);
     }
@@ -195,7 +192,7 @@ public sealed class CollectionLevelUpTooltipTextTests
             },
         };
 
-        var text = CollectionLevelUpTooltipText.Build(
+        var text = LevelUpPreviewTextFormatter.Build(
             Plan(levelUp),
             id => titles.TryGetValue(id, out var title) ? Preview(Step(title)) : null,
             currentHero: null
@@ -232,7 +229,7 @@ public sealed class CollectionLevelUpTooltipTextTests
             },
         };
 
-        var text = CollectionLevelUpTooltipText.Build(
+        var text = LevelUpPreviewTextFormatter.Build(
             Plan(levelUp),
             id => titles.TryGetValue(id, out var title) ? Preview(Step(title)) : null,
             currentHero: null
@@ -261,7 +258,7 @@ public sealed class CollectionLevelUpTooltipTextTests
             },
         };
 
-        var text = CollectionLevelUpTooltipText.Build(
+        var text = LevelUpPreviewTextFormatter.Build(
             Plan(levelUp),
             id => templates.TryGetValue(id, out var template) ? Preview(template) : null,
             currentHero: EHero.Jules
@@ -281,10 +278,10 @@ public sealed class CollectionLevelUpTooltipTextTests
             },
         };
 
-    private static CollectionLevelUpPreviewPlan Plan(TLevelUp levelUp)
+    private static LevelUpPreviewPlan Plan(TLevelUp levelUp)
     {
         var query = Assert.IsType<TSpawnContextQuery>(levelUp.Rewards);
-        var groups = new List<CollectionLevelUpPreviewGroup>();
+        var groups = new List<LevelUpPreviewGroup>();
         foreach (var group in query.Groups)
         {
             if (
@@ -301,13 +298,13 @@ public sealed class CollectionLevelUpTooltipTextTests
                 .Prerequisites?.OfType<TPrerequisiteRun>()
                 .Select(prerequisite => prerequisite.Conditions)
                 .OfType<TRunConditionalPlayerHero>()
-                .Select(condition => new CollectionLevelUpPreviewHeroCondition(
+                .Select(condition => new LevelUpPreviewHeroCondition(
                     condition.Heroes,
                     condition.Operator.ToString()
                 ))
                 .ToArray();
             groups.Add(
-                new CollectionLevelUpPreviewGroup(
+                new LevelUpPreviewGroup(
                     group.RandomWeight,
                     group.Limit is TFixedValue fixedValue ? (int)fixedValue.Value : 1,
                     ids,
@@ -315,7 +312,7 @@ public sealed class CollectionLevelUpTooltipTextTests
                 )
             );
         }
-        return new CollectionLevelUpPreviewPlan(
+        return new LevelUpPreviewPlan(
             (int)levelUp.Level,
             (int)levelUp.HealthIncrease,
             query.SelectionMethod == ESpawnSelectionMethod.Random,
@@ -323,21 +320,21 @@ public sealed class CollectionLevelUpTooltipTextTests
         );
     }
 
-    private static CollectionEncounterPreviewTemplatePlan Preview(TCardBase template) =>
+    private static EncounterPreviewTemplatePlan Preview(TCardBase template) =>
         new(
             template.Id,
-            CollectionEncounterPreviewTemplateKind.EncounterStep,
+            EncounterPreviewTemplateKind.EncounterStep,
             template.Heroes,
             template.InternalName,
-            new CollectionEncounterPreviewLocalizedText(
+            new EncounterPreviewLocalizedText(
                 template.Localization?.Title?.Key,
                 template.Localization?.Title?.Text
             ),
-            new CollectionEncounterPreviewLocalizedText(
+            new EncounterPreviewLocalizedText(
                 template.Localization?.Description?.Key,
                 template.Localization?.Description?.Text
             ),
-            new Dictionary<string, CollectionEncounterPreviewAbilityValue>(),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
             rewardFilter: null
         );
 

@@ -28,6 +28,18 @@ namespace BazaarPlusPlus.Tests.SettingsDockRegistry;
 
 public class SettingsDockRegistryTests
 {
+    private sealed class StubEncounterPreviewModule : IEncounterPreviewModule
+    {
+        public EncounterPreviewResult ResolveEvent(EventPreviewQuery query) =>
+            new(EventPreviewAvailability.Unavailable, null);
+
+        public EncounterStepPreviewResult ResolveStep(EncounterStepPreviewQuery query) =>
+            new(EventPreviewAvailability.Unavailable, null);
+
+        public LevelUpPreviewResult ResolveLevelUp(LevelUpPreviewQuery query) =>
+            new(EventPreviewAvailability.Unavailable, null);
+    }
+
     private sealed class FakeEntry : ISettingsDockEntry
     {
         public string Key { get; }
@@ -435,7 +447,10 @@ public class SettingsDockRegistryTests
         {
             var config = new BppConfig();
             config.Initialize(new ConfigFile(configPath, saveOnInit: false));
-            BppPatchHost.Install(new ContractTestServices(config));
+            BppPatchHost.Install(
+                new ContractTestServices(config),
+                new BppPatchFeatures(new StubEncounterPreviewModule())
+            );
 
             Assert.False(QuestPreviewGate.IsEnabled());
 

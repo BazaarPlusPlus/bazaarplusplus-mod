@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal static class CollectionEncounterHeroEligibility
+internal static class EncounterHeroEligibility
 {
     public static bool Matches(IReadOnlyCollection<EHero> stepHeroes, EHero? currentHero)
     {

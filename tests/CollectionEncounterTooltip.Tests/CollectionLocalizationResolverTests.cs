@@ -9,7 +9,7 @@ using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
 public class CollectionLocalizationResolverTests
 {

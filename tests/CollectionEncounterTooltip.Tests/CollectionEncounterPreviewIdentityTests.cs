@@ -2,9 +2,9 @@ using System.Security.Cryptography;
 using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionEncounterPreviewIdentityTests : IDisposable
+public sealed class EncounterPreviewIdentityTests : IDisposable
 {
     private readonly string _directory = Path.Combine(
         Path.GetTempPath(),
@@ -19,7 +19,7 @@ public sealed class CollectionEncounterPreviewIdentityTests : IDisposable
         var databasePath = Path.Combine(_directory, "GameData.db");
         File.WriteAllText(manifestPath, """{"Entries":{"GameData":{"ETag":"\"etag-a\""}}}""");
 
-        var identity = CollectionEncounterPreviewIdentityResolver.Resolve(
+        var identity = EncounterPreviewIdentityResolver.Resolve(
             manifestPath,
             databasePath,
             "https://data.example.invalid/",
@@ -42,7 +42,7 @@ public sealed class CollectionEncounterPreviewIdentityTests : IDisposable
         File.WriteAllBytes(databasePath, bytes);
         File.WriteAllText(manifestPath, "{broken");
 
-        var identity = CollectionEncounterPreviewIdentityResolver.Resolve(
+        var identity = EncounterPreviewIdentityResolver.Resolve(
             manifestPath,
             databasePath,
             "https://data.example.invalid",
@@ -63,7 +63,7 @@ public sealed class CollectionEncounterPreviewIdentityTests : IDisposable
         Directory.CreateDirectory(_directory);
 
         Assert.Throws<InvalidOperationException>(() =>
-            CollectionEncounterPreviewIdentityResolver.Resolve(
+            EncounterPreviewIdentityResolver.Resolve(
                 Path.Combine(_directory, "manifest.json"),
                 Path.Combine(_directory, "GameData.db"),
                 "https://data.example.invalid",

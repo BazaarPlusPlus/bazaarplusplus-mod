@@ -1,10 +1,8 @@
 #nullable enable
 #pragma warning disable CS0436
 using System;
-using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.Game.Tooltips;
-using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.Tooltips;
@@ -60,26 +58,12 @@ internal static class HeroLevelRewardsTooltipPatch
             // into the hero-level tooltip. Clear them the way the card path does.
             controller._questDisplayService?.BuildDisplay(null, null);
 
-            var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
             var currentLevel = heroLevelTooltipData.GetCurrentAndNextLevel().currentLevel;
-            if (
-                staticData == null
-                || !EventPreviewPlanRuntime.TryGetLevelUp(
-                    staticData,
-                    currentLevel,
-                    out var levelUpPlan,
-                    out var snapshot
-                )
-            )
-                return;
-
-            var content = CollectionLevelUpTooltipText.Build(
-                levelUpPlan,
-                id => snapshot.TryGetTemplate(id, out var template) ? template : null,
-                EncounterEventTooltipPatch.TryReadCurrentHero(),
-                BppTooltipText.ColorKeywords,
-                currentLevel
+            var result = BppPatchHost.Features.EncounterPreview.ResolveLevelUp(
+                new LevelUpPreviewQuery(currentLevel)
             );
+            var content =
+                result.Availability == EventPreviewAvailability.Available ? result.Content : null;
             if (string.IsNullOrEmpty(content))
             {
                 ReportObserved(

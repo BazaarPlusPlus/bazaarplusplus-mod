@@ -3,11 +3,11 @@ using System;
 using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal sealed class CollectionEncounterRewardFilter
+internal sealed class EncounterRewardFilter
 {
-    public CollectionEncounterRewardFilter(
+    public EncounterRewardFilter(
         ECardType cardType,
         int? quantity,
         bool fromAnyHero,
@@ -65,12 +65,12 @@ internal sealed class CollectionEncounterRewardFilter
 
     public bool HasTierGateOverride => Tiers.Count > 0;
 
-    public CollectionEncounterRewardFilter WithFromAnyHero(bool fromAnyHero)
+    public EncounterRewardFilter WithFromAnyHero(bool fromAnyHero)
     {
         if (FromAnyHero == fromAnyHero)
             return this;
 
-        return new CollectionEncounterRewardFilter(
+        return new EncounterRewardFilter(
             CardType,
             Quantity,
             fromAnyHero,

@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using BazaarGameShared.Domain.Core.Types;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal static class CollectionEncounterRewardParser
+internal static class EncounterRewardParser
 {
     private static readonly (string Phrase, string EnumName)[] ItemTagTerms =
     {
@@ -56,7 +56,7 @@ internal static class CollectionEncounterRewardParser
         ("value", "Value"),
     };
 
-    public static CollectionEncounterRewardFilter? TryParse(string? resultText)
+    public static EncounterRewardFilter? TryParse(string? resultText)
     {
         if (string.IsNullOrWhiteSpace(resultText))
             return null;
@@ -78,7 +78,7 @@ internal static class CollectionEncounterRewardParser
             tags = Array.Empty<ECardTag>();
 
         var summary = BuildSummary(cardType, sizes, tiers, tags, keywords);
-        return new CollectionEncounterRewardFilter(
+        return new EncounterRewardFilter(
             cardType,
             ParseQuantity(lower, cardType),
             lower.Contains("from any hero", StringComparison.Ordinal),

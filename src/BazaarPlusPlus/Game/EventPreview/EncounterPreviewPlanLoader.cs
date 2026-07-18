@@ -7,15 +7,15 @@ using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Game;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal sealed class CollectionEncounterPreviewPlanLoadResult
+internal sealed class EncounterPreviewPlanLoadResult
 {
-    public CollectionEncounterPreviewPlanLoadResult(
-        CollectionEncounterPreviewSnapshot snapshot,
+    public EncounterPreviewPlanLoadResult(
+        EncounterPreviewSnapshot snapshot,
         bool wasCacheHit,
         string cacheMissReason,
-        CollectionEncounterPreviewCompileResult? compileResult,
+        EncounterPreviewCompileResult? compileResult,
         double cacheReadMilliseconds,
         double compileMilliseconds
     )
@@ -28,34 +28,34 @@ internal sealed class CollectionEncounterPreviewPlanLoadResult
         CompileMilliseconds = compileMilliseconds;
     }
 
-    public CollectionEncounterPreviewSnapshot Snapshot { get; }
+    public EncounterPreviewSnapshot Snapshot { get; }
 
     public bool WasCacheHit { get; }
 
     public string CacheMissReason { get; }
 
-    public CollectionEncounterPreviewCompileResult? CompileResult { get; }
+    public EncounterPreviewCompileResult? CompileResult { get; }
 
     public double CacheReadMilliseconds { get; }
 
     public double CompileMilliseconds { get; }
 }
 
-internal sealed class CollectionEncounterPreviewPlanLoader
+internal sealed class EncounterPreviewPlanLoader
 {
-    private readonly CollectionEncounterPreviewCacheStore _cacheStore;
+    private readonly EncounterPreviewCacheStore _cacheStore;
     private readonly Func<
         IReadOnlyDictionary<Guid, ITCard>,
         IReadOnlyDictionary<int, TLevelUp>,
-        CollectionEncounterPreviewCompileResult
+        EncounterPreviewCompileResult
     > _compile;
 
-    public CollectionEncounterPreviewPlanLoader(
-        CollectionEncounterPreviewCacheStore cacheStore,
+    public EncounterPreviewPlanLoader(
+        EncounterPreviewCacheStore cacheStore,
         Func<
             IReadOnlyDictionary<Guid, ITCard>,
             IReadOnlyDictionary<int, TLevelUp>,
-            CollectionEncounterPreviewCompileResult
+            EncounterPreviewCompileResult
         > compile
     )
     {
@@ -63,8 +63,8 @@ internal sealed class CollectionEncounterPreviewPlanLoader
         _compile = compile ?? throw new ArgumentNullException(nameof(compile));
     }
 
-    public async Task<CollectionEncounterPreviewPlanLoadResult> LoadAsync(
-        CollectionEncounterPreviewCacheIdentity identity,
+    public async Task<EncounterPreviewPlanLoadResult> LoadAsync(
+        EncounterPreviewCacheIdentity identity,
         Func<Task<Dictionary<Guid, ITCard>?>> loadCardMap,
         Func<Dictionary<int, TLevelUp>?> loadLevelUps,
         CancellationToken cancellationToken
@@ -80,7 +80,7 @@ internal sealed class CollectionEncounterPreviewPlanLoader
         var cacheStarted = Stopwatch.GetTimestamp();
         if (_cacheStore.TryLoad(identity, out var cached, out var missReason))
         {
-            return new CollectionEncounterPreviewPlanLoadResult(
+            return new EncounterPreviewPlanLoadResult(
                 cached!,
                 wasCacheHit: true,
                 cacheMissReason: string.Empty,
@@ -102,7 +102,7 @@ internal sealed class CollectionEncounterPreviewPlanLoader
 
         var compileStarted = Stopwatch.GetTimestamp();
         var compileResult = _compile(map, levelUps);
-        return new CollectionEncounterPreviewPlanLoadResult(
+        return new EncounterPreviewPlanLoadResult(
             compileResult.Snapshot,
             wasCacheHit: false,
             missReason,

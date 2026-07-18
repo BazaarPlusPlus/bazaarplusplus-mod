@@ -11,6 +11,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
+using BazaarPlusPlus.Game.Encounters;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;

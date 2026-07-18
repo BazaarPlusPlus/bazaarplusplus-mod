@@ -2,9 +2,9 @@
 using System;
 using System.Threading;
 
-namespace BazaarPlusPlus.Game.CollectionPanel;
+namespace BazaarPlusPlus.Game.EventPreview;
 
-internal sealed class CollectionEncounterPreviewPlanRegistry
+internal sealed class EncounterPreviewPlanRegistry
 {
     private readonly object _gate = new();
     private object? _generationSource;
@@ -31,11 +31,7 @@ internal sealed class CollectionEncounterPreviewPlanRegistry
             return IsCurrentUnderLock(source, generation);
     }
 
-    public bool TryPublish(
-        object source,
-        long generation,
-        CollectionEncounterPreviewSnapshot snapshot
-    )
+    public bool TryPublish(object source, long generation, EncounterPreviewSnapshot snapshot)
     {
         if (snapshot == null)
             throw new ArgumentNullException(nameof(snapshot));
@@ -53,7 +49,7 @@ internal sealed class CollectionEncounterPreviewPlanRegistry
     public bool TryCommitAndPublish(
         object source,
         long generation,
-        CollectionEncounterPreviewSnapshot snapshot,
+        EncounterPreviewSnapshot snapshot,
         Action commit
     )
     {
@@ -73,7 +69,7 @@ internal sealed class CollectionEncounterPreviewPlanRegistry
         }
     }
 
-    public bool TryGet(object source, out CollectionEncounterPreviewSnapshot snapshot)
+    public bool TryGet(object source, out EncounterPreviewSnapshot snapshot)
     {
         var published = Volatile.Read(ref _published);
         if (published != null && ReferenceEquals(source, published.Source))
@@ -84,6 +80,20 @@ internal sealed class CollectionEncounterPreviewPlanRegistry
 
         snapshot = null!;
         return false;
+    }
+
+    public bool TryRunIfCurrent(object source, long generation, Action action)
+    {
+        if (action == null)
+            throw new ArgumentNullException(nameof(action));
+
+        lock (_gate)
+        {
+            if (!IsCurrentUnderLock(source, generation))
+                return false;
+            action();
+            return true;
+        }
     }
 
     public void Reset()
@@ -101,7 +111,7 @@ internal sealed class CollectionEncounterPreviewPlanRegistry
 
     private sealed class PublishedSnapshot
     {
-        public PublishedSnapshot(object source, CollectionEncounterPreviewSnapshot snapshot)
+        public PublishedSnapshot(object source, EncounterPreviewSnapshot snapshot)
         {
             Source = source;
             Snapshot = snapshot;
@@ -109,6 +119,6 @@ internal sealed class CollectionEncounterPreviewPlanRegistry
 
         public object Source { get; }
 
-        public CollectionEncounterPreviewSnapshot Snapshot { get; }
+        public EncounterPreviewSnapshot Snapshot { get; }
     }
 }
