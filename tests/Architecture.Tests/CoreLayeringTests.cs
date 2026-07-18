@@ -1665,6 +1665,9 @@ public class CoreLayeringTests
         var patchSource = File.ReadAllText(
             Path.Combine(mainSource, "Patches", "Combat", "CurrentReplayRecordingButtonPatch.cs")
         );
+        var runtimeSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CombatReplay", "CombatReplayRuntime.cs")
+        );
         var projectSource = File.ReadAllText(Path.Combine(mainSource, "BazaarPlusPlus.csproj"));
 
         Assert.Contains("typeof(FightMenuDialog)", patchSource);
@@ -1688,6 +1691,21 @@ public class CoreLayeringTests
         Assert.DoesNotContain("_cloneRect.TransformVector(", controllerSource);
         Assert.DoesNotContain("_cloneRect.position + Vector3.up", controllerSource);
         Assert.Contains("CurrentReplayRecordingUiLogState", controllerSource);
+        Assert.Contains("BindNativeActions(", controllerSource);
+        Assert.Contains("nativeRecapButton.onClick.Invoke", controllerSource);
+        Assert.Contains("nativeRecapBackButton.onClick.Invoke", controllerSource);
+        Assert.Contains("\"RecapButton\"", patchSource);
+        Assert.Contains("\"BackButton\"", patchSource);
+        Assert.Contains("StartCurrentReplayAfterRecapClosed", runtimeSource);
+        Assert.Contains(
+            "boardManager.IsRecapViewOpen || boardManager.StorageMoving",
+            runtimeSource
+        );
+        Assert.Contains(
+            "!boardManager.IsRecapViewOpen && !boardManager.StorageMoving",
+            runtimeSource
+        );
+        Assert.Contains("invokeNativeRecap?.Invoke()", runtimeSource);
         Assert.Contains(
             "settingsButton.gameObject.AddComponent<CurrentReplayRecordingButtonController>()",
             controllerSource

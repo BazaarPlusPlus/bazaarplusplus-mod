@@ -15,6 +15,8 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     private const float DockButtonGap = BppSettingsDockPlacement.DefaultSiblingGap;
     private Button? _settingsButton;
     private Button? _nativeReplayButton;
+    private Button? _nativeRecapButton;
+    private Button? _nativeRecapBackButton;
     private Button? _button;
     private RectTransform? _cloneRect;
     private GameObject? _clone;
@@ -57,7 +59,11 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         return controller;
     }
 
-    internal static void BindNativeReplay(Button nativeReplayButton)
+    internal static void BindNativeActions(
+        Button nativeReplayButton,
+        Button nativeRecapButton,
+        Button nativeRecapBackButton
+    )
     {
         foreach (
             var controller in FindObjectsOfType<CurrentReplayRecordingButtonController>(
@@ -66,6 +72,8 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         )
         {
             controller._nativeReplayButton = nativeReplayButton;
+            controller._nativeRecapButton = nativeRecapButton;
+            controller._nativeRecapBackButton = nativeRecapBackButton;
             controller.Refresh();
         }
     }
@@ -203,14 +211,26 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     {
         var runtime = CombatReplayRuntime.Instance;
         var nativeReplayButton = _nativeReplayButton;
-        if (runtime == null || nativeReplayButton == null)
+        var nativeRecapButton = _nativeRecapButton;
+        var nativeRecapBackButton = _nativeRecapBackButton;
+        if (
+            runtime == null
+            || nativeReplayButton == null
+            || nativeRecapButton == null
+            || nativeRecapBackButton == null
+        )
             return;
 
         var snapshot = runtime.GetCurrentReplayRecordingSnapshot();
         if (snapshot.CanReveal)
             runtime.TryRevealCurrentReplayVideo(out _);
         else if (snapshot.CanStart)
-            runtime.TryStartCurrentReplayRecording(nativeReplayButton.onClick.Invoke, out _);
+            runtime.TryStartCurrentReplayRecording(
+                nativeReplayButton.onClick.Invoke,
+                nativeRecapButton.onClick.Invoke,
+                nativeRecapBackButton.onClick.Invoke,
+                out _
+            );
         Refresh();
     }
 
