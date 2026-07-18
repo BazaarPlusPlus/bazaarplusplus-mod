@@ -23,11 +23,11 @@
   </PropertyGroup>
   <!-- Package references -->
   <ItemGroup>
-    <PackageReference Include="BepInEx.Core" Version="5.*" />
-    <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
-    <PackageReference Include="Krafs.Publicizer" Version="2.3.0" PrivateAssets="all" />
-    <PackageReference Include="UnityEngine.Modules" Version="2022.3.40" IncludeAssets="compile" />
-    <PackageReference Include="NETStandard.Library" Version="2.0.3" />
+    <PackageReference Include="BepInEx.Core" />
+    <PackageReference Include="BepInEx.PluginInfoProps" />
+    <PackageReference Include="Krafs.Publicizer" PrivateAssets="all" />
+    <PackageReference Include="UnityEngine.Modules" IncludeAssets="compile" />
+    <PackageReference Include="NETStandard.Library" />
   </ItemGroup>
 
   <!-- The host adapters reach a few internal game members directly (the rest is reflection),
