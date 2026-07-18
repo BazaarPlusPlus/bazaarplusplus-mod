@@ -131,8 +131,7 @@ public class BazaarAgentReplayControlProcessorTests
             {
                 BazaarAgentReplayControlStatus.InvalidPayload =>
                     BazaarAgentLogReasonCode.ReplayInvalidPayload,
-                BazaarAgentReplayControlStatus.Rejected =>
-                    BazaarAgentLogReasonCode.ReplayRejected,
+                BazaarAgentReplayControlStatus.Rejected => BazaarAgentLogReasonCode.ReplayRejected,
                 _ => BazaarAgentLogReasonCode.ReplayUnavailable,
             },
             logEvent.Values[3].Value

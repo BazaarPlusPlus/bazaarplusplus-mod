@@ -271,8 +271,18 @@ test_all() {
     fi
 }
 
+restore_dotnet_tools() {
+    dotnet tool restore
+}
+
 format() {
-    csharpier format .
+    restore_dotnet_tools
+    dotnet csharpier format .
+}
+
+format_check() {
+    restore_dotnet_tools
+    dotnet csharpier check .
 }
 
 check_ilspy() {
@@ -405,6 +415,7 @@ Usage:
   $0 fetch-data [-p:Name=Value ...]
   $0 test
   $0 format
+  $0 format-check
   $0 decompile [DllName]
   $0 decompile-all
   $0 decompile-ptr [DllName]
@@ -432,8 +443,9 @@ case "${1:-}" in
         shift
         parse_build_options "$@"
         ;;
-    test)       test_all ;;
-    format)     format ;;
+    test)         test_all ;;
+    format)       format ;;
+    format-check) format_check ;;
     decompile)
         require_steam_branch public
         decompile "$@"

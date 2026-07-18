@@ -715,8 +715,7 @@ internal static class VoiceLineDisplay
             + chinese.Substring(punctuationIndex + 1);
     }
 
-    private static bool IsClosingQuote(char value) =>
-        value is '」' or '』' or '”' or '’';
+    private static bool IsClosingQuote(char value) => value is '」' or '』' or '”' or '’';
 
     private static bool AreScalesEquivalent(float left, float right) =>
         Math.Abs(left - right) <= ScaleComparisonTolerance;

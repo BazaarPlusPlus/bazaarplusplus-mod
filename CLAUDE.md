@@ -22,8 +22,8 @@ dotnet test tests\Architecture.Tests\Architecture.Tests.csproj
 # Run an exe-runner test project (no Microsoft.NET.Test.Sdk)
 dotnet run --project tests\ChoiceScreenPedestalResolver.Tests\ChoiceScreenPedestalResolver.Tests.csproj
 
-# Format
-csharpier format .
+# Format with the repo-pinned CSharpier version
+./run.sh format
 ```
 
 `run.sh` works on macOS and Windows (Git Bash). Subcommands:
@@ -32,7 +32,8 @@ csharpier format .
 - `./run.sh publish [--with-bazaaragent] [-p:Name=Value ...]` — production build: fetch remote embedded data, run seed gates, then `-t:BuildAll` (Debug + Release) with installer packaging
 - `./run.sh fetch-data [-p:Name=Value ...]` — refresh remote embedded data
 - `./run.sh test` — run all test projects under `tests/`
-- `./run.sh format` — csharpier format
+- `./run.sh format` — restore the repo-pinned CSharpier tool and format the source tree
+- `./run.sh format-check` — restore the repo-pinned CSharpier tool and fail on unformatted files
 - `./run.sh decompile [DllName]` — decompile a single game DLL (default: Assembly-CSharp)
 - `./run.sh decompile-all` — decompile all tracked game DLLs
 - `./run.sh decompile-ptr [DllName]` — decompile a single PTR game DLL into `decompiled-vptr/`

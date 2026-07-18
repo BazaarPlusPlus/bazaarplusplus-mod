@@ -647,31 +647,28 @@ internal sealed partial class HistoryPanelRepository
         var hasCounts = rawSnapshotCounts?.HasAnyRecordedCard == true;
         command.CommandText = hasCounts
             ? $"""
-            UPDATE {RunLogSchema.BattlesTableName}
-            SET replay_downloaded = 1,
-                player_hand_item_count = $playerHandItemCount,
-                player_skill_count = $playerSkillCount,
-                opponent_hand_item_count = $opponentHandItemCount,
-                opponent_skill_count = $opponentSkillCount
-            WHERE source = 'GHOST'
-              AND battle_id = $battleId;
-            """
+                UPDATE {RunLogSchema.BattlesTableName}
+                SET replay_downloaded = 1,
+                    player_hand_item_count = $playerHandItemCount,
+                    player_skill_count = $playerSkillCount,
+                    opponent_hand_item_count = $opponentHandItemCount,
+                    opponent_skill_count = $opponentSkillCount
+                WHERE source = 'GHOST'
+                  AND battle_id = $battleId;
+                """
             : $"""
-            UPDATE {RunLogSchema.BattlesTableName}
-            SET replay_downloaded = 1
-            WHERE source = 'GHOST'
-              AND battle_id = $battleId;
-            """;
+                UPDATE {RunLogSchema.BattlesTableName}
+                SET replay_downloaded = 1
+                WHERE source = 'GHOST'
+                  AND battle_id = $battleId;
+                """;
         command.Parameters.AddWithValue("$battleId", battleId);
         if (hasCounts)
         {
             var counts = rawSnapshotCounts.GetValueOrDefault();
             command.Parameters.AddWithValue("$playerHandItemCount", counts.PlayerHandItemCount);
             command.Parameters.AddWithValue("$playerSkillCount", counts.PlayerSkillCount);
-            command.Parameters.AddWithValue(
-                "$opponentHandItemCount",
-                counts.OpponentHandItemCount
-            );
+            command.Parameters.AddWithValue("$opponentHandItemCount", counts.OpponentHandItemCount);
             command.Parameters.AddWithValue("$opponentSkillCount", counts.OpponentSkillCount);
         }
         command.ExecuteNonQuery();

@@ -95,10 +95,8 @@ var programmaticScopeType = assembly.GetType(
 foreach (var methodName in new[] { "Enter", "Restore", "IsActive" })
 {
     Assert(
-        programmaticScopeType.GetMethod(
-            methodName,
-            BindingFlags.NonPublic | BindingFlags.Static
-        ) != null,
+        programmaticScopeType.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)
+            != null,
         $"Hero programmatic-selection scope must expose {methodName}."
     );
 }

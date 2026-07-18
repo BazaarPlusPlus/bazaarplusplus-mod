@@ -19,8 +19,7 @@ internal static class ReplayRunEconomyFallback
         if (manifest == null)
             return;
         if (
-            manifest.Participants.PlayerIncome.HasValue
-            && manifest.Participants.PlayerGold.HasValue
+            manifest.Participants.PlayerIncome.HasValue && manifest.Participants.PlayerGold.HasValue
         )
             return;
         if (string.IsNullOrWhiteSpace(manifest.RunId))

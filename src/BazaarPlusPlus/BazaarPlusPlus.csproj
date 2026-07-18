@@ -23,16 +23,26 @@
   <!-- Embedded resources -->
   <ItemGroup>
     <EmbeddedResource Include="Data\CollectionSources\collection-sources.json" />
-    <EmbeddedResource Include="Resources\DockButtons\collection-panel-icon.png"
-      LogicalName="BazaarPlusPlus.Resources.DockButtons.collection-panel-icon.png" />
-    <EmbeddedResource Include="Resources\DockButtons\replay-export-icon.png"
-      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-export-icon.png" />
-    <EmbeddedResource Include="Resources\DockButtons\replay-recording-icon.png"
-      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-recording-icon.png" />
-    <EmbeddedResource Include="Resources\DockButtons\replay-view-icon.png"
-      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-view-icon.png" />
-    <EmbeddedResource Include="Resources\DockButtons\replay-retry-icon.png"
-      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-retry-icon.png" />
+    <EmbeddedResource
+      Include="Resources\DockButtons\collection-panel-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.collection-panel-icon.png"
+    />
+    <EmbeddedResource
+      Include="Resources\DockButtons\replay-export-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-export-icon.png"
+    />
+    <EmbeddedResource
+      Include="Resources\DockButtons\replay-recording-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-recording-icon.png"
+    />
+    <EmbeddedResource
+      Include="Resources\DockButtons\replay-view-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-view-icon.png"
+    />
+    <EmbeddedResource
+      Include="Resources\DockButtons\replay-retry-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-retry-icon.png"
+    />
   </ItemGroup>
 
   <!-- Project paths -->

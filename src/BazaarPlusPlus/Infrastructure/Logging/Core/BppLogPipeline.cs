@@ -158,7 +158,10 @@ internal sealed class BppLogPipeline
                 {
                     if (
                         ReferenceEquals(pair.Value.Definition, definition)
-                        && (stormKey == null || string.Equals(pair.Key, stormKey, StringComparison.Ordinal))
+                        && (
+                            stormKey == null
+                            || string.Equals(pair.Key, stormKey, StringComparison.Ordinal)
+                        )
                     )
                         keys.Add(pair.Key);
                 }

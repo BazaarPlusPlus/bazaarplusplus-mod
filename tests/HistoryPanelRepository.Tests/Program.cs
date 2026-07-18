@@ -583,7 +583,11 @@ static object CreateGhostImportsWithoutCounts(Type ghostImportType, params strin
     return CreateGhostImportsCore(ghostImportType, includeCounts: false, battlePairs);
 }
 
-static object CreateGhostImportsCore(Type ghostImportType, bool includeCounts, params string[] battlePairs)
+static object CreateGhostImportsCore(
+    Type ghostImportType,
+    bool includeCounts,
+    params string[] battlePairs
+)
 {
     var listType = typeof(List<>).MakeGenericType(ghostImportType);
     var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
