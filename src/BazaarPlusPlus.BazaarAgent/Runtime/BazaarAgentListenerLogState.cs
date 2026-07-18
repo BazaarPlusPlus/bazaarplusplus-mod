@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.BazaarAgent;
 
 internal sealed class BazaarAgentListenerLogState

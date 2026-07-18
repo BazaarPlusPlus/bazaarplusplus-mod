@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 using System.Collections.Concurrent;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.VoiceSubtitles.Settings;

@@ -1,6 +1,5 @@
 #pragma warning disable CS0436
 #nullable enable
-using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using BazaarPlusPlus.Game.Settings;

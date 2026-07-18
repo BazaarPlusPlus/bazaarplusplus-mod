@@ -10,8 +10,6 @@ using BazaarGameShared.Domain.Spawning.SpawnFilters;
 using BazaarGameShared.Domain.Spawning.SpawnGroups;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
 using BazaarGameShared.Domain.Values;
-using BazaarPlusPlus.Game.CollectionPanel;
-using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Localization;
 using Xunit;
 
@@ -274,7 +272,7 @@ public sealed class LevelUpPreviewTextFormatterTests
             Localization = new TCardLocalization
             {
                 Title = new TLocalizableText { Text = title },
-                Description = new TLocalizableText { Text = description },
+                Description = new TLocalizableText { Text = description ?? string.Empty },
             },
         };
 

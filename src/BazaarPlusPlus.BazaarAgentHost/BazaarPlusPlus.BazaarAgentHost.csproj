@@ -13,7 +13,10 @@
     <BepInExPluginVersion>$(BppVersion)</BepInExPluginVersion>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <NoWarn>CS0436</NoWarn>
+    <!-- Krafs.Publicizer generates IgnoresAccessChecksToAttribute into AssemblyInfo, while
+         the referenced BazaarPlusPlus plugin provides the same type. Scope this generated-
+         source conflict to the publicized host project instead of weakening the warning gate. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
   </PropertyGroup>
 
   <!-- Project-specific paths. Shared game assembly and game-root discovery lives in

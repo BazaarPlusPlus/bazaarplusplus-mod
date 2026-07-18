@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarGameShared.Infra.Messages;
 
 namespace BazaarPlusPlus.Game.PvpBattles;

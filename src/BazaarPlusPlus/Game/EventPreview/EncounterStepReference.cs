@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Game.EventPreview;
 
 internal sealed class EncounterStepReference

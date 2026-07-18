@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;

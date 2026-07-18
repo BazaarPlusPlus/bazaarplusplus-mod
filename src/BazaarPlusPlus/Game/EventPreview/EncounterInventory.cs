@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Game.EventPreview;
 
 // One owned card in the inventory snapshot: template id plus the names of its tags

@@ -3,9 +3,6 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarGameShared.Domain.Spawning.SpawnBehaviors;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
-using BazaarPlusPlus.Game.CollectionPanel;
-using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Localization;
 using Xunit;
 

@@ -3,7 +3,6 @@
 using System.Reflection;
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Core.Events;
-using BazaarPlusPlus.Patches;
 using HarmonyLib;
 
 namespace BazaarPlusPlus.Patches.RunLogging;

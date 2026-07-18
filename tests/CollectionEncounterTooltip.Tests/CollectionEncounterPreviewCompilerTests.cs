@@ -12,7 +12,6 @@ using BazaarGameShared.Domain.Spawning.SpawnFilters.Constraints;
 using BazaarGameShared.Domain.Spawning.SpawnGroups;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
 using BazaarGameShared.Domain.Values;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Newtonsoft.Json.Linq;
 using Xunit;
 

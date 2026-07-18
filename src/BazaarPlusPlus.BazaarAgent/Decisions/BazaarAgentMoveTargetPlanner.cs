@@ -1,6 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.BazaarAgent;
 
 /// <summary>
@@ -16,6 +14,9 @@ public static class BazaarAgentMoveTargetPlanner
     /// <see cref="IReadOnlyList{T}"/> of socket-id string lists
     /// ("Socket_0", "Socket_1", …) the item would occupy. Sorted by starting index.
     /// </summary>
+    /// <param name="itemSize">Number of consecutive sockets occupied by the item.</param>
+    /// <param name="capacity">Total socket capacity of the target section.</param>
+    /// <param name="occupiedSockets">Socket indices currently occupied in the target section.</param>
     /// <param name="excludeStartIndexInclusive">
     /// Optional: first socket index to treat as vacant (for "moving from-self" case).
     /// Pass -1 to disable.

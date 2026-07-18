@@ -1,7 +1,6 @@
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Game;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
 namespace EncounterTooltip.Tests;

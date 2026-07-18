@@ -1,7 +1,4 @@
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.CollectionPanel;
-using BazaarPlusPlus.Game.CollectionPanel.Data;
-using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.Localization;
 using Xunit;
 

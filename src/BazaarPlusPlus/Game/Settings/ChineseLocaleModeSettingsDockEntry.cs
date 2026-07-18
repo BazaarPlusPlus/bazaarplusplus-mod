@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Localization;
 

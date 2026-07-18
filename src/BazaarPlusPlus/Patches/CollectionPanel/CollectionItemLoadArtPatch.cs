@@ -1,10 +1,7 @@
 #nullable enable
 #pragma warning disable CS0436
-using System;
-using System.Threading.Tasks;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
-using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.UI;
 using Object = UnityEngine.Object;

@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
 internal sealed class CollectionSearchRefreshGate

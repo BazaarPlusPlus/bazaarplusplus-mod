@@ -1,17 +1,11 @@
 #nullable enable
-using System;
 using System.Collections;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
-using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay.Audio;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 

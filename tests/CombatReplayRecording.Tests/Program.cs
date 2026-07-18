@@ -2,8 +2,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 
 var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
@@ -251,13 +249,6 @@ Assert(
         && cardSetCaptureType.GetProperty("Source") != null,
     "PvpBattleCardSetCapture should expose Items, Status, and Source."
 );
-Assert(
-    matcherType != null
-        && collectorType != null
-        && manifestFactoryType != null
-        && payloadFactoryType != null,
-    "The PVP battle matcher, collector, and factories should exist."
-);
 var shouldRefreshPlayerCaptureMethod = collectorType.GetMethod(
     "ShouldRefreshPlayerCapture",
     BindingFlags.NonPublic | BindingFlags.Static
@@ -269,9 +260,7 @@ Assert(
 Assert(
     catalogType.GetMethod("Save") != null
         && catalogType.GetMethod("TryLoad") != null
-        && catalogType.GetMethod("ListRecentBattles") != null
-        && catalogInterfaceType != null
-        && catalogStoreType != null,
+        && catalogType.GetMethod("ListRecentBattles") != null,
     "The PVP battle catalog read side should expose Save, TryLoad, and ListRecentBattles."
 );
 Assert(
@@ -394,11 +383,11 @@ Assert(
 );
 Assert(
     abandonedResults.Any(result =>
-        !(bool)GetProperty(persistenceResultType, result, "Succeeded")
+        !(bool)GetRequiredProperty(persistenceResultType, result, "Succeeded")
         && string.Equals(
             (string?)GetProperty(
                 manifestType,
-                GetProperty(persistenceResultType, result, "Manifest"),
+                GetRequiredProperty(persistenceResultType, result, "Manifest"),
                 "BattleId"
             ),
             "battle-dispose-abandoned",
@@ -435,11 +424,11 @@ while (TryDequeuePersistenceResult(persistenceQueueType, queue!, out var result)
 
 Assert(
     queueResults.Any(result =>
-        (bool)GetProperty(persistenceResultType, result, "Succeeded")
+        (bool)GetRequiredProperty(persistenceResultType, result, "Succeeded")
         && string.Equals(
             (string?)GetProperty(
                 manifestType,
-                GetProperty(persistenceResultType, result, "Manifest"),
+                GetRequiredProperty(persistenceResultType, result, "Manifest"),
                 "BattleId"
             ),
             "battle-dispose-slow",
@@ -457,7 +446,7 @@ Assert(
     "Forced shutdown abandonment should not roll back payloads when the manifest save was never attempted."
 );
 Assert(
-    !(bool)GetProperty(persistenceQueueType, queue!, "HasPendingPersistence"),
+    !(bool)GetRequiredProperty(persistenceQueueType, queue!, "HasPendingPersistence"),
     "After draining the completed queue results from disposal, replay persistence should no longer report outstanding work."
 );
 var tempRoot = Path.Combine(
@@ -897,11 +886,9 @@ try
         "AttachToRun should backfill the saved battle row once the owning run exists."
     );
     var reboundBattles = (
-        (System.Collections.IEnumerable)Invoke(
-            catalogType,
-            battleCatalog!,
-            "ListByRunId",
-            new object?[] { "run-001" }
+        (System.Collections.IEnumerable)(
+            Invoke(catalogType, battleCatalog!, "ListByRunId", new object?[] { "run-001" })
+            ?? throw new InvalidOperationException("ListByRunId should return a collection.")
         )
     )
         .Cast<object>()
@@ -1356,11 +1343,9 @@ try
     );
     Invoke(catalogType, battleCatalog!, "Save", new object?[] { missingPayloadManifest! });
     var savedReplays = (
-        (System.Collections.IEnumerable)Invoke(
-            controllerType,
-            controller!,
-            "ListRecentBattles",
-            Array.Empty<object?>()
+        (System.Collections.IEnumerable)(
+            Invoke(controllerType, controller!, "ListRecentBattles", Array.Empty<object?>())
+            ?? throw new InvalidOperationException("ListRecentBattles should return a collection.")
         )
     )
         .Cast<object>()
@@ -2345,6 +2330,12 @@ static object? GetProperty(Type type, object instance, string name)
     return property!.GetValue(instance);
 }
 
+static object GetRequiredProperty(Type type, object instance, string name)
+{
+    return GetProperty(type, instance, name)
+        ?? throw new InvalidOperationException($"Property returned null: {type.FullName}.{name}");
+}
+
 static object? GetFieldValue(Type type, object instance, string name)
 {
     var field = type.GetField(
@@ -2587,14 +2578,6 @@ static object CreateManifestFixture(
     return manifest;
 }
 
-static int ReadSnapshotCount(Type recordType, object instance, string propertyName)
-{
-    return ((System.Collections.IEnumerable?)GetProperty(recordType, instance, propertyName))
-            ?.Cast<object>()
-            .Count()
-        ?? 0;
-}
-
 static object SingleBattleProjection(object uploadSnapshot)
 {
     var metadata =
@@ -2637,26 +2620,6 @@ static int GetInt32(SqliteConnection connection, string sql, string battleId)
         command.ExecuteScalar()
             ?? throw new InvalidOperationException($"Query returned null: {sql}")
     );
-}
-
-static bool ColumnExists(SqliteConnection connection, string tableName, string columnName)
-{
-    using var command = connection.CreateCommand();
-    command.CommandText = $"PRAGMA table_info({tableName});";
-    using var reader = command.ExecuteReader();
-    while (reader.Read())
-    {
-        if (
-            string.Equals(
-                reader.GetString(reader.GetOrdinal("name")),
-                columnName,
-                StringComparison.Ordinal
-            )
-        )
-            return true;
-    }
-
-    return false;
 }
 
 static void Assert(bool condition, string message)

@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.GameInterop.VoiceSubtitles;
 
 internal sealed class VoiceSubtitleObserverCallbacks

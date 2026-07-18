@@ -1,8 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
 namespace BazaarPlusPlus.GameInterop.CardPreview;
 
 internal sealed class NativeCardPreviewScopeLifetime<TResource>

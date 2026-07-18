@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Threading;
-
 namespace BazaarPlusPlus.Game.CombatReplay.Audio;
 
 internal static class ReplayAudioCaptureThreadJoiner

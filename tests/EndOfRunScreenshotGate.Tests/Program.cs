@@ -1,5 +1,4 @@
 #nullable enable
-using System.IO;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Game.Screenshots;
 using BazaarPlusPlus.Storage.RunScreenshot;

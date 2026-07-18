@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using System.Globalization;
 using BazaarGameClient.Domain.Cards;
 using BazaarGameClient.Domain.Models;

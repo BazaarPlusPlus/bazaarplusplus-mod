@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Item;

@@ -1,6 +1,5 @@
 #nullable enable
 #pragma warning disable CS0436
-using System;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Game.QuestPreview;
 using BazaarPlusPlus.Game.Tooltips;

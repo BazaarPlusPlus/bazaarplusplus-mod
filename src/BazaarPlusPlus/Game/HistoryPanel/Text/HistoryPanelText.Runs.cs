@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 using BazaarPlusPlus.Localization;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;

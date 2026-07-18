@@ -1,7 +1,6 @@
 #nullable enable
 using System.Diagnostics;
 using System.Net;
-using System.Net.Http;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using BazaarPlusPlus.Game.RunLogging.Upload;

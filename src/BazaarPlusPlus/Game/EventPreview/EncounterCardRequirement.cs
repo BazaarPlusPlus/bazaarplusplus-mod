@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Game.EventPreview;
 
 // One TPrerequisiteCardCount: the number of owned cards matching the conditional is

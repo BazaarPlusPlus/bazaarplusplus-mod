@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Threading.Tasks;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.AppFramework;

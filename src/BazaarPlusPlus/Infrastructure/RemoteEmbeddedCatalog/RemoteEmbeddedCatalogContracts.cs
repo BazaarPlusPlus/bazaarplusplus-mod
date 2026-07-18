@@ -1,8 +1,4 @@
 #nullable enable
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-
 namespace BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 
 internal interface IRemoteEmbeddedCatalog<TSnapshot> : IDisposable

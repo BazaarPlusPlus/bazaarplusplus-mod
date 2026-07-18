@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using TheBazaar;
 
 namespace BazaarPlusPlus.Game.Tooltips;

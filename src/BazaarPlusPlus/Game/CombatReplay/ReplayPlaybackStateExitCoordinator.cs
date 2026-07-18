@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal readonly record struct ReplayPlaybackCleanupStep(string Stage, Action Execute);

@@ -1,9 +1,6 @@
 #pragma warning disable CS0436
 #nullable enable
-using System;
 using System.Diagnostics;
-using System.IO;
-using System.Threading;
 using BazaarPlusPlus.Infrastructure.Logging;
 using BepInEx;
 using BepInEx.Logging;

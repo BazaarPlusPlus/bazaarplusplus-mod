@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Paths;
@@ -39,10 +38,8 @@ using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Patches;
 using BazaarPlusPlus.Patches.Tooltips;
-using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
 using BepInEx.Logging;
-using UnityEngine;
 
 namespace BazaarPlusPlus;
 

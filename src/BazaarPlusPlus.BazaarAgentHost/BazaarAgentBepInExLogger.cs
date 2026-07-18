@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.BazaarAgent;
 using BepInEx.Logging;
 

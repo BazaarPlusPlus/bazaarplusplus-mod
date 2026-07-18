@@ -1,7 +1,6 @@
 #nullable enable
 using System.Collections;
 using System.Net;
-using System.Net.Http;
 using System.Reflection;
 using Newtonsoft.Json.Linq;
 
@@ -981,7 +980,7 @@ static void Assert(bool condition, string message)
         throw new InvalidOperationException(message);
 }
 
-sealed class RecordingHttpMessageHandler : HttpMessageHandler
+internal sealed class RecordingHttpMessageHandler : HttpMessageHandler
 {
     private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
 

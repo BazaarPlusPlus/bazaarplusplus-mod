@@ -2,7 +2,6 @@
 using BazaarPlusPlus.BazaarAgent;
 using BazaarPlusPlus.GameInterop;
 using BepInEx;
-using UnityEngine;
 
 namespace BazaarPlusPlus.BazaarAgentHost;
 

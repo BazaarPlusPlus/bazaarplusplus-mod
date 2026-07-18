@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.ModApi.Models;
 
 public sealed class GhostBattleImportRecord

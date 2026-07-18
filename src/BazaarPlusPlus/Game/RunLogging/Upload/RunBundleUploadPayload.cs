@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.ModApi.Models;
 

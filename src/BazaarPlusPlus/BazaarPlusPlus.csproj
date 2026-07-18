@@ -10,7 +10,10 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
-    <NoWarn>CS0436</NoWarn>
+    <!-- Krafs.Publicizer generates IgnoresAccessChecksToAttribute into AssemblyInfo, while
+         MonoMod.Utils provides the same type. Scope this generated-source conflict to the
+         publicized plugin project instead of weakening the repository warning gate. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
     <BuildProductionPackage Condition="'$(BuildProductionPackage)' == ''"
       >false</BuildProductionPackage>
   </PropertyGroup>

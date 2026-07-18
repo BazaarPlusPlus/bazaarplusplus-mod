@@ -1,7 +1,6 @@
 #nullable enable
 using System.Linq.Expressions;
 using System.Net;
-using System.Net.Http;
 using System.Reflection;
 using BepInEx.Logging;
 using Microsoft.Data.Sqlite;

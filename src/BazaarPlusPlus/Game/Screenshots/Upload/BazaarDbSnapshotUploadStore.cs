@@ -1,13 +1,8 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.ModApi.Models;
 using BazaarPlusPlus.Storage.RunLog;
 using BazaarPlusPlus.Storage.Sqlite;
-using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.Screenshots.Upload;
 

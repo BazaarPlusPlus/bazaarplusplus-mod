@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 
 namespace BazaarPlusPlus.Game.CombatReplay;

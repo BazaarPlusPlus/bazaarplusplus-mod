@@ -1,5 +1,4 @@
 #nullable enable
-using System.Threading;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
 using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;

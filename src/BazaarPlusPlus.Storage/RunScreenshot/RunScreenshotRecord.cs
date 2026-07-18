@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Storage.RunScreenshot;
 
 public sealed class RunScreenshotRecord

@@ -1,5 +1,4 @@
 #nullable enable
-using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.EventPreview;

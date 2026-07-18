@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PvpBattles;

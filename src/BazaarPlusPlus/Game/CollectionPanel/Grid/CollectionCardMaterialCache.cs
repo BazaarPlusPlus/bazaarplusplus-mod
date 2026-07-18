@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.Assets.Scripts.ScriptableObjectsScripts;
 using UnityEngine;

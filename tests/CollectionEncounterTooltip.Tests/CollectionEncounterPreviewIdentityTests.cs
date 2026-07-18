@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
 namespace EncounterTooltip.Tests;

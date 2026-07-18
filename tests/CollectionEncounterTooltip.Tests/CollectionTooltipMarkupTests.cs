@@ -1,4 +1,3 @@
-using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using Xunit;
 
 namespace EncounterTooltip.Tests;

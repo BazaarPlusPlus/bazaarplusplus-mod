@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Threading;
-
 namespace BazaarPlusPlus.GameInterop.CardPreview;
 
 internal static class NativeCardPreviewPoolSettlement

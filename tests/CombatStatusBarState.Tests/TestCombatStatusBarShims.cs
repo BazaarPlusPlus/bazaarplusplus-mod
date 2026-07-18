@@ -51,21 +51,20 @@ namespace BazaarPlusPlus.Game.CombatStatusBar
     }
 }
 
-namespace TheBazaar
+// The game declares both runtime types in the global namespace; keep the shim's compile surface
+// identical so linked production sources resolve names the same way as the real assemblies.
+public sealed class GameServiceManager
 {
-    public sealed class GameServiceManager
-    {
-        public bool GamePaused { get; private set; }
+    public bool GamePaused { get; private set; }
 
-        public void PauseOrUnpauseGame(bool paused)
-        {
-            GamePaused = paused;
-        }
-    }
-
-    public sealed class Singleton<T>
-        where T : class
+    public void PauseOrUnpauseGame(bool paused)
     {
-        public static T? Instance { get; set; }
+        GamePaused = paused;
     }
+}
+
+public sealed class Singleton<T>
+    where T : class
+{
+    public static T? Instance { get; set; }
 }

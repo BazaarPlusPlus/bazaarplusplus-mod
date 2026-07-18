@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.IO;
-using System.Net.Http;
 using System.Reflection;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;

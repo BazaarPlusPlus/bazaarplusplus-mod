@@ -1,11 +1,11 @@
 #nullable enable
 #pragma warning disable CS0436
-using System.Collections.Generic;
 using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace BazaarPlusPlus.Patches.Tooltips;
 

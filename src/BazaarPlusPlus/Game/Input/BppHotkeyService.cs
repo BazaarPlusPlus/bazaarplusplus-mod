@@ -1,10 +1,7 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
-using TheBazaar;
 using UnityEngine.InputSystem;
 using UnityEngine.InputSystem.Controls;
 

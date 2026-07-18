@@ -1,6 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.BazaarAgent;
 
 public static class BazaarAgentTargetSelectionActions

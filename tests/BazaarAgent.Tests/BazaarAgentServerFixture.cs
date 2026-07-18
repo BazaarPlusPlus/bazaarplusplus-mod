@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.BazaarAgent;
 
 /// <summary>Per-test HTTP server fixture: each test news one up and disposes it at the end

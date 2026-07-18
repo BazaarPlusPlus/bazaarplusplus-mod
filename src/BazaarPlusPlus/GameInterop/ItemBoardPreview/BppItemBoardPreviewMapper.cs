@@ -1,7 +1,5 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.GameInterop.CardPreview;
 

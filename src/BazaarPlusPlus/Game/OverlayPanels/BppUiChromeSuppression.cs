@@ -1,8 +1,6 @@
 #nullable enable
 
-using System;
 using BazaarPlusPlus.Game.CollectionPanel;
-using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;
 using CombatStatusBarFeature = BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBar;
 

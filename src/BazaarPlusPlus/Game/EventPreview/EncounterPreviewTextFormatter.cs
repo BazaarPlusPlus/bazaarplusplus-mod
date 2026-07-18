@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using System.Globalization;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Encounters;

@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
 internal readonly record struct ReplayVideoOutputFileNames(

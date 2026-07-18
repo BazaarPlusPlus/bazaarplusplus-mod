@@ -1,7 +1,5 @@
 #nullable enable
 #pragma warning disable CS0436
-using System;
-using System.Collections.Generic;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.Tooltips;

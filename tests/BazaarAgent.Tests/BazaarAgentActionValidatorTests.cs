@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarPlusPlus.BazaarAgent;
 using Xunit;
 

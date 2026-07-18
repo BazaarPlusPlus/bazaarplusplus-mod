@@ -1,6 +1,5 @@
 #nullable enable
 
-using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;

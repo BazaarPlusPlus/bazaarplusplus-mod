@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.CombatReplay.Audio;
 
 internal enum ReplayAudioBackend

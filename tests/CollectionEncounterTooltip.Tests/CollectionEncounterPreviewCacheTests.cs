@@ -1,5 +1,4 @@
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Newtonsoft.Json.Linq;
 using Xunit;
 

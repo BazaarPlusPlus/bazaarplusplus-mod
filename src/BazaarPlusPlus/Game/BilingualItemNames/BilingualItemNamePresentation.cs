@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.BilingualItemNames;
 
 internal static class BilingualItemNamePresentation

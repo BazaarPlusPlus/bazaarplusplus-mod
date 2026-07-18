@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.GameInterop.CardPreview;
 
 internal static class NativeTooltipRefreshTransaction

@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.BilingualItemNames;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.Localization;

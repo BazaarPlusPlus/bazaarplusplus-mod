@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure;
 using TMPro;

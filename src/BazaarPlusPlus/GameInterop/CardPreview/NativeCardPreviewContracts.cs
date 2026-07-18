@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using BazaarGameClient.Domain.Models.Cards;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;

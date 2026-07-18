@@ -1,13 +1,8 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
-using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;

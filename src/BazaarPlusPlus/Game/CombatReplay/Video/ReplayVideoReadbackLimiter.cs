@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Threading;
-
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
 internal sealed class ReplayVideoReadbackLimiter

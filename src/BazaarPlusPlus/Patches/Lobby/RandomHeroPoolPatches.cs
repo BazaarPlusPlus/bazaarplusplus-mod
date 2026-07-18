@@ -1,14 +1,9 @@
 #pragma warning disable CS0436
 #nullable enable
-using System;
-using System.Collections.Generic;
-using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.Lobby.RandomHeroPool;
-using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.UI;
-using UnityEngine;
 
 namespace BazaarPlusPlus.Patches.Lobby;
 

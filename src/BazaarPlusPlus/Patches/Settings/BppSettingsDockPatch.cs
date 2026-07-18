@@ -1,6 +1,5 @@
 #pragma warning disable CS0436
 #nullable enable
-using System;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Infrastructure;

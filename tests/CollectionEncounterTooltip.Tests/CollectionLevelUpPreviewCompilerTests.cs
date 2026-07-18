@@ -10,7 +10,6 @@ using BazaarGameShared.Domain.Spawning.SpawnFilters;
 using BazaarGameShared.Domain.Spawning.SpawnGroups;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
 using BazaarGameShared.Domain.Values;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
 namespace EncounterTooltip.Tests;

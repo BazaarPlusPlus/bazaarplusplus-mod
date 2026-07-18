@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure;

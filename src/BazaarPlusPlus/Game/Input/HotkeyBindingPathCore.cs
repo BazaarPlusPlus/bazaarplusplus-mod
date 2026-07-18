@@ -1,8 +1,5 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Game.Input;
 
 // Pure binding-path algebra. This file must stay free of Unity/game-runtime references:

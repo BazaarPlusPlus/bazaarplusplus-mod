@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Threading.Tasks;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Storage.RunScreenshot;
 

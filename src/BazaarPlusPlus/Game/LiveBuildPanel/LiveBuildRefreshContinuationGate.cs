@@ -1,6 +1,4 @@
 #nullable enable
-using System.Threading;
-
 namespace BazaarPlusPlus.Game.LiveBuildPanel;
 
 internal sealed class LiveBuildRefreshContinuationGate

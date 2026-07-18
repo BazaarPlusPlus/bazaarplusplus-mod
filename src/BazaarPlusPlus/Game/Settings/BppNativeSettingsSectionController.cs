@@ -1,8 +1,5 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using System.Reflection;
-using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.UI.Components;
 using TheBazaar.UIScripts;

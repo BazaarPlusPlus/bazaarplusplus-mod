@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.GameInterop.Cards;

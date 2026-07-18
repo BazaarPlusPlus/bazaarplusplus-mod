@@ -1,6 +1,4 @@
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.CollectionPanel;
-using BazaarPlusPlus.Game.EventPreview;
 using Xunit;
 
 namespace EncounterTooltip.Tests;

@@ -1,7 +1,5 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
 using BazaarPlusPlus.Game.Input;
 using UnityEngine;
 using UnityEngine.InputSystem;

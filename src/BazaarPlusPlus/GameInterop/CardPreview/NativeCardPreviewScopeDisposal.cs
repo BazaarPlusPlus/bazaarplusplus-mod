@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Threading.Tasks;
-
 namespace BazaarPlusPlus.GameInterop.CardPreview;
 
 internal sealed class NativeCardPreviewScopeDisposal

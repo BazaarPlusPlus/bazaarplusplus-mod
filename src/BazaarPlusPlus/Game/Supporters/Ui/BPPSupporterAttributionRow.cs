@@ -1,9 +1,6 @@
 #nullable enable
-using System.Collections.Generic;
-using System.Linq;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
-using TheBazaar;
 using UnityEngine;
 using UnityEngine.UIElements;
 

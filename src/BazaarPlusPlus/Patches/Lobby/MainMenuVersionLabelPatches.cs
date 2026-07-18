@@ -1,6 +1,5 @@
 #pragma warning disable CS0436
 #nullable enable
-using System;
 using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;

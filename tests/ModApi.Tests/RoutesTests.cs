@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.ModApi;
 
 internal static class RoutesTests

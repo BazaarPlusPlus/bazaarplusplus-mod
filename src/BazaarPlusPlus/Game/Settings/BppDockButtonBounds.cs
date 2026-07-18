@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.Settings;
 
 internal readonly struct BppDockButtonBounds(float minX, float maxX, float minY, float maxY)

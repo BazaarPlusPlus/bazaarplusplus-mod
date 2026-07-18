@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using System.Reflection;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;

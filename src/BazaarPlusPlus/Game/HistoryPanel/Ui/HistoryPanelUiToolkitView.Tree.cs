@@ -1,8 +1,6 @@
 #nullable enable
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.GameInterop.Heroes;
-using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;

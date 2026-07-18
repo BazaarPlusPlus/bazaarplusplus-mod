@@ -140,7 +140,7 @@ internal static class TempDirPathProviderTests
     }
 }
 
-sealed class TempDirPathProvider : IPathProvider
+internal sealed class TempDirPathProvider : IPathProvider
 {
     private readonly string _dbPath;
 

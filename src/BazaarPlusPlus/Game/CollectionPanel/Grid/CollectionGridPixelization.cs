@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
 // Converts the active tab's fixed grid spec into overlay-pixel geometry. Kept Unity-free so the

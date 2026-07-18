@@ -1,6 +1,5 @@
 #nullable enable
 #pragma warning disable CS0436, Harmony003
-using System;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.Game.Tooltips;
