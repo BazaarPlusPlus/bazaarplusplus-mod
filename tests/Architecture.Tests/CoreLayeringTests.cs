@@ -1707,9 +1707,24 @@ public class CoreLayeringTests
             "!boardManager.IsRecapViewOpen && !boardManager.StorageMoving",
             runtimeSource
         );
-        Assert.Contains("invokeNativeRecap?.Invoke()", runtimeSource);
+        Assert.Contains("invokeNativeRecap();", runtimeSource);
         Assert.Contains("\"native-replay-invoke-failed\"", runtimeSource);
         Assert.Contains("\"native-recap-close-timeout\"", runtimeSource);
+        Assert.Contains("CurrentReplayRecapPostRollSeconds = 3f", runtimeSource);
+        Assert.Contains(
+            "new WaitForSecondsRealtime(CurrentReplayRecapPostRollSeconds)",
+            runtimeSource
+        );
+        Assert.Contains("\"native-replay-recap-post-roll-ended\"", runtimeSource);
+        Assert.Contains("Replay recording is still capturing the recap.", runtimeSource);
+        Assert.DoesNotContain("PublishEnded(\"native-replay-ended\"", runtimeSource);
+        Assert.True(
+            runtimeSource.IndexOf("invokeNativeRecap();", StringComparison.Ordinal)
+                < runtimeSource.IndexOf(
+                    "new WaitForSecondsRealtime(CurrentReplayRecapPostRollSeconds)",
+                    StringComparison.Ordinal
+                )
+        );
         Assert.Contains(
             "settingsButton.gameObject.AddComponent<CurrentReplayRecordingButtonController>()",
             controllerSource

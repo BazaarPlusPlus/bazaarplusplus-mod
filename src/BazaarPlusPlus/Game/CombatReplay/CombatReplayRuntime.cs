@@ -21,6 +21,8 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal sealed class CombatReplayRuntime : MonoBehaviour
 {
+    private const float CurrentReplayRecapPostRollSeconds = 3f;
+
     private IBppServices? _services;
     private RunLifecycleModule? _runLifecycle;
     private CombatReplayCaptureService? _captureService;
@@ -39,6 +41,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private IDisposable? _recordingStartedSubscription;
     private IDisposable? _recordingCompletedSubscription;
     private Coroutine? _pendingCurrentReplayStart;
+    private Coroutine? _pendingCurrentReplayRecapPostRoll;
     private Action? _invokeCurrentRecordingRecap;
     private bool _destroying;
 
@@ -176,6 +179,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             "native-replay-runtime-destroyed-before-start",
             "Combat replay runtime was destroyed."
         );
+        CancelCurrentReplayRecapPostRoll();
         if (_currentRecording.NativeReplayStarted)
         {
             _playbackPublisher?.PublishEnded("runtime-destroyed", failed: true);
@@ -580,13 +584,58 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (!_currentRecording.NativeReplayStarted)
             return;
 
-        var outcome = _playbackPublisher?.PublishEnded("native-replay-ended", failed: false);
-        _currentRecording.MarkReplayEnded(
-            outcome is { Succeeded: false } ? outcome.Value.Exception?.Message : null
-        );
         var invokeNativeRecap = _invokeCurrentRecordingRecap;
         _invokeCurrentRecordingRecap = null;
-        invokeNativeRecap?.Invoke();
+        if (invokeNativeRecap == null)
+        {
+            CompleteCurrentReplayRecording(
+                "native-recap-action-unavailable",
+                failed: true,
+                "The native recap action is unavailable."
+            );
+            return;
+        }
+
+        try
+        {
+            invokeNativeRecap();
+            _pendingCurrentReplayRecapPostRoll = StartCoroutine(
+                CompleteCurrentReplayRecordingAfterRecapPostRoll()
+            );
+        }
+        catch (Exception ex)
+        {
+            CompleteCurrentReplayRecording("native-recap-invoke-failed", failed: true, ex.Message);
+        }
+    }
+
+    private IEnumerator CompleteCurrentReplayRecordingAfterRecapPostRoll()
+    {
+        yield return new WaitForSecondsRealtime(CurrentReplayRecapPostRollSeconds);
+        _pendingCurrentReplayRecapPostRoll = null;
+        CompleteCurrentReplayRecording(
+            "native-replay-recap-post-roll-ended",
+            failed: false,
+            reason: null
+        );
+    }
+
+    private void CompleteCurrentReplayRecording(string endReason, bool failed, string? reason)
+    {
+        var outcome = _playbackPublisher?.PublishEnded(endReason, failed);
+        _currentRecording.MarkReplayEnded(
+            outcome is { Succeeded: false } ? outcome.Value.Exception?.Message : reason
+        );
+    }
+
+    private void CancelCurrentReplayRecapPostRoll()
+    {
+        var pending = _pendingCurrentReplayRecapPostRoll;
+        if (pending == null)
+            return;
+
+        _pendingCurrentReplayRecapPostRoll = null;
+        StopCoroutine(pending);
     }
 
     private void OnVideoRecordingStarted(CombatReplayVideoRecordingStarted started)
@@ -775,6 +824,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
+        if (_pendingCurrentReplayRecapPostRoll != null)
+        {
+            reason = "Replay recording is still capturing the recap.";
+            return false;
+        }
+
         if (replay.IsReplaying)
         {
             reason = "Replay playback has not finished yet.";
@@ -948,6 +1003,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             "native-replay-state-exited-before-start",
             "Replay state exited before the native replay could start."
         );
+        CancelCurrentReplayRecapPostRoll();
         if (_currentRecording.NativeReplayStarted)
         {
             var currentEnded = _playbackPublisher?.PublishEnded("replay-state-exit", failed: true);

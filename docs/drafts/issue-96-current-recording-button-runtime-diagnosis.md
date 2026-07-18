@@ -92,7 +92,7 @@
 
 - 继续复用游戏的原生按钮动作：patch 同时绑定 Replay、Recap、Back 三个按钮，不复制 `ShowRecapView` / `HideRecapView` 的私有实现。
 - 普通状态起录仍同步触发 Replay；Recap 状态起录先触发原生 Back，再等待 `IsRecapViewOpen == false && StorageMoving == false`，之后才触发 Replay，避免两套翻板动画并发。
-- current-native 录制收到 `Events.ReplayEnded` 时，先发布 recorder 的 ended 事件以停止捕获，再触发原生 Recap；因此 Recap 动画不会被录入本场视频。
+- current-native 录制收到 `Events.ReplayEnded` 时先触发原生 Recap，继续捕获 3 秒后再发布 recorder 的 ended 事件；这 3 秒作为固定 post-roll，明确包含 Recap 切换与停留画面。post-roll 期间程序化 Continue 会被拒绝，避免自动流程提前退出 ReplayState、截断视频尾部。
 - Architecture.Tests 固定三按钮接线、Recap 关闭等待条件和录制结束后的原生 Recap 调用；实机验证需覆盖「普通状态录制后自动进 Recap」与「Recap 状态点击录制时先完整翻回、再开始回放」两条路径。
 
 ## 当前问题与已确认事实
