@@ -14,7 +14,7 @@ internal static class EndOfRunScreenshotPatch
         try
         {
             return !BppPatchHost.TryGetFeatures(out var features)
-                || !features!.EndOfRunCaptureWorkflow.RequestContinue(__instance);
+                || !features!.EndOfRunCaptureWorkflow.ShouldBlockContinue(__instance);
         }
         catch
         {

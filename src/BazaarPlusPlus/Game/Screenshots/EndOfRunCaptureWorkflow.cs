@@ -9,7 +9,7 @@ namespace BazaarPlusPlus.Game.Screenshots;
 
 internal interface IEndOfRunCaptureWorkflow
 {
-    bool RequestContinue(EndOfRunScreenController screen);
+    bool ShouldBlockContinue(EndOfRunScreenController screen);
     void ObserveRevealStarted(EndOfRunSummaryController summary);
 }
 
@@ -52,14 +52,14 @@ internal sealed class EndOfRunCaptureWorkflow : IEndOfRunCaptureWorkflow, IDispo
         RefreshBufferedRunContext();
     }
 
-    public bool RequestContinue(EndOfRunScreenController screen)
+    public bool ShouldBlockContinue(EndOfRunScreenController screen)
     {
         if (_disposed || screen == null || _driver == null)
             return false;
 
         try
         {
-            return _core.RequestContinue(screen, ReadContext());
+            return _core.ShouldBlockContinue(screen, ReadContext());
         }
         catch (Exception ex)
         {
@@ -150,7 +150,8 @@ internal sealed class EndOfRunCaptureWorkflow : IEndOfRunCaptureWorkflow, IDispo
 
     internal static EndOfRunCaptureReadinessOutcome ReadReadiness(
         object? screen,
-        bool hasSummaryRevealStarted
+        bool hasSummaryRevealStarted,
+        bool hasVisuallySettledCards
     )
     {
         if (screen == null)
@@ -187,8 +188,10 @@ internal sealed class EndOfRunCaptureWorkflow : IEndOfRunCaptureWorkflow, IDispo
             var state = reveal.State switch
             {
                 EndOfRunSummaryRevealState.NoLoadedCards => EndOfRunCaptureReadinessState.Ready,
-                EndOfRunSummaryRevealState.RevealInProgress =>
-                    EndOfRunCaptureReadinessState.RevealInProgress,
+                EndOfRunSummaryRevealState.RevealInProgress => hasVisuallySettledCards
+                && reveal.SkillsSettled
+                    ? EndOfRunCaptureReadinessState.Ready
+                    : EndOfRunCaptureReadinessState.RevealInProgress,
                 EndOfRunSummaryRevealState.RevealComplete => EndOfRunCaptureReadinessState.Ready,
                 _ => EndOfRunCaptureReadinessState.DetectionFailed,
             };

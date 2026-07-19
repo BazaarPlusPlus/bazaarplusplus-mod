@@ -5,6 +5,7 @@ using BazaarPlusPlus.Storage.RunScreenshot;
 
 EndOfRunCaptureWorkflowBehaviorTests.Run();
 VerifyReadinessAdapter();
+VerifyVisualStabilityTracker();
 VerifyArtifactMapping();
 VerifyPngFileSystemAdapter();
 
@@ -18,21 +19,24 @@ static void VerifyReadinessAdapter()
         new TheBazaar.UI.EndOfRun.EndOfRunSummaryController(readyCard)
     );
     Assert(
-        EndOfRunCaptureWorkflow.ReadReadiness(screen, hasSummaryRevealStarted: false).State
-            == EndOfRunCaptureReadinessState.RevealNotStarted,
+        EndOfRunCaptureWorkflow
+            .ReadReadiness(screen, hasSummaryRevealStarted: false, hasVisuallySettledCards: false)
+            .State == EndOfRunCaptureReadinessState.RevealNotStarted,
         "Face-up content must still wait for the native reveal-start signal."
     );
 
     screen.SetTransitionCount(1);
     Assert(
-        EndOfRunCaptureWorkflow.ReadReadiness(screen, hasSummaryRevealStarted: true).State
-            == EndOfRunCaptureReadinessState.TransitionInProgress,
+        EndOfRunCaptureWorkflow
+            .ReadReadiness(screen, hasSummaryRevealStarted: true, hasVisuallySettledCards: false)
+            .State == EndOfRunCaptureReadinessState.TransitionInProgress,
         "Reveal-start must not bypass an active native transition."
     );
     screen.SetTransitionCount(0);
     Assert(
-        EndOfRunCaptureWorkflow.ReadReadiness(screen, hasSummaryRevealStarted: true).State
-            == EndOfRunCaptureReadinessState.Ready,
+        EndOfRunCaptureWorkflow
+            .ReadReadiness(screen, hasSummaryRevealStarted: true, hasVisuallySettledCards: false)
+            .State == EndOfRunCaptureReadinessState.Ready,
         "Settled face-up content should be ready."
     );
 
@@ -43,14 +47,34 @@ static void VerifyReadinessAdapter()
         timelineSummary
     );
     Assert(
-        EndOfRunCaptureWorkflow.ReadReadiness(timelineScreen, hasSummaryRevealStarted: true).State
-            == EndOfRunCaptureReadinessState.RevealInProgress,
+        EndOfRunCaptureWorkflow
+            .ReadReadiness(
+                timelineScreen,
+                hasSummaryRevealStarted: true,
+                hasVisuallySettledCards: false
+            )
+            .State == EndOfRunCaptureReadinessState.RevealInProgress,
         "Face-down summary cards should remain in reveal."
+    );
+    Assert(
+        EndOfRunCaptureWorkflow
+            .ReadReadiness(
+                timelineScreen,
+                hasSummaryRevealStarted: true,
+                hasVisuallySettledCards: true
+            )
+            .State == EndOfRunCaptureReadinessState.Ready,
+        "Visually settled cards should bypass an invisible FaceUp animation tail."
     );
     timelineCard.Animator.SetFaceUp(true);
     Assert(
-        EndOfRunCaptureWorkflow.ReadReadiness(timelineScreen, hasSummaryRevealStarted: true).State
-            == EndOfRunCaptureReadinessState.Ready,
+        EndOfRunCaptureWorkflow
+            .ReadReadiness(
+                timelineScreen,
+                hasSummaryRevealStarted: true,
+                hasVisuallySettledCards: false
+            )
+            .State == EndOfRunCaptureReadinessState.Ready,
         "The same summary should become ready after FaceUp."
     );
 
@@ -59,13 +83,13 @@ static void VerifyReadinessAdapter()
     emptySummary.SetSkillSequence(sequence);
     var emptyScreen = new TheBazaar.UI.EndOfRun.EndOfRunScreenController(0, emptySummary);
     Assert(
-        EndOfRunCaptureWorkflow.ReadReadiness(emptyScreen, true).State
+        EndOfRunCaptureWorkflow.ReadReadiness(emptyScreen, true, false).State
             == EndOfRunCaptureReadinessState.RevealInProgress,
         "Empty item board should still wait for skill reveal."
     );
     sequence.SetComplete(true);
     Assert(
-        EndOfRunCaptureWorkflow.ReadReadiness(emptyScreen, true).State
+        EndOfRunCaptureWorkflow.ReadReadiness(emptyScreen, true, false).State
             == EndOfRunCaptureReadinessState.Ready,
         "Settled empty item board should be ready."
     );
@@ -77,12 +101,12 @@ static void VerifyReadinessAdapter()
         )
     );
     Assert(
-        EndOfRunCaptureWorkflow.ReadReadiness(badScreen, true).State
+        EndOfRunCaptureWorkflow.ReadReadiness(badScreen, true, false).State
             == EndOfRunCaptureReadinessState.DetectionFailed,
         "Known summary reflection failure should remain distinguishable."
     );
     Assert(
-        EndOfRunCaptureWorkflow.ReadReadiness(new object(), false).State
+        EndOfRunCaptureWorkflow.ReadReadiness(new object(), false, false).State
             == EndOfRunCaptureReadinessState.UnknownTarget,
         "Unknown target should fail open instead of becoming a screenshot target."
     );
@@ -93,11 +117,38 @@ static void VerifyReadinessAdapter()
                     0,
                     new TheBazaar.UI.EndOfRun.OtherEndOfRunController()
                 ),
+                false,
                 false
             )
             .State == EndOfRunCaptureReadinessState.NotSummary,
         "Known non-summary pages should not be captured."
     );
+}
+
+static void VerifyVisualStabilityTracker()
+{
+    var tracker = new EndOfRunVisualStabilityTracker();
+    Assert(
+        !tracker.Observe(2, cardSetFingerprint: 10, poseFingerprint: 100, nowSeconds: 0f),
+        "The first sample should establish a baseline, not claim stability."
+    );
+    Assert(
+        !tracker.Observe(2, 10, 100, 1f),
+        "A static initial pose must not settle before actual card motion is observed."
+    );
+    Assert(
+        !tracker.Observe(2, 10, 101, 1.1f),
+        "A pose change should latch motion and restart the stability window."
+    );
+    Assert(
+        !tracker.Observe(2, 10, 101, 1.59f),
+        "Cards must remain stable for the full 500 ms window."
+    );
+    Assert(
+        tracker.Observe(2, 10, 101, 1.6f),
+        "Observed motion followed by 500 ms stability should settle."
+    );
+    Assert(!tracker.Observe(3, 11, 101, 2f), "A changed card set should reset the motion history.");
 }
 
 static void VerifyArtifactMapping()

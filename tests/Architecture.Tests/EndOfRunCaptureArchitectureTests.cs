@@ -16,16 +16,15 @@ public sealed class EndOfRunCaptureArchitectureTests
             Path.Combine(root, "Patches", "EndOfRun", "EndOfRunSummaryRevealPatch.cs")
         );
 
-        Assert.Contains("EndOfRunCaptureWorkflow.RequestContinue(__instance)", continuePatch);
+        Assert.Contains("EndOfRunCaptureWorkflow.ShouldBlockContinue(__instance)", continuePatch);
         Assert.Contains("EndOfRunCaptureWorkflow.ObserveRevealStarted(__instance)", revealPatch);
+        Assert.DoesNotContain("RequestContinue", continuePatch);
         foreach (var source in new[] { continuePatch, revealPatch })
         {
             Assert.Contains("BppPatchHost.TryGetFeatures", source);
             Assert.DoesNotContain("EndOfRunCaptureDriver", source);
             Assert.DoesNotContain("ScreenshotService", source);
             Assert.DoesNotContain("EndOfRunCaptureWorkflowCore", source);
-            Assert.DoesNotContain("ResumeContinue", source);
-            Assert.DoesNotContain("BeginCapture", source);
         }
     }
 
@@ -39,12 +38,12 @@ public sealed class EndOfRunCaptureArchitectureTests
 
         Assert.Contains("WaitForEndOfFrame", driver);
         Assert.Contains("BppUiChromeSuppression.Begin", driver);
+        Assert.Contains("BeginCaptureCurrentFrame", driver);
+        Assert.Contains("EndOfRunSummaryVisualSnapshotSampler.TryCapture", driver);
+        Assert.Contains("EndOfRunVisualStabilityTracker", driver);
         Assert.Contains("IEndOfRunCaptureSurface<EndOfRunScreenController>", driver);
-        Assert.Contains("public EndOfRunContinueResumeOutcome ResumeContinue(", driver);
-        Assert.Contains("ContinueMethod.Invoke", driver);
-        Assert.Contains("EndOfRunNativeContinueVerifier.HasAdvanced", driver);
-        Assert.Contains("GetActiveControllerSelection", driver);
-        Assert.Contains("if (!TryGetActiveController(screen, out var activeController))", driver);
+        Assert.DoesNotContain("ResumeContinue", driver);
+        Assert.DoesNotContain("EndOfRunNativeContinueVerifier", driver);
         Assert.DoesNotContain("AttemptCount", driver);
         Assert.DoesNotContain("MetadataDeadline", driver);
         Assert.DoesNotContain("RevealDeadline", driver);
@@ -60,11 +59,12 @@ public sealed class EndOfRunCaptureArchitectureTests
         var contracts = File.ReadAllText(Path.Combine(screenshots, "EndOfRunCaptureWorkflow.cs"));
 
         Assert.Contains("interface IEndOfRunCaptureWorkflow", contracts);
-        Assert.Contains("bool RequestContinue(EndOfRunScreenController screen);", contracts);
+        Assert.Contains("bool ShouldBlockContinue(EndOfRunScreenController screen);", contracts);
         Assert.Contains("void ObserveRevealStarted(EndOfRunSummaryController summary);", contracts);
         Assert.Contains("private RunState _state", core);
-        Assert.Contains("DeferredContinueState? DeferredContinue", core);
-        Assert.Contains("surface.IsContinueTargetCurrent", core);
+        Assert.Contains("Task FrameAcquired { get; }", core);
+        Assert.Contains("_state.HasFrameAcquired", core);
+        Assert.Contains("BeginCapture(surface, screen, context)", core);
         Assert.Contains("CaptureTimeoutSeconds", core);
         Assert.Contains("MetadataTimeoutSeconds", core);
         Assert.Contains("RevealDeadlineSeconds", core);
@@ -72,6 +72,9 @@ public sealed class EndOfRunCaptureArchitectureTests
         Assert.False(File.Exists(Path.Combine(screenshots, "ScreenshotCaptureOperation.cs")));
         Assert.False(File.Exists(Path.Combine(screenshots, "EndOfRunCaptureReadinessDetector.cs")));
         Assert.False(File.Exists(Path.Combine(screenshots, "EndOfRunScreenshotController.cs")));
+        Assert.False(File.Exists(Path.Combine(screenshots, "EndOfRunNativeContinueVerifier.cs")));
+        Assert.DoesNotContain("RequestContinue", contracts);
+        Assert.DoesNotContain("AwaitingContinue", core);
     }
 
     [Fact]
