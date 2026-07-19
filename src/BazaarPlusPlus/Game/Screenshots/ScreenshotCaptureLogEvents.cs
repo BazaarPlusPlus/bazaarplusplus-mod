@@ -137,29 +137,6 @@ internal static class ScreenshotCaptureLogEvents
         ]
     );
 
-    internal static readonly BppLogFieldDefinition ContinueResumeFailedScreenshotId = PublicField(
-        0,
-        "screenshot_id",
-        BppLogCardinality.High,
-        BppLogCorrelationPolicy.Short
-    );
-    internal static readonly BppLogFieldDefinition ContinueResumeFailedRunId = PublicField(
-        1,
-        "run_id",
-        BppLogCardinality.High,
-        BppLogCorrelationPolicy.Short
-    );
-    internal static readonly BppLogFieldDefinition ContinueResumeFailedStatus = PublicField(
-        2,
-        "status",
-        BppLogCardinality.Low
-    );
-    internal static readonly BppLogEventDefinition ContinueResumeFailed = new(
-        BppLogFeatureScope.Screenshots,
-        "screenshots.capture.continue_resume_failed",
-        [ContinueResumeFailedScreenshotId, ContinueResumeFailedRunId, ContinueResumeFailedStatus]
-    );
-
     internal static readonly BppLogFieldDefinition CleanupFailedStage = PublicField(
         0,
         "stage",
@@ -222,27 +199,5 @@ internal static class ScreenshotCaptureDiagnostics
                     ScreenshotCaptureLogEvents.CleanupFailedFilePath.Bind(filePath),
                 ]
         );
-    }
-
-    internal static void ReportContinueResumeFailed(
-        string? screenshotId,
-        string? runId,
-        EndOfRunContinueResumeOutcome outcome
-    )
-    {
-        var fields = new[]
-        {
-            ScreenshotCaptureLogEvents.ContinueResumeFailedScreenshotId.Bind(screenshotId),
-            ScreenshotCaptureLogEvents.ContinueResumeFailedRunId.Bind(runId),
-            ScreenshotCaptureLogEvents.ContinueResumeFailedStatus.Bind(outcome.Status),
-        };
-        if (outcome.Exception == null)
-            BppLog.WarnEvent(ScreenshotCaptureLogEvents.ContinueResumeFailed, fields);
-        else
-            BppLog.WarnEvent(
-                ScreenshotCaptureLogEvents.ContinueResumeFailed,
-                outcome.Exception,
-                fields
-            );
     }
 }
