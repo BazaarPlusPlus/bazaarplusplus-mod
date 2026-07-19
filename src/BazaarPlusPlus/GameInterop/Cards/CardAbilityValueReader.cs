@@ -2,12 +2,15 @@
 using System.Collections;
 using System.Globalization;
 using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Values;
+using BazaarGameShared.Domain.Values.ReferenceValues;
 
 namespace BazaarPlusPlus.GameInterop.Cards;
 
-internal readonly record struct CardEffectValue(string ValueText, string? Unit);
+internal readonly record struct CardAbilityValue(string ValueText, string? Unit);
 
-internal static class CardEffectValueReader
+internal static class CardAbilityValueReader
 {
     private const string AbilitiesProperty = "Abilities";
     private const string AurasProperty = "Auras";
@@ -33,23 +36,23 @@ internal static class CardEffectValueReader
         "Value",
     };
 
-    internal static bool TryReadAbility(
+    internal static bool TryRead(
         TCardBase template,
-        string effectId,
-        out CardEffectValue result
-    ) => TryRead(template, AbilitiesProperty, effectId, out result);
+        string abilityId,
+        out CardAbilityValue result
+    ) => TryRead(template, AbilitiesProperty, abilityId, out result);
 
     internal static bool TryReadAura(
         TCardBase template,
-        string effectId,
-        out CardEffectValue result
-    ) => TryRead(template, AurasProperty, effectId, out result);
+        string auraId,
+        out CardAbilityValue result
+    ) => TryRead(template, AurasProperty, auraId, out result);
 
     private static bool TryRead(
         TCardBase template,
         string effectsProperty,
         string effectId,
-        out CardEffectValue result
+        out CardAbilityValue result
     )
     {
         result = default;
@@ -71,33 +74,28 @@ internal static class CardEffectValueReader
             var value = action?.GetType().GetProperty("Value")?.GetValue(action);
             if (string.Equals(accessor, "mod", StringComparison.OrdinalIgnoreCase))
             {
-                if (!TryReadModifierScalar(value, out var modifierText))
+                var modifier = value?.GetType().GetProperty("Modifier")?.GetValue(value);
+                var modifierValue = modifier?.GetType().GetProperty("Value")?.GetValue(modifier);
+                var modifierScalar = modifierValue
+                    ?.GetType()
+                    .GetProperty("Value")
+                    ?.GetValue(modifierValue);
+                if (!TryFormatScalar(modifierScalar, out var modifierText))
                     return false;
-                result = new CardEffectValue(modifierText, null);
+                result = new CardAbilityValue(modifierText, null);
                 return true;
             }
 
             var scalar = value?.GetType().GetProperty("Value")?.GetValue(value);
             if (TryFormatScalar(scalar, out var scalarText))
             {
-                result = new CardEffectValue(scalarText, ResolveAttributeUnit(action));
+                result = new CardAbilityValue(scalarText, ResolveAttributeUnit(action));
                 return true;
             }
 
-            if (
-                TryReadReferencedCardAttribute(
-                    template,
-                    value,
-                    applyModifier: !string.Equals(
-                        accessor,
-                        "ref",
-                        StringComparison.OrdinalIgnoreCase
-                    ),
-                    out var attributeText
-                )
-            )
+            if (TryReadCardAttributeReference(template, value, out var attributeText))
             {
-                result = new CardEffectValue(attributeText, ResolveAttributeUnit(action));
+                result = new CardAbilityValue(attributeText, ResolveAttributeUnit(action));
                 return true;
             }
 
@@ -106,7 +104,7 @@ internal static class CardEffectValueReader
             var limitScalar = limit?.GetType().GetProperty("Value")?.GetValue(limit);
             if (TryFormatScalar(limitScalar, out var limitText))
             {
-                result = new CardEffectValue(limitText, null);
+                result = new CardAbilityValue(limitText, null);
                 return true;
             }
 
@@ -116,101 +114,48 @@ internal static class CardEffectValueReader
         return false;
     }
 
-    private static bool TryReadModifierScalar(object? value, out string valueText)
-    {
-        var modifier = value?.GetType().GetProperty("Modifier")?.GetValue(value);
-        var modifierValue = modifier?.GetType().GetProperty("Value")?.GetValue(modifier);
-        var modifierScalar = modifierValue?.GetType().GetProperty("Value")?.GetValue(modifierValue);
-        return TryFormatScalar(modifierScalar, out valueText);
-    }
-
-    private static bool TryReadReferencedCardAttribute(
+    private static bool TryReadCardAttributeReference(
         TCardBase template,
         object? value,
-        bool applyModifier,
         out string valueText
     )
     {
         valueText = string.Empty;
-        var valueTypeName = value?.GetType().Name;
+        ECardAttributeType attributeType;
+        TValueModifier? modifier;
+        switch (value)
+        {
+            case TReferenceValueCardAttribute reference:
+                attributeType = reference.AttributeType;
+                modifier = reference.Modifier;
+                break;
+            case TReferenceValueCardAttributeUnscaled reference:
+                attributeType = reference.AttributeType;
+                modifier = reference.Modifier;
+                break;
+            default:
+                return false;
+        }
+
+        var attributes = template.GetType().GetProperty("Attributes")?.GetValue(template);
         if (
-            !string.Equals(valueTypeName, "TReferenceValueCardAttribute", StringComparison.Ordinal)
-            && !string.Equals(
-                valueTypeName,
-                "TReferenceValueCardAttributeUnscaled",
-                StringComparison.Ordinal
-            )
+            attributes is not IReadOnlyDictionary<ECardAttributeType, int> cardAttributes
+            || !cardAttributes.TryGetValue(attributeType, out var original)
         )
             return false;
 
-        var attributeType = value!.GetType().GetProperty("AttributeType")?.GetValue(value);
-        if (attributeType == null)
+        if (modifier != null && modifier.Value is not TFixedValue)
             return false;
 
-        var attributes = template.GetType().GetProperty("Attributes")?.GetValue(template);
-        if (attributes is not IEnumerable entries)
-            return false;
-        foreach (var entry in entries)
-        {
-            if (!TryReadEntry(entry, out var key, out var attributeValue))
-                continue;
-            if (!string.Equals(key?.ToString(), attributeType.ToString(), StringComparison.Ordinal))
-                continue;
-
-            if (!applyModifier)
-                return TryFormatScalar(attributeValue, out valueText);
-            return TryApplyModifier(value, attributeValue, out valueText);
-        }
-        return false;
-    }
-
-    private static bool TryApplyModifier(
-        object referenceValue,
-        object? attributeValue,
-        out string valueText
-    )
-    {
-        valueText = string.Empty;
-        if (!TryConvertNumber(attributeValue, out var original))
-            return false;
-
-        var modifier = referenceValue.GetType().GetProperty("Modifier")?.GetValue(referenceValue);
-        if (modifier == null)
-        {
-            valueText = FormatNumber(original);
-            return true;
-        }
-
-        var modifierValue = modifier.GetType().GetProperty("Value")?.GetValue(modifier);
-        var modifierScalar = modifierValue?.GetType().GetProperty("Value")?.GetValue(modifierValue);
-        if (!TryConvertNumber(modifierScalar, out var operand))
-            return false;
-
-        var mode = modifier.GetType().GetProperty("ModifyMode")?.GetValue(modifier)?.ToString();
-        var modified = mode switch
-        {
-            "Add" => original + operand,
-            "Subtract" => original - operand,
-            "Multiply" => RoundIfRequested(original * operand, modifier),
-            "Divide" => operand == 0d ? original : RoundIfRequested(original / operand, modifier),
-            _ => original,
-        };
+        var modified = modifier?.GetModifiedValue(original, default) ?? original;
         valueText = FormatNumber(modified);
         return true;
-    }
-
-    private static double RoundIfRequested(double value, object modifier)
-    {
-        var shouldRound = modifier.GetType().GetProperty("ShouldRound")?.GetValue(modifier);
-        if (shouldRound is bool enabled && !enabled)
-            return value;
-        return value > 0d && value < 1d ? 1d : Math.Round(value, MidpointRounding.AwayFromZero);
     }
 
     private static bool TryReadFromCardAttributes(
         TCardBase template,
         object? action,
-        out CardEffectValue result
+        out CardAbilityValue result
     )
     {
         result = default;
@@ -241,7 +186,7 @@ internal static class CardEffectValueReader
                 continue;
             if (!TryFormatScalar(attributeValue, out var valueText))
                 return false;
-            result = new CardEffectValue(valueText, NormalizeAttributeUnit(attributeKey));
+            result = new CardAbilityValue(valueText, NormalizeAttributeUnit(attributeKey));
             return true;
         }
         return false;
@@ -279,44 +224,32 @@ internal static class CardEffectValueReader
         return key != null;
     }
 
-    private static bool TryConvertNumber(object? scalar, out double value)
-    {
-        switch (scalar)
-        {
-            case float number:
-                value = number;
-                return true;
-            case double number:
-                value = number;
-                return true;
-            case decimal number:
-                value = (double)number;
-                return true;
-            case int number:
-                value = number;
-                return true;
-            case long number:
-                value = number;
-                return true;
-            default:
-                value = 0d;
-                return false;
-        }
-    }
-
     private static bool TryFormatScalar(object? scalar, out string valueText)
     {
         valueText = string.Empty;
-        if (TryConvertNumber(scalar, out var number))
+        switch (scalar)
         {
-            valueText = FormatNumber(number);
-            return true;
+            case null:
+                return false;
+            case float value:
+                valueText = FormatNumber(value);
+                return true;
+            case double value:
+                valueText = FormatNumber(value);
+                return true;
+            case decimal value:
+                valueText = FormatNumber((double)value);
+                return true;
+            case int value:
+                valueText = value.ToString(CultureInfo.InvariantCulture);
+                return true;
+            case long value:
+                valueText = value.ToString(CultureInfo.InvariantCulture);
+                return true;
+            default:
+                valueText = scalar.ToString() ?? string.Empty;
+                return !string.IsNullOrWhiteSpace(valueText);
         }
-        if (scalar == null)
-            return false;
-
-        valueText = scalar.ToString() ?? string.Empty;
-        return !string.IsNullOrWhiteSpace(valueText);
     }
 
     private static string FormatNumber(double value)

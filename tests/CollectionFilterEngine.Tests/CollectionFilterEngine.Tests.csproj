@@ -125,8 +125,8 @@
       Link="PackageIdentity.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\CardEffectValueReader.cs"
-      Link="CardEffectValueReader.cs"
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\CardAbilityValueReader.cs"
+      Link="CardAbilityValueReader.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CardTags\PlayerFacingCardTags.cs"

@@ -27,9 +27,9 @@ internal sealed class EncounterPreviewLocalizedText
     public string? FallbackText { get; }
 }
 
-internal sealed class EncounterPreviewPlaceholderValue
+internal sealed class EncounterPreviewAbilityValue
 {
-    public EncounterPreviewPlaceholderValue(string valueText, string? unit = null)
+    public EncounterPreviewAbilityValue(string valueText, string? unit = null)
     {
         ValueText = valueText ?? string.Empty;
         Unit = unit;
@@ -49,7 +49,7 @@ internal sealed class EncounterPreviewTemplatePlan
         string? internalName,
         EncounterPreviewLocalizedText? title,
         EncounterPreviewLocalizedText? description,
-        IReadOnlyDictionary<string, EncounterPreviewPlaceholderValue>? placeholderValues,
+        IReadOnlyDictionary<string, EncounterPreviewAbilityValue>? abilityValues,
         EncounterRewardFilter? rewardFilter
     )
     {
@@ -59,7 +59,7 @@ internal sealed class EncounterPreviewTemplatePlan
         InternalName = internalName ?? string.Empty;
         Title = title ?? new EncounterPreviewLocalizedText(null, null);
         Description = description ?? new EncounterPreviewLocalizedText(null, null);
-        PlaceholderValues = CopyPlaceholderValues(placeholderValues);
+        AbilityValues = CopyAbilityValues(abilityValues);
         RewardFilter = EncounterPreviewPlanCopies.CopyRewardFilter(rewardFilter);
     }
 
@@ -75,7 +75,7 @@ internal sealed class EncounterPreviewTemplatePlan
 
     public EncounterPreviewLocalizedText Description { get; }
 
-    public IReadOnlyDictionary<string, EncounterPreviewPlaceholderValue> PlaceholderValues { get; }
+    public IReadOnlyDictionary<string, EncounterPreviewAbilityValue> AbilityValues { get; }
 
     public EncounterRewardFilter? RewardFilter { get; }
 
@@ -91,35 +91,32 @@ internal sealed class EncounterPreviewTemplatePlan
         return Array.AsReadOnly(result);
     }
 
-    private static IReadOnlyDictionary<
-        string,
-        EncounterPreviewPlaceholderValue
-    > CopyPlaceholderValues(
-        IReadOnlyDictionary<string, EncounterPreviewPlaceholderValue>? placeholderValues
+    private static IReadOnlyDictionary<string, EncounterPreviewAbilityValue> CopyAbilityValues(
+        IReadOnlyDictionary<string, EncounterPreviewAbilityValue>? abilityValues
     )
     {
-        if (placeholderValues == null || placeholderValues.Count == 0)
+        if (abilityValues == null || abilityValues.Count == 0)
         {
-            return new ReadOnlyDictionary<string, EncounterPreviewPlaceholderValue>(
-                new Dictionary<string, EncounterPreviewPlaceholderValue>(StringComparer.Ordinal)
+            return new ReadOnlyDictionary<string, EncounterPreviewAbilityValue>(
+                new Dictionary<string, EncounterPreviewAbilityValue>(StringComparer.Ordinal)
             );
         }
 
-        var result = new Dictionary<string, EncounterPreviewPlaceholderValue>(
-            placeholderValues.Count,
+        var result = new Dictionary<string, EncounterPreviewAbilityValue>(
+            abilityValues.Count,
             StringComparer.Ordinal
         );
-        foreach (var pair in placeholderValues)
+        foreach (var pair in abilityValues)
         {
             if (string.IsNullOrEmpty(pair.Key) || pair.Value == null)
                 continue;
-            result[pair.Key] = new EncounterPreviewPlaceholderValue(
+            result[pair.Key] = new EncounterPreviewAbilityValue(
                 pair.Value.ValueText,
                 pair.Value.Unit
             );
         }
 
-        return new ReadOnlyDictionary<string, EncounterPreviewPlaceholderValue>(result);
+        return new ReadOnlyDictionary<string, EncounterPreviewAbilityValue>(result);
     }
 }
 

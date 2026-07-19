@@ -119,7 +119,7 @@ public sealed class EncounterPreviewPlanRegistryTests
             "Event",
             new EncounterPreviewLocalizedText(string.Empty, "Event"),
             new EncounterPreviewLocalizedText(string.Empty, "Event"),
-            new Dictionary<string, EncounterPreviewPlaceholderValue>(),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
             rewardFilter: null
         );
         var plan = new EncounterPreviewEventPlan(
@@ -185,7 +185,7 @@ public sealed class EncounterPreviewPlanRegistryTests
             "Event",
             new EncounterPreviewLocalizedText(string.Empty, "Event"),
             new EncounterPreviewLocalizedText(string.Empty, "Event"),
-            new Dictionary<string, EncounterPreviewPlaceholderValue>(),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
             rewardFilter: null
         );
         var stepTemplate = new EncounterPreviewTemplatePlan(
@@ -195,7 +195,7 @@ public sealed class EncounterPreviewPlanRegistryTests
             "Step",
             new EncounterPreviewLocalizedText(string.Empty, "Step"),
             new EncounterPreviewLocalizedText(string.Empty, "Get an item"),
-            new Dictionary<string, EncounterPreviewPlaceholderValue>(),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
             rewardFilter: null
         );
         var plan = new EncounterPreviewEventPlan(

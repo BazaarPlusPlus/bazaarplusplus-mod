@@ -12,24 +12,27 @@ namespace EncounterTooltip.Tests;
 
 public sealed class EventPreviewLocalizationTests
 {
-    [Fact]
-    public void Captured_aura_reference_value_renders_in_event_preview_copy()
+    [Theory]
+    [InlineData(EPlayerAttributeType.Experience, 3, "XP")]
+    [InlineData(EPlayerAttributeType.Gold, 30, "Gold")]
+    public void Shrouded_figure_aura_value_renders_in_event_preview(
+        EPlayerAttributeType playerAttribute,
+        int value,
+        string unit
+    )
     {
         var template = new TCardEncounterStep
         {
-            Id = Guid.Parse("1f6f3974-ce2d-4e9e-a1d9-9a3367a0adb9"),
-            InternalName = "[Shrouded Figure] Choose Knowledge",
             Localization = new TCardLocalization
             {
-                Title = new TLocalizableText { Text = "Choose Knowledge" },
                 Description = new TLocalizableText
                 {
-                    Text = "Pick a Chest containing up to {aura.9} XP",
+                    Text = $"Pick a Chest containing up to {{aura.9}} {unit}",
                 },
             },
             Attributes = new Dictionary<ECardAttributeType, int>
             {
-                [ECardAttributeType.Custom_0] = 3,
+                [ECardAttributeType.Custom_0] = value,
             },
             Auras = new Dictionary<string, TCardAura>
             {
@@ -37,7 +40,7 @@ public sealed class EventPreviewLocalizationTests
                 {
                     Action = new TAuraActionPlayerModifyAttribute
                     {
-                        AttributeType = EPlayerAttributeType.Experience,
+                        AttributeType = playerAttribute,
                         Value = new TReferenceValueCardAttribute
                         {
                             AttributeType = ECardAttributeType.Custom_0,
@@ -51,22 +54,22 @@ public sealed class EventPreviewLocalizationTests
                 },
             },
         };
-        var placeholderValues = EventPreviewLocalization.CapturePlaceholderValues(template);
+        var abilityValues = EventPreviewLocalization.CaptureAbilityValues(template);
         var plan = new EncounterPreviewTemplatePlan(
             template.Id,
             EncounterPreviewTemplateKind.EncounterStep,
             Array.Empty<EHero>(),
             template.InternalName,
-            new EncounterPreviewLocalizedText(null, template.Localization.Title.Text),
+            new EncounterPreviewLocalizedText(null, null),
             new EncounterPreviewLocalizedText(null, template.Localization.Description.Text),
-            placeholderValues,
+            abilityValues,
             rewardFilter: null
         );
 
         var description = EventPreviewLocalization.ResolveDescription(plan);
 
-        Assert.Equal("Pick a Chest containing up to 3 XP", description);
-        Assert.Equal("3", placeholderValues["aura.9"].ValueText);
+        Assert.Equal($"Pick a Chest containing up to {value} {unit}", description);
+        Assert.Equal(value.ToString(), abilityValues["aura.9"].ValueText);
         Assert.DoesNotContain("{aura.", description);
     }
 }

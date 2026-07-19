@@ -17,53 +17,53 @@ internal static class EventPreviewLocalization
     {
         if (template == null)
             return null;
-        return FormatEffectPlaceholders(template, PickText(template.Description));
+        return FormatAbilityPlaceholders(template, PickText(template.Description));
     }
 
-    internal static IReadOnlyDictionary<
-        string,
-        EncounterPreviewPlaceholderValue
-    > CapturePlaceholderValues(TCardBase template)
+    internal static IReadOnlyDictionary<string, EncounterPreviewAbilityValue> CaptureAbilityValues(
+        TCardBase template
+    )
     {
-        var result = new Dictionary<string, EncounterPreviewPlaceholderValue>(
-            StringComparer.Ordinal
-        );
-
-        if (template.Abilities != null)
+        var result = new Dictionary<string, EncounterPreviewAbilityValue>(StringComparer.Ordinal);
+        var abilities = template.Abilities;
+        if (abilities != null)
         {
-            foreach (var abilityId in template.Abilities.Keys)
+            foreach (var abilityId in abilities.Keys)
             {
-                AddPlaceholder("ability", abilityId, CardEffectValueReader.TryReadAbility);
-                AddPlaceholder("ability", $"{abilityId}.mod", CardEffectValueReader.TryReadAbility);
+                AddAbilityValue(abilityId);
+                AddAbilityValue($"{abilityId}.mod");
             }
         }
-        if (template.Auras != null)
+        var auras = template.Auras;
+        if (auras != null)
         {
-            foreach (var auraId in template.Auras.Keys)
+            foreach (var auraId in auras.Keys)
             {
-                AddPlaceholder("aura", auraId, CardEffectValueReader.TryReadAura);
-                AddPlaceholder("aura", $"{auraId}.mod", CardEffectValueReader.TryReadAura);
+                AddAuraValue(auraId);
+                AddAuraValue($"{auraId}.mod");
             }
         }
         return result;
 
-        void AddPlaceholder(string kind, string effectId, EffectValueReader read)
+        void AddAbilityValue(string placeholder)
         {
-            if (read(template, effectId, out var value))
+            if (CardAbilityValueReader.TryRead(template, placeholder, out var value))
+                result[placeholder] = new EncounterPreviewAbilityValue(value.ValueText, value.Unit);
+        }
+
+        void AddAuraValue(string placeholder)
+        {
+            if (CardAbilityValueReader.TryReadAura(template, placeholder, out var value))
             {
-                result[$"{kind}.{effectId}"] = new EncounterPreviewPlaceholderValue(
+                // Keep the existing plan/cache model; namespacing only aura keys avoids
+                // colliding with legacy unprefixed ability ids.
+                result[$"aura.{placeholder}"] = new EncounterPreviewAbilityValue(
                     value.ValueText,
                     value.Unit
                 );
             }
         }
     }
-
-    private delegate bool EffectValueReader(
-        TCardBase template,
-        string effectId,
-        out CardEffectValue value
-    );
 
     private static string? PickText(EncounterPreviewLocalizedText text)
     {
@@ -88,15 +88,15 @@ internal static class EventPreviewLocalization
         return string.IsNullOrWhiteSpace(text.Key) ? null : text.Key;
     }
 
-    private static string? FormatEffectPlaceholders(
+    private static string? FormatAbilityPlaceholders(
         EncounterPreviewTemplatePlan template,
         string? text
     ) =>
-        FormatEffectPlaceholders(
+        FormatAbilityPlaceholders(
             text,
-            (string placeholder, out string valueText, out string? unit) =>
+            (string abilityId, out string valueText, out string? unit) =>
             {
-                if (template.PlaceholderValues.TryGetValue(placeholder, out var value))
+                if (template.AbilityValues.TryGetValue(abilityId, out var value))
                 {
                     valueText = value.ValueText;
                     unit = value.Unit;
@@ -109,15 +109,15 @@ internal static class EventPreviewLocalization
             }
         );
 
-    private delegate bool EffectValueResolver(
-        string placeholder,
+    private delegate bool AbilityValueResolver(
+        string abilityId,
         out string valueText,
         out string? unit
     );
 
-    private static string? FormatEffectPlaceholders(
+    private static string? FormatAbilityPlaceholders(
         string? text,
-        EffectValueResolver resolveEffectValue
+        AbilityValueResolver resolveAbilityValue
     )
     {
         if (
@@ -131,10 +131,14 @@ internal static class EventPreviewLocalization
 
         var formatted = Regex.Replace(
             text!,
-            @"\{((?:ability|aura)\.[^}]+)\}",
+            @"\{(ability|aura)\.([^}]+)\}",
             match =>
             {
-                if (!resolveEffectValue(match.Groups[1].Value, out var value, out var unit))
+                var placeholder =
+                    match.Groups[1].Value == "ability"
+                        ? match.Groups[2].Value
+                        : $"aura.{match.Groups[2].Value}";
+                if (!resolveAbilityValue(placeholder, out var value, out var unit))
                     return string.Empty;
                 if (unit == null)
                     return value;

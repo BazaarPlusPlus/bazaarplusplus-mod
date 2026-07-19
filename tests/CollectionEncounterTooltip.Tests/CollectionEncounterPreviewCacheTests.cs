@@ -26,9 +26,7 @@ public sealed class EncounterPreviewCacheTests : IDisposable
         Assert.Equal(expected.TemplateCount, actual.TemplateCount);
         Assert.True(actual.TryGetEvent(EventId, out _));
         Assert.True(actual.TryGetTemplate(StepId, out var step));
-        Assert.Equal("Take up to {aura.9} Gold", step.Description.FallbackText);
-        Assert.Equal("30", step.PlaceholderValues["aura.9"].ValueText);
-        Assert.Equal("Gold", step.PlaceholderValues["aura.9"].Unit);
+        Assert.Equal("Take the reward", step.Description.FallbackText);
         Assert.NotNull(step.RewardFilter);
         Assert.False(step.RewardFilter.UsesDayTierTable);
         Assert.True(step.RewardFilter.UsesDayTierDistribution);
@@ -121,7 +119,7 @@ public sealed class EncounterPreviewCacheTests : IDisposable
             "Test Event",
             new EncounterPreviewLocalizedText("event-title", "Test Event"),
             new EncounterPreviewLocalizedText("event-description", "Pick one"),
-            new Dictionary<string, EncounterPreviewPlaceholderValue>(),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
             rewardFilter: null
         );
         var stepTemplate = new EncounterPreviewTemplatePlan(
@@ -130,11 +128,8 @@ public sealed class EncounterPreviewCacheTests : IDisposable
             new[] { EHero.Jules },
             "Test Step",
             new EncounterPreviewLocalizedText("step-title", "Test Step"),
-            new EncounterPreviewLocalizedText("step-description", "Take up to {aura.9} Gold"),
-            new Dictionary<string, EncounterPreviewPlaceholderValue>
-            {
-                ["aura.9"] = new EncounterPreviewPlaceholderValue("30", "Gold"),
-            },
+            new EncounterPreviewLocalizedText("step-description", "Take the reward"),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
             rewardFilter: new EncounterRewardFilter(
                 ECardType.Item,
                 quantity: 1,
