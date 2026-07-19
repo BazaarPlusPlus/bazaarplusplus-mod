@@ -31,7 +31,19 @@ try
     var fakeBin = Path.Combine(tempRoot, "bin");
     var dotnetRecord = Path.Combine(tempRoot, "dotnet.args");
 
-    File.WriteAllText(Path.Combine(gameRoot, "TheBazaar.app", "Contents", "Info.plist"), "fixture");
+    File.WriteAllText(
+        Path.Combine(gameRoot, "TheBazaar.app", "Contents", "Info.plist"),
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>The Bazaar</string>
+        </dict>
+        </plist>
+        """
+    );
     File.WriteAllText(exe, "UNITY current executable");
     File.WriteAllText(orig, "UNITY stale backup");
     File.WriteAllText(script, "#!/bin/sh\n");
