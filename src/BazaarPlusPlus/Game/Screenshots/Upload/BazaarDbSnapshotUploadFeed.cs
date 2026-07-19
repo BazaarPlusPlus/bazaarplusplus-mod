@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.Game.HistoryPanel.AccountLink;
 using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
@@ -10,6 +11,8 @@ namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
 internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
 {
+    private readonly BazaarDbAccountLinkStore _accountLinkStore = new();
+
     public UploadFeedKind Kind => UploadFeedKind.BazaarDbSnapshot;
 
     public UploadFeedActivation? Activate(IBppServices services, UploadFeedLogState _)
@@ -63,7 +66,12 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
                         screenshotLogState,
                         cancellationToken
                     ),
-                IsEnabled = () => IsEnabled(services),
+                IsEnabled = () =>
+                    IsEnabled(
+                        services.Config.BazaarDbUploadEnabled?.Value ?? false,
+                        BppClientCacheBridge.TryGetProfileAccountId,
+                        _accountLinkStore.IsLinked
+                    ),
                 Disposable = httpClient,
             };
         }
@@ -77,8 +85,18 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
         }
     }
 
-    private static bool IsEnabled(IBppServices services) =>
-        services.Config.BazaarDbUploadEnabled?.Value ?? false;
+    internal static bool IsEnabled(
+        bool uploadEnabled,
+        Func<string?> playerAccountIdResolver,
+        Func<string, bool> isAccountLinked
+    )
+    {
+        if (!uploadEnabled)
+            return false;
+
+        var playerAccountId = playerAccountIdResolver()?.Trim();
+        return !string.IsNullOrWhiteSpace(playerAccountId) && isAccountLinked(playerAccountId);
+    }
 
     internal static async Task<UploadAttemptResult> RunAttemptAsync(
         Func<CancellationToken, Task> uploadAsync,
