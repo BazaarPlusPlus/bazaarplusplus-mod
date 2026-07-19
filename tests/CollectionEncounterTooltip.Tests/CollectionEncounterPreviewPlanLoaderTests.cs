@@ -111,7 +111,7 @@ public sealed class EncounterPreviewPlanLoaderTests : IDisposable
                     "Event",
                     new EncounterPreviewLocalizedText(string.Empty, "Event"),
                     new EncounterPreviewLocalizedText(string.Empty, "Event"),
-                    new Dictionary<string, EncounterPreviewAbilityValue>(),
+                    new Dictionary<string, EncounterPreviewPlaceholderValue>(),
                     rewardFilter: null
                 ),
             }

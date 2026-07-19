@@ -4,6 +4,7 @@ using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Effect.AuraActions;
 using BazaarGameShared.Domain.Values;
 using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
@@ -49,6 +50,48 @@ public class CollectionLocalizationResolverTests
         var description = CollectionLocalizationResolver.ResolveDescription(template);
 
         Assert.Equal("Gain 10 Gold.", description);
+    }
+
+    [Fact]
+    public void Aura_reference_card_attribute_placeholders_resolve()
+    {
+        var template = new TCardEncounterStep
+        {
+            Localization = new TCardLocalization
+            {
+                Description = new TLocalizableText
+                {
+                    Text = "Pick a Chest containing up to {aura.9} Gold",
+                },
+            },
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Custom_0] = 30,
+            },
+            Auras = new Dictionary<string, TCardAura>
+            {
+                ["9"] = new TCardAura
+                {
+                    Action = new TAuraActionPlayerModifyAttribute
+                    {
+                        AttributeType = EPlayerAttributeType.Gold,
+                        Value = new TReferenceValueCardAttribute
+                        {
+                            AttributeType = ECardAttributeType.Custom_0,
+                            Modifier = new TValueModifier
+                            {
+                                ModifyMode = EValueModifierMode.Multiply,
+                                Value = new TFixedValue { Value = 1f },
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        var description = CollectionLocalizationResolver.ResolveDescription(template);
+
+        Assert.Equal("Pick a Chest containing up to 30 Gold", description);
     }
 
     private static TCardEncounterStep Template(string description, TActionBase action)

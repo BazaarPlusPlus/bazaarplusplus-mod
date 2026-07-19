@@ -1881,8 +1881,8 @@ public class CoreLayeringTests
         var collectionLocalizationSource = File.ReadAllText(
             Path.Combine(collectionRoot, "Data", "CollectionLocalizationResolver.cs")
         );
-        var abilityReaderSource = File.ReadAllText(
-            Path.Combine(mainSource, "GameInterop", "Cards", "CardAbilityValueReader.cs")
+        var effectReaderSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Cards", "CardEffectValueReader.cs")
         );
 
         Assert.Contains("interface IEncounterPreviewModule", moduleSource);
@@ -1898,7 +1898,7 @@ public class CoreLayeringTests
             "LevelUpPreviewResult ResolveLevelUp(LevelUpPreviewQuery query)",
             moduleSource
         );
-        Assert.Contains("class CardAbilityValueReader", abilityReaderSource);
+        Assert.Contains("class CardEffectValueReader", effectReaderSource);
         Assert.DoesNotContain("GetProperty(\"Abilities\")", eventLocalizationSource);
         Assert.DoesNotContain("GetProperty(\"Abilities\")", collectionLocalizationSource);
 

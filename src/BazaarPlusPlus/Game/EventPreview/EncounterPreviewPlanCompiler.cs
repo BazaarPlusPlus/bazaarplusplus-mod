@@ -363,7 +363,7 @@ internal sealed class EncounterPreviewPlanCompiler
                         localization?.Description?.Key,
                         localization?.Description?.Text
                     ),
-                    EventPreviewLocalization.CaptureAbilityValues(template),
+                    EventPreviewLocalization.CapturePlaceholderValues(template),
                     rewardFilter
                 )
             );

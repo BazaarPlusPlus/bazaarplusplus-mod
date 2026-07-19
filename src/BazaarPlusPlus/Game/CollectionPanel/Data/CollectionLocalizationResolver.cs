@@ -27,14 +27,14 @@ internal static partial class CollectionLocalizationResolver
         if (description == null)
             return null;
         var text = PickText(description);
-        return FormatAbilityPlaceholders(template, text);
+        return FormatEffectPlaceholders(template, text);
     }
 
     public static IReadOnlyList<string> ResolveTitleSearchTexts(TCardBase template) =>
-        SearchTexts(template, template.Localization?.Title, formatAbilityPlaceholders: false);
+        SearchTexts(template, template.Localization?.Title, formatEffectPlaceholders: false);
 
     public static IReadOnlyList<string> ResolveDescriptionSearchTexts(TCardBase template) =>
-        SearchTexts(template, template.Localization?.Description, formatAbilityPlaceholders: true);
+        SearchTexts(template, template.Localization?.Description, formatEffectPlaceholders: true);
 
     public static IReadOnlyList<string> ResolveTooltipSearchTexts(TCardBase template)
     {
@@ -44,21 +44,21 @@ internal static partial class CollectionLocalizationResolver
 
         var values = new List<string>(tooltips.Count * 3);
         foreach (var tooltip in tooltips)
-            AddSearchTexts(values, template, tooltip?.Content, formatAbilityPlaceholders: true);
+            AddSearchTexts(values, template, tooltip?.Content, formatEffectPlaceholders: true);
         return values;
     }
 
     private static IReadOnlyList<string> SearchTexts(
         TCardBase template,
         TLocalizableText? text,
-        bool formatAbilityPlaceholders
+        bool formatEffectPlaceholders
     )
     {
         if (text == null)
             return Array.Empty<string>();
 
         var values = new List<string>(3);
-        AddSearchTexts(values, template, text, formatAbilityPlaceholders);
+        AddSearchTexts(values, template, text, formatEffectPlaceholders);
         return values;
     }
 
@@ -66,14 +66,14 @@ internal static partial class CollectionLocalizationResolver
         List<string> values,
         TCardBase template,
         TLocalizableText? text,
-        bool formatAbilityPlaceholders
+        bool formatEffectPlaceholders
     )
     {
         if (text == null)
             return;
 
-        AddSearchText(values, TryGetLocalizedText(text), template, formatAbilityPlaceholders);
-        AddSearchText(values, text.Text, template, formatAbilityPlaceholders);
+        AddSearchText(values, TryGetLocalizedText(text), template, formatEffectPlaceholders);
+        AddSearchText(values, text.Text, template, formatEffectPlaceholders);
     }
 
     private static string? PickText(TLocalizableText text)
@@ -107,13 +107,13 @@ internal static partial class CollectionLocalizationResolver
         List<string> values,
         string? text,
         TCardBase template,
-        bool formatAbilityPlaceholders
+        bool formatEffectPlaceholders
     )
     {
         if (string.IsNullOrWhiteSpace(text))
             return;
 
-        var value = formatAbilityPlaceholders ? FormatAbilityPlaceholders(template, text) : text;
+        var value = formatEffectPlaceholders ? FormatEffectPlaceholders(template, text) : text;
         if (string.IsNullOrWhiteSpace(value))
             return;
 
@@ -130,18 +130,23 @@ internal static partial class CollectionLocalizationResolver
     // the data layer never depends on game UI services directly.
     internal static Func<string, string?>? AttributeUnitLocalizer = null;
 
-    private delegate bool AbilityValueResolver(
-        string abilityId,
+    private delegate bool EffectValueResolver(
+        string effectKind,
+        string effectId,
         out string valueText,
         out string? unit
     );
 
-    private static string? FormatAbilityPlaceholders(TCardBase template, string? text) =>
-        FormatAbilityPlaceholders(
+    private static string? FormatEffectPlaceholders(TCardBase template, string? text) =>
+        FormatEffectPlaceholders(
             text,
-            (string abilityId, out string valueText, out string? unit) =>
+            (string effectKind, string effectId, out string valueText, out string? unit) =>
             {
-                if (CardAbilityValueReader.TryRead(template, abilityId, out var value))
+                CardEffectValue value;
+                var resolved = string.Equals(effectKind, "ability", StringComparison.Ordinal)
+                    ? CardEffectValueReader.TryReadAbility(template, effectId, out value)
+                    : CardEffectValueReader.TryReadAura(template, effectId, out value);
+                if (resolved)
                 {
                     valueText = value.ValueText;
                     unit = value.Unit;
@@ -154,25 +159,36 @@ internal static partial class CollectionLocalizationResolver
             }
         );
 
-    private static string? FormatAbilityPlaceholders(
+    private static string? FormatEffectPlaceholders(
         string? text,
-        AbilityValueResolver resolveAbilityValue
+        EffectValueResolver resolveEffectValue
     )
     {
         if (
-            string.IsNullOrWhiteSpace(text) || !text.Contains("{ability.", StringComparison.Ordinal)
+            string.IsNullOrWhiteSpace(text)
+            || (
+                !text.Contains("{ability.", StringComparison.Ordinal)
+                && !text.Contains("{aura.", StringComparison.Ordinal)
+            )
         )
             return text;
 
         var formatted = Regex.Replace(
             text!,
-            @"\{ability\.([^}]+)\}",
+            @"\{(ability|aura)\.([^}]+)\}",
             match =>
             {
                 // Unresolvable placeholders (e.g. live-computed totals) degrade to
                 // nothing rather than leaking raw tokens; leftover empty brackets
                 // are cleaned afterwards.
-                if (!resolveAbilityValue(match.Groups[1].Value, out var value, out var unit))
+                if (
+                    !resolveEffectValue(
+                        match.Groups[1].Value,
+                        match.Groups[2].Value,
+                        out var value,
+                        out var unit
+                    )
+                )
                     return string.Empty;
                 if (unit == null)
                     return value;

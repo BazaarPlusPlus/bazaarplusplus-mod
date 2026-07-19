@@ -332,7 +332,7 @@ public sealed class LevelUpPreviewTextFormatterTests
                 template.Localization?.Description?.Key,
                 template.Localization?.Description?.Text
             ),
-            new Dictionary<string, EncounterPreviewAbilityValue>(),
+            new Dictionary<string, EncounterPreviewPlaceholderValue>(),
             rewardFilter: null
         );
 

@@ -9,7 +9,7 @@ namespace BazaarPlusPlus.Game.EventPreview;
 
 internal sealed class EncounterPreviewCacheStore
 {
-    public const int SchemaVersion = 3;
+    public const int SchemaVersion = 4;
     internal const int MaxCacheFileBytes = 32 * 1024 * 1024;
 
     private static readonly UTF8Encoding Utf8NoBom = new(
@@ -392,9 +392,9 @@ internal sealed class EncounterPreviewCacheStore
             InternalName = plan.InternalName,
             Title = ToWire(plan.Title),
             Description = ToWire(plan.Description),
-            AbilityValues = plan
-                .AbilityValues.OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => new AbilityValueWire
+            PlaceholderValues = plan
+                .PlaceholderValues.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => new PlaceholderValueWire
                 {
                     Key = pair.Key,
                     ValueText = pair.Value.ValueText,
@@ -406,29 +406,29 @@ internal sealed class EncounterPreviewCacheStore
 
     private static EncounterPreviewTemplatePlan FromWire(TemplatePlanWire plan)
     {
-        if (plan.Heroes == null || plan.AbilityValues == null)
+        if (plan.Heroes == null || plan.PlaceholderValues == null)
             throw new FormatException("Template-plan collections are missing.");
         if (!Enum.IsDefined(typeof(EncounterPreviewTemplateKind), plan.Kind))
             throw new FormatException($"Unknown template kind '{plan.Kind}'.");
 
-        var abilityValues = new Dictionary<string, EncounterPreviewAbilityValue>(
-            plan.AbilityValues.Count,
+        var placeholderValues = new Dictionary<string, EncounterPreviewPlaceholderValue>(
+            plan.PlaceholderValues.Count,
             StringComparer.Ordinal
         );
-        foreach (var value in plan.AbilityValues)
+        foreach (var value in plan.PlaceholderValues)
         {
-            var required = Required(value, "ability value");
-            var key = Required(required.Key, "ability key");
+            var required = Required(value, "placeholder value");
+            var key = Required(required.Key, "placeholder key");
             if (
-                !abilityValues.TryAdd(
+                !placeholderValues.TryAdd(
                     key,
-                    new EncounterPreviewAbilityValue(
-                        Required(required.ValueText, "ability value text"),
+                    new EncounterPreviewPlaceholderValue(
+                        Required(required.ValueText, "placeholder value text"),
                         required.Unit
                     )
                 )
             )
-                throw new FormatException($"Duplicate ability key '{key}'.");
+                throw new FormatException($"Duplicate placeholder key '{key}'.");
         }
 
         return new EncounterPreviewTemplatePlan(
@@ -438,7 +438,7 @@ internal sealed class EncounterPreviewCacheStore
             plan.InternalName,
             FromWire(plan.Title),
             FromWire(plan.Description),
-            abilityValues,
+            placeholderValues,
             FromWire(plan.RewardFilter)
         );
     }
@@ -780,8 +780,8 @@ internal sealed class EncounterPreviewCacheStore
         [JsonProperty("description", Order = 5)]
         public LocalizedTextWire? Description { get; set; }
 
-        [JsonProperty("abilityValues", Order = 6)]
-        public List<AbilityValueWire>? AbilityValues { get; set; }
+        [JsonProperty("placeholderValues", Order = 6)]
+        public List<PlaceholderValueWire>? PlaceholderValues { get; set; }
 
         [JsonProperty("rewardFilter", Order = 7)]
         public RewardFilterWire? RewardFilter { get; set; }
@@ -796,7 +796,7 @@ internal sealed class EncounterPreviewCacheStore
         public string? FallbackText { get; set; }
     }
 
-    private sealed class AbilityValueWire
+    private sealed class PlaceholderValueWire
     {
         [JsonProperty("key", Order = 0)]
         public string? Key { get; set; }

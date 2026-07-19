@@ -17,31 +17,53 @@ internal static class EventPreviewLocalization
     {
         if (template == null)
             return null;
-        return FormatAbilityPlaceholders(template, PickText(template.Description));
+        return FormatEffectPlaceholders(template, PickText(template.Description));
     }
 
-    internal static IReadOnlyDictionary<string, EncounterPreviewAbilityValue> CaptureAbilityValues(
-        TCardBase template
-    )
+    internal static IReadOnlyDictionary<
+        string,
+        EncounterPreviewPlaceholderValue
+    > CapturePlaceholderValues(TCardBase template)
     {
-        var result = new Dictionary<string, EncounterPreviewAbilityValue>(StringComparer.Ordinal);
-        var abilities = template.Abilities;
-        if (abilities == null)
-            return result;
+        var result = new Dictionary<string, EncounterPreviewPlaceholderValue>(
+            StringComparer.Ordinal
+        );
 
-        foreach (var abilityId in abilities.Keys)
+        if (template.Abilities != null)
         {
-            AddAbilityValue(abilityId);
-            AddAbilityValue($"{abilityId}.mod");
+            foreach (var abilityId in template.Abilities.Keys)
+            {
+                AddPlaceholder("ability", abilityId, CardEffectValueReader.TryReadAbility);
+                AddPlaceholder("ability", $"{abilityId}.mod", CardEffectValueReader.TryReadAbility);
+            }
+        }
+        if (template.Auras != null)
+        {
+            foreach (var auraId in template.Auras.Keys)
+            {
+                AddPlaceholder("aura", auraId, CardEffectValueReader.TryReadAura);
+                AddPlaceholder("aura", $"{auraId}.mod", CardEffectValueReader.TryReadAura);
+            }
         }
         return result;
 
-        void AddAbilityValue(string placeholder)
+        void AddPlaceholder(string kind, string effectId, EffectValueReader read)
         {
-            if (CardAbilityValueReader.TryRead(template, placeholder, out var value))
-                result[placeholder] = new EncounterPreviewAbilityValue(value.ValueText, value.Unit);
+            if (read(template, effectId, out var value))
+            {
+                result[$"{kind}.{effectId}"] = new EncounterPreviewPlaceholderValue(
+                    value.ValueText,
+                    value.Unit
+                );
+            }
         }
     }
+
+    private delegate bool EffectValueReader(
+        TCardBase template,
+        string effectId,
+        out CardEffectValue value
+    );
 
     private static string? PickText(EncounterPreviewLocalizedText text)
     {
@@ -66,15 +88,15 @@ internal static class EventPreviewLocalization
         return string.IsNullOrWhiteSpace(text.Key) ? null : text.Key;
     }
 
-    private static string? FormatAbilityPlaceholders(
+    private static string? FormatEffectPlaceholders(
         EncounterPreviewTemplatePlan template,
         string? text
     ) =>
-        FormatAbilityPlaceholders(
+        FormatEffectPlaceholders(
             text,
-            (string abilityId, out string valueText, out string? unit) =>
+            (string placeholder, out string valueText, out string? unit) =>
             {
-                if (template.AbilityValues.TryGetValue(abilityId, out var value))
+                if (template.PlaceholderValues.TryGetValue(placeholder, out var value))
                 {
                     valueText = value.ValueText;
                     unit = value.Unit;
@@ -87,28 +109,32 @@ internal static class EventPreviewLocalization
             }
         );
 
-    private delegate bool AbilityValueResolver(
-        string abilityId,
+    private delegate bool EffectValueResolver(
+        string placeholder,
         out string valueText,
         out string? unit
     );
 
-    private static string? FormatAbilityPlaceholders(
+    private static string? FormatEffectPlaceholders(
         string? text,
-        AbilityValueResolver resolveAbilityValue
+        EffectValueResolver resolveEffectValue
     )
     {
         if (
-            string.IsNullOrWhiteSpace(text) || !text.Contains("{ability.", StringComparison.Ordinal)
+            string.IsNullOrWhiteSpace(text)
+            || (
+                !text.Contains("{ability.", StringComparison.Ordinal)
+                && !text.Contains("{aura.", StringComparison.Ordinal)
+            )
         )
             return text;
 
         var formatted = Regex.Replace(
             text!,
-            @"\{ability\.([^}]+)\}",
+            @"\{((?:ability|aura)\.[^}]+)\}",
             match =>
             {
-                if (!resolveAbilityValue(match.Groups[1].Value, out var value, out var unit))
+                if (!resolveEffectValue(match.Groups[1].Value, out var value, out var unit))
                     return string.Empty;
                 if (unit == null)
                     return value;

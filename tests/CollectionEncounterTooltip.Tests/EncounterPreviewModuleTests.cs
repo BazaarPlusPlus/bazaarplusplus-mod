@@ -603,7 +603,7 @@ public sealed class EncounterPreviewModuleTests : IDisposable
             title,
             new EncounterPreviewLocalizedText(string.Empty, title),
             new EncounterPreviewLocalizedText(string.Empty, description),
-            new Dictionary<string, EncounterPreviewAbilityValue>(),
+            new Dictionary<string, EncounterPreviewPlaceholderValue>(),
             rewardFilter: null
         );
 
