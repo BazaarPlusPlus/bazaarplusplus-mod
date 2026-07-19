@@ -8,11 +8,6 @@ fi
 GAME_ROOT="${BPP_GAME_ROOT:-$HOME/Library/Application Support/Steam/steamapps/common/The Bazaar}"
 TRAMPOLINE_STUB="${BPP_TRAMPOLINE_STUB:-}"
 
-if [[ -z "$TRAMPOLINE_STUB" ]]; then
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    TRAMPOLINE_STUB="$SCRIPT_DIR/../../bazaarplusplus-installer/src-tauri/resources/Trampoline/macos/bpp_launcher"
-fi
-
 MARKER="$GAME_ROOT/.bpp-launch-mode"
 if [[ ! -f "$MARKER" ]]; then
     exit 0
@@ -30,14 +25,23 @@ if [[ ! -d "$APP_PATH" || ! -f "$INFO_PLIST" ]]; then
     exit 1
 fi
 
-EXE_NAME="$(defaults read "$INFO_PLIST" CFBundleExecutable)"
+EXE_NAME="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$INFO_PLIST")"
 EXE_PATH="$APP_PATH/Contents/MacOS/$EXE_NAME"
 ORIG_PATH="$EXE_PATH.orig"
+STAGED_STUB="$EXE_PATH.bpp-stub"
 PREFIX_SCRIPT="$GAME_ROOT/run_bepinex.sh"
 
 links_unity() {
     local path="$1"
     [[ -f "$path" ]] && otool -L "$path" 2>/dev/null | grep -q 'UnityPlayer.dylib'
+}
+
+game_running() {
+    # pgrep -f patterns are EREs matched as substrings; escape the path and
+    # anchor it so unrelated command lines containing it don't abort the repair.
+    local escaped
+    escaped="$(printf '%s' "$EXE_PATH" | sed -e 's/[^^]/[&]/g' -e 's/\^/\\^/g')"
+    pgrep -f "^${escaped}( |\$)" >/dev/null 2>&1
 }
 
 disable_prefix_launcher() {
@@ -63,7 +67,7 @@ EOF
 
 sign_and_verify_bundle() {
     local entitlements
-    entitlements="$(mktemp -t bpp-ents-XXXXXX.plist)"
+    entitlements="$(mktemp -t bpp-ents)"
     write_entitlements "$entitlements"
     codesign --force --sign - --entitlements "$entitlements" "$ORIG_PATH" \
         && codesign --force --sign - "$APP_PATH" \
@@ -81,32 +85,43 @@ restore_vanilla_layout() {
     fi
 }
 
+cleanup_failed_repair() {
+    rm -f "$STAGED_STUB"
+    restore_vanilla_layout
+}
+
 if links_unity "$EXE_PATH"; then
-    if pgrep -f "$EXE_PATH" >/dev/null 2>&1; then
+    if game_running; then
         echo "[BPP] Cannot repair macOS trampoline while The Bazaar is running. Close the game and retry." >&2
         exit 1
     fi
     if [[ ! -f "$TRAMPOLINE_STUB" ]]; then
-        echo "[BPP] Cannot repair macOS trampoline: missing stub $TRAMPOLINE_STUB" >&2
+        echo "[BPP] Cannot repair macOS trampoline: missing stub '$TRAMPOLINE_STUB' (set BPP_TRAMPOLINE_STUB)" >&2
         exit 1
     fi
 
     echo "[BPP] Repairing macOS launch trampoline after game executable reverted."
-    rm -f "$ORIG_PATH"
+    # From here until the trap is cleared, any exit (failure, Ctrl-C, kill)
+    # must put the vanilla executable back. ORIG_PATH is deleted before the
+    # first mutation so restore_vanilla_layout stays a no-op until EXE_PATH
+    # has actually been moved aside.
+    trap cleanup_failed_repair EXIT
+    trap 'exit 1' INT TERM
+    rm -f "$ORIG_PATH" "$STAGED_STUB"
+    cp "$TRAMPOLINE_STUB" "$STAGED_STUB"
+    chmod 755 "$STAGED_STUB"
+    xattr -d com.apple.quarantine "$STAGED_STUB" 2>/dev/null || true
     mv "$EXE_PATH" "$ORIG_PATH"
     if ! {
-        cp "$TRAMPOLINE_STUB" "$EXE_PATH" \
-            && chmod 755 "$EXE_PATH" \
-            && { xattr -d com.apple.quarantine "$EXE_PATH" 2>/dev/null || true; } \
+        mv "$STAGED_STUB" "$EXE_PATH" \
             && disable_prefix_launcher \
             && sign_and_verify_bundle
     }; then
-        restore_vanilla_layout
-        echo "[BPP] macOS trampoline repair failed; restored the vanilla game executable." >&2
+        echo "[BPP] macOS trampoline repair failed; restoring the vanilla game executable." >&2
         exit 1
     fi
+    trap - EXIT INT TERM
 
-    printf 'trampoline' > "$MARKER"
     echo "[BPP] macOS launch trampoline repaired."
     exit 0
 fi
