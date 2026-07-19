@@ -100,6 +100,71 @@ using (var capture = new LogCapture())
 var uploadFeedType = RequireType(
     "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadFeed"
 );
+var uploadEligibilityMethod = uploadFeedType.GetMethod(
+    "IsEnabled",
+    BindingFlags.Static | BindingFlags.NonPublic,
+    binder: null,
+    [typeof(bool), typeof(Func<string?>), typeof(Func<string, bool>)],
+    modifiers: null
+);
+Assert(
+    uploadEligibilityMethod != null,
+    "Screenshot upload feed should expose its upload eligibility boundary for tests."
+);
+Assert(
+    !(bool)
+        uploadEligibilityMethod!.Invoke(
+            null,
+            [false, new Func<string?>(() => "acct-linked"), new Func<string, bool>(_ => true)]
+        )!,
+    "BazaarDB snapshot uploads should remain disabled when the upload setting is off."
+);
+Assert(
+    !(bool)
+        uploadEligibilityMethod.Invoke(
+            null,
+            [true, new Func<string?>(() => null), new Func<string, bool>(_ => true)]
+        )!,
+    "BazaarDB snapshot uploads should remain disabled when no current game account is available."
+);
+Assert(
+    !(bool)
+        uploadEligibilityMethod.Invoke(
+            null,
+            [true, new Func<string?>(() => "acct-unlinked"), new Func<string, bool>(_ => false)]
+        )!,
+    "BazaarDB snapshot uploads should remain disabled when the current account is not linked."
+);
+Assert(
+    (bool)
+        uploadEligibilityMethod.Invoke(
+            null,
+            [true, new Func<string?>(() => "acct-linked"), new Func<string, bool>(_ => true)]
+        )!,
+    "BazaarDB snapshot uploads should use the existing workflow when the current account is linked."
+);
+var linkedAccountId = "acct-linked-elsewhere";
+string? queriedAccountId = null;
+Assert(
+    !(bool)
+        uploadEligibilityMethod.Invoke(
+            null,
+            [
+                true,
+                new Func<string?>(() => " acct-current "),
+                new Func<string, bool>(accountId =>
+                {
+                    queriedAccountId = accountId;
+                    return string.Equals(accountId, linkedAccountId, StringComparison.Ordinal);
+                }),
+            ]
+        )!,
+    "A link marker for another account must not enable BazaarDB snapshot uploads."
+);
+Assert(
+    queriedAccountId == "acct-current",
+    "BazaarDB snapshot upload eligibility should query the current normalized account id."
+);
 var runAttempt = uploadFeedType.GetMethod(
     "RunAttemptAsync",
     BindingFlags.Static | BindingFlags.NonPublic
