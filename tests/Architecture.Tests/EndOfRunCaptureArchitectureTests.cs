@@ -16,7 +16,7 @@ public sealed class EndOfRunCaptureArchitectureTests
             Path.Combine(root, "Patches", "EndOfRun", "EndOfRunSummaryRevealPatch.cs")
         );
 
-        Assert.Contains("EndOfRunCaptureWorkflow.ShouldBlockContinue(__instance)", continuePatch);
+        Assert.Contains("EndOfRunCaptureWorkflow.RequestContinue(__instance)", continuePatch);
         Assert.Contains("EndOfRunCaptureWorkflow.ObserveRevealStarted(__instance)", revealPatch);
         foreach (var source in new[] { continuePatch, revealPatch })
         {
@@ -24,6 +24,8 @@ public sealed class EndOfRunCaptureArchitectureTests
             Assert.DoesNotContain("EndOfRunCaptureDriver", source);
             Assert.DoesNotContain("ScreenshotService", source);
             Assert.DoesNotContain("EndOfRunCaptureWorkflowCore", source);
+            Assert.DoesNotContain("ResumeContinue", source);
+            Assert.DoesNotContain("BeginCapture", source);
         }
     }
 
@@ -38,6 +40,11 @@ public sealed class EndOfRunCaptureArchitectureTests
         Assert.Contains("WaitForEndOfFrame", driver);
         Assert.Contains("BppUiChromeSuppression.Begin", driver);
         Assert.Contains("IEndOfRunCaptureSurface<EndOfRunScreenController>", driver);
+        Assert.Contains("public EndOfRunContinueResumeOutcome ResumeContinue(", driver);
+        Assert.Contains("ContinueMethod.Invoke", driver);
+        Assert.Contains("EndOfRunNativeContinueVerifier.HasAdvanced", driver);
+        Assert.Contains("GetActiveControllerSelection", driver);
+        Assert.Contains("if (!TryGetActiveController(screen, out var activeController))", driver);
         Assert.DoesNotContain("AttemptCount", driver);
         Assert.DoesNotContain("MetadataDeadline", driver);
         Assert.DoesNotContain("RevealDeadline", driver);
@@ -53,9 +60,11 @@ public sealed class EndOfRunCaptureArchitectureTests
         var contracts = File.ReadAllText(Path.Combine(screenshots, "EndOfRunCaptureWorkflow.cs"));
 
         Assert.Contains("interface IEndOfRunCaptureWorkflow", contracts);
-        Assert.Contains("bool ShouldBlockContinue(EndOfRunScreenController screen);", contracts);
+        Assert.Contains("bool RequestContinue(EndOfRunScreenController screen);", contracts);
         Assert.Contains("void ObserveRevealStarted(EndOfRunSummaryController summary);", contracts);
         Assert.Contains("private RunState _state", core);
+        Assert.Contains("DeferredContinueState? DeferredContinue", core);
+        Assert.Contains("surface.IsContinueTargetCurrent", core);
         Assert.Contains("CaptureTimeoutSeconds", core);
         Assert.Contains("MetadataTimeoutSeconds", core);
         Assert.Contains("RevealDeadlineSeconds", core);

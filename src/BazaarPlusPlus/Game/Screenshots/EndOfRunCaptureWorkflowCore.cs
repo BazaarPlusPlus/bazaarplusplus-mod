@@ -44,6 +44,21 @@ internal interface IEndOfRunCaptureAttempt
     void Cancel();
 }
 
+internal readonly record struct EndOfRunContinueTarget(int ScreenId, int SummaryId);
+
+internal enum EndOfRunContinueResumeStatus
+{
+    Advanced,
+    ContextStale,
+    NativeNoOp,
+    Failed,
+}
+
+internal readonly record struct EndOfRunContinueResumeOutcome(
+    EndOfRunContinueResumeStatus Status,
+    Exception? Exception = null
+);
+
 internal interface IEndOfRunCaptureSurface<TScreen>
     where TScreen : class
 {
@@ -52,7 +67,11 @@ internal interface IEndOfRunCaptureSurface<TScreen>
     bool IsScreenActive(TScreen screen);
     int GetScreenId(TScreen screen);
     EndOfRunCaptureReadinessOutcome GetReadiness(TScreen screen, bool hasRevealStarted);
+    bool TryGetContinueTarget(TScreen screen, out EndOfRunContinueTarget target);
+    bool TryGetContinueTargetAmbiguity(TScreen screen, out bool ambiguous);
+    bool IsContinueTargetCurrent(TScreen screen, EndOfRunContinueTarget target);
     IEndOfRunCaptureAttempt BeginCapture(TScreen screen, ScreenshotCaptureRequest request);
+    EndOfRunContinueResumeOutcome ResumeContinue(TScreen screen, EndOfRunContinueTarget target);
     void SetContinueBlocked(TScreen? screen, bool blocked);
 }
 
@@ -133,7 +152,11 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
     {
         if (_state.Terminal)
             return;
-        if (_state.ActiveAttempt != null || _state.PersistenceTask != null)
+        if (
+            _state.Operation != null
+            || _state.ActiveAttempt != null
+            || _state.PersistenceTask != null
+        )
         {
             CompleteContextExpired();
             return;
@@ -167,7 +190,11 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         var surface = _surface;
         if (surface == null || !surface.IsAvailable || !context.Enabled)
         {
-            if (_state.ActiveAttempt != null || _state.PersistenceTask != null)
+            if (
+                _state.Operation != null
+                || _state.ActiveAttempt != null
+                || _state.PersistenceTask != null
+            )
                 CompleteContextExpired();
             else
                 SetContinueBlocked(screen: null, blocked: false);
@@ -187,7 +214,7 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         ProcessScreen(surface, screen, context, canStartCapture: true);
     }
 
-    internal bool ShouldBlockContinue(TScreen screen, EndOfRunCaptureContext context)
+    internal bool RequestContinue(TScreen screen, EndOfRunCaptureContext context)
     {
         var surface = _surface;
         if (
@@ -198,12 +225,144 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
             || !surface.IsScreenActive(screen)
         )
         {
+            var shouldConsumeStaleRequest =
+                surface != null
+                && surface.IsAvailable
+                && context.Enabled
+                && screen != null
+                && !surface.IsScreenActive(screen);
+            if (
+                !_state.Terminal
+                && (
+                    _state.Operation != null
+                    || _state.ActiveAttempt != null
+                    || _state.PersistenceTask != null
+                )
+            )
+            {
+                CompleteContextExpired();
+            }
+            else
+                SetContinueBlocked(screen: null, blocked: false);
+            return shouldConsumeStaleRequest;
+        }
+
+        if (_state.Terminal)
+        {
             SetContinueBlocked(screen: null, blocked: false);
             return false;
         }
+        if (_state.Stage == WorkflowStage.BlockedAmbiguousTarget)
+        {
+            return ShouldConsumeAmbiguousContinue(surface, screen);
+        }
+        if (_state.DeferredContinue is { } deferred)
+        {
+            if (!IsDeferredContinueCurrent(surface, screen, deferred))
+            {
+                _state.DeferredContinue = null;
+                CompleteContextExpired();
+                return true;
+            }
 
+            return true;
+        }
+
+        var isControllerReplacement =
+            _state.ScreenId != 0 && _state.ScreenId != surface.GetScreenId(screen);
         ProcessScreen(surface, screen, context, canStartCapture: false);
-        return _state.ContinueBlocked;
+        if (_state.Terminal)
+            return isControllerReplacement;
+        if (_state.Stage == WorkflowStage.AwaitingContinue)
+        {
+            if (!surface.TryGetContinueTarget(screen, out var target))
+            {
+                var ambiguous = false;
+                int? ambiguousScreenId = null;
+                Exception? exception = null;
+                try
+                {
+                    if (!surface.TryGetContinueTargetAmbiguity(screen, out ambiguous))
+                    {
+                        CompleteUnavailableContinueTarget(exception: null);
+                        return true;
+                    }
+                    if (ambiguous)
+                        ambiguousScreenId = surface.GetScreenId(screen);
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                }
+                if (ambiguous && ambiguousScreenId.HasValue && exception == null)
+                {
+                    _state.AmbiguousContinueScreenId = ambiguousScreenId.Value;
+                    _state.Stage = WorkflowStage.BlockedAmbiguousTarget;
+                    SetContinueBlocked(screen: null, blocked: false);
+                    return true;
+                }
+
+                CompleteUnavailableContinueTarget(exception);
+                return true;
+            }
+
+            _state.DeferredContinue = new DeferredContinueState(_state.Generation, screen, target);
+            _state.Stage = WorkflowStage.CaptureRequested;
+            SetContinueBlocked(screen, blocked: true);
+            return true;
+        }
+
+        return _state.Stage
+            is WorkflowStage.WaitingForReadiness
+                or WorkflowStage.CaptureRequested
+                or WorkflowStage.WaitingForRetry
+                or WorkflowStage.Capturing
+                or WorkflowStage.Persisting;
+    }
+
+    private bool ShouldConsumeAmbiguousContinue(
+        IEndOfRunCaptureSurface<TScreen> surface,
+        TScreen screen
+    )
+    {
+        if (!_state.AmbiguousContinueScreenId.HasValue)
+            return false;
+
+        try
+        {
+            if (surface.GetScreenId(screen) != _state.AmbiguousContinueScreenId.Value)
+            {
+                CompleteContextExpired();
+                return true;
+            }
+            if (!surface.TryGetContinueTargetAmbiguity(screen, out var ambiguous))
+            {
+                CompleteUnavailableContinueTarget(exception: null);
+                return true;
+            }
+            if (ambiguous)
+                return true;
+            _state.AmbiguousContinueScreenId = null;
+            CompleteContextExpired();
+            return false;
+        }
+        catch (Exception ex)
+        {
+            CompleteUnavailableContinueTarget(ex);
+            return true;
+        }
+    }
+
+    private void CompleteUnavailableContinueTarget(Exception? exception)
+    {
+        _state.AmbiguousContinueScreenId = null;
+        CompleteTerminal(
+            CaptureTerminalKind.Failed,
+            ScreenshotCaptureReasonCode.ContextExpired,
+            ScreenshotArtifactStatus.Unavailable,
+            filePath: null,
+            exception
+        );
     }
 
     internal void FailOpenUnexpected(Exception exception)
@@ -211,8 +370,8 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         if (_state.Terminal)
             return;
         EnsureOperation(new EndOfRunCaptureContext(true, RunId: null, HeroName: null));
-        CancelOutstandingWork(cleanLateArtifact: true);
         var filePath = _state.Operation?.VerifiedArtifactPath;
+        CancelOutstandingWork(cleanLateArtifact: string.IsNullOrWhiteSpace(filePath));
         CompleteTerminal(
             string.IsNullOrWhiteSpace(filePath)
                 ? CaptureTerminalKind.Failed
@@ -243,6 +402,30 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         if (!_state.Armed)
             OnEndOfRunInitializing();
 
+        if (_state.Stage == WorkflowStage.BlockedAmbiguousTarget)
+        {
+            SetContinueBlocked(screen: null, blocked: false);
+            return;
+        }
+
+        if (
+            _state.DeferredContinue is { } deferred
+            && !IsDeferredContinueCurrent(surface, screen, deferred)
+        )
+        {
+            _state.DeferredContinue = null;
+            CompleteContextExpired();
+            return;
+        }
+
+        if (_state.Stage == WorkflowStage.CaptureRequested)
+        {
+            SetContinueBlocked(screen, blocked: true);
+            if (canStartCapture)
+                BeginCapture(surface, screen, context);
+            return;
+        }
+
         if (_state.Stage == WorkflowStage.Capturing)
         {
             PollCapture(screen, context);
@@ -251,6 +434,20 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         if (_state.Stage == WorkflowStage.Persisting)
         {
             PollPersistence();
+            return;
+        }
+        if (_state.Stage == WorkflowStage.WaitingForRetry)
+        {
+            if (_clock.UnscaledSeconds < _state.RetryAvailableAt)
+            {
+                SetContinueBlocked(screen, blocked: true);
+                return;
+            }
+
+            _state.Stage = WorkflowStage.CaptureRequested;
+            SetContinueBlocked(screen, blocked: true);
+            if (canStartCapture)
+                BeginCapture(surface, screen, context);
             return;
         }
 
@@ -273,7 +470,10 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
                 if (_state.SummaryObserved)
                     CompleteContextExpired();
                 else
+                {
+                    _state.Stage = WorkflowStage.Idle;
                     SetContinueBlocked(screen: null, blocked: false);
+                }
                 return;
             case EndOfRunCaptureReadinessState.TransitionInProgress:
                 _state.SummaryObserved = true;
@@ -306,28 +506,18 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
                 _state.DegradationReason ??=
                     readiness.ReasonCode ?? ScreenshotCaptureReasonCode.ReadinessDeadline;
                 _state.DegradationException ??= readiness.Exception;
-                break;
+                _state.Stage = WorkflowStage.AwaitingContinue;
+                SetContinueBlocked(screen: null, blocked: false);
+                return;
             case EndOfRunCaptureReadinessState.Ready:
                 _state.SummaryObserved = true;
-                break;
+                _state.Stage = WorkflowStage.AwaitingContinue;
+                SetContinueBlocked(screen: null, blocked: false);
+                return;
             default:
                 SetContinueBlocked(screen: null, blocked: false);
                 return;
         }
-
-        if (_state.Stage == WorkflowStage.WaitingForRetry)
-        {
-            if (_clock.UnscaledSeconds < _state.RetryAvailableAt)
-            {
-                SetContinueBlocked(screen, blocked: true);
-                return;
-            }
-            _state.Stage = WorkflowStage.WaitingForReadiness;
-        }
-
-        SetContinueBlocked(screen, blocked: true);
-        if (canStartCapture)
-            BeginCapture(surface, screen, context);
     }
 
     private void BeginCapture(
@@ -643,6 +833,29 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         );
     }
 
+    private bool IsDeferredContinueCurrent(
+        IEndOfRunCaptureSurface<TScreen> surface,
+        TScreen screen,
+        DeferredContinueState deferred
+    )
+    {
+        if (
+            deferred.Generation != _state.Generation
+            || !ReferenceEquals(deferred.Screen, screen)
+            || deferred.Target.ScreenId != _state.ScreenId
+        )
+            return false;
+
+        try
+        {
+            return surface.IsContinueTargetCurrent(screen, deferred.Target);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private void CompleteContextExpired()
     {
         if (_state.Terminal)
@@ -651,6 +864,7 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
             return;
         }
 
+        _state.DeferredContinue = null;
         CancelOutstandingWork(cleanLateArtifact: true);
         var operation = _state.Operation;
         if (operation == null)
@@ -691,12 +905,59 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         _state.Stage = WorkflowStage.Terminal;
         _state.ActiveAttempt = null;
         _state.PersistenceTask = null;
-        SetContinueBlocked(screen: null, blocked: false);
 
         var operation = _state.Operation;
         if (operation == null)
+        {
+            SetContinueBlocked(screen: null, blocked: false);
             return;
+        }
         ReportTerminal(operation, kind, reason, artifactStatus, filePath, exception);
+        ResumeDeferredContinue(operation);
+    }
+
+    private void ResumeDeferredContinue(CaptureOperationState operation)
+    {
+        var deferred = _state.DeferredContinue;
+        _state.DeferredContinue = null;
+        if (deferred == null || deferred.Generation != _state.Generation || _surface == null)
+        {
+            SetContinueBlocked(screen: null, blocked: false);
+            return;
+        }
+
+        EndOfRunContinueResumeOutcome outcome;
+        try
+        {
+            outcome = _surface.ResumeContinue(deferred.Screen, deferred.Target);
+        }
+        catch (Exception ex)
+        {
+            outcome = new EndOfRunContinueResumeOutcome(EndOfRunContinueResumeStatus.Failed, ex);
+        }
+
+        if (outcome.Status != EndOfRunContinueResumeStatus.Advanced)
+            ReportContinueResumeFailed(operation, outcome);
+        SetContinueBlocked(screen: null, blocked: false);
+    }
+
+    private static void ReportContinueResumeFailed(
+        CaptureOperationState operation,
+        EndOfRunContinueResumeOutcome outcome
+    )
+    {
+        try
+        {
+            ScreenshotCaptureDiagnostics.ReportContinueResumeFailed(
+                operation.ScreenshotId,
+                operation.RunId,
+                outcome
+            );
+        }
+        catch
+        {
+            // Diagnostics cannot prevent fail-open or make continuation retry automatically.
+        }
     }
 
     private void CancelOutstandingWork(bool cleanLateArtifact)
@@ -880,8 +1141,28 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         internal IEndOfRunCaptureAttempt? ActiveAttempt { get; set; }
         internal Task<ScreenshotMetadataPersistenceOutcome>? PersistenceTask { get; set; }
         internal CaptureOperationState? Operation { get; set; }
+        internal DeferredContinueState? DeferredContinue { get; set; }
+        internal int? AmbiguousContinueScreenId { get; set; }
         internal ScreenshotCaptureReasonCode? DegradationReason { get; set; }
         internal Exception? DegradationException { get; set; }
+    }
+
+    private sealed class DeferredContinueState
+    {
+        internal DeferredContinueState(
+            int generation,
+            TScreen screen,
+            EndOfRunContinueTarget target
+        )
+        {
+            Generation = generation;
+            Screen = screen;
+            Target = target;
+        }
+
+        internal int Generation { get; }
+        internal TScreen Screen { get; }
+        internal EndOfRunContinueTarget Target { get; }
     }
 
     private sealed class CaptureOperationState
@@ -908,6 +1189,9 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
     {
         Idle,
         WaitingForReadiness,
+        AwaitingContinue,
+        BlockedAmbiguousTarget,
+        CaptureRequested,
         WaitingForRetry,
         Capturing,
         Persisting,

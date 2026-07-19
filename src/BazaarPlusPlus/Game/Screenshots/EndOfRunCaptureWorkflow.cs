@@ -9,7 +9,7 @@ namespace BazaarPlusPlus.Game.Screenshots;
 
 internal interface IEndOfRunCaptureWorkflow
 {
-    bool ShouldBlockContinue(EndOfRunScreenController screen);
+    bool RequestContinue(EndOfRunScreenController screen);
     void ObserveRevealStarted(EndOfRunSummaryController summary);
 }
 
@@ -52,14 +52,14 @@ internal sealed class EndOfRunCaptureWorkflow : IEndOfRunCaptureWorkflow, IDispo
         RefreshBufferedRunContext();
     }
 
-    public bool ShouldBlockContinue(EndOfRunScreenController screen)
+    public bool RequestContinue(EndOfRunScreenController screen)
     {
         if (_disposed || screen == null || _driver == null)
             return false;
 
         try
         {
-            return _core.ShouldBlockContinue(screen, ReadContext());
+            return _core.RequestContinue(screen, ReadContext());
         }
         catch (Exception ex)
         {
