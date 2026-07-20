@@ -1,4 +1,5 @@
 #nullable enable
+using System.Globalization;
 using System.Text;
 using BazaarPlusPlus.ModApi.Models;
 using Newtonsoft.Json.Linq;
@@ -164,11 +165,9 @@ public sealed class GhostBattleClient
     private static GhostBattleImportRecord? TryParseBattle(JObject battle)
     {
         var battleId = battle["battle_id"]?.Value<string>()?.Trim();
-        var recordedAtUtc = battle["recorded_at_utc"]?.Value<string>()?.Trim();
         if (
             string.IsNullOrWhiteSpace(battleId)
-            || string.IsNullOrWhiteSpace(recordedAtUtc)
-            || !DateTimeOffset.TryParse(recordedAtUtc, out var parsedRecordedAtUtc)
+            || !TryParseUtcTimestamp(battle["recorded_at_utc"], out var parsedRecordedAtUtc)
         )
         {
             return null;
@@ -232,6 +231,47 @@ public sealed class GhostBattleClient
             ReplayDownloaded = false,
             LastSyncedAtUtc = DateTimeOffset.UtcNow,
         };
+    }
+
+    private static bool TryParseUtcTimestamp(JToken? token, out DateTimeOffset parsedUtc)
+    {
+        parsedUtc = default;
+        if (token == null || token.Type == JTokenType.Null)
+            return false;
+
+        // JObject.Parse eagerly turns ISO-8601 values into Date tokens. Converting that token
+        // back through Value<string>() can discard its DateTimeKind/offset, causing a UTC value
+        // to be parsed as local time. Preserve the typed value and normalize it explicitly.
+        if (token.Type == JTokenType.Date && token is JValue dateValue)
+        {
+            switch (dateValue.Value)
+            {
+                case DateTimeOffset dateTimeOffset:
+                    parsedUtc = dateTimeOffset.ToUniversalTime();
+                    return true;
+                case DateTime dateTime:
+                    var normalized =
+                        dateTime.Kind == DateTimeKind.Unspecified
+                            ? DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
+                            : dateTime;
+                    parsedUtc = new DateTimeOffset(normalized).ToUniversalTime();
+                    return true;
+            }
+        }
+
+        if (token.Type != JTokenType.String)
+            return false;
+
+        var rawValue = token.Value<string>()?.Trim();
+        return !string.IsNullOrWhiteSpace(rawValue)
+            && DateTimeOffset.TryParse(
+                rawValue,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces
+                    | DateTimeStyles.AssumeUniversal
+                    | DateTimeStyles.AdjustToUniversal,
+                out parsedUtc
+            );
     }
 
     private static int? ReadNullableInt(JObject source, params string[] propertyNames)
