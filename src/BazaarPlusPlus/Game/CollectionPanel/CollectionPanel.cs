@@ -8,6 +8,7 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
+using BazaarPlusPlus.Game.Encounters;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
@@ -114,10 +115,9 @@ internal sealed class CollectionPanel : MonoBehaviour
     private bool _viewMissedNativeTypography;
 
     // The run's current day, captured once per open in ResolveOpenSelection (null out of run, or
-    // when Data.Run is unreadable). The separate preference preserves the user's on/off choice
-    // without ever turning the out-of-run fallback into a highlighted no-op filter.
+    // when Data.Run is unreadable). The Day toggle filters by this value, falling back to
+    // DayTierSchedule.OutOfRunDay. Recomputed on every open.
     private int? _currentRunDay;
-    private bool _dayFilterEnabled = true;
 
     public void Initialize(
         IBppServices services,
@@ -371,7 +371,11 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void ApplyOpenSelection(CollectionPanelSelectionState selection)
     {
         _filter.ApplySelection(selection);
-        _filter.SelectedRunDay = _dayFilterEnabled ? _currentRunDay : null;
+        // The Day toggle's on/off persists across opens; when it is on, re-pin it to the
+        // freshly-read day. _currentRunDay was just captured in ResolveOpenSelection, which always
+        // runs before this.
+        if (_filter.SelectedRunDay != null)
+            _filter.SelectedRunDay = _currentRunDay ?? DayTierSchedule.OutOfRunDay;
         PruneInvisibleSourceSelections();
         _scrollY = 0f;
     }
@@ -676,6 +680,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             panel._scrollY = 0f;
             panel.ApplyFilters();
             panel.RefreshView();
+            panel._view?.ResetControlsScroll();
         }
 
         public void ToggleTier(ETier tier)
@@ -685,15 +690,16 @@ internal sealed class CollectionPanel : MonoBehaviour
             panel._scrollY = 0f;
             panel.ApplyFilters();
             panel.RefreshView();
+            panel._view?.ResetControlsScroll();
         }
 
         public void ToggleRunDayFilter()
         {
-            if (!panel._currentRunDay.HasValue)
-                return;
-
-            panel._dayFilterEnabled = !panel._dayFilterEnabled;
-            panel._filter.SelectedRunDay = panel._dayFilterEnabled ? panel._currentRunDay : null;
+            // Toggle whether the day participates in filtering. On uses the current run day
+            // (or OutOfRunDay out of run); off clears the day filter entirely.
+            panel._filter.SelectedRunDay = panel._filter.SelectedRunDay is null
+                ? panel._currentRunDay ?? DayTierSchedule.OutOfRunDay
+                : (int?)null;
             panel._scrollY = 0f;
             panel.ApplyFilters();
             panel.RefreshView();
@@ -768,65 +774,6 @@ internal sealed class CollectionPanel : MonoBehaviour
 
             panel._filter.SearchQuery = query;
             panel._searchRefreshGate.Schedule();
-        }
-
-        public void ClearAllFilters()
-        {
-            panel._dayFilterEnabled = false;
-            panel._filter.ClearAllFilters();
-            RefreshAfterFilterChange();
-        }
-
-        public void ClearHeroFilter()
-        {
-            if (panel._filter.Heroes.Count == 0)
-                return;
-            panel._filter.Heroes.Clear();
-            panel.PruneInvisibleSourceSelections();
-            RefreshAfterFilterChange();
-        }
-
-        public void ClearTierSizeFilter()
-        {
-            var clearSizes = CollectionTabProfile.For(panel._filter.ActiveTab).ShowSizeFilter;
-            if (panel._filter.Tiers.Count == 0 && (!clearSizes || panel._filter.Sizes.Count == 0))
-                return;
-            panel._filter.Tiers.Clear();
-            if (clearSizes)
-                panel._filter.Sizes.Clear();
-            RefreshAfterFilterChange();
-        }
-
-        public void ClearTagFilter()
-        {
-            if (panel._filter.Tags.Count == 0)
-                return;
-            panel._filter.Tags.Clear();
-            panel._filter.TagMatchMode = CollectionFacetMatchMode.Any;
-            RefreshAfterFilterChange();
-        }
-
-        public void ClearKeywordFilter()
-        {
-            if (panel._filter.Keywords.Count == 0)
-                return;
-            panel._filter.Keywords.Clear();
-            panel._filter.KeywordMatchMode = CollectionFacetMatchMode.Any;
-            RefreshAfterFilterChange();
-        }
-
-        public void ClearSourceFilter()
-        {
-            if (!panel._filter.ClearSelectedSource())
-                return;
-            RefreshAfterFilterChange();
-        }
-
-        private void RefreshAfterFilterChange()
-        {
-            panel._scrollY = 0f;
-            panel.ApplyFilters();
-            panel.RefreshView();
         }
     }
 
@@ -1028,7 +975,6 @@ internal sealed class CollectionPanel : MonoBehaviour
         var availableKeywords = _facetAvailability.KeywordsFor(_filter.ActiveType);
         var dayFilterPresentation = CollectionDayFilterPresentation.For(
             profile,
-            _currentRunDay.HasValue,
             _filter.SelectedRunDay != null
         );
         var heroFilterPresentation = CollectionHeroFilterPresentation.For(profile);
@@ -1061,7 +1007,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             DayFilterVisible = dayFilterPresentation.IsVisible,
             DayFilterEnabled = dayFilterPresentation.IsEnabled,
             DayFilterActive = dayFilterPresentation.IsActive,
-            DayFilterValue = _currentRunDay,
+            DayFilterValue = _currentRunDay ?? DayTierSchedule.OutOfRunDay,
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,

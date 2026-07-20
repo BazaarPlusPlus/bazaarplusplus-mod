@@ -23,10 +23,4 @@ internal interface ICollectionPanelCommands
     void ToggleSource(string sourceKey);
     void SetSortPriority(CollectionSortPriority priority);
     void SetSearchQuery(string query);
-    void ClearAllFilters();
-    void ClearHeroFilter();
-    void ClearTierSizeFilter();
-    void ClearTagFilter();
-    void ClearKeywordFilter();
-    void ClearSourceFilter();
 }

@@ -227,11 +227,7 @@ internal sealed partial class CollectionPanelView
 
     private static Label CreateKeywordRelatedSectionLabel()
     {
-        var label = CreateLabel(
-            Sizes.CollectionFilterFont,
-            FontStyle.Bold,
-            Colors.HistoryStatusText
-        );
+        var label = CreateLabel(Sizes.FontTiny, FontStyle.Bold, Colors.HistoryStatusText);
         label.text = CollectionPanelText.KeywordRelatedSection();
         label.style.width = Length.Percent(100f);
         label.style.flexBasis = Length.Percent(100f);
@@ -406,13 +402,7 @@ internal sealed partial class CollectionPanelView
 
     private static Button CreateTagFacetChipButton(Action onClick)
     {
-        var chip = CreateButton(
-            string.Empty,
-            onClick,
-            0f,
-            Sizes.CollectionFacetChipHeight,
-            fixedWidth: false
-        );
+        var chip = CreateButton(string.Empty, onClick, 0f, Sizes.InfoChipHeight, fixedWidth: false);
         chip.style.minWidth = Sizes.InfoChipMinWidth;
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
@@ -431,7 +421,7 @@ internal sealed partial class CollectionPanelView
         chip.Add(icon);
 
         var label = new Label { name = TagChipLabelName, pickingMode = PickingMode.Ignore };
-        label.style.fontSize = Sizes.CollectionFilterFont;
+        label.style.fontSize = Sizes.FontSmall;
         label.style.unityFontStyleAndWeight = FontStyle.Normal;
         label.style.unityTextAlign = TextAnchor.MiddleCenter;
         label.style.flexShrink = 1f;
@@ -604,11 +594,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Border(icon.style, Borders.Thin, Colors.HistoryButtonBorder);
         ResizeSourceIcon(icon, Mathf.Round(Sizes.SourceChipMinSize * Sizes.SourceChipIconRatio));
 
-        var initials = CreateLabel(
-            Sizes.CollectionFilterFont,
-            FontStyle.Bold,
-            Colors.HistoryChipText
-        );
+        var initials = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryChipText);
         initials.name = SourceChipInitialsName;
         initials.text = GetInitials(displayName);
         initials.pickingMode = PickingMode.Ignore;
@@ -962,12 +948,12 @@ internal sealed partial class CollectionPanelView
 
     // Always visible; the face shows the effective day number and highlights when the day
     // participates in filtering (gold = on, chip background = off).
-    private void RefreshDayToggle(int? day, bool active)
+    private void RefreshDayToggle(int day, bool active)
     {
         if (_dayToggleButton == null)
             return;
 
-        _dayToggleButton.text = CollectionPanelText.DayValue(day);
+        _dayToggleButton.text = day.ToString(System.Globalization.CultureInfo.InvariantCulture);
         StyleButton(
             _dayToggleButton,
             active ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,
@@ -1010,7 +996,6 @@ internal sealed partial class CollectionPanelView
         if (fixedWidth)
             UiStyle.FixedWidth(button.style, width);
         button.style.height = height;
-        button.style.fontSize = Sizes.CollectionFilterFont;
         button.style.flexGrow = 0f;
         button.style.flexShrink = 0f;
         button.style.unityTextAlign = TextAnchor.MiddleCenter;

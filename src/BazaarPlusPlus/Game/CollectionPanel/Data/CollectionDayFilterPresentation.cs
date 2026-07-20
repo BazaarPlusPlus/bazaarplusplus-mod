@@ -19,12 +19,11 @@ internal readonly struct CollectionDayFilterPresentation
 
     public static CollectionDayFilterPresentation For(
         CollectionTabProfile profile,
-        bool hasCurrentRunDay,
         bool isSelected
     ) =>
         new(
             isVisible: true,
-            isEnabled: profile.ShowDayFilter && hasCurrentRunDay,
-            isActive: profile.ShowDayFilter && hasCurrentRunDay && isSelected
+            isEnabled: profile.ShowDayFilter,
+            isActive: profile.ShowDayFilter && isSelected
         );
 }
