@@ -1,7 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
-using BazaarPlusPlus.Game.Encounters;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -43,10 +42,10 @@ internal sealed class CollectionFilterState
     public string? SelectedSourceKey { get; set; }
     public string SearchQuery { get; set; } = string.Empty;
 
-    // User-selected run "Day" filter; null means no day filtering. Starts enabled so the panel
-    // binds it to Data.Run.Day on open; outside a run, OutOfRunDay keeps the toggle visibly active
-    // without narrowing the catalog.
-    public int? SelectedRunDay { get; set; } = DayTierSchedule.OutOfRunDay;
+    // Effective run-day filter; null means no day filtering. CollectionPanel binds this to the
+    // actual current run day when the day preference is enabled. Out of run it stays null so the
+    // UI never presents a no-op day value as an active filter.
+    public int? SelectedRunDay { get; set; }
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
     public EHero? SelectedHero
@@ -142,6 +141,20 @@ internal sealed class CollectionFilterState
             return false;
         SelectedSourceKey = null;
         return true;
+    }
+
+    public void ClearAllFilters()
+    {
+        Heroes.Clear();
+        Tiers.Clear();
+        Tags.Clear();
+        Keywords.Clear();
+        Sizes.Clear();
+        SelectedSourceKey = null;
+        SearchQuery = string.Empty;
+        SelectedRunDay = null;
+        TagMatchMode = CollectionFacetMatchMode.Any;
+        KeywordMatchMode = CollectionFacetMatchMode.Any;
     }
 
     public bool PruneSelectedSource(IReadOnlyCollection<string> visibleSourceKeys)

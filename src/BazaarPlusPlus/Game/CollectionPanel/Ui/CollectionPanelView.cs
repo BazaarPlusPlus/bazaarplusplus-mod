@@ -41,12 +41,11 @@ internal sealed class CollectionPanelViewModel
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
-    // Day filter icon: DayFilterValue is the number shown (current run day, or OutOfRunDay);
-    // DayFilterActive highlights it when the day participates in filtering.
+    // Day filter pill: null is the out-of-run/unavailable "Any" state.
     public bool DayFilterVisible { get; set; } = true;
     public bool DayFilterEnabled { get; set; } = true;
     public bool DayFilterActive { get; set; }
-    public int DayFilterValue { get; set; }
+    public int? DayFilterValue { get; set; }
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
     public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();
@@ -187,7 +186,7 @@ internal sealed partial class CollectionPanelView : IDisposable
                 "CollectionPanelNativeTitle",
                 _parent,
                 BppOverlaySorting.NativeCardPreview,
-                Sizes.FontTitle,
+                Sizes.CollectionFilterTitleFont,
                 Colors.GameTitleText,
                 out _titleOverlay
             )
@@ -469,6 +468,9 @@ internal sealed partial class CollectionPanelView : IDisposable
             _keywordFilterLabel.text = CollectionPanelText.KeywordHeader();
         if (_keywordRelatedSectionLabel != null)
             _keywordRelatedSectionLabel.text = CollectionPanelText.KeywordRelatedSection();
+
+        RefreshFilterDisclosure(model);
+        RefreshActiveFilterSummary(model);
 
         UpdateContentSpacerHeight(model.ContentHeight);
 

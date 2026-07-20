@@ -32,6 +32,23 @@ internal static class CollectionPanelText
         "搜索名称、描述、内部 ID、标签和相关效果。",
         "搜尋名稱、描述、內部 ID、標籤和相關效果。"
     );
+    private static readonly LocalizedTextSet ActiveFiltersText = new(
+        "Active filters",
+        "当前筛选",
+        "目前篩選"
+    );
+    private static readonly LocalizedTextSet ClearText = new("Clear", "清除", "清除");
+    private static readonly LocalizedTextSet ClearAllText = new(
+        "Clear all",
+        "清除全部",
+        "清除全部"
+    );
+    private static readonly LocalizedTextSet UnlimitedText = new("Any", "不限", "不限");
+    private static readonly LocalizedTextSet SelectedCountText = new(
+        "{0} selected",
+        "已选 {0} 项",
+        "已選 {0} 項"
+    );
 
     private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄");
     private static readonly LocalizedTextSet DayHeaderText = new("Day", "天数", "天數");
@@ -109,6 +126,30 @@ internal static class CollectionPanelText
     internal static string SearchLabel() => Resolve(SearchLabelText);
 
     internal static string SearchTooltip() => Resolve(SearchTooltipText);
+
+    internal static string ActiveFilters() => Resolve(ActiveFiltersText);
+
+    internal static string Clear() => Resolve(ClearText);
+
+    internal static string ClearAll() => Resolve(ClearAllText);
+
+    internal static string Unlimited() => Resolve(UnlimitedText);
+
+    internal static string SelectedCount(int count) =>
+        string.Format(
+            System.Globalization.CultureInfo.CurrentCulture,
+            Resolve(SelectedCountText),
+            count
+        );
+
+    internal static string DayValue(int? day) =>
+        day.HasValue
+            ? LocalizedTextHelpers.FormatSimple(
+                $"Day {day.Value}",
+                $"第 {day.Value} 天",
+                $"第 {day.Value} 天"
+            )
+            : Unlimited();
 
     internal static string HeroHeader() => Resolve(HeroHeaderText);
 

@@ -47,7 +47,11 @@ internal sealed partial class CollectionPanelView
         titleRow.style.alignItems = Align.Center;
         rail.Add(titleRow);
 
-        _title = CreateLabel(Sizes.FontTitle, FontStyle.Normal, Colors.GameTitleText);
+        _title = CreateLabel(
+            Sizes.CollectionFilterTitleFont,
+            FontStyle.Normal,
+            Colors.GameTitleText
+        );
         _title.style.flexGrow = 1f;
         _title.style.flexShrink = 1f;
         _title.style.minWidth = 0f;
@@ -101,7 +105,11 @@ internal sealed partial class CollectionPanelView
         sortGroup.style.marginTop = UiSpacing.Xs;
         primaryControlsRow.Add(sortGroup);
 
-        _sortLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        _sortLabel = CreateLabel(
+            Sizes.CollectionFilterHeaderFont,
+            FontStyle.Bold,
+            Colors.HistorySubtitleText
+        );
         _sortLabel.text = CollectionPanelText.SortHeader();
         _sortLabel.style.marginRight = UiSpacing.Xs;
         sortGroup.Add(_sortLabel);
@@ -124,6 +132,8 @@ internal sealed partial class CollectionPanelView
         _dayToggleButton.style.marginTop = UiSpacing.Xs;
         primaryControlsRow.Add(_dayToggleButton);
 
+        BuildActiveFilterSummary(rail);
+
         var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
         controlsScroll.style.flexGrow = 1f;
         controlsScroll.style.flexShrink = 1f;
@@ -139,8 +149,11 @@ internal sealed partial class CollectionPanelView
         // Hero filter.
         _heroFilterSection = CreateFilterSection(
             controlsScroll,
+            FilterSectionKind.Hero,
             CollectionPanelText.HeroHeader(),
             UiSpacing.Xl,
+            _commands.ClearHeroFilter,
+            modeButton: null,
             out _heroChipRow,
             out _heroFilterLabel
         );
@@ -151,8 +164,11 @@ internal sealed partial class CollectionPanelView
         // Size + tier filter. On Skills, Refresh hides Size and lets Quality fill the row.
         _tierFilterSection = CreateFilterSection(
             controlsScroll,
+            FilterSectionKind.TierSize,
             CollectionPanelText.TierSizeHeader(),
             UiSpacing.Lg,
+            _commands.ClearTierSizeFilter,
+            modeButton: null,
             out var tierSizeChipRow,
             out _tierFilterLabel
         );
@@ -169,39 +185,44 @@ internal sealed partial class CollectionPanelView
 
         // Keyword filter (EHiddenTag gameplay keywords). This is the common secondary filter for
         // Items and Skills, so keep it directly below Quality.
+        _keywordMatchModeButton = CreateFacetMatchModeButton(_commands.ToggleKeywordMatchMode);
         _keywordFilterSection = CreateFilterSection(
             controlsScroll,
+            FilterSectionKind.Keyword,
             CollectionPanelText.KeywordHeader(),
             UiSpacing.Lg,
+            _commands.ClearKeywordFilter,
+            _keywordMatchModeButton,
             out _keywordChipRow,
-            out _keywordFilterLabel,
-            out var keywordHeaderRow
+            out _keywordFilterLabel
         );
-        _keywordMatchModeButton = CreateFacetMatchModeButton(_commands.ToggleKeywordMatchMode);
-        keywordHeaderRow.Add(_keywordMatchModeButton);
         _keywordChipRow.style.flexWrap = Wrap.Wrap;
         _keywordChipRow.style.justifyContent = Justify.FlexStart;
 
         // Tag filter (player-facing item categories). Items show this below gameplay
         // keywords; Skills hide it and source filters move up naturally.
+        _tagMatchModeButton = CreateFacetMatchModeButton(_commands.ToggleTagMatchMode);
         _tagFilterSection = CreateFilterSection(
             controlsScroll,
+            FilterSectionKind.Tag,
             CollectionPanelText.TagHeader(),
             UiSpacing.Lg,
+            _commands.ClearTagFilter,
+            _tagMatchModeButton,
             out _tagChipRow,
-            out _tagFilterLabel,
-            out var tagHeaderRow
+            out _tagFilterLabel
         );
-        _tagMatchModeButton = CreateFacetMatchModeButton(_commands.ToggleTagMatchMode);
-        tagHeaderRow.Add(_tagMatchModeButton);
         _tagChipRow.style.flexWrap = Wrap.Wrap;
         _tagChipRow.style.justifyContent = Justify.FlexStart;
 
         // Source filter (merchant portraits on Items, trainer portraits on Skills).
         _sourceFilterSection = CreateFilterSection(
             controlsScroll,
+            FilterSectionKind.Source,
             CollectionPanelText.SourceHeader(ECardType.Item),
             UiSpacing.Lg,
+            _commands.ClearSourceFilter,
+            modeButton: null,
             out _sourceChipRow,
             out _sourceFilterLabel
         );
@@ -211,7 +232,7 @@ internal sealed partial class CollectionPanelView
         _sourceChipRow.RegisterCallback<GeometryChangedEvent>(OnSourceChipRowGeometryChanged);
 
         _disclaimerLabel = CreateLabel(
-            Sizes.FontCorner,
+            Sizes.CollectionFilterFont,
             FontStyle.Normal,
             Colors.HistoryFooterSecondaryText
         );
@@ -225,7 +246,11 @@ internal sealed partial class CollectionPanelView
         _disclaimerLabel.style.overflow = Overflow.Hidden;
         rail.Add(_disclaimerLabel);
 
-        _statusLabel = CreateLabel(Sizes.FontSmall, FontStyle.Normal, Colors.HistoryStatusText);
+        _statusLabel = CreateLabel(
+            Sizes.CollectionFilterFont,
+            FontStyle.Normal,
+            Colors.HistoryStatusText
+        );
         _statusLabel.style.marginTop = UiSpacing.Md;
         _statusLabel.style.flexShrink = 0f;
         _statusLabel.style.minHeight = Sizes.StatusHeight;
@@ -266,7 +291,11 @@ internal sealed partial class CollectionPanelView
         container.style.flexShrink = 0f;
         container.style.width = Length.Percent(100f);
 
-        _searchLabel = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        _searchLabel = CreateLabel(
+            Sizes.CollectionFilterHeaderFont,
+            FontStyle.Bold,
+            Colors.HistorySubtitleText
+        );
         _searchLabel.text = CollectionPanelText.SearchLabel();
         _searchLabel.style.marginBottom = UiSpacing.Xs;
         container.Add(_searchLabel);
@@ -291,7 +320,7 @@ internal sealed partial class CollectionPanelView
         field.style.backgroundColor = Color.clear;
         field.style.color = Colors.HistoryChipText;
         _typography!.Apply(field);
-        field.style.fontSize = Sizes.FontSmall;
+        field.style.fontSize = Sizes.CollectionFilterFont;
         field.style.borderLeftWidth = 0f;
         field.style.borderRightWidth = 0f;
         field.style.borderTopWidth = 0f;
@@ -364,7 +393,7 @@ internal sealed partial class CollectionPanelView
             input.style.backgroundColor = Color.clear;
             input.style.color = Colors.HistoryChipText;
             _typography!.Apply(input);
-            input.style.fontSize = Sizes.FontSmall;
+            input.style.fontSize = Sizes.CollectionFilterFont;
             input.style.unityTextAlign = TextAnchor.MiddleLeft;
             input.style.borderLeftWidth = 0f;
             input.style.borderRightWidth = 0f;
@@ -385,14 +414,18 @@ internal sealed partial class CollectionPanelView
             text.style.alignSelf = Align.Stretch;
             text.style.color = Colors.HistoryChipText;
             _typography!.Apply(text);
-            text.style.fontSize = Sizes.FontSmall;
+            text.style.fontSize = Sizes.CollectionFilterFont;
             text.style.unityTextAlign = TextAnchor.MiddleLeft;
         }
     }
 
     private static Label CreateCountLabel()
     {
-        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryStatusText);
+        var label = CreateLabel(
+            Sizes.CollectionFilterFont,
+            FontStyle.Bold,
+            Colors.HistoryStatusText
+        );
         label.style.backgroundColor = Colors.HistoryStatusBackground;
         label.style.height = Sizes.ButtonCompactHeight;
         UiStyle.FixedWidth(label.style, Sizes.CollectionMatchCountWidth);
@@ -420,72 +453,16 @@ internal sealed partial class CollectionPanelView
         return button;
     }
 
-    private static VisualElement CreateFilterSection(
-        VisualElement parent,
-        string title,
-        float marginTop,
-        out VisualElement chipRow
-    ) => CreateFilterSection(parent, title, marginTop, out chipRow, out _);
-
-    private static VisualElement CreateFilterSection(
-        VisualElement parent,
-        string title,
-        float marginTop,
-        out VisualElement chipRow,
-        out Label label
-    ) => CreateFilterSection(parent, title, marginTop, out chipRow, out label, out _);
-
-    private static VisualElement CreateFilterSection(
-        VisualElement parent,
-        string title,
-        float marginTop,
-        out VisualElement chipRow,
-        out Label label,
-        out VisualElement headerRow
-    )
-    {
-        var section = new VisualElement();
-        section.style.flexDirection = FlexDirection.Column;
-        section.style.flexShrink = 0f;
-        section.style.marginTop = marginTop;
-        parent.Add(section);
-
-        headerRow = new VisualElement();
-        headerRow.style.flexDirection = FlexDirection.Row;
-        headerRow.style.alignItems = Align.Center;
-        headerRow.style.alignSelf = Align.Stretch;
-        headerRow.style.marginBottom = UiSpacing.Sm;
-        section.Add(headerRow);
-
-        label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
-        label.text = title;
-        label.style.flexGrow = 1f;
-        label.style.flexShrink = 1f;
-        label.style.minWidth = 0f;
-        label.style.whiteSpace = WhiteSpace.NoWrap;
-        label.style.overflow = Overflow.Hidden;
-        headerRow.Add(label);
-
-        chipRow = new VisualElement();
-        chipRow.style.flexDirection = FlexDirection.Row;
-        chipRow.style.flexWrap = Wrap.Wrap;
-        chipRow.style.alignItems = Align.Center;
-        chipRow.style.alignSelf = Align.Stretch;
-        section.Add(chipRow);
-
-        return section;
-    }
-
     private static Button CreateFacetMatchModeButton(Action onClick)
     {
         var button = CreateButton(
             string.Empty,
             onClick,
             Sizes.FacetModeToggleWidth,
-            Sizes.InfoChipHeight
+            Sizes.CollectionFacetChipHeight
         );
         button.style.marginLeft = UiSpacing.Sm;
-        button.style.fontSize = Sizes.FontSmall;
+        button.style.fontSize = Sizes.CollectionFilterFont;
         StyleButton(button, Colors.HistoryChipBackground, Colors.HistoryChipText);
         return button;
     }
@@ -506,7 +483,7 @@ internal sealed partial class CollectionPanelView
     {
         var divider = new VisualElement { pickingMode = PickingMode.Ignore };
         divider.style.width = Borders.Thin;
-        divider.style.height = Sizes.InfoChipHeight;
+        divider.style.height = Sizes.CollectionFacetChipHeight;
         divider.style.marginLeft = UiSpacing.Sm;
         divider.style.marginRight = UiSpacing.Sm;
         divider.style.flexShrink = 0f;
@@ -523,7 +500,7 @@ internal sealed partial class CollectionPanelView
         var button = CreateButton(
             string.Empty,
             _commands.ToggleRunDayFilter,
-            Sizes.DayIconWidth,
+            Sizes.CollectionDayButtonWidth,
             Sizes.ButtonStandardHeight
         );
         button.tooltip = CollectionPanelText.DayHeader();

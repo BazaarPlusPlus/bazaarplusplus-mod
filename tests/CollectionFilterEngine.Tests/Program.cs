@@ -157,9 +157,36 @@ AssertFalse(
     "CollectionPanel hero preference should reject empty values."
 );
 AssertEqual(
-    DayTierSchedule.OutOfRunDay,
+    null,
     new CollectionFilterState().SelectedRunDay,
-    "New filter state should start with the day filter selected."
+    "New filter state should not expose an out-of-run no-op day filter."
+);
+var clearState = new CollectionFilterState
+{
+    SearchQuery = "burn",
+    SelectedRunDay = 6,
+    SelectedSourceKey = "merchant:aila",
+    TagMatchMode = CollectionFacetMatchMode.All,
+    KeywordMatchMode = CollectionFacetMatchMode.All,
+};
+clearState.Heroes.Add(EHero.Dooley);
+clearState.Tiers.Add(ETier.Gold);
+clearState.Sizes.Add(ECardSize.Large);
+clearState.Tags.Add(ECardTag.Weapon);
+clearState.Keywords.Add(EHiddenTag.Burn);
+clearState.ClearAllFilters();
+AssertTrue(
+    clearState.Heroes.Count == 0
+        && clearState.Tiers.Count == 0
+        && clearState.Sizes.Count == 0
+        && clearState.Tags.Count == 0
+        && clearState.Keywords.Count == 0
+        && clearState.SelectedSourceKey == null
+        && clearState.SelectedRunDay == null
+        && clearState.SearchQuery.Length == 0
+        && clearState.TagMatchMode == CollectionFacetMatchMode.Any
+        && clearState.KeywordMatchMode == CollectionFacetMatchMode.Any,
+    "Clearing all filters should reset every narrowing condition and facet mode."
 );
 var selectionState = new CollectionFilterState();
 selectionState.SelectedSourceKey = "trainer:old";
@@ -285,11 +312,23 @@ AssertFalse(
 
 var itemDayPresentation = CollectionDayFilterPresentation.For(
     CollectionTabProfile.For(CollectionTabKind.Items),
+    hasCurrentRunDay: true,
     isSelected: true
 );
 AssertTrue(
     itemDayPresentation.IsVisible && itemDayPresentation.IsEnabled && itemDayPresentation.IsActive,
     "Normal item tabs should still show an enabled, highlighted day pill when selected."
+);
+var outOfRunDayPresentation = CollectionDayFilterPresentation.For(
+    CollectionTabProfile.For(CollectionTabKind.Items),
+    hasCurrentRunDay: false,
+    isSelected: true
+);
+AssertTrue(
+    outOfRunDayPresentation.IsVisible
+        && !outOfRunDayPresentation.IsEnabled
+        && !outOfRunDayPresentation.IsActive,
+    "Out-of-run day presentation should remain visible as a disabled, inactive Any value."
 );
 var itemHeroPresentation = CollectionHeroFilterPresentation.For(
     CollectionTabProfile.For(CollectionTabKind.Items)

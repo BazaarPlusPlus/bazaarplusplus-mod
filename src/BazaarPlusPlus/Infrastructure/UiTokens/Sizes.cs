@@ -23,6 +23,10 @@ internal static class Sizes
     public const float SupporterAttributionNameMaxWidth = 118f;
     public const float SupporterActionMinWidth = 74f;
     public const float CollectionMatchCountWidth = 96f;
+    public const float CollectionActiveFilterHeight = 30f;
+    public const float CollectionDayButtonWidth = 72f;
+    public const float CollectionFacetChipHeight = 28f;
+    public const float CollectionFilterClearButtonWidth = 58f;
     public const float HeroChipIconSize = 48f;
     public const float HeroChipButtonSize = 56f;
     public const int HeroChipsPerRow = 8;
@@ -80,6 +84,9 @@ internal static class Sizes
     public const int FontTiny = 10;
     public const int FontCorner = 11;
     public const int FontSmall = 12;
+    public const int CollectionFilterFont = 14;
+    public const int CollectionFilterHeaderFont = 15;
+    public const int CollectionFilterTitleFont = 30;
     public const int FontPreview = 13;
     public const int FontBody = 14;
     public const int FontFooterPrimary = 15;
