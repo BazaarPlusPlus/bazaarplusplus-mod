@@ -7,7 +7,7 @@ using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.CardTags;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
-using BazaarPlusPlus.Game.Encounters;
+using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.TagTypography;
 
 var searchRefreshGate = new CollectionSearchRefreshGate(0.16f);
@@ -156,9 +156,8 @@ AssertFalse(
     CollectionPanelHeroPreference.TryParse("", out _),
     "CollectionPanel hero preference should reject empty values."
 );
-AssertEqual(
-    DayTierSchedule.OutOfRunDay,
-    new CollectionFilterState().SelectedRunDay,
+AssertTrue(
+    new CollectionFilterState().UseRunDayFilter,
     "New filter state should start with the day filter selected."
 );
 var selectionState = new CollectionFilterState();
@@ -339,7 +338,7 @@ var defaultPackageResult = CollectionFilterEngine.Apply(
 );
 AssertSequence(defaultPackageResult, new[] { normal.Id }, "Packages are excluded by default.");
 
-var matchingPackageFilter = new CollectionFilterState { SelectedRunDay = 1 };
+var matchingPackageFilter = new CollectionFilterState();
 matchingPackageFilter.Heroes.Add(EHero.Dooley);
 matchingPackageFilter.Tiers.Add(ETier.Bronze);
 matchingPackageFilter.Sizes.Add(ECardSize.Medium);
@@ -1307,7 +1306,6 @@ var searchGlobalFilter = new CollectionFilterState
 {
     SelectedSourceKey = querySource.SourceKey,
     SearchQuery = "lighter",
-    SelectedRunDay = 1,
 };
 searchGlobalFilter.Heroes.Add(EHero.Vanessa);
 searchGlobalFilter.Tiers.Add(ETier.Bronze);
@@ -1705,91 +1703,102 @@ AssertFalse(
     "Package-like names no longer mark packages without HiddenTag.Package."
 );
 
-// --- Day filter: DayTierSchedule maps a run day to a StartingTier ceiling. ---
-AssertEqual(ETier.Bronze, DayTierSchedule.CeilingTier(1), "Day 1 ceiling is Bronze.");
-AssertEqual(ETier.Silver, DayTierSchedule.CeilingTier(2), "Day 2 raises the ceiling to Silver.");
-AssertEqual(ETier.Silver, DayTierSchedule.CeilingTier(5), "Day 5 is still Silver-capped.");
-AssertEqual(ETier.Gold, DayTierSchedule.CeilingTier(6), "Day 6 raises the ceiling to Gold.");
-AssertEqual(ETier.Gold, DayTierSchedule.CeilingTier(7), "Day 7 is still Gold-capped.");
-AssertEqual(ETier.Diamond, DayTierSchedule.CeilingTier(8), "Day 8 raises the ceiling to Diamond.");
-AssertEqual(
-    ETier.Diamond,
-    DayTierSchedule.CeilingTier(12),
-    "Days beyond the table stay Diamond-capped."
-);
-AssertEqual(
-    ETier.Diamond,
-    DayTierSchedule.CeilingTier(DayTierSchedule.OutOfRunDay),
-    "OutOfRunDay sits in the Diamond band, so the out-of-run filter narrows nothing."
-);
-
-// --- Day filter: SelectedRunDay keeps StartingTier <= ceiling(day); ANDs with other dimensions. ---
+// --- Day filter: shared GameData MaximumTier gates StartingTier and ANDs with other dimensions. ---
 var dayBronze = Card("Day Bronze", ETier.Bronze);
 var daySilver = Card("Day Silver", ETier.Silver);
 var dayGold = Card("Day Gold", ETier.Gold);
 var dayDiamond = Card("Day Diamond", ETier.Diamond);
 var dayLegendary = Card("Day Legendary", ETier.Legendary);
 var dayPool = new[] { dayBronze, daySilver, dayGold, dayDiamond, dayLegendary };
+var bronzeDayTable = GameDataDayTierTable.FromWeights(1f, 0f, 0f, 0f)!;
+var goldDayTable = GameDataDayTierTable.FromWeights(0.7f, 0.2f, 0.09f, 0f)!;
+var diamondDayTable = GameDataDayTierTable.FromWeights(0.89f, 0.1f, 0f, 0.01f)!;
 
 AssertSequence(
-    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = 1 }),
+    CollectionFilterEngine.Apply(
+        dayPool,
+        new CollectionFilterState(),
+        new CollectionFilterContext { DayTiers = bronzeDayTable }
+    ),
     new[] { dayBronze.Id },
-    "Day 1 keeps only Bronze-start cards."
+    "A Bronze GameData ceiling keeps only Bronze-start cards."
 );
 AssertSequence(
-    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = 2 }),
-    new[] { dayBronze.Id, daySilver.Id },
-    "Day 2 keeps Bronze and Silver, excludes Gold/Diamond."
-);
-AssertSequence(
-    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = 6 }),
+    CollectionFilterEngine.Apply(
+        dayPool,
+        new CollectionFilterState(),
+        new CollectionFilterContext { DayTiers = goldDayTable }
+    ),
     new[] { dayBronze.Id, daySilver.Id, dayGold.Id },
-    "Day 6 unlocks Gold."
+    "The highest positive GameData tier is the ceiling even when its probability is smaller."
 );
 AssertSequence(
-    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = 8 }),
+    CollectionFilterEngine.Apply(
+        dayPool,
+        new CollectionFilterState(),
+        new CollectionFilterContext { DayTiers = diamondDayTable }
+    ),
     new[] { dayBronze.Id, daySilver.Id, dayGold.Id, dayDiamond.Id, dayLegendary.Id },
-    "Day 8 unlocks Diamond and shows Legendary-start cards alongside Diamond."
+    "A Diamond GameData ceiling preserves Legendary-to-Diamond compatibility."
 );
 AssertSequence(
-    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState { SelectedRunDay = null }),
+    CollectionFilterEngine.Apply(dayPool, new CollectionFilterState()),
     new[] { dayBronze.Id, daySilver.Id, dayGold.Id, dayDiamond.Id, dayLegendary.Id },
-    "Null SelectedRunDay disables day filtering."
+    "Missing or unavailable GameData fails open instead of guessing a ceiling."
+);
+var disabledDayFilter = new CollectionFilterState { UseRunDayFilter = false };
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        dayPool,
+        disabledDayFilter,
+        new CollectionFilterContext { DayTiers = bronzeDayTable }
+    ),
+    new[] { dayBronze.Id, daySilver.Id, dayGold.Id, dayDiamond.Id, dayLegendary.Id },
+    "Turning the Day filter off skips a trustworthy GameData ceiling."
 );
 
-var dayAndTierFilter = new CollectionFilterState { SelectedRunDay = 6 };
+var dayAndTierFilter = new CollectionFilterState();
 dayAndTierFilter.Tiers.Add(ETier.Diamond);
 AssertSequence(
-    CollectionFilterEngine.Apply(dayPool, dayAndTierFilter),
+    CollectionFilterEngine.Apply(
+        dayPool,
+        dayAndTierFilter,
+        new CollectionFilterContext { DayTiers = goldDayTable }
+    ),
     Array.Empty<Guid>(),
-    "Manual Tier=Diamond ANDs with Day 6 (ceiling Gold) to nothing — independent dimensions, neither rewrites the other."
+    "Manual Tier=Diamond ANDs with a Gold GameData ceiling to nothing."
 );
 
 AssertSequence(
     CollectionFilterEngine.Apply(
         dayPool,
-        new CollectionFilterState { SelectedRunDay = 8 },
-        new CollectionFilterContext { OfferedCardIds = new[] { dayGold.Id, dayLegendary.Id } }
+        new CollectionFilterState(),
+        new CollectionFilterContext
+        {
+            OfferedCardIds = new[] { dayGold.Id, dayLegendary.Id },
+            DayTiers = diamondDayTable,
+        }
     ),
     new[] { dayGold.Id, dayLegendary.Id },
-    "Day predicate ANDs with the resolved offer pool."
+    "The GameData day predicate ANDs with the resolved offer pool."
 );
 
 // --- Day filter: fixed-tier sources (offer rule pins a starting tier) ignore the day gate. ---
 AssertSequence(
     CollectionFilterEngine.Apply(
         dayPool,
-        new CollectionFilterState { SelectedRunDay = 1 },
+        new CollectionFilterState(),
         new CollectionFilterContext
         {
             OfferedCardIds = new[] { dayGold.Id, dayDiamond.Id },
             SuppressDayGate = true,
+            DayTiers = bronzeDayTable,
         }
     ),
     new[] { dayGold.Id, dayDiamond.Id },
     "A fixed-tier source's pool is exempt from the day ceiling (Luxe on Day 1 still deals Diamond)."
 );
-var suppressedDayManualTier = new CollectionFilterState { SelectedRunDay = 1 };
+var suppressedDayManualTier = new CollectionFilterState();
 suppressedDayManualTier.Tiers.Add(ETier.Gold);
 AssertSequence(
     CollectionFilterEngine.Apply(
@@ -1799,6 +1808,7 @@ AssertSequence(
         {
             OfferedCardIds = new[] { dayGold.Id, dayDiamond.Id },
             SuppressDayGate = true,
+            DayTiers = bronzeDayTable,
         }
     ),
     new[] { dayGold.Id },

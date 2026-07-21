@@ -3,16 +3,64 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarGameShared.Domain.Spawning.SpawnBehaviors;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
+using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.Localization;
 using Xunit;
 
 namespace EncounterTooltip.Tests;
 
-public sealed class TierDistributionTests
+public sealed class GameDataDayTierTableTests
 {
-    public TierDistributionTests()
+    public GameDataDayTierTableTests()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+    }
+
+    [Fact]
+    public void GameData_table_uses_the_highest_positive_finite_tier_as_its_maximum()
+    {
+        var table = GameDataDayTierTable.FromWeights(0.89f, 0.1f, 0f, 0.01f);
+
+        Assert.NotNull(table);
+        Assert.Equal(ETier.Diamond, table.MaximumTier);
+        Assert.Collection(
+            table.Entries,
+            entry =>
+            {
+                Assert.Equal(ETier.Bronze, entry.Tier);
+                Assert.Equal(89d, entry.Percent, 5);
+            },
+            entry =>
+            {
+                Assert.Equal(ETier.Silver, entry.Tier);
+                Assert.Equal(10d, entry.Percent, 5);
+            },
+            entry =>
+            {
+                Assert.Equal(ETier.Diamond, entry.Tier);
+                Assert.Equal(1d, entry.Percent, 5);
+            }
+        );
+    }
+
+    [Fact]
+    public void GameData_table_normalizes_non_unit_weights_and_ignores_unusable_entries()
+    {
+        var table = GameDataDayTierTable.FromWeights(
+            bronze: -1f,
+            silver: 2f,
+            gold: float.NaN,
+            diamond: 6f
+        );
+
+        Assert.NotNull(table);
+        Assert.Equal(ETier.Diamond, table.MaximumTier);
+        Assert.Collection(
+            table.Entries,
+            entry => Assert.Equal(25d, entry.Percent, 5),
+            entry => Assert.Equal(75d, entry.Percent, 5)
+        );
+        Assert.Null(GameDataDayTierTable.FromWeights(0f, -1f, float.NaN, float.PositiveInfinity));
     }
 
     [Theory]
@@ -29,13 +77,9 @@ public sealed class TierDistributionTests
         string expectedLast
     )
     {
-        var distribution = TierDistribution.FromWeights(bronze, silver, gold, diamond);
+        var distribution = GameDataDayTierTable.FromWeights(bronze, silver, gold, diamond);
 
-        var text = EncounterPreviewTextFormatter.BuildQualityLine(
-            distribution,
-            fixedTier: null,
-            dayTierCeiling: ETier.Diamond
-        );
+        var text = EncounterPreviewTextFormatter.BuildQualityLine(distribution, fixedTier: null);
 
         Assert.DoesNotContain("Quality today", text);
         Assert.Contains(expectedFirst, text);
@@ -47,13 +91,9 @@ public sealed class TierDistributionTests
     [Fact]
     public void Distribution_normalizes_positive_weights_instead_of_assuming_total_is_one()
     {
-        var distribution = TierDistribution.FromWeights(0f, 0.2f, 0.55f, 0.05f);
+        var distribution = GameDataDayTierTable.FromWeights(0f, 0.2f, 0.55f, 0.05f);
 
-        var text = EncounterPreviewTextFormatter.BuildQualityLine(
-            distribution,
-            fixedTier: null,
-            dayTierCeiling: ETier.Diamond
-        );
+        var text = EncounterPreviewTextFormatter.BuildQualityLine(distribution, fixedTier: null);
 
         Assert.Contains("Silver 25%", text);
         Assert.Contains("Gold 68.75%", text);
@@ -63,13 +103,13 @@ public sealed class TierDistributionTests
     [Fact]
     public void Distribution_ignores_non_positive_weights_and_rejects_an_empty_table()
     {
-        var distribution = TierDistribution.FromWeights(-1f, 0f, 2f, float.NaN);
+        var distribution = GameDataDayTierTable.FromWeights(-1f, 0f, 2f, float.NaN);
 
         Assert.NotNull(distribution);
         Assert.Single(distribution!.Entries);
         Assert.Equal(ETier.Gold, distribution.Entries[0].Tier);
         Assert.Equal(100d, distribution.Entries[0].Percent);
-        Assert.Null(TierDistribution.FromWeights(0f, -1f, float.NaN, 0f));
+        Assert.Null(GameDataDayTierTable.FromWeights(0f, -1f, float.NaN, 0f));
     }
 
     [Theory]
@@ -90,9 +130,8 @@ public sealed class TierDistributionTests
 
         var policy = EncounterMerchantTierResolver.Resolve(template);
         var text = EncounterPreviewTextFormatter.BuildQualityLine(
-            TierDistribution.FromWeights(0.9f, 0.1f, 0f, 0f),
-            policy.FixedTier,
-            policy.UsesDayDistribution ? ETier.Silver : null
+            GameDataDayTierTable.FromWeights(0.9f, 0.1f, 0f, 0f),
+            policy.FixedTier
         );
 
         Assert.Equal(tier, policy.FixedTier);
@@ -155,9 +194,8 @@ public sealed class TierDistributionTests
         L.Install(new TestLanguageProvider(language), new TestLocaleModeProvider(localeMode));
 
         var text = EncounterPreviewTextFormatter.BuildQualityLine(
-            TierDistribution.FromWeights(0.9f, 0.1f, 0f, 0f),
-            fixedTier: null,
-            dayTierCeiling: ETier.Silver
+            GameDataDayTierTable.FromWeights(0.9f, 0.1f, 0f, 0f),
+            fixedTier: null
         );
 
         Assert.Contains(expectedBronze, text);
@@ -167,16 +205,11 @@ public sealed class TierDistributionTests
     }
 
     [Fact]
-    public void Quality_line_falls_back_to_the_existing_day_ceiling()
+    public void Quality_line_omits_day_tier_claims_without_a_trustworthy_table()
     {
-        var text = EncounterPreviewTextFormatter.BuildQualityLine(
-            dayTierDistribution: null,
-            fixedTier: null,
-            dayTierCeiling: ETier.Gold
-        );
+        var text = EncounterPreviewTextFormatter.BuildQualityLine(dayTiers: null, fixedTier: null);
 
-        Assert.Contains("up to Gold", text);
-        Assert.DoesNotContain("Quality today", text);
+        Assert.Equal(string.Empty, text);
     }
 
     [Fact]
@@ -185,8 +218,7 @@ public sealed class TierDistributionTests
         var text = EncounterPreviewTextFormatter.BuildRewardQualityLine(
             CreateRewardFilter(usesDayTierTable: true, usesDayTierDistribution: true),
             "Get 3 Loot items",
-            TierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
-            ETier.Silver
+            GameDataDayTierTable.FromWeights(0.7f, 0.3f, 0f, 0f)
         );
 
         Assert.Contains("Bronze 70%", text);
@@ -199,8 +231,7 @@ public sealed class TierDistributionTests
         var text = EncounterPreviewTextFormatter.BuildRewardQualityLine(
             CreateRewardFilter(usesDayTierTable: false, usesDayTierDistribution: true),
             "Gain 2 Gold and a Shield item from any Hero",
-            TierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
-            ETier.Silver
+            GameDataDayTierTable.FromWeights(0.7f, 0.3f, 0f, 0f)
         );
 
         Assert.Contains("Bronze 70%", text);
@@ -213,8 +244,7 @@ public sealed class TierDistributionTests
         var text = EncounterPreviewTextFormatter.BuildRewardQualityLine(
             CreateRewardFilter(usesDayTierTable: false, usesDayTierDistribution: false),
             "Get an item",
-            TierDistribution.FromWeights(0.7f, 0.3f, 0f, 0f),
-            ETier.Silver
+            GameDataDayTierTable.FromWeights(0.7f, 0.3f, 0f, 0f)
         );
 
         Assert.Equal(string.Empty, text);

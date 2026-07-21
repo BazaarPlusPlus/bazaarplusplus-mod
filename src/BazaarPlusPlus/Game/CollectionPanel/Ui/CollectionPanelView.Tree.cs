@@ -515,9 +515,8 @@ internal sealed partial class CollectionPanelView
         return divider;
     }
 
-    // Compact day-number "icon": shows the effective day (current run day, or OutOfRunDay) and
-    // tapping toggles whether the day participates in filtering. RefreshDayToggle sets the number
-    // and the active highlight; the tooltip names the control since the face is just a number.
+    // Compact day-number "icon": shows the current run day (or an unavailable dash) and toggles
+    // whether the day participates in filtering. The tooltip names the number-only control.
     private Button CreateDayToggleButton()
     {
         var button = CreateButton(

@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
+using BazaarPlusPlus.GameInterop.DayTiers;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -68,7 +69,8 @@ internal static class CollectionQuery
         CollectionFilterState filter,
         CollectionFacetAvailabilitySnapshot facetAvailability,
         ICollectionSourceCatalog sourceCatalog,
-        ICollectionOfferPoolResolver offerPoolResolver
+        ICollectionOfferPoolResolver offerPoolResolver,
+        GameDataDayTierTable? dayTiers = null
     )
     {
         if (catalogCards == null)
@@ -116,6 +118,7 @@ internal static class CollectionQuery
                 OfferedCardIds = offeredCardIds,
                 ApplyHeroFilter =
                     !hasSelectedSource || filter.ActiveTab == CollectionTabKind.Skills,
+                DayTiers = dayTiers,
                 SuppressDayGate =
                     offeredCardIds != null && sourceResolution.Source!.SuppressDayGate,
             }
@@ -176,7 +179,7 @@ internal static class CollectionQuery
             ActiveType = source.ActiveType,
             SelectedSourceKey = source.SelectedSourceKey,
             SearchQuery = source.SearchQuery,
-            SelectedRunDay = source.SelectedRunDay,
+            UseRunDayFilter = source.UseRunDayFilter,
             SortPriority = source.SortPriority,
             TagMatchMode = source.TagMatchMode,
             KeywordMatchMode = source.KeywordMatchMode,
