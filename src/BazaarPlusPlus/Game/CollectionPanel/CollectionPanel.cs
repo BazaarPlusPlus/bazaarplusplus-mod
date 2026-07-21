@@ -8,11 +8,11 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.Game.CollectionPanel.Ui;
-using BazaarPlusPlus.Game.Encounters;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
@@ -75,6 +75,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private IBppConfig _config = null!;
     private INativeCardPreviewHost _nativeCardPreviewHost = null!;
+    private IGameDataDayTierResolver _dayTierResolver = null!;
     private CollectionPanelView? _view;
     private CollectionGridOverlay? _overlay;
     private INativeCardPreviewScope? _previewScope;
@@ -114,15 +115,15 @@ internal sealed class CollectionPanel : MonoBehaviour
     // the typography instance and re-refreshes once, so the startup window self-heals.
     private bool _viewMissedNativeTypography;
 
-    // The run's current day, captured once per open in ResolveOpenSelection (null out of run, or
-    // when Data.Run is unreadable). The Day toggle filters by this value, falling back to
-    // DayTierSchedule.OutOfRunDay. Recomputed on every open.
+    // The run's current day, captured on open and refreshed from each shared day-tier result.
+    // Null is rendered as unavailable; it is never converted into a guessed out-of-run day.
     private int? _currentRunDay;
 
     public void Initialize(
         IBppServices services,
         BppStaticCardMapProvider cardMapProvider,
-        INativeCardPreviewHost nativeCardPreviewHost
+        INativeCardPreviewHost nativeCardPreviewHost,
+        IGameDataDayTierResolver dayTierResolver
     )
     {
         if (_initialized)
@@ -133,12 +134,15 @@ internal sealed class CollectionPanel : MonoBehaviour
             throw new ArgumentNullException(nameof(cardMapProvider));
         if (nativeCardPreviewHost == null)
             throw new ArgumentNullException(nameof(nativeCardPreviewHost));
+        if (dayTierResolver == null)
+            throw new ArgumentNullException(nameof(dayTierResolver));
 
         _initialized = true;
         _instance = this;
         _services = services;
         _config = services.Config;
         _nativeCardPreviewHost = nativeCardPreviewHost;
+        _dayTierResolver = dayTierResolver;
         _catalog = new CollectionCatalog(cardMapProvider);
     }
 
@@ -371,11 +375,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void ApplyOpenSelection(CollectionPanelSelectionState selection)
     {
         _filter.ApplySelection(selection);
-        // The Day toggle's on/off persists across opens; when it is on, re-pin it to the
-        // freshly-read day. _currentRunDay was just captured in ResolveOpenSelection, which always
-        // runs before this.
-        if (_filter.SelectedRunDay != null)
-            _filter.SelectedRunDay = _currentRunDay ?? DayTierSchedule.OutOfRunDay;
         PruneInvisibleSourceSelections();
         _scrollY = 0f;
     }
@@ -695,11 +694,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         public void ToggleRunDayFilter()
         {
-            // Toggle whether the day participates in filtering. On uses the current run day
-            // (or OutOfRunDay out of run); off clears the day filter entirely.
-            panel._filter.SelectedRunDay = panel._filter.SelectedRunDay is null
-                ? panel._currentRunDay ?? DayTierSchedule.OutOfRunDay
-                : (int?)null;
+            panel._filter.UseRunDayFilter = !panel._filter.UseRunDayFilter;
             panel._scrollY = 0f;
             panel.ApplyFilters();
             panel.RefreshView();
@@ -936,12 +931,15 @@ internal sealed class CollectionPanel : MonoBehaviour
         {
             if (!_isLoadingCatalog)
                 ClearStatus();
+            var dayTiers = _dayTierResolver.Resolve();
+            _currentRunDay = dayTiers.Day;
             var query = CollectionQuery.Run(
                 _catalogCards,
                 _filter,
                 _facetAvailability,
                 _sourceCatalog,
-                _offerPoolCache
+                _offerPoolCache,
+                dayTiers.Table
             );
             AdoptNormalization(query.Normalization);
             _virtualizer.SetVisible(query.Cards, _filter.ActiveTab, query.OfferMatchesByCardId);
@@ -975,7 +973,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         var availableKeywords = _facetAvailability.KeywordsFor(_filter.ActiveType);
         var dayFilterPresentation = CollectionDayFilterPresentation.For(
             profile,
-            _filter.SelectedRunDay != null
+            _filter.UseRunDayFilter
         );
         var heroFilterPresentation = CollectionHeroFilterPresentation.For(profile);
         var model = new CollectionPanelViewModel
@@ -1007,7 +1005,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             DayFilterVisible = dayFilterPresentation.IsVisible,
             DayFilterEnabled = dayFilterPresentation.IsEnabled,
             DayFilterActive = dayFilterPresentation.IsActive,
-            DayFilterValue = _currentRunDay ?? DayTierSchedule.OutOfRunDay,
+            DayFilterValue = _currentRunDay,
             AvailableHeroes = HeroOrder,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,

@@ -1,7 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
-using BazaarPlusPlus.Game.Encounters;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -43,10 +42,9 @@ internal sealed class CollectionFilterState
     public string? SelectedSourceKey { get; set; }
     public string SearchQuery { get; set; } = string.Empty;
 
-    // User-selected run "Day" filter; null means no day filtering. Starts enabled so the panel
-    // binds it to Data.Run.Day on open; outside a run, OutOfRunDay keeps the toggle visibly active
-    // without narrowing the catalog.
-    public int? SelectedRunDay { get; set; } = DayTierSchedule.OutOfRunDay;
+    // The Day filter is a toggle. Its actual day and ceiling always come from the shared GameData
+    // resolver; unavailable data therefore leaves this selected while failing open.
+    public bool UseRunDayFilter { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
     public EHero? SelectedHero

@@ -1,6 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.Encounters;
+using BazaarPlusPlus.GameInterop.DayTiers;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -32,7 +32,10 @@ internal static class CollectionFilterEngine
         var sizeFilterCount = profile.ShowSizeFilter ? filter.Sizes.Count : 0;
         // In-run only; null disables. Independent of the manual Tier row — both narrow by tier.
         // Fixed-tier sources are exempt: their pool ignores the day's tier ceiling.
-        var dayFilter = context.SuppressDayGate ? null : filter.SelectedRunDay;
+        var dayMaximumTier =
+            filter.UseRunDayFilter && !context.SuppressDayGate
+                ? context.DayTiers?.MaximumTier
+                : null;
 
         foreach (var card in all)
         {
@@ -46,7 +49,10 @@ internal static class CollectionFilterEngine
                 continue;
             if (tierFilterCount > 0 && !filter.Tiers.Contains(card.StartingTier))
                 continue;
-            if (dayFilter is int day && !DayTierSchedule.AllowsStartingTier(card.StartingTier, day))
+            if (
+                dayMaximumTier.HasValue
+                && !AllowsStartingTier(card.StartingTier, dayMaximumTier.Value)
+            )
                 continue;
             if (tagFilterCount > 0 && !MatchesFacet(card.Tags, filter.Tags, filter.TagMatchMode))
                 continue;
@@ -87,6 +93,12 @@ internal static class CollectionFilterEngine
         if (tierOrder != 0)
             return tierOrder;
         return SizeRank(a.Size).CompareTo(SizeRank(b.Size));
+    }
+
+    private static bool AllowsStartingTier(ETier startingTier, ETier maximumTier)
+    {
+        var effective = startingTier == ETier.Legendary ? ETier.Diamond : startingTier;
+        return GameDataDayTierOrder.Rank(effective) <= GameDataDayTierOrder.Rank(maximumTier);
     }
 
     private static int CompareBySizeThenTier(CollectionCardVm a, CollectionCardVm b)

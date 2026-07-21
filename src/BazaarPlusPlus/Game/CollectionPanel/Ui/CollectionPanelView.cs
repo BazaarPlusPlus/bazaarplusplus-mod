@@ -41,12 +41,12 @@ internal sealed class CollectionPanelViewModel
     public bool SourceSelectorEnabled { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
-    // Day filter icon: DayFilterValue is the number shown (current run day, or OutOfRunDay);
+    // Day filter icon: DayFilterValue is the current run day, or null when unavailable;
     // DayFilterActive highlights it when the day participates in filtering.
     public bool DayFilterVisible { get; set; } = true;
     public bool DayFilterEnabled { get; set; } = true;
     public bool DayFilterActive { get; set; }
-    public int DayFilterValue { get; set; }
+    public int? DayFilterValue { get; set; }
     public IReadOnlyList<EHero> AvailableHeroes { get; set; } = Array.Empty<EHero>();
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
     public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();

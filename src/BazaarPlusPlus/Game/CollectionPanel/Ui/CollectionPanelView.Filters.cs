@@ -948,12 +948,13 @@ internal sealed partial class CollectionPanelView
 
     // Always visible; the face shows the effective day number and highlights when the day
     // participates in filtering (gold = on, chip background = off).
-    private void RefreshDayToggle(int day, bool active)
+    private void RefreshDayToggle(int? day, bool active)
     {
         if (_dayToggleButton == null)
             return;
 
-        _dayToggleButton.text = day.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _dayToggleButton.text =
+            day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—";
         StyleButton(
             _dayToggleButton,
             active ? Colors.ButtonSelectedBackground : Colors.HistoryChipBackground,

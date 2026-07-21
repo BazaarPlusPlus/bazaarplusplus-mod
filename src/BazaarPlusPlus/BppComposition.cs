@@ -30,6 +30,7 @@ using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.GameInterop.RunSnapshot;
 using BazaarPlusPlus.GameInterop.StaticCards;
@@ -53,6 +54,9 @@ internal sealed class BppComposition : IDisposable
     private readonly EncounterStateProbe _encounterStateProbe = new();
     private readonly RunSnapshotProbe _runSnapshotProbe = new();
     private readonly BppStaticCardMapProvider _staticCardMapProvider = new();
+    private readonly IGameDataDayTierResolver _dayTierResolver = new GameDataDayTierResolver(
+        new GameDataDayTierSource()
+    );
     private readonly BppRuntimeServices _services;
     private readonly BppFeatureRegistry _featureRegistry = new();
     private readonly BppMountableRegistry _mountables = new();
@@ -136,6 +140,7 @@ internal sealed class BppComposition : IDisposable
         _encounterPreviewModule = new EncounterPreviewModule(
             _services,
             _staticCardMapProvider,
+            _dayTierResolver,
             encounterPreviewCachePath
         );
         _endOfRunCaptureWorkflow = new EndOfRunCaptureWorkflow(_services);
@@ -187,7 +192,8 @@ internal sealed class BppComposition : IDisposable
             new CollectionPanelMount(
                 () => overlayPanelHostMount.Host,
                 _staticCardMapProvider,
-                _nativeCardPreviewHost
+                _nativeCardPreviewHost,
+                _dayTierResolver
             )
         );
         _mountables.Register(

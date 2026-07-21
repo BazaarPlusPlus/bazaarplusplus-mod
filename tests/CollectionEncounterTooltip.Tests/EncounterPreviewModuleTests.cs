@@ -12,6 +12,7 @@ using BazaarGameShared.Domain.Spawning.SpawnGroups;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
 using BazaarGameShared.Domain.Values;
 using BazaarGameShared.Domain.Values.ReferenceValues;
+using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Localization;
 using Newtonsoft.Json.Linq;
@@ -41,7 +42,6 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         var runtime = new FakeRuntime(source)
         {
             CurrentHero = EHero.Jules,
-            CurrentDay = 3,
             Inventory = new EncounterInventory(Array.Empty<EncounterInventoryCard>()),
         };
         var registry = PublishedRegistry(source, Snapshot());
@@ -64,7 +64,6 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         var runtime = new FakeRuntime(source)
         {
             CurrentHero = EHero.Vanessa,
-            CurrentDay = 3,
             Inventory = new EncounterInventory(Array.Empty<EncounterInventoryCard>()),
         };
         using var module = Module(runtime, PublishedRegistry(source, Snapshot()));
@@ -85,16 +84,36 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         var runtime = new FakeRuntime(firstSource)
         {
             CurrentHero = EHero.Jules,
-            CurrentDay = 3,
             Inventory = new EncounterInventory(Array.Empty<EncounterInventoryCard>()),
         };
-        runtime.OnReadCurrentDay = () => runtime.Source = secondSource;
+        runtime.OnResolveDayTiers = () => runtime.Source = secondSource;
         using var module = Module(runtime, PublishedRegistry(firstSource, Snapshot()));
 
         var result = module.ResolveEvent(new EventPreviewQuery(EventId, "native"));
 
         Assert.Equal(EventPreviewAvailability.Available, result.Availability);
-        Assert.Same(firstSource, runtime.LastDistributionSource);
+        Assert.Same(firstSource, runtime.LastDayTierSource);
+    }
+
+    [Fact]
+    public void Step_query_reads_one_day_tier_result_for_distribution_and_maximum()
+    {
+        var source = new object();
+        var table = GameDataDayTierTable.FromWeights(0.99f, 0f, 0f, 0.01f)!;
+        var runtime = new FakeRuntime(source)
+        {
+            DayTierResolution = GameDataDayTierResolution.Available(day: 7, table),
+        };
+        using var module = Module(runtime, PublishedRegistry(source, DayTierStepSnapshot()));
+
+        var result = module.ResolveStep(new EncounterStepPreviewQuery(StepId, "Get an item"));
+
+        Assert.Equal(EventPreviewAvailability.Available, result.Availability);
+        Assert.Equal(1, runtime.DayTierReadCount);
+        Assert.Same(source, runtime.LastDayTierSource);
+        Assert.Contains("Bronze 99%", result.Content);
+        Assert.Contains("Diamond 1%", result.Content);
+        Assert.Equal(ETier.Diamond, runtime.DayTierResolution.MaximumTier);
     }
 
     [Fact]
@@ -105,7 +124,6 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         var runtime = new FakeRuntime(oldSource)
         {
             CurrentHero = EHero.Jules,
-            CurrentDay = 3,
             Inventory = new EncounterInventory(Array.Empty<EncounterInventoryCard>()),
         };
         using var module = Module(runtime, PublishedRegistry(oldSource, Snapshot()));
@@ -130,7 +148,6 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         var runtime = new FakeRuntime(source)
         {
             CurrentHero = EHero.Jules,
-            CurrentDay = 3,
             Inventory = new EncounterInventory(Array.Empty<EncounterInventoryCard>()),
         };
         var registry = new EncounterPreviewPlanRegistry();
@@ -152,7 +169,7 @@ public sealed class EncounterPreviewModuleTests : IDisposable
             module.ResolveStep(new EncounterStepPreviewQuery(EventId, "native")).Availability
         );
 
-        runtime.ThrowOnDayRead = true;
+        runtime.ThrowOnDayTierRead = true;
         Assert.Equal(
             EventPreviewAvailability.Unavailable,
             module.ResolveEvent(new EventPreviewQuery(EventId, "native")).Availability
@@ -349,7 +366,6 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         var runtime = new FakeRuntime(source)
         {
             CurrentHero = EHero.Jules,
-            CurrentDay = 3,
             Inventory = new EncounterInventory(Array.Empty<EncounterInventoryCard>()),
         };
         EventPreviewLocalization.AttributeUnitLocalizer = unit => unit == "Gold" ? "Coins" : null;
@@ -441,6 +457,37 @@ public sealed class EncounterPreviewModuleTests : IDisposable
             new[] { eventPlan },
             new[] { root, step },
             new[] { levelPlan }
+        );
+    }
+
+    private static EncounterPreviewSnapshot DayTierStepSnapshot()
+    {
+        var reward = new EncounterRewardFilter(
+            ECardType.Item,
+            quantity: 1,
+            fromAnyHero: false,
+            Array.Empty<ECardSize>(),
+            new[] { ETier.Bronze, ETier.Silver, ETier.Gold, ETier.Diamond },
+            Array.Empty<ECardTag>(),
+            Array.Empty<EHiddenTag>(),
+            "Item",
+            usesDayTierTable: true,
+            usesDayTierDistribution: true
+        );
+        var step = new EncounterPreviewTemplatePlan(
+            StepId,
+            EncounterPreviewTemplateKind.EncounterStep,
+            Array.Empty<EHero>(),
+            "Day Tier Step",
+            new EncounterPreviewLocalizedText(string.Empty, "Day Tier Step"),
+            new EncounterPreviewLocalizedText(string.Empty, "Get an item"),
+            new Dictionary<string, EncounterPreviewAbilityValue>(),
+            reward
+        );
+        return new EncounterPreviewSnapshot(
+            Array.Empty<EncounterPreviewEventPlan>(),
+            new[] { step },
+            Array.Empty<LevelUpPreviewPlan>()
         );
     }
 
@@ -614,10 +661,15 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         public object Source { get; set; } = source;
         public EHero? CurrentHero { get; set; }
         public EncounterInventory? Inventory { get; set; }
-        public int? CurrentDay { get; set; }
-        public Action? OnReadCurrentDay { get; set; }
-        public bool ThrowOnDayRead { get; set; }
-        public object? LastDistributionSource { get; private set; }
+        public Action? OnResolveDayTiers { get; set; }
+        public bool ThrowOnDayTierRead { get; set; }
+        public object? LastDayTierSource { get; private set; }
+        public int DayTierReadCount { get; private set; }
+        public GameDataDayTierResolution DayTierResolution { get; set; } =
+            GameDataDayTierResolution.Available(
+                day: 3,
+                GameDataDayTierTable.FromWeights(0.5f, 0.5f, 0f, 0f)!
+            );
         public bool IsInCombat { get; set; }
         public BppGameDataSourceInfo? SourceInfo { get; set; }
         public Dictionary<Guid, ITCard>? CardMap { get; set; }
@@ -645,20 +697,14 @@ public sealed class EncounterPreviewModuleTests : IDisposable
 
         public EncounterInventory? ReadInventory() => Inventory;
 
-        public int? ReadCurrentDay()
+        public GameDataDayTierResolution ResolveDayTiers(object source)
         {
-            OnReadCurrentDay?.Invoke();
-            if (ThrowOnDayRead)
-                throw new InvalidOperationException("day unavailable");
-            return CurrentDay;
-        }
-
-        public ETier? ReadDayTierCeiling(int? currentDay) => ETier.Silver;
-
-        public TierDistribution? ReadDayTierDistribution(object source, int? currentDay)
-        {
-            LastDistributionSource = source;
-            return TierDistribution.FromWeights(0.5f, 0.5f, 0f, 0f);
+            OnResolveDayTiers?.Invoke();
+            if (ThrowOnDayTierRead)
+                throw new InvalidOperationException("day tiers unavailable");
+            DayTierReadCount++;
+            LastDayTierSource = source;
+            return DayTierResolution;
         }
 
         public string ColorKeywords(string text) => text;

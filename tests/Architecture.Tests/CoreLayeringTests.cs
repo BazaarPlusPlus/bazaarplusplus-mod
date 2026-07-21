@@ -115,6 +115,66 @@ public class CoreLayeringTests
         );
     }
 
+    [Fact]
+    public void Day_tiers_have_one_shared_GameInterop_owner_and_no_hardcoded_schedule()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var resolverPath = Path.Combine(
+            mainSource,
+            "GameInterop",
+            "DayTiers",
+            "GameDataDayTierResolver.cs"
+        );
+        Assert.True(File.Exists(resolverPath), "The shared GameData day-tier resolver must exist.");
+        Assert.False(
+            File.Exists(Path.Combine(mainSource, "Game", "Encounters", "DayTierSchedule.cs")),
+            "The hardcoded DayTierSchedule must stay removed."
+        );
+
+        var violations = new List<string>();
+        foreach (
+            var root in new[]
+            {
+                mainSource,
+                Path.Combine(repoRoot, "tests", "CollectionFilterEngine.Tests"),
+                Path.Combine(repoRoot, "tests", "CollectionEncounterTooltip.Tests"),
+            }
+        )
+        {
+            foreach (
+                var file in Directory
+                    .EnumerateFiles(root, "*", SearchOption.AllDirectories)
+                    .Where(path =>
+                        path.EndsWith(".cs", StringComparison.Ordinal)
+                        || path.EndsWith(".csproj", StringComparison.Ordinal)
+                    )
+            )
+            {
+                if (File.ReadAllText(file).Contains("DayTierSchedule", StringComparison.Ordinal))
+                    violations.Add(Path.GetRelativePath(repoRoot, file).Replace('\\', '/'));
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "No source or pinned test include may retain DayTierSchedule:\n"
+                + string.Join("\n", violations)
+        );
+
+        var collectionPanelDir = Path.Combine(mainSource, "Game", "CollectionPanel");
+        foreach (
+            var file in Directory.EnumerateFiles(
+                collectionPanelDir,
+                "*.cs",
+                SearchOption.AllDirectories
+            )
+        )
+        {
+            Assert.DoesNotContain("BazaarPlusPlus.Game.EventPreview", File.ReadAllText(file));
+        }
+    }
+
     // Feature-scoped ratchet, not a repo-wide layering rule: Game/ may legitimately reference
     // TheBazaar.* elsewhere (Game/Tooltips does). This locks in the decision that CollectionPanel
     // consumes native tooltip typography through the GameInterop.TagTypography seam instead of

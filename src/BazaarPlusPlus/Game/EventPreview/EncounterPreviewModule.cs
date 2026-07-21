@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
@@ -71,10 +72,11 @@ internal sealed class EncounterPreviewModule : IEncounterPreviewModule, IDisposa
     internal EncounterPreviewModule(
         IBppServices services,
         BppStaticCardMapProvider cardMapProvider,
+        IGameDataDayTierResolver dayTierResolver,
         string cachePath
     )
         : this(
-            new EncounterPreviewGameRuntime(cardMapProvider),
+            new EncounterPreviewGameRuntime(cardMapProvider, dayTierResolver),
             new EncounterPreviewPlanRegistry(),
             new EncounterPreviewCacheStore(cachePath),
             services?.GameBuild.RawVersion ?? throw new ArgumentNullException(nameof(services)),
@@ -269,9 +271,8 @@ internal sealed class EncounterPreviewModule : IEncounterPreviewModule, IDisposa
             if (query.TemplateId == Guid.Empty)
                 return new EncounterPreviewResult(EventPreviewAvailability.Missing, null);
 
-            var currentDay = _runtime.ReadCurrentDay();
-            var dayTierCeiling = _runtime.ReadDayTierCeiling(currentDay);
-            var dayTierDistribution = _runtime.ReadDayTierDistribution(source, currentDay);
+            var dayTiers = _runtime.ResolveDayTiers(source);
+            var currentDay = dayTiers.Day;
             var template = _runtime.GetCardTemplate(source, query.TemplateId);
             if (template?.Tags?.Contains(ECardTag.Merchant) == true)
             {
@@ -280,9 +281,8 @@ internal sealed class EncounterPreviewModule : IEncounterPreviewModule, IDisposa
                     return new EncounterPreviewResult(EventPreviewAvailability.Unsupported, null);
 
                 var merchantContent = EncounterPreviewTextFormatter.BuildQualityLine(
-                    policy.UsesDayDistribution ? dayTierDistribution : null,
-                    policy.FixedTier,
-                    policy.UsesDayDistribution ? dayTierCeiling : null
+                    policy.UsesDayDistribution ? dayTiers.Table : null,
+                    policy.FixedTier
                 );
                 return Presentation(merchantContent);
             }
@@ -301,12 +301,7 @@ internal sealed class EncounterPreviewModule : IEncounterPreviewModule, IDisposa
                 return new EncounterPreviewResult(EventPreviewAvailability.Unsupported, null);
 
             return Presentation(
-                EncounterPreviewTextFormatter.Build(
-                    option,
-                    _runtime.ColorKeywords,
-                    dayTierCeiling,
-                    dayTierDistribution
-                )
+                EncounterPreviewTextFormatter.Build(option, _runtime.ColorKeywords, dayTiers.Table)
             );
         }
         catch (Exception)
@@ -329,12 +324,11 @@ internal sealed class EncounterPreviewModule : IEncounterPreviewModule, IDisposa
             if (stepPlan.Kind != EncounterPreviewTemplateKind.EncounterStep)
                 return new EncounterStepPreviewResult(EventPreviewAvailability.Unsupported, null);
 
-            var currentDay = _runtime.ReadCurrentDay();
+            var dayTiers = _runtime.ResolveDayTiers(source);
             var content = EncounterPreviewTextFormatter.BuildRewardQualityLine(
                 stepPlan.RewardFilter,
                 query.NativeText,
-                _runtime.ReadDayTierDistribution(source, currentDay),
-                _runtime.ReadDayTierCeiling(currentDay)
+                dayTiers.Table
             );
             return string.IsNullOrWhiteSpace(content)
                 ? new EncounterStepPreviewResult(EventPreviewAvailability.Unsupported, null)

@@ -1,4 +1,5 @@
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.Localization;
 using Xunit;
 
@@ -117,8 +118,7 @@ public sealed class EncounterPreviewTextFormatterTests
         var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Silver,
-            dayTierDistribution: TierDistribution.FromWeights(0.9f, 0.1f, 0, 0)
+            dayTiers: GameDataDayTierTable.FromWeights(0.9f, 0.1f, 0, 0)
         );
 
         Assert.Contains("Get a Medium item (", text);
@@ -158,8 +158,7 @@ public sealed class EncounterPreviewTextFormatterTests
         var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Silver,
-            dayTierDistribution: TierDistribution.FromWeights(0.9f, 0.1f, 0, 0)
+            dayTiers: GameDataDayTierTable.FromWeights(0.9f, 0.1f, 0, 0)
         );
 
         Assert.Contains(expected, text);
@@ -181,7 +180,7 @@ public sealed class EncounterPreviewTextFormatterTests
         var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Gold
+            dayTiers: GameDataDayTierTable.FromWeights(0.8f, 0.15f, 0.05f, 0f)
         );
 
         Assert.Contains("Get 2 Diamond-tier Food", text);
@@ -205,7 +204,7 @@ public sealed class EncounterPreviewTextFormatterTests
         var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Gold
+            dayTiers: GameDataDayTierTable.FromWeights(0.8f, 0.15f, 0.05f, 0f)
         );
 
         Assert.Contains("获得2个钻石级食物", text);
@@ -239,7 +238,7 @@ public sealed class EncounterPreviewTextFormatterTests
         var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Gold
+            dayTiers: GameDataDayTierTable.FromWeights(0.8f, 0.15f, 0.05f, 0f)
         );
 
         Assert.Contains(resultText, text);
@@ -266,7 +265,7 @@ public sealed class EncounterPreviewTextFormatterTests
         var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Gold
+            dayTiers: GameDataDayTierTable.FromWeights(0.8f, 0.15f, 0.05f, 0f)
         );
 
         Assert.Contains("Get a Rage item", text);
@@ -274,7 +273,7 @@ public sealed class EncounterPreviewTextFormatterTests
     }
 
     [Fact]
-    public void Build_shows_the_exact_tier_when_the_day_ceiling_leaves_one()
+    public void Build_shows_the_exact_runtime_distribution_when_only_bronze_is_weighted()
     {
         // A Bronze-Diamond span (e.g. from a not-Legendary complement) is day-driven:
         // on day 1 the effective tier is exactly Bronze.
@@ -294,10 +293,10 @@ public sealed class EncounterPreviewTextFormatterTests
         var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Bronze
+            dayTiers: GameDataDayTierTable.FromWeights(1f, 0f, 0f, 0f)
         );
 
-        Assert.Contains("Get a Medium item (Bronze)", text);
+        Assert.Contains("Get a Medium item (Bronze 100%)", text);
     }
 
     [Fact]

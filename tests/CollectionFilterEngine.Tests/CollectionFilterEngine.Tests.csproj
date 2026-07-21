@@ -76,10 +76,9 @@
       Link="CollectionFilterState.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\Encounters\DayTierSchedule.cs"
-      Link="DayTierSchedule.cs"
+      Include="..\..\src\BazaarPlusPlus\GameInterop\DayTiers\GameDataDayTierTable.cs"
+      Link="GameDataDayTierTable.cs"
     />
-    <Compile Include="..\..\src\BazaarPlusPlus\Game\Encounters\TierOrder.cs" Link="TierOrder.cs" />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionPanelSelectionState.cs"
       Link="CollectionPanelSelectionState.cs"
