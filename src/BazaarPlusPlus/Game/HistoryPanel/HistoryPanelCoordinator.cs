@@ -3,6 +3,7 @@ using BazaarPlusPlus.Game.HistoryPanel.AccountLink;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.Files;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Clients;
 using UnityEngine;
@@ -310,6 +311,51 @@ internal sealed class HistoryPanelCoordinator : IDisposable
     public void PrewarmRecordingAvailability()
     {
         _replayService.PrewarmRecordingAvailability();
+    }
+
+    public bool CanOpenDetailedCombatReport(HistoryBattleRecord? battle)
+    {
+        return battle != null
+            && _dataService.TryResolveLatestBattleReport(
+                battle.BattleId,
+                _runtime.CombatReportDirectoryPath,
+                out _,
+                out _
+            );
+    }
+
+    public void TryOpenDetailedCombatReport(HistoryBattleRecord? battle)
+    {
+        if (battle == null)
+            return;
+
+        if (
+            !_dataService.TryResolveLatestBattleReport(
+                battle.BattleId,
+                _runtime.CombatReportDirectoryPath,
+                out var resolvedReport,
+                out var resolveError
+            )
+        )
+        {
+            SetStatusMessage(
+                resolveError == null
+                    ? HistoryPanelText.DetailedCombatReportUnavailable()
+                    : HistoryPanelText.DetailedCombatReportOpenFailed(resolveError.Message),
+                StatusSeverity.Failure
+            );
+            _requestUiRefresh();
+            return;
+        }
+
+        if (!SystemReportOpener.TryOpen(resolvedReport!, out var reason))
+        {
+            SetStatusMessage(
+                HistoryPanelText.DetailedCombatReportOpenFailed(reason),
+                StatusSeverity.Failure
+            );
+            _requestUiRefresh();
+        }
     }
 
     public bool CanDeleteSelectedRun(HistoryRunRecord? selectedRun, out string reason)

@@ -28,6 +28,9 @@ public static class RunLogSchema
 
     public static string CombatReplayVideosTableName => "combat_replay_videos";
 
+    public static string CombatReplayVideoSyncAnchorsTableName =>
+        "combat_replay_video_sync_anchors";
+
     public static string SyncCursorsTableName => "sync_cursors";
 
     public static string RunSyncStateTableName => "run_sync_state";
@@ -197,6 +200,17 @@ public static class RunLogSchema
                 error TEXT NULL
             );
 
+            CREATE TABLE IF NOT EXISTS {CombatReplayVideoSyncAnchorsTableName} (
+                video_id TEXT NOT NULL,
+                battle_id TEXT NOT NULL,
+                output_ordinal INTEGER NOT NULL,
+                combat_frame INTEGER NOT NULL,
+                combat_ms INTEGER NOT NULL,
+                media_pts_ms INTEGER NOT NULL,
+                PRIMARY KEY (video_id, output_ordinal),
+                FOREIGN KEY (video_id) REFERENCES {CombatReplayVideosTableName}(video_id) ON DELETE CASCADE
+            );
+
             CREATE TABLE IF NOT EXISTS {SyncCursorsTableName} (
                 scope TEXT PRIMARY KEY,
                 cursor_value TEXT NOT NULL,
@@ -267,6 +281,9 @@ public static class RunLogSchema
 
             CREATE INDEX IF NOT EXISTS idx_{CombatReplayVideosTableName}_battle
                 ON {CombatReplayVideosTableName}(battle_id, started_at_utc DESC);
+
+            CREATE INDEX IF NOT EXISTS idx_{CombatReplayVideoSyncAnchorsTableName}_battle
+                ON {CombatReplayVideoSyncAnchorsTableName}(battle_id, video_id, output_ordinal);
 
             CREATE INDEX IF NOT EXISTS idx_{BazaarDbSnapshotUploadsTableName}_status
                 ON {BazaarDbSnapshotUploadsTableName}(status);

@@ -1749,7 +1749,7 @@ public class CoreLayeringTests
         Assert.Contains("BppDockButtonVisuals.Apply(", controllerSource);
         Assert.Contains("fallbackFrame.color = new Color(1f, 1f, 1f, 0f)", controllerSource);
         Assert.Contains("_icon != null && _icon.sprite != null", controllerSource);
-        Assert.Contains("tooltip.PositionOverUI(_cloneRect)", controllerSource);
+        Assert.Contains("tooltip.PositionOverUI(_tooltipAnchorRect)", controllerSource);
         Assert.Contains("tooltip._coroutine != null", controllerSource);
         Assert.Contains("tooltip.KeepTooltipWithinBounds()", controllerSource);
         Assert.Contains("GetWorldCorners(_buttonWorldCorners)", controllerSource);
@@ -1763,10 +1763,18 @@ public class CoreLayeringTests
         Assert.Contains("BindNativeActions(", controllerSource);
         Assert.Contains("nativeRecapButton.onClick.Invoke", controllerSource);
         Assert.Contains("nativeRecapBackButton.onClick.Invoke", controllerSource);
-        Assert.Contains("_button.interactable = nativeActionsBound", controllerSource);
+        Assert.Contains("snapshot.CanOpenReport || snapshot.CanReveal", controllerSource);
+        Assert.Contains("runtime.TryOpenCurrentReplayReport(out _)", controllerSource);
+        Assert.Contains("CombatReportRecordingId.TryParse(", runtimeSource);
+        Assert.Contains(
+            "SystemReportOpener.TryOpen(reportRootDirectoryPath, recordingId",
+            runtimeSource
+        );
+        Assert.Contains("BppUiTestIds.CurrentReplayRecordAgain", controllerSource);
+        Assert.Contains("CurrentReplayRecordingText.RecordAgainTooltip", controllerSource);
         Assert.Contains("\"RecapButton\"", patchSource);
         Assert.Contains("\"BackButton\"", patchSource);
-        Assert.Contains("StartCurrentReplayAfterRecapClosed", runtimeSource);
+        Assert.Contains("StartCurrentReplayWhenReady", runtimeSource);
         Assert.Contains(
             "boardManager.IsRecapViewOpen || boardManager.StorageMoving",
             runtimeSource
@@ -1829,6 +1837,119 @@ public class CoreLayeringTests
             );
             Assert.Contains($"BazaarPlusPlus.Resources.DockButtons.{iconName}", projectSource);
         }
+    }
+
+    [Fact]
+    public void Post_combat_report_assets_use_cache_first_native_offscreen_export()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var reportAssetsDir = Path.Combine(mainSource, "Game", "CombatReplay", "ReportAssets");
+        var exporterSource = File.ReadAllText(
+            Path.Combine(reportAssetsDir, "PostCombatReportNativeCardAssetExporter.cs")
+        );
+        var textureExporterSource = File.ReadAllText(
+            Path.Combine(reportAssetsDir, "NativeReportTexturePngExporter.cs")
+        );
+        var runtimeSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CombatReplay", "CombatReplayRuntime.cs")
+        );
+        var recoverySource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CombatReplay",
+                "Reports",
+                "CombatReplayReportRecoveryPublisher.cs"
+            )
+        );
+
+        Assert.Contains("LoadAssetAsyncByAddress<Texture>", exporterSource);
+        Assert.Contains("ConstructAndInstantiateCardVisuals", exporterSource);
+        Assert.Contains("ItemVisualsController", exporterSource);
+        Assert.Contains("ExportLayerName = \"Inspection_Overlay\"", exporterSource);
+        Assert.Contains("LayerMask.NameToLayer(ExportLayerName)", exporterSource);
+        Assert.Contains("CameraRenderType.Base", exporterSource);
+        Assert.Contains("UniversalRenderPipeline.SingleCameraRequest", exporterSource);
+        Assert.Contains("destination = target", exporterSource);
+        Assert.Contains("RenderPipeline.SupportsRenderRequest", exporterSource);
+        Assert.Contains("RenderPipeline.SubmitRenderRequest", exporterSource);
+        Assert.Contains("GetComponentsInChildren<Renderer>", exporterSource);
+        Assert.Contains("bounds.Encapsulate", exporterSource);
+        Assert.Contains("DisableEmbeddedCanvases", exporterSource);
+        Assert.Contains("_camera.targetTexture = target", exporterSource);
+        Assert.Contains("_camera.forceIntoRenderTexture = true", exporterSource);
+        Assert.Contains("_camera.enabled = false", exporterSource);
+        Assert.Contains("WaitForEndOfFrame", exporterSource);
+        Assert.Contains("CompleteRenderAndReadback", exporterSource);
+        Assert.Contains("_root.SetActive(false)", exporterSource);
+        Assert.Contains("AsyncGPUReadback.Request", textureExporterSource);
+        Assert.Contains("Graphics.Blit", textureExporterSource);
+        Assert.DoesNotContain("ScreenCapture.", exporterSource);
+        Assert.DoesNotContain("NativeCardPreview", exporterSource);
+        Assert.DoesNotContain("CardPreviewItem", exporterSource);
+        Assert.DoesNotContain("RenderMode.", exporterSource);
+        Assert.DoesNotContain("GraphicRaycaster", exporterSource);
+        Assert.DoesNotContain("Camera.Render()", exporterSource);
+        Assert.DoesNotContain("CameraRenderType.Overlay", exporterSource);
+        Assert.DoesNotContain("cameraStack?.Add", exporterSource);
+        Assert.DoesNotContain("_camera.enabled = true", exporterSource);
+        Assert.True(
+            exporterSource.IndexOf(
+                "_materialization.Reserve(entry.RenderKey)",
+                StringComparison.Ordinal
+            ) < exporterSource.IndexOf("MaterializeSkill(", StringComparison.Ordinal),
+            "The cache reservation must precede every Unity materializer path."
+        );
+        Assert.Contains("BepInEx.Paths.GameRootPath", runtimeSource);
+        Assert.Contains("\"BazaarPlusPlusV4\"", runtimeSource);
+        Assert.Contains("_pendingReportAssetManifest = manifest;", runtimeSource);
+        Assert.Contains(
+            "_pendingReportAssetManifest = recordVideo ? manifest : null",
+            runtimeSource
+        );
+        Assert.DoesNotContain("StartReportCardPreviewMaterialization", runtimeSource);
+        Assert.DoesNotContain("PostCombatReportMaterializationExitGate", runtimeSource);
+        Assert.DoesNotContain("PostCombatReportAssetWorkQueue", runtimeSource);
+
+        var currentStart = runtimeSource.IndexOf(
+            "private IEnumerator StartCurrentReplayWhenReady(",
+            StringComparison.Ordinal
+        );
+        var currentPrepare = runtimeSource.IndexOf(
+            "PrepareReportAssets(",
+            currentStart,
+            StringComparison.Ordinal
+        );
+        var currentInvoke = runtimeSource.IndexOf(
+            "TryInvokeCurrentReplay(",
+            currentPrepare,
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            currentStart >= 0 && currentPrepare > currentStart && currentInvoke > currentPrepare
+        );
+
+        var savedStart = runtimeSource.IndexOf(
+            "private async Task StartReplayAsync(",
+            StringComparison.Ordinal
+        );
+        var savedPrepare = runtimeSource.IndexOf(
+            "PrepareReportAssetsAsync(manifest)",
+            savedStart,
+            StringComparison.Ordinal
+        );
+        var savedInject = runtimeSource.IndexOf(
+            "ReplayBootstrap.InjectSavedReplayAsync(",
+            savedPrepare,
+            StringComparison.Ordinal
+        );
+        Assert.True(savedStart >= 0 && savedPrepare > savedStart && savedInject > savedPrepare);
+
+        Assert.Contains("ListAvailableCardAssets(manifest)", recoverySource);
+        Assert.Contains("ListAvailableAssets(manifest, document)", recoverySource);
+        Assert.DoesNotContain("MaterializeBattle", recoverySource);
+        Assert.DoesNotContain("AsyncGPUReadback", recoverySource);
     }
 
     [Fact]

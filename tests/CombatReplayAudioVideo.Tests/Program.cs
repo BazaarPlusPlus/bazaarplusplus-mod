@@ -909,6 +909,9 @@ file static class EncoderDrainTests
         var inputType = TestReflection.RequireType(
             "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoEncoderDrainInput"
         );
+        var syncAnchorType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoSyncAnchor"
+        );
         var outputRoot = Path.Combine(
             Path.GetTempPath(),
             "bpp-encoder-drain-tests",
@@ -966,6 +969,7 @@ file static class EncoderDrainTests
                     0,
                     0L,
                     0L,
+                    Array.CreateInstance(syncAnchorType, 0),
                 },
                 culture: null
             )!;

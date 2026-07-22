@@ -82,6 +82,7 @@ Structure lives in `docs/ARCHITECTURE.md`; durable knowledge in `docs/MEMORY.md`
 - Format every Git commit message as Conventional Commits: `<type>(<scope>): <description>`.
 - Keep commits scoped: when `./run.sh format`/csharpier reformats files outside your change.
 - A long-running automation task must self-heal — auto-relaunch the game process on crash/exit and continue until the goal is met, rather than stopping on the first failure
+- For in-game UI automation, inspect the configured bindings and use registered shortcuts first (defaults: `F8` for HistoryPanel and `Tab` for CollectionPanel), then use stable plugin UI test IDs (`VisualElement.name` for UI Toolkit and named GameObjects for uGUI); use screenshot coordinates only as a last resort, and never infer a plugin entry from a visually similar native game button
 - Never build mod file-write paths from `Application.dataPath` — on macOS its parent is the `.app` bundle root, and unsealed writes there break `codesign` re-signing and the trampoline repair (blocking `./run.sh build` after every game update). Anchor writes on `BepInEx.Paths.GameRootPath` / the `<GameRoot>/BazaarPlusPlusV4/` data dir, which BepInEx special-cases on macOS to the directory containing the `.app`
 
 ## Agent skills

@@ -26,6 +26,10 @@
 
   <ItemGroup>
     <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/UiTesting/BppUiTestIds.cs"
+      Link="UiTesting/BppUiTestIds.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Infrastructure/Logging/Core/BppLogSchema.cs"
       Link="Logging/Core/BppLogSchema.cs"
     />

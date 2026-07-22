@@ -11,7 +11,10 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     private readonly ReplayVideoCaptureRequest _request;
     private readonly DateTimeOffset _startedAtUtc;
     private readonly double _frameInterval;
+    private readonly Func<ReplayVideoCombatPosition> _combatPosition;
+    private readonly ReplayVideoSyncAnchorCollector _syncAnchorCollector;
     private readonly object _finalizeLock = new();
+    private readonly List<ReplayVideoSyncAnchor> _syncAnchors = new();
 
     // Reused across every captured frame for the in-place vertical flip so we
     // do not allocate a fresh per-row scratch buffer on each readback. Only
@@ -55,11 +58,20 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
     private ReplayVideoRecordingReasonCode? _degradationReasonCode;
     private Exception? _failureException;
 
-    public ReplayVideoCaptureSession(ReplayVideoCaptureRequest request)
+    public ReplayVideoCaptureSession(
+        ReplayVideoCaptureRequest request,
+        Func<ReplayVideoCombatPosition>? combatPosition = null
+    )
     {
         _request = request ?? throw new ArgumentNullException(nameof(request));
         _startedAtUtc = DateTimeOffset.UtcNow;
         _frameInterval = 1.0 / Math.Max(1, request.Fps);
+        _combatPosition = combatPosition ?? (() => new ReplayVideoCombatPosition(0, 0));
+        _syncAnchorCollector = new ReplayVideoSyncAnchorCollector(
+            request.VideoId,
+            request.BattleId,
+            request.Fps
+        );
     }
 
     public ReplayVideoCaptureRequest Request => _request;
@@ -255,6 +267,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
             if (encoder.TryEnqueueFrame(buffer))
             {
+                RecordSyncAnchor();
                 if (isNew)
                     _capturedFrames++;
                 else
@@ -331,7 +344,8 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                     _readbackBackpressureSkips,
                     _readbackLimiter.MaxObserved,
                     _readbackCopyTiming.P95Microseconds,
-                    _cfrCopyTiming.P95Microseconds
+                    _cfrCopyTiming.P95Microseconds,
+                    _syncAnchors.ToArray()
                 )
             );
             return _finalizeDrain;
@@ -371,9 +385,14 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
         try
         {
+            var combatPosition = _combatPosition();
             ScreenCapture.CaptureScreenshotIntoRenderTexture(rt);
             var sequenceNumber = Interlocked.Increment(ref _issuedSequence);
-            AsyncGPUReadback.Request(rt, 0, request => OnReadbackComplete(request, sequenceNumber));
+            AsyncGPUReadback.Request(
+                rt,
+                0,
+                request => OnReadbackComplete(request, sequenceNumber, combatPosition)
+            );
             return true;
         }
         catch (Exception ex)
@@ -385,7 +404,11 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
     }
 
-    private void OnReadbackComplete(AsyncGPUReadbackRequest request, int sequenceNumber)
+    private void OnReadbackComplete(
+        AsyncGPUReadbackRequest request,
+        int sequenceNumber,
+        ReplayVideoCombatPosition combatPosition
+    )
     {
         _readbackLimiter.Release();
 
@@ -442,6 +465,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             if (!SystemInfo.graphicsUVStartsAtTop)
                 FlipVerticalRgba32(_latestFrameBuffer!, _request.Width, _request.Height);
             _latestSeq = sequenceNumber;
+            _syncAnchorCollector.TryAdoptCapturedFrame(sequenceNumber, combatPosition);
             _hasLatest = true;
         }
         catch (Exception ex)
@@ -493,6 +517,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
         if (encoder.TryEnqueueFrame(buffer))
         {
+            RecordSyncAnchor();
             _capturedFrames++;
             _lastEmittedSeq = _latestSeq;
         }
@@ -501,6 +526,11 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
             pool.Return(buffer);
             _droppedFrames++;
         }
+    }
+
+    private void RecordSyncAnchor()
+    {
+        _syncAnchors.Add(_syncAnchorCollector.RecordOutput());
     }
 
     // In-place vertical flip identical to Rgba32FrameTransforms.FlipVerticalRgba32,

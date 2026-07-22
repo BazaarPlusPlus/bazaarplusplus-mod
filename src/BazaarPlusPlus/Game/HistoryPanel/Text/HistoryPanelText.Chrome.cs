@@ -30,6 +30,18 @@ internal static partial class HistoryPanelText
 
     private static readonly LocalizedTextSet RecordAndReplayText = new("Record", "录制", "錄製");
 
+    private static readonly LocalizedTextSet ViewDetailedCombatReportText = new(
+        "View detailed combat report",
+        "查看战斗详细记录",
+        "查看戰鬥詳細記錄"
+    );
+
+    private static readonly LocalizedTextSet DetailedCombatReportUnavailableText = new(
+        "The detailed combat report is no longer available.",
+        "战斗详细记录已不可用。",
+        "戰鬥詳細記錄已不可用。"
+    );
+
     private static readonly LocalizedTextSet ReplayUnavailableText = new("Unavailable", "不可用");
 
     private static readonly LocalizedTextSet ReplayDisabledInRunText = new("In Run", "对局中禁用");
@@ -61,6 +73,18 @@ internal static partial class HistoryPanelText
     internal static string Replay() => Resolve(ReplayText);
 
     internal static string RecordAndReplay() => Resolve(RecordAndReplayText);
+
+    internal static string ViewDetailedCombatReport() => Resolve(ViewDetailedCombatReportText);
+
+    internal static string DetailedCombatReportUnavailable() =>
+        Resolve(DetailedCombatReportUnavailableText);
+
+    internal static string DetailedCombatReportOpenFailed(string reason) =>
+        FormatSimple(
+            $"Could not open the detailed combat report: {reason}",
+            $"无法打开战斗详细记录：{reason}",
+            $"無法開啟戰鬥詳細記錄：{reason}"
+        );
 
     internal static string ReplayUnavailable() => Resolve(ReplayUnavailableText);
 

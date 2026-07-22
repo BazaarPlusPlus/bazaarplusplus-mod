@@ -193,8 +193,8 @@ internal sealed class NativeCardPreviewFactory
 
             card.transform.localScale = Vector3.one;
             card.transform.localRotation = Quaternion.identity;
-            card.gameObject.SetActive(true);
             NativeCardPreviewReflection.ApplyLayerRecursive(card.gameObject, owner.Layer);
+            card.gameObject.SetActive(true);
 
             var setUpFailure = await NativeCardPreviewRuntime.InvokeSetUpSafe(
                 card,

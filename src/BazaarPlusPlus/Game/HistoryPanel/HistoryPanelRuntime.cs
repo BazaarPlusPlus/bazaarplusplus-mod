@@ -21,6 +21,9 @@ internal sealed class HistoryPanelRuntime : IHistoryPanelRuntime
         RunLogDatabasePath = runLogDatabasePath ?? string.Empty;
         CombatReplayDirectoryPath = combatReplayDirectoryPath ?? string.Empty;
         CombatReplayVideoDirectoryPath = combatReplayVideoDirectoryPath ?? string.Empty;
+        CombatReportDirectoryPath = ResolveCombatReportDirectoryPath(
+            CombatReplayVideoDirectoryPath
+        );
         PluginsDirectoryPath = pluginsDirectoryPath ?? string.Empty;
         CombatReplayRuntimeAccessor =
             combatReplayRuntimeAccessor
@@ -37,7 +40,27 @@ internal sealed class HistoryPanelRuntime : IHistoryPanelRuntime
 
     public string CombatReplayVideoDirectoryPath { get; }
 
+    public string CombatReportDirectoryPath { get; }
+
     public string PluginsDirectoryPath { get; }
 
     public Func<CombatReplayRuntime?> CombatReplayRuntimeAccessor { get; }
+
+    private static string ResolveCombatReportDirectoryPath(string videoDirectoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(videoDirectoryPath))
+            return string.Empty;
+
+        try
+        {
+            var dataRoot = Path.GetDirectoryName(Path.GetFullPath(videoDirectoryPath));
+            return string.IsNullOrWhiteSpace(dataRoot)
+                ? string.Empty
+                : Path.Combine(dataRoot, "reports");
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
 }

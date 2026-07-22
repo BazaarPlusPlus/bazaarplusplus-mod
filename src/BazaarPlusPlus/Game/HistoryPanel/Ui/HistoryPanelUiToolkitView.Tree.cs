@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.GameInterop.Heroes;
+using BazaarPlusPlus.Infrastructure.UiTesting;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -52,6 +53,7 @@ internal sealed partial class HistoryPanelUiToolkitView
     private void BuildRunsSection(VisualElement parent)
     {
         _runsSection = CreateSectionPanel(null);
+        _runsSection.name = BppUiTestIds.HistoryRunsSection;
         _runsSection.style.width = Length.Percent(Sizes.RunsColumnWidthPercent);
         _runsSection.style.flexGrow = 0f;
         _runsSection.style.flexShrink = 0f;
@@ -59,12 +61,14 @@ internal sealed partial class HistoryPanelUiToolkitView
         parent.Add(_runsSection);
         _runsSection.Add(CreateSectionTitle(HistoryPanelText.RunsTab()));
         _runsList = CreateRunList();
+        _runsList.name = BppUiTestIds.HistoryRunsList;
         _runsSection.Add(CreateListFrame(_runsList));
     }
 
     private void BuildBattlesSection(VisualElement parent)
     {
         _battlesSection = CreateSectionPanel(null);
+        _battlesSection.name = BppUiTestIds.HistoryBattlesSection;
         _battlesSection.style.flexGrow = 1f;
         _battlesSection.style.flexShrink = 1f;
         _battlesSection.style.minHeight = 0f;
@@ -84,6 +88,7 @@ internal sealed partial class HistoryPanelUiToolkitView
         _runsBattleSubtitle.style.display = DisplayStyle.None;
         _battlesSection.Add(_runsBattleSubtitle);
         _battleList = CreateBattleList();
+        _battleList.name = BppUiTestIds.HistoryBattlesList;
         _battleList.style.marginTop = UiSpacing.Md;
         _battlesSection.Add(CreateListFrame(_battleList));
     }
@@ -91,6 +96,7 @@ internal sealed partial class HistoryPanelUiToolkitView
     private void BuildPreview(VisualElement parent)
     {
         _previewContainer = new VisualElement();
+        _previewContainer.name = BppUiTestIds.HistoryPreview;
         _previewContainer.style.flexGrow = 0f;
         _previewContainer.style.flexShrink = 0f;
         _previewContainer.style.height = Length.Percent(Sizes.PreviewHeightPercent);
@@ -178,6 +184,7 @@ internal sealed partial class HistoryPanelUiToolkitView
             Sizes.CloseButtonWidth,
             Sizes.ButtonStandardHeight
         );
+        _closeButton.name = BppUiTestIds.HistoryClose;
         StyleButton(_closeButton, Colors.CloseBackground, Colors.CloseText);
         titleRow.Add(_closeButton);
 
@@ -332,6 +339,7 @@ internal sealed partial class HistoryPanelUiToolkitView
 
         // ── Fixed footer: status banner directly above its actions ───────────
         _statusLabel = CreateLabel(Sizes.FontCorner, FontStyle.Normal, Colors.HistoryStatusText);
+        _statusLabel.name = BppUiTestIds.HistoryStatus;
         _statusLabel.style.display = DisplayStyle.None;
         _statusLabel.style.flexGrow = 0f;
         _statusLabel.style.flexShrink = 0f;
@@ -361,9 +369,22 @@ internal sealed partial class HistoryPanelUiToolkitView
             _recordAndReplay
         );
         _replayButton = CreateRailButton(HistoryPanelText.Replay(), _replay);
+        _detailedReportButton = CreateRailButton(
+            HistoryPanelText.ViewDetailedCombatReport(),
+            _openDetailedReport
+        );
+        _deleteButton.name = BppUiTestIds.HistoryDelete;
+        _recordAndReplayButton.name = BppUiTestIds.HistoryRecord;
+        _replayButton.name = BppUiTestIds.HistoryReplay;
+        _detailedReportButton.name = BppUiTestIds.HistoryDetailedReport;
         StyleButton(_deleteButton, Colors.DeleteBackground, Colors.DeleteText);
         StyleButton(_recordAndReplayButton, Colors.RecordReplayBackground, Colors.RecordReplayText);
         StyleButton(_replayButton, Colors.ReplayBackground, Colors.ReplayText);
+        StyleButton(_detailedReportButton, Colors.HistoryButtonBackground, Colors.HistoryTitleText);
+
+        _detailedReportButton.style.display = DisplayStyle.None;
+        _detailedReportButton.style.marginBottom = UiSpacing.Md;
+        actions.Add(_detailedReportButton);
 
         var replayActionRow = new VisualElement();
         replayActionRow.style.flexDirection = FlexDirection.Row;
@@ -743,6 +764,8 @@ internal sealed partial class HistoryPanelUiToolkitView
             Sizes.ButtonStandardHeight,
             fixedWidth: false
         );
+        _runsTabButton.name = BppUiTestIds.HistoryRunsTab;
+        _ghostTabButton.name = BppUiTestIds.HistoryGhostTab;
         tabsRow.Add(_runsTabButton);
         _ghostTabButton.style.marginLeft = UiSpacing.Sm;
         tabsRow.Add(_ghostTabButton);

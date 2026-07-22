@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="SixLabors.ImageSharp" />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/CombatReplayReportPublicationCoordinator.cs"
+      Link="CombatReplayReportPublicationCoordinator.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/StaticReportPaths.cs"
+      Link="StaticReportPaths.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/StaticReportIntegrity.cs"
+      Link="StaticReportIntegrity.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/ReportHtmlEmitter.cs"
+      Link="ReportHtmlEmitter.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/ViewerReleaseRegistry.cs"
+      Link="ViewerReleaseRegistry.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/ViewerInstaller.cs"
+      Link="ViewerInstaller.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportData/CombatReportContracts.cs"
+      Link="CombatReportContracts.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportData/CombatReportJson.cs"
+      Link="CombatReportJson.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoSyncMetadata.cs"
+      Link="ReplayVideoSyncMetadata.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportAssets/PostCombatReportAssetFile.cs"
+      Link="PostCombatReportAssetFile.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Files/ImmutableArtifactCommitter.cs"
+      Link="ImmutableArtifactCommitter.cs"
+    />
+  </ItemGroup>
+</Project>

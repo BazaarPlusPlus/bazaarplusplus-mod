@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+    <PackageReference Include="SixLabors.ImageSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportAssets/Cache/ReportAssetRenderKey.cs"
+      Link="ReportAssetRenderKey.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportAssets/Cache/ReportAssetCache.cs"
+      Link="ReportAssetCache.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportAssets/Cache/ReportAssetMaterializationCoordinator.cs"
+      Link="ReportAssetMaterializationCoordinator.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportAssets/PostCombatReportAssetFile.cs"
+      Link="PostCombatReportAssetFile.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportData/CombatReportContracts.cs"
+      Link="CombatReportContracts.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportData/ReportStatusIconSemanticResolver.cs"
+      Link="ReportStatusIconSemanticResolver.cs"
+    />
+  </ItemGroup>
+</Project>

@@ -22,17 +22,21 @@ internal readonly record struct CurrentReplayRecordingSnapshot(
     string? BattleId,
     string? RecordingId,
     string? FinalFilePath,
+    string? ReportHtmlFilePath,
     string? Reason,
     bool Visible,
     bool CanStart,
-    bool CanReveal
+    bool CanReveal,
+    bool CanOpenReport
 );
 
 internal sealed class CurrentReplayRecordingState
 {
     private string? _battleId;
     private string? _recordingId;
+    private string? _artifactRecordingId;
     private string? _finalFilePath;
+    private string? _reportHtmlFilePath;
     private string? _reason;
     private bool _battlePersisted;
     private bool _replayStateActive;
@@ -58,7 +62,9 @@ internal sealed class CurrentReplayRecordingState
 
         _battleId = battleId;
         _recordingId = null;
+        _artifactRecordingId = null;
         _finalFilePath = null;
+        _reportHtmlFilePath = null;
         _reason = null;
         _battlePersisted = false;
         _availabilityReady = false;
@@ -87,14 +93,14 @@ internal sealed class CurrentReplayRecordingState
 
     internal void SetAvailability(bool ready, string? reason)
     {
-        if (
-            _battleId == null
-            || HasActiveSession
-            || Phase
-                is CurrentReplayRecordingPhase.Succeeded
-                    or CurrentReplayRecordingPhase.Degraded
-        )
+        if (_battleId == null || HasActiveSession)
             return;
+
+        if (Phase is CurrentReplayRecordingPhase.Succeeded or CurrentReplayRecordingPhase.Degraded)
+        {
+            _availabilityReady = ready;
+            return;
+        }
 
         _availabilityReady = ready;
         if (!ready)
@@ -120,14 +126,18 @@ internal sealed class CurrentReplayRecordingState
             || !_battlePersisted
             || !_availabilityReady
             || Phase
-                is not (CurrentReplayRecordingPhase.Ready or CurrentReplayRecordingPhase.Failed)
+                is not (
+                    CurrentReplayRecordingPhase.Ready
+                    or CurrentReplayRecordingPhase.Succeeded
+                    or CurrentReplayRecordingPhase.Degraded
+                    or CurrentReplayRecordingPhase.Failed
+                )
         )
         {
             return false;
         }
 
         _recordingId = recordingId;
-        _finalFilePath = null;
         _reason = null;
         _nativeReplayStarted = false;
         Phase = CurrentReplayRecordingPhase.Armed;
@@ -196,7 +206,14 @@ internal sealed class CurrentReplayRecordingState
             return;
         }
 
-        _finalFilePath = completion.ArtifactUsable ? completion.FinalFilePath : null;
+        if (completion.ArtifactUsable)
+        {
+            _artifactRecordingId = completion.RecordingId;
+            _finalFilePath = completion.FinalFilePath;
+            // The previous report belongs to the previous video artifact. Until publication
+            // for this replacement terminates, the primary action falls back to its MP4.
+            _reportHtmlFilePath = null;
+        }
         _reason = completion.Reason;
         _nativeReplayStarted = false;
         if (!completion.ArtifactUsable)
@@ -213,6 +230,25 @@ internal sealed class CurrentReplayRecordingState
                 : CurrentReplayRecordingPhase.Degraded;
     }
 
+    internal void ApplyReportCompletion(
+        string recordingId,
+        string battleId,
+        string reportHtmlFilePath
+    )
+    {
+        if (
+            string.IsNullOrWhiteSpace(reportHtmlFilePath)
+            || !MatchesBattle(battleId)
+            || !string.Equals(_artifactRecordingId, recordingId, StringComparison.Ordinal)
+            || string.IsNullOrWhiteSpace(_finalFilePath)
+        )
+        {
+            return;
+        }
+
+        _reportHtmlFilePath = reportHtmlFilePath;
+    }
+
     internal void LeaveReplayState()
     {
         Reset();
@@ -221,26 +257,29 @@ internal sealed class CurrentReplayRecordingState
     internal CurrentReplayRecordingSnapshot Snapshot()
     {
         var visible = _replayStateActive && _battleId != null;
-        var canReveal =
-            visible
-            && !string.IsNullOrWhiteSpace(_finalFilePath)
-            && Phase
-                is CurrentReplayRecordingPhase.Succeeded
-                    or CurrentReplayRecordingPhase.Degraded;
+        var canReveal = visible && !string.IsNullOrWhiteSpace(_finalFilePath) && !HasActiveSession;
+        var canOpenReport =
+            visible && !string.IsNullOrWhiteSpace(_reportHtmlFilePath) && !HasActiveSession;
         var canStart =
             visible
             && _battlePersisted
             && _availabilityReady
-            && Phase is CurrentReplayRecordingPhase.Ready or CurrentReplayRecordingPhase.Failed;
+            && Phase
+                is CurrentReplayRecordingPhase.Ready
+                    or CurrentReplayRecordingPhase.Succeeded
+                    or CurrentReplayRecordingPhase.Degraded
+                    or CurrentReplayRecordingPhase.Failed;
         return new CurrentReplayRecordingSnapshot(
             Phase,
             _battleId,
             _recordingId,
             _finalFilePath,
+            _reportHtmlFilePath,
             _reason,
             visible,
             canStart,
-            canReveal
+            canReveal,
+            canOpenReport
         );
     }
 
@@ -266,7 +305,9 @@ internal sealed class CurrentReplayRecordingState
     {
         _battleId = null;
         _recordingId = null;
+        _artifactRecordingId = null;
         _finalFilePath = null;
+        _reportHtmlFilePath = null;
         _reason = null;
         _battlePersisted = false;
         _replayStateActive = false;

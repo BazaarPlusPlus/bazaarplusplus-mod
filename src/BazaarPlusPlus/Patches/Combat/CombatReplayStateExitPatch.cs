@@ -11,6 +11,6 @@ internal static class CombatReplayStateExitPatch
     [HarmonyPrefix]
     private static bool Prefix()
     {
-        return !CombatReplayRuntime.TryExitBootstrappedSavedReplayToMenu();
+        return !CombatReplayRuntime.TryHandleReplayStateExit();
     }
 }

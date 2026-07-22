@@ -260,6 +260,74 @@ public sealed class ReplayPlaybackLogOperationTests
         );
     }
 
+    [Theory]
+    [InlineData("LocalSaved", true, true, true)]
+    [InlineData("ImportedGhost", true, true, true)]
+    [InlineData("LocalSaved", false, true, false)]
+    [InlineData("LocalSaved", true, false, false)]
+    [InlineData("CurrentNative", true, true, false)]
+    public void Native_end_finalizes_only_started_recorded_saved_playbacks(
+        string sourceName,
+        bool recordVideo,
+        bool started,
+        bool expected
+    )
+    {
+        var source = Enum.Parse<CombatReplayPlaybackSource>(sourceName);
+        var operation = new ReplayPlaybackLogOperation(BattleId, source, recordVideo);
+        if (started)
+            Assert.True(operation.TryMarkStarted(out _));
+
+        Assert.Equal(expected, ReplayPlaybackNativeEndPolicy.ShouldFinalizeRecording(operation));
+    }
+
+    [Fact]
+    public void Native_end_publishes_once_for_a_recorded_saved_playback()
+    {
+        var operation = CreateOperation(recordVideo: true);
+        Assert.True(operation.TryMarkStarted(out _));
+        var publishCount = 0;
+
+        Assert.True(
+            ReplayPlaybackNativeEndCoordinator.TryFinalizeRecording(
+                operation,
+                () =>
+                {
+                    publishCount++;
+                    return ReplayPlaybackPublishOutcome.Success();
+                }
+            )
+        );
+        Assert.Equal(1, publishCount);
+    }
+
+    [Fact]
+    public void Native_end_publish_failure_is_preserved_as_playback_degradation()
+    {
+        var operation = CreateOperation(recordVideo: true);
+        Assert.True(operation.TryMarkStarted(out _));
+        var failure = new InvalidOperationException("event publish failed");
+
+        Assert.True(
+            ReplayPlaybackNativeEndCoordinator.TryFinalizeRecording(
+                operation,
+                () => ReplayPlaybackPublishOutcome.Failure(failure)
+            )
+        );
+        Assert.True(
+            operation.TryComplete(
+                ReplayPlaybackEndReasonCode.SavedReplayExit,
+                ReplayRollbackStatus.NotRequired,
+                ReplayPlaybackReasonCode.None,
+                exception: null,
+                out var terminal
+            )
+        );
+        Assert.Equal(ReplayPlaybackTerminalStatus.Degraded, terminal.Status);
+        Assert.Equal(ReplayPlaybackReasonCode.EndedPublishFailed, terminal.ReasonCode);
+        Assert.Same(failure, terminal.Exception);
+    }
+
     private static ReplayPlaybackLogOperation CreateOperation(
         bool recordVideo = false,
         ManualClock? clock = null

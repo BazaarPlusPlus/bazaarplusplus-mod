@@ -17,7 +17,8 @@ internal sealed record ReplayVideoEncoderDrainInput(
     int ReadbackBackpressureSkips,
     int MaxOutstandingReadbacks,
     long ReadbackCopyP95Us,
-    long CfrCopyP95Us
+    long CfrCopyP95Us,
+    IReadOnlyList<ReplayVideoSyncAnchor> SyncAnchors
 );
 
 /// <summary>
@@ -131,6 +132,7 @@ internal sealed class ReplayVideoEncoderDrain
             StderrTail = stderrTail,
             Exception = failureException,
             Degraded = _input.DegradationReasonCode.HasValue,
+            SyncAnchors = _input.SyncAnchors,
         };
 
         LogCaptureFinalized(result);

@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
+using BazaarPlusPlus.GameInterop.Files;
 using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
@@ -82,6 +83,40 @@ internal sealed class HistoryPanelDataService
         {
             battles = _repository.ListBattlesByRun(runId);
             return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex;
+            return false;
+        }
+    }
+
+    public bool TryResolveLatestBattleReport(
+        string? battleId,
+        string? reportRootDirectoryPath,
+        out ResolvedSystemReport? resolvedReport,
+        out Exception? error
+    )
+    {
+        resolvedReport = null;
+        error = null;
+        if (
+            _repository == null
+            || string.IsNullOrWhiteSpace(battleId)
+            || string.IsNullOrWhiteSpace(reportRootDirectoryPath)
+        )
+        {
+            return false;
+        }
+
+        try
+        {
+            var candidates = _repository.ListCompletedReportCandidates(battleId);
+            return HistoryBattleReportLocator.TryResolveLatestReport(
+                candidates,
+                reportRootDirectoryPath,
+                out resolvedReport
+            );
         }
         catch (Exception ex)
         {

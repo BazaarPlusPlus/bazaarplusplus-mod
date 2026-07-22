@@ -48,6 +48,9 @@ internal sealed class ReplayVideoCaptureResult
     public Exception? Exception { get; init; }
 
     public bool Degraded { get; init; }
+
+    public IReadOnlyList<ReplayVideoSyncAnchor> SyncAnchors { get; init; } =
+        Array.Empty<ReplayVideoSyncAnchor>();
 }
 
 internal enum ReplayVideoCaptureStatus

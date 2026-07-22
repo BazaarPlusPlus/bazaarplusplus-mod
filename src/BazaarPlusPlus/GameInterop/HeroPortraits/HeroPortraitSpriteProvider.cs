@@ -62,13 +62,15 @@ internal static class HeroPortraitSpriteProvider
                 );
             }
 
+            var identity = HeroPortraitAssetIdentity.From(hero, skin);
             var result = await skin.LoadPortraitSpriteAsync();
             return new AsyncLoadResult<HeroPortraitLoadOutcome>(
                 result == null
                     ? HeroPortraitLoadOutcome.Degraded(
-                        HeroPortraitFailureReason.PortraitUnavailable
+                        HeroPortraitFailureReason.PortraitUnavailable,
+                        identity: identity
                     )
-                    : HeroPortraitLoadOutcome.Ready(result),
+                    : HeroPortraitLoadOutcome.Ready(result, identity),
                 shouldCache
             );
         }
@@ -79,6 +81,32 @@ internal static class HeroPortraitSpriteProvider
                 shouldCache
             );
         }
+    }
+}
+
+internal sealed record HeroPortraitAssetIdentity(
+    EHero Hero,
+    string SkinAssetName,
+    string PortraitAssetGuid,
+    string PortraitSubObjectName
+)
+{
+    internal string StableKey =>
+        $"hero:{(int)Hero}:{Hero}|skin:{SkinAssetName}|portrait:{PortraitAssetGuid}:{PortraitSubObjectName}";
+
+    internal static HeroPortraitAssetIdentity From(EHero hero, SkinAssetDataSO skin)
+    {
+        var portrait = skin.portraitTextureReference;
+        return new HeroPortraitAssetIdentity(
+            hero,
+            string.IsNullOrWhiteSpace(skin.name) ? "unnamed-default-skin" : skin.name.Trim(),
+            string.IsNullOrWhiteSpace(portrait?.AssetGUID)
+                ? "missing-portrait-guid"
+                : portrait.AssetGUID.Trim(),
+            string.IsNullOrWhiteSpace(portrait?.SubObjectName)
+                ? "default-subobject"
+                : portrait.SubObjectName.Trim()
+        );
     }
 }
 
@@ -96,24 +124,30 @@ internal sealed class HeroPortraitLoadOutcome
     private HeroPortraitLoadOutcome(
         Sprite? sprite,
         HeroPortraitFailureReason reason,
-        Exception? exception
+        Exception? exception,
+        HeroPortraitAssetIdentity? identity
     )
     {
         Sprite = sprite;
         Reason = reason;
         Exception = exception;
+        Identity = identity;
     }
 
     internal Sprite? Sprite { get; }
     internal HeroPortraitFailureReason Reason { get; }
     internal Exception? Exception { get; }
+    internal HeroPortraitAssetIdentity? Identity { get; }
     internal bool IsDegraded => Reason != HeroPortraitFailureReason.None;
 
-    internal static HeroPortraitLoadOutcome Ready(Sprite sprite) =>
-        new(sprite, HeroPortraitFailureReason.None, null);
+    internal static HeroPortraitLoadOutcome Ready(
+        Sprite sprite,
+        HeroPortraitAssetIdentity identity
+    ) => new(sprite, HeroPortraitFailureReason.None, null, identity);
 
     internal static HeroPortraitLoadOutcome Degraded(
         HeroPortraitFailureReason reason,
-        Exception? exception = null
-    ) => new(null, reason, exception);
+        Exception? exception = null,
+        HeroPortraitAssetIdentity? identity = null
+    ) => new(null, reason, exception, identity);
 }

@@ -69,6 +69,19 @@ internal sealed class ReplayPlaybackLogOperation : IReplayPlaybackOutcomeSink
 
     public string BattleId { get; }
 
+    internal CombatReplayPlaybackSource Source => _source;
+
+    internal bool RecordVideo => _recordVideo;
+
+    internal bool HasStarted
+    {
+        get
+        {
+            lock (_gate)
+                return _started && !_terminal;
+        }
+    }
+
     internal bool IsTerminal
     {
         get
@@ -160,6 +173,46 @@ internal sealed class ReplayPlaybackLogOperation : IReplayPlaybackOutcomeSink
 
     private static long MonotonicMilliseconds() =>
         (long)(Stopwatch.GetTimestamp() * 1000d / Stopwatch.Frequency);
+}
+
+internal static class ReplayPlaybackNativeEndPolicy
+{
+    internal static bool ShouldFinalizeRecording(ReplayPlaybackLogOperation? operation) =>
+        operation is { HasStarted: true, RecordVideo: true }
+        && operation.Source
+            is CombatReplayPlaybackSource.LocalSaved
+                or CombatReplayPlaybackSource.ImportedGhost;
+}
+
+internal static class ReplayPlaybackNativeEndCoordinator
+{
+    internal static bool TryFinalizeRecording(
+        ReplayPlaybackLogOperation? operation,
+        Func<ReplayPlaybackPublishOutcome> publishEnded
+    )
+    {
+        if (!ReplayPlaybackNativeEndPolicy.ShouldFinalizeRecording(operation))
+            return false;
+        if (publishEnded == null)
+            throw new ArgumentNullException(nameof(publishEnded));
+
+        ReplayPlaybackPublishOutcome ended;
+        try
+        {
+            ended = publishEnded();
+        }
+        catch (Exception ex)
+        {
+            ended = ReplayPlaybackPublishOutcome.Failure(ex);
+        }
+
+        if (!ended.Succeeded)
+            operation!.ReportDegradation(
+                ReplayPlaybackReasonCode.EndedPublishFailed,
+                ended.Exception
+            );
+        return true;
+    }
 }
 
 internal static class ReplayPlaybackLogWriter

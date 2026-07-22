@@ -1,5 +1,4 @@
 #nullable enable
-
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
 internal enum CurrentReplayRecorderAvailabilityPhase
@@ -48,4 +47,6 @@ internal sealed class CombatReplayVideoRecordingCompleted
     internal ReplayVideoMetadataStatus MetadataStatus { get; init; }
     internal ReplayVideoRecordingReasonCode ReasonCode { get; init; }
     internal string? Reason { get; init; }
+    internal IReadOnlyList<ReplayVideoSyncAnchor> SyncAnchors { get; init; } =
+        Array.Empty<ReplayVideoSyncAnchor>();
 }

@@ -2,6 +2,7 @@
 using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.UiTesting;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -14,6 +15,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private readonly Action _close;
     private readonly Action _replay;
     private readonly Action _recordAndReplay;
+    private readonly Action _openDetailedReport;
     private readonly Action _delete;
     private readonly Action _checkServerHealth;
     private readonly Action<string> _linkBazaarDbAccount;
@@ -93,6 +95,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
     private Button? _deleteButton;
     private Button? _replayButton;
     private Button? _recordAndReplayButton;
+    private Button? _detailedReportButton;
     private Button? _closeButton;
     private bool _suppressSelectionCallbacks;
     private Rect _lastPreviewContainerBounds;
@@ -104,6 +107,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         Action close,
         Action replay,
         Action recordAndReplay,
+        Action openDetailedReport,
         Action delete,
         Action checkServerHealth,
         Action<string> linkBazaarDbAccount,
@@ -122,6 +126,8 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _replay = replay ?? throw new ArgumentNullException(nameof(replay));
         _recordAndReplay =
             recordAndReplay ?? throw new ArgumentNullException(nameof(recordAndReplay));
+        _openDetailedReport =
+            openDetailedReport ?? throw new ArgumentNullException(nameof(openDetailedReport));
         _delete = delete ?? throw new ArgumentNullException(nameof(delete));
         _checkServerHealth =
             checkServerHealth ?? throw new ArgumentNullException(nameof(checkServerHealth));
@@ -167,11 +173,12 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
             return;
         }
 
-        _rootObject = new GameObject("HistoryPanelUiToolkitRoot");
+        _rootObject = new GameObject(BppUiTestIds.HistoryRootObject);
         _rootObject.transform.SetParent(_parent, false);
         _document = _rootObject.AddComponent<UIDocument>();
         _document.panelSettings = _panelSettings;
         _root = _document.rootVisualElement;
+        _root.name = BppUiTestIds.HistoryRoot;
         _root.style.flexGrow = 1f;
         _root.style.position = Position.Absolute;
         _root.style.left = 0f;
@@ -421,6 +428,12 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _recordAndReplayButton!.text = model.RecordAndReplayButtonText;
         _recordAndReplayButton.tooltip = model.RecordAndReplayButtonText;
         _recordAndReplayButton.SetEnabled(model.RecordAndReplayButtonEnabled);
+        _detailedReportButton!.text = model.DetailedReportButtonText;
+        _detailedReportButton.tooltip = model.DetailedReportButtonText;
+        _detailedReportButton.style.display = model.DetailedReportButtonVisible
+            ? DisplayStyle.Flex
+            : DisplayStyle.None;
+        _detailedReportButton.SetEnabled(model.DetailedReportButtonVisible);
         _deleteButton!.text = model.DeleteButtonText;
         _deleteButton.tooltip = model.DeleteButtonText;
         _deleteButton.SetEnabled(model.DeleteButtonEnabled);

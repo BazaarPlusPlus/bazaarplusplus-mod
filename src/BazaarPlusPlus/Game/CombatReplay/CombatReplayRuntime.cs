@@ -3,12 +3,16 @@ using System.Collections;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay.Bootstrap;
 using BazaarPlusPlus.Game.CombatReplay.PlaybackUi;
+using BazaarPlusPlus.Game.CombatReplay.ReportAssets;
+using BazaarPlusPlus.Game.CombatReplay.ReportData;
+using BazaarPlusPlus.Game.CombatReplay.Reports;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.GameInterop.Files;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Localization;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;
@@ -18,6 +22,7 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 internal sealed class CombatReplayRuntime : MonoBehaviour
 {
     private const float CurrentReplayRecapPostRollSeconds = 3f;
+    private const int StartupReportRecoveryBatchSize = 2;
 
     private IBppServices? _services;
     private RunLifecycleModule? _runLifecycle;
@@ -34,10 +39,22 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private Func<CombatReplayVideoRecorder?>? _videoRecorder;
     private readonly CurrentReplayRecordingState _currentRecording = new();
     private PvpBattleManifest? _currentRecordingManifest;
+    private PvpBattleManifest? _pendingReportAssetManifest;
+    private string? _pendingReportAssetRecordingId;
     private IDisposable? _recordingStartedSubscription;
     private IDisposable? _recordingCompletedSubscription;
     private Coroutine? _pendingCurrentReplayStart;
     private Coroutine? _pendingCurrentReplayRecapPostRoll;
+    private PostCombatReportNativeCardAssetExporter? _reportCardAssetExporter;
+    private PostCombatReportNativeSpriteMaterializer? _reportNativeSpriteMaterializer;
+    private CombatReplayReportPublicationCoordinator? _reportPublication;
+    private Coroutine? _pendingReportAssetPreparation;
+    private TaskCompletionSource<
+        IReadOnlyList<PostCombatReportAssetFile>
+    >? _reportAssetPreparationCompletion;
+    private Coroutine? _pendingReportRecovery;
+    private IReadOnlyList<PostCombatReportAssetFile> _pendingPreparedReportAssets =
+        Array.Empty<PostCombatReportAssetFile>();
     private Action? _invokeCurrentRecordingRecap;
     private bool _destroying;
 
@@ -140,6 +157,17 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _persistence.PayloadStore,
             _loader
         );
+        var reportDataRoot = Path.Combine(BepInEx.Paths.GameRootPath, "BazaarPlusPlusV4");
+        var reportAssetRoot = Path.Combine(reportDataRoot, "report-assets");
+        _reportCardAssetExporter = new PostCombatReportNativeCardAssetExporter(
+            reportAssetRoot,
+            _services.GameBuild.RawVersion
+        );
+        _reportNativeSpriteMaterializer = new PostCombatReportNativeSpriteMaterializer(
+            reportAssetRoot,
+            _services.GameBuild.RawVersion
+        );
+        _reportPublication = new CombatReplayReportPublicationCoordinator(reportDataRoot);
 
         Events.StateChanged.AddListener(OnStateChanged, this);
         Events.ReplayStarted.AddListener(OnNativeReplayStarted, this);
@@ -152,11 +180,96 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _services.EventBus.Subscribe<CombatReplayVideoRecordingCompleted>(
                 OnVideoRecordingCompleted
             );
+
+        RecoverIncompleteStaticReports(battleCatalog, reportDataRoot);
+    }
+
+    private void RecoverIncompleteStaticReports(
+        IPvpBattleCatalog battleCatalog,
+        string reportDataRoot
+    )
+    {
+        var services = _services;
+        var persistence = _persistence;
+        var loader = _loader;
+        var cardAssetExporter = _reportCardAssetExporter;
+        var nativeSpriteMaterializer = _reportNativeSpriteMaterializer;
+        var publication = _reportPublication;
+        var runLogDatabasePath = services?.Paths.RunLogDatabasePath;
+        var videoRootDirectoryPath = services?.Paths.CombatReplayVideoDirectoryPath;
+        if (
+            services == null
+            || persistence == null
+            || loader == null
+            || cardAssetExporter == null
+            || publication == null
+            || string.IsNullOrWhiteSpace(runLogDatabasePath)
+            || string.IsNullOrWhiteSpace(videoRootDirectoryPath)
+        )
+        {
+            return;
+        }
+
+        try
+        {
+            var metadataStore = new CombatReplayVideoMetadataStore(runLogDatabasePath);
+            var publisher = new CombatReplayReportRecoveryPublisher(
+                battleCatalog,
+                persistence.PayloadStore,
+                loader,
+                cardAssetExporter,
+                nativeSpriteMaterializer,
+                publication
+            );
+            var recovery = new CombatReplayReportStartupRecovery(
+                reportDataRoot,
+                videoRootDirectoryPath,
+                (limit, offset) => metadataStore.ListCompletedForReportRecovery(limit, offset),
+                publisher
+            );
+            _pendingReportRecovery = StartCoroutine(
+                RecoverIncompleteStaticReportsOverFrames(
+                    recovery,
+                    L.CurrentLanguageCode,
+                    L.CurrentMode == BppChineseLocaleMode.Taiwan
+                )
+            );
+        }
+        catch
+        {
+            // Startup reconciliation is best effort. Recording, replay playback, and later live
+            // report publication must remain available if the database or filesystem is damaged.
+        }
+    }
+
+    private IEnumerator RecoverIncompleteStaticReportsOverFrames(
+        CombatReplayReportStartupRecovery recovery,
+        string locale,
+        bool useTraditionalChinese
+    )
+    {
+        while (!_destroying && !recovery.IsCompleted)
+        {
+            var summary = recovery.RecoverNextBatch(
+                StartupReportRecoveryBatchSize,
+                locale,
+                useTraditionalChinese
+            );
+            if (!string.IsNullOrWhiteSpace(summary.SourceFailure))
+                break;
+
+            // Candidate discovery and cache inspection are bounded to one database page per
+            // frame. Startup recovery is cache-only and never admits Unity materialization work.
+            yield return null;
+        }
+
+        _pendingReportRecovery = null;
     }
 
     private void Update()
     {
         _persistence?.DrainPendingResults();
+        _reportPublication?.DrainTerminals(OnReportPublicationTerminal);
 
         ObservePendingMenuReturn();
 
@@ -176,6 +289,20 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             "Combat replay runtime was destroyed."
         );
         CancelCurrentReplayRecapPostRoll();
+        if (_pendingReportRecovery != null)
+        {
+            StopCoroutine(_pendingReportRecovery);
+            _pendingReportRecovery = null;
+        }
+        CancelReportAssetPreparation();
+        _reportCardAssetExporter?.Dispose();
+        _reportCardAssetExporter = null;
+        _reportNativeSpriteMaterializer?.Dispose();
+        _reportNativeSpriteMaterializer = null;
+        _reportPublication = null;
+        _pendingReportAssetManifest = null;
+        _pendingReportAssetRecordingId = null;
+        _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
         if (_currentRecording.NativeReplayStarted)
         {
             _playbackPublisher?.PublishEnded("runtime-destroyed", failed: true);
@@ -290,6 +417,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
             _currentRecordingManifest = artifact.Manifest;
             _currentRecording.LatchBattle(artifact.Manifest.BattleId);
+            CaptureReportDraft(artifact.Manifest, artifact.Payload);
             PrepareCurrentReplayRecordingAvailability();
             _persistence.Enqueue(artifact.Payload, artifact.Manifest);
         }
@@ -305,6 +433,25 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                     ReplayCaptureReasonCode.CaptureOrEnqueueException
                 )
             );
+        }
+    }
+
+    private void CaptureReportDraft(PvpBattleManifest manifest, PvpReplayPayload payload)
+    {
+        var loader = _loader;
+        var reportPublication = _reportPublication;
+        if (loader == null || reportPublication == null)
+            return;
+
+        try
+        {
+            var sequence = loader.Load(payload);
+            reportPublication.TryCaptureDraft(manifest, sequence.CombatMessage, out _);
+        }
+        catch
+        {
+            // Replay persistence and recording remain usable if report projection degrades.
+            // A missing draft simply prevents a misleading partial HTML from being published.
         }
     }
 
@@ -368,6 +515,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
+        _pendingReportAssetManifest = manifest;
+        _pendingReportAssetRecordingId = recordingId;
+        _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
         _playbackPublisher!.BeginSession(
             manifest.BattleId,
             manifest,
@@ -377,102 +527,118 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _invokeCurrentRecordingRecap = invokeNativeRecap;
 
         var boardManager = Singleton<BoardManager>.Instance;
-        if (boardManager is { } && (boardManager.IsRecapViewOpen || boardManager.StorageMoving))
+        var closeRecapFirst =
+            boardManager is { } && (boardManager.IsRecapViewOpen || boardManager.StorageMoving);
+        try
         {
-            try
-            {
-                _pendingCurrentReplayStart = StartCoroutine(
-                    StartCurrentReplayAfterRecapClosed(
-                        recordingId,
-                        invokeNativeReplay,
-                        invokeNativeRecapBack
-                    )
-                );
-                reason = string.Empty;
-                return true;
-            }
-            catch (Exception ex)
-            {
-                FailCurrentReplayStart(
+            _pendingCurrentReplayStart = StartCoroutine(
+                StartCurrentReplayWhenReady(
                     recordingId,
-                    "native-recap-transition-start-failed",
-                    ex.Message
-                );
-                reason = ex.Message;
-                return false;
-            }
+                    manifest,
+                    invokeNativeReplay,
+                    invokeNativeRecapBack,
+                    closeRecapFirst
+                )
+            );
+            reason = string.Empty;
+            return true;
         }
-
-        return TryInvokeCurrentReplay(recordingId, invokeNativeReplay, out reason);
+        catch (Exception ex)
+        {
+            FailCurrentReplayStart(
+                recordingId,
+                "native-replay-preparation-start-failed",
+                ex.Message
+            );
+            reason = ex.Message;
+            return false;
+        }
     }
 
-    private IEnumerator StartCurrentReplayAfterRecapClosed(
+    private IEnumerator StartCurrentReplayWhenReady(
         string recordingId,
+        PvpBattleManifest manifest,
         Action invokeNativeReplay,
-        Action invokeNativeRecapBack
+        Action invokeNativeRecapBack,
+        bool closeRecapFirst
     )
     {
-        const float recapCloseTimeoutSeconds = 10f;
-        var timeoutAt = Time.realtimeSinceStartup + recapCloseTimeoutSeconds;
-        while (true)
+        if (closeRecapFirst)
         {
-            if (AppState.CurrentState is not ReplayState)
+            const float recapCloseTimeoutSeconds = 10f;
+            var timeoutAt = Time.realtimeSinceStartup + recapCloseTimeoutSeconds;
+            while (true)
             {
-                _pendingCurrentReplayStart = null;
-                FailCurrentReplayStart(
-                    recordingId,
-                    "native-replay-state-exited-before-start",
-                    "Replay state exited while the recap view was closing."
-                );
-                yield break;
-            }
-
-            var boardManager = Singleton<BoardManager>.Instance;
-            if (boardManager == null)
-            {
-                _pendingCurrentReplayStart = null;
-                FailCurrentReplayStart(
-                    recordingId,
-                    "native-replay-board-unavailable",
-                    "The combat board is unavailable."
-                );
-                yield break;
-            }
-
-            if (boardManager.IsRecapViewOpen && !boardManager.StorageMoving && !AppState.BlockInput)
-            {
-                try
-                {
-                    invokeNativeRecapBack();
-                }
-                catch (Exception ex)
+                if (AppState.CurrentState is not ReplayState)
                 {
                     _pendingCurrentReplayStart = null;
                     FailCurrentReplayStart(
                         recordingId,
-                        "native-recap-back-invoke-failed",
-                        ex.Message
+                        "native-replay-state-exited-before-start",
+                        "Replay state exited while the recap view was closing."
                     );
                     yield break;
                 }
+
+                var boardManager = Singleton<BoardManager>.Instance;
+                if (boardManager == null)
+                {
+                    _pendingCurrentReplayStart = null;
+                    FailCurrentReplayStart(
+                        recordingId,
+                        "native-replay-board-unavailable",
+                        "The combat board is unavailable."
+                    );
+                    yield break;
+                }
+
+                if (
+                    boardManager.IsRecapViewOpen
+                    && !boardManager.StorageMoving
+                    && !AppState.BlockInput
+                )
+                {
+                    try
+                    {
+                        invokeNativeRecapBack();
+                    }
+                    catch (Exception ex)
+                    {
+                        _pendingCurrentReplayStart = null;
+                        FailCurrentReplayStart(
+                            recordingId,
+                            "native-recap-back-invoke-failed",
+                            ex.Message
+                        );
+                        yield break;
+                    }
+                }
+
+                if (!boardManager.IsRecapViewOpen && !boardManager.StorageMoving)
+                    break;
+
+                if (Time.realtimeSinceStartup >= timeoutAt)
+                {
+                    _pendingCurrentReplayStart = null;
+                    FailCurrentReplayStart(
+                        recordingId,
+                        "native-recap-close-timeout",
+                        "The recap view did not finish closing."
+                    );
+                    yield break;
+                }
+
+                yield return null;
             }
-
-            if (!boardManager.IsRecapViewOpen && !boardManager.StorageMoving)
-                break;
-
-            if (Time.realtimeSinceStartup >= timeoutAt)
-            {
-                _pendingCurrentReplayStart = null;
-                FailCurrentReplayStart(
-                    recordingId,
-                    "native-recap-close-timeout",
-                    "The recap view did not finish closing."
-                );
-                yield break;
-            }
-
-            yield return null;
         }
+
+        IReadOnlyList<PostCombatReportAssetFile> preparedAssets =
+            Array.Empty<PostCombatReportAssetFile>();
+        var preparation = PrepareReportAssets(manifest, assets => preparedAssets = assets);
+        while (preparation.MoveNext())
+            yield return preparation.Current;
+        (preparation as IDisposable)?.Dispose();
+        _pendingPreparedReportAssets = preparedAssets;
 
         _pendingCurrentReplayStart = null;
         TryInvokeCurrentReplay(recordingId, invokeNativeReplay, out _);
@@ -515,6 +681,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _videoRecorder?.Invoke()?.CancelArmedCurrentReplay(recordingId, endReason);
         _playbackPublisher?.PublishEnded(endReason, failed: true);
         _currentRecording.RollbackArm(recordingId, reason);
+        _reportCardAssetExporter?.Cancel();
+        _reportNativeSpriteMaterializer?.Cancel();
+        _pendingReportAssetManifest = null;
+        _pendingReportAssetRecordingId = null;
+        _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
         _invokeCurrentRecordingRecap = null;
     }
 
@@ -541,6 +712,23 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
 
         return SystemFileRevealer.TryReveal(snapshot.FinalFilePath, out reason);
+    }
+
+    internal bool TryOpenCurrentReplayReport(out string reason)
+    {
+        var snapshot = _currentRecording.Snapshot();
+        var reportRootDirectoryPath = GetReportRootDirectoryPath();
+        reason = snapshot.Reason ?? "Battle report is unavailable.";
+        if (
+            !snapshot.CanOpenReport
+            || !CombatReportRecordingId.TryParse(snapshot.RecordingId, out var recordingId)
+            || string.IsNullOrWhiteSpace(reportRootDirectoryPath)
+        )
+        {
+            return false;
+        }
+
+        return SystemReportOpener.TryOpen(reportRootDirectoryPath, recordingId, out reason);
     }
 
     private void RefreshCurrentReplayRecordingAvailability()
@@ -581,7 +769,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private void OnNativeReplayEnded()
     {
         if (!_currentRecording.NativeReplayStarted)
+        {
+            ReplayPlaybackNativeEndCoordinator.TryFinalizeRecording(
+                _activePlaybackOperation,
+                () =>
+                    _playbackPublisher?.PublishEnded("recorded-saved-replay-ended", failed: false)
+                    ?? ReplayPlaybackPublishOutcome.Success()
+            );
             return;
+        }
 
         var invokeNativeRecap = _invokeCurrentRecordingRecap;
         _invokeCurrentRecordingRecap = null;
@@ -649,11 +845,222 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private void OnVideoRecordingStarted(CombatReplayVideoRecordingStarted started)
     {
         _currentRecording.MarkRecordingStarted(started.RecordingId, started.BattleId);
+        _reportPublication?.ObserveVideoStarted(started);
+
+        var pendingManifest = _pendingReportAssetManifest;
+        if (
+            pendingManifest != null
+            && string.Equals(pendingManifest.BattleId, started.BattleId, StringComparison.Ordinal)
+            && (
+                string.IsNullOrWhiteSpace(_pendingReportAssetRecordingId)
+                || string.Equals(
+                    _pendingReportAssetRecordingId,
+                    started.RecordingId,
+                    StringComparison.Ordinal
+                )
+            )
+        )
+        {
+            _pendingReportAssetRecordingId = started.RecordingId;
+            _reportPublication?.MarkAssetsReady(
+                started.RecordingId,
+                started.BattleId,
+                _pendingPreparedReportAssets
+            );
+            _pendingReportAssetManifest = null;
+            _pendingReportAssetRecordingId = null;
+            _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
+        }
     }
 
     private void OnVideoRecordingCompleted(CombatReplayVideoRecordingCompleted completed)
     {
         _currentRecording.ApplyCompletion(completed);
+        _reportPublication?.ObserveVideoTerminal(
+            completed,
+            L.CurrentLanguageCode,
+            L.CurrentMode == BppChineseLocaleMode.Taiwan
+        );
+    }
+
+    private void OnReportPublicationTerminal(CombatReplayReportPublicationTerminal terminal)
+    {
+        var reportRootDirectoryPath = GetReportRootDirectoryPath();
+        if (
+            !terminal.Succeeded
+            || string.IsNullOrWhiteSpace(reportRootDirectoryPath)
+            || !CombatReportRecordingId.TryParse(terminal.RecordingId, out var recordingId)
+            || !SystemReportOpener.TryResolve(
+                reportRootDirectoryPath,
+                recordingId,
+                out var resolvedReport,
+                out _
+            )
+        )
+        {
+            // The persisted video remains the current-completion fallback when report
+            // publication fails or its committed HTML is no longer physical.
+            return;
+        }
+
+        _currentRecording.ApplyReportCompletion(
+            terminal.RecordingId,
+            terminal.BattleId,
+            resolvedReport!.FullPath
+        );
+    }
+
+    private static string GetReportRootDirectoryPath() =>
+        Path.Combine(BepInEx.Paths.GameRootPath, "BazaarPlusPlusV4", "reports");
+
+    private IEnumerator PrepareReportAssets(
+        PvpBattleManifest manifest,
+        Action<IReadOnlyList<PostCombatReportAssetFile>> onCompleted
+    )
+    {
+        var cardAssetExporter = _reportCardAssetExporter;
+        var nativeSpriteMaterializer = _reportNativeSpriteMaterializer;
+        CombatReportDocumentV1? reportDocument = null;
+        _reportPublication?.TryGetDraftSnapshot(manifest.BattleId, out reportDocument);
+
+        if (cardAssetExporter != null)
+        {
+            var operation = DrainReportAssetOperation(
+                manifest.BattleId,
+                cardAssetExporter.MaterializeBattle(manifest, () => { })
+            );
+            using (operation as IDisposable)
+            {
+                while (operation.MoveNext())
+                    yield return operation.Current;
+            }
+        }
+
+        if (nativeSpriteMaterializer != null && reportDocument != null)
+        {
+            var operation = DrainReportAssetOperation(
+                manifest.BattleId,
+                nativeSpriteMaterializer.MaterializeBattle(manifest, reportDocument, () => { })
+            );
+            using (operation as IDisposable)
+            {
+                while (operation.MoveNext())
+                    yield return operation.Current;
+            }
+        }
+
+        var assets = new List<PostCombatReportAssetFile>();
+        try
+        {
+            if (cardAssetExporter != null)
+                assets.AddRange(cardAssetExporter.ListAvailableCardAssets(manifest));
+        }
+        catch
+        {
+            // A corrupt optional cache mapping degrades only that entity to a placeholder.
+        }
+        try
+        {
+            if (nativeSpriteMaterializer != null && reportDocument != null)
+            {
+                assets.AddRange(
+                    nativeSpriteMaterializer.ListAvailableAssets(manifest, reportDocument)
+                );
+            }
+        }
+        catch
+        {
+            // Native hero/status cache bindings are optional report decoration.
+        }
+
+        onCompleted(assets);
+    }
+
+    private static IEnumerator DrainReportAssetOperation(string? battleId, IEnumerator operation)
+    {
+        using (operation as IDisposable)
+        {
+            while (true)
+            {
+                bool hasCurrent;
+                object? current = null;
+                Exception? failure = null;
+                try
+                {
+                    hasCurrent = operation.MoveNext();
+                    if (hasCurrent)
+                        current = operation.Current;
+                }
+                catch (Exception ex)
+                {
+                    hasCurrent = false;
+                    failure = ex;
+                }
+
+                if (failure != null)
+                {
+                    PostCombatReportAssetDiagnostics.ReportFailure(
+                        battleId,
+                        null,
+                        PostCombatReportCardPreviewReasonCode.Exception,
+                        null,
+                        exception: failure
+                    );
+                    yield break;
+                }
+
+                if (!hasCurrent)
+                    yield break;
+                yield return current;
+            }
+        }
+    }
+
+    private Task<IReadOnlyList<PostCombatReportAssetFile>> PrepareReportAssetsAsync(
+        PvpBattleManifest manifest
+    )
+    {
+        if (_pendingReportAssetPreparation != null)
+            throw new InvalidOperationException("Report asset preparation is already running.");
+
+        var completion = new TaskCompletionSource<IReadOnlyList<PostCombatReportAssetFile>>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _reportAssetPreparationCompletion = completion;
+        _pendingReportAssetPreparation = StartCoroutine(
+            PrepareReportAssetsForSavedReplay(manifest, completion)
+        );
+        return completion.Task;
+    }
+
+    private IEnumerator PrepareReportAssetsForSavedReplay(
+        PvpBattleManifest manifest,
+        TaskCompletionSource<IReadOnlyList<PostCombatReportAssetFile>> completion
+    )
+    {
+        // Ensure StartCoroutine has assigned its handle before a cache-only pass can finish.
+        yield return null;
+        IReadOnlyList<PostCombatReportAssetFile> assets = Array.Empty<PostCombatReportAssetFile>();
+        var operation = PrepareReportAssets(manifest, prepared => assets = prepared);
+        while (operation.MoveNext())
+            yield return operation.Current;
+        (operation as IDisposable)?.Dispose();
+
+        _pendingReportAssetPreparation = null;
+        _reportAssetPreparationCompletion = null;
+        completion.TrySetResult(assets);
+    }
+
+    private void CancelReportAssetPreparation()
+    {
+        var pending = _pendingReportAssetPreparation;
+        if (pending != null)
+            StopCoroutine(pending);
+        _pendingReportAssetPreparation = null;
+        _reportCardAssetExporter?.Cancel();
+        _reportNativeSpriteMaterializer?.Cancel();
+        _reportAssetPreparationCompletion?.TrySetResult(Array.Empty<PostCombatReportAssetFile>());
+        _reportAssetPreparationCompletion = null;
     }
 
     public bool ReplayLatest()
@@ -713,6 +1120,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         try
         {
             sequence = controller.LoadReplay(payload);
+            _reportPublication?.TryCaptureDraft(manifest, sequence.CombatMessage, out _);
         }
         catch (Exception ex)
         {
@@ -783,6 +1191,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         try
         {
             sequence = loader.Load(payload);
+            _reportPublication?.TryCaptureDraft(manifest, sequence.CombatMessage, out _);
         }
         catch (Exception ex)
         {
@@ -815,8 +1224,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     /// Drives the replay "continue" button programmatically: validates that playback has finished
     /// and is waiting on the button, then runs the same chain a real click does
     /// (BoardManager.OnBoardRecapReplayButtonsContinueClicked: LevelUp recap cleanup, then
-    /// <c>ReplayState.Exit()</c>). This is the only programmatic path allowed to exit ReplayState —
-    /// finalizing any in-flight video recording depends on it.
+    /// <c>ReplayState.Exit()</c>). This is the only programmatic path allowed to exit ReplayState;
+    /// recorded saved replays normally finalize at native ReplayEnded, while state exit remains the
+    /// idempotent lifecycle fallback.
     /// </summary>
     public bool TryContinueReplay(out string reason)
     {
@@ -853,7 +1263,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         // Mirror the native continue click: clear the LevelUp recap overlay first
         // (BoardManager.OnBoardRecapReplayButtonsContinueClicked guards on ERunState.LevelUp),
         // then Exit(). For bootstrapped saved replays the Exit() prefix patch reroutes into
-        // TryExitBootstrappedSavedReplayToMenu, which publishes the recorder's "ended" signal.
+        // TryExitBootstrappedSavedReplayToMenu, which closes any still-active playback session.
         if (Data.CurrentState?.StateName == BazaarGameShared.Domain.Runs.ERunState.LevelUp)
             Singleton<BoardManager>.Instance?.ExitRecapReplayState();
 
@@ -874,6 +1284,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         var attemptedBootstrapFromLobby = false;
         _savedReplayProgress = SavedReplayProgress.StartInProgress;
+        _pendingReportAssetManifest = recordVideo ? manifest : null;
+        _pendingReportAssetRecordingId = null;
+        _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
         _playbackPublisher!.BeginSession(battleId, manifest, source, recordVideo);
         try
         {
@@ -909,6 +1322,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 _services?.Paths.RunLogDatabasePath,
                 operation
             );
+            if (recordVideo)
+                _pendingPreparedReportAssets = await PrepareReportAssetsAsync(manifest);
             await ReplayBootstrap.InjectSavedReplayAsync(
                 bootstrapContext,
                 manifest,
@@ -929,6 +1344,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
         catch (Exception ex)
         {
+            CancelReportAssetPreparation();
+            _pendingReportAssetManifest = null;
+            _pendingReportAssetRecordingId = null;
+            _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
             _returnToMenuAfterReplay = false;
             _bootstrappedReplayActive = false;
             _savedReplayProgress = SavedReplayProgress.StartFailureCleanup;
@@ -1120,6 +1539,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         );
     }
 
+    internal static bool TryHandleReplayStateExit()
+    {
+        return TryExitBootstrappedSavedReplayToMenu();
+    }
+
     internal static bool TryExitBootstrappedSavedReplayToMenu()
     {
         var instance = Instance;
@@ -1151,8 +1575,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         LatchReplayExitInProgress();
         // Bootstrapped saved replays exit through this manual path (the state-exit patch
         // intercepts the normal transition), so OnStateChanged's PublishEnded never fires for
-        // them. Emit it here too, otherwise the video recorder never gets the "ended" signal and
-        // leaves ffmpeg running on a never-finalized file (no moov atom -> unplayable MP4).
+        // them. Recorded sessions normally publish at native ReplayEnded; keep this idempotent
+        // publish as the exit fallback and to clear non-recorded playback sessions.
         var operation = _activePlaybackOperation;
         var ended = ReplayPlaybackStateExitCoordinator.Handle(
             startCoordinatorOwnsTerminal: false,

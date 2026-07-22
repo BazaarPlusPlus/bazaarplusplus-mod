@@ -2,6 +2,7 @@
 using System.Collections;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.Settings;
+using BazaarPlusPlus.Infrastructure.UiTesting;
 using TheBazaar;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -11,25 +12,33 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 {
-    private const string CloneName = "BPP_CurrentReplayRecordingButton";
+    private const string CloneName = BppUiTestIds.CurrentReplayRecord;
+    private const string RecordAgainCloneName = BppUiTestIds.CurrentReplayRecordAgain;
     private const float DockButtonGap = BppSettingsDockPlacement.DefaultSiblingGap;
     private Button? _settingsButton;
     private Button? _nativeReplayButton;
     private Button? _nativeRecapButton;
     private Button? _nativeRecapBackButton;
     private Button? _button;
+    private Button? _recordAgainButton;
     private RectTransform? _cloneRect;
+    private RectTransform? _recordAgainCloneRect;
     private GameObject? _clone;
+    private GameObject? _recordAgainClone;
     private Image? _icon;
+    private Image? _recordAgainIcon;
     private BppDockButtonSpriteId? _lastSpriteId;
+    private BppDockButtonSpriteId? _lastRecordAgainSpriteId;
     private Coroutine? _tooltipPositionCoroutine;
     private bool _tooltipHovered;
+    private RectTransform? _tooltipAnchorRect;
     private readonly WaitForEndOfFrame _tooltipEndOfFrame = new();
     private readonly Vector3[] _buttonWorldCorners = new Vector3[4];
     private readonly Vector3[] _tooltipWorldCorners = new Vector3[4];
     private readonly BppDockButtonScreenLayout _screenLayout = new();
     private readonly CurrentReplayRecordingUiLogState _uiLogState = new();
     private bool _layoutAvailable;
+    private bool _recordAgainLayoutAvailable;
     private CurrentReplayRecordingUiLayoutReasonCode _layoutReasonCode;
 
     internal static CurrentReplayRecordingButtonController? Attach(Button settingsButton)
@@ -53,9 +62,16 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
                 : existingClone.gameObject;
         clone.name = CloneName;
         clone.SetActive(false);
+        var existingRecordAgainClone = host.Find(RecordAgainCloneName);
+        var recordAgainClone =
+            existingRecordAgainClone == null
+                ? Instantiate(settingsButton.gameObject, host, worldPositionStays: false)
+                : existingRecordAgainClone.gameObject;
+        recordAgainClone.name = RecordAgainCloneName;
+        recordAgainClone.SetActive(false);
         var controller =
             settingsButton.gameObject.AddComponent<CurrentReplayRecordingButtonController>();
-        controller.Initialize(settingsButton, clone);
+        controller.Initialize(settingsButton, clone, recordAgainClone);
         return controller;
     }
 
@@ -78,28 +94,54 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         }
     }
 
-    private void Initialize(Button settingsButton, GameObject clone)
+    private void Initialize(Button settingsButton, GameObject clone, GameObject recordAgainClone)
     {
         _settingsButton = settingsButton;
         _clone = clone;
         _cloneRect = clone.transform as RectTransform;
+        _recordAgainClone = recordAgainClone;
+        _recordAgainCloneRect = recordAgainClone.transform as RectTransform;
+        (_button, _icon) = PrepareClone(
+            clone,
+            CurrentReplayRecordingButtonAction.Primary,
+            OnClicked
+        );
+        (_recordAgainButton, _recordAgainIcon) = PrepareClone(
+            recordAgainClone,
+            CurrentReplayRecordingButtonAction.RecordAgain,
+            OnRecordAgainClicked
+        );
+        ApplyIcon(CurrentReplayRecordingPhase.Ready);
+        ApplyRecordAgainIcon();
+
+        CombatReplayRuntime.Instance?.PrepareCurrentReplayRecordingAvailability();
+        SyncLayout();
+        Refresh();
+    }
+
+    private (Button Button, Image? Icon) PrepareClone(
+        GameObject clone,
+        CurrentReplayRecordingButtonAction action,
+        UnityEngine.Events.UnityAction onClicked
+    )
+    {
         var nativeButtonController = clone.GetComponent<BazaarButtonController>();
         var nativeVisualState = BppDockButtonVisualState.Capture(
             clone.GetComponent<Button>(),
             nativeButtonController?.DefaultImage
         );
-        _icon = StripNativeBehavior(clone);
+        var icon = StripNativeBehavior(clone);
         var fallbackFrame = clone.GetComponent<Image>();
         if (fallbackFrame == null)
         {
             fallbackFrame = clone.AddComponent<Image>();
             fallbackFrame.color = new Color(1f, 1f, 1f, 0f);
         }
-        BppDockButtonVisuals.Apply(clone, _icon, freshClone: true, nativeState: nativeVisualState);
-        _button = clone.GetComponent<Button>() ?? clone.AddComponent<Button>();
-        _button.onClick.RemoveAllListeners();
-        _button.onClick.AddListener(OnClicked);
-        _button.navigation = new Navigation { mode = Navigation.Mode.None };
+        BppDockButtonVisuals.Apply(clone, icon, freshClone: true, nativeState: nativeVisualState);
+        var button = clone.GetComponent<Button>() ?? clone.AddComponent<Button>();
+        button.onClick.RemoveAllListeners();
+        button.onClick.AddListener(onClicked);
+        button.navigation = new Navigation { mode = Navigation.Mode.None };
 
         var layout = clone.GetComponent<LayoutElement>() ?? clone.AddComponent<LayoutElement>();
         layout.ignoreLayout = true;
@@ -107,12 +149,8 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         var relay = clone.GetComponent<CurrentReplayRecordingButtonHoverRelay>();
         if (relay == null)
             relay = clone.AddComponent<CurrentReplayRecordingButtonHoverRelay>();
-        relay.Bind(this);
-        ApplyIcon(CurrentReplayRecordingPhase.Ready);
-
-        CombatReplayRuntime.Instance?.PrepareCurrentReplayRecordingAvailability();
-        SyncLayout();
-        Refresh();
+        relay.Bind(this, action);
+        return (button, icon);
     }
 
     private void LateUpdate()
@@ -145,9 +183,15 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 
     private void SyncLayout()
     {
-        if (_settingsButton == null || _cloneRect == null)
+        if (
+            _settingsButton == null
+            || _cloneRect == null
+            || _recordAgainCloneRect == null
+            || _button == null
+        )
         {
             _layoutAvailable = false;
+            _recordAgainLayoutAvailable = false;
             return;
         }
 
@@ -162,6 +206,14 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             _layoutAvailable,
             blockerName
         );
+        _recordAgainLayoutAvailable =
+            _layoutAvailable
+            && _screenLayout.TryResolveAndApplyCollection(
+                _button,
+                _recordAgainCloneRect,
+                DockButtonGap,
+                out _
+            );
     }
 
     private static Button ResolveDockAnchorButton(Button settingsButton)
@@ -183,7 +235,12 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
 
     private void Refresh()
     {
-        if (_clone == null || _button == null)
+        if (
+            _clone == null
+            || _button == null
+            || _recordAgainClone == null
+            || _recordAgainButton == null
+        )
             return;
         var snapshot = GetDisplaySnapshot();
         var visible = snapshot.Visible && _layoutAvailable;
@@ -196,6 +253,16 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             _nativeReplayButton != null
             && _nativeRecapButton != null
             && _nativeRecapBackButton != null;
+        var recordAgainVisible =
+            visible
+            && _recordAgainLayoutAvailable
+            && (snapshot.CanOpenReport || snapshot.CanReveal)
+            && snapshot.CanStart;
+        var recordAgainWasActive = _recordAgainClone.activeSelf;
+        if (recordAgainWasActive != recordAgainVisible)
+            _recordAgainClone.SetActive(recordAgainVisible);
+        if (recordAgainVisible && !recordAgainWasActive)
+            _lastRecordAgainSpriteId = null;
         _uiLogState.Observe(
             snapshot,
             _layoutAvailable,
@@ -207,11 +274,54 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         if (!visible)
             return;
 
-        _button.interactable = nativeActionsBound && (snapshot.CanStart || snapshot.CanReveal);
-        ApplyIcon(snapshot.Phase);
+        var hasCompletionArtifact = snapshot.CanOpenReport || snapshot.CanReveal;
+        _button.interactable = hasCompletionArtifact || (nativeActionsBound && snapshot.CanStart);
+        _recordAgainButton.interactable = nativeActionsBound && snapshot.CanStart;
+        ApplyIcon(hasCompletionArtifact ? CurrentReplayRecordingPhase.Succeeded : snapshot.Phase);
+        ApplyRecordAgainIcon();
     }
 
     private void OnClicked()
+    {
+        var runtime = CombatReplayRuntime.Instance;
+        if (runtime == null)
+            return;
+
+        var snapshot = runtime.GetCurrentReplayRecordingSnapshot();
+        if (snapshot.CanOpenReport)
+        {
+            runtime.TryOpenCurrentReplayReport(out _);
+            Refresh();
+            return;
+        }
+        if (snapshot.CanReveal)
+        {
+            runtime.TryRevealCurrentReplayVideo(out _);
+            Refresh();
+            return;
+        }
+
+        var nativeReplayButton = _nativeReplayButton;
+        var nativeRecapButton = _nativeRecapButton;
+        var nativeRecapBackButton = _nativeRecapBackButton;
+        if (
+            nativeReplayButton == null
+            || nativeRecapButton == null
+            || nativeRecapBackButton == null
+        )
+            return;
+
+        if (snapshot.CanStart)
+            runtime.TryStartCurrentReplayRecording(
+                nativeReplayButton.onClick.Invoke,
+                nativeRecapButton.onClick.Invoke,
+                nativeRecapBackButton.onClick.Invoke,
+                out _
+            );
+        Refresh();
+    }
+
+    private void OnRecordAgainClicked()
     {
         var runtime = CombatReplayRuntime.Instance;
         var nativeReplayButton = _nativeReplayButton;
@@ -226,9 +336,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             return;
 
         var snapshot = runtime.GetCurrentReplayRecordingSnapshot();
-        if (snapshot.CanReveal)
-            runtime.TryRevealCurrentReplayVideo(out _);
-        else if (snapshot.CanStart)
+        if (snapshot.CanStart)
             runtime.TryStartCurrentReplayRecording(
                 nativeReplayButton.onClick.Invoke,
                 nativeRecapButton.onClick.Invoke,
@@ -238,19 +346,26 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         Refresh();
     }
 
-    internal void ShowTooltip()
+    internal void ShowTooltip(CurrentReplayRecordingButtonAction action)
     {
         var snapshot = GetDisplaySnapshot();
-        if (!snapshot.Visible || _cloneRect == null)
+        var anchorRect =
+            action == CurrentReplayRecordingButtonAction.RecordAgain
+                ? _recordAgainCloneRect
+                : _cloneRect;
+        if (!snapshot.Visible || anchorRect == null)
             return;
 
         _tooltipHovered = true;
+        _tooltipAnchorRect = anchorRect;
         if (_tooltipPositionCoroutine != null)
             StopCoroutine(_tooltipPositionCoroutine);
         Data.TooltipParentComponent?.ShowAuxiliaryTooltipController(
-            _cloneRect,
+            anchorRect,
             Vector3.zero,
-            CurrentReplayRecordingText.Tooltip(snapshot)
+            action == CurrentReplayRecordingButtonAction.RecordAgain
+                ? CurrentReplayRecordingText.RecordAgainTooltip(snapshot)
+                : CurrentReplayRecordingText.Tooltip(snapshot)
         );
         _tooltipPositionCoroutine = StartCoroutine(PositionTooltipBesideButton());
     }
@@ -261,6 +376,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     internal void HideTooltip()
     {
         _tooltipHovered = false;
+        _tooltipAnchorRect = null;
         if (_tooltipPositionCoroutine != null)
         {
             StopCoroutine(_tooltipPositionCoroutine);
@@ -274,7 +390,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         while (_tooltipHovered)
         {
             yield return _tooltipEndOfFrame;
-            if (!_tooltipHovered || _cloneRect == null)
+            if (!_tooltipHovered || _tooltipAnchorRect == null)
                 break;
 
             var tooltipParent = Data.TooltipParentComponent;
@@ -287,10 +403,10 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             )
                 continue;
 
-            tooltip.PositionOverUI(_cloneRect);
+            tooltip.PositionOverUI(_tooltipAnchorRect);
             var tooltipRect = tooltip.PositioningRectTransform;
             LayoutRebuilder.ForceRebuildLayoutImmediate(tooltipRect);
-            _cloneRect.GetWorldCorners(_buttonWorldCorners);
+            _tooltipAnchorRect.GetWorldCorners(_buttonWorldCorners);
             var tooltipBoundsRect = tooltip._contentForWorldBounds ?? tooltipRect;
             tooltipBoundsRect.GetWorldCorners(_tooltipWorldCorners);
 
@@ -328,6 +444,23 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         _lastSpriteId = spriteId;
     }
 
+    private void ApplyRecordAgainIcon()
+    {
+        if (_recordAgainIcon == null)
+            return;
+
+        const BppDockButtonSpriteId spriteId = BppDockButtonSpriteId.ReplayRetry;
+        if (_lastRecordAgainSpriteId == spriteId)
+            return;
+
+        var sprite = BppDockButtonSpriteProvider.Get(spriteId);
+        if (sprite == null)
+            return;
+
+        BppDockButtonVisuals.ApplyIcon(_recordAgainIcon, sprite);
+        _lastRecordAgainSpriteId = spriteId;
+    }
+
     private static BppDockButtonSpriteId SpriteId(CurrentReplayRecordingPhase phase) =>
         phase switch
         {
@@ -341,16 +474,30 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         };
 }
 
+internal enum CurrentReplayRecordingButtonAction
+{
+    Primary,
+    RecordAgain,
+}
+
 internal sealed class CurrentReplayRecordingButtonHoverRelay
     : MonoBehaviour,
         IPointerEnterHandler,
         IPointerExitHandler
 {
     private CurrentReplayRecordingButtonController? _owner;
+    private CurrentReplayRecordingButtonAction _action;
 
-    internal void Bind(CurrentReplayRecordingButtonController owner) => _owner = owner;
+    internal void Bind(
+        CurrentReplayRecordingButtonController owner,
+        CurrentReplayRecordingButtonAction action
+    )
+    {
+        _owner = owner;
+        _action = action;
+    }
 
-    public void OnPointerEnter(PointerEventData eventData) => _owner?.ShowTooltip();
+    public void OnPointerEnter(PointerEventData eventData) => _owner?.ShowTooltip(_action);
 
     public void OnPointerExit(PointerEventData eventData) => _owner?.HideTooltip();
 }

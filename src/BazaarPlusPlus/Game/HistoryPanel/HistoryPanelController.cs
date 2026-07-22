@@ -93,6 +93,11 @@ internal sealed partial class HistoryPanel
             _ = _coordinator.TryReplaySelectedBattleAsync(ActiveSelectedBattle, recordVideo);
     }
 
+    private void TryOpenSelectedBattleReport()
+    {
+        _coordinator?.TryOpenDetailedCombatReport(ActiveSelectedBattle);
+    }
+
     private void TryDeleteSelectedRun()
     {
         _coordinator?.TryDeleteSelectedRun(SelectedRun);

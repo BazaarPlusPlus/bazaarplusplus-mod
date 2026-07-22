@@ -55,6 +55,8 @@ internal sealed class ReplayVideoRecordingCompletion
     internal Exception? Exception { get; set; }
     internal string? Reason { get; set; }
     internal DateTimeOffset? EndedAtUtc { get; set; }
+    internal IReadOnlyList<ReplayVideoSyncAnchor> SyncAnchors { get; set; } =
+        Array.Empty<ReplayVideoSyncAnchor>();
 }
 
 internal readonly record struct ReplayVideoRecordingTerminal(
@@ -66,7 +68,8 @@ internal readonly record struct ReplayVideoRecordingTerminal(
     ReplayVideoAudioStatus AudioStatus,
     ReplayVideoMetadataStatus MetadataStatus,
     ReplayVideoRecordingReasonCode ReasonCode,
-    string? Reason
+    string? Reason,
+    IReadOnlyList<ReplayVideoSyncAnchor> SyncAnchors
 );
 
 internal sealed class ReplayVideoRecordingOperation
@@ -129,7 +132,8 @@ internal sealed class ReplayVideoRecordingOperation
             completion.AudioStatus,
             completion.MetadataStatus,
             reason,
-            completion.Reason ?? completion.Exception?.Message
+            completion.Reason ?? completion.Exception?.Message,
+            completion.SyncAnchors
         );
 
         if (!artifactUsable)
@@ -380,6 +384,7 @@ internal sealed class ReplayVideoRecordingLifecycle
                     : mux.StderrTail,
                 Exception = capture.Exception ?? mux.Exception ?? degradationException,
                 EndedAtUtc = capture.EndedAtUtc,
+                SyncAnchors = capture.SyncAnchors,
             }
         );
     }
@@ -408,6 +413,7 @@ internal sealed class ReplayVideoRecordingLifecycle
                     : mux.StderrTail,
                 Exception = exception,
                 EndedAtUtc = capture.EndedAtUtc,
+                SyncAnchors = capture.SyncAnchors,
             }
         );
 

@@ -1,4 +1,5 @@
 #nullable enable
+using System.Reflection;
 using Microsoft.Data.Sqlite;
 
 var schemaType = RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
@@ -151,6 +152,174 @@ try
     Assert(
         battleIds.SequenceEqual(["battle-bad", "battle-good"]),
         "ListBattleIdsByRun should return all linked battles ordered from newest to oldest."
+    );
+
+    const string ValidOldRecordingId = "00000000000000000000000000000001";
+    const string ReportlessRecordingId = "00000000000000000000000000000002";
+    const string WrongExtensionRecordingId = "00000000000000000000000000000003";
+    const string FailedRecordingId = "00000000000000000000000000000004";
+    const string OutsideRecordingId = "00000000000000000000000000000005";
+    const string RootPrefixRecordingId = "00000000000000000000000000000006";
+    const string TieARecordingId = "0000000000000000000000000000000a";
+    const string TieZRecordingId = "0000000000000000000000000000000f";
+    const string InvalidRecordingId = "not-a-canonical-recording-id";
+
+    var reportRoot = Path.Combine(tempRoot, "reports");
+    var rootPrefixSibling = Path.Combine(tempRoot, "reports2");
+    var outsideRoot = Path.Combine(tempRoot, "outside");
+    Directory.CreateDirectory(reportRoot);
+    Directory.CreateDirectory(rootPrefixSibling);
+    Directory.CreateDirectory(outsideRoot);
+    var validReportPath = Path.Combine(reportRoot, ValidOldRecordingId + ".html");
+    File.WriteAllText(validReportPath, "<!doctype html><title>valid static report</title>");
+    File.WriteAllText(
+        Path.Combine(reportRoot, WrongExtensionRecordingId + ".htm"),
+        "<!doctype html><title>wrong extension</title>"
+    );
+    File.WriteAllText(
+        Path.Combine(outsideRoot, OutsideRecordingId + ".html"),
+        "<!doctype html><title>outside</title>"
+    );
+    File.WriteAllText(
+        Path.Combine(rootPrefixSibling, RootPrefixRecordingId + ".html"),
+        "<!doctype html><title>root prefix sibling</title>"
+    );
+    File.WriteAllText(
+        Path.Combine(reportRoot, InvalidRecordingId + ".html"),
+        "<!doctype html><title>invalid recording id</title>"
+    );
+    File.WriteAllText(
+        Path.Combine(reportRoot, FailedRecordingId + ".html"),
+        "<!doctype html><title>failed recording</title>"
+    );
+
+    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+    {
+        connection.Open();
+        InsertVideo(
+            connection,
+            ValidOldRecordingId,
+            "battle-good",
+            "ignored-valid.mp4",
+            "2026-07-22T12:00:00.0000000+00:00",
+            "2026-07-22T12:01:00.0000000+00:00",
+            "COMPLETED"
+        );
+        InsertVideo(
+            connection,
+            ReportlessRecordingId,
+            "battle-good",
+            "ignored-reportless.mp4",
+            "2026-07-22T12:02:00.0000000+00:00",
+            "2026-07-22T12:03:00.0000000+00:00",
+            "COMPLETED"
+        );
+        InsertVideo(
+            connection,
+            WrongExtensionRecordingId,
+            "battle-good",
+            "ignored-wrong-extension.mp4",
+            "2026-07-22T12:03:10.0000000+00:00",
+            "2026-07-22T12:03:20.0000000+00:00",
+            "COMPLETED"
+        );
+        InsertVideo(
+            connection,
+            OutsideRecordingId,
+            "battle-good",
+            "ignored-outside.mp4",
+            "2026-07-22T12:03:30.0000000+00:00",
+            "2026-07-22T12:03:40.0000000+00:00",
+            "COMPLETED"
+        );
+        InsertVideo(
+            connection,
+            FailedRecordingId,
+            "battle-good",
+            "ignored-failed.mp4",
+            "2026-07-22T12:04:00.0000000+00:00",
+            "2026-07-22T12:05:00.0000000+00:00",
+            "FAILED"
+        );
+        InsertVideo(
+            connection,
+            RootPrefixRecordingId,
+            "battle-good",
+            "ignored-root-prefix.mp4",
+            "2026-07-22T12:06:00.0000000+00:00",
+            "2026-07-22T12:07:00.0000000+00:00",
+            "COMPLETED"
+        );
+        InsertVideo(
+            connection,
+            InvalidRecordingId,
+            "battle-good",
+            "ignored-invalid-id.mp4",
+            "2026-07-22T12:08:00.0000000+00:00",
+            "2026-07-22T12:09:00.0000000+00:00",
+            "COMPLETED"
+        );
+        InsertVideo(
+            connection,
+            TieARecordingId,
+            "battle-good",
+            "ignored-tie-a.mp4",
+            "2026-07-22T12:10:00.0000000+00:00",
+            "2026-07-22T12:11:00.0000000+00:00",
+            "COMPLETED"
+        );
+        InsertVideo(
+            connection,
+            TieZRecordingId,
+            "battle-good",
+            "ignored-tie-z.mp4",
+            "2026-07-22T12:10:00.0000000+00:00",
+            "2026-07-22T12:11:00.0000000+00:00",
+            "COMPLETED"
+        );
+    }
+
+    var candidateRows = (
+        (System.Collections.IEnumerable)(
+            repositoryType
+                .GetMethod("ListCompletedReportCandidates")!
+                .Invoke(repository, ["battle-good"])!
+        )
+    )
+        .Cast<object>()
+        .ToList();
+    Assert(
+        candidateRows
+            .Select(row => (string)row.GetType().GetProperty("RecordingId")!.GetValue(row)!)
+            .SequenceEqual([
+                TieZRecordingId,
+                TieARecordingId,
+                InvalidRecordingId,
+                RootPrefixRecordingId,
+                OutsideRecordingId,
+                WrongExtensionRecordingId,
+                ReportlessRecordingId,
+                ValidOldRecordingId,
+            ]),
+        "Report candidates should exclude failed recordings and use deterministic newest-first ordering."
+    );
+
+    var dataServiceType = RequireType(
+        "BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelDataService"
+    );
+    var dataService = Activator.CreateInstance(dataServiceType, [repository, null])!;
+    var resolveArgs = new object?[] { "battle-good", reportRoot, null, null };
+    var reportResolved = (bool)(
+        dataServiceType.GetMethod("TryResolveLatestBattleReport")!.Invoke(dataService, resolveArgs)!
+    );
+    var resolvedReportPath =
+        resolveArgs[2]
+            ?.GetType()
+            .GetProperty("FullPath", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?.GetValue(resolveArgs[2]) as string;
+    Assert(
+        reportResolved && string.Equals(resolvedReportPath, validReportPath),
+        "Newer missing, wrong-extension, outside-root, root-prefix, failed, or noncanonical recordings must not hide the prior usable static report."
     );
 
     var ghostImportType = RequireModApiType("BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord");
@@ -510,6 +679,61 @@ static void InsertRunEvent(SqliteConnection connection, string runId, int seq)
         """;
     command.Parameters.AddWithValue("$runId", runId);
     command.Parameters.AddWithValue("$seq", seq);
+    command.ExecuteNonQuery();
+}
+
+static void InsertVideo(
+    SqliteConnection connection,
+    string videoId,
+    string battleId,
+    string videoRelativePath,
+    string startedAtUtc,
+    string endedAtUtc,
+    string status
+)
+{
+    using var command = connection.CreateCommand();
+    command.CommandText = """
+        INSERT INTO combat_replay_videos (
+            video_id,
+            battle_id,
+            source,
+            video_relative_path,
+            width,
+            height,
+            fps,
+            codec,
+            started_at_utc,
+            ended_at_utc,
+            duration_ms,
+            captured_frames,
+            dropped_frames,
+            file_size_bytes,
+            status
+        ) VALUES (
+            $videoId,
+            $battleId,
+            'HistoryPanel',
+            $videoRelativePath,
+            1920,
+            1080,
+            60,
+            'libx264',
+            $startedAtUtc,
+            $endedAtUtc,
+            1000,
+            60,
+            0,
+            3,
+            $status
+        );
+        """;
+    command.Parameters.AddWithValue("$videoId", videoId);
+    command.Parameters.AddWithValue("$battleId", battleId);
+    command.Parameters.AddWithValue("$videoRelativePath", videoRelativePath);
+    command.Parameters.AddWithValue("$startedAtUtc", startedAtUtc);
+    command.Parameters.AddWithValue("$endedAtUtc", endedAtUtc);
+    command.Parameters.AddWithValue("$status", status);
     command.ExecuteNonQuery();
 }
 

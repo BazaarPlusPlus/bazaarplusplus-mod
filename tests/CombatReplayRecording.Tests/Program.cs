@@ -57,7 +57,6 @@ var replayRunEconomyFallbackType = RequireType(
 var snapshotRehydratorType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Bootstrap.SnapshotRehydrator"
 );
-
 RunReplaySavedStateNormalizationChecks(replaySavedStateNormalizerType, manifestType);
 RunReplayOpeningStateSelectionChecks(replayOpeningStateRestorerType);
 RunReplayRunEconomyFallbackChecks(replayRunEconomyFallbackType, manifestType);
@@ -68,7 +67,9 @@ RunCurrentReplayRecordingStateChecks();
 RunReplayVideoPreflightReasonChecks();
 RunCurrentReplayRecordingUiLogChecks();
 RunCurrentReplayVideoMetadataChecks();
+RunReplayVideoSyncCollectorChecks();
 RunSystemFileRevealCommandChecks();
+ReportProjectionChecks.Run();
 
 Assert(
     (bool)InvokeStatic(audioTapStopperType, "IsUsable", new object?[] { false, "present.wav" })!
@@ -2031,7 +2032,175 @@ static void RunCurrentReplayRecordingStateChecks()
     var succeeded = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
     Assert(
         (bool)GetProperty(succeeded.GetType(), succeeded, "CanReveal")!,
-        "A usable completed artifact should turn the button into reveal-video mode."
+        "A usable completed artifact should provide the reveal-video fallback while its report publishes."
+    );
+    Assert(
+        !(bool)GetProperty(succeeded.GetType(), succeeded, "CanOpenReport")!,
+        "A video completion must not advertise the report before its committed HTML exists."
+    );
+    Assert(
+        (bool)GetProperty(succeeded.GetType(), succeeded, "CanStart")!,
+        "A completed current battle should remain recordable so the player can record it again."
+    );
+
+    Invoke(
+        stateType,
+        state,
+        "ApplyReportCompletion",
+        new object?[] { "recording-stale", "battle-current", "/tmp/stale.report.html" }
+    );
+    var staleReport = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        !(bool)GetProperty(staleReport.GetType(), staleReport, "CanOpenReport")!,
+        "A report terminal from a stale recording must not replace the current completion action."
+    );
+
+    Invoke(
+        stateType,
+        state,
+        "ApplyReportCompletion",
+        new object?[] { "recording-current", "battle-current", "/tmp/current-replay.report.html" }
+    );
+    var reportReady = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        (bool)GetProperty(reportReady.GetType(), reportReady, "CanOpenReport")!,
+        "The matching report terminal should promote the primary completion action to HTML."
+    );
+    Assert(
+        (string?)GetProperty(reportReady.GetType(), reportReady, "ReportHtmlFilePath")
+            == "/tmp/current-replay.report.html",
+        "The state should preserve the committed physical report path."
+    );
+
+    Assert(
+        (bool)Invoke(stateType, state, "TryArm", new object?[] { "recording-again" })!,
+        "A completed current battle should arm a second recording."
+    );
+    var rearmed = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        !(bool)GetProperty(rearmed.GetType(), rearmed, "CanReveal")!,
+        "The previous artifact should not be revealed while a replacement recording is active."
+    );
+    Assert(
+        !(bool)GetProperty(rearmed.GetType(), rearmed, "CanOpenReport")!,
+        "The previous report should not open while a replacement recording is active."
+    );
+    Invoke(stateType, state, "MarkNativeReplayStarted", Array.Empty<object?>());
+    Invoke(
+        stateType,
+        state,
+        "MarkRecordingStarted",
+        new object?[] { "recording-again", "battle-current" }
+    );
+    Invoke(stateType, state, "MarkReplayEnded", new object?[] { null });
+
+    var failedReplacement = Activator.CreateInstance(completedType, nonPublic: true)!;
+    SetProperty(completedType, failedReplacement, "RecordingId", "recording-again");
+    SetProperty(completedType, failedReplacement, "BattleId", "battle-current");
+    SetProperty(
+        completedType,
+        failedReplacement,
+        "Source",
+        Enum.Parse(sourceType, "CurrentNative")
+    );
+    SetProperty(completedType, failedReplacement, "FinalFilePath", null);
+    SetProperty(completedType, failedReplacement, "ArtifactUsable", false);
+    SetProperty(
+        completedType,
+        failedReplacement,
+        "MetadataStatus",
+        Enum.Parse(metadataType, "Failed")
+    );
+    SetProperty(
+        completedType,
+        failedReplacement,
+        "ReasonCode",
+        Enum.Parse(reasonType, "CaptureFailed")
+    );
+    Invoke(stateType, state, "ApplyCompletion", new object?[] { failedReplacement });
+    var replacementFailed = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        (bool)GetProperty(replacementFailed.GetType(), replacementFailed, "CanReveal")!,
+        "A failed re-recording must preserve access to the previous usable artifact."
+    );
+    Assert(
+        (bool)GetProperty(replacementFailed.GetType(), replacementFailed, "CanOpenReport")!,
+        "A failed re-recording must preserve access to the previous committed report."
+    );
+    Assert(
+        (bool)GetProperty(replacementFailed.GetType(), replacementFailed, "CanStart")!,
+        "A failed re-recording should remain retryable."
+    );
+
+    Assert(
+        (bool)Invoke(stateType, state, "TryArm", new object?[] { "recording-third" })!,
+        "The battle should remain recordable after a failed replacement."
+    );
+    Invoke(stateType, state, "MarkNativeReplayStarted", Array.Empty<object?>());
+    Invoke(
+        stateType,
+        state,
+        "MarkRecordingStarted",
+        new object?[] { "recording-third", "battle-current" }
+    );
+    Invoke(stateType, state, "MarkReplayEnded", new object?[] { null });
+    var successfulReplacement = Activator.CreateInstance(completedType, nonPublic: true)!;
+    SetProperty(
+        successfulReplacement.GetType(),
+        successfulReplacement,
+        "RecordingId",
+        "recording-third"
+    );
+    SetProperty(
+        successfulReplacement.GetType(),
+        successfulReplacement,
+        "BattleId",
+        "battle-current"
+    );
+    SetProperty(
+        successfulReplacement.GetType(),
+        successfulReplacement,
+        "Source",
+        Enum.Parse(sourceType, "CurrentNative")
+    );
+    SetProperty(
+        successfulReplacement.GetType(),
+        successfulReplacement,
+        "FinalFilePath",
+        "/tmp/current-replay-third.mp4"
+    );
+    SetProperty(successfulReplacement.GetType(), successfulReplacement, "ArtifactUsable", true);
+    SetProperty(
+        successfulReplacement.GetType(),
+        successfulReplacement,
+        "MetadataStatus",
+        Enum.Parse(metadataType, "Complete")
+    );
+    SetProperty(
+        successfulReplacement.GetType(),
+        successfulReplacement,
+        "ReasonCode",
+        Enum.Parse(reasonType, "Completed")
+    );
+    Invoke(stateType, state, "ApplyCompletion", new object?[] { successfulReplacement });
+    var replacementAwaitingReport = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        !(bool)
+            GetProperty(
+                replacementAwaitingReport.GetType(),
+                replacementAwaitingReport,
+                "CanOpenReport"
+            )!,
+        "A successful replacement video must clear the previous report while its own report publishes."
+    );
+    Assert(
+        (bool)
+            GetProperty(
+                replacementAwaitingReport.GetType(),
+                replacementAwaitingReport,
+                "CanReveal"
+            )!,
+        "The replacement MP4 should remain the completion fallback while report publication is pending."
     );
 
     Invoke(stateType, state, "LeaveReplayState", Array.Empty<object?>());
@@ -2039,6 +2208,87 @@ static void RunCurrentReplayRecordingStateChecks()
     Assert(
         !(bool)GetProperty(reset.GetType(), reset, "Visible")!,
         "Leaving ReplayState should remove the temporary current-battle button."
+    );
+
+    var reorderedTerminalState = Activator.CreateInstance(stateType, nonPublic: true)!;
+    Invoke(stateType, reorderedTerminalState, "LatchBattle", new object?[] { "battle-current" });
+    Invoke(stateType, reorderedTerminalState, "EnterReplayState", Array.Empty<object?>());
+    Invoke(
+        stateType,
+        reorderedTerminalState,
+        "MarkBattlePersistence",
+        new object?[] { "battle-current", true, null }
+    );
+    Invoke(stateType, reorderedTerminalState, "SetAvailability", new object?[] { true, null });
+    Assert(
+        (bool)
+            Invoke(
+                stateType,
+                reorderedTerminalState,
+                "TryArm",
+                new object?[] { "recording-current" }
+            )!,
+        "The terminal-order regression fixture should arm recording A."
+    );
+    Invoke(stateType, reorderedTerminalState, "MarkNativeReplayStarted", Array.Empty<object?>());
+    Invoke(
+        stateType,
+        reorderedTerminalState,
+        "MarkRecordingStarted",
+        new object?[] { "recording-current", "battle-current" }
+    );
+    Invoke(stateType, reorderedTerminalState, "MarkReplayEnded", new object?[] { null });
+    Invoke(stateType, reorderedTerminalState, "ApplyCompletion", new object?[] { completed });
+    Invoke(stateType, reorderedTerminalState, "SetAvailability", new object?[] { true, null });
+    Assert(
+        (bool)
+            Invoke(
+                stateType,
+                reorderedTerminalState,
+                "TryArm",
+                new object?[] { "recording-again" }
+            )!,
+        "Recording B should be armable while recording A's report is still publishing."
+    );
+    Invoke(
+        stateType,
+        reorderedTerminalState,
+        "ApplyReportCompletion",
+        new object?[] { "recording-current", "battle-current", "/tmp/late-a.report.html" }
+    );
+    Invoke(stateType, reorderedTerminalState, "MarkNativeReplayStarted", Array.Empty<object?>());
+    Invoke(
+        stateType,
+        reorderedTerminalState,
+        "MarkRecordingStarted",
+        new object?[] { "recording-again", "battle-current" }
+    );
+    Invoke(stateType, reorderedTerminalState, "MarkReplayEnded", new object?[] { null });
+    Invoke(
+        stateType,
+        reorderedTerminalState,
+        "ApplyCompletion",
+        new object?[] { failedReplacement }
+    );
+    var reorderedTerminalResult = Invoke(
+        stateType,
+        reorderedTerminalState,
+        "Snapshot",
+        Array.Empty<object?>()
+    )!;
+    Assert(
+        (bool)
+            GetProperty(
+                reorderedTerminalResult.GetType(),
+                reorderedTerminalResult,
+                "CanOpenReport"
+            )!
+            && (string?)GetProperty(
+                reorderedTerminalResult.GetType(),
+                reorderedTerminalResult,
+                "ReportHtmlFilePath"
+            ) == "/tmp/late-a.report.html",
+        "A late report terminal for usable recording A must survive an armed then failed recording B."
     );
 }
 
@@ -2166,6 +2416,9 @@ static void RunCurrentReplayVideoMetadataChecks()
     );
     var startedType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.VideoRecordingStarted");
     var finishedType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.VideoRecordingFinished");
+    var syncAnchorType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoSyncAnchor"
+    );
     var root = Path.Combine(
         Path.GetTempPath(),
         "bpp-current-replay-video-metadata-tests",
@@ -2190,6 +2443,7 @@ static void RunCurrentReplayVideoMetadataChecks()
 
         var finished = Activator.CreateInstance(finishedType, nonPublic: true)!;
         SetProperty(finishedType, finished, "VideoId", "video-current");
+        SetProperty(finishedType, finished, "BattleId", "battle-current");
         SetProperty(finishedType, finished, "VideoRelativePath", "2026-07-15/battle-current.mp4");
         SetProperty(finishedType, finished, "EndedAtUtc", DateTimeOffset.UtcNow);
         SetProperty(finishedType, finished, "DurationMs", 1234L);
@@ -2197,6 +2451,28 @@ static void RunCurrentReplayVideoMetadataChecks()
         SetProperty(finishedType, finished, "DroppedFrames", 0);
         SetProperty(finishedType, finished, "FileSizeBytes", 4096L);
         SetProperty(finishedType, finished, "Status", "COMPLETED");
+        var syncAnchors = Array.CreateInstance(syncAnchorType, 2);
+        syncAnchors.SetValue(
+            Activator.CreateInstance(
+                syncAnchorType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new object?[] { "video-current", "battle-current", 0, 0, 0L, 0L },
+                culture: null
+            ),
+            0
+        );
+        syncAnchors.SetValue(
+            Activator.CreateInstance(
+                syncAnchorType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new object?[] { "video-current", "battle-current", 1, 50, 17L, 1L },
+                culture: null
+            ),
+            1
+        );
+        SetProperty(finishedType, finished, "SyncAnchors", syncAnchors);
         Invoke(storeType, store, "SaveFinish", new object?[] { finished });
 
         using var connection = new SqliteConnection($"Data Source={databasePath}");
@@ -2229,11 +2505,177 @@ static void RunCurrentReplayVideoMetadataChecks()
             reader.GetString(4) == "COMPLETED",
             "Completed current replay videos must be listable by the Tauri query."
         );
+        reader.Close();
+
+        command.CommandText = """
+            SELECT output_ordinal, combat_frame, combat_ms, media_pts_ms
+            FROM combat_replay_video_sync_anchors
+            WHERE video_id = 'video-current'
+            ORDER BY output_ordinal;
+            """;
+        using var anchorReader = command.ExecuteReader();
+        Assert(anchorReader.Read(), "The first exact video sync anchor should be persisted.");
+        Assert(
+            anchorReader.GetInt64(0) == 0
+                && anchorReader.GetInt32(1) == 0
+                && anchorReader.GetInt32(2) == 0
+                && anchorReader.GetInt64(3) == 0,
+            "The first video sync anchor should preserve combat and media coordinates."
+        );
+        Assert(anchorReader.Read(), "The second exact video sync anchor should be persisted.");
+        Assert(
+            anchorReader.GetInt64(0) == 1
+                && anchorReader.GetInt32(1) == 1
+                && anchorReader.GetInt32(2) == 50
+                && anchorReader.GetInt64(3) == 17,
+            "The second video sync anchor should preserve monotonic output coordinates."
+        );
+        Assert(!anchorReader.Read(), "Only committed output frames should create sync anchors.");
+        anchorReader.Close();
+
+        Invoke(storeType, store, "SaveFinish", new object?[] { finished });
+        command.CommandText = """
+            SELECT COUNT(*)
+            FROM combat_replay_video_sync_anchors
+            WHERE video_id = 'video-current';
+            """;
+        Assert(
+            Convert.ToInt32(command.ExecuteScalar()) == 2,
+            "Replaying an identical completion must be idempotent without duplicating anchors."
+        );
+
+        var conflictingAnchors = Array.CreateInstance(syncAnchorType, 2);
+        conflictingAnchors.SetValue(syncAnchors.GetValue(0), 0);
+        conflictingAnchors.SetValue(
+            Activator.CreateInstance(
+                syncAnchorType,
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                binder: null,
+                args: new object?[] { "video-current", "battle-current", 2, 100, 34L, 1L },
+                culture: null
+            ),
+            1
+        );
+        SetProperty(finishedType, finished, "SyncAnchors", conflictingAnchors);
+        var conflictRejected = false;
+        try
+        {
+            Invoke(storeType, store, "SaveFinish", new object?[] { finished });
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException is InvalidOperationException)
+        {
+            conflictRejected = ex.InnerException.Message.Contains(
+                "conflict",
+                StringComparison.OrdinalIgnoreCase
+            );
+        }
+        Assert(
+            conflictRejected,
+            "A duplicate output ordinal with different persisted coordinates must fail loudly."
+        );
+
+        command.CommandText = """
+            SELECT COUNT(*), MAX(CASE WHEN output_ordinal = 1 THEN media_pts_ms END)
+            FROM combat_replay_video_sync_anchors
+            WHERE video_id = 'video-current';
+            """;
+        using (var conflictReader = command.ExecuteReader())
+        {
+            Assert(
+                conflictReader.Read()
+                    && conflictReader.GetInt32(0) == 2
+                    && conflictReader.GetInt64(1) == 17,
+                "A rejected duplicate conflict must leave the original anchor sequence unchanged."
+            );
+        }
+
+        var recoveryCandidates = (System.Collections.IEnumerable)
+            Invoke(storeType, store, "ListCompletedForReportRecovery", new object?[] { 10, 0 })!;
+        var candidate = recoveryCandidates.Cast<object>().Single();
+        var candidateType = candidate.GetType();
+        Assert(
+            GetProperty(candidateType, candidate, "RecordingId") as string == "video-current"
+                && GetProperty(candidateType, candidate, "BattleId") as string == "battle-current"
+                && GetProperty(candidateType, candidate, "Source") as string == "CurrentNative"
+                && GetProperty(candidateType, candidate, "VideoRelativePath") as string
+                    == "2026-07-15/battle-current.mp4"
+                && (
+                    (System.Collections.IEnumerable)
+                        GetProperty(candidateType, candidate, "SyncAnchors")!
+                )
+                    .Cast<object>()
+                    .Count() == 2,
+            "Report startup recovery must receive the typed recording, battle, source, and relative video identity."
+        );
     }
     finally
     {
         Directory.Delete(root, recursive: true);
     }
+}
+
+static void RunReplayVideoSyncCollectorChecks()
+{
+    var trackerType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCombatPositionTracker"
+    );
+    var collectorType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoSyncAnchorCollector"
+    );
+    var tracker = Activator.CreateInstance(
+        trackerType,
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+        binder: null,
+        args: new object?[] { 50 },
+        culture: null
+    )!;
+    var collector = Activator.CreateInstance(
+        collectorType,
+        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+        binder: null,
+        args: new object?[] { "recording-sync", "battle-sync", 60 },
+        culture: null
+    )!;
+
+    var capturedAtA = Invoke(trackerType, tracker, "Snapshot", Array.Empty<object?>())!;
+    Invoke(trackerType, tracker, "Advance", Array.Empty<object?>());
+    Invoke(trackerType, tracker, "Advance", Array.Empty<object?>());
+    var trackerNowAtB = Invoke(trackerType, tracker, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        (bool)
+            Invoke(
+                collectorType,
+                collector,
+                "TryAdoptCapturedFrame",
+                new object?[] { 1L, capturedAtA }
+            )!,
+        "The first captured frame position should be adopted."
+    );
+
+    var anchorA = Invoke(collectorType, collector, "RecordOutput", Array.Empty<object?>())!;
+    Assert(
+        (int)GetProperty(anchorA.GetType(), anchorA, "CombatFrame")! == 0
+            && (int)GetProperty(anchorA.GetType(), anchorA, "CombatMs")! == 0,
+        "An async readback enqueued after combat advanced to B must retain capture-time position A."
+    );
+
+    Assert(
+        (bool)
+            Invoke(
+                collectorType,
+                collector,
+                "TryAdoptCapturedFrame",
+                new object?[] { 2L, trackerNowAtB }
+            )!,
+        "The next captured source frame should adopt position B."
+    );
+    var anchorB = Invoke(collectorType, collector, "RecordOutput", Array.Empty<object?>())!;
+    Assert(
+        (int)GetProperty(anchorB.GetType(), anchorB, "CombatFrame")! == 1
+            && (int)GetProperty(anchorB.GetType(), anchorB, "CombatMs")! == 50
+            && (long)GetProperty(anchorB.GetType(), anchorB, "OutputOrdinal")! == 1L,
+        "A later captured frame should advance both combat position and output ordinal."
+    );
 }
 
 static object? Invoke(Type type, object instance, string methodName, object?[] args)

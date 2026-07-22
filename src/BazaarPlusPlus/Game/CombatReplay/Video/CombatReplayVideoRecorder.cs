@@ -1,8 +1,10 @@
 #nullable enable
 using System.Collections;
 using System.Collections.Concurrent;
+using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay.Audio;
+using BazaarPlusPlus.Game.CombatReplay.ReportData;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
@@ -15,6 +17,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     private CombatReplayVideoMetadataStore? _metadataStore;
     private IDisposable? _startingSubscription;
     private IDisposable? _endedSubscription;
+    private IDisposable? _combatFrameSubscription;
+    private readonly ReplayVideoCombatPositionTracker _combatPosition = new(
+        CombatReportProjector.FrameDurationMs
+    );
     private ReplayVideoCaptureSession? _activeSession;
     private Coroutine? _captureCoroutine;
     private IDisposable? _uiSuppressionScope;
@@ -358,6 +364,9 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         _endedSubscription = services.EventBus.Subscribe<CombatReplayPlaybackEnded>(
             OnPlaybackEnded
         );
+        _combatFrameSubscription = services.EventBus.Subscribe<CombatFrameAdvanced>(
+            OnCombatFrameAdvanced
+        );
     }
 
     private void OnDisable()
@@ -366,6 +375,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         _startingSubscription = null;
         _endedSubscription?.Dispose();
         _endedSubscription = null;
+        _combatFrameSubscription?.Dispose();
+        _combatFrameSubscription = null;
 
         AbortActiveSession("recorder-disabled");
         CancelPreparedCurrentReplay(ReplayVideoRecordingReasonCode.Aborted);
@@ -482,6 +493,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             }
 
             BeginRecording(operation, request, services);
+            PublishRecordingStarted(services, operation);
         }
         catch (Exception ex)
         {
@@ -502,6 +514,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             }
         }
     }
+
+    private void OnCombatFrameAdvanced(CombatFrameAdvanced _) => _combatPosition.Advance();
 
     private void BeginPreparedCurrentReplay(CombatReplayPlaybackStarting evt)
     {
@@ -537,14 +551,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             }
 
             BeginRecording(prepared.Operation, prepared.Request, services);
-            services.EventBus.Publish(
-                new CombatReplayVideoRecordingStarted
-                {
-                    RecordingId = prepared.Operation.RecordingId,
-                    BattleId = prepared.Operation.BattleId,
-                    Source = prepared.Operation.Source,
-                }
-            );
+            PublishRecordingStarted(services, prepared.Operation);
         }
         catch (Exception ex)
         {
@@ -565,6 +572,21 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 );
             }
         }
+    }
+
+    private static void PublishRecordingStarted(
+        IBppServices services,
+        ReplayVideoRecordingOperation operation
+    )
+    {
+        services.EventBus.Publish(
+            new CombatReplayVideoRecordingStarted
+            {
+                RecordingId = operation.RecordingId,
+                BattleId = operation.BattleId,
+                Source = operation.Source,
+            }
+        );
     }
 
     private void OnPlaybackEnded(CombatReplayPlaybackEnded evt)
@@ -776,6 +798,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 StderrTail = result?.StderrTail,
                 Exception = exception,
                 EndedAtUtc = result?.EndedAtUtc,
+                SyncAnchors = result?.SyncAnchors ?? Array.Empty<ReplayVideoSyncAnchor>(),
             }
         );
     }
@@ -878,7 +901,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         IBppServices services
     )
     {
-        var session = new ReplayVideoCaptureSession(request);
+        _combatPosition.Reset();
+        var session = new ReplayVideoCaptureSession(request, _combatPosition.Snapshot);
         _activeOperation = operation;
         _activeSession = session;
         _activeRecordingTempPath = request.OutputFilePath;
@@ -1070,6 +1094,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 new VideoRecordingFinished
                 {
                     VideoId = result.VideoId,
+                    BattleId = result.BattleId,
                     VideoRelativePath = relativePath,
                     EndedAtUtc = endedAt,
                     DurationMs = result.DurationMs,
@@ -1078,6 +1103,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                     FileSizeBytes = finalFileSize,
                     Status = status,
                     Error = result.Error,
+                    SyncAnchors = result.SyncAnchors,
                 }
             );
             return new MetadataWriteOutcome(
@@ -1330,6 +1356,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 StderrTail = result?.StderrTail,
                 Exception = terminalException ?? result?.Exception,
                 EndedAtUtc = result?.EndedAtUtc,
+                SyncAnchors = result?.SyncAnchors ?? Array.Empty<ReplayVideoSyncAnchor>(),
             }
         );
     }
@@ -1545,6 +1572,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 new VideoRecordingFinished
                 {
                     VideoId = prepared.Operation.RecordingId,
+                    BattleId = prepared.Operation.BattleId,
                     VideoRelativePath = ComputeRelativePath(
                         _services?.Paths.CombatReplayVideoDirectoryPath,
                         prepared.Request.FinalOutputFilePath
@@ -1585,6 +1613,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                             ? null
                             : terminal.ReasonCode.ToString()
                     ),
+                SyncAnchors = terminal.SyncAnchors,
             }
         );
     }

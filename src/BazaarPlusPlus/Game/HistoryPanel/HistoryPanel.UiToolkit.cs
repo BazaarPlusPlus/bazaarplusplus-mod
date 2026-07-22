@@ -22,6 +22,7 @@ internal sealed partial class HistoryPanel
                 () => SetHistoryVisible(false),
                 () => TryReplaySelectedBattle(false),
                 () => TryReplaySelectedBattle(true),
+                TryOpenSelectedBattleReport,
                 TryDeleteSelectedRun,
                 TryCheckServerHealth,
                 SubmitAccountLinkCode,
@@ -103,6 +104,8 @@ internal sealed partial class HistoryPanel
 
         var selectedBattle = ActiveSelectedBattle;
         var hasSelectedBattle = selectedBattle != null;
+        var detailedReportVisible =
+            hasSelectedBattle && _coordinator?.CanOpenDetailedCombatReport(selectedBattle) == true;
         var selectedRun = SelectedRun;
         var now = Time.unscaledTime;
         var databaseChip =
@@ -219,6 +222,8 @@ internal sealed partial class HistoryPanel
             ReplayButtonEnabled = buttons.ReplayButtonEnabled,
             RecordAndReplayButtonText = buttons.RecordAndReplayButtonText,
             RecordAndReplayButtonEnabled = buttons.RecordAndReplayButtonEnabled,
+            DetailedReportButtonText = HistoryPanelText.ViewDetailedCombatReport(),
+            DetailedReportButtonVisible = detailedReportVisible,
             DeleteButtonText = buttons.DeleteButtonText,
             DeleteButtonEnabled = buttons.DeleteButtonEnabled,
             HasSelectedBattle = hasSelectedBattle,
@@ -336,6 +341,10 @@ internal sealed class HistoryPanelUiToolkitModel
     public string RecordAndReplayButtonText { get; set; } = string.Empty;
 
     public bool RecordAndReplayButtonEnabled { get; set; }
+
+    public string DetailedReportButtonText { get; set; } = string.Empty;
+
+    public bool DetailedReportButtonVisible { get; set; }
 
     public string DeleteButtonText { get; set; } = string.Empty;
 

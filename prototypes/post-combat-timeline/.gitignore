@@ -1,0 +1,7 @@
+assets/native/
+extractor/bin/
+extractor/obj/
+latest-battle.timeline.json
+native-assets.js
+native-assets/__pycache__/
+videos/

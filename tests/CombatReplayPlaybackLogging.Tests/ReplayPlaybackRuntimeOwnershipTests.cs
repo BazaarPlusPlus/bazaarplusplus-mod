@@ -66,23 +66,130 @@ public sealed class ReplayPlaybackRuntimeOwnershipTests
         Assert.DoesNotContain("CompletePlaybackOperation(", exit);
     }
 
+    [Fact]
+    public void Report_assets_are_prepared_before_replay_without_gating_exit()
+    {
+        var source = RuntimeSource();
+        var currentStart = Segment(
+            source,
+            "private IEnumerator StartCurrentReplayWhenReady(",
+            "private bool TryInvokeCurrentReplay("
+        );
+        var prepare = currentStart.IndexOf("PrepareReportAssets(", StringComparison.Ordinal);
+        var complete = currentStart.IndexOf(
+            "_pendingPreparedReportAssets = preparedAssets",
+            StringComparison.Ordinal
+        );
+        Assert.True(prepare >= 0 && complete > prepare);
+
+        var savedStart = Segment(
+            source,
+            "private async Task StartReplayAsync(",
+            "private void OnStateChanged(StateChangedEvent data)"
+        );
+        Assert.True(
+            savedStart.IndexOf("PrepareReportAssetsAsync(manifest)", StringComparison.Ordinal)
+                < savedStart.IndexOf(
+                    "ReplayBootstrap.InjectSavedReplayAsync(",
+                    StringComparison.Ordinal
+                )
+        );
+        Assert.Contains("_pendingReportAssetManifest = recordVideo ? manifest : null", savedStart);
+        Assert.Contains("_pendingReportAssetRecordingId = null", savedStart);
+
+        var recordingStart = Segment(
+            source,
+            "private void OnVideoRecordingStarted(",
+            "private void OnVideoRecordingCompleted("
+        );
+        Assert.Contains("_reportPublication?.ObserveVideoStarted(started)", recordingStart);
+        Assert.Contains("_pendingReportAssetRecordingId = started.RecordingId", recordingStart);
+        Assert.Contains("_pendingPreparedReportAssets", recordingStart);
+        Assert.DoesNotContain("StartReportCardPreviewMaterialization", source);
+        Assert.DoesNotContain("PostCombatReportMaterializationExitGate", source);
+        Assert.DoesNotContain("PostCombatReportAssetWorkQueue", source);
+    }
+
+    [Fact]
+    public void Startup_report_recovery_is_paged_and_cache_only()
+    {
+        var source = RuntimeSource();
+        var recovery = Segment(
+            source,
+            "private void RecoverIncompleteStaticReports(",
+            "private void Update()"
+        );
+
+        Assert.Contains("ListCompletedForReportRecovery(limit, offset)", recovery);
+        Assert.Contains("RecoverNextBatch(", recovery);
+        Assert.Contains("yield return null;", recovery);
+        Assert.Contains("StartupReportRecoveryBatchSize", source);
+        Assert.Contains("cache-only", recovery);
+        Assert.DoesNotContain("MaterializeBattle", recovery);
+        Assert.DoesNotContain("EnqueueDeferredReportRecovery", recovery);
+        Assert.DoesNotContain("RetryAfterMaterialization", recovery);
+        Assert.DoesNotContain("int.MaxValue", recovery);
+    }
+
+    [Fact]
+    public void Recorded_saved_replay_propagates_its_recording_identity_to_report_assets()
+    {
+        var recorderSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Game",
+            "CombatReplay",
+            "Video",
+            "CombatReplayVideoRecorder.cs"
+        );
+        var savedReplayStart = Segment(
+            recorderSource,
+            "private void OnPlaybackStarting(CombatReplayPlaybackStarting evt)",
+            "private void BeginPreparedCurrentReplay(CombatReplayPlaybackStarting evt)"
+        );
+        Assert.Contains("if (!evt.RecordVideo)", savedReplayStart);
+        var beginRecording = savedReplayStart.IndexOf(
+            "BeginRecording(operation, request, services)",
+            StringComparison.Ordinal
+        );
+        var publishStarted = savedReplayStart.IndexOf(
+            "PublishRecordingStarted(services, operation)",
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            beginRecording >= 0 && publishStarted > beginRecording,
+            "A saved replay must publish its concrete recording identity after recording begins."
+        );
+
+        var runtimeSource = RuntimeSource();
+        var recordingStart = Segment(
+            runtimeSource,
+            "private void OnVideoRecordingStarted(",
+            "private void OnVideoRecordingCompleted("
+        );
+        Assert.Contains("_reportPublication?.ObserveVideoStarted(started)", recordingStart);
+        Assert.Contains("_pendingReportAssetRecordingId = started.RecordingId", recordingStart);
+
+        Assert.Contains("_pendingPreparedReportAssets", recordingStart);
+        Assert.Contains("MarkAssetsReady(", recordingStart);
+    }
+
     private static string RuntimeSource()
+    {
+        return Source("src", "BazaarPlusPlus", "Game", "CombatReplay", "CombatReplayRuntime.cs");
+    }
+
+    private static string Source(params string[] pathSegments)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
         while (directory != null && !File.Exists(Path.Combine(directory.FullName, "AGENTS.md")))
             directory = directory.Parent;
 
         Assert.NotNull(directory);
-        return File.ReadAllText(
-            Path.Combine(
-                directory!.FullName,
-                "src",
-                "BazaarPlusPlus",
-                "Game",
-                "CombatReplay",
-                "CombatReplayRuntime.cs"
-            )
-        );
+        var path = new string[pathSegments.Length + 1];
+        path[0] = directory!.FullName;
+        Array.Copy(pathSegments, 0, path, 1, pathSegments.Length);
+        return File.ReadAllText(Path.Combine(path));
     }
 
     private static string Segment(string source, string startToken, string endToken)
