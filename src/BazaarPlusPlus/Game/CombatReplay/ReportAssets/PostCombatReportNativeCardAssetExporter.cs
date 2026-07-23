@@ -24,8 +24,9 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
     private const int RenderKeySchemaVersion = 1;
     private const int SkillOutputPixels = 512;
     private const int ItemOutputHeight = 512;
+    private const int ItemTransparentCropPaddingPixels = 8;
     private const string DirectRendererVersion = "1";
-    private const string ItemRendererVersion = "8";
+    private const string ItemRendererVersion = "9";
     private const string CaptureProfileVersion = "8";
     private const string EncoderVersion = "2.1.11";
     private static readonly WaitForEndOfFrame OffscreenFrameBoundary = new();
@@ -835,7 +836,13 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
             Helpers.SetAllRenderersEnabledState(_root, active: false, includeInactive: true);
             _root.SetActive(false);
             _camera.targetTexture = null;
-            return NativeReportTexturePngExporter.ReadbackAndWriteAsync(target, outputPath, token);
+            return NativeReportTexturePngExporter.ReadbackAndWriteAsync(
+                target,
+                outputPath,
+                token,
+                trimTransparentBounds: true,
+                transparentPaddingPixels: ItemTransparentCropPaddingPixels
+            );
         }
 
         internal void CancelRender(RenderTexture? target)

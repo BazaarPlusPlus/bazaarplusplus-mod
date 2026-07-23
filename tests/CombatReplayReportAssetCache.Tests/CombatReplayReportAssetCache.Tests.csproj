@@ -29,6 +29,10 @@
       Link="PostCombatReportAssetFile.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportAssets/ReportAssetAlphaCrop.cs"
+      Link="ReportAssetAlphaCrop.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportData/CombatReportContracts.cs"
       Link="CombatReportContracts.cs"
     />

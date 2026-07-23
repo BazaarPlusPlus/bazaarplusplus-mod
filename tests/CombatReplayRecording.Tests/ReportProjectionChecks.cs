@@ -112,14 +112,31 @@ internal static class ReportProjectionChecks
         {
             Frames = new List<CombatSimFrame> { firstFrame, lateRageFrame },
         };
-        var document = Project(
-            new PvpBattleManifest
+        var manifest = new PvpBattleManifest
+        {
+            BattleId = "0123456789abcdef0123456789abcdef",
+            RecordedAtUtc = DateTimeOffset.Parse("2026-07-22T00:00:00Z"),
+        };
+        manifest.Snapshots.PlayerHand.Items =
+        [
+            new PvpBattleCardSnapshot
             {
-                BattleId = "0123456789abcdef0123456789abcdef",
-                RecordedAtUtc = DateTimeOffset.Parse("2026-07-22T00:00:00Z"),
+                InstanceId = "socket-effect-a",
+                TemplateId = "c017c0dd-af3c-47e0-b510-3661d9dcd7f2",
+                Type = ECardType.SocketEffect,
+                Size = ECardSize.Small,
+                Name = "[Stove] Socket Effect",
             },
-            new NetMessageCombatSim(combat)
-        );
+            new PvpBattleCardSnapshot
+            {
+                InstanceId = cardId.Value,
+                TemplateId = "618271c5-5721-40ac-b1c7-43aa06a02d07",
+                Type = ECardType.Item,
+                Size = ECardSize.Small,
+                Name = "Honeycomb",
+            },
+        ];
+        var document = Project(manifest, new NetMessageCombatSim(combat));
 
         Require(
             document.FrameZeroState.Player.Health == 1_000
@@ -157,6 +174,13 @@ internal static class ReportProjectionChecks
         Require(
             document.RawRecordCount == 14 && document.RawRecordCount > document.Events.Count,
             $"RawRecordCount must count all raw subrecords including delta-zero updates (raw={document.RawRecordCount}, projected={document.Events.Count})."
+        );
+        Require(
+            document.Entities.Single(entity => entity.EntityId == "socket-effect-a").Type
+                == "effect"
+                && document.Entities.Single(entity => entity.EntityId == cardId.Value).Type
+                    == "item",
+            "Socket-effect snapshots in a hand capture must not masquerade as item entities."
         );
     }
 

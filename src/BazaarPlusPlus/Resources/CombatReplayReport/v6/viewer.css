@@ -757,37 +757,16 @@ video:focus-visible {
   font-weight: 750;
 }
 
-.bpp-lane-art.bpp-art-item {
-  width: auto;
-  max-width: clamp(28px, calc(76px * var(--bpp-lane-scale, 1)), 92px);
-  height: clamp(28px, calc(40px * var(--bpp-lane-scale, 1)), 48px);
-  aspect-ratio: var(--bpp-item-art-aspect, 1);
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-.bpp-lane-art.bpp-art-item .bpp-lane-image {
-  width: 100%;
-  max-width: none;
-  height: 100%;
-  border: 1px solid #40536c;
-  border-radius: 8px;
-  background: #132134;
-  object-fit: contain;
-}
-
 .bpp-lane-art.bpp-art-item.bpp-span-1 {
-  --bpp-item-art-aspect: 0.5;
+  width: clamp(13px, calc(18.6px * var(--bpp-lane-scale, 1)), 24px);
 }
 
 .bpp-lane-art.bpp-art-item.bpp-span-2 {
-  --bpp-item-art-aspect: 1;
+  width: clamp(26px, calc(36.1px * var(--bpp-lane-scale, 1)), 47px);
 }
 
 .bpp-lane-art.bpp-art-item.bpp-span-3 {
-  --bpp-item-art-aspect: 1.5;
+  width: clamp(50px, calc(71.2px * var(--bpp-lane-scale, 1)), 92px);
 }
 
 .bpp-lane-art.is-missing {

@@ -80,7 +80,7 @@ internal sealed class ViewerReleaseDefinition
 
 internal sealed class ViewerReleaseRegistry
 {
-    internal const string CurrentVersion = "6";
+    internal const string CurrentVersion = "7";
     private const string ResourceNamePrefix = "BazaarPlusPlus.Resources.CombatReplayReport.";
     private const string EChartsResourceName = ResourceNamePrefix + "echarts.min.js";
     private const string V1ViewerResourceName = ResourceNamePrefix + "v1.viewer.js";
@@ -93,6 +93,8 @@ internal sealed class ViewerReleaseRegistry
     private const string V4StylesheetResourceName = ResourceNamePrefix + "v4.viewer.css";
     private const string V5ViewerResourceName = ResourceNamePrefix + "v5.viewer.js";
     private const string V5StylesheetResourceName = ResourceNamePrefix + "v5.viewer.css";
+    private const string V6ViewerResourceName = ResourceNamePrefix + "v6.viewer.js";
+    private const string V6StylesheetResourceName = ResourceNamePrefix + "v6.viewer.css";
     private const string ViewerResourceName = ResourceNamePrefix + "viewer.js";
     private const string StylesheetResourceName = ResourceNamePrefix + "viewer.css";
     private static readonly byte[] ScriptSeparator = Encoding.UTF8.GetBytes("\n;\n");
@@ -135,6 +137,12 @@ internal sealed class ViewerReleaseRegistry
     private const int V6StylesheetLength = 25253;
     private const string V6StylesheetSha256 =
         "f52db5018f652893b0c867550e1ea6155d121c619eaacdd2c7f05b8383f8c3f0";
+    private const int V7ScriptLength = 717495;
+    private const string V7ScriptSha256 =
+        "8541bd9bf65904ba178b2c2bdec0ada86d95cf3389b7517d209305461b0d5c60";
+    private const int V7StylesheetLength = 25643;
+    private const string V7StylesheetSha256 =
+        "c865002fb089626d85d31cace8940add3547cc651be8a56547f9a8680701bd73";
 
     private readonly IReadOnlyDictionary<string, ViewerReleaseDefinition> _releases;
 
@@ -180,6 +188,8 @@ internal sealed class ViewerReleaseRegistry
         var v4Stylesheet = ReadRequiredResource(assembly, V4StylesheetResourceName);
         var v5Script = BuildScript(echarts, ReadRequiredResource(assembly, V5ViewerResourceName));
         var v5Stylesheet = ReadRequiredResource(assembly, V5StylesheetResourceName);
+        var v6Script = BuildScript(echarts, ReadRequiredResource(assembly, V6ViewerResourceName));
+        var v6Stylesheet = ReadRequiredResource(assembly, V6StylesheetResourceName);
         var currentScript = BuildScript(
             echarts,
             ReadRequiredResource(assembly, ViewerResourceName)
@@ -239,14 +249,24 @@ internal sealed class ViewerReleaseRegistry
                     V5StylesheetSha256
                 ),
                 new ViewerReleaseDefinition(
-                    CurrentVersion,
+                    "6",
                     reportSchemaVersion: 1,
-                    currentScript,
-                    currentStylesheet,
+                    v6Script,
+                    v6Stylesheet,
                     V6ScriptLength,
                     V6ScriptSha256,
                     V6StylesheetLength,
                     V6StylesheetSha256
+                ),
+                new ViewerReleaseDefinition(
+                    CurrentVersion,
+                    reportSchemaVersion: 1,
+                    currentScript,
+                    currentStylesheet,
+                    V7ScriptLength,
+                    V7ScriptSha256,
+                    V7StylesheetLength,
+                    V7StylesheetSha256
                 ),
             }
         );

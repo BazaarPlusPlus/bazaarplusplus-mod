@@ -640,7 +640,7 @@ internal sealed class CombatReportProjector
                     EntityId = card.InstanceId,
                     TemplateId = card.TemplateId,
                     Owner = owner,
-                    Type = type,
+                    Type = ResolveReportEntityType(card.Type, type),
                     Name = card.Name ?? string.Empty,
                     Size = card.Size.ToString(),
                     Slot = card.Socket.HasValue ? (int)card.Socket.Value : null,
@@ -652,6 +652,15 @@ internal sealed class CombatReportProjector
             );
         }
     }
+
+    private static string ResolveReportEntityType(ECardType cardType, string collectionType) =>
+        cardType switch
+        {
+            ECardType.SocketEffect => "effect",
+            ECardType.Item => "item",
+            ECardType.Skill => "skill",
+            _ => collectionType,
+        };
 
     private static CombatReportEventV1 NewEvent(
         string id,

@@ -61,7 +61,6 @@
       entityHero: "英雄",
       entityItem: "物品",
       entitySkill: "技能",
-      entityEffect: "效果",
       entityUnknown: "实体",
       emptyTimeline: "这份报告没有可显示的战斗事件。",
       frameEvents: "本帧事件",
@@ -180,7 +179,6 @@
       entityHero: "hero",
       entityItem: "item",
       entitySkill: "skill",
-      entityEffect: "effect",
       entityUnknown: "entity",
       emptyTimeline: "This report has no battle events to display.",
       frameEvents: "Events at this frame",
@@ -1338,33 +1336,8 @@
       case "hero": return translate(copy, "entityHero");
       case "item": return translate(copy, "entityItem");
       case "skill": return translate(copy, "entitySkill");
-      case "effect": return translate(copy, "entityEffect");
       default: return translate(copy, "entityUnknown");
     }
-  }
-
-  function fallbackEntityGlyph(entity) {
-    switch (asString(entity && entity.type, "entity").toLowerCase()) {
-      case "skill": return "◆";
-      case "effect": return "◎";
-      case "item": return "?";
-      default: return asString(entity && entity.name, "?").slice(0, 1);
-    }
-  }
-
-  function applyNativeItemAspect(assetFrame, image) {
-    if (!assetFrame || !image || image.naturalWidth <= 0 || image.naturalHeight <= 0) return;
-    assetFrame.style.setProperty(
-      "--bpp-item-art-aspect",
-      image.naturalWidth + " / " + image.naturalHeight
-    );
-  }
-
-  function showEntityAssetFallback(assetFrame, image, entity) {
-    assetFrame.classList.add("is-missing", "bpp-art-placeholder");
-    assetFrame.classList.remove("bpp-art-item");
-    image.remove();
-    assetFrame.textContent = fallbackEntityGlyph(entity);
   }
 
   function renderLaneLabels(entities, copy, laneHeight) {
@@ -1390,28 +1363,15 @@
         const image = createElement("img", "bpp-lane-image", "timeline-lane-icon-" + index);
         image.alt = "";
         image.loading = "lazy";
-        if (assetKind === "bpp-art-item") {
-          image.addEventListener("load", function () {
-            applyNativeItemAspect(assetFrame, image);
-          });
-        }
+        image.src = assetUrl;
         image.addEventListener("error", function () {
-          showEntityAssetFallback(assetFrame, image, entity);
+          assetFrame.classList.add("is-missing");
+          image.remove();
         });
         assetFrame.append(image);
-        image.src = assetUrl;
-        if (assetKind === "bpp-art-item" && image.complete) {
-          applyNativeItemAspect(assetFrame, image);
-        }
         row.append(assetFrame);
       } else {
-        row.append(
-          createTextElement(
-            "span",
-            "bpp-lane-art bpp-art-placeholder is-missing",
-            fallbackEntityGlyph(entity)
-          )
-        );
+        row.append(createTextElement("span", "bpp-lane-art bpp-art-placeholder", entity.name.slice(0, 1)));
       }
       const label = createElement("span", "bpp-lane-copy");
       label.append(createTextElement("strong", "bpp-lane-name", entity.name));

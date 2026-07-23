@@ -20,6 +20,7 @@ try
     AttributeOrderIsCanonical();
     TypedBindingsCannotConfuseStatusIconsWithEntities();
     StatusSemanticsUseExactNativeMappingsAndFailClosed();
+    AlphaCropUsesVisibleBoundsInsteadOfCanvasGeometry();
     await ThreeFreshCachesAreDeterministic();
     await SameLineupSecondPassCreatesNoMaterializer();
     await ConcurrentMissesSingleflight();
@@ -48,6 +49,50 @@ void Check(bool condition, string message)
 {
     if (!condition)
         failures.Add(message);
+}
+
+void AlphaCropUsesVisibleBoundsInsteadOfCanvasGeometry()
+{
+    const int width = 6;
+    const int height = 5;
+    var pixels = new byte[width * height * 4];
+    pixels[(1 * width + 2) * 4 + 3] = ReportAssetAlphaCrop.DefaultAlphaThreshold - 1;
+    pixels[(1 * width + 3) * 4 + 3] = ReportAssetAlphaCrop.DefaultAlphaThreshold;
+    pixels[(3 * width + 4) * 4 + 3] = byte.MaxValue;
+
+    Check(
+        ReportAssetAlphaCrop.TryResolveBounds(pixels, width, height, padding: 1, out var bounds),
+        "Alpha crop must find pixels at or above the visibility threshold."
+    );
+    Check(
+        bounds == new ReportAssetPixelBounds(2, 0, 4, 5),
+        $"Alpha crop used the wrong padded bounds: {bounds}."
+    );
+
+    var cropped = ReportAssetAlphaCrop.Crop(pixels, width, height, bounds);
+    Check(
+        cropped.Length == bounds.Width * bounds.Height * 4,
+        "Alpha crop output must use the resolved pixel dimensions."
+    );
+    Check(
+        cropped[(1 * bounds.Width + 1) * 4 + 3] == ReportAssetAlphaCrop.DefaultAlphaThreshold,
+        "Alpha crop must preserve the visible source pixel at its translated position."
+    );
+    Check(
+        cropped[(3 * bounds.Width + 2) * 4 + 3] == byte.MaxValue,
+        "Alpha crop must preserve the far visible source pixel."
+    );
+
+    Check(
+        !ReportAssetAlphaCrop.TryResolveBounds(
+            new byte[width * height * 4],
+            width,
+            height,
+            padding: 0,
+            out _
+        ),
+        "A fully transparent canvas must not produce a crop rectangle."
+    );
 }
 
 void TypedBindingsCannotConfuseStatusIconsWithEntities()

@@ -80,6 +80,14 @@
       LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v5.viewer.css"
     />
     <EmbeddedResource
+      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v6/viewer.js"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v6.viewer.js"
+    />
+    <EmbeddedResource
+      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v6/viewer.css"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v6.viewer.css"
+    />
+    <EmbeddedResource
       Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/echarts.min.js"
       LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts.min.js"
     />

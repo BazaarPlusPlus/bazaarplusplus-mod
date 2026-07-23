@@ -80,7 +80,9 @@ internal static class NativeReportTexturePngExporter
     internal static Task<ReportAssetProducedFile> ReadbackAndWriteAsync(
         RenderTexture renderTexture,
         string outputPath,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        bool trimTransparentBounds = false,
+        int transparentPaddingPixels = 0
     )
     {
         if (renderTexture == null)
@@ -92,6 +94,8 @@ internal static class NativeReportTexturePngExporter
                 "Report texture output path is required.",
                 nameof(outputPath)
             );
+        if (transparentPaddingPixels < 0)
+            throw new ArgumentOutOfRangeException(nameof(transparentPaddingPixels));
 
         cancellationToken.ThrowIfCancellationRequested();
         var width = renderTexture.width;
@@ -138,7 +142,15 @@ internal static class NativeReportTexturePngExporter
             throw;
         }
 
-        return CompleteWriteAsync(completion.Task, width, height, outputPath, cancellationToken);
+        return CompleteWriteAsync(
+            completion.Task,
+            width,
+            height,
+            outputPath,
+            cancellationToken,
+            trimTransparentBounds,
+            transparentPaddingPixels
+        );
     }
 
     internal static RenderTexture CreateTarget(int width, int height, string name)
@@ -180,13 +192,23 @@ internal static class NativeReportTexturePngExporter
         int width,
         int height,
         string outputPath,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        bool trimTransparentBounds,
+        int transparentPaddingPixels
     )
     {
         var pixels = await readback.ConfigureAwait(false);
         cancellationToken.ThrowIfCancellationRequested();
         return await Task.Run(
-                () => WriteValidatedPng(pixels, width, height, outputPath),
+                () =>
+                    WriteValidatedPng(
+                        pixels,
+                        width,
+                        height,
+                        outputPath,
+                        trimTransparentBounds,
+                        transparentPaddingPixels
+                    ),
                 cancellationToken
             )
             .ConfigureAwait(false);
@@ -196,7 +218,9 @@ internal static class NativeReportTexturePngExporter
         byte[] pixels,
         int width,
         int height,
-        string outputPath
+        string outputPath,
+        bool trimTransparentBounds,
+        int transparentPaddingPixels
     )
     {
         if (pixels.Length != checked(width * height * 4))
@@ -221,15 +245,44 @@ internal static class NativeReportTexturePngExporter
             );
         }
 
+        var outputPixels = pixels;
+        var outputWidth = width;
+        var outputHeight = height;
+        if (trimTransparentBounds)
+        {
+            if (
+                !ReportAssetAlphaCrop.TryResolveBounds(
+                    pixels,
+                    width,
+                    height,
+                    transparentPaddingPixels,
+                    out var cropBounds
+                )
+            )
+            {
+                throw new InvalidDataException(
+                    "Native report texture has no visible alpha bounds."
+                );
+            }
+
+            outputPixels = ReportAssetAlphaCrop.Crop(pixels, width, height, cropBounds);
+            outputWidth = cropBounds.Width;
+            outputHeight = cropBounds.Height;
+        }
+
         AtomicFileWriter.Write(
             outputPath,
             temporaryPath =>
             {
-                using var image = Image.LoadPixelData<Rgba32>(pixels, width, height);
+                using var image = Image.LoadPixelData<Rgba32>(
+                    outputPixels,
+                    outputWidth,
+                    outputHeight
+                );
                 image.SaveAsPng(temporaryPath);
             }
         );
-        return new ReportAssetProducedFile(width, height);
+        return new ReportAssetProducedFile(outputWidth, outputHeight);
     }
 
     private static void FlipVertical(byte[] pixels, int width, int height)

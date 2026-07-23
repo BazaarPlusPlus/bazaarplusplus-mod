@@ -179,11 +179,11 @@ void VerifyHtmlEmitter()
     );
     Check(
         html.Contains(
-            "<link rel=\"stylesheet\" href=\"../report-viewer/v6/viewer.css\">",
+            "<link rel=\"stylesheet\" href=\"../report-viewer/v7/viewer.css\">",
             StringComparison.Ordinal
         )
             && html.Contains(
-                "<script defer src=\"../report-viewer/v6/viewer.js\"></script>",
+                "<script defer src=\"../report-viewer/v7/viewer.js\"></script>",
                 StringComparison.Ordinal
             ),
         "HTML must reference exactly one immutable shared Viewer version."
@@ -217,6 +217,7 @@ void VerifyViewerReleasePinAndInstall()
     var frozenV3 = registry.GetRequired("3");
     var frozenV4 = registry.GetRequired("4");
     var frozenV5 = registry.GetRequired("5");
+    var frozenV6 = registry.GetRequired("6");
     var release = registry.GetRequired(ViewerReleaseRegistry.CurrentVersion);
     Check(
         legacy.ScriptBytes.Length > 500_000
@@ -231,14 +232,18 @@ void VerifyViewerReleasePinAndInstall()
             && frozenV4.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV4.StylesheetBytes)
             && frozenV5.ScriptSha256 == StaticReportIntegrity.Sha256(frozenV5.ScriptBytes)
             && frozenV5.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV5.StylesheetBytes)
+            && frozenV6.ScriptSha256 == StaticReportIntegrity.Sha256(frozenV6.ScriptBytes)
+            && frozenV6.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV6.StylesheetBytes)
             && release.ScriptSha256 == StaticReportIntegrity.Sha256(release.ScriptBytes)
             && release.StylesheetSha256 == StaticReportIntegrity.Sha256(release.StylesheetBytes)
             && frozenV3.ScriptSha256 == frozenV4.ScriptSha256
             && frozenV3.StylesheetSha256 != frozenV4.StylesheetSha256
             && frozenV4.ScriptSha256 != frozenV5.ScriptSha256
             && frozenV4.StylesheetSha256 == frozenV5.StylesheetSha256
-            && frozenV5.ScriptSha256 != release.ScriptSha256
-            && frozenV5.StylesheetSha256 != release.StylesheetSha256,
+            && frozenV5.ScriptSha256 != frozenV6.ScriptSha256
+            && frozenV5.StylesheetSha256 != frozenV6.StylesheetSha256
+            && frozenV6.ScriptSha256 != release.ScriptSha256
+            && frozenV6.StylesheetSha256 != release.StylesheetSha256,
         "Every immutable Viewer release must match its source-controlled length and SHA pins."
     );
 
@@ -446,6 +451,7 @@ void VerifyViewerFunctionalContract()
             && script.Contains("translate(copy, \"entityHero\")", StringComparison.Ordinal)
             && script.Contains("translate(copy, \"entityItem\")", StringComparison.Ordinal)
             && script.Contains("translate(copy, \"entitySkill\")", StringComparison.Ordinal)
+            && script.Contains("translate(copy, \"entityEffect\")", StringComparison.Ordinal)
             && Count(script, "previousEvent:") == 3
             && Count(script, "playRecording:") == 3
             && Count(script, "followPlayhead:") == 3
@@ -476,22 +482,25 @@ void VerifyViewerFunctionalContract()
             && stylesheet.Contains(".bpp-lane-label.is-event-related", StringComparison.Ordinal)
             && stylesheet.Contains(".bpp-stats-charts", StringComparison.Ordinal)
             && stylesheet.Contains(".bpp-timeline-toolbar", StringComparison.Ordinal)
+            && stylesheet.Contains(".bpp-lane-art.bpp-art-item", StringComparison.Ordinal)
             && stylesheet.Contains(
-                ".bpp-lane-art.bpp-art-item.bpp-span-1",
+                "height: clamp(28px, calc(40px * var(--bpp-lane-scale, 1)), 48px)",
                 StringComparison.Ordinal
             )
             && stylesheet.Contains(
-                "calc(18.6px * var(--bpp-lane-scale, 1))",
+                ".bpp-lane-art.bpp-art-item .bpp-lane-image",
                 StringComparison.Ordinal
             )
             && stylesheet.Contains(
-                "calc(36.1px * var(--bpp-lane-scale, 1))",
+                "max-width: clamp(28px, calc(76px * var(--bpp-lane-scale, 1)), 92px)",
                 StringComparison.Ordinal
             )
             && stylesheet.Contains(
-                "calc(71.2px * var(--bpp-lane-scale, 1))",
+                "aspect-ratio: var(--bpp-item-art-aspect, 1)",
                 StringComparison.Ordinal
             )
+            && stylesheet.Contains("width: auto", StringComparison.Ordinal)
+            && !stylesheet.Contains("18.6px", StringComparison.Ordinal)
             && stylesheet.Contains(
                 "grid-template-rows: auto auto auto minmax(0, 1fr)",
                 StringComparison.Ordinal
@@ -499,7 +508,31 @@ void VerifyViewerFunctionalContract()
             && stylesheet.Contains("height: 100dvh", StringComparison.Ordinal)
             && stylesheet.Contains("height: 80px", StringComparison.Ordinal)
             && stylesheet.Contains("height: 100%;", StringComparison.Ordinal),
-        "Viewer CSS must retain a compact responsive media workbench, a viewport-bound timeline workspace, compact low-height metrics, responsive zoom controls, and natural Small/Medium/Large item ratios."
+        "Viewer CSS must retain a compact responsive media workbench, a viewport-bound timeline workspace, compact low-height metrics, responsive zoom controls, and intrinsic alpha-cropped item dimensions."
+    );
+    Check(
+        script.Contains(
+            "function applyNativeItemAspect(assetFrame, image)",
+            StringComparison.Ordinal
+        )
+            && script.Contains(
+                "image.naturalWidth + \" / \" + image.naturalHeight",
+                StringComparison.Ordinal
+            ),
+        "Item lane geometry must derive from the decoded alpha-cropped PNG rather than a canvas-size guess."
+    );
+    Check(
+        script.Contains("case \"effect\": return \"◎\";", StringComparison.Ordinal)
+            && script.Contains("case \"item\": return \"?\";", StringComparison.Ordinal)
+            && script.Contains(
+                "function showEntityAssetFallback(assetFrame, image, entity)",
+                StringComparison.Ordinal
+            )
+            && script.Contains(
+                "assetFrame.classList.remove(\"bpp-art-item\")",
+                StringComparison.Ordinal
+            ),
+        "Missing socket-effect assets and missing item assets must use explicit semantic placeholders."
     );
 }
 
