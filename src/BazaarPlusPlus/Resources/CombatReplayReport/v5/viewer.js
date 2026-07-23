@@ -46,15 +46,6 @@
       recordingHintExact: "点击时间轴事件可定位到录像中的对应时刻。",
       recordingHintUnsynced: "这份录像缺少经过验证的帧级同步信息，因此不会自动跳转。",
       noRecordingHint: "本报告只包含战斗事件，没有生成录像。",
-      previousEvent: "上一个事件",
-      nextEvent: "下一个事件",
-      playRecording: "播放",
-      pauseRecording: "暂停",
-      fullscreenRecording: "全屏查看录像",
-      followPlayhead: "跟随播放头",
-      stopFollowingPlayhead: "停止跟随播放头",
-      inspectorEmptyTitle: "选择一个时间点",
-      inspectorEmptyCopy: "悬停可预览录像；点击或拖动时间轴可固定时刻，并查看该帧的全部事件。",
       timelineTitle: "事件时间轴",
       timelineHint: "横向滚动查看战斗；悬停高亮聚合事件，点击展开同一时刻的完整事件。",
       entity: "实体 / 状态",
@@ -164,15 +155,6 @@
       recordingHintExact: "Select a timeline event to seek to the matching point in the recording.",
       recordingHintUnsynced: "This recording has no verified frame-level sync data, so automatic seeking is disabled.",
       noRecordingHint: "This report contains battle events only; no recording was produced.",
-      previousEvent: "Previous event",
-      nextEvent: "Next event",
-      playRecording: "Play",
-      pauseRecording: "Pause",
-      fullscreenRecording: "View recording fullscreen",
-      followPlayhead: "Follow playhead",
-      stopFollowingPlayhead: "Stop following playhead",
-      inspectorEmptyTitle: "Select a point in time",
-      inspectorEmptyCopy: "Hover to preview the recording. Select or drag on the timeline to pin a time and inspect every event in that frame.",
       timelineTitle: "Event timeline",
       timelineHint: "Scroll horizontally through the battle. Hover to highlight a cluster; select it to inspect every event at that point.",
       entity: "Entity / state",
@@ -283,15 +265,6 @@
     recordingHintExact: "點選時間軸事件可定位到錄影中的對應時刻。",
     recordingHintUnsynced: "這份錄影缺少經過驗證的影格級同步資訊，因此不會自動跳轉。",
     noRecordingHint: "本報告只包含戰鬥事件，沒有產生錄影。",
-    previousEvent: "上一個事件",
-    nextEvent: "下一個事件",
-    playRecording: "播放",
-    pauseRecording: "暫停",
-    fullscreenRecording: "全螢幕查看錄影",
-    followPlayhead: "跟隨播放頭",
-    stopFollowingPlayhead: "停止跟隨播放頭",
-    inspectorEmptyTitle: "選擇一個時間點",
-    inspectorEmptyCopy: "懸停可預覽錄影；點選或拖動時間軸可固定時刻，並查看該影格的全部事件。",
     timelineTitle: "事件時間軸",
     timelineHint: "橫向捲動查看戰鬥；懸停醒目顯示聚合事件，點選展開同一時刻的完整事件。",
     entity: "實體 / 狀態",
@@ -844,18 +817,6 @@
     return seconds < 10 ? seconds.toFixed(2) + "s" : seconds.toFixed(1) + "s";
   }
 
-  function formatTimecode(milliseconds) {
-    const totalMilliseconds = Math.max(0, Math.round(asFiniteNumber(milliseconds, 0)));
-    const minutes = Math.floor(totalMilliseconds / 60000);
-    const seconds = Math.floor((totalMilliseconds % 60000) / 1000);
-    const remainder = totalMilliseconds % 1000;
-    return String(minutes).padStart(2, "0")
-      + ":"
-      + String(seconds).padStart(2, "0")
-      + "."
-      + String(remainder).padStart(3, "0");
-  }
-
   function formatNumber(value) {
     const number = asFiniteNumber(value, NaN);
     return Number.isFinite(number) ? new Intl.NumberFormat().format(number) : "";
@@ -933,10 +894,6 @@
   }
 
   function renderMetricsChart(parent, model, copy) {
-    const emptyController = {
-      resize() {},
-      updatePlayhead() {},
-    };
     const shell = createElement("section", "bpp-metrics-shell", "metrics-section");
     const heading = createElement("div", "bpp-subsection-heading");
     const title = createElement("div");
@@ -949,7 +906,7 @@
     if (model.metrics.length === 0) {
       shell.append(createTextElement("p", "bpp-inline-empty", translate(copy, "metricsEmpty"), "metrics-empty-state"));
       parent.append(shell);
-      return emptyController;
+      return function () {};
     }
 
     const chartElement = createElement("div", "bpp-metrics-chart", "metrics-chart");
@@ -960,27 +917,16 @@
     const chart = createChart(chartElement);
     if (!chart) {
       chartElement.replaceChildren(createTextElement("p", "bpp-inline-empty", translate(copy, "metricsEmpty")));
-      return emptyController;
+      return function () {};
     }
 
     const series = metricSeries(model, copy);
-    function isCompactMetricsLayout() {
-      return Boolean(window.matchMedia
-        && window.matchMedia("(max-height: 900px)").matches);
-    }
-    function metricsGrid(compact) {
-      return compact
-        ? { left: 74, right: 24, top: 10, bottom: 28 }
-        : { left: 74, right: 24, top: 64, bottom: 42 };
-    }
-    const compactMetrics = isCompactMetricsLayout();
     chart.setOption({
       animation: false,
       backgroundColor: "transparent",
       color: METRIC_ORDER.map((metric) => METRIC_COLORS[metric]),
-      grid: metricsGrid(compactMetrics),
+      grid: { left: 74, right: 24, top: 64, bottom: 42 },
       legend: {
-        show: !compactMetrics,
         type: "scroll",
         top: 12,
         left: 18,
@@ -1021,30 +967,9 @@
       series,
       aria: { enabled: true, label: { description: translate(copy, "metricsHint") } },
     });
-    const playhead = createElement("div", "bpp-metrics-playhead", "metrics-playhead");
-    chartElement.append(playhead);
-    let lastCombatMs = 0;
-    let lastPreview = false;
-    function updatePlayhead(combatMs, preview) {
-      lastCombatMs = Math.max(0, Math.min(model.durationMs, combatMs));
-      lastPreview = Boolean(preview);
-      const plotWidth = Math.max(1, chartElement.clientWidth - 98);
-      const x = 74 + (lastCombatMs / Math.max(1, model.durationMs)) * plotWidth;
-      playhead.style.transform = "translateX(" + Math.round(x) + "px)";
-      playhead.classList.toggle("is-preview", lastPreview);
-    }
-    const resize = function () {
-      const compact = isCompactMetricsLayout();
-      chart.setOption({
-        grid: metricsGrid(compact),
-        legend: { show: !compact },
-      });
-      chart.resize();
-      updatePlayhead(lastCombatMs, lastPreview);
-    };
+    const resize = function () { chart.resize(); };
     window.addEventListener("resize", resize, { passive: true });
-    updatePlayhead(0, false);
-    return { resize, updatePlayhead };
+    return resize;
   }
 
   function outcomeLabel(copy, outcome) {
@@ -1112,195 +1037,86 @@
     parent.append(notice);
   }
 
-  function renderMediaWorkbench(root, model, copy) {
-    const section = createElement(
-      "section",
-      "bpp-section bpp-media-workbench",
-      "media-workbench"
-    );
+  function renderVideo(root, model, copy) {
+    const section = createElement("section", "bpp-section bpp-video-section", "video-section");
     section.id = "recording";
-    section.classList.toggle("is-missing-video", !model.videoUrl);
+    const heading = createElement("div", "bpp-section-heading");
+    const headingText = createElement("div");
+    headingText.append(createTextElement("h2", "bpp-section-title", translate(copy, "recordingTitle")));
+    const hintKey = model.videoUrl
+      ? model.sync.status === "ReadyExact"
+        ? "recordingHintExact"
+        : "recordingHintUnsynced"
+      : "noRecordingHint";
+    headingText.append(createTextElement("p", "bpp-section-subtitle", translate(copy, hintKey)));
+    heading.append(headingText);
 
-    const monitor = createElement("div", "bpp-monitor-panel", "recording-monitor");
-    const frame = createElement("div", "bpp-video-frame", "recording-video-frame");
-    frame.id = "bpp-recording-video-frame";
-    frame.setAttribute("data-seek-pending", "0");
-    frame.setAttribute("data-seek-commit-count", "0");
-    frame.setAttribute("data-playback-frame-count", "0");
-    frame.setAttribute("data-playback-frame-p95-ms", "0");
-    frame.setAttribute("data-playback-frame-max-ms", "0");
-    frame.setAttribute("data-playback-frame-over-25", "0");
-    const stateClass = model.sync.status === "ReadyExact"
-      ? "is-exact"
-      : model.videoUrl
-        ? "is-unsynced"
-        : "is-missing";
-    const stateLabel = model.sync.status === "ReadyExact"
-      ? translate(copy, "exact")
-      : model.videoUrl
-        ? translate(copy, "unsynced")
-        : translate(copy, "noRecording");
-    const monitorBadge = createElement("div", "bpp-monitor-badge");
-    monitorBadge.append(
-      createTextElement("strong", "bpp-monitor-title", translate(copy, "recordingTitle")),
-      createTextElement("span", "bpp-sync-pill " + stateClass, stateLabel, "video-sync-state")
-    );
-    monitorBadge.lastChild.setAttribute(
-      "data-sync-state",
-      model.videoUrl ? model.sync.status : "NotRequested"
-    );
-    frame.append(monitorBadge);
+    const stateClass = model.sync.status === "ReadyExact" ? "is-exact" : model.videoUrl ? "is-unsynced" : "is-missing";
+    const stateLabel = model.sync.status === "ReadyExact" ? translate(copy, "exact") : model.videoUrl ? translate(copy, "unsynced") : translate(copy, "noRecording");
+    const syncPill = createTextElement("span", "bpp-sync-pill " + stateClass, stateLabel, "video-sync-state");
+    syncPill.setAttribute("data-sync-state", model.videoUrl ? model.sync.status : "NotRequested");
+    heading.append(syncPill);
+    section.append(heading);
 
     let video = null;
     if (model.videoUrl) {
+      const frame = createElement("div", "bpp-video-frame", "recording-video-frame");
+      frame.id = "bpp-recording-video-frame";
       video = createElement("video", "bpp-recording-video", "recording-video");
-      video.controls = false;
+      video.controls = true;
       video.preload = "metadata";
       video.playsInline = true;
       video.setAttribute("aria-label", translate(copy, "recordingTitle"));
       video.src = model.videoUrl;
-      frame.prepend(video);
-    } else {
-      const empty = createElement("div", "bpp-video-empty", "video-empty-state");
-      empty.append(createTextElement("strong", "bpp-empty-title", translate(copy, "noRecording")));
-      empty.append(createTextElement("p", "bpp-empty-copy", translate(copy, "noRecordingHint")));
-      frame.prepend(empty);
-    }
-    monitor.append(frame);
+      frame.append(video);
+      section.append(frame);
 
-    const transport = createElement("div", "bpp-transport", "recording-transport");
-    function transportButton(labelKey, glyph, testId) {
-      const button = createTextElement("button", "bpp-transport-button", glyph, testId);
-      button.type = "button";
-      button.setAttribute("aria-label", translate(copy, labelKey));
-      button.title = translate(copy, labelKey);
-      return button;
-    }
-    const previous = transportButton("previousEvent", "|◀", "transport-previous-event");
-    const play = transportButton("playRecording", "▶", "transport-play-pause");
-    const next = transportButton("nextEvent", "▶|", "transport-next-event");
-    const timecode = createTextElement(
-      "output",
-      "bpp-timecode",
-      formatTimecode(0),
-      "transport-timecode"
-    );
-    timecode.title = formatTimecode(0) + " / " + formatTimecode(model.durationMs);
-    const follow = transportButton("stopFollowingPlayhead", "◎", "transport-follow-playhead");
-    follow.classList.add("is-active");
-    follow.setAttribute("aria-pressed", "true");
-    const fullscreen = transportButton(
-      "fullscreenRecording",
-      "⛶",
-      "transport-fullscreen"
-    );
-    play.disabled = !video;
-    fullscreen.disabled = !video;
-    transport.append(previous, play, next, timecode, follow, fullscreen);
-    monitor.append(transport);
-
-    const inspectorHost = createElement(
-      "div",
-      "bpp-workbench-inspector-host",
-      "workbench-inspector-host"
-    );
-    section.append(monitor, inspectorHost);
-
-    const mediaStatus = createTextElement(
-      "p",
-      "bpp-media-status bpp-visually-hidden",
-      stateLabel,
-      "video-load-state"
-    );
-    mediaStatus.setAttribute("aria-live", "polite");
-    section.append(mediaStatus);
-
-    for (const issue of model.sync.issues) {
-      renderNotice(section, translate(copy, issue), "is-warning", "video-issue-" + issue);
-    }
-
-    let timelineController = null;
-    const media = {
-      video,
-      frame,
-      inspectorHost,
-      bindTimeline(controller) {
-        timelineController = controller;
-      },
-      updateTime(combatMs, preview) {
-        const current = (preview ? "~" : "") + formatTimecode(combatMs);
-        setText(timecode, current);
-        timecode.title = current + " / " + formatTimecode(model.durationMs);
-        timecode.classList.toggle("is-preview", Boolean(preview));
-      },
-      updatePlaying(playing) {
-        setText(play, playing ? "❚❚" : "▶");
-        play.setAttribute(
-          "aria-label",
-          translate(copy, playing ? "pauseRecording" : "playRecording")
-        );
-        play.title = translate(copy, playing ? "pauseRecording" : "playRecording");
-      },
-      updateFollow(following) {
-        follow.classList.toggle("is-active", following);
-        follow.setAttribute("aria-pressed", following ? "true" : "false");
-        follow.setAttribute(
-          "aria-label",
-          translate(copy, following ? "stopFollowingPlayhead" : "followPlayhead")
-        );
-        follow.title = translate(copy, following ? "stopFollowingPlayhead" : "followPlayhead");
-      },
-    };
-
-    previous.addEventListener("click", function () {
-      if (timelineController) timelineController.navigate(-1);
-    });
-    next.addEventListener("click", function () {
-      if (timelineController) timelineController.navigate(1);
-    });
-    play.addEventListener("click", function () {
-      if (timelineController) timelineController.togglePlayback();
-    });
-    follow.addEventListener("click", function () {
-      if (timelineController) timelineController.toggleFollow();
-    });
-    fullscreen.addEventListener("click", function () {
-      if (!video) return;
-      video.controls = true;
-      if (frame.requestFullscreen) {
-        const request = frame.requestFullscreen();
-        if (request && typeof request.catch === "function") {
-          request.catch(function () { video.controls = false; });
-        }
-      } else if (video.webkitEnterFullscreen) {
-        video.webkitEnterFullscreen();
+      const toggle = createTextElement("button", "bpp-secondary-button bpp-video-toggle", "", "recording-video-toggle");
+      toggle.type = "button";
+      toggle.setAttribute("aria-controls", frame.id);
+      const shortViewport = window.matchMedia && window.matchMedia("(max-height: 900px)").matches;
+      let expanded = !shortViewport;
+      function applyExpandedState() {
+        frame.hidden = !expanded;
+        section.classList.toggle("is-video-collapsed", !expanded);
+        toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+        setText(toggle, translate(copy, expanded ? "collapseRecording" : "expandRecording"));
       }
-    });
-    document.addEventListener("fullscreenchange", function () {
-      if (video && document.fullscreenElement !== frame) video.controls = false;
-    });
+      toggle.addEventListener("click", function () {
+        expanded = !expanded;
+        if (!expanded && video && !video.paused) video.pause();
+        applyExpandedState();
+        window.requestAnimationFrame(function () {
+          if (expanded) section.scrollIntoView({ block: "start", behavior: "auto" });
+          window.dispatchEvent(new Event("resize"));
+        });
+      });
+      heading.append(toggle);
+      applyExpandedState();
 
-    if (video) {
+      const mediaStatus = createTextElement("p", "bpp-media-status", stateLabel, "video-load-state");
+      mediaStatus.setAttribute("aria-live", "polite");
       video.addEventListener("loadedmetadata", function () {
-        setText(
-          mediaStatus,
-          translate(copy, "recordingReady") + " · " + formatDuration(video.duration * 1000)
-        );
+        setText(mediaStatus, translate(copy, "recordingReady") + " · " + formatDuration(video.duration * 1000));
       });
       video.addEventListener("error", function () {
         mediaStatus.classList.add("is-error");
         setText(mediaStatus, translate(copy, "recordingLoadError"));
       });
-      video.addEventListener("play", function () { media.updatePlaying(true); });
-      video.addEventListener("pause", function () { media.updatePlaying(false); });
-      video.addEventListener("ended", function () { media.updatePlaying(false); });
-      video.addEventListener("click", function () {
-        if (timelineController) timelineController.togglePlayback();
-      });
+      section.append(mediaStatus);
+    } else {
+      const empty = createElement("div", "bpp-empty-state bpp-video-empty", "video-empty-state");
+      empty.append(createTextElement("strong", "bpp-empty-title", translate(copy, "noRecording")));
+      empty.append(createTextElement("p", "bpp-empty-copy", translate(copy, "noRecordingHint")));
+      section.append(empty);
+    }
+
+    for (const issue of model.sync.issues) {
+      renderNotice(section, translate(copy, issue), "is-warning", "video-issue-" + issue);
     }
 
     root.append(section);
-    return media;
+    return video;
   }
 
   function safeEntityAsset(entity) {
@@ -1760,40 +1576,7 @@
     context.restore();
   }
 
-  function drawPlayhead(context, combatMs, durationMs, width, height, preview) {
-    if (!Number.isFinite(combatMs)) return;
-    const x = timelineXAtCombatMs(combatMs, durationMs, width);
-    context.save();
-    context.strokeStyle = preview ? "rgba(90, 201, 214, 0.82)" : "#edc461";
-    context.fillStyle = preview ? "rgba(90, 201, 214, 0.92)" : "#edc461";
-    context.lineWidth = preview ? 1.5 : 2;
-    if (preview) context.setLineDash([4, 4]);
-    context.beginPath();
-    context.moveTo(x + 0.5, 0);
-    context.lineTo(x + 0.5, height);
-    context.stroke();
-    context.setLineDash([]);
-    context.beginPath();
-    context.moveTo(x - 5, 0);
-    context.lineTo(x + 5, 0);
-    context.lineTo(x, 7);
-    context.closePath();
-    context.fill();
-    context.restore();
-  }
-
-  function drawTimeline(
-    canvas,
-    model,
-    entities,
-    clusters,
-    statusRanges,
-    selectedCluster,
-    laneHeight,
-    playheadMs,
-    previewMs,
-    requestDraw
-  ) {
+  function drawTimeline(canvas, model, entities, clusters, statusRanges, selectedCluster, laneHeight, requestDraw) {
     const context = canvas.getContext("2d");
     if (!context) {
       return;
@@ -1845,11 +1628,6 @@
 
     for (const cluster of clusters) {
       drawMarker(context, cluster, cluster === selectedCluster, requestDraw);
-    }
-
-    drawPlayhead(context, playheadMs, model.durationMs, width, height, false);
-    if (Number.isFinite(previewMs) && Math.abs(previewMs - playheadMs) > 1) {
-      drawPlayhead(context, previewMs, model.durationMs, width, height, true);
     }
   }
 
@@ -1919,42 +1697,6 @@
       }
     }
     return anchors[anchors.length - 1].mediaPtsMs;
-  }
-
-  function mapMediaToCombat(mediaMs, anchors) {
-    if (anchors.length < 2) {
-      return null;
-    }
-    if (mediaMs <= anchors[0].mediaPtsMs) {
-      return anchors[0].combatMs;
-    }
-    for (let index = 1; index < anchors.length; index += 1) {
-      const right = anchors[index];
-      const left = anchors[index - 1];
-      if (mediaMs <= right.mediaPtsMs) {
-        const mediaSpan = right.mediaPtsMs - left.mediaPtsMs;
-        if (mediaSpan <= 0) {
-          return right.combatMs;
-        }
-        const progress = (mediaMs - left.mediaPtsMs) / mediaSpan;
-        return left.combatMs + progress * (right.combatMs - left.combatMs);
-      }
-    }
-    return anchors[anchors.length - 1].combatMs;
-  }
-
-  function timelineXAtCombatMs(combatMs, durationMs, width) {
-    return 14
-      + Math.max(0, Math.min(1, combatMs / Math.max(1, durationMs)))
-        * Math.max(1, width - 28);
-  }
-
-  function combatMsAtPointer(canvas, clientX, durationMs) {
-    const bounds = canvas.getBoundingClientRect();
-    if (bounds.width <= 0) return 0;
-    const canvasX = (clientX - bounds.left) * (canvas.width / bounds.width);
-    const ratio = Math.max(0, Math.min(1, (canvasX - 14) / Math.max(1, canvas.width - 28)));
-    return ratio * Math.max(0, durationMs);
   }
 
   function entityName(entityMap, id, copy) {
@@ -2061,76 +1803,54 @@
     }
   }
 
-  function renderInspector(parent, model, copy, timelineEvents, onClear) {
+  function renderInspector(section, model, copy, video, timelineEvents) {
     const inspector = createElement("aside", "bpp-frame-inspector", "frame-inspector");
+    inspector.hidden = true;
     const header = createElement("div", "bpp-inspector-header");
     const titleGroup = createElement("div");
-    const title = createTextElement(
-      "h3",
-      "bpp-inspector-title",
-      translate(copy, "inspectorEmptyTitle"),
-      "frame-inspector-title"
-    );
+    const title = createTextElement("h3", "bpp-inspector-title", translate(copy, "frameEvents"), "frame-inspector-title");
     const summary = createTextElement("p", "bpp-inspector-summary", "", "frame-inspector-summary");
     const total = createTextElement("span", "bpp-count-pill bpp-frame-event-total", "", "frame-event-total");
     titleGroup.append(title, summary, total);
-    const close = createTextElement("button", "bpp-icon-button", "×", "frame-inspector-close");
+    const close = createTextElement("button", "bpp-icon-button", translate(copy, "close"), "frame-inspector-close");
     close.type = "button";
-    close.setAttribute("aria-label", translate(copy, "close"));
-    close.title = translate(copy, "close");
+    close.addEventListener("click", function () {
+      inspector.hidden = true;
+    });
     header.append(titleGroup, close);
     inspector.append(header);
     const content = createElement("div", "bpp-inspector-content");
     inspector.append(content);
-    parent.append(inspector);
+    section.append(inspector);
 
     const entityMap = new Map(model.entities.map((entity) => [entity.id, entity]));
-    function clear() {
-      inspector.classList.add("is-empty");
-      setText(title, translate(copy, "inspectorEmptyTitle"));
-      setText(summary, translate(copy, "inspectorEmptyCopy"));
-      total.hidden = true;
-      close.hidden = true;
-      content.replaceChildren();
-    }
-    function show(cluster) {
+    return function show(cluster, seekVideo) {
       if (!cluster) {
         return;
       }
       const first = cluster.events[0];
       const frameEvents = eventsAtFrame(timelineEvents, first.frame);
-      inspector.classList.remove("is-empty");
-      setText(title, translate(copy, "frameEvents"));
       setText(
         summary,
         formatDuration(first.combatMs) + " · " + translate(copy, "frame") + " " + first.frame
       );
       setText(total, frameEvents.length + " " + translate(copy, "event"));
       total.setAttribute("data-frame", String(first.frame));
-      total.hidden = false;
-      close.hidden = false;
       renderInspectorEvents(content, frameEvents, entityMap, copy, INSPECTOR_PAGE_SIZE);
-    }
-    function showTime(combatMs) {
-      inspector.classList.add("is-empty");
-      setText(title, translate(copy, "inspectorEmptyTitle"));
-      setText(summary, formatDuration(combatMs) + " · " + translate(copy, "inspectorEmptyCopy"));
-      total.hidden = true;
-      close.hidden = false;
-      content.replaceChildren();
-    }
-    close.addEventListener("click", function () {
-      clear();
-      if (onClear) onClear();
-    });
-    clear();
-    return { show, showTime, clear };
+      inspector.hidden = false;
+
+      if (seekVideo && video && model.sync.status === "ReadyExact") {
+        const mediaMs = mapCombatToMedia(first.combatMs, model.sync.anchors);
+        if (Number.isFinite(mediaMs)) {
+          video.currentTime = Math.max(0, mediaMs / 1000);
+        }
+      }
+    };
   }
 
-  function renderTimeline(root, model, copy, media) {
+  function renderTimeline(root, model, copy, video) {
     const section = createElement("section", "bpp-section bpp-timeline-section", "timeline-section");
     section.id = "timeline";
-    const video = media.video;
     const entityById = new Map(model.entities.map((entity) => [entity.id, entity]));
     const timelineEvents = model.events.filter((event) => isVisibleTimelineEvent(event, entityById));
     const heading = createElement("div", "bpp-section-heading");
@@ -2158,17 +1878,16 @@
     heading.append(timelineMeta);
     section.append(heading);
     root.append(section);
-    const metrics = renderMetricsChart(section, model, copy);
+    const resizeMetrics = renderMetricsChart(section, model, copy);
 
     const hasStatusRanges = model.events.some((event) =>
       event.kind.toLowerCase() === "card-attribute" && STATUS_ACTIONS.has(event.action)
     );
     if (timelineEvents.length === 0 && !hasStatusRanges) {
-      renderInspector(media.inspectorHost, model, copy, model.events, null);
       const empty = createElement("div", "bpp-empty-state", "timeline-empty-state");
       empty.append(createTextElement("strong", "bpp-empty-title", translate(copy, "emptyTimeline")));
       section.append(empty);
-      return metrics.resize;
+      return resizeMetrics;
     }
 
     const knownEntityIds = new Set(model.entities.map((entity) => entity.id));
@@ -2191,12 +1910,6 @@
     let pinnedCluster = null;
     let keyboardIndex = -1;
     let redrawRequested = false;
-    let playheadMs = 0;
-    let previewMs = NaN;
-    let committedMs = 0;
-    let followingPlayhead = true;
-    let draggingPlayhead = false;
-    let dragPointerId = null;
 
     const toolbar = createElement("div", "bpp-timeline-toolbar", "timeline-zoom-toolbar");
     const zoomGroups = {};
@@ -2233,192 +1946,52 @@
     scroll.append(grid);
     section.append(scroll);
 
-    let inspector = null;
-    let pendingMediaSeek = null;
-    let seekAnimationFrame = 0;
-    let playbackAnimationFrame = 0;
-    let playbackFrameIntervals = [];
-    let playbackFramesOver25 = 0;
-    let lastPlaybackFrameTimestamp = 0;
-    let programmaticScroll = false;
-
-    function setFollowingPlayhead(value) {
-      followingPlayhead = Boolean(value);
-      media.updateFollow(followingPlayhead);
-    }
-
-    function scheduleMediaSeek(combatMs, precise) {
-      if (!video || !video.paused || model.sync.status !== "ReadyExact") return;
-      const mediaMs = mapCombatToMedia(combatMs, model.sync.anchors);
-      if (!Number.isFinite(mediaMs)) return;
-      pendingMediaSeek = {
-        mediaSeconds: Math.max(0, mediaMs / 1000),
-        precise: Boolean(precise),
-      };
-      media.frame.setAttribute("data-seek-pending", "1");
-      media.frame.setAttribute("data-seek-target", pendingMediaSeek.mediaSeconds.toFixed(6));
-      if (seekAnimationFrame || video.seeking) return;
-      seekAnimationFrame = window.requestAnimationFrame(flushMediaSeek);
-    }
-
-    function flushMediaSeek() {
-      seekAnimationFrame = 0;
-      if (!pendingMediaSeek || !video || !video.paused || video.seeking) return;
-      const pending = pendingMediaSeek;
-      pendingMediaSeek = null;
-      media.frame.setAttribute("data-seek-pending", "0");
-      if (Math.abs(video.currentTime - pending.mediaSeconds) < 0.001) return;
-      try {
-        if (!pending.precise && typeof video.fastSeek === "function") {
-          video.fastSeek(pending.mediaSeconds);
-        } else {
-          video.currentTime = pending.mediaSeconds;
-        }
-        const commitCount = Number(media.frame.getAttribute("data-seek-commit-count")) || 0;
-        media.frame.setAttribute("data-seek-commit-count", String(commitCount + 1));
-      } catch (_error) {
-        // Metadata may not be available yet. The next pointer update will retry.
+    const showInspector = renderInspector(section, model, copy, video, model.events);
+    let hoverSeekFrame = -1;
+    let pendingHoverSeek = null;
+    let hoverSeekAnimationFrame = 0;
+    function scheduleHoverSeek(cluster) {
+      if (!cluster || !video || !video.paused || model.sync.status !== "ReadyExact") {
+        return;
       }
-    }
-
-    function keepPlayheadVisible() {
-      if (!followingPlayhead || canvas.width <= 0) return;
-      const playheadX = canvas.offsetLeft
-        + timelineXAtCombatMs(playheadMs, model.durationMs, canvas.width);
-      const obscuredLeft = scroll.scrollLeft + labels.offsetWidth + 28;
-      const visibleRight = scroll.scrollLeft + scroll.clientWidth - 36;
-      if (playheadX >= obscuredLeft && playheadX <= visibleRight) return;
-      programmaticScroll = true;
-      scroll.scrollLeft = Math.max(
-        0,
-        playheadX - labels.offsetWidth - scroll.clientWidth * 0.36
-      );
-      window.requestAnimationFrame(function () { programmaticScroll = false; });
-    }
-
-    function updatePlayheadFromVideo() {
-      if (!video || model.sync.status !== "ReadyExact") return;
-      const combatMs = mapMediaToCombat(video.currentTime * 1000, model.sync.anchors);
-      if (!Number.isFinite(combatMs)) return;
-      playheadMs = Math.max(0, Math.min(model.durationMs, combatMs));
-      committedMs = playheadMs;
-      previewMs = NaN;
-      media.updateTime(playheadMs, false);
-      keepPlayheadVisible();
-      requestDraw();
-    }
-
-    function resetPlaybackFrameTelemetry() {
-      playbackFrameIntervals = [];
-      playbackFramesOver25 = 0;
-      lastPlaybackFrameTimestamp = 0;
-      media.frame.setAttribute("data-playback-frame-count", "0");
-      media.frame.setAttribute("data-playback-frame-p95-ms", "0");
-      media.frame.setAttribute("data-playback-frame-max-ms", "0");
-      media.frame.setAttribute("data-playback-frame-over-25", "0");
-    }
-
-    function recordPlaybackFrame(timestamp) {
-      if (!Number.isFinite(timestamp)) return;
-      if (lastPlaybackFrameTimestamp > 0) {
-        const interval = timestamp - lastPlaybackFrameTimestamp;
-        if (interval > 0 && interval < 250) {
-          playbackFrameIntervals.push(interval);
-          if (interval > 25) playbackFramesOver25 += 1;
-          if (playbackFrameIntervals.length > 1200) {
-            const removed = playbackFrameIntervals.shift();
-            if (removed > 25) playbackFramesOver25 -= 1;
-          }
-          media.frame.setAttribute(
-            "data-playback-frame-count",
-            String(playbackFrameIntervals.length)
-          );
-          if (
-            playbackFrameIntervals.length !== 1
-            && playbackFrameIntervals.length % 15 !== 0
-          ) {
-            lastPlaybackFrameTimestamp = timestamp;
-            return;
-          }
-          const sorted = playbackFrameIntervals
-            .slice()
-            .sort((left, right) => left - right);
-          const percentileIndex = Math.min(
-            sorted.length - 1,
-            Math.floor(sorted.length * 0.95)
-          );
-          media.frame.setAttribute(
-            "data-playback-frame-p95-ms",
-            sorted[percentileIndex].toFixed(2)
-          );
-          media.frame.setAttribute(
-            "data-playback-frame-max-ms",
-            sorted[sorted.length - 1].toFixed(2)
-          );
-          media.frame.setAttribute(
-            "data-playback-frame-over-25",
-            String(playbackFramesOver25)
-          );
-        }
+      const first = cluster.events[0];
+      if (!first || first.frame === hoverSeekFrame) {
+        return;
       }
-      lastPlaybackFrameTimestamp = timestamp;
-    }
-
-    function schedulePlaybackFrame() {
-      if (!video || video.paused || video.ended || playbackAnimationFrame) return;
-      playbackAnimationFrame = window.requestAnimationFrame(function (timestamp) {
-        playbackAnimationFrame = 0;
-        recordPlaybackFrame(timestamp);
-        updatePlayheadFromVideo();
-        schedulePlaybackFrame();
+      pendingHoverSeek = { frame: first.frame, combatMs: first.combatMs };
+      if (hoverSeekAnimationFrame) {
+        return;
+      }
+      hoverSeekAnimationFrame = window.requestAnimationFrame(function () {
+        hoverSeekAnimationFrame = 0;
+        const pending = pendingHoverSeek;
+        pendingHoverSeek = null;
+        if (!pending || !video.paused || model.sync.status !== "ReadyExact") {
+          return;
+        }
+        const mediaMs = mapCombatToMedia(pending.combatMs, model.sync.anchors);
+        if (!Number.isFinite(mediaMs)) {
+          return;
+        }
+        const mediaSeconds = Math.max(0, mediaMs / 1000);
+        if (Math.abs(video.currentTime - mediaSeconds) < 0.001) {
+          hoverSeekFrame = pending.frame;
+          return;
+        }
+        try {
+          video.currentTime = mediaSeconds;
+          hoverSeekFrame = pending.frame;
+        } catch (_error) {
+          // Metadata may not be available yet. A later hover will retry after the video is ready.
+        }
       });
     }
-
-    function cancelPlaybackFrame() {
-      if (playbackAnimationFrame) window.cancelAnimationFrame(playbackAnimationFrame);
-      playbackAnimationFrame = 0;
-    }
-
-    function commitTime(combatMs, cluster) {
-      committedMs = Math.max(0, Math.min(model.durationMs, combatMs));
-      playheadMs = committedMs;
-      previewMs = NaN;
-      if (video && !video.paused) video.pause();
-      scheduleMediaSeek(committedMs, true);
-      media.updateTime(committedMs, false);
-      pinnedCluster = cluster || null;
-      selectedCluster = pinnedCluster;
-      keyboardIndex = selectedCluster ? clusters.indexOf(selectedCluster) : -1;
-      if (cluster) inspector.show(cluster);
-      else inspector.showTime(committedMs);
-      requestDraw();
-    }
-
-    function clearPinnedSelection() {
-      pinnedCluster = null;
-      selectedCluster = null;
-      keyboardIndex = -1;
-      requestDraw();
-    }
-
-    inspector = renderInspector(
-      media.inspectorHost,
-      model,
-      copy,
-      model.events,
-      clearPinnedSelection
-    );
-
     const requestDraw = function () {
       if (redrawRequested) return;
       redrawRequested = true;
       window.requestAnimationFrame(function () {
         redrawRequested = false;
         applyRelatedLaneHighlights(labels, selectedCluster, entities);
-        metrics.updatePlayhead(
-          Number.isFinite(previewMs) ? previewMs : playheadMs,
-          Number.isFinite(previewMs)
-        );
         drawTimeline(
           canvas,
           model,
@@ -2427,8 +2000,6 @@
           statusRanges,
           selectedCluster,
           laneHeight,
-          playheadMs,
-          previewMs,
           requestDraw
         );
       });
@@ -2517,194 +2088,53 @@
       rebuildTimeline(true);
     });
 
-    const navigationEvents = [];
-    const navigationFrames = new Set();
-    for (const event of timelineEvents) {
-      if (navigationFrames.has(event.frame)) continue;
-      navigationFrames.add(event.frame);
-      navigationEvents.push(event);
-    }
-    navigationEvents.sort((left, right) => left.combatMs - right.combatMs || left.frame - right.frame);
-
-    function clusterForEvent(event) {
-      return clusters.find((cluster) => cluster.events.some((candidate) => candidate.id === event.id)) || null;
-    }
-
-    function navigate(delta) {
-      if (navigationEvents.length === 0) return;
-      let target = null;
-      if (delta > 0) {
-        target = navigationEvents.find((event) => event.combatMs > committedMs + 0.5)
-          || navigationEvents[navigationEvents.length - 1];
-      } else {
-        for (let index = navigationEvents.length - 1; index >= 0; index -= 1) {
-          if (navigationEvents[index].combatMs < committedMs - 0.5) {
-            target = navigationEvents[index];
-            break;
-          }
-        }
-        target = target || navigationEvents[0];
-      }
-      const cluster = clusterForEvent(target);
-      commitTime(target.combatMs, cluster);
-      keepPlayheadVisible();
-    }
-
-    function togglePlayback() {
-      if (!video) return;
-      if (!video.paused) {
-        video.pause();
-        committedMs = playheadMs;
-        return;
-      }
-      previewMs = NaN;
-      pendingMediaSeek = null;
-      if (seekAnimationFrame) {
-        window.cancelAnimationFrame(seekAnimationFrame);
-        seekAnimationFrame = 0;
-      }
-      if (model.sync.status === "ReadyExact") {
-        const mediaMs = mapCombatToMedia(committedMs, model.sync.anchors);
-        if (Number.isFinite(mediaMs)) {
-          try { video.currentTime = Math.max(0, mediaMs / 1000); } catch (_error) { }
-        }
-      }
-      const playRequest = video.play();
-      if (playRequest && typeof playRequest.catch === "function") {
-        playRequest.catch(function () { media.updatePlaying(false); });
-      }
-    }
-
-    function toggleFollow() {
-      setFollowingPlayhead(!followingPlayhead);
-      if (followingPlayhead) keepPlayheadVisible();
-    }
-
-    function previewAtPointer(event) {
-      const hovered = nearestCluster(
-        canvas,
-        event.clientX,
-        event.clientY,
-        hitIndex,
-        statusRanges
-      );
-      selectedCluster = hovered || pinnedCluster;
-      const pointerTime = hovered && hovered.events[0]
-        ? hovered.events[0].combatMs
-        : combatMsAtPointer(canvas, event.clientX, model.durationMs);
-      previewMs = pointerTime;
-      media.updateTime(previewMs, true);
-      scheduleMediaSeek(previewMs, false);
-      requestDraw();
-      return { hovered, pointerTime };
-    }
-
-    canvas.addEventListener("pointerdown", function (event) {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      draggingPlayhead = true;
-      dragPointerId = event.pointerId;
-      canvas.setPointerCapture(event.pointerId);
-      if (video && !video.paused) video.pause();
-      previewAtPointer(event);
-    });
     canvas.addEventListener("pointermove", function (event) {
-      if (video && !video.paused && !draggingPlayhead) {
-        const hovered = nearestCluster(
-          canvas,
-          event.clientX,
-          event.clientY,
-          hitIndex,
-          statusRanges
-        );
-        selectedCluster = hovered || pinnedCluster;
+      const hovered = nearestCluster(canvas, event.clientX, event.clientY, hitIndex, statusRanges);
+      const active = hovered || pinnedCluster;
+      if (active !== selectedCluster) {
+        selectedCluster = active;
         requestDraw();
-        return;
       }
-      previewAtPointer(event);
-    });
-    canvas.addEventListener("pointerup", function (event) {
-      if (!draggingPlayhead || event.pointerId !== dragPointerId) return;
-      const result = previewAtPointer(event);
-      draggingPlayhead = false;
-      dragPointerId = null;
-      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-      commitTime(result.pointerTime, result.hovered);
-    });
-    canvas.addEventListener("pointercancel", function (event) {
-      if (event.pointerId !== dragPointerId) return;
-      draggingPlayhead = false;
-      dragPointerId = null;
-      previewMs = NaN;
-      selectedCluster = pinnedCluster;
-      media.updateTime(playheadMs, false);
-      requestDraw();
+      scheduleHoverSeek(hovered);
     });
     canvas.addEventListener("pointerleave", function () {
-      if (draggingPlayhead) return;
-      previewMs = NaN;
       selectedCluster = pinnedCluster;
-      media.updateTime(playheadMs, false);
       requestDraw();
     });
-
-    function handleTimelineShortcut(event) {
-      const target = event.target;
-      if (
-        target instanceof Element
-        && target.closest("button, a, input, select, textarea, video")
-      ) {
-        return;
-      }
-      if (event.key === " ") {
-        event.preventDefault();
-        togglePlayback();
-        return;
-      }
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-      event.preventDefault();
-      const delta = event.key === "ArrowLeft" ? -1 : 1;
-      if (event.shiftKey) {
-        commitTime(committedMs + delta * 100, null);
-      } else {
-        navigate(delta);
-      }
-    }
-    document.addEventListener("keydown", handleTimelineShortcut);
-
-    scroll.addEventListener("wheel", function () {
-      if (!programmaticScroll) setFollowingPlayhead(false);
-    }, { passive: true });
-    scroll.addEventListener("touchstart", function () {
-      if (!programmaticScroll) setFollowingPlayhead(false);
-    }, { passive: true });
-
-    if (video) {
-      video.addEventListener("seeked", function () {
-        if (pendingMediaSeek && !seekAnimationFrame) {
-          seekAnimationFrame = window.requestAnimationFrame(flushMediaSeek);
+    canvas.addEventListener("click", function (event) {
+      const selected = nearestCluster(canvas, event.clientX, event.clientY, hitIndex, statusRanges);
+      if (selected) {
+        if (hoverSeekAnimationFrame) {
+          window.cancelAnimationFrame(hoverSeekAnimationFrame);
+          hoverSeekAnimationFrame = 0;
+          pendingHoverSeek = null;
         }
-      });
-      video.addEventListener("play", function () {
-        resetPlaybackFrameTelemetry();
-        media.updatePlaying(true);
-        schedulePlaybackFrame();
-      });
-      video.addEventListener("pause", function () {
-        cancelPlaybackFrame();
-        if (!Number.isFinite(previewMs)) updatePlayheadFromVideo();
-      });
-      video.addEventListener("ended", function () {
-        cancelPlaybackFrame();
-        updatePlayheadFromVideo();
-      });
-    }
+        selectedCluster = selected;
+        pinnedCluster = selected;
+        keyboardIndex = clusters.indexOf(selected);
+        showInspector(selected, true);
+        requestDraw();
+      }
+    });
+    canvas.addEventListener("keydown", function (event) {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+      event.preventDefault();
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        const delta = event.key === "ArrowLeft" ? -1 : 1;
+        keyboardIndex = Math.max(0, Math.min(clusters.length - 1, keyboardIndex < 0 ? 0 : keyboardIndex + delta));
+        selectedCluster = clusters[keyboardIndex];
+        pinnedCluster = selectedCluster;
+        showInspector(selectedCluster, false);
+        requestDraw();
+      } else if (selectedCluster) {
+        showInspector(selectedCluster, true);
+      }
+    });
 
-    media.bindTimeline({ navigate, togglePlayback, toggleFollow });
-    media.updateFollow(followingPlayhead);
-    media.updateTime(playheadMs, false);
     rebuildTimeline(false);
-    return metrics.resize;
+    return resizeMetrics;
   }
 
   function buildStatistics(model) {
@@ -3051,7 +2481,7 @@
     };
   }
 
-  function renderReportTabs(root, model, copy, media) {
+  function renderReportTabs(root, model, copy, video) {
     const tabs = createElement("nav", "bpp-report-tabs", "report-tabs");
     tabs.setAttribute("role", "tablist");
     const timelineButton = createTextElement("button", "bpp-report-tab is-active", translate(copy, "timelineTab"), "report-tab-timeline");
@@ -3069,7 +2499,7 @@
     timelinePanel.setAttribute("role", "tabpanel");
     statisticsPanel.setAttribute("role", "tabpanel");
     root.append(tabs, timelinePanel, statisticsPanel);
-    const resizeTimeline = renderTimeline(timelinePanel, model, copy, media) || function () {};
+    const resizeTimeline = renderTimeline(timelinePanel, model, copy, video) || function () {};
     const resizeStatistics = renderStatistics(statisticsPanel, model, copy) || function () {};
     statisticsPanel.hidden = true;
 
@@ -3120,8 +2550,8 @@
       const root = getRoot();
       const model = buildViewModel(envelope, copy);
       renderHeader(root, model, copy);
-      const media = renderMediaWorkbench(root, model, copy);
-      renderReportTabs(root, model, copy, media);
+      const video = renderVideo(root, model, copy);
+      renderReportTabs(root, model, copy, video);
       document.documentElement.classList.add("bpp-report-ready");
     } catch (error) {
       renderFatal(error);

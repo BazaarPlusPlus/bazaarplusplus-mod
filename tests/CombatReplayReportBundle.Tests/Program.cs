@@ -66,7 +66,11 @@ void VerifyStaticPaths()
             && StaticReportPaths.BuildViewerScriptRelativeUrl("5")
                 == "../report-viewer/v5/viewer.js"
             && StaticReportPaths.BuildViewerStylesheetRelativeUrl("5")
-                == "../report-viewer/v5/viewer.css",
+                == "../report-viewer/v5/viewer.css"
+            && StaticReportPaths.BuildViewerScriptRelativeUrl("6")
+                == "../report-viewer/v6/viewer.js"
+            && StaticReportPaths.BuildViewerStylesheetRelativeUrl("6")
+                == "../report-viewer/v6/viewer.css",
         "Every shared Viewer release must use its stable versioned sibling URLs."
     );
 
@@ -175,11 +179,11 @@ void VerifyHtmlEmitter()
     );
     Check(
         html.Contains(
-            "<link rel=\"stylesheet\" href=\"../report-viewer/v5/viewer.css\">",
+            "<link rel=\"stylesheet\" href=\"../report-viewer/v6/viewer.css\">",
             StringComparison.Ordinal
         )
             && html.Contains(
-                "<script defer src=\"../report-viewer/v5/viewer.js\"></script>",
+                "<script defer src=\"../report-viewer/v6/viewer.js\"></script>",
                 StringComparison.Ordinal
             ),
         "HTML must reference exactly one immutable shared Viewer version."
@@ -212,6 +216,7 @@ void VerifyViewerReleasePinAndInstall()
     var previous = registry.GetRequired("2");
     var frozenV3 = registry.GetRequired("3");
     var frozenV4 = registry.GetRequired("4");
+    var frozenV5 = registry.GetRequired("5");
     var release = registry.GetRequired(ViewerReleaseRegistry.CurrentVersion);
     Check(
         legacy.ScriptBytes.Length > 500_000
@@ -224,12 +229,16 @@ void VerifyViewerReleasePinAndInstall()
             && frozenV3.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV3.StylesheetBytes)
             && frozenV4.ScriptSha256 == StaticReportIntegrity.Sha256(frozenV4.ScriptBytes)
             && frozenV4.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV4.StylesheetBytes)
+            && frozenV5.ScriptSha256 == StaticReportIntegrity.Sha256(frozenV5.ScriptBytes)
+            && frozenV5.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV5.StylesheetBytes)
             && release.ScriptSha256 == StaticReportIntegrity.Sha256(release.ScriptBytes)
             && release.StylesheetSha256 == StaticReportIntegrity.Sha256(release.StylesheetBytes)
             && frozenV3.ScriptSha256 == frozenV4.ScriptSha256
             && frozenV3.StylesheetSha256 != frozenV4.StylesheetSha256
-            && frozenV4.ScriptSha256 != release.ScriptSha256
-            && frozenV4.StylesheetSha256 == release.StylesheetSha256,
+            && frozenV4.ScriptSha256 != frozenV5.ScriptSha256
+            && frozenV4.StylesheetSha256 == frozenV5.StylesheetSha256
+            && frozenV5.ScriptSha256 != release.ScriptSha256
+            && frozenV5.StylesheetSha256 != release.StylesheetSha256,
         "Every immutable Viewer release must match its source-controlled length and SHA pins."
     );
 
@@ -354,15 +363,16 @@ void VerifyViewerFunctionalContract()
         "Metric/routine countdown records must stay out of lane markers, sustained statuses must remain flat interactive ranges, skill Rage triggers remain visible, and the paged inspector must expand the entire selected frame."
     );
     Check(
-        script.Contains("function scheduleHoverSeek(cluster)", StringComparison.Ordinal)
-            && script.Contains("!video.paused", StringComparison.Ordinal)
-            && script.Contains("model.sync.status !== \"ReadyExact\"", StringComparison.Ordinal)
-            && script.Contains("window.requestAnimationFrame(function ()", StringComparison.Ordinal)
+        script.Contains("function scheduleMediaSeek(combatMs, precise)", StringComparison.Ordinal)
+            && script.Contains("pendingMediaSeek = {", StringComparison.Ordinal)
+            && script.Contains("video.paused || video.seeking", StringComparison.Ordinal)
+            && script.Contains("typeof video.fastSeek === \"function\"", StringComparison.Ordinal)
+            && script.Contains("video.addEventListener(\"seeked\"", StringComparison.Ordinal)
             && script.Contains(
-                "window.cancelAnimationFrame(hoverSeekAnimationFrame)",
+                "window.requestAnimationFrame(flushMediaSeek)",
                 StringComparison.Ordinal
             ),
-        "Paused exact-sync recordings must preview hovered frames through one coalesced animation-frame seek, while click cancels pending preview work."
+        "Paused recordings must use a latest-target-only seek queue with fast approximate drag seeks and precise committed seeks."
     );
     Check(
         script.Contains("event.attributionConfidence === \"exact\"", StringComparison.Ordinal)
@@ -403,17 +413,44 @@ void VerifyViewerFunctionalContract()
         "Dense adjacent frames that quantize to the same pixel must retain separate frame cluster identities."
     );
     Check(
-        script.Contains("recording-video-toggle", StringComparison.Ordinal)
-            && script.Contains("(max-height: 900px)", StringComparison.Ordinal)
-            && script.Contains("frame.hidden = !expanded", StringComparison.Ordinal),
-        "Short viewports must default to a collapsible recording while preserving an explicit full-width expansion control."
+        script.Contains("media-workbench", StringComparison.Ordinal)
+            && script.Contains("workbench-inspector-host", StringComparison.Ordinal)
+            && script.Contains("transport-play-pause", StringComparison.Ordinal)
+            && script.Contains("transport-follow-playhead", StringComparison.Ordinal)
+            && script.Contains("transport-previous-event", StringComparison.Ordinal)
+            && script.Contains("transport-next-event", StringComparison.Ordinal)
+            && script.Contains("data-seek-pending", StringComparison.Ordinal)
+            && script.Contains("data-playback-frame-p95-ms", StringComparison.Ordinal)
+            && script.Contains("function recordPlaybackFrame(timestamp)", StringComparison.Ordinal)
+            && script.Contains(
+                "playbackAnimationFrame = window.requestAnimationFrame(function (timestamp)",
+                StringComparison.Ordinal
+            )
+            && !script.Contains("requestVideoFrameCallback", StringComparison.Ordinal)
+            && script.Contains(
+                "function mapMediaToCombat(mediaMs, anchors)",
+                StringComparison.Ordinal
+            )
+            && script.Contains(
+                "function combatMsAtPointer(canvas, clientX, durationMs)",
+                StringComparison.Ordinal
+            )
+            && script.Contains(
+                "canvas.setPointerCapture(event.pointerId)",
+                StringComparison.Ordinal
+            ),
+        "Viewer must expose one compact nonlinear workbench with a shared playhead, adjacent frame stepping, drag scrubbing, seek instrumentation, follow mode, and a persistent inspector."
     );
     Check(
         script.Contains("function translatedEntityType(copy, rawType)", StringComparison.Ordinal)
             && script.Contains("translate(copy, \"entityHero\")", StringComparison.Ordinal)
             && script.Contains("translate(copy, \"entityItem\")", StringComparison.Ordinal)
-            && script.Contains("translate(copy, \"entitySkill\")", StringComparison.Ordinal),
-        "Lane type labels are Viewer UI and must be localized instead of leaking raw English entity types."
+            && script.Contains("translate(copy, \"entitySkill\")", StringComparison.Ordinal)
+            && Count(script, "previousEvent:") == 3
+            && Count(script, "playRecording:") == 3
+            && Count(script, "followPlayhead:") == 3
+            && Count(script, "inspectorEmptyTitle:") == 3,
+        "Lane labels and nonlinear-workbench controls must cover Simplified Chinese, English, and Traditional Chinese instead of leaking raw UI copy."
     );
     Check(
         !script.Contains("fetch(", StringComparison.Ordinal)
@@ -422,9 +459,20 @@ void VerifyViewerFunctionalContract()
         "The file Viewer must remain a classic, self-contained script with no local fetch, dynamic import, or Worker dependency."
     );
     Check(
-        stylesheet.Contains(".bpp-recording-video", StringComparison.Ordinal)
-            && stylesheet.Contains("width: 100%;", StringComparison.Ordinal)
-            && stylesheet.Contains(".bpp-video-frame[hidden]", StringComparison.Ordinal)
+        stylesheet.Contains(".bpp-media-workbench", StringComparison.Ordinal)
+            && stylesheet.Contains("height: 190px", StringComparison.Ordinal)
+            && stylesheet.Contains(
+                "grid-template-columns: minmax(260px, 1fr) minmax(360px, 48%)",
+                StringComparison.Ordinal
+            )
+            && stylesheet.Contains(
+                "grid-template-columns: clamp(240px, 26vw, 300px) minmax(0, 1fr)",
+                StringComparison.Ordinal
+            )
+            && stylesheet.Contains(".bpp-workbench-inspector-host", StringComparison.Ordinal)
+            && stylesheet.Contains(".bpp-transport", StringComparison.Ordinal)
+            && stylesheet.Contains("height: 150px", StringComparison.Ordinal)
+            && stylesheet.Contains("height: 132px", StringComparison.Ordinal)
             && stylesheet.Contains(".bpp-lane-label.is-event-related", StringComparison.Ordinal)
             && stylesheet.Contains(".bpp-stats-charts", StringComparison.Ordinal)
             && stylesheet.Contains(".bpp-timeline-toolbar", StringComparison.Ordinal)
@@ -449,9 +497,9 @@ void VerifyViewerFunctionalContract()
                 StringComparison.Ordinal
             )
             && stylesheet.Contains("height: 100dvh", StringComparison.Ordinal)
-            && stylesheet.Contains("height: 120px", StringComparison.Ordinal)
+            && stylesheet.Contains("height: 80px", StringComparison.Ordinal)
             && stylesheet.Contains("height: 100%;", StringComparison.Ordinal),
-        "Viewer CSS must retain a full-width recording, a viewport-bound timeline workspace, compact low-height metrics, responsive zoom controls, and natural Small/Medium/Large item ratios."
+        "Viewer CSS must retain a compact responsive media workbench, a viewport-bound timeline workspace, compact low-height metrics, responsive zoom controls, and natural Small/Medium/Large item ratios."
     );
 }
 
