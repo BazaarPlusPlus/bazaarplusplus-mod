@@ -17,6 +17,8 @@ declare global {
   interface Window {
     __BPP_VIEWER_TEST__?: {
       commitCount: number;
+      echartsDisposeCount: number;
+      echartsInitCount: number;
       hoverDrawCount: number;
       timelineControllerCount: number;
       timelinePreprocessCount: number;
@@ -75,6 +77,8 @@ function boot(): void {
     document.documentElement.lang = initialLocale;
     window.__BPP_VIEWER_TEST__ = {
       commitCount: 0,
+      echartsDisposeCount: 0,
+      echartsInitCount: 0,
       hoverDrawCount: 0,
       timelineControllerCount: 0,
       timelinePreprocessCount: 0,

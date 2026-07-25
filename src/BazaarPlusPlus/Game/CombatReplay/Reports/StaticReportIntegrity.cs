@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using BazaarPlusPlus.Infrastructure.Files;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 
@@ -58,7 +59,10 @@ internal static class ReportPhysicalFile
         var root = TrimEndingSeparators(Path.GetFullPath(rootDirectoryPath));
         var candidate = Path.GetFullPath(filePath);
         if (!IsBelowRoot(root, candidate))
-            throw new InvalidOperationException(description + " escaped its allowed root.");
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.PathEscapesRoot,
+                description + " escaped its allowed root."
+            );
 
         RequireDirectory(root, description + " root");
         var relative = candidate
@@ -69,7 +73,10 @@ internal static class ReportPhysicalFile
             StringSplitOptions.RemoveEmptyEntries
         );
         if (segments.Length == 0)
-            throw new IOException(description + " must be a file below its allowed root.");
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.InvalidDestinationType,
+                description + " must be a file below its allowed root."
+            );
 
         var current = root;
         for (var index = 0; index < segments.Length - 1; index++)
@@ -87,10 +94,16 @@ internal static class ReportPhysicalFile
             throw new FileNotFoundException(description + " does not exist.", filePath);
 
         var attributes = File.GetAttributes(filePath);
-        if ((attributes & FileAttributes.Directory) != 0)
-            throw new IOException(description + " must be a file.");
         if ((attributes & FileAttributes.ReparsePoint) != 0)
-            throw new IOException(description + " must be a physical file, not a symbolic link.");
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.SymbolicLinkOrReparsePoint,
+                description + " must be a physical file, not a symbolic link."
+            );
+        if ((attributes & FileAttributes.Directory) != 0)
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.InvalidDestinationType,
+                description + " must be a file."
+            );
     }
 
     private static void RequireDirectory(string directoryPath, string description)
@@ -99,13 +112,18 @@ internal static class ReportPhysicalFile
             throw new DirectoryNotFoundException(description + " does not exist.");
 
         var attributes = File.GetAttributes(directoryPath);
-        if (
-            (attributes & FileAttributes.Directory) == 0
-            || (attributes & FileAttributes.ReparsePoint) != 0
-        )
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
         {
-            throw new IOException(description + " must be a physical directory.");
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.SymbolicLinkOrReparsePoint,
+                description + " must be a physical directory."
+            );
         }
+        if ((attributes & FileAttributes.Directory) == 0)
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.InvalidDestinationType,
+                description + " must be a directory."
+            );
     }
 
     private static bool IsBelowRoot(string root, string candidate)

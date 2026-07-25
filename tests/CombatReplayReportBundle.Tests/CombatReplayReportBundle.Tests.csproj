@@ -7,13 +7,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile
       Include="../../src/BazaarPlusPlus/Infrastructure/Files/ImmutableArtifactCommitter.cs"
       Link="ImmutableArtifactCommitter.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Infrastructure/Files/ReplaceableArtifactPublisher.cs"
-      Link="ReplaceableArtifactPublisher.cs"
+      Include="../../src/BazaarPlusPlus/Infrastructure/Files/ArtifactPublicationException.cs"
+      Link="ArtifactPublicationException.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/StaticReportPaths.cs"

@@ -102,15 +102,13 @@ internal sealed class CombatReplayVideoMetadataStore : SqliteStoreBase
         transaction.Commit();
     }
 
-    public IReadOnlyList<CompletedVideoReportRecoveryCandidate> ListCompletedForReportRecovery(
+    public CompletedVideoReportRecoveryPage ListCompletedForReportRecovery(
         int limit,
-        int offset = 0
+        CompletedVideoReportRecoveryCursor? cursor = null
     )
     {
         if (limit <= 0)
             throw new ArgumentOutOfRangeException(nameof(limit));
-        if (offset < 0)
-            throw new ArgumentOutOfRangeException(nameof(offset));
 
         using var connection = OpenConnection();
         using var command = CreateCommand(connection);
@@ -119,30 +117,63 @@ internal sealed class CombatReplayVideoMetadataStore : SqliteStoreBase
                 video_id,
                 battle_id,
                 source,
-                video_relative_path
+                video_relative_path,
+                COALESCE(ended_at_utc, started_at_utc) AS recovery_completed_at_utc,
+                started_at_utc AS recovery_started_at_utc
             FROM {RunLogSchema.CombatReplayVideosTableName}
             WHERE status = 'COMPLETED'
+                AND (
+                    $cursorCompletedAtUtc IS NULL
+                    OR COALESCE(ended_at_utc, started_at_utc) < $cursorCompletedAtUtc
+                    OR (
+                        COALESCE(ended_at_utc, started_at_utc) = $cursorCompletedAtUtc
+                        AND started_at_utc < $cursorStartedAtUtc
+                    )
+                    OR (
+                        COALESCE(ended_at_utc, started_at_utc) = $cursorCompletedAtUtc
+                        AND started_at_utc = $cursorStartedAtUtc
+                        AND video_id < $cursorRecordingId
+                    )
+                )
             ORDER BY
                 COALESCE(ended_at_utc, started_at_utc) DESC,
                 started_at_utc DESC,
                 video_id DESC
-            LIMIT $limit OFFSET $offset;
+            LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$limit", limit);
-        command.Parameters.AddWithValue("$offset", offset);
+        command.Parameters.AddWithValue(
+            "$cursorCompletedAtUtc",
+            (object?)cursor?.CompletedAtUtc ?? DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$cursorStartedAtUtc",
+            (object?)cursor?.StartedAtUtc ?? DBNull.Value
+        );
+        command.Parameters.AddWithValue(
+            "$cursorRecordingId",
+            (object?)cursor?.RecordingId ?? DBNull.Value
+        );
 
         var result = new List<CompletedVideoReportRecoveryCandidate>();
+        CompletedVideoReportRecoveryCursor? nextCursor = null;
         using (var reader = command.ExecuteReader())
         {
             while (reader.Read())
             {
+                var recordingId = reader.GetString(reader.GetOrdinal("video_id"));
                 result.Add(
                     new CompletedVideoReportRecoveryCandidate(
-                        reader.GetString(reader.GetOrdinal("video_id")),
+                        recordingId,
                         reader.GetString(reader.GetOrdinal("battle_id")),
                         reader.GetString(reader.GetOrdinal("source")),
                         reader.GetString(reader.GetOrdinal("video_relative_path"))
                     )
+                );
+                nextCursor = new CompletedVideoReportRecoveryCursor(
+                    reader.GetString(reader.GetOrdinal("recovery_completed_at_utc")),
+                    reader.GetString(reader.GetOrdinal("recovery_started_at_utc")),
+                    recordingId
                 );
             }
         }
@@ -155,7 +186,7 @@ internal sealed class CombatReplayVideoMetadataStore : SqliteStoreBase
                 SyncAnchors = ListSyncAnchors(connection, candidate.RecordingId),
             };
         }
-        return result;
+        return new CompletedVideoReportRecoveryPage(result, nextCursor);
     }
 
     private static void AppendSyncAnchors(
@@ -276,6 +307,17 @@ internal sealed record CompletedVideoReportRecoveryCandidate(
     internal IReadOnlyList<ReplayVideoSyncAnchor> SyncAnchors { get; init; } =
         Array.Empty<ReplayVideoSyncAnchor>();
 }
+
+internal sealed record CompletedVideoReportRecoveryCursor(
+    string CompletedAtUtc,
+    string StartedAtUtc,
+    string RecordingId
+);
+
+internal sealed record CompletedVideoReportRecoveryPage(
+    IReadOnlyList<CompletedVideoReportRecoveryCandidate> Candidates,
+    CompletedVideoReportRecoveryCursor? NextCursor
+);
 
 internal sealed class VideoRecordingStarted
 {

@@ -29,7 +29,10 @@ internal sealed class ImmutableArtifactCommitter
         var root = RequirePhysicalRoot(rootDirectoryPath);
         var destination = Path.GetFullPath(destinationFilePath);
         if (!IsBelowRoot(root, destination))
-            throw new InvalidOperationException("Immutable artifact destination escaped its root.");
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.PathEscapesRoot,
+                "Immutable artifact destination escaped its root."
+            );
 
         lock (CommitStripes[
             (StringComparer.Ordinal.GetHashCode(destination) & 0x7fffffff) % CommitStripes.Length
@@ -51,7 +54,7 @@ internal sealed class ImmutableArtifactCommitter
             );
 
         EnsurePhysicalDirectoryChain(root, parent);
-        if (File.Exists(destination))
+        if (File.Exists(destination) || Directory.Exists(destination))
             return VerifyExisting(destination, bytes);
 
         var tempPath = Path.Combine(
@@ -78,7 +81,7 @@ internal sealed class ImmutableArtifactCommitter
             // Recheck immediately before publishing. This prevents a pre-existing link from being
             // mistaken for a valid immutable object and makes a same-process directory swap fail.
             EnsurePhysicalDirectoryChain(root, parent);
-            if (File.Exists(destination))
+            if (File.Exists(destination) || Directory.Exists(destination))
                 return VerifyExisting(destination, bytes);
 
             try
@@ -87,7 +90,7 @@ internal sealed class ImmutableArtifactCommitter
                 tempPath = string.Empty;
                 return ImmutableArtifactCommitResult.Created;
             }
-            catch (IOException) when (File.Exists(destination))
+            catch (IOException) when (File.Exists(destination) || Directory.Exists(destination))
             {
                 return VerifyExisting(destination, bytes);
             }
@@ -113,7 +116,8 @@ internal sealed class ImmutableArtifactCommitter
         var actual = File.ReadAllBytes(filePath);
         if (!ByteArraysEqual(actual, expected))
         {
-            throw new IOException(
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.InvalidArtifactIdentity,
                 "An immutable artifact already exists at this identity with different bytes."
             );
         }
@@ -139,7 +143,10 @@ internal sealed class ImmutableArtifactCommitter
     {
         var directory = TrimEndingSeparators(Path.GetFullPath(directoryPath));
         if (!string.Equals(root, directory, PathComparison) && !IsBelowRoot(root, directory))
-            throw new InvalidOperationException("Immutable artifact directory escaped its root.");
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.PathEscapesRoot,
+                "Immutable artifact directory escaped its root."
+            );
 
         RequirePhysicalDirectory(root);
         if (string.Equals(root, directory, PathComparison))
@@ -178,13 +185,18 @@ internal sealed class ImmutableArtifactCommitter
             throw new DirectoryNotFoundException("Immutable artifact directory is unavailable.");
 
         var attributes = File.GetAttributes(path);
-        if (
-            (attributes & FileAttributes.Directory) == 0
-            || (attributes & FileAttributes.ReparsePoint) != 0
-        )
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
         {
-            throw new IOException(
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.SymbolicLinkOrReparsePoint,
                 "Immutable artifact directory cannot be a link or reparse point."
+            );
+        }
+        if ((attributes & FileAttributes.Directory) == 0)
+        {
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.InvalidDestinationType,
+                "Immutable artifact directory must be a directory."
             );
         }
     }
@@ -192,13 +204,18 @@ internal sealed class ImmutableArtifactCommitter
     private static void RequirePhysicalFile(string path)
     {
         var attributes = File.GetAttributes(path);
-        if (
-            (attributes & FileAttributes.Directory) != 0
-            || (attributes & FileAttributes.ReparsePoint) != 0
-        )
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
         {
-            throw new IOException(
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.SymbolicLinkOrReparsePoint,
                 "Immutable artifact cannot be a directory, link, or reparse point."
+            );
+        }
+        if ((attributes & FileAttributes.Directory) != 0)
+        {
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.InvalidDestinationType,
+                "Immutable artifact destination must be a file."
             );
         }
     }

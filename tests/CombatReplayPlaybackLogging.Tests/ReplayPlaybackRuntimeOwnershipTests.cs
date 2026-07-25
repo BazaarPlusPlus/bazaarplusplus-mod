@@ -209,7 +209,7 @@ public sealed class ReplayPlaybackRuntimeOwnershipTests
             "private void Update()"
         );
 
-        Assert.Contains("ListCompletedForReportRecovery(limit, offset)", recovery);
+        Assert.Contains("ListCompletedForReportRecovery(limit, cursor)", recovery);
         Assert.Contains("RecoverNextBatch(", recovery);
         Assert.Contains("yield return null;", recovery);
         Assert.Contains("StartupReportRecoveryBatchSize", source);

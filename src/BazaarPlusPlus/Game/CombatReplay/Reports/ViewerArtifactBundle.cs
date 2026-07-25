@@ -6,6 +6,7 @@ namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 
 internal sealed class ViewerArtifactBundle
 {
+    internal const int CurrentReportSchemaVersion = 1;
     private const string ResourceNamePrefix = "BazaarPlusPlus.Resources.CombatReplayReport.";
     private const string EChartsResourceName = ResourceNamePrefix + "echarts.min.js";
     private const string ViewerResourceName = ResourceNamePrefix + "viewer.js";
@@ -14,6 +15,9 @@ internal sealed class ViewerArtifactBundle
     private const string EChartsSha256 =
         "5eef51bee09fb9cc234c4179a58ae0150126f49f88c992efe2d6bca81d8dd03b";
     private static readonly byte[] ScriptSeparator = Encoding.UTF8.GetBytes("\n;\n");
+    private static readonly Lazy<ViewerArtifactBundle> DefaultBundle = new(() =>
+        CreateDefault(typeof(ViewerArtifactBundle).Assembly)
+    );
     private readonly byte[] _scriptBytes;
     private readonly byte[] _stylesheetBytes;
 
@@ -45,14 +49,26 @@ internal sealed class ViewerArtifactBundle
         );
         ScriptSha256 = expectedScriptSha256;
         StylesheetSha256 = expectedStylesheetSha256;
-        BundleId = StaticReportIntegrity.Sha256(
+        BundleId = ComputeBundleId(
+            reportSchemaVersion,
+            expectedScriptSha256,
+            expectedStylesheetSha256
+        );
+    }
+
+    internal static string ComputeBundleId(
+        int reportSchemaVersion,
+        string scriptSha256,
+        string stylesheetSha256
+    )
+    {
+        if (reportSchemaVersion <= 0)
+            throw new ArgumentOutOfRangeException(nameof(reportSchemaVersion));
+        StaticReportPaths.ParseSha256(scriptSha256, nameof(scriptSha256));
+        StaticReportPaths.ParseSha256(stylesheetSha256, nameof(stylesheetSha256));
+        return StaticReportIntegrity.Sha256(
             Encoding.ASCII.GetBytes(
-                reportSchemaVersion
-                    + "\n"
-                    + expectedScriptSha256
-                    + "\n"
-                    + expectedStylesheetSha256
-                    + "\n"
+                reportSchemaVersion + "\n" + scriptSha256 + "\n" + stylesheetSha256 + "\n"
             )
         );
     }
@@ -73,8 +89,7 @@ internal sealed class ViewerArtifactBundle
     /// </summary>
     internal string BundleId { get; }
 
-    internal static ViewerArtifactBundle CreateDefault() =>
-        CreateDefault(typeof(ViewerArtifactBundle).Assembly);
+    internal static ViewerArtifactBundle CreateDefault() => DefaultBundle.Value;
 
     internal static ViewerArtifactBundle CreateDefault(Assembly assembly)
     {
@@ -93,7 +108,7 @@ internal sealed class ViewerArtifactBundle
         var scriptSha256 = StaticReportIntegrity.Sha256(script);
         var stylesheetSha256 = StaticReportIntegrity.Sha256(stylesheet);
         return new ViewerArtifactBundle(
-            reportSchemaVersion: 1,
+            reportSchemaVersion: CurrentReportSchemaVersion,
             script,
             stylesheet,
             script.Length,

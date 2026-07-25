@@ -7,6 +7,11 @@ import {
 import { timelineXAtCombatMs } from "./geometry.ts";
 
 export const STATUS_ACTIONS = new Set(["Haste", "Slow", "Freeze"]);
+const STATUS_APPLY_ACTIONS = new Set([
+  "CardHaste",
+  "CardSlow",
+  "CardFreeze",
+]);
 
 const COMBATANT_TARGET_ACTIONS = new Set([
   "PlayerDamage",
@@ -191,6 +196,14 @@ function statusApplyAction(action: string): string {
   return "";
 }
 
+function statusApplicationKey(
+  frame: number,
+  action: string,
+  targetId: string,
+): string {
+  return `${frame}\u001f${action}\u001f${targetId}`;
+}
+
 export function buildStatusRanges(
   model: TimelineModel,
   entities: readonly TimelineEntity[],
@@ -202,6 +215,31 @@ export function buildStatusRanges(
   );
   const active = new Map<string, StatusRange>();
   const ranges: StatusRange[] = [];
+  const applicationEvents = new Map<string, NormalizedEvent[]>();
+
+  for (const event of model.events) {
+    if (
+      event.kind.toLowerCase() !== "effect-executed"
+      || !STATUS_APPLY_ACTIONS.has(event.action)
+    ) {
+      continue;
+    }
+    const targetIds = new Set([
+      ...event.targetIds,
+      ...event.removedTargetIds,
+    ]);
+    for (const targetId of targetIds) {
+      if (!entityIndex.has(targetId)) continue;
+      const key = statusApplicationKey(
+        event.frame,
+        event.action,
+        targetId,
+      );
+      const events = applicationEvents.get(key);
+      if (events) events.push(event);
+      else applicationEvents.set(key, [event]);
+    }
+  }
 
   function closeRange(
     range: StatusRange,
@@ -288,13 +326,13 @@ export function buildStatusRanges(
   const duration = Math.max(1, model.durationMs);
   for (const range of ranges) {
     const applyAction = statusApplyAction(range.action);
-    const relatedEvents = model.events.filter(
-      (event) =>
-        event.frame === range.startEvent.frame
-        && event.kind.toLowerCase() === "effect-executed"
-        && event.action === applyAction
-        && event.targetIds.includes(range.targetId),
-    );
+    const relatedEvents = applicationEvents.get(
+      statusApplicationKey(
+        range.startEvent.frame,
+        applyAction,
+        range.targetId,
+      ),
+    ) ?? [];
     range.x = timelineXAtCombatMs(
       range.startMs,
       duration,

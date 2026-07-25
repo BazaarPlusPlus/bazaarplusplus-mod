@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCompactNumber } from "../../i18n/format.ts";
 import {
   themeColors,
@@ -50,6 +50,7 @@ function numericValue(value: unknown): number {
 
 function useEChart(option: ChartOption): React.RefObject<HTMLDivElement | null> {
   const hostRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<ChartInstance | null>(null);
   useEffect(() => {
     const host = hostRef.current;
     const runtime = window.echarts;
@@ -58,13 +59,23 @@ function useEChart(option: ChartOption): React.RefObject<HTMLDivElement | null> 
       renderer: "canvas",
       useDirtyRect: true,
     });
-    chart.setOption(option, { notMerge: true });
+    chartRef.current = chart;
+    if (window.__BPP_VIEWER_TEST__) {
+      window.__BPP_VIEWER_TEST__.echartsInitCount += 1;
+    }
     const observer = new ResizeObserver(() => chart.resize());
     observer.observe(host);
     return () => {
       observer.disconnect();
+      chartRef.current = null;
       chart.dispose();
+      if (window.__BPP_VIEWER_TEST__) {
+        window.__BPP_VIEWER_TEST__.echartsDisposeCount += 1;
+      }
     };
+  }, []);
+  useEffect(() => {
+    chartRef.current?.setOption(option, { notMerge: true });
   }, [option]);
   return hostRef;
 }
@@ -351,27 +362,42 @@ export function StatisticsCharts({
   statistics: CombatStatistics;
   t: (key: string) => string;
 }): React.JSX.Element {
-  const outputOption = comparisonChartOption({
-    categories: [t("damage"), t("heal"), t("shield")],
-    opponent: [
-      statistics.damageDealt.opponent,
-      statistics.output.opponent[3],
-      statistics.output.opponent[4],
-    ],
-    player: [
-      statistics.damageDealt.player,
-      statistics.output.player[3],
-      statistics.output.player[4],
-    ],
-    t,
-  });
-  const effectsOption = comparisonChartOption({
-    categories: [t("charge"), t("haste"), t("slow"), t("freeze")],
-    opponent: statistics.effects.opponent,
-    player: statistics.effects.player,
-    t,
-    wholeNumbers: true,
-  });
+  const outputData = useMemo(
+    () => ({
+      categories: [t("damage"), t("heal"), t("shield")],
+      opponent: [
+        statistics.damageDealt.opponent,
+        statistics.output.opponent[3],
+        statistics.output.opponent[4],
+      ],
+      player: [
+        statistics.damageDealt.player,
+        statistics.output.player[3],
+        statistics.output.player[4],
+      ],
+    }),
+    [statistics, t],
+  );
+  const effectsData = useMemo(
+    () => ({
+      categories: [t("charge"), t("haste"), t("slow"), t("freeze")],
+      opponent: statistics.effects.opponent,
+      player: statistics.effects.player,
+    }),
+    [statistics, t],
+  );
+  const outputOption = useMemo(
+    () => comparisonChartOption({ ...outputData, t }),
+    [outputData, t],
+  );
+  const effectsOption = useMemo(
+    () => comparisonChartOption({
+      ...effectsData,
+      t,
+      wholeNumbers: true,
+    }),
+    [effectsData, t],
+  );
 
   return (
     <section
@@ -380,28 +406,20 @@ export function StatisticsCharts({
     >
       <ChartCard t={t} title={t("outputTotals")}>
         <ComparisonChart
-          categories={[t("damage"), t("heal"), t("shield")]}
-          opponent={[
-            statistics.damageDealt.opponent,
-            statistics.output.opponent[3],
-            statistics.output.opponent[4],
-          ]}
+          categories={outputData.categories}
+          opponent={outputData.opponent}
           option={outputOption}
-          player={[
-            statistics.damageDealt.player,
-            statistics.output.player[3],
-            statistics.output.player[4],
-          ]}
+          player={outputData.player}
           testId="statistics-echarts-output"
           t={t}
         />
       </ChartCard>
       <ChartCard t={t} title={t("statusCounts")}>
         <ComparisonChart
-          categories={[t("charge"), t("haste"), t("slow"), t("freeze")]}
-          opponent={statistics.effects.opponent}
+          categories={effectsData.categories}
+          opponent={effectsData.opponent}
           option={effectsOption}
-          player={statistics.effects.player}
+          player={effectsData.player}
           testId="statistics-echarts-effects"
           t={t}
         />

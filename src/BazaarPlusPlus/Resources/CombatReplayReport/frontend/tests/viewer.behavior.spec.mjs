@@ -18,6 +18,18 @@ const viewerArtifactDirectory = process.env.BPP_VIEWER_ARTIFACT_DIR
 const echartsFileName =
   "5eef51bee09fb9cc234c4179a58ae0150126f49f88c992efe2d6bca81d8dd03b.min.js";
 
+function schemaEvent(event) {
+  return {
+    ...event,
+    removedTargetEntityIds: event.removedTargetEntityIds ?? [],
+    rawReference: event.rawReference ?? {
+      category: "behavior-test",
+      type: event.kind,
+      index: event.frameSequence,
+    },
+  };
+}
+
 async function visibleGuideRatios(page, bounds) {
   const viewportWidth = await page.evaluate(
     () => document.documentElement.clientWidth,
@@ -39,6 +51,7 @@ const fixtureEnvelope = {
     schemaVersion: 1,
     documentId: "behavior-fixture",
     battleId: "behavior-battle",
+    recordedAtUtc: "2026-07-25T00:00:00Z",
     durationMs: 8000,
     frameDurationMs: 50,
     frameCount: 160,
@@ -48,6 +61,16 @@ const fixtureEnvelope = {
       opponentName: "Fixture Opponent",
       outcome: "win",
     },
+    player: {
+      name: "Fixture Player",
+      hero: "Jules",
+    },
+    opponent: {
+      name: "Fixture Opponent",
+      hero: "Mak",
+    },
+    winner: "player",
+    loser: "opponent",
     frameZeroState: {
       player: {
         health: 1000,
@@ -137,7 +160,7 @@ const fixtureEnvelope = {
       },
     ],
     events: [
-      {
+      schemaEvent({
         eventId: "damage-1",
         frame: 40,
         frameSequence: 0,
@@ -151,8 +174,8 @@ const fixtureEnvelope = {
         unit: "points",
         role: "applied",
         attributionConfidence: "exact",
-      },
-      {
+      }),
+      schemaEvent({
         eventId: "charge-1",
         frame: 60,
         frameSequence: 0,
@@ -166,8 +189,8 @@ const fixtureEnvelope = {
         unit: "milliseconds",
         role: "applied",
         attributionConfidence: "exact",
-      },
-      {
+      }),
+      schemaEvent({
         eventId: "burn-1",
         frame: 80,
         frameSequence: 0,
@@ -181,8 +204,8 @@ const fixtureEnvelope = {
         unit: "points",
         role: "applied",
         attributionConfidence: "exact",
-      },
-      {
+      }),
+      schemaEvent({
         eventId: "heal-1",
         frame: 100,
         frameSequence: 0,
@@ -196,14 +219,18 @@ const fixtureEnvelope = {
         unit: "points",
         role: "applied",
         attributionConfidence: "exact",
-      },
+      }),
     ],
   },
   recordingManifest: {
     schemaVersion: 1,
+    artifactId: "behavior-artifact",
+    recordingId: "behavior-recording",
     battleId: "behavior-battle",
+    videoRelativeUrl: "",
     syncMetadataStatus: "NotRequested",
     syncAnchors: [],
+    assets: [],
   },
 };
 
@@ -261,7 +288,7 @@ test.beforeAll(async ({ browserName }) => {
   );
   const chartEnvelope = structuredClone(fixtureEnvelope);
   chartEnvelope.battleDocument.events.push(
-    {
+    schemaEvent({
       eventId: "chart-player-damage",
       frame: 110,
       frameSequence: 0,
@@ -275,8 +302,8 @@ test.beforeAll(async ({ browserName }) => {
       unit: "points",
       role: "received",
       attributionConfidence: "exact",
-    },
-    {
+    }),
+    schemaEvent({
       eventId: "chart-opponent-damage",
       frame: 120,
       frameSequence: 0,
@@ -290,7 +317,7 @@ test.beforeAll(async ({ browserName }) => {
       unit: "points",
       role: "received",
       attributionConfidence: "exact",
-    },
+    }),
   );
   chartEnvelope.battleDocument.rawRecordCount += 2;
   await writeFile(
@@ -330,15 +357,22 @@ test.beforeAll(async ({ browserName }) => {
   const recordingEnvelope = structuredClone(fixtureEnvelope);
   recordingEnvelope.recordingManifest = {
     schemaVersion: 1,
+    artifactId: "behavior-recording-artifact",
     battleId: "behavior-battle",
     recordingId: "behavior-recording",
     syncMetadataStatus: "ReadyExact",
     syncAnchors: [
-      { combatMs: 0, mediaPtsMs: 0 },
-      { combatMs: 8000, mediaPtsMs: 8000 },
+      { combatFrame: 0, combatMs: 0, mediaPtsMs: 0, outputOrdinal: 0 },
+      {
+        combatFrame: 160,
+        combatMs: 8000,
+        mediaPtsMs: 8000,
+        outputOrdinal: 160,
+      },
     ],
     videoRelativeUrl:
       "../CombatReplayVideos/behavior-recording/recording.mp4",
+    assets: [],
   };
   await writeFile(
     join(fixtureDirectory, "recording-report.html"),
@@ -347,7 +381,7 @@ test.beforeAll(async ({ browserName }) => {
   );
   const navigationEnvelope = structuredClone(fixtureEnvelope);
   navigationEnvelope.battleDocument.events = [
-    {
+    schemaEvent({
       eventId: "hidden-metric",
       frame: 10,
       frameSequence: 0,
@@ -359,8 +393,8 @@ test.beforeAll(async ({ browserName }) => {
       unit: "points",
       role: "received",
       attributionConfidence: "unavailable",
-    },
-    {
+    }),
+    schemaEvent({
       eventId: "hidden-health",
       frame: 20,
       frameSequence: 0,
@@ -373,8 +407,8 @@ test.beforeAll(async ({ browserName }) => {
       unit: "points",
       role: "received",
       attributionConfidence: "exact",
-    },
-    {
+    }),
+    schemaEvent({
       eventId: "hidden-rage",
       frame: 30,
       frameSequence: 0,
@@ -387,7 +421,7 @@ test.beforeAll(async ({ browserName }) => {
       unit: "points",
       role: "applied",
       attributionConfidence: "exact",
-    },
+    }),
     ...navigationEnvelope.battleDocument.events,
   ];
   navigationEnvelope.battleDocument.rawRecordCount += 3;
@@ -1916,6 +1950,43 @@ test("paints themed ECharts and a structured hover card", async ({
   positionsAfterSort.forEach((position, index) => {
     expect(Math.abs(position - positionsBeforeSort[index])).toBeLessThan(0.5);
   });
+});
+
+test("keeps mounted ECharts instances across statistics rerenders and disposes on unmount", async ({
+  page,
+}) => {
+  await page.goto(`${chartReportUrl}?lang=en`);
+  await page.getByTestId("report-tab-statistics").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        dispose: window.__BPP_VIEWER_TEST__?.echartsDisposeCount ?? -1,
+        init: window.__BPP_VIEWER_TEST__?.echartsInitCount ?? -1,
+      }))
+    )
+    .toEqual({ dispose: 0, init: 2 });
+
+  await page.getByTestId("statistics-activity-sort-damage").click();
+  await page.getByTestId("statistics-activity-group-by-side").click();
+  await page.getByTestId("locale-switch").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        dispose: window.__BPP_VIEWER_TEST__?.echartsDisposeCount ?? -1,
+        init: window.__BPP_VIEWER_TEST__?.echartsInitCount ?? -1,
+      }))
+    )
+    .toEqual({ dispose: 0, init: 2 });
+
+  await page.getByTestId("report-tab-timeline").click();
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        dispose: window.__BPP_VIEWER_TEST__?.echartsDisposeCount ?? -1,
+        init: window.__BPP_VIEWER_TEST__?.echartsInitCount ?? -1,
+      }))
+    )
+    .toEqual({ dispose: 2, init: 2 });
 });
 
 test("scopes the inspector to the exact clicked cluster", async ({

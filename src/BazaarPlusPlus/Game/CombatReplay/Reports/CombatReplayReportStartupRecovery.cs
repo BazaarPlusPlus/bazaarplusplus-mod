@@ -1,6 +1,8 @@
 #nullable enable
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using BazaarPlusPlus.Game.CombatReplay.Video;
+using BazaarPlusPlus.Infrastructure.Files;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 
@@ -19,6 +21,7 @@ internal enum CombatReplayReportRecoveryQueueOutcome
 {
     Queued,
     Deferred,
+    RetryableFailure,
     Failed,
 }
 
@@ -45,56 +48,41 @@ internal sealed record CombatReplayReportRecoverySummary(
 /// </summary>
 internal sealed class CombatReplayReportStartupRecovery
 {
+    internal const long InitialRetryDelayMilliseconds = 250;
+    internal const long MaximumRetryDelayMilliseconds = 30_000;
+
     private readonly StaticReportPaths _paths;
     private readonly string _videoRootDirectoryPath;
     private readonly Func<
         int,
-        int,
-        IReadOnlyList<CompletedVideoReportRecoveryCandidate>
+        CompletedVideoReportRecoveryCursor?,
+        CompletedVideoReportRecoveryPage
     > _listCompletedCandidates;
     private readonly ICombatReplayReportRecoveryPublisher _publisher;
     private readonly Func<string?> _ensureViewerInstalled;
+    private readonly Func<long> _monotonicMilliseconds;
+    private readonly Dictionary<string, CandidateRetryState> _pendingCandidateRetries = new(
+        StringComparer.Ordinal
+    );
     private string? _currentViewerBundleId;
-    private int _nextCandidateOffset;
+    private CompletedVideoReportRecoveryCursor? _nextCandidateCursor;
+    private int _consecutiveSourceFailureCount;
+    private long _nextSourceAttemptAtMilliseconds;
+    private bool _viewerInstalled;
+    private bool _sourceExhausted;
     private bool _completed;
-
-    internal CombatReplayReportStartupRecovery(
-        string dataRootDirectoryPath,
-        string videoRootDirectoryPath,
-        Func<int, IReadOnlyList<CompletedVideoReportRecoveryCandidate>> listCompletedCandidates,
-        ICombatReplayReportRecoveryPublisher publisher,
-        Func<string?>? ensureViewerInstalled = null
-    )
-        : this(
-            dataRootDirectoryPath,
-            videoRootDirectoryPath,
-            (limit, offset) =>
-            {
-                var candidates =
-                    listCompletedCandidates(limit + offset)
-                    ?? Array.Empty<CompletedVideoReportRecoveryCandidate>();
-                if (offset >= candidates.Count)
-                    return Array.Empty<CompletedVideoReportRecoveryCandidate>();
-                var count = Math.Min(limit, candidates.Count - offset);
-                var page = new CompletedVideoReportRecoveryCandidate[count];
-                for (var index = 0; index < count; index++)
-                    page[index] = candidates[offset + index];
-                return page;
-            },
-            publisher,
-            ensureViewerInstalled
-        ) { }
 
     internal CombatReplayReportStartupRecovery(
         string dataRootDirectoryPath,
         string videoRootDirectoryPath,
         Func<
             int,
-            int,
-            IReadOnlyList<CompletedVideoReportRecoveryCandidate>
+            CompletedVideoReportRecoveryCursor?,
+            CompletedVideoReportRecoveryPage
         > listCompletedCandidates,
         ICombatReplayReportRecoveryPublisher publisher,
-        Func<string?>? ensureViewerInstalled = null
+        Func<string?>? ensureViewerInstalled = null,
+        Func<long>? monotonicMilliseconds = null
     )
     {
         if (string.IsNullOrWhiteSpace(videoRootDirectoryPath))
@@ -124,14 +112,15 @@ internal sealed class CombatReplayReportStartupRecovery
             ?? throw new ArgumentNullException(nameof(listCompletedCandidates));
         _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
         _ensureViewerInstalled = ensureViewerInstalled ?? (() => null);
+        _monotonicMilliseconds = monotonicMilliseconds ?? MonotonicMilliseconds;
     }
 
     internal bool IsCompleted => _completed;
 
     /// <summary>
-    /// Reconciles one bounded database page. Runtime calls this at most once per frame, avoiding
-    /// an unbounded startup query plus per-row sync-anchor reads while still advancing a durable
-    /// offset until every completed recording has been examined in this process.
+    /// Reconciles at most one bounded candidate batch. Runtime calls this at most once per frame.
+    /// Discovery advances through a stable keyset cursor, while transient per-candidate and source
+    /// failures remain pending behind capped backoff instead of becoming permanently skipped.
     /// </summary>
     internal CombatReplayReportRecoverySummary RecoverNextBatch(
         int batchSize,
@@ -144,199 +133,283 @@ internal sealed class CombatReplayReportStartupRecovery
         if (_completed)
             return EmptySummary();
 
-        if (!TryEnsureViewerInstalled(out var viewerFailure))
+        var now = _monotonicMilliseconds();
+        if (!_viewerInstalled && now < _nextSourceAttemptAtMilliseconds)
+            return EmptySummary();
+        if (!TryEnsureViewerInstalled(out var viewerFailure, out var viewerFailureIsRetryable))
         {
-            _completed = true;
-            return new CombatReplayReportRecoverySummary(
-                0,
-                0,
-                0,
-                0,
-                0,
-                viewerFailure,
-                Array.Empty<CombatReplayReportRecoveryFailure>()
-            );
-        }
-
-        IReadOnlyList<CompletedVideoReportRecoveryCandidate> candidates;
-        try
-        {
-            candidates =
-                _listCompletedCandidates(batchSize, _nextCandidateOffset)
-                ?? Array.Empty<CompletedVideoReportRecoveryCandidate>();
-        }
-        catch (Exception ex)
-        {
-            _completed = true;
-            return new CombatReplayReportRecoverySummary(
-                0,
-                0,
-                0,
-                0,
-                0,
-                DescribeFailure(ex),
-                Array.Empty<CombatReplayReportRecoveryFailure>()
-            );
-        }
-
-        _nextCandidateOffset += candidates.Count;
-        _completed = candidates.Count < batchSize;
-        return RecoverCandidates(candidates, batchSize, locale, useTraditionalChinese);
-    }
-
-    internal CombatReplayReportRecoverySummary Recover(
-        int candidateLimit,
-        int maximumQueuedCount,
-        string locale,
-        bool useTraditionalChinese = false
-    )
-    {
-        if (candidateLimit <= 0)
-            throw new ArgumentOutOfRangeException(nameof(candidateLimit));
-        if (maximumQueuedCount <= 0 || maximumQueuedCount > candidateLimit)
-            throw new ArgumentOutOfRangeException(nameof(maximumQueuedCount));
-
-        if (!TryEnsureViewerInstalled(out var viewerFailure))
-        {
-            return new CombatReplayReportRecoverySummary(
-                0,
-                0,
-                0,
-                0,
-                0,
-                viewerFailure,
-                Array.Empty<CombatReplayReportRecoveryFailure>()
-            );
-        }
-
-        IReadOnlyList<CompletedVideoReportRecoveryCandidate> candidates;
-        try
-        {
-            candidates =
-                _listCompletedCandidates(candidateLimit, 0)
-                ?? Array.Empty<CompletedVideoReportRecoveryCandidate>();
-        }
-        catch (Exception ex)
-        {
-            return new CombatReplayReportRecoverySummary(
-                0,
-                0,
-                0,
-                0,
-                0,
-                DescribeFailure(ex),
-                Array.Empty<CombatReplayReportRecoveryFailure>()
-            );
-        }
-
-        return RecoverCandidates(candidates, maximumQueuedCount, locale, useTraditionalChinese);
-    }
-
-    private CombatReplayReportRecoverySummary RecoverCandidates(
-        IReadOnlyList<CompletedVideoReportRecoveryCandidate> candidates,
-        int admissionBatchSize,
-        string locale,
-        bool useTraditionalChinese
-    )
-    {
-        var examinedCount = 0;
-        var existingReportCount = 0;
-        var queuedCount = 0;
-        var deferredCount = 0;
-        var failures = new List<CombatReplayReportRecoveryFailure>();
-        // admissionBatchSize is a sequential admission-batch size, not a total startup cap. The
-        // previous total cap stranded every candidate after the first batch until another game
-        // restart. TryQueue completes its admission synchronously, so it is safe to continue with
-        // the next bounded batch in the same startup reconciliation.
-        for (var batchStart = 0; batchStart < candidates.Count; batchStart += admissionBatchSize)
-        {
-            var batchEnd = Math.Min(candidates.Count, batchStart + admissionBatchSize);
-            for (var index = batchStart; index < batchEnd; index++)
+            var viewerSummary = new RecoverySummaryBuilder { SourceFailure = viewerFailure };
+            if (!viewerFailureIsRetryable)
             {
-                var candidate = candidates[index];
-                examinedCount++;
-                try
-                {
-                    ValidateCandidateIdentity(candidate);
-                    var reportFilePath = _paths.GetReportHtmlFilePath(candidate.RecordingId);
-                    if (File.Exists(reportFilePath))
-                    {
-                        ReportPhysicalFile.RequireBelowRoot(
-                            _paths.ReportsDirectoryPath,
-                            reportFilePath,
-                            "Existing combat report"
-                        );
-                        if (
-                            !string.IsNullOrWhiteSpace(_currentViewerBundleId)
-                            && StaticReportPaths.IsCurrentViewerReport(
-                                reportFilePath,
-                                _currentViewerBundleId,
-                                out _
-                            )
-                        )
-                        {
-                            existingReportCount++;
-                            continue;
-                        }
-                    }
+                _completed = true;
+                return viewerSummary.Build();
+            }
 
-                    var videoFilePath = ResolvePhysicalVideoFile(candidate.VideoRelativePath);
-                    var outcome = _publisher.TryQueue(
-                        candidate,
-                        videoFilePath,
-                        locale,
-                        useTraditionalChinese,
-                        out var reason
+            return RecordSourceFailure(viewerSummary, viewerFailure, now);
+        }
+
+        var summary = new RecoverySummaryBuilder();
+        RecoverDueCandidateRetries(batchSize, now, locale, useTraditionalChinese, summary);
+
+        var remainingCapacity = batchSize - summary.ExaminedCount;
+        if (remainingCapacity > 0 && !_sourceExhausted && now >= _nextSourceAttemptAtMilliseconds)
+        {
+            CompletedVideoReportRecoveryPage page;
+            try
+            {
+                page =
+                    _listCompletedCandidates(remainingCapacity, _nextCandidateCursor)
+                    ?? throw new InvalidDataException(
+                        "The completed-recording source returned no recovery page."
                     );
-                    switch (outcome)
-                    {
-                        case CombatReplayReportRecoveryQueueOutcome.Queued:
-                            queuedCount++;
-                            break;
-                        case CombatReplayReportRecoveryQueueOutcome.Deferred:
-                            deferredCount++;
-                            break;
-                        case CombatReplayReportRecoveryQueueOutcome.Failed:
-                            throw new InvalidOperationException(
-                                string.IsNullOrWhiteSpace(reason)
-                                    ? "The completed recording could not be queued for report recovery."
-                                    : reason
-                            );
-                        default:
-                            throw new InvalidOperationException(
-                                "The report recovery publisher returned an unsupported outcome."
-                            );
-                    }
-                }
-                catch (Exception ex)
+                ValidateSourcePage(page, remainingCapacity, _nextCandidateCursor);
+            }
+            catch (Exception ex)
+            {
+                return RecordSourceFailure(summary, DescribeFailure(ex), now);
+            }
+
+            ResetSourceFailureState();
+            if (page.Candidates.Count > 0)
+                _nextCandidateCursor = page.NextCursor;
+            _sourceExhausted = page.Candidates.Count < remainingCapacity;
+
+            for (var index = 0; index < page.Candidates.Count; index++)
+            {
+                var candidate = page.Candidates[index];
+                if (
+                    candidate != null
+                    && _pendingCandidateRetries.ContainsKey(candidate.RecordingId)
+                )
                 {
-                    failures.Add(
-                        new CombatReplayReportRecoveryFailure(
-                            candidate?.RecordingId ?? string.Empty,
-                            candidate?.BattleId ?? string.Empty,
-                            DescribeFailure(ex)
-                        )
-                    );
+                    continue;
                 }
+
+                RecoverCandidate(
+                    candidate,
+                    previousAttemptCount: 0,
+                    now,
+                    locale,
+                    useTraditionalChinese,
+                    summary
+                );
             }
         }
 
-        return new CombatReplayReportRecoverySummary(
-            examinedCount,
-            existingReportCount,
-            queuedCount,
-            deferredCount,
-            failures.Count,
-            null,
-            failures
-        );
+        RefreshCompletionState();
+        return summary.Build();
     }
 
     private static CombatReplayReportRecoverySummary EmptySummary() =>
         new(0, 0, 0, 0, 0, null, Array.Empty<CombatReplayReportRecoveryFailure>());
 
-    private bool TryEnsureViewerInstalled(out string? failure)
+    private void RecoverDueCandidateRetries(
+        int batchSize,
+        long now,
+        string locale,
+        bool useTraditionalChinese,
+        RecoverySummaryBuilder summary
+    )
     {
+        var dueRetries = _pendingCandidateRetries
+            .Values.Where(retry => retry.NextAttemptAtMilliseconds <= now)
+            .OrderBy(retry => retry.NextAttemptAtMilliseconds)
+            .ThenBy(retry => retry.Candidate.RecordingId, StringComparer.Ordinal)
+            .Take(batchSize)
+            .ToArray();
+
+        for (var index = 0; index < dueRetries.Length; index++)
+        {
+            var retry = dueRetries[index];
+            _pendingCandidateRetries.Remove(retry.Candidate.RecordingId);
+            RecoverCandidate(
+                retry.Candidate,
+                retry.AttemptCount,
+                now,
+                locale,
+                useTraditionalChinese,
+                summary
+            );
+        }
+    }
+
+    private void RecoverCandidate(
+        CompletedVideoReportRecoveryCandidate? candidate,
+        int previousAttemptCount,
+        long now,
+        string locale,
+        bool useTraditionalChinese,
+        RecoverySummaryBuilder summary
+    )
+    {
+        summary.ExaminedCount++;
+        if (candidate == null)
+        {
+            summary.AddFailure(null, "A completed video recovery candidate is required.");
+            return;
+        }
+
+        try
+        {
+            ValidateCandidateIdentity(candidate);
+            var reportFilePath = _paths.GetReportHtmlFilePath(candidate.RecordingId);
+            if (File.Exists(reportFilePath))
+            {
+                ReportPhysicalFile.RequireBelowRoot(
+                    _paths.ReportsDirectoryPath,
+                    reportFilePath,
+                    "Existing combat report"
+                );
+                if (
+                    StaticReportPaths.TryValidateViewerReport(
+                        reportFilePath,
+                        out _,
+                        out _,
+                        out _,
+                        out var reportReason
+                    )
+                )
+                {
+                    summary.ExistingReportCount++;
+                    return;
+                }
+
+                summary.AddFailure(
+                    candidate,
+                    string.IsNullOrWhiteSpace(reportReason)
+                        ? "The immutable battle report is incomplete or invalid."
+                        : reportReason
+                );
+                return;
+            }
+
+            var videoFilePath = ResolvePhysicalVideoFile(candidate.VideoRelativePath);
+            var outcome = _publisher.TryQueue(
+                candidate,
+                videoFilePath,
+                locale,
+                useTraditionalChinese,
+                out var reason
+            );
+            switch (outcome)
+            {
+                case CombatReplayReportRecoveryQueueOutcome.Queued:
+                    summary.QueuedCount++;
+                    return;
+                case CombatReplayReportRecoveryQueueOutcome.Deferred:
+                    summary.DeferredCount++;
+                    QueueCandidateRetry(candidate, previousAttemptCount, now);
+                    return;
+                case CombatReplayReportRecoveryQueueOutcome.RetryableFailure:
+                    var failureReason = string.IsNullOrWhiteSpace(reason)
+                        ? "The completed recording could not be queued for report recovery."
+                        : reason;
+                    summary.AddFailure(candidate, failureReason);
+                    QueueCandidateRetry(candidate, previousAttemptCount, now);
+                    return;
+                case CombatReplayReportRecoveryQueueOutcome.Failed:
+                    summary.AddFailure(
+                        candidate,
+                        string.IsNullOrWhiteSpace(reason)
+                            ? "The completed recording cannot produce a battle report."
+                            : reason
+                    );
+                    return;
+                default:
+                    throw new InvalidDataException(
+                        "The report recovery publisher returned an unsupported outcome."
+                    );
+            }
+        }
+        catch (Exception ex)
+        {
+            summary.AddFailure(candidate, DescribeFailure(ex));
+            if (IsRetryableCandidateFailure(ex))
+                QueueCandidateRetry(candidate, previousAttemptCount, now);
+        }
+    }
+
+    private void QueueCandidateRetry(
+        CompletedVideoReportRecoveryCandidate candidate,
+        int previousAttemptCount,
+        long now
+    )
+    {
+        var attemptCount = SaturatingIncrement(previousAttemptCount);
+        _pendingCandidateRetries[candidate.RecordingId] = new CandidateRetryState(
+            candidate,
+            attemptCount,
+            now + RetryDelayMilliseconds(attemptCount)
+        );
+    }
+
+    private static bool IsRetryableCandidateFailure(Exception exception)
+    {
+        exception = exception.GetBaseException();
+        return exception
+            is not (
+                ArtifactPublicationException
+                or ArgumentException
+                or InvalidDataException
+                or NotSupportedException
+                or UnauthorizedAccessException
+            );
+    }
+
+    private static void ValidateSourcePage(
+        CompletedVideoReportRecoveryPage page,
+        int requestedCount,
+        CompletedVideoReportRecoveryCursor? previousCursor
+    )
+    {
+        if (page.Candidates == null)
+            throw new InvalidDataException(
+                "The completed-recording source returned no candidate list."
+            );
+        if (page.Candidates.Count > requestedCount)
+            throw new InvalidDataException(
+                "The completed-recording source exceeded the requested page size."
+            );
+        if (page.Candidates.Count == 0)
+            return;
+        if (page.NextCursor == null)
+            throw new InvalidDataException(
+                "A non-empty completed-recording page requires a continuation cursor."
+            );
+        if (Equals(page.NextCursor, previousCursor))
+            throw new InvalidDataException(
+                "The completed-recording source did not advance its continuation cursor."
+            );
+    }
+
+    private CombatReplayReportRecoverySummary RecordSourceFailure(
+        RecoverySummaryBuilder summary,
+        string? failure,
+        long now
+    )
+    {
+        _consecutiveSourceFailureCount = SaturatingIncrement(_consecutiveSourceFailureCount);
+        _nextSourceAttemptAtMilliseconds =
+            now + RetryDelayMilliseconds(_consecutiveSourceFailureCount);
+        summary.SourceFailure = failure;
+        return summary.Build();
+    }
+
+    private void ResetSourceFailureState()
+    {
+        _consecutiveSourceFailureCount = 0;
+        _nextSourceAttemptAtMilliseconds = 0;
+    }
+
+    private bool TryEnsureViewerInstalled(out string? failure, out bool retryable)
+    {
+        if (_viewerInstalled)
+        {
+            failure = null;
+            retryable = false;
+            return true;
+        }
+
         try
         {
             _currentViewerBundleId = _ensureViewerInstalled();
@@ -347,15 +420,77 @@ internal sealed class CombatReplayReportStartupRecovery
                     nameof(_currentViewerBundleId)
                 );
             }
+            _viewerInstalled = true;
             failure = null;
+            retryable = false;
             return true;
         }
         catch (Exception ex)
         {
             failure = DescribeFailure(ex);
+            retryable = ex.GetBaseException() is not ArtifactPublicationException;
             return false;
         }
     }
+
+    private static long RetryDelayMilliseconds(int attemptCount)
+    {
+        var exponent = Math.Min(Math.Max(attemptCount - 1, 0), 7);
+        return Math.Min(
+            InitialRetryDelayMilliseconds * (1L << exponent),
+            MaximumRetryDelayMilliseconds
+        );
+    }
+
+    private static int SaturatingIncrement(int value) =>
+        value == int.MaxValue ? int.MaxValue : value + 1;
+
+    private void RefreshCompletionState()
+    {
+        _completed = _sourceExhausted && _pendingCandidateRetries.Count == 0;
+    }
+
+    private sealed record CandidateRetryState(
+        CompletedVideoReportRecoveryCandidate Candidate,
+        int AttemptCount,
+        long NextAttemptAtMilliseconds
+    );
+
+    private sealed class RecoverySummaryBuilder
+    {
+        private readonly List<CombatReplayReportRecoveryFailure> _failures = new();
+
+        internal int ExaminedCount { get; set; }
+        internal int ExistingReportCount { get; set; }
+        internal int QueuedCount { get; set; }
+        internal int DeferredCount { get; set; }
+        internal string? SourceFailure { get; set; }
+
+        internal void AddFailure(CompletedVideoReportRecoveryCandidate? candidate, string reason)
+        {
+            _failures.Add(
+                new CombatReplayReportRecoveryFailure(
+                    candidate?.RecordingId ?? string.Empty,
+                    candidate?.BattleId ?? string.Empty,
+                    reason
+                )
+            );
+        }
+
+        internal CombatReplayReportRecoverySummary Build() =>
+            new(
+                ExaminedCount,
+                ExistingReportCount,
+                QueuedCount,
+                DeferredCount,
+                _failures.Count,
+                SourceFailure,
+                _failures
+            );
+    }
+
+    private static long MonotonicMilliseconds() =>
+        (long)(Stopwatch.GetTimestamp() * (1000d / Stopwatch.Frequency));
 
     private string ResolvePhysicalVideoFile(string relativePath)
     {
@@ -403,9 +538,6 @@ internal sealed class CombatReplayReportStartupRecovery
 
     private static void ValidateCandidateIdentity(CompletedVideoReportRecoveryCandidate candidate)
     {
-        if (candidate == null)
-            throw new InvalidDataException("A completed video recovery candidate is required.");
-
         _ = StaticReportPaths.ParseRecordingId(candidate.RecordingId);
         if (!IsLowerHexIdentity(candidate.BattleId))
         {

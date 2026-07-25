@@ -86,24 +86,8 @@ function TabsTrigger({
   );
 }
 
-function TabsContent({
-  className,
-  ...props
-}: React.ComponentProps<typeof TabsPrimitive.Content>) {
-  return (
-    <TabsPrimitive.Content
-      className={cn("min-h-0 flex-1 outline-none", className)}
-      data-slot="tabs-content"
-      {...props}
-    />
-  );
-}
-
 export {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
-  tabsListVariants,
-  tabsTriggerVariants,
 };

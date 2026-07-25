@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { cn } from "../../lib/utils.ts";
 import {
   formatCompactNumber,
   formatDuration,
@@ -30,6 +29,7 @@ import {
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { ScrollArea } from "../ui/scroll-area.tsx";
+import { mergeInspectorEvents } from "./frame-event-groups.ts";
 
 const PAGE_SIZE = 80;
 
@@ -103,61 +103,15 @@ function eventAmount(event: NormalizedEvent): string {
     : formatCompactNumber(event.value);
 }
 
-interface MergedEventGroup {
-  event: NormalizedEvent;
-  count: number;
-  targetIds: string[];
-  focused: boolean;
-  key: string;
-}
-
-function mergeEventRows(
-  events: readonly NormalizedEvent[],
-  focusedIdSet: ReadonlySet<string>,
-): MergedEventGroup[] {
-  const merged = new Map<string, MergedEventGroup>();
-  for (const event of events) {
-    const amountPart = eventAmount(event);
-    const key = [
-      event.kind,
-      event.action,
-      event.sourceId,
-      event.triggerSourceId,
-      amountPart,
-    ].join("");
-    const existing = merged.get(key);
-    if (existing) {
-      existing.count += 1;
-      for (const id of event.targetIds) {
-        if (!existing.targetIds.includes(id)) {
-          existing.targetIds.push(id);
-        }
-      }
-      existing.focused = existing.focused || focusedIdSet.has(event.id);
-    } else {
-      merged.set(key, {
-        event,
-        count: 1,
-        targetIds: [...event.targetIds],
-        focused: focusedIdSet.has(event.id),
-        key: key + ":" + event.id,
-      });
-    }
-  }
-  return Array.from(merged.values());
-}
-
 function EventRow({
   event,
   entityById,
-  focused,
   mergedCount = 1,
   mergedTargets,
   t,
 }: {
   event: NormalizedEvent;
   entityById: ReadonlyMap<string, NormalizedEntity>;
-  focused: boolean;
   mergedCount?: number;
   mergedTargets?: readonly string[];
   t: (key: string) => string;
@@ -168,13 +122,9 @@ function EventRow({
   const amount = eventAmount(event);
   return (
     <article
-      className={cn(
-        "border-b border-border/45 px-3 py-2 last:border-b-0",
-        focused
-          && "bg-brand-soft/7 shadow-[inset_2px_0_0_var(--color-brand-soft)]",
-      )}
+      className="border-b border-border/45 bg-brand-soft/7 px-3 py-2 shadow-[inset_2px_0_0_var(--color-brand-soft)] last:border-b-0"
       data-bpp-event-id={event.id}
-      data-bpp-test-id={focused ? "focused-cluster-event" : undefined}
+      data-bpp-test-id="focused-cluster-event"
     >
       <div className="flex min-h-control-xs items-center gap-2">
         {event.icon ? (
@@ -301,26 +251,9 @@ export function FrameInspector({
       result.set(token, values);
     }
     return Array.from(result.entries())
-      .map(([token, group]) => {
-        const focused = group.filter((event) =>
-          focusedIdSet.has(event.id),
-        );
-        const remaining = group.filter((event) =>
-          !focusedIdSet.has(event.id),
-        );
-        return {
-          token,
-          events: focused.concat(remaining),
-          focusedCount: focused.length,
-        };
-      })
-      .sort(
-        (left, right) =>
-          Number(right.focusedCount > 0)
-            - Number(left.focusedCount > 0)
-          || right.events.length - left.events.length,
-      );
-  }, [events, focusedIdSet]);
+      .map(([token, group]) => ({ token, events: group }))
+      .sort((left, right) => right.events.length - left.events.length);
+  }, [events]);
   useLayoutEffect(() => {
     const viewport = inspectorRef.current?.querySelector<HTMLElement>(
       "[data-slot='scroll-area-viewport']",
@@ -328,9 +261,6 @@ export function FrameInspector({
     if (viewport) viewport.scrollTop = 0;
   }, [entityId, focusKey, frame]);
   const first = events[0];
-  const focusedTokens = groups
-    .filter((group) => group.focusedCount > 0)
-    .map((group) => group.token);
 
   return (
     <aside
@@ -404,35 +334,15 @@ export function FrameInspector({
         <div>
           <Accordion
             className="divide-y divide-border/45"
-            defaultValue={
-              focusedTokens.length > 0
-                ? focusedTokens
-                : groups
-                  .filter((group) =>
-                    groups.length === 1
-                    || (
-                      first
-                      && group.token === eventKindToken(first)
-                    )
-                  )
-                  .map((group) => group.token)
-            }
+            defaultValue={groups.map((group) => group.token)}
             key={`${entityId}:${frame ?? "none"}:${focusKey}`}
             type="multiple"
           >
             {groups.map((group) => (
               <AccordionItem
-                className={cn(
-                  "rounded-none border-x-0 border-y-0 bg-transparent",
-                  group.focusedCount > 0
-                    && "bg-brand-soft/4 shadow-[inset_2px_0_0_var(--color-brand-soft)]",
-                )}
+                className="rounded-none border-x-0 border-y-0 bg-brand-soft/4 shadow-[inset_2px_0_0_var(--color-brand-soft)]"
                 data-bpp-event-token={group.token}
-                data-bpp-test-id={
-                  group.focusedCount > 0
-                    ? "focused-cluster-group"
-                    : "frame-event-group"
-                }
+                data-bpp-test-id="focused-cluster-group"
                 key={group.token}
                 value={group.token}
               >
@@ -447,14 +357,12 @@ export function FrameInspector({
                   </Badge>
                 </AccordionTrigger>
                 <AccordionContent className="space-y-0 border-t border-border/45 p-0">
-                  {mergeEventRows(
+                  {mergeInspectorEvents(
                     group.events.slice(0, limit),
-                    focusedIdSet,
                   ).map((merged) => (
                     <EventRow
                       entityById={entityById}
                       event={merged.event}
-                      focused={merged.focused}
                       key={merged.key}
                       mergedCount={merged.count}
                       mergedTargets={merged.targetIds}

@@ -9,9 +9,22 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="SixLabors.ImageSharp" />
+    <None
+      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/frontend/tests/fixtures/combat-report-envelope-v1.golden.json"
+      Link="fixtures/combat-report-envelope-v1.golden.json"
+      CopyToOutputDirectory="PreserveNewest"
+    />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/CombatReplayReportPublicationCoordinator.cs"
       Link="CombatReplayReportPublicationCoordinator.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/CombatReplayReportPublicationModels.cs"
+      Link="CombatReplayReportPublicationModels.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/CombatReplayReportArtifactBuilder.cs"
+      Link="CombatReplayReportArtifactBuilder.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/StaticReportPaths.cs"
@@ -54,8 +67,8 @@
       Link="ImmutableArtifactCommitter.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Infrastructure/Files/ReplaceableArtifactPublisher.cs"
-      Link="ReplaceableArtifactPublisher.cs"
+      Include="../../src/BazaarPlusPlus/Infrastructure/Files/ArtifactPublicationException.cs"
+      Link="ArtifactPublicationException.cs"
     />
   </ItemGroup>
 </Project>

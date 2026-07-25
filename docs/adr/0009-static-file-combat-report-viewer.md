@@ -1,4 +1,4 @@
-# Serve combat reports as versioned static file artifacts
+# Serve combat reports as content-addressed static file artifacts
 
 ## Context
 
@@ -16,19 +16,25 @@ port from the mod.
 1. A combat report is a static HTML file opened by the default browser with `file://`.
 2. Each report HTML embeds its immutable report JSON in a non-executable
    `<script type="application/json">` element. The Viewer never fetches a local JSON file.
-3. Viewer code and styles are installed once under a versioned shared directory. JavaScript is one
-   classic IIFE bundle; it uses no module import, dynamic import, Worker or runtime network request.
+3. Viewer code and styles are installed once as a content-addressed generation derived from the
+   report schema plus the JavaScript and CSS digests. JavaScript is one classic IIFE bundle; it uses
+   no module import, dynamic import, Worker or runtime network request.
 4. Game-rendered images live in one append-only, content-addressed cache shared by every report.
    A render-key index is checked before Unity materialization; only misses reach Unity.
-5. The report stores stable relative URLs to its pinned Viewer version, shared content objects and
+5. The report stores stable relative URLs to its exact Viewer generation, shared content objects and
    existing replay video. Moving only the HTML may break those links; portable export is a separate
    future feature.
-6. F8 opens the physical report HTML directly. The default path has no local listener, token,
-   authentication, HTTP Range route or dependency on Tauri/BazaarAgent.
-7. Viewer versions, reports and cache objects are immutable. Existing bytes are verified and reused;
-   conflicting bytes fail closed instead of overwriting history.
+6. F8 opens HistoryPanel, whose detailed-report action opens the physical report HTML in the default
+   browser. The default path has no local listener, token, authentication, HTTP Range route or
+   dependency on Tauri/BazaarAgent.
+7. Viewer generations, reports and cache objects are immutable. Existing bytes are verified and
+   reused; conflicting bytes fail closed instead of overwriting history. The current gate installs
+   or verifies only the current generation: there is no numbered registry, mutable alias, historical
+   fallback or rewrite migration.
 8. The report path does not remove or change BazaarAgent's optional listener. The default report/main
    path simply has no listener and no Tauri/BazaarAgent dependency.
+9. React, Tailwind, shadcn-style Radix primitives and Vite are build-time authoring tools only. The
+   runtime artifact remains a classic IIFE, one stylesheet and relative static resources.
 
 ## Consequences
 
@@ -36,6 +42,6 @@ port from the mod.
 - Per recording, the only new report artifact is a small HTML file plus genuine global cache misses.
 - Browser behavior for sibling-directory scripts/styles/images and local MP4 seek is a release gate
   on Chrome, Safari and Edge.
-- Shared Viewer versions and cache objects cannot use blind LRU deletion because old reports retain
+- Viewer generations and cache objects cannot use blind LRU deletion because reports retain exact
   relative references. Garbage collection, if added, must trace live report references first.
 - ADR-0006 remains unchanged: BazaarAgent is optional and does not participate in report delivery.

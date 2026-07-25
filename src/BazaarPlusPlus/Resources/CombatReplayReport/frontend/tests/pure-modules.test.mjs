@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   beginLogicalDraw,
@@ -73,6 +74,11 @@ import {
   normalizeSide,
 } from "../src/model/normalize.ts";
 import {
+  buildViewModel,
+  decodeEnvelope,
+  ReportError,
+} from "../src/model/report.ts";
+import {
   entityArtDimensions,
   maximumEntityArtWidth,
   normalizedEntityArtSpan,
@@ -83,6 +89,7 @@ import {
   opponentBoundaryLane,
 } from "../src/timeline/lane-filter.ts";
 import { buildEntityActivity } from "../src/statistics/aggregate.ts";
+import { mergeInspectorEvents } from "../src/components/inspector/frame-event-groups.ts";
 
 function timelineEvent(overrides = {}) {
   return {
@@ -105,10 +112,46 @@ function timelineEvent(overrides = {}) {
     iconSemanticKey: "",
     icon: "",
     occurrences: 1,
-    raw: {},
     ...overrides,
   };
 }
+
+test("inspector merge identity keeps unit, semantic icon, and attribution distinct", () => {
+  const base = timelineEvent({
+    frame: 12,
+    combatMs: 600,
+    kind: "effect-executed",
+    action: "CardHaste",
+    value: 2,
+    unit: "seconds",
+    sourceId: "source",
+    triggerSourceId: "trigger",
+    targetIds: ["target-a"],
+    iconSemanticKey: "haste",
+    attributionConfidence: "exact",
+  });
+  const events = [
+    { ...base, id: "same-a" },
+    { ...base, id: "same-b", targetIds: ["target-b"] },
+    { ...base, id: "different-unit", unit: "milliseconds" },
+    { ...base, id: "different-icon", iconSemanticKey: "slow" },
+    {
+      ...base,
+      id: "different-attribution",
+      attributionConfidence: "inferred",
+    },
+  ];
+
+  const merged = mergeInspectorEvents(events);
+
+  assert.equal(merged.length, 4);
+  assert.equal(merged[0].count, 2);
+  assert.deepEqual(merged[0].targetIds, ["target-a", "target-b"]);
+  assert.deepEqual(
+    merged.slice(1).map((group) => group.event.id),
+    ["different-unit", "different-icon", "different-attribution"],
+  );
+});
 
 test("timeline geometry reserves both interaction gutters reversibly", () => {
   const width = 1_000;
@@ -430,27 +473,38 @@ test("item art uses exact one, two, and three-slot geometry", () => {
   );
 });
 
-test("report entities and events normalize legacy field aliases deterministically", () => {
-  const rawEntity = {
-    instanceId: "item-1",
-    displayName: "Large Item",
-    semanticType: "item",
-    team: "friendly",
-    size: 8,
-    visual: { relativeUrl: "../asset.png" },
-  };
-  assert.deepEqual(normalizeEntity(rawEntity, 0), {
+test("report entities and events normalize exact schema-v1 fields", () => {
+  assert.deepEqual(normalizeEntity({
+    entityId: "item-1",
+    owner: "player",
+    type: "item",
+    name: "Large Item",
+    span: 3,
+    assetRelativeUrl:
+      "../report-assets/objects/aa/"
+      + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      + ".png",
+    order: 0,
+  }, 0), {
     id: "item-1",
     name: "Large Item",
     type: "item",
     side: "player",
     span: 3,
-    asset: "../asset.png",
+    asset:
+      "../report-assets/objects/aa/"
+      + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      + ".png",
     hiddenFromTimeline: false,
-    raw: rawEntity,
   });
   const hidden = normalizeEntity(
-    { id: "effect-1", name: "[Stove] Socket Effect", type: "effect" },
+    {
+      entityId: "effect-1",
+      owner: "player",
+      name: "[Stove] Socket Effect",
+      type: "effect",
+      order: 1,
+    },
     1,
   );
   assert.equal(hidden.name, "");
@@ -458,49 +512,69 @@ test("report entities and events normalize legacy field aliases deterministicall
 
   const event = normalizeEvent(
     {
-      id: "event-1",
+      eventId: "event-1",
       frame: 7,
-      sequence: 2,
-      combatTimeSeconds: 1.25,
-      source: { instanceId: "source-1" },
-      targets: [{ entityId: "target-1" }],
-      targetEntityId: "target-2",
-      count: 3,
+      frameSequence: 2,
+      combatTimeMs: 1_250,
+      kind: "effect-executed",
+      action: "Damage",
+      sourceEntityId: "source-1",
+      targetEntityIds: ["target-1", "target-2"],
+      removedTargetEntityIds: [],
+      role: "applied",
+      attributionConfidence: "exact",
+      rawReference: {
+        category: "effect",
+        type: "Damage",
+        index: 0,
+      },
     },
     0,
   );
   assert.equal(event.combatMs, 1_250);
   assert.equal(event.sourceId, "source-1");
   assert.deepEqual(event.targetIds, ["target-1", "target-2"]);
-  assert.equal(event.occurrences, 3);
-  assert.equal(eventTimeMs({ combatFrame: 4 }), 200);
+  assert.equal(event.occurrences, 1);
+  assert.equal(eventTimeMs({
+    eventId: "event-2",
+    frame: 4,
+    frameSequence: 0,
+    combatTimeMs: 200,
+    kind: "status",
+    action: "",
+    targetEntityIds: [],
+    removedTargetEntityIds: [],
+    role: "received",
+    attributionConfidence: "unknown",
+    rawReference: {
+      category: "status",
+      type: "Status",
+      index: 0,
+    },
+  }), 200);
 });
 
-test("combatant metrics normalize aliases and preserve frame-zero state", () => {
-  assert.equal(normalizeSide("friendly"), "player");
-  assert.equal(normalizeEntity({ id: "self", side: "self" }, 0).side, "player");
-  assert.equal(
-    normalizeEntity({ id: "enemy", side: "enemy" }, 0).side,
-    "opponent",
-  );
-  assert.equal(
-    normalizeEntity({ id: "spectator", side: "spectator" }, 0).side,
-    "neutral",
-  );
-  assert.equal(normalizeSide("opponent-hero"), "opponent");
+test("combatant metrics normalize exact schema-v1 fields and preserve frame zero", () => {
+  assert.equal(normalizeSide("player"), "player");
+  assert.equal(normalizeSide("opponent"), "opponent");
+  assert.equal(normalizeSide("friendly"), "neutral");
+  assert.equal(normalizeSide("enemy"), "neutral");
   assert.equal(normalizeSide("spectator"), "neutral");
   assert.equal(normalizeMetricName("Health_Regen"), "healthRegen");
-  assert.equal(normalizeMetricName("armor"), "shield");
+  assert.equal(normalizeMetricName("shield"), "shield");
+  assert.equal(normalizeMetricName("armor"), "");
   assert.equal(normalizeMetricName("unknown"), "");
   assert.deepEqual(
     normalizeMetric({
-      combatant: "enemy",
-      name: "fire",
-      currentValue: "42",
-      combatMs: 500,
+      frame: 10,
+      combatTimeMs: 500,
+      combatant: "opponent",
+      metric: "Burn",
+      value: 42,
+      unit: "points",
     }),
     {
-      frame: 0,
+      frame: 10,
       combatMs: 500,
       side: "opponent",
       metric: "burn",
@@ -510,10 +584,8 @@ test("combatant metrics normalize aliases and preserve frame-zero state", () => 
   );
   assert.deepEqual(
     frameZeroMetricSamples({
-      frameZeroState: {
-        player: { health: 1_000, shield: 20 },
-        opponent: { health: 900 },
-      },
+      player: { health: 1_000, shield: 20 },
+      opponent: { health: 900 },
     }),
     [
       {
@@ -542,6 +614,81 @@ test("combatant metrics normalize aliases and preserve frame-zero state", () => 
       },
     ],
   );
+});
+
+const schemaV1GoldenPayload = JSON.parse(
+  readFileSync(
+    new URL(
+      "./fixtures/combat-report-envelope-v1.golden.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+);
+
+function assertInvalidSchemaV1(mutator) {
+  const payload = structuredClone(schemaV1GoldenPayload);
+  mutator(payload);
+  assert.throws(
+    () => decodeEnvelope(payload),
+    (error) =>
+      error instanceof ReportError
+      && error.code === "invalidData",
+  );
+}
+
+test("schema-v1 golden payload decodes without compatibility aliases", () => {
+  const envelope = decodeEnvelope(structuredClone(schemaV1GoldenPayload));
+  const report = buildViewModel(envelope, COPY.en);
+
+  assert.equal(report.battleId, "battle-1");
+  assert.equal(report.playerName, "pengx17");
+  assert.equal(report.opponentName, "Anaui");
+  assert.equal(report.outcome, "victory");
+  assert.equal(report.entities.length, 2);
+  assert.equal(
+    report.entities[1].asset,
+    "../report-assets/objects/aa/"
+      + "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      + ".png",
+  );
+  assert.equal(report.events.length, 2);
+  assert.equal(report.events[0].occurrences, 1);
+  assert.equal(report.metrics.length, 8);
+  assert.equal(
+    report.videoUrl,
+    "../CombatReplayVideos/cccccccccccccccccccccccccccccccc/battle.mp4",
+  );
+  assert.equal(report.sync.status, "ReadyExact");
+  assert.deepEqual(report.sync.anchors, [
+    { combatMs: 0, mediaPtsMs: 0 },
+    { combatMs: 150, mediaPtsMs: 150 },
+  ]);
+});
+
+test("schema-v1 decoder rejects removed aliases and malformed array entries", () => {
+  assertInvalidSchemaV1((payload) => {
+    payload.battleDocument.entityTable = payload.battleDocument.entities;
+    delete payload.battleDocument.entities;
+  });
+  assertInvalidSchemaV1((payload) => {
+    payload.battleDocument.combatEvents = payload.battleDocument.events;
+    delete payload.battleDocument.events;
+  });
+  assertInvalidSchemaV1((payload) => {
+    payload.battleDocument.events[0].occurrences = 3;
+  });
+  assertInvalidSchemaV1((payload) => {
+    payload.recordingManifest.video = {
+      relativeUrl: payload.recordingManifest.videoRelativeUrl,
+    };
+    delete payload.recordingManifest.videoRelativeUrl;
+  });
+  assertInvalidSchemaV1((payload) => {
+    payload.battleDocument.events[0].targetEntityIds.push({
+      entityId: "player-hero",
+    });
+  });
 });
 
 test("combatant state shares one reversible y domain", () => {
@@ -796,4 +943,109 @@ test("status ranges pair applications with their exact frame effects", () => {
   assert.deepEqual(timelineClusterEventIds(ranges[0].cluster), [
     "haste-source",
   ]);
+});
+
+test("status range indexing preserves overlapping targets and removed-target attribution", () => {
+  const startA = timelineEvent({
+    id: "start-a",
+    frame: 10,
+    combatMs: 1_000,
+    kind: "card-attribute",
+    action: "Haste",
+    previousValue: 0,
+    currentValue: 2_000,
+    targetIds: ["target-a"],
+  });
+  const startB = timelineEvent({
+    id: "start-b",
+    frame: 10,
+    combatMs: 1_000,
+    kind: "card-attribute",
+    action: "Haste",
+    previousValue: 0,
+    currentValue: 3_000,
+    targetIds: ["target-b"],
+  });
+  const multiTargetApply = timelineEvent({
+    id: "apply-multi",
+    frame: 10,
+    combatMs: 1_000,
+    kind: "effect-executed",
+    action: "CardHaste",
+    sourceId: "skill",
+    targetIds: ["target-a", "target-b"],
+    removedTargetIds: ["target-a"],
+  });
+  const removedTargetApply = timelineEvent({
+    id: "apply-removed",
+    frame: 10,
+    combatMs: 1_000,
+    kind: "effect-executed",
+    action: "CardHaste",
+    sourceId: "skill",
+    removedTargetIds: ["target-b"],
+  });
+  const endA = timelineEvent({
+    id: "end-a",
+    frame: 20,
+    combatMs: 3_000,
+    kind: "card-attribute",
+    action: "Haste",
+    previousValue: 2_000,
+    currentValue: 0,
+    targetIds: ["target-a"],
+  });
+  const endB = timelineEvent({
+    id: "end-b",
+    frame: 30,
+    combatMs: 4_000,
+    kind: "card-attribute",
+    action: "Haste",
+    previousValue: 3_000,
+    currentValue: 0,
+    targetIds: ["target-b"],
+  });
+
+  const ranges = buildStatusRanges(
+    {
+      durationMs: 5_000,
+      events: [
+        startA,
+        startB,
+        multiTargetApply,
+        removedTargetApply,
+        endA,
+        endB,
+      ],
+    },
+    [
+      { id: "skill", type: "skill" },
+      { id: "target-a", type: "item" },
+      { id: "target-b", type: "item" },
+    ],
+    1_000,
+    54,
+  );
+
+  assert.equal(ranges.length, 2);
+  assert.deepEqual(
+    ranges.map((range) => [range.targetId, range.startMs, range.endMs]),
+    [
+      ["target-a", 1_000, 3_000],
+      ["target-b", 1_000, 4_000],
+    ],
+  );
+  assert.deepEqual(timelineClusterEventIds(ranges[0].cluster), [
+    "apply-multi",
+  ]);
+  assert.deepEqual(timelineClusterEventIds(ranges[1].cluster), [
+    "apply-multi",
+    "apply-removed",
+  ]);
+  assert.deepEqual(
+    ranges.map((range) =>
+      range.cluster.relatedEvents.map((event) => event.id)
+    ),
+    [["start-a"], ["start-b"]],
+  );
 });

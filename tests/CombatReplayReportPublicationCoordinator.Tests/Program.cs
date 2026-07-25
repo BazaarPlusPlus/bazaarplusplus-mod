@@ -20,16 +20,19 @@ var sandbox = Path.Combine(
 try
 {
     Directory.CreateDirectory(sandbox);
+    VerifySchemaV1GoldenFixture();
     await VerifyCpuAndFilesystemWorkUsesInjectedScheduler();
     VerifyRecordingGenerationIsolation();
     VerifyTransientPublicationRetries();
+    VerifyTransientVideoAdmissionRetries();
+    VerifyTransientArtifactBuildRetries();
+    VerifyStructuredPublicationFailuresAreNonRetryable();
     VerifySchemaMismatchIsNonRetryable();
     VerifyConflictingGenerationIdentityIsNonRetryable();
     VerifyInvalidAssetDegradesIndependentlyAndClearsStaleReference();
     VerifyEventSemanticAssetBinding();
     VerifyResolvedAssetEnrichesEntityDisplayName();
     VerifyExactVideoSyncRequiresContiguousIdentityMatchedAnchors();
-    VerifyReplaceablePublishRecoversConcurrentCreate();
 }
 finally
 {
@@ -45,6 +48,206 @@ if (failures.Count > 0)
 else
 {
     Console.WriteLine("CombatReplayReportPublicationCoordinator tests passed.");
+}
+
+void VerifySchemaV1GoldenFixture()
+{
+    const string itemContentKey =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const string iconContentKey =
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    var envelope = new EmbeddedReportEnvelopeV1
+    {
+        SchemaVersion = 1,
+        Locale = "zh-CN",
+        BattleDocument = new CombatReportDocumentV1
+        {
+            SchemaVersion = 1,
+            DocumentId = "document-1",
+            BattleId = "battle-1",
+            RecordedAtUtc = new DateTimeOffset(2026, 7, 25, 1, 2, 3, TimeSpan.Zero),
+            Summary = new CombatReportSummaryV1
+            {
+                PlayerName = "pengx17",
+                OpponentName = "Anaui",
+                Outcome = "victory",
+            },
+            Player = new CombatReportParticipantV1 { Name = "pengx17", Hero = "Jules" },
+            Opponent = new CombatReportParticipantV1 { Name = "Anaui", Hero = "Mak" },
+            FrameDurationMs = 50,
+            FrameCount = 3,
+            DurationMs = 150,
+            Winner = "player",
+            Loser = "opponent",
+            RawRecordCount = 7,
+            Entities =
+            {
+                new CombatReportEntityV1
+                {
+                    EntityId = "player-hero",
+                    Owner = "player",
+                    Type = "hero",
+                    Name = "pengx17",
+                    Order = 0,
+                },
+                new CombatReportEntityV1
+                {
+                    EntityId = "opponent-item",
+                    TemplateId = "item-template",
+                    Owner = "opponent",
+                    Type = "item",
+                    Name = "Cash Cannon",
+                    Size = "Large",
+                    Slot = 2,
+                    Span = 3,
+                    Tier = "Gold",
+                    Enchant = "Fiery",
+                    ContentKey = itemContentKey,
+                    AssetRelativeUrl = "../report-assets/objects/aa/" + itemContentKey + ".png",
+                    Order = 1,
+                },
+            },
+            Events =
+            {
+                new CombatReportEventV1
+                {
+                    EventId = "event-0",
+                    Frame = 1,
+                    FrameSequence = 0,
+                    CombatTimeMs = 50,
+                    Kind = "effect-executed",
+                    Action = "Damage",
+                    SourceEntityId = "opponent-item",
+                    TargetEntityIds = { "player-hero" },
+                    Value = 42,
+                    Unit = "points",
+                    IsCritical = true,
+                    Role = "applied",
+                    AttributionConfidence = "exact",
+                    IconSemanticKey = "damage",
+                    IconContentKey = iconContentKey,
+                    IconAssetRelativeUrl = "../report-assets/objects/bb/" + iconContentKey + ".png",
+                    RawReference = new CombatReportRawReferenceV1
+                    {
+                        Category = "effect",
+                        Type = "Damage",
+                        Index = 4,
+                    },
+                },
+                new CombatReportEventV1
+                {
+                    EventId = "event-1",
+                    Frame = 2,
+                    FrameSequence = 0,
+                    CombatTimeMs = 100,
+                    Kind = "player-attribute",
+                    Action = "Health",
+                    TargetEntityIds = { "player-hero" },
+                    Role = "received",
+                    AttributionConfidence = "target-exact-source-unknown",
+                    RawReference = new CombatReportRawReferenceV1
+                    {
+                        Category = "player-update",
+                        Type = "CombatSimPlayerAttributeUpdate",
+                        Index = 0,
+                    },
+                },
+            },
+            FrameZeroState = new CombatReportFrameZeroStateV1
+            {
+                Player = new CombatReportCombatantStateV1
+                {
+                    Health = 1_000,
+                    HealthRegen = 5,
+                    Burn = 0,
+                },
+                Opponent = new CombatReportCombatantStateV1
+                {
+                    Health = 900,
+                    Rage = 20,
+                    Shield = 30,
+                    Poison = 4,
+                },
+            },
+            Metrics =
+            {
+                new CombatReportMetricSampleV1
+                {
+                    Frame = 1,
+                    CombatTimeMs = 50,
+                    Combatant = "player",
+                    Metric = "Health",
+                    Value = 958,
+                    Unit = "points",
+                },
+            },
+        },
+        RecordingManifest = new RecordingReportManifestV1
+        {
+            SchemaVersion = 1,
+            ArtifactId = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            RecordingId = "cccccccccccccccccccccccccccccccc",
+            BattleId = "battle-1",
+            VideoRelativeUrl = "../CombatReplayVideos/cccccccccccccccccccccccccccccccc/battle.mp4",
+            SyncMetadataStatus = "ReadyExact",
+            Width = 1920,
+            Height = 1080,
+            FramesPerSecond = 60,
+            DurationMs = 150,
+            SyncAnchors =
+            {
+                new RecordingReportSyncAnchorV1
+                {
+                    CombatFrame = 0,
+                    CombatMs = 0,
+                    MediaPtsMs = 0,
+                    OutputOrdinal = 0,
+                },
+                new RecordingReportSyncAnchorV1
+                {
+                    CombatFrame = 3,
+                    CombatMs = 150,
+                    MediaPtsMs = 150,
+                    OutputOrdinal = 3,
+                },
+            },
+            Assets =
+            {
+                new RecordingReportAssetV1
+                {
+                    ContentKey = itemContentKey,
+                    RelativeUrl = "../report-assets/objects/aa/" + itemContentKey + ".png",
+                    SemanticRole = "entity:item",
+                    NaturalWidth = 300,
+                    NaturalHeight = 100,
+                    Sha256 = itemContentKey,
+                },
+            },
+        },
+    };
+
+    var actual = CombatReportJson.Serialize(envelope);
+    var fixturePath = Path.Combine(
+        AppContext.BaseDirectory,
+        "fixtures",
+        "combat-report-envelope-v1.golden.json"
+    );
+    Check(File.Exists(fixturePath), "Schema-v1 golden fixture must be copied to test output.");
+    if (!File.Exists(fixturePath))
+        return;
+
+    var expected = File.ReadAllText(fixturePath).TrimEnd('\r', '\n');
+    Check(
+        string.Equals(actual, expected, StringComparison.Ordinal),
+        $"Schema-v1 JSON must match CombatReportJson semantics.{Environment.NewLine}Actual:{actual}"
+    );
+    Check(
+        !actual.Contains("\"day\"", StringComparison.Ordinal)
+            && !actual.Contains("\"result\"", StringComparison.Ordinal)
+            && !actual.Contains("\"templateId\":null", StringComparison.Ordinal)
+            && !actual.Contains("\"effectId\":null", StringComparison.Ordinal),
+        "CombatReportJson must omit nullable schema-v1 fields instead of emitting null."
+    );
 }
 
 async Task VerifyCpuAndFilesystemWorkUsesInjectedScheduler()
@@ -115,43 +318,6 @@ async Task VerifyCpuAndFilesystemWorkUsesInjectedScheduler()
         if (action != null)
             await Task.Run(action);
     }
-}
-
-void VerifyReplaceablePublishRecoversConcurrentCreate()
-{
-    var root = Path.Combine(sandbox, "replaceable-concurrent-create");
-    var destination = Path.Combine(root, "objects", "viewer.js");
-    var expected = Encoding.UTF8.GetBytes("current viewer bytes");
-
-    var sameWinnerPublisher = new ReplaceableArtifactPublisher(
-        (source, target) =>
-        {
-            File.WriteAllBytes(target, expected);
-            File.Move(source, target);
-        }
-    );
-    var reused = sameWinnerPublisher.PublishBelowRoot(root, destination, expected);
-    Check(
-        reused == ReplaceableArtifactPublishResult.Reused
-            && File.ReadAllBytes(destination).SequenceEqual(expected),
-        "A concurrent process that creates identical bytes before File.Move must be reused."
-    );
-
-    File.Delete(destination);
-    var stale = Encoding.UTF8.GetBytes("stale viewer bytes");
-    var differentWinnerPublisher = new ReplaceableArtifactPublisher(
-        (source, target) =>
-        {
-            File.WriteAllBytes(target, stale);
-            File.Move(source, target);
-        }
-    );
-    var replaced = differentWinnerPublisher.PublishBelowRoot(root, destination, expected);
-    Check(
-        replaced == ReplaceableArtifactPublishResult.Replaced
-            && File.ReadAllBytes(destination).SequenceEqual(expected),
-        "A concurrent process that creates different bytes before File.Move must be safely replaced."
-    );
 }
 
 void VerifyRecordingGenerationIsolation()
@@ -229,16 +395,196 @@ void VerifyTransientPublicationRetries()
             && terminals[0].FailureKind == CombatReplayReportPublicationFailureKind.Retryable,
         "A transient write failure must remain retryable and observable."
     );
-    coordinator.RetryPendingPublications();
-    Check(attempts == 1, "Retry backoff must prevent a same-tick publication loop.");
+    var sameTick = Drain(coordinator);
+    Check(
+        attempts == 1 && sameTick.Count == 0,
+        "Retry backoff must prevent a same-tick publication loop."
+    );
 
     now = 250;
-    coordinator.RetryPendingPublications();
     terminals = Drain(coordinator);
     Check(
         attempts == 2 && published && terminals.Any(terminal => terminal.Succeeded),
         "A transient failure must retain all work and publish successfully after backoff."
     );
+}
+
+void VerifyTransientVideoAdmissionRetries()
+{
+    var root = Path.Combine(sandbox, "video-admission-retry");
+    var now = 0L;
+    var commits = 0;
+    var coordinator = CreateCoordinator(root, (_, _) => commits++, () => now);
+    const string recordingId = "34343434343434343434343434343434";
+    const string battleId = "video-admission-retry-battle";
+    coordinator.TryCaptureDraft(
+        new PvpBattleManifest { BattleId = battleId },
+        new NetMessageCombatSim(),
+        out _
+    );
+    coordinator.ObserveVideoStarted(Started(recordingId, battleId));
+    coordinator.MarkAssetsReady(recordingId, battleId, Array.Empty<PostCombatReportAssetFile>());
+
+    var videoDirectory = Path.Combine(root, "CombatReplayVideos");
+    var videoPath = Path.Combine(videoDirectory, recordingId + ".mp4");
+    coordinator.ObserveVideoTerminal(
+        new CombatReplayVideoRecordingCompleted
+        {
+            RecordingId = recordingId,
+            BattleId = battleId,
+            FinalFilePath = videoPath,
+            ArtifactUsable = true,
+            SyncAnchors = Array.Empty<ReplayVideoSyncAnchor>(),
+        },
+        "en"
+    );
+
+    var terminals = Drain(coordinator);
+    Check(
+        commits == 0
+            && terminals.Count == 1
+            && terminals[0].FailureKind == CombatReplayReportPublicationFailureKind.Retryable,
+        "A completed video that is temporarily missing during terminal admission must remain retryable."
+    );
+
+    Directory.CreateDirectory(videoDirectory);
+    File.WriteAllBytes(videoPath, new byte[] { 0, 0, 0, 0 });
+    now = 250;
+    terminals = Drain(coordinator);
+    Check(
+        commits == 1 && terminals.Any(terminal => terminal.Succeeded),
+        "Terminal admission must retain the video generation and publish after the transient file appears."
+    );
+}
+
+void VerifyTransientArtifactBuildRetries()
+{
+    var root = Path.Combine(sandbox, "artifact-build-retry");
+    var now = 0L;
+    var commits = 0;
+    var scheduled = new Queue<Action>();
+    var script = Encoding.UTF8.GetBytes("/* viewer */");
+    var css = Encoding.UTF8.GetBytes("/* css */");
+    var coordinator = new CombatReplayReportPublicationCoordinator(
+        root,
+        new ViewerArtifactBundle(
+            1,
+            script,
+            css,
+            script.Length,
+            StaticReportIntegrity.Sha256(script),
+            css.Length,
+            StaticReportIntegrity.Sha256(css)
+        ),
+        () => { },
+        (_, _) => commits++,
+        scheduled.Enqueue,
+        () => now
+    );
+    const string recordingId = "35353535353535353535353535353535";
+    const string battleId = "artifact-build-retry-battle";
+    coordinator.TryCaptureDraft(
+        new PvpBattleManifest { BattleId = battleId },
+        new NetMessageCombatSim(),
+        out _
+    );
+    coordinator.ObserveVideoStarted(Started(recordingId, battleId));
+    coordinator.MarkAssetsReady(recordingId, battleId, Array.Empty<PostCombatReportAssetFile>());
+    Check(
+        scheduled.Count == 1,
+        "Asset resolution must be queued before the artifact-build retry test."
+    );
+    scheduled.Dequeue()();
+
+    var completed = Completed(root, recordingId, battleId);
+    coordinator.ObserveVideoTerminal(completed, "en");
+    Check(scheduled.Count == 1, "A complete generation must queue one background artifact build.");
+    File.Delete(completed.FinalFilePath);
+    scheduled.Dequeue()();
+
+    var terminals = Drain(coordinator);
+    Check(
+        commits == 0
+            && terminals.Count == 1
+            && terminals[0].FailureKind == CombatReplayReportPublicationFailureKind.Retryable,
+        "A video that disappears during background artifact build must remain retryable."
+    );
+
+    File.WriteAllBytes(completed.FinalFilePath, new byte[] { 0, 0, 0, 0 });
+    now = 250;
+    terminals = Drain(coordinator);
+    Check(
+        terminals.Count == 0 && scheduled.Count == 1,
+        "Artifact-build retry backoff must queue one later worker without prematurely completing."
+    );
+    scheduled.Dequeue()();
+    terminals = Drain(coordinator);
+    Check(
+        commits == 1 && terminals.Any(terminal => terminal.Succeeded),
+        "The retained generation must publish after its transient artifact-build input returns."
+    );
+}
+
+void VerifyStructuredPublicationFailuresAreNonRetryable()
+{
+    var cases = new (string Name, Func<Exception> CreateFailure)[]
+    {
+        (
+            "traversal",
+            () =>
+                new ArtifactPublicationException(
+                    ArtifactPublicationFailureKind.PathEscapesRoot,
+                    "destination rejected"
+                )
+        ),
+        (
+            "symlink",
+            () =>
+                new ArtifactPublicationException(
+                    ArtifactPublicationFailureKind.SymbolicLinkOrReparsePoint,
+                    "destination rejected"
+                )
+        ),
+        ("permission", () => new UnauthorizedAccessException("destination rejected")),
+    };
+
+    foreach (var testCase in cases)
+    {
+        var root = Path.Combine(sandbox, "structured-" + testCase.Name);
+        var attempts = 0;
+        var now = 0L;
+        var coordinator = CreateCoordinator(
+            root,
+            (_, _) =>
+            {
+                attempts++;
+                throw testCase.CreateFailure();
+            },
+            () => now
+        );
+        var recordingId =
+            testCase.Name == "traversal" ? "71717171717171717171717171717171"
+            : testCase.Name == "symlink" ? "72727272727272727272727272727272"
+            : "73737373737373737373737373737373";
+        SupplyCompleteInputs(
+            coordinator,
+            root,
+            recordingId,
+            testCase.Name + "-battle",
+            schemaVersion: 1
+        );
+
+        var terminals = Drain(coordinator);
+        now = 30_000;
+        _ = Drain(coordinator);
+        Check(
+            attempts == 1
+                && terminals.Count == 1
+                && terminals[0].FailureKind
+                    == CombatReplayReportPublicationFailureKind.NonRetryable,
+            $"Structured {testCase.Name} publication failures must terminate without retries."
+        );
+    }
 }
 
 void VerifySchemaMismatchIsNonRetryable()
@@ -304,7 +650,9 @@ void VerifyInvalidAssetDegradesIndependentlyAndClearsStaleReference()
     coordinator.ObserveVideoStarted(Started(recordingId, battleId));
     var valid = CreatePngCacheObject(root, "valid", 7, 5);
     var invalid = new PostCombatReportAssetFile(
+        PostCombatReportAssetBindingKind.Entity,
         "invalid",
+        "card-preview",
         Path.Combine(root, "report-assets", "objects", "00", "missing.png")
     );
     coordinator.MarkAssetsReady(recordingId, battleId, new[] { invalid, valid });
@@ -589,7 +937,9 @@ PostCombatReportAssetFile CreatePngCacheObject(
     var path = Path.Combine(directory, digest + ".png");
     File.WriteAllBytes(path, bytes);
     return new PostCombatReportAssetFile(
+        PostCombatReportAssetBindingKind.Entity,
         instanceId,
+        "card-preview",
         path,
         ContentHash: digest,
         DisplayName: displayName

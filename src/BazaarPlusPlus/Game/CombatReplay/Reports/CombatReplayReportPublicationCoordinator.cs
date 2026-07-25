@@ -1,16 +1,12 @@
 #nullable enable
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Game.CombatReplay.ReportAssets;
 using BazaarPlusPlus.Game.CombatReplay.ReportData;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Infrastructure.Files;
-using Newtonsoft.Json;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 
@@ -47,9 +43,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
 
     private readonly object _gate = new();
     private readonly CombatReportProjector _projector = new();
-    private readonly StaticReportPaths _paths;
-    private readonly ViewerArtifactBundle _viewerArtifacts;
-    private readonly ReportHtmlEmitter _htmlEmitter;
+    private readonly CombatReplayReportArtifactBuilder _artifactBuilder;
     private readonly Action _ensureViewerInstalled;
     private readonly Action<string, byte[]> _commitReport;
     private readonly Action<Action> _schedule;
@@ -58,9 +52,10 @@ internal sealed class CombatReplayReportPublicationCoordinator
         StringComparer.Ordinal
     );
     private readonly Dictionary<string, long> _draftTouchOrder = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, RecordingGeneration> _generationsByRecording = new(
-        StringComparer.Ordinal
-    );
+    private readonly Dictionary<
+        string,
+        CombatReplayReportRecordingGeneration
+    > _generationsByRecording = new(StringComparer.Ordinal);
     private readonly HashSet<string> _inFlightRecordingIds = new(StringComparer.Ordinal);
     private readonly HashSet<string> _recentRecordingIds = new(StringComparer.Ordinal);
     private readonly Queue<string> _recentRecordingOrder = new();
@@ -90,30 +85,21 @@ internal sealed class CombatReplayReportPublicationCoordinator
         Func<long> monotonicMilliseconds
     )
     {
-        _paths = new StaticReportPaths(dataRootDirectoryPath);
-        _viewerArtifacts =
-            viewerArtifacts ?? throw new ArgumentNullException(nameof(viewerArtifacts));
-        _htmlEmitter = new ReportHtmlEmitter();
+        var paths = new StaticReportPaths(dataRootDirectoryPath);
+        var artifacts = viewerArtifacts ?? throw new ArgumentNullException(nameof(viewerArtifacts));
+        _artifactBuilder = new CombatReplayReportArtifactBuilder(paths, artifacts);
         _schedule = schedule ?? throw new ArgumentNullException(nameof(schedule));
         _monotonicMilliseconds =
             monotonicMilliseconds ?? throw new ArgumentNullException(nameof(monotonicMilliseconds));
 
-        var installer = new ViewerInstaller(
-            _paths,
-            _viewerArtifacts,
-            new ReplaceableArtifactPublisher()
-        );
-        var reportPublisher = new ReplaceableArtifactPublisher();
+        var installer = new ViewerInstaller(paths, artifacts, new ImmutableArtifactCommitter());
+        var reportCommitter = new ImmutableArtifactCommitter();
         _ensureViewerInstalled = ensureViewerInstalled ?? (() => installer.EnsureInstalled());
         _commitReport =
             commitReport
             ?? (
                 (destination, bytes) =>
-                    reportPublisher.PublishBelowRoot(
-                        _paths.DataRootDirectoryPath,
-                        destination,
-                        bytes
-                    )
+                    reportCommitter.CommitBelowRoot(paths.DataRootDirectoryPath, destination, bytes)
             );
     }
 
@@ -232,7 +218,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
         {
             if (!_draftsByBattle.TryGetValue(battleId, out var draft))
                 return false;
-            document = CloneDocument(draft);
+            document = CombatReplayReportArtifactBuilder.CloneDocument(draft);
             return true;
         }
     }
@@ -257,7 +243,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
             {
                 try
                 {
-                    completion.TrySetResult(CloneDocument(draft));
+                    completion.TrySetResult(CombatReplayReportArtifactBuilder.CloneDocument(draft));
                 }
                 catch (Exception ex)
                 {
@@ -319,12 +305,12 @@ internal sealed class CombatReplayReportPublicationCoordinator
         IReadOnlyList<PostCombatReportAssetFile> assetFiles
     )
     {
-        ResolvedReportAssetSet resolved;
+        CombatReplayReportResolvedAssetSet resolved;
         try
         {
             // Each asset degrades independently. Hashing and full PNG decode are deliberately
             // worker work; one corrupt cache object must not erase valid art for the other entities.
-            resolved = ResolveAssets(assetFiles);
+            resolved = _artifactBuilder.ResolveAssets(assetFiles);
         }
         catch (Exception ex)
         {
@@ -370,19 +356,18 @@ internal sealed class CombatReplayReportPublicationCoordinator
             return;
         }
 
-        PendingVideoArtifact video;
+        CombatReplayReportPendingVideoArtifact video;
         try
         {
             if (string.IsNullOrWhiteSpace(completed.FinalFilePath))
                 throw new ArgumentException("The completed video path is required.");
-            video = new PendingVideoArtifact(
+            video = new CombatReplayReportPendingVideoArtifact(
                 completed.RecordingId,
                 completed.BattleId,
                 Path.GetFullPath(completed.FinalFilePath),
                 NormalizeLocale(locale, useTraditionalChinese),
                 completed.SyncAnchors ?? Array.Empty<ReplayVideoSyncAnchor>()
             );
-            ValidateVideo(video);
         }
         catch (Exception ex)
         {
@@ -394,22 +379,54 @@ internal sealed class CombatReplayReportPublicationCoordinator
             return;
         }
 
-        lock (_gate)
+        if (!TryReserveVideo(video, out var attemptCount))
+            return;
+
+        try
         {
-            if (_recentRecordingIds.Contains(video.RecordingId))
-                return;
-            var generation = GetOrCreateGenerationNoLock(video.RecordingId, video.BattleId);
-            if (generation == null || generation.Video != null)
-                return;
-            generation.Video = video;
-            generation.Locale = video.Locale;
+            _artifactBuilder.ValidateVideo(video);
         }
+        catch (Exception ex)
+        {
+            HandlePublicationFailure(
+                new CombatReplayReportPublicationWorkItem(
+                    video.RecordingId,
+                    video.BattleId,
+                    string.Empty,
+                    Array.Empty<byte>(),
+                    attemptCount
+                ),
+                ex,
+                "The completed video could not be admitted: "
+            );
+            return;
+        }
+
+        lock (_gate)
+            _inFlightRecordingIds.Remove(video.RecordingId);
 
         TryAdvance();
     }
 
-    /// <summary>Allows the Runtime update loop to advance transient retries after backoff.</summary>
-    internal void RetryPendingPublications() => TryAdvance();
+    private bool TryReserveVideo(CombatReplayReportPendingVideoArtifact video, out int attemptCount)
+    {
+        lock (_gate)
+        {
+            attemptCount = 0;
+            if (_recentRecordingIds.Contains(video.RecordingId))
+                return false;
+
+            var generation = GetOrCreateGenerationNoLock(video.RecordingId, video.BattleId);
+            if (generation == null || generation.Video != null)
+                return false;
+
+            generation.Video = video;
+            generation.Locale = video.Locale;
+            attemptCount = generation.AttemptCount;
+            _inFlightRecordingIds.Add(video.RecordingId);
+            return true;
+        }
+    }
 
     internal void DrainTerminals(Action<CombatReplayReportPublicationTerminal> observe)
     {
@@ -417,7 +434,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
             throw new ArgumentNullException(nameof(observe));
 
         // Runtime already calls this once per Update, so retrying here self-heals without a timer
-        // that can outlive the plugin. RetryPendingPublications remains the explicit test/API seam.
+        // that can outlive the plugin.
         TryAdvance();
         while (_terminals.TryDequeue(out var terminal))
             observe(terminal);
@@ -425,11 +442,11 @@ internal sealed class CombatReplayReportPublicationCoordinator
 
     private void TryAdvance()
     {
-        List<PublicationCandidate> ready;
+        List<CombatReplayReportPublicationCandidate> ready;
         var now = _monotonicMilliseconds();
         lock (_gate)
         {
-            ready = new List<PublicationCandidate>();
+            ready = new List<CombatReplayReportPublicationCandidate>();
             foreach (var generation in _generationsByRecording.Values)
             {
                 if (
@@ -446,7 +463,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
 
                 _inFlightRecordingIds.Add(generation.RecordingId);
                 ready.Add(
-                    new PublicationCandidate(
+                    new CombatReplayReportPublicationCandidate(
                         generation.RecordingId,
                         generation.BattleId,
                         generation.Document,
@@ -462,81 +479,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
             StartPublication(ready[index]);
     }
 
-    private PublicationWorkItem BuildWorkItem(PublicationCandidate candidate)
-    {
-        var recordingId = StaticReportPaths.ParseRecordingId(candidate.RecordingId);
-        if (
-            !string.Equals(
-                candidate.Document.BattleId,
-                candidate.BattleId,
-                StringComparison.Ordinal
-            )
-            || !string.Equals(
-                candidate.Video.BattleId,
-                candidate.BattleId,
-                StringComparison.Ordinal
-            )
-            || !string.Equals(candidate.Video.RecordingId, recordingId, StringComparison.Ordinal)
-        )
-        {
-            throw new InvalidDataException("Report recording-generation identity is inconsistent.");
-        }
-
-        ValidateVideo(candidate.Video);
-        ApplyAssets(candidate.Document, candidate.Assets);
-        CombatReportJson.RefreshDocumentId(candidate.Document);
-        var videoRelativeUrl = _paths.BuildVideoRelativeUrl(candidate.Video.FinalVideoFilePath);
-        _ = TypedReportSiblingUrl.Parse(videoRelativeUrl);
-        var exactSyncAnchors = ReplayVideoSyncMetadata.SelectExactAnchors(
-            recordingId,
-            candidate.BattleId,
-            candidate.Video.SyncAnchors
-        );
-        var recordingManifest = new RecordingReportManifestV1
-        {
-            ArtifactId = "report-" + recordingId,
-            RecordingId = recordingId,
-            BattleId = candidate.BattleId,
-            VideoRelativeUrl = videoRelativeUrl,
-            SyncMetadataStatus = exactSyncAnchors.Count >= 2 ? "ReadyExact" : "ReadyUnsynced",
-            SyncAnchors = exactSyncAnchors
-                .Select(anchor => new RecordingReportSyncAnchorV1
-                {
-                    CombatFrame = anchor.CombatFrame,
-                    CombatMs = anchor.CombatMs,
-                    MediaPtsMs = anchor.MediaPtsMs,
-                    OutputOrdinal = anchor.OutputOrdinal,
-                })
-                .ToList(),
-            Assets = candidate.Assets.ManifestAssets.Select(CloneManifestAsset).ToList(),
-        };
-        var envelope = new EmbeddedReportEnvelopeV1
-        {
-            Locale = candidate.Video.Locale,
-            BattleDocument = candidate.Document,
-            RecordingManifest = recordingManifest,
-        };
-
-        ValidateSchemaCompatibility(envelope);
-        ValidateAssetConsistency(envelope);
-        var envelopeJson = CombatReportJson.Serialize(envelope);
-        var htmlBytes = _htmlEmitter.Emit(
-            BuildTitle(candidate.Document),
-            candidate.Video.Locale,
-            envelopeJson,
-            _viewerArtifacts.BundleId
-        );
-
-        return new PublicationWorkItem(
-            recordingId,
-            candidate.BattleId,
-            _paths.GetReportHtmlFilePath(recordingId),
-            htmlBytes,
-            candidate.AttemptCount
-        );
-    }
-
-    private void StartPublication(PublicationCandidate candidate)
+    private void StartPublication(CombatReplayReportPublicationCandidate candidate)
     {
         try
         {
@@ -545,7 +488,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
         catch (Exception ex)
         {
             HandlePublicationFailure(
-                new PublicationWorkItem(
+                new CombatReplayReportPublicationWorkItem(
                     candidate.RecordingId,
                     candidate.BattleId,
                     string.Empty,
@@ -558,19 +501,25 @@ internal sealed class CombatReplayReportPublicationCoordinator
         }
     }
 
-    private void BuildAndPublish(PublicationCandidate candidate)
+    private void BuildAndPublish(CombatReplayReportPublicationCandidate candidate)
     {
-        PublicationWorkItem work;
+        CombatReplayReportPublicationWorkItem work;
         try
         {
-            work = BuildWorkItem(candidate with { Document = CloneDocument(candidate.Document) });
+            work = _artifactBuilder.Build(candidate);
         }
         catch (Exception ex)
         {
-            CompleteNonRetryable(
-                candidate.RecordingId,
-                candidate.BattleId,
-                "Static report identity, schema, or path validation failed: " + DescribeFailure(ex)
+            HandlePublicationFailure(
+                new CombatReplayReportPublicationWorkItem(
+                    candidate.RecordingId,
+                    candidate.BattleId,
+                    string.Empty,
+                    Array.Empty<byte>(),
+                    candidate.AttemptCount
+                ),
+                ex,
+                "Static report artifact build failed: "
             );
             return;
         }
@@ -578,7 +527,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
         Publish(work);
     }
 
-    private void Publish(PublicationWorkItem work)
+    private void Publish(CombatReplayReportPublicationWorkItem work)
     {
         try
         {
@@ -593,7 +542,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
     }
 
     private void HandlePublicationFailure(
-        PublicationWorkItem work,
+        CombatReplayReportPublicationWorkItem work,
         Exception exception,
         string prefix
     )
@@ -640,7 +589,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
         }
     }
 
-    private void CompleteSuccess(PublicationWorkItem work)
+    private void CompleteSuccess(CombatReplayReportPublicationWorkItem work)
     {
         var shouldEnqueue = false;
         lock (_gate)
@@ -668,244 +617,10 @@ internal sealed class CombatReplayReportPublicationCoordinator
         }
     }
 
-    private ResolvedReportAssetSet ResolveAssets(
-        IReadOnlyList<PostCombatReportAssetFile> assetFiles
+    private CombatReplayReportRecordingGeneration? GetOrCreateGenerationNoLock(
+        string recordingId,
+        string battleId
     )
-    {
-        var manifestByDigest = new Dictionary<string, RecordingReportAssetV1>(
-            StringComparer.Ordinal
-        );
-        var entityAssets = new Dictionary<string, ResolvedBindingAsset>(StringComparer.Ordinal);
-        var eventSemanticAssets = new Dictionary<string, ResolvedBindingAsset>(
-            StringComparer.Ordinal
-        );
-
-        for (var index = 0; index < assetFiles.Count; index++)
-        {
-            var asset = assetFiles[index];
-            if (asset == null || string.IsNullOrWhiteSpace(asset.BindingKey))
-                continue;
-
-            try
-            {
-                var resolved = ResolveAsset(asset);
-                switch (asset.BindingKind)
-                {
-                    case PostCombatReportAssetBindingKind.Entity:
-                        entityAssets[asset.BindingKey] = resolved.BindingAsset;
-                        break;
-                    case PostCombatReportAssetBindingKind.EventSemantic:
-                        eventSemanticAssets[asset.BindingKey] = resolved.BindingAsset;
-                        break;
-                    default:
-                        continue;
-                }
-                manifestByDigest.TryAdd(resolved.ManifestAsset.Sha256, resolved.ManifestAsset);
-            }
-            catch
-            {
-                // Per-asset degradation is intentional. The entity's URL/key remain cleared and
-                // the Viewer renders its deterministic placeholder.
-            }
-        }
-
-        return new ResolvedReportAssetSet(
-            manifestByDigest
-                .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                .Select(pair => pair.Value)
-                .ToList(),
-            entityAssets,
-            eventSemanticAssets
-        );
-    }
-
-    private ResolvedAsset ResolveAsset(PostCombatReportAssetFile asset)
-    {
-        ReportPhysicalFile.RequireBelowRoot(
-            _paths.AssetRootDirectoryPath,
-            asset.FilePath,
-            "Captured report card preview"
-        );
-        var digest = StaticReportIntegrity.Sha256File(asset.FilePath);
-        if (
-            !string.IsNullOrWhiteSpace(asset.ContentHash)
-            && !string.Equals(asset.ContentHash, digest, StringComparison.Ordinal)
-        )
-        {
-            throw new InvalidDataException("A report asset content hash is inconsistent.");
-        }
-
-        var expectedObjectPath = Path.Combine(
-            _paths.AssetRootDirectoryPath,
-            "objects",
-            digest.Substring(0, 2),
-            digest + ".png"
-        );
-        if (
-            !string.Equals(
-                Path.GetFullPath(asset.FilePath),
-                Path.GetFullPath(expectedObjectPath),
-                PathComparison
-            )
-        )
-        {
-            throw new InvalidDataException(
-                "A report asset did not resolve to its content-addressed cache object."
-            );
-        }
-
-        if (!TryDecodePng(asset.FilePath, out var width, out var height))
-            throw new InvalidDataException("A report asset is not a fully decodable PNG.");
-        if (
-            (asset.PixelWidth > 0 && asset.PixelWidth != width)
-            || (asset.PixelHeight > 0 && asset.PixelHeight != height)
-        )
-        {
-            throw new InvalidDataException("A report asset's cached geometry is inconsistent.");
-        }
-
-        var relativeUrl = StaticReportPaths.BuildAssetRelativeUrl(digest);
-        _ = TypedReportSiblingUrl.Parse(relativeUrl);
-        var contentKey = "sha256-" + digest;
-        return new ResolvedAsset(
-            new RecordingReportAssetV1
-            {
-                ContentKey = contentKey,
-                RelativeUrl = relativeUrl,
-                SemanticRole = asset.SemanticRole,
-                NaturalWidth = width,
-                NaturalHeight = height,
-                Sha256 = digest,
-            },
-            new ResolvedBindingAsset(contentKey, relativeUrl, asset.DisplayName)
-        );
-    }
-
-    private void ValidateSchemaCompatibility(EmbeddedReportEnvelopeV1 envelope)
-    {
-        if (
-            envelope.SchemaVersion != _viewerArtifacts.ReportSchemaVersion
-            || envelope.BattleDocument.SchemaVersion != _viewerArtifacts.ReportSchemaVersion
-            || envelope.RecordingManifest.SchemaVersion != _viewerArtifacts.ReportSchemaVersion
-        )
-        {
-            throw new InvalidDataException(
-                "Viewer, envelope, document, and recording-manifest schemas are incompatible."
-            );
-        }
-    }
-
-    private static void ValidateAssetConsistency(EmbeddedReportEnvelopeV1 envelope)
-    {
-        var manifestByContentKey = new Dictionary<string, RecordingReportAssetV1>(
-            StringComparer.Ordinal
-        );
-        foreach (var asset in envelope.RecordingManifest.Assets)
-        {
-            var digest = StaticReportPaths.ParseSha256(asset.Sha256, nameof(asset.Sha256));
-            var expectedContentKey = "sha256-" + digest;
-            var expectedUrl = StaticReportPaths.BuildAssetRelativeUrl(digest);
-            if (
-                !string.Equals(asset.ContentKey, expectedContentKey, StringComparison.Ordinal)
-                || !string.Equals(asset.RelativeUrl, expectedUrl, StringComparison.Ordinal)
-                || !manifestByContentKey.TryAdd(asset.ContentKey, asset)
-            )
-            {
-                throw new InvalidDataException("The report asset manifest is inconsistent.");
-            }
-        }
-
-        foreach (var entity in envelope.BattleDocument.Entities)
-        {
-            if (
-                string.IsNullOrWhiteSpace(entity.ContentKey)
-                && string.IsNullOrWhiteSpace(entity.AssetRelativeUrl)
-            )
-            {
-                continue;
-            }
-            if (
-                string.IsNullOrWhiteSpace(entity.ContentKey)
-                || string.IsNullOrWhiteSpace(entity.AssetRelativeUrl)
-                || !manifestByContentKey.TryGetValue(entity.ContentKey, out var asset)
-                || !string.Equals(
-                    asset.RelativeUrl,
-                    entity.AssetRelativeUrl,
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                throw new InvalidDataException(
-                    "An entity asset reference is absent from the recording manifest."
-                );
-            }
-        }
-
-        foreach (var reportEvent in envelope.BattleDocument.Events)
-        {
-            if (
-                string.IsNullOrWhiteSpace(reportEvent.IconContentKey)
-                && string.IsNullOrWhiteSpace(reportEvent.IconAssetRelativeUrl)
-            )
-            {
-                continue;
-            }
-            if (
-                string.IsNullOrWhiteSpace(reportEvent.IconContentKey)
-                || string.IsNullOrWhiteSpace(reportEvent.IconAssetRelativeUrl)
-                || !manifestByContentKey.TryGetValue(reportEvent.IconContentKey, out var asset)
-                || !string.Equals(
-                    asset.RelativeUrl,
-                    reportEvent.IconAssetRelativeUrl,
-                    StringComparison.Ordinal
-                )
-            )
-            {
-                throw new InvalidDataException(
-                    "An event icon reference is absent from the recording manifest."
-                );
-            }
-        }
-    }
-
-    private static void ApplyAssets(CombatReportDocumentV1 document, ResolvedReportAssetSet assets)
-    {
-        for (var index = 0; index < document.Entities.Count; index++)
-        {
-            var entity = document.Entities[index];
-            // Always clear the projected/source value first. A missing or invalid asset for this
-            // recording must not inherit a URL from a prior application or recording generation.
-            entity.ContentKey = null;
-            entity.AssetRelativeUrl = null;
-            if (!assets.EntityAssets.TryGetValue(entity.EntityId, out var resolved))
-                continue;
-            entity.ContentKey = resolved.ContentKey;
-            entity.AssetRelativeUrl = resolved.RelativeUrl;
-            if (!string.IsNullOrWhiteSpace(resolved.DisplayName))
-                entity.Name = resolved.DisplayName;
-        }
-
-        for (var index = 0; index < document.Events.Count; index++)
-        {
-            var reportEvent = document.Events[index];
-            reportEvent.IconContentKey = null;
-            reportEvent.IconAssetRelativeUrl = null;
-            if (
-                string.IsNullOrWhiteSpace(reportEvent.IconSemanticKey)
-                || !assets.EventSemanticAssets.TryGetValue(
-                    reportEvent.IconSemanticKey,
-                    out var resolved
-                )
-            )
-            {
-                continue;
-            }
-            reportEvent.IconContentKey = resolved.ContentKey;
-            reportEvent.IconAssetRelativeUrl = resolved.RelativeUrl;
-        }
-    }
-
-    private RecordingGeneration? GetOrCreateGenerationNoLock(string recordingId, string battleId)
     {
         if (_generationsByRecording.TryGetValue(recordingId, out var existing))
         {
@@ -923,7 +638,11 @@ internal sealed class CombatReplayReportPublicationCoordinator
             return existing;
         }
 
-        var generation = new RecordingGeneration(recordingId, battleId, ++_sequence);
+        var generation = new CombatReplayReportRecordingGeneration(
+            recordingId,
+            battleId,
+            ++_sequence
+        );
         if (_draftsByBattle.TryGetValue(battleId, out var draft))
             generation.Document = draft;
         _generationsByRecording.Add(recordingId, generation);
@@ -1035,20 +754,12 @@ internal sealed class CombatReplayReportPublicationCoordinator
         }
     }
 
-    private void ValidateVideo(PendingVideoArtifact video)
-    {
-        ReportPhysicalFile.RequireBelowRoot(
-            _paths.VideoRootDirectoryPath,
-            video.FinalVideoFilePath,
-            "Recorded combat video"
-        );
-        _ = TypedReportSiblingUrl.Parse(_paths.BuildVideoRelativeUrl(video.FinalVideoFilePath));
-    }
-
     private static bool IsNonRetryablePublicationFailure(Exception exception)
     {
+        exception = exception.GetBaseException();
         if (
-            exception is ArgumentException
+            exception is ArtifactPublicationException
+            || exception is ArgumentException
             || exception is InvalidDataException
             || exception is InvalidOperationException
             || exception is NotSupportedException
@@ -1058,15 +769,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
             return true;
         }
 
-        if (exception is not IOException)
-            return false;
-        var message = exception.Message ?? string.Empty;
-        return message.IndexOf("immutable", StringComparison.OrdinalIgnoreCase) >= 0
-            || message.IndexOf("identity", StringComparison.OrdinalIgnoreCase) >= 0
-            || message.IndexOf("symbolic link", StringComparison.OrdinalIgnoreCase) >= 0
-            || message.IndexOf("reparse", StringComparison.OrdinalIgnoreCase) >= 0
-            || message.IndexOf("escaped", StringComparison.OrdinalIgnoreCase) >= 0
-            || message.IndexOf("must be a file", StringComparison.OrdinalIgnoreCase) >= 0;
+        return false;
     }
 
     private static long RetryDelayMilliseconds(int attemptCount)
@@ -1076,32 +779,6 @@ internal sealed class CombatReplayReportPublicationCoordinator
             InitialRetryDelayMilliseconds * (1L << exponent),
             MaximumRetryDelayMilliseconds
         );
-    }
-
-    private static CombatReportDocumentV1 CloneDocument(CombatReportDocumentV1 document) =>
-        JsonConvert.DeserializeObject<CombatReportDocumentV1>(CombatReportJson.Serialize(document))
-        ?? throw new InvalidDataException("The projected combat report could not be cloned.");
-
-    private static RecordingReportAssetV1 CloneManifestAsset(RecordingReportAssetV1 asset) =>
-        new()
-        {
-            ContentKey = asset.ContentKey,
-            RelativeUrl = asset.RelativeUrl,
-            SemanticRole = asset.SemanticRole,
-            NaturalWidth = asset.NaturalWidth,
-            NaturalHeight = asset.NaturalHeight,
-            Sha256 = asset.Sha256,
-        };
-
-    private static string BuildTitle(CombatReportDocumentV1 document)
-    {
-        var player = string.IsNullOrWhiteSpace(document.Summary.PlayerName)
-            ? "Player"
-            : document.Summary.PlayerName;
-        var opponent = string.IsNullOrWhiteSpace(document.Summary.OpponentName)
-            ? "Opponent"
-            : document.Summary.OpponentName;
-        return player + " vs " + opponent + " · BazaarPlusPlus";
     }
 
     private static string NormalizeLocale(string? locale, bool useTraditionalChinese)
@@ -1124,117 +801,6 @@ internal sealed class CombatReplayReportPublicationCoordinator
             : "zh-CN";
     }
 
-    private static bool TryDecodePng(string filePath, out int width, out int height)
-    {
-        width = 0;
-        height = 0;
-        try
-        {
-            using var stream = new FileStream(
-                filePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                4096,
-                FileOptions.SequentialScan
-            );
-            using var image = Image.Load<Rgba32>(stream, out var format);
-            if (
-                format == null
-                || !format.FileExtensions.Contains("png", StringComparer.OrdinalIgnoreCase)
-            )
-            {
-                return false;
-            }
-
-            width = image.Width;
-            height = image.Height;
-            return width > 0 && height > 0;
-        }
-        catch (Exception ex)
-            when (ex
-                    is IOException
-                        or UnauthorizedAccessException
-                        or ArgumentException
-                        or NotSupportedException
-                        or UnknownImageFormatException
-                        or InvalidImageContentException
-            )
-        {
-            width = 0;
-            height = 0;
-            return false;
-        }
-    }
-
     private static string DescribeFailure(Exception exception) =>
         string.IsNullOrWhiteSpace(exception.Message) ? exception.GetType().Name : exception.Message;
-
-    private static StringComparison PathComparison =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
-
-    private sealed class RecordingGeneration
-    {
-        internal RecordingGeneration(string recordingId, string battleId, long arrivalSequence)
-        {
-            RecordingId = recordingId;
-            BattleId = battleId;
-            ArrivalSequence = arrivalSequence;
-        }
-
-        internal string RecordingId { get; }
-        internal string BattleId { get; }
-        internal long ArrivalSequence { get; }
-        internal CombatReportDocumentV1? Document { get; set; }
-        internal ResolvedReportAssetSet? Assets { get; set; }
-        internal bool AssetsResolutionStarted { get; set; }
-        internal PendingVideoArtifact? Video { get; set; }
-        internal string Locale { get; set; } = "en";
-        internal int AttemptCount { get; set; }
-        internal long NextAttemptAtMilliseconds { get; set; }
-    }
-
-    private sealed record PendingVideoArtifact(
-        string RecordingId,
-        string BattleId,
-        string FinalVideoFilePath,
-        string Locale,
-        IReadOnlyList<ReplayVideoSyncAnchor> SyncAnchors
-    );
-
-    private sealed record PublicationCandidate(
-        string RecordingId,
-        string BattleId,
-        CombatReportDocumentV1 Document,
-        ResolvedReportAssetSet Assets,
-        PendingVideoArtifact Video,
-        int AttemptCount
-    );
-
-    private sealed record PublicationWorkItem(
-        string RecordingId,
-        string BattleId,
-        string ReportHtmlFilePath,
-        byte[] ReportHtmlBytes,
-        int AttemptCount
-    );
-
-    private sealed record ResolvedAsset(
-        RecordingReportAssetV1 ManifestAsset,
-        ResolvedBindingAsset BindingAsset
-    );
-
-    private sealed record ResolvedBindingAsset(
-        string ContentKey,
-        string RelativeUrl,
-        string DisplayName
-    );
-
-    private sealed record ResolvedReportAssetSet(
-        IReadOnlyList<RecordingReportAssetV1> ManifestAssets,
-        IReadOnlyDictionary<string, ResolvedBindingAsset> EntityAssets,
-        IReadOnlyDictionary<string, ResolvedBindingAsset> EventSemanticAssets
-    );
 }

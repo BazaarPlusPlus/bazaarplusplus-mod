@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/CombatReplayReportStartupRecovery.cs"
       Link="CombatReplayReportStartupRecovery.cs"
@@ -20,16 +24,8 @@
       Link="StaticReportIntegrity.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/CombatReplayReportRecoveryAssetGate.cs"
-      Link="CombatReplayReportRecoveryAssetGate.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportAssets/PostCombatReportAssetFile.cs"
-      Link="PostCombatReportAssetFile.cs"
-    />
-    <Compile
-      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportData/CombatReportContracts.cs"
-      Link="CombatReportContracts.cs"
+      Include="../../src/BazaarPlusPlus/Infrastructure/Files/ArtifactPublicationException.cs"
+      Link="ArtifactPublicationException.cs"
     />
   </ItemGroup>
 </Project>

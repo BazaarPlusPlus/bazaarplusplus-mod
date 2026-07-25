@@ -6,28 +6,28 @@ namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 internal sealed record ViewerInstallResult(
     ViewerArtifactBundle Artifacts,
     string BundleDirectoryPath,
-    ReplaceableArtifactPublishResult ScriptPublish,
-    ReplaceableArtifactPublishResult StylesheetPublish
+    ImmutableArtifactCommitResult ScriptPublish,
+    ImmutableArtifactCommitResult StylesheetPublish
 );
 
 internal sealed class ViewerInstaller
 {
     private readonly StaticReportPaths _paths;
     private readonly ViewerArtifactBundle _artifacts;
-    private readonly ReplaceableArtifactPublisher _publisher;
+    private readonly ImmutableArtifactCommitter _committer;
 
     internal ViewerInstaller(StaticReportPaths paths)
-        : this(paths, ViewerArtifactBundle.CreateDefault(), new ReplaceableArtifactPublisher()) { }
+        : this(paths, ViewerArtifactBundle.CreateDefault(), new ImmutableArtifactCommitter()) { }
 
     internal ViewerInstaller(
         StaticReportPaths paths,
         ViewerArtifactBundle artifacts,
-        ReplaceableArtifactPublisher publisher
+        ImmutableArtifactCommitter committer
     )
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
         _artifacts = artifacts ?? throw new ArgumentNullException(nameof(artifacts));
-        _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
+        _committer = committer ?? throw new ArgumentNullException(nameof(committer));
     }
 
     internal ViewerInstallResult EnsureInstalled()
@@ -35,12 +35,12 @@ internal sealed class ViewerInstaller
         // A report references this content-addressed generation only after EnsureInstalled
         // returns. A crash between the two writes can leave an unreferenced partial generation,
         // but can never make an existing report combine artifacts from different releases.
-        var stylesheet = _publisher.PublishBelowRoot(
+        var stylesheet = _committer.CommitBelowRoot(
             _paths.DataRootDirectoryPath,
             _paths.GetViewerStylesheetFilePath(_artifacts.BundleId),
             _artifacts.StylesheetBytes
         );
-        var script = _publisher.PublishBelowRoot(
+        var script = _committer.CommitBelowRoot(
             _paths.DataRootDirectoryPath,
             _paths.GetViewerScriptFilePath(_artifacts.BundleId),
             _artifacts.ScriptBytes

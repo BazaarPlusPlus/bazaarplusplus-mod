@@ -8,258 +8,35 @@ import {
   useRef,
   useState,
 } from "react";
-import { cn } from "../../lib/utils.ts";
-import {
-  combatMsAtPointer,
-} from "../../timeline/geometry.ts";
 import type { ReportAction } from "../../app/report-reducer.ts";
-import {
-  TIME_ZOOM_STEPS,
-  type ReportState,
-} from "../../app/report-state.ts";
+import { TIME_ZOOM_STEPS, type ReportState } from "../../app/report-state.ts";
 import type { ReportViewModel } from "../../model/report.ts";
-import {
-  normalizeSide,
-  type NormalizedEntity,
-} from "../../model/normalize.ts";
 import {
   LANE_HEIGHT,
   LANE_LABEL_WIDTH,
   MIN_TIMELINE_WIDTH,
   STATE_BAND_HEIGHT,
-  TIME_RULER_HEIGHT,
   timelineWidthAtZoom,
 } from "../../timeline/constants.ts";
-import {
-  TimelineCanvasController,
-} from "../../timeline/event-renderer.ts";
-import {
-  drawStateBand,
-  groupMetricSamples,
-  metricValueAt,
-} from "../../timeline/state-band-renderer.ts";
-import { METRIC_DOT_CLASSES } from "../../timeline/metric-theme.ts";
-import {
-  METRIC_ORDER,
-  stateAxisTicks,
-  sharedStateDomain,
-} from "../../timeline/state-scale.ts";
-import { formatCompactNumber, formatDuration } from "../../i18n/format.ts";
-import { EntityArt } from "../semantic/EntityArt.tsx";
+import { TimelineCanvasController } from "../../timeline/event-renderer.ts";
+import { drawStateBand, groupMetricSamples } from "../../timeline/state-band-renderer.ts";
+import { formatDuration } from "../../i18n/format.ts";
 import { FrameInspector } from "../inspector/FrameInspector.tsx";
-import {
-  timelineClusterEventIds,
-  type TimelineCluster,
-} from "../../timeline/clusters.ts";
+import { timelineClusterEventIds } from "../../timeline/clusters.ts";
 import {
   filterTimelineEntities,
   opponentBoundaryLane,
 } from "../../timeline/lane-filter.ts";
+import { heroLaneAtScroll } from "./TimelineLabels.tsx";
 import {
-  ToggleGroup,
-  ToggleGroupItem,
-} from "../ui/toggle-group.tsx";
-import { Badge } from "../ui/badge.tsx";
-import { LaneFilterPopover } from "./LaneFilterPopover.tsx";
+  TimelineViewport,
+  type TimelineTooltipRefs,
+  useTimelineViewportRefs,
+} from "./TimelineViewport.tsx";
 
 export interface TimelineHandle {
   setExternalPlayhead: (combatMs: number) => void;
   navigate: (direction: -1 | 1) => void;
-}
-
-interface TooltipRefs {
-  host: HTMLDivElement;
-  time: HTMLSpanElement;
-  label: HTMLElement;
-  count: HTMLSpanElement;
-}
-
-function heroLaneAtScroll(
-  heroLaneIndexes: readonly number[],
-  scrollTop: number,
-): number | null {
-  let activeLane: number | null = null;
-  for (const lane of heroLaneIndexes) {
-    if (scrollTop < lane * LANE_HEIGHT) break;
-    activeLane = lane;
-  }
-  return activeLane;
-}
-
-function entityTypeLabel(
-  type: string,
-  t: (key: string) => string,
-): string {
-  const normalized = type.toLowerCase();
-  return t(
-    normalized === "hero"
-      ? "entityHero"
-      : normalized === "item"
-        ? "entityItem"
-        : normalized === "skill"
-          ? "entitySkill"
-          : normalized === "effect"
-            ? "entityEffect"
-            : "entityUnknown",
-  );
-}
-
-function LaneLabelContents({
-  entity,
-  index,
-  sticky,
-  t,
-}: {
-  entity: NormalizedEntity;
-  index: number;
-  sticky?: boolean;
-  t: (key: string) => string;
-}): React.JSX.Element {
-  const side = normalizeSide(entity.side);
-  const artSlotTestId = sticky
-    ? "timeline-sticky-hero-art-slot"
-    : `timeline-lane-art-slot-${index}`;
-  const iconTestId = sticky
-    ? "timeline-sticky-hero-icon"
-    : `timeline-lane-icon-${index}`;
-  return (
-    <>
-      <span
-        className="bpp-lane-art-slot"
-        data-bpp-test-id={artSlotTestId}
-      >
-        <EntityArt
-          entity={entity}
-          testId={iconTestId}
-        />
-      </span>
-      <span className="bpp-lane-copy">
-        {sticky
-          ? (
-            <span className="bpp-sticky-hero-copy">
-              <strong className="min-w-0 truncate text-body text-foreground">
-                {entity.name}
-              </strong>
-              {side !== "neutral" && (
-                <Badge
-                  className="bpp-sticky-hero-side text-nano"
-                  data-bpp-test-id="timeline-sticky-hero-side"
-                  variant="outline"
-                >
-                  {t(side)}
-                </Badge>
-              )}
-            </span>
-          )
-          : (
-            <>
-              <strong className="block truncate text-body text-foreground">
-                {entity.name}
-              </strong>
-              <small className="block truncate text-micro text-muted-foreground">
-                {entityTypeLabel(entity.type, t)}
-              </small>
-            </>
-          )}
-      </span>
-      <span
-        className={cn(
-          "ml-auto h-7 w-0.5 rounded-full",
-          side === "opponent"
-            ? "bg-opponent/80"
-            : side === "player"
-              ? "bg-player/85"
-              : "bg-faint/70",
-        )}
-      />
-    </>
-  );
-}
-
-function StateLabels({
-  model,
-  combatMs,
-  scaleMode,
-  dispatch,
-  t,
-}: {
-  model: ReportViewModel;
-  combatMs: number;
-  scaleMode: ReportState["stateScale"];
-  dispatch: React.Dispatch<ReportAction>;
-  t: (key: string) => string;
-}): React.JSX.Element {
-  const grouped = useMemo(() => groupMetricSamples(model), [model]);
-  const domain = sharedStateDomain(grouped, scaleMode);
-  const ticks = stateAxisTicks(domain, scaleMode);
-  return (
-    <div
-      className="bpp-state-labels"
-      data-bpp-test-id="state-band-labels"
-    >
-      <div className="flex h-control-xs items-center gap-1 border-b border-border/60 px-2">
-        <span className="min-w-0 truncate font-mono text-micro text-muted-foreground">
-          {t("stateValues")} · {formatDuration(combatMs)}
-        </span>
-        <ToggleGroup
-          aria-label={t("metricsTitle")}
-          className="ml-auto border border-border/70 bg-background/60"
-          onValueChange={(value) => {
-            if (value === "linear" || value === "magnitude") {
-              dispatch({ type: "select-scale", scale: value });
-            }
-          }}
-          size="xs"
-          type="single"
-          value={scaleMode}
-        >
-          {(["linear", "magnitude"] as const).map((scale) => (
-            <ToggleGroupItem className="px-1.5" key={scale} value={scale}>
-              {t(scale === "linear" ? "linearScale" : "magnitudeScale")}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </div>
-      <div className="grid h-[93px] grid-rows-6">
-        {METRIC_ORDER.map((metric) => {
-          const player = metricValueAt(
-            grouped.get(`player:${metric}`),
-            combatMs,
-          );
-          const opponent = metricValueAt(
-            grouped.get(`opponent:${metric}`),
-            combatMs,
-          );
-          return (
-            <div
-              className="grid grid-cols-[8px_1fr_auto_auto] items-center gap-1 px-2 text-micro"
-              data-bpp-test-id={`state-label-${metric}`}
-              key={metric}
-            >
-              <span
-                className={cn(
-                  "size-1.5 rounded-full",
-                  METRIC_DOT_CLASSES[metric],
-                )}
-              />
-              <strong className="truncate text-foreground/85">
-                {t(metric)}
-              </strong>
-              <span className="font-mono text-player">
-                {player === null ? "—" : formatCompactNumber(player)}
-              </span>
-              <span className="font-mono text-opponent">
-                {opponent === null ? "—" : formatCompactNumber(opponent)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="sr-only" data-bpp-state-axis-ticks>
-        {ticks.map((tick) => tick.label).join(", ")}
-      </div>
-    </div>
-  );
 }
 
 export const TimelineView = forwardRef<
@@ -275,21 +52,8 @@ export const TimelineView = forwardRef<
   { model, state, dispatch, onPreviewCombatMs, t },
   forwardedRef,
 ): React.JSX.Element {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const gridRef = useRef<HTMLDivElement>(null);
-  const labelsRef = useRef<HTMLDivElement>(null);
-  const stateCanvasRef = useRef<HTMLCanvasElement>(null);
-  const rulerRef = useRef<HTMLCanvasElement>(null);
-  const eventCanvasRef = useRef<HTMLCanvasElement>(null);
-  const stickyHeroCanvasRef = useRef<HTMLCanvasElement>(null);
-  const stickyHeroLabelRef = useRef<HTMLDivElement>(null);
-  const tooltipHostRef = useRef<HTMLDivElement>(null);
-  const tooltipTimeRef = useRef<HTMLSpanElement>(null);
-  const tooltipLabelRef = useRef<HTMLElement>(null);
-  const tooltipCountRef = useRef<HTMLSpanElement>(null);
-  const controllerRef = useRef<TimelineCanvasController | null>(null);
+  const viewportRefs = useTimelineViewportRefs();
   const playheadRef = useRef(state.selectedCombatMs);
-  const previewRef = useRef<number | null>(null);
   const selectionRef = useRef({
     frame: state.selectedFrame,
     eventIds: state.selectedClusterEventIds,
@@ -315,9 +79,6 @@ export const TimelineView = forwardRef<
   );
   const pinnedHero =
     pinnedHeroLane === null ? null : entities[pinnedHeroLane] ?? null;
-  const pinnedHeroSide = pinnedHero
-    ? normalizeSide(pinnedHero.side)
-    : "neutral";
   const sideBoundaryLane = useMemo(
     () => opponentBoundaryLane(entities),
     [entities],
@@ -333,16 +94,16 @@ export const TimelineView = forwardRef<
   );
 
   const drawState = useCallback(() => {
-    if (!stateCanvasRef.current) return;
+    if (!viewportRefs.stateCanvas.current) return;
     drawStateBand({
-      canvas: stateCanvasRef.current,
+      canvas: viewportRefs.stateCanvas.current,
       model,
       grouped: groupedMetrics,
       width: timelineWidth,
       height: STATE_BAND_HEIGHT,
       scaleMode: state.stateScale,
       playheadMs: playheadRef.current,
-      previewMs: previewRef.current,
+      previewMs: viewportRefs.preview.current,
     });
   }, [
     groupedMetrics,
@@ -358,7 +119,7 @@ export const TimelineView = forwardRef<
   translateRef.current = t;
 
   useLayoutEffect(() => {
-    const scroll = scrollRef.current;
+    const scroll = viewportRefs.scroll.current;
     if (!scroll) return;
     const update = (): void => {
       setBaseWidth(
@@ -375,7 +136,7 @@ export const TimelineView = forwardRef<
   }, []);
 
   useLayoutEffect(() => {
-    const scroll = scrollRef.current;
+    const scroll = viewportRefs.scroll.current;
     if (!scroll) return;
     let frameHandle = 0;
     const update = (): void => {
@@ -384,7 +145,7 @@ export const TimelineView = forwardRef<
         heroLaneIndexes,
         scroll.scrollTop,
       );
-      controllerRef.current?.setPinnedHeroLane(activeLane);
+      viewportRefs.controller.current?.setPinnedHeroLane(activeLane);
       setPinnedHeroLane((current) =>
         current === activeLane ? current : activeLane
       );
@@ -402,11 +163,11 @@ export const TimelineView = forwardRef<
   }, [heroLaneIndexes]);
 
   useLayoutEffect(() => {
-    const canvas = eventCanvasRef.current;
-    const ruler = rulerRef.current;
-    const labels = labelsRef.current;
-    const stickyHeroCanvas = stickyHeroCanvasRef.current;
-    const stickyHeroLabel = stickyHeroLabelRef.current;
+    const canvas = viewportRefs.eventCanvas.current;
+    const ruler = viewportRefs.ruler.current;
+    const labels = viewportRefs.labels.current;
+    const stickyHeroCanvas = viewportRefs.stickyHeroCanvas.current;
+    const stickyHeroLabel = viewportRefs.stickyHeroLabel.current;
     if (
       !canvas
       || !ruler
@@ -416,20 +177,20 @@ export const TimelineView = forwardRef<
     ) {
       return;
     }
-    const tooltip = (): TooltipRefs | null => {
+    const tooltip = (): TimelineTooltipRefs | null => {
       if (
-        !tooltipHostRef.current
-        || !tooltipTimeRef.current
-        || !tooltipLabelRef.current
-        || !tooltipCountRef.current
+        !viewportRefs.tooltipHost.current
+        || !viewportRefs.tooltipTime.current
+        || !viewportRefs.tooltipLabel.current
+        || !viewportRefs.tooltipCount.current
       ) {
         return null;
       }
       return {
-        host: tooltipHostRef.current,
-        time: tooltipTimeRef.current,
-        label: tooltipLabelRef.current,
-        count: tooltipCountRef.current,
+        host: viewportRefs.tooltipHost.current,
+        time: viewportRefs.tooltipTime.current,
+        label: viewportRefs.tooltipLabel.current,
+        count: viewportRefs.tooltipCount.current,
       };
     };
     const controller = new TimelineCanvasController({
@@ -460,7 +221,7 @@ export const TimelineView = forwardRef<
         }
       },
       onPreview: (cluster, combatMs, clientX, clientY) => {
-        previewRef.current = combatMs;
+        viewportRefs.preview.current = combatMs;
         drawStateRef.current();
         previewCallbackRef.current(combatMs);
         const refs = tooltip();
@@ -477,7 +238,7 @@ export const TimelineView = forwardRef<
         refs.count.textContent = cluster
           ? `${cluster.events.length} ${translateRef.current("event")}`
           : "";
-        const bounds = scrollRef.current?.getBoundingClientRect();
+        const bounds = viewportRefs.scroll.current?.getBoundingClientRect();
         if (bounds) {
           const left = Math.max(
             8,
@@ -491,11 +252,11 @@ export const TimelineView = forwardRef<
         }
       },
     });
-    controllerRef.current = controller;
+    viewportRefs.controller.current = controller;
     controller.setPinnedHeroLane(
       heroLaneAtScroll(
         heroLaneIndexes,
-        scrollRef.current?.scrollTop ?? 0,
+        viewportRefs.scroll.current?.scrollTop ?? 0,
       ),
     );
     controller.setSelection(
@@ -505,16 +266,16 @@ export const TimelineView = forwardRef<
     controller.setPlayhead(playheadRef.current);
     return () => {
       controller.destroy();
-      controllerRef.current = null;
+      viewportRefs.controller.current = null;
     };
   }, [dispatch, entities, heroLaneIndexes, model]);
 
   useLayoutEffect(() => {
-    controllerRef.current?.setLayout(timelineWidth, LANE_HEIGHT);
+    viewportRefs.controller.current?.setLayout(timelineWidth, LANE_HEIGHT);
   }, [entities, model, timelineWidth]);
 
   useLayoutEffect(() => {
-    controllerRef.current?.setPinnedHeroLane(pinnedHeroLane);
+    viewportRefs.controller.current?.setPinnedHeroLane(pinnedHeroLane);
   }, [pinnedHeroLane]);
 
   useLayoutEffect(() => {
@@ -522,7 +283,7 @@ export const TimelineView = forwardRef<
   }, [drawState]);
 
   useEffect(() => {
-    controllerRef.current?.setSelection(
+    viewportRefs.controller.current?.setSelection(
       state.selectedFrame,
       state.selectedClusterEventIds,
     );
@@ -545,16 +306,20 @@ export const TimelineView = forwardRef<
 
   useEffect(() => {
     playheadRef.current = state.selectedCombatMs;
-    controllerRef.current?.setPlayhead(state.selectedCombatMs);
+    viewportRefs.controller.current?.setPlayhead(state.selectedCombatMs);
     drawState();
   }, [drawState, state.selectedCombatMs]);
 
   useEffect(() => {
-    if (!state.selectedEntityId || !labelsRef.current || !scrollRef.current) {
+    if (
+      !state.selectedEntityId
+      || !viewportRefs.labels.current
+      || !viewportRefs.scroll.current
+    ) {
       return;
     }
     const row = Array.from(
-      labelsRef.current.querySelectorAll<HTMLElement>(
+      viewportRefs.labels.current.querySelectorAll<HTMLElement>(
         "[data-bpp-entity-id]",
       ),
     ).find(
@@ -562,7 +327,7 @@ export const TimelineView = forwardRef<
         candidate.dataset.bppEntityId === state.selectedEntityId,
     );
     if (!row) return;
-    scrollRef.current.scrollTo({
+    viewportRefs.scroll.current.scrollTo({
       top: Math.max(0, row.offsetTop - LANE_HEIGHT),
       behavior: "smooth",
     });
@@ -579,48 +344,21 @@ export const TimelineView = forwardRef<
     () => ({
       setExternalPlayhead(combatMs: number): void {
         playheadRef.current = combatMs;
-        controllerRef.current?.setPlayhead(combatMs);
+        viewportRefs.controller.current?.setPlayhead(combatMs);
         drawState();
       },
       navigate(direction: -1 | 1): void {
-        controllerRef.current?.navigate(direction);
+        viewportRefs.controller.current?.navigate(direction);
       },
     }),
     [drawState],
   );
 
-  const handleStatePointerMove = (
-    event: React.PointerEvent<HTMLCanvasElement>,
-  ): void => {
-    if (!stateCanvasRef.current) return;
-    const combatMs = combatMsAtPointer(
-      stateCanvasRef.current,
-      event.clientX,
-      model.durationMs,
-    );
-    previewRef.current = combatMs;
-    controllerRef.current?.setPreview(combatMs);
-    drawState();
-    onPreviewCombatMs(combatMs);
-  };
   const clearPreview = (): void => {
-    previewRef.current = null;
-    controllerRef.current?.handlePointerLeave();
+    viewportRefs.preview.current = null;
+    viewportRefs.controller.current?.handlePointerLeave();
     drawState();
     onPreviewCombatMs(null);
-  };
-  const selectStateTime = (
-    event: React.PointerEvent<HTMLCanvasElement>,
-  ): void => {
-    if (event.button !== 0 || !stateCanvasRef.current) return;
-    dispatch({
-      type: "select-time",
-      combatMs: combatMsAtPointer(
-        stateCanvasRef.current,
-        event.clientX,
-        model.durationMs,
-      ),
-    });
   };
 
   return (
@@ -628,213 +366,22 @@ export const TimelineView = forwardRef<
       className="flex min-h-0 flex-1 overflow-hidden border border-border bg-surface shadow-panel"
       data-bpp-test-id="timeline-section"
     >
-      <div className="relative min-h-0 min-w-0 flex-1">
-          <div
-            className="bpp-timeline-scroll"
-            data-bpp-test-id="timeline-scroll"
-            ref={scrollRef}
-          >
-            <div
-              className="bpp-timeline-grid"
-              ref={gridRef}
-              style={{
-                "--bpp-lane-height": `${LANE_HEIGHT}px`,
-                "--bpp-state-band-height": `${STATE_BAND_HEIGHT}px`,
-                "--bpp-time-ruler-height": `${TIME_RULER_HEIGHT}px`,
-                gridTemplateColumns: `${LANE_LABEL_WIDTH}px ${timelineWidth}px`,
-                gridTemplateRows:
-                  `${STATE_BAND_HEIGHT}px ${TIME_RULER_HEIGHT}px ${laneCanvasHeight}px`,
-                width: LANE_LABEL_WIDTH + timelineWidth,
-              } as React.CSSProperties}
-            >
-              <StateLabels
-                combatMs={state.selectedCombatMs}
-                dispatch={dispatch}
-                model={model}
-                scaleMode={state.stateScale}
-                t={t}
-              />
-              <canvas
-                aria-label={t("metricsTitle")}
-                className="bpp-state-canvas"
-                data-bpp-test-id="state-band-canvas"
-                onPointerDown={selectStateTime}
-                onPointerLeave={clearPreview}
-                onPointerMove={handleStatePointerMove}
-                ref={stateCanvasRef}
-                role="img"
-              />
-              <div className="bpp-lane-label-header">
-                <span className="min-w-0 truncate">{t("entity")}</span>
-                <LaneFilterPopover
-                  dispatch={dispatch}
-                  state={state}
-                  t={t}
-                />
-              </div>
-              <canvas
-                aria-label={t("time")}
-                className="bpp-time-ruler-canvas"
-                data-bpp-test-id="timeline-ruler-canvas"
-                onPointerDown={(event) =>
-                  controllerRef.current?.handleRulerPointerDown(
-                    event.nativeEvent,
-                  )
-                }
-                onPointerLeave={clearPreview}
-                onPointerMove={(event) => {
-                  if (!rulerRef.current) return;
-                  const combatMs = combatMsAtPointer(
-                    rulerRef.current,
-                    event.clientX,
-                    model.durationMs,
-                  );
-                  previewRef.current = combatMs;
-                  controllerRef.current?.setPreview(combatMs);
-                  drawState();
-                  onPreviewCombatMs(combatMs);
-                }}
-                ref={rulerRef}
-                role="img"
-              />
-              <div
-                className="bpp-lane-labels"
-                data-bpp-test-id="timeline-lane-labels"
-                ref={labelsRef}
-              >
-                {entities.length === 0
-                  ? (
-                    <div
-                      className="grid place-items-center px-3 text-center text-compact text-muted-foreground"
-                      data-bpp-test-id="timeline-lane-filter-empty"
-                      style={{ height: LANE_HEIGHT }}
-                    >
-                      {t("laneFilterEmpty")}
-                    </div>
-                  )
-                  : entities.map((entity, index) => (
-                    <div
-                      className={cn(
-                        "bpp-lane-label",
-                        `bpp-side-${entity.side}`,
-                        index === sideBoundaryLane && "is-side-boundary",
-                      )}
-                      data-bpp-entity-id={entity.id}
-                      data-bpp-lane-index={index}
-                      data-bpp-side-boundary={
-                        index === sideBoundaryLane ? "opponent" : undefined
-                      }
-                      data-bpp-test-id={`timeline-lane-${index}`}
-                      key={entity.id}
-                      style={{ height: LANE_HEIGHT }}
-                    >
-                      <LaneLabelContents
-                        entity={entity}
-                        index={index}
-                        t={t}
-                      />
-                    </div>
-                  ))}
-              </div>
-              <canvas
-                aria-label={t("timelineTitle")}
-                className="bpp-event-canvas"
-                data-bpp-side-boundary-lane={sideBoundaryLane ?? ""}
-                data-bpp-test-id="timeline-canvas"
-                onPointerDown={(event) =>
-                  controllerRef.current?.handlePointerDown(event.nativeEvent)
-                }
-                onPointerLeave={clearPreview}
-                onPointerMove={(event) =>
-                  controllerRef.current?.handlePointerMove(event.nativeEvent)
-                }
-                ref={eventCanvasRef}
-                role="img"
-              />
-              <div
-                className={cn(
-                  "bpp-lane-label bpp-sticky-hero-label",
-                  pinnedHero && `bpp-side-${pinnedHeroSide}`,
-                  pinnedHeroLane === sideBoundaryLane && "is-side-boundary",
-                )}
-                aria-hidden="true"
-                data-bpp-side-boundary={
-                  pinnedHeroLane === sideBoundaryLane
-                    ? "opponent"
-                    : undefined
-                }
-                data-bpp-sticky-hero-lane={pinnedHeroLane ?? ""}
-                data-bpp-sticky-hero-entity-id={pinnedHero?.id ?? ""}
-                data-bpp-test-id="timeline-sticky-hero-label"
-                hidden={!pinnedHero}
-                ref={stickyHeroLabelRef}
-                style={{ height: LANE_HEIGHT }}
-              >
-                {pinnedHero && (
-                  <LaneLabelContents
-                    entity={pinnedHero}
-                    index={pinnedHeroLane ?? 0}
-                    sticky
-                    t={t}
-                  />
-                )}
-              </div>
-              <canvas
-                aria-hidden="true"
-                className={cn(
-                  "bpp-sticky-hero-canvas",
-                  pinnedHero && `bpp-side-${pinnedHeroSide}`,
-                )}
-                data-bpp-sticky-side={pinnedHero ? pinnedHeroSide : ""}
-                data-bpp-sticky-hero-lane={pinnedHeroLane ?? ""}
-                data-bpp-test-id="timeline-sticky-hero-events"
-                hidden={!pinnedHero}
-                onPointerDown={(event) => {
-                  if (pinnedHeroLane === null) return;
-                  controllerRef.current?.handleStickyHeroPointerDown(
-                    event.nativeEvent,
-                    event.currentTarget,
-                    pinnedHeroLane,
-                  );
-                }}
-                onPointerLeave={clearPreview}
-                onPointerMove={(event) => {
-                  if (pinnedHeroLane === null) return;
-                  controllerRef.current?.handleStickyHeroPointerMove(
-                    event.nativeEvent,
-                    event.currentTarget,
-                    pinnedHeroLane,
-                  );
-                }}
-                ref={stickyHeroCanvasRef}
-              />
-            </div>
-          </div>
-          <div
-            className="pointer-events-none absolute left-0 top-0 z-50 min-w-40 rounded-panel border border-brand-soft/25 bg-popover/98 px-2.5 py-2 text-micro shadow-float"
-            data-bpp-test-id="timeline-tooltip"
-            hidden
-            ref={tooltipHostRef}
-          >
-            <div className="flex items-center gap-2">
-              <strong
-                className="text-foreground"
-                data-bpp-test-id="timeline-tooltip-label"
-                ref={tooltipLabelRef}
-              />
-              <span
-                data-bpp-test-id="timeline-tooltip-time"
-                className="ml-auto font-mono text-brand-soft"
-                ref={tooltipTimeRef}
-              />
-            </div>
-            <span
-              className="mt-0.5 block text-muted-foreground"
-              data-bpp-test-id="timeline-tooltip-count"
-              ref={tooltipCountRef}
-            />
-          </div>
-      </div>
+      <TimelineViewport
+        clearPreview={clearPreview}
+        dispatch={dispatch}
+        drawState={drawState}
+        entities={entities}
+        laneCanvasHeight={laneCanvasHeight}
+        model={model}
+        onPreviewCombatMs={onPreviewCombatMs}
+        pinnedHero={pinnedHero}
+        pinnedHeroLane={pinnedHeroLane}
+        refs={viewportRefs}
+        sideBoundaryLane={sideBoundaryLane}
+        state={state}
+        t={t}
+        timelineWidth={timelineWidth}
+      />
       {state.inspectorOpen && (
         <FrameInspector
           entityId={state.inspectedEntityId}

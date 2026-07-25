@@ -7,9 +7,9 @@ import {
   useRef,
   useState,
 } from "react";
-import type { UnknownRecord } from "../model/value.ts";
 import {
   buildViewModel,
+  type ReportEnvelopeV1,
   type SupportedLocale,
 } from "../model/report.ts";
 import { copyForLocale } from "../i18n/use-copy.ts";
@@ -31,7 +31,7 @@ export function ReportApp({
   envelope,
   initialLocale,
 }: {
-  envelope: UnknownRecord;
+  envelope: ReportEnvelopeV1;
   initialLocale: SupportedLocale;
 }): React.JSX.Element {
   const [state, dispatch] = useReducer(

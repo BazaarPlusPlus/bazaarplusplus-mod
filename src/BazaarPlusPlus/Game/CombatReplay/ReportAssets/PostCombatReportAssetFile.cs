@@ -22,34 +22,4 @@ internal sealed record PostCombatReportAssetFile(
     int PixelWidth = 0,
     int PixelHeight = 0,
     string DisplayName = ""
-)
-{
-    /// <summary>
-    /// Compatibility constructor for the existing card-preview publisher. New producers should
-    /// always pass an explicit binding kind, key, and semantic role.
-    /// </summary>
-    internal PostCombatReportAssetFile(
-        string instanceId,
-        string filePath,
-        string RenderKeyHash = "",
-        string ContentHash = "",
-        int PixelWidth = 0,
-        int PixelHeight = 0,
-        string DisplayName = ""
-    )
-        : this(
-            PostCombatReportAssetBindingKind.Entity,
-            instanceId,
-            "card-preview",
-            filePath,
-            RenderKeyHash,
-            ContentHash,
-            PixelWidth,
-            PixelHeight,
-            DisplayName
-        ) { }
-
-    /// <summary>Temporary compatibility view for the current entity-only coordinator.</summary>
-    internal string InstanceId =>
-        BindingKind == PostCombatReportAssetBindingKind.Entity ? BindingKey : string.Empty;
-}
+);

@@ -2,6 +2,7 @@
 using BazaarPlusPlus.Game.CombatReplay.ReportAssets;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.PvpBattles.Persistence;
+using Microsoft.Data.Sqlite;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 
@@ -73,31 +74,19 @@ internal sealed class CombatReplayReportRecoveryPublisher : ICombatReplayReportR
                 || !Enum.IsDefined(typeof(CombatReplayPlaybackSource), source)
                 || !string.Equals(candidate.Source, source.ToString(), StringComparison.Ordinal)
             )
-            {
-                throw new InvalidOperationException(
-                    "The completed video has an unsupported replay source."
-                );
-            }
+                return Fail("The completed video has an unsupported replay source.", out reason);
 
-            var manifest =
-                _battleCatalog.TryLoad(candidate.BattleId)
-                ?? throw new InvalidOperationException(
-                    "The completed video's battle manifest is unavailable."
-                );
+            var manifest = _battleCatalog.TryLoad(candidate.BattleId);
+            if (manifest == null)
+                return Fail("The completed video's battle manifest is unavailable.", out reason);
             if (!string.Equals(manifest.BattleId, candidate.BattleId, StringComparison.Ordinal))
-                throw new InvalidOperationException(
-                    "The recovered battle manifest is inconsistent."
-                );
+                return Fail("The recovered battle manifest is inconsistent.", out reason);
 
-            var payload =
-                _payloadStore.Load(candidate.BattleId)
-                ?? throw new InvalidOperationException(
-                    "The completed video's replay payload is unavailable."
-                );
+            var payload = _payloadStore.Load(candidate.BattleId);
+            if (payload == null)
+                return Fail("The completed video's replay payload is unavailable.", out reason);
             if (!string.Equals(payload.BattleId, candidate.BattleId, StringComparison.Ordinal))
-                throw new InvalidOperationException(
-                    "The recovered replay payload is inconsistent."
-                );
+                return Fail("The recovered replay payload is inconsistent.", out reason);
 
             var sequence = _loader.Load(payload);
             if (!_publication.TryCaptureDraft(manifest, sequence.CombatMessage, out reason))
@@ -168,10 +157,27 @@ internal sealed class CombatReplayReportRecoveryPublisher : ICombatReplayReportR
             reason = string.Empty;
             return CombatReplayReportRecoveryQueueOutcome.Queued;
         }
+        catch (Exception ex) when (IsRetryable(ex))
+        {
+            reason = ex.GetBaseException().Message;
+            return CombatReplayReportRecoveryQueueOutcome.RetryableFailure;
+        }
         catch (Exception ex)
         {
             reason = ex.GetBaseException().Message;
             return CombatReplayReportRecoveryQueueOutcome.Failed;
         }
+    }
+
+    private static CombatReplayReportRecoveryQueueOutcome Fail(string failure, out string reason)
+    {
+        reason = failure;
+        return CombatReplayReportRecoveryQueueOutcome.Failed;
+    }
+
+    private static bool IsRetryable(Exception exception)
+    {
+        exception = exception.GetBaseException();
+        return exception is IOException or SqliteException;
     }
 }

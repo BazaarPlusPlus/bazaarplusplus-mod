@@ -6,23 +6,6 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal sealed class CombatReplayCaptureService
 {
-    /*
-        Compatibility markers preserved for source-level tests while the implementation now
-        delegates to matcher/collector/factories:
-        CaptureCurrentHandCardsAtOpening(ECombatantId.Player)
-        CaptureCurrentSkillsAtOpening(ECombatantId.Player)
-        CaptureOpeningHandCards(message, ECombatantId.Opponent)
-        CaptureOpponentSkillsFromOpening(message)
-        GameSimEventCardSpawned
-        GameSimEventPlayerSkillEquipped
-        return state == ERunState.PVPCombat;
-        OpponentName = candidate.OpponentName
-        OpponentAccountId = candidate.OpponentAccountId
-        CapturedEmpty
-        LiveRetry
-        OpeningMessage
-    */
-
     private readonly Func<DateTimeOffset> _clock;
     private readonly PvpBattleSequenceMatcher _matcher;
     private readonly PvpBattleSnapshotCollector _collector;

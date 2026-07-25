@@ -217,13 +217,16 @@ void TypedBindingsCannotConfuseStatusIconsWithEntities()
         "/cache/freeze.png"
     );
 
-    Check(entity.InstanceId == "player:Player", "Entity bindings must retain their entity ID.");
     Check(
-        status.InstanceId.Length == 0,
-        "Event-semantic bindings must never leak through the legacy entity-ID view."
+        entity.BindingKind == PostCombatReportAssetBindingKind.Entity
+            && entity.BindingKey == "player:Player"
+            && entity.SemanticRole == "hero-portrait",
+        "Entity bindings must retain their typed entity ID and semantic role."
     );
     Check(
-        status.BindingKey == "status.freeze" && status.SemanticRole == "status-effect-icon",
+        status.BindingKind == PostCombatReportAssetBindingKind.EventSemantic
+            && status.BindingKey == "status.freeze"
+            && status.SemanticRole == "status-effect-icon",
         "Status bindings must carry a stable semantic key and explicit role."
     );
 }

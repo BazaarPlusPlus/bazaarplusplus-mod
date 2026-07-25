@@ -5,13 +5,15 @@ namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 
 internal sealed class ReportHtmlEmitter
 {
-    public const string EmbeddedReportElementId = "bpp-report-data";
+    public const string EmbeddedReportElementId = StaticReportPaths.EmbeddedReportElementId;
 
     public byte[] Emit(
         string title,
         string htmlLanguage,
         string embeddedReportEnvelopeJson,
-        string viewerBundleId
+        string viewerBundleId,
+        string viewerScriptSha256,
+        string viewerStylesheetSha256
     )
     {
         if (title == null)
@@ -24,6 +26,8 @@ internal sealed class ReportHtmlEmitter
         var normalizedLanguage = NormalizeHtmlLanguage(htmlLanguage);
         var scriptUrl = StaticReportPaths.BuildViewerScriptRelativeUrl(viewerBundleId);
         var stylesheetUrl = StaticReportPaths.BuildViewerStylesheetRelativeUrl(viewerBundleId);
+        _ = StaticReportPaths.ParseSha256(viewerScriptSha256, nameof(viewerScriptSha256));
+        _ = StaticReportPaths.ParseSha256(viewerStylesheetSha256, nameof(viewerStylesheetSha256));
 
         var builder = new StringBuilder(4096 + embeddedReportEnvelopeJson.Length);
         builder
@@ -40,6 +44,18 @@ internal sealed class ReportHtmlEmitter
             .Append(StaticReportPaths.ViewerBundleMetaName)
             .Append("\" content=\"")
             .Append(EscapeHtmlAttribute(viewerBundleId))
+            .Append("\">\n");
+        builder
+            .Append("<meta name=\"")
+            .Append(StaticReportPaths.ViewerScriptSha256MetaName)
+            .Append("\" content=\"")
+            .Append(viewerScriptSha256)
+            .Append("\">\n");
+        builder
+            .Append("<meta name=\"")
+            .Append(StaticReportPaths.ViewerStylesheetSha256MetaName)
+            .Append("\" content=\"")
+            .Append(viewerStylesheetSha256)
             .Append("\">\n");
         builder.Append("<title>").Append(EscapeHtmlText(title)).Append("</title>\n");
         builder

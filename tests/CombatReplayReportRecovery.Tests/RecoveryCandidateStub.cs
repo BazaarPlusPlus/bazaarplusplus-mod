@@ -8,3 +8,14 @@ internal sealed record CompletedVideoReportRecoveryCandidate(
     string Source,
     string VideoRelativePath
 );
+
+internal sealed record CompletedVideoReportRecoveryCursor(
+    string CompletedAtUtc,
+    string StartedAtUtc,
+    string RecordingId
+);
+
+internal sealed record CompletedVideoReportRecoveryPage(
+    IReadOnlyList<CompletedVideoReportRecoveryCandidate> Candidates,
+    CompletedVideoReportRecoveryCursor? NextCursor
+);

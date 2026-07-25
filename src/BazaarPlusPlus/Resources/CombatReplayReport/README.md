@@ -38,7 +38,7 @@ BazaarPlusPlusV4/
 ```
 
 Each report HTML embeds its report JSON and references exactly one Viewer generation. Publishing
-repairs or completes that generation before the report becomes visible, so an interrupted update
+verifies or completes that generation before the report becomes visible, so an interrupted update
 cannot mix JavaScript and CSS from different builds. There is no legacy Viewer fallback or mutable
 stable alias. Game image assets remain immutable and content-addressed.
 

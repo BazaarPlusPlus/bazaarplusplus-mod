@@ -20,7 +20,6 @@ import {
   stateAxisTicks,
   type StateAxisTick,
   type StateDomain,
-  type StateMetric,
   type StateScaleMode,
 } from "./state-scale.ts";
 import {

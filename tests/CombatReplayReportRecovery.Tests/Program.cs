@@ -1,7 +1,6 @@
-using BazaarPlusPlus.Game.CombatReplay.ReportAssets;
-using BazaarPlusPlus.Game.CombatReplay.ReportData;
 using BazaarPlusPlus.Game.CombatReplay.Reports;
 using BazaarPlusPlus.Game.CombatReplay.Video;
+using BazaarPlusPlus.Infrastructure.Files;
 
 const string BattleId = "11111111111111111111111111111111";
 var failures = new List<string>();
@@ -15,16 +14,20 @@ try
     Directory.CreateDirectory(sandbox);
     VerifyMissingReportQueuesPhysicalVideo();
     VerifyExistingReportSkipsPublication();
-    VerifyStaleReportQueuesReplacementPublication();
+    VerifyStaleReportFailsClosed();
+    VerifyIncompleteReportFailsClosed();
     VerifyHostileCandidatesFailIndependently();
     VerifyPublisherFailureDoesNotBlockLaterCandidate();
+    VerifyPermanentPublisherFailureDoesNotBlockCompletion();
     VerifyDeferredCacheMissIsNotReportedAsFailure();
-    VerifyAssetGateReportsEveryRequiredCacheMiss();
-    VerifyRecoveryDrainsEveryAdmissionBatchInOneStartup();
-    VerifyRecoveryPagesRemainBoundedAndReachEveryCandidate();
+    VerifyFailedCandidateRetriesUntilQueued();
+    VerifyDeferredCandidateRetriesUntilQueued();
+    VerifyCursorPagesRemainStableWhenNewerRowsAppear();
     VerifyViewerGateRunsBeforeExistingReportsAreAccepted();
-    VerifyViewerGateFailureStopsRecovery();
-    VerifyCandidateSourceFailureIsContained();
+    VerifyViewerGateFailureRetriesWithBackoff();
+    VerifyPermanentViewerGateFailureDoesNotRetry();
+    VerifySourceFailureRetriesWithBackoffAndPreservesCursor();
+    VerifyPersistentSourceFailureSelfHeals();
     VerifyVideoDirectoryLinkIsRejected();
 }
 finally
@@ -51,11 +54,11 @@ void VerifyMissingReportQueuesPhysicalVideo()
     var video = WriteVideo(fixture.VideoRoot, relativeVideo);
     var publisher = new RecordingPublisher();
     var recovery = fixture.CreateRecovery(
-        _ => [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
+        [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
         publisher
     );
 
-    var summary = recovery.Recover(256, 16, "zh-CN");
+    var summary = recovery.RecoverNextBatch(256, "zh-CN");
     Check(
         summary.ExaminedCount == 1
             && summary.QueuedCount == 1
@@ -81,11 +84,11 @@ void VerifyExistingReportSkipsPublication()
     WriteCurrentReport(fixture.ReportRoot, recordingId);
     var publisher = new RecordingPublisher();
     var recovery = fixture.CreateRecovery(
-        _ => [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
+        [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
         publisher
     );
 
-    var summary = recovery.Recover(32, 16, "en");
+    var summary = recovery.RecoverNextBatch(32, "en");
     Check(
         summary.ExistingReportCount == 1
             && summary.QueuedCount == 0
@@ -95,7 +98,7 @@ void VerifyExistingReportSkipsPublication()
     );
 }
 
-void VerifyStaleReportQueuesReplacementPublication()
+void VerifyStaleReportFailsClosed()
 {
     var fixture = CreateFixture("stale-existing");
     const string recordingId = "abababababababababababababababab";
@@ -108,17 +111,64 @@ void VerifyStaleReportQueuesReplacementPublication()
     );
     var publisher = new RecordingPublisher();
     var recovery = fixture.CreateRecovery(
-        _ => [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
+        [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
         publisher
     );
 
-    var summary = recovery.Recover(32, 16, "en");
+    var summary = recovery.RecoverNextBatch(32, "en");
     Check(
         summary.ExistingReportCount == 0
-            && summary.QueuedCount == 1
-            && summary.FailedCount == 0
-            && publisher.Calls.Count == 1,
-        "An existing report without the current Viewer marker and references must be regenerated."
+            && summary.QueuedCount == 0
+            && summary.FailedCount == 1
+            && publisher.Calls.Count == 0,
+        "An invalid existing immutable report must fail closed instead of being regenerated."
+    );
+}
+
+void VerifyIncompleteReportFailsClosed()
+{
+    var fixture = CreateFixture("incomplete-existing");
+    Directory.CreateDirectory(fixture.ReportRoot);
+    var validReport = BuildCurrentReport();
+    var incompleteReports = new[]
+    {
+        ReplaceEmbeddedReportJson(validReport, "{\"events\":1"),
+        ReplaceEmbeddedReportJson(validReport, "{\"events\":[1,2"),
+        ReplaceEmbeddedReportJson(validReport, "{\"name\":\"unfinished"),
+        ReplaceEmbeddedReportJson(validReport, "{\"nested\":{}"),
+        ReplaceEmbeddedReportJson(validReport, "{\"nested\":[]"),
+        validReport.Replace(
+            "</script>\n<script defer",
+            "\n<script defer",
+            StringComparison.Ordinal
+        ),
+        validReport.Replace("</body>\n", string.Empty, StringComparison.Ordinal),
+        validReport.Replace("</html>\n", string.Empty, StringComparison.Ordinal),
+    };
+    var candidates = new List<CompletedVideoReportRecoveryCandidate>();
+    for (var index = 0; index < incompleteReports.Length; index++)
+    {
+        var recordingId = (index + 180).ToString("x32");
+        var relativeVideo = Path.Combine("date", recordingId + ".mp4");
+        _ = WriteVideo(fixture.VideoRoot, relativeVideo);
+        File.WriteAllText(
+            Path.Combine(fixture.ReportRoot, recordingId + ".html"),
+            incompleteReports[index]
+        );
+        candidates.Add(new(recordingId, BattleId, "CurrentNative", relativeVideo));
+    }
+
+    var publisher = new RecordingPublisher();
+    var recovery = fixture.CreateRecovery(candidates, publisher);
+
+    var summary = recovery.RecoverNextBatch(32, "en");
+    Check(
+        summary.ExaminedCount == incompleteReports.Length
+            && summary.ExistingReportCount == 0
+            && summary.QueuedCount == 0
+            && summary.FailedCount == incompleteReports.Length
+            && publisher.Calls.Count == 0,
+        "Truncated immutable reports must fail closed instead of being replaced."
     );
 }
 
@@ -145,9 +195,9 @@ void VerifyHostileCandidatesFailIndependently()
         new(validRecordingId, BattleId, "CurrentNative", validRelative),
     };
     var publisher = new RecordingPublisher();
-    var recovery = fixture.CreateRecovery(_ => candidates, publisher);
+    var recovery = fixture.CreateRecovery(candidates, publisher);
 
-    var summary = recovery.Recover(64, 16, "en");
+    var summary = recovery.RecoverNextBatch(64, "en");
     Check(
         summary.ExaminedCount == candidates.Length
             && summary.FailedCount == candidates.Length - 1
@@ -168,21 +218,40 @@ void VerifyPublisherFailureDoesNotBlockLaterCandidate()
     _ = WriteVideo(fixture.VideoRoot, secondRelative);
     var publisher = new RecordingPublisher { FailRecordingId = firstId };
     var recovery = fixture.CreateRecovery(
-        _ =>
-            [
-                new(firstId, BattleId, "CurrentNative", firstRelative),
-                new(secondId, BattleId, "CurrentNative", secondRelative),
-            ],
+        [
+            new(firstId, BattleId, "CurrentNative", firstRelative),
+            new(secondId, BattleId, "CurrentNative", secondRelative),
+        ],
         publisher
     );
 
-    var summary = recovery.Recover(16, 16, "en");
+    var summary = recovery.RecoverNextBatch(16, "en");
     Check(
         summary.FailedCount == 1
             && summary.QueuedCount == 1
             && publisher.Calls.Count == 2
             && publisher.Calls[1].Candidate.RecordingId == secondId,
         "A manifest/payload/publication failure for one recording must not block later recordings."
+    );
+}
+
+void VerifyPermanentPublisherFailureDoesNotBlockCompletion()
+{
+    var fixture = CreateFixture("permanent-publisher-failure");
+    const string recordingId = "15151515151515151515151515151515";
+    var relativeVideo = Path.Combine("date", recordingId + ".mp4");
+    _ = WriteVideo(fixture.VideoRoot, relativeVideo);
+    var publisher = new RecordingPublisher { FailRecordingId = recordingId };
+    var recovery = fixture.CreateRecovery(
+        [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
+        publisher
+    );
+
+    var failed = recovery.RecoverNextBatch(1, "en");
+    _ = recovery.RecoverNextBatch(1, "en");
+    Check(
+        recovery.IsCompleted && failed.FailedCount == 1 && publisher.Calls.Count == 1,
+        "A permanent publisher failure must be reported once without keeping startup recovery alive forever."
     );
 }
 
@@ -194,11 +263,11 @@ void VerifyDeferredCacheMissIsNotReportedAsFailure()
     _ = WriteVideo(fixture.VideoRoot, relativeVideo);
     var publisher = new RecordingPublisher { DeferredRecordingId = recordingId };
     var recovery = fixture.CreateRecovery(
-        _ => [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
+        [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
         publisher
     );
 
-    var summary = recovery.Recover(16, 4, "en");
+    var summary = recovery.RecoverNextBatch(16, "en");
     Check(
         summary.ExaminedCount == 1
             && summary.DeferredCount == 1
@@ -208,95 +277,79 @@ void VerifyDeferredCacheMissIsNotReportedAsFailure()
     );
 }
 
-void VerifyAssetGateReportsEveryRequiredCacheMiss()
+void VerifyFailedCandidateRetriesUntilQueued()
 {
-    var document = new CombatReportDocumentV1
-    {
-        Entities =
-        [
-            new() { EntityId = "hero", Type = "hero" },
-            new() { EntityId = "item", Type = "item" },
-            new() { EntityId = "skill", Type = "skill" },
-        ],
-        Events = [new() { IconSemanticKey = "status:burn" }],
-    };
-    var item = new PostCombatReportAssetFile("item", "item.png");
-    var cardOnlyMissing = CombatReplayReportRecoveryAssetGate.FindMissingBindings(
-        document,
-        [item],
-        requireNativeBindings: false
-    );
-    Check(
-        cardOnlyMissing.SequenceEqual(["entity:skill"]),
-        "The recovery asset gate must require every item/skill binding while leaving native bindings optional when their materializer is unavailable."
-    );
-
-    var nativeMissing = CombatReplayReportRecoveryAssetGate.FindMissingBindings(
-        document,
-        [item],
-        requireNativeBindings: true
-    );
-    Check(
-        nativeMissing.SequenceEqual(["entity:hero", "entity:skill", "event-semantic:status:burn"]),
-        "The recovery asset gate must report missing hero and event-semantic cache entries without scheduling Unity work."
-    );
-
-    var complete = CombatReplayReportRecoveryAssetGate.FindMissingBindings(
-        document,
-        [
-            item,
-            new PostCombatReportAssetFile("skill", "skill.png"),
-            new PostCombatReportAssetFile(
-                PostCombatReportAssetBindingKind.Entity,
-                "hero",
-                "hero-portrait",
-                "hero.png"
-            ),
-            new PostCombatReportAssetFile(
-                PostCombatReportAssetBindingKind.EventSemantic,
-                "status:burn",
-                "status-icon",
-                "burn.png"
-            ),
-        ],
-        requireNativeBindings: true
-    );
-    Check(
-        complete.Count == 0,
-        "A complete cache binding set must remain eligible for immutable report publication."
-    );
-}
-
-void VerifyRecoveryDrainsEveryAdmissionBatchInOneStartup()
-{
-    var fixture = CreateFixture("all-batches");
-    var candidates = new List<CompletedVideoReportRecoveryCandidate>();
-    for (var index = 0; index < 21; index++)
-    {
-        var recordingId = (index + 32).ToString("x32");
-        var relativeVideo = Path.Combine("date", recordingId + ".mp4");
-        _ = WriteVideo(fixture.VideoRoot, relativeVideo);
-        candidates.Add(new(recordingId, BattleId, "CurrentNative", relativeVideo));
-    }
-
+    var fixture = CreateFixture("failed-retry");
+    const string recordingId = "17171717171717171717171717171717";
+    var relativeVideo = Path.Combine("date", recordingId + ".mp4");
+    _ = WriteVideo(fixture.VideoRoot, relativeVideo);
+    long now = 0;
     var publisher = new RecordingPublisher();
-    var recovery = fixture.CreateRecovery(_ => candidates, publisher);
-    var summary = recovery.Recover(64, 4, "en");
+    publisher.FailAttemptsByRecordingId[recordingId] = 1;
+    var recovery = fixture.CreateRecovery(
+        [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
+        publisher,
+        () => now
+    );
+
+    var failed = recovery.RecoverNextBatch(1, "en");
+    var sameTick = recovery.RecoverNextBatch(1, "en");
     Check(
-        summary.ExaminedCount == candidates.Count
-            && summary.QueuedCount == candidates.Count
-            && summary.DeferredCount == 0
-            && summary.FailedCount == 0
-            && publisher.Calls.Count == candidates.Count,
-        "Startup recovery must continue through every bounded admission batch instead of stranding candidates after the first batch."
+        !recovery.IsCompleted
+            && failed.FailedCount == 1
+            && failed.QueuedCount == 0
+            && sameTick.ExaminedCount == 0
+            && publisher.Calls.Count == 1,
+        "A failed candidate must remain pending without retrying in a same-tick busy loop."
+    );
+
+    now = CombatReplayReportStartupRecovery.InitialRetryDelayMilliseconds;
+    var recovered = recovery.RecoverNextBatch(1, "en");
+    _ = recovery.RecoverNextBatch(1, "en");
+    Check(
+        recovery.IsCompleted && recovered.QueuedCount == 1 && publisher.Calls.Count == 2,
+        "A transient candidate failure must retry after backoff until publication is queued."
     );
 }
 
-void VerifyRecoveryPagesRemainBoundedAndReachEveryCandidate()
+void VerifyDeferredCandidateRetriesUntilQueued()
 {
-    var fixture = CreateFixture("bounded-pages");
+    var fixture = CreateFixture("deferred-retry");
+    const string recordingId = "18181818181818181818181818181818";
+    var relativeVideo = Path.Combine("date", recordingId + ".mp4");
+    _ = WriteVideo(fixture.VideoRoot, relativeVideo);
+    long now = 0;
+    var publisher = new RecordingPublisher();
+    publisher.DeferredAttemptsByRecordingId[recordingId] = 1;
+    var recovery = fixture.CreateRecovery(
+        [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
+        publisher,
+        () => now
+    );
+
+    var deferred = recovery.RecoverNextBatch(1, "en");
+    Check(
+        !recovery.IsCompleted
+            && deferred.DeferredCount == 1
+            && deferred.FailedCount == 0
+            && publisher.Calls.Count == 1,
+        "A deferred candidate must remain pending without being reported as a terminal failure."
+    );
+
+    now = CombatReplayReportStartupRecovery.InitialRetryDelayMilliseconds;
+    var recovered = recovery.RecoverNextBatch(1, "en");
+    _ = recovery.RecoverNextBatch(1, "en");
+    Check(
+        recovery.IsCompleted && recovered.QueuedCount == 1 && publisher.Calls.Count == 2,
+        "A deferred candidate must be admitted again after backoff when its dependency becomes available."
+    );
+}
+
+void VerifyCursorPagesRemainStableWhenNewerRowsAppear()
+{
+    var fixture = CreateFixture("stable-cursor-pages");
     var candidates = new List<CompletedVideoReportRecoveryCandidate>();
-    for (var index = 0; index < 9; index++)
+    for (var index = 0; index < 4; index++)
     {
         var recordingId = (index + 80).ToString("x32");
         var relativeVideo = Path.Combine("date", recordingId + ".mp4");
@@ -304,43 +357,43 @@ void VerifyRecoveryPagesRemainBoundedAndReachEveryCandidate()
         candidates.Add(new(recordingId, BattleId, "CurrentNative", relativeVideo));
     }
 
-    var pageCalls = new List<(int Limit, int Offset)>();
+    var pageCalls = new List<(int Limit, string? AfterRecordingId)>();
     var publisher = new RecordingPublisher();
     var recovery = new CombatReplayReportStartupRecovery(
         fixture.DataRoot,
         fixture.VideoRoot,
-        (limit, offset) =>
+        (limit, cursor) =>
         {
-            pageCalls.Add((limit, offset));
-            return candidates.Skip(offset).Take(limit).ToArray();
+            pageCalls.Add((limit, cursor?.RecordingId));
+            return RecoveryPages.PageAfter(candidates, limit, cursor);
         },
         publisher
     );
 
+    _ = recovery.RecoverNextBatch(2, "en");
+    const string newerRecordingId = "ffffffffffffffffffffffffffffffff";
+    candidates.Insert(
+        0,
+        new(
+            newerRecordingId,
+            BattleId,
+            "CurrentNative",
+            Path.Combine("date", newerRecordingId + ".mp4")
+        )
+    );
     while (!recovery.IsCompleted)
-        _ = recovery.RecoverNextBatch(4, "en");
+        _ = recovery.RecoverNextBatch(2, "en");
 
     Check(
-        pageCalls.SequenceEqual([(4, 0), (4, 4), (4, 8)])
-            && publisher.Calls.Count == candidates.Count,
-        "Startup recovery must query bounded pages and advance its offset until every completed recording is reachable."
-    );
-}
-
-void VerifyCandidateSourceFailureIsContained()
-{
-    var fixture = CreateFixture("source-failure");
-    var recovery = fixture.CreateRecovery(
-        _ => throw new InvalidOperationException("database unavailable"),
-        new RecordingPublisher()
-    );
-
-    var summary = recovery.Recover(16, 16, "en");
-    Check(
-        summary.ExaminedCount == 0
-            && summary.QueuedCount == 0
-            && summary.SourceFailure == "database unavailable",
-        "A database recovery query failure must be contained instead of breaking plugin startup."
+        pageCalls.SequenceEqual([
+            (2, (string?)null),
+            (2, candidates[2].RecordingId),
+            (2, candidates[4].RecordingId),
+        ])
+            && publisher
+                .Calls.Select(call => call.Candidate.RecordingId)
+                .SequenceEqual(candidates.Skip(1).Select(candidate => candidate.RecordingId)),
+        "Stable keyset pagination must reach the original startup candidates exactly once when a newer completed row appears between pages."
     );
 }
 
@@ -354,7 +407,12 @@ void VerifyViewerGateRunsBeforeExistingReportsAreAccepted()
     var recovery = new CombatReplayReportStartupRecovery(
         fixture.DataRoot,
         fixture.VideoRoot,
-        _ => [new(recordingId, BattleId, "CurrentNative", recordingId + ".mp4")],
+        (limit, cursor) =>
+            RecoveryPages.PageAfter(
+                [new(recordingId, BattleId, "CurrentNative", recordingId + ".mp4")],
+                limit,
+                cursor
+            ),
         new RecordingPublisher(),
         () =>
         {
@@ -363,36 +421,197 @@ void VerifyViewerGateRunsBeforeExistingReportsAreAccepted()
         }
     );
 
-    var summary = recovery.Recover(16, 16, "en");
+    var summary = recovery.RecoverNextBatch(16, "en");
     Check(
         ensureCalls == 1 && summary.ExistingReportCount == 1 && summary.SourceFailure == null,
-        "Startup recovery must validate or repair the shared Viewer before accepting existing HTML."
+        "Startup recovery must install or verify the shared Viewer before accepting existing HTML."
     );
 }
 
-void VerifyViewerGateFailureStopsRecovery()
+void VerifyViewerGateFailureRetriesWithBackoff()
 {
-    var fixture = CreateFixture("viewer-gate-failure");
+    var fixture = CreateFixture("viewer-gate-retry");
+    long now = 0;
+    var viewerCalls = 0;
     var sourceCalls = 0;
+    var recovery = new CombatReplayReportStartupRecovery(
+        fixture.DataRoot,
+        fixture.VideoRoot,
+        (_, _) =>
+        {
+            sourceCalls++;
+            return RecoveryPages.Empty();
+        },
+        new RecordingPublisher(),
+        () =>
+        {
+            viewerCalls++;
+            if (viewerCalls == 1)
+                throw new IOException("viewer bundle temporarily unavailable");
+            return TestValues.ViewerBundleId;
+        },
+        () => now
+    );
+
+    var first = recovery.RecoverNextBatch(16, "en");
+    var sameTick = recovery.RecoverNextBatch(16, "en");
+    Check(
+        !recovery.IsCompleted
+            && viewerCalls == 1
+            && sourceCalls == 0
+            && first.SourceFailure == "viewer bundle temporarily unavailable"
+            && sameTick.SourceFailure == null,
+        "A transient Viewer install failure must remain pending while same-tick calls respect backoff."
+    );
+
+    now = CombatReplayReportStartupRecovery.InitialRetryDelayMilliseconds;
+    var recovered = recovery.RecoverNextBatch(16, "en");
+    Check(
+        recovery.IsCompleted
+            && viewerCalls == 2
+            && sourceCalls == 1
+            && recovered.SourceFailure == null,
+        "Viewer installation must retry after backoff and resume candidate discovery."
+    );
+}
+
+void VerifyPermanentViewerGateFailureDoesNotRetry()
+{
+    var fixture = CreateFixture("viewer-gate-permanent-failure");
+    var viewerCalls = 0;
+    var sourceCalls = 0;
+    var recovery = new CombatReplayReportStartupRecovery(
+        fixture.DataRoot,
+        fixture.VideoRoot,
+        (_, _) =>
+        {
+            sourceCalls++;
+            return RecoveryPages.Empty();
+        },
+        new RecordingPublisher(),
+        () =>
+        {
+            viewerCalls++;
+            throw new ArtifactPublicationException(
+                ArtifactPublicationFailureKind.InvalidArtifactIdentity,
+                "viewer identity conflict"
+            );
+        }
+    );
+
+    var first = recovery.RecoverNextBatch(16, "en");
+    var second = recovery.RecoverNextBatch(16, "en");
+    Check(
+        recovery.IsCompleted
+            && viewerCalls == 1
+            && sourceCalls == 0
+            && first.SourceFailure == "viewer identity conflict"
+            && second.SourceFailure == null,
+        "A deterministic Viewer identity conflict must fail once without entering the retry queue."
+    );
+}
+
+void VerifySourceFailureRetriesWithBackoffAndPreservesCursor()
+{
+    var fixture = CreateFixture("source-failure-retry");
+    long now = 0;
+    var candidates = new List<CompletedVideoReportRecoveryCandidate>();
+    for (var index = 0; index < 2; index++)
+    {
+        var recordingId = (index + 160).ToString("x32");
+        var relativeVideo = Path.Combine("date", recordingId + ".mp4");
+        _ = WriteVideo(fixture.VideoRoot, relativeVideo);
+        candidates.Add(new(recordingId, BattleId, "CurrentNative", relativeVideo));
+    }
+
+    var calls = new List<(int Limit, string? AfterRecordingId)>();
+    var secondPageAttempts = 0;
     var publisher = new RecordingPublisher();
     var recovery = new CombatReplayReportStartupRecovery(
         fixture.DataRoot,
         fixture.VideoRoot,
-        _ =>
+        (limit, cursor) =>
         {
-            sourceCalls++;
-            return Array.Empty<CompletedVideoReportRecoveryCandidate>();
+            calls.Add((limit, cursor?.RecordingId));
+            if (cursor != null && secondPageAttempts++ == 0)
+                throw new IOException("database temporarily unavailable");
+            return RecoveryPages.PageAfter(candidates, limit, cursor);
         },
         publisher,
-        () => throw new InvalidDataException("viewer bundle unavailable")
+        () => TestValues.ViewerBundleId,
+        () => now
     );
 
-    var summary = recovery.Recover(16, 16, "en");
+    _ = recovery.RecoverNextBatch(1, "en");
+    var failed = recovery.RecoverNextBatch(1, "en");
+    _ = recovery.RecoverNextBatch(1, "en");
     Check(
-        sourceCalls == 0
-            && publisher.Calls.Count == 0
-            && summary.SourceFailure == "viewer bundle unavailable",
-        "A broken shared Viewer must fail recovery before reports can be treated as usable."
+        !recovery.IsCompleted
+            && failed.SourceFailure == "database temporarily unavailable"
+            && calls.SequenceEqual([(1, (string?)null), (1, candidates[0].RecordingId)])
+            && publisher.Calls.Count == 1,
+        "A transient source failure must preserve its continuation cursor and suppress same-tick retries."
+    );
+
+    now = CombatReplayReportStartupRecovery.InitialRetryDelayMilliseconds;
+    _ = recovery.RecoverNextBatch(1, "en");
+    _ = recovery.RecoverNextBatch(1, "en");
+    Check(
+        recovery.IsCompleted
+            && calls.SequenceEqual([
+                (1, (string?)null),
+                (1, candidates[0].RecordingId),
+                (1, candidates[0].RecordingId),
+                (1, candidates[1].RecordingId),
+            ])
+            && publisher.Calls.Count == 2,
+        "Recovery must retry the failed cursor after backoff and continue to the next page without skipping candidates."
+    );
+}
+
+void VerifyPersistentSourceFailureSelfHeals()
+{
+    var fixture = CreateFixture("persistent-source-failure");
+    long now = 0;
+    var sourceCalls = 0;
+    var sourceAvailable = false;
+    var recovery = new CombatReplayReportStartupRecovery(
+        fixture.DataRoot,
+        fixture.VideoRoot,
+        (_, _) =>
+        {
+            sourceCalls++;
+            if (!sourceAvailable)
+                throw new IOException("database unavailable");
+            return RecoveryPages.Empty();
+        },
+        new RecordingPublisher(),
+        () => TestValues.ViewerBundleId,
+        () => now
+    );
+
+    const int attemptsBeyondFormerLimit = 7;
+    for (var attempt = 1; attempt <= attemptsBeyondFormerLimit; attempt++)
+    {
+        var summary = recovery.RecoverNextBatch(16, "en");
+        Check(
+            summary.SourceFailure == "database unavailable",
+            "Every actual source retry must expose its failure."
+        );
+        Check(
+            !recovery.IsCompleted,
+            "A persistently failing source must remain recoverable instead of becoming permanently completed."
+        );
+        now += CombatReplayReportStartupRecovery.MaximumRetryDelayMilliseconds;
+    }
+
+    sourceAvailable = true;
+    var recovered = recovery.RecoverNextBatch(16, "en");
+    Check(
+        recovery.IsCompleted
+            && recovered.SourceFailure == null
+            && sourceCalls == attemptsBeyondFormerLimit + 1,
+        "Source discovery must self-heal after any number of capped-backoff failures."
     );
 }
 
@@ -417,19 +636,18 @@ void VerifyVideoDirectoryLinkIsRejected()
     const string recordingId = "15151515151515151515151515151515";
     var publisher = new RecordingPublisher();
     var recovery = fixture.CreateRecovery(
-        _ =>
-            [
-                new(
-                    recordingId,
-                    BattleId,
-                    "CurrentNative",
-                    Path.Combine("linked", Path.GetFileName(target))
-                ),
-            ],
+        [
+            new(
+                recordingId,
+                BattleId,
+                "CurrentNative",
+                Path.Combine("linked", Path.GetFileName(target))
+            ),
+        ],
         publisher
     );
 
-    var summary = recovery.Recover(16, 16, "en");
+    var summary = recovery.RecoverNextBatch(16, "en");
     Check(
         summary.FailedCount == 1 && publisher.Calls.Count == 0,
         "A video reached through a symlink/reparse directory must be rejected before publication."
@@ -459,19 +677,48 @@ static string WriteVideo(string videoRoot, string relativePath)
 static void WriteCurrentReport(string reportRoot, string recordingId)
 {
     Directory.CreateDirectory(reportRoot);
-    File.WriteAllText(
-        Path.Combine(reportRoot, recordingId + ".html"),
-        "<!doctype html><html><head>"
-            + "<meta name=\"bpp-viewer-bundle\" content=\""
-            + TestValues.ViewerBundleId
-            + "\">"
-            + "<link rel=\"stylesheet\" href=\"../report-viewer/objects/"
-            + TestValues.ViewerBundleId
-            + "/viewer.css\">"
-            + "</head><body><script defer src=\"../report-viewer/objects/"
-            + TestValues.ViewerBundleId
-            + "/viewer.js\"></script></body></html>"
-    );
+    File.WriteAllText(Path.Combine(reportRoot, recordingId + ".html"), BuildCurrentReport());
+}
+
+static string BuildCurrentReport(string embeddedJson = "{}") =>
+    "<!doctype html>\n"
+    + "<html lang=\"en\">\n"
+    + "<head>\n"
+    + "<meta name=\"bpp-viewer-bundle\" content=\""
+    + TestValues.ViewerBundleId
+    + "\">\n"
+    + "<meta name=\"bpp-viewer-script-sha256\" content=\""
+    + TestValues.ViewerScriptSha256
+    + "\">\n"
+    + "<meta name=\"bpp-viewer-stylesheet-sha256\" content=\""
+    + TestValues.ViewerStylesheetSha256
+    + "\">\n"
+    + "<link rel=\"stylesheet\" href=\"../report-viewer/objects/"
+    + TestValues.ViewerBundleId
+    + "/viewer.css\">\n"
+    + "</head>\n"
+    + "<body>\n"
+    + "<main data-bpp-test-id=\"report-root\"></main>\n"
+    + "<script type=\"application/json\" id=\""
+    + StaticReportPaths.EmbeddedReportElementId
+    + "\">"
+    + embeddedJson
+    + "</script>\n"
+    + "<script defer src=\"../report-viewer/objects/"
+    + TestValues.ViewerBundleId
+    + "/viewer.js\"></script>\n"
+    + "</body>\n"
+    + "</html>\n";
+
+static string ReplaceEmbeddedReportJson(string html, string replacement)
+{
+    var startToken =
+        "<script type=\"application/json\" id=\""
+        + StaticReportPaths.EmbeddedReportElementId
+        + "\">";
+    var payloadStart = html.IndexOf(startToken, StringComparison.Ordinal) + startToken.Length;
+    var payloadEnd = html.IndexOf("</script>", payloadStart, StringComparison.Ordinal);
+    return html.Substring(0, payloadStart) + replacement + html.Substring(payloadEnd);
 }
 
 void Check(bool condition, string message)
@@ -483,15 +730,28 @@ void Check(bool condition, string message)
 internal sealed record Fixture(string Root, string DataRoot, string VideoRoot, string ReportRoot)
 {
     internal CombatReplayReportStartupRecovery CreateRecovery(
-        Func<int, IReadOnlyList<CompletedVideoReportRecoveryCandidate>> list,
-        ICombatReplayReportRecoveryPublisher publisher
-    ) => new(DataRoot, VideoRoot, list, publisher, () => TestValues.ViewerBundleId);
+        IReadOnlyList<CompletedVideoReportRecoveryCandidate> candidates,
+        ICombatReplayReportRecoveryPublisher publisher,
+        Func<long>? monotonicMilliseconds = null
+    ) =>
+        new(
+            DataRoot,
+            VideoRoot,
+            (limit, cursor) => RecoveryPages.PageAfter(candidates, limit, cursor),
+            publisher,
+            () => TestValues.ViewerBundleId,
+            monotonicMilliseconds
+        );
 }
 
 internal static class TestValues
 {
     internal const string ViewerBundleId =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    internal const string ViewerScriptSha256 =
+        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    internal const string ViewerStylesheetSha256 =
+        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 }
 
 internal sealed class RecordingPublisher : ICombatReplayReportRecoveryPublisher
@@ -499,6 +759,11 @@ internal sealed class RecordingPublisher : ICombatReplayReportRecoveryPublisher
     internal List<PublicationCall> Calls { get; } = new();
     internal string? FailRecordingId { get; init; }
     internal string? DeferredRecordingId { get; init; }
+    internal Dictionary<string, int> FailAttemptsByRecordingId { get; } =
+        new(StringComparer.Ordinal);
+    internal Dictionary<string, int> DeferredAttemptsByRecordingId { get; } =
+        new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _attemptsByRecordingId = new(StringComparer.Ordinal);
 
     public CombatReplayReportRecoveryQueueOutcome TryQueue(
         CompletedVideoReportRecoveryCandidate candidate,
@@ -509,6 +774,9 @@ internal sealed class RecordingPublisher : ICombatReplayReportRecoveryPublisher
     )
     {
         Calls.Add(new PublicationCall(candidate, physicalVideoFilePath, locale));
+        _attemptsByRecordingId.TryGetValue(candidate.RecordingId, out var previousAttempts);
+        var attempt = previousAttempts + 1;
+        _attemptsByRecordingId[candidate.RecordingId] = attempt;
         if (string.Equals(candidate.RecordingId, FailRecordingId, StringComparison.Ordinal))
         {
             reason = "payload missing";
@@ -517,6 +785,25 @@ internal sealed class RecordingPublisher : ICombatReplayReportRecoveryPublisher
         if (string.Equals(candidate.RecordingId, DeferredRecordingId, StringComparison.Ordinal))
         {
             reason = "asset cache miss";
+            return CombatReplayReportRecoveryQueueOutcome.Deferred;
+        }
+        if (
+            FailAttemptsByRecordingId.TryGetValue(candidate.RecordingId, out var failAttempts)
+            && attempt <= failAttempts
+        )
+        {
+            reason = "payload temporarily unavailable";
+            return CombatReplayReportRecoveryQueueOutcome.RetryableFailure;
+        }
+        if (
+            DeferredAttemptsByRecordingId.TryGetValue(
+                candidate.RecordingId,
+                out var deferredAttempts
+            )
+            && attempt <= deferredAttempts
+        )
+        {
+            reason = "asset cache temporarily unavailable";
             return CombatReplayReportRecoveryQueueOutcome.Deferred;
         }
 
@@ -530,3 +817,43 @@ internal sealed record PublicationCall(
     string VideoFilePath,
     string Locale
 );
+
+internal static class RecoveryPages
+{
+    internal static CompletedVideoReportRecoveryPage PageAfter(
+        IReadOnlyList<CompletedVideoReportRecoveryCandidate> candidates,
+        int limit,
+        CompletedVideoReportRecoveryCursor? cursor
+    )
+    {
+        var startIndex = 0;
+        if (cursor != null)
+        {
+            startIndex = candidates
+                .Select((candidate, index) => (candidate, index))
+                .Where(entry =>
+                    string.Equals(
+                        entry.candidate.RecordingId,
+                        cursor.RecordingId,
+                        StringComparison.Ordinal
+                    )
+                )
+                .Select(entry => entry.index + 1)
+                .DefaultIfEmpty(candidates.Count)
+                .Single();
+        }
+
+        var page = candidates.Skip(startIndex).Take(limit).ToArray();
+        return new CompletedVideoReportRecoveryPage(
+            page,
+            page.Length == 0 ? null : CursorAfter(page[^1])
+        );
+    }
+
+    internal static CompletedVideoReportRecoveryPage Empty() =>
+        new(Array.Empty<CompletedVideoReportRecoveryCandidate>(), null);
+
+    private static CompletedVideoReportRecoveryCursor CursorAfter(
+        CompletedVideoReportRecoveryCandidate candidate
+    ) => new("2026-07-22T00:00:00.0000000Z", "2026-07-22T00:00:00.0000000Z", candidate.RecordingId);
+}

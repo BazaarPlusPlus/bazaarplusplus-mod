@@ -1,12 +1,80 @@
 import { safeAssetUrl } from "./asset-paths.ts";
 import {
-  asArray,
   asFiniteNumber,
   asString,
-  isRecord,
-  pick,
 } from "./value.ts";
 import { METRIC_ORDER, type StateMetric } from "../timeline/state-scale.ts";
+
+export interface ReportEntityV1 {
+  entityId: string;
+  templateId?: string;
+  owner: string;
+  type: string;
+  name: string;
+  size?: string;
+  slot?: number;
+  span?: number;
+  tier?: string;
+  enchant?: string;
+  contentKey?: string;
+  assetRelativeUrl?: string;
+  order: number;
+}
+
+export interface ReportRawReferenceV1 {
+  category: string;
+  type: string;
+  index: number;
+}
+
+export interface ReportEventV1 {
+  eventId: string;
+  frame: number;
+  frameSequence: number;
+  combatTimeMs: number;
+  kind: string;
+  action: string;
+  effectId?: string;
+  executionContextId?: string;
+  sourceEntityId?: string;
+  triggerSourceEntityId?: string;
+  targetEntityIds: string[];
+  removedTargetEntityIds: string[];
+  value?: number;
+  previousValue?: number;
+  currentValue?: number;
+  unit?: string;
+  isCritical?: boolean;
+  role: string;
+  attributionConfidence: string;
+  iconSemanticKey?: string;
+  iconContentKey?: string;
+  iconAssetRelativeUrl?: string;
+  rawReference: ReportRawReferenceV1;
+}
+
+export interface ReportMetricSampleV1 {
+  frame: number;
+  combatTimeMs: number;
+  combatant: string;
+  metric: string;
+  value: number;
+  unit: string;
+}
+
+export interface ReportCombatantStateV1 {
+  health?: number;
+  rage?: number;
+  healthRegen?: number;
+  shield?: number;
+  burn?: number;
+  poison?: number;
+}
+
+export interface ReportFrameZeroStateV1 {
+  player: ReportCombatantStateV1;
+  opponent: ReportCombatantStateV1;
+}
 
 export interface NormalizedEntity {
   id: string;
@@ -16,7 +84,6 @@ export interface NormalizedEntity {
   span: number;
   asset: string;
   hiddenFromTimeline: boolean;
-  raw: unknown;
 }
 
 export interface NormalizedEvent {
@@ -39,7 +106,6 @@ export interface NormalizedEvent {
   iconSemanticKey: string;
   icon: string;
   occurrences: number;
-  raw: unknown;
 }
 
 export interface NormalizedMetric {
@@ -55,62 +121,32 @@ export function normalizeSide(
   side: unknown,
 ): "player" | "opponent" | "neutral" {
   const value = asString(side, "neutral").toLowerCase();
-  if (
-    value.includes("player")
-    || value.includes("friendly")
-    || value === "self"
-  ) {
-    return "player";
-  }
-  if (value.includes("opponent") || value.includes("enemy")) {
-    return "opponent";
-  }
+  if (value === "player") return "player";
+  if (value === "opponent") return "opponent";
   return "neutral";
 }
 
 export function normalizeEntity(
-  raw: unknown,
+  raw: ReportEntityV1,
   index: number,
 ): NormalizedEntity {
-  const visualValue = pick(raw, ["visual"], null);
-  const visual = isRecord(visualValue) ? visualValue : {};
   const fallbackId = `entity-${index}`;
-  const id = asString(
-    pick(raw, ["entityId", "instanceId", "id"], fallbackId),
-    fallbackId,
-  );
-  const capturedName = asString(
-    pick(raw, ["capturedName", "name", "displayName", "templateName"], ""),
-    "",
-  );
-  const type = asString(
-    pick(raw, ["type", "entityType", "semanticType"], "entity"),
-    "entity",
-  );
+  const id = asString(raw.entityId, fallbackId);
+  const capturedName = asString(raw.name, "");
+  const type = asString(raw.type, "entity");
   const hiddenFromTimeline =
     type.toLowerCase() === "effect"
     && /^\[[^\]]+\]\s+Socket Effect$/iu.test(capturedName);
   const name = capturedName === id || hiddenFromTimeline ? "" : capturedName;
-  const side = normalizeSide(
-    pick(raw, ["owner", "side", "team"], "neutral"),
-  );
+  const side = normalizeSide(raw.owner);
   const span = Math.max(
     1,
     Math.min(
       3,
-      Math.round(
-        asFiniteNumber(pick(raw, ["span", "slotSpan", "size"], 1), 1),
-      ),
+      Math.round(asFiniteNumber(raw.span, 1)),
     ),
   );
-  const asset = asString(
-    pick(
-      raw,
-      ["assetRelativeUrl", "iconRelativeUrl"],
-      pick(visual, ["assetRelativeUrl", "relativeUrl"], ""),
-    ),
-    "",
-  );
+  const asset = safeAssetUrl(raw.assetRelativeUrl ?? "");
   return {
     id,
     name,
@@ -119,130 +155,44 @@ export function normalizeEntity(
     span,
     asset,
     hiddenFromTimeline,
-    raw,
   };
 }
 
-function nestedEntityId(value: unknown): string {
-  if (typeof value === "string" || typeof value === "number") {
-    return String(value);
-  }
-  if (isRecord(value)) {
-    return asString(pick(value, ["entityId", "instanceId", "id"], ""), "");
-  }
-  return "";
-}
-
-export function eventTimeMs(raw: unknown): number {
-  const direct = asFiniteNumber(
-    pick(
-      raw,
-      ["combatMs", "combatTimeMs", "timeMs", "timestampMs"],
-      Number.NaN,
-    ),
-    Number.NaN,
-  );
-  if (Number.isFinite(direct)) {
-    return Math.max(0, direct);
-  }
-  const seconds = asFiniteNumber(
-    pick(raw, ["combatTimeSeconds", "timeSeconds"], Number.NaN),
-    Number.NaN,
-  );
-  if (Number.isFinite(seconds)) {
-    return Math.max(0, seconds * 1_000);
-  }
-  const frame = asFiniteNumber(
-    pick(raw, ["frame", "combatFrame"], Number.NaN),
-    Number.NaN,
-  );
-  return Number.isFinite(frame) ? Math.max(0, frame * 50) : 0;
+export function eventTimeMs(raw: ReportEventV1): number {
+  return Math.max(0, asFiniteNumber(raw.combatTimeMs, 0));
 }
 
 export function normalizeEvent(
-  raw: unknown,
+  raw: ReportEventV1,
   index: number,
 ): NormalizedEvent {
-  const sourceValue = pick(raw, ["sourceEntityId", "source"], "");
-  const triggerSourceValue = pick(
-    raw,
-    ["triggerSourceEntityId", "triggerSource"],
-    "",
-  );
-  const targetValues = pick(
-    raw,
-    ["targetEntityIds", "targets", "targetEntities"],
-    [],
-  );
-  const removedTargetValues = pick(
-    raw,
-    ["removedTargetEntityIds", "removedTargets"],
-    [],
-  );
-  const singularTarget = pick(raw, ["targetEntityId", "target"], null);
-  const targets = asArray(targetValues).map(nestedEntityId).filter(Boolean);
-  const removedTargets = asArray(removedTargetValues)
-    .map(nestedEntityId)
-    .filter(Boolean);
-  const singularTargetId = nestedEntityId(singularTarget);
-  if (singularTargetId && !targets.includes(singularTargetId)) {
-    targets.push(singularTargetId);
-  }
-
   const fallbackId = `event-${index}`;
   return {
-    id: asString(pick(raw, ["eventId", "id"], fallbackId), fallbackId),
-    frame: Math.max(
-      0,
-      Math.round(
-        asFiniteNumber(pick(raw, ["frame", "combatFrame"], 0), 0),
-      ),
-    ),
+    id: asString(raw.eventId, fallbackId),
+    frame: Math.max(0, Math.round(asFiniteNumber(raw.frame, 0))),
     sequence: Math.max(
       0,
-      Math.round(
-        asFiniteNumber(
-          pick(raw, ["frameSequence", "sequence", "order"], index),
-          index,
-        ),
-      ),
+      Math.round(asFiniteNumber(raw.frameSequence, index)),
     ),
     combatMs: eventTimeMs(raw),
-    kind: asString(
-      pick(raw, ["semanticKind", "kind", "type"], "status"),
-      "status",
-    ),
-    action: asString(pick(raw, ["action", "effectAction"], ""), ""),
-    value: pick(raw, ["value", "amount"], null),
-    previousValue: pick(raw, ["previousValue"], null),
-    currentValue: pick(raw, ["currentValue"], null),
-    unit: asString(pick(raw, ["unit", "valueUnit"], ""), ""),
-    sourceId: nestedEntityId(sourceValue),
-    triggerSourceId: nestedEntityId(triggerSourceValue),
-    targetIds: targets,
-    removedTargetIds: removedTargets,
-    role: asString(pick(raw, ["role"], ""), ""),
+    kind: asString(raw.kind, "status"),
+    action: asString(raw.action, ""),
+    value: raw.value ?? null,
+    previousValue: raw.previousValue ?? null,
+    currentValue: raw.currentValue ?? null,
+    unit: asString(raw.unit, ""),
+    sourceId: asString(raw.sourceEntityId, ""),
+    triggerSourceId: asString(raw.triggerSourceEntityId, ""),
+    targetIds: raw.targetEntityIds.slice(),
+    removedTargetIds: raw.removedTargetEntityIds.slice(),
+    role: asString(raw.role, ""),
     attributionConfidence: asString(
-      pick(raw, ["attributionConfidence", "attribution"], "unknown"),
+      raw.attributionConfidence,
       "unknown",
     ).toLowerCase(),
-    iconSemanticKey: asString(
-      pick(raw, ["iconSemanticKey", "statusIconSemanticKey"], ""),
-      "",
-    ),
-    icon: safeAssetUrl(
-      asString(
-        pick(raw, ["iconAssetRelativeUrl", "iconRelativeUrl"], ""),
-        "",
-      ),
-    ),
-    occurrences: Math.max(
-      1,
-      Math.round(
-        asFiniteNumber(pick(raw, ["occurrences", "count"], 1), 1),
-      ),
-    ),
-    raw,
+    iconSemanticKey: asString(raw.iconSemanticKey, ""),
+    icon: safeAssetUrl(raw.iconAssetRelativeUrl ?? ""),
+    occurrences: 1,
   };
 }
 
@@ -250,71 +200,42 @@ export function normalizeMetricName(value: unknown): StateMetric | "" {
   const normalized = asString(value, "")
     .replace(/[\s_-]/gu, "")
     .toLowerCase();
-  if (normalized === "health" || normalized === "hp") return "health";
+  if (normalized === "health") return "health";
   if (normalized === "rage") return "rage";
-  if (
-    normalized === "healthregen"
-    || normalized === "regen"
-    || normalized === "regeneration"
-  ) {
-    return "healthRegen";
-  }
-  if (normalized === "shield" || normalized === "armor") return "shield";
-  if (normalized === "burn" || normalized === "fire") return "burn";
-  if (normalized === "poison" || normalized === "toxic") return "poison";
+  if (normalized === "healthregen") return "healthRegen";
+  if (normalized === "shield") return "shield";
+  if (normalized === "burn") return "burn";
+  if (normalized === "poison") return "poison";
   return "";
 }
 
-export function normalizeMetric(raw: unknown): NormalizedMetric | null {
-  const metric = normalizeMetricName(pick(raw, ["metric", "name"], ""));
-  const side = normalizeSide(
-    asString(
-      pick(raw, ["combatant", "side", "owner"], "neutral"),
-      "neutral",
-    ).toLowerCase(),
-  );
-  const value = asFiniteNumber(
-    pick(raw, ["value", "currentValue"], Number.NaN),
-    Number.NaN,
-  );
+export function normalizeMetric(
+  raw: ReportMetricSampleV1,
+): NormalizedMetric | null {
+  const metric = normalizeMetricName(raw.metric);
+  const side = normalizeSide(raw.combatant);
+  const value = asFiniteNumber(raw.value, Number.NaN);
   if (!metric || side === "neutral" || !Number.isFinite(value)) {
     return null;
   }
   return {
-    frame: Math.max(
-      0,
-      Math.round(
-        asFiniteNumber(pick(raw, ["frame", "combatFrame"], 0), 0),
-      ),
-    ),
-    combatMs: Math.max(
-      0,
-      asFiniteNumber(
-        pick(raw, ["combatTimeMs", "combatMs", "timeMs"], 0),
-        0,
-      ),
-    ),
+    frame: Math.max(0, Math.round(asFiniteNumber(raw.frame, 0))),
+    combatMs: Math.max(0, asFiniteNumber(raw.combatTimeMs, 0)),
     side,
     metric,
     value,
-    unit: asString(pick(raw, ["unit"], "points"), "points"),
+    unit: asString(raw.unit, "points"),
   };
 }
 
 export function frameZeroMetricSamples(
-  battle: unknown,
+  frameZero: ReportFrameZeroStateV1,
 ): NormalizedMetric[] {
-  const frameZero = pick(battle, ["frameZeroState"], null);
-  if (!isRecord(frameZero)) return [];
   const samples: NormalizedMetric[] = [];
   for (const side of ["player", "opponent"] as const) {
-    const state = pick(frameZero, [side], null);
-    if (!isRecord(state)) continue;
+    const state = frameZero[side];
     for (const metric of METRIC_ORDER) {
-      const value = asFiniteNumber(
-        pick(state, [metric], Number.NaN),
-        Number.NaN,
-      );
+      const value = asFiniteNumber(state[metric], Number.NaN);
       if (!Number.isFinite(value)) continue;
       samples.push({
         frame: 0,

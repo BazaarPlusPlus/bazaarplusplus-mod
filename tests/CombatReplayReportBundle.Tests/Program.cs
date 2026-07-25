@@ -8,6 +8,10 @@ var sandbox = Path.Combine(
     Path.GetTempPath(),
     "bpp-static-report-tests-" + Guid.NewGuid().ToString("N")
 );
+const string TestViewerScriptSha256 =
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const string TestViewerStylesheetSha256 =
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
 try
 {
@@ -15,8 +19,9 @@ try
     VerifyStaticPaths();
     VerifyTypedSiblingUrls();
     VerifyHtmlEmitter();
+    VerifyCurrentViewerReportIntegrityScan();
     VerifyViewerArtifactPinAndInstall();
-    VerifyViewerOpenGateRepairsSharedArtifacts();
+    VerifyViewerOpenGateVerifiesPinnedArtifacts();
     VerifyViewerStaticRuntimeBoundary();
     VerifyImmutableCommitConcurrency();
     VerifyImmutableCommitRejectsLinks();
@@ -136,7 +141,9 @@ void VerifyHtmlEmitter()
         "战斗 <报告> & review",
         "zh_TW",
         envelope,
-        viewerBundleId
+        viewerBundleId,
+        TestViewerScriptSha256,
+        TestViewerStylesheetSha256
     );
     var html = Encoding.UTF8.GetString(bytes);
     Check(
@@ -177,8 +184,20 @@ void VerifyHtmlEmitter()
         html.Contains(
             "<meta name=\"bpp-viewer-bundle\" content=\"" + viewerBundleId + "\">",
             StringComparison.Ordinal
-        ),
-        "HTML must identify the exact current Viewer bundle used to render it."
+        )
+            && html.Contains(
+                "<meta name=\"bpp-viewer-script-sha256\" content=\""
+                    + TestViewerScriptSha256
+                    + "\">",
+                StringComparison.Ordinal
+            )
+            && html.Contains(
+                "<meta name=\"bpp-viewer-stylesheet-sha256\" content=\""
+                    + TestViewerStylesheetSha256
+                    + "\">",
+                StringComparison.Ordinal
+            ),
+        "HTML must pin the immutable Viewer bundle and both artifact digests."
     );
     Check(
         !html.Contains("http://", StringComparison.OrdinalIgnoreCase)
@@ -201,9 +220,154 @@ void VerifyHtmlEmitter()
     );
 }
 
+void VerifyCurrentViewerReportIntegrityScan()
+{
+    const string viewerBundleId =
+        "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+    var reportDirectory = Path.Combine(sandbox, "viewer-integrity-scan");
+    Directory.CreateDirectory(reportDirectory);
+    var emitted = Encoding.UTF8.GetString(
+        new ReportHtmlEmitter().Emit(
+            "Current",
+            "en",
+            "{\"events\":[1,2,3]}",
+            viewerBundleId,
+            TestViewerScriptSha256,
+            TestViewerStylesheetSha256
+        )
+    );
+
+    var completeReportPath = Path.Combine(reportDirectory, "complete.html");
+    File.WriteAllText(completeReportPath, emitted);
+    Check(
+        IsValidViewerReport(completeReportPath, out var completeReason)
+            && string.IsNullOrEmpty(completeReason),
+        "Viewer validation must accept a complete current report."
+    );
+
+    var largePayloadReportPath = Path.Combine(reportDirectory, "large-payload.html");
+    var largeJson = "{\"events\":[" + string.Join(",", Enumerable.Repeat("0", 160_000)) + "]}";
+    File.WriteAllText(
+        largePayloadReportPath,
+        Encoding.UTF8.GetString(
+            new ReportHtmlEmitter().Emit(
+                "Large",
+                "en",
+                largeJson,
+                viewerBundleId,
+                TestViewerScriptSha256,
+                TestViewerStylesheetSha256
+            )
+        )
+    );
+    Check(
+        IsValidViewerReport(largePayloadReportPath, out var largePayloadReason)
+            && string.IsNullOrEmpty(largePayloadReason),
+        "Viewer validation must stream a large valid embedded payload without a whole-file read."
+    );
+
+    var delayedHeadReportPath = Path.Combine(reportDirectory, "delayed-head.html");
+    File.WriteAllText(delayedHeadReportPath, new string(' ', 65 * 1024) + emitted);
+    Check(
+        !IsValidViewerReport(delayedHeadReportPath, out _),
+        "Viewer validation must only trust bundle references found in the bounded HTML head scan."
+    );
+
+    var truncatedPayloads = new[]
+    {
+        ("truncated-object.html", "{\"events\":1"),
+        ("truncated-array.html", "{\"events\":[1,2"),
+        ("truncated-string.html", "{\"name\":\"unfinished"),
+        ("truncated-nested-object.html", "{\"nested\":{}"),
+        ("truncated-nested-array.html", "{\"nested\":[]"),
+    };
+    foreach (var (fileName, payload) in truncatedPayloads)
+    {
+        var truncatedJsonReportPath = Path.Combine(reportDirectory, fileName);
+        File.WriteAllText(truncatedJsonReportPath, ReplaceEmbeddedReportJson(emitted, payload));
+        Check(
+            !IsValidViewerReport(truncatedJsonReportPath, out _),
+            "A current Viewer marker must not admit a report with truncated embedded JSON."
+        );
+    }
+
+    var missingDataReportPath = Path.Combine(reportDirectory, "missing-data.html");
+    File.WriteAllText(
+        missingDataReportPath,
+        emitted.Replace(
+            "<script type=\"application/json\" id=\"bpp-report-data\">"
+                + "{\"events\":[1,2,3]}"
+                + "</script>\n",
+            string.Empty,
+            StringComparison.Ordinal
+        )
+    );
+    Check(
+        !IsValidViewerReport(missingDataReportPath, out _),
+        "A current Viewer marker must not admit a report without embedded report data."
+    );
+
+    var missingScriptCloseReportPath = Path.Combine(reportDirectory, "missing-script-close.html");
+    File.WriteAllText(
+        missingScriptCloseReportPath,
+        emitted.Replace("</script>\n<script defer", "\n<script defer", StringComparison.Ordinal)
+    );
+    Check(
+        !IsValidViewerReport(missingScriptCloseReportPath, out _),
+        "A current Viewer marker must not admit a report without the data script close."
+    );
+
+    var missingBodyCloseReportPath = Path.Combine(reportDirectory, "missing-body-close.html");
+    File.WriteAllText(
+        missingBodyCloseReportPath,
+        emitted.Replace("</body>\n", string.Empty, StringComparison.Ordinal)
+    );
+    Check(
+        !IsValidViewerReport(missingBodyCloseReportPath, out _),
+        "A current Viewer marker must not admit a report without the body close."
+    );
+
+    var missingHtmlCloseReportPath = Path.Combine(reportDirectory, "missing-html-close.html");
+    File.WriteAllText(
+        missingHtmlCloseReportPath,
+        emitted.Replace("</html>\n", string.Empty, StringComparison.Ordinal)
+    );
+    Check(
+        !IsValidViewerReport(missingHtmlCloseReportPath, out _),
+        "A current Viewer marker must not admit a report without the document close."
+    );
+
+    bool IsValidViewerReport(string reportPath, out string reason)
+    {
+        var valid = StaticReportPaths.TryValidateViewerReport(
+            reportPath,
+            out var parsedBundleId,
+            out var parsedScriptSha256,
+            out var parsedStylesheetSha256,
+            out reason
+        );
+        return valid
+            && parsedBundleId == viewerBundleId
+            && parsedScriptSha256 == TestViewerScriptSha256
+            && parsedStylesheetSha256 == TestViewerStylesheetSha256;
+    }
+}
+
+static string ReplaceEmbeddedReportJson(string html, string replacement)
+{
+    const string startToken = "<script type=\"application/json\" id=\"bpp-report-data\">";
+    var payloadStart = html.IndexOf(startToken, StringComparison.Ordinal) + startToken.Length;
+    var payloadEnd = html.IndexOf("</script>", payloadStart, StringComparison.Ordinal);
+    return html.Substring(0, payloadStart) + replacement + html.Substring(payloadEnd);
+}
+
 void VerifyViewerArtifactPinAndInstall()
 {
     var artifacts = ViewerArtifactBundle.CreateDefault();
+    Check(
+        ReferenceEquals(artifacts, ViewerArtifactBundle.CreateDefault()),
+        "The embedded Viewer bundle must be materialized once and reused for the process lifetime."
+    );
     Check(
         artifacts.ScriptBytes.Length > 500_000
             && artifacts.ScriptSha256 == StaticReportIntegrity.Sha256(artifacts.ScriptBytes)
@@ -219,14 +383,14 @@ void VerifyViewerArtifactPinAndInstall()
     );
 
     var paths = new StaticReportPaths(Path.Combine(sandbox, "viewer-install"));
-    var installer = new ViewerInstaller(paths, artifacts, new ReplaceableArtifactPublisher());
+    var installer = new ViewerInstaller(paths, artifacts, new ImmutableArtifactCommitter());
     var first = installer.EnsureInstalled();
     var second = installer.EnsureInstalled();
     Check(
-        first.ScriptPublish == ReplaceableArtifactPublishResult.Created
-            && first.StylesheetPublish == ReplaceableArtifactPublishResult.Created
-            && second.ScriptPublish == ReplaceableArtifactPublishResult.Reused
-            && second.StylesheetPublish == ReplaceableArtifactPublishResult.Reused,
+        first.ScriptPublish == ImmutableArtifactCommitResult.Created
+            && first.StylesheetPublish == ImmutableArtifactCommitResult.Created
+            && second.ScriptPublish == ImmutableArtifactCommitResult.Reused
+            && second.StylesheetPublish == ImmutableArtifactCommitResult.Reused,
         "Viewer install must create once and then reuse one byte-identical generation."
     );
     Check(
@@ -257,13 +421,11 @@ void VerifyViewerArtifactPinAndInstall()
         paths.GetViewerScriptFilePath(artifacts.BundleId),
         Encoding.UTF8.GetBytes("mutated")
     );
-    var repaired = installer.EnsureInstalled();
-    Check(
-        repaired.ScriptPublish == ReplaceableArtifactPublishResult.Replaced
-            && File.ReadAllBytes(paths.GetViewerScriptFilePath(artifacts.BundleId))
-                .SequenceEqual(artifacts.ScriptBytes),
-        "A changed Viewer generation must be atomically repaired from embedded bytes."
+    CheckThrows<ArtifactPublicationException>(
+        () => installer.EnsureInstalled(),
+        "A changed immutable Viewer generation must fail closed instead of being overwritten."
     );
+    File.WriteAllBytes(paths.GetViewerScriptFilePath(artifacts.BundleId), artifacts.ScriptBytes);
 
     var alternateScript = (byte[])artifacts.ScriptBytes.Clone();
     alternateScript[alternateScript.Length - 1] ^= 0x01;
@@ -281,8 +443,8 @@ void VerifyViewerArtifactPinAndInstall()
         "Changing either Viewer artifact must create a different bundle generation."
     );
 
-    var publisher = new ReplaceableArtifactPublisher();
-    _ = publisher.PublishBelowRoot(
+    var committer = new ImmutableArtifactCommitter();
+    _ = committer.CommitBelowRoot(
         paths.DataRootDirectoryPath,
         paths.GetViewerStylesheetFilePath(alternate.BundleId),
         alternate.StylesheetBytes
@@ -290,11 +452,11 @@ void VerifyViewerArtifactPinAndInstall()
     var completedPartialGeneration = new ViewerInstaller(
         paths,
         alternate,
-        publisher
+        committer
     ).EnsureInstalled();
     Check(
-        completedPartialGeneration.StylesheetPublish == ReplaceableArtifactPublishResult.Reused
-            && completedPartialGeneration.ScriptPublish == ReplaceableArtifactPublishResult.Created
+        completedPartialGeneration.StylesheetPublish == ImmutableArtifactCommitResult.Reused
+            && completedPartialGeneration.ScriptPublish == ImmutableArtifactCommitResult.Created
             && File.ReadAllBytes(paths.GetViewerScriptFilePath(artifacts.BundleId))
                 .SequenceEqual(artifacts.ScriptBytes),
         "A partial unreferenced generation must be completed without changing an existing generation."
@@ -319,28 +481,32 @@ void VerifyViewerStaticRuntimeBoundary()
     );
 }
 
-void VerifyViewerOpenGateRepairsSharedArtifacts()
+void VerifyViewerOpenGateVerifiesPinnedArtifacts()
 {
     var dataRoot = Path.Combine(sandbox, "viewer-open-gate");
     var reportRoot = Path.Combine(dataRoot, "reports");
     Directory.CreateDirectory(reportRoot);
 
-    Check(
-        CombatReplayReportViewerGate.TryEnsureInstalledForReportRoot(reportRoot, out var reason)
-            && string.IsNullOrEmpty(reason),
-        "The F8/open gate must install or repair the shared Viewer before launching a report."
-    );
+    var install = CombatReplayReportViewerGate.EnsureInstalledForDataRoot(dataRoot);
 
     var artifacts = ViewerArtifactBundle.CreateDefault();
     var paths = new StaticReportPaths(dataRoot);
     var currentReportPath = Path.Combine(reportRoot, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.html");
     File.WriteAllBytes(
         currentReportPath,
-        new ReportHtmlEmitter().Emit("Current", "en", "{}", artifacts.BundleId)
+        new ReportHtmlEmitter().Emit(
+            "Current",
+            "en",
+            "{}",
+            artifacts.BundleId,
+            artifacts.ScriptSha256,
+            artifacts.StylesheetSha256
+        )
     );
     Check(
-        File.ReadAllBytes(paths.GetViewerScriptFilePath(artifacts.BundleId))
-            .SequenceEqual(artifacts.ScriptBytes)
+        install.Artifacts.BundleId == artifacts.BundleId
+            && File.ReadAllBytes(paths.GetViewerScriptFilePath(artifacts.BundleId))
+                .SequenceEqual(artifacts.ScriptBytes)
             && File.ReadAllBytes(paths.GetViewerStylesheetFilePath(artifacts.BundleId))
                 .SequenceEqual(artifacts.StylesheetBytes),
         "The Viewer open gate must publish the complete current generation."
@@ -353,6 +519,31 @@ void VerifyViewerOpenGateRepairsSharedArtifacts()
         ),
         "The Viewer open gate must accept a report that references the complete current bundle."
     );
+    var incompleteReportPath = Path.Combine(reportRoot, "cccccccccccccccccccccccccccccccc.html");
+    File.WriteAllText(
+        incompleteReportPath,
+        ReplaceEmbeddedReportJson(
+            Encoding.UTF8.GetString(
+                new ReportHtmlEmitter().Emit(
+                    "Incomplete",
+                    "en",
+                    "{}",
+                    artifacts.BundleId,
+                    artifacts.ScriptSha256,
+                    artifacts.StylesheetSha256
+                )
+            ),
+            "{\"events\":[1,2"
+        )
+    );
+    Check(
+        !CombatReplayReportViewerGate.TryEnsureInstalledForReport(
+            reportRoot,
+            incompleteReportPath,
+            out _
+        ),
+        "The Viewer open gate must reject a current-bundle report whose embedded data is incomplete."
+    );
     var staleReportPath = Path.Combine(reportRoot, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.html");
     File.WriteAllText(staleReportPath, "<!doctype html><html><body>stale</body></html>");
     Check(
@@ -363,12 +554,60 @@ void VerifyViewerOpenGateRepairsSharedArtifacts()
         ),
         "The Viewer open gate must reject an existing report from an unsupported Viewer bundle."
     );
+
+    var alternateScript = artifacts.ScriptBytes;
+    alternateScript[alternateScript.Length - 1] ^= 0x01;
+    var alternate = new ViewerArtifactBundle(
+        ViewerArtifactBundle.CurrentReportSchemaVersion,
+        alternateScript,
+        artifacts.StylesheetBytes,
+        alternateScript.Length,
+        StaticReportIntegrity.Sha256(alternateScript),
+        artifacts.StylesheetBytes.Length,
+        artifacts.StylesheetSha256
+    );
+    _ = new ViewerInstaller(paths, alternate, new ImmutableArtifactCommitter()).EnsureInstalled();
+    var pinnedReportPath = Path.Combine(reportRoot, "dddddddddddddddddddddddddddddddd.html");
+    File.WriteAllBytes(
+        pinnedReportPath,
+        new ReportHtmlEmitter().Emit(
+            "Pinned",
+            "en",
+            "{}",
+            alternate.BundleId,
+            alternate.ScriptSha256,
+            alternate.StylesheetSha256
+        )
+    );
+    File.WriteAllText(paths.GetViewerScriptFilePath(artifacts.BundleId), "corrupt current bundle");
     Check(
-        !CombatReplayReportViewerGate.TryEnsureInstalledForReportRoot(
-            Path.Combine(dataRoot, "not-reports"),
+        CombatReplayReportViewerGate.TryEnsureInstalledForReport(
+            reportRoot,
+            pinnedReportPath,
             out _
         ),
-        "The Viewer open gate must reject arbitrary sibling roots."
+        "A report pinned to another intact generation must open without installing or validating the unrelated current generation."
+    );
+
+    var forgedReportPath = Path.Combine(reportRoot, "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.html");
+    File.WriteAllBytes(
+        forgedReportPath,
+        new ReportHtmlEmitter().Emit(
+            "Forged",
+            "en",
+            "{}",
+            alternate.BundleId,
+            artifacts.ScriptSha256,
+            artifacts.StylesheetSha256
+        )
+    );
+    Check(
+        !CombatReplayReportViewerGate.TryEnsureInstalledForReport(
+            reportRoot,
+            forgedReportPath,
+            out _
+        ),
+        "Viewer artifact digests must be cryptographically bound to the pinned bundle identity."
     );
 }
 
@@ -393,7 +632,7 @@ void VerifyImmutableCommitConcurrency()
         $"Concurrent identical commits must create once and reuse all losers (created={created}, reused={reused})."
     );
 
-    CheckThrows<IOException>(
+    CheckThrows<ArtifactPublicationException>(
         () =>
             new ImmutableArtifactCommitter().CommitBelowRoot(
                 root,
@@ -425,7 +664,7 @@ void VerifyImmutableCommitRejectsLinks()
         return;
     }
 
-    CheckThrows<IOException>(
+    CheckThrows<ArtifactPublicationException>(
         () =>
             new ImmutableArtifactCommitter().CommitBelowRoot(
                 root,
@@ -439,7 +678,7 @@ void VerifyImmutableCommitRejectsLinks()
     Directory.CreateDirectory(external);
     var linkedDirectory = Path.Combine(root, "linked-directory");
     Directory.CreateSymbolicLink(linkedDirectory, external);
-    CheckThrows<IOException>(
+    CheckThrows<ArtifactPublicationException>(
         () =>
             new ImmutableArtifactCommitter().CommitBelowRoot(
                 root,
@@ -459,7 +698,7 @@ void VerifyPhysicalFileChain()
     File.WriteAllBytes(physical, new byte[] { 0, 1, 2 });
     ReportPhysicalFile.RequireBelowRoot(root, physical, "Recorded combat video");
 
-    CheckThrows<InvalidOperationException>(
+    CheckThrows<ArtifactPublicationException>(
         () =>
             ReportPhysicalFile.RequireBelowRoot(
                 root,
@@ -487,7 +726,7 @@ void VerifyPhysicalFileChain()
         return;
     }
 
-    CheckThrows<IOException>(
+    CheckThrows<ArtifactPublicationException>(
         () =>
             ReportPhysicalFile.RequireBelowRoot(
                 root,

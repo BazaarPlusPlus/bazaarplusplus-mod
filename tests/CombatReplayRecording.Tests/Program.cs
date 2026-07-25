@@ -2679,8 +2679,15 @@ static void RunCurrentReplayVideoMetadataChecks()
             );
         }
 
+        var recoveryPage = Invoke(
+            storeType,
+            store,
+            "ListCompletedForReportRecovery",
+            new object?[] { 10, null }
+        )!;
+        var recoveryPageType = recoveryPage.GetType();
         var recoveryCandidates = (System.Collections.IEnumerable)
-            Invoke(storeType, store, "ListCompletedForReportRecovery", new object?[] { 10, 0 })!;
+            GetProperty(recoveryPageType, recoveryPage, "Candidates")!;
         var candidate = recoveryCandidates.Cast<object>().Single();
         var candidateType = candidate.GetType();
         Assert(
@@ -2696,6 +2703,32 @@ static void RunCurrentReplayVideoMetadataChecks()
                     .Cast<object>()
                     .Count() == 2,
             "Report startup recovery must receive the typed recording, battle, source, and relative video identity."
+        );
+        var recoveryCursor = GetProperty(recoveryPageType, recoveryPage, "NextCursor");
+        Assert(
+            recoveryCursor != null
+                && GetProperty(recoveryCursor.GetType(), recoveryCursor, "RecordingId") as string
+                    == "video-current",
+            "A non-empty recovery page must expose a stable continuation cursor."
+        );
+        var exhaustedRecoveryPage = Invoke(
+            storeType,
+            store,
+            "ListCompletedForReportRecovery",
+            new object?[] { 10, recoveryCursor }
+        )!;
+        Assert(
+            !(
+                (System.Collections.IEnumerable)
+                    GetProperty(
+                        exhaustedRecoveryPage.GetType(),
+                        exhaustedRecoveryPage,
+                        "Candidates"
+                    )!
+            )
+                .Cast<object>()
+                .Any(),
+            "Recovery keyset pagination must exclude the cursor row from the following page."
         );
     }
     finally

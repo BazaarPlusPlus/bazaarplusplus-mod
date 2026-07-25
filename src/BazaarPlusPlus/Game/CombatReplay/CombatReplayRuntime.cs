@@ -227,7 +227,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             var recovery = new CombatReplayReportStartupRecovery(
                 reportDataRoot,
                 videoRootDirectoryPath,
-                (limit, offset) => metadataStore.ListCompletedForReportRecovery(limit, offset),
+                (limit, cursor) => metadataStore.ListCompletedForReportRecovery(limit, cursor),
                 publisher,
                 () =>
                     CombatReplayReportViewerGate
@@ -257,16 +257,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         while (!_destroying && !recovery.IsCompleted)
         {
-            var summary = recovery.RecoverNextBatch(
+            _ = recovery.RecoverNextBatch(
                 StartupReportRecoveryBatchSize,
                 locale,
                 useTraditionalChinese
             );
-            if (!string.IsNullOrWhiteSpace(summary.SourceFailure))
-                break;
 
             // Candidate discovery and cache inspection are bounded to one database page per
-            // frame. Startup recovery is cache-only and never admits Unity materialization work.
+            // frame. Source failures are retried with bounded backoff by the recovery object;
+            // startup recovery is cache-only and never admits Unity materialization work.
             yield return null;
         }
 
