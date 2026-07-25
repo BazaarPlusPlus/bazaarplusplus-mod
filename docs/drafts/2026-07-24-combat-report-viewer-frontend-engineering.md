@@ -1,14 +1,15 @@
 # Combat Report Viewer React/shadcn/Tailwind replacement
 
-Status: confirmed. This PR replaces the current Viewer in place; it is not a compatibility migration.
+Status: implemented. This PR replaces the current Viewer in place; it is not a compatibility
+migration.
 
 ## Product boundary
 
 The report remains a static, offline post-combat analysis tool:
 
 - each report HTML embeds immutable report JSON;
-- the browser loads one classic `report-viewer/viewer.js` and one
-  `report-viewer/viewer.css` through `file://`;
+- the browser loads one classic
+  `report-viewer/objects/<viewer-bundle-id>/{viewer.js,viewer.css}` generation through `file://`;
 - shared game assets and the optional recording use stable relative paths;
 - runtime network access, `fetch`, workers, dynamic imports, and a local HTTP server are forbidden;
 - dense combat events remain Canvas-rendered rather than becoming thousands of DOM nodes.
@@ -17,10 +18,11 @@ The current implementation is not retained. The finished PR contains no handwrit
 `legacy/viewer.js`, no monolithic accumulated override stylesheet, and no v1–v26 compatibility
 resources or registry entries.
 
-Because historical Viewer compatibility is explicitly out of scope, reports use the one stable
-unversioned Viewer URL. Plugin updates atomically replace that current Viewer after validating its
-source-controlled integrity pins. No `report-viewer/vN/` directory, version meta tag, immutable
-multi-generation registry, or report-rewrite migration remains.
+Because historical Viewer compatibility is explicitly out of scope, the plugin accepts only reports
+that reference the current content-addressed generation. It validates the embedded source artifacts,
+publishes both files below the generation's SHA-256 bundle ID, and emits a report only after that
+generation is complete. There is no mutable alias, `report-viewer/vN/` directory, version registry,
+old-Viewer fallback, or report-rewrite migration.
 
 ## Framework decision
 
@@ -286,11 +288,12 @@ ECharts Canvas is painted on the statistics page.
       Canvas/media and raw-payload disclosure exceptions.
 - [ ] Delete the superseded `.bpp-activity-table` and equivalent component-chrome selectors after
       their shadcn replacements land.
-- [ ] Remove all remaining versioned Viewer paths, version metadata, registry/version arguments,
+- [x] Remove all remaining numbered Viewer paths, registry/version arguments,
       resource declarations, compatibility tests, and stale README instructions.
-- [ ] Emit reports with stable `../report-viewer/viewer.js` and `.css` URLs and atomically replace
-      those current installed artifacts on plugin update.
-- [ ] Ensure no alternate file://, server, or old-DOM fallback remains.
+- [x] Emit reports with content-addressed
+      `../report-viewer/objects/<viewer-bundle-id>/{viewer.js,viewer.css}` URLs and publish the
+      complete generation before the report can reference it.
+- [x] Ensure no mutable Viewer alias, local server, or old-DOM fallback remains.
 
 ### 6. Verification and delivery
 
@@ -305,7 +308,7 @@ ECharts Canvas is painted on the statistics page.
 - [ ] Assert every used shadcn semantic CSS variable has a concrete computed value and no component
       source reintroduces stock color, typography, or radius tokens.
 - [ ] Assert statistics paints an ECharts Canvas from the exact installed concatenated script.
-- [ ] Assert emitted report HTML resolves only the stable unversioned Viewer URLs.
+- [x] Assert emitted report HTML resolves only the current content-addressed Viewer generation.
 - [ ] Run the report bundle tests, architecture tests, and main mod build.
 - [ ] Review the complete diff as one PR-sized delivery; do not retain transition code.
 
