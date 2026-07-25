@@ -814,7 +814,41 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
     "data-bpp-sticky-hero-entity-id",
     "player-hero",
   );
+  await expect(stickyLabel).toHaveClass(/bpp-side-player/u);
   await expect(stickyLabel).toContainText("Fixture Player");
+  await expect(
+    page.getByTestId("timeline-sticky-hero-side"),
+  ).toHaveText("Player");
+  await expect(
+    page.getByTestId("timeline-sticky-hero-side"),
+  ).toHaveClass(/text-nano/u);
+  const stickyBadgeTypography = await page
+    .getByTestId("timeline-sticky-hero-side")
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      const root = getComputedStyle(document.documentElement);
+      const nanoRem = Number.parseFloat(root.getPropertyValue("--text-nano"));
+      const rootFontSize = Number.parseFloat(root.fontSize);
+      return {
+        actualFontSize: Number.parseFloat(style.fontSize),
+        expectedFontSize: nanoRem * rootFontSize,
+      };
+    });
+  expect(
+    Math.abs(
+      stickyBadgeTypography.actualFontSize
+        - stickyBadgeTypography.expectedFontSize,
+    ),
+  ).toBeLessThan(0.1);
+  await expect(stickyLabel).not.toContainText("hero");
+  await expect(stickyCanvas).toHaveAttribute(
+    "data-bpp-sticky-side",
+    "player",
+  );
+  const playerStickyBackground = await stickyLabel.evaluate(
+    (element) => getComputedStyle(element).backgroundImage,
+  );
+  expect(playerStickyBackground).not.toBe("none");
 
   const readStickyGeometry = () => page.evaluate(() => {
     const ruler = document.querySelector(
@@ -872,7 +906,20 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
     "data-bpp-side-boundary",
     "opponent",
   );
+  await expect(stickyLabel).toHaveClass(/bpp-side-opponent/u);
   await expect(stickyLabel).toContainText("Fixture Opponent");
+  await expect(
+    page.getByTestId("timeline-sticky-hero-side"),
+  ).toHaveText("Opponent");
+  await expect(stickyLabel).not.toContainText("hero");
+  await expect(stickyCanvas).toHaveAttribute(
+    "data-bpp-sticky-side",
+    "opponent",
+  );
+  const opponentStickyBackground = await stickyLabel.evaluate(
+    (element) => getComputedStyle(element).backgroundImage,
+  );
+  expect(opponentStickyBackground).not.toBe(playerStickyBackground);
   geometry = await readStickyGeometry();
   expect(Math.abs(geometry.labelTop - geometry.rulerBottom)).toBeLessThan(1);
   expect(Math.abs(geometry.canvasTop - geometry.rulerBottom)).toBeLessThan(1);

@@ -443,7 +443,7 @@ test("report entities and events normalize legacy field aliases deterministicall
     id: "item-1",
     name: "Large Item",
     type: "item",
-    side: "friendly",
+    side: "player",
     span: 3,
     asset: "../asset.png",
     hiddenFromTimeline: false,
@@ -478,6 +478,15 @@ test("report entities and events normalize legacy field aliases deterministicall
 
 test("combatant metrics normalize aliases and preserve frame-zero state", () => {
   assert.equal(normalizeSide("friendly"), "player");
+  assert.equal(normalizeEntity({ id: "self", side: "self" }, 0).side, "player");
+  assert.equal(
+    normalizeEntity({ id: "enemy", side: "enemy" }, 0).side,
+    "opponent",
+  );
+  assert.equal(
+    normalizeEntity({ id: "spectator", side: "spectator" }, 0).side,
+    "neutral",
+  );
   assert.equal(normalizeSide("opponent-hero"), "opponent");
   assert.equal(normalizeSide("spectator"), "neutral");
   assert.equal(normalizeMetricName("Health_Regen"), "healthRegen");

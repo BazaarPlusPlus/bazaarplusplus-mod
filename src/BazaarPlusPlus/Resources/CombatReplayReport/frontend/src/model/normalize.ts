@@ -12,7 +12,7 @@ export interface NormalizedEntity {
   id: string;
   name: string;
   type: string;
-  side: string;
+  side: "player" | "opponent" | "neutral";
   span: number;
   asset: string;
   hiddenFromTimeline: boolean;
@@ -91,10 +91,9 @@ export function normalizeEntity(
     type.toLowerCase() === "effect"
     && /^\[[^\]]+\]\s+Socket Effect$/iu.test(capturedName);
   const name = capturedName === id || hiddenFromTimeline ? "" : capturedName;
-  const side = asString(
+  const side = normalizeSide(
     pick(raw, ["owner", "side", "team"], "neutral"),
-    "neutral",
-  ).toLowerCase();
+  );
   const span = Math.max(
     1,
     Math.min(

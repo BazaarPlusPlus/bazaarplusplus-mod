@@ -18,7 +18,10 @@ import {
   type ReportState,
 } from "../../app/report-state.ts";
 import type { ReportViewModel } from "../../model/report.ts";
-import type { NormalizedEntity } from "../../model/normalize.ts";
+import {
+  normalizeSide,
+  type NormalizedEntity,
+} from "../../model/normalize.ts";
 import {
   LANE_HEIGHT,
   LANE_LABEL_WIDTH,
@@ -56,6 +59,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "../ui/toggle-group.tsx";
+import { Badge } from "../ui/badge.tsx";
 import { LaneFilterPopover } from "./LaneFilterPopover.tsx";
 
 export interface TimelineHandle {
@@ -111,6 +115,7 @@ function LaneLabelContents({
   sticky?: boolean;
   t: (key: string) => string;
 }): React.JSX.Element {
+  const side = normalizeSide(entity.side);
   const artSlotTestId = sticky
     ? "timeline-sticky-hero-art-slot"
     : `timeline-lane-art-slot-${index}`;
@@ -129,19 +134,40 @@ function LaneLabelContents({
         />
       </span>
       <span className="bpp-lane-copy">
-        <strong className="block truncate text-body text-foreground">
-          {entity.name}
-        </strong>
-        <small className="block truncate text-micro text-muted-foreground">
-          {entityTypeLabel(entity.type, t)}
-        </small>
+        {sticky
+          ? (
+            <span className="bpp-sticky-hero-copy">
+              <strong className="min-w-0 truncate text-body text-foreground">
+                {entity.name}
+              </strong>
+              {side !== "neutral" && (
+                <Badge
+                  className="bpp-sticky-hero-side text-nano"
+                  data-bpp-test-id="timeline-sticky-hero-side"
+                  variant="outline"
+                >
+                  {t(side)}
+                </Badge>
+              )}
+            </span>
+          )
+          : (
+            <>
+              <strong className="block truncate text-body text-foreground">
+                {entity.name}
+              </strong>
+              <small className="block truncate text-micro text-muted-foreground">
+                {entityTypeLabel(entity.type, t)}
+              </small>
+            </>
+          )}
       </span>
       <span
         className={cn(
           "ml-auto h-7 w-0.5 rounded-full",
-          entity.side.toLowerCase().includes("opponent")
+          side === "opponent"
             ? "bg-opponent/80"
-            : entity.side.toLowerCase().includes("player")
+            : side === "player"
               ? "bg-player/85"
               : "bg-faint/70",
         )}
@@ -289,6 +315,9 @@ export const TimelineView = forwardRef<
   );
   const pinnedHero =
     pinnedHeroLane === null ? null : entities[pinnedHeroLane] ?? null;
+  const pinnedHeroSide = pinnedHero
+    ? normalizeSide(pinnedHero.side)
+    : "neutral";
   const sideBoundaryLane = useMemo(
     () => opponentBoundaryLane(entities),
     [entities],
@@ -725,7 +754,7 @@ export const TimelineView = forwardRef<
               <div
                 className={cn(
                   "bpp-lane-label bpp-sticky-hero-label",
-                  pinnedHero && `bpp-side-${pinnedHero.side}`,
+                  pinnedHero && `bpp-side-${pinnedHeroSide}`,
                   pinnedHeroLane === sideBoundaryLane && "is-side-boundary",
                 )}
                 aria-hidden="true"
@@ -752,7 +781,11 @@ export const TimelineView = forwardRef<
               </div>
               <canvas
                 aria-hidden="true"
-                className="bpp-sticky-hero-canvas"
+                className={cn(
+                  "bpp-sticky-hero-canvas",
+                  pinnedHero && `bpp-side-${pinnedHeroSide}`,
+                )}
+                data-bpp-sticky-side={pinnedHero ? pinnedHeroSide : ""}
                 data-bpp-sticky-hero-lane={pinnedHeroLane ?? ""}
                 data-bpp-test-id="timeline-sticky-hero-events"
                 hidden={!pinnedHero}
