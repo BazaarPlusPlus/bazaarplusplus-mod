@@ -289,7 +289,7 @@ export const RecordingWindow = forwardRef<
           type="button"
           variant="outline"
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-icon-sm" />
         </Button>
         <Button
           aria-label={playing ? t("pauseRecording") : t("playRecording")}
@@ -300,8 +300,8 @@ export const RecordingWindow = forwardRef<
           variant="outline"
         >
           {playing
-            ? <Pause className="size-4" />
-            : <Play className="size-4" />}
+            ? <Pause className="size-icon-md" />
+            : <Play className="size-icon-md" />}
         </Button>
         <Button
           aria-label={t("nextEvent")}
@@ -311,7 +311,7 @@ export const RecordingWindow = forwardRef<
           type="button"
           variant="outline"
         >
-          <ChevronRight className="size-4" />
+          <ChevronRight className="size-icon-sm" />
         </Button>
       </ButtonGroup>
       <span
@@ -331,7 +331,7 @@ export const RecordingWindow = forwardRef<
             variant="outline"
           >
             {SPEEDS[speedIndex]}×
-            <ChevronDown className="size-3" />
+            <ChevronDown className="size-icon-xs" />
           </Button>
         </PopoverTrigger>
         <PopoverContent
@@ -361,7 +361,9 @@ export const RecordingWindow = forwardRef<
                 >
                   {speed}×
                   <Check
-                    className={selected ? "size-3" : "size-3 opacity-0"}
+                    className={selected
+                      ? "size-icon-xs"
+                      : "size-icon-xs opacity-0"}
                   />
                 </Button>
               );
@@ -379,7 +381,7 @@ export const RecordingWindow = forwardRef<
             type="button"
             variant="ghost"
           >
-            <Maximize2 className="size-3.5" />
+            <Maximize2 className="size-icon-sm" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{t("fullscreenRecording")}</TooltipContent>
@@ -418,7 +420,7 @@ export const RecordingWindow = forwardRef<
                 type="button"
                 variant="ghost"
               >
-                <Minus className="size-3.5" />
+                <Minus className="size-icon-sm" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{t("hideRecording")}</TooltipContent>

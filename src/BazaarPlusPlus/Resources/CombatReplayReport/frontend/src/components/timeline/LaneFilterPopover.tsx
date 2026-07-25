@@ -63,7 +63,7 @@ export function LaneFilterPopover({
       <PopoverTrigger asChild>
         <Button
           aria-label={t("laneFilter")}
-          className="h-6 gap-1 px-1.5 normal-case tracking-normal"
+          className="h-control-xs gap-1 px-2 normal-case tracking-normal"
           data-bpp-test-id="lane-filter-trigger"
           size="xs"
           variant={hasFilters ? "secondary" : "ghost"}
@@ -89,7 +89,7 @@ export function LaneFilterPopover({
           <strong className="text-compact">{t("laneFilterTitle")}</strong>
           <Button
             aria-label={t("laneFilterReset")}
-            className="h-6 px-1.5"
+            className="h-control-xs px-2"
             data-bpp-test-id="lane-filter-reset"
             disabled={!hasFilters}
             onClick={() => dispatch({ type: "reset-lane-visibility" })}

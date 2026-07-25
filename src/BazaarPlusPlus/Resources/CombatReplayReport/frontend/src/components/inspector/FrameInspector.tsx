@@ -48,7 +48,7 @@ function EntityReference({
   if (!entity) {
     return (
       <span
-        className="truncate text-muted-foreground"
+        className="truncate text-compact text-muted-foreground"
         data-bpp-test-id={testId}
       >
         {fallback}
@@ -57,7 +57,7 @@ function EntityReference({
   }
   return (
     <span
-      className="inline-flex min-w-0 items-center gap-2"
+      className="inline-flex min-w-0 items-center gap-2 text-compact"
       data-bpp-entity-id={entity.id}
       data-bpp-test-id={testId}
     >
@@ -176,9 +176,9 @@ function EventRow({
       data-bpp-event-id={event.id}
       data-bpp-test-id={focused ? "focused-cluster-event" : undefined}
     >
-      <div className="flex min-h-6 items-center gap-2">
+      <div className="flex min-h-control-xs items-center gap-2">
         {event.icon ? (
-          <img alt="" className="size-4 object-contain" src={event.icon} />
+          <img alt="" className="size-icon-md object-contain" src={event.icon} />
         ) : (
           <SemanticIcon token={token} />
         )}
@@ -186,7 +186,7 @@ function EventRow({
           {t(token)}
         </strong>
         {mergedCount > 1 && (
-          <Badge className="h-5 px-1.5 font-mono" variant="secondary">
+          <Badge className="px-1.5 font-mono" variant="secondary">
             ×{mergedCount}
           </Badge>
         )}
@@ -213,7 +213,7 @@ function EventRow({
         </div>
         <ArrowRight
           aria-hidden="true"
-          className="mt-4 size-3.5 shrink-0 text-brand-soft/70"
+          className="mt-4 size-icon-sm shrink-0 text-brand-soft/70"
         />
         <div className="min-w-0">
           <span className="mb-0.5 block text-nano font-medium uppercase tracking-wide text-muted-foreground/80">
@@ -356,7 +356,7 @@ export function FrameInspector({
               </h2>
               {inspectedEntity && (
                 <Badge
-                  className="h-5 px-1.5 font-normal"
+                  className="px-1.5 font-normal"
                   data-bpp-test-id="frame-inspector-entity-type"
                   variant="outline"
                 >
@@ -393,7 +393,7 @@ export function FrameInspector({
             type="button"
             variant="ghost"
           >
-            <X className="size-3.5" />
+            <X className="size-icon-sm" />
           </Button>
         </div>
       </header>
@@ -436,11 +436,11 @@ export function FrameInspector({
                 key={group.token}
                 value={group.token}
               >
-                <AccordionTrigger className="min-h-9 px-3 py-2 text-compact hover:bg-accent/45">
+                <AccordionTrigger className="min-h-control-md px-3 py-2 text-body hover:bg-accent/45">
                   <SemanticIcon token={group.token} />
                   <span className="min-w-0 truncate">{t(group.token)}</span>
                   <Badge
-                    className="h-5 px-1.5 font-mono"
+                    className="px-1.5 font-mono"
                     variant="secondary"
                   >
                     ×{group.events.length}

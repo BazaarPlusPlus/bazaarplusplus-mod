@@ -127,7 +127,7 @@ function ActivityValue({
       <TooltipTrigger asChild>
         <span
           aria-label={accessibleValue}
-          className="inline-flex min-h-8 w-full cursor-help items-center justify-end outline-none focus-visible:ring-1 focus-visible:ring-brand-soft"
+          className="inline-flex min-h-control-sm w-full cursor-help items-center justify-end outline-none focus-visible:ring-1 focus-visible:ring-brand-soft"
           data-bpp-test-id={`statistics-activity-value-${column.key}`}
           tabIndex={0}
         >
@@ -142,7 +142,7 @@ function ActivityValue({
       >
         <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
           <SemanticIcon
-            className="size-4 shrink-0"
+            className="size-icon-md shrink-0"
             token={column.token ?? column.key}
           />
           <strong className="text-compact text-foreground">
@@ -273,7 +273,7 @@ export function ActivityTable({
             : t("activitySortDescending")
         }`}
         className={cn(
-          "h-9 w-full justify-end gap-1.5 rounded-none border-0 px-3 text-micro text-muted-foreground hover:text-foreground",
+          "w-full justify-end gap-1.5 px-3",
           key === "entity" && "justify-start",
           active
             && "bg-brand/7 text-brand-soft shadow-[inset_0_-2px_0_var(--color-brand-soft)]",
@@ -285,39 +285,38 @@ export function ActivityTable({
             sort: nextSort(sort, column),
           })
         }
-        size="sm"
-        style={{ borderRadius: 0 }}
+        size="default"
         type="button"
-        variant="ghost"
+        variant="tableHeader"
       >
         {typeof column !== "string" && (
           iconUrl ? (
             <img
               alt=""
-              className="size-4 object-contain"
+              className="size-icon-md object-contain"
               src={iconUrl}
             />
           ) : (
             <SemanticIcon
-              className="size-3.5"
+              className="size-icon-sm"
               token={column.token ?? column.key}
             />
           )
         )}
-        <span className="whitespace-nowrap">{label}</span>
+        <span className="whitespace-nowrap text-micro">{label}</span>
         <span
           aria-hidden="true"
-          className="grid size-3 shrink-0 place-items-center"
+          className="grid size-icon-xs shrink-0 place-items-center"
         >
           {sort.direction === "desc"
             ? (
               <ArrowDown
-                className={cn("size-3", !active && "invisible")}
+                className={cn("size-icon-xs", !active && "invisible")}
               />
             )
             : (
               <ArrowUp
-                className={cn("size-3", !active && "invisible")}
+                className={cn("size-icon-xs", !active && "invisible")}
               />
             )}
         </span>
@@ -333,7 +332,7 @@ export function ActivityTable({
           <h2 className="font-display text-heading font-semibold text-foreground">
             {t("entityActivityTitle")}
           </h2>
-          <label className="inline-flex h-7 shrink-0 cursor-pointer items-center gap-2 rounded-panel border border-border/55 bg-background/35 px-2.5 text-micro font-medium text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground">
+          <label className="inline-flex h-control-xs shrink-0 cursor-pointer items-center gap-2 rounded-panel border border-border/55 bg-background/35 px-2.5 text-micro font-medium text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground">
             <Checkbox
               checked={groupBySide}
               data-bpp-test-id="statistics-activity-group-by-side"

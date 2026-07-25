@@ -36,7 +36,7 @@ export function WorkbenchFooter({
 
   return (
     <footer
-      className="relative z-40 flex h-9 shrink-0 items-center gap-3 overflow-hidden border-t border-border bg-surface/98 px-2 shadow-sticky"
+      className="relative z-40 flex h-control-md shrink-0 items-center gap-2 overflow-hidden border-t border-border bg-surface/98 px-2 shadow-sticky"
       data-bpp-test-id="workbench-footer"
     >
       {showTimelineTools && (
@@ -54,7 +54,7 @@ export function WorkbenchFooter({
             type="button"
             variant="outline"
           >
-            <Minus className="size-3.5" />
+            <Minus className="size-icon-sm" />
           </Button>
           <Button
             aria-label={t("zoomReset")}
@@ -78,7 +78,7 @@ export function WorkbenchFooter({
             type="button"
             variant="outline"
           >
-            <Plus className="size-3.5" />
+            <Plus className="size-icon-sm" />
           </Button>
         </ButtonGroup>
       )}
@@ -92,7 +92,7 @@ export function WorkbenchFooter({
                   ? t("hideRecording")
                   : t("showRecording")
               }
-              className="ml-auto size-7 shrink-0 px-0"
+              className="ml-auto size-control-xs shrink-0 px-0"
               data-bpp-test-id="recording-visibility-toggle"
               onPressedChange={(pressed) => {
                 if (pressed !== recordingVisible) onToggleRecording();
@@ -102,8 +102,8 @@ export function WorkbenchFooter({
               variant="outline"
             >
               {recordingVisible
-                ? <Video className="size-3.5" />
-                : <VideoOff className="size-3.5" />}
+                ? <Video className="size-icon-sm" />
+                : <VideoOff className="size-icon-sm" />}
             </Toggle>
           </TooltipTrigger>
           <TooltipContent>

@@ -34,7 +34,7 @@ function reportRoot(): HTMLElement {
     root.setAttribute("data-bpp-test-id", "report-root");
     document.body.append(root);
   }
-  root.className = "bpp-report-root";
+  root.className = "bpp-report-root text-body";
   return root;
 }
 

@@ -108,13 +108,13 @@ function StateLabels({
       className="bpp-state-labels"
       data-bpp-test-id="state-band-labels"
     >
-      <div className="flex h-7 items-center gap-1 border-b border-border/60 px-2">
+      <div className="flex h-control-xs items-center gap-1 border-b border-border/60 px-2">
         <span className="min-w-0 truncate font-mono text-micro text-muted-foreground">
           {t("stateValues")} · {formatDuration(combatMs)}
         </span>
         <ToggleGroup
           aria-label={t("metricsTitle")}
-          className="ml-auto border border-border/70 bg-background/60 p-0.5"
+          className="ml-auto border border-border/70 bg-background/60"
           onValueChange={(value) => {
             if (value === "linear" || value === "magnitude") {
               dispatch({ type: "select-scale", scale: value });
@@ -125,11 +125,7 @@ function StateLabels({
           value={scaleMode}
         >
           {(["linear", "magnitude"] as const).map((scale) => (
-            <ToggleGroupItem
-              className="h-5 px-1.5"
-              key={scale}
-              value={scale}
-            >
+            <ToggleGroupItem className="px-1.5" key={scale} value={scale}>
               {t(scale === "linear" ? "linearScale" : "magnitudeScale")}
             </ToggleGroupItem>
           ))}

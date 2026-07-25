@@ -359,7 +359,7 @@
 
 .bpp-recording-drag-handle {
   display: flex;
-  height: 2rem;
+  height: var(--spacing-control-sm);
   flex: 0 0 auto;
   align-items: center;
   gap: 0.5rem;

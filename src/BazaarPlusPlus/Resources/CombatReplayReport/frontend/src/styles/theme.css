@@ -54,14 +54,15 @@
   --bpp-font-mono:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  --bpp-text-nano: 0.5625rem;
-  --bpp-text-nano-line-height: 0.75rem;
-  --bpp-text-micro: 0.625rem;
-  --bpp-text-micro-line-height: 0.875rem;
-  --bpp-text-compact: 0.6875rem;
-  --bpp-text-compact-line-height: 1rem;
-  --bpp-text-body: 0.75rem;
-  --bpp-text-body-line-height: 1.0625rem;
+  /* One shared density scale for DOM, Canvas, and ECharts. */
+  --bpp-text-nano: 0.625rem;
+  --bpp-text-nano-line-height: 0.875rem;
+  --bpp-text-micro: 0.6875rem;
+  --bpp-text-micro-line-height: 1rem;
+  --bpp-text-compact: 0.75rem;
+  --bpp-text-compact-line-height: 1.0625rem;
+  --bpp-text-body: 0.8125rem;
+  --bpp-text-body-line-height: 1.125rem;
   --bpp-text-heading: 0.875rem;
   --bpp-text-heading-line-height: 1.25rem;
   --bpp-text-headline: 1.125rem;
@@ -70,6 +71,15 @@
   --bpp-text-title-line-height: 1.5rem;
   --bpp-text-metric: 1.5rem;
   --bpp-text-metric-line-height: 1.75rem;
+
+  --bpp-control-xs: 1.75rem;
+  --bpp-control-sm: 2rem;
+  --bpp-control-md: 2.25rem;
+  --bpp-control-lg: 2.5rem;
+  --bpp-icon-xs: 0.75rem;
+  --bpp-icon-sm: 0.875rem;
+  --bpp-icon-md: 1rem;
+  --bpp-icon-lg: 1.25rem;
 
   --bpp-radius-art: 0.3125rem;
   --bpp-radius-panel: 0.375rem;
@@ -148,6 +158,15 @@
   --text-title--line-height: var(--bpp-text-title-line-height);
   --text-metric: var(--bpp-text-metric);
   --text-metric--line-height: var(--bpp-text-metric-line-height);
+
+  --spacing-control-xs: var(--bpp-control-xs);
+  --spacing-control-sm: var(--bpp-control-sm);
+  --spacing-control-md: var(--bpp-control-md);
+  --spacing-control-lg: var(--bpp-control-lg);
+  --spacing-icon-xs: var(--bpp-icon-xs);
+  --spacing-icon-sm: var(--bpp-icon-sm);
+  --spacing-icon-md: var(--bpp-icon-md);
+  --spacing-icon-lg: var(--bpp-icon-lg);
 
   --radius-art: var(--bpp-radius-art);
   --radius-panel: var(--bpp-radius-panel);

@@ -113,15 +113,16 @@ export function ReportHeader({
       >
         <TabsList
           aria-label={t("timelineTitle")}
-          className="h-8 w-full rounded-none border-0 border-b border-border/70 bg-transparent p-0"
+          className="w-full"
+          variant="underline"
         >
           {(["timeline", "statistics"] as const).map((tab) => (
             <TabsTrigger
-              className="h-8 w-1/2 flex-none rounded-none border-b-2 border-transparent bg-transparent px-2 text-compact shadow-none hover:bg-foreground/4 hover:text-foreground data-[state=active]:border-brand-soft data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              className="w-1/2 flex-none px-2"
               data-bpp-test-id={`report-tab-${tab}`}
               key={tab}
-              style={{ borderRadius: 0 }}
               value={tab}
+              variant="underline"
             >
               {t(tab === "timeline" ? "timelineTab" : "statisticsTab")}
             </TabsTrigger>
@@ -150,7 +151,7 @@ export function ReportHeader({
               type="button"
               variant="outline"
             >
-              <Languages className="hidden size-3.5 sm:block" />
+              <Languages className="hidden size-icon-sm sm:block" />
               <span className="text-compact font-bold">
                 {LOCALE_LABELS[state.locale]}
               </span>
@@ -168,7 +169,7 @@ export function ReportHeader({
                   type="button"
                   variant="outline"
                 >
-                  <HelpCircle className="size-4" />
+                  <HelpCircle className="size-icon-md" />
                 </Button>
               </PopoverTrigger>
             </TooltipTrigger>

@@ -570,12 +570,21 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
     })),
   );
   expect(headerControlMetrics.map(({ height }) => height)).toEqual([32, 32]);
-  expect(headerControlMetrics.every(({ radius }) => radius !== "0px")).toBe(
-    true,
+  expect(headerControlMetrics[0].radius).toBe("0px");
+  expect(headerControlMetrics[1].radius).not.toBe("0px");
+  await expect(page.getByTestId("report-root")).toHaveCSS(
+    "font-size",
+    "13px",
   );
+  await expect(
+    page
+      .getByTestId("state-band-labels")
+      .locator('[data-slot="toggle-group-item"]')
+      .first(),
+  ).toHaveCSS("height", "28px");
   await expect(page.getByTestId("time-zoom-out")).toHaveCSS(
     "height",
-    "24px",
+    "28px",
   );
   await expect(page.getByTestId("timeline-zoom-toolbar")).toBeAttached();
   await expect(page.getByTestId("timeline-legend")).toHaveCount(0);
@@ -600,6 +609,9 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
     });
   await page.getByTestId("report-tab-statistics").click();
   await expect(page.locator('[data-slot="table"]')).toHaveCount(1);
+  await expect(
+    page.getByTestId("statistics-activity-sort-damage"),
+  ).toHaveCSS("height", "36px");
   const timelineTabAfter = await page
     .getByTestId("report-tab-timeline")
     .evaluate((element) => {

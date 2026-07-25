@@ -31,7 +31,7 @@ function Fallback({
           : type === "effect"
             ? Diamond
             : CircleHelp;
-  return <Icon className={cn("size-4 text-muted-foreground", className)} />;
+  return <Icon className={cn("size-icon-md text-muted-foreground", className)} />;
 }
 
 export function EntityArt({
@@ -76,7 +76,7 @@ export function EntityArt({
       ) : (
         <span className="grid size-full place-items-center border border-brand/35 bg-surface-raised">
           <Fallback
-            className={size === "activity" ? "size-5" : undefined}
+            className={size === "activity" ? "size-icon-lg" : undefined}
             type={type}
           />
         </span>

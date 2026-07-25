@@ -62,7 +62,7 @@ export function SemanticIcon({
     <Icon
       aria-label={label}
       aria-hidden={label ? undefined : true}
-      className={cn("size-4 shrink-0", COLORS[token], className)}
+      className={cn("size-icon-md shrink-0", COLORS[token], className)}
       strokeWidth={2}
     />
   );

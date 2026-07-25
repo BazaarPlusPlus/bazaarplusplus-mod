@@ -43,7 +43,7 @@ function RecordCard({
       {record.entity ? (
         <EntityArt entity={record.entity} size="compact" />
       ) : (
-        <Icon className="size-5 text-brand-soft" />
+        <Icon className="size-icon-lg text-brand-soft" />
       )}
       <div className="min-w-0">
         <p className="text-nano font-semibold uppercase tracking-wider text-muted-foreground">

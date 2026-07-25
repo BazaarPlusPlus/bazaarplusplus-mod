@@ -333,7 +333,7 @@ function ChartCard({
 }): React.JSX.Element {
   return (
     <Card className="gap-0 overflow-hidden border-foreground/7 bg-card/70 shadow-none">
-      <header className="flex min-h-9 items-center justify-between gap-3 border-b border-border/55 px-3 py-1.5">
+      <header className="flex min-h-control-md items-center justify-between gap-3 border-b border-border/55 px-3 py-1.5">
         <h3 className="min-w-0 truncate font-display text-body font-semibold text-foreground">
           {title}
         </h3>
