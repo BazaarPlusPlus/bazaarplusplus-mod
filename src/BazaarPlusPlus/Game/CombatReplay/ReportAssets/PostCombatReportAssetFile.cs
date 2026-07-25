@@ -20,7 +20,8 @@ internal sealed record PostCombatReportAssetFile(
     string RenderKeyHash = "",
     string ContentHash = "",
     int PixelWidth = 0,
-    int PixelHeight = 0
+    int PixelHeight = 0,
+    string DisplayName = ""
 )
 {
     /// <summary>
@@ -33,7 +34,8 @@ internal sealed record PostCombatReportAssetFile(
         string RenderKeyHash = "",
         string ContentHash = "",
         int PixelWidth = 0,
-        int PixelHeight = 0
+        int PixelHeight = 0,
+        string DisplayName = ""
     )
         : this(
             PostCombatReportAssetBindingKind.Entity,
@@ -43,7 +45,8 @@ internal sealed record PostCombatReportAssetFile(
             RenderKeyHash,
             ContentHash,
             PixelWidth,
-            PixelHeight
+            PixelHeight,
+            DisplayName
         ) { }
 
     /// <summary>Temporary compatibility view for the current entity-only coordinator.</summary>

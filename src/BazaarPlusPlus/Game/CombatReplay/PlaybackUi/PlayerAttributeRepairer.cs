@@ -169,6 +169,60 @@ internal static class PlayerAttributeRepairer
         }
     }
 
+    internal static void RemovePortraitTimingReadySubscriptions(
+        BoardUIController controller,
+        IReplayPlaybackOutcomeSink? outcome = null
+    )
+    {
+        try
+        {
+            // BoardUIController.Init uses a plain C# event here, unlike the owner-keyed game
+            // Events listeners above it. Re-initializing a controller after replay cleanup would
+            // therefore accumulate OnPortraitTimingReady once per replay. Remove only this
+            // controller's existing handlers; Init immediately installs exactly one again.
+            var rageMeterField = typeof(BoardUIController).GetField(
+                "_rageMeterController",
+                BindingFlags.Instance | BindingFlags.NonPublic
+            );
+            var rageMeter =
+                rageMeterField?.GetValue(controller) as RageMeterController
+                ?? controller.GetComponentInChildren<RageMeterController>(includeInactive: true);
+            if (rageMeter == null)
+                return;
+
+            var handlerMethod = typeof(BoardUIController).GetMethod(
+                "OnPortraitTimingReady",
+                BindingFlags.Instance | BindingFlags.NonPublic
+            );
+            var eventField = typeof(RageMeterController).GetField(
+                "PortraitTimingReady",
+                BindingFlags.Instance | BindingFlags.NonPublic
+            );
+            if (handlerMethod == null || eventField == null)
+                return;
+
+            var handler = Delegate.CreateDelegate(typeof(Action), controller, handlerMethod);
+            var current = eventField.GetValue(rageMeter) as Delegate;
+            eventField.SetValue(rageMeter, RemoveAllMatchingHandlers(current, handler));
+        }
+        catch (Exception ex)
+        {
+            outcome?.ReportDegradation(ReplayPlaybackReasonCode.PlayerAttributesUnavailable, ex);
+        }
+    }
+
+    internal static Delegate? RemoveAllMatchingHandlers(Delegate? current, Delegate handler)
+    {
+        if (handler == null)
+            throw new ArgumentNullException(nameof(handler));
+
+        while (current?.GetInvocationList().Any(candidate => candidate.Equals(handler)) == true)
+        {
+            current = Delegate.Remove(current, handler);
+        }
+        return current;
+    }
+
     internal static void EnsurePlayerAttributes(
         object? player,
         ECombatantId combatantId,

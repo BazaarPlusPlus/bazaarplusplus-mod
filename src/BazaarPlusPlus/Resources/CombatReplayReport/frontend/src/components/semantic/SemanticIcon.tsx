@@ -1,0 +1,69 @@
+import {
+  Activity,
+  CircleDot,
+  ClockArrowUp,
+  Flame,
+  Gauge,
+  HeartPulse,
+  Plus,
+  Shield,
+  Snowflake,
+  Sparkles,
+  Swords,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+import { cn } from "../../lib/utils.ts";
+
+const ICONS: Record<string, LucideIcon> = {
+  attribute: Sparkles,
+  burn: Flame,
+  charge: Zap,
+  damage: Swords,
+  freeze: Snowflake,
+  haste: ClockArrowUp,
+  heal: Plus,
+  healthRegen: HeartPulse,
+  poison: CircleDot,
+  regen: HeartPulse,
+  shield: Shield,
+  skill: Sparkles,
+  slow: Gauge,
+  status: Activity,
+  trigger: Zap,
+};
+
+const COLORS: Record<string, string> = {
+  damage: "text-damage",
+  burn: "text-burn",
+  poison: "text-poison",
+  heal: "text-heal",
+  regen: "text-regen",
+  shield: "text-shield",
+  charge: "text-charge",
+  haste: "text-haste",
+  slow: "text-slow",
+  freeze: "text-freeze",
+  skill: "text-skill",
+  attribute: "text-attribute",
+};
+
+export function SemanticIcon({
+  token,
+  className,
+  label,
+}: {
+  token: string;
+  className?: string;
+  label?: string;
+}): React.JSX.Element {
+  const Icon = ICONS[token] ?? Activity;
+  return (
+    <Icon
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      className={cn("size-4 shrink-0", COLORS[token], className)}
+      strokeWidth={2}
+    />
+  );
+}

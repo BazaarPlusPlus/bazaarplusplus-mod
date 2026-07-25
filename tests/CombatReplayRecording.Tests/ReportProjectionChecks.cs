@@ -1,6 +1,7 @@
 using System.Reflection;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
@@ -40,6 +41,8 @@ internal static class ReportProjectionChecks
                         12
                     ),
                     [EPlayerAttributeType.Shield] = Attribute(EPlayerAttributeType.Shield, 40, 40),
+                    [EPlayerAttributeType.Burn] = Attribute(EPlayerAttributeType.Burn, 3, 3),
+                    [EPlayerAttributeType.Poison] = Attribute(EPlayerAttributeType.Poison, 4, 4),
                 },
                 Portrait = new CombatSimPlayerPortraitUpdate { Index = 3 },
             },
@@ -59,6 +62,8 @@ internal static class ReportProjectionChecks
                         0
                     ),
                     [EPlayerAttributeType.Shield] = Attribute(EPlayerAttributeType.Shield, 5, 5),
+                    [EPlayerAttributeType.Burn] = Attribute(EPlayerAttributeType.Burn, 0, 0),
+                    [EPlayerAttributeType.Poison] = Attribute(EPlayerAttributeType.Poison, 0, 0),
                 },
             },
         };
@@ -141,7 +146,9 @@ internal static class ReportProjectionChecks
         Require(
             document.FrameZeroState.Player.Health == 1_000
                 && document.FrameZeroState.Player.HealthRegen == 12
-                && document.FrameZeroState.Player.Shield == 40,
+                && document.FrameZeroState.Player.Shield == 40
+                && document.FrameZeroState.Player.Burn == 3
+                && document.FrameZeroState.Player.Poison == 4,
             "Delta-zero player metrics must survive as explicit frame-zero baselines."
         );
         Require(
@@ -152,8 +159,27 @@ internal static class ReportProjectionChecks
             document.FrameZeroState.Opponent.Health == 900
                 && document.FrameZeroState.Opponent.Rage == 0
                 && document.FrameZeroState.Opponent.HealthRegen == 0
-                && document.FrameZeroState.Opponent.Shield == 5,
-            "Opponent frame-zero state must explicitly contain all four metrics."
+                && document.FrameZeroState.Opponent.Shield == 5
+                && document.FrameZeroState.Opponent.Burn == 0
+                && document.FrameZeroState.Opponent.Poison == 0,
+            "Opponent frame-zero state must explicitly contain all six combat metrics."
+        );
+        var reportJsonType = typeof(CombatReportDocumentV1).Assembly.GetType(
+            "BazaarPlusPlus.Game.CombatReplay.ReportData.CombatReportJson",
+            throwOnError: true
+        )!;
+        var serializeMethod = reportJsonType.GetMethod(
+            "Serialize",
+            BindingFlags.Static | BindingFlags.NonPublic,
+            binder: null,
+            types: [typeof(CombatReportDocumentV1)],
+            modifiers: null
+        )!;
+        var serialized = (string)serializeMethod.Invoke(null, [document])!;
+        Require(
+            serialized.Contains("\"burn\":3", StringComparison.Ordinal)
+                && serialized.Contains("\"poison\":4", StringComparison.Ordinal),
+            "Burn and Poison frame-zero values must survive the immutable report JSON contract."
         );
 
         var damage = document.Events.Single(entry => entry.Kind == "health");
@@ -172,8 +198,8 @@ internal static class ReportProjectionChecks
             "Projected relations must retain source, trigger, targets, removed targets, and confidence."
         );
         Require(
-            document.RawRecordCount == 14 && document.RawRecordCount > document.Events.Count,
-            $"RawRecordCount must count all raw subrecords including delta-zero updates (raw={document.RawRecordCount}, projected={document.Events.Count})."
+            document.RawRecordCount == 18 && document.RawRecordCount > document.Events.Count,
+            $"RawRecordCount must count all raw subrecords including six delta-zero state updates per combatant (raw={document.RawRecordCount}, projected={document.Events.Count})."
         );
         Require(
             document.Entities.Single(entity => entity.EntityId == "socket-effect-a").Type
@@ -182,7 +208,215 @@ internal static class ReportProjectionChecks
                     == "item",
             "Socket-effect snapshots in a hand capture must not masquerade as item entities."
         );
+
+        RunEffectValueAttributionChecks(manifest, cardId);
     }
+
+    private static void RunEffectValueAttributionChecks(
+        PvpBattleManifest sourceManifest,
+        InstanceId sourceCardId
+    )
+    {
+        var targetCardId = new InstanceId("target-card");
+        var quantified = new CombatSimFrame
+        {
+            PlayerUpdates = new CombatSimPlayerUpdate
+            {
+                Attributes =
+                {
+                    [EPlayerAttributeType.HealthRegen] = Attribute(
+                        EPlayerAttributeType.HealthRegen,
+                        0,
+                        7
+                    ),
+                },
+            },
+            OpponentUpdates = new CombatSimPlayerUpdate
+            {
+                HealthAdjustments =
+                {
+                    new CombatSimPlayerHealthAdjustment
+                    {
+                        AttributeChanged = EPlayerHealthChangeType.Shield,
+                        DamageType = EDamageType.Damage,
+                        Amount = -10,
+                    },
+                    new CombatSimPlayerHealthAdjustment
+                    {
+                        AttributeChanged = EPlayerHealthChangeType.Health,
+                        DamageType = EDamageType.Damage,
+                        Amount = -25,
+                    },
+                },
+                Attributes =
+                {
+                    [EPlayerAttributeType.Burn] = Attribute(EPlayerAttributeType.Burn, 0, 12),
+                },
+            },
+        };
+        quantified.Events.Add(
+            Executed(
+                EActionCommandType.PlayerDamage,
+                sourceCardId,
+                new EffectTargetPlayer { Target = ECombatantId.Opponent },
+                "damage"
+            )
+        );
+        quantified.Events.Add(
+            Executed(
+                EActionCommandType.PlayerBurnApply,
+                sourceCardId,
+                new EffectTargetPlayer { Target = ECombatantId.Opponent },
+                "burn"
+            )
+        );
+        quantified.Events.Add(
+            Executed(
+                EActionCommandType.PlayerRegenApply,
+                sourceCardId,
+                new EffectTargetPlayer { Target = ECombatantId.Player },
+                "regen"
+            )
+        );
+        quantified.Events.Add(
+            Executed(
+                EActionCommandType.CardSlow,
+                sourceCardId,
+                new EffectTargetCard { Target = targetCardId },
+                "slow"
+            )
+        );
+        quantified.Events.Add(
+            Executed(
+                EActionCommandType.CardCharge,
+                sourceCardId,
+                new EffectTargetCard { Target = targetCardId },
+                "charge"
+            )
+        );
+        quantified.CardUpdates[targetCardId] = new CombatSimCardUpdate
+        {
+            CardInstanceId = targetCardId,
+            Attributes =
+            {
+                [ECardAttributeType.Slow] = CardAttribute(ECardAttributeType.Slow, 0, 1_950),
+            },
+        };
+
+        var ambiguous = new CombatSimFrame
+        {
+            OpponentUpdates = new CombatSimPlayerUpdate
+            {
+                Attributes =
+                {
+                    [EPlayerAttributeType.Burn] = Attribute(EPlayerAttributeType.Burn, 12, 32),
+                },
+            },
+        };
+        ambiguous.Events.Add(
+            Executed(
+                EActionCommandType.PlayerBurnApply,
+                sourceCardId,
+                new EffectTargetPlayer { Target = ECombatantId.Opponent },
+                "ambiguous-a"
+            )
+        );
+        ambiguous.Events.Add(
+            Executed(
+                EActionCommandType.PlayerBurnApply,
+                new InstanceId("other-source"),
+                new EffectTargetPlayer { Target = ECombatantId.Opponent },
+                "ambiguous-b"
+            )
+        );
+
+        var ambientDecay = new CombatSimFrame();
+        ambientDecay.Events.Add(
+            Executed(
+                EActionCommandType.CardSlow,
+                sourceCardId,
+                new EffectTargetCard { Target = targetCardId },
+                "negative-status"
+            )
+        );
+        ambientDecay.CardUpdates[targetCardId] = new CombatSimCardUpdate
+        {
+            CardInstanceId = targetCardId,
+            Attributes =
+            {
+                [ECardAttributeType.Slow] = CardAttribute(ECardAttributeType.Slow, 1_950, 1_900),
+            },
+        };
+
+        var manifest = new PvpBattleManifest
+        {
+            BattleId = "fedcba9876543210fedcba9876543210",
+            RecordedAtUtc = sourceManifest.RecordedAtUtc,
+        };
+        var document = Project(
+            manifest,
+            new NetMessageCombatSim(
+                new CombatSim
+                {
+                    Frames = new List<CombatSimFrame> { quantified, ambiguous, ambientDecay },
+                }
+            )
+        );
+        var executedEvents = document
+            .Events.Where(reportEvent => reportEvent.Kind == "effect-executed")
+            .ToList();
+
+        Require(
+            executedEvents.Single(reportEvent => reportEvent.EffectId == "damage").Value == 35,
+            "A unique direct-damage execution must receive the summed shield and health damage observed on its target."
+        );
+        Require(
+            executedEvents.Single(reportEvent => reportEvent.EffectId == "burn").Value == 12,
+            "A unique burn application must receive the target's positive Burn transition."
+        );
+        Require(
+            executedEvents.Single(reportEvent => reportEvent.EffectId == "regen").Value == 7,
+            "A unique regen application must receive the target's positive HealthRegen transition."
+        );
+        var slow = executedEvents.Single(reportEvent => reportEvent.EffectId == "slow");
+        Require(
+            slow.Value == 1_950 && slow.Unit == "ms",
+            "A unique card status application must report the observable positive net duration in milliseconds."
+        );
+        Require(
+            executedEvents.Single(reportEvent => reportEvent.EffectId == "charge").Value == null,
+            "Charge must remain count-only while the raw frame does not expose an unambiguous applied amount."
+        );
+        Require(
+            executedEvents
+                .Where(reportEvent =>
+                    reportEvent.EffectId?.StartsWith("ambiguous-", StringComparison.Ordinal) == true
+                )
+                .All(reportEvent => reportEvent.Value == null),
+            "A shared aggregate transition must not be split or copied across same-target executions."
+        );
+        Require(
+            executedEvents.Single(reportEvent => reportEvent.EffectId == "negative-status").Value
+                == null,
+            "Ambient negative status decay must never be reported as an applied amount."
+        );
+    }
+
+    private static CombatSimEventEffectExecuted Executed(
+        EActionCommandType action,
+        InstanceId source,
+        IEffectTarget target,
+        string effectId
+    ) =>
+        new()
+        {
+            ExecutionContextId = "context-" + effectId,
+            EffectId = effectId,
+            ActionType = action,
+            Source = source,
+            TriggerSource = source,
+            Target = target,
+        };
 
     private static CombatReportDocumentV1 Project(
         PvpBattleManifest manifest,

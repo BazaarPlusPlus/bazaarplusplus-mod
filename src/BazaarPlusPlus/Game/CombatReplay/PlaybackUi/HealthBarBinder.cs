@@ -153,7 +153,10 @@ internal static class HealthBarBinder
         PlayerAttributeRepairer.EnsurePlayerAttributes(player, controller.combatantId, outcome);
 
         if (PlaybackUiState.InitializedBoardUiControllers.Add(controller.GetInstanceID()))
+        {
+            PlayerAttributeRepairer.RemovePortraitTimingReadySubscriptions(controller, outcome);
             InvokeBoardUiMethod(controller, "Init", player);
+        }
 
         if (controller.combatantId == ECombatantId.Player)
             PlayerAttributeRepairer.UnregisterPlayerPortraitPlacedHandler(controller, outcome);

@@ -12,6 +12,10 @@
       Link="ImmutableArtifactCommitter.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Files/ReplaceableArtifactPublisher.cs"
+      Link="ReplaceableArtifactPublisher.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/StaticReportPaths.cs"
       Link="StaticReportPaths.cs"
     />
@@ -24,12 +28,16 @@
       Link="ReportHtmlEmitter.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/ViewerReleaseRegistry.cs"
-      Link="ViewerReleaseRegistry.cs"
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/ViewerArtifactBundle.cs"
+      Link="ViewerArtifactBundle.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/ViewerInstaller.cs"
       Link="ViewerInstaller.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/CombatReplayReportViewerGate.cs"
+      Link="CombatReplayReportViewerGate.cs"
     />
     <EmbeddedResource
       Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/viewer.js"
@@ -40,55 +48,7 @@
       LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.css"
     />
     <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v1/viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v1.viewer.js"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v1/viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v1.viewer.css"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v2/viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v2.viewer.js"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v2/viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v2.viewer.css"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v3/viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v3.viewer.js"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v3/viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v3.viewer.css"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v4/viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v4.viewer.js"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v4/viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v4.viewer.css"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v5/viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v5.viewer.js"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v5/viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v5.viewer.css"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v6/viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v6.viewer.js"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/v6/viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v6.viewer.css"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/echarts.min.js"
+      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/vendor/echarts/5eef51bee09fb9cc234c4179a58ae0150126f49f88c992efe2d6bca81d8dd03b.min.js"
       LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts.min.js"
     />
   </ItemGroup>

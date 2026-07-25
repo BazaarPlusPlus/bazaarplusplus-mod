@@ -15,12 +15,15 @@ try
     Directory.CreateDirectory(sandbox);
     VerifyMissingReportQueuesPhysicalVideo();
     VerifyExistingReportSkipsPublication();
+    VerifyStaleReportQueuesReplacementPublication();
     VerifyHostileCandidatesFailIndependently();
     VerifyPublisherFailureDoesNotBlockLaterCandidate();
     VerifyDeferredCacheMissIsNotReportedAsFailure();
     VerifyAssetGateReportsEveryRequiredCacheMiss();
     VerifyRecoveryDrainsEveryAdmissionBatchInOneStartup();
     VerifyRecoveryPagesRemainBoundedAndReachEveryCandidate();
+    VerifyViewerGateRunsBeforeExistingReportsAreAccepted();
+    VerifyViewerGateFailureStopsRecovery();
     VerifyCandidateSourceFailureIsContained();
     VerifyVideoDirectoryLinkIsRejected();
 }
@@ -75,7 +78,7 @@ void VerifyExistingReportSkipsPublication()
     var relativeVideo = Path.Combine("2026-07-22", recordingId + ".mp4");
     _ = WriteVideo(fixture.VideoRoot, relativeVideo);
     Directory.CreateDirectory(fixture.ReportRoot);
-    File.WriteAllText(Path.Combine(fixture.ReportRoot, recordingId + ".html"), "immutable");
+    WriteCurrentReport(fixture.ReportRoot, recordingId);
     var publisher = new RecordingPublisher();
     var recovery = fixture.CreateRecovery(
         _ => [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
@@ -89,6 +92,33 @@ void VerifyExistingReportSkipsPublication()
             && summary.FailedCount == 0
             && publisher.Calls.Count == 0,
         "An existing physical immutable report must never be regenerated at startup."
+    );
+}
+
+void VerifyStaleReportQueuesReplacementPublication()
+{
+    var fixture = CreateFixture("stale-existing");
+    const string recordingId = "abababababababababababababababab";
+    var relativeVideo = Path.Combine("2026-07-22", recordingId + ".mp4");
+    _ = WriteVideo(fixture.VideoRoot, relativeVideo);
+    Directory.CreateDirectory(fixture.ReportRoot);
+    File.WriteAllText(
+        Path.Combine(fixture.ReportRoot, recordingId + ".html"),
+        "<!doctype html><html><body>old viewer</body></html>"
+    );
+    var publisher = new RecordingPublisher();
+    var recovery = fixture.CreateRecovery(
+        _ => [new(recordingId, BattleId, "CurrentNative", relativeVideo)],
+        publisher
+    );
+
+    var summary = recovery.Recover(32, 16, "en");
+    Check(
+        summary.ExistingReportCount == 0
+            && summary.QueuedCount == 1
+            && summary.FailedCount == 0
+            && publisher.Calls.Count == 1,
+        "An existing report without the current Viewer marker and references must be regenerated."
     );
 }
 
@@ -314,6 +344,58 @@ void VerifyCandidateSourceFailureIsContained()
     );
 }
 
+void VerifyViewerGateRunsBeforeExistingReportsAreAccepted()
+{
+    var fixture = CreateFixture("viewer-gate-existing");
+    const string recordingId = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    Directory.CreateDirectory(fixture.ReportRoot);
+    WriteCurrentReport(fixture.ReportRoot, recordingId);
+    var ensureCalls = 0;
+    var recovery = new CombatReplayReportStartupRecovery(
+        fixture.DataRoot,
+        fixture.VideoRoot,
+        _ => [new(recordingId, BattleId, "CurrentNative", recordingId + ".mp4")],
+        new RecordingPublisher(),
+        () =>
+        {
+            ensureCalls++;
+            return TestValues.ViewerBundleId;
+        }
+    );
+
+    var summary = recovery.Recover(16, 16, "en");
+    Check(
+        ensureCalls == 1 && summary.ExistingReportCount == 1 && summary.SourceFailure == null,
+        "Startup recovery must validate or repair the shared Viewer before accepting existing HTML."
+    );
+}
+
+void VerifyViewerGateFailureStopsRecovery()
+{
+    var fixture = CreateFixture("viewer-gate-failure");
+    var sourceCalls = 0;
+    var publisher = new RecordingPublisher();
+    var recovery = new CombatReplayReportStartupRecovery(
+        fixture.DataRoot,
+        fixture.VideoRoot,
+        _ =>
+        {
+            sourceCalls++;
+            return Array.Empty<CompletedVideoReportRecoveryCandidate>();
+        },
+        publisher,
+        () => throw new InvalidDataException("viewer bundle unavailable")
+    );
+
+    var summary = recovery.Recover(16, 16, "en");
+    Check(
+        sourceCalls == 0
+            && publisher.Calls.Count == 0
+            && summary.SourceFailure == "viewer bundle unavailable",
+        "A broken shared Viewer must fail recovery before reports can be treated as usable."
+    );
+}
+
 void VerifyVideoDirectoryLinkIsRejected()
 {
     var fixture = CreateFixture("linked-video");
@@ -374,6 +456,24 @@ static string WriteVideo(string videoRoot, string relativePath)
     return path;
 }
 
+static void WriteCurrentReport(string reportRoot, string recordingId)
+{
+    Directory.CreateDirectory(reportRoot);
+    File.WriteAllText(
+        Path.Combine(reportRoot, recordingId + ".html"),
+        "<!doctype html><html><head>"
+            + "<meta name=\"bpp-viewer-bundle\" content=\""
+            + TestValues.ViewerBundleId
+            + "\">"
+            + "<link rel=\"stylesheet\" href=\"../report-viewer/objects/"
+            + TestValues.ViewerBundleId
+            + "/viewer.css\">"
+            + "</head><body><script defer src=\"../report-viewer/objects/"
+            + TestValues.ViewerBundleId
+            + "/viewer.js\"></script></body></html>"
+    );
+}
+
 void Check(bool condition, string message)
 {
     if (!condition)
@@ -385,7 +485,13 @@ internal sealed record Fixture(string Root, string DataRoot, string VideoRoot, s
     internal CombatReplayReportStartupRecovery CreateRecovery(
         Func<int, IReadOnlyList<CompletedVideoReportRecoveryCandidate>> list,
         ICombatReplayReportRecoveryPublisher publisher
-    ) => new(DataRoot, VideoRoot, list, publisher);
+    ) => new(DataRoot, VideoRoot, list, publisher, () => TestValues.ViewerBundleId);
+}
+
+internal static class TestValues
+{
+    internal const string ViewerBundleId =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 }
 
 internal sealed class RecordingPublisher : ICombatReplayReportRecoveryPublisher

@@ -39,7 +39,6 @@ internal sealed record CombatReplayReportPublicationTerminal(
 /// </summary>
 internal sealed class CombatReplayReportPublicationCoordinator
 {
-    private const string ViewerVersion = ViewerReleaseRegistry.CurrentVersion;
     private const int MaxRetainedDrafts = 16;
     private const int MaxPendingGenerations = 16;
     private const int MaxRecentRecordingIds = 256;
@@ -49,9 +48,9 @@ internal sealed class CombatReplayReportPublicationCoordinator
     private readonly object _gate = new();
     private readonly CombatReportProjector _projector = new();
     private readonly StaticReportPaths _paths;
-    private readonly ViewerReleaseRegistry _viewerRegistry;
+    private readonly ViewerArtifactBundle _viewerArtifacts;
     private readonly ReportHtmlEmitter _htmlEmitter;
-    private readonly Action<string> _ensureViewerInstalled;
+    private readonly Action _ensureViewerInstalled;
     private readonly Action<string, byte[]> _commitReport;
     private readonly Action<Action> _schedule;
     private readonly Func<long> _monotonicMilliseconds;
@@ -71,7 +70,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
     internal CombatReplayReportPublicationCoordinator(string dataRootDirectoryPath)
         : this(
             dataRootDirectoryPath,
-            ViewerReleaseRegistry.CreateDefault(),
+            ViewerArtifactBundle.CreateDefault(),
             null,
             null,
             action => _ = Task.Run(action),
@@ -84,15 +83,16 @@ internal sealed class CombatReplayReportPublicationCoordinator
     /// <summary>Test seam for deterministic scheduling and publication failure injection.</summary>
     internal CombatReplayReportPublicationCoordinator(
         string dataRootDirectoryPath,
-        ViewerReleaseRegistry viewerRegistry,
-        Action<string>? ensureViewerInstalled,
+        ViewerArtifactBundle viewerArtifacts,
+        Action? ensureViewerInstalled,
         Action<string, byte[]>? commitReport,
         Action<Action> schedule,
         Func<long> monotonicMilliseconds
     )
     {
         _paths = new StaticReportPaths(dataRootDirectoryPath);
-        _viewerRegistry = viewerRegistry ?? throw new ArgumentNullException(nameof(viewerRegistry));
+        _viewerArtifacts =
+            viewerArtifacts ?? throw new ArgumentNullException(nameof(viewerArtifacts));
         _htmlEmitter = new ReportHtmlEmitter();
         _schedule = schedule ?? throw new ArgumentNullException(nameof(schedule));
         _monotonicMilliseconds =
@@ -100,17 +100,20 @@ internal sealed class CombatReplayReportPublicationCoordinator
 
         var installer = new ViewerInstaller(
             _paths,
-            _viewerRegistry,
-            new ImmutableArtifactCommitter()
+            _viewerArtifacts,
+            new ReplaceableArtifactPublisher()
         );
-        var committer = new ImmutableArtifactCommitter();
-        _ensureViewerInstalled =
-            ensureViewerInstalled ?? (version => installer.EnsureInstalled(version));
+        var reportPublisher = new ReplaceableArtifactPublisher();
+        _ensureViewerInstalled = ensureViewerInstalled ?? (() => installer.EnsureInstalled());
         _commitReport =
             commitReport
             ?? (
                 (destination, bytes) =>
-                    committer.CommitBelowRoot(_paths.DataRootDirectoryPath, destination, bytes)
+                    reportPublisher.PublishBelowRoot(
+                        _paths.DataRootDirectoryPath,
+                        destination,
+                        bytes
+                    )
             );
     }
 
@@ -145,7 +148,10 @@ internal sealed class CombatReplayReportPublicationCoordinator
                         )
                     )
                     {
-                        generation.Document = CloneDocument(document);
+                        // Projected documents are immutable after capture. Keep the reference here
+                        // and clone only on the publication worker immediately before applying
+                        // recording-specific assets.
+                        generation.Document = document;
                     }
                 }
 
@@ -160,6 +166,29 @@ internal sealed class CombatReplayReportPublicationCoordinator
             reason = ex.Message;
             return false;
         }
+    }
+
+    internal Task<bool> CaptureDraftAsync(
+        PvpBattleManifest manifest,
+        NetMessageCombatSim combatMessage
+    )
+    {
+        var completion = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        try
+        {
+            _schedule(() =>
+            {
+                var succeeded = TryCaptureDraft(manifest, combatMessage, out _);
+                completion.TrySetResult(succeeded);
+            });
+        }
+        catch (Exception ex)
+        {
+            completion.TrySetException(ex);
+        }
+        return completion.Task;
     }
 
     internal void ObserveVideoStarted(CombatReplayVideoRecordingStarted started)
@@ -186,7 +215,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
                 && _draftsByBattle.TryGetValue(started.BattleId, out var draft)
             )
             {
-                generation.Document = CloneDocument(draft);
+                generation.Document = draft;
             }
         }
 
@@ -208,6 +237,41 @@ internal sealed class CombatReplayReportPublicationCoordinator
         }
     }
 
+    internal Task<CombatReportDocumentV1?> GetDraftSnapshotAsync(string battleId)
+    {
+        if (string.IsNullOrWhiteSpace(battleId))
+            return Task.FromResult<CombatReportDocumentV1?>(null);
+
+        CombatReportDocumentV1? draft;
+        lock (_gate)
+            _draftsByBattle.TryGetValue(battleId, out draft);
+        if (draft == null)
+            return Task.FromResult<CombatReportDocumentV1?>(null);
+
+        var completion = new TaskCompletionSource<CombatReportDocumentV1?>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        try
+        {
+            _schedule(() =>
+            {
+                try
+                {
+                    completion.TrySetResult(CloneDocument(draft));
+                }
+                catch (Exception ex)
+                {
+                    completion.TrySetException(ex);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            completion.TrySetException(ex);
+        }
+        return completion.Task;
+    }
+
     internal void MarkAssetsReady(
         string recordingId,
         string battleId,
@@ -220,16 +284,69 @@ internal sealed class CombatReplayReportPublicationCoordinator
             return;
         }
 
-        // Each asset degrades independently. One corrupt/missing cache object must not erase the
-        // valid art captured for every other entity in this recording generation.
-        var resolved = ResolveAssets(assetFiles ?? Array.Empty<PostCombatReportAssetFile>());
+        var files = (assetFiles ?? Array.Empty<PostCombatReportAssetFile>()).ToArray();
         lock (_gate)
         {
             if (_recentRecordingIds.Contains(recordingId))
                 return;
             var generation = GetOrCreateGenerationNoLock(recordingId, battleId);
-            if (generation == null || generation.Assets != null)
+            if (
+                generation == null
+                || generation.Assets != null
+                || generation.AssetsResolutionStarted
+            )
                 return;
+            generation.AssetsResolutionStarted = true;
+        }
+
+        try
+        {
+            _schedule(() => ResolveAssetsAndMarkReady(recordingId, battleId, files));
+        }
+        catch (Exception ex)
+        {
+            CompleteNonRetryable(
+                recordingId,
+                battleId,
+                "Report asset validation could not start: " + DescribeFailure(ex)
+            );
+        }
+    }
+
+    private void ResolveAssetsAndMarkReady(
+        string recordingId,
+        string battleId,
+        IReadOnlyList<PostCombatReportAssetFile> assetFiles
+    )
+    {
+        ResolvedReportAssetSet resolved;
+        try
+        {
+            // Each asset degrades independently. Hashing and full PNG decode are deliberately
+            // worker work; one corrupt cache object must not erase valid art for the other entities.
+            resolved = ResolveAssets(assetFiles);
+        }
+        catch (Exception ex)
+        {
+            CompleteNonRetryable(
+                recordingId,
+                battleId,
+                "Report asset validation failed: " + DescribeFailure(ex)
+            );
+            return;
+        }
+
+        lock (_gate)
+        {
+            if (
+                _recentRecordingIds.Contains(recordingId)
+                || !_generationsByRecording.TryGetValue(recordingId, out var generation)
+                || !string.Equals(generation.BattleId, battleId, StringComparison.Ordinal)
+                || generation.Assets != null
+            )
+            {
+                return;
+            }
             generation.Assets = resolved;
         }
 
@@ -332,7 +449,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
                     new PublicationCandidate(
                         generation.RecordingId,
                         generation.BattleId,
-                        CloneDocument(generation.Document),
+                        generation.Document,
                         generation.Assets,
                         generation.Video,
                         generation.AttemptCount
@@ -342,26 +459,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
         }
 
         for (var index = 0; index < ready.Count; index++)
-        {
-            var candidate = ready[index];
-            PublicationWorkItem work;
-            try
-            {
-                work = BuildWorkItem(candidate);
-            }
-            catch (Exception ex)
-            {
-                CompleteNonRetryable(
-                    candidate.RecordingId,
-                    candidate.BattleId,
-                    "Static report identity, schema, or path validation failed: "
-                        + DescribeFailure(ex)
-                );
-                continue;
-            }
-
-            StartPublication(work);
-        }
+            StartPublication(ready[index]);
     }
 
     private PublicationWorkItem BuildWorkItem(PublicationCandidate candidate)
@@ -399,7 +497,6 @@ internal sealed class CombatReplayReportPublicationCoordinator
             ArtifactId = "report-" + recordingId,
             RecordingId = recordingId,
             BattleId = candidate.BattleId,
-            ViewerVersion = ViewerVersion,
             VideoRelativeUrl = videoRelativeUrl,
             SyncMetadataStatus = exactSyncAnchors.Count >= 2 ? "ReadyExact" : "ReadyUnsynced",
             SyncAnchors = exactSyncAnchors
@@ -427,7 +524,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
             BuildTitle(candidate.Document),
             candidate.Video.Locale,
             envelopeJson,
-            ViewerVersion
+            _viewerArtifacts.BundleId
         );
 
         return new PublicationWorkItem(
@@ -439,23 +536,53 @@ internal sealed class CombatReplayReportPublicationCoordinator
         );
     }
 
-    private void StartPublication(PublicationWorkItem work)
+    private void StartPublication(PublicationCandidate candidate)
     {
         try
         {
-            _schedule(() => Publish(work));
+            _schedule(() => BuildAndPublish(candidate));
         }
         catch (Exception ex)
         {
-            HandlePublicationFailure(work, ex, "Static report publication could not start: ");
+            HandlePublicationFailure(
+                new PublicationWorkItem(
+                    candidate.RecordingId,
+                    candidate.BattleId,
+                    string.Empty,
+                    Array.Empty<byte>(),
+                    candidate.AttemptCount
+                ),
+                ex,
+                "Static report publication could not start: "
+            );
         }
+    }
+
+    private void BuildAndPublish(PublicationCandidate candidate)
+    {
+        PublicationWorkItem work;
+        try
+        {
+            work = BuildWorkItem(candidate with { Document = CloneDocument(candidate.Document) });
+        }
+        catch (Exception ex)
+        {
+            CompleteNonRetryable(
+                candidate.RecordingId,
+                candidate.BattleId,
+                "Static report identity, schema, or path validation failed: " + DescribeFailure(ex)
+            );
+            return;
+        }
+
+        Publish(work);
     }
 
     private void Publish(PublicationWorkItem work)
     {
         try
         {
-            _ensureViewerInstalled(ViewerVersion);
+            _ensureViewerInstalled();
             _commitReport(work.ReportHtmlFilePath, work.ReportHtmlBytes);
             CompleteSuccess(work);
         }
@@ -650,22 +777,16 @@ internal sealed class CombatReplayReportPublicationCoordinator
                 NaturalHeight = height,
                 Sha256 = digest,
             },
-            new ResolvedBindingAsset(contentKey, relativeUrl)
+            new ResolvedBindingAsset(contentKey, relativeUrl, asset.DisplayName)
         );
     }
 
     private void ValidateSchemaCompatibility(EmbeddedReportEnvelopeV1 envelope)
     {
-        var release = _viewerRegistry.GetRequired(ViewerVersion);
         if (
-            envelope.SchemaVersion != release.ReportSchemaVersion
-            || envelope.BattleDocument.SchemaVersion != release.ReportSchemaVersion
-            || envelope.RecordingManifest.SchemaVersion != release.ReportSchemaVersion
-            || !string.Equals(
-                envelope.RecordingManifest.ViewerVersion,
-                release.Version,
-                StringComparison.Ordinal
-            )
+            envelope.SchemaVersion != _viewerArtifacts.ReportSchemaVersion
+            || envelope.BattleDocument.SchemaVersion != _viewerArtifacts.ReportSchemaVersion
+            || envelope.RecordingManifest.SchemaVersion != _viewerArtifacts.ReportSchemaVersion
         )
         {
             throw new InvalidDataException(
@@ -760,6 +881,8 @@ internal sealed class CombatReplayReportPublicationCoordinator
                 continue;
             entity.ContentKey = resolved.ContentKey;
             entity.AssetRelativeUrl = resolved.RelativeUrl;
+            if (!string.IsNullOrWhiteSpace(resolved.DisplayName))
+                entity.Name = resolved.DisplayName;
         }
 
         for (var index = 0; index < document.Events.Count; index++)
@@ -802,7 +925,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
 
         var generation = new RecordingGeneration(recordingId, battleId, ++_sequence);
         if (_draftsByBattle.TryGetValue(battleId, out var draft))
-            generation.Document = CloneDocument(draft);
+            generation.Document = draft;
         _generationsByRecording.Add(recordingId, generation);
         PruneGenerationsNoLock();
         return _generationsByRecording.TryGetValue(recordingId, out var retained) ? retained : null;
@@ -1066,6 +1189,7 @@ internal sealed class CombatReplayReportPublicationCoordinator
         internal long ArrivalSequence { get; }
         internal CombatReportDocumentV1? Document { get; set; }
         internal ResolvedReportAssetSet? Assets { get; set; }
+        internal bool AssetsResolutionStarted { get; set; }
         internal PendingVideoArtifact? Video { get; set; }
         internal string Locale { get; set; } = "en";
         internal int AttemptCount { get; set; }
@@ -1102,7 +1226,11 @@ internal sealed class CombatReplayReportPublicationCoordinator
         ResolvedBindingAsset BindingAsset
     );
 
-    private sealed record ResolvedBindingAsset(string ContentKey, string RelativeUrl);
+    private sealed record ResolvedBindingAsset(
+        string ContentKey,
+        string RelativeUrl,
+        string DisplayName
+    );
 
     private sealed record ResolvedReportAssetSet(
         IReadOnlyList<RecordingReportAssetV1> ManifestAssets,

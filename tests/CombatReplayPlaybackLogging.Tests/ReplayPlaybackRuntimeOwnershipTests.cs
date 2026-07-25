@@ -111,6 +111,95 @@ public sealed class ReplayPlaybackRuntimeOwnershipTests
     }
 
     [Fact]
+    public void Native_pvp_presentation_is_rebuilt_only_after_replay_state_enters()
+    {
+        var runtimeSource = RuntimeSource();
+        var savedStart = Segment(
+            runtimeSource,
+            "private async Task StartReplayAsync(",
+            "private async Task PrepareSavedReplayNativePresentationAsync("
+        );
+        Assert.DoesNotContain("RebuildOpponentCollectiblesAsync", savedStart);
+        Assert.DoesNotContain("EnsureTemporaryOpponentPortraitAsync", savedStart);
+        Assert.Contains(
+            "() => PrepareSavedReplayNativePresentationAsync(manifest, operation)",
+            savedStart
+        );
+
+        var bootstrapSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Game",
+            "CombatReplay",
+            "Bootstrap",
+            "ReplayBootstrap.cs"
+        );
+        var pushReplayState = bootstrapSource.IndexOf(
+            "await AppState.TryPushState<ReplayState>();",
+            StringComparison.Ordinal
+        );
+        var prepareNativePresentation = bootstrapSource.IndexOf(
+            "await prepareNativePresentation();",
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            pushReplayState >= 0 && prepareNativePresentation > pushReplayState,
+            "Opponent collectibles and portrait must be rebuilt in the combat frame, after ReplayState enters."
+        );
+
+        var nativePresentationSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Game",
+            "CombatReplay",
+            "PlaybackUi",
+            "ReplayNativeBoardPresentation.cs"
+        );
+        var clear = nativePresentationSource.IndexOf(
+            "boardManager.TryClearOpponentCollectables();",
+            StringComparison.Ordinal
+        );
+        var load = nativePresentationSource.IndexOf(
+            "await boardManager.LoadOpponentCollectibles();",
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            clear >= 0 && load > clear,
+            "Saved replay collectible rebuild must invalidate the stale native cache before loading."
+        );
+        Assert.Contains(
+            "SetOpponentStashVisible(boardManager, isVisible: true);",
+            nativePresentationSource
+        );
+        Assert.Contains(
+            "SetOpponentBankVisible(boardManager, ShouldShowOpponentBank(replayControlsVisible));",
+            nativePresentationSource
+        );
+
+        var presentation = Segment(
+            runtimeSource,
+            "private async Task PrepareSavedReplayNativePresentationAsync(",
+            "private void OnStateChanged(StateChangedEvent data)"
+        );
+        Assert.Contains(
+            "ReplayNativeBoardPresentation.Normalize(replayControlsVisible: true);",
+            presentation
+        );
+
+        var visualPatchSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Patches",
+            "Combat",
+            "CombatReplayVisualPatches.cs"
+        );
+        Assert.Contains(
+            "ReplayNativeBoardPresentation.Normalize(replayControlsVisible: true);",
+            visualPatchSource
+        );
+    }
+
+    [Fact]
     public void Startup_report_recovery_is_paged_and_cache_only()
     {
         var source = RuntimeSource();

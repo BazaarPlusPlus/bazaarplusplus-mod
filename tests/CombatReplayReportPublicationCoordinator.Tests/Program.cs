@@ -5,6 +5,7 @@ using BazaarPlusPlus.Game.CombatReplay.ReportData;
 using BazaarPlusPlus.Game.CombatReplay.Reports;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Infrastructure.Files;
 using Newtonsoft.Json;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
@@ -19,13 +20,16 @@ var sandbox = Path.Combine(
 try
 {
     Directory.CreateDirectory(sandbox);
+    await VerifyCpuAndFilesystemWorkUsesInjectedScheduler();
     VerifyRecordingGenerationIsolation();
     VerifyTransientPublicationRetries();
     VerifySchemaMismatchIsNonRetryable();
     VerifyConflictingGenerationIdentityIsNonRetryable();
     VerifyInvalidAssetDegradesIndependentlyAndClearsStaleReference();
     VerifyEventSemanticAssetBinding();
+    VerifyResolvedAssetEnrichesEntityDisplayName();
     VerifyExactVideoSyncRequiresContiguousIdentityMatchedAnchors();
+    VerifyReplaceablePublishRecoversConcurrentCreate();
 }
 finally
 {
@@ -41,6 +45,113 @@ if (failures.Count > 0)
 else
 {
     Console.WriteLine("CombatReplayReportPublicationCoordinator tests passed.");
+}
+
+async Task VerifyCpuAndFilesystemWorkUsesInjectedScheduler()
+{
+    var root = Path.Combine(sandbox, "scheduled-work");
+    var scheduled = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+    var committed = false;
+    var script = Encoding.UTF8.GetBytes("/* viewer */");
+    var css = Encoding.UTF8.GetBytes("/* css */");
+    var artifacts = new ViewerArtifactBundle(
+        1,
+        script,
+        css,
+        script.Length,
+        StaticReportIntegrity.Sha256(script),
+        css.Length,
+        StaticReportIntegrity.Sha256(css)
+    );
+    var coordinator = new CombatReplayReportPublicationCoordinator(
+        root,
+        artifacts,
+        () => { },
+        (_, _) => committed = true,
+        scheduled.Enqueue,
+        () => 0L
+    );
+    const string recordingId = "10101010101010101010101010101010";
+    const string battleId = "scheduled-battle";
+
+    var capture = coordinator.CaptureDraftAsync(
+        new PvpBattleManifest { BattleId = battleId },
+        new NetMessageCombatSim()
+    );
+    Check(
+        !capture.IsCompleted && scheduled.Count == 1,
+        "Draft projection must be deferred through the background scheduler."
+    );
+    await RunNextScheduled();
+    Check(await capture, "Scheduled draft projection must complete successfully.");
+
+    var snapshot = coordinator.GetDraftSnapshotAsync(battleId);
+    Check(
+        !snapshot.IsCompleted && scheduled.Count == 1,
+        "Draft serialization/cloning must be deferred through the background scheduler."
+    );
+    await RunNextScheduled();
+    Check(await snapshot != null, "Scheduled draft snapshot creation must return the document.");
+
+    coordinator.ObserveVideoStarted(Started(recordingId, battleId));
+    coordinator.MarkAssetsReady(recordingId, battleId, Array.Empty<PostCombatReportAssetFile>());
+    Check(
+        !committed && scheduled.Count == 1,
+        "Asset hashing/validation must be deferred through the background scheduler."
+    );
+    await RunNextScheduled();
+
+    coordinator.ObserveVideoTerminal(Completed(root, recordingId, battleId), "en");
+    Check(
+        !committed && scheduled.Count == 1,
+        "Report serialization and publication must be deferred through the background scheduler."
+    );
+    await RunNextScheduled();
+    Check(committed, "The scheduled publication worker must commit the completed report.");
+
+    async Task RunNextScheduled()
+    {
+        Check(scheduled.TryDequeue(out var action), "Expected one scheduled report work item.");
+        if (action != null)
+            await Task.Run(action);
+    }
+}
+
+void VerifyReplaceablePublishRecoversConcurrentCreate()
+{
+    var root = Path.Combine(sandbox, "replaceable-concurrent-create");
+    var destination = Path.Combine(root, "objects", "viewer.js");
+    var expected = Encoding.UTF8.GetBytes("current viewer bytes");
+
+    var sameWinnerPublisher = new ReplaceableArtifactPublisher(
+        (source, target) =>
+        {
+            File.WriteAllBytes(target, expected);
+            File.Move(source, target);
+        }
+    );
+    var reused = sameWinnerPublisher.PublishBelowRoot(root, destination, expected);
+    Check(
+        reused == ReplaceableArtifactPublishResult.Reused
+            && File.ReadAllBytes(destination).SequenceEqual(expected),
+        "A concurrent process that creates identical bytes before File.Move must be reused."
+    );
+
+    File.Delete(destination);
+    var stale = Encoding.UTF8.GetBytes("stale viewer bytes");
+    var differentWinnerPublisher = new ReplaceableArtifactPublisher(
+        (source, target) =>
+        {
+            File.WriteAllBytes(target, stale);
+            File.Move(source, target);
+        }
+    );
+    var replaced = differentWinnerPublisher.PublishBelowRoot(root, destination, expected);
+    Check(
+        replaced == ReplaceableArtifactPublishResult.Replaced
+            && File.ReadAllBytes(destination).SequenceEqual(expected),
+        "A concurrent process that creates different bytes before File.Move must be safely replaced."
+    );
 }
 
 void VerifyRecordingGenerationIsolation()
@@ -260,6 +371,37 @@ void VerifyEventSemanticAssetBinding()
     VerifyEmbeddedDocumentIdentity(html);
 }
 
+void VerifyResolvedAssetEnrichesEntityDisplayName()
+{
+    var root = Path.Combine(sandbox, "entity-display-name");
+    string? html = null;
+    var coordinator = CreateCoordinator(root, (_, bytes) => html = Utf8(bytes));
+    const string recordingId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const string battleId = "entity-name-battle";
+    coordinator.TryCaptureDraft(
+        new PvpBattleManifest { BattleId = battleId },
+        new NetMessageCombatSim { EntityIds = new[] { "item" } },
+        out _
+    );
+    coordinator.ObserveVideoStarted(Started(recordingId, battleId));
+    var asset = CreatePngCacheObject(
+        root,
+        "item",
+        width: 7,
+        height: 5,
+        displayName: "Resolved Localized Item"
+    );
+    coordinator.MarkAssetsReady(recordingId, battleId, new[] { asset });
+    coordinator.ObserveVideoTerminal(Completed(root, recordingId, battleId), "en");
+
+    var envelope = ParseEmbeddedEnvelope(html!);
+    var entity = envelope?.BattleDocument.Entities.SingleOrDefault(item => item.EntityId == "item");
+    Check(
+        entity?.Name == "Resolved Localized Item",
+        "A successfully resolved native asset must enrich the report entity with its localized display name."
+    );
+}
+
 void VerifyExactVideoSyncRequiresContiguousIdentityMatchedAnchors()
 {
     var root = Path.Combine(sandbox, "video-sync");
@@ -365,8 +507,7 @@ CombatReplayReportPublicationCoordinator CreateCoordinator(
 {
     var script = Encoding.UTF8.GetBytes("/* viewer */");
     var css = Encoding.UTF8.GetBytes("/* css */");
-    var release = new ViewerReleaseDefinition(
-        ViewerReleaseRegistry.CurrentVersion,
+    var artifacts = new ViewerArtifactBundle(
         1,
         script,
         css,
@@ -377,8 +518,8 @@ CombatReplayReportPublicationCoordinator CreateCoordinator(
     );
     return new CombatReplayReportPublicationCoordinator(
         root,
-        new ViewerReleaseRegistry(new[] { release }),
-        _ => { },
+        artifacts,
+        () => { },
         commit,
         action => action(),
         clock ?? (() => 0L)
@@ -431,7 +572,8 @@ PostCombatReportAssetFile CreatePngCacheObject(
     string root,
     string instanceId,
     int width,
-    int height
+    int height,
+    string displayName = ""
 )
 {
     byte[] bytes;
@@ -446,7 +588,12 @@ PostCombatReportAssetFile CreatePngCacheObject(
     Directory.CreateDirectory(directory);
     var path = Path.Combine(directory, digest + ".png");
     File.WriteAllBytes(path, bytes);
-    return new PostCombatReportAssetFile(instanceId, path, ContentHash: digest);
+    return new PostCombatReportAssetFile(
+        instanceId,
+        path,
+        ContentHash: digest,
+        DisplayName: displayName
+    );
 }
 
 List<CombatReplayReportPublicationTerminal> Drain(

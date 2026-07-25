@@ -150,6 +150,20 @@ run_seed_gates() {
         ${args[@]+"${args[@]}"}
 }
 
+run_combat_report_viewer_release_gate() {
+    local frontend_dir="$SCRIPT_DIR/src/BazaarPlusPlus/Resources/CombatReplayReport/frontend"
+    echo -e "${CYAN}== Validating ${GREEN}Combat Report Viewer release artifacts${CYAN} ==${RESET}"
+    (
+        cd "$frontend_dir"
+        npm ci
+        npm run viewer:browsers:install
+        # Includes typecheck, deterministic artifact comparison, pure tests, and the
+        # Chromium/WebKit behavior suite. The check fails when committed viewer.js/viewer.css
+        # differ from a clean reproducible build.
+        npm test
+    )
+}
+
 publish() {
     local bazaaragent="${1:-false}"
     shift || true
@@ -182,11 +196,13 @@ publish() {
 
     fetch_remote_data "${common_args[@]}"
     run_seed_gates "${common_args[@]}" -p:RemoteEmbeddedDataPrepared=true
+    run_combat_report_viewer_release_gate
 
     local build_args=(
         -t:BuildAll
         "${common_args[@]}"
         -p:BuildProductionPackage=true
+        -p:CombatReportViewerReleaseGatePrepared=true
         -p:RemoteEmbeddedDataPrepared=true
     )
     if [[ "$bazaaragent" == "true" ]]; then
@@ -277,6 +293,17 @@ test_all() {
         printf '  %s\n' "${failures[@]}" >&2
         return 1
     fi
+}
+
+viewer_test() {
+    local frontend_dir="$SCRIPT_DIR/src/BazaarPlusPlus/Resources/CombatReplayReport/frontend"
+    echo -e "${CYAN}== Testing ${GREEN}Combat Report Viewer${CYAN} in Chromium + WebKit ==${RESET}"
+    (
+        cd "$frontend_dir"
+        npm ci
+        npm run viewer:browsers:install
+        npm test
+    )
 }
 
 restore_locks() {
@@ -440,6 +467,7 @@ Usage:
   $0 restore-locks
   $0 restore-locked
   $0 test
+  $0 viewer-test
   $0 format
   $0 format-check
   $0 decompile [DllName]
@@ -472,6 +500,7 @@ case "${1:-}" in
     restore-locks)  restore_locks ;;
     restore-locked) restore_locked ;;
     test)         test_all ;;
+    viewer-test)  viewer_test ;;
     format)       format ;;
     format-check) format_check ;;
     decompile)

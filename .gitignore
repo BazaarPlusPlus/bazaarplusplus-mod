@@ -6,6 +6,7 @@ exports/
 
 # Dependencies
 libs/
+node_modules/
 decompiled/
 decompiled-v*/
 
@@ -19,6 +20,8 @@ decompiled-v*/
 .dotnet-home/
 .nuget-packages/
 .npm-cache/
+playwright-report/
+test-results/
 .wrangler
 __pycache__/
 

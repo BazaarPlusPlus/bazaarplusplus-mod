@@ -15,8 +15,9 @@ try
     VerifyStaticPaths();
     VerifyTypedSiblingUrls();
     VerifyHtmlEmitter();
-    VerifyViewerReleasePinAndInstall();
-    VerifyViewerFunctionalContract();
+    VerifyViewerArtifactPinAndInstall();
+    VerifyViewerOpenGateRepairsSharedArtifacts();
+    VerifyViewerStaticRuntimeBoundary();
     VerifyImmutableCommitConcurrency();
     VerifyImmutableCommitRejectsLinks();
     VerifyPhysicalFileChain();
@@ -42,36 +43,19 @@ void VerifyStaticPaths()
     var dataRoot = Path.Combine(sandbox, "BazaarPlusPlusV4");
     var paths = new StaticReportPaths(dataRoot);
     const string recordingId = "0123456789abcdef0123456789abcdef";
+    const string viewerBundleId =
+        "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
     Check(
         paths.GetReportHtmlFilePath(recordingId)
             == Path.Combine(dataRoot, "reports", recordingId + ".html"),
         "Reports must be keyed by the typed recording ID."
     );
     Check(
-        StaticReportPaths.BuildViewerScriptRelativeUrl("1") == "../report-viewer/v1/viewer.js"
-            && StaticReportPaths.BuildViewerStylesheetRelativeUrl("1")
-                == "../report-viewer/v1/viewer.css"
-            && StaticReportPaths.BuildViewerScriptRelativeUrl("2")
-                == "../report-viewer/v2/viewer.js"
-            && StaticReportPaths.BuildViewerStylesheetRelativeUrl("2")
-                == "../report-viewer/v2/viewer.css"
-            && StaticReportPaths.BuildViewerScriptRelativeUrl("3")
-                == "../report-viewer/v3/viewer.js"
-            && StaticReportPaths.BuildViewerStylesheetRelativeUrl("3")
-                == "../report-viewer/v3/viewer.css"
-            && StaticReportPaths.BuildViewerScriptRelativeUrl("4")
-                == "../report-viewer/v4/viewer.js"
-            && StaticReportPaths.BuildViewerStylesheetRelativeUrl("4")
-                == "../report-viewer/v4/viewer.css"
-            && StaticReportPaths.BuildViewerScriptRelativeUrl("5")
-                == "../report-viewer/v5/viewer.js"
-            && StaticReportPaths.BuildViewerStylesheetRelativeUrl("5")
-                == "../report-viewer/v5/viewer.css"
-            && StaticReportPaths.BuildViewerScriptRelativeUrl("6")
-                == "../report-viewer/v6/viewer.js"
-            && StaticReportPaths.BuildViewerStylesheetRelativeUrl("6")
-                == "../report-viewer/v6/viewer.css",
-        "Every shared Viewer release must use its stable versioned sibling URLs."
+        StaticReportPaths.BuildViewerScriptRelativeUrl(viewerBundleId)
+            == "../report-viewer/objects/" + viewerBundleId + "/viewer.js"
+            && StaticReportPaths.BuildViewerStylesheetRelativeUrl(viewerBundleId)
+                == "../report-viewer/objects/" + viewerBundleId + "/viewer.css",
+        "The Viewer must use one immutable content-addressed sibling generation."
     );
 
     const string digest = "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd";
@@ -84,11 +68,6 @@ void VerifyStaticPaths()
         () => paths.GetReportHtmlFilePath("recording-name"),
         "Arbitrary recording names must not become report paths."
     );
-    CheckThrows<ArgumentException>(
-        () => StaticReportPaths.BuildViewerScriptRelativeUrl("01"),
-        "Viewer versions with leading zeroes must be rejected."
-    );
-
     var video = Path.Combine(dataRoot, "CombatReplayVideos", "2026-07-22", "战斗 录像.mp4");
     var url = paths.BuildVideoRelativeUrl(video);
     Check(
@@ -149,13 +128,15 @@ void VerifyTypedSiblingUrls()
 
 void VerifyHtmlEmitter()
 {
+    const string viewerBundleId =
+        "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
     const string envelope =
         "{\"schemaVersion\":1,\"label\":\"</script><script id='bpp-report-data'>x</script><>&\u2028\u2029\",\"asset\":\"../report-assets/objects/ab/abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd.png\"}";
     var bytes = new ReportHtmlEmitter().Emit(
         "战斗 <报告> & review",
         "zh_TW",
         envelope,
-        ViewerReleaseRegistry.CurrentVersion
+        viewerBundleId
     );
     var html = Encoding.UTF8.GetString(bytes);
     Check(
@@ -179,14 +160,25 @@ void VerifyHtmlEmitter()
     );
     Check(
         html.Contains(
-            "<link rel=\"stylesheet\" href=\"../report-viewer/v7/viewer.css\">",
+            "<link rel=\"stylesheet\" href=\"../report-viewer/objects/"
+                + viewerBundleId
+                + "/viewer.css\">",
             StringComparison.Ordinal
         )
             && html.Contains(
-                "<script defer src=\"../report-viewer/v7/viewer.js\"></script>",
+                "<script defer src=\"../report-viewer/objects/"
+                    + viewerBundleId
+                    + "/viewer.js\"></script>",
                 StringComparison.Ordinal
             ),
-        "HTML must reference exactly one immutable shared Viewer version."
+        "HTML must reference exactly one immutable shared Viewer generation."
+    );
+    Check(
+        html.Contains(
+            "<meta name=\"bpp-viewer-bundle\" content=\"" + viewerBundleId + "\">",
+            StringComparison.Ordinal
+        ),
+        "HTML must identify the exact current Viewer bundle used to render it."
     );
     Check(
         !html.Contains("http://", StringComparison.OrdinalIgnoreCase)
@@ -209,347 +201,175 @@ void VerifyHtmlEmitter()
     );
 }
 
-void VerifyViewerReleasePinAndInstall()
+void VerifyViewerArtifactPinAndInstall()
 {
-    var registry = ViewerReleaseRegistry.CreateDefault();
-    var legacy = registry.GetRequired("1");
-    var previous = registry.GetRequired("2");
-    var frozenV3 = registry.GetRequired("3");
-    var frozenV4 = registry.GetRequired("4");
-    var frozenV5 = registry.GetRequired("5");
-    var frozenV6 = registry.GetRequired("6");
-    var release = registry.GetRequired(ViewerReleaseRegistry.CurrentVersion);
+    var artifacts = ViewerArtifactBundle.CreateDefault();
     Check(
-        legacy.ScriptBytes.Length > 500_000
-            && legacy.ScriptSha256 == StaticReportIntegrity.Sha256(legacy.ScriptBytes)
-            && legacy.StylesheetSha256 == StaticReportIntegrity.Sha256(legacy.StylesheetBytes)
-            && previous.ScriptBytes.Length > legacy.ScriptBytes.Length
-            && previous.ScriptSha256 == StaticReportIntegrity.Sha256(previous.ScriptBytes)
-            && previous.StylesheetSha256 == StaticReportIntegrity.Sha256(previous.StylesheetBytes)
-            && frozenV3.ScriptSha256 == StaticReportIntegrity.Sha256(frozenV3.ScriptBytes)
-            && frozenV3.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV3.StylesheetBytes)
-            && frozenV4.ScriptSha256 == StaticReportIntegrity.Sha256(frozenV4.ScriptBytes)
-            && frozenV4.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV4.StylesheetBytes)
-            && frozenV5.ScriptSha256 == StaticReportIntegrity.Sha256(frozenV5.ScriptBytes)
-            && frozenV5.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV5.StylesheetBytes)
-            && frozenV6.ScriptSha256 == StaticReportIntegrity.Sha256(frozenV6.ScriptBytes)
-            && frozenV6.StylesheetSha256 == StaticReportIntegrity.Sha256(frozenV6.StylesheetBytes)
-            && release.ScriptSha256 == StaticReportIntegrity.Sha256(release.ScriptBytes)
-            && release.StylesheetSha256 == StaticReportIntegrity.Sha256(release.StylesheetBytes)
-            && frozenV3.ScriptSha256 == frozenV4.ScriptSha256
-            && frozenV3.StylesheetSha256 != frozenV4.StylesheetSha256
-            && frozenV4.ScriptSha256 != frozenV5.ScriptSha256
-            && frozenV4.StylesheetSha256 == frozenV5.StylesheetSha256
-            && frozenV5.ScriptSha256 != frozenV6.ScriptSha256
-            && frozenV5.StylesheetSha256 != frozenV6.StylesheetSha256
-            && frozenV6.ScriptSha256 != release.ScriptSha256
-            && frozenV6.StylesheetSha256 != release.StylesheetSha256,
-        "Every immutable Viewer release must match its source-controlled length and SHA pins."
+        artifacts.ScriptBytes.Length > 500_000
+            && artifacts.ScriptSha256 == StaticReportIntegrity.Sha256(artifacts.ScriptBytes)
+            && artifacts.StylesheetSha256 == StaticReportIntegrity.Sha256(artifacts.StylesheetBytes)
+            && artifacts.BundleId.Length == 64,
+        "The Viewer must derive a canonical content identity from its embedded bytes."
+    );
+    var callerOwnedScript = artifacts.ScriptBytes;
+    callerOwnedScript[0] ^= 0xff;
+    Check(
+        artifacts.ScriptSha256 == StaticReportIntegrity.Sha256(artifacts.ScriptBytes),
+        "Viewer artifact bytes exposed to callers must be defensive copies."
     );
 
     var paths = new StaticReportPaths(Path.Combine(sandbox, "viewer-install"));
-    var installer = new ViewerInstaller(paths, registry, new ImmutableArtifactCommitter());
-    var first = installer.EnsureInstalled(ViewerReleaseRegistry.CurrentVersion);
-    var second = installer.EnsureInstalled(ViewerReleaseRegistry.CurrentVersion);
+    var installer = new ViewerInstaller(paths, artifacts, new ReplaceableArtifactPublisher());
+    var first = installer.EnsureInstalled();
+    var second = installer.EnsureInstalled();
     Check(
-        first.ScriptCommit == ImmutableArtifactCommitResult.Created
-            && first.StylesheetCommit == ImmutableArtifactCommitResult.Created
-            && second.ScriptCommit == ImmutableArtifactCommitResult.Reused
-            && second.StylesheetCommit == ImmutableArtifactCommitResult.Reused,
-        "Viewer install must create once and then reuse byte-identical immutable files."
+        first.ScriptPublish == ReplaceableArtifactPublishResult.Created
+            && first.StylesheetPublish == ReplaceableArtifactPublishResult.Created
+            && second.ScriptPublish == ReplaceableArtifactPublishResult.Reused
+            && second.StylesheetPublish == ReplaceableArtifactPublishResult.Reused,
+        "Viewer install must create once and then reuse one byte-identical generation."
     );
     Check(
-        File.ReadAllBytes(paths.GetViewerScriptFilePath(ViewerReleaseRegistry.CurrentVersion))
-            .SequenceEqual(release.ScriptBytes)
-            && File.ReadAllBytes(
-                    paths.GetViewerStylesheetFilePath(ViewerReleaseRegistry.CurrentVersion)
-                )
-                .SequenceEqual(release.StylesheetBytes),
-        "Installed Viewer files must equal the registered release bytes."
+        File.ReadAllBytes(paths.GetViewerScriptFilePath(artifacts.BundleId))
+            .SequenceEqual(artifacts.ScriptBytes)
+            && File.ReadAllBytes(paths.GetViewerStylesheetFilePath(artifacts.BundleId))
+                .SequenceEqual(artifacts.StylesheetBytes),
+        "Installed Viewer files must equal the embedded artifact bytes."
     );
 
-    var changed = (byte[])release.ScriptBytes.Clone();
+    var changed = (byte[])artifacts.ScriptBytes.Clone();
     changed[0] ^= 0xff;
     CheckThrows<InvalidDataException>(
         () =>
-            new ViewerReleaseDefinition(
-                ViewerReleaseRegistry.CurrentVersion,
+            new ViewerArtifactBundle(
                 1,
                 changed,
-                release.StylesheetBytes,
-                release.ScriptBytes.Length,
-                release.ScriptSha256,
-                release.StylesheetBytes.Length,
-                release.StylesheetSha256
+                artifacts.StylesheetBytes,
+                artifacts.ScriptBytes.Length,
+                artifacts.ScriptSha256,
+                artifacts.StylesheetBytes.Length,
+                artifacts.StylesheetSha256
             ),
-        "Changing Viewer bytes without changing the version pin must fail closed."
+        "Changing Viewer bytes without updating its integrity pin must fail closed."
     );
 
     File.WriteAllBytes(
-        paths.GetViewerScriptFilePath(ViewerReleaseRegistry.CurrentVersion),
+        paths.GetViewerScriptFilePath(artifacts.BundleId),
         Encoding.UTF8.GetBytes("mutated")
     );
-    CheckThrows<IOException>(
-        () => installer.EnsureInstalled(ViewerReleaseRegistry.CurrentVersion),
-        "An installed immutable Viewer version must never be overwritten."
+    var repaired = installer.EnsureInstalled();
+    Check(
+        repaired.ScriptPublish == ReplaceableArtifactPublishResult.Replaced
+            && File.ReadAllBytes(paths.GetViewerScriptFilePath(artifacts.BundleId))
+                .SequenceEqual(artifacts.ScriptBytes),
+        "A changed Viewer generation must be atomically repaired from embedded bytes."
+    );
+
+    var alternateScript = (byte[])artifacts.ScriptBytes.Clone();
+    alternateScript[alternateScript.Length - 1] ^= 0x01;
+    var alternate = new ViewerArtifactBundle(
+        1,
+        alternateScript,
+        artifacts.StylesheetBytes,
+        alternateScript.Length,
+        StaticReportIntegrity.Sha256(alternateScript),
+        artifacts.StylesheetBytes.Length,
+        artifacts.StylesheetSha256
+    );
+    Check(
+        alternate.BundleId != artifacts.BundleId,
+        "Changing either Viewer artifact must create a different bundle generation."
+    );
+
+    var publisher = new ReplaceableArtifactPublisher();
+    _ = publisher.PublishBelowRoot(
+        paths.DataRootDirectoryPath,
+        paths.GetViewerStylesheetFilePath(alternate.BundleId),
+        alternate.StylesheetBytes
+    );
+    var completedPartialGeneration = new ViewerInstaller(
+        paths,
+        alternate,
+        publisher
+    ).EnsureInstalled();
+    Check(
+        completedPartialGeneration.StylesheetPublish == ReplaceableArtifactPublishResult.Reused
+            && completedPartialGeneration.ScriptPublish == ReplaceableArtifactPublishResult.Created
+            && File.ReadAllBytes(paths.GetViewerScriptFilePath(artifacts.BundleId))
+                .SequenceEqual(artifacts.ScriptBytes),
+        "A partial unreferenced generation must be completed without changing an existing generation."
     );
 }
 
-void VerifyViewerFunctionalContract()
+void VerifyViewerStaticRuntimeBoundary()
 {
-    var assembly = typeof(ViewerReleaseRegistry).Assembly;
-    var script = ReadEmbeddedText(
-        assembly,
-        "BazaarPlusPlus.Resources.CombatReplayReport.viewer.js"
-    );
-    var stylesheet = ReadEmbeddedText(
-        assembly,
-        "BazaarPlusPlus.Resources.CombatReplayReport.viewer.css"
-    );
+    var artifacts = ViewerArtifactBundle.CreateDefault();
+    var script = Encoding.UTF8.GetString(artifacts.ScriptBytes);
+    var stylesheet = Encoding.UTF8.GetString(artifacts.StylesheetBytes);
 
     Check(
-        script.Contains(
-            "const METRIC_ORDER = [\"health\", \"rage\", \"healthRegen\", \"shield\"]",
-            StringComparison.Ordinal
-        )
-            && script.Contains("function frameZeroMetricSamples(battle)", StringComparison.Ordinal)
-            && script.Contains("pick(battle, [\"frameZeroState\"]", StringComparison.Ordinal)
-            && !script.Contains("const firstChange = events.find", StringComparison.Ordinal)
-            && script.Contains("function signedOrder(value)", StringComparison.Ordinal)
-            && script.Contains("data-time-zoom", StringComparison.Ordinal)
-            && script.Contains("data-lane-zoom", StringComparison.Ordinal),
-        "Viewer must seed the shared four-metric chart from producer-owned frame-zero state, without guessing from a late first change, and retain independent time/lane zoom."
-    );
-    Check(
-        script.Contains("report-tab-timeline", StringComparison.Ordinal)
-            && script.Contains("report-tab-statistics", StringComparison.Ordinal)
-            && script.Contains("statistics-output-chart", StringComparison.Ordinal)
-            && script.Contains("statistics-effects-chart", StringComparison.Ordinal)
-            && !script.Contains("type: \"pie\"", StringComparison.Ordinal),
-        "Viewer must expose Timeline/Statistics tabs and comparison bars without a meaningless single-slice donut."
-    );
-    Check(
-        script.Contains("iconAssetRelativeUrl", StringComparison.Ordinal)
-            && script.Contains("safeAssetUrl", StringComparison.Ordinal)
-            && script.Contains("cachedIconImage", StringComparison.Ordinal)
-            && script.Contains("bpp-event-native-icon", StringComparison.Ordinal),
-        "Event native icons must pass through the typed asset allowlist and retain Canvas/inspector fallbacks."
-    );
-    Check(
-        script.Contains("triggerSourceEntityId", StringComparison.Ordinal)
-            && script.Contains("removedTargetEntityIds", StringComparison.Ordinal)
-            && script.Contains("attributionConfidence", StringComparison.Ordinal)
-            && script.Contains(
-                "function relatedLaneRoles(cluster, entities)",
-                StringComparison.Ordinal
-            )
-            && script.Contains("is-related-trigger", StringComparison.Ordinal)
-            && script.Contains("is-related-removed", StringComparison.Ordinal)
-            && script.Contains("appendRelation(\"attribution\"", StringComparison.Ordinal),
-        "Viewer details and hover/selection highlighting must retain source, trigger, target, removed-target, and attribution semantics."
-    );
-    Check(
-        script.Contains(
-            "model.events.filter((event) => isVisibleTimelineEvent(event, entityById))",
-            StringComparison.Ordinal
-        )
-            && script.Contains(
-                "function buildStatusRanges(model, entities",
-                StringComparison.Ordinal
-            )
-            && script.Contains("drawStatusRanges(context, statusRanges", StringComparison.Ordinal)
-            && script.Contains("ROUTINE_CARD_ACTIONS", StringComparison.Ordinal)
-            && script.Contains("source.type.toLowerCase() === \"skill\"", StringComparison.Ordinal)
-            && script.Contains("cluster.events.push(event)", StringComparison.Ordinal)
-            && script.Contains("function eventsAtFrame(events, frame)", StringComparison.Ordinal)
-            && script.Contains("event.frame === frame", StringComparison.Ordinal)
-            && script.Contains("frame-event-total", StringComparison.Ordinal)
-            && script.Contains("const visible = events.slice(0, limit)", StringComparison.Ordinal),
-        "Metric/routine countdown records must stay out of lane markers, sustained statuses must remain flat interactive ranges, skill Rage triggers remain visible, and the paged inspector must expand the entire selected frame."
-    );
-    Check(
-        script.Contains("function scheduleMediaSeek(combatMs, precise)", StringComparison.Ordinal)
-            && script.Contains("pendingMediaSeek = {", StringComparison.Ordinal)
-            && script.Contains("video.paused || video.seeking", StringComparison.Ordinal)
-            && script.Contains("typeof video.fastSeek === \"function\"", StringComparison.Ordinal)
-            && script.Contains("video.addEventListener(\"seeked\"", StringComparison.Ordinal)
-            && script.Contains(
-                "window.requestAnimationFrame(flushMediaSeek)",
-                StringComparison.Ordinal
-            ),
-        "Paused recordings must use a latest-target-only seek queue with fast approximate drag seeks and precise committed seeks."
-    );
-    Check(
-        script.Contains("event.attributionConfidence === \"exact\"", StringComparison.Ordinal)
-            && script.Contains("result.output[targetSide][1] += damage", StringComparison.Ordinal)
-            && script.Contains("result.output[targetSide][2] += damage", StringComparison.Ordinal)
-            && script.Contains(
-                "changedAttribute === \"Health\" && amount < 0",
-                StringComparison.Ordinal
-            )
-            && script.Contains(
-                "changedAttribute === \"Shield\" && amount > 0",
-                StringComparison.Ordinal
-            )
-            && script.Contains(
-                "changedAttribute === \"Shield\" && amount < 0",
-                StringComparison.Ordinal
-            )
-            && !script.Contains("changedAttribute === \"Joy\"", StringComparison.Ordinal)
-            && !script.Contains("opposite(targetSide)", StringComparison.Ordinal),
-        "Statistics must count only negative Health as damage, apply signed Shield gain/loss policy, exclude Joy, and never fabricate the opposite side as source."
-    );
-    Check(
-        script.Contains(
-            "function renderDamageComposition(parent, statistics, copy)",
-            StringComparison.Ordinal
-        )
-            && script.Contains("activeKeys.length === 1", StringComparison.Ordinal)
-            && script.Contains("stack: \"damage-composition\"", StringComparison.Ordinal)
-            && !script.Contains("type: \"pie\"", StringComparison.Ordinal),
-        "Damage composition must degrade to a direct summary for one type and use a reversible stacked comparison only for multiple types."
-    );
-    Check(
-        script.Contains("const key = event.frame + \":\"", StringComparison.Ordinal)
-            && !script.Contains(
-                "const key = endpoint.lane + \":\" + pixel",
-                StringComparison.Ordinal
-            ),
-        "Dense adjacent frames that quantize to the same pixel must retain separate frame cluster identities."
-    );
-    Check(
-        script.Contains("media-workbench", StringComparison.Ordinal)
-            && script.Contains("workbench-inspector-host", StringComparison.Ordinal)
-            && script.Contains("transport-play-pause", StringComparison.Ordinal)
-            && script.Contains("transport-follow-playhead", StringComparison.Ordinal)
-            && script.Contains("transport-previous-event", StringComparison.Ordinal)
-            && script.Contains("transport-next-event", StringComparison.Ordinal)
-            && script.Contains("data-seek-pending", StringComparison.Ordinal)
-            && script.Contains("data-playback-frame-p95-ms", StringComparison.Ordinal)
-            && script.Contains("function recordPlaybackFrame(timestamp)", StringComparison.Ordinal)
-            && script.Contains(
-                "playbackAnimationFrame = window.requestAnimationFrame(function (timestamp)",
-                StringComparison.Ordinal
-            )
-            && !script.Contains("requestVideoFrameCallback", StringComparison.Ordinal)
-            && script.Contains(
-                "function mapMediaToCombat(mediaMs, anchors)",
-                StringComparison.Ordinal
-            )
-            && script.Contains(
-                "function combatMsAtPointer(canvas, clientX, durationMs)",
-                StringComparison.Ordinal
-            )
-            && script.Contains(
-                "canvas.setPointerCapture(event.pointerId)",
-                StringComparison.Ordinal
-            ),
-        "Viewer must expose one compact nonlinear workbench with a shared playhead, adjacent frame stepping, drag scrubbing, seek instrumentation, follow mode, and a persistent inspector."
-    );
-    Check(
-        script.Contains("function translatedEntityType(copy, rawType)", StringComparison.Ordinal)
-            && script.Contains("translate(copy, \"entityHero\")", StringComparison.Ordinal)
-            && script.Contains("translate(copy, \"entityItem\")", StringComparison.Ordinal)
-            && script.Contains("translate(copy, \"entitySkill\")", StringComparison.Ordinal)
-            && script.Contains("translate(copy, \"entityEffect\")", StringComparison.Ordinal)
-            && Count(script, "previousEvent:") == 3
-            && Count(script, "playRecording:") == 3
-            && Count(script, "followPlayhead:") == 3
-            && Count(script, "inspectorEmptyTitle:") == 3,
-        "Lane labels and nonlinear-workbench controls must cover Simplified Chinese, English, and Traditional Chinese instead of leaking raw UI copy."
-    );
-    Check(
-        !script.Contains("fetch(", StringComparison.Ordinal)
-            && !script.Contains("new Worker", StringComparison.Ordinal)
-            && !script.Contains("import(", StringComparison.Ordinal),
-        "The file Viewer must remain a classic, self-contained script with no local fetch, dynamic import, or Worker dependency."
-    );
-    Check(
-        stylesheet.Contains(".bpp-media-workbench", StringComparison.Ordinal)
-            && stylesheet.Contains("height: 190px", StringComparison.Ordinal)
-            && stylesheet.Contains(
-                "grid-template-columns: minmax(260px, 1fr) minmax(360px, 48%)",
-                StringComparison.Ordinal
-            )
-            && stylesheet.Contains(
-                "grid-template-columns: clamp(240px, 26vw, 300px) minmax(0, 1fr)",
-                StringComparison.Ordinal
-            )
-            && stylesheet.Contains(".bpp-workbench-inspector-host", StringComparison.Ordinal)
-            && stylesheet.Contains(".bpp-transport", StringComparison.Ordinal)
-            && stylesheet.Contains("height: 150px", StringComparison.Ordinal)
-            && stylesheet.Contains("height: 132px", StringComparison.Ordinal)
-            && stylesheet.Contains(".bpp-lane-label.is-event-related", StringComparison.Ordinal)
-            && stylesheet.Contains(".bpp-stats-charts", StringComparison.Ordinal)
-            && stylesheet.Contains(".bpp-timeline-toolbar", StringComparison.Ordinal)
-            && stylesheet.Contains(".bpp-lane-art.bpp-art-item", StringComparison.Ordinal)
-            && stylesheet.Contains(
-                "height: clamp(28px, calc(40px * var(--bpp-lane-scale, 1)), 48px)",
-                StringComparison.Ordinal
-            )
-            && stylesheet.Contains(
-                ".bpp-lane-art.bpp-art-item .bpp-lane-image",
-                StringComparison.Ordinal
-            )
-            && stylesheet.Contains(
-                "max-width: clamp(28px, calc(76px * var(--bpp-lane-scale, 1)), 92px)",
-                StringComparison.Ordinal
-            )
-            && stylesheet.Contains(
-                "aspect-ratio: var(--bpp-item-art-aspect, 1)",
-                StringComparison.Ordinal
-            )
-            && stylesheet.Contains("width: auto", StringComparison.Ordinal)
-            && !stylesheet.Contains("18.6px", StringComparison.Ordinal)
-            && stylesheet.Contains(
-                "grid-template-rows: auto auto auto minmax(0, 1fr)",
-                StringComparison.Ordinal
-            )
-            && stylesheet.Contains("height: 100dvh", StringComparison.Ordinal)
-            && stylesheet.Contains("height: 80px", StringComparison.Ordinal)
-            && stylesheet.Contains("height: 100%;", StringComparison.Ordinal),
-        "Viewer CSS must retain a compact responsive media workbench, a viewport-bound timeline workspace, compact low-height metrics, responsive zoom controls, and intrinsic alpha-cropped item dimensions."
-    );
-    Check(
-        script.Contains(
-            "function applyNativeItemAspect(assetFrame, image)",
-            StringComparison.Ordinal
-        )
-            && script.Contains(
-                "image.naturalWidth + \" / \" + image.naturalHeight",
-                StringComparison.Ordinal
-            ),
-        "Item lane geometry must derive from the decoded alpha-cropped PNG rather than a canvas-size guess."
-    );
-    Check(
-        script.Contains("case \"effect\": return \"◎\";", StringComparison.Ordinal)
-            && script.Contains("case \"item\": return \"?\";", StringComparison.Ordinal)
-            && script.Contains(
-                "function showEntityAssetFallback(assetFrame, image, entity)",
-                StringComparison.Ordinal
-            )
-            && script.Contains(
-                "assetFrame.classList.remove(\"bpp-art-item\")",
-                StringComparison.Ordinal
-            ),
-        "Missing socket-effect assets and missing item assets must use explicit semantic placeholders."
+        script.Length > 500_000
+            && stylesheet.Contains(".bpp-report-root", StringComparison.Ordinal)
+            && !script.Contains("fetch(", StringComparison.Ordinal)
+            && !script.Contains("new Worker(", StringComparison.Ordinal)
+            && !script.Contains("new SharedWorker(", StringComparison.Ordinal)
+            && !script.Contains("import(", StringComparison.Ordinal)
+            && !stylesheet.Contains("@import", StringComparison.Ordinal),
+        "The committed Viewer artifacts must preserve the static file:// runtime boundary."
     );
 }
 
-string ReadEmbeddedText(System.Reflection.Assembly assembly, string resourceName)
+void VerifyViewerOpenGateRepairsSharedArtifacts()
 {
-    using var stream = assembly.GetManifestResourceStream(resourceName);
-    if (stream == null)
-    {
-        failures.Add("Missing embedded resource: " + resourceName);
-        return string.Empty;
-    }
-    using var reader = new StreamReader(
-        stream,
-        Encoding.UTF8,
-        detectEncodingFromByteOrderMarks: true
+    var dataRoot = Path.Combine(sandbox, "viewer-open-gate");
+    var reportRoot = Path.Combine(dataRoot, "reports");
+    Directory.CreateDirectory(reportRoot);
+
+    Check(
+        CombatReplayReportViewerGate.TryEnsureInstalledForReportRoot(reportRoot, out var reason)
+            && string.IsNullOrEmpty(reason),
+        "The F8/open gate must install or repair the shared Viewer before launching a report."
     );
-    return reader.ReadToEnd();
+
+    var artifacts = ViewerArtifactBundle.CreateDefault();
+    var paths = new StaticReportPaths(dataRoot);
+    var currentReportPath = Path.Combine(reportRoot, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.html");
+    File.WriteAllBytes(
+        currentReportPath,
+        new ReportHtmlEmitter().Emit("Current", "en", "{}", artifacts.BundleId)
+    );
+    Check(
+        File.ReadAllBytes(paths.GetViewerScriptFilePath(artifacts.BundleId))
+            .SequenceEqual(artifacts.ScriptBytes)
+            && File.ReadAllBytes(paths.GetViewerStylesheetFilePath(artifacts.BundleId))
+                .SequenceEqual(artifacts.StylesheetBytes),
+        "The Viewer open gate must publish the complete current generation."
+    );
+    Check(
+        CombatReplayReportViewerGate.TryEnsureInstalledForReport(
+            reportRoot,
+            currentReportPath,
+            out _
+        ),
+        "The Viewer open gate must accept a report that references the complete current bundle."
+    );
+    var staleReportPath = Path.Combine(reportRoot, "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.html");
+    File.WriteAllText(staleReportPath, "<!doctype html><html><body>stale</body></html>");
+    Check(
+        !CombatReplayReportViewerGate.TryEnsureInstalledForReport(
+            reportRoot,
+            staleReportPath,
+            out _
+        ),
+        "The Viewer open gate must reject an existing report from an unsupported Viewer bundle."
+    );
+    Check(
+        !CombatReplayReportViewerGate.TryEnsureInstalledForReportRoot(
+            Path.Combine(dataRoot, "not-reports"),
+            out _
+        ),
+        "The Viewer open gate must reject arbitrary sibling roots."
+    );
 }
 
 void VerifyImmutableCommitConcurrency()

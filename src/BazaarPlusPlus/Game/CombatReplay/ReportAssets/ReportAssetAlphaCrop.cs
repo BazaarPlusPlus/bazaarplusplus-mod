@@ -4,6 +4,52 @@ namespace BazaarPlusPlus.Game.CombatReplay.ReportAssets;
 
 internal readonly record struct ReportAssetPixelBounds(int X, int Y, int Width, int Height);
 
+internal enum ReportAssetReadbackSource
+{
+    UnitySprite,
+    MaterialTexture,
+    OffscreenCamera,
+}
+
+internal static class ReportAssetPixelOrientation
+{
+    internal static bool RequiresVerticalFlip(
+        bool graphicsUvStartsAtTop,
+        ReportAssetReadbackSource source
+    )
+    {
+        return source switch
+        {
+            ReportAssetReadbackSource.UnitySprite => !graphicsUvStartsAtTop,
+            ReportAssetReadbackSource.MaterialTexture
+            or ReportAssetReadbackSource.OffscreenCamera => graphicsUvStartsAtTop,
+            _ => throw new ArgumentOutOfRangeException(nameof(source), source, null),
+        };
+    }
+
+    internal static void FlipVertical(Span<byte> rgbaPixels, int width, int height)
+    {
+        if (width <= 0)
+            throw new ArgumentOutOfRangeException(nameof(width));
+        if (height <= 0)
+            throw new ArgumentOutOfRangeException(nameof(height));
+        if (rgbaPixels.Length != checked(width * height * 4))
+            throw new InvalidDataException("RGBA pixel byte length is invalid.");
+
+        var stride = checked(width * 4);
+        var row = new byte[stride];
+        for (var top = 0; top < height / 2; top++)
+        {
+            var bottom = height - 1 - top;
+            rgbaPixels.Slice(top * stride, stride).CopyTo(row);
+            rgbaPixels
+                .Slice(bottom * stride, stride)
+                .CopyTo(rgbaPixels.Slice(top * stride, stride));
+            row.CopyTo(rgbaPixels.Slice(bottom * stride, stride));
+        }
+    }
+}
+
 internal static class ReportAssetAlphaCrop
 {
     internal const byte DefaultAlphaThreshold = 8;

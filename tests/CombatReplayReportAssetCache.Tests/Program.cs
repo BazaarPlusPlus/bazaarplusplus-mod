@@ -21,8 +21,11 @@ try
     TypedBindingsCannotConfuseStatusIconsWithEntities();
     StatusSemanticsUseExactNativeMappingsAndFailClosed();
     AlphaCropUsesVisibleBoundsInsteadOfCanvasGeometry();
+    VerticalOrientationFlipPreservesRows();
+    ReadbackSourceOrientationContractsAreExplicit();
     await ThreeFreshCachesAreDeterministic();
     await SameLineupSecondPassCreatesNoMaterializer();
+    await CacheLockWaitDoesNotBlockCallingThread();
     await ConcurrentMissesSingleflight();
     await CorruptMappingAndObjectAreQuarantinedAndRecovered();
     TruncatedAndCorruptPngsAreRejected();
@@ -93,6 +96,110 @@ void AlphaCropUsesVisibleBoundsInsteadOfCanvasGeometry()
         ),
         "A fully transparent canvas must not produce a crop rectangle."
     );
+}
+
+void VerticalOrientationFlipPreservesRows()
+{
+    const int width = 2;
+    const int height = 3;
+    var pixels = new byte[]
+    {
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+    };
+
+    ReportAssetPixelOrientation.FlipVertical(pixels, width, height);
+
+    Check(
+        pixels.SequenceEqual(
+            new byte[]
+            {
+                21,
+                22,
+                23,
+                24,
+                25,
+                26,
+                27,
+                28,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+            }
+        ),
+        "Vertical orientation correction must swap complete RGBA rows without changing pixels."
+    );
+}
+
+void ReadbackSourceOrientationContractsAreExplicit()
+{
+    Check(
+        !ReportAssetPixelOrientation.RequiresVerticalFlip(
+            graphicsUvStartsAtTop: true,
+            ReportAssetReadbackSource.UnitySprite
+        ),
+        "Top-origin Unity sprites must preserve the accepted portrait/status orientation."
+    );
+    Check(
+        ReportAssetPixelOrientation.RequiresVerticalFlip(
+            graphicsUvStartsAtTop: false,
+            ReportAssetReadbackSource.UnitySprite
+        ),
+        "Bottom-origin Unity sprites must be normalized before browser encoding."
+    );
+
+    foreach (
+        var source in new[]
+        {
+            ReportAssetReadbackSource.MaterialTexture,
+            ReportAssetReadbackSource.OffscreenCamera,
+        }
+    )
+    {
+        Check(
+            ReportAssetPixelOrientation.RequiresVerticalFlip(graphicsUvStartsAtTop: true, source),
+            $"Top-origin {source} output must be flipped into browser orientation."
+        );
+        Check(
+            !ReportAssetPixelOrientation.RequiresVerticalFlip(graphicsUvStartsAtTop: false, source),
+            $"Bottom-origin {source} output must preserve its browser orientation."
+        );
+    }
 }
 
 void TypedBindingsCannotConfuseStatusIconsWithEntities()
@@ -467,6 +574,61 @@ async Task SameLineupSecondPassCreatesNoMaterializer()
         );
         Check(resolved != null, "Every lineup key must resolve.");
     }
+}
+
+async Task CacheLockWaitDoesNotBlockCallingThread()
+{
+    var cacheRoot = Path.Combine(root, "async-lock-wait");
+    var cache = new ReportAssetCache(cacheRoot);
+    var coordinator = new ReportAssetMaterializationCoordinator(cache);
+    var key = CreateKey() with { Variant = "async-lock-wait" };
+    var renderKeyHash = key.RenderKeyHash;
+    var mappingDirectory = Path.Combine(cacheRoot, "keys", renderKeyHash[..2]);
+    Directory.CreateDirectory(mappingDirectory);
+    File.WriteAllText(Path.Combine(mappingDirectory, renderKeyHash + ".json"), "{broken");
+
+    var lockDirectory = Path.Combine(cacheRoot, "locks", "render", renderKeyHash[..2]);
+    Directory.CreateDirectory(lockDirectory);
+    var lockPath = Path.Combine(lockDirectory, renderKeyHash + ".lock");
+    Task<ReportAssetResolvedAsset?>? operation = null;
+    using var invocationReturned = new ManualResetEventSlim(initialState: false);
+    using (
+        var heldLock = new FileStream(
+            lockPath,
+            FileMode.OpenOrCreate,
+            FileAccess.ReadWrite,
+            FileShare.None
+        )
+    )
+    {
+        var caller = new Thread(() =>
+        {
+            operation = coordinator.ResolveOrCreateAsync(
+                key,
+                () =>
+                    async (path, _) =>
+                    {
+                        await Task.Yield();
+                        WritePng(path, 23, 31, 41);
+                        return new ReportAssetProducedFile(23, 31);
+                    }
+            );
+            invocationReturned.Set();
+        });
+        caller.Start();
+
+        Check(
+            invocationReturned.Wait(TimeSpan.FromMilliseconds(250)),
+            "Starting materialization must not synchronously wait through the cache lock retry loop."
+        );
+        caller.Join(TimeSpan.FromSeconds(1));
+    }
+
+    var resolved = operation == null ? null : await operation;
+    Check(
+        resolved != null,
+        "Materialization must resume and publish after the contended cache lock is released."
+    );
 }
 
 async Task ConcurrentMissesSingleflight()

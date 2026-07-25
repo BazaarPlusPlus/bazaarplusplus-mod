@@ -433,7 +433,7 @@ internal sealed partial class HistoryPanelUiToolkitView : IDisposable
         _detailedReportButton.style.display = model.DetailedReportButtonVisible
             ? DisplayStyle.Flex
             : DisplayStyle.None;
-        _detailedReportButton.SetEnabled(model.DetailedReportButtonVisible);
+        _detailedReportButton.SetEnabled(model.DetailedReportButtonEnabled);
         _deleteButton!.text = model.DeleteButtonText;
         _deleteButton.tooltip = model.DeleteButtonText;
         _deleteButton.SetEnabled(model.DeleteButtonEnabled);

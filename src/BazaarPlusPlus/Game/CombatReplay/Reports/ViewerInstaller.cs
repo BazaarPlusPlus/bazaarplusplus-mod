@@ -4,44 +4,52 @@ using BazaarPlusPlus.Infrastructure.Files;
 namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 
 internal sealed record ViewerInstallResult(
-    ViewerReleaseDefinition Release,
-    ImmutableArtifactCommitResult ScriptCommit,
-    ImmutableArtifactCommitResult StylesheetCommit
+    ViewerArtifactBundle Artifacts,
+    string BundleDirectoryPath,
+    ReplaceableArtifactPublishResult ScriptPublish,
+    ReplaceableArtifactPublishResult StylesheetPublish
 );
 
 internal sealed class ViewerInstaller
 {
     private readonly StaticReportPaths _paths;
-    private readonly ViewerReleaseRegistry _registry;
-    private readonly ImmutableArtifactCommitter _committer;
+    private readonly ViewerArtifactBundle _artifacts;
+    private readonly ReplaceableArtifactPublisher _publisher;
 
     internal ViewerInstaller(StaticReportPaths paths)
-        : this(paths, ViewerReleaseRegistry.CreateDefault(), new ImmutableArtifactCommitter()) { }
+        : this(paths, ViewerArtifactBundle.CreateDefault(), new ReplaceableArtifactPublisher()) { }
 
     internal ViewerInstaller(
         StaticReportPaths paths,
-        ViewerReleaseRegistry registry,
-        ImmutableArtifactCommitter committer
+        ViewerArtifactBundle artifacts,
+        ReplaceableArtifactPublisher publisher
     )
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
-        _registry = registry ?? throw new ArgumentNullException(nameof(registry));
-        _committer = committer ?? throw new ArgumentNullException(nameof(committer));
+        _artifacts = artifacts ?? throw new ArgumentNullException(nameof(artifacts));
+        _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
     }
 
-    internal ViewerInstallResult EnsureInstalled(string version)
+    internal ViewerInstallResult EnsureInstalled()
     {
-        var release = _registry.GetRequired(version);
-        var script = _committer.CommitBelowRoot(
+        // A report references this content-addressed generation only after EnsureInstalled
+        // returns. A crash between the two writes can leave an unreferenced partial generation,
+        // but can never make an existing report combine artifacts from different releases.
+        var stylesheet = _publisher.PublishBelowRoot(
             _paths.DataRootDirectoryPath,
-            _paths.GetViewerScriptFilePath(release.Version),
-            release.ScriptBytes
+            _paths.GetViewerStylesheetFilePath(_artifacts.BundleId),
+            _artifacts.StylesheetBytes
         );
-        var stylesheet = _committer.CommitBelowRoot(
+        var script = _publisher.PublishBelowRoot(
             _paths.DataRootDirectoryPath,
-            _paths.GetViewerStylesheetFilePath(release.Version),
-            release.StylesheetBytes
+            _paths.GetViewerScriptFilePath(_artifacts.BundleId),
+            _artifacts.ScriptBytes
         );
-        return new ViewerInstallResult(release, script, stylesheet);
+        return new ViewerInstallResult(
+            _artifacts,
+            _paths.GetViewerBundleDirectoryPath(_artifacts.BundleId),
+            script,
+            stylesheet
+        );
     }
 }

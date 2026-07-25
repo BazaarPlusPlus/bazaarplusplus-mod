@@ -11,7 +11,7 @@ internal sealed class ReportHtmlEmitter
         string title,
         string htmlLanguage,
         string embeddedReportEnvelopeJson,
-        string viewerVersion
+        string viewerBundleId
     )
     {
         if (title == null)
@@ -22,11 +22,8 @@ internal sealed class ReportHtmlEmitter
             throw new ArgumentNullException(nameof(embeddedReportEnvelopeJson));
 
         var normalizedLanguage = NormalizeHtmlLanguage(htmlLanguage);
-        var normalizedViewerVersion = StaticReportPaths.ParseViewerVersion(viewerVersion);
-        var scriptUrl = StaticReportPaths.BuildViewerScriptRelativeUrl(normalizedViewerVersion);
-        var stylesheetUrl = StaticReportPaths.BuildViewerStylesheetRelativeUrl(
-            normalizedViewerVersion
-        );
+        var scriptUrl = StaticReportPaths.BuildViewerScriptRelativeUrl(viewerBundleId);
+        var stylesheetUrl = StaticReportPaths.BuildViewerStylesheetRelativeUrl(viewerBundleId);
 
         var builder = new StringBuilder(4096 + embeddedReportEnvelopeJson.Length);
         builder
@@ -39,8 +36,10 @@ internal sealed class ReportHtmlEmitter
         builder.Append("<meta charset=\"utf-8\">\n");
         builder.Append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n");
         builder
-            .Append("<meta name=\"bpp-report-viewer-version\" content=\"")
-            .Append(EscapeHtmlAttribute(normalizedViewerVersion))
+            .Append("<meta name=\"")
+            .Append(StaticReportPaths.ViewerBundleMetaName)
+            .Append("\" content=\"")
+            .Append(EscapeHtmlAttribute(viewerBundleId))
             .Append("\">\n");
         builder.Append("<title>").Append(EscapeHtmlText(title)).Append("</title>\n");
         builder

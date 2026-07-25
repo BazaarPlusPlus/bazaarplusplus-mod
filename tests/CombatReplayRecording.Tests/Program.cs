@@ -17,6 +17,7 @@ var captureStatusType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCap
 var captureSourceType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureSource");
 var matcherType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleSequenceMatcher");
 var collectorType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleSnapshotCollector");
+var cardDisplayNameType = RequireType("BazaarPlusPlus.GameInterop.StaticCards.BppCardDisplayName");
 var manifestFactoryType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifestFactory");
 var payloadFactoryType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpReplayPayloadFactory");
 var catalogType = RequireType("BazaarPlusPlus.Game.PvpBattles.Persistence.PvpBattleCatalog");
@@ -57,11 +58,19 @@ var replayRunEconomyFallbackType = RequireType(
 var snapshotRehydratorType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Bootstrap.SnapshotRehydrator"
 );
+var replayNativeBoardPresentationType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.PlaybackUi.ReplayNativeBoardPresentation"
+);
+var playerAttributeRepairerType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.PlaybackUi.PlayerAttributeRepairer"
+);
 RunReplaySavedStateNormalizationChecks(replaySavedStateNormalizerType, manifestType);
 RunReplayOpeningStateSelectionChecks(replayOpeningStateRestorerType);
 RunReplayRunEconomyFallbackChecks(replayRunEconomyFallbackType, manifestType);
 RunReplayPresentationRestorationChecks(replaySavedStateNormalizerType);
 RunReplaySpawnSanitizationChecks(snapshotRehydratorType);
+RunReplayNativeBoardPresentationChecks(replayNativeBoardPresentationType);
+RunPortraitTimingSubscriptionDeduplicationChecks(playerAttributeRepairerType);
 
 RunCurrentReplayRecordingStateChecks();
 RunReplayVideoPreflightReasonChecks();
@@ -70,6 +79,55 @@ RunCurrentReplayVideoMetadataChecks();
 RunReplayVideoSyncCollectorChecks();
 RunSystemFileRevealCommandChecks();
 ReportProjectionChecks.Run();
+
+static void RunReplayNativeBoardPresentationChecks(Type presentationType)
+{
+    Assert(
+        presentationType.GetMethod(
+            "RebuildOpponentCollectiblesAsync",
+            BindingFlags.NonPublic | BindingFlags.Static
+        ) != null,
+        "Saved replay presentation should explicitly rebuild native PVP collectables after ReplayState is active."
+    );
+    Assert(
+        (bool)InvokeStatic(presentationType, "ShouldShowOpponentBank", new object?[] { false })!,
+        "Saved replay playback should keep the opponent bank visible while replay controls are hidden."
+    );
+    Assert(
+        !(bool)InvokeStatic(presentationType, "ShouldShowOpponentBank", new object?[] { true })!,
+        "Saved replay playback should hide the opponent bank while replay controls are visible."
+    );
+}
+
+static void RunPortraitTimingSubscriptionDeduplicationChecks(Type repairerType)
+{
+    var removedCalls = 0;
+    var preservedCalls = 0;
+    Action duplicateHandler = () => removedCalls++;
+    Action unrelatedHandler = () => preservedCalls++;
+    var subscriptions = Delegate.Combine(
+        duplicateHandler,
+        unrelatedHandler,
+        duplicateHandler,
+        duplicateHandler
+    );
+
+    var remaining = (Delegate?)InvokeStatic(
+        repairerType,
+        "RemoveAllMatchingHandlers",
+        new object?[] { subscriptions, duplicateHandler }
+    );
+    remaining?.DynamicInvoke();
+
+    Assert(
+        removedCalls == 0,
+        "Replay BoardUI re-initialization must remove every prior PortraitTimingReady handler owned by that controller."
+    );
+    Assert(
+        preservedCalls == 1,
+        "PortraitTimingReady deduplication must preserve unrelated subscribers."
+    );
+}
 
 Assert(
     (bool)InvokeStatic(audioTapStopperType, "IsUsable", new object?[] { false, "present.wav" })!
@@ -254,9 +312,41 @@ var shouldRefreshPlayerCaptureMethod = collectorType.GetMethod(
     "ShouldRefreshPlayerCapture",
     BindingFlags.NonPublic | BindingFlags.Static
 );
+var resolveCardDisplayNameTextMethod = cardDisplayNameType.GetMethod(
+    "ResolveText",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
 Assert(
     shouldRefreshPlayerCaptureMethod != null,
     "PvpBattleSnapshotCollector should keep player capture refresh logic testable."
+);
+Assert(
+    resolveCardDisplayNameTextMethod != null,
+    "The shared card display-name resolver should keep its precedence directly testable."
+);
+Assert(
+    (string?)
+        resolveCardDisplayNameTextMethod!.Invoke(
+            null,
+            new object?[] { " Localized title ", "Snapshot fallback", "InternalName" }
+        ) == "Localized title",
+    "Localized card titles should win over snapshot and internal-name fallbacks."
+);
+Assert(
+    (string?)
+        resolveCardDisplayNameTextMethod.Invoke(
+            null,
+            new object?[] { " ", " Snapshot fallback ", "InternalName" }
+        ) == "Snapshot fallback",
+    "Snapshot names should fill missing localized titles."
+);
+Assert(
+    (string?)
+        resolveCardDisplayNameTextMethod.Invoke(
+            null,
+            new object?[] { null, null, " InternalName " }
+        ) == "InternalName",
+    "Internal names should be the final non-empty display fallback."
 );
 Assert(
     catalogType.GetMethod("Save") != null

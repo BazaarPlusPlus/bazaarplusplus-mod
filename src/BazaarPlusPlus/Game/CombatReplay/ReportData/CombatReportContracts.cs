@@ -74,6 +74,10 @@ public sealed class CombatReportCombatantStateV1
     public long? HealthRegen { get; set; }
 
     public long? Shield { get; set; }
+
+    public long? Burn { get; set; }
+
+    public long? Poison { get; set; }
 }
 
 public sealed class CombatReportParticipantV1
@@ -207,8 +211,6 @@ public sealed class RecordingReportManifestV1
     public string RecordingId { get; set; } = string.Empty;
 
     public string BattleId { get; set; } = string.Empty;
-
-    public string ViewerVersion { get; set; } = string.Empty;
 
     public string VideoRelativeUrl { get; set; } = string.Empty;
 

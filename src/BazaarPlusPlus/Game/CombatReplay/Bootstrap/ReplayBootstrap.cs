@@ -70,6 +70,7 @@ internal static class ReplayBootstrap
         PvpBattleManifest manifest,
         CombatSequenceMessages sequence,
         IReplayPlaybackOutcomeSink outcome,
+        Func<Task>? prepareNativePresentation = null,
         Func<ReplayPlaybackPublishOutcome>? publishStarting = null
     )
     {
@@ -136,6 +137,8 @@ internal static class ReplayBootstrap
         await AppState.TryPushState<ReplayState>();
         if (AppState.CurrentState is not ReplayState replayState)
             throw new InvalidOperationException("ReplayState did not become active.");
+        if (prepareNativePresentation != null)
+            await prepareNativePresentation();
         Singleton<BoardManager>.Instance.ShowReplayAndRecapButtons(show: false, deactivate: true);
         HealthBarBinder.HideEncounterPickerOverlays();
         HealthBarBinder.EnsureOpponentPortraitVisible();

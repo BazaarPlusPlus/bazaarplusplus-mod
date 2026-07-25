@@ -73,18 +73,26 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
             if (token.IsCancellationRequested)
                 break;
 
-            ReportAssetMaterializationCoordinator.ReportAssetMaterializationReservation reservation;
+            Task<ReportAssetMaterializationCoordinator.ReportAssetMaterializationReservation> reservationTask;
             try
             {
-                reservation = _materialization.Reserve(entry.RenderKey);
+                reservationTask = _materialization.ReserveAsync(entry.RenderKey, token);
             }
             catch
             {
                 continue;
             }
 
+            while (!reservationTask.IsCompleted)
+                yield return null;
+            if (reservationTask.IsCanceled || reservationTask.IsFaulted)
+                continue;
+
+            var reservation = reservationTask.Result;
             using (reservation)
             {
+                if (token.IsCancellationRequested)
+                    break;
                 if (reservation.Kind == ReportAssetMaterializationReservationKind.Hit)
                     continue;
                 if (reservation.Kind == ReportAssetMaterializationReservationKind.Follower)
@@ -140,15 +148,25 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
                     continue;
                 }
 
+                Task<ReportAssetResolvedAsset>? publishTask = null;
                 try
                 {
                     var produced = exportTask.Result;
-                    reservation.Publish(produced.PixelWidth, produced.PixelHeight);
+                    publishTask = reservation.PublishAsync(
+                        produced.PixelWidth,
+                        produced.PixelHeight
+                    );
                 }
                 catch
                 {
                     // Optional native bindings degrade to the deterministic Viewer placeholder.
                 }
+                if (publishTask == null)
+                    continue;
+                while (!publishTask.IsCompleted)
+                    yield return null;
+                if (publishTask.IsFaulted)
+                    _ = publishTask.Exception;
             }
         }
 
@@ -165,8 +183,52 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
         if (document == null)
             throw new ArgumentNullException(nameof(document));
 
+        return ResolveAvailableAssets(BuildAssetLookupCandidates(manifest, document));
+    }
+
+    internal Task<IReadOnlyList<PostCombatReportAssetFile>> ListAvailableAssetsAsync(
+        PvpBattleManifest manifest,
+        CombatReportDocumentV1 document,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (manifest == null)
+            throw new ArgumentNullException(nameof(manifest));
+        if (document == null)
+            throw new ArgumentNullException(nameof(document));
+
+        // Build bindings on the Unity thread because the render key includes activeColorSpace.
+        // The worker receives only immutable cache lookup data and never touches Unity objects.
+        var candidates = BuildAssetLookupCandidates(manifest, document);
+        return Task.Run(
+            () =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ResolveAvailableAssets(candidates);
+            },
+            cancellationToken
+        );
+    }
+
+    private IReadOnlyList<AssetLookupCandidate> BuildAssetLookupCandidates(
+        PvpBattleManifest manifest,
+        CombatReportDocumentV1 document
+    ) =>
+        BuildBindings(manifest, document)
+            .Select(entry => new AssetLookupCandidate(
+                entry.BindingKind,
+                entry.BindingKey,
+                entry.SemanticRole,
+                entry.RenderKey
+            ))
+            .ToList();
+
+    private IReadOnlyList<PostCombatReportAssetFile> ResolveAvailableAssets(
+        IReadOnlyList<AssetLookupCandidate> candidates
+    )
+    {
         var result = new List<PostCombatReportAssetFile>();
-        foreach (var entry in BuildBindings(manifest, document))
+        foreach (var entry in candidates)
         {
             if (!_cache.TryResolve(entry.RenderKey, out var resolved))
                 continue;
@@ -384,6 +446,13 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
         ReportAssetRenderKey RenderKey,
         Func<CancellationToken, Task<NativeReportSpriteLoadOutcome>> LoadAsync
     );
+
+    private sealed record AssetLookupCandidate(
+        PostCombatReportAssetBindingKind BindingKind,
+        string BindingKey,
+        string SemanticRole,
+        ReportAssetRenderKey RenderKey
+    );
 }
 
 internal sealed record NativeReportSpriteLoadOutcome(Sprite? Sprite, string NativeIdentity)
@@ -430,7 +499,8 @@ internal static class NativeReportSpritePngWriter
             width,
             height,
             outputPath,
-            cancellationToken
+            cancellationToken,
+            ReportAssetReadbackSource.UnitySprite
         );
     }
 }

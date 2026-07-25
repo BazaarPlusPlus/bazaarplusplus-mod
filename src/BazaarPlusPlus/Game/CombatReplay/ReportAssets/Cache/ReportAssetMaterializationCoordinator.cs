@@ -62,6 +62,19 @@ internal sealed class ReportAssetMaterializationCoordinator
         }
     }
 
+    internal Task<ReportAssetMaterializationReservation> ReserveAsync(
+        ReportAssetRenderKey key,
+        CancellationToken cancellationToken = default
+    ) =>
+        Task.Run(
+            () =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return Reserve(key);
+            },
+            cancellationToken
+        );
+
     internal async Task<ReportAssetResolvedAsset?> ResolveOrCreateAsync(
         ReportAssetRenderKey key,
         Func<Func<string, CancellationToken, Task<ReportAssetProducedFile>>> materializerFactory,
@@ -71,7 +84,7 @@ internal sealed class ReportAssetMaterializationCoordinator
         if (materializerFactory == null)
             throw new ArgumentNullException(nameof(materializerFactory));
 
-        using var reservation = Reserve(key);
+        using var reservation = await ReserveAsync(key, cancellationToken).ConfigureAwait(false);
         if (reservation.Kind == ReportAssetMaterializationReservationKind.Hit)
             return reservation.ResolvedAsset;
         if (reservation.Kind == ReportAssetMaterializationReservationKind.Follower)
@@ -87,7 +100,9 @@ internal sealed class ReportAssetMaterializationCoordinator
                 );
             var produced = await materializer(reservation.StagingFilePath, cancellationToken)
                 .ConfigureAwait(false);
-            return reservation.Publish(produced.PixelWidth, produced.PixelHeight);
+            return await reservation
+                .PublishAsync(produced.PixelWidth, produced.PixelHeight, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch
         {
@@ -152,6 +167,7 @@ internal sealed class ReportAssetMaterializationCoordinator
             InFlightMaterialization,
             ReportAssetResolvedAsset?
         >? _complete;
+        private readonly object _terminalGate = new();
         private bool _terminal;
 
         private ReportAssetMaterializationReservation(
@@ -190,21 +206,27 @@ internal sealed class ReportAssetMaterializationCoordinator
         internal ReportAssetResolvedAsset Publish(int pixelWidth, int pixelHeight)
         {
             EnsureOwner();
-            if (_terminal)
-                throw new InvalidOperationException(
-                    "Report asset reservation is already terminal."
-                );
+            lock (_terminalGate)
+            {
+                if (_terminal)
+                    throw new InvalidOperationException(
+                        "Report asset reservation is already terminal."
+                    );
+                // Claim the reservation before starting filesystem work. Dispose/Cancel may run
+                // concurrently while the publish is off-thread; it must not delete the staging
+                // PNG or complete the shared flight as a failure underneath the publisher.
+                _terminal = true;
+            }
 
             try
             {
                 ResolvedAsset = _cache!.Publish(_key!, StagingFilePath, pixelWidth, pixelHeight);
-                _terminal = true;
                 _complete!(_flightKey!, _flight!, ResolvedAsset);
                 return ResolvedAsset;
             }
             catch
             {
-                Fail();
+                _complete!(_flightKey!, _flight!, null);
                 throw;
             }
             finally
@@ -213,11 +235,30 @@ internal sealed class ReportAssetMaterializationCoordinator
             }
         }
 
+        internal Task<ReportAssetResolvedAsset> PublishAsync(
+            int pixelWidth,
+            int pixelHeight,
+            CancellationToken cancellationToken = default
+        ) =>
+            Task.Run(
+                () =>
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    return Publish(pixelWidth, pixelHeight);
+                },
+                cancellationToken
+            );
+
         internal void Fail()
         {
-            if (Kind != ReportAssetMaterializationReservationKind.Owner || _terminal)
+            if (Kind != ReportAssetMaterializationReservationKind.Owner)
                 return;
-            _terminal = true;
+            lock (_terminalGate)
+            {
+                if (_terminal)
+                    return;
+                _terminal = true;
+            }
             TryDeleteStagingFile();
             _complete!(_flightKey!, _flight!, null);
         }

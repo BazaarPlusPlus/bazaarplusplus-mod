@@ -42,6 +42,8 @@ public sealed class CombatReplayLogEventCatalogTests
             ["combat_replay.persistence.rollback_cleanup_failed"] = "battle_id:Public:High:Short",
             ["combat_replay.playback.cleanup_observed"] =
                 "stage:Public:Low:None|removed_count:Public:High:None|battle_id:Public:High:Short",
+            ["combat_replay.native_pvp_presentation.observed"] =
+                "battle_id:Public:High:Short|has_stash_id:Public:Low:None|has_bank_id:Public:Low:None|collection_count:Public:High:None|stash_loaded:Public:Low:None|stash_active:Public:Low:None|bank_loaded:Public:Low:None|bank_active:Public:Low:None|portrait_loaded:Public:Low:None|portrait_active:Public:Low:None|portrait_anchored:Public:Low:None",
             ["combat_replay.warmup.completed"] =
                 "stage:Public:Low:None|battle_id:Public:High:Short|duration_ms:Public:High:None|board_bank_loaded_count:Public:High:None|board_bank_already_loaded_count:Public:High:None|board_bank_failed_count:Public:High:None|board_bank_skipped_count:Public:High:None|soundtrack_bank_loaded_count:Public:High:None|soundtrack_bank_already_loaded_count:Public:High:None|soundtrack_bank_failed_count:Public:High:None|soundtrack_bank_skipped_count:Public:High:None|shared_asset_preloaded_count:Public:High:None|shared_asset_skipped_count:Public:High:None|card_preloaded_count:Public:High:None|card_skipped_count:Public:High:None|card_failed_count:Public:High:None|override_asset_preloaded_count:Public:High:None|override_asset_skipped_count:Public:High:None|override_asset_failed_count:Public:High:None|vfx_prewarmed_count:Public:High:None|vfx_skipped_count:Public:High:None|vfx_failed_count:Public:High:None",
             ["combat_replay.warmup.asset_skipped"] =

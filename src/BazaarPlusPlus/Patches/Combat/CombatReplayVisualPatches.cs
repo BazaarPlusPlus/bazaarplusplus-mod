@@ -2,6 +2,7 @@
 #nullable enable
 using System.Reflection;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.CombatReplay.PlaybackUi;
 using HarmonyLib;
 using TheBazaar.UI.EncounterPicker;
 using UnityEngine;
@@ -69,5 +70,27 @@ internal static class CombatReplayClockInjectedEncounterPickerPatch
 
         CombatReplayRuntime.HideEncounterPickerOverlays();
         return false;
+    }
+}
+
+[HarmonyPatch(typeof(BoardManager), nameof(BoardManager.ShowReplayAndRecapButtons))]
+internal static class CombatReplayNativeBoardPresentationPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(ref bool deactivate)
+    {
+        if (CombatReplayPatchGuard.IsReplayStartOrPlaybackActive)
+            deactivate = false;
+    }
+
+    [HarmonyPostfix]
+    private static void Postfix()
+    {
+        if (!CombatReplayPatchGuard.IsReplayStartOrPlaybackActive)
+            return;
+
+        // Saved replay controls are plugin-owned and remain visible while the native method is
+        // deliberately called with show=false. Never re-show native opponent chrome over them.
+        ReplayNativeBoardPresentation.Normalize(replayControlsVisible: true);
     }
 }

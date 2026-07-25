@@ -1,9 +1,11 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 
@@ -290,7 +292,7 @@ internal sealed class PvpBattleSnapshotCollector
             Size = card.Size,
             Section = card.Section,
             Socket = card.LeftSocketId,
-            Name = card.Template?.InternalName,
+            Name = BppCardDisplayName.Resolve(card.Template),
             Tier = card.Tier.ToString(),
             Enchant = card.GetEnchantment().ToString(),
             Tags = card.Tags?.Select(tag => tag.ToString()).ToList() ?? new List<string>(),
@@ -302,9 +304,7 @@ internal sealed class PvpBattleSnapshotCollector
 
     private static PvpBattleCardSnapshot CreateSkillSnapshot(SkillCard skill)
     {
-        var snapshot = CreateSnapshot(skill);
-        snapshot.Name = skill.Template?.Localization?.Title?.Text ?? skill.Template?.InternalName;
-        return snapshot;
+        return CreateSnapshot(skill);
     }
 
     private static (bool Captured, List<PvpBattleCardSnapshot> Snapshots) CaptureOpeningHandCards(
@@ -469,26 +469,24 @@ internal sealed class PvpBattleSnapshotCollector
     )
     {
         var existingCard = TryGetExistingCardSafe(instanceId);
-        var existingSkill = existingCard as SkillCard;
         var attributes =
             cardUpdate?.Attributes?.ToDictionary(
                 entry => entry.Key.ToString(),
                 entry => entry.Value.Value
             )
             ?? new Dictionary<string, int>();
+        var templateId =
+            spawnedCard?.TemplateId ?? existingCard?.TemplateId.ToString() ?? string.Empty;
 
         return new PvpBattleCardSnapshot
         {
             InstanceId = instanceId,
-            TemplateId =
-                spawnedCard?.TemplateId ?? existingCard?.TemplateId.ToString() ?? string.Empty,
+            TemplateId = templateId,
             Type = spawnedCard?.Type ?? existingCard?.Type ?? fallbackType ?? default,
             Size = cardUpdate?.Size ?? existingCard?.Size ?? default,
             Section = cardUpdate?.Placement?.Section ?? existingCard?.Section,
             Socket = cardUpdate?.Placement?.Socket ?? existingCard?.LeftSocketId,
-            Name =
-                existingSkill?.Template?.Localization?.Title?.Text
-                ?? existingCard?.Template?.InternalName,
+            Name = ResolveCardName(existingCard?.Template, templateId),
             Tier = cardUpdate?.Tier?.ToString() ?? existingCard?.Tier.ToString(),
             Enchant =
                 cardUpdate?.Enchantment?.ToString() ?? existingCard?.GetEnchantment().ToString(),
@@ -505,6 +503,31 @@ internal sealed class PvpBattleSnapshotCollector
                     )
                         ?? new Dictionary<string, int>(),
         };
+    }
+
+    private static string? ResolveCardName(ITCard? existingTemplate, string? templateId)
+    {
+        var resolved = BppCardDisplayName.Resolve(existingTemplate);
+        return string.IsNullOrWhiteSpace(resolved) ? ResolveTemplateName(templateId) : resolved;
+    }
+
+    private static string? ResolveTemplateName(string? templateId)
+    {
+        if (!Guid.TryParse(templateId, out var parsedTemplateId))
+            return null;
+
+        try
+        {
+            var template = BppStaticDataAccess.GetCardTemplate(
+                BppStaticDataAccess.TryGetReadyManagerObject(),
+                parsedTemplateId
+            );
+            return BppCardDisplayName.Resolve(template);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static Card? TryGetExistingCardSafe(string instanceId) =>

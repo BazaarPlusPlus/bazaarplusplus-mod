@@ -9,6 +9,9 @@ internal readonly struct HistoryPanelButtonModel
         bool replayButtonEnabled,
         string recordAndReplayButtonText,
         bool recordAndReplayButtonEnabled,
+        string detailedReportButtonText,
+        bool detailedReportButtonVisible,
+        bool detailedReportButtonEnabled,
         string deleteButtonText,
         bool deleteButtonEnabled
     )
@@ -17,6 +20,9 @@ internal readonly struct HistoryPanelButtonModel
         ReplayButtonEnabled = replayButtonEnabled;
         RecordAndReplayButtonText = recordAndReplayButtonText;
         RecordAndReplayButtonEnabled = recordAndReplayButtonEnabled;
+        DetailedReportButtonText = detailedReportButtonText;
+        DetailedReportButtonVisible = detailedReportButtonVisible;
+        DetailedReportButtonEnabled = detailedReportButtonEnabled;
         DeleteButtonText = deleteButtonText;
         DeleteButtonEnabled = deleteButtonEnabled;
     }
@@ -29,6 +35,12 @@ internal readonly struct HistoryPanelButtonModel
 
     public bool RecordAndReplayButtonEnabled { get; }
 
+    public string DetailedReportButtonText { get; }
+
+    public bool DetailedReportButtonVisible { get; }
+
+    public bool DetailedReportButtonEnabled { get; }
+
     public string DeleteButtonText { get; }
 
     public bool DeleteButtonEnabled { get; }
@@ -40,6 +52,8 @@ internal readonly struct HistoryPanelButtonModel
         string replayActionLabel,
         bool isInGameRun,
         bool canRecordSelectedBattle,
+        bool hasSelectedBattle,
+        bool hasDetailedReport,
         bool isDeleteConfirmationActive,
         bool canDeleteSelectedRun
     )
@@ -55,6 +69,11 @@ internal readonly struct HistoryPanelButtonModel
             canReplaySelectedBattle && !replayActionInProgress,
             HistoryPanelText.RecordAndReplay(),
             canRecordSelectedBattle && !replayActionInProgress,
+            hasDetailedReport
+                ? HistoryPanelText.ViewDetailedCombatReport()
+                : HistoryPanelText.RecordForDetailedCombatReport(),
+            hasSelectedBattle,
+            hasDetailedReport && !replayActionInProgress,
             isDeleteConfirmationActive
                 ? HistoryPanelText.DeleteConfirm()
                 : HistoryPanelText.Delete(),

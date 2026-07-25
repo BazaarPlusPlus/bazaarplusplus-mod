@@ -104,7 +104,7 @@ internal sealed partial class HistoryPanel
 
         var selectedBattle = ActiveSelectedBattle;
         var hasSelectedBattle = selectedBattle != null;
-        var detailedReportVisible =
+        var hasDetailedReport =
             hasSelectedBattle && _coordinator?.CanOpenDetailedCombatReport(selectedBattle) == true;
         var selectedRun = SelectedRun;
         var now = Time.unscaledTime;
@@ -118,6 +118,8 @@ internal sealed partial class HistoryPanel
             _coordinator?.GetReplayActionLabel(selectedBattle) ?? HistoryPanelText.Replay(),
             _runtime?.IsInGameRun == true,
             canRecordSelectedBattle,
+            hasSelectedBattle,
+            hasDetailedReport,
             _state.SectionMode == HistorySectionMode.Runs
                 && selectedRun != null
                 && _coordinator?.IsDeleteRunConfirmationActive(selectedRun.RunId, now) == true,
@@ -222,8 +224,9 @@ internal sealed partial class HistoryPanel
             ReplayButtonEnabled = buttons.ReplayButtonEnabled,
             RecordAndReplayButtonText = buttons.RecordAndReplayButtonText,
             RecordAndReplayButtonEnabled = buttons.RecordAndReplayButtonEnabled,
-            DetailedReportButtonText = HistoryPanelText.ViewDetailedCombatReport(),
-            DetailedReportButtonVisible = detailedReportVisible,
+            DetailedReportButtonText = buttons.DetailedReportButtonText,
+            DetailedReportButtonVisible = buttons.DetailedReportButtonVisible,
+            DetailedReportButtonEnabled = buttons.DetailedReportButtonEnabled,
             DeleteButtonText = buttons.DeleteButtonText,
             DeleteButtonEnabled = buttons.DeleteButtonEnabled,
             HasSelectedBattle = hasSelectedBattle,
@@ -345,6 +348,8 @@ internal sealed class HistoryPanelUiToolkitModel
     public string DetailedReportButtonText { get; set; } = string.Empty;
 
     public bool DetailedReportButtonVisible { get; set; }
+
+    public bool DetailedReportButtonEnabled { get; set; }
 
     public string DeleteButtonText { get; set; } = string.Empty;
 

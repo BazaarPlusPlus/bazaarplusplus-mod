@@ -48,6 +48,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private PostCombatReportNativeCardAssetExporter? _reportCardAssetExporter;
     private PostCombatReportNativeSpriteMaterializer? _reportNativeSpriteMaterializer;
     private CombatReplayReportPublicationCoordinator? _reportPublication;
+    private readonly Dictionary<string, Task<bool>> _pendingReportDraftCaptures = new(
+        StringComparer.Ordinal
+    );
     private Coroutine? _pendingReportAssetPreparation;
     private TaskCompletionSource<
         IReadOnlyList<PostCombatReportAssetFile>
@@ -225,7 +228,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 reportDataRoot,
                 videoRootDirectoryPath,
                 (limit, offset) => metadataStore.ListCompletedForReportRecovery(limit, offset),
-                publisher
+                publisher,
+                () =>
+                    CombatReplayReportViewerGate
+                        .EnsureInstalledForDataRoot(reportDataRoot)
+                        .Artifacts.BundleId
             );
             _pendingReportRecovery = StartCoroutine(
                 RecoverIncompleteStaticReportsOverFrames(
@@ -300,6 +307,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _reportNativeSpriteMaterializer?.Dispose();
         _reportNativeSpriteMaterializer = null;
         _reportPublication = null;
+        _pendingReportDraftCaptures.Clear();
         _pendingReportAssetManifest = null;
         _pendingReportAssetRecordingId = null;
         _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
@@ -443,16 +451,61 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (loader == null || reportPublication == null)
             return;
 
-        try
+        // The live capture path does not need the decoded sequence to start playback. Keep both
+        // MessagePack decode and report projection away from the Unity network/Update thread.
+        TrackReportDraftCapture(
+            manifest.BattleId,
+            Task.Run(() =>
+            {
+                try
+                {
+                    var sequence = loader.Load(payload);
+                    return reportPublication.TryCaptureDraft(
+                        manifest,
+                        sequence.CombatMessage,
+                        out _
+                    );
+                }
+                catch
+                {
+                    // Replay persistence and recording remain usable if report projection degrades.
+                    // A missing draft simply prevents a misleading partial HTML from being published.
+                    return false;
+                }
+            })
+        );
+    }
+
+    private void ScheduleReportDraftCapture(
+        PvpBattleManifest manifest,
+        BazaarGameShared.Infra.Messages.NetMessageCombatSim combatMessage
+    )
+    {
+        var publication = _reportPublication;
+        if (publication == null)
+            return;
+
+        TrackReportDraftCapture(
+            manifest.BattleId,
+            publication.CaptureDraftAsync(manifest, combatMessage)
+        );
+    }
+
+    private void TrackReportDraftCapture(string battleId, Task<bool> captureTask)
+    {
+        // Projection and its document-id serialization are pure DTO work. Keep them off Unity's
+        // Update thread; only the completed immutable document is retained by the coordinator.
+        foreach (
+            var completedBattleId in _pendingReportDraftCaptures
+                .Where(pair => pair.Value.IsCompleted)
+                .Select(pair => pair.Key)
+                .ToArray()
+        )
         {
-            var sequence = loader.Load(payload);
-            reportPublication.TryCaptureDraft(manifest, sequence.CombatMessage, out _);
+            _pendingReportDraftCaptures.Remove(completedBattleId);
         }
-        catch
-        {
-            // Replay persistence and recording remain usable if report projection degrades.
-            // A missing draft simply prevents a misleading partial HTML from being published.
-        }
+
+        _pendingReportDraftCaptures[battleId] = captureTask;
     }
 
     internal CurrentReplayRecordingSnapshot GetCurrentReplayRecordingSnapshot()
@@ -728,7 +781,24 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        return SystemReportOpener.TryOpen(reportRootDirectoryPath, recordingId, out reason);
+        if (
+            !SystemReportOpener.TryResolve(
+                reportRootDirectoryPath,
+                recordingId,
+                out var resolvedReport,
+                out reason
+            )
+            || !CombatReplayReportViewerGate.TryEnsureInstalledForReport(
+                resolvedReport!.ReportRootDirectoryPath,
+                resolvedReport.FullPath,
+                out reason
+            )
+        )
+        {
+            return false;
+        }
+
+        return SystemReportOpener.TryOpen(resolvedReport!, out reason);
     }
 
     private void RefreshCurrentReplayRecordingAvailability()
@@ -921,7 +991,33 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         var cardAssetExporter = _reportCardAssetExporter;
         var nativeSpriteMaterializer = _reportNativeSpriteMaterializer;
         CombatReportDocumentV1? reportDocument = null;
-        _reportPublication?.TryGetDraftSnapshot(manifest.BattleId, out reportDocument);
+        if (_pendingReportDraftCaptures.TryGetValue(manifest.BattleId, out var draftCaptureTask))
+        {
+            while (!draftCaptureTask.IsCompleted)
+                yield return null;
+            if (draftCaptureTask.IsFaulted)
+                _ = draftCaptureTask.Exception;
+            _pendingReportDraftCaptures.Remove(manifest.BattleId);
+        }
+
+        Task<CombatReportDocumentV1?>? draftSnapshotTask = null;
+        try
+        {
+            draftSnapshotTask = _reportPublication?.GetDraftSnapshotAsync(manifest.BattleId);
+        }
+        catch
+        {
+            // Missing report projection degrades only native report decoration.
+        }
+        if (draftSnapshotTask != null)
+        {
+            while (!draftSnapshotTask.IsCompleted)
+                yield return null;
+            if (draftSnapshotTask.Status == TaskStatus.RanToCompletion)
+                reportDocument = draftSnapshotTask.Result;
+            else if (draftSnapshotTask.IsFaulted)
+                _ = draftSnapshotTask.Exception;
+        }
 
         if (cardAssetExporter != null)
         {
@@ -950,21 +1046,24 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
 
         var assets = new List<PostCombatReportAssetFile>();
+        Task<IReadOnlyList<PostCombatReportAssetFile>>? cardAssetsTask = null;
         try
         {
             if (cardAssetExporter != null)
-                assets.AddRange(cardAssetExporter.ListAvailableCardAssets(manifest));
+                cardAssetsTask = cardAssetExporter.ListAvailableCardAssetsAsync(manifest);
         }
         catch
         {
             // A corrupt optional cache mapping degrades only that entity to a placeholder.
         }
+        Task<IReadOnlyList<PostCombatReportAssetFile>>? nativeAssetsTask = null;
         try
         {
             if (nativeSpriteMaterializer != null && reportDocument != null)
             {
-                assets.AddRange(
-                    nativeSpriteMaterializer.ListAvailableAssets(manifest, reportDocument)
+                nativeAssetsTask = nativeSpriteMaterializer.ListAvailableAssetsAsync(
+                    manifest,
+                    reportDocument
                 );
             }
         }
@@ -972,6 +1071,21 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         {
             // Native hero/status cache bindings are optional report decoration.
         }
+
+        while (
+            cardAssetsTask is { IsCompleted: false } || nativeAssetsTask is { IsCompleted: false }
+        )
+        {
+            yield return null;
+        }
+        if (cardAssetsTask is { Status: TaskStatus.RanToCompletion })
+            assets.AddRange(cardAssetsTask.Result);
+        else if (cardAssetsTask is { IsFaulted: true })
+            _ = cardAssetsTask.Exception;
+        if (nativeAssetsTask is { Status: TaskStatus.RanToCompletion })
+            assets.AddRange(nativeAssetsTask.Result);
+        else if (nativeAssetsTask is { IsFaulted: true })
+            _ = nativeAssetsTask.Exception;
 
         onCompleted(assets);
     }
@@ -1120,7 +1234,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         try
         {
             sequence = controller.LoadReplay(payload);
-            _reportPublication?.TryCaptureDraft(manifest, sequence.CombatMessage, out _);
+            ScheduleReportDraftCapture(manifest, sequence.CombatMessage);
         }
         catch (Exception ex)
         {
@@ -1191,7 +1305,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         try
         {
             sequence = loader.Load(payload);
-            _reportPublication?.TryCaptureDraft(manifest, sequence.CombatMessage, out _);
+            ScheduleReportDraftCapture(manifest, sequence.CombatMessage);
         }
         catch (Exception ex)
         {
@@ -1308,12 +1422,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                     sequence.SpawnMessage,
                     operation
                 );
-                await _portraitController.EnsureTemporaryOpponentPortraitAsync(manifest, operation);
             }
             catch (Exception ex)
             {
                 operation.ReportDegradation(
-                    ReplayPlaybackReasonCode.OpponentPortraitUnavailable,
+                    ReplayPlaybackReasonCode.OpponentIdentityUnavailable,
                     ex
                 );
             }
@@ -1329,6 +1442,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 manifest,
                 sequence,
                 operation,
+                () => PrepareSavedReplayNativePresentationAsync(manifest, operation),
                 _playbackPublisher.PublishStarting
             );
             if (_startupInterruptionReason != ReplayPlaybackReasonCode.None)
@@ -1413,6 +1527,46 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 SavedReplayProgress.StartFailureCleanup => SavedReplayProgress.Idle,
                 _ => _savedReplayProgress,
             };
+        }
+    }
+
+    private async Task PrepareSavedReplayNativePresentationAsync(
+        PvpBattleManifest manifest,
+        ReplayPlaybackLogOperation operation
+    )
+    {
+        try
+        {
+            await ReplayNativeBoardPresentation.RebuildOpponentCollectiblesAsync();
+        }
+        catch (Exception ex)
+        {
+            operation.ReportDegradation(
+                ReplayPlaybackReasonCode.OpponentCollectiblesUnavailable,
+                ex
+            );
+        }
+
+        try
+        {
+            await _portraitController!.EnsureTemporaryOpponentPortraitAsync(manifest, operation);
+        }
+        catch (Exception ex)
+        {
+            operation.ReportDegradation(ReplayPlaybackReasonCode.OpponentPortraitUnavailable, ex);
+        }
+
+        try
+        {
+            // The plugin's replay controls remain visible even though the native replay/recap
+            // buttons are suppressed. Treat that occupied layer as authoritative so native bank
+            // and related opponent chrome cannot cover the controls.
+            ReplayNativeBoardPresentation.Normalize(replayControlsVisible: true);
+            ReplayNativeBoardPresentation.Observe(operation.BattleId);
+        }
+        catch (Exception ex)
+        {
+            operation.ReportDegradation(ReplayPlaybackReasonCode.PresentationWarmupFailed, ex);
         }
     }
 

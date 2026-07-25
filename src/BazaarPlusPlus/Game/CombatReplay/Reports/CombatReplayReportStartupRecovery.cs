@@ -53,6 +53,8 @@ internal sealed class CombatReplayReportStartupRecovery
         IReadOnlyList<CompletedVideoReportRecoveryCandidate>
     > _listCompletedCandidates;
     private readonly ICombatReplayReportRecoveryPublisher _publisher;
+    private readonly Func<string?> _ensureViewerInstalled;
+    private string? _currentViewerBundleId;
     private int _nextCandidateOffset;
     private bool _completed;
 
@@ -60,7 +62,8 @@ internal sealed class CombatReplayReportStartupRecovery
         string dataRootDirectoryPath,
         string videoRootDirectoryPath,
         Func<int, IReadOnlyList<CompletedVideoReportRecoveryCandidate>> listCompletedCandidates,
-        ICombatReplayReportRecoveryPublisher publisher
+        ICombatReplayReportRecoveryPublisher publisher,
+        Func<string?>? ensureViewerInstalled = null
     )
         : this(
             dataRootDirectoryPath,
@@ -78,7 +81,8 @@ internal sealed class CombatReplayReportStartupRecovery
                     page[index] = candidates[offset + index];
                 return page;
             },
-            publisher
+            publisher,
+            ensureViewerInstalled
         ) { }
 
     internal CombatReplayReportStartupRecovery(
@@ -89,7 +93,8 @@ internal sealed class CombatReplayReportStartupRecovery
             int,
             IReadOnlyList<CompletedVideoReportRecoveryCandidate>
         > listCompletedCandidates,
-        ICombatReplayReportRecoveryPublisher publisher
+        ICombatReplayReportRecoveryPublisher publisher,
+        Func<string?>? ensureViewerInstalled = null
     )
     {
         if (string.IsNullOrWhiteSpace(videoRootDirectoryPath))
@@ -118,6 +123,7 @@ internal sealed class CombatReplayReportStartupRecovery
             listCompletedCandidates
             ?? throw new ArgumentNullException(nameof(listCompletedCandidates));
         _publisher = publisher ?? throw new ArgumentNullException(nameof(publisher));
+        _ensureViewerInstalled = ensureViewerInstalled ?? (() => null);
     }
 
     internal bool IsCompleted => _completed;
@@ -137,6 +143,20 @@ internal sealed class CombatReplayReportStartupRecovery
             throw new ArgumentOutOfRangeException(nameof(batchSize));
         if (_completed)
             return EmptySummary();
+
+        if (!TryEnsureViewerInstalled(out var viewerFailure))
+        {
+            _completed = true;
+            return new CombatReplayReportRecoverySummary(
+                0,
+                0,
+                0,
+                0,
+                0,
+                viewerFailure,
+                Array.Empty<CombatReplayReportRecoveryFailure>()
+            );
+        }
 
         IReadOnlyList<CompletedVideoReportRecoveryCandidate> candidates;
         try
@@ -175,6 +195,19 @@ internal sealed class CombatReplayReportStartupRecovery
             throw new ArgumentOutOfRangeException(nameof(candidateLimit));
         if (maximumQueuedCount <= 0 || maximumQueuedCount > candidateLimit)
             throw new ArgumentOutOfRangeException(nameof(maximumQueuedCount));
+
+        if (!TryEnsureViewerInstalled(out var viewerFailure))
+        {
+            return new CombatReplayReportRecoverySummary(
+                0,
+                0,
+                0,
+                0,
+                0,
+                viewerFailure,
+                Array.Empty<CombatReplayReportRecoveryFailure>()
+            );
+        }
 
         IReadOnlyList<CompletedVideoReportRecoveryCandidate> candidates;
         try
@@ -233,8 +266,18 @@ internal sealed class CombatReplayReportStartupRecovery
                             reportFilePath,
                             "Existing combat report"
                         );
-                        existingReportCount++;
-                        continue;
+                        if (
+                            !string.IsNullOrWhiteSpace(_currentViewerBundleId)
+                            && StaticReportPaths.IsCurrentViewerReport(
+                                reportFilePath,
+                                _currentViewerBundleId,
+                                out _
+                            )
+                        )
+                        {
+                            existingReportCount++;
+                            continue;
+                        }
                     }
 
                     var videoFilePath = ResolvePhysicalVideoFile(candidate.VideoRelativePath);
@@ -291,6 +334,28 @@ internal sealed class CombatReplayReportStartupRecovery
 
     private static CombatReplayReportRecoverySummary EmptySummary() =>
         new(0, 0, 0, 0, 0, null, Array.Empty<CombatReplayReportRecoveryFailure>());
+
+    private bool TryEnsureViewerInstalled(out string? failure)
+    {
+        try
+        {
+            _currentViewerBundleId = _ensureViewerInstalled();
+            if (!string.IsNullOrWhiteSpace(_currentViewerBundleId))
+            {
+                _currentViewerBundleId = StaticReportPaths.ParseSha256(
+                    _currentViewerBundleId,
+                    nameof(_currentViewerBundleId)
+                );
+            }
+            failure = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            failure = DescribeFailure(ex);
+            return false;
+        }
+    }
 
     private string ResolvePhysicalVideoFile(string relativePath)
     {

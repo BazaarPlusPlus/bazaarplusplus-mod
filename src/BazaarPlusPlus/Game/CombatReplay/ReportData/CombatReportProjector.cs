@@ -34,15 +34,18 @@ internal sealed class CombatReportProjector
             var frame = frames[frameIndex];
             var frameSequence = 0;
             var combatTimeMs = checked(frameIndex * FrameDurationMs);
+            var effectValueAttributions = CombatReportEffectValueAttributor.Resolve(frame);
 
             for (var rawIndex = 0; rawIndex < frame.Events.Count; rawIndex++)
             {
+                effectValueAttributions.TryGetValue(rawIndex, out var valueAttribution);
                 var projected = ProjectSimEvent(
                     frame.Events[rawIndex],
                     frameIndex,
                     frameSequence++,
                     combatTimeMs,
-                    rawIndex
+                    rawIndex,
+                    valueAttribution
                 );
                 projected.EventId = "e" + globalSequence++;
                 events.Add(projected);
@@ -160,7 +163,8 @@ internal sealed class CombatReportProjector
         int frame,
         int frameSequence,
         int combatTimeMs,
-        int rawIndex
+        int rawIndex,
+        CombatReportEffectValueAttribution? valueAttribution
     )
     {
         switch (combatEvent)
@@ -175,6 +179,8 @@ internal sealed class CombatReportProjector
                     executed.ActionType.ToString(),
                     Value(executed.Source),
                     TargetValues(executed.Target),
+                    value: valueAttribution?.Value,
+                    unit: valueAttribution?.Unit,
                     role: "applied",
                     attribution: "exact",
                     effectId: executed.EffectId,
@@ -509,12 +515,26 @@ internal sealed class CombatReportProjector
                 baseline.Shield,
                 value => baseline.Shield = value
             );
+            CaptureInitialAttribute(
+                attributes,
+                EPlayerAttributeType.Burn,
+                baseline.Burn,
+                value => baseline.Burn = value
+            );
+            CaptureInitialAttribute(
+                attributes,
+                EPlayerAttributeType.Poison,
+                baseline.Poison,
+                value => baseline.Poison = value
+            );
 
             if (
                 baseline.Health.HasValue
                 && baseline.Rage.HasValue
                 && baseline.HealthRegen.HasValue
                 && baseline.Shield.HasValue
+                && baseline.Burn.HasValue
+                && baseline.Poison.HasValue
             )
             {
                 break;

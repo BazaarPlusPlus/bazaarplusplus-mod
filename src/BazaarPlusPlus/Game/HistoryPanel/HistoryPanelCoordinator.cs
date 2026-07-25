@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarPlusPlus.Game.CombatReplay.Reports;
 using BazaarPlusPlus.Game.HistoryPanel.AccountLink;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
@@ -348,7 +349,13 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             return;
         }
 
-        if (!SystemReportOpener.TryOpen(resolvedReport!, out var reason))
+        if (
+            !CombatReplayReportViewerGate.TryEnsureInstalledForReport(
+                resolvedReport!.ReportRootDirectoryPath,
+                resolvedReport.FullPath,
+                out var reason
+            ) || !SystemReportOpener.TryOpen(resolvedReport, out reason)
+        )
         {
             SetStatusMessage(
                 HistoryPanelText.DetailedCombatReportOpenFailed(reason),

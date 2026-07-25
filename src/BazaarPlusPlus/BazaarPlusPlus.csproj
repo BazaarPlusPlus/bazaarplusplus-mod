@@ -43,45 +43,32 @@
       Include="Resources\DockButtons\replay-retry-icon.png"
       LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-retry-icon.png"
     />
-    <EmbeddedResource Include="Resources\CombatReplayReport\viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.js" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.css" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v1\viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v1.viewer.js" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v1\viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v1.viewer.css" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v2\viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v2.viewer.js" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v2\viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v2.viewer.css" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v3\viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v3.viewer.js" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v3\viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v3.viewer.css" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v4\viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v4.viewer.js" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v4\viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v4.viewer.css" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v5\viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v5.viewer.js" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v5\viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v5.viewer.css" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v6\viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v6.viewer.js" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\v6\viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.v6.viewer.css" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\echarts.min.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts.min.js" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\echarts-license.txt"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt" />
-    <EmbeddedResource Include="Resources\CombatReplayReport\echarts-notice.txt"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt" />
+    <EmbeddedResource
+      Include="Resources\CombatReplayReport\viewer.js"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.js"
+    />
+    <EmbeddedResource
+      Include="Resources\CombatReplayReport\viewer.css"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.css"
+    />
+    <EmbeddedResource
+      Include="Resources\CombatReplayReport\vendor\echarts\5eef51bee09fb9cc234c4179a58ae0150126f49f88c992efe2d6bca81d8dd03b.min.js"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts.min.js"
+    />
+    <EmbeddedResource
+      Include="Resources\CombatReplayReport\echarts-license.txt"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt"
+    />
+    <EmbeddedResource
+      Include="Resources\CombatReplayReport\echarts-notice.txt"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt"
+    />
   </ItemGroup>
 
   <!-- Project paths -->
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
+    <CombatReportViewerFrontendDirectory>$(ProjectRoot)Resources/CombatReplayReport/frontend</CombatReportViewerFrontendDirectory>
     <BPPInstallerSourcePath>$(ProjectRoot)/../../../bazaarplusplus-installer/src-tauri/resources</BPPInstallerSourcePath>
     <HostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant())</HostArchitecture>
     <MacSqliteRuntimeRid>osx-arm64</MacSqliteRuntimeRid>
@@ -286,6 +273,27 @@
 
   <!-- Release build -->
   <Target
+    Name="ValidateCombatReportViewerForInstaller"
+    BeforeTargets="CopyToInstallerSource"
+    Condition="'$(Configuration)' == 'Release' and '$(BuildProductionPackage)' == 'true' and '$(CombatReportViewerReleaseGatePrepared)' != 'true'"
+  >
+    <Error
+      Condition="!Exists('$(CombatReportViewerFrontendDirectory)/package.json')"
+      Text="[BazaarPlusPlus] Combat Report Viewer frontend package is missing."
+    />
+    <Message
+      Text="[BazaarPlusPlus] Validating reproducible Combat Report Viewer artifacts before installer packaging"
+      Importance="high"
+    />
+    <Exec WorkingDirectory="$(CombatReportViewerFrontendDirectory)" Command="npm ci" />
+    <Exec
+      WorkingDirectory="$(CombatReportViewerFrontendDirectory)"
+      Command="npm run viewer:browsers:install"
+    />
+    <Exec WorkingDirectory="$(CombatReportViewerFrontendDirectory)" Command="npm test" />
+  </Target>
+
+  <Target
     Name="CopyToInstallerSource"
     AfterTargets="Build"
     Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)') and '$(BuildProductionPackage)' == 'true'"
@@ -439,7 +447,7 @@
     <MSBuild
       Projects="$(MSBuildProjectFile)"
       Targets="Build"
-      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);RemoteEmbeddedDataPrepared=true"
+      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);CombatReportViewerReleaseGatePrepared=$(CombatReportViewerReleaseGatePrepared);RemoteEmbeddedDataPrepared=true"
     />
   </Target>
 </Project>

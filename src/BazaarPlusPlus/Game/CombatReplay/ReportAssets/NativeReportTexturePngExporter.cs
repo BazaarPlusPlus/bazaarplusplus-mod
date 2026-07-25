@@ -20,7 +20,8 @@ internal static class NativeReportTexturePngExporter
         int outputWidth,
         int outputHeight,
         string outputPath,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        ReportAssetReadbackSource readbackSource
     )
     {
         if (source == null)
@@ -68,7 +69,7 @@ internal static class NativeReportTexturePngExporter
                 RenderTexture.active = previous;
             }
 
-            return ReadbackAndWriteAsync(target, outputPath, cancellationToken);
+            return ReadbackAndWriteAsync(target, outputPath, cancellationToken, readbackSource);
         }
         catch
         {
@@ -81,6 +82,7 @@ internal static class NativeReportTexturePngExporter
         RenderTexture renderTexture,
         string outputPath,
         CancellationToken cancellationToken,
+        ReportAssetReadbackSource readbackSource,
         bool trimTransparentBounds = false,
         int transparentPaddingPixels = 0
     )
@@ -100,7 +102,13 @@ internal static class NativeReportTexturePngExporter
         cancellationToken.ThrowIfCancellationRequested();
         var width = renderTexture.width;
         var height = renderTexture.height;
-        var flipVertically = !SystemInfo.graphicsUVStartsAtTop;
+        // Raw material textures and offscreen camera targets have the opposite authored vertical
+        // convention from Unity Sprite geometry. Keep the source contract explicit so adding a new
+        // asset path cannot silently inherit the wrong normalization.
+        var flipVertically = ReportAssetPixelOrientation.RequiresVerticalFlip(
+            SystemInfo.graphicsUVStartsAtTop,
+            readbackSource
+        );
         var completion = new TaskCompletionSource<byte[]>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
@@ -122,7 +130,7 @@ internal static class NativeReportTexturePngExporter
                         var pixels = new byte[checked(width * height * 4)];
                         request.GetData<byte>().CopyTo(pixels);
                         if (flipVertically)
-                            FlipVertical(pixels, width, height);
+                            ReportAssetPixelOrientation.FlipVertical(pixels, width, height);
                         completion.TrySetResult(pixels);
                     }
                     catch (Exception ex)
@@ -283,19 +291,6 @@ internal static class NativeReportTexturePngExporter
             }
         );
         return new ReportAssetProducedFile(outputWidth, outputHeight);
-    }
-
-    private static void FlipVertical(byte[] pixels, int width, int height)
-    {
-        var stride = checked(width * 4);
-        var row = new byte[stride];
-        for (var top = 0; top < height / 2; top++)
-        {
-            var bottom = height - 1 - top;
-            Buffer.BlockCopy(pixels, top * stride, row, 0, stride);
-            Buffer.BlockCopy(pixels, bottom * stride, pixels, top * stride, stride);
-            Buffer.BlockCopy(row, 0, pixels, bottom * stride, stride);
-        }
     }
 
     private static void Release(RenderTexture? renderTexture)

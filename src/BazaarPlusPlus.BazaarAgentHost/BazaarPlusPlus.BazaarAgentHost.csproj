@@ -153,11 +153,15 @@
 
   <!-- Build both Debug and Release of the host (and its main/core deps) in one pass. -->
   <Target Name="BuildAll">
-    <MSBuild Projects="$(MSBuildProjectFile)" Targets="Build" Properties="Configuration=Debug" />
     <MSBuild
       Projects="$(MSBuildProjectFile)"
       Targets="Build"
-      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage)"
+      Properties="Configuration=Debug;RemoteEmbeddedDataPrepared=$(RemoteEmbeddedDataPrepared);BPPInstallerSourcePath=$(BPPInstallerSourcePath)"
+    />
+    <MSBuild
+      Projects="$(MSBuildProjectFile)"
+      Targets="Build"
+      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);CombatReportViewerReleaseGatePrepared=$(CombatReportViewerReleaseGatePrepared);RemoteEmbeddedDataPrepared=$(RemoteEmbeddedDataPrepared);BPPInstallerSourcePath=$(BPPInstallerSourcePath)"
     />
   </Target>
 </Project>

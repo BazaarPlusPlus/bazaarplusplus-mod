@@ -20,6 +20,7 @@ internal enum ReplayPlaybackReasonCode
     OpponentSkillsUnavailable,
     OpponentIdentityUnavailable,
     OpponentPortraitUnavailable,
+    OpponentCollectiblesUnavailable,
     OpponentPortraitCleanupFailed,
     PresentationWarmupFailed,
     AudioWarmupFailed,
@@ -402,6 +403,80 @@ internal static class CombatReplayLogEvents
         BppLogFeatureScope.CombatReplay,
         "combat_replay.playback.cleanup_observed",
         [CleanupObservedStage, CleanupObservedRemovedCount, CleanupObservedBattleId]
+    );
+
+    internal static readonly BppLogFieldDefinition NativePvpPresentationBattleId = Public(
+        0,
+        "battle_id",
+        BppLogCardinality.High,
+        BppLogCorrelationPolicy.Short
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationHasStashId = Public(
+        1,
+        "has_stash_id",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationHasBankId = Public(
+        2,
+        "has_bank_id",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationCollectionCount = Public(
+        3,
+        "collection_count",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationStashLoaded = Public(
+        4,
+        "stash_loaded",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationStashActive = Public(
+        5,
+        "stash_active",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationBankLoaded = Public(
+        6,
+        "bank_loaded",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationBankActive = Public(
+        7,
+        "bank_active",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationPortraitLoaded = Public(
+        8,
+        "portrait_loaded",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationPortraitActive = Public(
+        9,
+        "portrait_active",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition NativePvpPresentationPortraitAnchored = Public(
+        10,
+        "portrait_anchored",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogEventDefinition NativePvpPresentationObserved = new(
+        BppLogFeatureScope.CombatReplay,
+        "combat_replay.native_pvp_presentation.observed",
+        [
+            NativePvpPresentationBattleId,
+            NativePvpPresentationHasStashId,
+            NativePvpPresentationHasBankId,
+            NativePvpPresentationCollectionCount,
+            NativePvpPresentationStashLoaded,
+            NativePvpPresentationStashActive,
+            NativePvpPresentationBankLoaded,
+            NativePvpPresentationBankActive,
+            NativePvpPresentationPortraitLoaded,
+            NativePvpPresentationPortraitActive,
+            NativePvpPresentationPortraitAnchored,
+        ]
     );
 
     internal static readonly BppLogFieldDefinition WarmupCompletedStage = Public(

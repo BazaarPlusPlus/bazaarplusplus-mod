@@ -1,46 +1,64 @@
-# Offline combat report viewer assets
+# Combat report Viewer
 
-`viewer.js` and `viewer.css` are the source for the current immutable Viewer release. The release registry prepends the pinned ECharts distribution to the classic Viewer IIFE and installs the result under `report-viewer/v<version>/`; the browser still loads exactly one script and one stylesheet from `file://`, with no server dependency. `viewer.css` uses only system fonts.
+`viewer.js` and `viewer.css` are generated artifacts. Author React/TypeScript/Tailwind code only
+under `frontend/`, then run:
 
-Committed `vN/viewer.js` and `vN/viewer.css` files are immutable source snapshots for older releases. Never edit or delete one in place: change the current sources, increment `ViewerReleaseRegistry.CurrentVersion`, add the old/current byte pins, and keep every supported generation embedded so existing reports continue to open.
-
-The host HTML contract is intentionally small:
-
-- Place exactly one inert `<script type="application/json" id="bpp-report-data">` in the document.
-- The payload is `EmbeddedReportEnvelopeV1` with camel-case `schemaVersion`, `battleDocument`, and optional `recordingManifest` fields.
-- Reference this directory's CSS and JavaScript with generation-relative URLs. Load `viewer.js` as a classic deferred script.
-- Provide an optional empty element with `data-bpp-test-id="report-root"`; the viewer creates one when it is absent.
-- Keep the CSP metadata before every resource reference. The viewer needs local script, style, image, and media siblings only.
-
-Minimal payload shape:
-
-```json
-{
-  "schemaVersion": 1,
-  "locale": "zh-CN",
-  "battleDocument": {
-    "battleId": "battle-id",
-    "durationMs": 8500,
-    "summary": {
-      "playerName": "Player",
-      "opponentName": "Opponent",
-      "outcome": "loss"
-    },
-    "entities": [],
-    "events": []
-  },
-  "recordingManifest": {
-    "battleId": "battle-id",
-    "recordingId": "0123456789abcdef0123456789abcdef",
-    "videoRelativeUrl": "../CombatReplayVideos/2026-07-22/0123456789abcdef0123456789abcdef.mp4",
-    "syncMetadataStatus": "ReadyUnsynced",
-    "syncAnchors": []
-  }
-}
+```sh
+cd src/BazaarPlusPlus/Resources/CombatReplayReport/frontend
+npm run viewer:build
+npm run viewer:browsers:install
+npm test
 ```
 
-`ReadyExact` is accepted only when battle identities match and at least two monotonic `{ combatMs, mediaPtsMs }` anchors are present. Otherwise the viewer fails closed to `ReadyUnsynced`: video playback remains available while automatic timeline seeking is disabled.
+The build is intentionally constrained to one classic IIFE script and one stylesheet so generated
+reports can open directly through `file://`. It rejects extra chunks, source maps, remote resources,
+`fetch`, dynamic imports, and workers. React and Tailwind are bundled into `viewer.js` /
+`viewer.css`; the pinned ECharts UMD file under `vendor/echarts/` is prepended by
+`ViewerArtifactBundle` at installation time.
 
-Timeline events are painted on one canvas and clustered per frame/lane/role, so raw events do not become one DOM node each. Routine cooldown/countdown attribute records are omitted from lane markers but remain available in the frame inspector; sustained haste/slow/freeze state is reconstructed as a flat interval. Selecting a frame opens its complete event list in bounded pages. Source endpoints are diamonds, target endpoints are circles, self-targeting endpoints combine both shapes, and unassigned endpoints are squares.
+UI controls use the local shadcn/new-york primitive layer under `frontend/src/components/ui/`.
+Feature components compose those primitives rather than maintaining parallel button, tab, card,
+popover, accordion, scroll-area, or table styles. `frontend/components.json` is the shadcn source
+configuration.
 
-ECharts is embedded into each installed `viewer.js` release at install time. It is not copied beside individual reports and is never loaded as a second runtime request.
+Design values live in `frontend/src/styles/theme.css`. Concrete `:root` variables are the runtime
+source of truth so Canvas and ECharts can read them under `file://`; the `@theme inline` block only
+maps those values to Tailwind utilities. Do not place a Canvas-only value exclusively inside
+`@theme`, because Tailwind may omit it from the generated stylesheet.
+
+The plugin installs each Viewer build as an immutable, content-addressed generation:
+
+```text
+BazaarPlusPlusV4/
+  reports/<recording-id>.html
+  report-viewer/objects/<viewer-bundle-id>/viewer.js
+  report-viewer/objects/<viewer-bundle-id>/viewer.css
+  report-assets/objects/<sha-prefix>/<sha>.png
+  CombatReplayVideos/<recording>.mp4
+```
+
+Each report HTML embeds its report JSON and references exactly one Viewer generation. Publishing
+repairs or completes that generation before the report becomes visible, so an interrupted update
+cannot mix JavaScript and CSS from different builds. There is no legacy Viewer fallback or mutable
+stable alias. Game image assets remain immutable and content-addressed.
+
+Run the repository-level browser suite with `./run.sh viewer-test`. It uses direct `file://` reports
+in Chromium and WebKit.
+
+## Release packaging
+
+`./run.sh publish` runs the frontend release gate before the production `BuildAll`: clean dependency
+install, Chromium/WebKit installation, typecheck, deterministic artifact comparison, pure tests,
+and browser behavior tests. The generated Viewer files, pinned ECharts build, and license notices
+are embedded resources in `BazaarPlusPlus.dll`.
+
+The production MSBuild target then copies that DLL into both platform payload trees and rebuilds:
+
+```text
+bazaarplusplus-installer/src-tauri/resources/BepInExSource/macos/BepInEx.zip
+bazaarplusplus-installer/src-tauri/resources/BepInExSource/windows/BepInEx.zip
+```
+
+The Tauri installer bundles the platform ZIP as `BepInExSource/BepInEx.zip`. No loose Viewer files
+belong in the installer resource manifest; the installed plugin extracts the immutable Viewer
+generation from its own embedded resources when a report is published.

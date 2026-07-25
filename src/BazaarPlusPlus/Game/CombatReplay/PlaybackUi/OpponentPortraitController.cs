@@ -176,8 +176,18 @@ internal sealed class OpponentPortraitController
         if (manifest?.Participants == null)
             return;
 
-        if (spawnMessage?.Data?.CurrentState?.PvpOpponent != null)
+        var capturedOpponent = spawnMessage?.Data?.CurrentState?.PvpOpponent;
+        if (capturedOpponent != null)
+        {
+            Data.SimPvpOpponent = capturedOpponent;
+            var capturedLoadout = capturedOpponent.PlayerLoadout;
+#pragma warning disable CS0618 // Native Data.UpdateFromGameSimAsync uses this legacy loadout DTO.
+            CollectionManager.SanitizeLoadout(ref capturedLoadout);
+#pragma warning restore CS0618
+            Data.SimPvpOpponent.PlayerLoadout = capturedLoadout;
+            Data.UpdateOpponentCollectibles();
             return;
+        }
 
         if (!TryParseHeroName(manifest.Participants.OpponentHero, out var opponentHero))
         {

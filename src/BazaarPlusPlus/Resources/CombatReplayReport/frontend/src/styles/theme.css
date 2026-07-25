@@ -1,0 +1,159 @@
+:root {
+  /* Runtime tokens are concrete so Canvas and ECharts can read them on file://. */
+  --background: #0a0806;
+  --foreground: #f1e6cd;
+  --card: #0f0d09;
+  --card-foreground: var(--foreground);
+  --popover: #171310;
+  --popover-foreground: var(--foreground);
+  --media: #000000;
+  --muted: #2a2416;
+  --muted-foreground: #a89a7e;
+  --border: #312a1a;
+  --input: #403626;
+  --ring: #edc461;
+  --primary: #edc461;
+  --primary-foreground: var(--background);
+  --secondary: #211c12;
+  --secondary-foreground: var(--foreground);
+  --accent: #2a2416;
+  --accent-foreground: var(--foreground);
+  --destructive: #ff667f;
+  --destructive-foreground: var(--background);
+
+  --surface: #0f0d09;
+  --surface-soft: #141109;
+  --surface-raised: #171310;
+  --line-strong: #403626;
+  --faint: #7a6d52;
+  --brand: #edc461;
+  --brand-soft: #edc461;
+  --player: #e8c268;
+  --opponent: #e06a55;
+  --success: #67dda6;
+  --danger: #ff667f;
+  --damage: #ff667f;
+  --burn: #fb923c;
+  --poison: #a3e635;
+  --heal: #5ee0ad;
+  --regen: #5ee0ad;
+  --shield: #67b7f7;
+  --rage: #f6c85f;
+  --charge: #42e7d2;
+  --haste: #42e7d2;
+  --slow: #f2bd68;
+  --freeze: #91a7ff;
+  --skill: #d783f2;
+  --attribute: #a78bfa;
+  --status: #a9b7c9;
+
+  --bpp-font-sans:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+  --bpp-font-display: var(--bpp-font-sans);
+  --bpp-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --bpp-text-nano: 0.5625rem;
+  --bpp-text-nano-line-height: 0.75rem;
+  --bpp-text-micro: 0.625rem;
+  --bpp-text-micro-line-height: 0.875rem;
+  --bpp-text-compact: 0.6875rem;
+  --bpp-text-compact-line-height: 1rem;
+  --bpp-text-body: 0.75rem;
+  --bpp-text-body-line-height: 1.0625rem;
+  --bpp-text-heading: 0.875rem;
+  --bpp-text-heading-line-height: 1.25rem;
+  --bpp-text-headline: 1.125rem;
+  --bpp-text-headline-line-height: 1.375rem;
+  --bpp-text-title: 1.375rem;
+  --bpp-text-title-line-height: 1.5rem;
+  --bpp-text-metric: 1.5rem;
+  --bpp-text-metric-line-height: 1.75rem;
+
+  --bpp-radius-art: 0.3125rem;
+  --bpp-radius-panel: 0.375rem;
+  --bpp-spacing-shell-gutter: 0.3125rem;
+  --bpp-shadow-panel: 0 14px 34px rgb(0 0 0 / 28%);
+  --bpp-shadow-sticky: 10px 0 20px rgb(0 0 0 / 18%);
+  --bpp-shadow-float: 0 22px 65px rgb(0 0 0 / 70%);
+  --bpp-shadow-brand-glow: 0 0 12px rgb(232 194 104 / 22%);
+}
+
+@theme inline {
+  /* shadcn/Tailwind utilities map onto the same runtime token source. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-media: var(--media);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
+  --color-surface-raised: var(--surface-raised);
+  --color-line-strong: var(--line-strong);
+  --color-faint: var(--faint);
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-player: var(--player);
+  --color-opponent: var(--opponent);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-damage: var(--damage);
+  --color-burn: var(--burn);
+  --color-poison: var(--poison);
+  --color-heal: var(--heal);
+  --color-regen: var(--regen);
+  --color-shield: var(--shield);
+  --color-rage: var(--rage);
+  --color-charge: var(--charge);
+  --color-haste: var(--haste);
+  --color-slow: var(--slow);
+  --color-freeze: var(--freeze);
+  --color-skill: var(--skill);
+  --color-attribute: var(--attribute);
+  --color-status: var(--status);
+
+  --font-sans: var(--bpp-font-sans);
+  --font-display: var(--bpp-font-display);
+  --font-mono: var(--bpp-font-mono);
+
+  --text-nano: var(--bpp-text-nano);
+  --text-nano--line-height: var(--bpp-text-nano-line-height);
+  --text-micro: var(--bpp-text-micro);
+  --text-micro--line-height: var(--bpp-text-micro-line-height);
+  --text-compact: var(--bpp-text-compact);
+  --text-compact--line-height: var(--bpp-text-compact-line-height);
+  --text-body: var(--bpp-text-body);
+  --text-body--line-height: var(--bpp-text-body-line-height);
+  --text-heading: var(--bpp-text-heading);
+  --text-heading--line-height: var(--bpp-text-heading-line-height);
+  --text-headline: var(--bpp-text-headline);
+  --text-headline--line-height: var(--bpp-text-headline-line-height);
+  --text-title: var(--bpp-text-title);
+  --text-title--line-height: var(--bpp-text-title-line-height);
+  --text-metric: var(--bpp-text-metric);
+  --text-metric--line-height: var(--bpp-text-metric-line-height);
+
+  --radius-art: var(--bpp-radius-art);
+  --radius-panel: var(--bpp-radius-panel);
+  --spacing-shell-gutter: var(--bpp-spacing-shell-gutter);
+  --shadow-panel: var(--bpp-shadow-panel);
+  --shadow-sticky: var(--bpp-shadow-sticky);
+  --shadow-float: var(--bpp-shadow-float);
+  --shadow-brand-glow: var(--bpp-shadow-brand-glow);
+}

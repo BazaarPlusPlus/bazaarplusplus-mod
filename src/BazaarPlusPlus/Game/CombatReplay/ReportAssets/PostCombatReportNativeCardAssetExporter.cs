@@ -3,6 +3,7 @@ using System.Collections;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.GameInterop.StaticCards;
 using TheBazaar.AppFramework;
 using TheBazaar.Game.CardFrames;
 using UnityEngine;
@@ -25,8 +26,8 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
     private const int SkillOutputPixels = 512;
     private const int ItemOutputHeight = 512;
     private const int ItemTransparentCropPaddingPixels = 8;
-    private const string DirectRendererVersion = "1";
-    private const string ItemRendererVersion = "9";
+    private const string SkillRendererVersion = "2";
+    private const string ItemRendererVersion = "10";
     private const string CaptureProfileVersion = "8";
     private const string EncoderVersion = "2.1.11";
     private static readonly WaitForEndOfFrame OffscreenFrameBoundary = new();
@@ -84,12 +85,14 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
             if (token.IsCancellationRequested)
                 break;
 
-            ReportAssetMaterializationCoordinator.ReportAssetMaterializationReservation reservation;
+            Task<ReportAssetMaterializationCoordinator.ReportAssetMaterializationReservation> reservationTask;
             try
             {
                 // This cache reservation is deliberately the first operation. A valid hit must not
                 // construct a factory, touch Addressables, create a Camera/RT, or invoke readback.
-                reservation = _materialization.Reserve(entry.RenderKey);
+                // Cache locking, hashing, and PNG validation are filesystem/CPU work and must not
+                // block the Unity main thread.
+                reservationTask = _materialization.ReserveAsync(entry.RenderKey, token);
             }
             catch (Exception ex)
             {
@@ -97,8 +100,24 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
                 continue;
             }
 
+            while (!reservationTask.IsCompleted)
+                yield return null;
+            if (reservationTask.IsCanceled || reservationTask.IsFaulted)
+            {
+                ReportFailure(
+                    manifest.BattleId,
+                    entry.TemplateId,
+                    null,
+                    reservationTask.Exception?.GetBaseException()
+                );
+                continue;
+            }
+
+            var reservation = reservationTask.Result;
             using (reservation)
             {
+                if (token.IsCancellationRequested)
+                    break;
                 if (reservation.Kind == ReportAssetMaterializationReservationKind.Hit)
                 {
                     cacheHitCount++;
@@ -146,26 +165,74 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
         if (manifest == null)
             throw new ArgumentNullException(nameof(manifest));
 
-        var result = new List<PostCombatReportAssetFile>();
+        return ResolveAvailableCardAssets(BuildAssetLookupCandidates(manifest));
+    }
+
+    internal Task<IReadOnlyList<PostCombatReportAssetFile>> ListAvailableCardAssetsAsync(
+        PvpBattleManifest manifest,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (manifest == null)
+            throw new ArgumentNullException(nameof(manifest));
+
+        // Build render identities on the Unity thread because the render key includes the active
+        // Unity color space. Only immutable strings/records cross into the worker.
+        var candidates = BuildAssetLookupCandidates(manifest);
+        return Task.Run(
+            () =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                return ResolveAvailableCardAssets(candidates);
+            },
+            cancellationToken
+        );
+    }
+
+    private IReadOnlyList<AssetLookupCandidate> BuildAssetLookupCandidates(
+        PvpBattleManifest manifest
+    )
+    {
+        var candidates = new List<AssetLookupCandidate>();
         foreach (var snapshot in EnumerateReportCards(manifest))
         {
             if (string.IsNullOrWhiteSpace(snapshot.InstanceId))
                 continue;
             if (!TryBuildEntry(snapshot, out var entry))
                 continue;
-            if (!_cache.TryResolve(entry.RenderKey, out var resolved))
+            candidates.Add(
+                new AssetLookupCandidate(
+                    snapshot.InstanceId,
+                    entry.IsSkill ? "skill-art" : "item-card-preview",
+                    entry.RenderKey,
+                    BppCardDisplayName.Resolve(entry.Identity.Template, snapshot.Name)
+                )
+            );
+        }
+        return candidates;
+    }
+
+    private IReadOnlyList<PostCombatReportAssetFile> ResolveAvailableCardAssets(
+        IReadOnlyList<AssetLookupCandidate> candidates
+    )
+    {
+        var result = new List<PostCombatReportAssetFile>();
+        foreach (var candidate in candidates)
+        {
+            if (!_cache.TryResolve(candidate.RenderKey, out var resolved))
                 continue;
 
             result.Add(
                 new PostCombatReportAssetFile(
                     PostCombatReportAssetBindingKind.Entity,
-                    snapshot.InstanceId,
-                    entry.IsSkill ? "skill-art" : "item-card-preview",
+                    candidate.BindingKey,
+                    candidate.SemanticRole,
                     resolved.FilePath,
                     resolved.RenderKeyHash,
                     resolved.ContentHash,
                     resolved.PixelWidth,
-                    resolved.PixelHeight
+                    resolved.PixelHeight,
+                    candidate.DisplayName
                 )
             );
         }
@@ -237,7 +304,8 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
                 SkillOutputPixels,
                 SkillOutputPixels,
                 reservation.StagingFilePath,
-                token
+                token,
+                ReportAssetReadbackSource.MaterialTexture
             );
         }
         catch (Exception ex)
@@ -259,7 +327,9 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
             yield break;
         }
 
-        Publish(reservation, exportTask.Result, battleId, entry.TemplateId);
+        var publishTask = PublishAsync(reservation, exportTask.Result, battleId, entry.TemplateId);
+        while (!publishTask.IsCompleted)
+            yield return null;
     }
 
     private IEnumerator MaterializeItem(
@@ -370,7 +440,9 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
             yield break;
         }
 
-        Publish(reservation, exportTask.Result, battleId, entry.TemplateId);
+        var publishTask = PublishAsync(reservation, exportTask.Result, battleId, entry.TemplateId);
+        while (!publishTask.IsCompleted)
+            yield return null;
     }
 
     private static async Task<Texture?> LoadSkillTextureAsync(
@@ -393,7 +465,7 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
         return texture;
     }
 
-    private static void Publish(
+    private static async Task PublishAsync(
         ReportAssetMaterializationCoordinator.ReportAssetMaterializationReservation reservation,
         ReportAssetProducedFile produced,
         string? battleId,
@@ -402,7 +474,9 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
     {
         try
         {
-            reservation.Publish(produced.PixelWidth, produced.PixelHeight);
+            await reservation
+                .PublishAsync(produced.PixelWidth, produced.PixelHeight)
+                .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -458,7 +532,7 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
             identity.ResolvedTemplateVersion,
             identity.ResolvedSkinIdentity,
             profileName,
-            isSkill ? DirectRendererVersion : ItemRendererVersion,
+            isSkill ? SkillRendererVersion : ItemRendererVersion,
             isSkill ? "skill-art" : "item-card-preview",
             templateId.ToString("N"),
             "und",
@@ -591,6 +665,13 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
         int OutputWidth,
         int OutputHeight,
         ReportAssetRenderKey RenderKey
+    );
+
+    private sealed record AssetLookupCandidate(
+        string BindingKey,
+        string SemanticRole,
+        ReportAssetRenderKey RenderKey,
+        string DisplayName
     );
 
     private sealed record OffscreenItemVisual(
@@ -840,6 +921,7 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
                 target,
                 outputPath,
                 token,
+                ReportAssetReadbackSource.OffscreenCamera,
                 trimTransparentBounds: true,
                 transparentPaddingPixels: ItemTransparentCropPaddingPixels
             );

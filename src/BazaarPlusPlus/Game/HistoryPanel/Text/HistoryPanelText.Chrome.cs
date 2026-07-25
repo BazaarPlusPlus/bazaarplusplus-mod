@@ -36,6 +36,12 @@ internal static partial class HistoryPanelText
         "查看戰鬥詳細記錄"
     );
 
+    private static readonly LocalizedTextSet RecordForDetailedCombatReportText = new(
+        "Record to create detailed report",
+        "录制后查看详细记录",
+        "錄製後查看詳細記錄"
+    );
+
     private static readonly LocalizedTextSet DetailedCombatReportUnavailableText = new(
         "The detailed combat report is no longer available.",
         "战斗详细记录已不可用。",
@@ -75,6 +81,9 @@ internal static partial class HistoryPanelText
     internal static string RecordAndReplay() => Resolve(RecordAndReplayText);
 
     internal static string ViewDetailedCombatReport() => Resolve(ViewDetailedCombatReportText);
+
+    internal static string RecordForDetailedCombatReport() =>
+        Resolve(RecordForDetailedCombatReportText);
 
     internal static string DetailedCombatReportUnavailable() =>
         Resolve(DetailedCombatReportUnavailableText);

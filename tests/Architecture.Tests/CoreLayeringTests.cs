@@ -1766,10 +1766,9 @@ public class CoreLayeringTests
         Assert.Contains("snapshot.CanOpenReport || snapshot.CanReveal", controllerSource);
         Assert.Contains("runtime.TryOpenCurrentReplayReport(out _)", controllerSource);
         Assert.Contains("CombatReportRecordingId.TryParse(", runtimeSource);
-        Assert.Contains(
-            "SystemReportOpener.TryOpen(reportRootDirectoryPath, recordingId",
-            runtimeSource
-        );
+        Assert.Contains("SystemReportOpener.TryResolve(", runtimeSource);
+        Assert.Contains("CombatReplayReportViewerGate.TryEnsureInstalledForReport(", runtimeSource);
+        Assert.Contains("SystemReportOpener.TryOpen(resolvedReport!", runtimeSource);
         Assert.Contains("BppUiTestIds.CurrentReplayRecordAgain", controllerSource);
         Assert.Contains("CurrentReplayRecordingText.RecordAgainTooltip", controllerSource);
         Assert.Contains("\"RecapButton\"", patchSource);
@@ -1851,6 +1850,9 @@ public class CoreLayeringTests
         var textureExporterSource = File.ReadAllText(
             Path.Combine(reportAssetsDir, "NativeReportTexturePngExporter.cs")
         );
+        var spriteMaterializerSource = File.ReadAllText(
+            Path.Combine(reportAssetsDir, "PostCombatReportNativeSpriteMaterializer.cs")
+        );
         var runtimeSource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "CombatReplay", "CombatReplayRuntime.cs")
         );
@@ -1885,6 +1887,12 @@ public class CoreLayeringTests
         Assert.Contains("_root.SetActive(false)", exporterSource);
         Assert.Contains("AsyncGPUReadback.Request", textureExporterSource);
         Assert.Contains("Graphics.Blit", textureExporterSource);
+        Assert.Contains("SkillRendererVersion = \"2\"", exporterSource);
+        Assert.Contains("ReportAssetReadbackSource.MaterialTexture", exporterSource);
+        Assert.Contains("ReportAssetReadbackSource.OffscreenCamera", exporterSource);
+        Assert.Contains("ReportAssetReadbackSource.UnitySprite", spriteMaterializerSource);
+        Assert.Contains("ReportAssetPixelOrientation.RequiresVerticalFlip", textureExporterSource);
+        Assert.DoesNotContain("invertReadbackVertically", textureExporterSource);
         Assert.DoesNotContain("ScreenCapture.", exporterSource);
         Assert.DoesNotContain("NativeCardPreview", exporterSource);
         Assert.DoesNotContain("CardPreviewItem", exporterSource);
@@ -2206,6 +2214,59 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Production_installer_build_validates_the_combat_report_viewer_artifacts()
+    {
+        var repoRoot = RepoRoot();
+        var projectPath = Path.Combine(MainSourceRoot(repoRoot), "BazaarPlusPlus.csproj");
+        var project = XDocument.Load(projectPath);
+        var target = Assert.Single(
+            project.Descendants(),
+            element =>
+                element.Name.LocalName == "Target"
+                && Attribute(element, "Name") == "ValidateCombatReportViewerForInstaller"
+        );
+
+        Assert.Equal("CopyToInstallerSource", Attribute(target, "BeforeTargets"));
+        var condition = Attribute(target, "Condition") ?? string.Empty;
+        Assert.Contains("$(Configuration)", condition);
+        Assert.Contains("Release", condition);
+        Assert.Contains("$(BuildProductionPackage)", condition);
+        Assert.Contains("$(CombatReportViewerReleaseGatePrepared)", condition);
+
+        var commands = target
+            .Elements()
+            .Where(element => element.Name.LocalName == "Exec")
+            .Select(element => Attribute(element, "Command"))
+            .ToArray();
+        Assert.Collection(
+            commands,
+            command => Assert.Equal("npm ci", command),
+            command => Assert.Equal("npm run viewer:browsers:install", command),
+            command => Assert.Equal("npm test", command)
+        );
+
+        var buildAll = Assert.Single(
+            project.Descendants(),
+            element =>
+                element.Name.LocalName == "Target" && Attribute(element, "Name") == "BuildAll"
+        );
+        var releaseBuild = Assert.Single(
+            buildAll.Elements(),
+            element =>
+                element.Name.LocalName == "MSBuild"
+                && (
+                    Attribute(element, "Properties")
+                        ?.Contains("Configuration=Release", StringComparison.Ordinal)
+                    ?? false
+                )
+        );
+        Assert.Contains(
+            "CombatReportViewerReleaseGatePrepared=$(CombatReportViewerReleaseGatePrepared)",
+            Attribute(releaseBuild, "Properties")
+        );
+    }
+
+    [Fact]
     public void Remote_embedded_data_pipeline_declares_the_two_stable_resources()
     {
         var repoRoot = RepoRoot();
@@ -2281,6 +2342,65 @@ public class CoreLayeringTests
                     && Attribute(e, "Overwrite") == "true"
             );
         }
+    }
+
+    [Fact]
+    public void BazaarAgent_host_BuildAll_forwards_prepared_release_and_installer_properties()
+    {
+        var repoRoot = RepoRoot();
+        var hostProject = Path.Combine(
+            ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost"),
+            "BazaarPlusPlus.BazaarAgentHost.csproj"
+        );
+        var project = XDocument.Load(hostProject);
+        var buildAll = Assert.Single(
+            project.Descendants(),
+            element =>
+                element.Name.LocalName == "Target" && Attribute(element, "Name") == "BuildAll"
+        );
+        var builds = buildAll
+            .Elements()
+            .Where(element => element.Name.LocalName == "MSBuild")
+            .ToArray();
+        var debugProperties =
+            Attribute(
+                Assert.Single(
+                    builds,
+                    element =>
+                        (Attribute(element, "Properties") ?? string.Empty).Contains(
+                            "Configuration=Debug",
+                            StringComparison.Ordinal
+                        )
+                ),
+                "Properties"
+            ) ?? string.Empty;
+        var releaseProperties =
+            Attribute(
+                Assert.Single(
+                    builds,
+                    element =>
+                        (Attribute(element, "Properties") ?? string.Empty).Contains(
+                            "Configuration=Release",
+                            StringComparison.Ordinal
+                        )
+                ),
+                "Properties"
+            ) ?? string.Empty;
+
+        Assert.Contains(
+            "RemoteEmbeddedDataPrepared=$(RemoteEmbeddedDataPrepared)",
+            debugProperties
+        );
+        Assert.Contains("BPPInstallerSourcePath=$(BPPInstallerSourcePath)", debugProperties);
+        Assert.Contains(
+            "CombatReportViewerReleaseGatePrepared=$(CombatReportViewerReleaseGatePrepared)",
+            releaseProperties
+        );
+        Assert.Contains(
+            "RemoteEmbeddedDataPrepared=$(RemoteEmbeddedDataPrepared)",
+            releaseProperties
+        );
+        Assert.Contains("BPPInstallerSourcePath=$(BPPInstallerSourcePath)", releaseProperties);
     }
 
     [Fact]

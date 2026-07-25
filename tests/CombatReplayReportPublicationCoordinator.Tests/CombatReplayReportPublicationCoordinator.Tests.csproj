@@ -26,8 +26,8 @@
       Link="ReportHtmlEmitter.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/ViewerReleaseRegistry.cs"
-      Link="ViewerReleaseRegistry.cs"
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/ViewerArtifactBundle.cs"
+      Link="ViewerArtifactBundle.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/ViewerInstaller.cs"
@@ -52,6 +52,10 @@
     <Compile
       Include="../../src/BazaarPlusPlus/Infrastructure/Files/ImmutableArtifactCommitter.cs"
       Link="ImmutableArtifactCommitter.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Files/ReplaceableArtifactPublisher.cs"
+      Link="ReplaceableArtifactPublisher.cs"
     />
   </ItemGroup>
 </Project>
