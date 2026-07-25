@@ -190,7 +190,7 @@
 
 .bpp-lane-label-header {
   position: sticky;
-  top: 120px;
+  top: var(--bpp-state-band-height);
   left: 0;
   z-index: 43;
   display: flex;
@@ -213,7 +213,7 @@
 
 .bpp-time-ruler-canvas {
   position: sticky;
-  top: 120px;
+  top: var(--bpp-state-band-height);
   z-index: 39;
   grid-column: 2;
   grid-row: 2;
@@ -324,6 +324,42 @@
   display: block;
   background: var(--color-background);
   touch-action: none;
+}
+
+.bpp-sticky-hero-label,
+.bpp-sticky-hero-canvas {
+  position: sticky;
+  top: calc(
+    var(--bpp-state-band-height) + var(--bpp-time-ruler-height)
+  );
+  align-self: start;
+}
+
+.bpp-sticky-hero-label {
+  left: 0;
+  z-index: 36;
+  grid-column: 1;
+  grid-row: 3;
+  border-right: 1px solid var(--color-line-strong);
+  background: var(--color-surface-soft);
+  box-shadow:
+    var(--shadow-sticky),
+    0 1px 0 var(--color-border);
+}
+
+.bpp-sticky-hero-canvas {
+  z-index: 35;
+  grid-column: 2;
+  grid-row: 3;
+  display: block;
+  background: var(--color-background);
+  box-shadow: 0 1px 0 var(--color-border);
+  touch-action: none;
+}
+
+.bpp-sticky-hero-label[hidden],
+.bpp-sticky-hero-canvas[hidden] {
+  display: none;
 }
 
 .bpp-recording-window {

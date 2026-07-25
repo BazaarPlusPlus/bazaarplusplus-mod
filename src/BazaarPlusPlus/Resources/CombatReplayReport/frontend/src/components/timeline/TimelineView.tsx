@@ -18,6 +18,7 @@ import {
   type ReportState,
 } from "../../app/report-state.ts";
 import type { ReportViewModel } from "../../model/report.ts";
+import type { NormalizedEntity } from "../../model/normalize.ts";
 import {
   LANE_HEIGHT,
   LANE_LABEL_WIDTH,
@@ -69,6 +70,18 @@ interface TooltipRefs {
   count: HTMLSpanElement;
 }
 
+function heroLaneAtScroll(
+  heroLaneIndexes: readonly number[],
+  scrollTop: number,
+): number | null {
+  let activeLane: number | null = null;
+  for (const lane of heroLaneIndexes) {
+    if (scrollTop < lane * LANE_HEIGHT) break;
+    activeLane = lane;
+  }
+  return activeLane;
+}
+
 function entityTypeLabel(
   type: string,
   t: (key: string) => string,
@@ -84,6 +97,56 @@ function entityTypeLabel(
           : normalized === "effect"
             ? "entityEffect"
             : "entityUnknown",
+  );
+}
+
+function LaneLabelContents({
+  entity,
+  index,
+  sticky,
+  t,
+}: {
+  entity: NormalizedEntity;
+  index: number;
+  sticky?: boolean;
+  t: (key: string) => string;
+}): React.JSX.Element {
+  const artSlotTestId = sticky
+    ? "timeline-sticky-hero-art-slot"
+    : `timeline-lane-art-slot-${index}`;
+  const iconTestId = sticky
+    ? "timeline-sticky-hero-icon"
+    : `timeline-lane-icon-${index}`;
+  return (
+    <>
+      <span
+        className="bpp-lane-art-slot"
+        data-bpp-test-id={artSlotTestId}
+      >
+        <EntityArt
+          entity={entity}
+          testId={iconTestId}
+        />
+      </span>
+      <span className="bpp-lane-copy">
+        <strong className="block truncate text-body text-foreground">
+          {entity.name}
+        </strong>
+        <small className="block truncate text-micro text-muted-foreground">
+          {entityTypeLabel(entity.type, t)}
+        </small>
+      </span>
+      <span
+        className={cn(
+          "ml-auto h-7 w-0.5 rounded-full",
+          entity.side.toLowerCase().includes("opponent")
+            ? "bg-opponent/80"
+            : entity.side.toLowerCase().includes("player")
+              ? "bg-player/85"
+              : "bg-faint/70",
+        )}
+      />
+    </>
   );
 }
 
@@ -192,6 +255,8 @@ export const TimelineView = forwardRef<
   const stateCanvasRef = useRef<HTMLCanvasElement>(null);
   const rulerRef = useRef<HTMLCanvasElement>(null);
   const eventCanvasRef = useRef<HTMLCanvasElement>(null);
+  const stickyHeroCanvasRef = useRef<HTMLCanvasElement>(null);
+  const stickyHeroLabelRef = useRef<HTMLDivElement>(null);
   const tooltipHostRef = useRef<HTMLDivElement>(null);
   const tooltipTimeRef = useRef<HTMLSpanElement>(null);
   const tooltipLabelRef = useRef<HTMLElement>(null);
@@ -212,6 +277,18 @@ export const TimelineView = forwardRef<
     () => filterTimelineEntities(model.entities, state.laneVisibility),
     [model.entities, state.laneVisibility],
   );
+  const heroLaneIndexes = useMemo(
+    () =>
+      entities.flatMap((entity, index) =>
+        entity.type.toLowerCase() === "hero" ? [index] : []
+      ),
+    [entities],
+  );
+  const [pinnedHeroLane, setPinnedHeroLane] = useState<number | null>(
+    null,
+  );
+  const pinnedHero =
+    pinnedHeroLane === null ? null : entities[pinnedHeroLane] ?? null;
   const sideBoundaryLane = useMemo(
     () => opponentBoundaryLane(entities),
     [entities],
@@ -269,10 +346,47 @@ export const TimelineView = forwardRef<
   }, []);
 
   useLayoutEffect(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    let frameHandle = 0;
+    const update = (): void => {
+      frameHandle = 0;
+      const activeLane = heroLaneAtScroll(
+        heroLaneIndexes,
+        scroll.scrollTop,
+      );
+      controllerRef.current?.setPinnedHeroLane(activeLane);
+      setPinnedHeroLane((current) =>
+        current === activeLane ? current : activeLane
+      );
+    };
+    const handleScroll = (): void => {
+      if (frameHandle) return;
+      frameHandle = requestAnimationFrame(update);
+    };
+    update();
+    scroll.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      scroll.removeEventListener("scroll", handleScroll);
+      if (frameHandle) cancelAnimationFrame(frameHandle);
+    };
+  }, [heroLaneIndexes]);
+
+  useLayoutEffect(() => {
     const canvas = eventCanvasRef.current;
     const ruler = rulerRef.current;
     const labels = labelsRef.current;
-    if (!canvas || !ruler || !labels) return;
+    const stickyHeroCanvas = stickyHeroCanvasRef.current;
+    const stickyHeroLabel = stickyHeroLabelRef.current;
+    if (
+      !canvas
+      || !ruler
+      || !labels
+      || !stickyHeroCanvas
+      || !stickyHeroLabel
+    ) {
+      return;
+    }
     const tooltip = (): TooltipRefs | null => {
       if (
         !tooltipHostRef.current
@@ -295,6 +409,8 @@ export const TimelineView = forwardRef<
       model,
       entities,
       laneLabels: labels,
+      stickyHeroCanvas,
+      stickyHeroLabel,
       onSelect: (cluster, combatMs) => {
         if (cluster?.events[0]) {
           const event = cluster.events.reduce((nearest, candidate) =>
@@ -347,6 +463,12 @@ export const TimelineView = forwardRef<
       },
     });
     controllerRef.current = controller;
+    controller.setPinnedHeroLane(
+      heroLaneAtScroll(
+        heroLaneIndexes,
+        scrollRef.current?.scrollTop ?? 0,
+      ),
+    );
     controller.setSelection(
       selectionRef.current.frame,
       selectionRef.current.eventIds,
@@ -356,11 +478,15 @@ export const TimelineView = forwardRef<
       controller.destroy();
       controllerRef.current = null;
     };
-  }, [dispatch, entities, model]);
+  }, [dispatch, entities, heroLaneIndexes, model]);
 
   useLayoutEffect(() => {
     controllerRef.current?.setLayout(timelineWidth, LANE_HEIGHT);
   }, [entities, model, timelineWidth]);
+
+  useLayoutEffect(() => {
+    controllerRef.current?.setPinnedHeroLane(pinnedHeroLane);
+  }, [pinnedHeroLane]);
 
   useLayoutEffect(() => {
     drawState();
@@ -408,7 +534,7 @@ export const TimelineView = forwardRef<
     );
     if (!row) return;
     scrollRef.current.scrollTo({
-      top: Math.max(0, row.offsetTop - STATE_BAND_HEIGHT - 80),
+      top: Math.max(0, row.offsetTop - LANE_HEIGHT),
       behavior: "smooth",
     });
     row.classList.add("is-jump-target");
@@ -417,7 +543,7 @@ export const TimelineView = forwardRef<
       1_200,
     );
     return () => window.clearTimeout(timeout);
-  }, [state.selectedEntityId]);
+  }, [entities, state.selectedEntityId]);
 
   useImperativeHandle(
     forwardedRef,
@@ -483,11 +609,14 @@ export const TimelineView = forwardRef<
               className="bpp-timeline-grid"
               ref={gridRef}
               style={{
+                "--bpp-lane-height": `${LANE_HEIGHT}px`,
+                "--bpp-state-band-height": `${STATE_BAND_HEIGHT}px`,
+                "--bpp-time-ruler-height": `${TIME_RULER_HEIGHT}px`,
                 gridTemplateColumns: `${LANE_LABEL_WIDTH}px ${timelineWidth}px`,
                 gridTemplateRows:
                   `${STATE_BAND_HEIGHT}px ${TIME_RULER_HEIGHT}px ${laneCanvasHeight}px`,
                 width: LANE_LABEL_WIDTH + timelineWidth,
-              }}
+              } as React.CSSProperties}
             >
               <StateLabels
                 combatMs={state.selectedCombatMs}
@@ -570,32 +699,10 @@ export const TimelineView = forwardRef<
                       key={entity.id}
                       style={{ height: LANE_HEIGHT }}
                     >
-                      <span
-                        className="bpp-lane-art-slot"
-                        data-bpp-test-id={`timeline-lane-art-slot-${index}`}
-                      >
-                        <EntityArt
-                          entity={entity}
-                          testId={`timeline-lane-icon-${index}`}
-                        />
-                      </span>
-                      <span className="bpp-lane-copy">
-                        <strong className="block truncate text-body text-foreground">
-                          {entity.name}
-                        </strong>
-                        <small className="block truncate text-micro text-muted-foreground">
-                          {entityTypeLabel(entity.type, t)}
-                        </small>
-                      </span>
-                      <span
-                        className={cn(
-                          "ml-auto h-7 w-0.5 rounded-full",
-                          entity.side.toLowerCase().includes("opponent")
-                            ? "bg-opponent/80"
-                            : entity.side.toLowerCase().includes("player")
-                              ? "bg-player/85"
-                              : "bg-faint/70",
-                        )}
+                      <LaneLabelContents
+                        entity={entity}
+                        index={index}
+                        t={t}
                       />
                     </div>
                   ))}
@@ -614,6 +721,59 @@ export const TimelineView = forwardRef<
                 }
                 ref={eventCanvasRef}
                 role="img"
+              />
+              <div
+                className={cn(
+                  "bpp-lane-label bpp-sticky-hero-label",
+                  pinnedHero && `bpp-side-${pinnedHero.side}`,
+                  pinnedHeroLane === sideBoundaryLane && "is-side-boundary",
+                )}
+                aria-hidden="true"
+                data-bpp-side-boundary={
+                  pinnedHeroLane === sideBoundaryLane
+                    ? "opponent"
+                    : undefined
+                }
+                data-bpp-sticky-hero-lane={pinnedHeroLane ?? ""}
+                data-bpp-sticky-hero-entity-id={pinnedHero?.id ?? ""}
+                data-bpp-test-id="timeline-sticky-hero-label"
+                hidden={!pinnedHero}
+                ref={stickyHeroLabelRef}
+                style={{ height: LANE_HEIGHT }}
+              >
+                {pinnedHero && (
+                  <LaneLabelContents
+                    entity={pinnedHero}
+                    index={pinnedHeroLane ?? 0}
+                    sticky
+                    t={t}
+                  />
+                )}
+              </div>
+              <canvas
+                aria-hidden="true"
+                className="bpp-sticky-hero-canvas"
+                data-bpp-sticky-hero-lane={pinnedHeroLane ?? ""}
+                data-bpp-test-id="timeline-sticky-hero-events"
+                hidden={!pinnedHero}
+                onPointerDown={(event) => {
+                  if (pinnedHeroLane === null) return;
+                  controllerRef.current?.handleStickyHeroPointerDown(
+                    event.nativeEvent,
+                    event.currentTarget,
+                    pinnedHeroLane,
+                  );
+                }}
+                onPointerLeave={clearPreview}
+                onPointerMove={(event) => {
+                  if (pinnedHeroLane === null) return;
+                  controllerRef.current?.handleStickyHeroPointerMove(
+                    event.nativeEvent,
+                    event.currentTarget,
+                    pinnedHeroLane,
+                  );
+                }}
+                ref={stickyHeroCanvasRef}
               />
             </div>
           </div>

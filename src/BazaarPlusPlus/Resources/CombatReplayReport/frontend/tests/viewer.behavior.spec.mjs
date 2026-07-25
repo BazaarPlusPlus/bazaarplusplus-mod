@@ -466,6 +466,9 @@ test("boots the file report with one assembled script and one stylesheet", async
       .getByTestId("timeline-lane-1")
       .locator('[data-asset-status="missing"]'),
   ).toHaveCount(1);
+  await expect(
+    page.getByTestId("recording-visibility-toggle"),
+  ).toHaveCount(0);
   expect(externalRequests).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
@@ -638,6 +641,26 @@ test("separates both sides and filters lanes reversibly", async ({ page }) => {
   await page.setViewportSize({ width: 999, height: 857 });
   await page.goto(`${reportUrl}?lang=en`);
 
+  const stickyHeroPaintedPixels = () =>
+    page.getByTestId("timeline-sticky-hero-events").evaluate((canvas) => {
+      const context = canvas.getContext("2d");
+      const pixels = context.getImageData(
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      ).data;
+      let painted = 0;
+      for (let index = 3; index < pixels.length; index += 16) {
+        if (pixels[index] !== 0) painted += 1;
+      }
+      return painted;
+    });
+  await expect(page.getByTestId("timeline-sticky-hero-label")).toHaveAttribute(
+    "data-bpp-sticky-hero-entity-id",
+    "player-hero",
+  );
+  await expect.poll(stickyHeroPaintedPixels).toBeGreaterThan(0);
   const opponentBoundary = page.getByTestId("timeline-lane-3");
   await expect(opponentBoundary).toHaveAttribute(
     "data-bpp-entity-id",
@@ -707,6 +730,11 @@ test("separates both sides and filters lanes reversibly", async ({ page }) => {
   ).toHaveCount(6);
 
   await page.getByTestId("lane-filter-skill").click();
+  await expect(page.getByTestId("timeline-sticky-hero-label")).toHaveAttribute(
+    "data-bpp-sticky-hero-entity-id",
+    "player-hero",
+  );
+  await expect.poll(stickyHeroPaintedPixels).toBeGreaterThan(0);
   await expect(page.getByTestId("timeline-lane-labels")).not.toContainText(
     "Quick Thinking",
   );
@@ -753,6 +781,8 @@ test("separates both sides and filters lanes reversibly", async ({ page }) => {
   );
 
   await page.getByTestId("lane-filter-hero").click();
+  await expect(page.getByTestId("timeline-sticky-hero-label")).toBeHidden();
+  await expect(page.getByTestId("timeline-sticky-hero-events")).toBeHidden();
   await page.getByTestId("lane-filter-item").click();
   await page.getByTestId("lane-filter-skill").click();
   await page.getByTestId("lane-filter-effect").click();
@@ -764,6 +794,108 @@ test("separates both sides and filters lanes reversibly", async ({ page }) => {
   );
   await page.getByTestId("lane-filter-reset").click();
   await expect(page.locator("[data-bpp-entity-id]")).toHaveCount(5);
+  await expect(page.getByTestId("timeline-sticky-hero-label")).toHaveAttribute(
+    "data-bpp-sticky-hero-entity-id",
+    "player-hero",
+  );
+});
+
+test("pins one aligned hero lane and replaces it at the opponent section", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 999, height: 857 });
+  await page.goto(`${scrollRecordingReportUrl}?lang=en`);
+
+  const stickyLabel = page.getByTestId("timeline-sticky-hero-label");
+  const stickyCanvas = page.getByTestId("timeline-sticky-hero-events");
+  await expect(stickyLabel).toBeVisible();
+  await expect(stickyCanvas).toBeVisible();
+  await expect(stickyLabel).toHaveAttribute(
+    "data-bpp-sticky-hero-entity-id",
+    "player-hero",
+  );
+  await expect(stickyLabel).toContainText("Fixture Player");
+
+  const readStickyGeometry = () => page.evaluate(() => {
+    const ruler = document.querySelector(
+      '[data-bpp-test-id="timeline-ruler-canvas"]',
+    );
+    const label = document.querySelector(
+      '[data-bpp-test-id="timeline-sticky-hero-label"]',
+    );
+    const canvas = document.querySelector(
+      '[data-bpp-test-id="timeline-sticky-hero-events"]',
+    );
+    if (
+      !(ruler instanceof HTMLCanvasElement)
+      || !(label instanceof HTMLElement)
+      || !(canvas instanceof HTMLCanvasElement)
+    ) {
+      return null;
+    }
+    const rulerBounds = ruler.getBoundingClientRect();
+    const labelBounds = label.getBoundingClientRect();
+    const canvasBounds = canvas.getBoundingClientRect();
+    return {
+      canvasHeight: canvasBounds.height,
+      canvasRatio:
+        canvas.width / Number.parseFloat(canvas.style.width),
+      canvasTop: canvasBounds.top,
+      labelHeight: labelBounds.height,
+      labelTop: labelBounds.top,
+      rulerBottom: rulerBounds.bottom,
+    };
+  });
+  let geometry = await readStickyGeometry();
+  expect(geometry).not.toBeNull();
+  expect(Math.abs(geometry.labelTop - geometry.rulerBottom)).toBeLessThan(1);
+  expect(Math.abs(geometry.canvasTop - geometry.rulerBottom)).toBeLessThan(1);
+  expect(geometry.labelHeight).toBe(52);
+  expect(geometry.canvasHeight).toBe(52);
+  expect(geometry.canvasRatio).toBeCloseTo(2, 1);
+
+  const opponentHero = page.locator(
+    '[data-bpp-entity-id="opponent-hero"]',
+  );
+  const opponentLane = Number(
+    await opponentHero.getAttribute("data-bpp-lane-index"),
+  );
+  expect(opponentLane).toBeGreaterThan(0);
+  await page.getByTestId("timeline-scroll").evaluate((scroll, lane) => {
+    scroll.scrollTop = lane * 52 + 1;
+  }, opponentLane);
+  await expect(stickyLabel).toHaveAttribute(
+    "data-bpp-sticky-hero-entity-id",
+    "opponent-hero",
+  );
+  await expect(stickyLabel).toHaveAttribute(
+    "data-bpp-side-boundary",
+    "opponent",
+  );
+  await expect(stickyLabel).toContainText("Fixture Opponent");
+  geometry = await readStickyGeometry();
+  expect(Math.abs(geometry.labelTop - geometry.rulerBottom)).toBeLessThan(1);
+  expect(Math.abs(geometry.canvasTop - geometry.rulerBottom)).toBeLessThan(1);
+
+  const stickyBounds = await stickyCanvas.boundingBox();
+  expect(stickyBounds).not.toBeNull();
+  await page.mouse.click(
+    stickyBounds.x + stickyBounds.width * 0.25,
+    stickyBounds.y + 17,
+  );
+  await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
+    "Fixture Opponent",
+  );
+  await expect(stickyLabel).toHaveClass(/is-related-target/u);
+
+  await page.getByTestId("timeline-scroll").evaluate((scroll) => {
+    scroll.scrollTop = 0;
+  });
+  await expect(stickyLabel).toHaveAttribute(
+    "data-bpp-sticky-hero-entity-id",
+    "player-hero",
+  );
+  await expect(stickyLabel).toContainText("Fixture Player");
 });
 
 test("renders both combatants on the shared state band at device scale", async ({
@@ -780,6 +912,7 @@ test("renders both combatants on the shared state band at device scale", async (
     "state-band-canvas",
     "timeline-ruler-canvas",
     "timeline-canvas",
+    "timeline-sticky-hero-events",
   ]) {
     await expect
       .poll(() =>
@@ -1224,19 +1357,21 @@ test("remounts recording at the hidden selection with truthful playback UI", asy
   await expect(firstVideo).toHaveJSProperty("paused", false);
 
   const recordingToggle = page.getByTestId("recording-visibility-toggle");
+  await expect(recordingToggle).toHaveCount(1);
   await expect(
     page
       .getByTestId("header-utility-toolbar")
       .getByTestId("recording-visibility-toggle"),
   ).toHaveCount(0);
+  await expect(
+    page
+      .getByTestId("workbench-footer")
+      .getByTestId("recording-visibility-toggle"),
+  ).toHaveCount(1);
   await expect(recordingToggle).toBeVisible();
-  expect(
-    await recordingToggle.evaluate(
-      (element) =>
-        element.closest('[data-bpp-test-id="workbench-footer"]') !== null,
-    ),
-  ).toBe(true);
+  await expect(recordingToggle).toHaveAttribute("aria-pressed", "true");
   await recordingToggle.click();
+  await expect(recordingToggle).toHaveAttribute("aria-pressed", "false");
   await expect(page.getByTestId("recording-window")).toHaveCount(0);
   await expect(page.getByTestId("recording-video")).toHaveCount(0);
   await expect(page.getByTestId("workbench-footer")).toBeVisible();
@@ -1256,6 +1391,7 @@ test("remounts recording at the hidden selection with truthful playback UI", asy
   ).toContainText("3.00s");
 
   await recordingToggle.click();
+  await expect(recordingToggle).toHaveAttribute("aria-pressed", "true");
   const remountedVideo = page.getByTestId("recording-video");
   await expect(remountedVideo).toBeVisible();
   await expect(remountedVideo).not.toHaveAttribute(

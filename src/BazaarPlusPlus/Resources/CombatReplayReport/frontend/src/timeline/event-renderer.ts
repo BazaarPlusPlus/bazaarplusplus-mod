@@ -323,6 +323,8 @@ interface ControllerOptions {
   model: ReportViewModel;
   entities: NormalizedEntity[];
   laneLabels: HTMLElement;
+  stickyHeroCanvas: HTMLCanvasElement;
+  stickyHeroLabel: HTMLElement;
   onSelect: (cluster: TimelineCluster | null, combatMs: number) => void;
   onPreview: (
     cluster: TimelineCluster | null,
@@ -338,6 +340,8 @@ export class TimelineCanvasController {
   private readonly model: ReportViewModel;
   private readonly entities: NormalizedEntity[];
   private readonly laneLabels: HTMLElement;
+  private readonly stickyHeroCanvas: HTMLCanvasElement;
+  private readonly stickyHeroLabel: HTMLElement;
   private readonly onSelect: ControllerOptions["onSelect"];
   private readonly onPreview: ControllerOptions["onPreview"];
   private width = 1;
@@ -354,6 +358,7 @@ export class TimelineCanvasController {
   private playheadMs = 0;
   private previewMs: number | null = null;
   private hoverCluster: TimelineCluster | null = null;
+  private pinnedHeroLane: number | null = null;
   private frameHandle = 0;
 
   constructor(options: ControllerOptions) {
@@ -365,6 +370,8 @@ export class TimelineCanvasController {
     this.model = options.model;
     this.entities = options.entities;
     this.laneLabels = options.laneLabels;
+    this.stickyHeroCanvas = options.stickyHeroCanvas;
+    this.stickyHeroLabel = options.stickyHeroLabel;
     this.onSelect = options.onSelect;
     this.onPreview = options.onPreview;
   }
@@ -415,7 +422,27 @@ export class TimelineCanvasController {
       this.width,
       Math.max(this.laneHeight, this.entities.length * this.laneHeight),
     );
+    resizeLogicalCanvas(
+      this.stickyHeroCanvas,
+      this.width,
+      this.laneHeight,
+    );
     this.syncRelatedHighlights();
+    this.requestDraw();
+  }
+
+  setPinnedHeroLane(lane: number | null): void {
+    const next =
+      lane !== null
+        && Number.isInteger(lane)
+        && lane >= 0
+        && lane < this.entities.length
+        ? lane
+        : null;
+    if (next === this.pinnedHeroLane) return;
+    this.pinnedHeroLane = next;
+    this.syncRelatedHighlights();
+    this.drawStickyHeroRow();
     this.requestDraw();
   }
 
@@ -454,6 +481,38 @@ export class TimelineCanvasController {
       event.clientX,
       this.model.durationMs,
     );
+    this.updateHover(cluster, combatMs, event.clientX, event.clientY);
+  }
+
+  handleStickyHeroPointerMove(
+    event: PointerEvent,
+    canvas: HTMLCanvasElement,
+    lane: number,
+  ): void {
+    const bounds = canvas.getBoundingClientRect();
+    const logicalWidth =
+      Number.parseFloat(canvas.style.width) || this.width;
+    const localY =
+      (event.clientY - bounds.top) * (this.laneHeight / bounds.height);
+    const point = {
+      x: (event.clientX - bounds.left) * (logicalWidth / bounds.width),
+      y: lane * this.laneHeight + localY,
+    };
+    const cluster = this.hitTest(point.x, point.y);
+    const combatMs = combatMsAtPointer(
+      canvas,
+      event.clientX,
+      this.model.durationMs,
+    );
+    this.updateHover(cluster, combatMs, event.clientX, event.clientY);
+  }
+
+  private updateHover(
+    cluster: TimelineCluster | null,
+    combatMs: number,
+    clientX: number,
+    clientY: number,
+  ): void {
     if (
       cluster === this.hoverCluster
       && Math.abs((this.previewMs ?? 0) - combatMs) < 8
@@ -463,7 +522,7 @@ export class TimelineCanvasController {
     this.hoverCluster = cluster;
     this.previewMs = combatMs;
     this.syncRelatedHighlights();
-    this.onPreview(cluster, combatMs, event.clientX, event.clientY);
+    this.onPreview(cluster, combatMs, clientX, clientY);
     if (window.__BPP_VIEWER_TEST__) {
       window.__BPP_VIEWER_TEST__.hoverDrawCount += 1;
     }
@@ -484,6 +543,29 @@ export class TimelineCanvasController {
     const cluster = this.hitTest(point.x, point.y);
     const combatMs = combatMsAtPointer(
       this.canvas,
+      event.clientX,
+      this.model.durationMs,
+    );
+    this.onSelect(cluster, combatMs);
+  }
+
+  handleStickyHeroPointerDown(
+    event: PointerEvent,
+    canvas: HTMLCanvasElement,
+    lane: number,
+  ): void {
+    if (event.button !== 0) return;
+    const bounds = canvas.getBoundingClientRect();
+    const logicalWidth =
+      Number.parseFloat(canvas.style.width) || this.width;
+    const localY =
+      (event.clientY - bounds.top) * (this.laneHeight / bounds.height);
+    const cluster = this.hitTest(
+      (event.clientX - bounds.left) * (logicalWidth / bounds.width),
+      lane * this.laneHeight + localY,
+    );
+    const combatMs = combatMsAtPointer(
+      canvas,
       event.clientX,
       this.model.durationMs,
     );
@@ -617,7 +699,7 @@ export class TimelineCanvasController {
     const rows = this.laneLabels.querySelectorAll<HTMLElement>(
       "[data-bpp-lane-index]",
     );
-    for (const row of rows) {
+    const clear = (row: HTMLElement): void => {
       row.classList.remove(
         "is-event-related",
         "is-related-source",
@@ -625,13 +707,20 @@ export class TimelineCanvasController {
         "is-related-target",
         "is-related-removed",
       );
-    }
+    };
+    for (const row of rows) clear(row);
+    clear(this.stickyHeroLabel);
     const related = relatedLaneRoles(cluster, this.entities);
     for (const [lane, roles] of related) {
       const row = rows.item(lane);
-      if (!row) continue;
-      row.classList.add("is-event-related");
-      for (const role of roles) row.classList.add(`is-related-${role}`);
+      const apply = (element: HTMLElement): void => {
+        element.classList.add("is-event-related");
+        for (const role of roles) {
+          element.classList.add(`is-related-${role}`);
+        }
+      };
+      if (row) apply(row);
+      if (lane === this.pinnedHeroLane) apply(this.stickyHeroLabel);
     }
   }
 
@@ -766,6 +855,35 @@ export class TimelineCanvasController {
       this.width,
       this.playheadMs,
       this.previewMs,
+    );
+    this.drawStickyHeroRow();
+  }
+
+  private drawStickyHeroRow(): void {
+    const context = this.stickyHeroCanvas.getContext("2d");
+    if (!context) return;
+    const size = beginLogicalDraw(this.stickyHeroCanvas, context);
+    context.clearRect(0, 0, size.width, size.height);
+    if (this.pinnedHeroLane === null) return;
+    const logicalWidth =
+      Number.parseFloat(this.canvas.style.width) || this.width;
+    const logicalHeight =
+      Number.parseFloat(this.canvas.style.height)
+      || Math.max(
+        this.laneHeight,
+        this.entities.length * this.laneHeight,
+      );
+    const sourceScaleY = this.canvas.height / logicalHeight;
+    context.drawImage(
+      this.canvas,
+      0,
+      this.pinnedHeroLane * this.laneHeight * sourceScaleY,
+      this.canvas.width,
+      this.laneHeight * sourceScaleY,
+      0,
+      0,
+      size.width,
+      size.height,
     );
   }
 
