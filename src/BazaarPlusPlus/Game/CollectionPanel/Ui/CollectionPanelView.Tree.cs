@@ -134,6 +134,7 @@ internal sealed partial class CollectionPanelView
         controlsScroll.contentContainer.style.flexDirection = FlexDirection.Column;
         controlsScroll.contentContainer.style.minHeight = 0f;
         _controlsScrollView = controlsScroll;
+        _controlsDragScroller = new ScrollViewDragScroller(controlsScroll);
         rail.Add(controlsScroll);
 
         // Hero filter.
@@ -556,6 +557,7 @@ internal sealed partial class CollectionPanelView
         // Scroll offset is polled in CollectionPanel.Update via ReadScrollYPixels(): the
         // publicized UIElements Scroller exposes valueChanged ambiguously (field vs property),
         // so we avoid subscribing.
+        _gridDragScroller = new ScrollViewDragScroller(_gridScrollView);
         _gridViewport.Add(_gridScrollView);
 
         _gridContentSpacer = new VisualElement();
