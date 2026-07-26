@@ -217,14 +217,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     public void SetRunHeroFilter(string hero)
     {
-        var selectedHero = string.IsNullOrEmpty(hero) ? null : hero;
+        var selectedHero = HistoryPanelHeroPresentation.CanonicalFilterId(hero);
         _state.SelectedRunHero =
             selectedHero != null
-            && !string.Equals(
-                _state.SelectedRunHero,
-                selectedHero,
-                StringComparison.OrdinalIgnoreCase
-            )
+            && !HistoryPanelHeroPresentation.IsSelected(_state.SelectedRunHero, selectedHero)
                 ? selectedHero
                 : null;
         InvalidateFilteredRuns();
