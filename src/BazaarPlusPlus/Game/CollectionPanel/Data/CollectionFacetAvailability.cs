@@ -11,26 +11,33 @@ internal sealed class CollectionFacetAvailabilitySnapshot
 {
     public static readonly CollectionFacetAvailabilitySnapshot Empty = new(
         Array.Empty<ECardTag>(),
+        Array.Empty<ECardTag>(),
         Array.Empty<EHiddenTag>(),
         Array.Empty<EHiddenTag>()
     );
 
     public CollectionFacetAvailabilitySnapshot(
         IReadOnlyList<ECardTag> itemTags,
+        IReadOnlyList<ECardTag> skillTags,
         IReadOnlyList<EHiddenTag> itemKeywords,
         IReadOnlyList<EHiddenTag> skillKeywords
     )
     {
         ItemTags = itemTags;
+        SkillTags = skillTags;
         ItemKeywords = itemKeywords;
         SkillKeywords = skillKeywords;
     }
 
     public IReadOnlyList<ECardTag> ItemTags { get; }
+    public IReadOnlyList<ECardTag> SkillTags { get; }
     public IReadOnlyList<EHiddenTag> ItemKeywords { get; }
     public IReadOnlyList<EHiddenTag> SkillKeywords { get; }
 
     // Non-Skill maps to Item, mirroring CollectionTabProfile.For.
+    public IReadOnlyList<ECardTag> TagsFor(ECardType type) =>
+        type == ECardType.Skill ? SkillTags : ItemTags;
+
     public IReadOnlyList<EHiddenTag> KeywordsFor(ECardType type) =>
         type == ECardType.Skill ? SkillKeywords : ItemKeywords;
 }
@@ -45,6 +52,7 @@ internal static class CollectionFacetAvailability
             return CollectionFacetAvailabilitySnapshot.Empty;
 
         var itemTags = new HashSet<ECardTag>();
+        var skillTags = new HashSet<ECardTag>();
         var itemKeywords = new HashSet<EHiddenTag>();
         var skillKeywords = new HashSet<EHiddenTag>();
         foreach (var card in cards)
@@ -60,6 +68,8 @@ internal static class CollectionFacetAvailability
             }
             else if (card.Type == ECardType.Skill)
             {
+                foreach (var tag in card.Tags)
+                    skillTags.Add(tag);
                 foreach (var keyword in card.HiddenTags)
                     skillKeywords.Add(keyword);
             }
@@ -67,6 +77,7 @@ internal static class CollectionFacetAvailability
 
         return new CollectionFacetAvailabilitySnapshot(
             OrderedTags(itemTags),
+            OrderedTags(skillTags),
             OrderedKeywords(itemKeywords),
             OrderedKeywords(skillKeywords)
         );

@@ -139,7 +139,7 @@ internal static class CollectionQuery
         var profile = CollectionTabProfile.For(filter.ActiveTab);
         if (!profile.ShowTagFilter || filter.Tags.Count == 0)
             return null;
-        return RetainedSet(filter.Tags, facetAvailability.ItemTags);
+        return RetainedSet(filter.Tags, facetAvailability.TagsFor(filter.ActiveType));
     }
 
     private static IReadOnlyCollection<EHiddenTag>? RetainedKeywords(

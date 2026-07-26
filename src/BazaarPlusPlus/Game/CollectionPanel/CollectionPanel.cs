@@ -969,7 +969,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
 
         var profile = CollectionTabProfile.For(_filter.ActiveTab);
-        var availableTags = _facetAvailability.ItemTags;
+        var availableTags = _facetAvailability.TagsFor(_filter.ActiveType);
         var availableKeywords = _facetAvailability.KeywordsFor(_filter.ActiveType);
         var dayFilterPresentation = CollectionDayFilterPresentation.For(
             profile,

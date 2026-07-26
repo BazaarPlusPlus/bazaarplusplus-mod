@@ -446,8 +446,8 @@ var skillTagResult = CollectionFilterEngine.Apply(
 );
 AssertSequence(
     skillTagResult,
-    new[] { potionSkill.Id, weaponSkill.Id },
-    "Item tag filters do not narrow the Skill tab."
+    new[] { weaponSkill.Id },
+    "Player-facing type/tag filters should narrow the Skill tab."
 );
 var damageSkill = Card(
     "Damage Skill",
@@ -699,6 +699,107 @@ AssertSequence(
     "Item tags and item keywords combine as separate AND facets."
 );
 
+var instrumentTempoItem = InstrumentFacetCard();
+var instrumentTempoWrongHero = InstrumentFacetCard(hero: EHero.Dooley);
+var instrumentTempoWrongTier = InstrumentFacetCard(tier: ETier.Silver);
+var instrumentTempoWrongSize = InstrumentFacetCard(size: ECardSize.Large);
+var instrumentTempoWrongTag = InstrumentFacetCard(tag: ECardTag.Weapon);
+var instrumentTempoWrongKeyword = InstrumentFacetCard(keyword: EHiddenTag.TempoReference);
+var instrumentTempoWrongSearch = InstrumentFacetCard(name: "Orchestral Practice");
+var instrumentTempoNotOffered = InstrumentFacetCard(name: "Tempo Instrument Solo Encore");
+var instrumentTempoItemFilter = new CollectionFilterState { SearchQuery = "instrument solo" };
+instrumentTempoItemFilter.Heroes.Add(EHero.Vanessa);
+instrumentTempoItemFilter.Tiers.Add(ETier.Bronze);
+instrumentTempoItemFilter.Sizes.Add(ECardSize.Medium);
+instrumentTempoItemFilter.Tags.Add(ECardTag.Instrument);
+instrumentTempoItemFilter.Keywords.Add(EHiddenTag.Tempo);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[]
+        {
+            instrumentTempoWrongHero,
+            instrumentTempoWrongTier,
+            instrumentTempoWrongSize,
+            instrumentTempoWrongTag,
+            instrumentTempoWrongKeyword,
+            instrumentTempoWrongSearch,
+            instrumentTempoNotOffered,
+            instrumentTempoItem,
+        },
+        instrumentTempoItemFilter,
+        new CollectionFilterContext
+        {
+            OfferedCardIds = new[]
+            {
+                instrumentTempoItem.Id,
+                instrumentTempoWrongHero.Id,
+                instrumentTempoWrongTier.Id,
+                instrumentTempoWrongSize.Id,
+                instrumentTempoWrongTag.Id,
+                instrumentTempoWrongKeyword.Id,
+                instrumentTempoWrongSearch.Id,
+            },
+        }
+    ),
+    new[] { instrumentTempoItem.Id },
+    "Instrument and Tempo item filters should intersect with hero, tier, size, search, and source."
+);
+
+var instrumentTempoReferenceSkill = InstrumentFacetCard(
+    name: "Tempo Reference Instrument Skill",
+    type: ECardType.Skill,
+    keyword: EHiddenTag.TempoReference
+);
+var instrumentTempoReferenceWrongTagSkill = InstrumentFacetCard(
+    name: "Tempo Reference Instrument Skill",
+    type: ECardType.Skill,
+    tag: ECardTag.Weapon,
+    keyword: EHiddenTag.TempoReference
+);
+var instrumentTempoReferenceWrongKeywordSkill = InstrumentFacetCard(
+    name: "Tempo Reference Instrument Skill",
+    type: ECardType.Skill
+);
+var instrumentTempoReferenceWrongHeroSkill = InstrumentFacetCard(
+    name: "Tempo Reference Instrument Skill",
+    type: ECardType.Skill,
+    keyword: EHiddenTag.TempoReference,
+    hero: EHero.Dooley
+);
+var instrumentTempoReferenceSkillFilter = new CollectionFilterState
+{
+    ActiveType = ECardType.Skill,
+    SearchQuery = "reference instrument",
+};
+instrumentTempoReferenceSkillFilter.Heroes.Add(EHero.Vanessa);
+instrumentTempoReferenceSkillFilter.Tiers.Add(ETier.Bronze);
+instrumentTempoReferenceSkillFilter.Tags.Add(ECardTag.Instrument);
+instrumentTempoReferenceSkillFilter.Keywords.Add(EHiddenTag.TempoReference);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[]
+        {
+            instrumentTempoReferenceWrongTagSkill,
+            instrumentTempoReferenceWrongKeywordSkill,
+            instrumentTempoReferenceWrongHeroSkill,
+            instrumentTempoReferenceSkill,
+        },
+        instrumentTempoReferenceSkillFilter,
+        new CollectionFilterContext
+        {
+            OfferedCardIds = new[]
+            {
+                instrumentTempoReferenceSkill.Id,
+                instrumentTempoReferenceWrongTagSkill.Id,
+                instrumentTempoReferenceWrongKeywordSkill.Id,
+                instrumentTempoReferenceWrongHeroSkill.Id,
+            },
+        }
+    ),
+    new[] { instrumentTempoReferenceSkill.Id },
+    "Instrument and TempoReference skill filters should intersect with hero, tier, search, and source."
+);
+
 var derivedLifestealTemplate = new TCardItem
 {
     Id = Guid.NewGuid(),
@@ -832,6 +933,7 @@ AssertValues(
         nameof(ECardTag.Merchant),
         nameof(ECardTag.Property),
         nameof(ECardTag.Loot),
+        nameof(ECardTag.Instrument),
     },
     "Tag whitelist should match the curated CollectionPanel tag order."
 );
@@ -849,21 +951,21 @@ foreach (
         $"Tag whitelist must exclude mechanism tag {mechanismTag}."
     );
 foreach (
-    var bazaarDbTag in new[] { ECardTag.Apparel, ECardTag.Merchant, ECardTag.Loot, ECardTag.Weapon }
+    var playerFacingTag in new[]
+    {
+        ECardTag.Apparel,
+        ECardTag.Merchant,
+        ECardTag.Loot,
+        ECardTag.Weapon,
+        ECardTag.Instrument,
+    }
 )
     AssertTrue(
-        PlayerFacingCardTags.Ordered.Contains(bazaarDbTag),
-        $"Tag whitelist should include BazaarDB type/tag {bazaarDbTag}."
+        PlayerFacingCardTags.Ordered.Contains(playerFacingTag),
+        $"Tag whitelist should include player-facing type/tag {playerFacingTag}."
     );
 foreach (
-    var unusedTypeTag in new[]
-    {
-        ECardTag.Ingredient,
-        ECardTag.Instrument,
-        ECardTag.Key,
-        ECardTag.Map,
-        ECardTag.Sigil,
-    }
+    var unusedTypeTag in new[] { ECardTag.Ingredient, ECardTag.Key, ECardTag.Map, ECardTag.Sigil }
 )
     AssertFalse(
         PlayerFacingCardTags.Ordered.Contains(unusedTypeTag),
@@ -900,6 +1002,7 @@ AssertValues(
         nameof(EHiddenTag.Gold),
         nameof(EHiddenTag.Income),
         nameof(EHiddenTag.Value),
+        nameof(EHiddenTag.Tempo),
         nameof(EHiddenTag.Multicast),
         nameof(EHiddenTag.QuestReference),
         nameof(EHiddenTag.FlyingReference),
@@ -917,6 +1020,7 @@ AssertValues(
         nameof(EHiddenTag.CritReference),
         nameof(EHiddenTag.AmmoReference),
         nameof(EHiddenTag.RageReference),
+        nameof(EHiddenTag.TempoReference),
         nameof(EHiddenTag.EconomyReference),
         nameof(EHiddenTag.PotionReference),
     },
@@ -934,7 +1038,6 @@ foreach (
         EHiddenTag.HeatedReference,
         EHiddenTag.JoyReference,
         EHiddenTag.TechReference,
-        EHiddenTag.TempoReference,
     }
 )
     AssertFalse(
@@ -960,6 +1063,10 @@ foreach (
 AssertTrue(
     CollectionKeywordWhitelist.IsReferenceKeyword(EHiddenTag.PotionReference),
     "PotionReference should start the keyword reference subsection like other reference keywords."
+);
+AssertTrue(
+    CollectionKeywordWhitelist.IsReferenceKeyword(EHiddenTag.TempoReference),
+    "TempoReference should remain in the Related keyword subsection."
 );
 AssertFalse(
     CollectionKeywordWhitelist.IsReferenceKeyword(EHiddenTag.Poison),
@@ -1007,6 +1114,20 @@ AssertEqual(
     poisonReferenceBase.CardTag,
     "PoisonReference should not claim a card-tag display base."
 );
+AssertTrue(
+    ReferenceTagBaseResolver.TryResolve(EHiddenTag.TempoReference, out var tempoReferenceBase),
+    "TempoReference should resolve to the existing Tempo display base."
+);
+AssertEqual(
+    (EHiddenTag?)EHiddenTag.Tempo,
+    tempoReferenceBase.HiddenTag,
+    "TempoReference should render with the Tempo hidden-tag typography."
+);
+AssertEqual(
+    (ECardTag?)null,
+    tempoReferenceBase.CardTag,
+    "TempoReference should not claim a card-tag display base."
+);
 
 AssertFalse(
     ReferenceTagBaseResolver.TryResolve(EHiddenTag.Poison, out _),
@@ -1036,7 +1157,6 @@ foreach (
         EHiddenTag.Experience,
         EHiddenTag.Level,
         EHiddenTag.Reload,
-        EHiddenTag.Tempo,
         EHiddenTag.Ticket,
     }
 )
@@ -1054,8 +1174,14 @@ var availableFacetCards = new[]
     Card(
         "Damage Weapon",
         ETier.Bronze,
-        tags: new[] { ECardTag.Weapon, ECardTag.Ingredient },
-        hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.DamageReference }
+        tags: new[] { ECardTag.Weapon, ECardTag.Instrument, ECardTag.Ingredient },
+        hiddenTags: new[]
+        {
+            EHiddenTag.Damage,
+            EHiddenTag.Tempo,
+            EHiddenTag.DamageReference,
+            EHiddenTag.CanCrit,
+        }
     ),
     Card("Multicast Item", ETier.Bronze, hiddenTags: new[] { EHiddenTag.Multicast }),
     Card(
@@ -1071,19 +1197,32 @@ var availableFacetCards = new[]
         type: ECardType.Skill,
         hiddenTags: new[] { EHiddenTag.Quest }
     ),
+    Card(
+        "Instrument Tempo Reference Skill",
+        ETier.Bronze,
+        type: ECardType.Skill,
+        tags: new[] { ECardTag.Instrument },
+        hiddenTags: new[] { EHiddenTag.TempoReference }
+    ),
     Card("Potion Reference", ETier.Bronze, hiddenTags: new[] { EHiddenTag.PotionReference }),
 };
 var availableFacets = CollectionFacetAvailability.SnapshotFor(availableFacetCards);
 AssertValues(
     availableFacets.ItemTags.Select(tag => tag.ToString()).ToArray(),
-    new[] { nameof(ECardTag.Weapon) },
-    "Available item tags should include only non-package catalog tags that are in the BazaarDB-facing whitelist."
+    new[] { nameof(ECardTag.Weapon), nameof(ECardTag.Instrument) },
+    "Available item tags should include only non-package catalog tags that are player-facing."
+);
+AssertValues(
+    availableFacets.SkillTags.Select(tag => tag.ToString()).ToArray(),
+    new[] { nameof(ECardTag.Instrument) },
+    "Available skill tags should include player-facing tags carried by accepted skills."
 );
 AssertValues(
     availableFacets.ItemKeywords.Select(tag => tag.ToString()).ToArray(),
     new[]
     {
         nameof(EHiddenTag.Damage),
+        nameof(EHiddenTag.Tempo),
         nameof(EHiddenTag.Multicast),
         nameof(EHiddenTag.DamageReference),
         nameof(EHiddenTag.PotionReference),
@@ -1092,14 +1231,28 @@ AssertValues(
 );
 AssertValues(
     availableFacets.SkillKeywords.Select(tag => tag.ToString()).ToArray(),
-    new[] { nameof(EHiddenTag.Quest) },
+    new[] { nameof(EHiddenTag.Quest), nameof(EHiddenTag.TempoReference) },
     "Available skill keywords should be computed independently from item keywords."
 );
-var facetsWithoutMulticast = CollectionFacetAvailability.SnapshotFor(
-    new[] { damageItem, damageSkill }
+var legacyFacets = CollectionFacetAvailability.SnapshotFor(new[] { damageItem, damageSkill });
+AssertFalse(
+    legacyFacets.TagsFor(ECardType.Item).Contains(ECardTag.Instrument),
+    "Legacy item catalogs should omit Instrument when no accepted item carries it."
 );
 AssertFalse(
-    facetsWithoutMulticast.KeywordsFor(ECardType.Item).Contains(EHiddenTag.Multicast),
+    legacyFacets.TagsFor(ECardType.Skill).Contains(ECardTag.Instrument),
+    "Legacy skill catalogs should omit Instrument when no accepted skill carries it."
+);
+AssertFalse(
+    legacyFacets.KeywordsFor(ECardType.Item).Contains(EHiddenTag.Tempo),
+    "Legacy item catalogs should omit Tempo when no accepted item carries it."
+);
+AssertFalse(
+    legacyFacets.KeywordsFor(ECardType.Skill).Contains(EHiddenTag.TempoReference),
+    "Legacy skill catalogs should omit TempoReference when no accepted skill carries it."
+);
+AssertFalse(
+    legacyFacets.KeywordsFor(ECardType.Item).Contains(EHiddenTag.Multicast),
     "Item keyword availability should omit Multicast when the item catalog has no Multicast template."
 );
 AssertFalse(
@@ -1126,6 +1279,7 @@ var queryCatalogCards = new[]
 };
 var queryAvailability = new CollectionFacetAvailabilitySnapshot(
     new[] { ECardTag.Weapon },
+    Array.Empty<ECardTag>(),
     new[] { EHiddenTag.Damage },
     Array.Empty<EHiddenTag>()
 );
@@ -1270,9 +1424,9 @@ var tagGateOffResult = CollectionQuery.Run(
     queryResolver
 );
 AssertEqual(
-    null,
-    tagGateOffResult.Normalization.RetainedTags,
-    "CollectionQuery should use null retained tags when the profile gate is off."
+    0,
+    tagGateOffResult.Normalization.RetainedTags?.Count,
+    "CollectionQuery should prune a selected Skill tag that is unavailable in the accepted catalog."
 );
 
 var noSelectedFacetFilter = new CollectionFilterState();
@@ -1559,6 +1713,36 @@ AssertEqual(
     CollectionCardEligibilityReason.PlaceholderArtKey,
     placeholderSkillClassification.EligibilityReason,
     "Placeholder art should report a reasoned rejection."
+);
+var musicNoteSocketClassification = CollectionCardClassifier.Classify(
+    ECardType.SocketEffect,
+    ESpawnEligibility.Always,
+    "Assets/Cards/MusicNote.png",
+    "Music Note A"
+);
+AssertFalse(
+    musicNoteSocketClassification.IsCatalogCard,
+    "Music Note socket effects should remain outside the Item/Skill catalog."
+);
+AssertEqual(
+    CollectionCardEligibilityReason.UnsupportedType,
+    musicNoteSocketClassification.EligibilityReason,
+    "Music Note socket effects should remain excluded by their non-Item/Skill card type."
+);
+var musicNotePlaceholderClassification = CollectionCardClassifier.Classify(
+    ECardType.Item,
+    ESpawnEligibility.Always,
+    "Icon_Music_Note_Placeholder.png",
+    "Music Note Placeholder"
+);
+AssertFalse(
+    musicNotePlaceholderClassification.IsCatalogCard,
+    "Music Note placeholder art should not enter the catalog even if misclassified as an Item."
+);
+AssertEqual(
+    CollectionCardEligibilityReason.PlaceholderArtKey,
+    musicNotePlaceholderClassification.EligibilityReason,
+    "Music Note placeholder art should remain excluded by the placeholder-art rule."
 );
 AssertFalse(
     CollectionCardClassifier
@@ -2057,6 +2241,25 @@ static TCardBase CatalogTemplate(ECardType type, ESpawnEligibility spawningEligi
         },
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
     };
+
+static CollectionCardVm InstrumentFacetCard(
+    string name = "Tempo Instrument Solo",
+    ECardType type = ECardType.Item,
+    ETier tier = ETier.Bronze,
+    ECardSize size = ECardSize.Medium,
+    ECardTag tag = ECardTag.Instrument,
+    EHiddenTag keyword = EHiddenTag.Tempo,
+    EHero hero = EHero.Vanessa
+) =>
+    Card(
+        name,
+        tier,
+        type,
+        size,
+        tags: new[] { tag },
+        hiddenTags: new[] { keyword },
+        heroes: new[] { hero }
+    );
 
 static CollectionCardVm Card(
     string name,

@@ -32,6 +32,7 @@ internal static class CollectionKeywordWhitelist
         EHiddenTag.Gold,
         EHiddenTag.Income,
         EHiddenTag.Value,
+        EHiddenTag.Tempo,
         EHiddenTag.Multicast,
         EHiddenTag.QuestReference,
         EHiddenTag.FlyingReference,
@@ -49,6 +50,7 @@ internal static class CollectionKeywordWhitelist
         EHiddenTag.CritReference,
         EHiddenTag.AmmoReference,
         EHiddenTag.RageReference,
+        EHiddenTag.TempoReference,
         EHiddenTag.EconomyReference,
         EHiddenTag.PotionReference,
     };
@@ -74,6 +76,7 @@ internal static class CollectionKeywordWhitelist
                 or EHiddenTag.CritReference
                 or EHiddenTag.AmmoReference
                 or EHiddenTag.RageReference
+                or EHiddenTag.TempoReference
                 or EHiddenTag.EconomyReference
                 or EHiddenTag.PotionReference;
 }
