@@ -252,30 +252,30 @@ AssertValues(
     },
     "An accepted catalog with The Dragons content should append exactly one concrete hero chip after the existing seven."
 );
-var loadingRosterAfterCacheMiss = CollectionHeroSelectionRoster.ResolveAvailableHeroes(
+var loadingRosterPolicyAfterAcceptedCatalog = CollectionHeroSelectionRoster.ResolveAvailableHeroes(
     CollectionCatalogReadiness.Loading,
     Array.Empty<CollectionCardVm>()
 );
 AssertValues(
-    loadingRosterAfterCacheMiss,
+    loadingRosterPolicyAfterAcceptedCatalog,
     CollectionHeroSelectionRoster.BaseConcreteHeroes,
-    "A cache miss after an accepted eight-hero catalog should publish only the seven base chips while the replacement catalog loads."
+    "Loading roster policy should project only the seven base chips even when the prior accepted policy result had eight."
 );
-var loadingPreferenceAfterCacheMiss = CollectionPanelHeroPreference.ResolveStored(
+var loadingPreferencePolicyAfterAcceptedCatalog = CollectionPanelHeroPreference.ResolveStored(
     hasStoredValue: true,
     raw: "TheDragons",
     CollectionCatalogReadiness.Loading,
-    loadingRosterAfterCacheMiss
+    loadingRosterPolicyAfterAcceptedCatalog
 );
 AssertEqual(
     CollectionPanelHeroPreferenceLoadStatus.Resolved,
-    loadingPreferenceAfterCacheMiss.Status,
-    "The accepted-to-loading transition should retain a saved The Dragons preference."
+    loadingPreferencePolicyAfterAcceptedCatalog.Status,
+    "Loading preference policy should retain a saved The Dragons preference."
 );
 AssertEqual(
     dragonsHero,
-    loadingPreferenceAfterCacheMiss.Hero,
-    "The accepted-to-loading transition should keep the saved runtime hero available for the next accepted catalog."
+    loadingPreferencePolicyAfterAcceptedCatalog.Hero,
+    "Loading preference policy should keep the saved runtime hero available for the next accepted catalog."
 );
 AssertValues(
     CollectionHeroSelectionRoster.ResolveAvailableHeroes(

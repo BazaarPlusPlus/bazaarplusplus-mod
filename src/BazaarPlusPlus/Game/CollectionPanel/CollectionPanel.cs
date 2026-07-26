@@ -799,8 +799,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         var diagnostics = new CollectionPanelLoadDiagnostics();
         _isLoadingCatalog = true;
-        if (_catalogReadiness != CollectionCatalogReadiness.Accepted)
-            _catalogReadiness = CollectionCatalogReadiness.Loading;
         SetStatus(CollectionPanelText.CatalogLoading());
         ApplyEmptyVisibleSet();
         RefreshView();
