@@ -255,22 +255,13 @@
   <Target
     Name="ValidateCombatReportViewerForInstaller"
     BeforeTargets="CopyToInstallerSource"
-    Condition="'$(Configuration)' == 'Release' and '$(BuildProductionPackage)' == 'true' and '$(CombatReportViewerReleaseGatePrepared)' != 'true'"
+    DependsOnTargets="ValidateCombatReportViewerArtifacts"
+    Condition="'$(Configuration)' == 'Release' and '$(BuildProductionPackage)' == 'true'"
   >
-    <Error
-      Condition="!Exists('$(CombatReportViewerFrontendDirectory)/package.json')"
-      Text="[BazaarPlusPlus] Combat Report Viewer frontend package is missing."
-    />
     <Message
-      Text="[BazaarPlusPlus] Validating Combat Report Viewer source before installer packaging"
+      Text="[BazaarPlusPlus] Combat Report Viewer staged artifacts passed the installer gate"
       Importance="high"
     />
-    <Exec WorkingDirectory="$(CombatReportViewerFrontendDirectory)" Command="npm ci" />
-    <Exec
-      WorkingDirectory="$(CombatReportViewerFrontendDirectory)"
-      Command="npm run viewer:browsers:install"
-    />
-    <Exec WorkingDirectory="$(CombatReportViewerFrontendDirectory)" Command="npm test" />
   </Target>
 
   <Target
@@ -333,6 +324,29 @@
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
       DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).dll"
+    />
+    <GetFileHash Files="$(TargetDir)$(TargetName).dll" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_ReleaseMainAssemblyHash" />
+    </GetFileHash>
+    <GetFileHash
+      Files="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).dll"
+      Algorithm="SHA256"
+    >
+      <Output TaskParameter="Items" ItemName="_MacInstallerMainAssemblyHash" />
+    </GetFileHash>
+    <GetFileHash
+      Files="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).dll"
+      Algorithm="SHA256"
+    >
+      <Output TaskParameter="Items" ItemName="_WindowsInstallerMainAssemblyHash" />
+    </GetFileHash>
+    <Error
+      Condition="'@(_ReleaseMainAssemblyHash->'%(FileHash)')' != '@(_MacInstallerMainAssemblyHash->'%(FileHash)')'"
+      Text="[BazaarPlusPlus] macOS installer payload does not contain the exact Release DLL."
+    />
+    <Error
+      Condition="'@(_ReleaseMainAssemblyHash->'%(FileHash)')' != '@(_WindowsInstallerMainAssemblyHash->'%(FileHash)')'"
+      Text="[BazaarPlusPlus] Windows installer payload does not contain the exact Release DLL."
     />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).version"
@@ -427,7 +441,7 @@
     <MSBuild
       Projects="$(MSBuildProjectFile)"
       Targets="Build"
-      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);CombatReportViewerReleaseGatePrepared=$(CombatReportViewerReleaseGatePrepared);RemoteEmbeddedDataPrepared=true"
+      Properties="Configuration=Release;BuildProductionPackage=$(BuildProductionPackage);RemoteEmbeddedDataPrepared=true"
     />
   </Target>
 </Project>

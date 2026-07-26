@@ -150,20 +150,6 @@ run_seed_gates() {
         ${args[@]+"${args[@]}"}
 }
 
-run_combat_report_viewer_release_gate() {
-    local frontend_dir="$SCRIPT_DIR/src/BazaarPlusPlus/Resources/CombatReplayReport/frontend"
-    echo -e "${CYAN}== Validating ${GREEN}Combat Report Viewer release artifacts${CYAN} ==${RESET}"
-    (
-        cd "$frontend_dir"
-        npm ci
-        npm run viewer:browsers:install
-        # Includes typecheck, a clean frontend build, pure tests, and the
-        # Chromium/WebKit behavior suite. MSBuild generates its embedded copy
-        # independently under obj/ from the same locked source tree.
-        npm test
-    )
-}
-
 publish() {
     local bazaaragent="${1:-false}"
     shift || true
@@ -196,13 +182,11 @@ publish() {
 
     fetch_remote_data "${common_args[@]}"
     run_seed_gates "${common_args[@]}" -p:RemoteEmbeddedDataPrepared=true
-    run_combat_report_viewer_release_gate
 
     local build_args=(
         -t:BuildAll
         "${common_args[@]}"
         -p:BuildProductionPackage=true
-        -p:CombatReportViewerReleaseGatePrepared=true
         -p:RemoteEmbeddedDataPrepared=true
     )
     if [[ "$bazaaragent" == "true" ]]; then

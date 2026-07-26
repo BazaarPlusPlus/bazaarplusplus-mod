@@ -2231,19 +2231,9 @@ public class CoreLayeringTests
         Assert.Contains("$(Configuration)", condition);
         Assert.Contains("Release", condition);
         Assert.Contains("$(BuildProductionPackage)", condition);
-        Assert.Contains("$(CombatReportViewerReleaseGatePrepared)", condition);
-
-        var commands = target
-            .Elements()
-            .Where(element => element.Name.LocalName == "Exec")
-            .Select(element => Attribute(element, "Command"))
-            .ToArray();
-        Assert.Collection(
-            commands,
-            command => Assert.Equal("npm ci", command),
-            command => Assert.Equal("npm run viewer:browsers:install", command),
-            command => Assert.Equal("npm test", command)
-        );
+        Assert.Equal("ValidateCombatReportViewerArtifacts", Attribute(target, "DependsOnTargets"));
+        Assert.DoesNotContain("CombatReportViewerReleaseGatePrepared", condition);
+        Assert.DoesNotContain(target.Elements(), element => element.Name.LocalName == "Exec");
 
         var buildAll = Assert.Single(
             project.Descendants(),
@@ -2260,9 +2250,9 @@ public class CoreLayeringTests
                     ?? false
                 )
         );
-        Assert.Contains(
-            "CombatReportViewerReleaseGatePrepared=$(CombatReportViewerReleaseGatePrepared)",
-            Attribute(releaseBuild, "Properties")
+        Assert.DoesNotContain(
+            "CombatReportViewerReleaseGatePrepared",
+            Attribute(releaseBuild, "Properties") ?? string.Empty
         );
     }
 
@@ -2326,6 +2316,12 @@ public class CoreLayeringTests
         Assert.Contains("$(MSBuildProjectExtensionsPath)", artifactDirectory);
         Assert.Contains("$(Configuration)", artifactDirectory);
         Assert.Contains("$(TargetFramework)", artifactDirectory);
+        Assert.Contains(
+            targets.Descendants(),
+            element =>
+                element.Name.LocalName == "CombatReportViewerBuildInput"
+                && Attribute(element, "Include") == "$(MSBuildThisFileFullPath)"
+        );
 
         var buildTarget = Assert.Single(
             targets.Descendants(),
@@ -2345,6 +2341,36 @@ public class CoreLayeringTests
                 )
         );
 
+        var validationTarget = Assert.Single(
+            targets.Descendants(),
+            element =>
+                element.Name.LocalName == "Target"
+                && Attribute(element, "Name") == "ValidateCombatReportViewerArtifacts"
+        );
+        Assert.Equal(
+            "BuildCombatReportViewerArtifacts",
+            Attribute(validationTarget, "DependsOnTargets")
+        );
+        var validationCommands = validationTarget
+            .Elements()
+            .Where(element => element.Name.LocalName == "Exec")
+            .ToArray();
+        Assert.Collection(
+            validationCommands,
+            command =>
+                Assert.Equal("npm run viewer:browsers:install", Attribute(command, "Command")),
+            command => Assert.Equal("npm run viewer:typecheck", Attribute(command, "Command")),
+            command => Assert.Equal("npm run test:pure", Attribute(command, "Command")),
+            command =>
+            {
+                Assert.Equal("npm run test:behavior", Attribute(command, "Command"));
+                Assert.Equal(
+                    "BPP_VIEWER_ARTIFACT_DIR=$(CombatReportViewerArtifactDirectory)",
+                    Attribute(command, "EnvironmentVariables")
+                );
+            }
+        );
+
         var reportResourceRoot = Path.Combine(
             MainSourceRoot(repoRoot),
             "Resources",
@@ -2352,6 +2378,57 @@ public class CoreLayeringTests
         );
         Assert.False(File.Exists(Path.Combine(reportResourceRoot, "viewer.js")));
         Assert.False(File.Exists(Path.Combine(reportResourceRoot, "viewer.css")));
+    }
+
+    [Fact]
+    public void Installer_payloads_must_match_the_exact_release_main_assembly()
+    {
+        var repoRoot = RepoRoot();
+        var projectPath = Path.Combine(MainSourceRoot(repoRoot), "BazaarPlusPlus.csproj");
+        var project = XDocument.Load(projectPath);
+        var target = Assert.Single(
+            project.Descendants(),
+            element =>
+                element.Name.LocalName == "Target"
+                && Attribute(element, "Name") == "CopyToInstallerSource"
+        );
+
+        var hashInputs = target
+            .Elements()
+            .Where(element => element.Name.LocalName == "GetFileHash")
+            .Select(element => Attribute(element, "Files")?.Replace('\\', '/'))
+            .ToArray();
+        Assert.Equal(3, hashInputs.Length);
+        Assert.Contains("$(TargetDir)$(TargetName).dll", hashInputs);
+        Assert.Contains(
+            "$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/$(TargetName).dll",
+            hashInputs
+        );
+        Assert.Contains(
+            "$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins/$(TargetName).dll",
+            hashInputs
+        );
+
+        var hashErrors = target
+            .Elements()
+            .Where(element => element.Name.LocalName == "Error")
+            .Where(element =>
+                (Attribute(element, "Text") ?? string.Empty).Contains(
+                    "exact Release DLL",
+                    StringComparison.Ordinal
+                )
+            )
+            .ToArray();
+        Assert.Equal(2, hashErrors.Length);
+        Assert.All(
+            hashErrors,
+            error =>
+            {
+                var condition = Attribute(error, "Condition") ?? string.Empty;
+                Assert.Contains("_ReleaseMainAssemblyHash", condition);
+                Assert.Contains("%(FileHash)", condition);
+            }
+        );
     }
 
     [Fact]
@@ -2433,7 +2510,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void BazaarAgent_host_BuildAll_forwards_prepared_release_and_installer_properties()
+    public void BazaarAgent_host_BuildAll_forwards_release_and_installer_properties()
     {
         var repoRoot = RepoRoot();
         var hostProject = Path.Combine(
@@ -2480,10 +2557,7 @@ public class CoreLayeringTests
             debugProperties
         );
         Assert.Contains("BPPInstallerSourcePath=$(BPPInstallerSourcePath)", debugProperties);
-        Assert.Contains(
-            "CombatReportViewerReleaseGatePrepared=$(CombatReportViewerReleaseGatePrepared)",
-            releaseProperties
-        );
+        Assert.DoesNotContain("CombatReportViewerReleaseGatePrepared", releaseProperties);
         Assert.Contains(
             "RemoteEmbeddedDataPrepared=$(RemoteEmbeddedDataPrepared)",
             releaseProperties

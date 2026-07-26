@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <CombatReportViewerBuildInput Include="$(MSBuildThisFileFullPath)" />
     <CombatReportViewerBuildInput Include="$(CombatReportViewerFrontendDirectory)\src\**\*" />
     <CombatReportViewerBuildInput Include="$(CombatReportViewerFrontendDirectory)\build.mjs" />
     <CombatReportViewerBuildInput Include="$(CombatReportViewerFrontendDirectory)\package.json" />
@@ -61,6 +62,35 @@
     <Exec
       WorkingDirectory="$(CombatReportViewerFrontendDirectory)"
       Command="npm run viewer:build -- --out-dir &quot;$(CombatReportViewerArtifactDirectory)&quot;"
+    />
+  </Target>
+
+  <Target
+    Name="ValidateCombatReportViewerArtifacts"
+    DependsOnTargets="BuildCombatReportViewerArtifacts"
+    Condition="'$(DesignTimeBuild)' != 'true'"
+  >
+    <Error
+      Condition="!Exists('$(CombatReportViewerScriptPath)') or !Exists('$(CombatReportViewerStylesheetPath)')"
+      Text="[CombatReportViewer] The staged Viewer artifacts are missing."
+    />
+    <Message
+      Text="[CombatReportViewer] Validating the exact staged artifacts embedded by this build"
+      Importance="high"
+    />
+    <Exec
+      WorkingDirectory="$(CombatReportViewerFrontendDirectory)"
+      Command="npm run viewer:browsers:install"
+    />
+    <Exec
+      WorkingDirectory="$(CombatReportViewerFrontendDirectory)"
+      Command="npm run viewer:typecheck"
+    />
+    <Exec WorkingDirectory="$(CombatReportViewerFrontendDirectory)" Command="npm run test:pure" />
+    <Exec
+      WorkingDirectory="$(CombatReportViewerFrontendDirectory)"
+      Command="npm run test:behavior"
+      EnvironmentVariables="BPP_VIEWER_ARTIFACT_DIR=$(CombatReportViewerArtifactDirectory)"
     />
   </Target>
 </Project>
