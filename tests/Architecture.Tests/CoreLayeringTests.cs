@@ -666,6 +666,40 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Transitional_Hero8_literal_is_confined_to_the_deletable_identity_adapter()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var adapter = Path.Combine(
+            mainSource,
+            "GameInterop",
+            "Heroes",
+            "TheDragonsHeroIdentity.cs"
+        );
+
+        Assert.True(
+            File.Exists(adapter),
+            $"The deletable The Dragons identity adapter must live at '{adapter}'."
+        );
+
+        var adapterFull = Path.GetFullPath(adapter);
+        var offenders = EnumerateSourceFiles(mainSource)
+            .Where(file =>
+                !string.Equals(Path.GetFullPath(file), adapterFull, StringComparison.Ordinal)
+            )
+            .Where(file => File.ReadAllText(file).Contains("Hero8", StringComparison.Ordinal))
+            .Select(file => Path.GetRelativePath(mainSource, file).Replace('\\', '/'))
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "The transitional Hero8 literal belongs only in the deletable "
+                + "GameInterop.Heroes identity adapter. Offending files:\n"
+                + string.Join("\n", offenders)
+        );
+    }
+
+    [Fact]
     public void LiveBuildPanel_owns_build_recommendation_implementation()
     {
         var repoRoot = RepoRoot();
