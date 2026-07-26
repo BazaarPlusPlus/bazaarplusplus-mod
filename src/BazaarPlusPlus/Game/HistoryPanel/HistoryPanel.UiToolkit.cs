@@ -214,7 +214,7 @@ internal sealed partial class HistoryPanel
             RunsBattleSubtitle =
                 selectedRun == null
                     ? HistoryPanelText.SelectRunSubtitle()
-                    : $"{selectedRun.Hero} | {HistoryPanelFormatter.FormatDayOnly(selectedRun.FinalDay)}",
+                    : $"{HistoryPanelHeroPresentation.DisplayName(selectedRun.Hero)} | {HistoryPanelFormatter.FormatDayOnly(selectedRun.FinalDay)}",
             ReplayButtonText = buttons.ReplayButtonText,
             ReplayButtonEnabled = buttons.ReplayButtonEnabled,
             RecordAndReplayButtonText = buttons.RecordAndReplayButtonText,
