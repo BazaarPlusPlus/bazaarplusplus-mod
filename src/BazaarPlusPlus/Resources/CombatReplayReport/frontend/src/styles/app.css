@@ -456,12 +456,31 @@
   box-shadow: var(--shadow-float);
 }
 
+.bpp-recording-docked {
+  --bpp-recording-video-aspect: 16 / 9;
+
+  position: fixed;
+  z-index: 31;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-background);
+}
+
 .bpp-recording-media {
   position: relative;
   width: 100%;
   flex: 0 0 auto;
   aspect-ratio: var(--bpp-recording-video-aspect);
   overflow: hidden;
+}
+
+.bpp-recording-docked .bpp-recording-media {
+  height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  aspect-ratio: auto;
 }
 
 .bpp-recording-drag-handle {

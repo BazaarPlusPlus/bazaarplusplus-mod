@@ -866,10 +866,11 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
     "data-bpp-sticky-side",
     "player",
   );
-  const playerStickyBackground = await stickyLabel.evaluate(
-    (element) => getComputedStyle(element).backgroundImage,
+  const playerStickySideColor = await stickyLabel.evaluate(
+    (element) =>
+      getComputedStyle(element).getPropertyValue("--bpp-sticky-side"),
   );
-  expect(playerStickyBackground).not.toBe("none");
+  expect(playerStickySideColor).not.toBe("");
 
   const readStickyGeometry = () => page.evaluate(() => {
     const ruler = document.querySelector(
@@ -937,10 +938,11 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
     "data-bpp-sticky-side",
     "opponent",
   );
-  const opponentStickyBackground = await stickyLabel.evaluate(
-    (element) => getComputedStyle(element).backgroundImage,
+  const opponentStickySideColor = await stickyLabel.evaluate(
+    (element) =>
+      getComputedStyle(element).getPropertyValue("--bpp-sticky-side"),
   );
-  expect(opponentStickyBackground).not.toBe(playerStickyBackground);
+  expect(opponentStickySideColor).not.toBe(playerStickySideColor);
   geometry = await readStickyGeometry();
   expect(Math.abs(geometry.labelTop - geometry.rulerBottom)).toBeLessThan(1);
   expect(Math.abs(geometry.canvasTop - geometry.rulerBottom)).toBeLessThan(1);
@@ -2186,6 +2188,251 @@ test("gives the timeline the viewport and keeps at least ten lanes visible", asy
   expect(Math.abs(geometry.footerSectionGap)).toBeLessThan(0.5);
   expect(geometry.visibleLaneHeight / geometry.laneHeight).toBeGreaterThanOrEqual(
     10,
+  );
+});
+
+test("virtualizes the footer combat log and highlights every visible row from the active frame", async ({
+  page,
+}) => {
+  await page.goto(`${denseReportUrl}?lang=en`);
+  await page.getByTestId("combat-log-dock-toggle").click();
+
+  const dock = page.getByTestId("footer-replay-dock");
+  const log = page.getByTestId("combat-log");
+  const rows = page.getByTestId("combat-log-entry");
+  await expect(dock).toBeVisible();
+  await expect(log).toHaveAttribute("data-bpp-total-count", "84");
+  await expect(rows).not.toHaveCount(0);
+  expect(await rows.count()).toBeLessThan(84);
+  const sameFrameHighlight = await rows.evaluateAll((elements) => {
+    const highlighted = elements.filter(
+      (element) => element.getAttribute("data-bpp-same-frame") === "true",
+    );
+    return {
+      count: highlighted.length,
+      frames: Array.from(
+        new Set(
+          highlighted.map((element) =>
+            element.getAttribute("data-bpp-frame")
+          ),
+        ),
+      ),
+    };
+  });
+  expect(sameFrameHighlight.count).toBeGreaterThan(1);
+  expect(sameFrameHighlight.frames).toEqual(["40"]);
+  await expect(
+    page.locator(
+      '[data-bpp-test-id="combat-log-entry"][data-bpp-active="true"]',
+    ),
+  ).toHaveCount(1);
+  const activeEntry = page.locator(
+    '[data-bpp-test-id="combat-log-entry"][data-bpp-active="true"]',
+  );
+  await expect(activeEntry).toHaveAttribute("data-bpp-combat-ms", "2000");
+  await expect(activeEntry).toHaveAttribute("aria-current", "true");
+  await expect(activeEntry).toContainText("Currently selected event");
+  const otherEntryAtFrame = page.locator(
+    '[data-bpp-test-id="combat-log-entry"]'
+      + '[data-bpp-same-frame="true"][data-bpp-active="false"]',
+  ).first();
+  await expect(otherEntryAtFrame).not.toHaveAttribute("aria-current", "true");
+  await expect(otherEntryAtFrame).toContainText(
+    "Occurred in the same frame as the current event",
+  );
+  const selectedIndex = await otherEntryAtFrame.getAttribute("data-index");
+  expect(selectedIndex).not.toBeNull();
+  await otherEntryAtFrame.click();
+  await expect(
+    page.locator(
+      `[data-bpp-test-id="combat-log-entry"][data-index="${selectedIndex}"]`,
+    ),
+  ).toHaveAttribute("data-bpp-active", "true");
+  await expect(
+    page.locator(
+      '[data-bpp-test-id="combat-log-entry"][data-bpp-same-frame="true"]',
+    ),
+  ).toHaveCount(sameFrameHighlight.count);
+
+  const ruler = page.getByTestId("timeline-ruler-canvas");
+  const rulerBounds = await ruler.boundingBox();
+  expect(rulerBounds).not.toBeNull();
+  await ruler.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    element.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: bounds.left + bounds.width * 0.05,
+      clientY: bounds.top + bounds.height * 0.5,
+    }));
+  });
+  await expect(log).toHaveAttribute("data-bpp-follow-source", "paused");
+  await expect(activeEntry).not.toHaveAttribute("data-index", selectedIndex);
+  await ruler.dispatchEvent("pointerout");
+  await expect(activeEntry).toHaveAttribute("data-index", selectedIndex);
+
+  const viewport = page.getByTestId("combat-log-viewport");
+  const scrollGeometry = await viewport.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(scrollGeometry.scrollHeight).toBeGreaterThan(
+    scrollGeometry.clientHeight,
+  );
+  await viewport.hover();
+  await page.mouse.wheel(0, 240);
+  await expect(page.getByTestId("combat-log-resume")).toBeVisible();
+  await page.getByTestId("combat-log-resume").click();
+  await expect(page.getByTestId("combat-log-resume")).toBeHidden();
+  await rows.first().focus();
+  await expect(page.getByTestId("combat-log-resume")).toBeVisible();
+});
+
+test("embeds the existing recording instance in the footer dock", async ({
+  page,
+}) => {
+  await page.goto(`${recordingReportUrl}?lang=en`);
+  const video = page.getByTestId("recording-video");
+  await expect(video).toHaveCount(1);
+  await video.evaluate((element) => {
+    element.dataset.identitySentinel = "stable-recording-video";
+    element.playbackRate = 1.5;
+    window.__bppRecordingVideo = element;
+  });
+  await video.dispatchEvent("play");
+  await page.getByTestId("combat-log-dock-toggle").click();
+
+  await expect(page.getByTestId("footer-replay-dock")).toBeVisible();
+  await expect(page.getByTestId("combat-log")).toHaveAttribute(
+    "data-bpp-follow-source",
+    "playback",
+  );
+  await expect(page.getByTestId("recording-window")).toHaveAttribute(
+    "data-bpp-recording-presentation",
+    "docked",
+  );
+  await expect(video).toHaveCount(1);
+  expect(
+    await page.evaluate(
+      () =>
+        document.querySelector(
+          '[data-bpp-test-id="recording-video"]',
+        ) === window.__bppRecordingVideo,
+    ),
+  ).toBe(true);
+  await expect(video).toHaveAttribute(
+    "data-identity-sentinel",
+    "stable-recording-video",
+  );
+  expect(await video.evaluate((element) => element.playbackRate)).toBe(1.5);
+  const geometry = await page.evaluate(() => {
+      const host = document.querySelector(
+        '[data-bpp-test-id="footer-recording-host"]',
+      );
+      const recording = document.querySelector(
+        '[data-bpp-test-id="recording-window"]',
+      );
+      const dock = document.querySelector(
+        '[data-bpp-test-id="footer-replay-dock"]',
+      );
+      if (!host || !recording || !dock) return null;
+      const hostBounds = host.getBoundingClientRect();
+      const recordingBounds = recording.getBoundingClientRect();
+      const dockBounds = dock.getBoundingClientRect();
+      return {
+        dock: {
+          left: dockBounds.left,
+          right: dockBounds.right,
+        },
+        host: {
+          height: hostBounds.height,
+          width: hostBounds.width,
+        },
+        recording: {
+          height: recordingBounds.height,
+          left: recordingBounds.left,
+          right: recordingBounds.right,
+          width: recordingBounds.width,
+        },
+      };
+    });
+  expect(geometry).not.toBeNull();
+  expect(
+    Math.abs(geometry.recording.width - geometry.host.width),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(geometry.recording.height - geometry.host.height),
+  ).toBeLessThanOrEqual(1);
+  expect(geometry.recording.left).toBeGreaterThanOrEqual(geometry.dock.left);
+  expect(geometry.recording.right).toBeLessThanOrEqual(geometry.dock.right);
+  expect(
+    await page
+      .getByTestId("recording-controls")
+      .evaluate(
+        (element) =>
+          element.closest('[data-bpp-test-id="workbench-footer"]') !== null,
+      ),
+  ).toBe(true);
+
+  const resizeHandle = page.getByTestId("footer-replay-dock-resize");
+  await expect(resizeHandle).toHaveAttribute("role", "separator");
+  await expect(resizeHandle).toHaveAttribute(
+    "aria-orientation",
+    "horizontal",
+  );
+  const heightBeforeKeyboardResize = (
+    await page.getByTestId("footer-replay-dock").boundingBox()
+  ).height;
+  await resizeHandle.focus();
+  await resizeHandle.press("ArrowUp");
+  const heightAfterKeyboardResize = (
+    await page.getByTestId("footer-replay-dock").boundingBox()
+  ).height;
+  expect(heightAfterKeyboardResize).toBeGreaterThan(
+    heightBeforeKeyboardResize,
+  );
+
+  await page.getByTestId("combat-log-dock-toggle").click();
+  await expect(page.getByTestId("footer-replay-dock")).toBeHidden();
+  expect(
+    await page.evaluate(
+      () =>
+        document.querySelector(
+          '[data-bpp-test-id="recording-video"]',
+        ) === window.__bppRecordingVideo,
+    ),
+  ).toBe(true);
+  expect(await video.evaluate((element) => element.playbackRate)).toBe(1.5);
+  await page.getByTestId("combat-log-dock-toggle").click();
+
+  await page.setViewportSize({ width: 480, height: 857 });
+  await expect(page.getByTestId("combat-log-route").first()).toBeHidden();
+  const narrowDimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(narrowDimensions.scrollWidth).toBeLessThanOrEqual(
+    narrowDimensions.clientWidth,
+  );
+
+  await page.setViewportSize({ width: 320, height: 420 });
+  await expect
+    .poll(async () => (
+      await page.getByTestId("footer-replay-dock").boundingBox()
+    ).height)
+    .toBeLessThanOrEqual(144);
+  await expect(
+    page.getByTestId("combat-log").getByText("Combat log", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByTestId("combat-log-entry").first()).toBeVisible();
+  expect(
+    (await page.getByTestId("timeline-scroll").boundingBox()).height,
+  ).toBeGreaterThanOrEqual(175);
+  const shortViewportDimensions = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(shortViewportDimensions.scrollWidth).toBeLessThanOrEqual(
+    shortViewportDimensions.clientWidth,
   );
 });
 

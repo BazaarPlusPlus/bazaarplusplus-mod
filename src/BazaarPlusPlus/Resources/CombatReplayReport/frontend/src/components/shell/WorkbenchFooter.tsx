@@ -1,4 +1,10 @@
-import { Minus, Plus, Video, VideoOff } from "lucide-react";
+import {
+  ListVideo,
+  Minus,
+  Plus,
+  Video,
+  VideoOff,
+} from "lucide-react";
 import type { ReportAction } from "../../app/report-reducer.ts";
 import {
   TIME_ZOOM_STEPS,
@@ -16,18 +22,22 @@ import {
 export function WorkbenchFooter({
   dispatch,
   hasRecording,
+  onToggleReplayDock,
   onToggleRecording,
   recordingControlsRef,
   recordingVisible,
+  replayDockOpen,
   showTimelineTools,
   state,
   t,
 }: {
   dispatch: React.Dispatch<ReportAction>;
   hasRecording: boolean;
+  onToggleReplayDock: () => void;
   onToggleRecording: () => void;
   recordingControlsRef: (node: HTMLDivElement | null) => void;
   recordingVisible: boolean;
+  replayDockOpen: boolean;
   showTimelineTools: boolean;
   state: ReportState;
   t: (key: string) => string;
@@ -83,7 +93,32 @@ export function WorkbenchFooter({
         </ButtonGroup>
       )}
 
-      {hasRecording && (
+      {showTimelineTools && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Toggle
+              aria-label={t(
+                replayDockOpen ? "hideCombatLogDock" : "showCombatLogDock",
+              )}
+              className="ml-auto size-control-xs shrink-0 px-0"
+              data-bpp-test-id="combat-log-dock-toggle"
+              onPressedChange={(pressed) => {
+                if (pressed !== replayDockOpen) onToggleReplayDock();
+              }}
+              pressed={replayDockOpen}
+              size="xs"
+              variant="outline"
+            >
+              <ListVideo className="size-icon-sm" />
+            </Toggle>
+          </TooltipTrigger>
+          <TooltipContent>
+            {t(replayDockOpen ? "hideCombatLogDock" : "showCombatLogDock")}
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {hasRecording && !replayDockOpen && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Toggle
@@ -92,7 +127,11 @@ export function WorkbenchFooter({
                   ? t("hideRecording")
                   : t("showRecording")
               }
-              className="ml-auto size-control-xs shrink-0 px-0"
+              className={
+                showTimelineTools
+                  ? "size-control-xs shrink-0 px-0"
+                  : "ml-auto size-control-xs shrink-0 px-0"
+              }
               data-bpp-test-id="recording-visibility-toggle"
               onPressedChange={(pressed) => {
                 if (pressed !== recordingVisible) onToggleRecording();

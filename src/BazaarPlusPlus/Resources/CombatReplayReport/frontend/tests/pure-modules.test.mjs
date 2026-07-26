@@ -90,6 +90,11 @@ import {
 } from "../src/timeline/lane-filter.ts";
 import { buildEntityActivity } from "../src/statistics/aggregate.ts";
 import { mergeInspectorEvents } from "../src/components/inspector/frame-event-groups.ts";
+import {
+  buildCombatLogEntries,
+  nearestCombatLogEntryIndex,
+  selectedCombatLogEntryIndex,
+} from "../src/combat-log/entries.ts";
 
 function timelineEvent(overrides = {}) {
   return {
@@ -115,6 +120,100 @@ function timelineEvent(overrides = {}) {
     ...overrides,
   };
 }
+
+test("combat log merges only identical events from the same frame", () => {
+  const base = timelineEvent({
+    frame: 20,
+    combatMs: 1_000,
+    kind: "effect-executed",
+    action: "CardHaste",
+    sourceId: "source",
+    targetIds: ["target"],
+    value: 2_000,
+    unit: "milliseconds",
+  });
+  const entries = buildCombatLogEntries([
+    { ...base, id: "same-a", occurrences: 2 },
+    { ...base, id: "same-b", occurrences: 3 },
+    {
+      ...base,
+      id: "next-frame",
+      frame: 21,
+      combatMs: 1_050,
+    },
+    {
+      ...base,
+      id: "different-target",
+      targetIds: ["other-target"],
+    },
+  ]);
+
+  assert.equal(entries.length, 3);
+  const mergedEntry = entries.find((entry) =>
+    entry.eventIds.includes("same-a")
+  );
+  assert.ok(mergedEntry);
+  assert.equal(mergedEntry.count, 5);
+  assert.deepEqual(mergedEntry.eventIds, ["same-a", "same-b"]);
+  assert.equal(entries.filter((entry) => entry.frame === 20).length, 2);
+  assert.equal(entries.filter((entry) => entry.frame === 21).length, 1);
+});
+
+test("combat log nearest entry lookup is stable at bounds and ties", () => {
+  const entries = [0, 1_000, 2_000].map((combatMs, index) => ({
+    id: String(index),
+    frame: index,
+    combatMs,
+    token: "status",
+    sourceId: "",
+    triggerSourceId: "",
+    targetIds: [],
+    eventIds: [],
+    value: null,
+    unit: "",
+    count: 1,
+  }));
+
+  assert.equal(nearestCombatLogEntryIndex([], 1_000), -1);
+  assert.equal(nearestCombatLogEntryIndex(entries, -100), 0);
+  assert.equal(nearestCombatLogEntryIndex(entries, 500), 0);
+  assert.equal(nearestCombatLogEntryIndex(entries, 1_600), 2);
+  assert.equal(nearestCombatLogEntryIndex(entries, 3_000), 2);
+});
+
+test("combat log selection prefers the clicked event within a shared frame", () => {
+  const entries = [
+    {
+      id: "first",
+      frame: 20,
+      combatMs: 1_000,
+      token: "damage",
+      sourceId: "source-a",
+      triggerSourceId: "",
+      targetIds: ["target"],
+      eventIds: ["event-a"],
+      value: 10,
+      unit: "points",
+      count: 1,
+    },
+    {
+      id: "second",
+      frame: 20,
+      combatMs: 1_000,
+      token: "healing",
+      sourceId: "source-b",
+      triggerSourceId: "",
+      targetIds: ["target"],
+      eventIds: ["event-b"],
+      value: 5,
+      unit: "points",
+      count: 1,
+    },
+  ];
+
+  assert.equal(selectedCombatLogEntryIndex(entries, ["event-b"], 1_000), 1);
+  assert.equal(selectedCombatLogEntryIndex(entries, [], 1_000), 0);
+});
 
 test("inspector merge identity keeps unit, semantic icon, and attribution distinct", () => {
   const base = timelineEvent({

@@ -26,6 +26,11 @@ import {
   type RecordingHandle,
 } from "../components/recording/RecordingWindow.tsx";
 import { WorkbenchFooter } from "../components/shell/WorkbenchFooter.tsx";
+import {
+  FooterReplayDock,
+  type FooterReplayDockHandle,
+} from "../components/shell/FooterReplayDock.tsx";
+import type { CombatLogEntry } from "../combat-log/entries.ts";
 
 export function ReportApp({
   envelope,
@@ -40,10 +45,16 @@ export function ReportApp({
     createInitialReportState,
   );
   const [recordingVisible, setRecordingVisible] = useState(true);
+  const [replayDockOpen, setReplayDockOpen] = useState(false);
   const [recordingControlsHost, setRecordingControlsHost] =
+    useState<HTMLDivElement | null>(null);
+  const [recordingDockHost, setRecordingDockHost] =
     useState<HTMLDivElement | null>(null);
   const timelineRef = useRef<TimelineHandle>(null);
   const recordingRef = useRef<RecordingHandle>(null);
+  const replayDockRef = useRef<FooterReplayDockHandle>(null);
+  const playbackActiveRef = useRef(false);
+  const playbackCombatMsRef = useRef(0);
   const { copy, t } = useMemo(
     () => copyForLocale(state.locale),
     [state.locale],
@@ -91,6 +102,7 @@ export function ReportApp({
   }, []);
 
   const previewCombatMs = useCallback((combatMs: number | null): void => {
+    replayDockRef.current?.setPreviewCombatMs(combatMs);
     if (combatMs !== null) {
       recordingRef.current?.seekCombatMs(combatMs, true);
     }
@@ -101,6 +113,32 @@ export function ReportApp({
     }
     setRecordingVisible(!recordingVisible);
   }, [recordingVisible]);
+  const toggleReplayDock = useCallback((): void => {
+    setReplayDockOpen((open) => {
+      if (!open) setRecordingVisible(true);
+      return !open;
+    });
+  }, []);
+  const selectCombatLogEntry = useCallback((
+    entry: CombatLogEntry,
+  ): void => {
+    dispatch({
+      type: "select-frame",
+      frame: entry.frame,
+      combatMs: entry.combatMs,
+      clusterEventIds: entry.eventIds,
+      entityId: entry.targetIds[0] || entry.sourceId,
+    });
+  }, []);
+  const handlePlaybackActiveChange = useCallback((active: boolean): void => {
+    playbackActiveRef.current = active;
+    replayDockRef.current?.setPlaybackActive(active);
+  }, []);
+  const handlePlaybackCombatTime = useCallback((combatMs: number): void => {
+    playbackCombatMsRef.current = combatMs;
+    timelineRef.current?.setExternalPlayhead(combatMs);
+    replayDockRef.current?.setPlaybackCombatMs(combatMs);
+  }, []);
 
   return (
     <div className="flex size-full min-h-0 flex-col overflow-hidden">
@@ -140,13 +178,28 @@ export function ReportApp({
             </div>
           )}
         </div>
+        {state.tab === "timeline" && replayDockOpen && (
+          <FooterReplayDock
+            initialPlaybackActive={playbackActiveRef.current}
+            initialPlaybackCombatMs={playbackCombatMsRef.current}
+            model={model}
+            onRecordingHost={setRecordingDockHost}
+            onSelectEntry={selectCombatLogEntry}
+            pinnedCombatMs={state.selectedCombatMs}
+            pinnedEventIds={state.selectedClusterEventIds}
+            ref={replayDockRef}
+            t={t}
+          />
+        )}
         {(state.tab === "timeline" || Boolean(model.videoUrl)) && (
           <WorkbenchFooter
             dispatch={dispatch}
             hasRecording={Boolean(model.videoUrl)}
+            onToggleReplayDock={toggleReplayDock}
             onToggleRecording={toggleRecording}
             recordingControlsRef={setRecordingControlsHost}
             recordingVisible={recordingVisible}
+            replayDockOpen={replayDockOpen && state.tab === "timeline"}
             showTimelineTools={state.tab === "timeline"}
             state={state}
             t={t}
@@ -156,16 +209,21 @@ export function ReportApp({
       {model.videoUrl && (
         <RecordingWindow
           controlsHost={recordingControlsHost}
+          dockHost={recordingDockHost}
           model={model}
-          onPlaybackCombatTime={(combatMs) =>
-            timelineRef.current?.setExternalPlayhead(combatMs)
-          }
+          onPlaybackActiveChange={handlePlaybackActiveChange}
+          onPlaybackCombatTime={handlePlaybackCombatTime}
           onHide={() => {
             recordingRef.current?.prepareToHide();
             setRecordingVisible(false);
           }}
           onNextEvent={() => timelineRef.current?.navigate(1)}
           onPreviousEvent={() => timelineRef.current?.navigate(-1)}
+          presentation={
+            replayDockOpen && state.tab === "timeline"
+              ? "docked"
+              : "floating"
+          }
           ref={recordingRef}
           t={t}
           visible={recordingVisible}

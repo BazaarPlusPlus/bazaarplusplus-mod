@@ -1,7 +1,9 @@
 import { Minus } from "lucide-react";
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useRef,
 } from "react";
 import { createPortal } from "react-dom";
@@ -13,9 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "../ui/tooltip.tsx";
-import {
-  RecordingControls,
-} from "./RecordingControls.tsx";
+import { RecordingControls } from "./RecordingControls.tsx";
 import { useRecordingPlayback } from "./useRecordingPlayback.ts";
 
 const WORKBENCH_FOOTER_HEIGHT = 36;
@@ -30,9 +30,12 @@ export const RecordingWindow = forwardRef<
   RecordingHandle,
   {
     controlsHost: HTMLDivElement | null;
+    dockHost: HTMLDivElement | null;
     model: ReportViewModel;
     visible: boolean;
+    presentation: "floating" | "docked";
     onHide: () => void;
+    onPlaybackActiveChange: (active: boolean) => void;
     onPlaybackCombatTime: (combatMs: number) => void;
     onPreviousEvent: () => void;
     onNextEvent: () => void;
@@ -41,9 +44,12 @@ export const RecordingWindow = forwardRef<
 >(function RecordingWindow(
   {
     controlsHost,
+    dockHost,
     model,
     visible,
+    presentation,
     onHide,
+    onPlaybackActiveChange,
     onPlaybackCombatTime,
     onPreviousEvent,
     onNextEvent,
@@ -58,6 +64,14 @@ export const RecordingWindow = forwardRef<
     startY: number;
     left: number;
     top: number;
+  } | null>(null);
+  const floatingStyleRef = useRef<{
+    bottom: string;
+    height: string;
+    left: string;
+    right: string;
+    top: string;
+    width: string;
   } | null>(null);
   const {
     handleLoadedMetadata,
@@ -88,6 +102,59 @@ export const RecordingWindow = forwardRef<
     () => ({ prepareToHide, seekCombatMs }),
     [prepareToHide, seekCombatMs],
   );
+
+  useEffect(() => {
+    onPlaybackActiveChange(playing);
+  }, [onPlaybackActiveChange, playing]);
+
+  useEffect(
+    () => () => onPlaybackActiveChange(false),
+    [onPlaybackActiveChange],
+  );
+
+  useLayoutEffect(() => {
+    const host = hostRef.current;
+    const docked = presentation === "docked" && dockHost !== null;
+    if (!host) return;
+
+    if (!docked) {
+      const floatingStyle = floatingStyleRef.current;
+      if (floatingStyle) {
+        Object.assign(host.style, floatingStyle);
+        floatingStyleRef.current = null;
+      }
+      return;
+    }
+
+    if (!floatingStyleRef.current) {
+      floatingStyleRef.current = {
+        bottom: host.style.bottom,
+        height: host.style.height,
+        left: host.style.left,
+        right: host.style.right,
+        top: host.style.top,
+        width: host.style.width,
+      };
+    }
+
+    const syncDockBounds = (): void => {
+      const bounds = dockHost.getBoundingClientRect();
+      host.style.left = `${bounds.left}px`;
+      host.style.top = `${bounds.top}px`;
+      host.style.right = "auto";
+      host.style.bottom = "auto";
+      host.style.width = `${bounds.width}px`;
+      host.style.height = `${bounds.height}px`;
+    };
+    syncDockBounds();
+    const observer = new ResizeObserver(syncDockBounds);
+    observer.observe(dockHost);
+    window.addEventListener("resize", syncDockBounds);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", syncDockBounds);
+    };
+  }, [dockHost, presentation, visible]);
 
   const startDrag = (
     event: React.PointerEvent<HTMLElement>,
@@ -142,6 +209,7 @@ export const RecordingWindow = forwardRef<
   };
 
   if (!visible) return null;
+  const docked = presentation === "docked" && dockHost !== null;
 
   const controls = (
     <RecordingControls
@@ -164,14 +232,19 @@ export const RecordingWindow = forwardRef<
     />
   );
 
-  return (
-    <>
-      <section
-        aria-label={t("recordingTitle")}
-        className="bpp-recording-window"
-        data-bpp-test-id="recording-window"
-        ref={hostRef}
-      >
+  const recording = (
+    <section
+      aria-label={t("recordingTitle")}
+      className={
+        docked
+          ? "bpp-recording-docked"
+          : "bpp-recording-window"
+      }
+      data-bpp-test-id="recording-window"
+      data-bpp-recording-presentation={docked ? "docked" : "floating"}
+      ref={hostRef}
+    >
+      {!docked && (
         <header
           className="bpp-recording-drag-handle"
           data-bpp-test-id="recording-drag-handle"
@@ -201,28 +274,34 @@ export const RecordingWindow = forwardRef<
             <TooltipContent>{t("hideRecording")}</TooltipContent>
           </Tooltip>
         </header>
-        <div className="bpp-recording-media bg-media">
-          <video
-            className="block size-full object-contain"
-            data-bpp-test-id="recording-video"
-            onCanPlay={() => setLoaded(true)}
-            onError={() => setLoadFailed(true)}
-            onLoadedMetadata={() => handleLoadedMetadata(hostRef.current)}
-            onPause={() => setPlaying(false)}
-            onPlay={() => setPlaying(true)}
-            onTimeUpdate={handleTimeUpdate}
-            playsInline
-            preload="metadata"
-            ref={videoRef}
-            src={model.videoUrl}
-          />
-          {!loaded && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 top-8 grid place-items-center bg-media/80 px-6 text-center text-compact text-muted-foreground">
-              {t(loadFailed ? "recordingLoadError" : "recordingReady")}
-            </div>
-          )}
-        </div>
-      </section>
+      )}
+      <div className="bpp-recording-media bg-media">
+        <video
+          className="block size-full object-contain"
+          data-bpp-test-id="recording-video"
+          onCanPlay={() => setLoaded(true)}
+          onError={() => setLoadFailed(true)}
+          onLoadedMetadata={() => handleLoadedMetadata(hostRef.current)}
+          onPause={() => setPlaying(false)}
+          onPlay={() => setPlaying(true)}
+          onTimeUpdate={handleTimeUpdate}
+          playsInline
+          preload="metadata"
+          ref={videoRef}
+          src={model.videoUrl}
+        />
+        {!loaded && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 top-8 grid place-items-center bg-media/80 px-6 text-center text-compact text-muted-foreground">
+            {t(loadFailed ? "recordingLoadError" : "recordingReady")}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
+  return (
+    <>
+      {recording}
       {controlsHost && createPortal(controls, controlsHost)}
     </>
   );
