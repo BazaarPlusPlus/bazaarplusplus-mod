@@ -464,8 +464,12 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
-  background: var(--color-background);
+  background: var(--color-media);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--color-border) 65%, transparent);
 }
 
 .bpp-recording-media {
@@ -477,10 +481,13 @@
 }
 
 .bpp-recording-docked .bpp-recording-media {
-  height: 100%;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   min-height: 0;
-  flex: 1 1 auto;
-  aspect-ratio: auto;
+  flex: 0 1 auto;
+  aspect-ratio: var(--bpp-recording-video-aspect);
 }
 
 .bpp-recording-drag-handle {

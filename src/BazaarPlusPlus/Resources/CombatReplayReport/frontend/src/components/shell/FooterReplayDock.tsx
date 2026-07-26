@@ -103,7 +103,7 @@ export const FooterReplayDock = forwardRef<
 
   return (
     <section
-      className="relative z-30 flex shrink-0 border-t border-border bg-surface/98 shadow-sticky"
+      className="relative z-30 flex shrink-0 overflow-hidden border-t border-border bg-background shadow-sticky"
       data-bpp-test-id="footer-replay-dock"
       style={{ height }}
     >
@@ -176,7 +176,7 @@ export const FooterReplayDock = forwardRef<
       />
       {model.videoUrl && (
         <div
-          className="h-full w-[clamp(120px,42vw,520px)] shrink-0 border-l border-border/60 bg-media min-[721px]:w-[clamp(280px,34vw,520px)]"
+          className="h-full w-[clamp(136px,32vw,180px)] shrink-0 border-l border-border/60 bg-media min-[721px]:aspect-video min-[721px]:w-auto min-[721px]:max-w-[40vw]"
           data-bpp-test-id="footer-recording-host"
           ref={onRecordingHost}
         />

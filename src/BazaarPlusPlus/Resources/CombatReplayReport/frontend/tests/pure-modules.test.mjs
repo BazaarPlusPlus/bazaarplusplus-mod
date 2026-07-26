@@ -92,6 +92,8 @@ import { buildEntityActivity } from "../src/statistics/aggregate.ts";
 import { mergeInspectorEvents } from "../src/components/inspector/frame-event-groups.ts";
 import {
   buildCombatLogEntries,
+  groupCombatLogEntries,
+  isNarrativeCombatLogEntry,
   nearestCombatLogEntryIndex,
   selectedCombatLogEntryIndex,
 } from "../src/combat-log/entries.ts";
@@ -159,11 +161,61 @@ test("combat log merges only identical events from the same frame", () => {
   assert.equal(entries.filter((entry) => entry.frame === 21).length, 1);
 });
 
+test("combat log narrative excludes generic setup and attribute noise", () => {
+  assert.equal(
+    isNarrativeCombatLogEntry({ action: "PlayerDamage", token: "damage" }),
+    true,
+  );
+  assert.equal(
+    isNarrativeCombatLogEntry({ action: "Died", token: "status" }),
+    true,
+  );
+  assert.equal(
+    isNarrativeCombatLogEntry({
+      action: "PlayerModifyAttribute",
+      token: "status",
+    }),
+    false,
+  );
+  assert.equal(
+    isNarrativeCombatLogEntry({ action: "FlyingStart", token: "status" }),
+    false,
+  );
+});
+
+test("combat log grouping never merges distinct actions", () => {
+  const entries = buildCombatLogEntries([
+    timelineEvent({
+      id: "first",
+      frame: 20,
+      kind: "effect-executed",
+      action: "PlayerDamage",
+      sourceId: "source",
+      targetIds: ["target"],
+      value: 10,
+      unit: "points",
+    }),
+    timelineEvent({
+      id: "second",
+      frame: 20,
+      kind: "effect-executed",
+      action: "PlayerBurnApply",
+      sourceId: "source",
+      targetIds: ["target"],
+      value: 10,
+      unit: "points",
+    }),
+  ]);
+
+  assert.equal(groupCombatLogEntries(entries).length, 2);
+});
+
 test("combat log nearest entry lookup is stable at bounds and ties", () => {
   const entries = [0, 1_000, 2_000].map((combatMs, index) => ({
     id: String(index),
     frame: index,
     combatMs,
+    action: "",
     token: "status",
     sourceId: "",
     triggerSourceId: "",
@@ -187,6 +239,7 @@ test("combat log selection prefers the clicked event within a shared frame", () 
       id: "first",
       frame: 20,
       combatMs: 1_000,
+      action: "PlayerDamage",
       token: "damage",
       sourceId: "source-a",
       triggerSourceId: "",
@@ -200,6 +253,7 @@ test("combat log selection prefers the clicked event within a shared frame", () 
       id: "second",
       frame: 20,
       combatMs: 1_000,
+      action: "PlayerHeal",
       token: "healing",
       sourceId: "source-b",
       triggerSourceId: "",

@@ -1,5 +1,5 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { ChevronRight, Pause, Play, RotateCcw } from "lucide-react";
 import {
   forwardRef,
   useEffect,
@@ -18,11 +18,14 @@ import type { ReportViewModel } from "../../model/report.ts";
 import {
   buildCombatLogEntries,
   combatLogEntity,
+  groupCombatLogEntries,
+  isNarrativeCombatLogEntry,
   nearestCombatLogEntryIndex,
   selectedCombatLogEntryIndex,
   type CombatLogEntry,
 } from "../../combat-log/entries.ts";
 import { cn } from "../../lib/utils.ts";
+import { isVisibleTimelineEvent } from "../../timeline/clusters.ts";
 import { EntityArt } from "../semantic/EntityArt.tsx";
 import { SemanticIcon } from "../semantic/SemanticIcon.tsx";
 import { Button } from "../ui/button.tsx";
@@ -49,20 +52,11 @@ function entryAmount(entry: CombatLogEntry): string {
 
 function EntityChip({
   entity,
-  fallback,
 }: {
-  entity: NormalizedEntity | null;
-  fallback: string;
+  entity: NormalizedEntity;
 }): React.JSX.Element {
-  if (!entity) {
-    return (
-      <span className="min-w-0 truncate text-muted-foreground">
-        {fallback}
-      </span>
-    );
-  }
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5">
+    <span className="inline-flex min-w-0 max-w-28 items-center gap-1.5 max-[600px]:max-w-20">
       <EntityArt entity={entity} size="compact" />
       <span className="truncate" title={entity.name}>{entity.name}</span>
     </span>
@@ -92,13 +86,22 @@ export const CombatLogList = forwardRef<
   },
   forwardedRef,
 ): React.JSX.Element {
-  const entries = useMemo(
-    () => buildCombatLogEntries(model.events),
-    [model.events],
-  );
   const entityById = useMemo(
     () => new Map(model.entities.map((entity) => [entity.id, entity])),
     [model.entities],
+  );
+  const rawEntries = useMemo(
+    () =>
+      buildCombatLogEntries(
+        model.events.filter((event) =>
+          isVisibleTimelineEvent(event, entityById)
+        ),
+      ).filter(isNarrativeCombatLogEntry),
+    [entityById, model.events],
+  );
+  const entries = useMemo(
+    () => groupCombatLogEntries(rawEntries),
+    [rawEntries],
   );
   const viewportRef = useRef<HTMLDivElement>(null);
   const previewMsRef = useRef<number | null>(null);
@@ -118,7 +121,7 @@ export const CombatLogList = forwardRef<
 
   const virtualizer = useVirtualizer({
     count: entries.length,
-    estimateSize: () => 58,
+    estimateSize: () => 36,
     getScrollElement: () => viewportRef.current,
     overscan: 8,
   });
@@ -207,24 +210,16 @@ export const CombatLogList = forwardRef<
     <section
       className="flex min-h-0 min-w-0 flex-1 flex-col"
       data-bpp-follow-source={manualPaused ? "paused" : followSource}
-      data-bpp-total-count={entries.length}
+      data-bpp-row-count={entries.length}
+      data-bpp-total-count={rawEntries.length}
       data-bpp-test-id="combat-log"
     >
-      <header className="flex h-control-sm shrink-0 items-center gap-2 border-b border-border/60 px-3">
+      <header className="flex h-control-sm shrink-0 items-center gap-2 border-b border-border/60 bg-surface-raised/70 px-3">
         <strong className="text-compact">{t("combatLogTitle")}</strong>
-        <span className="font-mono text-micro text-muted-foreground">
-          {entries.length} {t("event")}
-        </span>
-        <span className="ml-auto inline-flex items-center gap-1.5 text-micro text-muted-foreground">
-          {followSource === "playback"
-            ? <Play className="size-icon-sm" />
-            : manualPaused
-              ? <Pause className="size-icon-sm" />
-              : null}
-          {manualPaused ? t("combatLogPaused") : followLabel}
-        </span>
-        {manualPaused && (
+        {manualPaused
+          ? (
           <Button
+            className="ml-auto"
             data-bpp-test-id="combat-log-resume"
             onClick={() => setManualPaused(false)}
             size="xs"
@@ -234,7 +229,15 @@ export const CombatLogList = forwardRef<
             <RotateCcw className="size-icon-sm" />
             {t("combatLogResume")}
           </Button>
-        )}
+          )
+          : (
+            <span className="ml-auto inline-flex items-center gap-1.5 text-micro text-muted-foreground">
+              {followSource === "playback"
+                ? <Play className="size-icon-sm" />
+                : <Pause className="size-icon-sm opacity-60" />}
+              <span className="max-[600px]:sr-only">{followLabel}</span>
+            </span>
+          )}
       </header>
       <div
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
@@ -277,6 +280,9 @@ export const CombatLogList = forwardRef<
                 .filter((entity): entity is NormalizedEntity => entity !== null);
               const amount = entryAmount(entry);
               const active = virtualRow.index === activeIndex;
+              const frameStart =
+                virtualRow.index === 0
+                || entries[virtualRow.index - 1]?.frame !== entry.frame;
               const sameFrame =
                 activeIndex >= 0
                 && entries[activeIndex]?.frame === entry.frame;
@@ -284,13 +290,15 @@ export const CombatLogList = forwardRef<
                 <Button
                   aria-current={active ? "true" : undefined}
                   className={cn(
-                    "absolute left-0 top-0 grid h-[58px] w-full grid-cols-[4.25rem_7.25rem_minmax(0,1fr)_auto] items-center gap-2 border-b border-border/40 px-3 text-left transition-colors hover:bg-accent/45 max-[720px]:grid-cols-[3.75rem_minmax(0,1fr)_auto]",
-                    sameFrame && "bg-accent/25",
-                    active && "bg-brand-soft/10 shadow-[inset_3px_0_0_var(--color-brand-soft)]",
+                    "absolute left-0 top-0 grid h-9 w-full grid-cols-[4rem_minmax(0,1fr)_4.5rem] items-center gap-2 border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_minmax(0,1fr)_auto] max-[600px]:px-2",
+                    frameStart && "border-t border-t-border/55",
+                    sameFrame && "bg-brand-soft/[0.07]",
+                    active && "bg-brand-soft/[0.13] shadow-[inset_3px_0_0_var(--color-brand-soft)]",
                   )}
                   data-bpp-active={active ? "true" : "false"}
                   data-bpp-combat-ms={entry.combatMs}
                   data-bpp-frame={entry.frame}
+                  data-bpp-frame-start={frameStart ? "true" : "false"}
                   data-bpp-same-frame={sameFrame ? "true" : "false"}
                   data-bpp-test-id="combat-log-entry"
                   data-index={virtualRow.index}
@@ -312,39 +320,45 @@ export const CombatLogList = forwardRef<
                       )}
                     </span>
                   )}
-                  <span className="font-mono text-micro text-brand-soft">
-                    {formatDuration(entry.combatMs)}
-                  </span>
-                  <span className="flex min-w-0 items-center gap-1.5">
-                    <SemanticIcon className="size-icon-sm" token={entry.token} />
-                    <strong className="truncate text-compact">
-                      {t(entry.token)}
-                    </strong>
-                  </span>
-                  <span
-                    className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-1.5 text-compact max-[720px]:hidden"
-                    data-bpp-test-id="combat-log-route"
-                  >
-                    <EntityChip
-                      entity={source}
-                      fallback={t("sourceNotRecorded")}
-                    />
-                    <span aria-hidden="true" className="text-muted-foreground">
-                      →
-                    </span>
-                    <span className="inline-flex min-w-0 items-center gap-1">
-                      <EntityChip
-                        entity={targets[0] ?? null}
-                        fallback={t("targetNotRecorded")}
-                      />
-                      {targets.length > 1 && (
-                        <span className="shrink-0 text-micro text-muted-foreground">
-                          +{targets.length - 1}
-                        </span>
+                  <span className="inline-flex h-full min-w-0 items-center gap-1 font-mono text-micro text-brand-soft">
+                    {frameStart
+                      ? (
+                        <strong>{formatDuration(entry.combatMs)}</strong>
+                      )
+                      : (
+                        <span
+                          aria-hidden="true"
+                          className="ml-1 h-full border-l border-border/35"
+                        />
                       )}
-                    </span>
                   </span>
-                  <span className="flex shrink-0 items-center gap-1.5 font-mono text-micro">
+                  <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                    <SemanticIcon className="size-icon-sm" token={entry.token} />
+                    <span className="shrink-0 text-compact font-semibold text-foreground max-[600px]:sr-only">
+                      {t(entry.token)}
+                    </span>
+                    {(source || targets.length > 0) && (
+                      <span
+                        className="inline-flex min-w-0 items-center gap-1 overflow-hidden text-compact text-muted-foreground"
+                        data-bpp-test-id="combat-log-route"
+                      >
+                        {source && <EntityChip entity={source} />}
+                        {source && targets.length > 0 && (
+                          <ChevronRight
+                            aria-hidden="true"
+                            className="size-icon-sm shrink-0 opacity-60"
+                          />
+                        )}
+                        {targets[0] && <EntityChip entity={targets[0]} />}
+                        {targets.length > 1 && (
+                          <span className="shrink-0 text-micro text-muted-foreground">
+                            +{targets.length - 1}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums">
                     {amount && (
                       <strong className="text-foreground">{amount}</strong>
                     )}

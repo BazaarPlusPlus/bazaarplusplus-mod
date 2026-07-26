@@ -2204,6 +2204,16 @@ test("virtualizes the footer combat log and highlights every visible row from th
   await expect(log).toHaveAttribute("data-bpp-total-count", "84");
   await expect(rows).not.toHaveCount(0);
   expect(await rows.count()).toBeLessThan(84);
+  expect((await rows.first().boundingBox()).height).toBeLessThanOrEqual(47);
+  await expect(rows.first()).toHaveAttribute("data-bpp-frame-start", "true");
+  expect(
+    await rows.evaluateAll((elements) =>
+      elements.some(
+        (element) =>
+          element.getAttribute("data-bpp-frame-start") === "false",
+      )
+    ),
+  ).toBe(true);
   const sameFrameHighlight = await rows.evaluateAll((elements) => {
     const highlighted = elements.filter(
       (element) => element.getAttribute("data-bpp-same-frame") === "true",
@@ -2331,12 +2341,14 @@ test("embeds the existing recording instance in the footer dock", async ({
       const recording = document.querySelector(
         '[data-bpp-test-id="recording-window"]',
       );
+      const media = document.querySelector(".bpp-recording-media");
       const dock = document.querySelector(
         '[data-bpp-test-id="footer-replay-dock"]',
       );
-      if (!host || !recording || !dock) return null;
+      if (!host || !recording || !media || !dock) return null;
       const hostBounds = host.getBoundingClientRect();
       const recordingBounds = recording.getBoundingClientRect();
+      const mediaBounds = media.getBoundingClientRect();
       const dockBounds = dock.getBoundingClientRect();
       return {
         dock: {
@@ -2353,6 +2365,12 @@ test("embeds the existing recording instance in the footer dock", async ({
           right: recordingBounds.right,
           width: recordingBounds.width,
         },
+        media: {
+          bottomGap: recordingBounds.bottom - mediaBounds.bottom,
+          height: mediaBounds.height,
+          topGap: mediaBounds.top - recordingBounds.top,
+          width: mediaBounds.width,
+        },
       };
     });
   expect(geometry).not.toBeNull();
@@ -2364,6 +2382,12 @@ test("embeds the existing recording instance in the footer dock", async ({
   ).toBeLessThanOrEqual(1);
   expect(geometry.recording.left).toBeGreaterThanOrEqual(geometry.dock.left);
   expect(geometry.recording.right).toBeLessThanOrEqual(geometry.dock.right);
+  expect(
+    Math.abs(geometry.media.topGap - geometry.media.bottomGap),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(geometry.media.width / geometry.media.height - 16 / 9),
+  ).toBeLessThanOrEqual(0.02);
   expect(
     await page
       .getByTestId("recording-controls")
@@ -2405,7 +2429,12 @@ test("embeds the existing recording instance in the footer dock", async ({
   await page.getByTestId("combat-log-dock-toggle").click();
 
   await page.setViewportSize({ width: 480, height: 857 });
-  await expect(page.getByTestId("combat-log-route").first()).toBeHidden();
+  await expect(page.getByTestId("combat-log-route").first()).toBeVisible();
+  const narrowRoute = await page
+    .getByTestId("combat-log-route")
+    .first()
+    .boundingBox();
+  expect(narrowRoute.width).toBeGreaterThan(24);
   const narrowDimensions = await page.evaluate(() => ({
     clientWidth: document.documentElement.clientWidth,
     scrollWidth: document.documentElement.scrollWidth,

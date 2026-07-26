@@ -8,6 +8,7 @@ export interface CombatLogEntry {
   id: string;
   frame: number;
   combatMs: number;
+  action: string;
   token: string;
   sourceId: string;
   triggerSourceId: string;
@@ -69,6 +70,7 @@ export function buildCombatLogEntries(
       id: `${event.id}:${key}`,
       frame: event.frame,
       combatMs: event.combatMs,
+      action: event.action,
       token,
       sourceId: event.sourceId,
       triggerSourceId: event.triggerSourceId,
@@ -85,6 +87,62 @@ export function buildCombatLogEntries(
       || left.frame - right.frame
       || left.id.localeCompare(right.id),
   );
+}
+
+/**
+ * Collapses a dense frame into readable action summaries without losing the
+ * event ids required by the timeline inspector. Actions, values, and sources
+ * stay in the key so semantically different outcomes never share a row.
+ */
+export function groupCombatLogEntries(
+  entries: readonly CombatLogEntry[],
+): CombatLogEntry[] {
+  const grouped = new Map<string, CombatLogEntry>();
+  for (const entry of entries) {
+    const key = [
+      entry.frame,
+      entry.token,
+      entry.action,
+      entry.sourceId,
+      entry.triggerSourceId,
+      entry.unit,
+      valueKey(entry.value),
+    ].join("\u001f");
+    const current = grouped.get(key);
+    if (!current) {
+      grouped.set(key, {
+        ...entry,
+        id: `group:${entry.id}`,
+        eventIds: [...entry.eventIds],
+        targetIds: [...entry.targetIds],
+      });
+      continue;
+    }
+
+    current.count += entry.count;
+    current.eventIds.push(...entry.eventIds);
+    const targetIds = new Set(current.targetIds);
+    for (const targetId of entry.targetIds) targetIds.add(targetId);
+    current.targetIds = Array.from(targetIds);
+  }
+  return Array.from(grouped.values()).sort(
+    (left, right) =>
+      left.combatMs - right.combatMs
+      || left.frame - right.frame
+      || left.id.localeCompare(right.id),
+  );
+}
+
+/**
+ * The combat log is a player-facing narrative, not a raw event inspector.
+ * Generic attribute mutations and setup markers remain available in the
+ * timeline/report payload but would overwhelm the transcript. A death marker
+ * is the sole generic-status exception because it closes the battle story.
+ */
+export function isNarrativeCombatLogEntry(
+  entry: Pick<CombatLogEntry, "action" | "token">,
+): boolean {
+  return entry.token !== "status" || entry.action === "Died";
 }
 
 export function nearestCombatLogEntryIndex(
