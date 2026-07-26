@@ -177,15 +177,13 @@ internal static class CollectionSourceCatalog
                 $"entries[{i}].availableHeroes",
                 parseHero
             );
-            if (availableHeroes == null)
-                continue;
             var description = entry.Description ?? string.Empty;
             var offerSegments = BuildOfferSegments(
                 entry.OfferSegments,
                 $"entries[{i}].offerSegments",
                 parseHero
             );
-            if (offerSegments == null)
+            if (availableHeroes == null || offerSegments == null)
                 continue;
             var portraitTemplateId = ParseGuid(
                 entry.PortraitTemplateId,
@@ -291,6 +289,7 @@ internal static class CollectionSourceCatalog
 
         var segments = new List<CollectionSourceOfferSegment>(dtos.Count);
         var usedKeys = new HashSet<string>(StringComparer.Ordinal);
+        var hasUnavailableFixedHero = false;
         for (var i = 0; i < dtos.Count; i++)
         {
             var dto = dtos[i];
@@ -303,7 +302,10 @@ internal static class CollectionSourceCatalog
             var kind = ParseEnum<CollectionSourceOfferSegmentKind>(dto.Kind, $"{segmentPath}.kind");
             var rule = BuildOfferRule(dto.Rule, $"{segmentPath}.rule", parseHero);
             if (rule == null)
-                return null;
+            {
+                hasUnavailableFixedHero = true;
+                continue;
+            }
             segments.Add(
                 new CollectionSourceOfferSegment(
                     key,
@@ -313,6 +315,9 @@ internal static class CollectionSourceCatalog
                 )
             );
         }
+
+        if (hasUnavailableFixedHero)
+            return null;
 
         var hasPinnedTier = segments.Any(segment => segment.Rule.StartingTier != null);
         var hasUnpinnedTier = segments.Any(segment => segment.Rule.StartingTier == null);

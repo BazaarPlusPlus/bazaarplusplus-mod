@@ -468,6 +468,40 @@ AssertThrows<InvalidOperationException>(
     () => BuildHeroFieldCatalog(CollectionSourceHeroMode.FixedHero, "NotARealHero", _ => null),
     "Invalid FixedHero configuration should fail instead of being treated as unavailable."
 );
+AssertThrows<InvalidOperationException>(
+    () =>
+        BuildHeroValidationCatalog(
+            """["TheDragons"]""",
+            """[{ "key": "invalid", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "NotARealHero" } }]"""
+        ),
+    "An all-unavailable explicit allowlist should not mask an invalid hero in its offer rules."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        BuildHeroValidationCatalog(
+            "[]",
+            """
+            [
+              { "key": "unavailable", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "TheDragons" } },
+              { "key": "invalid", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "NotARealHero" } }
+            ]
+            """
+        ),
+    "An unavailable FixedHero segment should not mask an invalid hero in a later segment."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        BuildHeroValidationCatalog(
+            "[]",
+            """
+            [
+              { "key": "invalid", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "NotARealHero" } },
+              { "key": "unavailable", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "TheDragons" } }
+            ]
+            """
+        ),
+    "Invalid hero validation should be independent of segment ordering."
+);
 
 var currentCatalogPath = Path.Combine(
     "src",
@@ -2118,6 +2152,36 @@ static IReadOnlyList<CollectionSourceEntry> BuildHeroFieldCatalog(
         }
         """,
         resolveExactHeroName
+    );
+}
+
+static IReadOnlyList<CollectionSourceEntry> BuildHeroValidationCatalog(
+    string availableHeroesJson,
+    string offerSegmentsJson
+)
+{
+    const string sourceId = "77777777-0000-0000-0000-000000000008";
+    return CollectionSourceCatalog.Build(
+        $$"""
+        {
+          "schemaVersion": 4,
+          "groups": ["fixture"],
+          "entries": [
+            {
+              "name": "Validation order",
+              "kind": "Merchant",
+              "group": "fixture",
+              "order": 0,
+              "availableHeroes": {{availableHeroesJson}},
+              "description": "Validation order fixture",
+              "portraitTemplateId": "{{sourceId}}",
+              "sourceTemplateIds": ["{{sourceId}}"],
+              "offerSegments": {{offerSegmentsJson}}
+            }
+          ]
+        }
+        """,
+        _ => null
     );
 }
 
