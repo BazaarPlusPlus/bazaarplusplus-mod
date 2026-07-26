@@ -50,6 +50,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private CollectionCatalog _catalog = null!;
     private readonly CollectionFilterState _filter = new();
+    private readonly CollectionSearchModeState _searchMode = new();
     private readonly CollectionSearchRefreshGate _searchRefreshGate = new(
         SearchRefreshDebounceSeconds
     );
@@ -339,6 +340,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void Open(CollectionPanelSelectionState selection)
     {
+        ResetSearchForLifecycle();
         ApplyOpenSelection(selection);
         // Temporary main-path probe: EnsureView() is heavy one-time UITK construction (visual
         // tree + CJK glyph raster + cold OTF extract) that runs on the click frame BEFORE the
@@ -389,7 +391,10 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         if (!_isVisible)
             return;
-        _searchRefreshGate.Cancel();
+        ResetSearchForLifecycle();
+        // Cancel a deferred focus requested by the expanded presentation before the fading view
+        // remains alive for another frame.
+        RefreshView();
         // Drop composition state with the panel: a composition whose terminating Count==0
         // event never arrives would otherwise keep Advance() blocked after the next Open().
         DetachImeKeyboard();
@@ -544,7 +549,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void DisposeUnityRuntime()
     {
-        _searchRefreshGate.Cancel();
+        ResetSearchForLifecycle();
         CancelPanelLoad();
         var virtualizer = _virtualizer;
         var overlay = _overlay;
@@ -666,6 +671,8 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         public void Close() => panel.RequestCloseFromUi();
 
+        public void ToggleSearch() => panel.ToggleSearch();
+
         public void SetActiveTab(CollectionTabKind tab)
         {
             if (!panel._filter.SelectTab(tab))
@@ -768,6 +775,9 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         public void SetSearchQuery(string query)
         {
+            if (!panel._searchMode.IsExpanded)
+                return;
+
             query ??= string.Empty;
             if (string.Equals(panel._filter.SearchQuery, query, StringComparison.Ordinal))
                 return;
@@ -775,6 +785,23 @@ internal sealed class CollectionPanel : MonoBehaviour
             panel._filter.SearchQuery = query;
             panel._searchRefreshGate.Schedule();
         }
+    }
+
+    private void ToggleSearch()
+    {
+        var queryChanged = _searchMode.IsExpanded
+            ? _searchMode.Collapse(_filter)
+            : _searchMode.Expand(_filter);
+        _searchRefreshGate.Cancel();
+        if (queryChanged)
+            ApplyFilters();
+        RefreshView();
+    }
+
+    private void ResetSearchForLifecycle()
+    {
+        _searchMode.Reset(_filter);
+        _searchRefreshGate.Cancel();
     }
 
     private void StartPanelLoad()
@@ -1006,6 +1033,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedKeywords = _filter.Keywords,
             TagMatchMode = _filter.TagMatchMode,
             KeywordMatchMode = _filter.KeywordMatchMode,
+            SearchExpanded = _searchMode.IsExpanded,
             SearchQuery = _filter.SearchQuery,
             SelectedSourceKey = profile.ShowSourceFilter ? _filter.SelectedSourceKey : null,
             SourceSelectorEnabled = profile.ShowSourceFilter && !_isLoadingCatalog,

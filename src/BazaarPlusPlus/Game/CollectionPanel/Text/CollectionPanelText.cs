@@ -27,11 +27,30 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet ItemsTabText = new("Items", "物品", "物品");
     private static readonly LocalizedTextSet SkillsTabText = new("Skills", "技能", "技能");
     private static readonly LocalizedTextSet CloseText = new("Close", "关闭", "關閉");
-    private static readonly LocalizedTextSet SearchLabelText = new("Search", "搜索", "搜尋");
     private static readonly LocalizedTextSet SearchTooltipText = new(
         "Search names, descriptions, internal ids, tags, and related effects.",
         "搜索名称、描述、内部 ID、标签和相关效果。",
         "搜尋名稱、描述、內部 ID、標籤和相關效果。"
+    );
+    private static readonly LocalizedTextSet SearchButtonTooltipText = new(
+        "Open search",
+        "打开搜索",
+        "開啟搜尋"
+    );
+    private static readonly LocalizedTextSet CloseSearchTooltipText = new(
+        "Close search",
+        "关闭搜索",
+        "關閉搜尋"
+    );
+    private static readonly LocalizedTextSet ItemSearchPlaceholderText = new(
+        "Search items",
+        "搜索物品",
+        "搜尋物品"
+    );
+    private static readonly LocalizedTextSet SkillSearchPlaceholderText = new(
+        "Search skills",
+        "搜索技能",
+        "搜尋技能"
     );
 
     private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄");
@@ -107,9 +126,16 @@ internal static class CollectionPanelText
 
     internal static string Close() => Resolve(CloseText);
 
-    internal static string SearchLabel() => Resolve(SearchLabelText);
-
     internal static string SearchTooltip() => Resolve(SearchTooltipText);
+
+    internal static string SearchButtonTooltip() => Resolve(SearchButtonTooltipText);
+
+    internal static string CloseSearchTooltip() => Resolve(CloseSearchTooltipText);
+
+    internal static string SearchPlaceholder(ECardType activeType) =>
+        activeType == ECardType.Skill
+            ? Resolve(SkillSearchPlaceholderText)
+            : Resolve(ItemSearchPlaceholderText);
 
     internal static string HeroHeader() => Resolve(HeroHeaderText);
 

@@ -7,6 +7,7 @@ using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.CardTags;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
+using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.GameInterop.TagTypography;
@@ -56,6 +57,86 @@ AssertFalse(
 AssertTrue(
     searchRefreshGate.Advance(0.061f),
     "The committed query should refresh once after composition ends and debounce elapses."
+);
+
+var searchModeFilter = new CollectionFilterState();
+var searchModeState = new CollectionSearchModeState();
+AssertFalse(searchModeState.IsExpanded, "Collection search should start collapsed.");
+AssertEqual(
+    string.Empty,
+    searchModeFilter.SearchQuery,
+    "Collection search should start with an empty query."
+);
+searchModeFilter.SearchQuery = "stale item query";
+AssertTrue(
+    searchModeState.Expand(searchModeFilter),
+    "Expanding search should report and clear a stale query."
+);
+AssertTrue(searchModeState.IsExpanded, "Expanding search should enter overlay search mode.");
+AssertEqual(
+    string.Empty,
+    searchModeFilter.SearchQuery,
+    "Every transition into overlay search mode should start with an empty query."
+);
+searchModeFilter.SearchQuery = "active skill query";
+AssertTrue(
+    searchModeState.Collapse(searchModeFilter),
+    "Closing search should report and clear the active query."
+);
+AssertFalse(searchModeState.IsExpanded, "Closing search should restore the default operation row.");
+AssertEqual(
+    string.Empty,
+    searchModeFilter.SearchQuery,
+    "Closing search should remove the actual filter query."
+);
+searchModeState.Expand(searchModeFilter);
+searchModeFilter.SearchQuery = "query before panel close";
+AssertTrue(
+    searchModeState.Reset(searchModeFilter),
+    "Closing the panel should report and clear its active query."
+);
+AssertFalse(
+    searchModeState.IsExpanded,
+    "Closing and reopening the panel should restore collapsed search mode."
+);
+AssertEqual(
+    string.Empty,
+    searchModeFilter.SearchQuery,
+    "Closing and reopening the panel should not restore an old search term."
+);
+var parsedSearchIcon = CollectionSearchSvgIconData.Parse(
+    """
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+         stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="10.5" cy="10.5" r="5.75" />
+      <line x1="14.75" y1="14.75" x2="20" y2="20" />
+    </svg>
+    """
+);
+AssertEqual(24f, parsedSearchIcon.Width, "Collection SVG parsing should preserve the viewBox.");
+AssertEqual(
+    1,
+    parsedSearchIcon.Circles.Count,
+    "The search SVG should preserve its magnifier circle."
+);
+AssertEqual(
+    1,
+    parsedSearchIcon.Segments.Count,
+    "The search SVG should preserve its handle segment."
+);
+var parsedCloseIcon = CollectionSearchSvgIconData.Parse(
+    """
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+         stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="7.25" y1="7.25" x2="16.75" y2="16.75" />
+      <line x1="16.75" y1="7.25" x2="7.25" y2="16.75" />
+    </svg>
+    """
+);
+AssertEqual(
+    2,
+    parsedCloseIcon.Segments.Count,
+    "The close SVG should preserve both rounded X strokes."
 );
 
 var heroState = new CollectionFilterState();
