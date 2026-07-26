@@ -157,9 +157,9 @@ run_combat_report_viewer_release_gate() {
         cd "$frontend_dir"
         npm ci
         npm run viewer:browsers:install
-        # Includes typecheck, deterministic artifact comparison, pure tests, and the
+        # Includes typecheck, clean-build artifact comparison, pure tests, and the
         # Chromium/WebKit behavior suite. The check fails when committed viewer.js/viewer.css
-        # differ from a clean reproducible build.
+        # differ from one clean build.
         npm test
     )
 }

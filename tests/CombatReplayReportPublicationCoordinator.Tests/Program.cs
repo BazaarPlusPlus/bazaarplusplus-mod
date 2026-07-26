@@ -257,15 +257,7 @@ async Task VerifyCpuAndFilesystemWorkUsesInjectedScheduler()
     var committed = false;
     var script = Encoding.UTF8.GetBytes("/* viewer */");
     var css = Encoding.UTF8.GetBytes("/* css */");
-    var artifacts = new ViewerArtifactBundle(
-        1,
-        script,
-        css,
-        script.Length,
-        StaticReportIntegrity.Sha256(script),
-        css.Length,
-        StaticReportIntegrity.Sha256(css)
-    );
+    var artifacts = new ViewerArtifactBundle(1, script, css);
     var coordinator = new CombatReplayReportPublicationCoordinator(
         root,
         artifacts,
@@ -467,15 +459,7 @@ void VerifyTransientArtifactBuildRetries()
     var css = Encoding.UTF8.GetBytes("/* css */");
     var coordinator = new CombatReplayReportPublicationCoordinator(
         root,
-        new ViewerArtifactBundle(
-            1,
-            script,
-            css,
-            script.Length,
-            StaticReportIntegrity.Sha256(script),
-            css.Length,
-            StaticReportIntegrity.Sha256(css)
-        ),
+        new ViewerArtifactBundle(1, script, css),
         () => { },
         (_, _) => commits++,
         scheduled.Enqueue,
@@ -855,15 +839,7 @@ CombatReplayReportPublicationCoordinator CreateCoordinator(
 {
     var script = Encoding.UTF8.GetBytes("/* viewer */");
     var css = Encoding.UTF8.GetBytes("/* css */");
-    var artifacts = new ViewerArtifactBundle(
-        1,
-        script,
-        css,
-        script.Length,
-        StaticReportIntegrity.Sha256(script),
-        css.Length,
-        StaticReportIntegrity.Sha256(css)
-    );
+    var artifacts = new ViewerArtifactBundle(1, script, css);
     return new CombatReplayReportPublicationCoordinator(
         root,
         artifacts,

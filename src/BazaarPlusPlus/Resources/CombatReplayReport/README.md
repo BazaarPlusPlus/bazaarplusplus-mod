@@ -12,9 +12,9 @@ npm test
 
 The build is intentionally constrained to one classic IIFE script and one stylesheet so generated
 reports can open directly through `file://`. It rejects extra chunks, source maps, remote resources,
-`fetch`, dynamic imports, and workers. React and Tailwind are bundled into `viewer.js` /
-`viewer.css`; the pinned ECharts UMD file under `vendor/echarts/` is prepended by
-`ViewerArtifactBundle` at installation time.
+`fetch`, dynamic imports, and workers. Vite bundles React and the ECharts modules used by the
+statistics view into `viewer.js`; Tailwind emits `viewer.css`. `ViewerArtifactBundle` embeds and
+installs those exact committed bytes without a second runtime concatenation step.
 
 UI controls use the local shadcn/new-york primitive layer under `frontend/src/components/ui/`.
 Feature components compose those primitives rather than maintaining parallel button, tab, card,
@@ -48,9 +48,9 @@ in Chromium and WebKit.
 ## Release packaging
 
 `./run.sh publish` runs the frontend release gate before the production `BuildAll`: clean dependency
-install, Chromium/WebKit installation, typecheck, deterministic artifact comparison, pure tests,
-and browser behavior tests. The generated Viewer files, pinned ECharts build, and license notices
-are embedded resources in `BazaarPlusPlus.dll`.
+install, Chromium/WebKit installation, typecheck, clean-build comparison against the committed
+artifacts, pure tests, and browser behavior tests. The generated Viewer files and the ECharts
+license notices are embedded resources in `BazaarPlusPlus.dll`.
 
 The production MSBuild target then copies that DLL into both platform payload trees and rebuilds:
 

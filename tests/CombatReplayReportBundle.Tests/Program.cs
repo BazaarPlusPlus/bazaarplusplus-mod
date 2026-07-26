@@ -21,6 +21,7 @@ try
     VerifyHtmlEmitter();
     VerifyCurrentViewerReportIntegrityScan();
     VerifyViewerArtifactPinAndInstall();
+    VerifyViewerThirdPartyNoticesAreEmbedded();
     VerifyViewerOpenGateVerifiesPinnedArtifacts();
     VerifyViewerStaticRuntimeBoundary();
     VerifyImmutableCommitConcurrency();
@@ -369,7 +370,7 @@ void VerifyViewerArtifactPinAndInstall()
         "The embedded Viewer bundle must be materialized once and reused for the process lifetime."
     );
     Check(
-        artifacts.ScriptBytes.Length > 500_000
+        artifacts.ScriptBytes.Length > 100_000
             && artifacts.ScriptSha256 == StaticReportIntegrity.Sha256(artifacts.ScriptBytes)
             && artifacts.StylesheetSha256 == StaticReportIntegrity.Sha256(artifacts.StylesheetBytes)
             && artifacts.BundleId.Length == 64,
@@ -401,22 +402,6 @@ void VerifyViewerArtifactPinAndInstall()
         "Installed Viewer files must equal the embedded artifact bytes."
     );
 
-    var changed = (byte[])artifacts.ScriptBytes.Clone();
-    changed[0] ^= 0xff;
-    CheckThrows<InvalidDataException>(
-        () =>
-            new ViewerArtifactBundle(
-                1,
-                changed,
-                artifacts.StylesheetBytes,
-                artifacts.ScriptBytes.Length,
-                artifacts.ScriptSha256,
-                artifacts.StylesheetBytes.Length,
-                artifacts.StylesheetSha256
-            ),
-        "Changing Viewer bytes without updating its integrity pin must fail closed."
-    );
-
     File.WriteAllBytes(
         paths.GetViewerScriptFilePath(artifacts.BundleId),
         Encoding.UTF8.GetBytes("mutated")
@@ -429,15 +414,7 @@ void VerifyViewerArtifactPinAndInstall()
 
     var alternateScript = (byte[])artifacts.ScriptBytes.Clone();
     alternateScript[alternateScript.Length - 1] ^= 0x01;
-    var alternate = new ViewerArtifactBundle(
-        1,
-        alternateScript,
-        artifacts.StylesheetBytes,
-        alternateScript.Length,
-        StaticReportIntegrity.Sha256(alternateScript),
-        artifacts.StylesheetBytes.Length,
-        artifacts.StylesheetSha256
-    );
+    var alternate = new ViewerArtifactBundle(1, alternateScript, artifacts.StylesheetBytes);
     Check(
         alternate.BundleId != artifacts.BundleId,
         "Changing either Viewer artifact must create a different bundle generation."
@@ -463,6 +440,25 @@ void VerifyViewerArtifactPinAndInstall()
     );
 }
 
+void VerifyViewerThirdPartyNoticesAreEmbedded()
+{
+    var assembly = typeof(ViewerArtifactBundle).Assembly;
+    var requiredResources = new[]
+    {
+        "BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt",
+        "BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt",
+    };
+    foreach (var resourceName in requiredResources)
+    {
+        using var stream = assembly.GetManifestResourceStream(resourceName);
+        Check(
+            stream != null && stream.Length > 0,
+            "The Viewer bundle fixture must expose the required ECharts legal resource: "
+                + resourceName
+        );
+    }
+}
+
 void VerifyViewerStaticRuntimeBoundary()
 {
     var artifacts = ViewerArtifactBundle.CreateDefault();
@@ -470,7 +466,7 @@ void VerifyViewerStaticRuntimeBoundary()
     var stylesheet = Encoding.UTF8.GetString(artifacts.StylesheetBytes);
 
     Check(
-        script.Length > 500_000
+        script.Length > 100_000
             && stylesheet.Contains(".bpp-report-root", StringComparison.Ordinal)
             && !script.Contains("fetch(", StringComparison.Ordinal)
             && !script.Contains("new Worker(", StringComparison.Ordinal)
@@ -560,11 +556,7 @@ void VerifyViewerOpenGateVerifiesPinnedArtifacts()
     var alternate = new ViewerArtifactBundle(
         ViewerArtifactBundle.CurrentReportSchemaVersion,
         alternateScript,
-        artifacts.StylesheetBytes,
-        alternateScript.Length,
-        StaticReportIntegrity.Sha256(alternateScript),
-        artifacts.StylesheetBytes.Length,
-        artifacts.StylesheetSha256
+        artifacts.StylesheetBytes
     );
     _ = new ViewerInstaller(paths, alternate, new ImmutableArtifactCommitter()).EnsureInstalled();
     var pinnedReportPath = Path.Combine(reportRoot, "dddddddddddddddddddddddddddddddd.html");

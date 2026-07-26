@@ -52,10 +52,6 @@
       LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.css"
     />
     <EmbeddedResource
-      Include="Resources\CombatReplayReport\vendor\echarts\5eef51bee09fb9cc234c4179a58ae0150126f49f88c992efe2d6bca81d8dd03b.min.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts.min.js"
-    />
-    <EmbeddedResource
       Include="Resources\CombatReplayReport\echarts-license.txt"
       LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt"
     />
@@ -282,7 +278,7 @@
       Text="[BazaarPlusPlus] Combat Report Viewer frontend package is missing."
     />
     <Message
-      Text="[BazaarPlusPlus] Validating reproducible Combat Report Viewer artifacts before installer packaging"
+      Text="[BazaarPlusPlus] Validating committed Combat Report Viewer artifacts before installer packaging"
       Importance="high"
     />
     <Exec WorkingDirectory="$(CombatReportViewerFrontendDirectory)" Command="npm ci" />

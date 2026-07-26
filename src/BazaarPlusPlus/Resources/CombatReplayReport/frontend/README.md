@@ -1,8 +1,9 @@
 # Combat Report Viewer frontend
 
 This directory owns browser-level behavior tests for the static `file://` Viewer.
-The release contract remains one installed stylesheet plus one installed IIFE script
-(ECharts followed by the generated Viewer payload).
+The release contract remains one installed stylesheet plus one installed IIFE script.
+Vite bundles the required ECharts modules directly into that script; the plugin embeds
+the committed JS/CSS bytes without rebuilding the frontend during an ordinary C# build.
 
 ## Run
 

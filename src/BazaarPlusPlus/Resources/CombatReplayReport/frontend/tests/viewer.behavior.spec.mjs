@@ -1,11 +1,5 @@
 import { expect, test } from "@playwright/test";
-import {
-  copyFile,
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -15,8 +9,6 @@ const reportResourceDirectory = resolve(testDirectory, "../..");
 const viewerArtifactDirectory = process.env.BPP_VIEWER_ARTIFACT_DIR
   ? resolve(process.env.BPP_VIEWER_ARTIFACT_DIR)
   : reportResourceDirectory;
-const echartsFileName =
-  "5eef51bee09fb9cc234c4179a58ae0150126f49f88c992efe2d6bca81d8dd03b.min.js";
 
 function schemaEvent(event) {
   return {
@@ -269,13 +261,9 @@ test.beforeAll(async ({ browserName }) => {
   fixtureDirectory = await mkdtemp(
     join(tmpdir(), `bpp-viewer-${process.pid}-${browserName}-`),
   );
-  const echarts = await readFile(
-    join(reportResourceDirectory, "vendor", "echarts", echartsFileName),
-  );
-  const viewer = await readFile(join(viewerArtifactDirectory, "viewer.js"));
-  await writeFile(
+  await copyFile(
+    join(viewerArtifactDirectory, "viewer.js"),
     join(fixtureDirectory, "viewer.js"),
-    Buffer.concat([echarts, Buffer.from("\n;\n"), viewer]),
   );
   await copyFile(
     join(viewerArtifactDirectory, "viewer.css"),

@@ -52,8 +52,12 @@
       LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.css"
     />
     <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/vendor/echarts/5eef51bee09fb9cc234c4179a58ae0150126f49f88c992efe2d6bca81d8dd03b.min.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts.min.js"
+      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/echarts-license.txt"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt"
+    />
+    <EmbeddedResource
+      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/echarts-notice.txt"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt"
     />
   </ItemGroup>
 </Project>

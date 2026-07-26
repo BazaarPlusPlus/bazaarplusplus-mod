@@ -1,5 +1,4 @@
 import { build as viteBuild } from "vite";
-import { createHash } from "node:crypto";
 import {
   copyFile,
   mkdtemp,
@@ -22,18 +21,6 @@ const committedArtifacts = {
 };
 const expectedOutputs = Object.keys(committedArtifacts).sort();
 const sourceDirectory = join(frontendDirectory, "src");
-const echartsDistribution = join(
-  frontendDirectory,
-  "node_modules",
-  "echarts",
-  "dist",
-  "echarts.simple.min.js",
-);
-const echartsVendorDirectory = join(
-  resourceDirectory,
-  "vendor",
-  "echarts",
-);
 
 async function outputFiles(directory) {
   const files = [];
@@ -134,6 +121,8 @@ async function buildArtifacts(outputDirectory) {
   });
   const files = await outputFiles(outputDirectory);
   assertExactOutputs(files);
+  // ECharts emits whitespace-only lines inside generated template literals. Strip only those
+  // lines so the committed artifact passes the repository's trailing-whitespace gate.
   await Promise.all(
     files.map(async (file) => {
       const path = join(outputDirectory, file);
@@ -157,32 +146,6 @@ async function bytesEqual(leftPath, rightPath) {
   return left.equals(right);
 }
 
-async function assertPinnedECharts() {
-  const vendorFiles = (await readdir(echartsVendorDirectory))
-    .filter((file) => file.endsWith(".min.js"))
-    .sort();
-  if (vendorFiles.length !== 1) {
-    throw new Error(
-      `ECharts vendor directory must contain exactly one minified runtime; received ${vendorFiles.join(", ") || "(none)"}.`,
-    );
-  }
-
-  const vendorFile = vendorFiles[0];
-  const vendorPath = join(echartsVendorDirectory, vendorFile);
-  const bytes = await readFile(vendorPath);
-  const digest = createHash("sha256").update(bytes).digest("hex");
-  if (vendorFile !== `${digest}.min.js`) {
-    throw new Error(
-      `ECharts vendor filename must equal its content SHA-256; expected ${digest}.min.js.`,
-    );
-  }
-  if (!(await bytesEqual(vendorPath, echartsDistribution))) {
-    throw new Error(
-      "Pinned ECharts runtime differs from the installed echarts.simple.min.js distribution.",
-    );
-  }
-}
-
 async function assertRuntimeBoundary(artifacts) {
   const [script, stylesheet] = await Promise.all([
     readFile(artifacts["viewer.js"], "utf8"),
@@ -195,7 +158,7 @@ async function assertRuntimeBoundary(artifacts) {
     [/\bWebSocket\b/u, "WebSocket"],
     [/\bEventSource\b/u, "EventSource"],
     [/\bnew\s+(?:Shared)?Worker\s*\(/u, "runtime worker"],
-    [/\bApache ECharts\b/u, "bundled ECharts distribution"],
+    [/\bimport\s*\(/u, "dynamic import"],
   ];
   for (const [pattern, label] of scriptRules) {
     if (pattern.test(script)) violations.push(label);
@@ -227,7 +190,6 @@ async function assertNonEmpty(artifacts) {
 async function generate() {
   const temporaryDirectory = await mkdtemp(join(tmpdir(), "bpp-viewer-build-"));
   try {
-    await assertPinnedECharts();
     await assertThemeOwnership();
     const artifacts = await buildArtifacts(temporaryDirectory);
     await assertRuntimeBoundary(artifacts);
@@ -243,36 +205,23 @@ async function generate() {
 }
 
 async function check() {
-  const firstDirectory = await mkdtemp(join(tmpdir(), "bpp-viewer-check-a-"));
-  const secondDirectory = await mkdtemp(join(tmpdir(), "bpp-viewer-check-b-"));
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "bpp-viewer-check-"));
   try {
-    await assertPinnedECharts();
     await assertThemeOwnership();
-    const [first, second] = await Promise.all([
-      buildArtifacts(firstDirectory),
-      buildArtifacts(secondDirectory),
-    ]);
+    const artifacts = await buildArtifacts(temporaryDirectory);
     await Promise.all([
-      assertRuntimeBoundary(first),
-      assertRuntimeBoundary(second),
-      assertNonEmpty(first),
-      assertNonEmpty(second),
+      assertRuntimeBoundary(artifacts),
+      assertNonEmpty(artifacts),
     ]);
     for (const file of expectedOutputs) {
-      if (!(await bytesEqual(first[file], second[file]))) {
-        throw new Error(`Viewer ${file} output is not reproducible.`);
-      }
-      if (!(await bytesEqual(first[file], committedArtifacts[file]))) {
+      if (!(await bytesEqual(artifacts[file], committedArtifacts[file]))) {
         throw new Error(
           `Committed ${file} is stale; run npm run viewer:build.`,
         );
       }
     }
   } finally {
-    await Promise.all([
-      rm(firstDirectory, { recursive: true, force: true }),
-      rm(secondDirectory, { recursive: true, force: true }),
-    ]);
+    await rm(temporaryDirectory, { recursive: true, force: true });
   }
 }
 

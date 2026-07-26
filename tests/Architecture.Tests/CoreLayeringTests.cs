@@ -2267,6 +2267,49 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Main_plugin_embeds_the_complete_combat_report_viewer_release()
+    {
+        var repoRoot = RepoRoot();
+        var projectPath = Path.Combine(MainSourceRoot(repoRoot), "BazaarPlusPlus.csproj");
+        var project = XDocument.Load(projectPath);
+        var resources = project
+            .Descendants()
+            .Where(element => element.Name.LocalName == "EmbeddedResource")
+            .Select(element => new
+            {
+                Include = Attribute(element, "Include")?.Replace('\\', '/'),
+                LogicalName = Attribute(element, "LogicalName"),
+            })
+            .ToArray();
+
+        var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Resources/CombatReplayReport/viewer.js"] =
+                "BazaarPlusPlus.Resources.CombatReplayReport.viewer.js",
+            ["Resources/CombatReplayReport/viewer.css"] =
+                "BazaarPlusPlus.Resources.CombatReplayReport.viewer.css",
+            ["Resources/CombatReplayReport/echarts-license.txt"] =
+                "BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt",
+            ["Resources/CombatReplayReport/echarts-notice.txt"] =
+                "BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt",
+        };
+        foreach (var (include, logicalName) in expected)
+        {
+            Assert.Contains(
+                resources,
+                resource => resource.Include == include && resource.LogicalName == logicalName
+            );
+        }
+
+        Assert.DoesNotContain(
+            resources,
+            resource =>
+                resource.Include?.Contains("echarts", StringComparison.OrdinalIgnoreCase) == true
+                && resource.Include.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+        );
+    }
+
+    [Fact]
     public void Remote_embedded_data_pipeline_declares_the_two_stable_resources()
     {
         var repoRoot = RepoRoot();

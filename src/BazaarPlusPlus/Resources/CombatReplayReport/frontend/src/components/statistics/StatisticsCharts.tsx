@@ -1,3 +1,10 @@
+import { BarChart } from "echarts/charts";
+import {
+  GridComponent,
+  TooltipComponent,
+} from "echarts/components";
+import * as echarts from "echarts/core";
+import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCompactNumber } from "../../i18n/format.ts";
 import {
@@ -33,11 +40,7 @@ interface ComparisonChartProps {
   wholeNumbers?: boolean;
 }
 
-declare global {
-  interface Window {
-    echarts?: EChartsRuntime;
-  }
-}
+echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer]);
 
 function numericValue(value: unknown): number {
   const candidate =
@@ -53,8 +56,8 @@ function useEChart(option: ChartOption): React.RefObject<HTMLDivElement | null> 
   const chartRef = useRef<ChartInstance | null>(null);
   useEffect(() => {
     const host = hostRef.current;
-    const runtime = window.echarts;
-    if (!host || !runtime) return;
+    if (!host) return;
+    const runtime = echarts as EChartsRuntime;
     const chart = runtime.init(host, undefined, {
       renderer: "canvas",
       useDirtyRect: true,
