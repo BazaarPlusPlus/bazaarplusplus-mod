@@ -378,13 +378,11 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         if (_catalog.TryGetCached(out var cached))
         {
-            _catalogReadiness = CollectionCatalogReadiness.Accepted;
-            _availableHeroes = CollectionHeroSelectionRoster.BaseConcreteHeroes;
-            SetCatalogCards(cached.Cards);
+            SetCatalogState(CollectionCatalogReadiness.Accepted, cached.Cards);
             return;
         }
 
-        _catalogReadiness = CollectionCatalogReadiness.Loading;
+        SetCatalogState(CollectionCatalogReadiness.Loading, Array.Empty<CollectionCardVm>());
     }
 
     private void Close()
@@ -801,8 +799,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         var diagnostics = new CollectionPanelLoadDiagnostics();
         _isLoadingCatalog = true;
-        if (_catalogReadiness != CollectionCatalogReadiness.Accepted)
-            _catalogReadiness = CollectionCatalogReadiness.Loading;
         SetStatus(CollectionPanelText.CatalogLoading());
         ApplyEmptyVisibleSet();
         RefreshView();
@@ -865,8 +861,10 @@ internal sealed class CollectionPanel : MonoBehaviour
             }
             else
             {
-                _catalogReadiness = CollectionCatalogReadiness.Unavailable;
-                SetCatalogCards(Array.Empty<CollectionCardVm>());
+                SetCatalogState(
+                    CollectionCatalogReadiness.Unavailable,
+                    Array.Empty<CollectionCardVm>()
+                );
                 SetStatus(CollectionPanelText.CatalogUnavailable());
             }
         }
@@ -1119,8 +1117,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void InvalidateCatalog(CollectionPanelLogReasonCode reasonCode)
     {
-        _catalogReadiness = CollectionCatalogReadiness.Loading;
-        SetCatalogCards(Array.Empty<CollectionCardVm>());
+        SetCatalogState(CollectionCatalogReadiness.Loading, Array.Empty<CollectionCardVm>());
         _offerPoolCache.Clear();
         _catalog.InvalidateCache(reasonCode);
     }
@@ -1133,11 +1130,19 @@ internal sealed class CollectionPanel : MonoBehaviour
         _facetAvailability = CollectionFacetAvailability.SnapshotFor(cards);
     }
 
+    private void SetCatalogState(
+        CollectionCatalogReadiness readiness,
+        IReadOnlyList<CollectionCardVm> cards
+    )
+    {
+        _catalogReadiness = readiness;
+        _availableHeroes = CollectionHeroSelectionRoster.ResolveAvailableHeroes(readiness, cards);
+        SetCatalogCards(cards);
+    }
+
     private void AcceptCatalog(IReadOnlyList<CollectionCardVm> cards)
     {
-        _catalogReadiness = CollectionCatalogReadiness.Accepted;
-        _availableHeroes = CollectionHeroSelectionRoster.BaseConcreteHeroes;
-        SetCatalogCards(cards);
+        SetCatalogState(CollectionCatalogReadiness.Accepted, cards);
 
         var normalizedHero = CollectionHeroSelectionRoster.NormalizeSelection(
             _filter.SelectedHero,

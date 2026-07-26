@@ -197,6 +197,164 @@ AssertTrue(
     TheDragonsHeroIdentity.TryResolve(TheDragonsHeroIdentity.CanonicalId, out var dragonsHero),
     "The integrated identity adapter should resolve the canonical The Dragons preference."
 );
+var dragonsCatalogCards = new[]
+{
+    Card("Dragons Item", ETier.Bronze, heroes: new[] { dragonsHero }),
+    Card("Dragons Skill", ETier.Bronze, type: ECardType.Skill, heroes: new[] { dragonsHero }),
+};
+AssertValues(
+    CollectionHeroSelectionRoster.ResolveAvailableHeroes(
+        CollectionCatalogReadiness.Loading,
+        dragonsCatalogCards,
+        _ =>
+            throw new InvalidOperationException(
+                "Loading catalogs must not probe transitional hero identity."
+            )
+    ),
+    CollectionHeroSelectionRoster.BaseConcreteHeroes,
+    "A loading catalog should expose only the seven established concrete heroes."
+);
+AssertValues(
+    CollectionHeroSelectionRoster.ResolveAvailableHeroes(
+        CollectionCatalogReadiness.Accepted,
+        new[] { Card("Vanessa Item", ETier.Bronze, heroes: new[] { EHero.Vanessa }) }
+    ),
+    CollectionHeroSelectionRoster.BaseConcreteHeroes,
+    "An accepted catalog without The Dragons content should not expose an empty hero chip."
+);
+AssertValues(
+    CollectionHeroSelectionRoster.ResolveAvailableHeroes(
+        CollectionCatalogReadiness.Accepted,
+        new[]
+        {
+            Card("Dragons Package", ETier.Bronze, isPackage: true, heroes: new[] { dragonsHero }),
+        }
+    ),
+    CollectionHeroSelectionRoster.BaseConcreteHeroes,
+    "Package-only The Dragons content should not expose a chip whose normal Collection results are empty."
+);
+var acceptedDragonsRoster = CollectionHeroSelectionRoster.ResolveAvailableHeroes(
+    CollectionCatalogReadiness.Accepted,
+    dragonsCatalogCards
+);
+AssertValues(
+    acceptedDragonsRoster,
+    new[]
+    {
+        EHero.Vanessa,
+        EHero.Dooley,
+        EHero.Pygmalien,
+        EHero.Karnok,
+        EHero.Mak,
+        EHero.Stelle,
+        EHero.Jules,
+        dragonsHero,
+    },
+    "An accepted catalog with The Dragons content should append exactly one concrete hero chip after the existing seven."
+);
+var loadingRosterPolicyAfterAcceptedCatalog = CollectionHeroSelectionRoster.ResolveAvailableHeroes(
+    CollectionCatalogReadiness.Loading,
+    Array.Empty<CollectionCardVm>()
+);
+AssertValues(
+    loadingRosterPolicyAfterAcceptedCatalog,
+    CollectionHeroSelectionRoster.BaseConcreteHeroes,
+    "Loading roster policy should project only the seven base chips even when the prior accepted policy result had eight."
+);
+var loadingPreferencePolicyAfterAcceptedCatalog = CollectionPanelHeroPreference.ResolveStored(
+    hasStoredValue: true,
+    raw: "TheDragons",
+    CollectionCatalogReadiness.Loading,
+    loadingRosterPolicyAfterAcceptedCatalog
+);
+AssertEqual(
+    CollectionPanelHeroPreferenceLoadStatus.Resolved,
+    loadingPreferencePolicyAfterAcceptedCatalog.Status,
+    "Loading preference policy should retain a saved The Dragons preference."
+);
+AssertEqual(
+    dragonsHero,
+    loadingPreferencePolicyAfterAcceptedCatalog.Hero,
+    "Loading preference policy should keep the saved runtime hero available for the next accepted catalog."
+);
+AssertValues(
+    CollectionHeroSelectionRoster.ResolveAvailableHeroes(
+        CollectionCatalogReadiness.Accepted,
+        dragonsCatalogCards,
+        name =>
+            string.Equals(name, TheDragonsHeroIdentity.CanonicalId, StringComparison.Ordinal)
+                ? dragonsHero
+                : null
+    ),
+    acceptedDragonsRoster,
+    "A future runtime exposing only the canonical enum name should retain The Dragons."
+);
+AssertValues(
+    CollectionHeroSelectionRoster.ResolveAvailableHeroes(
+        CollectionCatalogReadiness.Accepted,
+        dragonsCatalogCards,
+        name => string.Equals(name, "Hero8", StringComparison.Ordinal) ? dragonsHero : null
+    ),
+    acceptedDragonsRoster,
+    "A legacy runtime exposing only the transitional enum name should retain The Dragons."
+);
+AssertValues(
+    CollectionHeroSelectionRoster.ResolveAvailableHeroes(
+        CollectionCatalogReadiness.Accepted,
+        dragonsCatalogCards,
+        _ => null
+    ),
+    CollectionHeroSelectionRoster.BaseConcreteHeroes,
+    "A runtime that cannot resolve The Dragons should not expose an unusable hero chip."
+);
+var resolvedDragonsPreference = CollectionPanelHeroPreference.ResolveStored(
+    hasStoredValue: true,
+    raw: "Hero8",
+    CollectionCatalogReadiness.Accepted,
+    acceptedDragonsRoster
+);
+AssertEqual(
+    CollectionPanelHeroPreferenceLoadStatus.Resolved,
+    resolvedDragonsPreference.Status,
+    "An accepted catalog with The Dragons content should resolve a legacy saved preference."
+);
+AssertEqual(
+    TheDragonsHeroIdentity.CanonicalId,
+    resolvedDragonsPreference.CanonicalRaw,
+    "A resolved legacy preference should migrate to the canonical The Dragons identity."
+);
+var dragonsIdentityFilter = new CollectionFilterState();
+dragonsIdentityFilter.ToggleHero(dragonsHero);
+var misleadingCommonItem = Card(
+    "The Dragons Decoy",
+    ETier.Bronze,
+    heroes: new[] { EHero.Common },
+    artKey: "TheDragons/Hero8"
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { dragonsCatalogCards[0], misleadingCommonItem },
+        dragonsIdentityFilter
+    ),
+    new[] { dragonsCatalogCards[0].Id },
+    "The Dragons item filtering should use enum identity rather than names or art keys."
+);
+dragonsIdentityFilter.ActiveType = ECardType.Skill;
+var misleadingCommonSkill = Card(
+    "Hero8 Skill Decoy",
+    ETier.Bronze,
+    type: ECardType.Skill,
+    heroes: new[] { EHero.Common },
+    artKey: "TheDragons/Skill"
+);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { dragonsCatalogCards[1], misleadingCommonSkill },
+        dragonsIdentityFilter
+    ),
+    new[] { dragonsCatalogCards[1].Id },
+    "The Dragons skill filtering should use enum identity rather than names or art keys."
+);
 var loadingDragonsPreference = CollectionPanelHeroPreference.ResolveStored(
     hasStoredValue: true,
     raw: "Hero8",

@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 
@@ -191,8 +192,12 @@ internal static class CollectionPanelText
     // Tag labels intentionally have no entry here: chips resolve through the game's native
     // typography (GameInterop.TagTypography.NativeTagTypography), never a mod-side dictionary.
 
-    internal static string Hero(EHero hero) =>
-        hero switch
+    internal static string Hero(EHero hero)
+    {
+        if (TheDragonsHeroIdentity.IsTheDragons(hero))
+            return TheDragonsHeroIdentity.ResolveDisplayName(hero);
+
+        return hero switch
         {
             EHero.Common => FormatSimple("Common", "通用", "通用"),
             EHero.Vanessa => FormatSimple("Vanessa", "Vanessa", "Vanessa"),
@@ -204,6 +209,7 @@ internal static class CollectionPanelText
             EHero.Stelle => FormatSimple("Stelle", "Stelle", "Stelle"),
             _ => hero.ToString(),
         };
+    }
 
     internal static string MatchCount(int count)
     {

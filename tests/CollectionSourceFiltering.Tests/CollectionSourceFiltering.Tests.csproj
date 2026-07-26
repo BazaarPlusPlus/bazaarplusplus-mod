@@ -18,5 +18,17 @@
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
     </Reference>
+    <Reference Include="TheBazaarRuntime">
+      <HintPath>$(ManagedPath)/TheBazaarRuntime.dll</HintPath>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
+    </Reference>
+    <None Include="$(ManagedPath)/TheBazaarRuntime.dll" Link="TheBazaarRuntime.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="$(ManagedPath)/UnityEngine.CoreModule.dll" Link="UnityEngine.CoreModule.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 </Project>

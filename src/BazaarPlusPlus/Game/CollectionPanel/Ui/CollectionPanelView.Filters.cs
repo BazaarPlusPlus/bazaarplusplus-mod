@@ -2,6 +2,7 @@
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.GameInterop.EncounterPortraits;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Infrastructure;
@@ -13,6 +14,8 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
 
 internal sealed partial class CollectionPanelView
 {
+    private const string HeroChipBadgeName = "bpp-collection-hero-chip-badge";
+
     private static readonly CollectionPortraitFailureGate<
         EHero,
         CollectionPortraitReasonCode
@@ -578,7 +581,9 @@ internal sealed partial class CollectionPanelView
         UiStyle.Border(icon.style, Borders.Thin, Colors.HistoryButtonBorder);
         ResizeHeroIcon(icon, Sizes.HeroChipIconSize);
 
-        if (!HeroPortraitSpriteProvider.IsRenderableHero(hero))
+        if (HeroPortraitSpriteProvider.IsRenderableHero(hero))
+            AddHeroBadgeFallback(icon, hero, Sizes.HeroChipIconSize);
+        else
             AddCommonHeroGlyph(icon, Sizes.HeroChipIconSize);
 
         return icon;
@@ -629,7 +634,9 @@ internal sealed partial class CollectionPanelView
         chip.style.minHeight = box;
         chip.style.maxHeight = box;
         ResizeHeroIcon(icon, iconSize);
-        if (!HeroPortraitSpriteProvider.IsRenderableHero(hero))
+        if (HeroPortraitSpriteProvider.IsRenderableHero(hero))
+            ResizeHeroBadge(icon, iconSize);
+        else
             AddCommonHeroGlyph(icon, iconSize);
     }
 
@@ -669,6 +676,7 @@ internal sealed partial class CollectionPanelView
     private static void AddCommonHeroGlyph(VisualElement icon, float iconSize)
     {
         icon.Clear();
+        icon.style.backgroundColor = Colors.HistoryStatusBackground;
         AddCommonHeroDot(icon, 0.5f, 0.5f, 0.125f, iconSize, Colors.HistoryChipText);
         AddCommonHeroDot(icon, 0.24f, 0.24f, 0.104f, iconSize, Colors.HistorySubtitleText);
         AddCommonHeroDot(icon, 0.76f, 0.24f, 0.104f, iconSize, Colors.HistorySubtitleText);
@@ -695,6 +703,35 @@ internal sealed partial class CollectionPanelView
         UiStyle.Radius(dot.style, size / 2f);
         parent.Add(dot);
     }
+
+    private static void AddHeroBadgeFallback(VisualElement icon, EHero hero, float iconSize)
+    {
+        icon.Clear();
+        var style = HeroVisual.Resolve(hero.ToString());
+        icon.style.backgroundColor = style.Background;
+
+        var badge = CreateLabel(HeroBadgeFontSize(iconSize), FontStyle.Bold, style.Text);
+        badge.name = HeroChipBadgeName;
+        badge.text = style.ShortCode;
+        badge.pickingMode = PickingMode.Ignore;
+        badge.style.position = Position.Absolute;
+        badge.style.left = 0f;
+        badge.style.right = 0f;
+        badge.style.top = 0f;
+        badge.style.bottom = 0f;
+        badge.style.unityTextAlign = TextAnchor.MiddleCenter;
+        icon.Add(badge);
+    }
+
+    private static void ResizeHeroBadge(VisualElement icon, float iconSize)
+    {
+        var badge = icon.Q<Label>(HeroChipBadgeName);
+        if (badge != null)
+            badge.style.fontSize = HeroBadgeFontSize(iconSize);
+    }
+
+    private static int HeroBadgeFontSize(float iconSize) =>
+        Mathf.Max(Sizes.FontTiny, Mathf.RoundToInt(iconSize * 0.25f));
 
     private static void LoadHeroChipIcon(EHero hero, VisualElement icon)
     {
@@ -850,13 +887,18 @@ internal sealed partial class CollectionPanelView
 
     private static void ApplyHeroChipIcon(VisualElement icon, Sprite? sprite)
     {
+        var badge = icon.Q<Label>(HeroChipBadgeName);
         if (sprite == null)
         {
             icon.style.backgroundImage = new StyleBackground(StyleKeyword.Null);
+            if (badge != null)
+                badge.style.display = DisplayStyle.Flex;
             return;
         }
 
         icon.style.backgroundImage = new StyleBackground(sprite);
+        if (badge != null)
+            badge.style.display = DisplayStyle.None;
         icon.MarkDirtyRepaint();
     }
 

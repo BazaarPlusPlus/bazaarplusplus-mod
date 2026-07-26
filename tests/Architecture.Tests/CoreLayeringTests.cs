@@ -224,6 +224,101 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void CollectionPanel_catalog_state_transitions_are_centralized()
+    {
+        var collectionPanelSource = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "CollectionPanel.cs"
+            )
+        );
+        var prepareForOpen = WithoutWhitespace(
+            MethodSource(
+                collectionPanelSource,
+                "private void PrepareCatalogReadinessForOpen()",
+                "private void Close()"
+            )
+        );
+        var loadPanel = WithoutWhitespace(
+            MethodSource(
+                collectionPanelSource,
+                "private IEnumerator LoadPanelAsync(int generation)",
+                "private bool IsLoadGenerationCurrent(int generation)"
+            )
+        );
+        var invalidateCatalog = WithoutWhitespace(
+            MethodSource(
+                collectionPanelSource,
+                "private void InvalidateCatalog(CollectionPanelLogReasonCode reasonCode)",
+                "// Facet availability is a pure projection"
+            )
+        );
+        var setCatalogState = WithoutWhitespace(
+            MethodSource(
+                collectionPanelSource,
+                "private void SetCatalogState(",
+                "private void AcceptCatalog("
+            )
+        );
+        var setCatalogCards = WithoutWhitespace(
+            MethodSource(
+                collectionPanelSource,
+                "private void SetCatalogCards(",
+                "private void SetCatalogState("
+            )
+        );
+        var acceptCatalog = WithoutWhitespace(
+            MethodSource(collectionPanelSource, "private void AcceptCatalog(", "\n    }\n}")
+        );
+
+        // Each field has one declaration initializer and one live assignment. Cards/facets use a
+        // subordinate helper whose only caller is SetCatalogState.
+        Assert.Equal(2, AssignmentCount(collectionPanelSource, "_catalogReadiness"));
+        Assert.Equal(2, AssignmentCount(collectionPanelSource, "_availableHeroes"));
+        Assert.Equal(2, AssignmentCount(collectionPanelSource, "_catalogCards"));
+        Assert.Equal(2, AssignmentCount(collectionPanelSource, "_facetAvailability"));
+        Assert.Contains("_catalogReadiness=readiness;", setCatalogState);
+        Assert.Contains(
+            "_availableHeroes=CollectionHeroSelectionRoster.ResolveAvailableHeroes(readiness,cards);",
+            setCatalogState
+        );
+        Assert.Contains("_catalogCards=cards;", setCatalogCards);
+        Assert.Contains(
+            "_facetAvailability=CollectionFacetAvailability.SnapshotFor(cards);",
+            setCatalogCards
+        );
+        Assert.DoesNotContain("_catalogReadiness=", loadPanel);
+
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Accepted,cached.Cards);",
+            prepareForOpen
+        );
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Loading,Array.Empty<CollectionCardVm>());",
+            prepareForOpen
+        );
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Unavailable,Array.Empty<CollectionCardVm>());",
+            loadPanel
+        );
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Loading,Array.Empty<CollectionCardVm>());",
+            invalidateCatalog
+        );
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Accepted,cards);",
+            acceptCatalog
+        );
+
+        // Catalog cards and their derived facets may be assigned by SetCatalogCards, but that
+        // helper itself must remain private to the centralized state transition.
+        Assert.Equal(2, collectionPanelSource.Split("SetCatalogCards(").Length - 1);
+        Assert.Contains("SetCatalogCards(cards);", setCatalogState);
+    }
+
+    [Fact]
     public void CollectionPanel_opens_from_native_clone_button_or_tab_not_settings_dock()
     {
         var repoRoot = RepoRoot();
@@ -2624,6 +2719,17 @@ public class CoreLayeringTests
         Assert.True(end > start, $"Could not find method boundary '{endMarker}'.");
         return source.Substring(start, end - start);
     }
+
+    private static string WithoutWhitespace(string value) =>
+        string.Concat(value.Where(character => !char.IsWhiteSpace(character)));
+
+    private static int AssignmentCount(string source, string fieldName) =>
+        System
+            .Text.RegularExpressions.Regex.Matches(
+                source,
+                $@"{System.Text.RegularExpressions.Regex.Escape(fieldName)}\s*=(?!=)"
+            )
+            .Count;
 
     private static string? Attribute(XElement element, string name) =>
         element.Attribute(name)?.Value;
