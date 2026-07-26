@@ -1,4 +1,4 @@
-import { useRef, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import type { ReportAction } from "../../app/report-reducer.ts";
 import type { ReportState } from "../../app/report-state.ts";
 import type { ReportViewModel } from "../../model/report.ts";
@@ -98,6 +98,34 @@ export function TimelineViewport({
   const pinnedHeroSide = pinnedHero
     ? normalizeSide(pinnedHero.side)
     : "neutral";
+
+  useEffect(() => {
+    const scroll = refs.scroll.current;
+    if (!scroll) return;
+
+    const handleWheel = (event: WheelEvent): void => {
+      if (!event.shiftKey) return;
+      const delta =
+        Math.abs(event.deltaX) > Math.abs(event.deltaY)
+          ? event.deltaX
+          : event.deltaY;
+      if (!Number.isFinite(delta) || delta === 0) return;
+      event.preventDefault();
+      const maximum = Math.max(
+        0,
+        scroll.scrollWidth - scroll.clientWidth,
+      );
+      const next = Math.max(
+        0,
+        Math.min(maximum, scroll.scrollLeft + delta),
+      );
+      if (Math.abs(next - scroll.scrollLeft) < 0.5) return;
+      scroll.scrollLeft = next;
+    };
+
+    scroll.addEventListener("wheel", handleWheel, { passive: false });
+    return () => scroll.removeEventListener("wheel", handleWheel);
+  }, [refs.scroll]);
 
   const previewAtPointer = (
     canvas: HTMLCanvasElement,

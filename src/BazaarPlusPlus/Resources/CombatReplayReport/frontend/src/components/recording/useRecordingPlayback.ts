@@ -117,6 +117,25 @@ export function useRecordingPlayback({
     const video = videoRef.current;
     if (!video) return;
     const nextMediaMs = video.currentTime * 1_000;
+    const finalAnchor = exact
+      ? model.sync.anchors[model.sync.anchors.length - 1]
+      : undefined;
+    if (
+      finalAnchor
+      && !video.paused
+      && nextMediaMs >= finalAnchor.mediaPtsMs
+    ) {
+      const finalMediaMs = Math.max(0, finalAnchor.mediaPtsMs);
+      resumeMediaMsRef.current = finalMediaMs;
+      requestedMediaMsRef.current = finalMediaMs;
+      setMediaMs(finalMediaMs);
+      onPlaybackCombatTime(finalAnchor.combatMs);
+      if (Math.abs(nextMediaMs - finalMediaMs) >= 1) {
+        video.currentTime = finalMediaMs / 1_000;
+      }
+      video.pause();
+      return;
+    }
     resumeMediaMsRef.current = nextMediaMs;
     requestedMediaMsRef.current = nextMediaMs;
     setMediaMs(nextMediaMs);
@@ -126,6 +145,11 @@ export function useRecordingPlayback({
     if (!exact || video.paused) return;
     const combatMs = mapMediaToCombat(nextMediaMs, model.sync.anchors);
     if (combatMs !== null) onPlaybackCombatTime(combatMs);
+  };
+
+  const handleEnded = (): void => {
+    videoRef.current?.pause();
+    setPlaying(false);
   };
 
   const handleLoadedMetadata = (host: HTMLElement | null): void => {
@@ -157,6 +181,7 @@ export function useRecordingPlayback({
   };
 
   return {
+    handleEnded,
     handleLoadedMetadata,
     handleTimeUpdate,
     loadFailed,

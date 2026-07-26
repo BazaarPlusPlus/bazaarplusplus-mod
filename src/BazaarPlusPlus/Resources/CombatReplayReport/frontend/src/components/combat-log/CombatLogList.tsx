@@ -19,6 +19,7 @@ import {
   buildCombatLogEntries,
   combatLogEntity,
   groupCombatLogEntries,
+  isDirectStatusApplicationEvent,
   isNarrativeCombatLogEntry,
   nearestCombatLogEntryIndex,
   selectedCombatLogEntryIndex,
@@ -125,6 +126,7 @@ export const CombatLogList = forwardRef<
       buildCombatLogEntries(
         model.events.filter((event) =>
           isVisibleTimelineEvent(event, entityById)
+          || isDirectStatusApplicationEvent(event)
         ),
       ).filter(isNarrativeCombatLogEntry),
     [entityById, model.events],
@@ -140,6 +142,7 @@ export const CombatLogList = forwardRef<
   const pinnedMsRef = useRef(pinnedCombatMs);
   const pinnedEventIdsRef = useRef(pinnedEventIds);
   const scheduledRef = useRef(0);
+  const hasFollowedRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(() =>
     selectedCombatLogEntryIndex(entries, pinnedEventIds, pinnedCombatMs)
   );
@@ -218,10 +221,14 @@ export const CombatLogList = forwardRef<
 
   useEffect(() => {
     if (manualPaused || activeIndex < 0) return;
+    const reduceMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     virtualizer.scrollToIndex(activeIndex, {
       align: "center",
-      behavior: "auto",
+      behavior: hasFollowedRef.current && !reduceMotion ? "smooth" : "auto",
     });
+    hasFollowedRef.current = true;
   }, [activeIndex, manualPaused, virtualizer]);
 
   const followLabel =

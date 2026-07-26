@@ -89,6 +89,15 @@ export const FooterReplayDock = forwardRef<
     return () => window.removeEventListener("resize", clampHeight);
   }, []);
 
+  const finishResize = (
+    event: React.PointerEvent<HTMLButtonElement>,
+  ): void => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = null;
+  };
+
   useImperativeHandle(
     forwardedRef,
     () => ({
@@ -103,7 +112,7 @@ export const FooterReplayDock = forwardRef<
 
   return (
     <section
-      className="relative z-30 flex shrink-0 overflow-hidden border-t border-border bg-background shadow-sticky"
+      className="relative z-30 flex shrink-0 overflow-hidden border-t border-border bg-background pt-3 shadow-sticky"
       data-bpp-test-id="footer-replay-dock"
       style={{ height }}
     >
@@ -113,12 +122,10 @@ export const FooterReplayDock = forwardRef<
         aria-valuemax={bounds.maximum}
         aria-valuemin={bounds.minimum}
         aria-valuenow={height}
-        className="absolute inset-x-0 top-0 z-10 flex h-2 -translate-y-1/2 cursor-row-resize items-center justify-center text-muted-foreground opacity-0 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+        className="absolute inset-x-0 top-0 z-10 flex h-3 w-full touch-none cursor-row-resize items-center justify-center rounded-none border-0 bg-surface-raised/70 p-0 text-muted-foreground/70 opacity-100 transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:bg-accent/70 focus-visible:text-foreground"
         data-bpp-test-id="footer-replay-dock-resize"
         role="separator"
-        onPointerCancel={() => {
-          dragRef.current = null;
-        }}
+        onPointerCancel={finishResize}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           dragRef.current = {
@@ -155,14 +162,12 @@ export const FooterReplayDock = forwardRef<
             Math.min(nextHeight, nextBounds.maximum),
           ));
         }}
-        onPointerUp={() => {
-          dragRef.current = null;
-        }}
+        onPointerUp={finishResize}
         size="icon-xs"
         type="button"
         variant="ghost"
       >
-        <GripHorizontal className="size-icon-md" />
+        <GripHorizontal className="h-2.5 w-8" />
       </Button>
       <CombatLogList
         initialPlaybackActive={initialPlaybackActive}

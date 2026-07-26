@@ -229,6 +229,7 @@ let fixtureDirectory;
 let reportUrl;
 let chartReportUrl;
 let denseReportUrl;
+let statusApplicationReportUrl;
 let recordingReportUrl;
 let navigationReportUrl;
 let scrollRecordingReportUrl;
@@ -341,6 +342,74 @@ test.beforeAll(async ({ browserName }) => {
     reportHtml(denseEnvelope),
     "utf8",
   );
+  const statusApplicationEnvelope = structuredClone(fixtureEnvelope);
+  const sourceSkill = statusApplicationEnvelope.battleDocument.entities.find(
+    (entity) => entity.entityId === "player-skill",
+  );
+  sourceSkill.name = "Petrifying Gaze";
+  statusApplicationEnvelope.battleDocument.entities.push({
+    entityId: "opponent-item-2",
+    owner: "opponent",
+    type: "item",
+    name: "Cash Cannon",
+    span: 2,
+    order: 2,
+  });
+  statusApplicationEnvelope.battleDocument.events.push(
+    schemaEvent({
+      eventId: "freeze-application-1",
+      frame: 169,
+      frameSequence: 0,
+      combatTimeMs: 8450,
+      kind: "effect-executed",
+      action: "CardFreeze",
+      sourceEntityId: "player-skill",
+      triggerSourceEntityId: "opponent-item",
+      targetEntityIds: ["opponent-item"],
+      value: 1000,
+      unit: "milliseconds",
+      role: "applied",
+      attributionConfidence: "exact",
+    }),
+    schemaEvent({
+      eventId: "freeze-application-2",
+      frame: 169,
+      frameSequence: 1,
+      combatTimeMs: 8450,
+      kind: "effect-executed",
+      action: "CardFreeze",
+      sourceEntityId: "player-skill",
+      triggerSourceEntityId: "opponent-item",
+      targetEntityIds: ["opponent-item-2"],
+      value: 1000,
+      unit: "milliseconds",
+      role: "applied",
+      attributionConfidence: "exact",
+    }),
+    schemaEvent({
+      eventId: "freeze-countdown-tick",
+      frame: 170,
+      frameSequence: 0,
+      combatTimeMs: 8500,
+      kind: "card-attribute",
+      action: "Freeze",
+      targetEntityIds: ["opponent-item"],
+      previousValue: 1000,
+      currentValue: 950,
+      value: -50,
+      unit: "milliseconds",
+      role: "received",
+      attributionConfidence: "unavailable",
+    }),
+  );
+  statusApplicationEnvelope.battleDocument.durationMs = 9000;
+  statusApplicationEnvelope.battleDocument.frameCount = 180;
+  statusApplicationEnvelope.battleDocument.rawRecordCount += 3;
+  await writeFile(
+    join(fixtureDirectory, "status-application-report.html"),
+    reportHtml(statusApplicationEnvelope),
+    "utf8",
+  );
   const recordingEnvelope = structuredClone(fixtureEnvelope);
   recordingEnvelope.recordingManifest = {
     schemaVersion: 1,
@@ -439,6 +508,9 @@ test.beforeAll(async ({ browserName }) => {
   ).href;
   denseReportUrl = pathToFileURL(
     join(fixtureDirectory, "dense-report.html"),
+  ).href;
+  statusApplicationReportUrl = pathToFileURL(
+    join(fixtureDirectory, "status-application-report.html"),
   ).href;
   recordingReportUrl = pathToFileURL(
     join(fixtureDirectory, "recording-report.html"),
@@ -1293,6 +1365,20 @@ test("paused recording preview cannot move the pinned solid axis", async ({
     "paused",
     true,
   );
+  await page.getByTestId("recording-play-toggle").click();
+  await expect(video).toHaveJSProperty("paused", false);
+  await video.evaluate((element) => {
+    element.currentTime = 8.25;
+  });
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect(video).toHaveJSProperty("currentTime", 8);
+  await expect(page.getByTestId("recording-timecode")).toHaveText(
+    "00:08.000",
+  );
+  await expect(page.getByTestId("recording-play-toggle")).toHaveAttribute(
+    "aria-label",
+    "Play",
+  );
 });
 
 test("preserves the timeline viewport and recording navigation across tabs", async ({
@@ -2121,7 +2207,7 @@ test("keeps the page chrome bounded while the timeline owns horizontal overflow"
   page,
 }) => {
   await page.setViewportSize({ width: 480, height: 857 });
-  await page.goto(`${reportUrl}?lang=zh-CN`);
+  await page.goto(`${scrollRecordingReportUrl}?lang=zh-CN`);
 
   const dimensions = await page.evaluate(() => {
     const timeline = document.querySelector(
@@ -2139,6 +2225,48 @@ test("keeps the page chrome bounded while the timeline owns horizontal overflow"
   );
   expect(dimensions.timelineScrollWidth).toBeGreaterThan(
     dimensions.timelineClientWidth,
+  );
+  const timeline = page.getByTestId("timeline-scroll");
+  await timeline.evaluate((element) => {
+    element.scrollLeft = 0;
+    element.scrollTop = 0;
+  });
+  await timeline.hover();
+  await page.mouse.wheel(0, 240);
+  expect(await timeline.evaluate((element) => element.scrollLeft)).toBe(0);
+  await expect
+    .poll(() => timeline.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  const verticalScrollTop = await timeline.evaluate((element) =>
+    element.scrollTop
+  );
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, -120);
+  await page.keyboard.up("Shift");
+  expect(await timeline.evaluate((element) => element.scrollLeft)).toBe(0);
+  expect(await timeline.evaluate((element) => element.scrollTop)).toBe(
+    verticalScrollTop,
+  );
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, 240);
+  await page.keyboard.up("Shift");
+  await expect
+    .poll(() => timeline.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(0);
+  expect(await timeline.evaluate((element) => element.scrollTop)).toBe(
+    verticalScrollTop,
+  );
+  const shiftedScrollLeft = await timeline.evaluate((element) =>
+    element.scrollLeft
+  );
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, -120);
+  await page.keyboard.up("Shift");
+  await expect
+    .poll(() => timeline.evaluate((element) => element.scrollLeft))
+    .toBeLessThan(shiftedScrollLeft);
+  expect(await timeline.evaluate((element) => element.scrollTop)).toBe(
+    verticalScrollTop,
   );
   await expect(page.getByTestId("report-tab-timeline")).toHaveText("时间轴");
 });
@@ -2194,6 +2322,22 @@ test("gives the timeline the viewport and keeps at least ten lanes visible", asy
 test("virtualizes the footer combat log and highlights every visible row from the active frame", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    const originalScrollTo = Element.prototype.scrollTo;
+    window.__bppCombatLogScrollBehaviors = [];
+    Element.prototype.scrollTo = function scrollTo(...args) {
+      if (
+        this.getAttribute?.("data-bpp-test-id") === "combat-log-viewport"
+        && typeof args[0] === "object"
+        && args[0] !== null
+      ) {
+        window.__bppCombatLogScrollBehaviors.push(
+          args[0].behavior ?? "auto",
+        );
+      }
+      return originalScrollTo.apply(this, args);
+    };
+  });
   await page.goto(`${denseReportUrl}?lang=en`);
   await page.getByTestId("combat-log-dock-toggle").click();
 
@@ -2316,28 +2460,33 @@ test("virtualizes the footer combat log and highlights every visible row from th
   await expect
     .poll(async () => viewport.evaluate((element) => element.scrollTop))
     .not.toBe(pinnedScrollTop);
-  const hoveredFollowGeometry = await page.evaluate(() => {
-    const viewport = document.querySelector(
-      '[data-bpp-test-id="combat-log-viewport"]',
-    );
-    const active = document.querySelector(
-      '[data-bpp-test-id="combat-log-entry"][data-bpp-active="true"]',
-    );
-    const viewportBounds = viewport?.getBoundingClientRect();
-    const activeBounds = active?.getBoundingClientRect();
-    return {
-      topGap:
-        viewportBounds && activeBounds
-          ? activeBounds.top - viewportBounds.top
-          : Number.NaN,
-      bottomGap:
-        viewportBounds && activeBounds
-          ? viewportBounds.bottom - activeBounds.bottom
-          : Number.NaN,
-    };
-  });
-  expect(hoveredFollowGeometry.topGap).toBeGreaterThanOrEqual(-1);
-  expect(hoveredFollowGeometry.bottomGap).toBeGreaterThanOrEqual(-1);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__bppCombatLogScrollBehaviors.includes("smooth")
+      )
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const viewport = document.querySelector(
+          '[data-bpp-test-id="combat-log-viewport"]',
+        );
+        const active = document.querySelector(
+          '[data-bpp-test-id="combat-log-entry"][data-bpp-active="true"]',
+        );
+        const viewportBounds = viewport?.getBoundingClientRect();
+        const activeBounds = active?.getBoundingClientRect();
+        return Boolean(
+          viewportBounds
+          && activeBounds
+          && activeBounds.top >= viewportBounds.top - 1
+          && activeBounds.bottom <= viewportBounds.bottom + 1,
+        );
+      })
+    )
+    .toBe(true);
   await ruler.dispatchEvent("pointerout");
   await expect(activeEntry).toHaveAttribute("data-index", selectedIndex);
 
@@ -2370,6 +2519,24 @@ test("virtualizes the footer combat log and highlights every visible row from th
   await expect(page.getByTestId("combat-log-resume")).toBeHidden();
   await viewport.press("PageDown");
   await expect(page.getByTestId("combat-log-resume")).toBeVisible();
+});
+
+test("keeps direct freeze applications in the combat log without countdown tick noise", async ({
+  page,
+}) => {
+  await page.goto(`${statusApplicationReportUrl}?lang=en`);
+  await page.getByTestId("combat-log-dock-toggle").click();
+
+  const freezeRow = page
+    .getByTestId("combat-log-entry")
+    .filter({ hasText: "Freeze" });
+  await expect(freezeRow).toHaveCount(1);
+  await expect(freezeRow).toContainText("Petrifying Gaze");
+  await expect(freezeRow).toContainText("Practice Shield");
+  await expect(freezeRow).toContainText("+1");
+  await expect(freezeRow).toContainText("1s");
+  await expect(freezeRow).toContainText("×2");
+  await expect(page.getByTestId("combat-log")).not.toContainText("-50ms");
 });
 
 test("embeds the existing recording instance in the footer dock", async ({
@@ -2477,6 +2644,29 @@ test("embeds the existing recording instance in the footer dock", async ({
   await expect(resizeHandle).toHaveAttribute(
     "aria-orientation",
     "horizontal",
+  );
+  const resizeHandleBounds = await resizeHandle.boundingBox();
+  expect(resizeHandleBounds).not.toBeNull();
+  expect(resizeHandleBounds.height).toBeGreaterThanOrEqual(10);
+  const dockHeightBeforePointerResize = (
+    await page.getByTestId("footer-replay-dock").boundingBox()
+  ).height;
+  await page.mouse.move(
+    resizeHandleBounds.x + resizeHandleBounds.width / 2,
+    resizeHandleBounds.y + resizeHandleBounds.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    resizeHandleBounds.x + resizeHandleBounds.width / 2,
+    resizeHandleBounds.y - 28,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+  const dockHeightAfterPointerResize = (
+    await page.getByTestId("footer-replay-dock").boundingBox()
+  ).height;
+  expect(dockHeightAfterPointerResize).toBeGreaterThanOrEqual(
+    dockHeightBeforePointerResize + 24,
   );
   const heightBeforeKeyboardResize = (
     await page.getByTestId("footer-replay-dock").boundingBox()

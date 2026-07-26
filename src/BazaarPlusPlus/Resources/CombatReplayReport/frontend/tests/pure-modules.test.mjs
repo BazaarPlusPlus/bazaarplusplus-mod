@@ -93,6 +93,7 @@ import { mergeInspectorEvents } from "../src/components/inspector/frame-event-gr
 import {
   buildCombatLogEntries,
   groupCombatLogEntries,
+  isDirectStatusApplicationEvent,
   isNarrativeCombatLogEntry,
   nearestCombatLogEntryIndex,
   selectedCombatLogEntryIndex,
@@ -181,6 +182,67 @@ test("combat log narrative excludes generic setup and attribute noise", () => {
     isNarrativeCombatLogEntry({ action: "FlyingStart", token: "status" }),
     false,
   );
+});
+
+test("combat log keeps direct freeze applications without exposing freeze countdown ticks", () => {
+  const directApplications = [
+    timelineEvent({
+      id: "freeze-a",
+      frame: 169,
+      combatMs: 8_450,
+      kind: "effect-executed",
+      action: "CardFreeze",
+      sourceId: "petrifying-gaze",
+      triggerSourceId: "regal-blade",
+      targetIds: ["dog"],
+      value: 1_000,
+      unit: "ms",
+    }),
+    timelineEvent({
+      id: "freeze-b",
+      frame: 169,
+      combatMs: 8_450,
+      kind: "effect-executed",
+      action: "CardFreeze",
+      sourceId: "petrifying-gaze",
+      triggerSourceId: "regal-blade",
+      targetIds: ["cash-cannon"],
+      value: 1_000,
+      unit: "ms",
+    }),
+  ];
+  const countdownTick = timelineEvent({
+    id: "freeze-tick",
+    frame: 170,
+    combatMs: 8_500,
+    kind: "card-attribute",
+    action: "Freeze",
+    targetIds: ["dog"],
+    value: -50,
+    previousValue: 1_000,
+    currentValue: 950,
+    unit: "ms",
+  });
+
+  assert.equal(
+    directApplications.every(isDirectStatusApplicationEvent),
+    true,
+  );
+  assert.equal(isDirectStatusApplicationEvent(countdownTick), false);
+
+  const entries = groupCombatLogEntries(
+    buildCombatLogEntries(
+      [...directApplications, countdownTick].filter(
+        isDirectStatusApplicationEvent,
+      ),
+    ).filter(isNarrativeCombatLogEntry),
+  );
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].action, "CardFreeze");
+  assert.equal(entries[0].token, "freeze");
+  assert.equal(entries[0].count, 2);
+  assert.deepEqual(entries[0].targetIds, ["dog", "cash-cannon"]);
+  assert.deepEqual(entries[0].eventIds, ["freeze-a", "freeze-b"]);
 });
 
 test("combat log grouping never merges distinct actions", () => {

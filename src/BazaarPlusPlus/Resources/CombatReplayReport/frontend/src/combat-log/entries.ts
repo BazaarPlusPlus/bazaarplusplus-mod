@@ -4,6 +4,12 @@ import type {
 } from "../model/normalize.ts";
 import { eventKindToken } from "../timeline/clusters.ts";
 
+const DIRECT_STATUS_APPLICATION_ACTIONS = new Set([
+  "CardHaste",
+  "CardSlow",
+  "CardFreeze",
+]);
+
 export interface CombatLogEntry {
   id: string;
   frame: number;
@@ -17,6 +23,20 @@ export interface CombatLogEntry {
   value: unknown;
   unit: string;
   count: number;
+}
+
+/**
+ * Direct tempo/control applications are represented by status ranges in the
+ * timeline, so their source markers are intentionally hidden there. They are
+ * still meaningful narrative actions and must remain in the combat log.
+ */
+export function isDirectStatusApplicationEvent(
+  event: Pick<NormalizedEvent, "kind" | "action">,
+): boolean {
+  return (
+    event.kind.toLowerCase() === "effect-executed"
+    && DIRECT_STATUS_APPLICATION_ACTIONS.has(event.action)
+  );
 }
 
 function valueKey(value: unknown): string {

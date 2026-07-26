@@ -74,6 +74,7 @@ export const RecordingWindow = forwardRef<
     width: string;
   } | null>(null);
   const {
+    handleEnded,
     handleLoadedMetadata,
     handleTimeUpdate,
     loadFailed,
@@ -280,6 +281,7 @@ export const RecordingWindow = forwardRef<
           className="block size-full object-contain"
           data-bpp-test-id="recording-video"
           onCanPlay={() => setLoaded(true)}
+          onEnded={handleEnded}
           onError={() => setLoadFailed(true)}
           onLoadedMetadata={() => handleLoadedMetadata(hostRef.current)}
           onPause={() => setPlaying(false)}
