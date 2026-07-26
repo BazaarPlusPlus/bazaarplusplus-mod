@@ -2211,8 +2211,10 @@ test("virtualizes the footer combat log and highlights every visible row from th
       "combat-log-time",
       "combat-log-kind",
       "combat-log-source",
+      "combat-log-source-label",
       "combat-log-arrow",
       "combat-log-target",
+      "combat-log-target-label",
       "combat-log-amount",
     ];
     return Object.fromEntries(
@@ -2294,6 +2296,10 @@ test("virtualizes the footer combat log and highlights every visible row from th
     ),
   ).toHaveCount(sameFrameHighlight.count);
 
+  const viewport = page.getByTestId("combat-log-viewport");
+  const pinnedScrollTop = await viewport.evaluate((element) =>
+    element.scrollTop
+  );
   const ruler = page.getByTestId("timeline-ruler-canvas");
   const rulerBounds = await ruler.boundingBox();
   expect(rulerBounds).not.toBeNull();
@@ -2301,16 +2307,40 @@ test("virtualizes the footer combat log and highlights every visible row from th
     const bounds = element.getBoundingClientRect();
     element.dispatchEvent(new PointerEvent("pointermove", {
       bubbles: true,
-      clientX: bounds.left + bounds.width * 0.05,
+      clientX: bounds.left + bounds.width * 0.95,
       clientY: bounds.top + bounds.height * 0.5,
     }));
   });
-  await expect(log).toHaveAttribute("data-bpp-follow-source", "paused");
+  await expect(log).toHaveAttribute("data-bpp-follow-source", "hover");
   await expect(activeEntry).not.toHaveAttribute("data-index", selectedIndex);
+  await expect
+    .poll(async () => viewport.evaluate((element) => element.scrollTop))
+    .not.toBe(pinnedScrollTop);
+  const hoveredFollowGeometry = await page.evaluate(() => {
+    const viewport = document.querySelector(
+      '[data-bpp-test-id="combat-log-viewport"]',
+    );
+    const active = document.querySelector(
+      '[data-bpp-test-id="combat-log-entry"][data-bpp-active="true"]',
+    );
+    const viewportBounds = viewport?.getBoundingClientRect();
+    const activeBounds = active?.getBoundingClientRect();
+    return {
+      topGap:
+        viewportBounds && activeBounds
+          ? activeBounds.top - viewportBounds.top
+          : Number.NaN,
+      bottomGap:
+        viewportBounds && activeBounds
+          ? viewportBounds.bottom - activeBounds.bottom
+          : Number.NaN,
+    };
+  });
+  expect(hoveredFollowGeometry.topGap).toBeGreaterThanOrEqual(-1);
+  expect(hoveredFollowGeometry.bottomGap).toBeGreaterThanOrEqual(-1);
   await ruler.dispatchEvent("pointerout");
   await expect(activeEntry).toHaveAttribute("data-index", selectedIndex);
 
-  const viewport = page.getByTestId("combat-log-viewport");
   const scrollGeometry = await viewport.evaluate((element) => ({
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
@@ -2321,9 +2351,24 @@ test("virtualizes the footer combat log and highlights every visible row from th
   await viewport.hover();
   await page.mouse.wheel(0, 240);
   await expect(page.getByTestId("combat-log-resume")).toBeVisible();
+  await ruler.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    element.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: bounds.left + bounds.width * 0.05,
+      clientY: bounds.top + bounds.height * 0.5,
+    }));
+  });
+  await expect(log).toHaveAttribute("data-bpp-follow-source", "hover");
+  await expect(page.getByTestId("combat-log-resume")).toBeHidden();
+  await ruler.dispatchEvent("pointerout");
+
+  await viewport.hover();
+  await page.mouse.wheel(0, 240);
+  await expect(page.getByTestId("combat-log-resume")).toBeVisible();
   await page.getByTestId("combat-log-resume").click();
   await expect(page.getByTestId("combat-log-resume")).toBeHidden();
-  await rows.first().focus();
+  await viewport.press("PageDown");
   await expect(page.getByTestId("combat-log-resume")).toBeVisible();
 });
 
@@ -2459,9 +2504,9 @@ test("embeds the existing recording instance in the footer dock", async ({
   await page.getByTestId("combat-log-dock-toggle").click();
 
   await page.setViewportSize({ width: 480, height: 857 });
-  await expect(page.getByTestId("combat-log-route").first()).toBeVisible();
+  await expect(page.getByTestId("combat-log-source").first()).toBeVisible();
   const narrowRoute = await page
-    .getByTestId("combat-log-route")
+    .getByTestId("combat-log-source")
     .first()
     .boundingBox();
   expect(narrowRoute.width).toBeGreaterThan(24);

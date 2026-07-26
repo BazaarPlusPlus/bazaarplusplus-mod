@@ -52,29 +52,43 @@ function entryAmount(entry: CombatLogEntry): string {
 
 function EntityChip({
   entity,
+  labelTestId,
 }: {
   entity: NormalizedEntity;
+  labelTestId: string;
 }): React.JSX.Element {
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5">
-      <EntityArt entity={entity} size="compact" />
-      <span className="truncate" title={entity.name}>{entity.name}</span>
+    <span className="grid w-full min-w-0 grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-1.5">
+      <EntityArt entity={entity} size="compact" squareSlot />
+      <span
+        className="truncate"
+        data-bpp-test-id={labelTestId}
+        title={entity.name}
+      >
+        {entity.name}
+      </span>
     </span>
   );
 }
 
 function MissingEntity({
   label,
+  labelTestId,
 }: {
   label: string;
+  labelTestId: string;
 }): React.JSX.Element {
   return (
-    <span
-      aria-label={label}
-      className="truncate text-muted-foreground/55"
-      title={label}
-    >
-      —
+    <span className="grid w-full min-w-0 grid-cols-[1.5rem_minmax(0,1fr)] items-center gap-1.5">
+      <span aria-hidden="true" className="size-6" />
+      <span
+        aria-label={label}
+        className="truncate text-muted-foreground/55"
+        data-bpp-test-id={labelTestId}
+        title={label}
+      >
+        —
+      </span>
     </span>
   );
 }
@@ -126,7 +140,6 @@ export const CombatLogList = forwardRef<
   const pinnedMsRef = useRef(pinnedCombatMs);
   const pinnedEventIdsRef = useRef(pinnedEventIds);
   const scheduledRef = useRef(0);
-  const programmaticScrollRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(() =>
     selectedCombatLogEntryIndex(entries, pinnedEventIds, pinnedCombatMs)
   );
@@ -186,6 +199,7 @@ export const CombatLogList = forwardRef<
       },
       setPreviewCombatMs(combatMs: number | null): void {
         previewMsRef.current = combatMs;
+        if (combatMs !== null) setManualPaused(false);
         scheduleActive();
       },
     }),
@@ -204,15 +218,10 @@ export const CombatLogList = forwardRef<
 
   useEffect(() => {
     if (manualPaused || activeIndex < 0) return;
-    programmaticScrollRef.current = true;
     virtualizer.scrollToIndex(activeIndex, {
       align: "center",
       behavior: "auto",
     });
-    const frame = window.requestAnimationFrame(() => {
-      programmaticScrollRef.current = false;
-    });
-    return () => window.cancelAnimationFrame(frame);
   }, [activeIndex, manualPaused, virtualizer]);
 
   const followLabel =
@@ -258,9 +267,6 @@ export const CombatLogList = forwardRef<
       <div
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
         data-bpp-test-id="combat-log-viewport"
-        onFocusCapture={() => {
-          setManualPaused(true);
-        }}
         onKeyDown={(event) => {
           if (["ArrowDown", "ArrowUp", "PageDown", "PageUp"].includes(
             event.key,
@@ -268,12 +274,12 @@ export const CombatLogList = forwardRef<
             setManualPaused(true);
           }
         }}
-        onPointerDown={() => {
-          if (!programmaticScrollRef.current) setManualPaused(true);
+        onPointerDown={(event) => {
+          if (event.target === event.currentTarget) {
+            setManualPaused(true);
+          }
         }}
-        onWheel={() => {
-          if (!programmaticScrollRef.current) setManualPaused(true);
-        }}
+        onWheel={() => setManualPaused(true)}
         ref={viewportRef}
         tabIndex={0}
       >
@@ -306,7 +312,7 @@ export const CombatLogList = forwardRef<
                 <Button
                   aria-current={active ? "true" : undefined}
                   className={cn(
-                    "absolute left-0 top-0 grid h-9 w-full grid-cols-[4rem_8.5rem_minmax(0,1fr)_4.5rem] items-center gap-x-2 border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2",
+                    "absolute left-0 top-0 grid h-9 w-full grid-cols-[4rem_8.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2",
                     frameStart && "border-t border-t-border/55",
                     sameFrame && "bg-brand-soft/[0.07]",
                     active && "bg-brand-soft/[0.13] shadow-[inset_3px_0_0_var(--color-brand-soft)]",
@@ -361,35 +367,50 @@ export const CombatLogList = forwardRef<
                     </span>
                   </span>
                   <span
-                    className="grid min-w-0 grid-cols-[minmax(0,1fr)_1rem_minmax(0,1fr)] items-center gap-x-1 overflow-hidden text-compact text-muted-foreground"
-                    data-bpp-test-id="combat-log-route"
+                    className="block min-w-0 overflow-hidden text-compact text-muted-foreground"
+                    data-bpp-test-id="combat-log-source"
                   >
-                    <span
-                      className="min-w-0 overflow-hidden"
-                      data-bpp-test-id="combat-log-source"
-                    >
-                      {source
-                        ? <EntityChip entity={source} />
-                        : <MissingEntity label={t("sourceNotRecorded")} />}
-                    </span>
-                    <ChevronRight
-                      aria-hidden="true"
-                      className="size-icon-sm shrink-0 justify-self-center opacity-45"
-                      data-bpp-test-id="combat-log-arrow"
-                    />
-                    <span
-                      className="inline-flex min-w-0 items-center gap-1 overflow-hidden"
-                      data-bpp-test-id="combat-log-target"
-                    >
-                      {targets[0]
-                        ? <EntityChip entity={targets[0]} />
-                        : <MissingEntity label={t("targetNotRecorded")} />}
-                      {targets.length > 1 && (
-                        <span className="shrink-0 text-micro text-muted-foreground">
-                          +{targets.length - 1}
-                        </span>
+                    {source
+                      ? (
+                        <EntityChip
+                          entity={source}
+                          labelTestId="combat-log-source-label"
+                        />
+                      )
+                      : (
+                        <MissingEntity
+                          label={t("sourceNotRecorded")}
+                          labelTestId="combat-log-source-label"
+                        />
                       )}
-                    </span>
+                  </span>
+                  <ChevronRight
+                    aria-hidden="true"
+                    className="size-icon-sm shrink-0 justify-self-center opacity-45"
+                    data-bpp-test-id="combat-log-arrow"
+                  />
+                  <span
+                    className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 overflow-hidden text-compact text-muted-foreground"
+                    data-bpp-test-id="combat-log-target"
+                  >
+                    {targets[0]
+                      ? (
+                        <EntityChip
+                          entity={targets[0]}
+                          labelTestId="combat-log-target-label"
+                        />
+                      )
+                      : (
+                        <MissingEntity
+                          label={t("targetNotRecorded")}
+                          labelTestId="combat-log-target-label"
+                        />
+                      )}
+                    {targets.length > 1 && (
+                      <span className="shrink-0 text-micro text-muted-foreground">
+                        +{targets.length - 1}
+                      </span>
+                    )}
                   </span>
                   <span
                     className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums"

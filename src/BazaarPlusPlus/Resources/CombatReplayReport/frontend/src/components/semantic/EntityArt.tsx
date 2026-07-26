@@ -37,10 +37,12 @@ function Fallback({
 export function EntityArt({
   entity,
   size = "default",
+  squareSlot = false,
   testId,
 }: {
   entity: NormalizedEntity;
   size?: EntityArtSize;
+  squareSlot?: boolean;
   testId?: string;
 }): React.JSX.Element {
   const [failed, setFailed] = useState(false);
@@ -63,7 +65,10 @@ export function EntityArt({
       data-entity-span={dimensions.span}
       data-entity-type={type}
       data-asset-status={asset && !failed ? "ready" : "missing"}
-      style={{ width: dimensions.width, height: dimensions.height }}
+      style={{
+        width: squareSlot ? dimensions.height : dimensions.width,
+        height: dimensions.height,
+      }}
     >
       {asset && !failed ? (
         <img
