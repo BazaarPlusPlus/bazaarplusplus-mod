@@ -1,6 +1,5 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.AppFramework;
@@ -16,7 +15,7 @@ internal static class HeroPortraitSpriteProvider
     );
 
     internal static bool IsRenderableHero(EHero hero) =>
-        hero != EHero.Common && !TheDragonsHeroIdentity.IsTheDragons(hero);
+        hero != EHero.Common && Enum.IsDefined(typeof(EHero), hero);
 
     internal static bool TryGetCached(EHero hero, out HeroPortraitLoadOutcome? outcome)
     {

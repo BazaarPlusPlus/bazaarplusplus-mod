@@ -1,8 +1,10 @@
+using System.Runtime.Loader;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.Heroes;
+using BazaarPlusPlus.GameInterop.HeroPortraits;
 
 var ailaId1 = Guid.Parse("11111111-1111-1111-1111-111111111111");
 var ailaId2 = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -642,6 +644,33 @@ AssertTrue(
         out var loadingDragonsHero
     ),
     "The integrated identity adapter should resolve The Dragons for loading preference coverage."
+);
+AssertTrue(
+    HeroPortraitSpriteProvider.IsRenderableHero(loadingDragonsHero),
+    "The shared portrait provider should attempt the native default-skin chain for The Dragons."
+);
+AssemblyLoadContext.Default.LoadFromAssemblyPath(
+    Path.Combine(AppContext.BaseDirectory, "UnityEngine.CoreModule.dll")
+);
+var degradedDragonsPortrait = await HeroPortraitSpriteProvider.LoadDefaultPortraitAsync(
+    loadingDragonsHero
+);
+AssertTrue(
+    degradedDragonsPortrait?.Reason == HeroPortraitFailureReason.CollectionManagerUnavailable,
+    "The shared portrait provider should return a degraded outcome instead of throwing when native services are unavailable."
+);
+AssertFalse(
+    HeroPortraitSpriteProvider.TryGetCached(loadingDragonsHero, out _),
+    "A pre-readiness native service failure should not poison the shared portrait cache."
+);
+var dragonsTooltip = CollectionPanelText.Hero(loadingDragonsHero);
+AssertFalse(
+    dragonsTooltip.Contains("Hero8", StringComparison.OrdinalIgnoreCase),
+    "The Collection hero tooltip should never expose the transitional enum placeholder."
+);
+AssertTrue(
+    dragonsTooltip.Contains("Dragons", StringComparison.OrdinalIgnoreCase),
+    "The Collection hero tooltip should resolve The Dragons through the shared identity adapter."
 );
 var openWhileCatalogLoads = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: false,
