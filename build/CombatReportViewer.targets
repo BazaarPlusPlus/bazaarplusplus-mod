@@ -1,0 +1,66 @@
+<Project>
+  <PropertyGroup>
+    <CombatReportViewerFrontendDirectory Condition="'$(CombatReportViewerFrontendDirectory)' == ''"
+      >$(MSBuildThisFileDirectory)..\src\BazaarPlusPlus\Resources\CombatReplayReport\frontend</CombatReportViewerFrontendDirectory>
+    <CombatReportViewerArtifactDirectory Condition="'$(CombatReportViewerArtifactDirectory)' == ''"
+      >$(MSBuildProjectExtensionsPath)$(Configuration)\$(TargetFramework)\combat-report-viewer</CombatReportViewerArtifactDirectory>
+    <CombatReportViewerScriptPath>$(CombatReportViewerArtifactDirectory)\viewer.js</CombatReportViewerScriptPath>
+    <CombatReportViewerStylesheetPath>$(CombatReportViewerArtifactDirectory)\viewer.css</CombatReportViewerStylesheetPath>
+    <CombatReportViewerNodeModulesLock>$(CombatReportViewerFrontendDirectory)\node_modules\.package-lock.json</CombatReportViewerNodeModulesLock>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <CombatReportViewerBuildInput Include="$(CombatReportViewerFrontendDirectory)\src\**\*" />
+    <CombatReportViewerBuildInput Include="$(CombatReportViewerFrontendDirectory)\build.mjs" />
+    <CombatReportViewerBuildInput Include="$(CombatReportViewerFrontendDirectory)\package.json" />
+    <CombatReportViewerBuildInput Include="$(CombatReportViewerFrontendDirectory)\package-lock.json" />
+    <CombatReportViewerBuildInput Include="$(CombatReportViewerFrontendDirectory)\tsconfig.json" />
+    <CombatReportViewerBuildInput Include="$(CombatReportViewerFrontendDirectory)\vite.config.ts" />
+
+    <EmbeddedResource
+      Include="$(CombatReportViewerScriptPath)"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.js"
+    />
+    <EmbeddedResource
+      Include="$(CombatReportViewerStylesheetPath)"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.css"
+    />
+    <EmbeddedResource
+      Include="$(CombatReportViewerFrontendDirectory)\..\echarts-license.txt"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt"
+    />
+    <EmbeddedResource
+      Include="$(CombatReportViewerFrontendDirectory)\..\echarts-notice.txt"
+      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt"
+    />
+  </ItemGroup>
+
+  <Target
+    Name="RestoreCombatReportViewerFrontend"
+    Inputs="$(CombatReportViewerFrontendDirectory)\package.json;$(CombatReportViewerFrontendDirectory)\package-lock.json"
+    Outputs="$(CombatReportViewerNodeModulesLock)"
+    Condition="'$(DesignTimeBuild)' != 'true'"
+  >
+    <Message Text="[CombatReportViewer] Restoring locked frontend dependencies" Importance="high" />
+    <Exec WorkingDirectory="$(CombatReportViewerFrontendDirectory)" Command="npm ci" />
+  </Target>
+
+  <Target
+    Name="BuildCombatReportViewerArtifacts"
+    BeforeTargets="CoreResGen"
+    DependsOnTargets="RestoreCombatReportViewerFrontend"
+    Inputs="@(CombatReportViewerBuildInput);$(CombatReportViewerNodeModulesLock)"
+    Outputs="$(CombatReportViewerScriptPath);$(CombatReportViewerStylesheetPath)"
+    Condition="'$(DesignTimeBuild)' != 'true'"
+  >
+    <MakeDir Directories="$(CombatReportViewerArtifactDirectory)" />
+    <Message
+      Text="[CombatReportViewer] Building frontend artifacts into $(CombatReportViewerArtifactDirectory)"
+      Importance="high"
+    />
+    <Exec
+      WorkingDirectory="$(CombatReportViewerFrontendDirectory)"
+      Command="npm run viewer:build -- --out-dir &quot;$(CombatReportViewerArtifactDirectory)&quot;"
+    />
+  </Target>
+</Project>

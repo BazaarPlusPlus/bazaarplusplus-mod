@@ -2267,12 +2267,26 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Main_plugin_embeds_the_complete_combat_report_viewer_release()
+    public void Combat_report_viewer_is_built_under_obj_and_embedded_from_one_shared_target()
     {
         var repoRoot = RepoRoot();
         var projectPath = Path.Combine(MainSourceRoot(repoRoot), "BazaarPlusPlus.csproj");
         var project = XDocument.Load(projectPath);
-        var resources = project
+        Assert.Contains(
+            project.Descendants(),
+            element =>
+                element.Name.LocalName == "Import"
+                && (
+                    Attribute(element, "Project")
+                        ?.Replace('\\', '/')
+                        .EndsWith("build/CombatReportViewer.targets", StringComparison.Ordinal)
+                    ?? false
+                )
+        );
+
+        var targetsPath = Path.Combine(repoRoot, "build", "CombatReportViewer.targets");
+        var targets = XDocument.Load(targetsPath);
+        var resources = targets
             .Descendants()
             .Where(element => element.Name.LocalName == "EmbeddedResource")
             .Select(element => new
@@ -2284,29 +2298,60 @@ public class CoreLayeringTests
 
         var expected = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["Resources/CombatReplayReport/viewer.js"] =
+            ["$(CombatReportViewerScriptPath)"] =
                 "BazaarPlusPlus.Resources.CombatReplayReport.viewer.js",
-            ["Resources/CombatReplayReport/viewer.css"] =
+            ["$(CombatReportViewerStylesheetPath)"] =
                 "BazaarPlusPlus.Resources.CombatReplayReport.viewer.css",
-            ["Resources/CombatReplayReport/echarts-license.txt"] =
+            ["$(CombatReportViewerFrontendDirectory)/../echarts-license.txt"] =
                 "BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt",
-            ["Resources/CombatReplayReport/echarts-notice.txt"] =
+            ["$(CombatReportViewerFrontendDirectory)/../echarts-notice.txt"] =
                 "BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt",
         };
         foreach (var (include, logicalName) in expected)
         {
             Assert.Contains(
                 resources,
-                resource => resource.Include == include && resource.LogicalName == logicalName
+                resource =>
+                    resource.Include?.Replace('\\', '/') == include
+                    && resource.LogicalName == logicalName
             );
         }
 
-        Assert.DoesNotContain(
-            resources,
-            resource =>
-                resource.Include?.Contains("echarts", StringComparison.OrdinalIgnoreCase) == true
-                && resource.Include.EndsWith(".js", StringComparison.OrdinalIgnoreCase)
+        var artifactDirectory = Assert
+            .Single(
+                targets.Descendants(),
+                element => element.Name.LocalName == "CombatReportViewerArtifactDirectory"
+            )
+            .Value;
+        Assert.Contains("$(MSBuildProjectExtensionsPath)", artifactDirectory);
+        Assert.Contains("$(Configuration)", artifactDirectory);
+        Assert.Contains("$(TargetFramework)", artifactDirectory);
+
+        var buildTarget = Assert.Single(
+            targets.Descendants(),
+            element =>
+                element.Name.LocalName == "Target"
+                && Attribute(element, "Name") == "BuildCombatReportViewerArtifacts"
         );
+        Assert.Equal("CoreResGen", Attribute(buildTarget, "BeforeTargets"));
+        Assert.Contains(
+            buildTarget.Elements(),
+            element =>
+                element.Name.LocalName == "Exec"
+                && (
+                    Attribute(element, "Command")
+                        ?.Contains("npm run viewer:build -- --out-dir", StringComparison.Ordinal)
+                    ?? false
+                )
+        );
+
+        var reportResourceRoot = Path.Combine(
+            MainSourceRoot(repoRoot),
+            "Resources",
+            "CombatReplayReport"
+        );
+        Assert.False(File.Exists(Path.Combine(reportResourceRoot, "viewer.js")));
+        Assert.False(File.Exists(Path.Combine(reportResourceRoot, "viewer.css")));
     }
 
     [Fact]

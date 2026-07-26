@@ -157,9 +157,9 @@ run_combat_report_viewer_release_gate() {
         cd "$frontend_dir"
         npm ci
         npm run viewer:browsers:install
-        # Includes typecheck, clean-build artifact comparison, pure tests, and the
-        # Chromium/WebKit behavior suite. The check fails when committed viewer.js/viewer.css
-        # differ from one clean build.
+        # Includes typecheck, a clean frontend build, pure tests, and the
+        # Chromium/WebKit behavior suite. MSBuild generates its embedded copy
+        # independently under obj/ from the same locked source tree.
         npm test
     )
 }

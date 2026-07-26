@@ -1,25 +1,16 @@
 import { build as viteBuild } from "vite";
 import {
-  copyFile,
-  mkdtemp,
   readFile,
   readdir,
-  rm,
   stat,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const frontendDirectory = dirname(fileURLToPath(import.meta.url));
-const resourceDirectory = resolve(frontendDirectory, "..");
 const configFile = join(frontendDirectory, "vite.config.ts");
-const committedArtifacts = {
-  "viewer.js": join(resourceDirectory, "viewer.js"),
-  "viewer.css": join(resourceDirectory, "viewer.css"),
-};
-const expectedOutputs = Object.keys(committedArtifacts).sort();
+const expectedOutputs = ["viewer.css", "viewer.js"];
 const sourceDirectory = join(frontendDirectory, "src");
 
 async function outputFiles(directory) {
@@ -122,7 +113,7 @@ async function buildArtifacts(outputDirectory) {
   const files = await outputFiles(outputDirectory);
   assertExactOutputs(files);
   // ECharts emits whitespace-only lines inside generated template literals. Strip only those
-  // lines so the committed artifact passes the repository's trailing-whitespace gate.
+  // lines so generated artifacts pass the repository's trailing-whitespace gate.
   await Promise.all(
     files.map(async (file) => {
       const path = join(outputDirectory, file);
@@ -136,14 +127,6 @@ async function buildArtifacts(outputDirectory) {
   return Object.fromEntries(
     files.map((file) => [file, join(outputDirectory, file)]),
   );
-}
-
-async function bytesEqual(leftPath, rightPath) {
-  const [left, right] = await Promise.all([
-    readFile(leftPath),
-    readFile(rightPath),
-  ]);
-  return left.equals(right);
 }
 
 async function assertRuntimeBoundary(artifacts) {
@@ -187,46 +170,25 @@ async function assertNonEmpty(artifacts) {
   }
 }
 
-async function generate() {
-  const temporaryDirectory = await mkdtemp(join(tmpdir(), "bpp-viewer-build-"));
-  try {
-    await assertThemeOwnership();
-    const artifacts = await buildArtifacts(temporaryDirectory);
-    await assertRuntimeBoundary(artifacts);
-    await assertNonEmpty(artifacts);
-    await Promise.all(
-      expectedOutputs.map((file) =>
-        copyFile(artifacts[file], committedArtifacts[file]),
-      ),
-    );
-  } finally {
-    await rm(temporaryDirectory, { recursive: true, force: true });
+function outputDirectoryFromArguments() {
+  const argumentIndex = process.argv.indexOf("--out-dir");
+  if (argumentIndex < 0) {
+    return join(frontendDirectory, "dist");
   }
+  const value = process.argv[argumentIndex + 1];
+  if (!value || value.startsWith("--")) {
+    throw new Error("--out-dir requires a directory path.");
+  }
+  return resolve(value);
 }
 
-async function check() {
-  const temporaryDirectory = await mkdtemp(join(tmpdir(), "bpp-viewer-check-"));
-  try {
-    await assertThemeOwnership();
-    const artifacts = await buildArtifacts(temporaryDirectory);
-    await Promise.all([
-      assertRuntimeBoundary(artifacts),
-      assertNonEmpty(artifacts),
-    ]);
-    for (const file of expectedOutputs) {
-      if (!(await bytesEqual(artifacts[file], committedArtifacts[file]))) {
-        throw new Error(
-          `Committed ${file} is stale; run npm run viewer:build.`,
-        );
-      }
-    }
-  } finally {
-    await rm(temporaryDirectory, { recursive: true, force: true });
-  }
+async function generate(outputDirectory) {
+  await assertThemeOwnership();
+  const artifacts = await buildArtifacts(outputDirectory);
+  await Promise.all([
+    assertRuntimeBoundary(artifacts),
+    assertNonEmpty(artifacts),
+  ]);
 }
 
-if (process.argv.includes("--check")) {
-  await check();
-} else {
-  await generate();
-}
+await generate(outputDirectoryFromArguments());

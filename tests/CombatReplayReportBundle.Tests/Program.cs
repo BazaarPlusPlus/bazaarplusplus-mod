@@ -473,7 +473,7 @@ void VerifyViewerStaticRuntimeBoundary()
             && !script.Contains("new SharedWorker(", StringComparison.Ordinal)
             && !script.Contains("import(", StringComparison.Ordinal)
             && !stylesheet.Contains("@import", StringComparison.Ordinal),
-        "The committed Viewer artifacts must preserve the static file:// runtime boundary."
+        "The generated Viewer artifacts must preserve the static file:// runtime boundary."
     );
 }
 

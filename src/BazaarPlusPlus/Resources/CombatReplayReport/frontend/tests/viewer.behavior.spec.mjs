@@ -5,10 +5,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const testDirectory = dirname(fileURLToPath(import.meta.url));
-const reportResourceDirectory = resolve(testDirectory, "../..");
 const viewerArtifactDirectory = process.env.BPP_VIEWER_ARTIFACT_DIR
   ? resolve(process.env.BPP_VIEWER_ARTIFACT_DIR)
-  : reportResourceDirectory;
+  : resolve(testDirectory, "../dist");
 
 function schemaEvent(event) {
   return {

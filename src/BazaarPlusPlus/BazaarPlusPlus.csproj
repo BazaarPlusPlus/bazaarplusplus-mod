@@ -19,6 +19,7 @@
   </PropertyGroup>
 
   <Import Project="RemoteEmbeddedData.targets" />
+  <Import Project="../../build/CombatReportViewer.targets" />
 
   <!-- Embedded resources -->
   <ItemGroup>
@@ -43,28 +44,11 @@
       Include="Resources\DockButtons\replay-retry-icon.png"
       LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-retry-icon.png"
     />
-    <EmbeddedResource
-      Include="Resources\CombatReplayReport\viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.js"
-    />
-    <EmbeddedResource
-      Include="Resources\CombatReplayReport\viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.css"
-    />
-    <EmbeddedResource
-      Include="Resources\CombatReplayReport\echarts-license.txt"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt"
-    />
-    <EmbeddedResource
-      Include="Resources\CombatReplayReport\echarts-notice.txt"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt"
-    />
   </ItemGroup>
 
   <!-- Project paths -->
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
-    <CombatReportViewerFrontendDirectory>$(ProjectRoot)Resources/CombatReplayReport/frontend</CombatReportViewerFrontendDirectory>
     <BPPInstallerSourcePath>$(ProjectRoot)/../../../bazaarplusplus-installer/src-tauri/resources</BPPInstallerSourcePath>
     <HostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant())</HostArchitecture>
     <MacSqliteRuntimeRid>osx-arm64</MacSqliteRuntimeRid>
@@ -278,7 +262,7 @@
       Text="[BazaarPlusPlus] Combat Report Viewer frontend package is missing."
     />
     <Message
-      Text="[BazaarPlusPlus] Validating committed Combat Report Viewer artifacts before installer packaging"
+      Text="[BazaarPlusPlus] Validating Combat Report Viewer source before installer packaging"
       Importance="high"
     />
     <Exec WorkingDirectory="$(CombatReportViewerFrontendDirectory)" Command="npm ci" />

@@ -8,12 +8,11 @@
     "npm": "11.6.2"
   },
   "scripts": {
-    "test": "npm run viewer:typecheck && npm run viewer:check && npm run test:pure && npm run test:behavior",
+    "test": "npm run viewer:typecheck && npm run viewer:build && npm run test:pure && npm run test:behavior",
     "test:behavior": "playwright test",
     "test:pure": "node --test ./tests/pure-modules.test.mjs",
     "viewer:browsers:install": "playwright install chromium webkit",
     "viewer:build": "node ./build.mjs",
-    "viewer:check": "node ./build.mjs --check",
     "viewer:typecheck": "tsc --project ./tsconfig.json"
   },
   "dependencies": {

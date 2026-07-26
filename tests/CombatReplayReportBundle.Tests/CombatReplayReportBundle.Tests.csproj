@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <Import Project="../../build/CombatReportViewer.targets" />
+
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
@@ -42,22 +44,6 @@
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/CombatReplayReportViewerGate.cs"
       Link="CombatReplayReportViewerGate.cs"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/viewer.js"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.js"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/viewer.css"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.viewer.css"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/echarts-license.txt"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt"
-    />
-    <EmbeddedResource
-      Include="../../src/BazaarPlusPlus/Resources/CombatReplayReport/echarts-notice.txt"
-      LogicalName="BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt"
     />
   </ItemGroup>
 </Project>
