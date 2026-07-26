@@ -9,7 +9,7 @@ internal interface ICollectionOfferPoolResolver
 {
     CollectionSourceOfferPoolResult GetOrResolve(
         CollectionSourceEntry source,
-        EHero? selectedHero,
+        EHero effectiveHero,
         IReadOnlyList<CollectionCardVm> catalogCards
     );
 }
@@ -99,7 +99,7 @@ internal static class CollectionQuery
         {
             var offerPoolResult = offerPoolResolver.GetOrResolve(
                 sourceResolution.Source,
-                filter.SelectedHero,
+                filter.EffectiveHero,
                 catalogCards
             );
             if (offerPoolResult.Status == CollectionSourceOfferPoolStatus.Ready)
@@ -117,7 +117,11 @@ internal static class CollectionQuery
             {
                 OfferedCardIds = offeredCardIds,
                 ApplyHeroFilter =
-                    !hasSelectedSource || filter.ActiveTab == CollectionTabKind.Skills,
+                    !hasSelectedSource
+                    || (
+                        filter.ActiveTab == CollectionTabKind.Skills
+                        && !sourceResolution.Source!.HasAllHeroesOfferSegment
+                    ),
                 DayTiers = dayTiers,
                 SuppressDayGate =
                     offeredCardIds != null && sourceResolution.Source!.SuppressDayGate,
@@ -184,7 +188,8 @@ internal static class CollectionQuery
             TagMatchMode = source.TagMatchMode,
             KeywordMatchMode = source.KeywordMatchMode,
         };
-        clone.Heroes.UnionWith(source.Heroes);
+        if (source.SelectedHero.HasValue)
+            clone.ToggleHero(source.SelectedHero.Value);
         clone.Tiers.UnionWith(source.Tiers);
         clone.Sizes.UnionWith(source.Sizes);
         clone.Tags.UnionWith(retainedTags ?? source.Tags);
@@ -208,8 +213,7 @@ internal static class CollectionQuery
         if (!expectedKind.HasValue || entry.Kind != expectedKind.Value)
             return SourceResolution.Clear;
 
-        var selectedHero = filter.SelectedHero;
-        if (selectedHero.HasValue && !entry.AppliesToHero(selectedHero.Value))
+        if (!entry.IsVisibleForHero(filter.EffectiveHero))
             return SourceResolution.Clear;
 
         return new SourceResolution(entry, false);

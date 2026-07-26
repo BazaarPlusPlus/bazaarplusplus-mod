@@ -45,11 +45,11 @@ internal static class CollectionSourceCatalog
 
     public static IEnumerable<CollectionSourceEntry> For(
         CollectionSourceKind kind,
-        EHero? selectedHero
+        EHero effectiveHero
     )
     {
         EnsureLoaded();
-        return VisibleEntries(_entries, kind, selectedHero);
+        return VisibleEntries(_entries, kind, effectiveHero);
     }
 
     private static void EnsureLoaded()
@@ -239,14 +239,14 @@ internal static class CollectionSourceCatalog
     internal static IEnumerable<CollectionSourceEntry> VisibleEntries(
         IReadOnlyList<CollectionSourceEntry> entries,
         CollectionSourceKind kind,
-        EHero? selectedHero
+        EHero effectiveHero
     )
     {
         foreach (var entry in entries)
         {
             if (entry.Kind != kind)
                 continue;
-            if (selectedHero.HasValue && !entry.AppliesToHero(selectedHero.Value))
+            if (!entry.IsVisibleForHero(effectiveHero))
                 continue;
             yield return entry;
         }

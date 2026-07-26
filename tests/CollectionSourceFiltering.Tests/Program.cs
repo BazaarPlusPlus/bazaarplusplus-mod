@@ -2,6 +2,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
+using BazaarPlusPlus.GameInterop.Heroes;
 
 var ailaId1 = Guid.Parse("11111111-1111-1111-1111-111111111111");
 var ailaId2 = Guid.Parse("22222222-2222-2222-2222-222222222222");
@@ -616,10 +617,49 @@ var openOutsideRun = CollectionPanelOpenSelectionResolver.Resolve(
     choiceSelectionTemplateIds: Array.Empty<Guid>(),
     entries
 );
+AssertValues(
+    CollectionHeroSelectionRoster.BaseConcreteHeroes,
+    new[]
+    {
+        EHero.Vanessa,
+        EHero.Dooley,
+        EHero.Pygmalien,
+        EHero.Karnok,
+        EHero.Mak,
+        EHero.Stelle,
+        EHero.Jules,
+    },
+    "The neutral/Common context should not render a Common hero chip."
+);
 AssertEqual(
     CollectionPanelSelectionState.Default,
     openOutsideRun,
     "Opening outside an in-game run should fall back to VAN + Jay Jay."
+);
+AssertTrue(
+    TheDragonsHeroIdentity.TryResolve(
+        TheDragonsHeroIdentity.CanonicalId,
+        out var loadingDragonsHero
+    ),
+    "The integrated identity adapter should resolve The Dragons for loading preference coverage."
+);
+var openWhileCatalogLoads = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: false,
+    currentHero: null,
+    currentEncounterTemplateId: null,
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries,
+    rememberedPreference: CollectionPanelHeroPreference.ResolveStored(
+        hasStoredValue: true,
+        raw: "TheDragons",
+        CollectionCatalogReadiness.Loading,
+        CollectionHeroSelectionRoster.BaseConcreteHeroes
+    )
+);
+AssertEqual(
+    loadingDragonsHero,
+    openWhileCatalogLoads.SelectedHero,
+    "Opening while the catalog loads should preserve a known concrete preference until an accepted roster can normalize it."
 );
 var openOutsideRunWithRememberedHero = CollectionPanelOpenSelectionResolver.Resolve(
     isInGameRun: false,
@@ -627,7 +667,12 @@ var openOutsideRunWithRememberedHero = CollectionPanelOpenSelectionResolver.Reso
     currentEncounterTemplateId: vanessaAila.SourceTemplateIds[0],
     choiceSelectionTemplateIds: Array.Empty<Guid>(),
     entries,
-    rememberedHero: EHero.Mak
+    rememberedPreference: CollectionPanelHeroPreference.ResolveStored(
+        hasStoredValue: true,
+        raw: "Mak",
+        CollectionCatalogReadiness.Accepted,
+        CollectionHeroSelectionRoster.BaseConcreteHeroes
+    )
 );
 AssertEqual(
     new CollectionPanelSelectionState(
@@ -645,16 +690,61 @@ var openOutsideRunWithRememberedCommon = CollectionPanelOpenSelectionResolver.Re
     currentEncounterTemplateId: vanessaAila.SourceTemplateIds[0],
     choiceSelectionTemplateIds: Array.Empty<Guid>(),
     entries,
-    rememberedHero: EHero.Common
+    rememberedPreference: CollectionPanelHeroPreference.ResolveStored(
+        hasStoredValue: true,
+        raw: "Common",
+        CollectionCatalogReadiness.Accepted,
+        CollectionHeroSelectionRoster.BaseConcreteHeroes
+    )
 );
 AssertEqual(
     new CollectionPanelSelectionState(
-        EHero.Common,
+        null,
         CollectionPanelSelectionState.DefaultMerchantSourceKey,
         CollectionSourceKind.Merchant
     ),
     openOutsideRunWithRememberedCommon,
     "Opening outside a run should preserve Common as a remembered hero."
+);
+var openOutsideRunWithUnavailableHero = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: false,
+    currentHero: null,
+    currentEncounterTemplateId: null,
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries,
+    rememberedPreference: CollectionPanelHeroPreference.ResolveStored(
+        hasStoredValue: true,
+        raw: "TheDragons",
+        CollectionCatalogReadiness.Accepted,
+        CollectionHeroSelectionRoster.BaseConcreteHeroes
+    )
+);
+AssertEqual(
+    new CollectionPanelSelectionState(
+        null,
+        CollectionPanelSelectionState.DefaultMerchantSourceKey,
+        CollectionSourceKind.Merchant
+    ),
+    openOutsideRunWithUnavailableHero,
+    "A known-but-unavailable preference should fall back to neutral for only the current session."
+);
+var openOutsideRunWithInvalidPreference = CollectionPanelOpenSelectionResolver.Resolve(
+    isInGameRun: false,
+    currentHero: null,
+    currentEncounterTemplateId: null,
+    choiceSelectionTemplateIds: Array.Empty<Guid>(),
+    entries,
+    rememberedPreference: CollectionPanelHeroPreference.ResolveStored(
+        hasStoredValue: true,
+        raw: "NotARealHero",
+        CollectionCatalogReadiness.Accepted,
+        CollectionHeroSelectionRoster.BaseConcreteHeroes
+    )
+);
+AssertEqual(
+    CollectionPanelSelectionState.Default,
+    openOutsideRunWithInvalidPreference,
+    "An invalid preference should behave like an absent first-open preference after deletion."
 );
 var dooleyAila = entries.Single(entry =>
     entry.Kind == CollectionSourceKind.Merchant
@@ -683,7 +773,12 @@ var openInRunIgnoresRememberedHero = CollectionPanelOpenSelectionResolver.Resolv
     currentEncounterTemplateId: dooleyAila.SourceTemplateIds[0],
     choiceSelectionTemplateIds: Array.Empty<Guid>(),
     entries,
-    rememberedHero: EHero.Mak
+    rememberedPreference: CollectionPanelHeroPreference.ResolveStored(
+        hasStoredValue: true,
+        raw: "Mak",
+        CollectionCatalogReadiness.Accepted,
+        CollectionHeroSelectionRoster.BaseConcreteHeroes
+    )
 );
 AssertEqual(
     new CollectionPanelSelectionState(
@@ -780,37 +875,34 @@ AssertEqual(
     "Opening during a run without a concrete hero should fall back to VAN + Jay Jay."
 );
 
-var noHeroCacheKey = CollectionSourceOfferPoolCacheKey.Build(vanessaAila, selectedHero: null);
+var commonCacheKey = CollectionSourceOfferPoolCacheKey.Build(vanessaAila, EHero.Common);
 AssertTrue(
-    noHeroCacheKey.StartsWith(vanessaAila.SourceKey + "|", StringComparison.Ordinal),
+    commonCacheKey.StartsWith(vanessaAila.SourceKey + "|", StringComparison.Ordinal),
     "Source offer cache key should include the stable source key."
 );
 AssertTrue(
-    noHeroCacheKey.Contains(ailaId1.ToString("N")[..12], StringComparison.Ordinal)
-        && noHeroCacheKey.Contains(ailaId2.ToString("N")[..12], StringComparison.Ordinal),
+    commonCacheKey.Contains(ailaId1.ToString("N")[..12], StringComparison.Ordinal)
+        && commonCacheKey.Contains(ailaId2.ToString("N")[..12], StringComparison.Ordinal),
     "Source offer cache key should include a fingerprint of all source template ids."
 );
 AssertTrue(
-    noHeroCacheKey.Contains(vanessaAila.OfferRuleFingerprint, StringComparison.Ordinal),
+    commonCacheKey.Contains(vanessaAila.OfferRuleFingerprint, StringComparison.Ordinal),
     "Source offer cache key should include the v4 source rule fingerprint."
 );
 AssertTrue(
-    noHeroCacheKey.EndsWith("|no-selected-hero", StringComparison.Ordinal),
-    "Source offer cache key should distinguish the no-selected-hero state."
+    commonCacheKey.EndsWith("|Common", StringComparison.Ordinal),
+    "Neutral source offer cache keys should use the effective Common hero."
 );
 var heroCacheKey = CollectionSourceOfferPoolCacheKey.Build(vanessaAila, EHero.Vanessa);
 AssertFalse(
-    string.Equals(noHeroCacheKey, heroCacheKey, StringComparison.Ordinal),
-    "Source offer cache key should vary by selected hero."
-);
-var commonCacheKey = CollectionSourceOfferPoolCacheKey.Build(vanessaAila, EHero.Common);
-AssertFalse(
-    string.Equals(noHeroCacheKey, commonCacheKey, StringComparison.Ordinal),
-    "Source offer cache key should distinguish Common from no selected hero."
-);
-AssertFalse(
     string.Equals(heroCacheKey, commonCacheKey, StringComparison.Ordinal),
     "Source offer cache key should distinguish Common from concrete heroes."
+);
+AssertTrue(
+    CollectionSourceOfferPoolCacheKey
+        .Build(vanessaAila, loadingDragonsHero)
+        .EndsWith("|TheDragons", StringComparison.Ordinal),
+    "BPP-owned source cache keys should use the canonical The Dragons identity."
 );
 
 var visibleForVanessa = CollectionSourceCatalog
@@ -821,15 +913,6 @@ AssertValues(
     visibleForVanessa,
     new[] { "Aila", "Nufu", "Nufu" },
     "Visible merchant sources should include selected hero sources plus global sources."
-);
-var visibleWithoutHero = CollectionSourceCatalog
-    .VisibleEntries(entries, CollectionSourceKind.Merchant, selectedHero: null)
-    .Select(entry => entry.Name)
-    .ToArray();
-AssertValues(
-    visibleWithoutHero,
-    new[] { "Aila", "Aila", "Nufu", "Nufu" },
-    "Without a concrete hero selected, merchant source selector should show all merchants."
 );
 var visibleForCommon = CollectionSourceCatalog
     .VisibleEntries(entries, CollectionSourceKind.Merchant, EHero.Common)
@@ -891,13 +974,13 @@ AssertSet(
 );
 var selectedHeroDisabledResult = CollectionSourceOfferPoolResolver.Resolve(
     selectedHeroRule,
-    selectedHero: null,
+    EHero.Common,
     selectedHeroCards
 );
 AssertSet(
     selectedHeroDisabledResult.OfferedCardIds,
-    selectedHeroCards.Select(card => card.Id).ToArray(),
-    "SelectedHero rules should not crop by hero when no concrete hero is selected."
+    new[] { selectedHeroCards[1].Id },
+    "SelectedHero rules should resolve neutral mode against the effective Common hero."
 );
 var selectedHeroTrainerRule = BuildSingleEntry(
     "Selected Hero Trainer",
@@ -939,7 +1022,7 @@ AssertSet(
 );
 var noneSelectedResult = CollectionSourceOfferPoolResolver.Resolve(
     source: null,
-    selectedHero: EHero.Vanessa,
+    effectiveHero: EHero.Vanessa,
     selectedHeroCards
 );
 AssertEqual(
@@ -1007,6 +1090,13 @@ var otherHeroesEntry = BuildSingleEntry(
     CollectionSourceKind.Merchant,
     """{ "heroMode": "OtherHeroes" }"""
 );
+AssertEqual(
+    0,
+    CollectionSourceCatalog
+        .VisibleEntries(new[] { otherHeroesEntry }, CollectionSourceKind.Merchant, EHero.Common)
+        .Count(),
+    "OtherHeroes-only sources should be hidden in the neutral/Common context."
+);
 var otherHeroCards = new[]
 {
     CatalogCard(Guid.Parse("eeeeeeee-0000-0000-0000-000000000001"), ECardType.Item, [EHero.Common]),
@@ -1039,19 +1129,13 @@ AssertSet(
 );
 var otherHeroesWithoutSelectedHero = CollectionSourceOfferPoolResolver.Resolve(
     otherHeroesEntry,
-    selectedHero: null,
+    EHero.Common,
     otherHeroCards
 );
 AssertSet(
     otherHeroesWithoutSelectedHero.OfferedCardIds,
-    new[]
-    {
-        otherHeroCards[1].Id,
-        otherHeroCards[2].Id,
-        otherHeroCards[3].Id,
-        otherHeroCards[4].Id,
-    },
-    "OtherHeroes rules should include all non-Common hero cards when no UI hero is selected."
+    Array.Empty<Guid>(),
+    "OtherHeroes rules should return no cards in the neutral/Common context."
 );
 
 var allHeroEntry = BuildSingleEntry(
@@ -1154,12 +1238,12 @@ AssertSet(
         + "(intentional divergence from the old description switch, which returned empty)."
 );
 var neutralWithNoHero = CollectionSourceOfferPoolResolver
-    .Resolve(neutralHeroEntry, selectedHero: null, neutralHeroCards)
+    .Resolve(neutralHeroEntry, EHero.Common, neutralHeroCards)
     .OfferedCardIds;
 AssertSet(
     neutralWithNoHero,
     neutralWithVanessa.ToArray(),
-    "NeutralOnly output must be invariant to the selected UI hero (no concrete hero vs Vanessa)."
+    "NeutralOnly output must be invariant to the effective hero (Common vs Vanessa)."
 );
 var neutralWithOtherHero = CollectionSourceOfferPoolResolver
     .Resolve(neutralHeroEntry, EHero.Dooley, neutralHeroCards)
@@ -1447,13 +1531,13 @@ foreach (var sourceEntry in currentCatalog)
     var match = MatchingCard(sourceEntry, selectedHero, GuidFromIndex(sourceEntry.SourceKey, 1));
     var nonMatch = MatchingCard(
         sourceEntry,
-        selectedHero,
+        selectedHero ?? EHero.Common,
         GuidFromIndex(sourceEntry.SourceKey, 2),
         sourceEntry.Kind == CollectionSourceKind.Merchant ? ECardType.Skill : ECardType.Item
     );
     var probePool = CollectionSourceOfferPoolResolver.Resolve(
         sourceEntry,
-        selectedHero,
+        selectedHero ?? EHero.Common,
         new[] { match, nonMatch }
     );
     AssertEqual(

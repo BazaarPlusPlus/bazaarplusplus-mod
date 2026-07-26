@@ -29,7 +29,7 @@ internal sealed class CollectionPanelViewModel
         CollectionTabProfile.For(CollectionTabKind.Items);
     public bool HeroFilterVisible { get; set; } = true;
     public bool HeroFilterEnabled { get; set; } = true;
-    public HashSet<EHero> SelectedHeroes { get; set; } = new();
+    public EHero? SelectedHero { get; set; }
     public HashSet<ETier> SelectedTiers { get; set; } = new();
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
     public HashSet<ECardTag> SelectedTags { get; set; } = new();
@@ -370,7 +370,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         foreach (var pair in _heroChips)
         {
             pair.Value.tooltip = CollectionPanelText.Hero(pair.Key);
-            RefreshHeroChip(pair.Key, pair.Value, model.SelectedHeroes.Contains(pair.Key));
+            RefreshHeroChip(pair.Key, pair.Value, model.SelectedHero == pair.Key);
         }
         foreach (var pair in _tierChips)
         {
