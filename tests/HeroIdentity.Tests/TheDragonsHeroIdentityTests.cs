@@ -41,6 +41,21 @@ public sealed class TheDragonsHeroIdentityTests
     }
 
     [Fact]
+    public void Persistence_identity_writes_canonical_and_reads_canonical_before_legacy()
+    {
+        Assert.True(TheDragonsHeroIdentity.TryResolve("Hero8", out var dragons));
+
+        Assert.Equal("TheDragons", TheDragonsHeroIdentity.ToCanonicalId(dragons));
+        Assert.Equal("TheDragons", TheDragonsHeroIdentity.CanonicalizeForStorage(" Hero8 "));
+        Assert.Equal("TheDragons", TheDragonsHeroIdentity.CanonicalizeForStorage(" TheDragons "));
+        Assert.Equal("UnknownHero", TheDragonsHeroIdentity.CanonicalizeForStorage(" UnknownHero "));
+        Assert.Equal(string.Empty, TheDragonsHeroIdentity.CanonicalizeForStorage(" "));
+        Assert.Equal(["TheDragons", "Hero8"], TheDragonsHeroIdentity.PersistenceReadIds(dragons));
+        Assert.Equal("Vanessa", TheDragonsHeroIdentity.ToCanonicalId(EHero.Vanessa));
+        Assert.Equal(["Vanessa"], TheDragonsHeroIdentity.PersistenceReadIds(EHero.Vanessa));
+    }
+
+    [Fact]
     public void Legacy_only_runtime_shape_resolves_both_aliases()
     {
         Assert.True(TheDragonsHeroIdentity.TryResolve("Hero8", out var currentDragons));

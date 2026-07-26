@@ -6,6 +6,7 @@ using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.AppFramework;
@@ -268,6 +269,8 @@ internal sealed class OpponentPortraitController
         if (!string.IsNullOrWhiteSpace(heroName))
         {
             var trimmed = heroName.Trim();
+            if (TheDragonsHeroIdentity.TryResolve(trimmed, out hero))
+                return true;
             if (Enum.TryParse(trimmed, ignoreCase: true, out hero))
                 return true;
         }

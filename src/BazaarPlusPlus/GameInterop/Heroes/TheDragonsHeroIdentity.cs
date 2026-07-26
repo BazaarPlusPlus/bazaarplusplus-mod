@@ -26,6 +26,21 @@ internal static class TheDragonsHeroIdentity
 
     internal static bool IsTheDragons(EHero hero) => IsAlias(hero.ToString());
 
+    internal static string ToCanonicalId(EHero hero) =>
+        IsTheDragons(hero) ? CanonicalId : hero.ToString();
+
+    internal static string CanonicalizeForStorage(string? heroId)
+    {
+        if (string.IsNullOrWhiteSpace(heroId))
+            return string.Empty;
+
+        var trimmed = heroId.Trim();
+        return IsAlias(trimmed) ? CanonicalId : trimmed;
+    }
+
+    internal static IReadOnlyList<string> PersistenceReadIds(EHero hero) =>
+        IsTheDragons(hero) ? [CanonicalId, LegacyId] : [hero.ToString()];
+
     internal static bool TryResolve(string? heroId, out EHero hero) =>
         TryResolve(heroId, TryResolveExactEnumName, out hero);
 
