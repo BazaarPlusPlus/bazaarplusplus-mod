@@ -4,7 +4,7 @@ using BazaarPlusPlus.GameInterop.Heroes;
 
 namespace BazaarPlusPlus.Game.LiveBuildPanel;
 
-public static class LiveBuildHeroPresentation
+internal static class LiveBuildHeroPresentation
 {
     internal static IReadOnlyList<TenWinHeroBuildCount> SelectHeroBuildCounts(
         TenWinCorpusSummary? summary
@@ -17,7 +17,7 @@ public static class LiveBuildHeroPresentation
                 .ToArray()
             : Array.Empty<TenWinHeroBuildCount>();
 
-    public static string DisplayName(string? heroId)
+    internal static string DisplayName(string? heroId)
     {
         if (!TheDragonsHeroIdentity.IsAlias(heroId))
             return heroId ?? string.Empty;
