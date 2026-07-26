@@ -30,6 +30,8 @@ public static class BazaarAgentActionValidator
         "Dooley",
         "Mak",
         "Karnok",
+        "TheDragons",
+        "Hero8",
     };
 
     private static readonly HashSet<string> _validPlayModes = new(StringComparer.OrdinalIgnoreCase)

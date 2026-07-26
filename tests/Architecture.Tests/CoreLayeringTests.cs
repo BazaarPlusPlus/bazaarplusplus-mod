@@ -1108,6 +1108,54 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void BazaarAgent_hero_aliases_cross_plugins_only_through_the_game_bridge()
+    {
+        var repoRoot = RepoRoot();
+        var coreRoot = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgent");
+        var hostRoot = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost");
+        var mainRoot = MainSourceRoot(repoRoot);
+        var validator = File.ReadAllText(
+            Path.Combine(coreRoot, "Decisions", "BazaarAgentActionValidator.cs")
+        );
+        var identity = File.ReadAllText(
+            Path.Combine(mainRoot, "GameInterop", "BazaarAgent", "BazaarAgentHeroIdentity.cs")
+        );
+        var probe = File.ReadAllText(
+            Path.Combine(mainRoot, "GameInterop", "BazaarAgent", "BazaarAgentGameProbe.cs")
+        );
+        var dispatcher = File.ReadAllText(
+            Path.Combine(hostRoot, "BazaarAgentGameActionDispatcher.cs")
+        );
+        var contextReader = File.ReadAllText(
+            Path.Combine(hostRoot, "BazaarAgentGameContextReader.cs")
+        );
+        var runtimeController = File.ReadAllText(
+            Path.Combine(coreRoot, "Runtime", "BazaarAgentRuntimeController.cs")
+        );
+        var assemblyAttributes = File.ReadAllText(
+            Path.Combine(mainRoot, "Properties", "AssemblyAttributes.cs")
+        );
+
+        Assert.Contains("\"TheDragons\"", validator);
+        Assert.Contains("\"Hero8\"", validator);
+        Assert.DoesNotContain("BazaarPlusPlus.GameInterop", validator);
+        Assert.Contains("TheDragonsHeroIdentity.TryResolve", identity);
+        Assert.Contains("TheDragonsHeroIdentity.CanonicalId", identity);
+        Assert.Contains("BazaarAgentHeroIdentity.Resolve", probe);
+        Assert.Contains("_gameProbe.ResolveHero", dispatcher);
+        Assert.Contains("FailureKind: BazaarAgentDispatchFailureKind.Unavailable", dispatcher);
+        Assert.DoesNotContain("Enum.TryParse<EHero>", dispatcher);
+        Assert.Contains("gameProbe.ToAgentHeroId", contextReader);
+        Assert.DoesNotContain("Player?.Hero.ToString()", contextReader);
+        Assert.Contains(
+            "BazaarAgentDispatchFailureMapper.Map(result.FailureKind)",
+            runtimeController
+        );
+        Assert.False(File.Exists(Path.Combine(hostRoot, "BazaarAgentHeroIdentity.cs")));
+        Assert.DoesNotContain("BazaarPlusPlus.BazaarAgentHost", assemblyAttributes);
+    }
+
+    [Fact]
     public void BazaarAgent_core_project_dependencies_remain_System_and_Newtonsoft_only()
     {
         var root = ProjectRoot(RepoRoot(), "BazaarPlusPlus.BazaarAgent");

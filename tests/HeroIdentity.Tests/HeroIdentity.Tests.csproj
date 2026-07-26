@@ -41,6 +41,14 @@
       Link="CombatReplayHeroIdentity.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/BazaarAgent/BazaarAgentHeroIdentity.cs"
+      Link="BazaarAgentHeroIdentity.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/BazaarAgent/BazaarAgentHeroResolution.cs"
+      Link="BazaarAgentHeroResolution.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/Colors.cs"
       Link="Colors.cs"
     />
