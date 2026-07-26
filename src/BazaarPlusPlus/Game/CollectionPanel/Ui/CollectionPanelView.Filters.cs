@@ -492,10 +492,12 @@ internal sealed partial class CollectionPanelView
         if (option.Keyword.HasValue)
             return ResolveTagDisplay(option.Keyword.Value);
 
-        var display =
-            option.Mechanic == CollectionMechanic.Multicast
-                ? NativeTagTypography.Resolve(EHiddenTag.Multicast)
-                : NativeTagTypography.Resolve(option.Mechanic?.ToString() ?? string.Empty);
+        var display = option.Mechanic switch
+        {
+            CollectionMechanic.Multicast => NativeTagTypography.Resolve(EHiddenTag.Multicast),
+            CollectionMechanic.Destroy => NativeTagTypography.Resolve("Destroy"),
+            _ => NativeTagTypography.Resolve(option.Mechanic?.ToString() ?? string.Empty),
+        };
         ReportTagTypographyFailure();
         return display;
     }
