@@ -77,6 +77,7 @@ Structure lives in `docs/ARCHITECTURE.md`; durable knowledge in `docs/MEMORY.md`
 - When replacing a subsystem or migrating to a prototype, remove the old implementation entirely and ship only the new version in-place — do not leave the old path as a fallback or stand up a merged build chain that runs both
 - Do not build standalone probe/diagnostic scaffolding to validate a hypothesis — add a temporary probe on the main path (the user builds + reloads to verify), or drop it and record it as a to-verify item in the design doc, then ship
 - When CJK text renders as tofu boxes, route the text to a CJK-capable font; do not "fix" it by editing the copy
+- When a degradation event is categorized, include the category field in its `BppLogStormPolicy` key; otherwise one category's failure can suppress later categories' logs during the storm window
 - Touch only the named target of a delete/change request; do not opportunistically widen scope or adjust unrelated config
 - Reuse the game's native UI components and the codebase's established prior-art patterns  instead of hand-rolling a new render/upload chain
 - After invoking a native Unity `Button.onClick` programmatically, verify the expected game-state transition before treating the action as successful — native listeners may return silently through interaction gates such as `AllowInteraction` without throwing
