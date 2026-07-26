@@ -50,7 +50,10 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
             {
                 if (action.Hero is { } heroStr)
                 {
-                    if (!Enum.TryParse<EHero>(heroStr, ignoreCase: true, out var hero))
+                    var heroStatus = BazaarAgentHeroIdentity.ResolveInput(heroStr, out var hero);
+                    if (heroStatus == BazaarAgentHeroResolveStatus.Unavailable)
+                        return new(false, "hero unavailable in this game build");
+                    if (heroStatus != BazaarAgentHeroResolveStatus.Resolved)
                         return new(false, "unknown hero");
                     var setHeroErr = SetRunConfigSelectedHero(hero);
                     if (setHeroErr is not null)

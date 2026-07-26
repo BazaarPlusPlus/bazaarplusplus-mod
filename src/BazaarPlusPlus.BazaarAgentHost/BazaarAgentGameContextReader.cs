@@ -234,7 +234,9 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             IsClientBusy = ReadClientBusy(),
             RunId = runId,
             StateName = stateName,
-            PlayerHero = run?.Player?.Hero.ToString(),
+            PlayerHero = run?.Player is { } player
+                ? BazaarAgentHeroIdentity.ToContextId(player.Hero)
+                : null,
             Day = run == null ? null : unchecked((int)run.Day),
             Hour = run == null ? null : unchecked((int)run.Hour),
             Wins = run == null ? null : unchecked((int)run.Victories),

@@ -29,6 +29,10 @@
       Link="HeroVisual.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentHeroIdentity.cs"
+      Link="BazaarAgentHeroIdentity.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/Colors.cs"
       Link="Colors.cs"
     />
