@@ -166,7 +166,11 @@ internal static class LobbyLogEvents
             CollectiblePoolDegradedCollectionKind,
             CollectiblePoolDegradedReasonCode,
         ],
-        new BppLogStormPolicy([CollectiblePoolDegradedOperation, CollectiblePoolDegradedReasonCode])
+        new BppLogStormPolicy([
+            CollectiblePoolDegradedOperation,
+            CollectiblePoolDegradedCollectionKind,
+            CollectiblePoolDegradedReasonCode,
+        ])
     );
 
     private static BppLogFieldDefinition PublicLow(int order, string name) =>
