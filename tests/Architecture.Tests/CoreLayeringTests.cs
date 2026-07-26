@@ -687,7 +687,9 @@ public class CoreLayeringTests
             .Where(file =>
                 !string.Equals(Path.GetFullPath(file), adapterFull, StringComparison.Ordinal)
             )
-            .Where(file => File.ReadAllText(file).Contains("Hero8", StringComparison.Ordinal))
+            .Where(file =>
+                File.ReadAllText(file).Contains("Hero8", StringComparison.OrdinalIgnoreCase)
+            )
             .Select(file => Path.GetRelativePath(mainSource, file).Replace('\\', '/'))
             .ToList();
 

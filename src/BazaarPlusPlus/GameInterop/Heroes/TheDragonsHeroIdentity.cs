@@ -13,6 +13,9 @@ internal static class TheDragonsHeroIdentity
     internal const string CanonicalId = "TheDragons";
     internal const string FallbackDisplayName = "The Dragons";
     private const string LegacyId = "Hero8";
+    private static readonly DisplayNameResolver NativeDisplayNames = new(
+        LocalizableShared.GetLocalizedHero
+    );
 
     internal static bool IsAlias(string? heroId) =>
         !string.IsNullOrWhiteSpace(heroId)
@@ -81,28 +84,49 @@ internal static class TheDragonsHeroIdentity
         && TryCanonicalize(right, out var rightCanonical)
         && string.Equals(leftCanonical, rightCanonical, StringComparison.Ordinal);
 
-    internal static string ResolveDisplayName(EHero hero) =>
-        ResolveDisplayName(hero, LocalizableShared.GetLocalizedHero);
+    internal static string ResolveDisplayName(EHero hero) => NativeDisplayNames.Resolve(hero);
 
-    internal static string ResolveDisplayName(EHero hero, Func<EHero, string?> getNativeName)
+    internal static string ResolveDisplayName(EHero hero, Func<EHero, string?> getNativeName) =>
+        new DisplayNameResolver(getNativeName).Resolve(hero);
+
+    internal sealed class DisplayNameResolver
     {
-        if (getNativeName == null)
-            throw new ArgumentNullException(nameof(getNativeName));
+        private readonly Func<EHero, string?> _getNativeName;
+        private readonly HashSet<EHero> _stableAliasPlaceholderFallbacks = new();
 
-        string? nativeName;
-        try
+        internal DisplayNameResolver(Func<EHero, string?> getNativeName)
         {
-            nativeName = getNativeName(hero);
-        }
-        catch (Exception)
-        {
-            return FallbackFor(hero);
+            _getNativeName =
+                getNativeName ?? throw new ArgumentNullException(nameof(getNativeName));
         }
 
-        if (string.IsNullOrWhiteSpace(nativeName))
-            return FallbackFor(hero);
+        internal string Resolve(EHero hero)
+        {
+            lock (_stableAliasPlaceholderFallbacks)
+            {
+                if (_stableAliasPlaceholderFallbacks.Contains(hero))
+                    return FallbackFor(hero);
 
-        return IsTheDragons(hero) && IsAlias(nativeName) ? FallbackDisplayName : nativeName;
+                string? nativeName;
+                try
+                {
+                    nativeName = _getNativeName(hero);
+                }
+                catch (Exception)
+                {
+                    return FallbackFor(hero);
+                }
+
+                if (string.IsNullOrWhiteSpace(nativeName))
+                    return FallbackFor(hero);
+
+                if (!IsTheDragons(hero) || !IsAlias(nativeName))
+                    return nativeName;
+
+                _stableAliasPlaceholderFallbacks.Add(hero);
+                return FallbackDisplayName;
+            }
+        }
     }
 
     private static EHero? TryResolveExactEnumName(string name)

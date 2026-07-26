@@ -170,6 +170,54 @@ public sealed class TheDragonsHeroIdentityTests
     }
 
     [Fact]
+    public void Stable_alias_placeholder_is_read_once_then_served_from_fallback_cache()
+    {
+        Assert.True(TheDragonsHeroIdentity.TryResolve("TheDragons", out var dragons));
+        var nativeCalls = 0;
+        var resolver = new TheDragonsHeroIdentity.DisplayNameResolver(_ =>
+        {
+            nativeCalls++;
+            return "Hero8";
+        });
+
+        Assert.Equal("The Dragons", resolver.Resolve(dragons));
+        Assert.Equal("The Dragons", resolver.Resolve(dragons));
+        Assert.Equal(1, nativeCalls);
+    }
+
+    [Fact]
+    public void Blank_native_name_is_not_cached_and_can_recover()
+    {
+        Assert.True(TheDragonsHeroIdentity.TryResolve("TheDragons", out var dragons));
+        var nativeCalls = 0;
+        var resolver = new TheDragonsHeroIdentity.DisplayNameResolver(_ =>
+            ++nativeCalls == 1 ? null : "Recovered Dragons"
+        );
+
+        Assert.Equal("The Dragons", resolver.Resolve(dragons));
+        Assert.Equal("Recovered Dragons", resolver.Resolve(dragons));
+        Assert.Equal(2, nativeCalls);
+    }
+
+    [Fact]
+    public void Native_exception_is_not_cached_and_can_recover()
+    {
+        Assert.True(TheDragonsHeroIdentity.TryResolve("TheDragons", out var dragons));
+        var nativeCalls = 0;
+        var resolver = new TheDragonsHeroIdentity.DisplayNameResolver(_ =>
+        {
+            nativeCalls++;
+            return nativeCalls == 1
+                ? throw new InvalidOperationException("localization unavailable")
+                : "Recovered Dragons";
+        });
+
+        Assert.Equal("The Dragons", resolver.Resolve(dragons));
+        Assert.Equal("Recovered Dragons", resolver.Resolve(dragons));
+        Assert.Equal(2, nativeCalls);
+    }
+
+    [Fact]
     public void Non_dragons_native_display_remains_unchanged()
     {
         Assert.Equal(
