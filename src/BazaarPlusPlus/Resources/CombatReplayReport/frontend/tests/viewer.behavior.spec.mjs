@@ -2206,6 +2206,36 @@ test("virtualizes the footer combat log and highlights every visible row from th
   expect(await rows.count()).toBeLessThan(84);
   expect((await rows.first().boundingBox()).height).toBeLessThanOrEqual(47);
   await expect(rows.first()).toHaveAttribute("data-bpp-frame-start", "true");
+  const columnAlignment = await rows.evaluateAll((elements) => {
+    const testIds = [
+      "combat-log-time",
+      "combat-log-kind",
+      "combat-log-source",
+      "combat-log-arrow",
+      "combat-log-target",
+      "combat-log-amount",
+    ];
+    return Object.fromEntries(
+      testIds.map((testId) => {
+        const positions = elements.slice(0, 6).map((element) =>
+          element.querySelector(
+            `[data-bpp-test-id="${testId}"]`,
+          )?.getBoundingClientRect().left
+        );
+        return [testId, positions];
+      }),
+    );
+  });
+  for (const [testId, positions] of Object.entries(columnAlignment)) {
+    expect(
+      positions.every((position) => Number.isFinite(position)),
+      `${testId} should exist in every sampled row`,
+    ).toBe(true);
+    expect(
+      Math.max(...positions) - Math.min(...positions),
+      `${testId} should stay on one fixed column`,
+    ).toBeLessThanOrEqual(1);
+  }
   expect(
     await rows.evaluateAll((elements) =>
       elements.some(

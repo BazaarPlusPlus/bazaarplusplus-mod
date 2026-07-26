@@ -56,9 +56,25 @@ function EntityChip({
   entity: NormalizedEntity;
 }): React.JSX.Element {
   return (
-    <span className="inline-flex min-w-0 max-w-28 items-center gap-1.5 max-[600px]:max-w-20">
+    <span className="inline-flex min-w-0 items-center gap-1.5">
       <EntityArt entity={entity} size="compact" />
       <span className="truncate" title={entity.name}>{entity.name}</span>
+    </span>
+  );
+}
+
+function MissingEntity({
+  label,
+}: {
+  label: string;
+}): React.JSX.Element {
+  return (
+    <span
+      aria-label={label}
+      className="truncate text-muted-foreground/55"
+      title={label}
+    >
+      —
     </span>
   );
 }
@@ -290,7 +306,7 @@ export const CombatLogList = forwardRef<
                 <Button
                   aria-current={active ? "true" : undefined}
                   className={cn(
-                    "absolute left-0 top-0 grid h-9 w-full grid-cols-[4rem_minmax(0,1fr)_4.5rem] items-center gap-2 border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_minmax(0,1fr)_auto] max-[600px]:px-2",
+                    "absolute left-0 top-0 grid h-9 w-full grid-cols-[4rem_8.5rem_minmax(0,1fr)_4.5rem] items-center gap-x-2 border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2",
                     frameStart && "border-t border-t-border/55",
                     sameFrame && "bg-brand-soft/[0.07]",
                     active && "bg-brand-soft/[0.13] shadow-[inset_3px_0_0_var(--color-brand-soft)]",
@@ -320,7 +336,10 @@ export const CombatLogList = forwardRef<
                       )}
                     </span>
                   )}
-                  <span className="inline-flex h-full min-w-0 items-center gap-1 font-mono text-micro text-brand-soft">
+                  <span
+                    className="inline-flex h-full min-w-0 items-center gap-1 font-mono text-micro text-brand-soft"
+                    data-bpp-test-id="combat-log-time"
+                  >
                     {frameStart
                       ? (
                         <strong>{formatDuration(entry.combatMs)}</strong>
@@ -332,33 +351,50 @@ export const CombatLogList = forwardRef<
                         />
                       )}
                   </span>
-                  <span className="flex min-w-0 items-center gap-1.5 overflow-hidden">
+                  <span
+                    className="flex min-w-0 items-center gap-1.5 overflow-hidden"
+                    data-bpp-test-id="combat-log-kind"
+                  >
                     <SemanticIcon className="size-icon-sm" token={entry.token} />
                     <span className="shrink-0 text-compact font-semibold text-foreground max-[600px]:sr-only">
                       {t(entry.token)}
                     </span>
-                    {(source || targets.length > 0) && (
-                      <span
-                        className="inline-flex min-w-0 items-center gap-1 overflow-hidden text-compact text-muted-foreground"
-                        data-bpp-test-id="combat-log-route"
-                      >
-                        {source && <EntityChip entity={source} />}
-                        {source && targets.length > 0 && (
-                          <ChevronRight
-                            aria-hidden="true"
-                            className="size-icon-sm shrink-0 opacity-60"
-                          />
-                        )}
-                        {targets[0] && <EntityChip entity={targets[0]} />}
-                        {targets.length > 1 && (
-                          <span className="shrink-0 text-micro text-muted-foreground">
-                            +{targets.length - 1}
-                          </span>
-                        )}
-                      </span>
-                    )}
                   </span>
-                  <span className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums">
+                  <span
+                    className="grid min-w-0 grid-cols-[minmax(0,1fr)_1rem_minmax(0,1fr)] items-center gap-x-1 overflow-hidden text-compact text-muted-foreground"
+                    data-bpp-test-id="combat-log-route"
+                  >
+                    <span
+                      className="min-w-0 overflow-hidden"
+                      data-bpp-test-id="combat-log-source"
+                    >
+                      {source
+                        ? <EntityChip entity={source} />
+                        : <MissingEntity label={t("sourceNotRecorded")} />}
+                    </span>
+                    <ChevronRight
+                      aria-hidden="true"
+                      className="size-icon-sm shrink-0 justify-self-center opacity-45"
+                      data-bpp-test-id="combat-log-arrow"
+                    />
+                    <span
+                      className="inline-flex min-w-0 items-center gap-1 overflow-hidden"
+                      data-bpp-test-id="combat-log-target"
+                    >
+                      {targets[0]
+                        ? <EntityChip entity={targets[0]} />
+                        : <MissingEntity label={t("targetNotRecorded")} />}
+                      {targets.length > 1 && (
+                        <span className="shrink-0 text-micro text-muted-foreground">
+                          +{targets.length - 1}
+                        </span>
+                      )}
+                    </span>
+                  </span>
+                  <span
+                    className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums"
+                    data-bpp-test-id="combat-log-amount"
+                  >
                     {amount && (
                       <strong className="text-foreground">{amount}</strong>
                     )}
