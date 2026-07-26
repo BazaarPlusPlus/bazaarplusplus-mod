@@ -116,8 +116,10 @@ internal sealed partial class CollectionPanelView : IDisposable
     private VisualElement? _heroFilterSection;
     private VisualElement? _tierFilterSection;
     private ScrollView? _controlsScrollView;
+    private ScrollViewDragScroller? _controlsDragScroller;
     private VisualElement? _gridViewport;
     private ScrollView? _gridScrollView;
+    private ScrollViewDragScroller? _gridDragScroller;
     private VisualElement? _gridContentSpacer;
     private Label? _emptyLabel;
     private Label? _loadingLabel;
@@ -576,6 +578,8 @@ internal sealed partial class CollectionPanelView : IDisposable
 
     public void Dispose()
     {
+        _controlsDragScroller?.Dispose();
+        _gridDragScroller?.Dispose();
         if (_rootObject != null)
             UnityEngine.Object.Destroy(_rootObject);
         _titleOverlay?.Dispose();
@@ -589,6 +593,8 @@ internal sealed partial class CollectionPanelView : IDisposable
         _titleOverlay = null;
         _root = null;
         _controlsScrollView = null;
+        _controlsDragScroller = null;
+        _gridDragScroller = null;
     }
 
     private void OnGridViewportGeometryChanged(GeometryChangedEvent evt)
