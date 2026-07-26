@@ -124,6 +124,18 @@ internal sealed partial class CollectionPanelView
         _dayToggleButton.style.marginTop = UiSpacing.Xs;
         primaryControlsRow.Add(_dayToggleButton);
 
+        // Hero context stays visible while the remaining filters scroll.
+        _heroFilterSection = CreateFilterSection(
+            rail,
+            CollectionPanelText.HeroHeader(),
+            UiSpacing.Xl,
+            out _heroChipRow,
+            out _heroFilterLabel
+        );
+        _heroChipRow.style.flexWrap = Wrap.NoWrap;
+        _heroChipRow.style.justifyContent = Justify.FlexStart;
+        _heroChipRow.RegisterCallback<GeometryChangedEvent>(OnHeroChipRowGeometryChanged);
+
         var controlsScroll = new ScrollView(ScrollViewMode.Vertical);
         controlsScroll.style.flexGrow = 1f;
         controlsScroll.style.flexShrink = 1f;
@@ -136,18 +148,6 @@ internal sealed partial class CollectionPanelView
         _controlsScrollView = controlsScroll;
         _controlsDragScroller = new ScrollViewDragScroller(controlsScroll);
         rail.Add(controlsScroll);
-
-        // Hero filter.
-        _heroFilterSection = CreateFilterSection(
-            controlsScroll,
-            CollectionPanelText.HeroHeader(),
-            UiSpacing.Xl,
-            out _heroChipRow,
-            out _heroFilterLabel
-        );
-        _heroChipRow.style.flexWrap = Wrap.NoWrap;
-        _heroChipRow.style.justifyContent = Justify.FlexStart;
-        _heroChipRow.RegisterCallback<GeometryChangedEvent>(OnHeroChipRowGeometryChanged);
 
         // Size + tier filter. On Skills, Refresh hides Size and lets Quality fill the row.
         _tierFilterSection = CreateFilterSection(
@@ -224,7 +224,7 @@ internal sealed partial class CollectionPanelView
         _disclaimerLabel.style.whiteSpace = WhiteSpace.Normal;
         _disclaimerLabel.style.maxHeight = Sizes.DetailTextMaxHeight;
         _disclaimerLabel.style.overflow = Overflow.Hidden;
-        rail.Add(_disclaimerLabel);
+        controlsScroll.Add(_disclaimerLabel);
 
         _statusLabel = CreateLabel(Sizes.FontSmall, FontStyle.Normal, Colors.HistoryStatusText);
         _statusLabel.style.marginTop = UiSpacing.Md;

@@ -1644,6 +1644,40 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Collection_hero_filter_is_fixed_and_later_filters_share_one_scroll_view()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "Ui",
+                "CollectionPanelView.Tree.cs"
+            )
+        );
+        var operationRail = MethodSource(
+            source,
+            "private void BuildOperationRail",
+            "private static VisualElement CreateOperationRow"
+        );
+
+        Assert.Contains(
+            "_heroFilterSection = CreateFilterSection(\n            rail,",
+            operationRail
+        );
+        Assert.Contains(
+            "_tierFilterSection = CreateFilterSection(\n            controlsScroll,",
+            operationRail
+        );
+        Assert.Contains("controlsScroll.Add(_disclaimerLabel);", operationRail);
+        Assert.Contains(
+            "_controlsDragScroller = new ScrollViewDragScroller(controlsScroll);",
+            operationRail
+        );
+        Assert.Equal(1, CountOccurrences(operationRail, "new ScrollView(ScrollViewMode.Vertical)"));
+    }
+
+    [Fact]
     public void Collection_title_uses_native_game_heading_typography()
     {
         var mainSource = MainSourceRoot(RepoRoot());
@@ -2770,6 +2804,19 @@ public class CoreLayeringTests
 
     private static string WithoutWhitespace(string value) =>
         string.Concat(value.Where(character => !char.IsWhiteSpace(character)));
+
+    private static int CountOccurrences(string source, string value)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = source.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += value.Length;
+        }
+
+        return count;
+    }
 
     private static int AssignmentCount(string source, string fieldName) =>
         System
