@@ -33,7 +33,6 @@ internal static class CollectionKeywordWhitelist
         EHiddenTag.Income,
         EHiddenTag.Value,
         EHiddenTag.Tempo,
-        EHiddenTag.Multicast,
         EHiddenTag.QuestReference,
         EHiddenTag.FlyingReference,
         EHiddenTag.HasteReference,
@@ -55,8 +54,7 @@ internal static class CollectionKeywordWhitelist
         EHiddenTag.PotionReference,
     };
 
-    public static bool IsRelatedKeyword(EHiddenTag tag) =>
-        tag == EHiddenTag.Multicast || IsReferenceKeyword(tag);
+    public static bool IsRelatedKeyword(EHiddenTag tag) => IsReferenceKeyword(tag);
 
     public static bool IsReferenceKeyword(EHiddenTag tag) =>
         tag

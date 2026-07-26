@@ -34,6 +34,7 @@ internal sealed class CollectionPanelViewModel
     public HashSet<ECardSize> SelectedSizes { get; set; } = new();
     public HashSet<ECardTag> SelectedTags { get; set; } = new();
     public HashSet<EHiddenTag> SelectedKeywords { get; set; } = new();
+    public HashSet<CollectionMechanic> SelectedMechanics { get; set; } = new();
     public CollectionFacetMatchMode TagMatchMode { get; set; } = CollectionFacetMatchMode.Any;
     public CollectionFacetMatchMode KeywordMatchMode { get; set; } = CollectionFacetMatchMode.Any;
     public bool SearchExpanded { get; set; }
@@ -52,7 +53,8 @@ internal sealed class CollectionPanelViewModel
     public IReadOnlyList<ETier> AvailableTiers { get; set; } = Array.Empty<ETier>();
     public IReadOnlyList<ECardSize> AvailableSizes { get; set; } = Array.Empty<ECardSize>();
     public IReadOnlyList<ECardTag> AvailableTags { get; set; } = Array.Empty<ECardTag>();
-    public IReadOnlyList<EHiddenTag> AvailableKeywords { get; set; } = Array.Empty<EHiddenTag>();
+    public IReadOnlyList<CollectionKeywordFacetOption> AvailableKeywordOptions { get; set; } =
+        Array.Empty<CollectionKeywordFacetOption>();
     public IReadOnlyList<CollectionSourceOptionViewModel> AvailableSources { get; set; } =
         Array.Empty<CollectionSourceOptionViewModel>();
     public float ContentHeight { get; set; }
@@ -147,8 +149,8 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly Dictionary<ECardSize, Button> _sizeChips = new();
     private readonly Dictionary<ECardTag, Button> _tagChips = new();
     private readonly List<ECardTag> _tagChipOrder = new();
-    private readonly Dictionary<EHiddenTag, Button> _keywordChips = new();
-    private readonly List<EHiddenTag> _keywordChipOrder = new();
+    private readonly Dictionary<CollectionKeywordFacetOption, Button> _keywordChips = new();
+    private readonly List<CollectionKeywordFacetOption> _keywordChipOrder = new();
 
     private readonly Dictionary<string, Button> _sourceChips = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VisualElement> _sourceChipIcons = new(
@@ -409,7 +411,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         {
             var display = ResolveTagDisplay(pair.Key);
             ApplyTagChipContent(pair.Value, display);
-            RefreshChip(pair.Value, model.SelectedKeywords.Contains(pair.Key), display.AccentColor);
+            RefreshChip(pair.Value, IsKeywordOptionSelected(pair.Key, model), display.AccentColor);
         }
         foreach (var pair in _sourceChips)
         {

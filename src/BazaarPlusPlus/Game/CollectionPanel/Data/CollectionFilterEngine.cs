@@ -29,6 +29,7 @@ internal static class CollectionFilterEngine
         var tierFilterCount = filter.Tiers.Count;
         var tagFilterCount = profile.ShowTagFilter ? filter.Tags.Count : 0;
         var keywordFilterCount = profile.ShowKeywordFilter ? filter.Keywords.Count : 0;
+        var mechanicFilterCount = profile.ShowKeywordFilter ? filter.Mechanics.Count : 0;
         var sizeFilterCount = profile.ShowSizeFilter ? filter.Sizes.Count : 0;
         // In-run only; null disables. Independent of the manual Tier row — both narrow by tier.
         // Fixed-tier sources are exempt: their pool ignores the day's tier ceiling.
@@ -57,8 +58,13 @@ internal static class CollectionFilterEngine
             if (tagFilterCount > 0 && !MatchesFacet(card.Tags, filter.Tags, filter.TagMatchMode))
                 continue;
             if (
-                keywordFilterCount > 0
-                && !MatchesFacet(card.HiddenTags, filter.Keywords, filter.KeywordMatchMode)
+                keywordFilterCount + mechanicFilterCount > 0
+                && !MatchesKeywordFacet(
+                    card,
+                    filter.Keywords,
+                    filter.Mechanics,
+                    filter.KeywordMatchMode
+                )
             )
                 continue;
             if (sizeFilterCount > 0 && !filter.Sizes.Contains(card.Size))
@@ -117,6 +123,45 @@ internal static class CollectionFilterEngine
         mode == CollectionFacetMatchMode.All
             ? AllSelectedValuesMatch(cardValues, filterValues)
             : AnySelectedValueMatches(cardValues, filterValues);
+
+    private static bool MatchesKeywordFacet(
+        CollectionCardVm card,
+        HashSet<EHiddenTag> selectedKeywords,
+        HashSet<CollectionMechanic> selectedMechanics,
+        CollectionFacetMatchMode mode
+    )
+    {
+        if (mode == CollectionFacetMatchMode.All)
+        {
+            return AllSelectedValuesMatch(card.HiddenTags, selectedKeywords)
+                && AllSelectedMechanicsMatch(card.Mechanics, selectedMechanics);
+        }
+
+        return AnySelectedValueMatches(card.HiddenTags, selectedKeywords)
+            || AnySelectedMechanicMatches(card.Mechanics, selectedMechanics);
+    }
+
+    private static bool AnySelectedMechanicMatches(
+        CollectionMechanic cardFacts,
+        HashSet<CollectionMechanic> selected
+    )
+    {
+        foreach (var mechanic in selected)
+            if (cardFacts.Has(mechanic))
+                return true;
+        return false;
+    }
+
+    private static bool AllSelectedMechanicsMatch(
+        CollectionMechanic cardFacts,
+        HashSet<CollectionMechanic> selected
+    )
+    {
+        foreach (var mechanic in selected)
+            if (!cardFacts.Has(mechanic))
+                return false;
+        return true;
+    }
 
     private static bool AnySelectedValueMatches<T>(
         IReadOnlyCollection<T> cardValues,

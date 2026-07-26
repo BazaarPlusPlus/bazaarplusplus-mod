@@ -24,6 +24,18 @@
       Link="CollectionDerivedKeywordFacts.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMechanic.cs"
+      Link="CollectionMechanic.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMechanicFacts.cs"
+      Link="CollectionMechanicFacts.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionKeywordFacetOption.cs"
+      Link="CollectionKeywordFacetOption.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionLocalizationResolver.cs"
       Link="CollectionLocalizationResolver.cs"
     />

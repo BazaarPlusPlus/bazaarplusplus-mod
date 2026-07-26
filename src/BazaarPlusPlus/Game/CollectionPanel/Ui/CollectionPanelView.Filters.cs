@@ -129,7 +129,7 @@ internal sealed partial class CollectionPanelView
 
         if (model.TabProfile.ShowKeywordFilter)
         {
-            EnsureKeywordChips(model.AvailableKeywords);
+            EnsureKeywordChips(model.AvailableKeywordOptions);
         }
         else
         {
@@ -156,24 +156,24 @@ internal sealed partial class CollectionPanelView
         }
     }
 
-    private void EnsureKeywordChips(IReadOnlyList<EHiddenTag> keywords)
+    private void EnsureKeywordChips(IReadOnlyList<CollectionKeywordFacetOption> options)
     {
         if (_keywordChipRow == null)
             return;
-        if (!KeywordChipsMatch(keywords))
+        if (!KeywordChipsMatch(options))
         {
             ClearKeywordFacetRow();
             var hasRelatedSection = false;
-            foreach (var keyword in keywords)
+            foreach (var option in options)
             {
-                if (!hasRelatedSection && CollectionKeywordWhitelist.IsRelatedKeyword(keyword))
+                if (!hasRelatedSection && option.IsRelated)
                 {
                     _keywordRelatedSectionLabel = CreateKeywordRelatedSectionLabel();
                     _keywordChipRow.Add(_keywordRelatedSectionLabel);
                     hasRelatedSection = true;
                 }
 
-                var captured = keyword;
+                var captured = option;
                 var chip = CreateTagFacetChipButton(() => _commands.ToggleKeyword(captured));
                 ApplyTagChipContent(chip, ResolveTagDisplay(captured));
                 _keywordChips[captured] = chip;
@@ -193,7 +193,7 @@ internal sealed partial class CollectionPanelView
         return true;
     }
 
-    private bool KeywordChipsMatch(IReadOnlyList<EHiddenTag> visible)
+    private bool KeywordChipsMatch(IReadOnlyList<CollectionKeywordFacetOption> visible)
     {
         if (visible.Count != _keywordChipOrder.Count)
             return false;
@@ -486,6 +486,27 @@ internal sealed partial class CollectionPanelView
         ReportTagTypographyFailure();
         return display;
     }
+
+    private static NativeTagDisplay ResolveTagDisplay(CollectionKeywordFacetOption option)
+    {
+        if (option.Keyword.HasValue)
+            return ResolveTagDisplay(option.Keyword.Value);
+
+        var display =
+            option.Mechanic == CollectionMechanic.Multicast
+                ? NativeTagTypography.Resolve(EHiddenTag.Multicast)
+                : NativeTagTypography.Resolve(option.Mechanic?.ToString() ?? string.Empty);
+        ReportTagTypographyFailure();
+        return display;
+    }
+
+    private static bool IsKeywordOptionSelected(
+        CollectionKeywordFacetOption option,
+        CollectionPanelViewModel model
+    ) =>
+        option.Keyword.HasValue
+            ? model.SelectedKeywords.Contains(option.Keyword.Value)
+            : option.Mechanic.HasValue && model.SelectedMechanics.Contains(option.Mechanic.Value);
 
     private static void ReportTagTypographyFailure()
     {

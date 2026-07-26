@@ -1,0 +1,105 @@
+#nullable enable
+using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Cards.Interfaces;
+using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Effect.AuraActions;
+
+namespace BazaarPlusPlus.Game.CollectionPanel.Data;
+
+// Collection-owned structured facts projected once while a catalog VM is built. Filtering and
+// view refreshes read only the resulting flags; they never revisit game effect graphs.
+internal static class CollectionMechanicFacts
+{
+    public static CollectionMechanic Project(TCardBase template)
+    {
+        var facts = FromNativeHiddenTags(template.HiddenTags);
+        if (template is not IHasTierData tierData)
+            return facts;
+
+        var activeAbilityIds = new HashSet<string>(StringComparer.Ordinal);
+        var activeAuraIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var pair in tierData.Tiers)
+        {
+            var tier = pair.Key;
+            var tierTemplate = pair.Value;
+            if (tierData.GetAttributeBaseValueAtTier(ECardAttributeType.Multicast, tier) > 1)
+                facts |= CollectionMechanic.Multicast;
+
+            if (tierTemplate == null)
+                continue;
+            activeAbilityIds.UnionWith(tierTemplate.AbilityIds);
+            activeAuraIds.UnionWith(tierTemplate.AuraIds);
+        }
+
+        if (!facts.Has(CollectionMechanic.Multicast))
+        {
+            foreach (var abilityId in activeAbilityIds)
+            {
+                if (
+                    template.Abilities.TryGetValue(abilityId, out var ability)
+                    && ability != null
+                    && ActionModifiesMulticast(ability.Action)
+                )
+                {
+                    facts |= CollectionMechanic.Multicast;
+                    break;
+                }
+            }
+        }
+
+        if (!facts.Has(CollectionMechanic.Multicast))
+        {
+            foreach (var auraId in activeAuraIds)
+            {
+                if (
+                    template.Auras.TryGetValue(auraId, out var aura)
+                    && aura?.Action is TAuraActionCardModifyAttribute modifier
+                    && modifier.AttributeType == ECardAttributeType.Multicast
+                )
+                {
+                    facts |= CollectionMechanic.Multicast;
+                    break;
+                }
+            }
+        }
+
+        return facts;
+    }
+
+    public static bool TryFromHiddenTag(EHiddenTag hiddenTag, out CollectionMechanic mechanic)
+    {
+        mechanic =
+            hiddenTag == EHiddenTag.Multicast
+                ? CollectionMechanic.Multicast
+                : CollectionMechanic.None;
+        return mechanic != CollectionMechanic.None;
+    }
+
+    private static CollectionMechanic FromNativeHiddenTags(
+        IReadOnlyCollection<EHiddenTag> hiddenTags
+    )
+    {
+        var facts = CollectionMechanic.None;
+        foreach (var hiddenTag in hiddenTags)
+            if (TryFromHiddenTag(hiddenTag, out var mechanic))
+                facts |= mechanic;
+        return facts;
+    }
+
+    private static bool ActionModifiesMulticast(ITAction action)
+    {
+        if (
+            action is TActionCardModifyAttribute modifier
+            && modifier.AttributeType == ECardAttributeType.Multicast
+        )
+            return true;
+        if (action is not TActionAnd combined)
+            return false;
+
+        foreach (var child in combined.Actions)
+            if (child != null && ActionModifiesMulticast(child))
+                return true;
+        return false;
+    }
+}
