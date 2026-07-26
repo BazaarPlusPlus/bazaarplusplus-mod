@@ -382,7 +382,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         }
 
-        _catalogReadiness = CollectionCatalogReadiness.Loading;
+        SetCatalogState(CollectionCatalogReadiness.Loading, Array.Empty<CollectionCardVm>());
     }
 
     private void Close()
