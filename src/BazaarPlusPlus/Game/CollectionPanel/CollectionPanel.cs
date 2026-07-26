@@ -32,18 +32,6 @@ internal sealed class CollectionPanel : MonoBehaviour
     public static bool IsVisible => _instance != null && _instance._isVisible;
     internal static CollectionPanel? Instance => _instance;
 
-    private static readonly EHero[] HeroOrder = new[]
-    {
-        EHero.Common,
-        EHero.Vanessa,
-        EHero.Dooley,
-        EHero.Pygmalien,
-        EHero.Karnok,
-        EHero.Mak,
-        EHero.Stelle,
-        EHero.Jules,
-    };
-
     private static readonly ETier[] TierOrder = new[]
     {
         ETier.Bronze,
@@ -93,7 +81,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     // load, so the roster only varies with (kind, selected hero).
     private (
         CollectionSourceKind Kind,
-        EHero? Hero,
+        EHero Hero,
         IReadOnlyList<CollectionSourceOptionViewModel> Sources
     )? _availableSourcesCache;
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
@@ -108,6 +96,9 @@ internal sealed class CollectionPanel : MonoBehaviour
     private Coroutine? _loadCoroutine;
     private int _loadGeneration;
     private bool _isLoadingCatalog;
+    private CollectionCatalogReadiness _catalogReadiness = CollectionCatalogReadiness.Loading;
+    private IReadOnlyList<EHero> _availableHeroes =
+        CollectionHeroSelectionRoster.BaseConcreteHeroes;
 
     // True when the last RefreshView ran before the game's async tooltip typography
     // registration completed: tag chips rendered degraded (string-table labels, no accent
@@ -223,9 +214,12 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private CollectionPanelSelectionState ResolveOpenSelection()
     {
+        PrepareCatalogReadinessForOpen();
         var failures = new List<CollectionPanelSelectionProbeFailure>(4);
         var isInGameRun = TryReadIsInGameRunForOpen(failures);
-        var rememberedHero = isInGameRun ? null : _heroPreferenceStore.Load();
+        var rememberedPreference = isInGameRun
+            ? null
+            : _heroPreferenceStore.Load(_catalogReadiness, _availableHeroes);
         var hero = isInGameRun ? TryReadCurrentHero(failures) : null;
         var encounterIds = isInGameRun ? TryReadEncounterIds(failures) : EncounterIdsSnapshot.Empty;
         _currentRunDay = isInGameRun ? TryReadCurrentDay(failures) : null;
@@ -235,7 +229,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             encounterIds.CurrentEncounterTemplateId,
             encounterIds.ChoiceSelectionTemplateIds,
             CollectionSourceCatalog.Entries,
-            rememberedHero
+            rememberedPreference
         );
 
         _selectionLogState.ObserveOpen(
@@ -375,8 +369,22 @@ internal sealed class CollectionPanel : MonoBehaviour
     private void ApplyOpenSelection(CollectionPanelSelectionState selection)
     {
         _filter.ApplySelection(selection);
-        PruneInvisibleSourceSelections();
+        if (_catalogReadiness == CollectionCatalogReadiness.Accepted)
+            PruneInvisibleSourceSelections();
         _scrollY = 0f;
+    }
+
+    private void PrepareCatalogReadinessForOpen()
+    {
+        if (_catalog.TryGetCached(out var cached))
+        {
+            _catalogReadiness = CollectionCatalogReadiness.Accepted;
+            _availableHeroes = CollectionHeroSelectionRoster.BaseConcreteHeroes;
+            SetCatalogCards(cached.Cards);
+            return;
+        }
+
+        _catalogReadiness = CollectionCatalogReadiness.Loading;
     }
 
     private void Close()
@@ -673,8 +681,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         public void ToggleHero(EHero hero)
         {
-            panel._filter.ToggleHero(hero);
-            panel._heroPreferenceStore.Save(hero);
+            panel._heroPreferenceStore.Save(panel._filter.ToggleHero(hero));
             panel.PruneInvisibleSourceSelections();
             panel._scrollY = 0f;
             panel.ApplyFilters();
@@ -794,6 +801,8 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         var diagnostics = new CollectionPanelLoadDiagnostics();
         _isLoadingCatalog = true;
+        if (_catalogReadiness != CollectionCatalogReadiness.Accepted)
+            _catalogReadiness = CollectionCatalogReadiness.Loading;
         SetStatus(CollectionPanelText.CatalogLoading());
         ApplyEmptyVisibleSet();
         RefreshView();
@@ -809,7 +818,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         if (_catalog.TryGetCached(out var cached))
         {
             catalogResult = cached;
-            SetCatalogCards(cached.Cards);
+            AcceptCatalog(cached.Cards);
             ClearStatus();
         }
         else
@@ -850,12 +859,13 @@ internal sealed class CollectionPanel : MonoBehaviour
                     }
 
                     catalogResult = _catalog.Commit(buildSession);
-                    SetCatalogCards(catalogResult.Cards);
+                    AcceptCatalog(catalogResult.Cards);
                     ClearStatus();
                 }
             }
             else
             {
+                _catalogReadiness = CollectionCatalogReadiness.Unavailable;
                 SetCatalogCards(Array.Empty<CollectionCardVm>());
                 SetStatus(CollectionPanelText.CatalogUnavailable());
             }
@@ -991,7 +1001,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             HeroFilterEnabled = heroFilterPresentation.IsEnabled,
             // The view only does Contains lookups on these inside the synchronous Refresh and
             // never retains the model, so the live filter sets are shared instead of copied.
-            SelectedHeroes = _filter.Heroes,
+            SelectedHero = _filter.SelectedHero,
             SelectedTiers = _filter.Tiers,
             SelectedSizes = _filter.Sizes,
             SelectedTags = _filter.Tags,
@@ -1006,7 +1016,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             DayFilterEnabled = dayFilterPresentation.IsEnabled,
             DayFilterActive = dayFilterPresentation.IsActive,
             DayFilterValue = _currentRunDay,
-            AvailableHeroes = HeroOrder,
+            AvailableHeroes = _availableHeroes,
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
             AvailableTags = availableTags,
@@ -1033,15 +1043,15 @@ internal sealed class CollectionPanel : MonoBehaviour
             return Array.Empty<CollectionSourceOptionViewModel>();
 
         var kind = sourceKind.Value;
-        var selectedHero = _filter.SelectedHero;
+        var effectiveHero = _filter.EffectiveHero;
         if (
             _availableSourcesCache is { } cached
             && cached.Kind == kind
-            && cached.Hero == selectedHero
+            && cached.Hero == effectiveHero
         )
             return cached.Sources;
 
-        var roster = CollectionSourceRoster.Build(CollectionSourceCatalog.For(kind, selectedHero));
+        var roster = CollectionSourceRoster.Build(CollectionSourceCatalog.For(kind, effectiveHero));
         var result = new List<CollectionSourceOptionViewModel>(roster.Count);
         foreach (var item in roster)
         {
@@ -1057,28 +1067,31 @@ internal sealed class CollectionPanel : MonoBehaviour
                 }
             );
         }
-        _availableSourcesCache = (kind, selectedHero, result);
+        _availableSourcesCache = (kind, effectiveHero, result);
         return result;
     }
 
     private bool PruneInvisibleSourceSelections()
     {
-        var selectedHero = _filter.SelectedHero;
+        if (_catalogReadiness != CollectionCatalogReadiness.Accepted)
+            return false;
+
+        var effectiveHero = _filter.EffectiveHero;
         var sourceKind = CollectionTabProfile.For(_filter.ActiveTab).SourceKind;
         if (!sourceKind.HasValue)
             return _filter.ClearSelectedSource();
 
-        var visibleSources = SourceKeysFor(sourceKind.Value, selectedHero);
+        var visibleSources = SourceKeysFor(sourceKind.Value, effectiveHero);
         return _filter.PruneSelectedSource(visibleSources);
     }
 
     private static IReadOnlyList<string> SourceKeysFor(
         CollectionSourceKind kind,
-        EHero? selectedHero
+        EHero effectiveHero
     )
     {
         var keys = new List<string>();
-        foreach (var entry in CollectionSourceCatalog.For(kind, selectedHero))
+        foreach (var entry in CollectionSourceCatalog.For(kind, effectiveHero))
             keys.Add(entry.SourceKey);
         return keys;
     }
@@ -1106,6 +1119,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private void InvalidateCatalog(CollectionPanelLogReasonCode reasonCode)
     {
+        _catalogReadiness = CollectionCatalogReadiness.Loading;
         SetCatalogCards(Array.Empty<CollectionCardVm>());
         _offerPoolCache.Clear();
         _catalog.InvalidateCache(reasonCode);
@@ -1117,5 +1131,21 @@ internal sealed class CollectionPanel : MonoBehaviour
     {
         _catalogCards = cards;
         _facetAvailability = CollectionFacetAvailability.SnapshotFor(cards);
+    }
+
+    private void AcceptCatalog(IReadOnlyList<CollectionCardVm> cards)
+    {
+        _catalogReadiness = CollectionCatalogReadiness.Accepted;
+        _availableHeroes = CollectionHeroSelectionRoster.BaseConcreteHeroes;
+        SetCatalogCards(cards);
+
+        var normalizedHero = CollectionHeroSelectionRoster.NormalizeSelection(
+            _filter.SelectedHero,
+            _catalogReadiness,
+            _availableHeroes
+        );
+        if (_filter.SelectedHero != normalizedHero && _filter.SelectedHero.HasValue)
+            _filter.ToggleHero(_filter.SelectedHero.Value);
+        PruneInvisibleSourceSelections();
     }
 }

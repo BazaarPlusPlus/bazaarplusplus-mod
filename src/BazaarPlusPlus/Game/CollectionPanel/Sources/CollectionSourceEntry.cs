@@ -55,6 +55,19 @@ internal sealed class CollectionSourceEntry
 
     public bool SuppressDayGate { get; }
 
+    public bool HasAllHeroesOfferSegment
+    {
+        get
+        {
+            foreach (var segment in OfferSegments)
+            {
+                if (segment.Rule.HeroMode == CollectionSourceHeroMode.AllHeroes)
+                    return true;
+            }
+            return false;
+        }
+    }
+
     public string Group { get; }
 
     public int Order { get; }
@@ -63,6 +76,21 @@ internal sealed class CollectionSourceEntry
 
     public bool AppliesToHero(EHero hero) =>
         AvailableHeroes.Count == 0 || AvailableHeroes.Contains(hero);
+
+    public bool IsVisibleForHero(EHero hero)
+    {
+        if (!AppliesToHero(hero))
+            return false;
+        if (hero != EHero.Common)
+            return true;
+
+        foreach (var segment in OfferSegments)
+        {
+            if (segment.Rule.HeroMode != CollectionSourceHeroMode.OtherHeroes)
+                return true;
+        }
+        return false;
+    }
 
     private static string BuildOfferRuleFingerprint(
         IReadOnlyList<CollectionSourceOfferSegment> segments

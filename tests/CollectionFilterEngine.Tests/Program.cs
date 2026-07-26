@@ -8,6 +8,7 @@ using BazaarPlusPlus.Game.CardTags;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.DayTiers;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.GameInterop.TagTypography;
 
 var searchRefreshGate = new CollectionSearchRefreshGate(0.16f);
@@ -58,53 +59,49 @@ AssertTrue(
 );
 
 var heroState = new CollectionFilterState();
-heroState.ToggleHero(EHero.Vanessa);
-AssertValues(
-    heroState.Heroes.ToArray(),
-    new[] { EHero.Vanessa },
-    "Selecting a concrete hero should add that hero."
-);
-heroState.ToggleHero(EHero.Dooley);
-AssertValues(
-    heroState.Heroes.ToArray(),
-    new[] { EHero.Dooley },
-    "Selecting a second concrete hero should replace the first."
-);
-heroState.ToggleHero(EHero.Common);
-AssertValues(
-    heroState.Heroes.ToArray(),
-    new[] { EHero.Common },
-    "Selecting Common should replace the selected concrete hero."
+AssertEqual(
+    null,
+    heroState.SelectedHero,
+    "A new filter state should have no concrete hero selected."
 );
 AssertEqual(
     EHero.Common,
-    heroState.ToSelectionState().SelectedHero,
-    "Common should round-trip as the selected hero, not as no selected hero."
+    heroState.EffectiveHero,
+    "A filter state without a concrete selection should query in the Common hero context."
 );
-heroState.ToggleHero(EHero.Common);
-AssertValues(
-    heroState.Heroes.ToArray(),
-    Array.Empty<EHero>(),
+heroState.ToggleHero(EHero.Vanessa);
+AssertEqual(
+    EHero.Vanessa,
+    heroState.SelectedHero,
+    "Selecting a concrete hero should select that hero."
+);
+heroState.ToggleHero(EHero.Dooley);
+AssertEqual(
+    EHero.Dooley,
+    heroState.SelectedHero,
+    "Selecting a second concrete hero should replace the first."
+);
+var neutralToggleValue = heroState.ToggleHero(EHero.Dooley);
+AssertEqual(
+    null,
+    heroState.SelectedHero,
     "Toggling the only selected hero should clear the hero selection."
 );
 AssertEqual(
-    null,
-    heroState.ToSelectionState().SelectedHero,
-    "An empty hero selection should round-trip as no selected hero."
+    EHero.Common,
+    neutralToggleValue,
+    "A toggle should return the post-toggle effective hero for persistence."
+);
+AssertEqual(
+    EHero.Common,
+    heroState.EffectiveHero,
+    "Clearing the selected hero should restore the Common query context."
 );
 heroState.ToggleHero(EHero.Dooley);
-AssertValues(
-    heroState.Heroes.ToArray(),
-    new[] { EHero.Dooley },
-    "Selecting a concrete hero after Common should still select only that hero."
-);
-var ambiguousHeroState = new CollectionFilterState();
-ambiguousHeroState.Heroes.Add(EHero.Common);
-ambiguousHeroState.Heroes.Add(EHero.Vanessa);
 AssertEqual(
-    null,
-    ambiguousHeroState.SelectedHero,
-    "Ambiguous multi-hero state should not pick a HashSet-dependent selected hero."
+    EHero.Dooley,
+    heroState.SelectedHero,
+    "Selecting a concrete hero from neutral mode should remain single-select."
 );
 
 var defaultSelection = CollectionPanelSelectionState.Default;
@@ -146,7 +143,7 @@ AssertTrue(
 AssertTrue(
     CollectionPanelHeroPreference.TryParse("Common", out var parsedCommon)
         && parsedCommon == EHero.Common,
-    "CollectionPanel hero preference should preserve Common as a real panel hero."
+    "CollectionPanel hero preference should preserve Common as the neutral effective hero."
 );
 AssertFalse(
     CollectionPanelHeroPreference.TryParse("NotARealHero", out _),
@@ -156,6 +153,121 @@ AssertFalse(
     CollectionPanelHeroPreference.TryParse("", out _),
     "CollectionPanel hero preference should reject empty values."
 );
+AssertEqual(
+    CollectionPanelHeroPreferenceLoadStatus.Absent,
+    CollectionPanelHeroPreference
+        .ResolveStored(
+            hasStoredValue: false,
+            raw: null,
+            CollectionCatalogReadiness.Loading,
+            CollectionHeroSelectionRoster.BaseConcreteHeroes
+        )
+        .Status,
+    "Missing preference state should remain distinguishable from invalid stored data."
+);
+AssertEqual(
+    CollectionPanelHeroPreferenceLoadStatus.Invalid,
+    CollectionPanelHeroPreference
+        .ResolveStored(
+            hasStoredValue: true,
+            raw: "NotARealHero",
+            CollectionCatalogReadiness.Accepted,
+            CollectionHeroSelectionRoster.BaseConcreteHeroes
+        )
+        .Status,
+    "Invalid preference state should be deletable without treating it as merely unavailable."
+);
+var resolvedDooleyPreference = CollectionPanelHeroPreference.ResolveStored(
+    hasStoredValue: true,
+    raw: "Dooley",
+    CollectionCatalogReadiness.Accepted,
+    CollectionHeroSelectionRoster.BaseConcreteHeroes
+);
+AssertEqual(
+    CollectionPanelHeroPreferenceLoadStatus.Resolved,
+    resolvedDooleyPreference.Status,
+    "A known hero in the accepted roster should resolve."
+);
+AssertEqual(
+    EHero.Dooley,
+    resolvedDooleyPreference.Hero,
+    "Resolved preference state should retain its concrete hero."
+);
+AssertTrue(
+    TheDragonsHeroIdentity.TryResolve(TheDragonsHeroIdentity.CanonicalId, out var dragonsHero),
+    "The integrated identity adapter should resolve the canonical The Dragons preference."
+);
+var loadingDragonsPreference = CollectionPanelHeroPreference.ResolveStored(
+    hasStoredValue: true,
+    raw: "Hero8",
+    CollectionCatalogReadiness.Loading,
+    CollectionHeroSelectionRoster.BaseConcreteHeroes
+);
+AssertEqual(
+    CollectionPanelHeroPreferenceLoadStatus.Resolved,
+    loadingDragonsPreference.Status,
+    "Catalog loading must not misclassify a known preference as unavailable."
+);
+AssertEqual(
+    TheDragonsHeroIdentity.CanonicalId,
+    loadingDragonsPreference.CanonicalRaw,
+    "Known aliases should retain a canonical raw preference."
+);
+AssertEqual(
+    CollectionPanelHeroPreferenceLoadStatus.Resolved,
+    CollectionPanelHeroPreference
+        .ResolveStored(
+            hasStoredValue: true,
+            raw: "TheDragons",
+            CollectionCatalogReadiness.Unavailable,
+            CollectionHeroSelectionRoster.BaseConcreteHeroes
+        )
+        .Status,
+    "An unavailable catalog must not normalize or clear a known preference."
+);
+var unavailableDragonsPreference = CollectionPanelHeroPreference.ResolveStored(
+    hasStoredValue: true,
+    raw: "TheDragons",
+    CollectionCatalogReadiness.Accepted,
+    CollectionHeroSelectionRoster.BaseConcreteHeroes
+);
+AssertEqual(
+    CollectionPanelHeroPreferenceLoadStatus.KnownUnavailable,
+    unavailableDragonsPreference.Status,
+    "Only an accepted roster may classify a known hero preference as unavailable."
+);
+AssertEqual(
+    dragonsHero,
+    unavailableDragonsPreference.Hero,
+    "Known-unavailable preference state should retain its resolved runtime hero."
+);
+AssertEqual(
+    dragonsHero,
+    CollectionHeroSelectionRoster.NormalizeSelection(
+        dragonsHero,
+        CollectionCatalogReadiness.Loading,
+        CollectionHeroSelectionRoster.BaseConcreteHeroes
+    ),
+    "Catalog loading must not clear an unresolved concrete selection."
+);
+AssertEqual(
+    dragonsHero,
+    CollectionHeroSelectionRoster.NormalizeSelection(
+        dragonsHero,
+        CollectionCatalogReadiness.Unavailable,
+        CollectionHeroSelectionRoster.BaseConcreteHeroes
+    ),
+    "Catalog unavailability must not clear an unresolved concrete selection."
+);
+AssertEqual(
+    null,
+    CollectionHeroSelectionRoster.NormalizeSelection(
+        dragonsHero,
+        CollectionCatalogReadiness.Accepted,
+        CollectionHeroSelectionRoster.BaseConcreteHeroes
+    ),
+    "Only an accepted roster may normalize an unavailable concrete selection to neutral."
+);
 AssertTrue(
     new CollectionFilterState().UseRunDayFilter,
     "New filter state should start with the day filter selected."
@@ -163,9 +275,9 @@ AssertTrue(
 var selectionState = new CollectionFilterState();
 selectionState.SelectedSourceKey = "trainer:old";
 selectionState.ApplySelection(defaultSelection);
-AssertValues(
-    selectionState.Heroes.ToArray(),
-    new[] { EHero.Vanessa },
+AssertEqual(
+    EHero.Vanessa,
+    selectionState.SelectedHero,
     "Applying the default selection should select Vanessa in the filter state."
 );
 AssertEqual(
@@ -178,15 +290,36 @@ AssertEqual(
     selectionState.ToSelectionState(),
     "Filter state should round-trip the selected hero and merchant through the selection interface."
 );
+var legacyCommonSelection = new CollectionPanelSelectionState(
+    EHero.Common,
+    CollectionPanelSelectionState.DefaultMerchantSourceKey,
+    CollectionSourceKind.Merchant
+);
+AssertEqual(
+    null,
+    legacyCommonSelection.SelectedHero,
+    "A legacy Common selection should normalize to no concrete UI hero."
+);
+selectionState.ApplySelection(legacyCommonSelection);
+AssertEqual(
+    null,
+    selectionState.SelectedHero,
+    "Applying a legacy Common selection should leave every concrete hero unselected."
+);
+AssertEqual(
+    EHero.Common,
+    selectionState.EffectiveHero,
+    "Applying a legacy Common selection should retain Common as the effective query hero."
+);
 var runtimeSelection = new CollectionPanelSelectionState(
     EHero.Dooley,
     "merchant:jules:diamond:dooley+karnok+mak+pygmalien+stelle+vanessa",
     CollectionSourceKind.Merchant
 );
 selectionState.ApplySelection(runtimeSelection);
-AssertValues(
-    selectionState.Heroes.ToArray(),
-    new[] { EHero.Dooley },
+AssertEqual(
+    EHero.Dooley,
+    selectionState.SelectedHero,
     "Runtime selection should replace the previous selected hero."
 );
 AssertEqual(
@@ -339,7 +472,7 @@ var defaultPackageResult = CollectionFilterEngine.Apply(
 AssertSequence(defaultPackageResult, new[] { normal.Id }, "Packages are excluded by default.");
 
 var matchingPackageFilter = new CollectionFilterState();
-matchingPackageFilter.Heroes.Add(EHero.Dooley);
+matchingPackageFilter.ToggleHero(EHero.Dooley);
 matchingPackageFilter.Tiers.Add(ETier.Bronze);
 matchingPackageFilter.Sizes.Add(ECardSize.Medium);
 matchingPackageFilter.Tags.Add(ECardTag.Tool);
@@ -393,7 +526,7 @@ var vanessaBronze = Card("Vanessa Bronze", ETier.Bronze, heroes: new[] { EHero.V
 var dooleyBronze = Card("Dooley Bronze", ETier.Bronze, heroes: new[] { EHero.Dooley });
 var vanessaSilver = Card("Vanessa Silver", ETier.Silver, heroes: new[] { EHero.Vanessa });
 var sourceAndHeroFilter = new CollectionFilterState();
-sourceAndHeroFilter.Heroes.Add(EHero.Vanessa);
+sourceAndHeroFilter.ToggleHero(EHero.Vanessa);
 sourceAndHeroFilter.Tiers.Add(ETier.Bronze);
 var sourceAndHeroResult = CollectionFilterEngine.Apply(
     new[] { dooleyBronze, vanessaSilver, vanessaBronze },
@@ -410,7 +543,7 @@ AssertSequence(
 );
 
 var sourceOwnedHeroFilter = new CollectionFilterState();
-sourceOwnedHeroFilter.Heroes.Add(EHero.Vanessa);
+sourceOwnedHeroFilter.ToggleHero(EHero.Vanessa);
 var sourceOwnedHeroResult = CollectionFilterEngine.Apply(
     new[] { dooleyBronze, vanessaBronze },
     sourceOwnedHeroFilter,
@@ -708,7 +841,7 @@ var instrumentTempoWrongKeyword = InstrumentFacetCard(keyword: EHiddenTag.TempoR
 var instrumentTempoWrongSearch = InstrumentFacetCard(name: "Orchestral Practice");
 var instrumentTempoNotOffered = InstrumentFacetCard(name: "Tempo Instrument Solo Encore");
 var instrumentTempoItemFilter = new CollectionFilterState { SearchQuery = "instrument solo" };
-instrumentTempoItemFilter.Heroes.Add(EHero.Vanessa);
+instrumentTempoItemFilter.ToggleHero(EHero.Vanessa);
 instrumentTempoItemFilter.Tiers.Add(ETier.Bronze);
 instrumentTempoItemFilter.Sizes.Add(ECardSize.Medium);
 instrumentTempoItemFilter.Tags.Add(ECardTag.Instrument);
@@ -771,7 +904,7 @@ var instrumentTempoReferenceSkillFilter = new CollectionFilterState
     ActiveType = ECardType.Skill,
     SearchQuery = "reference instrument",
 };
-instrumentTempoReferenceSkillFilter.Heroes.Add(EHero.Vanessa);
+instrumentTempoReferenceSkillFilter.ToggleHero(EHero.Vanessa);
 instrumentTempoReferenceSkillFilter.Tiers.Add(ETier.Bronze);
 instrumentTempoReferenceSkillFilter.Tags.Add(ECardTag.Instrument);
 instrumentTempoReferenceSkillFilter.Keywords.Add(EHiddenTag.TempoReference);
@@ -808,6 +941,7 @@ var derivedLifestealTemplate = new TCardItem
     Size = ECardSize.Medium,
     InternalName = "Derived Lifesteal Weapon",
     ArtKey = "Assets/Cards/DerivedLifestealWeapon.png",
+    Heroes = new HashSet<EHero> { EHero.Common },
     Tags = new HashSet<ECardTag> { ECardTag.Weapon },
     HiddenTags = new HashSet<EHiddenTag>(),
     Tiers = new Dictionary<ETier, TCardTier>
@@ -846,6 +980,7 @@ var noLifestealTemplate = new TCardItem
     Size = ECardSize.Medium,
     InternalName = "No Lifesteal Weapon",
     ArtKey = "Assets/Cards/NoLifestealWeapon.png",
+    Heroes = new HashSet<EHero> { EHero.Common },
     Tags = new HashSet<ECardTag> { ECardTag.Weapon },
     HiddenTags = new HashSet<EHiddenTag>(),
     Tiers = new Dictionary<ETier, TCardTier>
@@ -1299,7 +1434,7 @@ var queryResolver = new FakeOfferPoolResolver(
     }
 );
 var queryFilter = new CollectionFilterState { SelectedSourceKey = querySource.SourceKey };
-queryFilter.Heroes.Add(EHero.Vanessa);
+queryFilter.ToggleHero(EHero.Vanessa);
 queryFilter.Tags.Add(ECardTag.Weapon);
 queryFilter.Tags.Add(ECardTag.Tool);
 queryFilter.Keywords.Add(EHiddenTag.Damage);
@@ -1355,6 +1490,96 @@ AssertEqual(
     "CollectionQuery should resolve a valid selected source once."
 );
 
+var neutralSelectedHeroSource = Source(
+    "merchant:query:neutral",
+    CollectionSourceKind.Merchant,
+    heroMode: CollectionSourceHeroMode.SelectedHero
+);
+var neutralSelectedHeroResolver = new FakeOfferPoolResolver(
+    new Dictionary<string, CollectionSourceOfferPoolResult>
+    {
+        [neutralSelectedHeroSource.SourceKey] = CollectionSourceOfferPoolResult.Ready(
+            new[] { queryCatalogCards[0].Id },
+            null
+        ),
+    }
+);
+CollectionQuery.Run(
+    queryCatalogCards,
+    new CollectionFilterState { SelectedSourceKey = neutralSelectedHeroSource.SourceKey },
+    queryAvailability,
+    new DictionarySourceCatalog(neutralSelectedHeroSource),
+    neutralSelectedHeroResolver
+);
+AssertEqual(
+    EHero.Common,
+    neutralSelectedHeroResolver.LastEffectiveHero,
+    "A SelectedHero source should receive Common when no concrete hero chip is selected."
+);
+var neutralHeroSpecificSourceResult = CollectionQuery.Run(
+    queryCatalogCards,
+    new CollectionFilterState { SelectedSourceKey = querySource.SourceKey },
+    queryAvailability,
+    queryCatalog,
+    queryResolver
+);
+AssertTrue(
+    neutralHeroSpecificSourceResult.Normalization.ClearSelectedSource,
+    "Entering neutral mode should prune a source that is available only to a concrete hero."
+);
+
+var allHeroesTrainerSource = Source(
+    "trainer:query:all-heroes",
+    CollectionSourceKind.Trainer,
+    heroMode: CollectionSourceHeroMode.AllHeroes
+);
+var allHeroesTrainerCards = new[]
+{
+    Card(
+        "All Heroes Vanessa Skill",
+        ETier.Bronze,
+        type: ECardType.Skill,
+        heroes: new[] { EHero.Vanessa }
+    ),
+    Card(
+        "All Heroes Dooley Skill",
+        ETier.Bronze,
+        type: ECardType.Skill,
+        heroes: new[] { EHero.Dooley }
+    ),
+    Card(
+        "All Heroes Common Skill",
+        ETier.Bronze,
+        type: ECardType.Skill,
+        heroes: new[] { EHero.Common }
+    ),
+};
+var allHeroesTrainerResolver = new FakeOfferPoolResolver(
+    new Dictionary<string, CollectionSourceOfferPoolResult>
+    {
+        [allHeroesTrainerSource.SourceKey] = CollectionSourceOfferPoolResult.Ready(
+            allHeroesTrainerCards.Select(card => card.Id).ToArray(),
+            null
+        ),
+    }
+);
+var allHeroesTrainerResult = CollectionQuery.Run(
+    allHeroesTrainerCards,
+    new CollectionFilterState
+    {
+        ActiveType = ECardType.Skill,
+        SelectedSourceKey = allHeroesTrainerSource.SourceKey,
+    },
+    CollectionFacetAvailability.SnapshotFor(allHeroesTrainerCards),
+    new DictionarySourceCatalog(allHeroesTrainerSource),
+    allHeroesTrainerResolver
+);
+AssertValues(
+    allHeroesTrainerResult.Cards.Select(card => card.DisplayName).ToArray(),
+    new[] { "All Heroes Common Skill", "All Heroes Dooley Skill", "All Heroes Vanessa Skill" },
+    "An explicit AllHeroes source should retain its real cross-hero offer pool in neutral mode."
+);
+
 var unknownSourceFilter = new CollectionFilterState { SelectedSourceKey = "merchant:missing" };
 var unknownSourceResult = CollectionQuery.Run(
     queryCatalogCards,
@@ -1396,7 +1621,7 @@ AssertEqual(
 );
 
 var heroMismatchFilter = new CollectionFilterState { SelectedSourceKey = querySource.SourceKey };
-heroMismatchFilter.Heroes.Add(EHero.Dooley);
+heroMismatchFilter.ToggleHero(EHero.Dooley);
 var heroMismatchResult = CollectionQuery.Run(
     queryCatalogCards,
     heroMismatchFilter,
@@ -1461,7 +1686,7 @@ var searchGlobalFilter = new CollectionFilterState
     SelectedSourceKey = querySource.SourceKey,
     SearchQuery = "lighter",
 };
-searchGlobalFilter.Heroes.Add(EHero.Vanessa);
+searchGlobalFilter.ToggleHero(EHero.Vanessa);
 searchGlobalFilter.Tiers.Add(ETier.Bronze);
 searchGlobalFilter.Tags.Add(ECardTag.Weapon);
 searchGlobalFilter.Keywords.Add(EHiddenTag.Damage);
@@ -1488,7 +1713,7 @@ var searchWithinFilters = new CollectionFilterState
     SelectedSourceKey = querySource.SourceKey,
     SearchQuery = "damage",
 };
-searchWithinFilters.Heroes.Add(EHero.Vanessa);
+searchWithinFilters.ToggleHero(EHero.Vanessa);
 searchWithinFilters.Tags.Add(ECardTag.Weapon);
 searchWithinFilters.Keywords.Add(EHiddenTag.Damage);
 AssertSequence(
@@ -1564,18 +1789,11 @@ var emptyHeroSkillResult = CollectionFilterEngine.Apply(
 );
 AssertSequence(
     emptyHeroSkillResult,
-    new[]
-    {
-        commonSharedSkill.Id,
-        commonSkill.Id,
-        missingHeroSkill.Id,
-        sharedHeroSkill.Id,
-        vanessaExclusiveSkill.Id,
-    },
-    "Empty hero selection should show every skill card without applying hero scope."
+    new[] { commonSkill.Id },
+    "No selected hero should show only Common-exclusive skills."
 );
 var exclusiveSkillFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
-exclusiveSkillFilter.Heroes.Add(EHero.Vanessa);
+exclusiveSkillFilter.ToggleHero(EHero.Vanessa);
 var exclusiveSkillResult = CollectionFilterEngine.Apply(
     new[]
     {
@@ -1623,7 +1841,6 @@ AssertSequence(
 );
 
 var commonSkillFilter = new CollectionFilterState { ActiveType = ECardType.Skill };
-commonSkillFilter.Heroes.Add(EHero.Common);
 var commonSkillResult = CollectionFilterEngine.Apply(
     new[]
     {
@@ -2039,6 +2256,7 @@ var tooltipOnlySearchVm = CollectionCardVm.From(
         Size = ECardSize.Small,
         InternalName = "Tooltip Search Probe",
         ArtKey = "tooltip-search-probe",
+        Heroes = new HashSet<EHero> { EHero.Common },
         Localization = new TCardLocalization
         {
             Title = new TLocalizableText { Text = "Tooltip Search Probe" },
@@ -2064,6 +2282,7 @@ var localizationHashSearchVm = CollectionCardVm.From(
         Size = ECardSize.Medium,
         InternalName = "Hash Search Probe",
         ArtKey = "hash-search-probe",
+        Heroes = new HashSet<EHero> { EHero.Common },
         Localization = new TCardLocalization
         {
             Title = new TLocalizableText
@@ -2289,7 +2508,7 @@ static CollectionCardVm Card(
         InternalName = internalName ?? name,
         ArtKey = artKey ?? string.Empty,
         IsPackage = isPackage,
-        Heroes = heroes ?? Array.Empty<EHero>(),
+        Heroes = heroes ?? new[] { EHero.Common },
         Enchantments =
             enchantments ?? new Dictionary<EEnchantmentType, CollectionCardEnchantmentFacets>(),
         SearchText = searchText ?? string.Empty,
@@ -2299,7 +2518,8 @@ static CollectionSourceEntry Source(
     string sourceKey,
     CollectionSourceKind kind,
     IReadOnlyList<EHero>? availableHeroes = null,
-    bool suppressDayGate = false
+    bool suppressDayGate = false,
+    CollectionSourceHeroMode? heroMode = null
 ) =>
     new(
         sourceKey,
@@ -2309,8 +2529,8 @@ static CollectionSourceEntry Source(
         string.Empty,
         Guid.NewGuid(),
         Array.Empty<Guid>(),
-        suppressDayGate
-            ? new[] { FixedTierSegment() }
+        heroMode.HasValue ? new[] { HeroSegment(heroMode.Value) }
+            : suppressDayGate ? new[] { FixedTierSegment() }
             : Array.Empty<CollectionSourceOfferSegment>(),
         "test",
         0,
@@ -2329,6 +2549,26 @@ static CollectionSourceOfferSegment FixedTierSegment() =>
                 CollectionSourceStartingTierMode.Exact,
                 ETier.Gold
             ),
+            Array.Empty<ECardSize>(),
+            Array.Empty<ECardTag>(),
+            Array.Empty<ECardTag>(),
+            Array.Empty<EHiddenTag>(),
+            false,
+            Array.Empty<EEnchantmentType>(),
+            Array.Empty<ECardTag>(),
+            Array.Empty<EHiddenTag>()
+        )
+    );
+
+static CollectionSourceOfferSegment HeroSegment(CollectionSourceHeroMode heroMode) =>
+    new(
+        "hero",
+        CollectionSourceOfferSegmentKind.Normal,
+        string.Empty,
+        new CollectionSourceOfferRule(
+            heroMode,
+            null,
+            null,
             Array.Empty<ECardSize>(),
             Array.Empty<ECardTag>(),
             Array.Empty<ECardTag>(),
@@ -2410,13 +2650,16 @@ internal sealed class FakeOfferPoolResolver : ICollectionOfferPoolResolver
 
     public int ResolveCount { get; private set; }
 
+    public EHero? LastEffectiveHero { get; private set; }
+
     public CollectionSourceOfferPoolResult GetOrResolve(
         CollectionSourceEntry source,
-        EHero? selectedHero,
+        EHero effectiveHero,
         IReadOnlyList<CollectionCardVm> catalogCards
     )
     {
         ResolveCount++;
+        LastEffectiveHero = effectiveHero;
         return _results.TryGetValue(source.SourceKey, out var result)
             ? result
             : CollectionSourceOfferPoolResult.NoneSelected();

@@ -88,6 +88,18 @@
       Link="CollectionPanelHeroPreference.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCatalogReadiness.cs"
+      Link="CollectionCatalogReadiness.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionHeroSelectionRoster.cs"
+      Link="CollectionHeroSelectionRoster.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Heroes\TheDragonsHeroIdentity.cs"
+      Link="TheDragonsHeroIdentity.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceEnums.cs"
       Link="CollectionSourceEnums.cs"
     />

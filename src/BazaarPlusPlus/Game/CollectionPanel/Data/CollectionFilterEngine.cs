@@ -25,7 +25,7 @@ internal static class CollectionFilterEngine
                 : context.OfferedCardIds as HashSet<Guid>
                     ?? new HashSet<Guid>(context.OfferedCardIds);
         var profile = CollectionTabProfile.For(filter.ActiveTab);
-        var heroFilterCount = context.ApplyHeroFilter ? filter.Heroes.Count : 0;
+        var applyHeroFilter = context.ApplyHeroFilter;
         var tierFilterCount = filter.Tiers.Count;
         var tagFilterCount = profile.ShowTagFilter ? filter.Tags.Count : 0;
         var keywordFilterCount = profile.ShowKeywordFilter ? filter.Keywords.Count : 0;
@@ -45,7 +45,7 @@ internal static class CollectionFilterEngine
                 continue;
             if (offerPoolSet != null && !offerPoolSet.Contains(card.Id))
                 continue;
-            if (heroFilterCount > 0 && !CollectionHeroScope.MatchesFilter(card, filter))
+            if (applyHeroFilter && !CollectionHeroScope.MatchesFilter(card, filter))
                 continue;
             if (tierFilterCount > 0 && !filter.Tiers.Contains(card.StartingTier))
                 continue;
