@@ -43,6 +43,8 @@ dotnet run --project tests\ChoiceScreenPedestalResolver.Tests\ChoiceScreenPedest
 - `./run.sh snapshot-managed` — archive the installed Managed dir under `game-libs/`
 - `./run.sh build-matrix` — build the source tree against every archived Managed snapshot
 
+When building from an isolated ticket worktree, explicitly pass `-p:BPPInstallerSourcePath="<absolute-path-to>/bazaarplusplus-installer/src-tauri/resources"` to projects that reference the main mod. The default sibling installer path does not exist beside ticket worktrees.
+
 Test projects under `tests/` are split per-feature. Some use xUnit + `Microsoft.NET.Test.Sdk` (run via `dotnet test`), others are executable (run via `dotnet run --project`). Check whether the csproj has `Microsoft.NET.Test.Sdk` to determine which.
 
 When changing a direct dependency, edit `Directory.Packages.props`, run `./run.sh restore-locks`, and review the six changed `src/**/packages.lock.json` files with the version change. Do not generate lock files for test projects. Before committing, run `./run.sh restore-locked` so dependency graph drift fails locally, then run the standard build and test commands.
