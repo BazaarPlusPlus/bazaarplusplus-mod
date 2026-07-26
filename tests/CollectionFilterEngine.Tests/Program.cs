@@ -1,8 +1,13 @@
 using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Effect;
+using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Effect.AuraActions;
+using BazaarGameShared.Domain.Effect.Trigger;
 using BazaarGameShared.Domain.Tooltips;
 using BazaarPlusPlus.Game.CardTags;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
@@ -951,15 +956,12 @@ var damageReferenceItem = Card(
     ETier.Bronze,
     hiddenTags: new[] { EHiddenTag.DamageReference }
 );
-var multicastItem = Card(
-    "Multicast Item",
-    ETier.Bronze,
-    hiddenTags: new[] { EHiddenTag.Multicast }
-);
+var multicastItem = Card("Multicast Item", ETier.Bronze, mechanics: CollectionMechanic.Multicast);
 var damageMulticastItem = Card(
     "Damage Multicast Item",
     ETier.Bronze,
-    hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.Multicast }
+    hiddenTags: new[] { EHiddenTag.Damage },
+    mechanics: CollectionMechanic.Multicast
 );
 var itemKeywordFilter = new CollectionFilterState();
 itemKeywordFilter.Keywords.Add(EHiddenTag.Damage);
@@ -995,18 +997,18 @@ AssertSequence(
     "All keyword mode requires every selected item keyword on the same card."
 );
 var multicastFilter = new CollectionFilterState();
-multicastFilter.Keywords.Add(EHiddenTag.Multicast);
+multicastFilter.Mechanics.Add(CollectionMechanic.Multicast);
 AssertSequence(
     CollectionFilterEngine.Apply(
         new[] { damageItem, multicastItem, damageMulticastItem },
         multicastFilter
     ),
     new[] { damageMulticastItem.Id, multicastItem.Id },
-    "Multicast filtering should match only cards carrying EHiddenTag.Multicast."
+    "Multicast filtering should match only cards carrying the cached Multicast mechanic."
 );
 var anyMulticastKeywordFilter = new CollectionFilterState();
 anyMulticastKeywordFilter.Keywords.Add(EHiddenTag.Damage);
-anyMulticastKeywordFilter.Keywords.Add(EHiddenTag.Multicast);
+anyMulticastKeywordFilter.Mechanics.Add(CollectionMechanic.Multicast);
 AssertSequence(
     CollectionFilterEngine.Apply(
         new[] { multicastItem, damageMulticastItem, damageItem, shieldItem },
@@ -1020,7 +1022,7 @@ var allMulticastKeywordFilter = new CollectionFilterState
     KeywordMatchMode = CollectionFacetMatchMode.All,
 };
 allMulticastKeywordFilter.Keywords.Add(EHiddenTag.Damage);
-allMulticastKeywordFilter.Keywords.Add(EHiddenTag.Multicast);
+allMulticastKeywordFilter.Mechanics.Add(CollectionMechanic.Multicast);
 AssertSequence(
     CollectionFilterEngine.Apply(
         new[] { multicastItem, damageMulticastItem, damageItem },
@@ -1274,7 +1276,493 @@ var attributeOnlyMulticastTemplate = new TCardItem
 var attributeOnlyMulticastVm = CollectionCardVm.From(attributeOnlyMulticastTemplate);
 AssertFalse(
     attributeOnlyMulticastVm.HiddenTags.Contains(EHiddenTag.Multicast),
-    "CollectionCardVm.From should not derive Multicast from tier attribute values."
+    "Structured Multicast projection should not mutate the native hidden-keyword facts."
+);
+AssertTrue(
+    attributeOnlyMulticastVm.Mechanics.Has(CollectionMechanic.Multicast),
+    "A supported tier with base Multicast greater than one should project the Multicast mechanic."
+);
+
+var baseOneMulticastTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(attributes: new() { [ECardAttributeType.Multicast] = 1 }),
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(baseOneMulticastTemplate).Mechanics.Has(CollectionMechanic.Multicast),
+    "Base Multicast one without an active modifier should not project Multicast."
+);
+
+var crossTierMulticastTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(attributes: new() { [ECardAttributeType.Multicast] = 1 }),
+        [ETier.Silver] = Tier(attributes: new() { [ECardAttributeType.Multicast] = 3 }),
+    }
+);
+AssertTrue(
+    CollectionCardVm.From(crossTierMulticastTemplate).Mechanics.Has(CollectionMechanic.Multicast),
+    "Multicast projection should inspect every supported tier and observe later-tier changes."
+);
+
+var activeAbilityMulticastTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "active-multicast" }),
+    },
+    abilities: new() { ["active-multicast"] = Ability(MulticastModifier()) }
+);
+AssertTrue(
+    CollectionCardVm
+        .From(activeAbilityMulticastTemplate)
+        .Mechanics.Has(CollectionMechanic.Multicast),
+    "An active base ability modifier should project Multicast."
+);
+
+var nestedAbilityMulticastTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "nested-multicast" }),
+    },
+    abilities: new()
+    {
+        ["nested-multicast"] = Ability(
+            new TActionAnd
+            {
+                Actions = new List<ITAction>
+                {
+                    new TActionAnd { Actions = new List<ITAction> { MulticastModifier() } },
+                },
+            }
+        ),
+    }
+);
+AssertTrue(
+    CollectionCardVm
+        .From(nestedAbilityMulticastTemplate)
+        .Mechanics.Has(CollectionMechanic.Multicast),
+    "A Multicast modifier nested in combined actions should project Multicast."
+);
+
+var activeAuraMulticastTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(auraIds: new[] { "active-multicast-aura" }),
+    },
+    auras: new() { ["active-multicast-aura"] = Aura(MulticastAuraModifier()) }
+);
+AssertTrue(
+    CollectionCardVm.From(activeAuraMulticastTemplate).Mechanics.Has(CollectionMechanic.Multicast),
+    "An active base aura modifier should project Multicast."
+);
+
+var orphanMulticastTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    abilities: new() { ["orphan-multicast"] = Ability(MulticastModifier()) },
+    auras: new() { ["orphan-multicast-aura"] = Aura(MulticastAuraModifier()) }
+);
+AssertFalse(
+    CollectionCardVm.From(orphanMulticastTemplate).Mechanics.Has(CollectionMechanic.Multicast),
+    "Unreferenced base abilities and auras should not project Multicast."
+);
+
+var enchantmentMulticastTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    enchantments: new()
+    {
+        [EEnchantmentType.Shiny] = new TEnchantment
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Multicast] = 2,
+            },
+            Abilities = new Dictionary<string, TCardAbility>
+            {
+                ["enchanted-multicast"] = Ability(MulticastModifier()),
+            },
+            Auras = new Dictionary<string, TCardAura>
+            {
+                ["enchanted-multicast-aura"] = Aura(MulticastAuraModifier()),
+            },
+        },
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(enchantmentMulticastTemplate).Mechanics.Has(CollectionMechanic.Multicast),
+    "Enchantment attributes, abilities, and auras should not pollute base Multicast facts."
+);
+
+var nativeAndDerivedMulticastTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(attributes: new() { [ECardAttributeType.Multicast] = 2 }),
+    },
+    hiddenTags: new() { EHiddenTag.Multicast }
+);
+var nativeAndDerivedMulticastVm = CollectionCardVm.From(nativeAndDerivedMulticastTemplate);
+var nativeOnlyMulticastVm = CollectionCardVm.From(
+    MechanicItemTemplate(
+        new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+        hiddenTags: new() { EHiddenTag.Multicast }
+    )
+);
+AssertTrue(
+    nativeOnlyMulticastVm.Mechanics.Has(CollectionMechanic.Multicast),
+    "A native Multicast hidden tag should map into the same structured mechanic fact."
+);
+var duplicateMulticastAvailability = CollectionFacetAvailability.SnapshotFor(
+    new[] { nativeAndDerivedMulticastVm }
+);
+AssertFalse(
+    duplicateMulticastAvailability.ItemKeywords.Contains(EHiddenTag.Multicast),
+    "Native Multicast hidden tags should be normalized out of the native keyword availability."
+);
+AssertValues(
+    duplicateMulticastAvailability.ItemMechanics.ToArray(),
+    new[] { CollectionMechanic.Multicast },
+    "Native and derived Multicast facts should collapse into one available mechanic."
+);
+AssertEqual(
+    1,
+    duplicateMulticastAvailability
+        .KeywordOptionsFor(ECardType.Item)
+        .Count(option => option.Mechanic == CollectionMechanic.Multicast),
+    "Native and derived Multicast facts should render one Multicast chip."
+);
+
+var multicastSkillTemplate = new TCardSkill
+{
+    Id = Guid.NewGuid(),
+    Type = ECardType.Skill,
+    StartingTier = ETier.Bronze,
+    InternalName = "Multicast Skill",
+    HiddenTags = new HashSet<EHiddenTag>(),
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "skill-multicast" }),
+    },
+    Abilities = new Dictionary<string, TCardAbility>
+    {
+        ["skill-multicast"] = Ability(MulticastModifier()),
+    },
+};
+var multicastSkillVm = CollectionCardVm.From(multicastSkillTemplate);
+var independentMulticastAvailability = CollectionFacetAvailability.SnapshotFor(
+    new[] { attributeOnlyMulticastVm, multicastSkillVm }
+);
+AssertTrue(
+    independentMulticastAvailability
+        .MechanicsFor(ECardType.Item)
+        .Contains(CollectionMechanic.Multicast),
+    "Item Multicast availability should be computed from item catalog facts."
+);
+AssertTrue(
+    independentMulticastAvailability
+        .MechanicsFor(ECardType.Skill)
+        .Contains(CollectionMechanic.Multicast),
+    "Skill Multicast availability should be computed independently from skill catalog facts."
+);
+
+var primaryMulticastOrder = CollectionFacetAvailability.SnapshotFor(
+    new[]
+    {
+        Card(
+            "Damage Multicast Related",
+            ETier.Bronze,
+            hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.DamageReference },
+            mechanics: CollectionMechanic.Multicast
+        ),
+    }
+);
+AssertValues(
+    primaryMulticastOrder
+        .KeywordOptionsFor(ECardType.Item)
+        .Select(option => option.ToString())
+        .ToArray(),
+    new[]
+    {
+        nameof(EHiddenTag.Damage),
+        nameof(CollectionMechanic.Multicast),
+        nameof(EHiddenTag.DamageReference),
+    },
+    "Multicast should sort in the primary keyword area before the Related subsection."
+);
+AssertFalse(
+    CollectionKeywordWhitelist.IsRelatedKeyword(EHiddenTag.Multicast),
+    "The legacy Multicast hidden tag should no longer be classified as Related."
+);
+
+var rootDestroyTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "root-destroy" }),
+    },
+    abilities: new() { ["root-destroy"] = Ability(new TActionCardDestroy()) }
+);
+var rootDestroyVm = CollectionCardVm.From(rootDestroyTemplate);
+AssertTrue(
+    rootDestroyVm.Mechanics.Has(CollectionMechanic.Destroy),
+    "A root TActionCardDestroy in an active base ability should project Destroy."
+);
+
+var nestedDestroyTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "nested-destroy" }),
+    },
+    abilities: new()
+    {
+        ["nested-destroy"] = Ability(
+            new TActionAnd
+            {
+                Actions = new List<ITAction>
+                {
+                    new TActionAnd { Actions = new List<ITAction> { new TActionCardDestroy() } },
+                },
+            }
+        ),
+    }
+);
+var nestedDestroyVm = CollectionCardVm.From(nestedDestroyTemplate);
+AssertTrue(
+    nestedDestroyVm.Mechanics.Has(CollectionMechanic.Destroy),
+    "A TActionCardDestroy nested in combined actions should project Destroy."
+);
+
+var orphanDestroyTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    abilities: new() { ["orphan-destroy"] = Ability(new TActionCardDestroy()) }
+);
+AssertFalse(
+    CollectionCardVm.From(orphanDestroyTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "An unreferenced base destroy ability should not project Destroy."
+);
+
+var enchantmentDestroyTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    enchantments: new()
+    {
+        [EEnchantmentType.Shiny] = new TEnchantment
+        {
+            Abilities = new Dictionary<string, TCardAbility>
+            {
+                ["enchanted-destroy"] = Ability(new TActionCardDestroy()),
+            },
+        },
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(enchantmentDestroyTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "Enchantment-provided destroy abilities should not pollute base Destroy facts."
+);
+
+var transformDestroyedTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "transform-destroyed" }),
+    },
+    abilities: new()
+    {
+        ["transform-destroyed"] = Ability(
+            new TActionCardTransformDestroyed
+            {
+                Abilities = new Dictionary<string, TCardAbility>
+                {
+                    ["derived-destroy"] = Ability(new TActionCardDestroy()),
+                },
+            }
+        ),
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(transformDestroyedTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "TransformDestroyed and its derived template abilities should not project direct Destroy."
+);
+
+var destroyRelatedOnlyTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(
+            attributes: new() { [ECardAttributeType.DestroyImmunity] = 1 },
+            abilityIds: new[]
+            {
+                "repair",
+                "before-destroyed",
+                "destroyed",
+                "performed-destruction",
+                "destroy-immunity",
+            }
+        ),
+    },
+    abilities: new()
+    {
+        ["repair"] = Ability(new TActionCardRepair()),
+        ["before-destroyed"] = Ability(
+            new TActionCardRepair(),
+            new TTriggerOnBeforeCardDestroyed()
+        ),
+        ["destroyed"] = Ability(new TActionCardRepair(), new TTriggerOnCardDestroyed()),
+        ["performed-destruction"] = Ability(
+            new TActionCardRepair(),
+            new TTriggerOnCardPerformedDestruction()
+        ),
+        ["destroy-immunity"] = Ability(
+            new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DestroyImmunity }
+        ),
+    },
+    hiddenTags: new() { EHiddenTag.AbsorbDestroy }
+) with
+{
+    InternalDescription = "Destroy another item when this tooltip is rendered.",
+};
+var destroyRelatedOnlyVm = CollectionCardVm.From(destroyRelatedOnlyTemplate);
+AssertFalse(
+    destroyRelatedOnlyVm.Mechanics.Has(CollectionMechanic.Destroy),
+    "Repair, destroy triggers, immunity, AbsorbDestroy, and tooltip text should not project direct Destroy."
+);
+
+var destroySkillTemplate = new TCardSkill
+{
+    Id = Guid.NewGuid(),
+    Type = ECardType.Skill,
+    StartingTier = ETier.Bronze,
+    InternalName = "Destroy Skill",
+    HiddenTags = new HashSet<EHiddenTag>(),
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "skill-destroy" }),
+    },
+    Abilities = new Dictionary<string, TCardAbility>
+    {
+        ["skill-destroy"] = Ability(new TActionCardDestroy()),
+    },
+};
+var destroySkillVm = CollectionCardVm.From(destroySkillTemplate);
+var itemDestroyAvailability = CollectionFacetAvailability.SnapshotFor(new[] { rootDestroyVm });
+AssertTrue(
+    itemDestroyAvailability.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Destroy),
+    "Item Destroy availability should be derived from item catalog facts."
+);
+AssertFalse(
+    itemDestroyAvailability.MechanicsFor(ECardType.Skill).Contains(CollectionMechanic.Destroy),
+    "Item Destroy facts should not leak into Skill availability."
+);
+var skillDestroyAvailability = CollectionFacetAvailability.SnapshotFor(new[] { destroySkillVm });
+AssertTrue(
+    skillDestroyAvailability.MechanicsFor(ECardType.Skill).Contains(CollectionMechanic.Destroy),
+    "Skill Destroy availability should be derived independently from skill catalog facts."
+);
+AssertFalse(
+    skillDestroyAvailability.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Destroy),
+    "Skill Destroy facts should not leak into Item availability."
+);
+
+var multicastOnlyMechanicCard = Card(
+    "Alpha Multicast",
+    ETier.Bronze,
+    mechanics: CollectionMechanic.Multicast
+);
+var destroyOnlyMechanicCard = Card(
+    "Beta Destroy",
+    ETier.Bronze,
+    mechanics: CollectionMechanic.Destroy
+);
+var multicastDestroyCard = Card(
+    "Gamma Multicast Destroy",
+    ETier.Bronze,
+    mechanics: CollectionMechanic.Multicast | CollectionMechanic.Destroy
+);
+var destroyMulticastAny = new CollectionFilterState();
+destroyMulticastAny.Mechanics.Add(CollectionMechanic.Multicast);
+destroyMulticastAny.Mechanics.Add(CollectionMechanic.Destroy);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { multicastDestroyCard, destroyOnlyMechanicCard, multicastOnlyMechanicCard },
+        destroyMulticastAny
+    ),
+    new[] { multicastOnlyMechanicCard.Id, destroyOnlyMechanicCard.Id, multicastDestroyCard.Id },
+    "Any mode should OR Destroy with Multicast."
+);
+var destroyMulticastAll = new CollectionFilterState
+{
+    KeywordMatchMode = CollectionFacetMatchMode.All,
+};
+destroyMulticastAll.Mechanics.Add(CollectionMechanic.Multicast);
+destroyMulticastAll.Mechanics.Add(CollectionMechanic.Destroy);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { multicastDestroyCard, destroyOnlyMechanicCard, multicastOnlyMechanicCard },
+        destroyMulticastAll
+    ),
+    new[] { multicastDestroyCard.Id },
+    "All mode should require both Destroy and Multicast on the same card."
+);
+
+var damageDestroyCard = Card(
+    "Damage Destroy",
+    ETier.Bronze,
+    hiddenTags: new[] { EHiddenTag.Damage },
+    mechanics: CollectionMechanic.Destroy
+);
+var destroyDamageAny = new CollectionFilterState();
+destroyDamageAny.Keywords.Add(EHiddenTag.Damage);
+destroyDamageAny.Mechanics.Add(CollectionMechanic.Destroy);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { damageDestroyCard, destroyOnlyMechanicCard, damageItem },
+        destroyDamageAny
+    ),
+    new[] { destroyOnlyMechanicCard.Id, damageDestroyCard.Id, damageItem.Id },
+    "Any mode should OR Destroy with native hidden keywords."
+);
+var destroyDamageAll = new CollectionFilterState
+{
+    KeywordMatchMode = CollectionFacetMatchMode.All,
+};
+destroyDamageAll.Keywords.Add(EHiddenTag.Damage);
+destroyDamageAll.Mechanics.Add(CollectionMechanic.Destroy);
+AssertSequence(
+    CollectionFilterEngine.Apply(
+        new[] { damageDestroyCard, destroyOnlyMechanicCard, damageItem },
+        destroyDamageAll
+    ),
+    new[] { damageDestroyCard.Id },
+    "All mode should require Destroy and native hidden keywords on the same card."
+);
+
+var primaryDestroyOrder = CollectionFacetAvailability.SnapshotFor(
+    new[]
+    {
+        Card(
+            "Damage Multicast Destroy Related",
+            ETier.Bronze,
+            hiddenTags: new[] { EHiddenTag.Damage, EHiddenTag.DamageReference },
+            mechanics: CollectionMechanic.Multicast | CollectionMechanic.Destroy
+        ),
+    }
+);
+AssertValues(
+    primaryDestroyOrder
+        .KeywordOptionsFor(ECardType.Item)
+        .Select(option => option.ToString())
+        .ToArray(),
+    new[]
+    {
+        nameof(EHiddenTag.Damage),
+        nameof(CollectionMechanic.Multicast),
+        nameof(CollectionMechanic.Destroy),
+        nameof(EHiddenTag.DamageReference),
+    },
+    "Destroy should sort with Multicast in the primary area before Related."
+);
+var destroyOption = primaryDestroyOrder
+    .KeywordOptionsFor(ECardType.Item)
+    .Single(option => option.Mechanic == CollectionMechanic.Destroy);
+AssertFalse(destroyOption.IsRelated, "Destroy should never render in the Related subsection.");
+AssertFalse(
+    primaryDestroyOrder.ItemKeywords.Contains(EHiddenTag.AbsorbDestroy),
+    "AbsorbDestroy should not create a broad Destroy Related option."
 );
 
 AssertEqual(
@@ -1377,7 +1865,6 @@ AssertValues(
         nameof(EHiddenTag.Income),
         nameof(EHiddenTag.Value),
         nameof(EHiddenTag.Tempo),
-        nameof(EHiddenTag.Multicast),
         nameof(EHiddenTag.QuestReference),
         nameof(EHiddenTag.FlyingReference),
         nameof(EHiddenTag.HasteReference),
@@ -1446,9 +1933,9 @@ AssertFalse(
     CollectionKeywordWhitelist.IsReferenceKeyword(EHiddenTag.Poison),
     "Base gameplay keywords should not be classified as reference keywords."
 );
-AssertTrue(
+AssertFalse(
     CollectionKeywordWhitelist.IsRelatedKeyword(EHiddenTag.Multicast),
-    "Multicast should be classified into the Related keyword subsection."
+    "Multicast should remain outside the Related keyword subsection."
 );
 AssertTrue(
     CollectionKeywordWhitelist.IsRelatedKeyword(EHiddenTag.PotionReference),
@@ -1538,9 +2025,9 @@ foreach (
         CollectionKeywordWhitelist.Ordered.Contains(nonBazaarDbKeyword),
         $"Keyword whitelist should exclude non-BazaarDB keyword {nonBazaarDbKeyword}."
     );
-AssertTrue(
+AssertFalse(
     CollectionKeywordWhitelist.Ordered.Contains(EHiddenTag.Multicast),
-    "CollectionPanel should include Multicast as an explicit Related keyword without changing the BazaarDB taxonomy."
+    "The native keyword whitelist should not create a second Multicast option beside the structured mechanic."
 );
 
 var availableFacetCards = new[]
@@ -1557,7 +2044,7 @@ var availableFacetCards = new[]
             EHiddenTag.CanCrit,
         }
     ),
-    Card("Multicast Item", ETier.Bronze, hiddenTags: new[] { EHiddenTag.Multicast }),
+    Card("Multicast Item", ETier.Bronze, mechanics: CollectionMechanic.Multicast),
     Card(
         "Package Shield",
         ETier.Bronze,
@@ -1597,7 +2084,6 @@ AssertValues(
     {
         nameof(EHiddenTag.Damage),
         nameof(EHiddenTag.Tempo),
-        nameof(EHiddenTag.Multicast),
         nameof(EHiddenTag.DamageReference),
         nameof(EHiddenTag.PotionReference),
     },
@@ -1626,12 +2112,12 @@ AssertFalse(
     "Legacy skill catalogs should omit TempoReference when no accepted skill carries it."
 );
 AssertFalse(
-    legacyFacets.KeywordsFor(ECardType.Item).Contains(EHiddenTag.Multicast),
-    "Item keyword availability should omit Multicast when the item catalog has no Multicast template."
+    legacyFacets.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Multicast),
+    "Item mechanic availability should omit Multicast when the item catalog has no Multicast template."
 );
 AssertFalse(
-    availableFacets.KeywordsFor(ECardType.Skill).Contains(EHiddenTag.Multicast),
-    "Skill keyword availability should omit Multicast when only the item catalog contains it."
+    availableFacets.MechanicsFor(ECardType.Skill).Contains(CollectionMechanic.Multicast),
+    "Skill mechanic availability should omit Multicast when only the item catalog contains it."
 );
 
 var queryCatalogCards = new[]
@@ -1655,7 +2141,9 @@ var queryAvailability = new CollectionFacetAvailabilitySnapshot(
     new[] { ECardTag.Weapon },
     Array.Empty<ECardTag>(),
     new[] { EHiddenTag.Damage },
-    Array.Empty<EHiddenTag>()
+    Array.Empty<EHiddenTag>(),
+    Array.Empty<CollectionMechanic>(),
+    Array.Empty<CollectionMechanic>()
 );
 var querySource = Source(
     "merchant:query:vanessa",
@@ -1678,6 +2166,7 @@ queryFilter.Tags.Add(ECardTag.Weapon);
 queryFilter.Tags.Add(ECardTag.Tool);
 queryFilter.Keywords.Add(EHiddenTag.Damage);
 queryFilter.Keywords.Add(EHiddenTag.Shield);
+queryFilter.Mechanics.Add(CollectionMechanic.Multicast);
 var queryResult = CollectionQuery.Run(
     queryCatalogCards,
     queryFilter,
@@ -1708,6 +2197,11 @@ AssertValues(
     new[] { EHiddenTag.Damage },
     "CollectionQuery should return retained keywords when unavailable selected keywords are trimmed."
 );
+AssertEqual(
+    0,
+    queryResult.Normalization.RetainedMechanics!.Count,
+    "CollectionQuery should trim unavailable mechanic selections through the same normalization."
+);
 AssertValues(
     queryFilter.Tags.ToArray(),
     new[] { ECardTag.Weapon, ECardTag.Tool },
@@ -1717,6 +2211,10 @@ AssertValues(
     queryFilter.Keywords.ToArray(),
     new[] { EHiddenTag.Damage, EHiddenTag.Shield },
     "CollectionQuery should not mutate selected keywords."
+);
+AssertTrue(
+    queryFilter.Mechanics.Contains(CollectionMechanic.Multicast),
+    "CollectionQuery should not mutate selected mechanics."
 );
 AssertEqual(
     querySource.SourceKey,
@@ -2732,7 +3230,8 @@ static CollectionCardVm Card(
     string? internalName = null,
     string? artKey = null,
     IReadOnlyDictionary<EEnchantmentType, CollectionCardEnchantmentFacets>? enchantments = null,
-    string? searchText = null
+    string? searchText = null,
+    CollectionMechanic mechanics = CollectionMechanic.None
 ) =>
     new()
     {
@@ -2742,6 +3241,7 @@ static CollectionCardVm Card(
         StartingTier = tier,
         Tags = tags ?? Array.Empty<ECardTag>(),
         HiddenTags = hiddenTags ?? Array.Empty<EHiddenTag>(),
+        Mechanics = mechanics,
         DisplayName = name,
         Description = description ?? string.Empty,
         InternalName = internalName ?? name,
@@ -2752,6 +3252,57 @@ static CollectionCardVm Card(
             enchantments ?? new Dictionary<EEnchantmentType, CollectionCardEnchantmentFacets>(),
         SearchText = searchText ?? string.Empty,
     };
+
+static TCardItem MechanicItemTemplate(
+    Dictionary<ETier, TCardTier> tiers,
+    Dictionary<string, TCardAbility>? abilities = null,
+    Dictionary<string, TCardAura>? auras = null,
+    Dictionary<EEnchantmentType, TEnchantment>? enchantments = null,
+    HashSet<EHiddenTag>? hiddenTags = null
+) =>
+    new()
+    {
+        Id = Guid.NewGuid(),
+        Type = ECardType.Item,
+        StartingTier = ETier.Bronze,
+        Size = ECardSize.Medium,
+        InternalName = "Multicast Projection Item",
+        ArtKey = "Assets/Cards/MulticastProjectionItem.png",
+        HiddenTags = hiddenTags ?? new HashSet<EHiddenTag>(),
+        Tiers = tiers,
+        Abilities = abilities ?? new Dictionary<string, TCardAbility>(),
+        Auras = auras ?? new Dictionary<string, TCardAura>(),
+        Enchantments = enchantments,
+    };
+
+static TCardTier Tier(
+    Dictionary<ECardAttributeType, int>? attributes = null,
+    IReadOnlyCollection<string>? abilityIds = null,
+    IReadOnlyCollection<string>? auraIds = null
+) =>
+    new()
+    {
+        Attributes = attributes ?? new Dictionary<ECardAttributeType, int>(),
+        AbilityIds = abilityIds == null ? new HashSet<string>() : new HashSet<string>(abilityIds),
+        AuraIds = auraIds == null ? new HashSet<string>() : new HashSet<string>(auraIds),
+    };
+
+static TCardAbility Ability(ITAction action, TTriggerBase? trigger = null) =>
+    new()
+    {
+        Id = Guid.NewGuid().ToString(),
+        Action = action,
+        Trigger = trigger ?? new TTriggerOnCardFired(),
+    };
+
+static TCardAura Aura(ITAuraAction action) =>
+    new() { Id = Guid.NewGuid().ToString(), Action = action };
+
+static TActionCardModifyAttribute MulticastModifier() =>
+    new() { AttributeType = ECardAttributeType.Multicast };
+
+static TAuraActionCardModifyAttribute MulticastAuraModifier() =>
+    new() { AttributeType = ECardAttributeType.Multicast };
 
 static CollectionSourceEntry Source(
     string sourceKey,

@@ -730,10 +730,18 @@ internal sealed class CollectionPanel : MonoBehaviour
             panel.RefreshView();
         }
 
-        public void ToggleKeyword(EHiddenTag keyword)
+        public void ToggleKeyword(CollectionKeywordFacetOption option)
         {
-            if (!panel._filter.Keywords.Remove(keyword))
-                panel._filter.Keywords.Add(keyword);
+            if (option.Keyword.HasValue)
+            {
+                if (!panel._filter.Keywords.Remove(option.Keyword.Value))
+                    panel._filter.Keywords.Add(option.Keyword.Value);
+            }
+            else if (option.Mechanic.HasValue)
+            {
+                if (!panel._filter.Mechanics.Remove(option.Mechanic.Value))
+                    panel._filter.Mechanics.Add(option.Mechanic.Value);
+            }
             panel._scrollY = 0f;
             panel.ApplyFilters();
             panel.RefreshView();
@@ -996,6 +1004,11 @@ internal sealed class CollectionPanel : MonoBehaviour
             _filter.Keywords.Clear();
             _filter.Keywords.UnionWith(normalization.RetainedKeywords);
         }
+        if (normalization.RetainedMechanics != null)
+        {
+            _filter.Mechanics.Clear();
+            _filter.Mechanics.UnionWith(normalization.RetainedMechanics);
+        }
     }
 
     private void RefreshView()
@@ -1005,7 +1018,7 @@ internal sealed class CollectionPanel : MonoBehaviour
 
         var profile = CollectionTabProfile.For(_filter.ActiveTab);
         var availableTags = _facetAvailability.TagsFor(_filter.ActiveType);
-        var availableKeywords = _facetAvailability.KeywordsFor(_filter.ActiveType);
+        var availableKeywordOptions = _facetAvailability.KeywordOptionsFor(_filter.ActiveType);
         var dayFilterPresentation = CollectionDayFilterPresentation.For(
             profile,
             _filter.UseRunDayFilter
@@ -1031,6 +1044,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             SelectedSizes = _filter.Sizes,
             SelectedTags = _filter.Tags,
             SelectedKeywords = _filter.Keywords,
+            SelectedMechanics = _filter.Mechanics,
             TagMatchMode = _filter.TagMatchMode,
             KeywordMatchMode = _filter.KeywordMatchMode,
             SearchExpanded = _searchMode.IsExpanded,
@@ -1046,7 +1060,7 @@ internal sealed class CollectionPanel : MonoBehaviour
             AvailableTiers = TierOrder,
             AvailableSizes = SizeOrder,
             AvailableTags = availableTags,
-            AvailableKeywords = availableKeywords,
+            AvailableKeywordOptions = availableKeywordOptions,
             AvailableSources = AvailableSourcesFor(_filter.ActiveTab),
             ContentHeight = _virtualizer.ContentHeight,
         };

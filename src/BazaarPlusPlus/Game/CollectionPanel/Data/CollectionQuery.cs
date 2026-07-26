@@ -24,12 +24,14 @@ internal sealed class CollectionFilterNormalization
     public CollectionFilterNormalization(
         bool clearSelectedSource,
         IReadOnlyCollection<ECardTag>? retainedTags,
-        IReadOnlyCollection<EHiddenTag>? retainedKeywords
+        IReadOnlyCollection<EHiddenTag>? retainedKeywords,
+        IReadOnlyCollection<CollectionMechanic>? retainedMechanics
     )
     {
         ClearSelectedSource = clearSelectedSource;
         RetainedTags = retainedTags;
         RetainedKeywords = retainedKeywords;
+        RetainedMechanics = retainedMechanics;
     }
 
     public bool ClearSelectedSource { get; }
@@ -37,6 +39,8 @@ internal sealed class CollectionFilterNormalization
     public IReadOnlyCollection<ECardTag>? RetainedTags { get; }
 
     public IReadOnlyCollection<EHiddenTag>? RetainedKeywords { get; }
+
+    public IReadOnlyCollection<CollectionMechanic>? RetainedMechanics { get; }
 }
 
 internal sealed class CollectionQueryResult
@@ -86,10 +90,11 @@ internal static class CollectionQuery
 
         var retainedTags = RetainedTags(filter, facetAvailability);
         var retainedKeywords = RetainedKeywords(filter, facetAvailability);
+        var retainedMechanics = RetainedMechanics(filter, facetAvailability);
         var queryFilter =
-            retainedTags == null && retainedKeywords == null
+            retainedTags == null && retainedKeywords == null && retainedMechanics == null
                 ? filter
-                : CloneFilter(filter, retainedTags, retainedKeywords);
+                : CloneFilter(filter, retainedTags, retainedKeywords, retainedMechanics);
 
         var sourceResolution = ResolveSelectedSource(filter, sourceCatalog);
         IReadOnlyCollection<Guid>? offeredCardIds = null;
@@ -130,7 +135,8 @@ internal static class CollectionQuery
         var normalization = new CollectionFilterNormalization(
             sourceResolution.ClearSelectedSource,
             retainedTags,
-            retainedKeywords
+            retainedKeywords,
+            retainedMechanics
         );
         return new CollectionQueryResult(ordered, offerMatchesByCardId, normalization);
     }
@@ -157,6 +163,17 @@ internal static class CollectionQuery
         return RetainedSet(filter.Keywords, facetAvailability.KeywordsFor(filter.ActiveType));
     }
 
+    private static IReadOnlyCollection<CollectionMechanic>? RetainedMechanics(
+        CollectionFilterState filter,
+        CollectionFacetAvailabilitySnapshot facetAvailability
+    )
+    {
+        var profile = CollectionTabProfile.For(filter.ActiveTab);
+        if (!profile.ShowKeywordFilter || filter.Mechanics.Count == 0)
+            return null;
+        return RetainedSet(filter.Mechanics, facetAvailability.MechanicsFor(filter.ActiveType));
+    }
+
     private static IReadOnlyCollection<T> RetainedSet<T>(
         HashSet<T> selected,
         IReadOnlyList<T> available
@@ -175,7 +192,8 @@ internal static class CollectionQuery
     private static CollectionFilterState CloneFilter(
         CollectionFilterState source,
         IReadOnlyCollection<ECardTag>? retainedTags,
-        IReadOnlyCollection<EHiddenTag>? retainedKeywords
+        IReadOnlyCollection<EHiddenTag>? retainedKeywords,
+        IReadOnlyCollection<CollectionMechanic>? retainedMechanics
     )
     {
         var clone = new CollectionFilterState
@@ -194,6 +212,7 @@ internal static class CollectionQuery
         clone.Sizes.UnionWith(source.Sizes);
         clone.Tags.UnionWith(retainedTags ?? source.Tags);
         clone.Keywords.UnionWith(retainedKeywords ?? source.Keywords);
+        clone.Mechanics.UnionWith(retainedMechanics ?? source.Mechanics);
         return clone;
     }
 
