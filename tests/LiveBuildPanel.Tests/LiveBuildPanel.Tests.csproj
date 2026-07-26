@@ -33,6 +33,10 @@
       Link="LiveBuildRefreshContinuationGate.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildHeroPresentation.cs"
+      Link="LiveBuildHeroPresentation.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveItemBoardRowVm.cs"
       Link="LiveItemBoardRowVm.cs"
     />
@@ -121,6 +125,18 @@
       Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/BppOverlaySorting.cs"
       Link="BppOverlaySorting.cs"
     />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/Colors.cs"
+      Link="Colors.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/Heroes/HeroVisual.cs"
+      Link="HeroVisual.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/Heroes/TheDragonsHeroIdentity.cs"
+      Link="TheDragonsHeroIdentity.cs"
+    />
     <Compile Include="Program.cs" />
   </ItemGroup>
 
@@ -128,6 +144,9 @@
     <ProjectReference Include="../../src/BazaarPlusPlus/BazaarPlusPlus.csproj" />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
+    </Reference>
+    <Reference Include="TheBazaarRuntime">
+      <HintPath>$(ManagedPath)/TheBazaarRuntime.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>
