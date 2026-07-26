@@ -1,6 +1,7 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
@@ -33,6 +34,9 @@ internal sealed class BuildRecommendationRepository
         BuildLiveState? liveState = null
     )
     {
+        if (!HeroVisual.IsPlayableHero(hero))
+            return Array.Empty<BuildRecommendation>();
+
         var corpus = EnsureCorpus();
         if (corpus == null)
             return Array.Empty<BuildRecommendation>();
