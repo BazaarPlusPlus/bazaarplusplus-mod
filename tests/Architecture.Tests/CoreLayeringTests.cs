@@ -702,6 +702,44 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void TheDragons_canonicalization_stays_out_of_runtime_capture_contracts()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var runProbe = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "RunSnapshot", "RunSnapshotProbe.cs")
+        );
+        var pvpCollector = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "PvpBattles", "PvpBattleSnapshotCollector.cs")
+        );
+        var heroPoolPrefs = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "Lobby",
+                "RandomHeroPool",
+                "RandomHeroPoolPlayerPrefs.cs"
+            )
+        );
+        var replayPortrait = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CombatReplay",
+                "PlaybackUi",
+                "OpponentPortraitController.cs"
+            )
+        );
+
+        Assert.Contains("RandomHeroPoolHeroIdentity.Normalize", heroPoolPrefs);
+        Assert.Contains("CombatReplayHeroIdentity.TryParse", replayPortrait);
+        Assert.DoesNotContain("TheDragonsHeroIdentity", runProbe);
+        Assert.DoesNotContain("TheDragonsHeroIdentity", pvpCollector);
+        Assert.Contains("Hero = run.Player?.Hero.ToString()", runProbe);
+        Assert.Contains("Data.Run?.Player?.Hero.ToString()", pvpCollector);
+        Assert.Contains("opponent?.Hero.ToString()", pvpCollector);
+    }
+
+    [Fact]
     public void LiveBuildPanel_owns_build_recommendation_implementation()
     {
         var repoRoot = RepoRoot();
@@ -1575,7 +1613,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void RandomHeroSkinPool_has_no_legacy_playerprefs_migration()
+    public void RandomHeroSkinPool_has_no_obsolete_prefix_playerprefs_migration()
     {
         var repoRoot = RepoRoot();
         var source = File.ReadAllText(
@@ -1662,7 +1700,12 @@ public class CoreLayeringTests
         Assert.Contains("ResolveAccountScopeForPrefs", heroPrefs);
         Assert.Contains("ResolveAccountScopeForPrefs", collectiblePrefs);
         Assert.Contains("collectionType.ToString()", collectiblePrefs);
-        Assert.Contains("hero.ToString()", collectiblePrefs);
+        Assert.Contains("TheDragonsHeroIdentity.ToCanonicalId(hero)", collectiblePrefs);
+        Assert.Contains("TheDragonsHeroIdentity.PersistenceReadIds(hero)", collectiblePrefs);
+        Assert.Contains(
+            "RandomHeroSkinPoolPreferenceMigration.LoadCanonicalFirst",
+            collectiblePrefs
+        );
     }
 
     [Fact]
