@@ -1,6 +1,7 @@
 #nullable enable
 using System.Text;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.GameInterop.Heroes;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Sources;
 
@@ -118,7 +119,11 @@ internal sealed class CollectionSourceEntry
         builder
             .Append(rule.HeroMode)
             .Append('|')
-            .Append(rule.Hero?.ToString() ?? string.Empty)
+            .Append(
+                rule.Hero.HasValue
+                    ? TheDragonsHeroIdentity.ToCanonicalId(rule.Hero.Value)
+                    : string.Empty
+            )
             .Append('|')
             .Append(rule.StartingTier?.Mode.ToString() ?? string.Empty)
             .Append(':')
