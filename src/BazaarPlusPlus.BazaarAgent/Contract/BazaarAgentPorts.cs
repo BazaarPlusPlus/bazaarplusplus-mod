@@ -44,11 +44,19 @@ public enum BazaarAgentDispatchDiagnostic
     DispatcherException,
 }
 
+public enum BazaarAgentDispatchFailureKind
+{
+    Internal,
+    Invalid,
+    Unavailable,
+}
+
 public readonly record struct BazaarAgentDispatchResult(
     bool Executed,
     string? Error,
     BazaarAgentDispatchDiagnostic Diagnostic = BazaarAgentDispatchDiagnostic.None,
-    Exception? DiagnosticException = null
+    Exception? DiagnosticException = null,
+    BazaarAgentDispatchFailureKind FailureKind = BazaarAgentDispatchFailureKind.Internal
 );
 
 public enum BazaarAgentReplayControlKind

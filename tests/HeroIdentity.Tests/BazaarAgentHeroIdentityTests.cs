@@ -1,5 +1,5 @@
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.BazaarAgentHost;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.Heroes;
 using Xunit;
 
@@ -13,30 +13,30 @@ public sealed class BazaarAgentHeroIdentityTests
     [InlineData(" hero8 ")]
     public void Both_alias_inputs_resolve_to_the_current_runtime_hero(string heroId)
     {
-        var status = BazaarAgentHeroIdentity.ResolveInput(heroId, out var hero);
+        var resolution = BazaarAgentHeroIdentity.Resolve(heroId);
 
-        Assert.Equal(BazaarAgentHeroResolveStatus.Resolved, status);
-        Assert.True(TheDragonsHeroIdentity.IsTheDragons(hero));
+        Assert.Equal(BazaarAgentHeroResolutionStatus.Resolved, resolution.Status);
+        Assert.True(TheDragonsHeroIdentity.IsTheDragons(resolution.Hero));
     }
 
     [Fact]
     public void Alias_input_reports_unavailable_when_runtime_exposes_neither_name()
     {
-        var status = BazaarAgentHeroIdentity.ResolveInput("TheDragons", _ => null, out _);
+        var resolution = BazaarAgentHeroIdentity.Resolve("TheDragons", _ => null);
 
-        Assert.Equal(BazaarAgentHeroResolveStatus.Unavailable, status);
+        Assert.Equal(BazaarAgentHeroResolutionStatus.Unavailable, resolution.Status);
     }
 
     [Fact]
     public void Invalid_input_remains_distinct_from_unavailable_alias()
     {
         Assert.Equal(
-            BazaarAgentHeroResolveStatus.Invalid,
-            BazaarAgentHeroIdentity.ResolveInput("UnknownHero", out _)
+            BazaarAgentHeroResolutionStatus.Invalid,
+            BazaarAgentHeroIdentity.Resolve("UnknownHero").Status
         );
         Assert.Equal(
-            BazaarAgentHeroResolveStatus.Invalid,
-            BazaarAgentHeroIdentity.ResolveInput(" ", out _)
+            BazaarAgentHeroResolutionStatus.Invalid,
+            BazaarAgentHeroIdentity.Resolve(" ").Status
         );
     }
 
@@ -45,7 +45,7 @@ public sealed class BazaarAgentHeroIdentityTests
     {
         Assert.True(TheDragonsHeroIdentity.TryResolve("Hero8", out var dragons));
 
-        Assert.Equal("TheDragons", BazaarAgentHeroIdentity.ToContextId(dragons));
-        Assert.Equal("Vanessa", BazaarAgentHeroIdentity.ToContextId(EHero.Vanessa));
+        Assert.Equal("TheDragons", BazaarAgentHeroIdentity.ToAgentContextId(dragons));
+        Assert.Equal("Vanessa", BazaarAgentHeroIdentity.ToAgentContextId(EHero.Vanessa));
     }
 }
