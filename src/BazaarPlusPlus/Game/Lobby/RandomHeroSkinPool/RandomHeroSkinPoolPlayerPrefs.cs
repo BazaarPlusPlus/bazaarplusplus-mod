@@ -19,35 +19,20 @@ internal static class RandomHeroSkinPoolPlayerPrefs
         var accountScope = RandomPoolPrefsHelpers.ResolveAccountScopeForPrefs(
             RandomPoolKind.Collectible
         );
-        var canonicalKey = BuildScopedPrefsKey(readIds[0], collectionType, accountScope);
-        if (PlayerPrefs.HasKey(canonicalKey))
-        {
-            return RandomPoolPrefsHelpers.LoadIdCollection(
-                canonicalKey,
-                RandomPoolKind.Collectible
-            );
-        }
-
-        for (var index = 1; index < readIds.Count; index++)
-        {
-            var legacyKey = BuildScopedPrefsKey(readIds[index], collectionType, accountScope);
-            if (!PlayerPrefs.HasKey(legacyKey))
-                continue;
-
-            var selectedIds = RandomPoolPrefsHelpers.LoadIdCollection(
-                legacyKey,
-                RandomPoolKind.Collectible
-            );
-            if (selectedIds == null)
-                return null;
-
-            RandomPoolPrefsHelpers.SaveIdCollection(canonicalKey, selectedIds);
-            PlayerPrefs.DeleteKey(legacyKey);
-            PlayerPrefs.Save();
-            return selectedIds;
-        }
-
-        return null;
+        var readKeys = readIds
+            .Select(heroId => BuildScopedPrefsKey(heroId, collectionType, accountScope))
+            .ToArray();
+        return RandomHeroSkinPoolPreferenceMigration.LoadCanonicalFirst(
+            readKeys,
+            PlayerPrefs.HasKey,
+            key => RandomPoolPrefsHelpers.LoadIdCollection(key, RandomPoolKind.Collectible),
+            (key, selectedIds) => RandomPoolPrefsHelpers.SaveIdCollection(key, selectedIds),
+            key =>
+            {
+                PlayerPrefs.DeleteKey(key);
+                PlayerPrefs.Save();
+            }
+        );
     }
 
     public static void SaveSelectedIds(

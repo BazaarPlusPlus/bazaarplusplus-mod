@@ -1,6 +1,4 @@
 #nullable enable
-using BazaarPlusPlus.GameInterop.Heroes;
-
 namespace BazaarPlusPlus.Game.Lobby.RandomHeroPool;
 
 internal static class RandomHeroPoolPlayerPrefs
@@ -20,7 +18,7 @@ internal static class RandomHeroPoolPlayerPrefs
         RandomPoolPrefsHelpers.SaveIdCollection(BuildScopedPrefsKey(), NormalizeHeroIds(heroIds));
 
     internal static string NormalizeHeroId(string heroId) =>
-        TheDragonsHeroIdentity.CanonicalizeForStorage(heroId);
+        RandomHeroPoolHeroIdentity.Normalize(heroId);
 
     public static bool TryResolveState(
         IEnumerable<string> unlockedHeroIds,

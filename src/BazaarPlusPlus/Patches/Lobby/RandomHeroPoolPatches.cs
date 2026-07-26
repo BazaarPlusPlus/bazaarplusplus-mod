@@ -218,13 +218,7 @@ internal static class RandomHeroPoolSelectRandomHeroImmediatePatch
         HeroItemView? selectedHeroView = null;
         foreach (var view in unlockedHeroViews)
         {
-            if (
-                !string.Equals(
-                    RandomHeroPoolPlayerPrefs.NormalizeHeroId(view.Hero.ToString()),
-                    selectedHeroId,
-                    StringComparison.Ordinal
-                )
-            )
+            if (!RandomHeroPoolHeroIdentity.Matches(view.Hero.ToString(), selectedHeroId))
                 continue;
 
             selectedHeroView = view;

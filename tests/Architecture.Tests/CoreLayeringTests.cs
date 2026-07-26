@@ -730,8 +730,8 @@ public class CoreLayeringTests
             )
         );
 
-        Assert.Contains("TheDragonsHeroIdentity.CanonicalizeForStorage", heroPoolPrefs);
-        Assert.Contains("TheDragonsHeroIdentity.TryResolve", replayPortrait);
+        Assert.Contains("RandomHeroPoolHeroIdentity.Normalize", heroPoolPrefs);
+        Assert.Contains("CombatReplayHeroIdentity.TryParse", replayPortrait);
         Assert.DoesNotContain("TheDragonsHeroIdentity", runProbe);
         Assert.DoesNotContain("TheDragonsHeroIdentity", pvpCollector);
         Assert.Contains("Hero = run.Player?.Hero.ToString()", runProbe);
@@ -1702,8 +1702,10 @@ public class CoreLayeringTests
         Assert.Contains("collectionType.ToString()", collectiblePrefs);
         Assert.Contains("TheDragonsHeroIdentity.ToCanonicalId(hero)", collectiblePrefs);
         Assert.Contains("TheDragonsHeroIdentity.PersistenceReadIds(hero)", collectiblePrefs);
-        Assert.Contains("SaveIdCollection(canonicalKey, selectedIds)", collectiblePrefs);
-        Assert.Contains("PlayerPrefs.DeleteKey(legacyKey)", collectiblePrefs);
+        Assert.Contains(
+            "RandomHeroSkinPoolPreferenceMigration.LoadCanonicalFirst",
+            collectiblePrefs
+        );
     }
 
     [Fact]
