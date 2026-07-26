@@ -271,6 +271,31 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
+    public void HistoryPanelDockEntry_label_follows_the_current_history_hotkey()
+    {
+        var hotkeyDisplay = "F8";
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var history = new HistoryPanelSettingsDockEntry(() => hotkeyDisplay).Build(
+                new BppConfig()
+            );
+
+            Assert.Equal("Game History (Press F8 to open)", history.ResolveLabel("en"));
+            Assert.Equal("对局历史（按 F8 打开）", history.ResolveLabel("zh-CN"));
+
+            hotkeyDisplay = "MMB";
+
+            Assert.Equal("Game History (Press MMB to open)", history.ResolveLabel("en"));
+            Assert.Equal("对局历史（按 MMB 打开）", history.ResolveLabel("zh-CN"));
+        }
+        finally
+        {
+            L.Reset();
+        }
+    }
+
+    [Fact]
     public void EndOfRunScreenshot_uses_disabled_native_toggle_while_forced()
     {
         var configPath = Path.Combine(
