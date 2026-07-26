@@ -1678,6 +1678,114 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Collection_search_replaces_the_operation_row_and_uses_embedded_svg_icons()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var treePath = Path.Combine(
+            mainSource,
+            "Game",
+            "CollectionPanel",
+            "Ui",
+            "CollectionPanelView.Tree.cs"
+        );
+        var viewPath = Path.Combine(
+            mainSource,
+            "Game",
+            "CollectionPanel",
+            "Ui",
+            "CollectionPanelView.cs"
+        );
+        var treeSource = File.ReadAllText(treePath);
+        var viewSource = File.ReadAllText(viewPath);
+        var operationRail = MethodSource(
+            treeSource,
+            "private void BuildOperationRail",
+            "private static VisualElement CreateOperationRow"
+        );
+
+        Assert.DoesNotContain("rail.Add(CreateSearchField())", operationRail);
+        Assert.Contains("_searchToggleButton = CreateSearchToggleButton();", operationRail);
+        Assert.Contains("primaryControlsRow.Add(_searchToggleButton);", operationRail);
+        Assert.Contains("_standardOperationControls", operationRail);
+        Assert.Contains("_searchInputContainer", operationRail);
+        Assert.Contains("_standardOperationControls.style.flexWrap = Wrap.NoWrap", operationRail);
+        Assert.Contains(
+            "rail.style.minWidth = Sizes.CollectionOperationRailMinWidth",
+            operationRail
+        );
+        Assert.Contains("_commands.ToggleSearch", treeSource);
+        Assert.DoesNotContain("PointerDownEvent", treeSource);
+        Assert.Contains("RegisterCallback<FocusInEvent>", treeSource);
+        Assert.Contains("RegisterCallback<FocusOutEvent>", treeSource);
+        Assert.DoesNotContain("sortGroup.style.marginTop", operationRail);
+        Assert.DoesNotContain("_dayToggleButton.style.marginTop", operationRail);
+
+        var refreshSearchMode = MethodSource(
+            viewSource,
+            "private void RefreshSearchMode(",
+            "private void ScheduleSearchFocus()"
+        );
+        Assert.Contains("SetEnabled(!model.SearchExpanded)", refreshSearchMode);
+        Assert.Contains("PickingMode.Ignore", refreshSearchMode);
+        Assert.Contains("DisplayStyle.None", refreshSearchMode);
+
+        var scheduleFocus = MethodSource(
+            viewSource,
+            "private void ScheduleSearchFocus()",
+            "private void RefreshChromeTexts("
+        );
+        Assert.Contains("_searchField.schedule.Execute", scheduleFocus);
+        Assert.Contains("_searchField.Focus();", scheduleFocus);
+        Assert.Contains("_searchField.SelectRange(end, end);", scheduleFocus);
+
+        var projectPath = Path.Combine(mainSource, "BazaarPlusPlus.csproj");
+        var project = XDocument.Load(projectPath);
+        XNamespace msbuild = project.Root?.Name.Namespace ?? XNamespace.None;
+        var embeddedResources = project
+            .Descendants(msbuild + "EmbeddedResource")
+            .Select(element => Attribute(element, "Include") ?? string.Empty)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains(@"Resources\Collection\search.svg", embeddedResources);
+        Assert.Contains(@"Resources\Collection\close.svg", embeddedResources);
+
+        var searchSvgPath = Path.Combine(mainSource, "Resources", "Collection", "search.svg");
+        var closeSvgPath = Path.Combine(mainSource, "Resources", "Collection", "close.svg");
+        foreach (var svgPath in new[] { searchSvgPath, closeSvgPath })
+        {
+            var svg = XDocument.Load(svgPath);
+            Assert.Equal("0 0 24 24", Attribute(svg.Root!, "viewBox"));
+            Assert.Equal("round", Attribute(svg.Root!, "stroke-linecap"));
+            Assert.Equal("round", Attribute(svg.Root!, "stroke-linejoin"));
+        }
+
+        Assert.DoesNotContain("Icon_RingBtn_Search_TUI", treeSource);
+        Assert.DoesNotContain("Icon_RingBtn_X_TUI", treeSource);
+    }
+
+    [Fact]
+    public void Collection_search_placeholders_are_localized_per_active_tab()
+    {
+        var textSource = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "Text",
+                "CollectionPanelText.cs"
+            )
+        );
+
+        Assert.Contains("\"Search items\"", textSource);
+        Assert.Contains("\"搜索物品\"", textSource);
+        Assert.Contains("\"搜尋物品\"", textSource);
+        Assert.Contains("\"Search skills\"", textSource);
+        Assert.Contains("\"搜索技能\"", textSource);
+        Assert.Contains("\"搜尋技能\"", textSource);
+        Assert.Contains("SearchPlaceholder(ECardType activeType)", textSource);
+    }
+
+    [Fact]
     public void Collection_title_uses_native_game_heading_typography()
     {
         var mainSource = MainSourceRoot(RepoRoot());
@@ -1689,6 +1797,9 @@ public class CoreLayeringTests
         );
         var adapterSource = File.ReadAllText(
             Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameTypography.cs")
+        );
+        var titleOverlaySource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameTitleOverlay.cs")
         );
         var colorsSource = File.ReadAllText(
             Path.Combine(mainSource, "Infrastructure", "UiTokens", "Colors.cs")
@@ -1711,6 +1822,21 @@ public class CoreLayeringTests
         Assert.Contains("NotoFontFallbackRuntime._loadedSerifPrimary", adapterSource);
         Assert.Contains("_titleOverlay.Attach(_title!)", ensureCreated);
         Assert.Contains("_titleOverlay?.SetText(model.Title)", viewSource);
+        Assert.Contains("_layoutAnchor?.schedule.Execute(SyncBounds)", titleOverlaySource);
+        Assert.Contains("if (_root.activeSelf && !_hasValidBounds)", titleOverlaySource);
+        Assert.Contains("!IsFinite(worldBound.x)", titleOverlaySource);
+        Assert.Contains("!IsFinite(worldBound.width)", titleOverlaySource);
+        Assert.Contains("!IsFinite(pixelsPerPoint)", titleOverlaySource);
+        Assert.Contains("TextOverflowModes.Masking", titleOverlaySource);
+        Assert.Contains("Mathf.Ceil(worldBound.width * pixelsPerPoint)", titleOverlaySource);
+        Assert.Contains("Mathf.Ceil(worldBound.height * pixelsPerPoint)", titleOverlaySource);
+        Assert.Contains("searchFallbacks: true", titleOverlaySource);
+        Assert.Contains("tryAddCharacter: true", titleOverlaySource);
+        Assert.Contains("_title.GetPreferredValues(_title.text)", titleOverlaySource);
+        Assert.Contains(
+            "_title.ForceMeshUpdate(ignoreActiveState: true, forceTextReparsing: true)",
+            titleOverlaySource
+        );
         Assert.Contains("FontStyle.Normal", titleStyle);
         Assert.Contains("Colors.GameTitleText", titleStyle);
         Assert.DoesNotContain("PanelFontRole.Heading", titleStyle);
