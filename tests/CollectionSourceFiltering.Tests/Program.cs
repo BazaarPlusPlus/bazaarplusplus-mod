@@ -289,6 +289,220 @@ AssertThrows<InvalidOperationException>(
     "A source template id should belong to exactly one collection source entry."
 );
 
+AssertEqual(
+    CollectionSourceHeroParseStatus.Invalid,
+    CollectionSourceHeroParser.Parse("NotARealHero").Status,
+    "Unknown hero names should remain invalid catalog data."
+);
+AssertEqual(
+    CollectionSourceHeroParseStatus.KnownButUnavailable,
+    CollectionSourceHeroParser.Parse("TheDragons", _ => null).Status,
+    "The canonical Dragons id should remain known when the current game enum does not expose it."
+);
+AssertTrue(
+    TheDragonsHeroIdentity.TryResolve(
+        TheDragonsHeroIdentity.CanonicalId,
+        out var catalogDragonsHero
+    ),
+    "The current staging enum should expose one of The Dragons aliases."
+);
+AssertEqual(
+    CollectionSourceHeroParseStatus.Resolved,
+    CollectionSourceHeroParser
+        .Parse(
+            "Hero8",
+            name =>
+                string.Equals(name, TheDragonsHeroIdentity.CanonicalId, StringComparison.Ordinal)
+                    ? catalogDragonsHero
+                    : null
+        )
+        .Status,
+    "Legacy JSON should resolve when a future runtime exposes only the canonical enum name."
+);
+AssertEqual(
+    CollectionSourceHeroParseStatus.Resolved,
+    CollectionSourceHeroParser
+        .Parse(
+            "TheDragons",
+            name =>
+                string.Equals(name, "Hero8", StringComparison.Ordinal) ? catalogDragonsHero : null
+        )
+        .Status,
+    "Canonical JSON should resolve when the current runtime exposes only the legacy enum name."
+);
+var legacyAliasSource = BuildDragonsAliasEntry(
+    "Hero8",
+    name =>
+        string.Equals(name, TheDragonsHeroIdentity.CanonicalId, StringComparison.Ordinal)
+            ? catalogDragonsHero
+            : null
+);
+var canonicalAliasSource = BuildDragonsAliasEntry(
+    "TheDragons",
+    name => string.Equals(name, "Hero8", StringComparison.Ordinal) ? catalogDragonsHero : null
+);
+AssertEqual(
+    canonicalAliasSource.SourceKey,
+    legacyAliasSource.SourceKey,
+    "Source keys should canonicalize The Dragons aliases."
+);
+AssertEqual(
+    canonicalAliasSource.OfferRuleFingerprint,
+    legacyAliasSource.OfferRuleFingerprint,
+    "Offer-rule fingerprints should canonicalize The Dragons aliases."
+);
+AssertEqual(
+    CollectionSourceOfferPoolCacheKey.Build(canonicalAliasSource, catalogDragonsHero),
+    CollectionSourceOfferPoolCacheKey.Build(legacyAliasSource, catalogDragonsHero),
+    "BPP-owned offer-pool cache keys should canonicalize source-rule aliases."
+);
+AssertTrue(
+    canonicalAliasSource.OfferRuleFingerprint.Contains(
+        TheDragonsHeroIdentity.CanonicalId,
+        StringComparison.Ordinal
+    ),
+    "The Dragons rule fingerprints should store the canonical identity."
+);
+
+var unavailableHeroCatalog = CollectionSourceCatalog.Build(
+    $$"""
+    {
+      "schemaVersion": 4,
+      "groups": ["fixture"],
+      "entries": [
+        {
+          "name": "Mixed",
+          "kind": "Merchant",
+          "group": "fixture",
+          "order": 0,
+          "availableHeroes": ["Vanessa", "TheDragons"],
+          "description": "Mixed",
+          "portraitTemplateId": "77777777-0000-0000-0000-000000000001",
+          "sourceTemplateIds": ["77777777-0000-0000-0000-000000000001"],
+          "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
+        },
+        {
+          "name": "Unavailable allowlist",
+          "kind": "Merchant",
+          "group": "fixture",
+          "order": 1,
+          "availableHeroes": ["TheDragons"],
+          "description": "Unavailable",
+          "portraitTemplateId": "77777777-0000-0000-0000-000000000002",
+          "sourceTemplateIds": ["77777777-0000-0000-0000-000000000002"],
+          "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
+        },
+        {
+          "name": "Unavailable fixed hero",
+          "kind": "Merchant",
+          "group": "fixture",
+          "order": 2,
+          "availableHeroes": [],
+          "description": "Unavailable",
+          "portraitTemplateId": "77777777-0000-0000-0000-000000000003",
+          "sourceTemplateIds": ["77777777-0000-0000-0000-000000000003"],
+          "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "TheDragons" } }]
+        },
+        {
+          "name": "Global",
+          "kind": "Merchant",
+          "group": "fixture",
+          "order": 3,
+          "availableHeroes": [],
+          "description": "Global",
+          "portraitTemplateId": "77777777-0000-0000-0000-000000000004",
+          "sourceTemplateIds": ["77777777-0000-0000-0000-000000000004"],
+          "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
+        }
+      ]
+    }
+    """,
+    _ => null
+);
+AssertValues(
+    unavailableHeroCatalog.Select(entry => entry.Name).ToArray(),
+    new[] { "Mixed", "Global" },
+    "Known-but-unavailable heroes should be removed from mixed allowlists, while all-unavailable allowlists and fixed-hero entries are skipped."
+);
+AssertValues(
+    unavailableHeroCatalog.Single(entry => entry.Name == "Mixed").AvailableHeroes.ToArray(),
+    new[] { EHero.Vanessa },
+    "Mixed allowlists should retain their resolved heroes."
+);
+AssertEqual(
+    0,
+    unavailableHeroCatalog.Single(entry => entry.Name == "Global").AvailableHeroes.Count,
+    "A truly empty allowlist should preserve global visibility."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        CollectionSourceCatalog.Build(
+            """
+            {
+              "schemaVersion": 4,
+              "groups": ["fixture"],
+              "entries": [
+                {
+                  "name": "Invalid hero",
+                  "kind": "Merchant",
+                  "group": "fixture",
+                  "order": 0,
+                  "availableHeroes": ["NotARealHero"],
+                  "description": "Invalid",
+                  "portraitTemplateId": "77777777-0000-0000-0000-000000000005",
+                  "sourceTemplateIds": ["77777777-0000-0000-0000-000000000005"],
+                  "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "SelectedHero" } }]
+                }
+              ]
+            }
+            """,
+            _ => null
+        ),
+    "Invalid hero configuration should fail the whole catalog instead of being skipped."
+);
+AssertThrows<InvalidOperationException>(
+    () => BuildHeroFieldCatalog(CollectionSourceHeroMode.AllHeroes, "TheDragons", _ => null),
+    "Known-but-unavailable hero fields should skip only FixedHero entries, not relax other rule modes."
+);
+AssertThrows<InvalidOperationException>(
+    () => BuildHeroFieldCatalog(CollectionSourceHeroMode.FixedHero, "NotARealHero", _ => null),
+    "Invalid FixedHero configuration should fail instead of being treated as unavailable."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        BuildHeroValidationCatalog(
+            """["TheDragons"]""",
+            """[{ "key": "invalid", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "NotARealHero" } }]"""
+        ),
+    "An all-unavailable explicit allowlist should not mask an invalid hero in its offer rules."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        BuildHeroValidationCatalog(
+            "[]",
+            """
+            [
+              { "key": "unavailable", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "TheDragons" } },
+              { "key": "invalid", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "NotARealHero" } }
+            ]
+            """
+        ),
+    "An unavailable FixedHero segment should not mask an invalid hero in a later segment."
+);
+AssertThrows<InvalidOperationException>(
+    () =>
+        BuildHeroValidationCatalog(
+            "[]",
+            """
+            [
+              { "key": "invalid", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "NotARealHero" } },
+              { "key": "unavailable", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "TheDragons" } }
+            ]
+            """
+        ),
+    "Invalid hero validation should be independent of segment ordering."
+);
+
 var currentCatalogPath = Path.Combine(
     "src",
     "BazaarPlusPlus",
@@ -299,19 +513,19 @@ var currentCatalogPath = Path.Combine(
 var currentCatalogJson = File.ReadAllText(currentCatalogPath);
 var currentCatalog = CollectionSourceCatalog.Build(currentCatalogJson);
 AssertEqual(
-    71,
+    73,
     currentCatalog.Count,
-    "Current source catalog should include the 71 known sources after adding Private Pitchfork and Stickybeans."
+    "Current source catalog should include the 73 verified sources after adding The Dragons and Mama Bear."
 );
 AssertEqual(
-    49,
+    50,
     currentCatalog.Count(entry => entry.Kind == CollectionSourceKind.Merchant),
-    "Current source catalog should include the 49 known merchants."
+    "Current source catalog should include the 50 verified merchants."
 );
 AssertEqual(
-    22,
+    23,
     currentCatalog.Count(entry => entry.Kind == CollectionSourceKind.Trainer),
-    "Current source catalog should preserve the 22 known trainers."
+    "Current source catalog should include the 23 verified trainers."
 );
 AssertTrue(
     currentCatalog.Any(entry =>
@@ -323,13 +537,146 @@ AssertTrue(
     ),
     "Default selected merchant source key should exist in the current source catalog."
 );
+var aimbot = currentCatalog.Single(entry =>
+    entry.Kind == CollectionSourceKind.Merchant
+    && string.Equals(entry.Name, "Aimbot", StringComparison.Ordinal)
+);
+AssertEqual(
+    7,
+    aimbot.AvailableHeroes.Count,
+    "Aimbot's package-return schedule should keep its six existing heroes plus The Dragons."
+);
 AssertTrue(
-    currentCatalog.Any(entry =>
-        entry.Kind == CollectionSourceKind.Merchant
-        && string.Equals(entry.Name, "Aimbot", StringComparison.Ordinal)
-        && entry.AppliesToHero(EHero.Stelle)
-    ),
-    "Aimbot should be visible for Stelle after the v4 source-catalog migration."
+    aimbot.AppliesToHero(catalogDragonsHero)
+        && !aimbot.AppliesToHero(EHero.Common)
+        && !aimbot.AppliesToHero(EHero.Pygmalien),
+    "Aimbot should be available for The Dragons while remaining hidden in neutral and Pygmalien contexts."
+);
+var auditedDragonsSources = new[]
+{
+    "Dooley",
+    "Jules",
+    "Karnok",
+    "Kev's Armory",
+    "Herma",
+    "Mak",
+    "Pygmalien",
+    "Stelle",
+    "The Tester",
+    "Tok's Clocks",
+    "Vanessa",
+    "Fortis",
+    "Regenald",
+    "Slohmor Lumbra",
+    "Vermir",
+    "Zara",
+};
+foreach (var sourceName in auditedDragonsSources)
+{
+    AssertTrue(
+        currentCatalog.Any(entry =>
+            string.Equals(entry.Name, sourceName, StringComparison.Ordinal)
+            && entry.AppliesToHero(catalogDragonsHero)
+        ),
+        $"{sourceName} should be visible for The Dragons after the static-source audit."
+    );
+}
+var dragonsMerchant = currentCatalog.Single(entry =>
+    entry.Kind == CollectionSourceKind.Merchant
+    && string.Equals(entry.Name, "The Dragons", StringComparison.Ordinal)
+);
+AssertEqual(
+    Guid.Parse("85cdd52b-12c2-4b64-b308-a5788f791b81"),
+    dragonsMerchant.PortraitTemplateId,
+    "The Dragons merchant should use its stable encounter template id."
+);
+AssertEqual(
+    CollectionSourceHeroMode.FixedHero,
+    PrimaryRule(dragonsMerchant).HeroMode,
+    "The Dragons merchant should expose the hero's own item pool."
+);
+AssertEqual(
+    catalogDragonsHero,
+    PrimaryRule(dragonsMerchant).Hero,
+    "The Dragons merchant fixed-hero rule should resolve through the canonical identity."
+);
+AssertValues(
+    dragonsMerchant.AvailableHeroes.ToArray(),
+    CollectionHeroSelectionRoster.BaseConcreteHeroes.ToArray(),
+    "The Dragons merchant should be visible to the seven other concrete heroes."
+);
+AssertEqual(
+    "other-hero",
+    dragonsMerchant.Group,
+    "The Dragons merchant should use the established other-hero source group."
+);
+AssertEqual(
+    7,
+    dragonsMerchant.Order,
+    "The Dragons merchant should follow the seven existing hero merchants."
+);
+var dragonsOnlyItem = CatalogCard(
+    Guid.Parse("eeee4444-0000-0000-0000-000000000001"),
+    ECardType.Item,
+    [catalogDragonsHero]
+);
+var dragonsSharedItem = CatalogCard(
+    Guid.Parse("eeee4444-0000-0000-0000-000000000002"),
+    ECardType.Item,
+    [catalogDragonsHero, EHero.Vanessa]
+);
+var vanessaOnlyItem = CatalogCard(
+    Guid.Parse("eeee4444-0000-0000-0000-000000000003"),
+    ECardType.Item,
+    [EHero.Vanessa]
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(
+            dragonsMerchant,
+            EHero.Vanessa,
+            new[] { dragonsOnlyItem, dragonsSharedItem, vanessaOnlyItem }
+        )
+        .OfferedCardIds,
+    new[] { dragonsOnlyItem.Id, dragonsSharedItem.Id },
+    "The Dragons merchant should offer every item that belongs to The Dragons."
+);
+var mamaBear = currentCatalog.Single(entry =>
+    entry.Kind == CollectionSourceKind.Trainer
+    && string.Equals(entry.Name, "Mama Bear", StringComparison.Ordinal)
+);
+AssertEqual(
+    Guid.Parse("386dd351-d08e-49a5-9a38-52c4e73d45b2"),
+    mamaBear.PortraitTemplateId,
+    "Mama Bear should use the stable level-up trainer template id."
+);
+AssertValues(
+    mamaBear.AvailableHeroes.ToArray(),
+    new[] { catalogDragonsHero },
+    "Mama Bear should be visible only for The Dragons."
+);
+AssertEqual(
+    catalogDragonsHero,
+    PrimaryRule(mamaBear).Hero,
+    "Mama Bear should teach skills exclusive to The Dragons."
+);
+AssertEqual(7, mamaBear.Order, "Mama Bear should follow the seven existing hero trainers.");
+var dragonsOnlySkill = CatalogCard(
+    Guid.Parse("eeee5555-0000-0000-0000-000000000001"),
+    ECardType.Skill,
+    [catalogDragonsHero]
+);
+var dragonsSharedSkill = CatalogCard(
+    Guid.Parse("eeee5555-0000-0000-0000-000000000002"),
+    ECardType.Skill,
+    [catalogDragonsHero, EHero.Vanessa]
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(mamaBear, catalogDragonsHero, new[] { dragonsOnlySkill, dragonsSharedSkill })
+        .OfferedCardIds,
+    new[] { dragonsOnlySkill.Id },
+    "Mama Bear should match only skills exclusive to The Dragons."
 );
 var theTester = currentCatalog.Single(entry =>
     entry.Kind == CollectionSourceKind.Merchant
@@ -337,8 +684,8 @@ var theTester = currentCatalog.Single(entry =>
 );
 AssertValues(
     theTester.AvailableHeroes.ToArray(),
-    new[] { EHero.Dooley, EHero.Stelle },
-    "The Tester should only be visible for Dooley and Stelle."
+    new[] { EHero.Dooley, EHero.Stelle, catalogDragonsHero },
+    "The Tester should be visible for Dooley, Stelle, and The Dragons."
 );
 var testerDooleyTech = CatalogCard(
     Guid.Parse("dddd1111-0000-0000-0000-000000000001"),
@@ -470,8 +817,18 @@ AssertValues(
         EHero.Mak,
         EHero.Stelle,
         EHero.Jules,
+        catalogDragonsHero,
     },
-    "Stickybeans should be visible for concrete heroes and hidden for Common."
+    "Stickybeans should be visible for all eight concrete heroes and hidden for Common."
+);
+AssertTrue(
+    stickybeans.AppliesToHero(catalogDragonsHero) && !stickybeans.IsVisibleForHero(EHero.Common),
+    "Stickybeans' Common card identity should not override its ExcludePlayerHero schedule semantics in the neutral rail."
+);
+AssertEqual(
+    8,
+    stickybeans.Order,
+    "Stickybeans should follow The Dragons after the seven existing hero merchants."
 );
 var stickybeansCommon = CatalogCard(
     Guid.Parse("eeee2222-0000-0000-0000-000000000001"),
@@ -515,6 +872,73 @@ AssertSet(
         .OfferedCardIds,
     new[] { stickybeansDooley.Id, stickybeansSharedOther.Id },
     "Stickybeans should offer non-Common items that do not include the selected UI hero."
+);
+var stickybeansDragons = CatalogCard(
+    Guid.Parse("eeee2222-0000-0000-0000-000000000006"),
+    ECardType.Item,
+    [catalogDragonsHero]
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(
+            stickybeans,
+            catalogDragonsHero,
+            new[] { stickybeansCommon, stickybeansVanessa, stickybeansDragons }
+        )
+        .OfferedCardIds,
+    new[] { stickybeansVanessa.Id },
+    "Stickybeans should offer other-hero items for The Dragons while excluding Common and The Dragons items."
+);
+var aimbotDragonsCrit = CatalogCard(
+    Guid.Parse("eeee3333-0000-0000-0000-000000000010"),
+    ECardType.Item,
+    [catalogDragonsHero],
+    hiddenTags: [EHiddenTag.Crit]
+);
+var aimbotVanessaCrit = CatalogCard(
+    Guid.Parse("eeee3333-0000-0000-0000-000000000011"),
+    ECardType.Item,
+    [EHero.Vanessa],
+    hiddenTags: [EHiddenTag.Crit]
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(aimbot, catalogDragonsHero, new[] { aimbotDragonsCrit, aimbotVanessaCrit })
+        .OfferedCardIds,
+    new[] { aimbotDragonsCrit.Id, aimbotVanessaCrit.Id },
+    "Aimbot should preserve its AllHeroes Crit pool when The Dragons is selected."
+);
+var malafang = currentCatalog.Single(entry =>
+    entry.Kind == CollectionSourceKind.Trainer
+    && string.Equals(entry.Name, "Malafang", StringComparison.Ordinal)
+);
+AssertEqual(
+    8,
+    malafang.AvailableHeroes.Count,
+    "Malafang's trainer schedule should cover all eight concrete heroes."
+);
+var malafangNeutralBurn = CatalogCard(
+    Guid.Parse("eeee3333-0000-0000-0000-000000000001"),
+    ECardType.Skill,
+    [EHero.Common],
+    hiddenTags: [EHiddenTag.Burn]
+);
+var malafangDragonsBurn = CatalogCard(
+    Guid.Parse("eeee3333-0000-0000-0000-000000000002"),
+    ECardType.Skill,
+    [catalogDragonsHero],
+    hiddenTags: [EHiddenTag.Burn]
+);
+AssertTrue(
+    malafang.AppliesToHero(catalogDragonsHero) && !malafang.IsVisibleForHero(EHero.Common),
+    "Malafang should be visible for The Dragons but hidden in the neutral rail."
+);
+AssertSet(
+    CollectionSourceOfferPoolResolver
+        .Resolve(malafang, catalogDragonsHero, new[] { malafangNeutralBurn, malafangDragonsBurn })
+        .OfferedCardIds,
+    new[] { malafangDragonsBurn.Id },
+    "Malafang should resolve The Dragons Burn skill pool when that hero is selected."
 );
 AssertEqual(
     currentCatalog.Count,
@@ -586,8 +1010,8 @@ AssertNondecreasing(
 );
 AssertValues(
     FirstGroupLayerCounts(vanessaMerchantRoster, 4),
-    new[] { 3, 6, 6, 7 },
-    "The visible Vanessa merchant roster should preserve the locked 3/6/6/7 top layers."
+    new[] { 3, 6, 6, 8 },
+    "The visible Vanessa merchant roster should add The Dragons to the other-hero layer."
 );
 AssertValues(
     vanessaMerchantRoster.Where(item => item.BreakAfter).Select(item => item.Entry.Group).ToArray(),
@@ -610,6 +1034,75 @@ AssertEqual(
     0,
     vanessaTrainerRoster.Count(item => item.BreakAfter),
     "Trainer roster should not force row breaks because its first row self-aligns to six chips."
+);
+var neutralOtherHeroSources = CollectionSourceCatalog
+    .VisibleEntries(currentCatalog, CollectionSourceKind.Merchant, EHero.Common)
+    .Where(entry => entry.Group == "other-hero")
+    .ToArray();
+AssertEqual(
+    0,
+    neutralOtherHeroSources.Length,
+    "The neutral source rail should hide fixed-hero merchants and Stickybeans."
+);
+var dragonsOtherHeroSources = CollectionSourceRoster
+    .Build(
+        CollectionSourceCatalog
+            .VisibleEntries(currentCatalog, CollectionSourceKind.Merchant, catalogDragonsHero)
+            .Where(entry => entry.Group == "other-hero")
+    )
+    .Select(item => item.Entry.Name)
+    .ToArray();
+AssertValues(
+    dragonsOtherHeroSources,
+    new[] { "Vanessa", "Dooley", "Pygmalien", "Karnok", "Mak", "Stelle", "Jules", "Stickybeans" },
+    "The Dragons source rail should show the seven other hero merchants followed by Stickybeans."
+);
+var vanessaOtherHeroSources = CollectionSourceRoster
+    .Build(
+        CollectionSourceCatalog
+            .VisibleEntries(currentCatalog, CollectionSourceKind.Merchant, EHero.Vanessa)
+            .Where(entry => entry.Group == "other-hero")
+    )
+    .Select(item => item.Entry.Name)
+    .ToArray();
+AssertValues(
+    vanessaOtherHeroSources,
+    new[]
+    {
+        "Dooley",
+        "Pygmalien",
+        "Karnok",
+        "Mak",
+        "Stelle",
+        "Jules",
+        "The Dragons",
+        "Stickybeans",
+    },
+    "An existing hero's source rail should insert The Dragons after the seven legacy hero merchants and before Stickybeans."
+);
+var dragonsTrainerRoster = CollectionSourceRoster.Build(
+    CollectionSourceCatalog.VisibleEntries(
+        currentCatalog,
+        CollectionSourceKind.Trainer,
+        catalogDragonsHero
+    )
+);
+AssertValues(
+    dragonsTrainerRoster.Take(2).Select(item => item.Entry.Name).ToArray(),
+    new[] { "Mama Bear", "Nufu" },
+    "The Dragons trainer rail should start with Mama Bear and then the global trainer sequence."
+);
+AssertFalse(
+    CollectionSourceCatalog
+        .VisibleEntries(currentCatalog, CollectionSourceKind.Trainer, EHero.Common)
+        .Any(entry => entry.Name == "Malafang"),
+    "The neutral trainer rail should hide Malafang because its schedule requires a concrete player hero."
+);
+AssertFalse(
+    CollectionSourceCatalog
+        .VisibleEntries(currentCatalog, CollectionSourceKind.Trainer, EHero.Common)
+        .Any(entry => entry.Name == "Mama Bear"),
+    "The neutral trainer rail should hide Mama Bear."
 );
 
 var openOutsideRun = CollectionPanelOpenSelectionResolver.Resolve(
@@ -1596,6 +2089,99 @@ static CollectionSourceEntry BuildSingleEntry(
         name,
         kind,
         $$"""[{ "key": "normal", "kind": "Normal", "rule": {{offerRuleJson}} }]"""
+    );
+}
+
+static CollectionSourceEntry BuildDragonsAliasEntry(
+    string heroAlias,
+    Func<string, EHero?> resolveExactHeroName
+)
+{
+    const string sourceId = "77777777-0000-0000-0000-000000000006";
+    return CollectionSourceCatalog
+        .Build(
+            $$"""
+            {
+              "schemaVersion": 4,
+              "groups": ["fixture"],
+              "entries": [
+                {
+                  "name": "Alias source",
+                  "kind": "Merchant",
+                  "group": "fixture",
+                  "order": 0,
+                  "availableHeroes": ["{{heroAlias}}"],
+                  "description": "Alias fixture",
+                  "portraitTemplateId": "{{sourceId}}",
+                  "sourceTemplateIds": ["{{sourceId}}"],
+                  "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "FixedHero", "hero": "{{heroAlias}}" } }]
+                }
+              ]
+            }
+            """,
+            resolveExactHeroName
+        )
+        .Single();
+}
+
+static IReadOnlyList<CollectionSourceEntry> BuildHeroFieldCatalog(
+    CollectionSourceHeroMode heroMode,
+    string hero,
+    Func<string, EHero?> resolveExactHeroName
+)
+{
+    const string sourceId = "77777777-0000-0000-0000-000000000007";
+    return CollectionSourceCatalog.Build(
+        $$"""
+        {
+          "schemaVersion": 4,
+          "groups": ["fixture"],
+          "entries": [
+            {
+              "name": "Hero field",
+              "kind": "Merchant",
+              "group": "fixture",
+              "order": 0,
+              "availableHeroes": [],
+              "description": "Hero field fixture",
+              "portraitTemplateId": "{{sourceId}}",
+              "sourceTemplateIds": ["{{sourceId}}"],
+              "offerSegments": [{ "key": "normal", "kind": "Normal", "rule": { "heroMode": "{{heroMode}}", "hero": "{{hero}}" } }]
+            }
+          ]
+        }
+        """,
+        resolveExactHeroName
+    );
+}
+
+static IReadOnlyList<CollectionSourceEntry> BuildHeroValidationCatalog(
+    string availableHeroesJson,
+    string offerSegmentsJson
+)
+{
+    const string sourceId = "77777777-0000-0000-0000-000000000008";
+    return CollectionSourceCatalog.Build(
+        $$"""
+        {
+          "schemaVersion": 4,
+          "groups": ["fixture"],
+          "entries": [
+            {
+              "name": "Validation order",
+              "kind": "Merchant",
+              "group": "fixture",
+              "order": 0,
+              "availableHeroes": {{availableHeroesJson}},
+              "description": "Validation order fixture",
+              "portraitTemplateId": "{{sourceId}}",
+              "sourceTemplateIds": ["{{sourceId}}"],
+              "offerSegments": {{offerSegmentsJson}}
+            }
+          ]
+        }
+        """,
+        _ => null
     );
 }
 
