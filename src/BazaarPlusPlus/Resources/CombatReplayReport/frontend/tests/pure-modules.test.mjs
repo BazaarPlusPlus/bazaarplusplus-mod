@@ -1076,6 +1076,28 @@ test("entity activity separates structural attribute deltas and destroy actions"
   assert.equal(rowById.get(target.id)?.amounts.cooldownReduction, 10);
   assert.equal(rowById.get(target.id)?.amounts.multicast, -1);
   assert.equal(rowById.get(target.id)?.counts.multicast, 1);
+  assert.deepEqual(
+    rowById.get(target.id)?.amountDetails.damageModifier,
+    {
+      increaseAmount: 20,
+      increaseCount: 1,
+      decreaseAmount: 0,
+      decreaseCount: 0,
+      firstRecordedValue: 10,
+      lastRecordedValue: 30,
+    },
+  );
+  assert.deepEqual(
+    rowById.get(target.id)?.amountDetails.multicast,
+    {
+      increaseAmount: 0,
+      increaseCount: 0,
+      decreaseAmount: -1,
+      decreaseCount: 1,
+      firstRecordedValue: 2,
+      lastRecordedValue: 1,
+    },
+  );
 });
 
 test("recording sync interpolates and clamps in both directions", () => {

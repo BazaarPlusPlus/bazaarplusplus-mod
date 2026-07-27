@@ -14,6 +14,20 @@ import {
   TooltipTrigger,
 } from "../ui/tooltip.tsx";
 
+function formatActivityAmount(
+  column: ActivityColumn,
+  value: number,
+  signed: boolean,
+): string {
+  const formatted =
+    column.unit === "ms"
+      ? formatMilliseconds(value)
+      : column.unit === "percent"
+        ? `${formatCompactNumber(value)}%`
+        : formatCompactNumber(value);
+  return signed && value > 0 ? `+${formatted}` : formatted;
+}
+
 export function ActivityValue({
   row,
   column,
@@ -25,18 +39,43 @@ export function ActivityValue({
 }): React.JSX.Element {
   const count = row.counts[column.key] ?? 0;
   const amount = row.amounts[column.key] ?? 0;
+  const details = row.amountDetails[column.key];
   const quantified = row.quantifiedCounts[column.key] ?? 0;
   const partial = quantified > 0 && quantified < count;
-  const unsignedAmount =
-    column.unit === "ms"
-      ? formatMilliseconds(amount)
-      : column.unit === "percent"
-        ? `${formatCompactNumber(amount)}%`
-        : formatCompactNumber(amount);
-  const formattedAmount =
-    column.aggregation === "signed" && amount > 0
-      ? `+${unsignedAmount}`
-      : unsignedAmount;
+  const signed = column.aggregation === "signed";
+  const formattedAmount = formatActivityAmount(column, amount, signed);
+  const averageAmount = quantified > 0 ? amount / quantified : 0;
+  const formattedAverage = formatActivityAmount(
+    column,
+    averageAmount,
+    signed,
+  );
+  const hasRecordedRange =
+    signed
+    && details?.firstRecordedValue !== null
+    && details?.firstRecordedValue !== undefined
+    && details.lastRecordedValue !== null;
+  const recordedRange = hasRecordedRange
+    ? `${
+      formatActivityAmount(column, details.firstRecordedValue ?? 0, false)
+    } → ${
+      formatActivityAmount(column, details.lastRecordedValue ?? 0, false)
+    }`
+    : "";
+  const increaseAmount = details?.increaseAmount ?? 0;
+  const increaseCount = details?.increaseCount ?? 0;
+  const decreaseAmount = details?.decreaseAmount ?? 0;
+  const decreaseCount = details?.decreaseCount ?? 0;
+  const formattedIncrease = formatActivityAmount(
+    column,
+    increaseAmount,
+    true,
+  );
+  const formattedDecrease = formatActivityAmount(
+    column,
+    decreaseAmount,
+    true,
+  );
   const partialPrefix =
     partial && column.aggregation === "absolute" ? "≥" : "";
   const metricLabel = t(column.label);
@@ -46,6 +85,9 @@ export function ActivityValue({
       : "activityAmount",
   );
   const countLabel = t("activityCount");
+  const averageLabel = t(
+    signed ? "activityAverageChange" : "activityAverageAmount",
+  );
   const coverage = t("activityQuantifiedCoverage")
     .replace("{known}", formatNumber(quantified))
     .replace("{total}", formatNumber(count));
@@ -54,6 +96,20 @@ export function ActivityValue({
     column.quantitative && quantified > 0
       ? `${amountLabel} ${partialPrefix}${formattedAmount}`
       : "",
+    hasRecordedRange
+      ? `${t("activityRecordedValue")} ${recordedRange}`
+      : "",
+    increaseCount > 0
+      ? `${t("activityIncreases")} ${formattedIncrease} ×${
+        formatNumber(increaseCount)
+      }`
+      : "",
+    decreaseCount > 0
+      ? `${t("activityDecreases")} ${formattedDecrease} ×${
+        formatNumber(decreaseCount)
+      }`
+      : "",
+    quantified > 1 ? `${averageLabel} ${formattedAverage}` : "",
     `${countLabel} ${formatNumber(count)}`,
   ]
     .filter(Boolean)
@@ -121,8 +177,70 @@ export function ActivityValue({
               </dd>
             </>
           )}
+          {hasRecordedRange && (
+            <>
+              <dt className="text-micro text-muted-foreground">
+                {t("activityRecordedValue")}
+              </dt>
+              <dd
+                className="text-right font-mono text-compact font-semibold tabular-nums text-foreground"
+                data-bpp-test-id="statistics-activity-recorded-range"
+              >
+                {recordedRange}
+              </dd>
+            </>
+          )}
+          {increaseCount > 0 && (
+            <>
+              <dt className="text-micro text-muted-foreground">
+                {t("activityIncreases")}
+              </dt>
+              <dd
+                className="inline-flex items-baseline justify-end gap-1.5 text-right font-mono tabular-nums text-foreground"
+                data-bpp-test-id="statistics-activity-increase"
+              >
+                <strong className="text-compact text-success">
+                  {formattedIncrease}
+                </strong>
+                <small className="text-nano text-muted-foreground">
+                  ×{formatNumber(increaseCount)}
+                </small>
+              </dd>
+            </>
+          )}
+          {decreaseCount > 0 && (
+            <>
+              <dt className="text-micro text-muted-foreground">
+                {t("activityDecreases")}
+              </dt>
+              <dd
+                className="inline-flex items-baseline justify-end gap-1.5 text-right font-mono tabular-nums text-foreground"
+                data-bpp-test-id="statistics-activity-decrease"
+              >
+                <strong className="text-compact text-destructive">
+                  {formattedDecrease}
+                </strong>
+                <small className="text-nano text-muted-foreground">
+                  ×{formatNumber(decreaseCount)}
+                </small>
+              </dd>
+            </>
+          )}
+          {quantified > 1 && (
+            <>
+              <dt className="text-micro text-muted-foreground">
+                {averageLabel}
+              </dt>
+              <dd
+                className="text-right font-mono text-compact font-semibold tabular-nums text-foreground"
+                data-bpp-test-id="statistics-activity-average"
+              >
+                {formattedAverage}
+              </dd>
+            </>
+          )}
           <dt className="text-micro text-muted-foreground">{countLabel}</dt>
-          <dd className="text-right font-mono text-compact font-semibold text-foreground">
+          <dd className="text-right font-mono text-compact font-semibold tabular-nums text-foreground">
             {formatNumber(count)}
           </dd>
         </dl>

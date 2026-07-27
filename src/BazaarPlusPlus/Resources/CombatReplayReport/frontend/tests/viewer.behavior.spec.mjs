@@ -2906,6 +2906,25 @@ test("renders destroy and structural attributes consistently across timeline, in
   await expect(
     zarlicRow.getByTestId("statistics-activity-value-multicast"),
   ).toContainText("-1");
+  await zarlicRow
+    .getByTestId("statistics-activity-value-multicast")
+    .hover();
+  const activityTooltip = page.locator(
+    '[data-bpp-test-id="statistics-activity-cell-tooltip"]:not([data-state="closed"])',
+  );
+  await expect(activityTooltip).toBeVisible();
+  await expect(activityTooltip).toContainText("Net change");
+  await expect(activityTooltip).toContainText("First → last");
+  await expect(
+    activityTooltip.getByTestId("statistics-activity-recorded-range"),
+  ).toHaveText("2 → 1");
+  await expect(activityTooltip).toContainText("Decreases");
+  await expect(
+    activityTooltip.getByTestId("statistics-activity-decrease"),
+  ).toContainText("-1");
+  await expect(
+    activityTooltip.getByTestId("statistics-activity-decrease"),
+  ).toContainText("×1");
 
   const sorbetRow = page
     .locator("[data-bpp-test-id^='statistics-activity-row-']")

@@ -240,6 +240,15 @@ export interface CombatStatistics {
   damageTypes: Record<CombatSide, DamageTypes>;
 }
 
+export interface ActivityAmountDetails {
+  increaseAmount: number;
+  increaseCount: number;
+  decreaseAmount: number;
+  decreaseCount: number;
+  firstRecordedValue: number | null;
+  lastRecordedValue: number | null;
+}
+
 export function buildStatistics(model: StatisticsModel): CombatStatistics {
   const output: Record<CombatSide, number[]> = {
     player: [0, 0, 0, 0, 0, 0],
@@ -330,6 +339,7 @@ export interface EntityActivityRow {
   triggers: number;
   counts: Record<string, number>;
   amounts: Record<string, number>;
+  amountDetails: Record<string, ActivityAmountDetails>;
   quantifiedCounts: Record<string, number>;
 }
 
@@ -373,10 +383,19 @@ export function buildEntityActivity(
     if (!isActivityEntity(entity) || rows.has(entity.id)) continue;
     const counts: Record<string, number> = {};
     const amounts: Record<string, number> = {};
+    const amountDetails: Record<string, ActivityAmountDetails> = {};
     const quantifiedCounts: Record<string, number> = {};
     for (const column of ACTIVITY_COLUMNS) {
       counts[column.key] = 0;
       amounts[column.key] = 0;
+      amountDetails[column.key] = {
+        increaseAmount: 0,
+        increaseCount: 0,
+        decreaseAmount: 0,
+        decreaseCount: 0,
+        firstRecordedValue: null,
+        lastRecordedValue: null,
+      };
       quantifiedCounts[column.key] = 0;
     }
     rows.set(entity.id, {
@@ -385,6 +404,7 @@ export function buildEntityActivity(
       triggers: 0,
       counts,
       amounts,
+      amountDetails,
       quantifiedCounts,
     });
   }
@@ -406,6 +426,35 @@ export function buildEntityActivity(
     row.amounts[columnKey] +=
       column.aggregation === "signed" ? value : Math.abs(value);
     row.quantifiedCounts[columnKey] += count;
+    if (column.aggregation !== "signed") return;
+
+    const details = row.amountDetails[columnKey];
+    if (!details) return;
+    if (value > 0) {
+      details.increaseAmount += value;
+      details.increaseCount += count;
+    } else if (value < 0) {
+      details.decreaseAmount += value;
+      details.decreaseCount += count;
+    }
+
+    const previousValue = asFiniteNumber(
+      event.previousValue,
+      Number.NaN,
+    );
+    const currentValue = asFiniteNumber(
+      event.currentValue,
+      Number.NaN,
+    );
+    if (
+      details.firstRecordedValue === null
+      && Number.isFinite(previousValue)
+    ) {
+      details.firstRecordedValue = previousValue;
+    }
+    if (Number.isFinite(currentValue)) {
+      details.lastRecordedValue = currentValue;
+    }
   };
 
   for (const event of model.events) {
