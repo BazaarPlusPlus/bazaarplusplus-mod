@@ -72,6 +72,38 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void UploadArmRequested_lives_in_Game_Upload_not_Core_Events()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var eventPath = Path.Combine(mainSource, "Game", "Upload", "UploadArmRequested.cs");
+        Assert.True(
+            File.Exists(eventPath),
+            "UploadArmRequested must live under Game/Upload (UploadFeedKind is Game-layer)."
+        );
+
+        var source = File.ReadAllText(eventPath);
+        Assert.Contains("namespace BazaarPlusPlus.Game.Upload", source, StringComparison.Ordinal);
+        Assert.Contains("class UploadArmRequested", source, StringComparison.Ordinal);
+
+        var coreEventsDir = Path.Combine(mainSource, "Core", "Events");
+        Assert.True(Directory.Exists(coreEventsDir), "Core/Events directory must exist.");
+        foreach (
+            var file in Directory.EnumerateFiles(coreEventsDir, "*.cs", SearchOption.AllDirectories)
+        )
+        {
+            var text = File.ReadAllText(file);
+            Assert.DoesNotContain("UploadArmRequested", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("UploadFeedKind", text, StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                "using BazaarPlusPlus.Game.Upload",
+                text,
+                StringComparison.Ordinal
+            );
+        }
+    }
+
+    [Fact]
     public void CollectionPanel_does_not_depend_on_HistoryPanel_preview_internals()
     {
         var repoRoot = RepoRoot();

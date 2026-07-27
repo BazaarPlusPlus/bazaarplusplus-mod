@@ -158,7 +158,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_voiceSubtitlesModule);
         _featureRegistry.Register(_runLoggingModule);
 
-        _settingsDockRegistry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create(_eventBus));
         _settingsDockRegistry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(_settingsDockRegistry);
         _settingsDockRegistry.Register(ChineseLocaleModeSettingsDockEntry.Create(_eventBus));
