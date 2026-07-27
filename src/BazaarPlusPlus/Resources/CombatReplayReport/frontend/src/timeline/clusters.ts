@@ -1,4 +1,5 @@
 import { asFiniteNumber } from "../model/value.ts";
+import { eventDamageKind } from "../model/damage-semantics.ts";
 import {
   normalizeMetricName,
   type NormalizedEntity,
@@ -156,6 +157,17 @@ export function eventKindToken(
   event: Pick<NormalizedEvent, "kind" | "action">,
 ): string {
   return kindToken(`${event.kind} ${event.action}`);
+}
+
+export function timelineEventToken(
+  event: Pick<NormalizedEvent, "kind" | "action">,
+): string {
+  const damageKind = eventDamageKind(event);
+  if (damageKind === "direct") return "damageDirect";
+  if (damageKind === "burn") return "burn";
+  if (damageKind === "poison") return "poison";
+  if (damageKind === "other") return "damage";
+  return eventKindToken(event);
 }
 
 function isMetricOnlyEvent(event: NormalizedEvent): boolean {
@@ -432,7 +444,7 @@ export function buildClusters(
 
   for (const event of events) {
     const x = timelineXAtCombatMs(event.combatMs, duration, timelineWidth);
-    const token = eventKindToken(event);
+    const token = timelineEventToken(event);
     for (const endpoint of eventLaneEndpoints(event, entityIndex)) {
       const pixel = Math.round(x);
       const key =

@@ -400,6 +400,8 @@ test.beforeAll(async ({ browserName }) => {
       role: "applied",
       attributionConfidence: "exact",
       iconSemanticKey: "status.burn",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/11/1111111111111111111111111111111111111111111111111111111111111111.png",
     }),
     schemaEvent({
       eventId: "inspector-poison",
@@ -416,6 +418,8 @@ test.beforeAll(async ({ browserName }) => {
       role: "applied",
       attributionConfidence: "exact",
       iconSemanticKey: "status.poison",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/22/2222222222222222222222222222222222222222222222222222222222222222.png",
     }),
   ];
   damageKindsEnvelope.battleDocument.rawRecordCount = 3;
@@ -446,6 +450,8 @@ test.beforeAll(async ({ browserName }) => {
       role: "applied",
       attributionConfidence: "exact",
       iconSemanticKey: "damage",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/33/3333333333333333333333333333333333333333333333333333333333333333.png",
     }),
     schemaEvent({
       eventId: "direct-wolf",
@@ -461,6 +467,8 @@ test.beforeAll(async ({ browserName }) => {
       role: "applied",
       attributionConfidence: "exact",
       iconSemanticKey: "damage",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/33/3333333333333333333333333333333333333333333333333333333333333333.png",
     }),
     schemaEvent({
       eventId: "direct-shield-settlement-a",
@@ -2480,72 +2488,102 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
 }) => {
   await page.goto(`${damageKindsReportUrl}?lang=en`);
   const canvas = page.getByTestId("timeline-canvas");
-  let point = null;
-  await expect
-    .poll(async () => {
-      const bounds = await canvas.boundingBox();
-      if (!bounds) return "";
-      point = {
-        x: bounds.x + bounds.width * 0.25,
-        y: bounds.y + 3.5 * 52 - 9,
-      };
-      await page.mouse.move(point.x, point.y);
-      return (
-        (await page.getByTestId("timeline-tooltip-count").textContent()) ?? ""
-      ).trim();
-    })
-    .toBe("3 events");
-  expect(point).not.toBeNull();
-  await page.mouse.click(point.x, point.y);
+  const markers = [
+    {
+      offset: -12,
+      label: "Direct damage",
+      groupToken: "damage-direct",
+      icon:
+        "../report-assets/objects/00/0000000000000000000000000000000000000000000000000000000000000000.png",
+    },
+    {
+      offset: 0,
+      label: "Burn",
+      groupToken: "damage-burn",
+      icon:
+        "../report-assets/objects/11/1111111111111111111111111111111111111111111111111111111111111111.png",
+    },
+    {
+      offset: 12,
+      label: "Poison",
+      groupToken: "damage-poison",
+      icon:
+        "../report-assets/objects/22/2222222222222222222222222222222222222222222222222222222222222222.png",
+    },
+  ];
+  for (const marker of markers) {
+    let point = null;
+    await expect
+      .poll(async () => {
+        const bounds = await canvas.boundingBox();
+        if (!bounds) return "";
+        point = {
+          x: bounds.x + bounds.width * 0.25,
+          y: bounds.y + 3.5 * 52 + marker.offset,
+        };
+        await page.mouse.move(point.x, point.y);
+        return (
+          (await page
+            .getByTestId("timeline-tooltip-label")
+            .textContent()) ?? ""
+        ).trim();
+      })
+      .toBe(marker.label);
+    await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
+      "1 event",
+    );
+    expect(point).not.toBeNull();
+    await page.mouse.click(point.x, point.y);
 
-  await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
-    "Fixture Opponent",
-  );
-  await expect(page.getByTestId("frame-event-kind")).toHaveText([
-    "Direct damage",
-    "Burn",
-    "Poison",
-  ]);
-  expect(
-    await page.getByTestId("focused-cluster-group").evaluateAll(
-      (elements) =>
-        elements.map((element) =>
-          element.getAttribute("data-bpp-event-token")
-        ),
-    ),
-  ).toEqual(["damage-direct", "damage-burn", "damage-poison"]);
-  await expect(page.getByTestId("focused-cluster-event")).toHaveCount(3);
-  await expect(page.getByTestId("event-source-entity")).toHaveCount(3);
-  await expect(page.getByTestId("event-target-entity")).toHaveCount(0);
-  await expect(
-    page
-      .getByTestId("frame-event-list")
-      .locator('[data-slot="accordion-trigger"]'),
-  ).toHaveCount(0);
+    await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
+      "Fixture Opponent",
+    );
+    await expect(page.getByTestId("frame-event-kind")).toHaveText(
+      marker.label,
+    );
+    await expect(page.getByTestId("focused-cluster-group")).toHaveAttribute(
+      "data-bpp-event-token",
+      marker.groupToken,
+    );
+    await expect(page.getByTestId("focused-cluster-event")).toHaveCount(1);
+    await expect(page.getByTestId("event-source-entity")).toHaveCount(1);
+    await expect(page.getByTestId("event-target-entity")).toHaveCount(0);
+    await expect(page.getByTestId("frame-event-native-icon")).toHaveAttribute(
+      "src",
+      marker.icon,
+    );
+    await expect(
+      page
+        .getByTestId("frame-event-list")
+        .locator('[data-slot="accordion-trigger"]'),
+    ).toHaveCount(0);
 
-  const sourceTreeGeometry = await page
-    .getByTestId("focused-cluster-event")
-    .first()
-    .evaluate((element) => {
-      const line = element.querySelector(
-        '[data-bpp-test-id="frame-event-relation-line"]',
-      );
-      const branch = element.querySelector(
-        '[data-bpp-test-id="frame-event-relation-branch"]',
-      );
-      const source = element.querySelector(
-        '[data-bpp-test-id="event-source-entity"]',
-      );
-      const styles = (node) => node ? getComputedStyle(node) : null;
-      return {
-        branchWidth: styles(branch)?.borderTopWidth ?? "0px",
-        lineWidth: styles(line)?.borderLeftWidth ?? "0px",
-        sourceText: source?.textContent?.trim() ?? "",
-      };
-    });
-  expect(sourceTreeGeometry.branchWidth).not.toBe("0px");
-  expect(sourceTreeGeometry.lineWidth).not.toBe("0px");
-  expect(sourceTreeGeometry.sourceText).toContain("Training Blade");
+    if (marker.groupToken === "damage-direct") {
+      const sourceTreeGeometry = await page
+        .getByTestId("focused-cluster-event")
+        .evaluate((element) => {
+          const line = element.querySelector(
+            '[data-bpp-test-id="frame-event-relation-line"]',
+          );
+          const branch = element.querySelector(
+            '[data-bpp-test-id="frame-event-relation-branch"]',
+          );
+          const source = element.querySelector(
+            '[data-bpp-test-id="event-source-entity"]',
+          );
+          const styles = (node) => node ? getComputedStyle(node) : null;
+          return {
+            branchWidth: styles(branch)?.borderTopWidth ?? "0px",
+            lineWidth: styles(line)?.borderLeftWidth ?? "0px",
+            sourceText: source?.textContent?.trim() ?? "",
+          };
+        });
+      expect(sourceTreeGeometry.branchWidth).not.toBe("0px");
+      expect(sourceTreeGeometry.lineWidth).not.toBe("0px");
+      expect(sourceTreeGeometry.sourceText).toContain("Training Blade");
+    }
+    await page.getByTestId("frame-inspector-close").click();
+  }
 });
 
 test("groups same-frame direct damage sources under one exact total", async ({
@@ -2560,7 +2598,7 @@ test("groups same-frame direct damage sources under one exact total", async ({
       if (!bounds) return "";
       point = {
         x: bounds.x + bounds.width * 0.25,
-        y: bounds.y + 3.5 * 52 - 9,
+        y: bounds.y + 3.5 * 52 - 12,
       };
       await page.mouse.move(point.x, point.y);
       return (
@@ -2575,6 +2613,10 @@ test("groups same-frame direct damage sources under one exact total", async ({
   await expect(page.getByTestId("focused-cluster-event")).toHaveCount(1);
   await expect(page.getByTestId("frame-event-kind")).toHaveText(
     "Direct damage",
+  );
+  await expect(page.getByTestId("frame-event-native-icon")).toHaveAttribute(
+    "src",
+    "../report-assets/objects/33/3333333333333333333333333333333333333333333333333333333333333333.png",
   );
   await expect(page.getByTestId("frame-event-amount")).toHaveText("1,430");
   await expect(page.getByTestId("event-source-entity")).toHaveText([
@@ -2762,7 +2804,7 @@ test("scopes the inspector to the exact clicked cluster", async ({
     /is-related-source/u,
   );
 
-  await clickCluster(3.5 * 52 + 9, "1 events");
+  await clickCluster(3.5 * 52 + 9, "1 event");
   await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
     "Fixture Opponent",
   );

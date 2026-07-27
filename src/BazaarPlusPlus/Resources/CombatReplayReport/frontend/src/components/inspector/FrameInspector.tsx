@@ -187,6 +187,25 @@ function eventAmount(event: NormalizedEvent): string {
     : formatCompactNumber(event.value);
 }
 
+function EventKindIcon({
+  icon,
+  token,
+}: {
+  icon: string;
+  token: string;
+}): React.JSX.Element {
+  return icon ? (
+    <img
+      alt=""
+      className="size-icon-md shrink-0 object-contain"
+      data-bpp-test-id="frame-event-native-icon"
+      src={icon}
+    />
+  ) : (
+    <SemanticIcon token={token} />
+  );
+}
+
 function EventRow({
   event,
   entityById,
@@ -207,11 +226,7 @@ function EventRow({
       data-bpp-test-id="focused-cluster-event"
     >
       <div className="flex min-h-control-xs items-center gap-1.5">
-        {event.icon ? (
-          <img alt="" className="size-icon-md object-contain" src={event.icon} />
-        ) : (
-          <SemanticIcon token={presentation.token} />
-        )}
+        <EventKindIcon icon={event.icon} token={presentation.token} />
         <strong
           className="truncate text-compact text-foreground"
           data-bpp-test-id="frame-event-kind"
@@ -296,7 +311,10 @@ function DirectDamageGroupRow({
       data-bpp-test-id="focused-cluster-event"
     >
       <div className="flex min-h-control-xs items-center gap-1.5">
-        <SemanticIcon token="damage" />
+        <EventKindIcon
+          icon={events.find((event) => Boolean(event.icon))?.icon ?? ""}
+          token="damage"
+        />
         <strong
           className="truncate text-compact text-foreground"
           data-bpp-test-id="frame-event-kind"

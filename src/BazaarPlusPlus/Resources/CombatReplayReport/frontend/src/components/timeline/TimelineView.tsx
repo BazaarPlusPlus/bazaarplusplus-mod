@@ -257,7 +257,9 @@ export const TimelineView = forwardRef<
           ? translateRef.current(cluster.token)
           : translateRef.current("time");
         refs.count.textContent = cluster
-          ? `${cluster.events.length} ${translateRef.current("event")}`
+          ? `${cluster.events.length} ${translateRef.current(
+            cluster.events.length === 1 ? "eventSingular" : "event",
+          )}`
           : "";
         const bounds = viewportRefs.scroll.current?.getBoundingClientRect();
         if (bounds) {

@@ -58,8 +58,10 @@ import {
   eventKindToken,
   isVisibleTimelineEvent,
   relatedLaneRoles,
+  timelineEventToken,
   timelineClusterEventIds,
 } from "../src/timeline/clusters.ts";
+import { markerOffset } from "../src/timeline/event-drawing.ts";
 import {
   safeAssetUrl,
   safeVideoUrl,
@@ -169,6 +171,24 @@ test("damage semantics distinguish direct, burn, poison, and other outcomes", ()
   assert.equal(
     eventDamageKind(timelineEvent({ kind: "status", action: "Damage" })),
     null,
+  );
+  assert.equal(
+    timelineEventToken(
+      timelineEvent({ kind: "effect-executed", action: "PlayerDamage" }),
+    ),
+    "damageDirect",
+  );
+  assert.equal(
+    timelineEventToken(
+      timelineEvent({ kind: "effect-executed", action: "PlayerBurnApply" }),
+    ),
+    "burn",
+  );
+  assert.equal(
+    timelineEventToken(
+      timelineEvent({ kind: "effect-executed", action: "PlayerPoisonApply" }),
+    ),
+    "poison",
   );
 
   const entity = (id, side) => ({
@@ -1027,6 +1047,59 @@ test("recording sync rejects non-monotonic or mismatched exact metadata", () => 
     identityMatches: false,
     issues: ["identityMismatch", "invalidExactSync"],
   });
+});
+
+test("timeline keeps direct, burn, and poison markers visually distinct", () => {
+  const entities = [
+    { id: "source", type: "item" },
+    { id: "target", type: "hero" },
+  ];
+  const events = [
+    timelineEvent({
+      id: "direct",
+      kind: "effect-executed",
+      action: "PlayerDamage",
+      icon: "../report-assets/objects/00/direct.png",
+      sourceId: "source",
+      targetIds: ["target"],
+    }),
+    timelineEvent({
+      id: "burn",
+      sequence: 1,
+      kind: "effect-executed",
+      action: "PlayerBurnApply",
+      icon: "../report-assets/objects/11/burn.png",
+      sourceId: "source",
+      targetIds: ["target"],
+    }),
+    timelineEvent({
+      id: "poison",
+      sequence: 2,
+      kind: "effect-executed",
+      action: "PlayerPoisonApply",
+      icon: "../report-assets/objects/22/poison.png",
+      sourceId: "source",
+      targetIds: ["target"],
+    }),
+  ];
+
+  const clusters = buildClusters(
+    { durationMs: 2_000 },
+    events,
+    entities,
+    1_000,
+    52,
+  );
+  assert.deepEqual(
+    clusters.map((cluster) => cluster.token),
+    ["damageDirect", "burn", "poison"],
+  );
+  assert.deepEqual(
+    clusters.map((cluster) => cluster.icon),
+    events.map((event) => event.icon),
+  );
+  assert.deepEqual(clusters.map(markerOffset), [-12, 0, 12]);
+  assert.equal(buildVisualClusters(clusters).length, 3);
 });
 
 test("canvas backing scale honors DPR and logical coordinates", () => {

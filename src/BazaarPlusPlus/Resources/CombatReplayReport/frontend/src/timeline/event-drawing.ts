@@ -18,6 +18,9 @@ import type { StatusRange, TimelineCluster } from "./clusters.ts";
 
 const MARKER_COLOR_NAMES: Record<string, ThemeColorName> = {
   damage: "damage",
+  damageDirect: "damage",
+  burn: "burn",
+  poison: "poison",
   heal: "heal",
   shield: "shield",
   charge: "charge",
@@ -31,6 +34,9 @@ const MARKER_COLOR_NAMES: Record<string, ThemeColorName> = {
 
 const MARKER_GLYPHS: Record<string, string> = {
   damage: "✦",
+  damageDirect: "✦",
+  burn: "♨",
+  poison: "●",
   heal: "+",
   shield: "◈",
   charge: "ϟ",
@@ -50,7 +56,11 @@ export function markerOffset(cluster: TimelineCluster): number {
   if (cluster.statusRange) return 0;
   if (cluster.role === "source" || cluster.role === "trigger") return 9;
   if (cluster.role === "target" || cluster.role === "both") {
-    if (cluster.token === "damage") return -9;
+    if (cluster.token === "damage" || cluster.token === "damageDirect") {
+      return -12;
+    }
+    if (cluster.token === "burn") return 0;
+    if (cluster.token === "poison") return 12;
     if (cluster.token === "heal" || cluster.token === "shield") return 9;
   }
   return 0;
