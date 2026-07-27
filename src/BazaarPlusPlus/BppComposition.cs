@@ -9,6 +9,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.EventPreview;
+using BazaarPlusPlus.Game.GraphicsUpscaling;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
@@ -177,8 +178,26 @@ internal sealed class BppComposition : IDisposable
         );
         _settingsDockRegistry.Register(LegendaryPositionSettingsDockEntry.Create());
         _settingsDockRegistry.Register(NameOverrideSettingsDockEntry.Create());
+        if (
+            UnityEngine.Application.platform
+            is UnityEngine.RuntimePlatform.OSXPlayer
+                or UnityEngine.RuntimePlatform.WindowsPlayer
+        )
+            GraphicsUpscalingSettingsDockEntry.RegisterAll(_settingsDockRegistry);
 
         _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
+        if (
+            UnityEngine.Application.platform
+            is UnityEngine.RuntimePlatform.OSXPlayer
+                or UnityEngine.RuntimePlatform.WindowsPlayer
+        )
+        {
+            _mountables.Register(
+                new ComponentMount<GraphicsUpscalingController>(
+                    (controller, services) => controller.Initialize(services.Config)
+                )
+            );
+        }
         _mountables.Register(
             new ComponentMount<EventPreviewStaticDataObserver>(
                 (observer, _) => observer.Initialize(_encounterPreviewModule)
