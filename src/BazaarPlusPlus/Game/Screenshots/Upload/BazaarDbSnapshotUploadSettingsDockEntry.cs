@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Upload;
 
@@ -7,15 +8,20 @@ namespace BazaarPlusPlus.Game.Screenshots.Upload;
 
 internal static class BazaarDbSnapshotUploadSettingsDockEntry
 {
-    internal static CyclingSettingsDockEntry<bool> Create() =>
-        CyclingSettingsDockEntry<bool>.Toggle(
+    internal static CyclingSettingsDockEntry<bool> Create(IBppEventBus eventBus)
+    {
+        if (eventBus == null)
+            throw new ArgumentNullException(nameof(eventBus));
+
+        return CyclingSettingsDockEntry<bool>.Toggle(
             BppSettingsDockOrder.BazaarDbUpload,
             "BazaarDbUpload",
             BazaarDbSnapshotUploadSettingsMenuLabel.Resolve,
             ReadEnabled,
             WriteEnabled,
-            OnEnabledChanged
+            enabled => OnEnabledChanged(eventBus, enabled)
         );
+    }
 
     private static bool ReadEnabled(IBppConfig config) =>
         config.BazaarDbUploadEnabled?.Value ?? false;
@@ -30,11 +36,11 @@ internal static class BazaarDbSnapshotUploadSettingsDockEntry
             EndOfRunScreenshotSettingsPolicy.ForceEnabled(config);
     }
 
-    private static void OnEnabledChanged(bool enabled)
+    private static void OnEnabledChanged(IBppEventBus eventBus, bool enabled)
     {
         if (!enabled)
             return;
 
-        BackgroundUploadPump.ArmImmediate(UploadFeedKind.BazaarDbSnapshot);
+        eventBus.Publish(new UploadArmRequested(UploadFeedKind.BazaarDbSnapshot));
     }
 }

@@ -15,8 +15,15 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
 
     public UploadFeedKind Kind => UploadFeedKind.BazaarDbSnapshot;
 
-    public UploadFeedActivation? Activate(IBppServices services, UploadFeedLogState _)
+    public IUploadFeedSession? Activate(
+        IBppServices services,
+        UploadFeedLogState logState,
+        UploadPumpCadence cadence
+    )
     {
+        // Cadence is pump-owned; BazaarDb does not re-log arm timing from it.
+        _ = logState;
+        _ = cadence;
         var screenshotLogState = new ScreenshotUploadLogState();
         try
         {
@@ -58,22 +65,21 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
                 screenshotLogState
             );
 
-            return new UploadFeedActivation
-            {
-                UploadInBackgroundAsync = cancellationToken =>
+            return new Session(
+                isEnabled: () =>
+                    EvaluateEnabled(
+                        services.Config.BazaarDbUploadEnabled?.Value ?? false,
+                        BppClientCacheBridge.TryGetProfileAccountId,
+                        _accountLinkStore.IsLinked
+                    ),
+                runAttemptAsync: cancellationToken =>
                     RunAttemptAsync(
                         uploadService.UploadPendingInBackgroundAsync,
                         screenshotLogState,
                         cancellationToken
                     ),
-                IsEnabled = () =>
-                    IsEnabled(
-                        services.Config.BazaarDbUploadEnabled?.Value ?? false,
-                        BppClientCacheBridge.TryGetProfileAccountId,
-                        _accountLinkStore.IsLinked
-                    ),
-                Disposable = httpClient,
-            };
+                resources: httpClient
+            );
         }
         catch (Exception ex)
         {
@@ -85,7 +91,26 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
         }
     }
 
-    internal static bool IsEnabled(
+    /// <summary>
+    /// Builds a session that only probes the three-condition enablement matrix. Used by tests so
+    /// eligibility assertions drive <see cref="IUploadFeedSession.IsEnabled"/> rather than a
+    /// static method signature pin.
+    /// </summary>
+    internal static IUploadFeedSession CreateEnabledProbe(
+        bool uploadEnabled,
+        Func<string?> playerAccountIdResolver,
+        Func<string, bool> isAccountLinked
+    )
+    {
+        return new Session(
+            isEnabled: () =>
+                EvaluateEnabled(uploadEnabled, playerAccountIdResolver, isAccountLinked),
+            runAttemptAsync: _ => Task.FromResult(UploadAttemptResult.NoHealthSignal()),
+            resources: null
+        );
+    }
+
+    internal static bool EvaluateEnabled(
         bool uploadEnabled,
         Func<string?> playerAccountIdResolver,
         Func<string, bool> isAccountLinked
@@ -120,5 +145,40 @@ internal sealed class BazaarDbSnapshotUploadFeed : IUploadFeed
             );
         }
         return UploadAttemptResult.NoHealthSignal();
+    }
+
+    private sealed class Session : IUploadFeedSession
+    {
+        private readonly Func<bool> _isEnabled;
+        private readonly Func<CancellationToken, Task<UploadAttemptResult>> _runAttemptAsync;
+        private readonly IDisposable? _resources;
+        private int _disposed;
+
+        public Session(
+            Func<bool> isEnabled,
+            Func<CancellationToken, Task<UploadAttemptResult>> runAttemptAsync,
+            IDisposable? resources
+        )
+        {
+            _isEnabled = isEnabled ?? throw new ArgumentNullException(nameof(isEnabled));
+            _runAttemptAsync =
+                runAttemptAsync ?? throw new ArgumentNullException(nameof(runAttemptAsync));
+            _resources = resources;
+        }
+
+        public bool IsEnabled => _isEnabled();
+
+        public Task<UploadAttemptResult> RunAttemptAsync(CancellationToken cancellationToken) =>
+            _runAttemptAsync(cancellationToken);
+
+        public IDisposable? SubscribeArmSignals(Action arm) => null;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return;
+
+            _resources?.Dispose();
+        }
     }
 }
