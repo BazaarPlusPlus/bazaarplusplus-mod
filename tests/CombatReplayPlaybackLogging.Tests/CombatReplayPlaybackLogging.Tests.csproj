@@ -42,8 +42,8 @@
       Link="ReplayPlaybackLogOperation.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReplayPlaybackStateExitCoordinator.cs"
-      Link="ReplayPlaybackStateExitCoordinator.cs"
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/SavedReplayLifecycle.cs"
+      Link="SavedReplayLifecycle.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReplayPersistenceLogState.cs"
