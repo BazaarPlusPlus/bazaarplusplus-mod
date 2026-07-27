@@ -222,7 +222,7 @@ export function FrameInspector({
   onClose: () => void;
   t: (key: string) => string;
 }): React.JSX.Element {
-  const inspectorRef = useRef<HTMLElement>(null);
+  const inspectorRef = useRef<HTMLDivElement>(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
   const focusKey = focusedEventIds.join("\u001f");
   useEffect(() => setLimit(PAGE_SIZE), [entityId, focusKey, frame]);
@@ -263,13 +263,13 @@ export function FrameInspector({
   const first = events[0];
 
   return (
-    <aside
-      className="flex h-full min-h-0 w-[clamp(320px,30vw,400px)] shrink-0 flex-col border-l border-border/70 bg-surface shadow-sticky"
+    <div
+      className="flex max-h-[min(34rem,calc(100vh-2rem))] min-h-0 w-full flex-col overflow-hidden bg-popover"
       data-bpp-test-id="frame-inspector"
       ref={inspectorRef}
     >
       <header
-        className="shrink-0 border-b border-border/70 px-3 py-2"
+        className="shrink-0 border-b border-border/70 px-3 py-1.5"
         data-bpp-test-id="frame-inspector-header"
       >
         <div className="flex items-start gap-2">
@@ -328,7 +328,7 @@ export function FrameInspector({
         </div>
       </header>
       <ScrollArea
-        className="min-h-0 flex-1"
+        className="max-h-[min(29rem,calc(100vh-7rem))] min-h-0"
         data-bpp-test-id="frame-event-list"
       >
         <div>
@@ -391,6 +391,6 @@ export function FrameInspector({
           )}
         </div>
       </ScrollArea>
-    </aside>
+    </div>
   );
 }

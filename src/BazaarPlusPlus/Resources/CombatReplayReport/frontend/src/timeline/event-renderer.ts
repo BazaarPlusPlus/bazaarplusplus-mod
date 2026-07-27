@@ -33,7 +33,12 @@ interface ControllerOptions {
   laneLabels: HTMLElement;
   stickyHeroCanvas: HTMLCanvasElement;
   stickyHeroLabel: HTMLElement;
-  onSelect: (cluster: TimelineCluster | null, combatMs: number) => void;
+  onSelect: (
+    cluster: TimelineCluster | null,
+    combatMs: number,
+    clientX?: number,
+    clientY?: number,
+  ) => void;
   onPreview: (
     cluster: TimelineCluster | null,
     combatMs: number | null,
@@ -219,10 +224,7 @@ export class TimelineCanvasController {
     clientX: number,
     clientY: number,
   ): void {
-    if (
-      cluster === this.hoverCluster
-      && Math.abs((this.previewMs ?? 0) - combatMs) < 8
-    ) {
+    if (cluster === this.hoverCluster && this.previewMs === combatMs) {
       return;
     }
     this.hoverCluster = cluster;
@@ -252,7 +254,7 @@ export class TimelineCanvasController {
       event.clientX,
       this.model.durationMs,
     );
-    this.onSelect(cluster, combatMs);
+    this.onSelect(cluster, combatMs, event.clientX, event.clientY);
   }
 
   handleStickyHeroPointerDown(
@@ -274,7 +276,7 @@ export class TimelineCanvasController {
       event.clientX,
       this.model.durationMs,
     );
-    this.onSelect(cluster, combatMs);
+    this.onSelect(cluster, combatMs, event.clientX, event.clientY);
   }
 
   handleRulerPointerDown(event: PointerEvent): void {
@@ -284,7 +286,7 @@ export class TimelineCanvasController {
       event.clientX,
       this.model.durationMs,
     );
-    this.onSelect(null, combatMs);
+    this.onSelect(null, combatMs, event.clientX, event.clientY);
   }
 
   navigate(direction: -1 | 1): void {

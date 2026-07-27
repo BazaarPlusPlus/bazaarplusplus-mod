@@ -1,9 +1,16 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ChevronRight, Pause, Play, RotateCcw } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Pause,
+  Play,
+  RotateCcw,
+} from "lucide-react";
 import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -18,6 +25,7 @@ import type { ReportViewModel } from "../../model/report.ts";
 import {
   buildCombatLogEntries,
   combatLogEntity,
+  combatLogGroupKey,
   groupCombatLogEntries,
   isDirectStatusApplicationEvent,
   isNarrativeCombatLogEntry,
@@ -35,6 +43,11 @@ export interface CombatLogHandle {
   setPlaybackActive: (active: boolean) => void;
   setPlaybackCombatMs: (combatMs: number) => void;
   setPreviewCombatMs: (combatMs: number | null) => void;
+}
+
+export interface CombatLogSelectionAnchor {
+  x: number;
+  y: number;
 }
 
 function entryAmount(entry: CombatLogEntry): string {
@@ -94,6 +107,138 @@ function MissingEntity({
   );
 }
 
+function expandTargets(entry: CombatLogEntry): CombatLogEntry[] {
+  if (entry.targetIds.length <= 1) return [entry];
+  return entry.targetIds.map((targetId, index) => ({
+    ...entry,
+    id: `${entry.id}:target:${index}:${targetId}`,
+    targetIds: [targetId],
+  }));
+}
+
+function CombatLogEntryColumns({
+  entry,
+  entityById,
+  frameStart,
+  t,
+  expandable,
+  expanded,
+}: {
+  entry: CombatLogEntry;
+  entityById: ReadonlyMap<string, NormalizedEntity>;
+  frameStart: boolean;
+  t: (key: string) => string;
+  expandable?: boolean;
+  expanded?: boolean;
+}): React.JSX.Element {
+  const source =
+    combatLogEntity(entityById, entry.sourceId)
+    ?? combatLogEntity(entityById, entry.triggerSourceId);
+  const targets = entry.targetIds
+    .map((id) => combatLogEntity(entityById, id))
+    .filter((entity): entity is NormalizedEntity => entity !== null);
+  const amount = entryAmount(entry);
+  return (
+    <>
+      <span
+        className="inline-flex h-full min-w-0 items-center gap-1 font-mono text-micro text-brand-soft"
+        data-bpp-test-id="combat-log-time"
+      >
+        {frameStart
+          ? <strong>{formatDuration(entry.combatMs)}</strong>
+          : (
+            <span
+              aria-hidden="true"
+              className="ml-1 h-full border-l border-border/35"
+            />
+          )}
+      </span>
+      <span
+        className="flex min-w-0 items-center gap-1.5 overflow-hidden"
+        data-bpp-test-id="combat-log-kind"
+      >
+        <SemanticIcon className="size-icon-sm" token={entry.token} />
+        <span className="shrink-0 text-compact font-semibold text-foreground max-[600px]:sr-only">
+          {t(entry.token)}
+        </span>
+      </span>
+      <span
+        className="block min-w-0 overflow-hidden text-compact text-muted-foreground"
+        data-bpp-test-id="combat-log-source"
+      >
+        {source
+          ? (
+            <EntityChip
+              entity={source}
+              labelTestId="combat-log-source-label"
+            />
+          )
+          : (
+            <MissingEntity
+              label={t("sourceNotRecorded")}
+              labelTestId="combat-log-source-label"
+            />
+          )}
+      </span>
+      <ChevronRight
+        aria-hidden="true"
+        className="size-icon-sm shrink-0 justify-self-center opacity-45"
+        data-bpp-test-id="combat-log-arrow"
+      />
+      <span
+        className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 overflow-hidden text-compact text-muted-foreground"
+        data-bpp-test-id="combat-log-target"
+      >
+        {targets[0]
+          ? (
+            <EntityChip
+              entity={targets[0]}
+              labelTestId="combat-log-target-label"
+            />
+          )
+          : (
+            <MissingEntity
+              label={t("targetNotRecorded")}
+              labelTestId="combat-log-target-label"
+            />
+          )}
+        {expandable
+          ? (
+            <span
+              className="inline-flex shrink-0 items-center gap-0.5 text-micro text-muted-foreground"
+              data-bpp-test-id="combat-log-entry-expand"
+            >
+              +{Math.max(1, targets.length - 1)}
+              <ChevronDown
+                aria-hidden="true"
+                className={cn(
+                  "size-icon-sm transition-transform",
+                  expanded && "rotate-180",
+                )}
+              />
+            </span>
+          )
+          : targets.length > 1
+            ? (
+              <span className="shrink-0 text-micro text-muted-foreground">
+                +{targets.length - 1}
+              </span>
+            )
+            : null}
+      </span>
+      <span
+        className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums"
+        data-bpp-test-id="combat-log-amount"
+      >
+        {amount && <strong className="text-foreground">{amount}</strong>}
+        {entry.count > 1 && (
+          <span className="text-muted-foreground">×{entry.count}</span>
+        )}
+      </span>
+    </>
+  );
+}
+
 export const CombatLogList = forwardRef<
   CombatLogHandle,
   {
@@ -102,7 +247,10 @@ export const CombatLogList = forwardRef<
     model: ReportViewModel;
     pinnedCombatMs: number;
     pinnedEventIds: readonly string[];
-    onSelectEntry: (entry: CombatLogEntry) => void;
+    onSelectEntry: (
+      entry: CombatLogEntry,
+      anchor?: CombatLogSelectionAnchor,
+    ) => void;
     t: (key: string) => string;
   }
 >(function CombatLogList(
@@ -135,6 +283,20 @@ export const CombatLogList = forwardRef<
     () => groupCombatLogEntries(rawEntries),
     [rawEntries],
   );
+  const detailsByEntryId = useMemo(() => {
+    const rawByKey = new Map<string, CombatLogEntry[]>();
+    for (const entry of rawEntries) {
+      const key = combatLogGroupKey(entry);
+      rawByKey.set(key, [...(rawByKey.get(key) ?? []), entry]);
+    }
+    return new Map(
+      entries.map((entry) => [
+        entry.id,
+        (rawByKey.get(combatLogGroupKey(entry)) ?? [entry])
+          .flatMap(expandTargets),
+      ]),
+    );
+  }, [entries, rawEntries]);
   const viewportRef = useRef<HTMLDivElement>(null);
   const previewMsRef = useRef<number | null>(null);
   const playbackMsRef = useRef(initialPlaybackCombatMs);
@@ -147,24 +309,38 @@ export const CombatLogList = forwardRef<
     selectedCombatLogEntryIndex(entries, pinnedEventIds, pinnedCombatMs)
   );
   const [manualPaused, setManualPaused] = useState(false);
+  const [expandedEntryIds, setExpandedEntryIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [followSource, setFollowSource] = useState<
     "hover" | "playback" | "pinned"
   >(initialPlaybackActive ? "playback" : "pinned");
 
   const virtualizer = useVirtualizer({
     count: entries.length,
-    estimateSize: () => 36,
+    estimateSize: (index) => {
+      const entry = entries[index];
+      const detailCount = entry
+        ? detailsByEntryId.get(entry.id)?.length ?? 0
+        : 0;
+      return 36 + (expandedEntryIds.has(entry?.id ?? "") ? detailCount * 32 : 0);
+    },
+    getItemKey: (index) => entries[index]?.id ?? index,
     getScrollElement: () => viewportRef.current,
     overscan: 8,
   });
 
+  useLayoutEffect(() => {
+    virtualizer.measure();
+  }, [expandedEntryIds, virtualizer]);
+
   const updateActive = (): void => {
     scheduledRef.current = 0;
     const source =
-      previewMsRef.current !== null
-        ? "hover"
-        : playbackActiveRef.current
-          ? "playback"
+      playbackActiveRef.current
+        ? "playback"
+        : previewMsRef.current !== null
+          ? "hover"
           : "pinned";
     const combatMs =
       source === "hover"
@@ -301,13 +477,9 @@ export const CombatLogList = forwardRef<
           >
             {virtualizer.getVirtualItems().map((virtualRow) => {
               const entry = entries[virtualRow.index];
-              const source =
-                combatLogEntity(entityById, entry.sourceId)
-                ?? combatLogEntity(entityById, entry.triggerSourceId);
-              const targets = entry.targetIds
-                .map((id) => combatLogEntity(entityById, id))
-                .filter((entity): entity is NormalizedEntity => entity !== null);
-              const amount = entryAmount(entry);
+              const details = detailsByEntryId.get(entry.id) ?? [];
+              const expandable = details.length > 1;
+              const expanded = expandedEntryIds.has(entry.id);
               const active = virtualRow.index === activeIndex;
               const frameStart =
                 virtualRow.index === 0
@@ -316,121 +488,93 @@ export const CombatLogList = forwardRef<
                 activeIndex >= 0
                 && entries[activeIndex]?.frame === entry.frame;
               return (
-                <Button
-                  aria-current={active ? "true" : undefined}
-                  className={cn(
-                    "absolute left-0 top-0 grid h-9 w-full grid-cols-[4rem_8.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2",
-                    frameStart && "border-t border-t-border/55",
-                    sameFrame && "bg-brand-soft/[0.07]",
-                    active && "bg-brand-soft/[0.13] shadow-[inset_3px_0_0_var(--color-brand-soft)]",
-                  )}
-                  data-bpp-active={active ? "true" : "false"}
-                  data-bpp-combat-ms={entry.combatMs}
-                  data-bpp-frame={entry.frame}
-                  data-bpp-frame-start={frameStart ? "true" : "false"}
-                  data-bpp-same-frame={sameFrame ? "true" : "false"}
-                  data-bpp-test-id="combat-log-entry"
+                <div
+                  className="absolute left-0 top-0 w-full"
                   data-index={virtualRow.index}
                   key={entry.id}
-                  onClick={() => onSelectEntry(entry)}
                   ref={virtualizer.measureElement}
                   style={{
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
-                  type="button"
-                  variant="tableHeader"
                 >
-                  {sameFrame && (
-                    <span className="sr-only">
-                      {t(
-                        active
-                          ? "combatLogSelectedEvent"
-                          : "combatLogSameFrameEvent",
-                      )}
-                    </span>
-                  )}
-                  <span
-                    className="inline-flex h-full min-w-0 items-center gap-1 font-mono text-micro text-brand-soft"
-                    data-bpp-test-id="combat-log-time"
+                  <Button
+                    aria-current={active ? "true" : undefined}
+                    aria-expanded={expandable ? expanded : undefined}
+                    className={cn(
+                      "grid h-9 w-full grid-cols-[4rem_8.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2",
+                      frameStart && "border-t border-t-border/55",
+                      sameFrame && "bg-brand-soft/[0.07]",
+                      active
+                        && "bg-brand-soft/[0.13] shadow-[inset_3px_0_0_var(--color-brand-soft)]",
+                    )}
+                    data-bpp-active={active ? "true" : "false"}
+                    data-bpp-combat-ms={entry.combatMs}
+                    data-bpp-frame={entry.frame}
+                    data-bpp-frame-start={frameStart ? "true" : "false"}
+                    data-bpp-same-frame={sameFrame ? "true" : "false"}
+                    data-bpp-test-id="combat-log-entry"
+                    data-index={virtualRow.index}
+                    onClick={(event) => {
+                      onSelectEntry(entry, {
+                        x: event.clientX,
+                        y: event.clientY,
+                      });
+                      if (!expandable) return;
+                      setExpandedEntryIds((current) => {
+                        const next = new Set(current);
+                        if (next.has(entry.id)) next.delete(entry.id);
+                        else next.add(entry.id);
+                        return next;
+                      });
+                    }}
+                    type="button"
+                    variant="tableHeader"
                   >
-                    {frameStart
-                      ? (
-                        <strong>{formatDuration(entry.combatMs)}</strong>
-                      )
-                      : (
-                        <span
-                          aria-hidden="true"
-                          className="ml-1 h-full border-l border-border/35"
-                        />
-                      )}
-                  </span>
-                  <span
-                    className="flex min-w-0 items-center gap-1.5 overflow-hidden"
-                    data-bpp-test-id="combat-log-kind"
-                  >
-                    <SemanticIcon className="size-icon-sm" token={entry.token} />
-                    <span className="shrink-0 text-compact font-semibold text-foreground max-[600px]:sr-only">
-                      {t(entry.token)}
-                    </span>
-                  </span>
-                  <span
-                    className="block min-w-0 overflow-hidden text-compact text-muted-foreground"
-                    data-bpp-test-id="combat-log-source"
-                  >
-                    {source
-                      ? (
-                        <EntityChip
-                          entity={source}
-                          labelTestId="combat-log-source-label"
-                        />
-                      )
-                      : (
-                        <MissingEntity
-                          label={t("sourceNotRecorded")}
-                          labelTestId="combat-log-source-label"
-                        />
-                      )}
-                  </span>
-                  <ChevronRight
-                    aria-hidden="true"
-                    className="size-icon-sm shrink-0 justify-self-center opacity-45"
-                    data-bpp-test-id="combat-log-arrow"
-                  />
-                  <span
-                    className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 overflow-hidden text-compact text-muted-foreground"
-                    data-bpp-test-id="combat-log-target"
-                  >
-                    {targets[0]
-                      ? (
-                        <EntityChip
-                          entity={targets[0]}
-                          labelTestId="combat-log-target-label"
-                        />
-                      )
-                      : (
-                        <MissingEntity
-                          label={t("targetNotRecorded")}
-                          labelTestId="combat-log-target-label"
-                        />
-                      )}
-                    {targets.length > 1 && (
-                      <span className="shrink-0 text-micro text-muted-foreground">
-                        +{targets.length - 1}
+                    {sameFrame && (
+                      <span className="sr-only">
+                        {t(
+                          active
+                            ? "combatLogSelectedEvent"
+                            : "combatLogSameFrameEvent",
+                        )}
                       </span>
                     )}
-                  </span>
-                  <span
-                    className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums"
-                    data-bpp-test-id="combat-log-amount"
-                  >
-                    {amount && (
-                      <strong className="text-foreground">{amount}</strong>
-                    )}
-                    {entry.count > 1 && (
-                      <span className="text-muted-foreground">×{entry.count}</span>
-                    )}
-                  </span>
-                </Button>
+                    <CombatLogEntryColumns
+                      entityById={entityById}
+                      entry={entry}
+                      expandable={expandable}
+                      expanded={expanded}
+                      frameStart={frameStart}
+                      t={t}
+                    />
+                  </Button>
+                  {expanded && (
+                    <div data-bpp-test-id="combat-log-entry-details">
+                      {details.map((detail) => (
+                        <Button
+                          className="grid h-8 w-full grid-cols-[4rem_8.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/20 bg-surface-raised/35 px-3 text-left font-normal hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2"
+                          data-bpp-parent-entry-id={entry.id}
+                          data-bpp-test-id="combat-log-entry-detail"
+                          key={detail.id}
+                          onClick={(event) =>
+                            onSelectEntry(detail, {
+                              x: event.clientX,
+                              y: event.clientY,
+                            })}
+                          type="button"
+                          variant="tableHeader"
+                        >
+                          <CombatLogEntryColumns
+                            entityById={entityById}
+                            entry={detail}
+                            frameStart={false}
+                            t={t}
+                          />
+                        </Button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

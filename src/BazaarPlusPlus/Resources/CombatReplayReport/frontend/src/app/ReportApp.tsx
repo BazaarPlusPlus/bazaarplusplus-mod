@@ -31,6 +31,7 @@ import {
   type FooterReplayDockHandle,
 } from "../components/shell/FooterReplayDock.tsx";
 import type { CombatLogEntry } from "../combat-log/entries.ts";
+import type { CombatLogSelectionAnchor } from "../components/combat-log/CombatLogList.tsx";
 
 export function ReportApp({
   envelope,
@@ -102,6 +103,7 @@ export function ReportApp({
   }, []);
 
   const previewCombatMs = useCallback((combatMs: number | null): void => {
+    if (playbackActiveRef.current) return;
     replayDockRef.current?.setPreviewCombatMs(combatMs);
     if (combatMs !== null) {
       recordingRef.current?.seekCombatMs(combatMs, true);
@@ -121,6 +123,7 @@ export function ReportApp({
   }, []);
   const selectCombatLogEntry = useCallback((
     entry: CombatLogEntry,
+    anchor?: CombatLogSelectionAnchor,
   ): void => {
     dispatch({
       type: "select-frame",
@@ -128,10 +131,12 @@ export function ReportApp({
       combatMs: entry.combatMs,
       clusterEventIds: entry.eventIds,
       entityId: entry.targetIds[0] || entry.sourceId,
+      anchor,
     });
   }, []);
   const handlePlaybackActiveChange = useCallback((active: boolean): void => {
     playbackActiveRef.current = active;
+    if (active) replayDockRef.current?.setPreviewCombatMs(null);
     replayDockRef.current?.setPlaybackActive(active);
   }, []);
   const handlePlaybackCombatTime = useCallback((combatMs: number): void => {

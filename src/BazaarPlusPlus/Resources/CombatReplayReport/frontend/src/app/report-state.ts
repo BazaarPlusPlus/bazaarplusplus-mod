@@ -10,6 +10,11 @@ import type { SupportedLocale } from "../model/report.ts";
 
 export type ReportTab = "timeline" | "statistics";
 
+export interface InspectorAnchor {
+  x: number;
+  y: number;
+}
+
 export interface ReportState {
   tab: ReportTab;
   locale: SupportedLocale;
@@ -21,6 +26,7 @@ export interface ReportState {
   selectedCombatMs: number;
   selectedEntityId: string;
   inspectorOpen: boolean;
+  inspectorAnchor: InspectorAnchor | null;
   laneVisibility: LaneVisibility;
   activitySort: ActivitySortState;
   activityGroupBySide: boolean;
@@ -43,6 +49,7 @@ export function createInitialReportState(
     selectedCombatMs: 0,
     selectedEntityId: "",
     inspectorOpen: false,
+    inspectorAnchor: null,
     laneVisibility: { ...DEFAULT_LANE_VISIBILITY },
     activitySort: {
       key: "damage",

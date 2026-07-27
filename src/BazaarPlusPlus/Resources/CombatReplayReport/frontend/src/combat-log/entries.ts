@@ -25,6 +25,29 @@ export interface CombatLogEntry {
   count: number;
 }
 
+export function combatLogGroupKey(
+  entry: Pick<
+    CombatLogEntry,
+    | "frame"
+    | "token"
+    | "action"
+    | "sourceId"
+    | "triggerSourceId"
+    | "unit"
+    | "value"
+  >,
+): string {
+  return [
+    entry.frame,
+    entry.token,
+    entry.action,
+    entry.sourceId,
+    entry.triggerSourceId,
+    entry.unit,
+    valueKey(entry.value),
+  ].join("\u001f");
+}
+
 /**
  * Direct tempo/control applications are represented by status ranges in the
  * timeline, so their source markers are intentionally hidden there. They are
@@ -119,15 +142,7 @@ export function groupCombatLogEntries(
 ): CombatLogEntry[] {
   const grouped = new Map<string, CombatLogEntry>();
   for (const entry of entries) {
-    const key = [
-      entry.frame,
-      entry.token,
-      entry.action,
-      entry.sourceId,
-      entry.triggerSourceId,
-      entry.unit,
-      valueKey(entry.value),
-    ].join("\u001f");
+    const key = combatLogGroupKey(entry);
     const current = grouped.get(key);
     if (!current) {
       grouped.set(key, {

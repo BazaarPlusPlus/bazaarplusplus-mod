@@ -22,6 +22,11 @@ import { TimelineCanvasController } from "../../timeline/event-renderer.ts";
 import { drawStateBand, groupMetricSamples } from "../../timeline/state-band-renderer.ts";
 import { formatDuration } from "../../i18n/format.ts";
 import { FrameInspector } from "../inspector/FrameInspector.tsx";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+} from "../ui/popover.tsx";
 import { timelineClusterEventIds } from "../../timeline/clusters.ts";
 import {
   filterTimelineEntities,
@@ -201,7 +206,7 @@ export const TimelineView = forwardRef<
       laneLabels: labels,
       stickyHeroCanvas,
       stickyHeroLabel,
-      onSelect: (cluster, combatMs) => {
+      onSelect: (cluster, combatMs, clientX, clientY) => {
         if (cluster?.events[0]) {
           const event = cluster.events.reduce((nearest, candidate) =>
             Math.abs(candidate.combatMs - combatMs)
@@ -215,6 +220,9 @@ export const TimelineView = forwardRef<
             combatMs: event.combatMs,
             clusterEventIds: timelineClusterEventIds(cluster),
             entityId: entities[cluster.lane]?.id ?? "",
+            anchor: clientX === undefined || clientY === undefined
+              ? undefined
+              : { x: clientX, y: clientY },
           });
         } else {
           dispatch({ type: "select-time", combatMs });
@@ -226,6 +234,8 @@ export const TimelineView = forwardRef<
         previewCallbackRef.current(combatMs);
         const refs = tooltip();
         if (!refs) return;
+        refs.host.dataset.bppCombatMs =
+          combatMs === null ? "" : String(combatMs);
         if (combatMs === null) {
           refs.host.hidden = true;
           return;
@@ -382,16 +392,62 @@ export const TimelineView = forwardRef<
         t={t}
         timelineWidth={timelineWidth}
       />
-      {state.inspectorOpen && (
-        <FrameInspector
-          entityId={state.inspectedEntityId}
-          frame={state.selectedFrame}
-          focusedEventIds={state.selectedClusterEventIds}
-          model={model}
-          onClose={() => dispatch({ type: "close-inspector" })}
-          t={t}
-        />
-      )}
+      <Popover
+        onOpenChange={(open) => {
+          if (!open) dispatch({ type: "close-inspector" });
+        }}
+        open={state.inspectorOpen}
+      >
+        <PopoverAnchor asChild>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none fixed size-px"
+            data-bpp-test-id="frame-inspector-anchor"
+            style={{
+              left:
+                state.inspectorAnchor?.x
+                ?? (typeof window === "undefined" ? 0 : window.innerWidth / 2),
+              top:
+                state.inspectorAnchor?.y
+                ?? (typeof window === "undefined" ? 0 : window.innerHeight / 2),
+            }}
+          />
+        </PopoverAnchor>
+        <PopoverContent
+          align="start"
+          className="w-[min(420px,calc(100vw-1rem))] overflow-hidden p-0"
+          collisionPadding={8}
+          data-bpp-test-id="frame-inspector-popover"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onInteractOutside={(event) => {
+            const target = event.target;
+            if (
+              target instanceof Element
+              && target.closest(
+                [
+                  '[data-bpp-test-id="timeline-canvas"]',
+                  '[data-bpp-test-id="timeline-sticky-hero-events"]',
+                  '[data-bpp-test-id="combat-log-entry"]',
+                  '[data-bpp-test-id="combat-log-entry-detail"]',
+                ].join(","),
+              )
+            ) {
+              event.preventDefault();
+            }
+          }}
+          side="right"
+          sideOffset={10}
+        >
+          <FrameInspector
+            entityId={state.inspectedEntityId}
+            frame={state.selectedFrame}
+            focusedEventIds={state.selectedClusterEventIds}
+            model={model}
+            onClose={() => dispatch({ type: "close-inspector" })}
+            t={t}
+          />
+        </PopoverContent>
+      </Popover>
     </section>
   );
 });

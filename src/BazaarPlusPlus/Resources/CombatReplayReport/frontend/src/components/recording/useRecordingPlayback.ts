@@ -55,8 +55,9 @@ export function useRecordingPlayback({
       return;
     }
     const apply = (): void => {
-      if (!videoRef.current) return;
-      videoRef.current.currentTime = Math.max(0, mapped / 1_000);
+      const current = videoRef.current;
+      if (!current || (preview && !current.paused)) return;
+      current.currentTime = Math.max(0, mapped / 1_000);
     };
     if (preview) {
       window.cancelAnimationFrame(previewFrameRef.current);

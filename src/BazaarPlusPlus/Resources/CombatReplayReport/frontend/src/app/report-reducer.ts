@@ -8,6 +8,7 @@ import type { StateScaleMode } from "../timeline/state-scale.ts";
 import {
   DEFAULT_TIME_ZOOM_INDEX,
   TIME_ZOOM_STEPS,
+  type InspectorAnchor,
   type ReportState,
   type ReportTab,
 } from "./report-state.ts";
@@ -24,6 +25,7 @@ export type ReportAction =
       combatMs: number;
       clusterEventIds: string[];
       entityId: string;
+      anchor?: InspectorAnchor;
     }
   | { type: "select-time"; combatMs: number }
   | { type: "close-inspector" }
@@ -75,7 +77,8 @@ export function reportReducer(
         selectedClusterEventIds: action.clusterEventIds,
         inspectedEntityId: action.entityId,
         selectedCombatMs: action.combatMs,
-        inspectorOpen: true,
+        inspectorOpen: action.anchor !== undefined,
+        inspectorAnchor: action.anchor ?? null,
       };
     case "select-time":
       return {
@@ -85,6 +88,7 @@ export function reportReducer(
         inspectedEntityId: "",
         selectedCombatMs: action.combatMs,
         inspectorOpen: false,
+        inspectorAnchor: null,
       };
     case "close-inspector":
       return {
@@ -93,6 +97,7 @@ export function reportReducer(
         selectedClusterEventIds: [],
         inspectedEntityId: "",
         inspectorOpen: false,
+        inspectorAnchor: null,
       };
     case "select-entity":
       return {

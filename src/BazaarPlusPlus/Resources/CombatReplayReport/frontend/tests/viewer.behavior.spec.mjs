@@ -1170,6 +1170,35 @@ test("pins a solid axis on click while pointer hover drives a dashed axis", asyn
   }).toBe(true);
 });
 
+test("updates the hover preview axis for adjacent pointer positions", async ({
+  page,
+}) => {
+  await page.goto(`${reportUrl}?lang=en`);
+  const canvas = page.getByTestId("timeline-canvas");
+  const tooltip = page.getByTestId("timeline-tooltip");
+  const bounds = await canvas.boundingBox();
+  expect(bounds).not.toBeNull();
+
+  await page.mouse.move(bounds.x + bounds.width * 0.2, bounds.y + 20);
+  await expect
+    .poll(() => tooltip.getAttribute("data-bpp-combat-ms"))
+    .not.toBe("");
+  const first = Number(
+    await tooltip.getAttribute("data-bpp-combat-ms"),
+  );
+
+  await page.mouse.move(bounds.x + bounds.width * 0.2 + 1, bounds.y + 20);
+  await expect
+    .poll(async () =>
+      Number(await tooltip.getAttribute("data-bpp-combat-ms"))
+    )
+    .toBeGreaterThan(first);
+  const second = Number(
+    await tooltip.getAttribute("data-bpp-combat-ms"),
+  );
+  expect(second - first).toBeLessThan(100);
+});
+
 test("paused recording preview cannot move the pinned solid axis", async ({
   page,
 }) => {
@@ -1367,6 +1396,15 @@ test("paused recording preview cannot move the pinned solid axis", async ({
   );
   await page.getByTestId("recording-play-toggle").click();
   await expect(video).toHaveJSProperty("paused", false);
+  const playingMediaTime = await video.evaluate(
+    (element) => element.currentTime,
+  );
+  await page.mouse.move(
+    bounds.x + bounds.width * guideRatios.pinned,
+    bounds.y + 10,
+  );
+  await page.waitForTimeout(50);
+  await expect(video).toHaveJSProperty("currentTime", playingMediaTime);
   await video.evaluate((element) => {
     element.currentTime = 8.25;
   });
@@ -1509,6 +1547,7 @@ test("remounts recording at the hidden selection with truthful playback UI", asy
   await page.getByTestId("recording-next-event").click();
   await expect(firstVideo).toHaveJSProperty("currentTime", 2);
   await expect(page.getByTestId("recording-timecode")).toHaveText("00:02.000");
+  await expect(page.getByTestId("frame-inspector-popover")).toHaveCount(0);
   await page.getByTestId("recording-play-toggle").click();
   await expect(firstVideo).toHaveJSProperty("paused", false);
 
@@ -1577,24 +1616,13 @@ test("event navigation skips frames without a rendered cluster", async ({
     .first();
   await page.keyboard.press("ArrowRight");
   await expect(currentTime).toContainText("2.00s");
-  await expect(page.getByTestId("focused-cluster-event")).toHaveAttribute(
-    "data-bpp-event-id",
-    "damage-1",
-  );
 
   await page.keyboard.press("ArrowRight");
   await expect(currentTime).toContainText("3.00s");
-  await expect(page.getByTestId("focused-cluster-event")).toHaveAttribute(
-    "data-bpp-event-id",
-    "charge-1",
-  );
 
   await page.keyboard.press("ArrowLeft");
   await expect(currentTime).toContainText("2.00s");
-  await expect(page.getByTestId("focused-cluster-event")).toHaveAttribute(
-    "data-bpp-event-id",
-    "damage-1",
-  );
+  await expect(page.getByTestId("frame-inspector-popover")).toHaveCount(0);
 });
 
 test("supports time zoom, statistics navigation, entity coverage, and sorting", async ({
@@ -2070,6 +2098,9 @@ test("scopes the inspector to the exact clicked cluster", async ({
   await page.goto(`${denseReportUrl}?lang=en`);
 
   const canvas = page.getByTestId("timeline-canvas");
+  const timelineWidthBeforeSelection = await page
+    .getByTestId("timeline-scroll")
+    .evaluate((element) => element.getBoundingClientRect().width);
   const clickCluster = async (laneOffset, expectedCount) => {
     let point = null;
     await expect
@@ -2094,6 +2125,7 @@ test("scopes the inspector to the exact clicked cluster", async ({
 
   await clickCluster(3.5 * 52 - 9, "80 events");
 
+  await expect(page.getByTestId("frame-inspector-popover")).toBeVisible();
   await expect(page.getByTestId("frame-inspector")).toBeVisible();
   await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
     "Fixture Opponent",
@@ -2146,27 +2178,39 @@ test("scopes the inspector to the exact clicked cluster", async ({
     const inspectorHeader = document.querySelector(
       '[data-bpp-test-id="frame-inspector-header"]',
     );
-    const timelineScroll = document.querySelector(
-      '[data-bpp-test-id="timeline-scroll"]',
+    const popover = document.querySelector(
+      '[data-bpp-test-id="frame-inspector-popover"]',
     );
     const inspectorBounds = inspector?.getBoundingClientRect();
     const headerBounds = inspectorHeader?.getBoundingClientRect();
-    const timelineBounds = timelineScroll?.getBoundingClientRect();
+    const popoverBounds = popover?.getBoundingClientRect();
     return {
       headerHeight: headerBounds?.height ?? 0,
-      inspectorLeft: inspectorBounds?.left ?? 0,
       inspectorWidth: inspectorBounds?.width ?? 0,
-      timelineRight: timelineBounds?.right ?? 0,
+      popoverBottom: popoverBounds?.bottom ?? 0,
+      popoverLeft: popoverBounds?.left ?? 0,
+      popoverRight: popoverBounds?.right ?? 0,
+      popoverTop: popoverBounds?.top ?? 0,
     };
   });
   expect(inspectorGeometry.inspectorWidth).toBeGreaterThanOrEqual(320);
-  expect(inspectorGeometry.inspectorWidth).toBeLessThanOrEqual(400);
+  expect(inspectorGeometry.inspectorWidth).toBeLessThanOrEqual(420);
   expect(inspectorGeometry.headerHeight).toBeLessThanOrEqual(64);
-  expect(
-    Math.abs(
-      inspectorGeometry.timelineRight - inspectorGeometry.inspectorLeft,
-    ),
-  ).toBeLessThanOrEqual(1);
+  expect(inspectorGeometry.popoverLeft).toBeGreaterThanOrEqual(0);
+  expect(inspectorGeometry.popoverTop).toBeGreaterThanOrEqual(0);
+  expect(inspectorGeometry.popoverRight).toBeLessThanOrEqual(
+    page.viewportSize().width,
+  );
+  expect(inspectorGeometry.popoverBottom).toBeLessThanOrEqual(
+    page.viewportSize().height,
+  );
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("timeline-scroll")
+        .evaluate((element) => element.getBoundingClientRect().width)
+    )
+    .toBe(timelineWidthBeforeSelection);
   await page.mouse.move(2, 2);
   await expect(page.getByTestId("timeline-lane-1")).toHaveClass(
     /is-related-source/u,
@@ -2198,6 +2242,7 @@ test("scopes the inspector to the exact clicked cluster", async ({
 
   await page.getByTestId("frame-inspector-close").click();
   await expect(page.getByTestId("frame-inspector")).toBeHidden();
+  await expect(page.getByTestId("frame-inspector-popover")).toBeHidden();
   await expect(page.getByTestId("timeline-lane-4")).not.toHaveClass(
     /is-related-source/u,
   );
@@ -2536,6 +2581,16 @@ test("keeps direct freeze applications in the combat log without countdown tick 
   await expect(freezeRow).toContainText("+1");
   await expect(freezeRow).toContainText("1s");
   await expect(freezeRow).toContainText("×2");
+  await freezeRow.click();
+  await expect(freezeRow).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByTestId("combat-log-entry-details")).toBeVisible();
+  const detailRows = page.getByTestId("combat-log-entry-detail");
+  await expect(detailRows).toHaveCount(2);
+  await expect(detailRows.nth(0)).toContainText("Practice Shield");
+  await expect(detailRows.nth(1)).toContainText("Cash Cannon");
+  await expect(page.getByTestId("frame-inspector-popover")).toBeVisible();
+  await detailRows.nth(0).click();
+  await expect(page.getByTestId("frame-event-total")).toHaveText("1 events");
   await expect(page.getByTestId("combat-log")).not.toContainText("-50ms");
 });
 
@@ -2554,6 +2609,21 @@ test("embeds the existing recording instance in the footer dock", async ({
   await page.getByTestId("combat-log-dock-toggle").click();
 
   await expect(page.getByTestId("footer-replay-dock")).toBeVisible();
+  await expect(page.getByTestId("combat-log")).toHaveAttribute(
+    "data-bpp-follow-source",
+    "playback",
+  );
+  const ruler = page.getByTestId("timeline-ruler-canvas");
+  const rulerBounds = await ruler.boundingBox();
+  expect(rulerBounds).not.toBeNull();
+  await ruler.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    element.dispatchEvent(new PointerEvent("pointermove", {
+      bubbles: true,
+      clientX: bounds.left + bounds.width * 0.85,
+      clientY: bounds.top + bounds.height * 0.5,
+    }));
+  });
   await expect(page.getByTestId("combat-log")).toHaveAttribute(
     "data-bpp-follow-source",
     "playback",
