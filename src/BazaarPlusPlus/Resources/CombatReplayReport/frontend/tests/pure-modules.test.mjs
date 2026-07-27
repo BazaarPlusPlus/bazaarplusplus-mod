@@ -92,7 +92,10 @@ import { buildEntityActivity } from "../src/statistics/aggregate.ts";
 import { mergeInspectorEvents } from "../src/components/inspector/frame-event-groups.ts";
 import {
   buildCombatLogEntries,
+  combatLogEventToken,
+  combatLogTargetDetails,
   groupCombatLogEntries,
+  isCombatLogHealthSettlementEvent,
   isDirectStatusApplicationEvent,
   isNarrativeCombatLogEntry,
   nearestCombatLogEntryIndex,
@@ -134,6 +137,8 @@ test("combat log merges only identical events from the same frame", () => {
     targetIds: ["target"],
     value: 2_000,
     unit: "milliseconds",
+    iconSemanticKey: "haste",
+    icon: "../report-assets/status-haste.png",
   });
   const entries = buildCombatLogEntries([
     { ...base, id: "same-a", occurrences: 2 },
@@ -158,8 +163,91 @@ test("combat log merges only identical events from the same frame", () => {
   assert.ok(mergedEntry);
   assert.equal(mergedEntry.count, 5);
   assert.deepEqual(mergedEntry.eventIds, ["same-a", "same-b"]);
+  assert.equal(mergedEntry.iconSemanticKey, "haste");
+  assert.equal(mergedEntry.icon, "../report-assets/status-haste.png");
   assert.equal(entries.filter((entry) => entry.frame === 20).length, 2);
   assert.equal(entries.filter((entry) => entry.frame === 21).length, 1);
+});
+
+test("combat log preserves burn and regeneration applications alongside their health settlements", () => {
+  const events = [
+    timelineEvent({
+      id: "burn-application",
+      frame: 80,
+      combatMs: 4_000,
+      kind: "effect-executed",
+      action: "PlayerBurnApply",
+      sourceId: "trail-mix",
+      targetIds: ["opponent"],
+      value: 16,
+      iconSemanticKey: "burn",
+      icon: "../report-assets/status-burn.png",
+    }),
+    timelineEvent({
+      id: "regen-application",
+      frame: 80,
+      combatMs: 4_000,
+      kind: "effect-executed",
+      action: "PlayerRegenApply",
+      sourceId: "trail-mix",
+      targetIds: ["player"],
+      value: 7,
+      iconSemanticKey: "regen",
+      icon: "../report-assets/status-regen.png",
+    }),
+    timelineEvent({
+      id: "burn-settlement",
+      frame: 81,
+      combatMs: 4_050,
+      kind: "health",
+      action: "Health:Burn",
+      targetIds: ["opponent"],
+      value: -16,
+    }),
+    timelineEvent({
+      id: "regen-settlement",
+      frame: 81,
+      combatMs: 4_050,
+      kind: "health",
+      action: "Health:Regen",
+      targetIds: ["player"],
+      value: 12,
+    }),
+  ];
+
+  assert.equal(combatLogEventToken(events[0]), "burn");
+  assert.equal(combatLogEventToken(events[1]), "regen");
+  assert.equal(combatLogEventToken(events[2]), "damage");
+  assert.equal(combatLogEventToken(events[3]), "heal");
+  assert.equal(isCombatLogHealthSettlementEvent(events[0]), false);
+  assert.equal(isCombatLogHealthSettlementEvent(events[1]), false);
+  assert.equal(isCombatLogHealthSettlementEvent(events[2]), true);
+  assert.equal(isCombatLogHealthSettlementEvent(events[3]), true);
+  assert.equal(
+    isCombatLogHealthSettlementEvent(
+      timelineEvent({ kind: "health", action: "Health:Damage" }),
+    ),
+    false,
+  );
+
+  const entries = buildCombatLogEntries(events);
+  assert.deepEqual(
+    Object.fromEntries(entries.map((entry) => [entry.action, entry.token])),
+    {
+      PlayerBurnApply: "burn",
+      PlayerRegenApply: "regen",
+      "Health:Burn": "damage",
+      "Health:Regen": "heal",
+    },
+  );
+  assert.equal(
+    entries.find((entry) => entry.action === "PlayerBurnApply")?.icon,
+    "../report-assets/status-burn.png",
+  );
+  assert.equal(
+    entries.find((entry) => entry.action === "PlayerRegenApply")?.icon,
+    "../report-assets/status-regen.png",
+  );
 });
 
 test("combat log narrative excludes generic setup and attribute noise", () => {
@@ -270,6 +358,47 @@ test("combat log grouping never merges distinct actions", () => {
   ]);
 
   assert.equal(groupCombatLogEntries(entries).length, 2);
+});
+
+test("combat log target details aggregate overlapping targets without duplicates", () => {
+  const base = {
+    frame: 80,
+    combatMs: 4_000,
+    action: "CardSlow",
+    token: "slow",
+    iconSemanticKey: "",
+    icon: "",
+    sourceId: "boar-roast",
+    triggerSourceId: "",
+    value: 2_000,
+    unit: "ms",
+  };
+  const details = combatLogTargetDetails([
+    {
+      ...base,
+      id: "first",
+      targetIds: ["boar-roast", "cash-cannon"],
+      eventIds: ["first-event"],
+      count: 1,
+    },
+    {
+      ...base,
+      id: "second",
+      targetIds: ["boar-roast", "regal-blade", "regal-blade"],
+      eventIds: ["second-event"],
+      count: 2,
+    },
+  ]);
+
+  assert.deepEqual(
+    details.map((detail) => detail.targetIds[0]),
+    ["boar-roast", "cash-cannon", "regal-blade"],
+  );
+  assert.deepEqual(
+    details.map((detail) => detail.count),
+    [3, 1, 2],
+  );
+  assert.deepEqual(details[0].eventIds, ["first-event", "second-event"]);
 });
 
 test("combat log nearest entry lookup is stable at bounds and ties", () => {

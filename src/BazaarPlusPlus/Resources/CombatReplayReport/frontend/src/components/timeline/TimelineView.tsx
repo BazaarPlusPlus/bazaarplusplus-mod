@@ -18,6 +18,7 @@ import {
   STATE_BAND_HEIGHT,
   timelineWidthAtZoom,
 } from "../../timeline/constants.ts";
+import { timelineXAtCombatMs } from "../../timeline/geometry.ts";
 import { TimelineCanvasController } from "../../timeline/event-renderer.ts";
 import { drawStateBand, groupMetricSamples } from "../../timeline/state-band-renderer.ts";
 import { formatDuration } from "../../i18n/format.ts";
@@ -41,7 +42,14 @@ import {
 
 export interface TimelineHandle {
   setExternalPlayhead: (combatMs: number) => void;
+  focusCombatEntry: (combatMs: number, entityId: string) => void;
   navigate: (direction: -1 | 1) => void;
+}
+
+interface TimelineFocusRequest {
+  combatMs: number;
+  entityId: string;
+  nonce: number;
 }
 
 export const TimelineView = forwardRef<
@@ -68,6 +76,9 @@ export const TimelineView = forwardRef<
     eventIds: state.selectedClusterEventIds,
   };
   const [baseWidth, setBaseWidth] = useState(MIN_TIMELINE_WIDTH);
+  const focusNonceRef = useRef(0);
+  const [focusRequest, setFocusRequest] =
+    useState<TimelineFocusRequest | null>(null);
   const entities = useMemo(
     () => filterTimelineEntities(model.entities, state.laneVisibility),
     [model.entities, state.laneVisibility],
@@ -337,7 +348,9 @@ export const TimelineView = forwardRef<
         candidate.dataset.bppEntityId === state.selectedEntityId,
     );
     if (!row) return;
-    viewportRefs.scroll.current.scrollTo({
+    const scroll = viewportRefs.scroll.current;
+    scroll.scrollTo({
+      left: scroll.scrollLeft,
       top: Math.max(0, row.offsetTop - LANE_HEIGHT),
       behavior: "smooth",
     });
@@ -349,6 +362,56 @@ export const TimelineView = forwardRef<
     return () => window.clearTimeout(timeout);
   }, [entities, state.selectedEntityId]);
 
+  useLayoutEffect(() => {
+    const scroll = viewportRefs.scroll.current;
+    if (!scroll || !focusRequest) return;
+
+    const row = Array.from(
+      viewportRefs.labels.current?.querySelectorAll<HTMLElement>(
+        "[data-bpp-entity-id]",
+      ) ?? [],
+    ).find(
+      (candidate) =>
+        candidate.dataset.bppEntityId === focusRequest.entityId,
+    );
+    const eventViewportWidth = Math.max(
+      1,
+      scroll.clientWidth - LANE_LABEL_WIDTH,
+    );
+    const eventX = timelineXAtCombatMs(
+      focusRequest.combatMs,
+      model.durationMs,
+      timelineWidth,
+    );
+    const maxLeft = Math.max(0, scroll.scrollWidth - scroll.clientWidth);
+    scroll.scrollTo({
+      left: Math.min(
+        maxLeft,
+        Math.max(0, eventX - eventViewportWidth * 0.45),
+      ),
+      top: row
+        ? Math.max(0, row.offsetTop - LANE_HEIGHT)
+        : scroll.scrollTop,
+      behavior: "auto",
+    });
+
+    if (!row) return;
+    row.classList.add("is-jump-target");
+    const timeout = window.setTimeout(
+      () => row.classList.remove("is-jump-target"),
+      1_200,
+    );
+    return () => {
+      window.clearTimeout(timeout);
+      row.classList.remove("is-jump-target");
+    };
+  }, [
+    entities,
+    focusRequest,
+    model.durationMs,
+    timelineWidth,
+  ]);
+
   useImperativeHandle(
     forwardedRef,
     () => ({
@@ -357,11 +420,19 @@ export const TimelineView = forwardRef<
         viewportRefs.controller.current?.setPlayhead(combatMs);
         drawState();
       },
+      focusCombatEntry(combatMs: number, entityId: string): void {
+        focusNonceRef.current += 1;
+        setFocusRequest({
+          combatMs,
+          entityId,
+          nonce: focusNonceRef.current,
+        });
+      },
       navigate(direction: -1 | 1): void {
         viewportRefs.controller.current?.navigate(direction);
       },
     }),
-    [drawState],
+    [drawState, model.durationMs, timelineWidth],
   );
 
   const clearPreview = (): void => {

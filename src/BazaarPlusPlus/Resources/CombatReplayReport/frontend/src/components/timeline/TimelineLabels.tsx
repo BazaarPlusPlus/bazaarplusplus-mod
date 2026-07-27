@@ -26,7 +26,7 @@ export function heroLaneAtScroll(
 ): number | null {
   let activeLane: number | null = null;
   for (const lane of heroLaneIndexes) {
-    if (scrollTop < lane * LANE_HEIGHT) break;
+    if (scrollTop < (lane + 1) * LANE_HEIGHT) break;
     activeLane = lane;
   }
   return activeLane;

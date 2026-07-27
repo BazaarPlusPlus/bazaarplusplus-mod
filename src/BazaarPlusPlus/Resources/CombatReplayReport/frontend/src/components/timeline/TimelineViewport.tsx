@@ -249,7 +249,9 @@ export function TimelineViewport({
                   key={entity.id}
                   style={{ height: LANE_HEIGHT }}
                 >
-                  <LaneLabelContents entity={entity} index={index} t={t} />
+                  {index !== pinnedHeroLane && (
+                    <LaneLabelContents entity={entity} index={index} t={t} />
+                  )}
                 </div>
               ))}
           </div>
@@ -273,11 +275,15 @@ export function TimelineViewport({
             className={cn(
               "bpp-lane-label bpp-sticky-hero-label",
               pinnedHero && `bpp-side-${pinnedHeroSide}`,
-              pinnedHeroLane === sideBoundaryLane && "is-side-boundary",
+              pinnedHeroLane !== null
+                && pinnedHeroLane === sideBoundaryLane
+                && "is-side-boundary",
             )}
             aria-hidden="true"
             data-bpp-side-boundary={
-              pinnedHeroLane === sideBoundaryLane ? "opponent" : undefined
+              pinnedHeroLane !== null && pinnedHeroLane === sideBoundaryLane
+                ? "opponent"
+                : undefined
             }
             data-bpp-sticky-hero-lane={pinnedHeroLane ?? ""}
             data-bpp-sticky-hero-entity-id={pinnedHero?.id ?? ""}

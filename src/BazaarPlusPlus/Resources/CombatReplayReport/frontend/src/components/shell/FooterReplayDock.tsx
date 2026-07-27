@@ -11,7 +11,6 @@ import type { CombatLogEntry } from "../../combat-log/entries.ts";
 import {
   CombatLogList,
   type CombatLogHandle,
-  type CombatLogSelectionAnchor,
 } from "../combat-log/CombatLogList.tsx";
 import { Button } from "../ui/button.tsx";
 
@@ -47,10 +46,7 @@ export const FooterReplayDock = forwardRef<
     pinnedCombatMs: number;
     pinnedEventIds: readonly string[];
     onRecordingHost: (node: HTMLDivElement | null) => void;
-    onSelectEntry: (
-      entry: CombatLogEntry,
-      anchor?: CombatLogSelectionAnchor,
-    ) => void;
+    onSelectEntry: (entry: CombatLogEntry) => void;
     t: (key: string) => string;
   }
 >(function FooterReplayDock(

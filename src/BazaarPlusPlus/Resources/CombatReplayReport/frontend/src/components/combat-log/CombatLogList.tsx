@@ -1,7 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ChevronDown,
-  ChevronRight,
   Pause,
   Play,
   RotateCcw,
@@ -26,8 +25,10 @@ import {
   buildCombatLogEntries,
   combatLogEntity,
   combatLogGroupKey,
+  combatLogTargetDetails,
   groupCombatLogEntries,
-  isDirectStatusApplicationEvent,
+  isCombatLogApplicationEvent,
+  isCombatLogHealthSettlementEvent,
   isNarrativeCombatLogEntry,
   nearestCombatLogEntryIndex,
   selectedCombatLogEntryIndex,
@@ -43,11 +44,6 @@ export interface CombatLogHandle {
   setPlaybackActive: (active: boolean) => void;
   setPlaybackCombatMs: (combatMs: number) => void;
   setPreviewCombatMs: (combatMs: number | null) => void;
-}
-
-export interface CombatLogSelectionAnchor {
-  x: number;
-  y: number;
 }
 
 function entryAmount(entry: CombatLogEntry): string {
@@ -107,13 +103,21 @@ function MissingEntity({
   );
 }
 
-function expandTargets(entry: CombatLogEntry): CombatLogEntry[] {
-  if (entry.targetIds.length <= 1) return [entry];
-  return entry.targetIds.map((targetId, index) => ({
-    ...entry,
-    id: `${entry.id}:target:${index}:${targetId}`,
-    targetIds: [targetId],
-  }));
+function CombatLogKindIcon({
+  entry,
+}: {
+  entry: CombatLogEntry;
+}): React.JSX.Element {
+  return entry.icon ? (
+    <img
+      alt=""
+      className="size-icon-md shrink-0 object-contain"
+      data-bpp-test-id="combat-log-kind-native-icon"
+      src={entry.icon}
+    />
+  ) : (
+    <SemanticIcon className="size-icon-sm" token={entry.token} />
+  );
 }
 
 function CombatLogEntryColumns({
@@ -121,6 +125,7 @@ function CombatLogEntryColumns({
   entityById,
   frameStart,
   t,
+  detailCount,
   expandable,
   expanded,
 }: {
@@ -128,6 +133,7 @@ function CombatLogEntryColumns({
   entityById: ReadonlyMap<string, NormalizedEntity>;
   frameStart: boolean;
   t: (key: string) => string;
+  detailCount: number;
   expandable?: boolean;
   expanded?: boolean;
 }): React.JSX.Element {
@@ -157,8 +163,8 @@ function CombatLogEntryColumns({
         className="flex min-w-0 items-center gap-1.5 overflow-hidden"
         data-bpp-test-id="combat-log-kind"
       >
-        <SemanticIcon className="size-icon-sm" token={entry.token} />
-        <span className="shrink-0 text-compact font-semibold text-foreground max-[600px]:sr-only">
+        <CombatLogKindIcon entry={entry} />
+        <span className="truncate text-compact font-semibold text-foreground max-[600px]:sr-only">
           {t(entry.token)}
         </span>
       </span>
@@ -180,35 +186,45 @@ function CombatLogEntryColumns({
             />
           )}
       </span>
-      <ChevronRight
-        aria-hidden="true"
-        className="size-icon-sm shrink-0 justify-self-center opacity-45"
-        data-bpp-test-id="combat-log-arrow"
-      />
+      {expandable ? (
+        <span
+          aria-hidden="true"
+          className="relative h-full w-full"
+          data-bpp-test-id="combat-log-arrow"
+        >
+          <span
+            className="absolute left-1/2 right-0 top-1/2 h-px bg-brand-soft/35"
+            data-bpp-test-id="combat-log-tree-root-arm"
+          />
+          {expanded && (
+            <span
+              className="absolute -bottom-px left-1/2 top-1/2 w-px bg-brand-soft/35"
+              data-bpp-test-id="combat-log-tree-root-spine"
+            />
+          )}
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          data-bpp-test-id="combat-log-relation"
+        />
+      )}
       <span
         className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 overflow-hidden text-compact text-muted-foreground"
         data-bpp-test-id="combat-log-target"
       >
-        {targets[0]
-          ? (
-            <EntityChip
-              entity={targets[0]}
-              labelTestId="combat-log-target-label"
-            />
-          )
-          : (
-            <MissingEntity
-              label={t("targetNotRecorded")}
-              labelTestId="combat-log-target-label"
-            />
-          )}
         {expandable
           ? (
             <span
-              className="inline-flex shrink-0 items-center gap-0.5 text-micro text-muted-foreground"
+              className="col-span-2 inline-flex min-w-0 items-center gap-1 text-compact text-muted-foreground"
               data-bpp-test-id="combat-log-entry-expand"
             >
-              +{Math.max(1, targets.length - 1)}
+              <span data-bpp-test-id="combat-log-target-summary">
+                {t("combatLogTargets")}
+              </span>
+              <strong className="font-mono text-micro text-foreground">
+                ×{detailCount}
+              </strong>
               <ChevronDown
                 aria-hidden="true"
                 className={cn(
@@ -218,13 +234,30 @@ function CombatLogEntryColumns({
               />
             </span>
           )
-          : targets.length > 1
-            ? (
-              <span className="shrink-0 text-micro text-muted-foreground">
-                +{targets.length - 1}
-              </span>
-            )
-            : null}
+          : (
+            <>
+              {targets[0]
+                ? (
+                  <EntityChip
+                    entity={targets[0]}
+                    labelTestId="combat-log-target-label"
+                  />
+                )
+                : (
+                  <MissingEntity
+                    label={t("targetNotRecorded")}
+                    labelTestId="combat-log-target-label"
+                  />
+                )}
+              {targets.length > 1
+                ? (
+                  <span className="shrink-0 text-micro text-muted-foreground">
+                    +{targets.length - 1}
+                  </span>
+                )
+                : null}
+            </>
+          )}
       </span>
       <span
         className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums"
@@ -239,6 +272,89 @@ function CombatLogEntryColumns({
   );
 }
 
+function CombatLogTreeDetail({
+  detail,
+  entityById,
+  isLast,
+  onSelectEntry,
+  parentEntryId,
+  t,
+}: {
+  detail: CombatLogEntry;
+  entityById: ReadonlyMap<string, NormalizedEntity>;
+  isLast: boolean;
+  onSelectEntry: (entry: CombatLogEntry) => void;
+  parentEntryId: string;
+  t: (key: string) => string;
+}): React.JSX.Element {
+  const target = combatLogEntity(entityById, detail.targetIds[0]);
+  const amount = entryAmount(detail);
+
+  return (
+    <Button
+      aria-label={[
+        t(detail.token),
+        target?.name ?? t("targetNotRecorded"),
+        amount,
+      ].filter(Boolean).join(" · ")}
+      className="grid h-8 w-full grid-cols-[4rem_4.75rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/15 px-3 text-left font-normal transition-colors hover:bg-accent/35 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2"
+      data-bpp-last-child={isLast ? "true" : "false"}
+      data-bpp-parent-entry-id={parentEntryId}
+      data-bpp-target-id={detail.targetIds[0] ?? ""}
+      data-bpp-test-id="combat-log-entry-detail"
+      onClick={() => onSelectEntry(detail)}
+      size="sm"
+      type="button"
+      variant="tableHeader"
+    >
+      <span aria-hidden="true" />
+      <span aria-hidden="true" />
+      <span aria-hidden="true" />
+      <span
+        aria-hidden="true"
+        className="relative grid h-full place-items-center"
+        data-bpp-test-id="combat-log-tree-branch"
+      >
+        <span
+          className={cn(
+            "absolute left-1/2 top-0 w-px bg-brand-soft/35",
+            isLast ? "bottom-1/2" : "-bottom-px",
+          )}
+          data-bpp-test-id="combat-log-tree-spine"
+        />
+        <span
+          className="absolute left-1/2 top-1/2 h-px w-1/2 bg-brand-soft/35"
+          data-bpp-test-id="combat-log-tree-elbow"
+        />
+      </span>
+      <span
+        className="block min-w-0 overflow-hidden text-compact text-muted-foreground"
+        data-bpp-test-id="combat-log-tree-target"
+      >
+        {target
+          ? (
+            <EntityChip
+              entity={target}
+              labelTestId="combat-log-tree-target-label"
+            />
+          )
+          : (
+            <MissingEntity
+              label={t("targetNotRecorded")}
+              labelTestId="combat-log-tree-target-label"
+            />
+          )}
+      </span>
+      <span className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums">
+        {amount && <strong className="text-foreground">{amount}</strong>}
+        {detail.count > 1 && (
+          <span className="text-muted-foreground">×{detail.count}</span>
+        )}
+      </span>
+    </Button>
+  );
+}
+
 export const CombatLogList = forwardRef<
   CombatLogHandle,
   {
@@ -247,10 +363,7 @@ export const CombatLogList = forwardRef<
     model: ReportViewModel;
     pinnedCombatMs: number;
     pinnedEventIds: readonly string[];
-    onSelectEntry: (
-      entry: CombatLogEntry,
-      anchor?: CombatLogSelectionAnchor,
-    ) => void;
+    onSelectEntry: (entry: CombatLogEntry) => void;
     t: (key: string) => string;
   }
 >(function CombatLogList(
@@ -274,7 +387,8 @@ export const CombatLogList = forwardRef<
       buildCombatLogEntries(
         model.events.filter((event) =>
           isVisibleTimelineEvent(event, entityById)
-          || isDirectStatusApplicationEvent(event)
+          || isCombatLogApplicationEvent(event)
+          || isCombatLogHealthSettlementEvent(event)
         ),
       ).filter(isNarrativeCombatLogEntry),
     [entityById, model.events],
@@ -292,8 +406,9 @@ export const CombatLogList = forwardRef<
     return new Map(
       entries.map((entry) => [
         entry.id,
-        (rawByKey.get(combatLogGroupKey(entry)) ?? [entry])
-          .flatMap(expandTargets),
+        combatLogTargetDetails(
+          rawByKey.get(combatLogGroupKey(entry)) ?? [entry],
+        ),
       ]),
     );
   }, [entries, rawEntries]);
@@ -323,7 +438,10 @@ export const CombatLogList = forwardRef<
       const detailCount = entry
         ? detailsByEntryId.get(entry.id)?.length ?? 0
         : 0;
-      return 36 + (expandedEntryIds.has(entry?.id ?? "") ? detailCount * 32 : 0);
+      return 36
+        + (expandedEntryIds.has(entry?.id ?? "")
+          ? detailCount * 32 + 4
+          : 0);
     },
     getItemKey: (index) => entries[index]?.id ?? index,
     getScrollElement: () => viewportRef.current,
@@ -501,7 +619,7 @@ export const CombatLogList = forwardRef<
                     aria-current={active ? "true" : undefined}
                     aria-expanded={expandable ? expanded : undefined}
                     className={cn(
-                      "grid h-9 w-full grid-cols-[4rem_8.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2",
+                      "grid h-9 w-full grid-cols-[4rem_4.75rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2",
                       frameStart && "border-t border-t-border/55",
                       sameFrame && "bg-brand-soft/[0.07]",
                       active
@@ -514,11 +632,8 @@ export const CombatLogList = forwardRef<
                     data-bpp-same-frame={sameFrame ? "true" : "false"}
                     data-bpp-test-id="combat-log-entry"
                     data-index={virtualRow.index}
-                    onClick={(event) => {
-                      onSelectEntry(entry, {
-                        x: event.clientX,
-                        y: event.clientY,
-                      });
+                    onClick={() => {
+                      onSelectEntry(entry);
                       if (!expandable) return;
                       setExpandedEntryIds((current) => {
                         const next = new Set(current);
@@ -542,6 +657,7 @@ export const CombatLogList = forwardRef<
                     <CombatLogEntryColumns
                       entityById={entityById}
                       entry={entry}
+                      detailCount={details.length}
                       expandable={expandable}
                       expanded={expanded}
                       frameStart={frameStart}
@@ -549,28 +665,24 @@ export const CombatLogList = forwardRef<
                     />
                   </Button>
                   {expanded && (
-                    <div data-bpp-test-id="combat-log-entry-details">
-                      {details.map((detail) => (
-                        <Button
-                          className="grid h-8 w-full grid-cols-[4rem_8.5rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/20 bg-surface-raised/35 px-3 text-left font-normal hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2"
-                          data-bpp-parent-entry-id={entry.id}
-                          data-bpp-test-id="combat-log-entry-detail"
+                    <div
+                      className="pb-1"
+                      data-bpp-source-id={
+                        entry.sourceId || entry.triggerSourceId
+                      }
+                      data-bpp-test-id="combat-log-entry-details"
+                      role="group"
+                    >
+                      {details.map((detail, detailIndex) => (
+                        <CombatLogTreeDetail
+                          detail={detail}
+                          entityById={entityById}
+                          isLast={detailIndex === details.length - 1}
                           key={detail.id}
-                          onClick={(event) =>
-                            onSelectEntry(detail, {
-                              x: event.clientX,
-                              y: event.clientY,
-                            })}
-                          type="button"
-                          variant="tableHeader"
-                        >
-                          <CombatLogEntryColumns
-                            entityById={entityById}
-                            entry={detail}
-                            frameStart={false}
-                            t={t}
-                          />
-                        </Button>
+                          onSelectEntry={onSelectEntry}
+                          parentEntryId={entry.id}
+                          t={t}
+                        />
                       ))}
                     </div>
                   )}

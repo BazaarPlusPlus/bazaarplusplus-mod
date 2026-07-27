@@ -31,7 +31,6 @@ import {
   type FooterReplayDockHandle,
 } from "../components/shell/FooterReplayDock.tsx";
 import type { CombatLogEntry } from "../combat-log/entries.ts";
-import type { CombatLogSelectionAnchor } from "../components/combat-log/CombatLogList.tsx";
 
 export function ReportApp({
   envelope,
@@ -123,15 +122,15 @@ export function ReportApp({
   }, []);
   const selectCombatLogEntry = useCallback((
     entry: CombatLogEntry,
-    anchor?: CombatLogSelectionAnchor,
   ): void => {
+    const entityId = entry.targetIds[0] || entry.sourceId;
+    timelineRef.current?.focusCombatEntry(entry.combatMs, entityId);
     dispatch({
       type: "select-frame",
       frame: entry.frame,
       combatMs: entry.combatMs,
       clusterEventIds: entry.eventIds,
-      entityId: entry.targetIds[0] || entry.sourceId,
-      anchor,
+      entityId,
     });
   }, []);
   const handlePlaybackActiveChange = useCallback((active: boolean): void => {

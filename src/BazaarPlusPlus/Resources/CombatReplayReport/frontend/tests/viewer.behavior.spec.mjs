@@ -165,6 +165,9 @@ const fixtureEnvelope = {
         unit: "points",
         role: "applied",
         attributionConfidence: "exact",
+        iconSemanticKey: "damage",
+        iconAssetRelativeUrl:
+          "../report-assets/objects/00/0000000000000000000000000000000000000000000000000000000000000000.png",
       }),
       schemaEvent({
         eventId: "charge-1",
@@ -749,11 +752,8 @@ test("separates both sides and filters lanes reversibly", async ({ page }) => {
       }
       return painted;
     });
-  await expect(page.getByTestId("timeline-sticky-hero-label")).toHaveAttribute(
-    "data-bpp-sticky-hero-entity-id",
-    "player-hero",
-  );
-  await expect.poll(stickyHeroPaintedPixels).toBeGreaterThan(0);
+  await expect(page.getByTestId("timeline-sticky-hero-label")).toBeHidden();
+  await expect.poll(stickyHeroPaintedPixels).toBe(0);
   const opponentBoundary = page.getByTestId("timeline-lane-3");
   await expect(opponentBoundary).toHaveAttribute(
     "data-bpp-entity-id",
@@ -823,11 +823,8 @@ test("separates both sides and filters lanes reversibly", async ({ page }) => {
   ).toHaveCount(6);
 
   await page.getByTestId("lane-filter-skill").click();
-  await expect(page.getByTestId("timeline-sticky-hero-label")).toHaveAttribute(
-    "data-bpp-sticky-hero-entity-id",
-    "player-hero",
-  );
-  await expect.poll(stickyHeroPaintedPixels).toBeGreaterThan(0);
+  await expect(page.getByTestId("timeline-sticky-hero-label")).toBeHidden();
+  await expect.poll(stickyHeroPaintedPixels).toBe(0);
   await expect(page.getByTestId("timeline-lane-labels")).not.toContainText(
     "Quick Thinking",
   );
@@ -887,10 +884,7 @@ test("separates both sides and filters lanes reversibly", async ({ page }) => {
   );
   await page.getByTestId("lane-filter-reset").click();
   await expect(page.locator("[data-bpp-entity-id]")).toHaveCount(5);
-  await expect(page.getByTestId("timeline-sticky-hero-label")).toHaveAttribute(
-    "data-bpp-sticky-hero-entity-id",
-    "player-hero",
-  );
+  await expect(page.getByTestId("timeline-sticky-hero-label")).toBeHidden();
 });
 
 test("pins one aligned hero lane and replaces it at the opponent section", async ({
@@ -901,8 +895,84 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
 
   const stickyLabel = page.getByTestId("timeline-sticky-hero-label");
   const stickyCanvas = page.getByTestId("timeline-sticky-hero-events");
+  const timelineScroll = page.getByTestId("timeline-scroll");
+  const laneLabels = page.getByTestId("timeline-lane-labels");
+  const playerHeroLane = laneLabels.locator(
+    '[data-bpp-entity-id="player-hero"]',
+  );
+  const opponentHeroLane = laneLabels.locator(
+    '[data-bpp-entity-id="opponent-hero"]',
+  );
+  const opponentLane = Number(
+    await opponentHeroLane.getAttribute("data-bpp-lane-index"),
+  );
+  expect(opponentLane).toBeGreaterThan(0);
+  const visibleHeroAvatarCount = (entityId) =>
+    page.evaluate((heroEntityId) => {
+      const scroll = document.querySelector(
+        '[data-bpp-test-id="timeline-scroll"]',
+      );
+      if (!(scroll instanceof HTMLElement)) return 0;
+      const scrollBounds = scroll.getBoundingClientRect();
+      const labels = document.querySelector(
+        '[data-bpp-test-id="timeline-lane-labels"]',
+      );
+      const originalLane = Array.from(
+        labels?.querySelectorAll("[data-bpp-entity-id]") ?? [],
+      ).find(
+        (lane) => lane.getAttribute("data-bpp-entity-id") === heroEntityId,
+      );
+      const stickyLane = document.querySelector(
+        '[data-bpp-test-id="timeline-sticky-hero-label"]',
+      );
+      const avatars = [
+        originalLane?.querySelector(
+          '[data-bpp-test-id^="timeline-lane-icon-"]',
+        ),
+        stickyLane?.getAttribute("data-bpp-sticky-hero-entity-id")
+          === heroEntityId
+          ? stickyLane.querySelector(
+            '[data-bpp-test-id="timeline-sticky-hero-icon"]',
+          )
+          : null,
+      ].filter(Boolean);
+      return Array.from(avatars).filter((avatar) => {
+        if (!(avatar instanceof HTMLElement) || avatar.closest("[hidden]")) {
+          return false;
+        }
+        const bounds = avatar.getBoundingClientRect();
+        return bounds.width > 0
+          && bounds.height > 0
+          && bounds.right > scrollBounds.left
+          && bounds.left < scrollBounds.right
+          && bounds.bottom > scrollBounds.top
+          && bounds.top < scrollBounds.bottom;
+      }).length;
+    }, entityId);
+
+  await timelineScroll.evaluate((scroll) => {
+    scroll.scrollTop = 0;
+    scroll.dispatchEvent(new Event("scroll"));
+  });
+  await expect
+    .poll(() => timelineScroll.evaluate((scroll) => scroll.scrollTop))
+    .toBe(0);
+  await expect(stickyLabel).toBeHidden();
+  await expect(stickyCanvas).toBeHidden();
+  await expect(page.getByTestId("timeline-lane-icon-0")).toBeVisible();
+  await expect
+    .poll(() => visibleHeroAvatarCount("player-hero"))
+    .toBe(1);
+
+  await timelineScroll.evaluate((scroll) => {
+    scroll.scrollTop = 53;
+  });
   await expect(stickyLabel).toBeVisible();
   await expect(stickyCanvas).toBeVisible();
+  await expect(playerHeroLane).toBeEmpty();
+  await expect
+    .poll(() => visibleHeroAvatarCount("player-hero"))
+    .toBe(1);
   await expect(stickyLabel).toHaveAttribute(
     "data-bpp-sticky-hero-entity-id",
     "player-hero",
@@ -982,15 +1052,8 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
   expect(geometry.canvasHeight).toBe(52);
   expect(geometry.canvasRatio).toBeCloseTo(2, 1);
 
-  const opponentHero = page.locator(
-    '[data-bpp-entity-id="opponent-hero"]',
-  );
-  const opponentLane = Number(
-    await opponentHero.getAttribute("data-bpp-lane-index"),
-  );
-  expect(opponentLane).toBeGreaterThan(0);
-  await page.getByTestId("timeline-scroll").evaluate((scroll, lane) => {
-    scroll.scrollTop = lane * 52 + 1;
+  await timelineScroll.evaluate((scroll, lane) => {
+    scroll.scrollTop = (lane + 1) * 52 + 1;
   }, opponentLane);
   await expect(stickyLabel).toHaveAttribute(
     "data-bpp-sticky-hero-entity-id",
@@ -1010,6 +1073,11 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
     "data-bpp-sticky-side",
     "opponent",
   );
+  await expect(opponentHeroLane).toBeEmpty();
+  await expect(playerHeroLane).not.toBeEmpty();
+  await expect
+    .poll(() => visibleHeroAvatarCount("opponent-hero"))
+    .toBe(1);
   const opponentStickySideColor = await stickyLabel.evaluate(
     (element) =>
       getComputedStyle(element).getPropertyValue("--bpp-sticky-side"),
@@ -1030,14 +1098,17 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
   );
   await expect(stickyLabel).toHaveClass(/is-related-target/u);
 
-  await page.getByTestId("timeline-scroll").evaluate((scroll) => {
+  await timelineScroll.evaluate((scroll) => {
     scroll.scrollTop = 0;
   });
-  await expect(stickyLabel).toHaveAttribute(
-    "data-bpp-sticky-hero-entity-id",
-    "player-hero",
-  );
-  await expect(stickyLabel).toContainText("Fixture Player");
+  await expect(stickyLabel).toBeHidden();
+  await expect(stickyCanvas).toBeHidden();
+  await expect(playerHeroLane).not.toBeEmpty();
+  await expect(opponentHeroLane).not.toBeEmpty();
+  await expect(page.getByTestId("timeline-lane-icon-0")).toBeVisible();
+  await expect
+    .poll(() => visibleHeroAvatarCount("player-hero"))
+    .toBe(1);
 });
 
 test("renders both combatants on the shared state band at device scale", async ({
@@ -2428,13 +2499,36 @@ test("virtualizes the footer combat log and highlights every visible row from th
   expect(await rows.count()).toBeLessThan(84);
   expect((await rows.first().boundingBox()).height).toBeLessThanOrEqual(47);
   await expect(rows.first()).toHaveAttribute("data-bpp-frame-start", "true");
+  const nativeKindIcons = page.getByTestId("combat-log-kind-native-icon");
+  await expect(nativeKindIcons.first()).toBeVisible();
+  await expect(nativeKindIcons.first()).toHaveAttribute(
+    "src",
+    /report-assets\/objects\/.+\.png$/,
+  );
+  const kindColumnGeometry = await rows.first().evaluate((element) => {
+    const kind = element.querySelector(
+      '[data-bpp-test-id="combat-log-kind"]',
+    )?.getBoundingClientRect();
+    const source = element.querySelector(
+      '[data-bpp-test-id="combat-log-source"]',
+    )?.getBoundingClientRect();
+    return {
+      width: kind?.width ?? Number.NaN,
+      trailingGap:
+        kind === undefined || source === undefined
+          ? Number.NaN
+          : source.left - kind.right,
+    };
+  });
+  expect(kindColumnGeometry.width).toBeLessThanOrEqual(78);
+  expect(kindColumnGeometry.trailingGap).toBeLessThanOrEqual(9);
   const columnAlignment = await rows.evaluateAll((elements) => {
     const testIds = [
       "combat-log-time",
       "combat-log-kind",
       "combat-log-source",
       "combat-log-source-label",
-      "combat-log-arrow",
+      "combat-log-relation",
       "combat-log-target",
       "combat-log-target-label",
       "combat-log-amount",
@@ -2517,7 +2611,7 @@ test("virtualizes the footer combat log and highlights every visible row from th
       '[data-bpp-test-id="combat-log-entry"][data-bpp-same-frame="true"]',
     ),
   ).toHaveCount(sameFrameHighlight.count);
-  await expect(page.getByTestId("frame-inspector-popover")).toBeVisible();
+  await expect(page.getByTestId("frame-inspector-popover")).toHaveCount(0);
 
   const viewport = page.getByTestId("combat-log-viewport");
   const pinnedScrollTop = await viewport.evaluate((element) =>
@@ -2534,15 +2628,6 @@ test("virtualizes the footer combat log and highlights every visible row from th
       clientY: bounds.top + bounds.height * 0.5,
     }));
   });
-  await previewAtRulerEnd();
-  await expect(log).toHaveAttribute("data-bpp-follow-source", "pinned");
-  await expect(activeEntry).toHaveAttribute("data-index", selectedIndex);
-  expect(await viewport.evaluate((element) => element.scrollTop)).toBe(
-    pinnedScrollTop,
-  );
-
-  await page.getByTestId("frame-inspector-close").click();
-  await expect(page.getByTestId("frame-inspector-popover")).toBeHidden();
   await previewAtRulerEnd();
   await expect(log).toHaveAttribute("data-bpp-follow-source", "hover");
   await expect(activeEntry).not.toHaveAttribute("data-index", selectedIndex);
@@ -2621,20 +2706,101 @@ test("keeps direct freeze applications in the combat log without countdown tick 
     .filter({ hasText: "Freeze" });
   await expect(freezeRow).toHaveCount(1);
   await expect(freezeRow).toContainText("Petrifying Gaze");
-  await expect(freezeRow).toContainText("Practice Shield");
-  await expect(freezeRow).toContainText("+1");
+  await expect(freezeRow.getByTestId("combat-log-target-summary"))
+    .toHaveText("Targets");
+  await expect(freezeRow.getByTestId("combat-log-entry-expand"))
+    .toContainText("×2");
+  await expect(freezeRow.getByTestId("combat-log-target-label")).toHaveCount(0);
   await expect(freezeRow).toContainText("1s");
   await expect(freezeRow).toContainText("×2");
   await freezeRow.click();
   await expect(freezeRow).toHaveAttribute("aria-expanded", "true");
-  await expect(page.getByTestId("combat-log-entry-details")).toBeVisible();
+  const rootGeometry = await freezeRow.evaluate((row) => {
+    const root = row.querySelector(
+      '[data-bpp-test-id="combat-log-arrow"]',
+    )?.getBoundingClientRect();
+    const arm = row.querySelector(
+      '[data-bpp-test-id="combat-log-tree-root-arm"]',
+    )?.getBoundingClientRect();
+    const spine = row.querySelector(
+      '[data-bpp-test-id="combat-log-tree-root-spine"]',
+    )?.getBoundingClientRect();
+    if (!root || !arm || !spine) return null;
+    return {
+      rootLeft: root.left,
+      rootWidth: root.width,
+      armLeft: arm.left,
+      armRight: arm.right,
+      armWidth: arm.width,
+      spineLeft: spine.left,
+    };
+  });
+  expect(rootGeometry).not.toBeNull();
+  expect(rootGeometry.armLeft).toBeCloseTo(
+    rootGeometry.rootLeft + rootGeometry.rootWidth / 2,
+    0,
+  );
+  expect(rootGeometry.armRight).toBeCloseTo(
+    rootGeometry.rootLeft + rootGeometry.rootWidth,
+    0,
+  );
+  expect(rootGeometry.armWidth).toBeLessThan(rootGeometry.rootWidth * 0.6);
+  expect(rootGeometry.spineLeft).toBeCloseTo(rootGeometry.armLeft, 0);
+  const detailTree = page.getByTestId("combat-log-entry-details");
+  await expect(detailTree).toBeVisible();
   const detailRows = page.getByTestId("combat-log-entry-detail");
   await expect(detailRows).toHaveCount(2);
   await expect(detailRows.nth(0)).toContainText("Practice Shield");
   await expect(detailRows.nth(1)).toContainText("Cash Cannon");
-  await expect(page.getByTestId("frame-inspector-popover")).toBeVisible();
+  await expect(
+    detailRows.getByTestId("combat-log-tree-target-label"),
+  ).toHaveText(["Practice Shield", "Cash Cannon"]);
+  await expect(page.getByTestId("combat-log-tree-branch")).toHaveCount(2);
+  await expect(page.getByTestId("combat-log-tree-target")).toHaveCount(2);
+  const detailGeometry = await detailTree.evaluate((tree) => {
+    const branches = Array.from(
+      tree.querySelectorAll('[data-bpp-test-id="combat-log-tree-branch"]'),
+    );
+    const targets = Array.from(
+      tree.querySelectorAll('[data-bpp-test-id="combat-log-tree-target"]'),
+    );
+    const spines = Array.from(
+      tree.querySelectorAll('[data-bpp-test-id="combat-log-tree-spine"]'),
+    );
+    const rows = Array.from(
+      tree.querySelectorAll('[data-bpp-test-id="combat-log-entry-detail"]'),
+    );
+    return {
+      branchHeights: branches.map((node) => node.getBoundingClientRect().height),
+      branchLefts: branches.map((node) => node.getBoundingClientRect().left),
+      targetLefts: targets.map((node) => node.getBoundingClientRect().left),
+      spineHeights: spines.map((node) => node.getBoundingClientRect().height),
+      rowHeights: rows.map((node) => node.getBoundingClientRect().height),
+      paddingBottom: Number.parseFloat(getComputedStyle(tree).paddingBottom),
+    };
+  });
+  expect(
+    Math.max(...detailGeometry.branchLefts)
+      - Math.min(...detailGeometry.branchLefts),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    detailGeometry.targetLefts.every(
+      (left, index) => left > detailGeometry.branchLefts[index],
+    ),
+  ).toBe(true);
+  expect(detailGeometry.rowHeights).toEqual([32, 32]);
+  expect(detailGeometry.spineHeights[0]).toBeCloseTo(
+    detailGeometry.branchHeights[0] + 1,
+    0,
+  );
+  expect(detailGeometry.spineHeights[1]).toBeCloseTo(
+    detailGeometry.branchHeights[1] / 2,
+    0,
+  );
+  expect(detailGeometry.paddingBottom).toBe(4);
+  await expect(page.getByTestId("frame-inspector-popover")).toHaveCount(0);
   await detailRows.nth(0).click();
-  await expect(page.getByTestId("frame-event-total")).toHaveText("1 event");
+  await expect(page.getByTestId("frame-inspector-popover")).toHaveCount(0);
   await expect(page.getByTestId("combat-log")).not.toContainText("-50ms");
 });
 
@@ -2776,12 +2942,11 @@ test("embeds the existing recording instance in the footer dock", async ({
     { steps: 6 },
   );
   await page.mouse.up();
-  const dockHeightAfterPointerResize = (
-    await page.getByTestId("footer-replay-dock").boundingBox()
-  ).height;
-  expect(dockHeightAfterPointerResize).toBeGreaterThanOrEqual(
-    dockHeightBeforePointerResize + 24,
-  );
+  await expect
+    .poll(async () => (
+      await page.getByTestId("footer-replay-dock").boundingBox()
+    ).height)
+    .toBeGreaterThanOrEqual(dockHeightBeforePointerResize + 24);
   const heightBeforeKeyboardResize = (
     await page.getByTestId("footer-replay-dock").boundingBox()
   ).height;

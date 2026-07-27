@@ -16,6 +16,8 @@ export interface CombatLogEntry {
   combatMs: number;
   action: string;
   token: string;
+  iconSemanticKey: string;
+  icon: string;
   sourceId: string;
   triggerSourceId: string;
   targetIds: string[];
@@ -31,6 +33,8 @@ export function combatLogGroupKey(
     | "frame"
     | "token"
     | "action"
+    | "iconSemanticKey"
+    | "icon"
     | "sourceId"
     | "triggerSourceId"
     | "unit"
@@ -41,6 +45,8 @@ export function combatLogGroupKey(
     entry.frame,
     entry.token,
     entry.action,
+    entry.iconSemanticKey,
+    entry.icon,
     entry.sourceId,
     entry.triggerSourceId,
     entry.unit,
@@ -62,6 +68,58 @@ export function isDirectStatusApplicationEvent(
   );
 }
 
+/**
+ * Applications must remain visible even when the timeline renders their later
+ * settlement under a different semantic label (burn → damage, regen → heal).
+ */
+export function isCombatLogApplicationEvent(
+  event: Pick<NormalizedEvent, "kind" | "action">,
+): boolean {
+  if (event.kind.toLowerCase() !== "effect-executed") return false;
+  const action = event.action.toLowerCase();
+  return (
+    DIRECT_STATUS_APPLICATION_ACTIONS.has(event.action)
+    || action.includes("burn")
+    || action.includes("regen")
+  );
+}
+
+/**
+ * The timeline deliberately collapses burn into damage and regeneration into
+ * healing. The combat log needs to preserve the application itself as a
+ * separate narrative step, while still presenting the later health settlement
+ * with the familiar damage/healing labels.
+ */
+export function combatLogEventToken(
+  event: Pick<NormalizedEvent, "kind" | "action">,
+): string {
+  const kind = event.kind.toLowerCase();
+  const action = event.action.toLowerCase();
+  if (kind === "effect-executed" && action.includes("burn")) return "burn";
+  if (kind === "effect-executed" && action.includes("regen")) return "regen";
+  const healthAction = action.replace(/^health[\s:._-]*/, "");
+  if (kind === "health" && healthAction.includes("burn")) return "damage";
+  if (
+    kind === "health"
+    && (healthAction.includes("regen") || healthAction.includes("heal"))
+  ) {
+    return "heal";
+  }
+  return eventKindToken(event);
+}
+
+export function isCombatLogHealthSettlementEvent(
+  event: Pick<NormalizedEvent, "kind" | "action">,
+): boolean {
+  if (event.kind.toLowerCase() !== "health") return false;
+  const action = event.action.toLowerCase().replace(/^health[\s:._-]*/, "");
+  return (
+    action.includes("burn")
+    || action.includes("regen")
+    || action.includes("heal")
+  );
+}
+
 function valueKey(value: unknown): string {
   if (typeof value === "number") {
     return Object.is(value, -0) ? "-0" : String(value);
@@ -79,7 +137,7 @@ function entryKey(event: NormalizedEvent): string {
   return [
     event.frame,
     event.kind,
-    eventKindToken(event),
+    combatLogEventToken(event),
     event.action,
     event.sourceId,
     event.triggerSourceId,
@@ -101,7 +159,7 @@ export function buildCombatLogEntries(
 ): CombatLogEntry[] {
   const merged = new Map<string, CombatLogEntry>();
   for (const event of events) {
-    const token = eventKindToken(event);
+    const token = combatLogEventToken(event);
     const key = entryKey(event);
     const current = merged.get(key);
     if (current) {
@@ -115,6 +173,8 @@ export function buildCombatLogEntries(
       combatMs: event.combatMs,
       action: event.action,
       token,
+      iconSemanticKey: event.iconSemanticKey,
+      icon: event.icon,
       sourceId: event.sourceId,
       triggerSourceId: event.triggerSourceId,
       targetIds: [...event.targetIds],
@@ -166,6 +226,41 @@ export function groupCombatLogEntries(
       || left.frame - right.frame
       || left.id.localeCompare(right.id),
   );
+}
+
+/**
+ * Expands a grouped combat-log action into one detail row per unique target.
+ * A target can appear in more than one raw record when a single frame contains
+ * overlapping applications, so detail rows aggregate those records rather than
+ * repeating the same entity in the expanded branch.
+ */
+export function combatLogTargetDetails(
+  entries: readonly CombatLogEntry[],
+): CombatLogEntry[] {
+  const details = new Map<string, CombatLogEntry>();
+  for (const entry of entries) {
+    const targetIds = entry.targetIds.length > 0
+      ? Array.from(new Set(entry.targetIds))
+      : [""];
+    for (const [targetIndex, targetId] of targetIds.entries()) {
+      const key = targetId || "\u0000missing-target";
+      const current = details.get(key);
+      if (current) {
+        current.count += entry.count;
+        current.eventIds = Array.from(
+          new Set([...current.eventIds, ...entry.eventIds]),
+        );
+        continue;
+      }
+      details.set(key, {
+        ...entry,
+        id: `${entry.id}:target:${targetIndex}:${targetId || "missing"}`,
+        targetIds: targetId ? [targetId] : [],
+        eventIds: [...entry.eventIds],
+      });
+    }
+  }
+  return Array.from(details.values());
 }
 
 /**
