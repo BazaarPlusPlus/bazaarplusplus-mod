@@ -19,8 +19,10 @@ export interface ActivityColumn {
   token?: string;
   semanticKey?: string;
   fallback?: string;
+  eventKind: "card-attribute" | "effect-executed";
   actions: readonly string[];
   quantitative: boolean;
+  aggregation: "absolute" | "signed";
   unit: string;
 }
 
@@ -39,8 +41,10 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     label: "activityDamage",
     token: "damage",
     semanticKey: "status.damage",
+    eventKind: "effect-executed",
     actions: ["PlayerDamage"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "points",
   },
   {
@@ -48,8 +52,10 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     label: "activityBurn",
     token: "burn",
     semanticKey: "status.burn",
+    eventKind: "effect-executed",
     actions: ["PlayerBurnApply"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "points",
   },
   {
@@ -57,8 +63,10 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     label: "activityPoison",
     token: "poison",
     semanticKey: "status.poison",
+    eventKind: "effect-executed",
     actions: ["PlayerPoisonApply"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "points",
   },
   {
@@ -66,8 +74,10 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     label: "activityHeal",
     token: "heal",
     semanticKey: "status.heal",
+    eventKind: "effect-executed",
     actions: ["PlayerHeal"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "points",
   },
   {
@@ -75,8 +85,10 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     label: "activityShield",
     token: "shield",
     semanticKey: "status.shield",
+    eventKind: "effect-executed",
     actions: ["PlayerShieldApply"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "points",
   },
   {
@@ -84,26 +96,21 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     label: "activityRegen",
     token: "regen",
     semanticKey: "status.regen",
+    eventKind: "effect-executed",
     actions: ["PlayerRegenApply"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "points",
-  },
-  {
-    key: "attribute",
-    label: "activityAttribute",
-    token: "attribute",
-    fallback: "A",
-    actions: ["CardModifyAttribute"],
-    quantitative: false,
-    unit: "",
   },
   {
     key: "charge",
     label: "activityCharge",
     token: "charge",
     semanticKey: "status.charge",
+    eventKind: "effect-executed",
     actions: ["CardCharge"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "ms",
   },
   {
@@ -111,8 +118,10 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     label: "activityHaste",
     token: "haste",
     semanticKey: "status.haste",
+    eventKind: "effect-executed",
     actions: ["CardHaste"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "ms",
   },
   {
@@ -120,8 +129,10 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     label: "activitySlow",
     token: "slow",
     semanticKey: "status.slow",
+    eventKind: "effect-executed",
     actions: ["CardSlow"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "ms",
   },
   {
@@ -129,9 +140,77 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     label: "activityFreeze",
     token: "freeze",
     semanticKey: "status.freeze",
+    eventKind: "effect-executed",
     actions: ["CardFreeze"],
     quantitative: true,
+    aggregation: "absolute",
     unit: "ms",
+  },
+  {
+    key: "damageModifier",
+    label: "attributeDamage",
+    token: "attributeDamage",
+    semanticKey: "status.damage",
+    eventKind: "card-attribute",
+    actions: ["DamageAmount"],
+    quantitative: true,
+    aggregation: "signed",
+    unit: "points",
+  },
+  {
+    key: "cooldownReduction",
+    label: "attributeCooldownReduction",
+    token: "attributeCooldownReduction",
+    semanticKey: "status.cooldownReduction",
+    eventKind: "card-attribute",
+    actions: ["PercentCooldownReduction"],
+    quantitative: true,
+    aggregation: "signed",
+    unit: "percent",
+  },
+  {
+    key: "multicast",
+    label: "attributeMulticast",
+    token: "attributeMulticast",
+    semanticKey: "status.multicast",
+    eventKind: "card-attribute",
+    actions: ["Multicast"],
+    quantitative: true,
+    aggregation: "signed",
+    unit: "points",
+  },
+  {
+    key: "ammo",
+    label: "attributeAmmo",
+    token: "attributeAmmo",
+    semanticKey: "status.ammo",
+    eventKind: "card-attribute",
+    actions: ["Ammo"],
+    quantitative: true,
+    aggregation: "signed",
+    unit: "points",
+  },
+  {
+    key: "critChance",
+    label: "attributeCritChance",
+    token: "attributeCritChance",
+    semanticKey: "status.critChance",
+    eventKind: "card-attribute",
+    actions: ["CritChance"],
+    quantitative: true,
+    aggregation: "signed",
+    unit: "percent",
+  },
+  {
+    key: "destroy",
+    label: "destroy",
+    token: "destroy",
+    semanticKey: "status.destroy",
+    eventKind: "effect-executed",
+    actions: ["CardDisable", "CardDestroy"],
+    quantitative: false,
+    aggregation: "absolute",
+    unit: "",
   },
 ];
 
@@ -274,10 +353,16 @@ export function isActivityEntity(entity: unknown): entity is NormalizedEntity {
 export function buildEntityActivity(
   model: StatisticsModel,
 ): EntityActivityRow[] {
-  const columnByAction = new Map<string, string>();
+  const columnByEvent = new Map<string, string>();
+  const columnByKey = new Map(
+    ACTIVITY_COLUMNS.map((column) => [column.key, column]),
+  );
   for (const column of ACTIVITY_COLUMNS) {
     for (const action of column.actions) {
-      columnByAction.set(action, column.key);
+      columnByEvent.set(
+        `${column.eventKind}\u001f${action}`,
+        column.key,
+      );
     }
   }
   const entityMap = new Map(
@@ -303,36 +388,54 @@ export function buildEntityActivity(
       quantifiedCounts,
     });
   }
-  for (const event of model.events) {
-    if (event.kind.toLowerCase() !== "effect-executed") continue;
-    if (event.attributionConfidence !== "exact") continue;
-    const directSource = entityMap.get(event.sourceId);
-    const triggerSource = entityMap.get(event.triggerSourceId);
-    const source =
-      directSource && isActivityEntity(directSource)
-        ? directSource
-        : triggerSource && isActivityEntity(triggerSource)
-          ? triggerSource
-          : null;
-    if (!source) continue;
-    const count = Math.max(1, event.occurrences || 1);
-    const row = rows.get(source.id);
-    if (!row) continue;
-    row.triggers += count;
-    const columnKey = columnByAction.get(event.action);
-    if (!columnKey) continue;
+  const applyEvent = (
+    row: EntityActivityRow,
+    event: NormalizedEvent,
+    count: number,
+    columnKey: string,
+  ): void => {
     row.counts[columnKey] += count;
-    const column = ACTIVITY_COLUMNS.find(
-      (candidate) => candidate.key === columnKey,
-    );
+    const column = columnByKey.get(columnKey);
     const hasValue =
       event.value !== null
       && event.value !== undefined
       && event.value !== ""
       && Number.isFinite(asFiniteNumber(event.value, Number.NaN));
-    if (!column || !column.quantitative || !hasValue) continue;
-    row.amounts[columnKey] += Math.abs(asFiniteNumber(event.value, 0));
+    if (!column || !column.quantitative || !hasValue) return;
+    const value = asFiniteNumber(event.value, 0);
+    row.amounts[columnKey] +=
+      column.aggregation === "signed" ? value : Math.abs(value);
     row.quantifiedCounts[columnKey] += count;
+  };
+
+  for (const event of model.events) {
+    const kind = event.kind.toLowerCase();
+    const columnKey = columnByEvent.get(`${kind}\u001f${event.action}`);
+    const count = Math.max(1, event.occurrences || 1);
+    if (kind === "effect-executed") {
+      if (event.attributionConfidence !== "exact") continue;
+      const directSource = entityMap.get(event.sourceId);
+      const triggerSource = entityMap.get(event.triggerSourceId);
+      const source =
+        directSource && isActivityEntity(directSource)
+          ? directSource
+          : triggerSource && isActivityEntity(triggerSource)
+            ? triggerSource
+            : null;
+      if (!source) continue;
+      const row = rows.get(source.id);
+      if (!row) continue;
+      row.triggers += count;
+      if (columnKey) applyEvent(row, event, count, columnKey);
+      continue;
+    }
+    if (kind !== "card-attribute" || !columnKey) continue;
+    for (const targetId of new Set(event.targetIds)) {
+      const target = entityMap.get(targetId);
+      if (!target || !isActivityEntity(target)) continue;
+      const row = rows.get(target.id);
+      if (row) applyEvent(row, event, count, columnKey);
+    }
   }
   return Array.from(rows.values());
 }

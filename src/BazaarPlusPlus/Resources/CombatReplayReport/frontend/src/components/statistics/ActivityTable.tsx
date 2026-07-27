@@ -164,7 +164,7 @@ export function ActivityTable({
         data-bpp-test-id="statistics-entity-activity-scroll"
       >
         <Table
-          className="min-w-[1120px]"
+          className="min-w-[2100px]"
           containerClassName="overflow-visible"
           data-bpp-test-id="statistics-entity-activity"
         >

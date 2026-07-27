@@ -113,6 +113,8 @@ export function mergeInspectorEvents(
       event.sourceId,
       event.triggerSourceId,
       eventValueKey(event.value),
+      eventValueKey(event.previousValue),
+      eventValueKey(event.currentValue),
       event.unit,
       event.iconSemanticKey,
       event.icon,

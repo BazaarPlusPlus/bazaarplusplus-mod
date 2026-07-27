@@ -24,6 +24,7 @@ import {
   drawTimelineScene,
 } from "./event-scene-renderer.ts";
 import { combatMsAtPointer } from "./geometry.ts";
+import { layoutTimelineMarkers } from "./marker-layout.ts";
 
 interface ControllerOptions {
   canvas: HTMLCanvasElement;
@@ -119,7 +120,7 @@ export class TimelineCanvasController {
         .filter((cluster): cluster is TimelineCluster => cluster !== null),
     );
     this.visualClusters = buildVisualClusters(this.clusters);
-    this.markerClusters = this.visualClusters;
+    this.markerClusters = layoutTimelineMarkers(this.visualClusters);
     this.firstVisibleMs = this.clusters.reduce(
       (min, cluster) =>
         Math.min(

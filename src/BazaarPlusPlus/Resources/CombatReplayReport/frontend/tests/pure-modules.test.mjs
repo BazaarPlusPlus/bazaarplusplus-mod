@@ -61,7 +61,12 @@ import {
   timelineEventToken,
   timelineClusterEventIds,
 } from "../src/timeline/clusters.ts";
-import { markerOffset } from "../src/timeline/event-drawing.ts";
+import {
+  markerOffset,
+  markerPoint,
+} from "../src/timeline/event-drawing.ts";
+import { layoutTimelineMarkers } from "../src/timeline/marker-layout.ts";
+import { hitTestTimelineClusters } from "../src/timeline/event-interaction.ts";
 import {
   safeAssetUrl,
   safeVideoUrl,
@@ -98,10 +103,12 @@ import {
   damageKindFromType,
   eventDamageKind,
 } from "../src/model/damage-semantics.ts";
+import { eventPresentation } from "../src/model/event-semantics.ts";
 import {
   mergeInspectorEvents,
   summarizeDirectDamageGroup,
 } from "../src/components/inspector/frame-event-groups.ts";
+import { attributeEventDiff } from "../src/components/inspector/event-diff.ts";
 import {
   buildCombatLogEntries,
   combatLogEventToken,
@@ -1001,6 +1008,76 @@ test("entity activity falls back to an exact trigger source without overriding a
   assert.equal(rowById.get(directItem.id)?.amounts.haste, 500);
 });
 
+test("entity activity separates structural attribute deltas and destroy actions", () => {
+  const source = normalizeEntity(
+    {
+      entityId: "destroy-source",
+      owner: "opponent",
+      type: "item",
+      name: "Disintegration Ray",
+    },
+    0,
+  );
+  const target = normalizeEntity(
+    {
+      entityId: "changed-target",
+      owner: "player",
+      type: "item",
+      name: "Ice Swan",
+    },
+    1,
+  );
+  const rows = buildEntityActivity({
+    entities: [source, target],
+    events: [
+      timelineEvent({
+        id: "destroy",
+        kind: "effect-executed",
+        action: "CardDisable",
+        sourceId: source.id,
+        targetIds: [target.id],
+        attributionConfidence: "exact",
+      }),
+      timelineEvent({
+        id: "damage-stat",
+        kind: "card-attribute",
+        action: "DamageAmount",
+        targetIds: [target.id],
+        previousValue: 10,
+        currentValue: 30,
+        value: 20,
+      }),
+      timelineEvent({
+        id: "cooldown-reduction",
+        kind: "card-attribute",
+        action: "PercentCooldownReduction",
+        targetIds: [target.id],
+        previousValue: 0,
+        currentValue: 10,
+        value: 10,
+      }),
+      timelineEvent({
+        id: "multicast",
+        kind: "card-attribute",
+        action: "Multicast",
+        targetIds: [target.id],
+        previousValue: 2,
+        currentValue: 1,
+        value: -1,
+      }),
+    ],
+  });
+  const rowById = new Map(rows.map((row) => [row.entity.id, row]));
+
+  assert.equal(rowById.get(source.id)?.triggers, 1);
+  assert.equal(rowById.get(source.id)?.counts.destroy, 1);
+  assert.equal(rowById.get(target.id)?.triggers, 0);
+  assert.equal(rowById.get(target.id)?.amounts.damageModifier, 20);
+  assert.equal(rowById.get(target.id)?.amounts.cooldownReduction, 10);
+  assert.equal(rowById.get(target.id)?.amounts.multicast, -1);
+  assert.equal(rowById.get(target.id)?.counts.multicast, 1);
+});
+
 test("recording sync interpolates and clamps in both directions", () => {
   const anchors = [
     { combatMs: 1_000, mediaPtsMs: 2_000 },
@@ -1100,6 +1177,66 @@ test("timeline keeps direct, burn, and poison markers visually distinct", () => 
   );
   assert.deepEqual(clusters.map(markerOffset), [-12, 0, 12]);
   assert.equal(buildVisualClusters(clusters).length, 3);
+});
+
+test("dense timeline markers use distinct laid-out hit targets", () => {
+  const entities = [
+    { id: "source", type: "item" },
+    { id: "target", type: "hero" },
+  ];
+  const events = [
+    ["direct", "PlayerDamage"],
+    ["burn", "PlayerBurnApply"],
+    ["poison", "PlayerPoisonApply"],
+    ["heal", "PlayerHeal"],
+    ["shield", "PlayerShieldApply"],
+  ].map(([id, action], sequence) =>
+    timelineEvent({
+      id,
+      action,
+      combatMs: 1_000,
+      frame: 20,
+      kind: "effect-executed",
+      sequence,
+      sourceId: "source",
+      targetIds: ["target"],
+    })
+  );
+  const visual = buildVisualClusters(
+    buildClusters(
+      { durationMs: 2_000 },
+      events,
+      entities,
+      1_000,
+      52,
+    ),
+  );
+  const markers = layoutTimelineMarkers(visual);
+  const points = markers.map(markerPoint);
+
+  assert.equal(new Set(points.map(({ x, y }) => `${x}:${y}`)).size, 5);
+  for (let left = 0; left < points.length; left += 1) {
+    for (let right = left + 1; right < points.length; right += 1) {
+      assert.ok(
+        Math.hypot(
+          points[left].x - points[right].x,
+          points[left].y - points[right].y,
+        ) >= 19,
+      );
+    }
+  }
+  const hitIndex = createHitIndex(markers);
+  for (let index = 0; index < markers.length; index += 1) {
+    assert.equal(
+      hitTestTimelineClusters({
+        ...points[index],
+        hitIndex,
+        visualClusters: markers,
+        laneHeight: 52,
+      }),
+      markers[index],
+    );
+  }
 });
 
 test("canvas backing scale honors DPR and logical coordinates", () => {
@@ -1495,6 +1632,39 @@ test("timeline visibility and clustering preserve every underlying event", () =>
   assert.equal(
     isVisibleTimelineEvent(
       timelineEvent({
+        kind: "card-attribute",
+        action: "Multicast",
+        targetIds: ["target"],
+      }),
+      entityById,
+    ),
+    true,
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      timelineEvent({
+        kind: "card-attribute",
+        action: "PercentCooldownReduction",
+        targetIds: ["target"],
+      }),
+      entityById,
+    ),
+    true,
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      timelineEvent({
+        kind: "card-attribute",
+        action: "CritChance",
+        targetIds: ["target"],
+      }),
+      entityById,
+    ),
+    false,
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      timelineEvent({
         kind: "effect-executed",
         action: "PlayerRageApply",
         sourceId: "skill",
@@ -1623,6 +1793,46 @@ test("timeline visibility and clustering preserve every underlying event", () =>
     ["damage-1", "damage-2"],
   );
   assert.equal(visual[0].members.length, 2);
+});
+
+test("structural event semantics render destroy and attribute diffs explicitly", () => {
+  const destroy = timelineEvent({
+    kind: "effect-executed",
+    action: "CardDisable",
+  });
+  const multicast = timelineEvent({
+    kind: "card-attribute",
+    action: "Multicast",
+    value: -1,
+    previousValue: 2,
+    currentValue: 1,
+  });
+  const damage = timelineEvent({
+    kind: "card-attribute",
+    action: "DamageAmount",
+    value: 20,
+    previousValue: 10,
+    currentValue: 30,
+  });
+
+  assert.deepEqual(eventPresentation(destroy), {
+    groupKey: "destroy",
+    labelKey: "destroy",
+    token: "destroy",
+  });
+  assert.equal(eventKindToken(destroy), "destroy");
+  assert.equal(timelineEventToken(destroy), "destroy");
+  assert.equal(timelineEventToken(multicast), "attribute");
+  assert.deepEqual(attributeEventDiff(multicast), {
+    deltaText: "−1",
+    polarity: "decrease",
+    transitionText: "2 → 1",
+  });
+  assert.deepEqual(attributeEventDiff(damage), {
+    deltaText: "+20",
+    polarity: "increase",
+    transitionText: "10 → 30",
+  });
 });
 
 test("status ranges pair applications with their exact frame effects", () => {

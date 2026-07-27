@@ -35,6 +35,41 @@ async function visibleGuideRatios(page, bounds) {
   };
 }
 
+async function timelineMarkerPoint(
+  page,
+  { combatMs, durationMs, entityId, dx = 0, dy = 0 },
+) {
+  return page.evaluate(
+    ({ combatMs, durationMs, entityId, dx, dy }) => {
+      const canvas = document.querySelector(
+        '[data-bpp-test-id="timeline-canvas"]',
+      );
+      const lane = document.querySelector(
+        `[data-bpp-lane-index][data-bpp-entity-id="${entityId}"]`,
+      );
+      if (!(canvas instanceof HTMLCanvasElement) || !lane) return null;
+      const bounds = canvas.getBoundingClientRect();
+      const logicalWidth =
+        Number.parseFloat(canvas.style.width) || canvas.width;
+      const logicalHeight =
+        Number.parseFloat(canvas.style.height) || canvas.height;
+      const laneIndex = Number(lane.getAttribute("data-bpp-lane-index"));
+      const timelineX =
+        14 + (combatMs / durationMs) * Math.max(1, logicalWidth - 78);
+      return {
+        x:
+          bounds.left
+          + (timelineX + dx) * (bounds.width / logicalWidth),
+        y:
+          bounds.top
+          + (laneIndex * 52 + 26 + dy)
+            * (bounds.height / logicalHeight),
+      };
+    },
+    { combatMs, durationMs, entityId, dx, dy },
+  );
+}
+
 const fixtureEnvelope = {
   schemaVersion: 1,
   locale: "en",
@@ -234,7 +269,9 @@ let chartReportUrl;
 let damageKindsReportUrl;
 let directDamageSummaryReportUrl;
 let denseReportUrl;
+let markerLayoutReportUrl;
 let statusApplicationReportUrl;
+let structuralReportUrl;
 let recordingReportUrl;
 let navigationReportUrl;
 let scrollRecordingReportUrl;
@@ -545,6 +582,147 @@ test.beforeAll(async ({ browserName }) => {
     reportHtml(denseEnvelope),
     "utf8",
   );
+  const markerLayoutEnvelope = structuredClone(fixtureEnvelope);
+  markerLayoutEnvelope.battleDocument.events = [
+    ["marker-direct", "PlayerDamage"],
+    ["marker-burn", "PlayerBurnApply"],
+    ["marker-poison", "PlayerPoisonApply"],
+    ["marker-heal", "PlayerHeal"],
+    ["marker-shield", "PlayerShieldApply"],
+  ].map(([eventId, action], frameSequence) =>
+    schemaEvent({
+      eventId,
+      frame: 80,
+      frameSequence,
+      combatTimeMs: 4000,
+      kind: "effect-executed",
+      action,
+      sourceEntityId: "opponent-item",
+      triggerSourceEntityId: "opponent-item",
+      targetEntityIds: ["player-hero"],
+      value: 10 + frameSequence,
+      unit: "points",
+      role: "applied",
+      attributionConfidence: "exact",
+    })
+  );
+  markerLayoutEnvelope.battleDocument.rawRecordCount = 5;
+  await writeFile(
+    join(fixtureDirectory, "marker-layout-report.html"),
+    reportHtml(markerLayoutEnvelope),
+    "utf8",
+  );
+  const structuralEnvelope = structuredClone(fixtureEnvelope);
+  structuralEnvelope.battleDocument.entities.find(
+    (entity) => entity.entityId === "player-item",
+  ).name = "Ice Swan";
+  structuralEnvelope.battleDocument.entities.find(
+    (entity) => entity.entityId === "opponent-item",
+  ).name = "Disintegration Ray";
+  structuralEnvelope.battleDocument.entities.push(
+    {
+      entityId: "player-item-multicast",
+      owner: "player",
+      type: "item",
+      name: "Zarlic",
+      span: 1,
+      order: 2,
+    },
+    {
+      entityId: "player-item-cooldown",
+      owner: "player",
+      type: "item",
+      name: "Sorbet",
+      span: 1,
+      order: 3,
+    },
+  );
+  structuralEnvelope.battleDocument.events = [
+    schemaEvent({
+      eventId: "structural-destroy",
+      frame: 80,
+      frameSequence: 0,
+      combatTimeMs: 4000,
+      kind: "effect-executed",
+      action: "CardDisable",
+      sourceEntityId: "opponent-item",
+      triggerSourceEntityId: "opponent-item",
+      targetEntityIds: ["player-item"],
+      role: "applied",
+      attributionConfidence: "exact",
+      iconSemanticKey: "status.destroy",
+    }),
+    schemaEvent({
+      eventId: "structural-damage",
+      frame: 80,
+      frameSequence: 1,
+      combatTimeMs: 4000,
+      kind: "card-attribute",
+      action: "DamageAmount",
+      targetEntityIds: ["player-item-multicast"],
+      value: 20,
+      previousValue: 10,
+      currentValue: 30,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+      iconSemanticKey: "status.damage",
+    }),
+    schemaEvent({
+      eventId: "structural-multicast",
+      frame: 80,
+      frameSequence: 2,
+      combatTimeMs: 4000,
+      kind: "card-attribute",
+      action: "Multicast",
+      targetEntityIds: ["player-item-multicast"],
+      value: -1,
+      previousValue: 2,
+      currentValue: 1,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+      iconSemanticKey: "status.multicast",
+    }),
+    schemaEvent({
+      eventId: "structural-cooldown",
+      frame: 80,
+      frameSequence: 3,
+      combatTimeMs: 4000,
+      kind: "card-attribute",
+      action: "PercentCooldownReduction",
+      targetEntityIds: ["player-item-cooldown"],
+      value: 10,
+      previousValue: 10,
+      currentValue: 20,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+      iconSemanticKey: "status.cooldownReduction",
+    }),
+    schemaEvent({
+      eventId: "structural-crit",
+      frame: 80,
+      frameSequence: 4,
+      combatTimeMs: 4000,
+      kind: "card-attribute",
+      action: "CritChance",
+      targetEntityIds: ["player-item-cooldown"],
+      value: 5,
+      previousValue: 0,
+      currentValue: 5,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+      iconSemanticKey: "status.critChance",
+    }),
+  ];
+  structuralEnvelope.battleDocument.rawRecordCount = 5;
+  await writeFile(
+    join(fixtureDirectory, "structural-report.html"),
+    reportHtml(structuralEnvelope),
+    "utf8",
+  );
   const statusApplicationEnvelope = structuredClone(fixtureEnvelope);
   const sourceSkill = statusApplicationEnvelope.battleDocument.entities.find(
     (entity) => entity.entityId === "player-skill",
@@ -753,8 +931,14 @@ test.beforeAll(async ({ browserName }) => {
   denseReportUrl = pathToFileURL(
     join(fixtureDirectory, "dense-report.html"),
   ).href;
+  markerLayoutReportUrl = pathToFileURL(
+    join(fixtureDirectory, "marker-layout-report.html"),
+  ).href;
   statusApplicationReportUrl = pathToFileURL(
     join(fixtureDirectory, "status-application-report.html"),
+  ).href;
+  structuralReportUrl = pathToFileURL(
+    join(fixtureDirectory, "structural-report.html"),
   ).href;
   recordingReportUrl = pathToFileURL(
     join(fixtureDirectory, "recording-report.html"),
@@ -2487,24 +2671,26 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
   page,
 }) => {
   await page.goto(`${damageKindsReportUrl}?lang=en`);
-  const canvas = page.getByTestId("timeline-canvas");
   const markers = [
     {
-      offset: -12,
+      dx: 0,
+      dy: -13,
       label: "Direct damage",
       groupToken: "damage-direct",
       icon:
         "../report-assets/objects/00/0000000000000000000000000000000000000000000000000000000000000000.png",
     },
     {
-      offset: 0,
+      dx: -10,
+      dy: 9,
       label: "Burn",
       groupToken: "damage-burn",
       icon:
         "../report-assets/objects/11/1111111111111111111111111111111111111111111111111111111111111111.png",
     },
     {
-      offset: 12,
+      dx: 10,
+      dy: 9,
       label: "Poison",
       groupToken: "damage-poison",
       icon:
@@ -2515,12 +2701,14 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
     let point = null;
     await expect
       .poll(async () => {
-        const bounds = await canvas.boundingBox();
-        if (!bounds) return "";
-        point = {
-          x: bounds.x + bounds.width * 0.25,
-          y: bounds.y + 3.5 * 52 + marker.offset,
-        };
+        point = await timelineMarkerPoint(page, {
+          combatMs: 2_000,
+          durationMs: 8_000,
+          entityId: "opponent-hero",
+          dx: marker.dx,
+          dy: marker.dy,
+        });
+        if (!point) return "";
         await page.mouse.move(point.x, point.y);
         return (
           (await page
@@ -2584,6 +2772,153 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
     }
     await page.getByTestId("frame-inspector-close").click();
   }
+});
+
+test("lays out five same-time lane markers as separate hit targets", async ({
+  page,
+}) => {
+  await page.goto(`${markerLayoutReportUrl}?lang=en`);
+  const markers = [
+    { dx: -20, dy: -11, label: "Direct damage" },
+    { dx: 0, dy: -11, label: "Burn" },
+    { dx: 20, dy: -11, label: "Poison" },
+    { dx: -10, dy: 11, label: "Healing" },
+    { dx: 10, dy: 11, label: "Shield" },
+  ];
+  const points = [];
+  for (const marker of markers) {
+    let point = null;
+    await expect
+      .poll(async () => {
+        point = await timelineMarkerPoint(page, {
+          combatMs: 4_000,
+          durationMs: 8_000,
+          entityId: "player-hero",
+          dx: marker.dx,
+          dy: marker.dy,
+        });
+        if (!point) return "";
+        await page.mouse.move(point.x, point.y);
+        return (
+          (await page.getByTestId("timeline-tooltip-label").textContent())
+          ?? ""
+        ).trim();
+      })
+      .toBe(marker.label);
+    await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
+      "1 event",
+    );
+    points.push(point);
+  }
+  for (let left = 0; left < points.length; left += 1) {
+    for (let right = left + 1; right < points.length; right += 1) {
+      expect(
+        Math.hypot(
+          points[left].x - points[right].x,
+          points[left].y - points[right].y,
+        ),
+      ).toBeGreaterThan(16);
+    }
+  }
+});
+
+test("renders destroy and structural attributes consistently across timeline, inspector, and statistics", async ({
+  page,
+}) => {
+  await page.goto(`${structuralReportUrl}?lang=en`);
+
+  const destroyPoint = await timelineMarkerPoint(page, {
+    combatMs: 4_000,
+    durationMs: 8_000,
+    entityId: "player-item",
+  });
+  expect(destroyPoint).not.toBeNull();
+  await page.mouse.move(destroyPoint.x, destroyPoint.y);
+  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+    "Destroyed",
+  );
+  await page.mouse.click(destroyPoint.x, destroyPoint.y);
+  await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
+    "Ice Swan",
+  );
+  await expect(page.getByTestId("frame-event-kind")).toHaveText(
+    "Destroyed",
+  );
+  await expect(page.getByTestId("event-source-entity")).toHaveText(
+    "Disintegration Ray",
+  );
+  await page.getByTestId("frame-inspector-close").click();
+
+  const attributePoint = await timelineMarkerPoint(page, {
+    combatMs: 4_000,
+    durationMs: 8_000,
+    entityId: "player-item-multicast",
+  });
+  expect(attributePoint).not.toBeNull();
+  await page.mouse.move(attributePoint.x, attributePoint.y);
+  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+    "Attribute change",
+  );
+  await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
+    "2 events",
+  );
+  await page.mouse.click(attributePoint.x, attributePoint.y);
+  await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
+    "Zarlic",
+  );
+  await expect(page.getByTestId("frame-event-kind")).toHaveText([
+    "Damage stat",
+    "Multicast",
+  ]);
+  await expect(page.getByTestId("frame-event-amount")).toHaveText([
+    "+20",
+    "−1",
+  ]);
+  await expect(page.getByTestId("frame-event-transition")).toHaveText([
+    "10 → 30",
+    "2 → 1",
+  ]);
+  await expect(page.getByTestId("focused-cluster-event").first()).toHaveAttribute(
+    "data-bpp-diff-polarity",
+    "increase",
+  );
+  await expect(page.getByTestId("focused-cluster-event").nth(1)).toHaveAttribute(
+    "data-bpp-diff-polarity",
+    "decrease",
+  );
+  await expect(page.getByTestId("event-source-entity")).toHaveCount(0);
+
+  await page.getByTestId("frame-inspector-close").click();
+  await page.getByTestId("report-tab-statistics").click();
+  const destroyRow = page
+    .locator("[data-bpp-test-id^='statistics-activity-row-']")
+    .filter({ hasText: "Disintegration Ray" });
+  await expect(
+    destroyRow.getByTestId("statistics-activity-value-destroy"),
+  ).toContainText("×1");
+
+  const zarlicRow = page
+    .locator("[data-bpp-test-id^='statistics-activity-row-']")
+    .filter({ hasText: "Zarlic" });
+  await expect(
+    zarlicRow.getByTestId("statistics-activity-value-damageModifier"),
+  ).toContainText("+20");
+  await expect(
+    zarlicRow.getByTestId("statistics-activity-value-multicast"),
+  ).toContainText("-1");
+
+  const sorbetRow = page
+    .locator("[data-bpp-test-id^='statistics-activity-row-']")
+    .filter({ hasText: "Sorbet" });
+  await expect(
+    sorbetRow.getByTestId("statistics-activity-value-cooldownReduction"),
+  ).toContainText("+10%");
+  await expect(
+    sorbetRow.getByTestId("statistics-activity-value-critChance"),
+  ).toContainText("+5%");
+  await expect(
+    page.getByTestId("statistics-activity-sort-destroy"),
+  ).toContainText("Destroyed");
 });
 
 test("groups same-frame direct damage sources under one exact total", async ({

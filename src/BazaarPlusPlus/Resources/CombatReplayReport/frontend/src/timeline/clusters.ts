@@ -1,5 +1,10 @@
 import { asFiniteNumber } from "../model/value.ts";
-import { eventDamageKind } from "../model/damage-semantics.ts";
+import {
+  baseEventKindToken,
+  cardAttributeSemantic,
+  eventPresentation,
+  timelinePresentationToken,
+} from "../model/event-semantics.ts";
 import {
   normalizeMetricName,
   type NormalizedEntity,
@@ -61,6 +66,8 @@ export interface TimelineCluster {
   members?: TimelineCluster[];
   tier?: EventTier;
   impact?: number;
+  markerX?: number;
+  markerY?: number;
 }
 
 /**
@@ -75,7 +82,9 @@ export function eventTier(
 ): EventTier {
   const kind = event.kind.toLowerCase();
   if (kind === "health" || kind === "combatant-died") return 1;
-  if (eventKindToken(event) === "status") return 3;
+  const token = eventKindToken(event);
+  if (token === "destroy") return 1;
+  if (kind === "card-attribute" || token === "status") return 3;
   return 2;
 }
 
@@ -126,48 +135,19 @@ export function timelineClusterEventIds(
 }
 
 export function kindToken(kind: unknown): string {
-  const normalized = String(kind ?? "").toLowerCase();
-  if (
-    normalized.includes("damage")
-    || normalized.includes("burn")
-    || normalized.includes("poison")
-  ) {
-    return "damage";
-  }
-  if (
-    normalized.includes("heal")
-    || normalized.includes("regen")
-    || normalized.includes("restore")
-  ) {
-    return "heal";
-  }
-  if (normalized.includes("shield")) return "shield";
-  if (normalized.includes("charge")) return "charge";
-  if (normalized.includes("haste") || normalized.includes("speedup")) {
-    return "haste";
-  }
-  if (normalized.includes("slow")) return "slow";
-  if (normalized.includes("freeze")) return "freeze";
-  if (normalized.includes("skill")) return "skill";
-  if (normalized.includes("trigger")) return "trigger";
-  return "status";
+  return baseEventKindToken(kind);
 }
 
 export function eventKindToken(
   event: Pick<NormalizedEvent, "kind" | "action">,
 ): string {
-  return kindToken(`${event.kind} ${event.action}`);
+  return eventPresentation(event).token;
 }
 
 export function timelineEventToken(
   event: Pick<NormalizedEvent, "kind" | "action">,
 ): string {
-  const damageKind = eventDamageKind(event);
-  if (damageKind === "direct") return "damageDirect";
-  if (damageKind === "burn") return "burn";
-  if (damageKind === "poison") return "poison";
-  if (damageKind === "other") return "damage";
-  return eventKindToken(event);
+  return timelinePresentationToken(event);
 }
 
 function isMetricOnlyEvent(event: NormalizedEvent): boolean {
@@ -183,7 +163,9 @@ export function isVisibleTimelineEvent(
 ): boolean {
   if (isMetricOnlyEvent(event)) return false;
   if (event.kind.toLowerCase() === "health") return false;
-  if (event.kind.toLowerCase() === "card-attribute") return false;
+  if (event.kind.toLowerCase() === "card-attribute") {
+    return cardAttributeSemantic(event.action)?.timelineVisible ?? false;
+  }
   if (event.kind.toLowerCase() !== "effect-executed") return true;
   if (event.action === "CardModifyAttribute") return false;
   if (
@@ -469,6 +451,10 @@ export function buildClusters(
 
   const built = Array.from(clusterMap.values());
   for (const cluster of built) {
+    const icons = new Set(
+      cluster.events.map((event) => event.icon).filter(Boolean),
+    );
+    cluster.icon = icons.size === 1 ? Array.from(icons)[0] : "";
     cluster.tier = clusterEventTier(cluster.events);
     cluster.impact = clusterImpact(cluster.events);
   }
@@ -548,7 +534,7 @@ export function createHitIndex(
 ): Map<number, TimelineCluster[]> {
   const index = new Map<number, TimelineCluster[]>();
   for (const cluster of clusters) {
-    const key = Math.floor(cluster.x / 24);
+    const key = Math.floor((cluster.markerX ?? cluster.x) / 24);
     if (!index.has(key)) {
       index.set(key, []);
     }

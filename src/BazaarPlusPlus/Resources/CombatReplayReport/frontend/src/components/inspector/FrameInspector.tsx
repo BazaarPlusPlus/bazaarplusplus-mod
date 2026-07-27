@@ -12,13 +12,16 @@ import {
   formatMilliseconds,
   formatNumber,
 } from "../../i18n/format.ts";
-import { eventDamageKind } from "../../model/damage-semantics.ts";
+import { cn } from "../../lib/utils.ts";
+import {
+  eventPresentation,
+  type EventPresentation,
+} from "../../model/event-semantics.ts";
 import type {
   NormalizedEntity,
   NormalizedEvent,
 } from "../../model/normalize.ts";
 import type { ReportViewModel } from "../../model/report.ts";
-import { eventKindToken } from "../../timeline/clusters.ts";
 import { eventsAtFrame } from "../../timeline/event-renderer.ts";
 import { EntityArt } from "../semantic/EntityArt.tsx";
 import { SemanticIcon } from "../semantic/SemanticIcon.tsx";
@@ -35,39 +38,9 @@ import {
   mergeInspectorEvents,
   summarizeDirectDamageGroup,
 } from "./frame-event-groups.ts";
+import { attributeEventDiff } from "./event-diff.ts";
 
 const PAGE_SIZE = 80;
-
-interface InspectorEventPresentation {
-  groupKey: string;
-  labelKey: string;
-  token: string;
-}
-
-function inspectorEventPresentation(
-  event: Pick<NormalizedEvent, "kind" | "action">,
-): InspectorEventPresentation {
-  const damageKind = eventDamageKind(event);
-  if (damageKind) {
-    return {
-      groupKey: `damage-${damageKind}`,
-      labelKey:
-        damageKind === "direct"
-          ? "damageDirect"
-          : damageKind === "burn"
-            ? "damageBurn"
-            : damageKind === "poison"
-              ? "damagePoison"
-              : "damageOther",
-      token:
-        damageKind === "burn" || damageKind === "poison"
-          ? damageKind
-          : "damage",
-    };
-  }
-  const token = eventKindToken(event);
-  return { groupKey: token, labelKey: token, token };
-}
 
 function EntityReference({
   entityById,
@@ -118,7 +91,8 @@ function EventSourceTree({
 }: {
   entityById: ReadonlyMap<string, NormalizedEntity>;
   nodes: readonly RelationNode[];
-}): React.JSX.Element {
+}): React.JSX.Element | null {
+  if (nodes.length === 0) return null;
   return (
     <div
       className="relative ml-2.5 mt-1.5 flex min-w-0 flex-col gap-1 pl-4"
@@ -217,11 +191,19 @@ function EventRow({
   mergedCount?: number;
   t: (key: string) => string;
 }): React.JSX.Element {
-  const presentation = inspectorEventPresentation(event);
-  const amount = eventAmount(event);
+  const presentation = eventPresentation(event);
+  const diff = attributeEventDiff(event);
+  const amount = diff?.deltaText ?? eventAmount(event);
   return (
     <article
-      className="border-b border-border/45 bg-surface-raised/45 px-2.5 py-2 last:border-b-0"
+      className={cn(
+        "border-b border-border/45 bg-surface-raised/45 px-2.5 py-2 last:border-b-0",
+        diff?.polarity === "increase"
+          && "border-l-2 border-l-success/70 bg-success/5",
+        diff?.polarity === "decrease"
+          && "border-l-2 border-l-destructive/70 bg-destructive/5",
+      )}
+      data-bpp-diff-polarity={diff?.polarity}
       data-bpp-event-id={event.id}
       data-bpp-test-id="focused-cluster-event"
     >
@@ -240,13 +222,28 @@ function EventRow({
         )}
         {amount && (
           <strong
-            className="ml-auto shrink-0 font-mono text-compact text-brand-soft"
+            className={cn(
+              "ml-auto shrink-0 rounded-panel border px-1.5 py-0.5 font-mono text-compact",
+              diff?.polarity === "increase"
+                ? "border-success/30 bg-success/10 text-success"
+                : diff?.polarity === "decrease"
+                  ? "border-destructive/30 bg-destructive/10 text-destructive"
+                  : "border-transparent text-brand-soft",
+            )}
             data-bpp-test-id="frame-event-amount"
           >
             {amount}
           </strong>
         )}
       </div>
+      {diff && (
+        <div
+          className="ml-7 mt-0.5 font-mono text-micro tabular-nums text-muted-foreground"
+          data-bpp-test-id="frame-event-transition"
+        >
+          {diff.transitionText}
+        </div>
+      )}
       <EventSourceTree
         entityById={entityById}
         nodes={sourceTreeNodes([event], t)}
@@ -264,7 +261,7 @@ function sourceTreeNodes(
   for (const event of events) {
     const sourceId = event.sourceId || event.triggerSourceId;
     const sourceKey = `source:${sourceId}`;
-    if (!seen.has(sourceKey)) {
+    if (sourceId && !seen.has(sourceKey)) {
       seen.add(sourceKey);
       nodes.push({
         ariaLabel: t("source"),
@@ -378,10 +375,10 @@ export function FrameInspector({
   const groups = useMemo(() => {
     const result = new Map<
       string,
-      InspectorEventPresentation & { events: NormalizedEvent[] }
+      EventPresentation & { events: NormalizedEvent[] }
     >();
     for (const event of events) {
-      const presentation = inspectorEventPresentation(event);
+      const presentation = eventPresentation(event);
       const group = result.get(presentation.groupKey);
       if (group) group.events.push(event);
       else result.set(presentation.groupKey, {

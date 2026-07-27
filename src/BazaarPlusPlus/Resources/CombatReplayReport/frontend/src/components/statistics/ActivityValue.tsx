@@ -27,12 +27,24 @@ export function ActivityValue({
   const amount = row.amounts[column.key] ?? 0;
   const quantified = row.quantifiedCounts[column.key] ?? 0;
   const partial = quantified > 0 && quantified < count;
-  const formattedAmount =
+  const unsignedAmount =
     column.unit === "ms"
       ? formatMilliseconds(amount)
-      : formatCompactNumber(amount);
+      : column.unit === "percent"
+        ? `${formatCompactNumber(amount)}%`
+        : formatCompactNumber(amount);
+  const formattedAmount =
+    column.aggregation === "signed" && amount > 0
+      ? `+${unsignedAmount}`
+      : unsignedAmount;
+  const partialPrefix =
+    partial && column.aggregation === "absolute" ? "≥" : "";
   const metricLabel = t(column.label);
-  const amountLabel = t("activityAmount");
+  const amountLabel = t(
+    column.aggregation === "signed"
+      ? "activityNetChange"
+      : "activityAmount",
+  );
   const countLabel = t("activityCount");
   const coverage = t("activityQuantifiedCoverage")
     .replace("{known}", formatNumber(quantified))
@@ -40,7 +52,7 @@ export function ActivityValue({
   const accessibleValue = [
     metricLabel,
     column.quantitative && quantified > 0
-      ? `${amountLabel} ${partial ? "≥" : ""}${formattedAmount}`
+      ? `${amountLabel} ${partialPrefix}${formattedAmount}`
       : "",
     `${countLabel} ${formatNumber(count)}`,
   ]
@@ -54,7 +66,7 @@ export function ActivityValue({
     visibleValue = (
       <span className="inline-flex flex-col items-end leading-none">
         <strong className="font-mono text-compact text-foreground">
-          {partial ? "≥" : ""}
+          {partialPrefix}
           {formattedAmount}
         </strong>
         <small className="mt-1 font-mono text-nano text-muted-foreground">
@@ -104,7 +116,7 @@ export function ActivityValue({
                 {amountLabel}
               </dt>
               <dd className="text-right font-mono text-compact font-semibold text-foreground">
-                {partial ? "≥" : ""}
+                {partialPrefix}
                 {formattedAmount}
               </dd>
             </>

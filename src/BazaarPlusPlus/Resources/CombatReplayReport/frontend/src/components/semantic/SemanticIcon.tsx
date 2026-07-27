@@ -1,5 +1,6 @@
 import {
   Activity,
+  CircleOff,
   CircleDot,
   ClockArrowUp,
   Flame,
@@ -17,9 +18,18 @@ import { cn } from "../../lib/utils.ts";
 
 const ICONS: Record<string, LucideIcon> = {
   attribute: Sparkles,
+  attributeAmmo: Sparkles,
+  attributeChilled: Sparkles,
+  attributeCooldownReduction: Sparkles,
+  attributeCritChance: Sparkles,
+  attributeDamage: Sparkles,
+  attributeFreezeReduction: Sparkles,
+  attributeMulticast: Sparkles,
+  attributeSlowReduction: Sparkles,
   burn: Flame,
   charge: Zap,
   damage: Swords,
+  destroy: CircleOff,
   freeze: Snowflake,
   haste: ClockArrowUp,
   heal: Plus,
@@ -46,6 +56,15 @@ const COLORS: Record<string, string> = {
   freeze: "text-freeze",
   skill: "text-skill",
   attribute: "text-attribute",
+  attributeAmmo: "text-attribute",
+  attributeChilled: "text-freeze",
+  attributeCooldownReduction: "text-attribute",
+  attributeCritChance: "text-attribute",
+  attributeDamage: "text-damage",
+  attributeFreezeReduction: "text-freeze",
+  attributeMulticast: "text-attribute",
+  attributeSlowReduction: "text-slow",
+  destroy: "text-damage",
 };
 
 export function SemanticIcon({

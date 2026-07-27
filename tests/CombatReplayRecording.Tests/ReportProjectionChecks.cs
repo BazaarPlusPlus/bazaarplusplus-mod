@@ -222,6 +222,82 @@ internal static class ReportProjectionChecks
         );
 
         RunEffectValueAttributionChecks(manifest, cardId);
+        RunStructuralStatusIconChecks(manifest, cardId);
+    }
+
+    private static void RunStructuralStatusIconChecks(
+        PvpBattleManifest sourceManifest,
+        InstanceId sourceCardId
+    )
+    {
+        var targetCardId = new InstanceId("structural-target");
+        var frame = new CombatSimFrame();
+        frame.Events.Add(
+            Executed(
+                EActionCommandType.CardDisable,
+                sourceCardId,
+                new EffectTargetCard { Target = targetCardId },
+                "destroy"
+            )
+        );
+        frame.CardUpdates[targetCardId] = new CombatSimCardUpdate
+        {
+            CardInstanceId = targetCardId,
+            Attributes =
+            {
+                [ECardAttributeType.Ammo] = CardAttribute(ECardAttributeType.Ammo, 2, 1),
+                [ECardAttributeType.CritChance] = CardAttribute(
+                    ECardAttributeType.CritChance,
+                    0,
+                    5
+                ),
+                [ECardAttributeType.DamageAmount] = CardAttribute(
+                    ECardAttributeType.DamageAmount,
+                    10,
+                    30
+                ),
+                [ECardAttributeType.Multicast] = CardAttribute(ECardAttributeType.Multicast, 2, 1),
+                [ECardAttributeType.PercentCooldownReduction] = CardAttribute(
+                    ECardAttributeType.PercentCooldownReduction,
+                    0,
+                    10
+                ),
+            },
+        };
+
+        var document = Project(
+            new PvpBattleManifest
+            {
+                BattleId = "00112233445566778899aabbccddeeff",
+                RecordedAtUtc = sourceManifest.RecordedAtUtc,
+            },
+            new NetMessageCombatSim(new CombatSim { Frames = new List<CombatSimFrame> { frame } })
+        );
+        Require(
+            document
+                .Events.Single(reportEvent => reportEvent.Action == "CardDisable")
+                .IconSemanticKey == "status.destroy",
+            "CardDisable must retain the game's native destroy/disable icon semantic."
+        );
+        var expected = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Ammo"] = "status.ammo",
+            ["CritChance"] = "status.critChance",
+            ["DamageAmount"] = "status.damage",
+            ["Multicast"] = "status.multicast",
+            ["PercentCooldownReduction"] = "status.cooldownReduction",
+        };
+        foreach (var pair in expected)
+        {
+            Require(
+                document
+                    .Events.Single(reportEvent =>
+                        reportEvent.Kind == "card-attribute" && reportEvent.Action == pair.Key
+                    )
+                    .IconSemanticKey == pair.Value,
+                $"{pair.Key} must retain its native tooltip icon semantic."
+            );
+        }
     }
 
     private static void RunEffectValueAttributionChecks(

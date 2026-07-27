@@ -29,6 +29,23 @@ internal static class ReportStatusIconSemanticResolver
     private static readonly ReportStatusIconSemantic Haste = new("status.haste", "HasteAmount");
     private static readonly ReportStatusIconSemantic Slow = new("status.slow", "SlowAmount");
     private static readonly ReportStatusIconSemantic Freeze = new("status.freeze", "FreezeAmount");
+    private static readonly ReportStatusIconSemantic Ammo = new("status.ammo", "Ammo");
+    private static readonly ReportStatusIconSemantic CooldownReduction = new(
+        "status.cooldownReduction",
+        "PercentCooldownReduction"
+    );
+    private static readonly ReportStatusIconSemantic CritChance = new(
+        "status.critChance",
+        "CritChance"
+    );
+    private static readonly ReportStatusIconSemantic Destroy = new(
+        "status.destroy",
+        "DisableTargets"
+    );
+    private static readonly ReportStatusIconSemantic Multicast = new(
+        "status.multicast",
+        "Multicast"
+    );
 
     private static readonly IReadOnlyDictionary<string, ReportStatusIconSemantic> ByStableKey =
         new Dictionary<string, ReportStatusIconSemantic>(StringComparer.Ordinal)
@@ -43,6 +60,11 @@ internal static class ReportStatusIconSemanticResolver
             [Haste.StableKey] = Haste,
             [Slow.StableKey] = Slow,
             [Freeze.StableKey] = Freeze,
+            [Ammo.StableKey] = Ammo,
+            [CooldownReduction.StableKey] = CooldownReduction,
+            [CritChance.StableKey] = CritChance,
+            [Destroy.StableKey] = Destroy,
+            [Multicast.StableKey] = Multicast,
         };
 
     internal static bool TryResolve(
@@ -95,6 +117,11 @@ internal static class ReportStatusIconSemanticResolver
         {
             semantic = action switch
             {
+                "Ammo" => Ammo,
+                "CritChance" => CritChance,
+                "DamageAmount" => Damage,
+                "Multicast" => Multicast,
+                "PercentCooldownReduction" => CooldownReduction,
                 "ChargeAmount" => Charge,
                 "Haste" or "HasteAmount" => Haste,
                 "Slow" or "SlowAmount" => Slow,
@@ -108,6 +135,7 @@ internal static class ReportStatusIconSemanticResolver
         {
             semantic = action switch
             {
+                "CardDisable" or "CardDestroy" => Destroy,
                 "CardCharge" => Charge,
                 "CardHaste" => Haste,
                 "CardSlow" => Slow,

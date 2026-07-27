@@ -7,7 +7,7 @@ import {
   type TimelineCluster,
 } from "./clusters.ts";
 import { EVENT_HIT_RADIUS } from "./constants.ts";
-import { markerOffset } from "./event-drawing.ts";
+import { markerPoint } from "./event-drawing.ts";
 import { timelineXAtCombatMs } from "./geometry.ts";
 
 export interface TimelinePoint {
@@ -78,9 +78,9 @@ export function hitTestTimelineClusters({
   let bestDistance = Number.POSITIVE_INFINITY;
   for (let offset = -1; offset <= 1; offset += 1) {
     for (const cluster of hitIndex.get(bucket + offset) ?? []) {
-      const markerY = cluster.y + markerOffset(cluster);
-      const dx = Math.abs(cluster.x - x);
-      const dy = Math.abs(markerY - y);
+      const marker = markerPoint(cluster);
+      const dx = Math.abs(marker.x - x);
+      const dy = Math.abs(marker.y - y);
       const distance = Math.hypot(dx, dy);
       if (
         dx <= EVENT_HIT_RADIUS

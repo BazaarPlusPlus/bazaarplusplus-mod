@@ -19,6 +19,7 @@ import type { StatusRange, TimelineCluster } from "./clusters.ts";
 const MARKER_COLOR_NAMES: Record<string, ThemeColorName> = {
   damage: "damage",
   damageDirect: "damage",
+  destroy: "damage",
   burn: "burn",
   poison: "poison",
   heal: "heal",
@@ -30,11 +31,13 @@ const MARKER_COLOR_NAMES: Record<string, ThemeColorName> = {
   skill: "skill",
   trigger: "rage",
   status: "status",
+  attribute: "attribute",
 };
 
 const MARKER_GLYPHS: Record<string, string> = {
   damage: "✦",
   damageDirect: "✦",
+  destroy: "×",
   burn: "♨",
   poison: "●",
   heal: "+",
@@ -46,6 +49,7 @@ const MARKER_GLYPHS: Record<string, string> = {
   skill: "◆",
   trigger: "◇",
   status: "∿",
+  attribute: "±",
 };
 
 function markerColor(token: string): string {
@@ -66,6 +70,15 @@ export function markerOffset(cluster: TimelineCluster): number {
   return 0;
 }
 
+export function markerPoint(
+  cluster: TimelineCluster,
+): { x: number; y: number } {
+  return {
+    x: cluster.markerX ?? cluster.x,
+    y: cluster.markerY ?? cluster.y + markerOffset(cluster),
+  };
+}
+
 export function drawMarker(
   context: CanvasRenderingContext2D,
   cluster: TimelineCluster,
@@ -74,9 +87,9 @@ export function drawMarker(
 ): void {
   const tier = cluster.tier ?? 2;
   const color = markerColor(cluster.token);
-  const y = cluster.y + markerOffset(cluster);
+  const marker = markerPoint(cluster);
   context.save();
-  context.translate(cluster.x, y);
+  context.translate(marker.x, marker.y);
   const image = cachedTimelineImage(cluster.icon, requestDraw);
   if (image) {
     const size = tier === 1 ? 18 : tier === 3 ? 11 : 14;
