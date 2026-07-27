@@ -11,3 +11,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("RunLoggingModule.Tests")]
 [assembly: InternalsVisibleTo("EndOfRunScreenshotGate.Tests")]
 [assembly: InternalsVisibleTo("RandomHeroPoolPatchCompatibility.Tests")]
+[assembly: InternalsVisibleTo("HistoryPanelFactory.Tests")]
