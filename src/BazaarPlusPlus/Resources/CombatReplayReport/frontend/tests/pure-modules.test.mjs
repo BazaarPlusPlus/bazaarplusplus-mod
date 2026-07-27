@@ -292,9 +292,25 @@ test("combat log uses signed Health attributes only when no explicit adjustment 
     targetIds: ["player"],
     value: 12,
   });
+  const healthMaxIncrease = timelineEvent({
+    id: "health-max-increase",
+    frame: 126,
+    combatMs: 6_300,
+    kind: "player-attribute",
+    action: "HealthMax",
+    targetIds: ["player"],
+    value: 20,
+  });
 
   assert.equal(combatLogEventToken(attributeOnlyHeal), "heal");
   assert.equal(combatLogEventToken(attributeOnlyDamage), "damage");
+  assert.equal(combatLogEventToken(healthMaxIncrease), "status");
+  assert.equal(
+    isNarrativeCombatLogEntry(
+      buildCombatLogEntries([healthMaxIncrease])[0],
+    ),
+    false,
+  );
   assert.equal(
     isCombatLogHealthSettlementEvent(attributeOnlyHeal),
     true,

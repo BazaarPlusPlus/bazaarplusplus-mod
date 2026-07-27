@@ -424,10 +424,25 @@ test.beforeAll(async ({ browserName }) => {
       iconAssetRelativeUrl:
         "../report-assets/objects/11/1111111111111111111111111111111111111111111111111111111111111111.png",
     }),
+    schemaEvent({
+      eventId: "health-max-increase",
+      frame: 171,
+      frameSequence: 1,
+      combatTimeMs: 8550,
+      kind: "player-attribute",
+      action: "HealthMax",
+      targetEntityIds: ["player-hero"],
+      value: 20,
+      previousValue: 2_175,
+      currentValue: 2_195,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+    }),
   );
   statusApplicationEnvelope.battleDocument.durationMs = 9000;
   statusApplicationEnvelope.battleDocument.frameCount = 180;
-  statusApplicationEnvelope.battleDocument.rawRecordCount += 4;
+  statusApplicationEnvelope.battleDocument.rawRecordCount += 5;
   await writeFile(
     join(fixtureDirectory, "status-application-report.html"),
     reportHtml(statusApplicationEnvelope),
@@ -2320,6 +2335,42 @@ test("scopes the inspector to the exact clicked cluster", async ({
   await expect(page.getByTestId("event-target-entity").first()).toContainText(
     "Fixture Opponent",
   );
+  await expect(
+    page.getByTestId("focused-cluster-event").first().getByText("Source", {
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByTestId("focused-cluster-event").first().getByText("Target", {
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  const relationGeometry = await page
+    .getByTestId("focused-cluster-event")
+    .first()
+    .evaluate((element) => {
+      const source = element.querySelector(
+        '[data-bpp-test-id="event-source-entity"]',
+      );
+      const target = element.querySelector(
+        '[data-bpp-test-id="event-target-entity"]',
+      );
+      const line = element.querySelector(
+        '[data-bpp-test-id="frame-event-relation-line"]',
+      );
+      const sourceBounds = source?.getBoundingClientRect();
+      const targetBounds = target?.getBoundingClientRect();
+      const lineStyle = line ? getComputedStyle(line) : null;
+      return {
+        sourceLeft: sourceBounds?.left ?? 0,
+        targetLeft: targetBounds?.left ?? 0,
+        lineWidth: lineStyle?.borderTopWidth ?? "0px",
+      };
+    });
+  expect(relationGeometry.targetLeft).toBeGreaterThan(
+    relationGeometry.sourceLeft,
+  );
+  expect(relationGeometry.lineWidth).not.toBe("0px");
   await expect(page.getByTestId("timeline-lane-1")).toHaveClass(
     /is-related-source/u,
   );

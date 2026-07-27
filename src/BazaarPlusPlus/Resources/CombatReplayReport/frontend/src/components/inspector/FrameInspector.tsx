@@ -146,25 +146,37 @@ function EventRow({
           </strong>
         )}
       </div>
-      <dl
-        className="mt-1.5 grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-2 gap-y-1"
+      <div
+        className="mt-1.5 flex min-w-0 flex-col"
         data-bpp-test-id="frame-event-relation"
       >
-        <dt className="text-nano font-medium uppercase tracking-wide text-muted-foreground/80">
-          {t("source")}
-        </dt>
-        <dd className="min-w-0">
+        <div
+          aria-label={t("source")}
+          className="min-w-0"
+          role="group"
+        >
           <EntityReference
             entityById={entityById}
             entityId={sourceId}
             fallback={t("sourceNotRecorded")}
             testId="event-source-entity"
           />
-        </dd>
-        <dt className="text-nano font-medium uppercase tracking-wide text-muted-foreground/80">
-          {t("target")}
-        </dt>
-        <dd className="min-w-0">
+        </div>
+        <div
+          aria-label={t("target")}
+          className="relative ml-3 mt-1 min-w-0 pl-4"
+          data-bpp-test-id="frame-event-target-branch"
+          role="group"
+        >
+          <span
+            aria-hidden="true"
+            className="absolute -top-1 bottom-1/2 left-0 border-l border-brand-soft/35"
+          />
+          <span
+            aria-hidden="true"
+            className="absolute left-0 top-1/2 w-3 border-t border-brand-soft/35"
+            data-bpp-test-id="frame-event-relation-line"
+          />
           <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-1">
             {targetIds.length > 0 ? (
               targetIds.map((targetId) => (
@@ -185,24 +197,31 @@ function EventRow({
               />
             )}
           </span>
-        </dd>
+        </div>
         {event.triggerSourceId
           && event.triggerSourceId !== event.sourceId && (
-            <>
-              <dt className="text-nano font-medium uppercase tracking-wide text-muted-foreground/80">
-                {t("triggerSource")}
-              </dt>
-              <dd className="min-w-0">
-                <EntityReference
-                  entityById={entityById}
-                  entityId={event.triggerSourceId}
-                  fallback={t("sourceNotRecorded")}
-                  testId="event-trigger-source-entity"
-                />
-              </dd>
-            </>
+            <div
+              aria-label={t("triggerSource")}
+              className="relative ml-3 mt-1 min-w-0 pl-4"
+              role="group"
+            >
+              <span
+                aria-hidden="true"
+                className="absolute -top-1 bottom-1/2 left-0 border-l border-brand-soft/35"
+              />
+              <span
+                aria-hidden="true"
+                className="absolute left-0 top-1/2 w-3 border-t border-brand-soft/35"
+              />
+              <EntityReference
+                entityById={entityById}
+                entityId={event.triggerSourceId}
+                fallback={t("sourceNotRecorded")}
+                testId="event-trigger-source-entity"
+              />
+            </div>
           )}
-      </dl>
+      </div>
     </article>
   );
 }

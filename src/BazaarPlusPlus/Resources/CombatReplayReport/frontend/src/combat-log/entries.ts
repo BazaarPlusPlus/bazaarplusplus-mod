@@ -97,7 +97,8 @@ export function combatLogEventToken(
   const action = event.action.toLowerCase();
   if (kind === "effect-executed" && action.includes("burn")) return "burn";
   if (kind === "effect-executed" && action.includes("regen")) return "regen";
-  if (kind === "player-attribute" && action === "health") {
+  if (kind === "player-attribute") {
+    if (action !== "health") return "status";
     const delta = finiteNumberOrZero(event.value);
     if (delta > 0) return "heal";
     if (delta < 0) return "damage";
