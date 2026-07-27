@@ -25,10 +25,10 @@ import {
   buildCombatLogEntries,
   combatLogEntity,
   combatLogGroupKey,
+  combatLogHealthSettlementEvents,
   combatLogTargetDetails,
   groupCombatLogEntries,
   isCombatLogApplicationEvent,
-  isCombatLogHealthSettlementEvent,
   isNarrativeCombatLogEntry,
   nearestCombatLogEntryIndex,
   selectedCombatLogEntryIndex,
@@ -381,14 +381,18 @@ export const CombatLogList = forwardRef<
     [model.entities],
   );
   const rawEntries = useMemo(
-    () =>
-      buildCombatLogEntries(
+    () => {
+      const healthSettlementEventIds = new Set(
+        combatLogHealthSettlementEvents(model.events).map((event) => event.id),
+      );
+      return buildCombatLogEntries(
         model.events.filter((event) =>
           isVisibleTimelineEvent(event, entityById)
           || isCombatLogApplicationEvent(event)
-          || isCombatLogHealthSettlementEvent(event)
+          || healthSettlementEventIds.has(event.id)
         ),
-      ).filter(isNarrativeCombatLogEntry),
+      ).filter(isNarrativeCombatLogEntry);
+    },
     [entityById, model.events],
   );
   const entries = useMemo(

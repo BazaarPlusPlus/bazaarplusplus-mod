@@ -93,6 +93,7 @@ import { mergeInspectorEvents } from "../src/components/inspector/frame-event-gr
 import {
   buildCombatLogEntries,
   combatLogEventToken,
+  combatLogHealthSettlementEvents,
   combatLogTargetDetails,
   groupCombatLogEntries,
   isCombatLogHealthSettlementEvent,
@@ -247,6 +248,84 @@ test("combat log preserves burn and regeneration applications alongside their he
   assert.equal(
     entries.find((entry) => entry.action === "PlayerRegenApply")?.icon,
     "../report-assets/status-regen.png",
+  );
+});
+
+test("combat log uses signed Health attributes only when no explicit adjustment exists", () => {
+  const attributeOnlyHeal = timelineEvent({
+    id: "attribute-only-heal",
+    frame: 126,
+    combatMs: 6_300,
+    kind: "player-attribute",
+    action: "Health",
+    targetIds: ["player"],
+    value: 20,
+    previousValue: 2_222,
+    currentValue: 2_242,
+    iconSemanticKey: "status.heal",
+    icon: "../report-assets/objects/11/1111111111111111111111111111111111111111111111111111111111111111.png",
+  });
+  const attributeOnlyDamage = timelineEvent({
+    id: "attribute-only-damage",
+    frame: 127,
+    combatMs: 6_350,
+    kind: "player-attribute",
+    action: "Health",
+    targetIds: ["opponent"],
+    value: -25,
+  });
+  const explicitRegen = timelineEvent({
+    id: "explicit-regen",
+    frame: 128,
+    combatMs: 6_400,
+    kind: "health",
+    action: "Health:Regen",
+    targetIds: ["player"],
+    value: 12,
+  });
+  const duplicateAggregate = timelineEvent({
+    id: "duplicate-aggregate",
+    frame: 128,
+    combatMs: 6_400,
+    kind: "player-attribute",
+    action: "Health",
+    targetIds: ["player"],
+    value: 12,
+  });
+
+  assert.equal(combatLogEventToken(attributeOnlyHeal), "heal");
+  assert.equal(combatLogEventToken(attributeOnlyDamage), "damage");
+  assert.equal(
+    isCombatLogHealthSettlementEvent(attributeOnlyHeal),
+    true,
+  );
+  assert.equal(
+    isCombatLogHealthSettlementEvent(
+      timelineEvent({
+        kind: "player-attribute",
+        action: "Health",
+        value: 0,
+      }),
+    ),
+    false,
+  );
+
+  const selected = combatLogHealthSettlementEvents([
+    attributeOnlyHeal,
+    attributeOnlyDamage,
+    explicitRegen,
+    duplicateAggregate,
+  ]);
+  assert.deepEqual(
+    selected.map((event) => event.id),
+    ["attribute-only-heal", "attribute-only-damage", "explicit-regen"],
+  );
+
+  const entries = buildCombatLogEntries(selected);
+  assert.equal(
+    entries.find((entry) => entry.eventIds.includes("attribute-only-heal"))
+      ?.icon,
+    attributeOnlyHeal.icon,
   );
 });
 

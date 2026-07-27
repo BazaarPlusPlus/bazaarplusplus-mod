@@ -91,12 +91,18 @@ export function isCombatLogApplicationEvent(
  * with the familiar damage/healing labels.
  */
 export function combatLogEventToken(
-  event: Pick<NormalizedEvent, "kind" | "action">,
+  event: Pick<NormalizedEvent, "kind" | "action" | "value">,
 ): string {
   const kind = event.kind.toLowerCase();
   const action = event.action.toLowerCase();
   if (kind === "effect-executed" && action.includes("burn")) return "burn";
   if (kind === "effect-executed" && action.includes("regen")) return "regen";
+  if (kind === "player-attribute" && action === "health") {
+    const delta = finiteNumberOrZero(event.value);
+    if (delta > 0) return "heal";
+    if (delta < 0) return "damage";
+    return "status";
+  }
   const healthAction = action.replace(/^health[\s:._-]*/, "");
   if (kind === "health" && healthAction.includes("burn")) return "damage";
   if (
@@ -109,8 +115,14 @@ export function combatLogEventToken(
 }
 
 export function isCombatLogHealthSettlementEvent(
-  event: Pick<NormalizedEvent, "kind" | "action">,
+  event: Pick<NormalizedEvent, "kind" | "action" | "value">,
 ): boolean {
+  if (
+    event.kind.toLowerCase() === "player-attribute"
+    && event.action.toLowerCase() === "health"
+  ) {
+    return finiteNumberOrZero(event.value) !== 0;
+  }
   if (event.kind.toLowerCase() !== "health") return false;
   const action = event.action.toLowerCase().replace(/^health[\s:._-]*/, "");
   return (
@@ -118,6 +130,43 @@ export function isCombatLogHealthSettlementEvent(
     || action.includes("regen")
     || action.includes("heal")
   );
+}
+
+function finiteNumberOrZero(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function healthSettlementTargetKeys(
+  event: Pick<NormalizedEvent, "frame" | "targetIds">,
+): string[] {
+  const targetIds = event.targetIds.length > 0 ? event.targetIds : [""];
+  return targetIds.map((targetId) => `${event.frame}\u001f${targetId}`);
+}
+
+/**
+ * Player Health deltas are the aggregate state transition for a frame. Keep
+ * them only when the producer emitted no more specific health adjustment for
+ * that target; otherwise Regen/Burn/Heal adjustments already tell the clearer
+ * story and the generic delta would duplicate it.
+ */
+export function combatLogHealthSettlementEvents(
+  events: readonly NormalizedEvent[],
+): NormalizedEvent[] {
+  const explicitHealthTargets = new Set<string>();
+  for (const event of events) {
+    if (event.kind.toLowerCase() !== "health") continue;
+    for (const key of healthSettlementTargetKeys(event)) {
+      explicitHealthTargets.add(key);
+    }
+  }
+
+  return events.filter((event) => {
+    if (!isCombatLogHealthSettlementEvent(event)) return false;
+    if (event.kind.toLowerCase() !== "player-attribute") return true;
+    return healthSettlementTargetKeys(event).every(
+      (key) => !explicitHealthTargets.has(key),
+    );
+  });
 }
 
 function valueKey(value: unknown): string {
