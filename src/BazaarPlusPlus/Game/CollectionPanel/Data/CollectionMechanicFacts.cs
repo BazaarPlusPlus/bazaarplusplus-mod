@@ -29,6 +29,10 @@ internal static class CollectionMechanicFacts
             var tierTemplate = pair.Value;
             if (tierData.GetAttributeBaseValueAtTier(ECardAttributeType.Multicast, tier) > 1)
                 facts |= CollectionMechanic.Multicast;
+            // Base destroy immunity only — enchantment-provided Radiant immunity lives on
+            // Enchantments and is never walked here.
+            if (tierData.GetAttributeBaseValueAtTier(ECardAttributeType.DestroyImmunity, tier) > 0)
+                facts |= CollectionMechanic.Destroy;
 
             if (tierTemplate == null)
                 continue;
@@ -69,10 +73,14 @@ internal static class CollectionMechanicFacts
 
     public static bool TryFromHiddenTag(EHiddenTag hiddenTag, out CollectionMechanic mechanic)
     {
-        mechanic =
-            hiddenTag == EHiddenTag.Multicast
-                ? CollectionMechanic.Multicast
-                : CollectionMechanic.None;
+        // AbsorbDestroy is not on the keyword whitelist, so mapping it here only feeds the
+        // Destroy mechanic fact — it never surfaces as its own keyword chip.
+        mechanic = hiddenTag switch
+        {
+            EHiddenTag.Multicast => CollectionMechanic.Multicast,
+            EHiddenTag.AbsorbDestroy => CollectionMechanic.Destroy,
+            _ => CollectionMechanic.None,
+        };
         return mechanic != CollectionMechanic.None;
     }
 
@@ -94,7 +102,11 @@ internal static class CollectionMechanicFacts
             && modifier.AttributeType == ECardAttributeType.Multicast
         )
             return CollectionMechanic.Multicast;
-        if (action is TActionCardDestroy)
+        // Direct destroy plus the rest of the destroy-cluster action surfaces. Nested abilities
+        // carried inside TActionCardTransformDestroyed.Abilities belong to the spawned
+        // replacement and are intentionally never walked (sub-rule retained from #149; no
+        // longer separately observable through the single Destroy flag).
+        if (action is TActionCardDestroy or TActionCardRepair or TActionCardTransformDestroyed)
             return CollectionMechanic.Destroy;
         if (action is not TActionAnd combined)
             return CollectionMechanic.None;
@@ -106,8 +118,8 @@ internal static class CollectionMechanicFacts
     }
 
     // Destruction-reaction triggers only. TTriggerOnCardRepaired is deliberately excluded —
-    // the "was repaired" trigger is not part of the destroy cluster (repair *actions* arrive in
-    // a later slice).
+    // the "was repaired" trigger is not part of the destroy cluster (repair *actions* match
+    // via ProjectActionFacts instead).
     private static CollectionMechanic ProjectTriggerFacts(TTriggerBase? trigger)
     {
         if (

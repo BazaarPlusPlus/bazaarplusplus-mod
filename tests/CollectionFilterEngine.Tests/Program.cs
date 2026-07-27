@@ -1575,9 +1575,9 @@ var transformDestroyedTemplate = MechanicItemTemplate(
         ),
     }
 );
-AssertFalse(
+AssertTrue(
     CollectionCardVm.From(transformDestroyedTemplate).Mechanics.Has(CollectionMechanic.Destroy),
-    "TransformDestroyed and its derived template abilities should not project direct Destroy."
+    "TActionCardTransformDestroyed on an active base ability should project Destroy; nested spawn-template abilities remain unwalked."
 );
 
 // Destruction-reaction triggers (#156): each of the three destroy-cluster triggers matches
@@ -1692,7 +1692,10 @@ var enchantmentDestructionTriggerTemplate = MechanicItemTemplate(
             Abilities = new Dictionary<string, TCardAbility>
             {
                 ["enchanted-destroyed"] = Ability(
-                    new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DamageAmount },
+                    new TActionCardModifyAttribute
+                    {
+                        AttributeType = ECardAttributeType.DamageAmount,
+                    },
                     new TTriggerOnCardDestroyed()
                 ),
             },
@@ -1721,33 +1724,128 @@ AssertFalse(
     "TTriggerOnCardRepaired should not project Destroy; only destruction-reaction triggers are in this slice."
 );
 
-// Remaining non-trigger destroy-adjacent surfaces stay out of Destroy until a later merge
-// slice (#157). Tooltip text must never match by itself.
-var destroyRelatedNonTriggerTemplate = MechanicItemTemplate(
+// Remaining destroy-cluster action / tag / attribute surfaces (#157).
+var rootRepairTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier(abilityIds: new[] { "root-repair" }) },
+    abilities: new() { ["root-repair"] = Ability(new TActionCardRepair()) }
+);
+AssertTrue(
+    CollectionCardVm.From(rootRepairTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "A root TActionCardRepair in an active base ability should project Destroy."
+);
+
+var nestedRepairTemplate = MechanicItemTemplate(
     new Dictionary<ETier, TCardTier>
     {
-        [ETier.Bronze] = Tier(
-            attributes: new() { [ECardAttributeType.DestroyImmunity] = 1 },
-            abilityIds: new[] { "repair", "destroy-immunity" }
-        ),
+        [ETier.Bronze] = Tier(abilityIds: new[] { "nested-repair" }),
     },
     abilities: new()
     {
-        ["repair"] = Ability(new TActionCardRepair()),
-        ["destroy-immunity"] = Ability(
-            new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DestroyImmunity }
+        ["nested-repair"] = Ability(
+            new TActionAnd
+            {
+                Actions = new List<ITAction>
+                {
+                    new TActionAnd { Actions = new List<ITAction> { new TActionCardRepair() } },
+                },
+            }
         ),
-    },
+    }
+);
+AssertTrue(
+    CollectionCardVm.From(nestedRepairTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "A TActionCardRepair nested in combined actions should project Destroy."
+);
+
+var absorbDestroyTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
     hiddenTags: new() { EHiddenTag.AbsorbDestroy }
-) with
-{
-    InternalDescription = "Destroy another item when this tooltip is rendered.",
-};
+);
+AssertTrue(
+    CollectionCardVm.From(absorbDestroyTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "The native AbsorbDestroy hidden tag should project Destroy."
+);
+AssertFalse(
+    CollectionKeywordWhitelist.Ordered.Contains(EHiddenTag.AbsorbDestroy),
+    "AbsorbDestroy must not appear as its own keyword chip; it surfaces only via Destroy."
+);
+
+var destroyImmunityTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(attributes: new() { [ECardAttributeType.DestroyImmunity] = 1 }),
+    }
+);
+AssertTrue(
+    CollectionCardVm.From(destroyImmunityTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "A positive base DestroyImmunity value at any supported tier should project Destroy."
+);
+
+var zeroDestroyImmunityTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(attributes: new() { [ECardAttributeType.DestroyImmunity] = 0 }),
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(zeroDestroyImmunityTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "A zero base DestroyImmunity value should not project Destroy."
+);
+
+var enchantmentRepairTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    enchantments: new()
+    {
+        [EEnchantmentType.Shiny] = new TEnchantment
+        {
+            Abilities = new Dictionary<string, TCardAbility>
+            {
+                ["enchanted-repair"] = Ability(new TActionCardRepair()),
+            },
+        },
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(enchantmentRepairTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "Enchantment-provided repair abilities should not pollute base Destroy facts."
+);
+
+var enchantmentReplaceDestroyedTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    enchantments: new()
+    {
+        [EEnchantmentType.Shiny] = new TEnchantment
+        {
+            Abilities = new Dictionary<string, TCardAbility>
+            {
+                ["enchanted-transform-destroyed"] = Ability(new TActionCardTransformDestroyed()),
+            },
+        },
+    }
+);
 AssertFalse(
     CollectionCardVm
-        .From(destroyRelatedNonTriggerTemplate)
+        .From(enchantmentReplaceDestroyedTemplate)
         .Mechanics.Has(CollectionMechanic.Destroy),
-    "Repair actions, destroy immunity, AbsorbDestroy, and tooltip text should not project Destroy in the trigger-only slice."
+    "Enchantment-provided replace-destroyed abilities should not pollute base Destroy facts."
+);
+
+var radiantDestroyImmunityTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    enchantments: new()
+    {
+        [EEnchantmentType.Radiant] = new TEnchantment
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DestroyImmunity] = 1,
+            },
+        },
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(radiantDestroyImmunityTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "Radiant destroy immunity on an enchantment must not project base Destroy facts."
 );
 
 var tooltipOnlyDestroyTemplate = MechanicItemTemplate(
