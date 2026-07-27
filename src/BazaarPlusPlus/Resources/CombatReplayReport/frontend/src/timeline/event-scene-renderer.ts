@@ -8,6 +8,7 @@ import {
   type TimelineCluster,
 } from "./clusters.ts";
 import {
+  drawHeroHealthAreas,
   drawMarker,
   drawPlayhead,
   drawPreviewGuide,
@@ -15,6 +16,7 @@ import {
   drawSideBoundary,
   drawStatusRanges,
   drawTimeGrid,
+  type HeroHealthAreaGeometry,
 } from "./event-drawing.ts";
 import {
   shouldDrawTimelinePreview,
@@ -33,12 +35,14 @@ export interface TimelineSceneOptions {
   clusters: readonly TimelineCluster[];
   markerClusters: readonly TimelineCluster[];
   statusRanges: readonly StatusRange[];
+  heroHealthAreas: readonly HeroHealthAreaGeometry[];
   firstVisibleMs: number;
   selectedVisualClusters: ReadonlySet<TimelineCluster>;
   hoverCluster: TimelineCluster | null;
   playheadMs: number;
   previewMs: number | null;
   pinnedHeroLane: number | null;
+  showHeroHealth: boolean;
   requestDraw: () => void;
 }
 
@@ -53,11 +57,13 @@ export function drawTimelineScene(options: TimelineSceneOptions): void {
     clusters,
     markerClusters,
     statusRanges,
+    heroHealthAreas,
     firstVisibleMs,
     selectedVisualClusters,
     hoverCluster,
     playheadMs,
     previewMs,
+    showHeroHealth,
     requestDraw,
   } = options;
   const context = canvas.getContext("2d");
@@ -67,6 +73,13 @@ export function drawTimelineScene(options: TimelineSceneOptions): void {
   context.fillStyle = themeColor("background");
   context.fillRect(0, 0, size.width, size.height);
   drawTimeGrid(context, model, size.width, size.height);
+  const visibleHealthAreas = showHeroHealth ? heroHealthAreas : [];
+  drawHeroHealthAreas(context, visibleHealthAreas);
+  canvas.dataset.bppHeroHealthVisible =
+    visibleHealthAreas.length > 0 ? "true" : "false";
+  canvas.dataset.bppHeroHealthLanes = visibleHealthAreas
+    .map((area) => `${area.side}:${area.lane}`)
+    .join(",");
 
   const selectedCluster =
     selectedVisualClusters.values().next().value ?? null;
@@ -172,6 +185,7 @@ export function drawStickyHeroRow({
   entities,
   laneHeight,
   pinnedHeroLane,
+  showHeroHealth,
 }: Pick<
   TimelineSceneOptions,
   | "canvas"
@@ -179,11 +193,20 @@ export function drawStickyHeroRow({
   | "entities"
   | "laneHeight"
   | "pinnedHeroLane"
+  | "showHeroHealth"
 >): void {
   const context = stickyHeroCanvas.getContext("2d");
   if (!context) return;
   const size = beginLogicalDraw(stickyHeroCanvas, context);
   context.clearRect(0, 0, size.width, size.height);
+  const pinnedEntity =
+    pinnedHeroLane === null ? null : entities[pinnedHeroLane] ?? null;
+  stickyHeroCanvas.dataset.bppHeroHealthVisible =
+    showHeroHealth
+      && pinnedEntity?.type.toLowerCase() === "hero"
+      && (pinnedEntity.side === "player" || pinnedEntity.side === "opponent")
+      ? "true"
+      : "false";
   if (pinnedHeroLane === null) return;
   const logicalHeight =
     Number.parseFloat(canvas.style.height)

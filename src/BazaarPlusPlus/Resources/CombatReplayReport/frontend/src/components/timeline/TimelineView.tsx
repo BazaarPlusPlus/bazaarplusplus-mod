@@ -114,6 +114,7 @@ export const TimelineView = forwardRef<
   const [visibleMetrics, setVisibleMetrics] = useState<
     ReadonlySet<StateMetric>
   >(() => new Set(METRIC_ORDER));
+  const visibleMetricsRef = useRef(visibleMetrics);
   const highlightedMetricRef = useRef<StateMetric | null>(null);
   const timelineWidth = timelineWidthAtZoom(
     baseWidth,
@@ -180,6 +181,7 @@ export const TimelineView = forwardRef<
   const previewCallbackRef = useRef(onPreviewCombatMs);
   const translateRef = useRef(t);
   drawStateRef.current = drawState;
+  visibleMetricsRef.current = visibleMetrics;
   previewCallbackRef.current = onPreviewCombatMs;
   translateRef.current = t;
 
@@ -351,6 +353,9 @@ export const TimelineView = forwardRef<
         viewportRefs.scroll.current?.scrollTop ?? 0,
       ),
     );
+    controller.setHeroHealthVisible(
+      visibleMetricsRef.current.has("health"),
+    );
     controller.setSelection(
       selectionRef.current.frame,
       selectionRef.current.eventIds,
@@ -369,6 +374,12 @@ export const TimelineView = forwardRef<
   useLayoutEffect(() => {
     viewportRefs.controller.current?.setPinnedHeroLane(pinnedHeroLane);
   }, [pinnedHeroLane]);
+
+  useLayoutEffect(() => {
+    viewportRefs.controller.current?.setHeroHealthVisible(
+      visibleMetrics.has("health"),
+    );
+  }, [visibleMetrics]);
 
   useLayoutEffect(() => {
     drawState();

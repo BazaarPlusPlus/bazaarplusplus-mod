@@ -62,6 +62,7 @@ import {
   timelineClusterEventIds,
 } from "../src/timeline/clusters.ts";
 import {
+  heroHealthAreaGeometry,
   markerImageBounds,
   markerPoint,
 } from "../src/timeline/event-drawing.ts";
@@ -1368,6 +1369,82 @@ test("native timeline markers preserve their aspect ratio around the center", ()
   assert.ok(Math.abs(portrait.width - 13.517241379310345) < 0.000001);
   assert.equal(portrait.x, -portrait.width / 2);
   assert.equal(portrait.y, -7);
+});
+
+test("hero health areas use side-local peaks and step geometry", () => {
+  const areas = heroHealthAreaGeometry(
+    {
+      durationMs: 4_000,
+      metrics: [
+        {
+          frame: 0,
+          combatMs: 0,
+          side: "player",
+          metric: "health",
+          value: 1_000,
+          unit: "points",
+        },
+        {
+          frame: 40,
+          combatMs: 2_000,
+          side: "player",
+          metric: "health",
+          value: 500,
+          unit: "points",
+        },
+        {
+          frame: 60,
+          combatMs: 3_000,
+          side: "player",
+          metric: "health",
+          value: 0,
+          unit: "points",
+        },
+        {
+          frame: 0,
+          combatMs: 0,
+          side: "opponent",
+          metric: "health",
+          value: 1_500,
+          unit: "points",
+        },
+      ],
+    },
+    [
+      { side: "player", type: "hero" },
+      { side: "player", type: "item" },
+      { side: "opponent", type: "hero" },
+    ],
+    478,
+    52,
+  );
+
+  assert.deepEqual(areas, [
+    {
+      lane: 0,
+      side: "player",
+      peak: 1_000,
+      baselineY: 48,
+      points: [
+        { x: 14, y: 4 },
+        { x: 214, y: 4 },
+        { x: 214, y: 26 },
+        { x: 314, y: 26 },
+        { x: 314, y: 48 },
+        { x: 414, y: 48 },
+      ],
+    },
+    {
+      lane: 2,
+      side: "opponent",
+      peak: 1_500,
+      baselineY: 152,
+      points: [
+        { x: 14, y: 108 },
+        { x: 414, y: 108 },
+      ],
+    },
+  ]);
 });
 
 test("canvas backing scale honors DPR and logical coordinates", () => {

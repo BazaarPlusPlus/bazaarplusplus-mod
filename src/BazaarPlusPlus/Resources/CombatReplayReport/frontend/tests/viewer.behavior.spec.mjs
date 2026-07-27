@@ -1403,6 +1403,10 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
     .toBe(0);
   await expect(stickyLabel).toBeHidden();
   await expect(stickyCanvas).toBeHidden();
+  await expect(stickyCanvas).toHaveAttribute(
+    "data-bpp-hero-health-visible",
+    "false",
+  );
   await expect(page.getByTestId("timeline-lane-icon-0")).toBeVisible();
   await expect
     .poll(() => visibleHeroAvatarCount("player-hero"))
@@ -1413,6 +1417,10 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
   });
   await expect(stickyLabel).toBeVisible();
   await expect(stickyCanvas).toBeVisible();
+  await expect(stickyCanvas).toHaveAttribute(
+    "data-bpp-hero-health-visible",
+    "true",
+  );
   await expect(playerHeroLane).toBeEmpty();
   await expect
     .poll(() => visibleHeroAvatarCount("player-hero"))
@@ -1682,13 +1690,50 @@ test("highlights and toggles state lines from the metric legend", async ({
   await page.goto(`${reportUrl}?lang=en`);
 
   const canvas = page.getByTestId("state-band-canvas");
+  const timelineCanvas = page.getByTestId("timeline-canvas");
   const health = page.getByTestId("state-label-health");
   const burn = page.getByTestId("state-label-burn");
+  const readPlayerAreaPixels = () =>
+    timelineCanvas.evaluate((element) => {
+      const context = element.getContext("2d");
+      const logicalWidth =
+        Number.parseFloat(element.style.width)
+        || element.getBoundingClientRect().width;
+      const logicalHeight =
+        Number.parseFloat(element.style.height)
+        || element.getBoundingClientRect().height;
+      const scaleX = element.width / logicalWidth;
+      const scaleY = element.height / logicalHeight;
+      const logicalX = 14 + (2_500 / 8_000) * (logicalWidth - 78);
+      const pixel = (logicalY) =>
+        Array.from(
+          context.getImageData(
+            Math.round(logicalX * scaleX),
+            Math.round(logicalY * scaleY),
+            1,
+            1,
+          ).data,
+        );
+      return {
+        hero: pixel(40),
+        item: pixel(52 + 40),
+      };
+    });
   await expect(health).toHaveAttribute("aria-pressed", "true");
   await expect(canvas).toHaveAttribute(
     "data-bpp-visible-metrics",
     "health,rage,healthRegen,shield,burn,poison",
   );
+  await expect(timelineCanvas).toHaveAttribute(
+    "data-bpp-hero-health-visible",
+    "true",
+  );
+  await expect(timelineCanvas).toHaveAttribute(
+    "data-bpp-hero-health-lanes",
+    "player:0,opponent:3",
+  );
+  const visibleAreaPixels = await readPlayerAreaPixels();
+  expect(visibleAreaPixels.hero).not.toEqual(visibleAreaPixels.item);
 
   await burn.hover();
   await expect(canvas).toHaveAttribute(
@@ -1716,6 +1761,12 @@ test("highlights and toggles state lines from the metric legend", async ({
     "data-bpp-highlighted-metric",
     "",
   );
+  await expect(timelineCanvas).toHaveAttribute(
+    "data-bpp-hero-health-visible",
+    "false",
+  );
+  const hiddenAreaPixels = await readPlayerAreaPixels();
+  expect(hiddenAreaPixels.hero).toEqual(hiddenAreaPixels.item);
 
   await health.press(" ");
   await expect(health).toHaveAttribute("aria-pressed", "true");
@@ -1727,6 +1778,12 @@ test("highlights and toggles state lines from the metric legend", async ({
     "data-bpp-highlighted-metric",
     "health",
   );
+  await expect(timelineCanvas).toHaveAttribute(
+    "data-bpp-hero-health-visible",
+    "true",
+  );
+  const restoredAreaPixels = await readPlayerAreaPixels();
+  expect(restoredAreaPixels.hero).not.toEqual(restoredAreaPixels.item);
 });
 
 test("pins a solid axis on click while pointer hover drives a dashed axis", async ({

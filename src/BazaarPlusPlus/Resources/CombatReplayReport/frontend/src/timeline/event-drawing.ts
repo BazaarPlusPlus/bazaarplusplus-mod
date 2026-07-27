@@ -1,4 +1,5 @@
 import type { ReportViewModel } from "../model/report.ts";
+import type { NormalizedEntity } from "../model/normalize.ts";
 import {
   themeColor,
   themeLengthPx,
@@ -10,6 +11,7 @@ import { beginLogicalDraw, resizeLogicalCanvas } from "./canvas.ts";
 import { TIME_RULER_HEIGHT } from "./constants.ts";
 import {
   shouldDrawTimelinePreview,
+  TIMELINE_LEFT_GUTTER,
   TIMELINE_RIGHT_INTERACTION_GUTTER,
   timelineXAtCombatMs,
 } from "./geometry.ts";
@@ -201,6 +203,121 @@ export function drawTimeGrid(
     context.stroke();
   }
   context.restore();
+}
+
+export interface HeroHealthAreaGeometry {
+  lane: number;
+  side: "player" | "opponent";
+  peak: number;
+  baselineY: number;
+  points: Array<{ x: number; y: number }>;
+}
+
+export function heroHealthAreaGeometry(
+  model: Pick<ReportViewModel, "durationMs" | "metrics">,
+  entities: readonly NormalizedEntity[],
+  width: number,
+  laneHeight: number,
+): HeroHealthAreaGeometry[] {
+  const areas: HeroHealthAreaGeometry[] = [];
+  for (const side of ["player", "opponent"] as const) {
+    const lane = entities.findIndex(
+      (entity) =>
+        entity.side === side && entity.type.toLowerCase() === "hero",
+    );
+    if (lane < 0) continue;
+    const samples = model.metrics
+      .filter(
+        (sample) => sample.side === side && sample.metric === "health",
+      )
+      .slice()
+      .sort(
+        (left, right) =>
+          left.combatMs - right.combatMs || left.frame - right.frame,
+      );
+    if (samples.length === 0) continue;
+
+    const peak = Math.max(
+      1,
+      ...samples.map((sample) => Math.max(0, sample.value)),
+    );
+    const top = lane * laneHeight + 4;
+    const baselineY = (lane + 1) * laneHeight - 4;
+    const verticalRange = Math.max(1, baselineY - top);
+    const yAtValue = (value: number): number =>
+      baselineY
+      - Math.max(0, Math.min(1, value / peak)) * verticalRange;
+    const rightX = Math.max(
+      TIMELINE_LEFT_GUTTER,
+      width - TIMELINE_RIGHT_INTERACTION_GUTTER,
+    );
+    const leftX = Math.min(
+      rightX,
+      Math.max(
+        TIMELINE_LEFT_GUTTER,
+        timelineXAtCombatMs(
+          samples[0].combatMs,
+          model.durationMs,
+          width,
+        ),
+      ),
+    );
+    let previousY = yAtValue(samples[0].value);
+    const points = [{ x: leftX, y: previousY }];
+    for (const sample of samples.slice(1)) {
+      const x = Math.max(
+        leftX,
+        Math.min(
+          rightX,
+          timelineXAtCombatMs(
+            sample.combatMs,
+            model.durationMs,
+            width,
+          ),
+        ),
+      );
+      const nextY = yAtValue(sample.value);
+      points.push({ x, y: previousY }, { x, y: nextY });
+      previousY = nextY;
+    }
+    points.push({ x: rightX, y: previousY });
+    areas.push({ lane, side, peak, baselineY, points });
+  }
+  return areas;
+}
+
+export function drawHeroHealthAreas(
+  context: CanvasRenderingContext2D,
+  areas: readonly HeroHealthAreaGeometry[],
+): void {
+  const color = themeColor("damage");
+  for (const area of areas) {
+    const first = area.points[0];
+    const last = area.points[area.points.length - 1];
+    if (!first || !last) continue;
+    context.save();
+    context.beginPath();
+    context.moveTo(first.x, area.baselineY);
+    context.lineTo(first.x, first.y);
+    for (const point of area.points.slice(1)) {
+      context.lineTo(point.x, point.y);
+    }
+    context.lineTo(last.x, area.baselineY);
+    context.closePath();
+    context.fillStyle = withAlpha(color, 0.08);
+    context.fill();
+
+    context.beginPath();
+    context.moveTo(first.x, first.y);
+    for (const point of area.points.slice(1)) {
+      context.lineTo(point.x, point.y);
+    }
+    context.strokeStyle = withAlpha(color, 0.52);
+    context.lineWidth = 1.25;
+    context.setLineDash(area.side === "opponent" ? [5, 3] : []);
+    context.stroke();
+    context.restore();
+  }
 }
 
 export function drawSideBoundary(

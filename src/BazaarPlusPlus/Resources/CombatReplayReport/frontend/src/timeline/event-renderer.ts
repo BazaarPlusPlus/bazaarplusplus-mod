@@ -11,6 +11,10 @@ import {
 } from "./clusters.ts";
 import { resizeLogicalCanvas } from "./canvas.ts";
 import {
+  heroHealthAreaGeometry,
+  type HeroHealthAreaGeometry,
+} from "./event-drawing.ts";
+import {
   applyTimelineRelatedHighlights,
   eventsAtTimelineFrame,
   hitTestTimelineClusters,
@@ -65,6 +69,7 @@ export class TimelineCanvasController {
   private markerClusters: TimelineCluster[] = [];
   private firstVisibleMs = 0;
   private statusRanges: StatusRange[] = [];
+  private heroHealthAreas: HeroHealthAreaGeometry[] = [];
   private hitIndex = new Map<number, TimelineCluster[]>();
   private selectedFrame: number | null = null;
   private selectedClusterEventIds = new Set<string>();
@@ -73,6 +78,7 @@ export class TimelineCanvasController {
   private previewMs: number | null = null;
   private hoverCluster: TimelineCluster | null = null;
   private pinnedHeroLane: number | null = null;
+  private showHeroHealth = true;
   private frameHandle = 0;
 
   constructor(options: ControllerOptions) {
@@ -103,6 +109,12 @@ export class TimelineCanvasController {
       isVisibleTimelineEvent(event, entityById),
     );
     this.statusRanges = buildStatusRanges(
+      this.model,
+      this.entities,
+      this.width,
+      this.laneHeight,
+    );
+    this.heroHealthAreas = heroHealthAreaGeometry(
       this.model,
       this.entities,
       this.width,
@@ -157,6 +169,12 @@ export class TimelineCanvasController {
     this.pinnedHeroLane = next;
     this.syncRelatedHighlights();
     this.drawStickyHeroRow();
+    this.requestDraw();
+  }
+
+  setHeroHealthVisible(visible: boolean): void {
+    if (visible === this.showHeroHealth) return;
+    this.showHeroHealth = visible;
     this.requestDraw();
   }
 
@@ -366,12 +384,14 @@ export class TimelineCanvasController {
       clusters: this.clusters,
       markerClusters: this.markerClusters,
       statusRanges: this.statusRanges,
+      heroHealthAreas: this.heroHealthAreas,
       firstVisibleMs: this.firstVisibleMs,
       selectedVisualClusters: this.selectedVisualClusters,
       hoverCluster: this.hoverCluster,
       playheadMs: this.playheadMs,
       previewMs: this.previewMs,
       pinnedHeroLane: this.pinnedHeroLane,
+      showHeroHealth: this.showHeroHealth,
       requestDraw: this.requestDraw,
     });
   }
@@ -383,6 +403,7 @@ export class TimelineCanvasController {
       entities: this.entities,
       laneHeight: this.laneHeight,
       pinnedHeroLane: this.pinnedHeroLane,
+      showHeroHealth: this.showHeroHealth,
     });
   }
 
