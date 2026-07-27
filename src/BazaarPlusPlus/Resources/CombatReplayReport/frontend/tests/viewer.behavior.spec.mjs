@@ -1111,6 +1111,67 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
     .toBe(1);
 });
 
+test("scrolls a combat log target lane into the visible timeline viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 999, height: 857 });
+  await page.goto(`${scrollRecordingReportUrl}?lang=en`);
+  await page.getByTestId("combat-log-dock-toggle").click();
+
+  const timelineScroll = page.getByTestId("timeline-scroll");
+  await timelineScroll.evaluate((scroll) => {
+    scroll.scrollTop = 0;
+  });
+  const damageRow = page
+    .getByTestId("combat-log-entry")
+    .filter({ hasText: "Damage" });
+  await expect(damageRow).toHaveCount(1);
+  await damageRow.click();
+
+  const targetLane = page.locator(
+    '[data-bpp-entity-id="opponent-hero"]',
+  );
+  await expect(targetLane).toHaveClass(/is-jump-target/u);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scroll = document.querySelector(
+          '[data-bpp-test-id="timeline-scroll"]',
+        );
+        const ruler = document.querySelector(
+          '[data-bpp-test-id="timeline-ruler-canvas"]',
+        );
+        const sticky = document.querySelector(
+          '[data-bpp-test-id="timeline-sticky-hero-label"]',
+        );
+        const lane = document.querySelector(
+          '[data-bpp-entity-id="opponent-hero"]',
+        );
+        if (
+          !(scroll instanceof HTMLElement)
+          || !(ruler instanceof HTMLElement)
+          || !(lane instanceof HTMLElement)
+        ) {
+          return false;
+        }
+        const scrollBounds = scroll.getBoundingClientRect();
+        const rulerBounds = ruler.getBoundingClientRect();
+        const stickyBounds =
+          sticky instanceof HTMLElement && !sticky.hidden
+            ? sticky.getBoundingClientRect()
+            : null;
+        const laneBounds = lane.getBoundingClientRect();
+        const visibleTop = Math.max(
+          rulerBounds.bottom,
+          stickyBounds?.bottom ?? Number.NEGATIVE_INFINITY,
+        );
+        return laneBounds.top >= visibleTop - 1
+          && laneBounds.bottom <= scrollBounds.bottom + 1;
+      })
+    )
+    .toBe(true);
+});
+
 test("renders both combatants on the shared state band at device scale", async ({
   page,
 }) => {
@@ -2556,6 +2617,17 @@ test("virtualizes the footer combat log and highlights every visible row from th
   }
   expect(
     await rows.evaluateAll((elements) =>
+      elements.every((element) => {
+        const relation = element.querySelector(
+          '[data-bpp-test-id="combat-log-relation"]',
+        );
+        return relation?.textContent?.trim() === ""
+          && relation.querySelector("svg") === null;
+      })
+    ),
+  ).toBe(true);
+  expect(
+    await rows.evaluateAll((elements) =>
       elements.some(
         (element) =>
           element.getAttribute("data-bpp-frame-start") === "false",
@@ -2715,88 +2787,40 @@ test("keeps direct freeze applications in the combat log without countdown tick 
   await expect(freezeRow).toContainText("×2");
   await freezeRow.click();
   await expect(freezeRow).toHaveAttribute("aria-expanded", "true");
-  const rootGeometry = await freezeRow.evaluate((row) => {
-    const root = row.querySelector(
-      '[data-bpp-test-id="combat-log-arrow"]',
-    )?.getBoundingClientRect();
-    const arm = row.querySelector(
-      '[data-bpp-test-id="combat-log-tree-root-arm"]',
-    )?.getBoundingClientRect();
-    const spine = row.querySelector(
-      '[data-bpp-test-id="combat-log-tree-root-spine"]',
-    )?.getBoundingClientRect();
-    if (!root || !arm || !spine) return null;
-    return {
-      rootLeft: root.left,
-      rootWidth: root.width,
-      armLeft: arm.left,
-      armRight: arm.right,
-      armWidth: arm.width,
-      spineLeft: spine.left,
-    };
-  });
-  expect(rootGeometry).not.toBeNull();
-  expect(rootGeometry.armLeft).toBeCloseTo(
-    rootGeometry.rootLeft + rootGeometry.rootWidth / 2,
-    0,
-  );
-  expect(rootGeometry.armRight).toBeCloseTo(
-    rootGeometry.rootLeft + rootGeometry.rootWidth,
-    0,
-  );
-  expect(rootGeometry.armWidth).toBeLessThan(rootGeometry.rootWidth * 0.6);
-  expect(rootGeometry.spineLeft).toBeCloseTo(rootGeometry.armLeft, 0);
-  const detailTree = page.getByTestId("combat-log-entry-details");
-  await expect(detailTree).toBeVisible();
+  await expect(freezeRow.getByTestId("combat-log-relation")).toBeEmpty();
+  await expect(page.getByTestId("combat-log-arrow")).toHaveCount(0);
+  await expect(page.getByTestId("combat-log-tree-root-arm")).toHaveCount(0);
+  await expect(page.getByTestId("combat-log-tree-root-spine")).toHaveCount(0);
+  const detailGroup = page.getByTestId("combat-log-entry-details");
+  await expect(detailGroup).toBeVisible();
   const detailRows = page.getByTestId("combat-log-entry-detail");
   await expect(detailRows).toHaveCount(2);
   await expect(detailRows.nth(0)).toContainText("Practice Shield");
   await expect(detailRows.nth(1)).toContainText("Cash Cannon");
   await expect(
-    detailRows.getByTestId("combat-log-tree-target-label"),
+    detailRows.getByTestId("combat-log-detail-target-label"),
   ).toHaveText(["Practice Shield", "Cash Cannon"]);
-  await expect(page.getByTestId("combat-log-tree-branch")).toHaveCount(2);
-  await expect(page.getByTestId("combat-log-tree-target")).toHaveCount(2);
-  const detailGeometry = await detailTree.evaluate((tree) => {
-    const branches = Array.from(
-      tree.querySelectorAll('[data-bpp-test-id="combat-log-tree-branch"]'),
-    );
+  await expect(page.getByTestId("combat-log-detail-target")).toHaveCount(2);
+  await expect(page.getByTestId("combat-log-tree-branch")).toHaveCount(0);
+  await expect(page.getByTestId("combat-log-tree-spine")).toHaveCount(0);
+  await expect(page.getByTestId("combat-log-tree-elbow")).toHaveCount(0);
+  const detailGeometry = await detailGroup.evaluate((group) => {
     const targets = Array.from(
-      tree.querySelectorAll('[data-bpp-test-id="combat-log-tree-target"]'),
-    );
-    const spines = Array.from(
-      tree.querySelectorAll('[data-bpp-test-id="combat-log-tree-spine"]'),
+      group.querySelectorAll('[data-bpp-test-id="combat-log-detail-target"]'),
     );
     const rows = Array.from(
-      tree.querySelectorAll('[data-bpp-test-id="combat-log-entry-detail"]'),
+      group.querySelectorAll('[data-bpp-test-id="combat-log-entry-detail"]'),
     );
     return {
-      branchHeights: branches.map((node) => node.getBoundingClientRect().height),
-      branchLefts: branches.map((node) => node.getBoundingClientRect().left),
-      targetLefts: targets.map((node) => node.getBoundingClientRect().left),
-      spineHeights: spines.map((node) => node.getBoundingClientRect().height),
+      targetPaddingLeft: targets.map((node) =>
+        Number.parseFloat(getComputedStyle(node).paddingLeft)
+      ),
       rowHeights: rows.map((node) => node.getBoundingClientRect().height),
-      paddingBottom: Number.parseFloat(getComputedStyle(tree).paddingBottom),
+      paddingBottom: Number.parseFloat(getComputedStyle(group).paddingBottom),
     };
   });
-  expect(
-    Math.max(...detailGeometry.branchLefts)
-      - Math.min(...detailGeometry.branchLefts),
-  ).toBeLessThanOrEqual(1);
-  expect(
-    detailGeometry.targetLefts.every(
-      (left, index) => left > detailGeometry.branchLefts[index],
-    ),
-  ).toBe(true);
+  expect(detailGeometry.targetPaddingLeft).toEqual([8, 8]);
   expect(detailGeometry.rowHeights).toEqual([32, 32]);
-  expect(detailGeometry.spineHeights[0]).toBeCloseTo(
-    detailGeometry.branchHeights[0] + 1,
-    0,
-  );
-  expect(detailGeometry.spineHeights[1]).toBeCloseTo(
-    detailGeometry.branchHeights[1] / 2,
-    0,
-  );
   expect(detailGeometry.paddingBottom).toBe(4);
   await expect(page.getByTestId("frame-inspector-popover")).toHaveCount(0);
   await detailRows.nth(0).click();
