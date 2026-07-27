@@ -52,6 +52,20 @@ interface ControllerOptions {
   ) => void;
 }
 
+type PendingHover =
+  | {
+    kind: "timeline";
+    clientX: number;
+    clientY: number;
+  }
+  | {
+    kind: "sticky";
+    canvas: HTMLCanvasElement;
+    lane: number;
+    clientX: number;
+    clientY: number;
+  };
+
 export class TimelineCanvasController {
   private readonly canvas: HTMLCanvasElement;
   private readonly ruler: HTMLCanvasElement;
@@ -80,6 +94,7 @@ export class TimelineCanvasController {
   private pinnedHeroLane: number | null = null;
   private showHeroHealth = true;
   private frameHandle = 0;
+  private pendingHover: PendingHover | null = null;
 
   constructor(options: ControllerOptions) {
     if (window.__BPP_VIEWER_TEST__) {
@@ -206,14 +221,15 @@ export class TimelineCanvasController {
   }
 
   handlePointerMove(event: PointerEvent): void {
-    const point = this.logicalPoint(event);
-    const cluster = this.hitTest(point.x, point.y);
-    const combatMs = combatMsAtPointer(
-      this.canvas,
-      event.clientX,
-      this.model.durationMs,
-    );
-    this.updateHover(cluster, combatMs, event.clientX, event.clientY);
+    if (window.__BPP_VIEWER_TEST__) {
+      window.__BPP_VIEWER_TEST__.hoverInputCount += 1;
+    }
+    this.pendingHover = {
+      kind: "timeline",
+      clientX: event.clientX,
+      clientY: event.clientY,
+    };
+    this.requestDraw();
   }
 
   handleStickyHeroPointerMove(
@@ -221,20 +237,17 @@ export class TimelineCanvasController {
     canvas: HTMLCanvasElement,
     lane: number,
   ): void {
-    const point = stickyHeroPointAtPointer({
-      event,
+    if (window.__BPP_VIEWER_TEST__) {
+      window.__BPP_VIEWER_TEST__.hoverInputCount += 1;
+    }
+    this.pendingHover = {
+      kind: "sticky",
       canvas,
-      width: this.width,
-      laneHeight: this.laneHeight,
       lane,
-    });
-    const cluster = this.hitTest(point.x, point.y);
-    const combatMs = combatMsAtPointer(
-      canvas,
-      event.clientX,
-      this.model.durationMs,
-    );
-    this.updateHover(cluster, combatMs, event.clientX, event.clientY);
+      clientX: event.clientX,
+      clientY: event.clientY,
+    };
+    this.requestDraw();
   }
 
   private updateHover(
@@ -246,17 +259,19 @@ export class TimelineCanvasController {
     if (cluster === this.hoverCluster && this.previewMs === combatMs) {
       return;
     }
+    const clusterChanged = cluster !== this.hoverCluster;
     this.hoverCluster = cluster;
     this.previewMs = combatMs;
-    this.syncRelatedHighlights();
+    if (clusterChanged) this.syncRelatedHighlights();
     this.onPreview(cluster, combatMs, clientX, clientY);
     if (window.__BPP_VIEWER_TEST__) {
       window.__BPP_VIEWER_TEST__.hoverDrawCount += 1;
+      window.__BPP_VIEWER_TEST__.previewDispatchCount += 1;
     }
-    this.requestDraw();
   }
 
   handlePointerLeave(): void {
+    this.pendingHover = null;
     this.hoverCluster = null;
     this.previewMs = null;
     this.syncRelatedHighlights();
@@ -323,10 +338,13 @@ export class TimelineCanvasController {
   destroy(): void {
     if (this.frameHandle) cancelAnimationFrame(this.frameHandle);
     this.frameHandle = 0;
+    this.pendingHover = null;
     this.applyRelatedHighlights(null);
   }
 
-  private logicalPoint(event: PointerEvent): { x: number; y: number } {
+  private logicalPoint(
+    event: Pick<PointerEvent, "clientX" | "clientY">,
+  ): { x: number; y: number } {
     return timelinePointAtPointer({
       event,
       canvas: this.canvas,
@@ -372,7 +390,49 @@ export class TimelineCanvasController {
     });
   };
 
+  private flushPendingHover(): void {
+    const pending = this.pendingHover;
+    this.pendingHover = null;
+    if (!pending) return;
+    if (pending.kind === "timeline") {
+      const point = this.logicalPoint(pending);
+      const cluster = this.hitTest(point.x, point.y);
+      const combatMs = combatMsAtPointer(
+        this.canvas,
+        pending.clientX,
+        this.model.durationMs,
+      );
+      this.updateHover(
+        cluster,
+        combatMs,
+        pending.clientX,
+        pending.clientY,
+      );
+      return;
+    }
+    const point = stickyHeroPointAtPointer({
+      event: pending,
+      canvas: pending.canvas,
+      width: this.width,
+      laneHeight: this.laneHeight,
+      lane: pending.lane,
+    });
+    const cluster = this.hitTest(point.x, point.y);
+    const combatMs = combatMsAtPointer(
+      pending.canvas,
+      pending.clientX,
+      this.model.durationMs,
+    );
+    this.updateHover(
+      cluster,
+      combatMs,
+      pending.clientX,
+      pending.clientY,
+    );
+  }
+
   private draw(): void {
+    this.flushPendingHover();
     drawTimelineScene({
       canvas: this.canvas,
       ruler: this.ruler,

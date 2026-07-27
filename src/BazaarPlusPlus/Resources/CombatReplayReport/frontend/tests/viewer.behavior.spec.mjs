@@ -2138,6 +2138,120 @@ test("paused recording preview cannot move the pinned solid axis", async ({
   );
 });
 
+test("serializes paused recording preview seeks behind pointer updates", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__bppVideoSeeking = false;
+    const states = new WeakMap();
+    const stateFor = (media) => {
+      let state = states.get(media);
+      if (!state) {
+        state = { currentTime: 0, paused: true };
+        states.set(media, state);
+      }
+      return state;
+    };
+    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+      configurable: true,
+      get() {
+        return stateFor(this).currentTime;
+      },
+      set(value) {
+        stateFor(this).currentTime = Number(value);
+        queueMicrotask(() => this.dispatchEvent(new Event("timeupdate")));
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "paused", {
+      configurable: true,
+      get() {
+        return stateFor(this).paused;
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "seeking", {
+      configurable: true,
+      get() {
+        return window.__bppVideoSeeking;
+      },
+    });
+  });
+  await page.goto(`${recordingReportUrl}?lang=en`);
+  await page
+    .getByTestId("recording-video")
+    .dispatchEvent("loadedmetadata");
+  const ruler = page.getByTestId("timeline-ruler-canvas");
+  const before = await page.evaluate(() => ({
+    dispatches: window.__BPP_VIEWER_TEST__?.previewDispatchCount ?? -1,
+    seeks: window.__BPP_VIEWER_TEST__?.recordingPreviewSeekCount ?? -1,
+  }));
+
+  await ruler.evaluate(async (element) => {
+    const bounds = element.getBoundingClientRect();
+    await new Promise((resolve) => {
+      let index = 0;
+      const timer = window.setInterval(() => {
+        element.dispatchEvent(
+          new PointerEvent("pointermove", {
+            bubbles: true,
+            clientX:
+              bounds.left
+              + bounds.width * (0.12 + (index % 24) * 0.03),
+            clientY: bounds.top + bounds.height / 2,
+          }),
+        );
+        index += 1;
+        if (index < 36) return;
+        window.clearInterval(timer);
+        resolve();
+      }, 5);
+    });
+  });
+  await page.waitForTimeout(140);
+
+  const after = await page.evaluate(() => ({
+    dispatches: window.__BPP_VIEWER_TEST__?.previewDispatchCount ?? -1,
+    seeks: window.__BPP_VIEWER_TEST__?.recordingPreviewSeekCount ?? -1,
+  }));
+  const previewDispatches = after.dispatches - before.dispatches;
+  const previewSeeks = after.seeks - before.seeks;
+  expect(previewDispatches).toBeGreaterThan(3);
+  expect(previewSeeks).toBeGreaterThan(0);
+  expect(previewSeeks).toBeLessThan(previewDispatches);
+
+  await page.evaluate(() => {
+    window.__bppVideoSeeking = true;
+  });
+  await ruler.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    element.dispatchEvent(
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        clientX: bounds.left + bounds.width * 0.88,
+        clientY: bounds.top + bounds.height / 2,
+      }),
+    );
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__BPP_VIEWER_TEST__?.previewDispatchCount ?? -1
+      )
+    )
+    .toBeGreaterThan(after.dispatches);
+  await ruler.dispatchEvent("pointerout");
+  await page.evaluate(() => {
+    window.__bppVideoSeeking = false;
+  });
+  await page.waitForTimeout(100);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        window.__BPP_VIEWER_TEST__?.recordingPreviewSeekCount ?? -1
+      )
+    )
+    .toBe(after.seeks);
+});
+
 test("preserves the timeline viewport and recording navigation across tabs", async ({
   page,
 }) => {
@@ -2551,7 +2665,7 @@ test("explains every activity metric on hover and keyboard focus", async ({
   ).toHaveText("×1");
 });
 
-test("activity rows expose button semantics and activate with Enter or Space", async ({
+test("activity cells stay in statistics instead of jumping to a timeline lane", async ({
   page,
 }) => {
   await page.goto(`${reportUrl}?lang=en`);
@@ -2560,28 +2674,29 @@ test("activity rows expose button semantics and activate with Enter or Space", a
   const itemRow = page
     .locator("[data-bpp-test-id^='statistics-activity-row-']")
     .filter({ hasText: "Training Blade" });
-  await expect(itemRow).toHaveAttribute("role", "button");
-  await expect(itemRow).toHaveAttribute(
-    "aria-label",
-    "Training Blade · Click to view the timeline lane",
-  );
-  await itemRow.focus();
-  await itemRow.press("Enter");
-  await expect(page.getByTestId("timeline-section")).toBeVisible();
+  await expect(itemRow).not.toHaveAttribute("role", "button");
+  await expect(itemRow).not.toHaveAttribute("tabindex", "0");
+  await itemRow.getByTestId("statistics-activity-value-damage").click();
+  await expect(page.getByTestId("statistics-section")).toBeVisible();
+  await expect(page.getByTestId("timeline-section")).toBeHidden();
   await expect(
     page.locator('[data-bpp-entity-id="player-item"]'),
-  ).toHaveClass(/is-jump-target/u);
+  ).not.toHaveClass(/is-jump-target/u);
 
-  await page.getByTestId("report-tab-statistics").click();
   const skillRow = page
     .locator("[data-bpp-test-id^='statistics-activity-row-']")
     .filter({ hasText: "Quick Thinking" });
-  await skillRow.focus();
-  await skillRow.press(" ");
-  await expect(page.getByTestId("timeline-section")).toBeVisible();
+  const hasteCell = skillRow.getByTestId("statistics-activity-value-haste");
+  await hasteCell.focus();
+  await hasteCell.press(" ");
+  await expect(page.getByTestId("statistics-section")).toBeVisible();
+  await expect(page.getByTestId("timeline-section")).toBeHidden();
   await expect(
     page.locator('[data-bpp-entity-id="player-skill"]'),
-  ).toHaveClass(/is-jump-target/u);
+  ).not.toHaveClass(/is-jump-target/u);
+  await expect(
+    page.getByTestId("statistics-activity-cell-tooltip"),
+  ).toBeVisible();
 });
 
 test("keeps pointer hover imperative without React commits", async ({ page }) => {
@@ -2608,6 +2723,48 @@ test("keeps pointer hover imperative without React commits", async ({ page }) =>
   }));
   expect(after.commits).toBe(before.commits);
   expect(after.hoverDraws).toBeGreaterThan(before.hoverDraws);
+});
+
+test("coalesces burst pointer input before imperative hover work", async ({
+  page,
+}) => {
+  await page.goto(`${reportUrl}?lang=en`);
+  const canvas = page.getByTestId("timeline-canvas");
+  const before = await page.evaluate(() => ({
+    commits: window.__BPP_VIEWER_TEST__?.commitCount ?? -1,
+    hoverDraws: window.__BPP_VIEWER_TEST__?.hoverDrawCount ?? -1,
+    hoverInputs: window.__BPP_VIEWER_TEST__?.hoverInputCount ?? -1,
+  }));
+
+  await canvas.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    for (let index = 0; index < 48; index += 1) {
+      element.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          clientX: bounds.left + 24 + index * 2,
+          clientY: bounds.top + 18 + (index % 3) * 10,
+        }),
+      );
+    }
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => ({
+        hoverDraws: window.__BPP_VIEWER_TEST__?.hoverDrawCount ?? -1,
+        hoverInputs: window.__BPP_VIEWER_TEST__?.hoverInputCount ?? -1,
+      }))
+    )
+    .toEqual({
+      hoverDraws: before.hoverDraws + 1,
+      hoverInputs: before.hoverInputs + 48,
+    });
+  const after = await page.evaluate(() => ({
+    commits: window.__BPP_VIEWER_TEST__?.commitCount ?? -1,
+    hoverDraws: window.__BPP_VIEWER_TEST__?.hoverDrawCount ?? -1,
+    hoverInputs: window.__BPP_VIEWER_TEST__?.hoverInputCount ?? -1,
+  }));
+  expect(after.commits).toBe(before.commits);
 });
 
 test("keeps timeline preprocessing stable for a time-only selection", async ({
@@ -3716,6 +3873,9 @@ test("virtualizes the footer combat log and highlights every visible row from th
       clientY: bounds.top + bounds.height * 0.5,
     }));
   });
+  await page.evaluate(() => {
+    window.__bppCombatLogScrollBehaviors.length = 0;
+  });
   await previewAtRulerEnd();
   await expect(log).toHaveAttribute("data-bpp-follow-source", "hover");
   await expect(activeEntry).not.toHaveAttribute("data-index", selectedIndex);
@@ -3725,10 +3885,15 @@ test("virtualizes the footer combat log and highlights every visible row from th
   await expect
     .poll(() =>
       page.evaluate(() =>
-        window.__bppCombatLogScrollBehaviors.includes("smooth")
+        window.__bppCombatLogScrollBehaviors.at(-1) ?? ""
       )
     )
-    .toBe(true);
+    .toBe("auto");
+  expect(
+    await page.evaluate(() =>
+      window.__bppCombatLogScrollBehaviors.includes("smooth")
+    ),
+  ).toBe(false);
   await expect
     .poll(() =>
       page.evaluate(() => {

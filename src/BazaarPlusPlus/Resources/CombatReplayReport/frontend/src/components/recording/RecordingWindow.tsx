@@ -22,6 +22,7 @@ const WORKBENCH_FOOTER_HEIGHT = 36;
 const WORKBENCH_FOOTER_GAP = 10;
 
 export interface RecordingHandle {
+  cancelPreview: () => void;
   seekCombatMs: (combatMs: number, preview?: boolean) => void;
   prepareToHide: () => void;
 }
@@ -82,6 +83,7 @@ export const RecordingWindow = forwardRef<
     mediaMs,
     playing,
     prepareToHide,
+    cancelPreview,
     seekCombatMs,
     setLoadFailed,
     setLoaded,
@@ -100,8 +102,12 @@ export const RecordingWindow = forwardRef<
 
   useImperativeHandle(
     forwardedRef,
-    () => ({ prepareToHide, seekCombatMs }),
-    [prepareToHide, seekCombatMs],
+    () => ({
+      cancelPreview,
+      prepareToHide,
+      seekCombatMs,
+    }),
+    [cancelPreview, prepareToHide, seekCombatMs],
   );
 
   useEffect(() => {

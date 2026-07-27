@@ -11,6 +11,9 @@ import {
 } from "../../recording/sync.ts";
 import { RECORDING_SPEEDS } from "./RecordingControls.tsx";
 
+const PREVIEW_SEEK_INTERVAL_MS = 64;
+const PREVIEW_SEEK_RETRY_MS = 16;
+
 export function useRecordingPlayback({
   model,
   onPlaybackCombatTime,
@@ -21,7 +24,10 @@ export function useRecordingPlayback({
   visible: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const previewFrameRef = useRef(0);
+  const previewTimerRef = useRef(0);
+  const pendingPreviewMediaMsRef = useRef<number | null>(null);
+  const lastPreviewSeekAtRef = useRef(Number.NEGATIVE_INFINITY);
+  const applyPreviewSeekRef = useRef<() => void>(() => undefined);
   const requestedMediaMsRef = useRef(Number.NaN);
   const resumeMediaMsRef = useRef(0);
   const [playing, setPlaying] = useState(false);
@@ -32,6 +38,65 @@ export function useRecordingPlayback({
   const [mediaMs, setMediaMs] = useState(0);
 
   const exact = model.sync.status === "ReadyExact";
+
+  const schedulePreviewSeek = useCallback((): void => {
+    if (
+      previewTimerRef.current
+      || pendingPreviewMediaMsRef.current === null
+    ) {
+      return;
+    }
+    const elapsed = performance.now() - lastPreviewSeekAtRef.current;
+    const delay = Math.max(0, PREVIEW_SEEK_INTERVAL_MS - elapsed);
+    previewTimerRef.current = window.setTimeout(() => {
+      previewTimerRef.current = 0;
+      applyPreviewSeekRef.current();
+    }, delay);
+  }, []);
+
+  const applyPreviewSeek = useCallback((): void => {
+    const mapped = pendingPreviewMediaMsRef.current;
+    if (mapped === null) return;
+    const video = videoRef.current;
+    if (!video || !video.paused) {
+      pendingPreviewMediaMsRef.current = null;
+      return;
+    }
+    if (video.seeking) {
+      previewTimerRef.current = window.setTimeout(() => {
+        previewTimerRef.current = 0;
+        applyPreviewSeekRef.current();
+      }, PREVIEW_SEEK_RETRY_MS);
+      return;
+    }
+    pendingPreviewMediaMsRef.current = null;
+    lastPreviewSeekAtRef.current = performance.now();
+    setMediaMs(mapped);
+    if (Math.abs(video.currentTime * 1_000 - mapped) >= 45) {
+      video.currentTime = Math.max(0, mapped / 1_000);
+      if (window.__BPP_VIEWER_TEST__) {
+        window.__BPP_VIEWER_TEST__.recordingPreviewSeekCount += 1;
+      }
+    }
+  }, []);
+  applyPreviewSeekRef.current = applyPreviewSeek;
+
+  const cancelPreviewSeek = useCallback((): void => {
+    window.clearTimeout(previewTimerRef.current);
+    previewTimerRef.current = 0;
+    pendingPreviewMediaMsRef.current = null;
+  }, []);
+
+  const cancelPreview = useCallback((): void => {
+    const hadPendingPreview = pendingPreviewMediaMsRef.current !== null;
+    cancelPreviewSeek();
+    const video = videoRef.current;
+    if (!hadPendingPreview || !video) return;
+    const currentMediaMs = Math.max(0, video.currentTime * 1_000);
+    requestedMediaMsRef.current = currentMediaMs;
+    resumeMediaMsRef.current = currentMediaMs;
+    setMediaMs(currentMediaMs);
+  }, [cancelPreviewSeek]);
 
   const seekCombatMs = useCallback((
     combatMs: number,
@@ -46,6 +111,26 @@ export function useRecordingPlayback({
       Math.abs(mapped - requestedMediaMsRef.current) < 45;
     requestedMediaMsRef.current = mapped;
     resumeMediaMsRef.current = mapped;
+    if (preview) {
+      if (
+        alreadyRequested
+        && (
+          pendingPreviewMediaMsRef.current !== null
+          || !video
+          || Math.abs(video.currentTime * 1_000 - mapped) < 45
+        )
+      ) {
+        return;
+      }
+      pendingPreviewMediaMsRef.current = mapped;
+      if (!video) {
+        setMediaMs(mapped);
+        return;
+      }
+      schedulePreviewSeek();
+      return;
+    }
+    cancelPreviewSeek();
     setMediaMs(mapped);
     if (!video) return;
     if (
@@ -54,21 +139,16 @@ export function useRecordingPlayback({
     ) {
       return;
     }
-    const apply = (): void => {
-      const current = videoRef.current;
-      if (!current || (preview && !current.paused)) return;
-      current.currentTime = Math.max(0, mapped / 1_000);
-    };
-    if (preview) {
-      window.cancelAnimationFrame(previewFrameRef.current);
-      previewFrameRef.current = window.requestAnimationFrame(apply);
-    } else {
-      apply();
-    }
-  }, [exact, model.sync.anchors]);
+    video.currentTime = Math.max(0, mapped / 1_000);
+  }, [
+    cancelPreviewSeek,
+    exact,
+    model.sync.anchors,
+    schedulePreviewSeek,
+  ]);
 
   const prepareToHide = useCallback((): void => {
-    window.cancelAnimationFrame(previewFrameRef.current);
+    cancelPreviewSeek();
     const video = videoRef.current;
     if (video) {
       if (video.readyState >= 1) {
@@ -83,11 +163,11 @@ export function useRecordingPlayback({
     setSpeedOpen(false);
     setLoaded(false);
     setLoadFailed(false);
-  }, []);
+  }, [cancelPreviewSeek]);
 
   useEffect(
-    () => () => window.cancelAnimationFrame(previewFrameRef.current),
-    [],
+    () => cancelPreviewSeek,
+    [cancelPreviewSeek],
   );
 
   useEffect(() => {
@@ -98,11 +178,12 @@ export function useRecordingPlayback({
 
   useEffect(() => {
     if (visible) return;
+    cancelPreviewSeek();
     setPlaying(false);
     setSpeedOpen(false);
     setLoaded(false);
     setLoadFailed(false);
-  }, [visible]);
+  }, [cancelPreviewSeek, visible]);
 
   const togglePlayback = async (): Promise<void> => {
     const video = videoRef.current;
@@ -137,13 +218,22 @@ export function useRecordingPlayback({
       video.pause();
       return;
     }
-    resumeMediaMsRef.current = nextMediaMs;
-    requestedMediaMsRef.current = nextMediaMs;
-    setMediaMs(nextMediaMs);
     // Timeline hover seeks a paused recording to preview that frame. Those
     // programmatic time updates must not feed back into the pinned playhead.
     // Only an actively playing recording owns playhead progression.
-    if (!exact || video.paused) return;
+    if (video.paused) {
+      if (pendingPreviewMediaMsRef.current === null) {
+        resumeMediaMsRef.current = nextMediaMs;
+        requestedMediaMsRef.current = nextMediaMs;
+        setMediaMs(nextMediaMs);
+      }
+      return;
+    }
+    cancelPreviewSeek();
+    resumeMediaMsRef.current = nextMediaMs;
+    requestedMediaMsRef.current = nextMediaMs;
+    setMediaMs(nextMediaMs);
+    if (!exact) return;
     const combatMs = mapMediaToCombat(nextMediaMs, model.sync.anchors);
     if (combatMs !== null) onPlaybackCombatTime(combatMs);
   };
@@ -161,6 +251,7 @@ export function useRecordingPlayback({
       host.dataset.videoAspect = `${video.videoWidth}:${video.videoHeight}`;
     }
     if (video) {
+      cancelPreviewSeek();
       const requested = requestedMediaMsRef.current;
       const targetMediaMs = Number.isFinite(requested)
         ? requested
@@ -182,6 +273,7 @@ export function useRecordingPlayback({
   };
 
   return {
+    cancelPreview,
     handleEnded,
     handleLoadedMetadata,
     handleTimeUpdate,

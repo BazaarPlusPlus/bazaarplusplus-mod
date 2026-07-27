@@ -1,4 +1,3 @@
-import type { ReportAction } from "../../app/report-reducer.ts";
 import { formatNumber } from "../../i18n/format.ts";
 import { cn } from "../../lib/utils.ts";
 import type { ReportViewModel } from "../../model/report.ts";
@@ -59,28 +58,18 @@ function GroupHeader({
 export function ActivityRows({
   rows,
   testIdPrefix,
-  dispatch,
   t,
 }: {
   rows: EntityActivityRow[];
   testIdPrefix: string;
-  dispatch: React.Dispatch<ReportAction>;
   t: (key: string) => string;
 }): React.JSX.Element {
-  const selectEntity = (entityId: string): void => {
-    dispatch({
-      type: "select-entity",
-      entityId,
-    });
-  };
-
   return (
     <>
       {rows.map((row, index) => (
         <TableRow
-          aria-label={`${row.entity.name} · ${t("activityJumpHint")}`}
           className={cn(
-            "group cursor-pointer border-b border-border/40 hover:bg-brand-soft/4",
+            "group border-b border-border/40 hover:bg-brand-soft/4",
             `bpp-side-${row.side}`,
           )}
           data-bpp-test-id={`statistics-activity-row-${testIdPrefix}-${index}`}
@@ -88,19 +77,6 @@ export function ActivityRows({
           data-entity-type={row.entity.type.toLowerCase()}
           data-side={row.side}
           key={row.entity.id}
-          onClick={() => selectEntity(row.entity.id)}
-          onKeyDown={(event) => {
-            if (
-              event.target !== event.currentTarget
-              || (event.key !== "Enter" && event.key !== " ")
-            ) {
-              return;
-            }
-            event.preventDefault();
-            selectEntity(row.entity.id);
-          }}
-          role="button"
-          tabIndex={0}
         >
           <TableCell className="sticky left-0 z-10 bg-card/95 px-3 py-1 group-hover:bg-muted/70">
             <div className="flex min-w-0 items-center gap-2">
@@ -140,13 +116,11 @@ export function GroupRows({
   group,
   model,
   columnCount,
-  dispatch,
   t,
 }: {
   group: { side: CombatSide; rows: EntityActivityRow[] };
   model: ReportViewModel;
   columnCount: number;
-  dispatch: React.Dispatch<ReportAction>;
   t: (key: string) => string;
 }): React.JSX.Element {
   return (
@@ -159,7 +133,6 @@ export function GroupRows({
         t={t}
       />
       <ActivityRows
-        dispatch={dispatch}
         rows={group.rows}
         testIdPrefix={group.side}
         t={t}

@@ -22,7 +22,7 @@ export function timelinePointAtPointer({
   laneHeight,
   entityCount,
 }: {
-  event: PointerEvent;
+  event: Pick<PointerEvent, "clientX" | "clientY">;
   canvas: HTMLCanvasElement;
   width: number;
   laneHeight: number;
@@ -46,7 +46,7 @@ export function stickyHeroPointAtPointer({
   laneHeight,
   lane,
 }: {
-  event: PointerEvent;
+  event: Pick<PointerEvent, "clientX" | "clientY">;
   canvas: HTMLCanvasElement;
   width: number;
   laneHeight: number;

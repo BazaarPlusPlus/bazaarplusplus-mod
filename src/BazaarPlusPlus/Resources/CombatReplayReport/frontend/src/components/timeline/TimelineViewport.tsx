@@ -106,6 +106,11 @@ export function TimelineViewport({
   onMetricToggle: (metric: StateMetric) => void;
   stateLabelCombatMs: number;
 }): React.JSX.Element {
+  const pointerPreviewFrameRef = useRef(0);
+  const pendingPointerPreviewRef = useRef<{
+    canvas: HTMLCanvasElement;
+    clientX: number;
+  } | null>(null);
   const pinnedHeroSide = pinnedHero
     ? normalizeSide(pinnedHero.side)
     : "neutral";
@@ -138,20 +143,52 @@ export function TimelineViewport({
     return () => scroll.removeEventListener("wheel", handleWheel);
   }, [refs.scroll]);
 
-  const previewAtPointer = (
-    canvas: HTMLCanvasElement,
-    clientX: number,
-  ): void => {
-    if (state.inspectorOpen) return;
+  useEffect(
+    () => () => window.cancelAnimationFrame(pointerPreviewFrameRef.current),
+    [],
+  );
+  useEffect(() => {
+    if (!state.inspectorOpen) return;
+    window.cancelAnimationFrame(pointerPreviewFrameRef.current);
+    pointerPreviewFrameRef.current = 0;
+    pendingPointerPreviewRef.current = null;
+  }, [state.inspectorOpen]);
+
+  const flushPointerPreview = (): void => {
+    pointerPreviewFrameRef.current = 0;
+    const pending = pendingPointerPreviewRef.current;
+    pendingPointerPreviewRef.current = null;
+    if (!pending || state.inspectorOpen) return;
     const combatMs = combatMsAtPointer(
-      canvas,
-      clientX,
+      pending.canvas,
+      pending.clientX,
       model.durationMs,
     );
     refs.preview.current = combatMs;
     refs.controller.current?.setPreview(combatMs);
     drawState();
     onPreviewCombatMs(combatMs);
+    if (window.__BPP_VIEWER_TEST__) {
+      window.__BPP_VIEWER_TEST__.previewDispatchCount += 1;
+    }
+  };
+
+  const previewAtPointer = (
+    canvas: HTMLCanvasElement,
+    clientX: number,
+  ): void => {
+    if (state.inspectorOpen) return;
+    pendingPointerPreviewRef.current = { canvas, clientX };
+    if (pointerPreviewFrameRef.current) return;
+    pointerPreviewFrameRef.current =
+      window.requestAnimationFrame(flushPointerPreview);
+  };
+
+  const clearPointerPreview = (): void => {
+    window.cancelAnimationFrame(pointerPreviewFrameRef.current);
+    pointerPreviewFrameRef.current = 0;
+    pendingPointerPreviewRef.current = null;
+    clearPreview();
   };
 
   return (
@@ -200,7 +237,7 @@ export function TimelineViewport({
                 ),
               });
             }}
-            onPointerLeave={clearPreview}
+            onPointerLeave={clearPointerPreview}
             onPointerMove={(event) => {
               if (state.inspectorOpen || !refs.stateCanvas.current) return;
               previewAtPointer(refs.stateCanvas.current, event.clientX);
@@ -225,7 +262,7 @@ export function TimelineViewport({
                 event.nativeEvent,
               )
             }
-            onPointerLeave={clearPreview}
+            onPointerLeave={clearPointerPreview}
             onPointerMove={(event) => {
               if (state.inspectorOpen || !refs.ruler.current) return;
               previewAtPointer(refs.ruler.current, event.clientX);
@@ -278,7 +315,7 @@ export function TimelineViewport({
             onPointerDown={(event) =>
               refs.controller.current?.handlePointerDown(event.nativeEvent)
             }
-            onPointerLeave={clearPreview}
+            onPointerLeave={clearPointerPreview}
             onPointerMove={(event) => {
               if (state.inspectorOpen) return;
               refs.controller.current?.handlePointerMove(event.nativeEvent);
@@ -334,7 +371,7 @@ export function TimelineViewport({
                 pinnedHeroLane,
               );
             }}
-            onPointerLeave={clearPreview}
+            onPointerLeave={clearPointerPreview}
             onPointerMove={(event) => {
               if (state.inspectorOpen || pinnedHeroLane === null) return;
               refs.controller.current?.handleStickyHeroPointerMove(

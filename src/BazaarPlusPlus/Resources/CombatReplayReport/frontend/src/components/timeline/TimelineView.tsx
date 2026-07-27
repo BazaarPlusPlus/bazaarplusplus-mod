@@ -413,37 +413,6 @@ export const TimelineView = forwardRef<
     drawState();
   }, [drawState, state.selectedCombatMs]);
 
-  useEffect(() => {
-    if (
-      !state.selectedEntityId
-      || !viewportRefs.labels.current
-      || !viewportRefs.scroll.current
-    ) {
-      return;
-    }
-    const row = Array.from(
-      viewportRefs.labels.current.querySelectorAll<HTMLElement>(
-        "[data-bpp-entity-id]",
-      ),
-    ).find(
-      (candidate) =>
-        candidate.dataset.bppEntityId === state.selectedEntityId,
-    );
-    if (!row) return;
-    const scroll = viewportRefs.scroll.current;
-    scroll.scrollTo({
-      left: scroll.scrollLeft,
-      top: Math.max(0, row.offsetTop - LANE_HEIGHT),
-      behavior: "smooth",
-    });
-    row.classList.add("is-jump-target");
-    const timeout = window.setTimeout(
-      () => row.classList.remove("is-jump-target"),
-      1_200,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [entities, state.selectedEntityId]);
-
   useLayoutEffect(() => {
     const scroll = viewportRefs.scroll.current;
     if (!scroll || !focusRequest) return;

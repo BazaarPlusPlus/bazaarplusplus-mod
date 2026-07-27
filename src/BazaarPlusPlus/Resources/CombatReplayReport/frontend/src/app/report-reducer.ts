@@ -29,7 +29,6 @@ export type ReportAction =
     }
   | { type: "select-time"; combatMs: number }
   | { type: "close-inspector" }
-  | { type: "select-entity"; entityId: string }
   | {
       type: "set-lane-visibility";
       filter: LaneFilterKey;
@@ -98,12 +97,6 @@ export function reportReducer(
         inspectedEntityId: "",
         inspectorOpen: false,
         inspectorAnchor: null,
-      };
-    case "select-entity":
-      return {
-        ...state,
-        tab: "timeline",
-        selectedEntityId: action.entityId,
       };
     case "set-lane-visibility":
       return state.laneVisibility[action.filter] === action.visible

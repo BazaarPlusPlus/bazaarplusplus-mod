@@ -20,6 +20,9 @@ declare global {
       echartsDisposeCount: number;
       echartsInitCount: number;
       hoverDrawCount: number;
+      hoverInputCount: number;
+      previewDispatchCount: number;
+      recordingPreviewSeekCount: number;
       timelineControllerCount: number;
       timelinePreprocessCount: number;
       lastError?: string;
@@ -80,6 +83,9 @@ function boot(): void {
       echartsDisposeCount: 0,
       echartsInitCount: 0,
       hoverDrawCount: 0,
+      hoverInputCount: 0,
+      previewDispatchCount: 0,
+      recordingPreviewSeekCount: 0,
       timelineControllerCount: 0,
       timelinePreprocessCount: 0,
     };

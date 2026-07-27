@@ -104,9 +104,11 @@ export function ReportApp({
   const previewCombatMs = useCallback((combatMs: number | null): void => {
     if (playbackActiveRef.current) return;
     replayDockRef.current?.setPreviewCombatMs(combatMs);
-    if (combatMs !== null) {
-      recordingRef.current?.seekCombatMs(combatMs, true);
+    if (combatMs === null) {
+      recordingRef.current?.cancelPreview();
+      return;
     }
+    recordingRef.current?.seekCombatMs(combatMs, true);
   }, []);
   const toggleRecording = useCallback((): void => {
     if (recordingVisible) {

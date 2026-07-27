@@ -24,7 +24,6 @@ export interface ReportState {
   selectedClusterEventIds: string[];
   inspectedEntityId: string;
   selectedCombatMs: number;
-  selectedEntityId: string;
   inspectorOpen: boolean;
   inspectorAnchor: InspectorAnchor | null;
   laneVisibility: LaneVisibility;
@@ -47,7 +46,6 @@ export function createInitialReportState(
     selectedClusterEventIds: [],
     inspectedEntityId: "",
     selectedCombatMs: 0,
-    selectedEntityId: "",
     inspectorOpen: false,
     inspectorAnchor: null,
     laneVisibility: { ...DEFAULT_LANE_VISIBILITY },

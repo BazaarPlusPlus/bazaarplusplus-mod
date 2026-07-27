@@ -216,7 +216,6 @@ export function ActivityTable({
               ? groups.map((group) => (
                 <GroupRows
                   columnCount={columnCount}
-                  dispatch={dispatch}
                   group={group}
                   key={group.side}
                   model={model}
@@ -225,7 +224,6 @@ export function ActivityTable({
               ))
               : (
                 <ActivityRows
-                  dispatch={dispatch}
                   rows={sortedRows}
                   testIdPrefix="all"
                   t={t}

@@ -522,7 +522,12 @@ export const CombatLogList = forwardRef<
     ).matches;
     virtualizer.scrollToIndex(activeIndex, {
       align: "center",
-      behavior: hasFollowedRef.current && !reduceMotion ? "smooth" : "auto",
+      behavior:
+        followSource === "pinned"
+        && hasFollowedRef.current
+        && !reduceMotion
+          ? "smooth"
+          : "auto",
     });
     hasFollowedRef.current = true;
   }, [activeIndex, manualPaused, virtualizer]);
