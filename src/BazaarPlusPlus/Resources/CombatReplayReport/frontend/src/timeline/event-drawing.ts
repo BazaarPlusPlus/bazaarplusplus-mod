@@ -56,18 +56,22 @@ function markerColor(token: string): string {
   return themeColor(MARKER_COLOR_NAMES[token] ?? "status");
 }
 
-export function markerOffset(cluster: TimelineCluster): number {
-  if (cluster.statusRange) return 0;
-  if (cluster.role === "source" || cluster.role === "trigger") return 9;
-  if (cluster.role === "target" || cluster.role === "both") {
-    if (cluster.token === "damage" || cluster.token === "damageDirect") {
-      return -12;
-    }
-    if (cluster.token === "burn") return 0;
-    if (cluster.token === "poison") return 12;
-    if (cluster.token === "heal" || cluster.token === "shield") return 9;
-  }
-  return 0;
+export function markerImageBounds(
+  naturalWidth: number,
+  naturalHeight: number,
+  size: number,
+): { x: number; y: number; width: number; height: number } {
+  const width = Math.max(1, naturalWidth);
+  const height = Math.max(1, naturalHeight);
+  const scale = Math.min(size / width, size / height);
+  const drawWidth = width * scale;
+  const drawHeight = height * scale;
+  return {
+    x: -drawWidth / 2,
+    y: -drawHeight / 2,
+    width: drawWidth,
+    height: drawHeight,
+  };
 }
 
 export function markerPoint(
@@ -75,7 +79,7 @@ export function markerPoint(
 ): { x: number; y: number } {
   return {
     x: cluster.markerX ?? cluster.x,
-    y: cluster.markerY ?? cluster.y + markerOffset(cluster),
+    y: cluster.markerY ?? cluster.y,
   };
 }
 
@@ -93,6 +97,11 @@ export function drawMarker(
   const image = cachedTimelineImage(cluster.icon, requestDraw);
   if (image) {
     const size = tier === 1 ? 18 : tier === 3 ? 11 : 14;
+    const bounds = markerImageBounds(
+      image.naturalWidth || image.width,
+      image.naturalHeight || image.height,
+      size,
+    );
     if (selected) {
       context.strokeStyle = themeColor("foreground");
       context.lineWidth = 1.5;
@@ -103,7 +112,13 @@ export function drawMarker(
         size + 4,
       );
     }
-    context.drawImage(image, -size / 2, -size / 2, size, size);
+    context.drawImage(
+      image,
+      bounds.x,
+      bounds.y,
+      bounds.width,
+      bounds.height,
+    );
   } else {
     const fontSize =
       tier === 1

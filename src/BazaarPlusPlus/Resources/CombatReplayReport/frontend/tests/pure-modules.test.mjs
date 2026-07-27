@@ -62,7 +62,7 @@ import {
   timelineClusterEventIds,
 } from "../src/timeline/clusters.ts";
 import {
-  markerOffset,
+  markerImageBounds,
   markerPoint,
 } from "../src/timeline/event-drawing.ts";
 import { layoutTimelineMarkers } from "../src/timeline/marker-layout.ts";
@@ -1235,7 +1235,7 @@ test("recording sync rejects non-monotonic or mismatched exact metadata", () => 
   });
 });
 
-test("timeline keeps direct, burn, and poison markers visually distinct", () => {
+test("timeline keeps direct, burn, and poison markers semantically distinct", () => {
   const entities = [
     { id: "source", type: "item" },
     { id: "target", type: "hero" },
@@ -1284,7 +1284,10 @@ test("timeline keeps direct, burn, and poison markers visually distinct", () => 
     clusters.map((cluster) => cluster.icon),
     events.map((event) => event.icon),
   );
-  assert.deepEqual(clusters.map(markerOffset), [-12, 0, 12]);
+  assert.deepEqual(
+    clusters.map((cluster) => markerPoint(cluster).y),
+    clusters.map((cluster) => cluster.y),
+  );
   assert.equal(buildVisualClusters(clusters).length, 3);
 });
 
@@ -1324,6 +1327,11 @@ test("dense timeline markers use distinct laid-out hit targets", () => {
   const points = markers.map(markerPoint);
 
   assert.equal(new Set(points.map(({ x, y }) => `${x}:${y}`)).size, 5);
+  const laneCenter = visual[0].y;
+  assert.deepEqual(
+    Array.from(new Set(points.map(({ y }) => y))).sort((a, b) => a - b),
+    [laneCenter - 11, laneCenter + 11],
+  );
   for (let left = 0; left < points.length; left += 1) {
     for (let right = left + 1; right < points.length; right += 1) {
       assert.ok(
@@ -1346,6 +1354,20 @@ test("dense timeline markers use distinct laid-out hit targets", () => {
       markers[index],
     );
   }
+});
+
+test("native timeline markers preserve their aspect ratio around the center", () => {
+  assert.deepEqual(markerImageBounds(32, 16, 14), {
+    x: -7,
+    y: -3.5,
+    width: 14,
+    height: 7,
+  });
+  const portrait = markerImageBounds(56, 58, 14);
+  assert.equal(portrait.height, 14);
+  assert.ok(Math.abs(portrait.width - 13.517241379310345) < 0.000001);
+  assert.equal(portrait.x, -portrait.width / 2);
+  assert.equal(portrait.y, -7);
 });
 
 test("canvas backing scale honors DPR and logical coordinates", () => {

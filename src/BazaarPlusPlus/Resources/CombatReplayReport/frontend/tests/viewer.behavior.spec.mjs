@@ -2697,7 +2697,7 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
   const markers = [
     {
       dx: 0,
-      dy: -13,
+      dy: -11,
       label: "Direct damage",
       groupToken: "damage-direct",
       icon:
@@ -2705,7 +2705,7 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
     },
     {
       dx: -10,
-      dy: 9,
+      dy: 11,
       label: "Burn",
       groupToken: "damage-burn",
       icon:
@@ -2713,7 +2713,7 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
     },
     {
       dx: 10,
-      dy: 9,
+      dy: 11,
       label: "Poison",
       groupToken: "damage-poison",
       icon:

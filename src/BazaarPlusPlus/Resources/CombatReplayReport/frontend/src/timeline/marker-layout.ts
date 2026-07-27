@@ -1,5 +1,4 @@
 import type { TimelineCluster } from "./clusters.ts";
-import { markerOffset } from "./event-drawing.ts";
 
 const DENSE_GROUP_WIDTH = 20;
 const MARKER_COLUMN_GAP = 20;
@@ -28,15 +27,15 @@ interface MarkerSlot {
 function denseMarkerSlots(count: number): MarkerSlot[] {
   if (count === 2) {
     return [
-      { x: -7, y: -10 },
-      { x: 7, y: 10 },
+      { x: -7, y: -MARKER_ROW_OFFSET },
+      { x: 7, y: MARKER_ROW_OFFSET },
     ];
   }
   if (count === 3) {
     return [
-      { x: 0, y: -13 },
-      { x: -10, y: 9 },
-      { x: 10, y: 9 },
+      { x: 0, y: -MARKER_ROW_OFFSET },
+      { x: -10, y: MARKER_ROW_OFFSET },
+      { x: 10, y: MARKER_ROW_OFFSET },
     ];
   }
 
@@ -72,7 +71,7 @@ export function layoutTimelineMarkers(
   const laneGroups = new Map<number, TimelineCluster[]>();
   for (const cluster of clusters) {
     cluster.markerX = cluster.x;
-    cluster.markerY = cluster.y + markerOffset(cluster);
+    cluster.markerY = cluster.y;
     if (cluster.statusRange) continue;
     const lane = laneGroups.get(cluster.lane);
     if (lane) lane.push(cluster);
