@@ -20,8 +20,19 @@ import {
 } from "../../timeline/constants.ts";
 import { timelineXAtCombatMs } from "../../timeline/geometry.ts";
 import { TimelineCanvasController } from "../../timeline/event-renderer.ts";
-import { drawStateBand, groupMetricSamples } from "../../timeline/state-band-renderer.ts";
-import { formatDuration } from "../../i18n/format.ts";
+import {
+  drawStateBand,
+  groupMetricSamples,
+  metricValueAt,
+} from "../../timeline/state-band-renderer.ts";
+import {
+  METRIC_ORDER,
+  type StateMetric,
+} from "../../timeline/state-scale.ts";
+import {
+  formatCompactNumber,
+  formatDuration,
+} from "../../i18n/format.ts";
 import { FrameInspector } from "../inspector/FrameInspector.tsx";
 import {
   Popover,
@@ -100,6 +111,10 @@ export const TimelineView = forwardRef<
     [entities],
   );
   const groupedMetrics = useMemo(() => groupMetricSamples(model), [model]);
+  const [visibleMetrics, setVisibleMetrics] = useState<
+    ReadonlySet<StateMetric>
+  >(() => new Set(METRIC_ORDER));
+  const highlightedMetricRef = useRef<StateMetric | null>(null);
   const timelineWidth = timelineWidthAtZoom(
     baseWidth,
     TIME_ZOOM_STEPS[state.timeZoomIndex],
@@ -109,7 +124,37 @@ export const TimelineView = forwardRef<
     entities.length * LANE_HEIGHT,
   );
 
+  const updateStateLabels = useCallback((combatMs: number): void => {
+    const root = viewportRefs.stateLabels.current;
+    if (!root) return;
+    root.dataset.bppCombatMs = String(combatMs);
+    const time = root.querySelector<HTMLElement>("[data-bpp-state-time]");
+    if (time) time.textContent = formatDuration(combatMs);
+    for (const value of root.querySelectorAll<HTMLElement>(
+      "[data-bpp-state-side][data-bpp-state-metric]",
+    )) {
+      const metric = value.dataset.bppStateMetric as StateMetric | undefined;
+      const side = value.dataset.bppStateSide;
+      if (
+        !metric
+        || !METRIC_ORDER.includes(metric)
+        || (side !== "player" && side !== "opponent")
+      ) {
+        continue;
+      }
+      const current = metricValueAt(
+        groupedMetrics.get(`${side}:${metric}`),
+        combatMs,
+      );
+      value.textContent =
+        current === null ? "—" : formatCompactNumber(current);
+    }
+  }, [groupedMetrics]);
+
   const drawState = useCallback(() => {
+    updateStateLabels(
+      viewportRefs.preview.current ?? playheadRef.current,
+    );
     if (!viewportRefs.stateCanvas.current) return;
     drawStateBand({
       canvas: viewportRefs.stateCanvas.current,
@@ -120,12 +165,16 @@ export const TimelineView = forwardRef<
       scaleMode: state.stateScale,
       playheadMs: playheadRef.current,
       previewMs: viewportRefs.preview.current,
+      visibleMetrics,
+      highlightedMetric: highlightedMetricRef.current,
     });
   }, [
     groupedMetrics,
     model,
     state.stateScale,
     timelineWidth,
+    updateStateLabels,
+    visibleMetrics,
   ]);
   const drawStateRef = useRef(drawState);
   const previewCallbackRef = useRef(onPreviewCombatMs);
@@ -133,6 +182,26 @@ export const TimelineView = forwardRef<
   drawStateRef.current = drawState;
   previewCallbackRef.current = onPreviewCombatMs;
   translateRef.current = t;
+
+  const handleMetricHighlight = useCallback(
+    (metric: StateMetric | null): void => {
+      if (highlightedMetricRef.current === metric) return;
+      highlightedMetricRef.current = metric;
+      drawStateRef.current();
+    },
+    [],
+  );
+  const handleMetricToggle = useCallback((metric: StateMetric): void => {
+    setVisibleMetrics((current) => {
+      const next = new Set(current);
+      if (next.has(metric)) {
+        next.delete(metric);
+      } else {
+        next.add(metric);
+      }
+      return next;
+    });
+  }, []);
 
   useLayoutEffect(() => {
     const scroll = viewportRefs.scroll.current;
@@ -461,14 +530,20 @@ export const TimelineView = forwardRef<
         entities={entities}
         laneCanvasHeight={laneCanvasHeight}
         model={model}
+        onMetricHighlight={handleMetricHighlight}
+        onMetricToggle={handleMetricToggle}
         onPreviewCombatMs={onPreviewCombatMs}
         pinnedHero={pinnedHero}
         pinnedHeroLane={pinnedHeroLane}
         refs={viewportRefs}
         sideBoundaryLane={sideBoundaryLane}
         state={state}
+        stateLabelCombatMs={
+          viewportRefs.preview.current ?? playheadRef.current
+        }
         t={t}
         timelineWidth={timelineWidth}
+        visibleMetrics={visibleMetrics}
       />
       <Popover
         onOpenChange={(open) => {

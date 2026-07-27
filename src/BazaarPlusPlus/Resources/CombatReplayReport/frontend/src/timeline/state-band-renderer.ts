@@ -20,6 +20,7 @@ import {
   stateAxisTicks,
   type StateAxisTick,
   type StateDomain,
+  type StateMetric,
   type StateScaleMode,
 } from "./state-scale.ts";
 import {
@@ -102,12 +103,16 @@ function drawStepLine(
   scaleMode: StateScaleMode,
   side: "player" | "opponent",
   color: string,
+  emphasis: "normal" | "muted" | "highlighted",
 ): void {
   if (!samples || samples.length === 0) return;
   context.save();
   context.strokeStyle = color;
-  context.globalAlpha = side === "player" ? 1 : 0.92;
-  context.lineWidth = side === "player" ? 2.15 : 1.8;
+  const baseAlpha = side === "player" ? 1 : 0.92;
+  context.globalAlpha = emphasis === "muted" ? baseAlpha * 0.16 : baseAlpha;
+  context.lineWidth = emphasis === "highlighted"
+    ? side === "player" ? 3.25 : 2.8
+    : side === "player" ? 2.15 : 1.8;
   context.setLineDash(side === "opponent" ? [6, 4] : []);
   context.lineJoin = "round";
   context.lineCap = "round";
@@ -180,6 +185,8 @@ export interface StateBandRenderInput {
   scaleMode: StateScaleMode;
   playheadMs: number;
   previewMs: number | null;
+  visibleMetrics?: ReadonlySet<StateMetric>;
+  highlightedMetric?: StateMetric | null;
 }
 
 export function drawStateBand(input: StateBandRenderInput): {
@@ -194,11 +201,38 @@ export function drawStateBand(input: StateBandRenderInput): {
   context.fillStyle = themeColor("surface");
   context.fillRect(0, 0, size.width, size.height);
 
-  const domain = sharedStateDomain(input.grouped, input.scaleMode);
+  const visibleMetrics = input.visibleMetrics ?? new Set(METRIC_ORDER);
+  const visibleOrder = METRIC_ORDER.filter((metric) =>
+    visibleMetrics.has(metric)
+  );
+  const highlightedMetric =
+    input.highlightedMetric
+      && visibleMetrics.has(input.highlightedMetric)
+      ? input.highlightedMetric
+      : null;
+  input.canvas.dataset.bppVisibleMetrics = visibleOrder.join(",");
+  input.canvas.dataset.bppHighlightedMetric = highlightedMetric ?? "";
+
+  const domain = sharedStateDomain(
+    input.grouped,
+    input.scaleMode,
+    visibleOrder,
+  );
   const ticks = stateAxisTicks(domain, input.scaleMode);
   if (domain) {
     drawGrid(context, domain, size.width, size.height, ticks);
-    for (const metric of METRIC_ORDER) {
+    const drawOrder = highlightedMetric
+      ? [
+          ...visibleOrder.filter((metric) => metric !== highlightedMetric),
+          highlightedMetric,
+        ]
+      : visibleOrder;
+    for (const metric of drawOrder) {
+      const emphasis = highlightedMetric === null
+        ? "normal"
+        : metric === highlightedMetric
+          ? "highlighted"
+          : "muted";
       drawStepLine(
         context,
         input.grouped.get(`player:${metric}`),
@@ -209,6 +243,7 @@ export function drawStateBand(input: StateBandRenderInput): {
         input.scaleMode,
         "player",
         themeColor(METRIC_THEME_COLORS[metric]),
+        emphasis,
       );
       drawStepLine(
         context,
@@ -220,6 +255,7 @@ export function drawStateBand(input: StateBandRenderInput): {
         input.scaleMode,
         "opponent",
         themeColor(METRIC_THEME_COLORS[metric]),
+        emphasis,
       );
     }
   }

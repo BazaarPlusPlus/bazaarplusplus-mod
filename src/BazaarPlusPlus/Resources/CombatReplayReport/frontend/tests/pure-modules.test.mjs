@@ -1706,6 +1706,11 @@ test("combatant state shares one reversible y domain", () => {
   ]);
   const linearDomain = sharedStateDomain(grouped, "linear");
   assert.deepEqual(linearDomain, { minimum: 0, maximum: 3_240 });
+  assert.deepEqual(
+    sharedStateDomain(grouped, "linear", ["burn", "poison"]),
+    { minimum: 0, maximum: 864 },
+  );
+  assert.equal(sharedStateDomain(grouped, "linear", []), null);
   assert.equal(sharedStateMappedY(0, linearDomain, 120), 112);
   assert.equal(sharedStateMappedY(3_240, linearDomain, 120), 8);
   assert.equal(stateScaleValue(999, "magnitude"), 3);

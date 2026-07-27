@@ -1621,8 +1621,11 @@ test("renders both combatants on the shared state band at device scale", async (
 }) => {
   await page.goto(`${reportUrl}?lang=en`);
 
-  await expect(page.getByTestId("state-label-health")).toContainText("1,000");
-  await expect(page.getByTestId("state-label-health")).toContainText("1,200");
+  const labels = page.getByTestId("state-band-labels");
+  const stateTime = labels.locator("[data-bpp-state-time]");
+  const health = page.getByTestId("state-label-health");
+  await expect(health).toContainText("1,000");
+  await expect(health).toContainText("1,200");
   await expect(page.getByTestId("state-label-healthRegen")).toContainText("10");
   await expect(page.getByTestId("state-label-healthRegen")).toContainText("5");
 
@@ -1641,6 +1644,89 @@ test("renders both combatants on the shared state band at device scale", async (
       )
       .toBeCloseTo(2, 1);
   }
+
+  const stateCanvas = page.getByTestId("state-band-canvas");
+  const stateBounds = await stateCanvas.boundingBox();
+  expect(stateBounds).not.toBeNull();
+  const logicalWidth = await stateCanvas.evaluate(
+    (canvas) =>
+      Number.parseFloat(canvas.style.width)
+      || canvas.getBoundingClientRect().width,
+  );
+  const logicalX = 14 + (3_000 / 8_000) * (logicalWidth - 78);
+  await page.mouse.move(
+    stateBounds.x + logicalX * (stateBounds.width / logicalWidth),
+    stateBounds.y + stateBounds.height / 2,
+  );
+  await expect(stateTime).toHaveText("3.00s");
+  await expect(
+    health.locator('[data-bpp-state-side="player"]'),
+  ).toHaveText("900");
+  await expect(
+    health.locator('[data-bpp-state-side="opponent"]'),
+  ).toHaveText("1,080");
+
+  await page.mouse.move(1, 1);
+  await expect(stateTime).toHaveText("0.00s");
+  await expect(
+    health.locator('[data-bpp-state-side="player"]'),
+  ).toHaveText("1,000");
+  await expect(
+    health.locator('[data-bpp-state-side="opponent"]'),
+  ).toHaveText("1,200");
+});
+
+test("highlights and toggles state lines from the metric legend", async ({
+  page,
+}) => {
+  await page.goto(`${reportUrl}?lang=en`);
+
+  const canvas = page.getByTestId("state-band-canvas");
+  const health = page.getByTestId("state-label-health");
+  const burn = page.getByTestId("state-label-burn");
+  await expect(health).toHaveAttribute("aria-pressed", "true");
+  await expect(canvas).toHaveAttribute(
+    "data-bpp-visible-metrics",
+    "health,rage,healthRegen,shield,burn,poison",
+  );
+
+  await burn.hover();
+  await expect(canvas).toHaveAttribute(
+    "data-bpp-highlighted-metric",
+    "burn",
+  );
+  await page.mouse.move(1, 1);
+  await expect(canvas).toHaveAttribute(
+    "data-bpp-highlighted-metric",
+    "",
+  );
+
+  await health.focus();
+  await expect(canvas).toHaveAttribute(
+    "data-bpp-highlighted-metric",
+    "health",
+  );
+  await health.locator("strong").click();
+  await expect(health).toHaveAttribute("aria-pressed", "false");
+  await expect(canvas).toHaveAttribute(
+    "data-bpp-visible-metrics",
+    "rage,healthRegen,shield,burn,poison",
+  );
+  await expect(canvas).toHaveAttribute(
+    "data-bpp-highlighted-metric",
+    "",
+  );
+
+  await health.press(" ");
+  await expect(health).toHaveAttribute("aria-pressed", "true");
+  await expect(canvas).toHaveAttribute(
+    "data-bpp-visible-metrics",
+    "health,rage,healthRegen,shield,burn,poison",
+  );
+  await expect(canvas).toHaveAttribute(
+    "data-bpp-highlighted-metric",
+    "health",
+  );
 });
 
 test("pins a solid axis on click while pointer hover drives a dashed axis", async ({

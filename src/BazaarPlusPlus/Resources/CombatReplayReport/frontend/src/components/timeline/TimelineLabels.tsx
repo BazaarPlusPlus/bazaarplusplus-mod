@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type RefObject } from "react";
 import type { ReportAction } from "../../app/report-reducer.ts";
 import type { ReportState } from "../../app/report-state.ts";
 import { formatCompactNumber, formatDuration } from "../../i18n/format.ts";
@@ -13,10 +13,12 @@ import {
   METRIC_ORDER,
   sharedStateDomain,
   stateAxisTicks,
+  type StateMetric,
 } from "../../timeline/state-scale.ts";
 import { LANE_HEIGHT } from "../../timeline/constants.ts";
 import { cn } from "../../lib/utils.ts";
 import { Badge } from "../ui/badge.tsx";
+import { Button } from "../ui/button.tsx";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.tsx";
 import { EntityArt } from "../semantic/EntityArt.tsx";
 
@@ -121,24 +123,41 @@ export function StateLabels({
   model,
   combatMs,
   scaleMode,
+  rootRef,
+  visibleMetrics,
+  onMetricHighlight,
+  onMetricToggle,
   dispatch,
   t,
 }: {
   model: ReportViewModel;
   combatMs: number;
   scaleMode: ReportState["stateScale"];
+  rootRef: RefObject<HTMLDivElement | null>;
+  visibleMetrics: ReadonlySet<StateMetric>;
+  onMetricHighlight: (metric: StateMetric | null) => void;
+  onMetricToggle: (metric: StateMetric) => void;
   dispatch: React.Dispatch<ReportAction>;
   t: (key: string) => string;
 }): React.JSX.Element {
   const grouped = useMemo(() => groupMetricSamples(model), [model]);
-  const domain = sharedStateDomain(grouped, scaleMode);
+  const visibleOrder = METRIC_ORDER.filter((metric) =>
+    visibleMetrics.has(metric)
+  );
+  const domain = sharedStateDomain(grouped, scaleMode, visibleOrder);
   const ticks = stateAxisTicks(domain, scaleMode);
 
   return (
-    <div className="bpp-state-labels" data-bpp-test-id="state-band-labels">
+    <div
+      className="bpp-state-labels"
+      data-bpp-combat-ms={combatMs}
+      data-bpp-test-id="state-band-labels"
+      ref={rootRef}
+    >
       <div className="flex h-control-xs items-center gap-1 border-b border-border/60 px-2">
         <span className="min-w-0 truncate font-mono text-micro text-muted-foreground">
-          {t("stateValues")} · {formatDuration(combatMs)}
+          {t("stateValues")} ·{" "}
+          <span data-bpp-state-time>{formatDuration(combatMs)}</span>
         </span>
         <ToggleGroup
           aria-label={t("metricsTitle")}
@@ -161,6 +180,7 @@ export function StateLabels({
       </div>
       <div className="grid h-[93px] grid-rows-6">
         {METRIC_ORDER.map((metric) => {
+          const visible = visibleMetrics.has(metric);
           const player = metricValueAt(
             grouped.get(`player:${metric}`),
             combatMs,
@@ -170,10 +190,27 @@ export function StateLabels({
             combatMs,
           );
           return (
-            <div
-              className="grid grid-cols-[8px_1fr_auto_auto] items-center gap-1 px-2 text-micro"
+            <Button
+              aria-pressed={visible}
+              className={cn(
+                "grid h-full w-full grid-cols-[8px_minmax(0,1fr)_4.5rem_4.5rem] items-center gap-1 rounded-none px-2 text-left text-micro transition-none hover:bg-accent/25 focus-visible:bg-accent/35 focus-visible:outline-none focus-visible:ring-0",
+                !visible && "opacity-45",
+              )}
+              data-bpp-state-metric={metric}
               data-bpp-test-id={`state-label-${metric}`}
               key={metric}
+              onBlur={() => onMetricHighlight(null)}
+              onClick={() => onMetricToggle(metric)}
+              onFocus={() => onMetricHighlight(metric)}
+              onPointerEnter={() => onMetricHighlight(metric)}
+              onPointerLeave={(event) => {
+                if (event.currentTarget !== document.activeElement) {
+                  onMetricHighlight(null);
+                }
+              }}
+              size="xs"
+              type="button"
+              variant="tableHeader"
             >
               <span
                 className={cn(
@@ -184,13 +221,21 @@ export function StateLabels({
               <strong className="truncate text-foreground/85">
                 {t(metric)}
               </strong>
-              <span className="font-mono text-player">
+              <span
+                className="text-right font-mono tabular-nums text-player"
+                data-bpp-state-metric={metric}
+                data-bpp-state-side="player"
+              >
                 {player === null ? "—" : formatCompactNumber(player)}
               </span>
-              <span className="font-mono text-opponent">
+              <span
+                className="text-right font-mono tabular-nums text-opponent"
+                data-bpp-state-metric={metric}
+                data-bpp-state-side="opponent"
+              >
                 {opponent === null ? "—" : formatCompactNumber(opponent)}
               </span>
-            </div>
+            </Button>
           );
         })}
       </div>

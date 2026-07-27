@@ -44,11 +44,12 @@ export function stateScaleValue(
 export function sharedStateDomain(
   grouped: GroupedStateSamples,
   scaleMode: StateScaleMode,
+  metrics: readonly StateMetric[] = METRIC_ORDER,
 ): StateDomain | null {
   let minimum = 0;
   let maximum = 0;
   let hasSamples = false;
-  for (const metric of METRIC_ORDER) {
+  for (const metric of metrics) {
     for (const side of ["player", "opponent"]) {
       const samples = grouped.get(`${side}:${metric}`) ?? [];
       for (const sample of samples) {

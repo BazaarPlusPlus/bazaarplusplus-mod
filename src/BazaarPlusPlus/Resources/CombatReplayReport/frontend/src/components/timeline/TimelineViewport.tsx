@@ -15,6 +15,7 @@ import {
 } from "../../timeline/constants.ts";
 import { TimelineCanvasController } from "../../timeline/event-renderer.ts";
 import { combatMsAtPointer } from "../../timeline/geometry.ts";
+import type { StateMetric } from "../../timeline/state-scale.ts";
 import { LaneFilterPopover } from "./LaneFilterPopover.tsx";
 import {
   LaneLabelContents,
@@ -25,6 +26,7 @@ export interface TimelineViewportRefs {
   scroll: RefObject<HTMLDivElement | null>;
   grid: RefObject<HTMLDivElement | null>;
   labels: RefObject<HTMLDivElement | null>;
+  stateLabels: RefObject<HTMLDivElement | null>;
   stateCanvas: RefObject<HTMLCanvasElement | null>;
   ruler: RefObject<HTMLCanvasElement | null>;
   eventCanvas: RefObject<HTMLCanvasElement | null>;
@@ -50,6 +52,7 @@ export function useTimelineViewportRefs(): TimelineViewportRefs {
     scroll: useRef<HTMLDivElement>(null),
     grid: useRef<HTMLDivElement>(null),
     labels: useRef<HTMLDivElement>(null),
+    stateLabels: useRef<HTMLDivElement>(null),
     stateCanvas: useRef<HTMLCanvasElement>(null),
     ruler: useRef<HTMLCanvasElement>(null),
     eventCanvas: useRef<HTMLCanvasElement>(null),
@@ -79,6 +82,10 @@ export function TimelineViewport({
   pinnedHero,
   drawState,
   clearPreview,
+  visibleMetrics,
+  onMetricHighlight,
+  onMetricToggle,
+  stateLabelCombatMs,
 }: {
   model: ReportViewModel;
   state: ReportState;
@@ -94,6 +101,10 @@ export function TimelineViewport({
   pinnedHero: NormalizedEntity | null;
   drawState: () => void;
   clearPreview: () => void;
+  visibleMetrics: ReadonlySet<StateMetric>;
+  onMetricHighlight: (metric: StateMetric | null) => void;
+  onMetricToggle: (metric: StateMetric) => void;
+  stateLabelCombatMs: number;
 }): React.JSX.Element {
   const pinnedHeroSide = pinnedHero
     ? normalizeSide(pinnedHero.side)
@@ -164,11 +175,15 @@ export function TimelineViewport({
           } as React.CSSProperties}
         >
           <StateLabels
-            combatMs={state.selectedCombatMs}
+            combatMs={stateLabelCombatMs}
             dispatch={dispatch}
             model={model}
+            onMetricHighlight={onMetricHighlight}
+            onMetricToggle={onMetricToggle}
+            rootRef={refs.stateLabels}
             scaleMode={state.stateScale}
             t={t}
+            visibleMetrics={visibleMetrics}
           />
           <canvas
             aria-label={t("metricsTitle")}
