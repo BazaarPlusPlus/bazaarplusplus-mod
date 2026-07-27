@@ -269,8 +269,42 @@ void StatusSemanticsUseExactNativeMappingsAndFailClosed()
         );
     }
 
+    var signedHealth = new (long Delta, string Stable, string Native)[]
+    {
+        (20, "status.heal", "HealAmount"),
+        (-20, "status.damage", "DamageAmount"),
+    };
+    foreach (var item in signedHealth)
+    {
+        var reportEvent = new CombatReportEventV1
+        {
+            Kind = "player-attribute",
+            Action = "Health",
+            Value = item.Delta,
+        };
+        Check(
+            ReportStatusIconSemanticResolver.TryResolve(reportEvent, out var semantic)
+                && semantic.StableKey == item.Stable
+                && semantic.NativeAttributeKey == item.Native,
+            $"Signed Health delta {item.Delta} must resolve to {item.Stable}."
+        );
+    }
+    Check(
+        !ReportStatusIconSemanticResolver.TryResolve(
+            new CombatReportEventV1
+            {
+                Kind = "player-attribute",
+                Action = "Health",
+                Value = 0,
+            },
+            out _
+        ),
+        "A zero Health delta must not invent a native status icon."
+    );
+
     var unsupported = new (string Kind, string Action)[]
     {
+        ("player-attribute", "Health"),
         ("player-attribute", "Rage"),
         ("skill-trigger", "CardFreeze"),
         ("card-attribute", "FreezeTargets"),

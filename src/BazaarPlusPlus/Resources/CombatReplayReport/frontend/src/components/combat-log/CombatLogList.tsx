@@ -186,10 +186,27 @@ function CombatLogEntryColumns({
             />
           )}
       </span>
-      <span
-        aria-hidden="true"
-        data-bpp-test-id="combat-log-relation"
-      />
+      {expandable && expanded ? (
+        <span
+          aria-hidden="true"
+          className="relative h-full w-full"
+          data-bpp-test-id="combat-log-relation"
+        >
+          <span
+            className="absolute left-1/2 right-0 top-1/2 h-px bg-brand-soft/35"
+            data-bpp-test-id="combat-log-tree-root-arm"
+          />
+          <span
+            className="absolute -bottom-px left-1/2 top-1/2 w-px bg-brand-soft/35"
+            data-bpp-test-id="combat-log-tree-root-spine"
+          />
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          data-bpp-test-id="combat-log-relation"
+        />
+      )}
       <span
         className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1 overflow-hidden text-compact text-muted-foreground"
         data-bpp-test-id="combat-log-target"
@@ -256,12 +273,14 @@ function CombatLogEntryColumns({
 function CombatLogTargetDetail({
   detail,
   entityById,
+  isLast,
   onSelectEntry,
   parentEntryId,
   t,
 }: {
   detail: CombatLogEntry;
   entityById: ReadonlyMap<string, NormalizedEntity>;
+  isLast: boolean;
   onSelectEntry: (entry: CombatLogEntry) => void;
   parentEntryId: string;
   t: (key: string) => string;
@@ -277,6 +296,7 @@ function CombatLogTargetDetail({
         amount,
       ].filter(Boolean).join(" · ")}
       className="grid h-8 w-full grid-cols-[4rem_4.75rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/15 bg-surface-raised/25 px-3 text-left font-normal transition-colors hover:bg-accent/35 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2"
+      data-bpp-last-child={isLast ? "true" : "false"}
       data-bpp-parent-entry-id={parentEntryId}
       data-bpp-target-id={detail.targetIds[0] ?? ""}
       data-bpp-test-id="combat-log-entry-detail"
@@ -288,9 +308,25 @@ function CombatLogTargetDetail({
       <span aria-hidden="true" />
       <span aria-hidden="true" />
       <span aria-hidden="true" />
-      <span aria-hidden="true" />
       <span
-        className="block min-w-0 overflow-hidden pl-2 text-compact text-muted-foreground"
+        aria-hidden="true"
+        className="relative grid h-full place-items-center"
+        data-bpp-test-id="combat-log-tree-branch"
+      >
+        <span
+          className={cn(
+            "absolute left-1/2 top-0 w-px bg-brand-soft/35",
+            isLast ? "bottom-1/2" : "-bottom-px",
+          )}
+          data-bpp-test-id="combat-log-tree-spine"
+        />
+        <span
+          className="absolute left-1/2 top-1/2 h-px w-1/2 bg-brand-soft/35"
+          data-bpp-test-id="combat-log-tree-elbow"
+        />
+      </span>
+      <span
+        className="block min-w-0 overflow-hidden text-compact text-muted-foreground"
         data-bpp-test-id="combat-log-detail-target"
       >
         {target
@@ -635,10 +671,11 @@ export const CombatLogList = forwardRef<
                       data-bpp-test-id="combat-log-entry-details"
                       role="group"
                     >
-                      {details.map((detail) => (
+                      {details.map((detail, detailIndex) => (
                         <CombatLogTargetDetail
                           detail={detail}
                           entityById={entityById}
+                          isLast={detailIndex === details.length - 1}
                           key={detail.id}
                           onSelectEntry={onSelectEntry}
                           parentEntryId={entry.id}

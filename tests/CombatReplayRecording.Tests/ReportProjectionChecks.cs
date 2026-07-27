@@ -110,6 +110,11 @@ internal static class ReportProjectionChecks
                 Attributes =
                 {
                     [EPlayerAttributeType.Rage] = Attribute(EPlayerAttributeType.Rage, 7, 10),
+                    [EPlayerAttributeType.Health] = Attribute(
+                        EPlayerAttributeType.Health,
+                        1_000,
+                        1_020
+                    ),
                 },
             },
         };
@@ -188,6 +193,13 @@ internal static class ReportProjectionChecks
                 && damage.AttributionConfidence == "target-exact-source-unknown",
             "Unknown-source damage must remain source-unknown instead of being assigned to the opposite side."
         );
+        var healing = document.Events.Single(entry =>
+            entry.Kind == "player-attribute" && entry.Action == "Health"
+        );
+        Require(
+            healing.Value == 20 && healing.IconSemanticKey == "status.heal",
+            "A positive Health delta must bind the game's native healing icon semantic."
+        );
         var aura = document.Events.Single(entry => entry.Kind == "aura");
         Require(
             aura.SourceEntityId == cardId.Value
@@ -198,7 +210,7 @@ internal static class ReportProjectionChecks
             "Projected relations must retain source, trigger, targets, removed targets, and confidence."
         );
         Require(
-            document.RawRecordCount == 18 && document.RawRecordCount > document.Events.Count,
+            document.RawRecordCount == 19 && document.RawRecordCount > document.Events.Count,
             $"RawRecordCount must count all raw subrecords including six delta-zero state updates per combatant (raw={document.RawRecordCount}, projected={document.Events.Count})."
         );
         Require(

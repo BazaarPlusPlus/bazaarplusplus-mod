@@ -404,10 +404,28 @@ test.beforeAll(async ({ browserName }) => {
       role: "received",
       attributionConfidence: "unavailable",
     }),
+    schemaEvent({
+      eventId: "native-heal-settlement",
+      frame: 171,
+      frameSequence: 0,
+      combatTimeMs: 8550,
+      kind: "health",
+      action: "Health:Heal",
+      targetEntityIds: ["player-hero"],
+      value: 20,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+      iconSemanticKey: "status.heal",
+      iconContentKey:
+        "1111111111111111111111111111111111111111111111111111111111111111",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/11/1111111111111111111111111111111111111111111111111111111111111111.png",
+    }),
   );
   statusApplicationEnvelope.battleDocument.durationMs = 9000;
   statusApplicationEnvelope.battleDocument.frameCount = 180;
-  statusApplicationEnvelope.battleDocument.rawRecordCount += 3;
+  statusApplicationEnvelope.battleDocument.rawRecordCount += 4;
   await writeFile(
     join(fixtureDirectory, "status-application-report.html"),
     reportHtml(statusApplicationEnvelope),
@@ -2773,6 +2791,22 @@ test("keeps direct freeze applications in the combat log without countdown tick 
   await page.goto(`${statusApplicationReportUrl}?lang=en`);
   await page.getByTestId("combat-log-dock-toggle").click();
 
+  const healingRow = page
+    .locator(
+      '[data-bpp-test-id="combat-log-entry"][data-bpp-combat-ms="8550"]',
+    )
+    .filter({ hasText: "Healing" });
+  await expect(healingRow).toHaveCount(1);
+  await expect(
+    healingRow.getByTestId("combat-log-kind-native-icon"),
+  ).toHaveAttribute(
+    "src",
+    /report-assets\/objects\/11\/1{64}\.png$/,
+  );
+  await expect(
+    healingRow.getByTestId("combat-log-kind").locator("svg"),
+  ).toHaveCount(0);
+
   const freezeRow = page
     .getByTestId("combat-log-entry")
     .filter({ hasText: "Freeze" });
@@ -2785,12 +2819,43 @@ test("keeps direct freeze applications in the combat log without countdown tick 
   await expect(freezeRow.getByTestId("combat-log-target-label")).toHaveCount(0);
   await expect(freezeRow).toContainText("1s");
   await expect(freezeRow).toContainText("×2");
-  await freezeRow.click();
-  await expect(freezeRow).toHaveAttribute("aria-expanded", "true");
   await expect(freezeRow.getByTestId("combat-log-relation")).toBeEmpty();
-  await expect(page.getByTestId("combat-log-arrow")).toHaveCount(0);
   await expect(page.getByTestId("combat-log-tree-root-arm")).toHaveCount(0);
   await expect(page.getByTestId("combat-log-tree-root-spine")).toHaveCount(0);
+  await freezeRow.click();
+  await expect(freezeRow).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByTestId("combat-log-arrow")).toHaveCount(0);
+  const rootGeometry = await freezeRow.evaluate((row) => {
+    const root = row.querySelector(
+      '[data-bpp-test-id="combat-log-relation"]',
+    )?.getBoundingClientRect();
+    const arm = row.querySelector(
+      '[data-bpp-test-id="combat-log-tree-root-arm"]',
+    )?.getBoundingClientRect();
+    const spine = row.querySelector(
+      '[data-bpp-test-id="combat-log-tree-root-spine"]',
+    )?.getBoundingClientRect();
+    if (!root || !arm || !spine) return null;
+    return {
+      rootLeft: root.left,
+      rootWidth: root.width,
+      armLeft: arm.left,
+      armRight: arm.right,
+      armWidth: arm.width,
+      spineLeft: spine.left,
+    };
+  });
+  expect(rootGeometry).not.toBeNull();
+  expect(rootGeometry.armLeft).toBeCloseTo(
+    rootGeometry.rootLeft + rootGeometry.rootWidth / 2,
+    0,
+  );
+  expect(rootGeometry.armRight).toBeCloseTo(
+    rootGeometry.rootLeft + rootGeometry.rootWidth,
+    0,
+  );
+  expect(rootGeometry.armWidth).toBeLessThan(rootGeometry.rootWidth * 0.6);
+  expect(rootGeometry.spineLeft).toBeCloseTo(rootGeometry.armLeft, 0);
   const detailGroup = page.getByTestId("combat-log-entry-details");
   await expect(detailGroup).toBeVisible();
   const detailRows = page.getByTestId("combat-log-entry-detail");
@@ -2801,30 +2866,58 @@ test("keeps direct freeze applications in the combat log without countdown tick 
     detailRows.getByTestId("combat-log-detail-target-label"),
   ).toHaveText(["Practice Shield", "Cash Cannon"]);
   await expect(page.getByTestId("combat-log-detail-target")).toHaveCount(2);
-  await expect(page.getByTestId("combat-log-tree-branch")).toHaveCount(0);
-  await expect(page.getByTestId("combat-log-tree-spine")).toHaveCount(0);
-  await expect(page.getByTestId("combat-log-tree-elbow")).toHaveCount(0);
+  await expect(page.getByTestId("combat-log-tree-branch")).toHaveCount(2);
+  await expect(page.getByTestId("combat-log-tree-spine")).toHaveCount(2);
+  await expect(page.getByTestId("combat-log-tree-elbow")).toHaveCount(2);
   const detailGeometry = await detailGroup.evaluate((group) => {
+    const branches = Array.from(
+      group.querySelectorAll('[data-bpp-test-id="combat-log-tree-branch"]'),
+    );
     const targets = Array.from(
       group.querySelectorAll('[data-bpp-test-id="combat-log-detail-target"]'),
+    );
+    const spines = Array.from(
+      group.querySelectorAll('[data-bpp-test-id="combat-log-tree-spine"]'),
     );
     const rows = Array.from(
       group.querySelectorAll('[data-bpp-test-id="combat-log-entry-detail"]'),
     );
     return {
-      targetPaddingLeft: targets.map((node) =>
-        Number.parseFloat(getComputedStyle(node).paddingLeft)
-      ),
+      branchHeights: branches.map((node) => node.getBoundingClientRect().height),
+      branchLefts: branches.map((node) => node.getBoundingClientRect().left),
+      targetLefts: targets.map((node) => node.getBoundingClientRect().left),
+      spineHeights: spines.map((node) => node.getBoundingClientRect().height),
       rowHeights: rows.map((node) => node.getBoundingClientRect().height),
       paddingBottom: Number.parseFloat(getComputedStyle(group).paddingBottom),
     };
   });
-  expect(detailGeometry.targetPaddingLeft).toEqual([8, 8]);
+  expect(
+    Math.max(...detailGeometry.branchLefts)
+      - Math.min(...detailGeometry.branchLefts),
+  ).toBeLessThanOrEqual(1);
+  expect(
+    detailGeometry.targetLefts.every(
+      (left, index) => left > detailGeometry.branchLefts[index],
+    ),
+  ).toBe(true);
   expect(detailGeometry.rowHeights).toEqual([32, 32]);
+  expect(detailGeometry.spineHeights[0]).toBeCloseTo(
+    detailGeometry.branchHeights[0] + 1,
+    0,
+  );
+  expect(detailGeometry.spineHeights[1]).toBeCloseTo(
+    detailGeometry.branchHeights[1] / 2,
+    0,
+  );
   expect(detailGeometry.paddingBottom).toBe(4);
   await expect(page.getByTestId("frame-inspector-popover")).toHaveCount(0);
   await detailRows.nth(0).click();
   await expect(page.getByTestId("frame-inspector-popover")).toHaveCount(0);
+  await freezeRow.click();
+  await expect(freezeRow).toHaveAttribute("aria-expanded", "false");
+  await expect(freezeRow.getByTestId("combat-log-relation")).toBeEmpty();
+  await expect(page.getByTestId("combat-log-tree-root-arm")).toHaveCount(0);
+  await expect(page.getByTestId("combat-log-entry-details")).toHaveCount(0);
   await expect(page.getByTestId("combat-log")).not.toContainText("-50ms");
 });
 

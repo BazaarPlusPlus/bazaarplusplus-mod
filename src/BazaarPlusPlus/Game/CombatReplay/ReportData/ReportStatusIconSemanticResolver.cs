@@ -54,6 +54,17 @@ internal static class ReportStatusIconSemanticResolver
         if (reportEvent == null)
             return false;
 
+        if (
+            string.Equals(reportEvent.Kind, "player-attribute", StringComparison.Ordinal)
+            && string.Equals(reportEvent.Action, "Health", StringComparison.Ordinal)
+            && reportEvent.Value is long healthDelta
+            && healthDelta != 0
+        )
+        {
+            semantic = healthDelta > 0 ? Heal : Damage;
+            return true;
+        }
+
         return TryResolve(reportEvent.Kind, reportEvent.Action, out semantic);
     }
 
