@@ -178,11 +178,19 @@ internal sealed class BppComposition : IDisposable
         );
         _settingsDockRegistry.Register(LegendaryPositionSettingsDockEntry.Create());
         _settingsDockRegistry.Register(NameOverrideSettingsDockEntry.Create());
-        if (UnityEngine.Application.platform == UnityEngine.RuntimePlatform.OSXPlayer)
+        if (
+            UnityEngine.Application.platform
+            is UnityEngine.RuntimePlatform.OSXPlayer
+                or UnityEngine.RuntimePlatform.WindowsPlayer
+        )
             GraphicsUpscalingSettingsDockEntry.RegisterAll(_settingsDockRegistry);
 
         _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
-        if (UnityEngine.Application.platform == UnityEngine.RuntimePlatform.OSXPlayer)
+        if (
+            UnityEngine.Application.platform
+            is UnityEngine.RuntimePlatform.OSXPlayer
+                or UnityEngine.RuntimePlatform.WindowsPlayer
+        )
         {
             _mountables.Register(
                 new ComponentMount<GraphicsUpscalingController>(

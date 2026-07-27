@@ -43,8 +43,8 @@ internal sealed class UrpUpscalingAdapter : IDisposable
         currentAsset.FsrOverrideSharpness = true;
         currentAsset.FsrSharpness = Mathf.Clamp01(fsrSharpness);
 
-        // The game's separate Metal dynamic-resolution scaler is disabled in the current
-        // quality assets. Keep its multiplier neutral so a future quality preset cannot
+        // The game's separate dynamic-resolution scaler is disabled in the current quality
+        // assets. Keep its multiplier neutral so a future quality preset cannot
         // accidentally apply a second scale on top of the explicit URP render scale.
         if (
             !Mathf.Approximately(ScalableBufferManager.widthScaleFactor, 1f)
