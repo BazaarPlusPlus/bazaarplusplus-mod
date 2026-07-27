@@ -1896,6 +1896,68 @@ AssertFalse(
     "Skill Destroy facts should not leak into Item availability."
 );
 
+// #158: related-only Destroy facts (no TActionCardDestroy) still make the chip available.
+// Item/Skill stay independent; packages never contribute.
+var relatedOnlyRepairVm = CollectionCardVm.From(rootRepairTemplate);
+var relatedOnlyItemAvailability = CollectionFacetAvailability.SnapshotFor(
+    new[] { relatedOnlyRepairVm }
+);
+AssertTrue(
+    relatedOnlyItemAvailability.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Destroy),
+    "A card that matches Destroy only through a related mechanism should make the Destroy chip available on its tab."
+);
+AssertFalse(
+    relatedOnlyItemAvailability.MechanicsFor(ECardType.Skill).Contains(CollectionMechanic.Destroy),
+    "Related-only Item Destroy facts should not leak into Skill availability."
+);
+
+var relatedOnlySkillTemplate = new TCardSkill
+{
+    Id = Guid.NewGuid(),
+    Type = ECardType.Skill,
+    StartingTier = ETier.Bronze,
+    InternalName = "Repair Skill",
+    HiddenTags = new HashSet<EHiddenTag>(),
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "skill-repair" }),
+    },
+    Abilities = new Dictionary<string, TCardAbility>
+    {
+        ["skill-repair"] = Ability(new TActionCardRepair()),
+    },
+};
+var relatedOnlySkillVm = CollectionCardVm.From(relatedOnlySkillTemplate);
+var relatedOnlySkillAvailability = CollectionFacetAvailability.SnapshotFor(
+    new[] { relatedOnlySkillVm }
+);
+AssertTrue(
+    relatedOnlySkillAvailability.MechanicsFor(ECardType.Skill).Contains(CollectionMechanic.Destroy),
+    "Skill related-only Destroy availability should be derived independently from skill catalog facts."
+);
+AssertFalse(
+    relatedOnlySkillAvailability.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Destroy),
+    "Related-only Skill Destroy facts should not leak into Item availability."
+);
+
+var packageDestroyOnlyCard = Card(
+    "Package Destroy Related",
+    ETier.Bronze,
+    isPackage: true,
+    mechanics: CollectionMechanic.Destroy
+);
+var packageDestroyAvailability = CollectionFacetAvailability.SnapshotFor(
+    new[] { packageDestroyOnlyCard }
+);
+AssertFalse(
+    packageDestroyAvailability.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Destroy),
+    "Package cards must never contribute Destroy chip availability."
+);
+AssertFalse(
+    packageDestroyAvailability.MechanicsFor(ECardType.Skill).Contains(CollectionMechanic.Destroy),
+    "Package cards must never contribute Destroy chip availability on either tab."
+);
+
 var multicastOnlyMechanicCard = Card(
     "Alpha Multicast",
     ETier.Bronze,
