@@ -72,6 +72,38 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void UploadArmRequested_lives_in_Game_Upload_not_Core_Events()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var eventPath = Path.Combine(mainSource, "Game", "Upload", "UploadArmRequested.cs");
+        Assert.True(
+            File.Exists(eventPath),
+            "UploadArmRequested must live under Game/Upload (UploadFeedKind is Game-layer)."
+        );
+
+        var source = File.ReadAllText(eventPath);
+        Assert.Contains("namespace BazaarPlusPlus.Game.Upload", source, StringComparison.Ordinal);
+        Assert.Contains("class UploadArmRequested", source, StringComparison.Ordinal);
+
+        var coreEventsDir = Path.Combine(mainSource, "Core", "Events");
+        Assert.True(Directory.Exists(coreEventsDir), "Core/Events directory must exist.");
+        foreach (
+            var file in Directory.EnumerateFiles(coreEventsDir, "*.cs", SearchOption.AllDirectories)
+        )
+        {
+            var text = File.ReadAllText(file);
+            Assert.DoesNotContain("UploadArmRequested", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("UploadFeedKind", text, StringComparison.Ordinal);
+            Assert.DoesNotContain(
+                "using BazaarPlusPlus.Game.Upload",
+                text,
+                StringComparison.Ordinal
+            );
+        }
+    }
+
+    [Fact]
     public void CollectionPanel_does_not_depend_on_HistoryPanel_preview_internals()
     {
         var repoRoot = RepoRoot();
@@ -221,6 +253,110 @@ public class CoreLayeringTests
                 + "Offending imports:\n"
                 + string.Join("\n", violations)
         );
+    }
+
+    [Fact]
+    public void CollectionViewState_catalog_state_transitions_are_centralized()
+    {
+        var viewStateSource = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "CollectionViewState.cs"
+            )
+        );
+        var panelSource = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "CollectionPanel.cs"
+            )
+        );
+
+        var setCatalogState = WithoutWhitespace(
+            MethodSource(
+                viewStateSource,
+                "private void SetCatalogState(",
+                "private void SetStatus("
+            )
+        );
+        var setCatalogCards = WithoutWhitespace(
+            MethodSource(
+                viewStateSource,
+                "private void SetCatalogCards(",
+                "private void SetCatalogState("
+            )
+        );
+        var acceptCatalog = WithoutWhitespace(
+            MethodSource(
+                viewStateSource,
+                "public CollectionRenderOutcome AcceptCatalog(",
+                "public CollectionRenderOutcome CatalogUnavailable()"
+            )
+        );
+        var resetCatalog = WithoutWhitespace(
+            MethodSource(
+                viewStateSource,
+                "public void ResetCatalog()",
+                "public void NoteCatalogLoadCancelled()"
+            )
+        );
+        var prepareForOpen = WithoutWhitespace(
+            MethodSource(
+                viewStateSource,
+                "public void PrepareCatalogForOpen(",
+                "public CollectionRenderOutcome? SetActiveTab("
+            )
+        );
+
+        // Catalog readiness/heroes/cards/facets live only on CollectionViewState. Each field has
+        // one declaration initializer and one live assignment; cards/facets use a subordinate
+        // helper whose only caller is SetCatalogState.
+        Assert.Equal(2, AssignmentCount(viewStateSource, "_catalogReadiness"));
+        Assert.Equal(2, AssignmentCount(viewStateSource, "_availableHeroes"));
+        Assert.Equal(2, AssignmentCount(viewStateSource, "_catalogCards"));
+        Assert.Equal(2, AssignmentCount(viewStateSource, "_facetAvailability"));
+        Assert.Contains("_catalogReadiness=readiness;", setCatalogState);
+        Assert.Contains(
+            "_availableHeroes=CollectionHeroSelectionRoster.ResolveAvailableHeroes(readiness,cards);",
+            setCatalogState
+        );
+        Assert.Contains("_catalogCards=cards;", setCatalogCards);
+        Assert.Contains(
+            "_facetAvailability=CollectionFacetAvailability.SnapshotFor(cards);",
+            setCatalogCards
+        );
+        Assert.Contains("SetCatalogCards(cards);", setCatalogState);
+        Assert.Equal(2, viewStateSource.Split("SetCatalogCards(").Length - 1);
+
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Accepted,cachedCards);",
+            prepareForOpen
+        );
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Loading,Array.Empty<CollectionCardVm>());",
+            prepareForOpen
+        );
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Accepted,cards);",
+            acceptCatalog
+        );
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Loading,Array.Empty<CollectionCardVm>());",
+            resetCatalog
+        );
+
+        // Panel must forward catalog transitions into CollectionViewState; it must not own the
+        // catalog field assignments.
+        Assert.DoesNotContain("_catalogReadiness", panelSource);
+        Assert.DoesNotContain("_catalogCards", panelSource);
+        Assert.DoesNotContain("_facetAvailability", panelSource);
+        Assert.Contains("_viewState.AcceptCatalog(", panelSource);
+        Assert.Contains("_viewState.CatalogUnavailable()", panelSource);
+        Assert.Contains("_viewState.ResetCatalog()", panelSource);
+        Assert.Contains("_viewState.PrepareCatalogForOpen(", panelSource);
     }
 
     [Fact]
@@ -400,7 +536,9 @@ public class CoreLayeringTests
         Assert.Contains("ReferenceEquals(cell.Vm, nextVisible[newIndex])", virtualizerSource);
         Assert.Contains("cell.Index = newIndex;", virtualizerSource);
         Assert.Contains("cell.HoverRelay?.Bind(cell.Session);", virtualizerSource);
-        Assert.Contains("Reposition(newIndex, cell);", virtualizerSource);
+        Assert.Contains("NativeCardCellFitter.Reposition(", virtualizerSource);
+        Assert.Contains("cell.BoundsCache", virtualizerSource);
+        Assert.Contains("allowMeasure: false", virtualizerSource);
     }
 
     [Fact]
@@ -514,6 +652,12 @@ public class CoreLayeringTests
                 "CollectionGridVirtualizer.cs"
             )
         );
+        var fitMathSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "CollectionCardFitMath.cs")
+        );
+        var fitterSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "NativeCardCellFitter.cs")
+        );
         var badgeSource = File.ReadAllText(
             Path.Combine(
                 mainSource,
@@ -524,23 +668,23 @@ public class CoreLayeringTests
             )
         );
 
-        var applyCellScaleIndex = virtualizerSource.IndexOf(
-            "private void ApplyCellScale",
-            StringComparison.Ordinal
-        );
-        Assert.True(
-            applyCellScaleIndex >= 0,
-            "CollectionGridVirtualizer.ApplyCellScale should exist."
-        );
-        var oldClampIndex = virtualizerSource.IndexOf(
-            "natW * scale > maxWidth",
-            applyCellScaleIndex,
-            StringComparison.Ordinal
-        );
-        Assert.True(
-            oldClampIndex < 0,
-            "The old frame-width clamp shrinks Large item cards because their frame art overhangs the body."
-        );
+        // Measurement/fit methods must live in the fitter, not the virtualizer.
+        Assert.DoesNotContain("ResolveNativeVisualBounds", virtualizerSource);
+        Assert.DoesNotContain("TryMeasureSubtreeBounds", virtualizerSource);
+        Assert.DoesNotContain("private void ApplyCellScale", virtualizerSource);
+        Assert.Contains("NativeCardCellFitter.ApplyScale", virtualizerSource);
+        Assert.Contains("NativeCardCellFitter.Reposition", virtualizerSource);
+        // Per-cell bounds cache: scroll path must not remeasure (allowMeasure: false).
+        Assert.Contains("InvalidateOnScaleDirty", virtualizerSource);
+        Assert.Contains("InvalidateOnRebind", virtualizerSource);
+        Assert.Contains("InvalidateOnArtLoaded", virtualizerSource);
+        Assert.Contains("allowMeasure: false", virtualizerSource);
+
+        Assert.Contains("bodyW * scale > maxWidth", fitMathSource);
+        Assert.DoesNotContain("natW * scale > maxWidth", fitMathSource);
+        Assert.Contains("frameHeightOverSocket", fitMathSource);
+        Assert.Contains("SetSizeWithCurrentAnchors", fitterSource);
+        Assert.Contains("MeasureInvocationCount", fitterSource);
 
         Assert.Contains("BadgeRootHeightScale", badgeSource);
         Assert.Contains("CollectionGridVirtualizer.FallbackNativeCardHeight / 200f", badgeSource);
@@ -663,6 +807,80 @@ public class CoreLayeringTests
                 + "per-feature HeroBadgeStyle copy. Offending files:\n"
                 + string.Join("\n", offenders)
         );
+    }
+
+    [Fact]
+    public void Transitional_Hero8_literal_is_confined_to_the_deletable_identity_adapter()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var adapter = Path.Combine(
+            mainSource,
+            "GameInterop",
+            "Heroes",
+            "TheDragonsHeroIdentity.cs"
+        );
+
+        Assert.True(
+            File.Exists(adapter),
+            $"The deletable The Dragons identity adapter must live at '{adapter}'."
+        );
+
+        var adapterFull = Path.GetFullPath(adapter);
+        var offenders = EnumerateSourceFiles(mainSource)
+            .Where(file =>
+                !string.Equals(Path.GetFullPath(file), adapterFull, StringComparison.Ordinal)
+            )
+            .Where(file =>
+                File.ReadAllText(file).Contains("Hero8", StringComparison.OrdinalIgnoreCase)
+            )
+            .Select(file => Path.GetRelativePath(mainSource, file).Replace('\\', '/'))
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "The transitional Hero8 literal belongs only in the deletable "
+                + "GameInterop.Heroes identity adapter. Offending files:\n"
+                + string.Join("\n", offenders)
+        );
+    }
+
+    [Fact]
+    public void TheDragons_canonicalization_stays_out_of_runtime_capture_contracts()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var runProbe = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "RunSnapshot", "RunSnapshotProbe.cs")
+        );
+        var pvpCollector = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "PvpBattles", "PvpBattleSnapshotCollector.cs")
+        );
+        var heroPoolPrefs = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "Lobby",
+                "RandomHeroPool",
+                "RandomHeroPoolPlayerPrefs.cs"
+            )
+        );
+        var replayPortrait = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CombatReplay",
+                "PlaybackUi",
+                "OpponentPortraitController.cs"
+            )
+        );
+
+        Assert.Contains("RandomHeroPoolHeroIdentity.Normalize", heroPoolPrefs);
+        Assert.Contains("CombatReplayHeroIdentity.TryParse", replayPortrait);
+        Assert.DoesNotContain("TheDragonsHeroIdentity", runProbe);
+        Assert.DoesNotContain("TheDragonsHeroIdentity", pvpCollector);
+        Assert.Contains("Hero = run.Player?.Hero.ToString()", runProbe);
+        Assert.Contains("Data.Run?.Player?.Hero.ToString()", pvpCollector);
+        Assert.Contains("opponent?.Hero.ToString()", pvpCollector);
     }
 
     [Fact]
@@ -936,6 +1154,54 @@ public class CoreLayeringTests
                 + "Offending imports:\n"
                 + string.Join("\n", violations)
         );
+    }
+
+    [Fact]
+    public void BazaarAgent_hero_aliases_cross_plugins_only_through_the_game_bridge()
+    {
+        var repoRoot = RepoRoot();
+        var coreRoot = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgent");
+        var hostRoot = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost");
+        var mainRoot = MainSourceRoot(repoRoot);
+        var validator = File.ReadAllText(
+            Path.Combine(coreRoot, "Decisions", "BazaarAgentActionValidator.cs")
+        );
+        var identity = File.ReadAllText(
+            Path.Combine(mainRoot, "GameInterop", "BazaarAgent", "BazaarAgentHeroIdentity.cs")
+        );
+        var probe = File.ReadAllText(
+            Path.Combine(mainRoot, "GameInterop", "BazaarAgent", "BazaarAgentGameProbe.cs")
+        );
+        var dispatcher = File.ReadAllText(
+            Path.Combine(hostRoot, "BazaarAgentGameActionDispatcher.cs")
+        );
+        var contextReader = File.ReadAllText(
+            Path.Combine(hostRoot, "BazaarAgentGameContextReader.cs")
+        );
+        var runtimeController = File.ReadAllText(
+            Path.Combine(coreRoot, "Runtime", "BazaarAgentRuntimeController.cs")
+        );
+        var assemblyAttributes = File.ReadAllText(
+            Path.Combine(mainRoot, "Properties", "AssemblyAttributes.cs")
+        );
+
+        Assert.Contains("\"TheDragons\"", validator);
+        Assert.Contains("\"Hero8\"", validator);
+        Assert.DoesNotContain("BazaarPlusPlus.GameInterop", validator);
+        Assert.Contains("TheDragonsHeroIdentity.TryResolve", identity);
+        Assert.Contains("TheDragonsHeroIdentity.CanonicalId", identity);
+        Assert.Contains("BazaarAgentHeroIdentity.Resolve", probe);
+        Assert.Contains("_gameProbe.ResolveHero", dispatcher);
+        Assert.Contains("FailureKind: BazaarAgentDispatchFailureKind.Unavailable", dispatcher);
+        Assert.DoesNotContain("Enum.TryParse<EHero>", dispatcher);
+        Assert.Contains("gameProbe.ToAgentHeroId", contextReader);
+        Assert.DoesNotContain("Player?.Hero.ToString()", contextReader);
+        Assert.Contains(
+            "BazaarAgentDispatchFailureMapper.Map(result.FailureKind)",
+            runtimeController
+        );
+        Assert.False(File.Exists(Path.Combine(hostRoot, "BazaarAgentHeroIdentity.cs")));
+        Assert.DoesNotContain("BazaarPlusPlus.BazaarAgentHost", assemblyAttributes);
     }
 
     [Fact]
@@ -1427,6 +1693,148 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void Collection_hero_filter_is_fixed_and_later_filters_share_one_scroll_view()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "Ui",
+                "CollectionPanelView.Tree.cs"
+            )
+        );
+        var operationRail = MethodSource(
+            source,
+            "private void BuildOperationRail",
+            "private static VisualElement CreateOperationRow"
+        );
+
+        Assert.Contains(
+            "_heroFilterSection = CreateFilterSection(\n            rail,",
+            operationRail
+        );
+        Assert.Contains(
+            "_tierFilterSection = CreateFilterSection(\n            controlsScroll,",
+            operationRail
+        );
+        Assert.Contains("controlsScroll.Add(_disclaimerLabel);", operationRail);
+        Assert.Contains(
+            "_controlsDragScroller = new ScrollViewDragScroller(controlsScroll);",
+            operationRail
+        );
+        Assert.Equal(1, CountOccurrences(operationRail, "new ScrollView(ScrollViewMode.Vertical)"));
+    }
+
+    [Fact]
+    public void Collection_search_replaces_the_operation_row_and_uses_embedded_svg_icons()
+    {
+        var repoRoot = RepoRoot();
+        var mainSource = MainSourceRoot(repoRoot);
+        var treePath = Path.Combine(
+            mainSource,
+            "Game",
+            "CollectionPanel",
+            "Ui",
+            "CollectionPanelView.Tree.cs"
+        );
+        var viewPath = Path.Combine(
+            mainSource,
+            "Game",
+            "CollectionPanel",
+            "Ui",
+            "CollectionPanelView.cs"
+        );
+        var treeSource = File.ReadAllText(treePath);
+        var viewSource = File.ReadAllText(viewPath);
+        var operationRail = MethodSource(
+            treeSource,
+            "private void BuildOperationRail",
+            "private static VisualElement CreateOperationRow"
+        );
+
+        Assert.DoesNotContain("rail.Add(CreateSearchField())", operationRail);
+        Assert.Contains("_searchToggleButton = CreateSearchToggleButton();", operationRail);
+        Assert.Contains("primaryControlsRow.Add(_searchToggleButton);", operationRail);
+        Assert.Contains("_standardOperationControls", operationRail);
+        Assert.Contains("_searchInputContainer", operationRail);
+        Assert.Contains("_standardOperationControls.style.flexWrap = Wrap.NoWrap", operationRail);
+        Assert.Contains(
+            "rail.style.minWidth = Sizes.CollectionOperationRailMinWidth",
+            operationRail
+        );
+        Assert.Contains("_commands.ToggleSearch", treeSource);
+        Assert.DoesNotContain("PointerDownEvent", treeSource);
+        Assert.Contains("RegisterCallback<FocusInEvent>", treeSource);
+        Assert.Contains("RegisterCallback<FocusOutEvent>", treeSource);
+        Assert.DoesNotContain("sortGroup.style.marginTop", operationRail);
+        Assert.DoesNotContain("_dayToggleButton.style.marginTop", operationRail);
+
+        var refreshSearchMode = MethodSource(
+            viewSource,
+            "private void RefreshSearchMode(",
+            "private void ScheduleSearchFocus()"
+        );
+        Assert.Contains("SetEnabled(!model.SearchExpanded)", refreshSearchMode);
+        Assert.Contains("PickingMode.Ignore", refreshSearchMode);
+        Assert.Contains("DisplayStyle.None", refreshSearchMode);
+
+        var scheduleFocus = MethodSource(
+            viewSource,
+            "private void ScheduleSearchFocus()",
+            "private void RefreshChromeTexts("
+        );
+        Assert.Contains("_searchField.schedule.Execute", scheduleFocus);
+        Assert.Contains("_searchField.Focus();", scheduleFocus);
+        Assert.Contains("_searchField.SelectRange(end, end);", scheduleFocus);
+
+        var projectPath = Path.Combine(mainSource, "BazaarPlusPlus.csproj");
+        var project = XDocument.Load(projectPath);
+        XNamespace msbuild = project.Root?.Name.Namespace ?? XNamespace.None;
+        var embeddedResources = project
+            .Descendants(msbuild + "EmbeddedResource")
+            .Select(element => Attribute(element, "Include") ?? string.Empty)
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.Contains(@"Resources\Collection\search.svg", embeddedResources);
+        Assert.Contains(@"Resources\Collection\close.svg", embeddedResources);
+
+        var searchSvgPath = Path.Combine(mainSource, "Resources", "Collection", "search.svg");
+        var closeSvgPath = Path.Combine(mainSource, "Resources", "Collection", "close.svg");
+        foreach (var svgPath in new[] { searchSvgPath, closeSvgPath })
+        {
+            var svg = XDocument.Load(svgPath);
+            Assert.Equal("0 0 24 24", Attribute(svg.Root!, "viewBox"));
+            Assert.Equal("round", Attribute(svg.Root!, "stroke-linecap"));
+            Assert.Equal("round", Attribute(svg.Root!, "stroke-linejoin"));
+        }
+
+        Assert.DoesNotContain("Icon_RingBtn_Search_TUI", treeSource);
+        Assert.DoesNotContain("Icon_RingBtn_X_TUI", treeSource);
+    }
+
+    [Fact]
+    public void Collection_search_placeholders_are_localized_per_active_tab()
+    {
+        var textSource = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "Text",
+                "CollectionPanelText.cs"
+            )
+        );
+
+        Assert.Contains("\"Search items\"", textSource);
+        Assert.Contains("\"搜索物品\"", textSource);
+        Assert.Contains("\"搜尋物品\"", textSource);
+        Assert.Contains("\"Search skills\"", textSource);
+        Assert.Contains("\"搜索技能\"", textSource);
+        Assert.Contains("\"搜尋技能\"", textSource);
+        Assert.Contains("SearchPlaceholder(ECardType activeType)", textSource);
+    }
+
+    [Fact]
     public void Collection_title_uses_native_game_heading_typography()
     {
         var mainSource = MainSourceRoot(RepoRoot());
@@ -1438,6 +1846,9 @@ public class CoreLayeringTests
         );
         var adapterSource = File.ReadAllText(
             Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameTypography.cs")
+        );
+        var titleOverlaySource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameTitleOverlay.cs")
         );
         var colorsSource = File.ReadAllText(
             Path.Combine(mainSource, "Infrastructure", "UiTokens", "Colors.cs")
@@ -1460,6 +1871,21 @@ public class CoreLayeringTests
         Assert.Contains("NotoFontFallbackRuntime._loadedSerifPrimary", adapterSource);
         Assert.Contains("_titleOverlay.Attach(_title!)", ensureCreated);
         Assert.Contains("_titleOverlay?.SetText(model.Title)", viewSource);
+        Assert.Contains("_layoutAnchor?.schedule.Execute(SyncBounds)", titleOverlaySource);
+        Assert.Contains("if (_root.activeSelf && !_hasValidBounds)", titleOverlaySource);
+        Assert.Contains("!IsFinite(worldBound.x)", titleOverlaySource);
+        Assert.Contains("!IsFinite(worldBound.width)", titleOverlaySource);
+        Assert.Contains("!IsFinite(pixelsPerPoint)", titleOverlaySource);
+        Assert.Contains("TextOverflowModes.Masking", titleOverlaySource);
+        Assert.Contains("Mathf.Ceil(worldBound.width * pixelsPerPoint)", titleOverlaySource);
+        Assert.Contains("Mathf.Ceil(worldBound.height * pixelsPerPoint)", titleOverlaySource);
+        Assert.Contains("searchFallbacks: true", titleOverlaySource);
+        Assert.Contains("tryAddCharacter: true", titleOverlaySource);
+        Assert.Contains("_title.GetPreferredValues(_title.text)", titleOverlaySource);
+        Assert.Contains(
+            "_title.ForceMeshUpdate(ignoreActiveState: true, forceTextReparsing: true)",
+            titleOverlaySource
+        );
         Assert.Contains("FontStyle.Normal", titleStyle);
         Assert.Contains("Colors.GameTitleText", titleStyle);
         Assert.DoesNotContain("PanelFontRole.Heading", titleStyle);
@@ -1539,7 +1965,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void RandomHeroSkinPool_has_no_legacy_playerprefs_migration()
+    public void RandomHeroSkinPool_has_no_obsolete_prefix_playerprefs_migration()
     {
         var repoRoot = RepoRoot();
         var source = File.ReadAllText(
@@ -1626,7 +2052,12 @@ public class CoreLayeringTests
         Assert.Contains("ResolveAccountScopeForPrefs", heroPrefs);
         Assert.Contains("ResolveAccountScopeForPrefs", collectiblePrefs);
         Assert.Contains("collectionType.ToString()", collectiblePrefs);
-        Assert.Contains("hero.ToString()", collectiblePrefs);
+        Assert.Contains("TheDragonsHeroIdentity.ToCanonicalId(hero)", collectiblePrefs);
+        Assert.Contains("TheDragonsHeroIdentity.PersistenceReadIds(hero)", collectiblePrefs);
+        Assert.Contains(
+            "RandomHeroSkinPoolPreferenceMigration.LoadCanonicalFirst",
+            collectiblePrefs
+        );
     }
 
     [Fact]
@@ -1946,16 +2377,13 @@ public class CoreLayeringTests
         );
 
         Assert.Contains("interface IEncounterPreviewModule", moduleSource);
+        Assert.Contains("EventPreviewResult ResolveEvent(EventPreviewQuery query)", moduleSource);
         Assert.Contains(
-            "EncounterPreviewResult ResolveEvent(EventPreviewQuery query)",
+            "EventPreviewResult ResolveStep(EncounterStepPreviewQuery query)",
             moduleSource
         );
         Assert.Contains(
-            "EncounterStepPreviewResult ResolveStep(EncounterStepPreviewQuery query)",
-            moduleSource
-        );
-        Assert.Contains(
-            "LevelUpPreviewResult ResolveLevelUp(LevelUpPreviewQuery query)",
+            "EventPreviewResult ResolveLevelUp(LevelUpPreviewQuery query)",
             moduleSource
         );
         Assert.Contains("class CardAbilityValueReader", abilityReaderSource);
@@ -2545,6 +2973,30 @@ public class CoreLayeringTests
         Assert.True(end > start, $"Could not find method boundary '{endMarker}'.");
         return source.Substring(start, end - start);
     }
+
+    private static string WithoutWhitespace(string value) =>
+        string.Concat(value.Where(character => !char.IsWhiteSpace(character)));
+
+    private static int CountOccurrences(string source, string value)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = source.IndexOf(value, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += value.Length;
+        }
+
+        return count;
+    }
+
+    private static int AssignmentCount(string source, string fieldName) =>
+        System
+            .Text.RegularExpressions.Regex.Matches(
+                source,
+                $@"{System.Text.RegularExpressions.Regex.Escape(fieldName)}\s*=(?!=)"
+            )
+            .Count;
 
     private static string? Attribute(XElement element, string name) =>
         element.Attribute(name)?.Value;

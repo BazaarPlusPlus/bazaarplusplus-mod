@@ -52,6 +52,18 @@ public sealed class AggregateItemMissingTypesTextTests
     }
 
     [Fact]
+    public void Instrument_is_a_formal_aggregate_item_type()
+    {
+        Assert.Contains(ECardTag.Instrument, AggregateItemMissingTypesText.ItemTypes);
+
+        var content = AggregateItemMissingTypesText.Build(
+            AggregateItemMissingTypesText.ItemTypes.Where(tag => tag != ECardTag.Instrument)
+        );
+
+        Assert.Equal("Missing Types: Instrument", content);
+    }
+
+    [Fact]
     public void Build_localizes_the_heading_for_simplified_chinese()
     {
         L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());

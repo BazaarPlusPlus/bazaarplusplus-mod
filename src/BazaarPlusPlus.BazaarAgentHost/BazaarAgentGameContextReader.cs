@@ -234,7 +234,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             IsClientBusy = ReadClientBusy(),
             RunId = runId,
             StateName = stateName,
-            PlayerHero = run?.Player?.Hero.ToString(),
+            PlayerHero = run?.Player is { } player ? gameProbe.ToAgentHeroId(player.Hero) : null,
             Day = run == null ? null : unchecked((int)run.Day),
             Hour = run == null ? null : unchecked((int)run.Hour),
             Wins = run == null ? null : unchecked((int)run.Victories),
@@ -581,7 +581,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 
         // 1b. Continue — replay finished and awaiting the continue button. Surface it as a generic
         // Flow advance so the replay-agnostic agent can proceed; the dispatcher routes Continue to
-        // CombatReplayRuntime.TryContinueReplay (ADR-0008). No card, no target.
+        // CombatReplayRuntime.TryContinueReplay (ADR-0007). No card, no target.
         if (replayPhase == BazaarAgentReplayPhase.FinishedAwaitingContinue)
         {
             actions.Add(

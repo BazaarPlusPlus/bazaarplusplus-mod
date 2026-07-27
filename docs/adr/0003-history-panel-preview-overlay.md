@@ -12,6 +12,6 @@ The offscreen-camera prototype produced an empty texture under URP because the r
 
 ## Guardrails
 
-- `ItemBoardPreviewSurface` owns the overlay canvas ([surface](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L301-L337)). Views convert `worldBound` points to physical pixels with `scaledPixelsPerPoint` before updating the surface ([History view](../../src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs#L197-L208), [LiveBuild view](../../src/BazaarPlusPlus/Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs#L797-L803)).
+- `ItemBoardPreviewSurface` owns the overlay canvas ([surface](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L296-L337)). Views convert `worldBound` points to physical pixels with `scaledPixelsPerPoint` before updating the surface ([History view](../../src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs#L192-L206), [LiveBuild view](../../src/BazaarPlusPlus/Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs#L785-L796)).
 - Reuse the shared native-card preview host; do not create a feature-local prefab/render pipeline.
 - Do not re-propose offscreen uGUI-to-RT unless the render pipeline or Unity capability changes.

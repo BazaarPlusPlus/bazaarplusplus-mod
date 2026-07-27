@@ -182,10 +182,13 @@ Assert(
     var dataService =
         Activator.CreateInstance(dataServiceType, new object?[] { null, null })
         ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
+    // Single 7-arg ctor: (runState, dataService, replayService, serverHealthProbe?,
+    // accountLinkClient?, isBazaarDbAccountLinkAvailable?, combatReplayDirectoryPath).
+    // No ArgumentNullException guards — null-by-position is the pinned behavior anchor.
     var dependencies =
         Activator.CreateInstance(
             coordinatorDependenciesType,
-            new object?[] { null, dataService, null, null }
+            new object?[] { null, dataService, null, null, null, null, null }
         )
         ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
     var coordinator =
@@ -226,10 +229,13 @@ Assert(
     var dataService =
         Activator.CreateInstance(dataServiceType, new object?[] { null, null })
         ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
+    // Single 7-arg ctor: (runState, dataService, replayService, serverHealthProbe?,
+    // accountLinkClient?, isBazaarDbAccountLinkAvailable?, combatReplayDirectoryPath).
+    // No ArgumentNullException guards — null-by-position is the pinned behavior anchor.
     var dependencies =
         Activator.CreateInstance(
             coordinatorDependenciesType,
-            new object?[] { null, dataService, null, null }
+            new object?[] { null, dataService, null, null, null, null, null }
         )
         ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
     var coordinator =

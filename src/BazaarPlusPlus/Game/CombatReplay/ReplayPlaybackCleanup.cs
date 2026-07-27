@@ -11,20 +11,20 @@ internal readonly record struct ReplayPlaybackPublishOutcome(bool Succeeded, Exc
         new(false, exception ?? throw new ArgumentNullException(nameof(exception)));
 }
 
-internal static class ReplayPlaybackStateExitCoordinator
+/// <summary>
+/// Runtime-private cleanup runner. Each exit path keeps its own cleanup order (ADR-0009);
+/// this helper only isolates per-step failure observation so one bad cleanup cannot abort the rest.
+/// </summary>
+internal static class ReplayPlaybackCleanup
 {
-    internal static ReplayPlaybackPublishOutcome Handle(
-        bool startCoordinatorOwnsTerminal,
+    internal static ReplayPlaybackPublishOutcome PublishThenCleanup(
         Func<ReplayPlaybackPublishOutcome> publishEnded,
-        Action<ReplayPlaybackReasonCode, Exception?>? latchStartupInterruption,
         Action<string, Exception>? observeCleanupFailure,
         params ReplayPlaybackCleanupStep[] cleanupSteps
     )
     {
         if (publishEnded == null)
             throw new ArgumentNullException(nameof(publishEnded));
-        if (startCoordinatorOwnsTerminal && latchStartupInterruption == null)
-            throw new ArgumentNullException(nameof(latchStartupInterruption));
 
         ReplayPlaybackPublishOutcome ended;
         try
@@ -36,21 +36,11 @@ internal static class ReplayPlaybackStateExitCoordinator
             ended = ReplayPlaybackPublishOutcome.Failure(ex);
         }
 
-        if (startCoordinatorOwnsTerminal)
-        {
-            latchStartupInterruption!(
-                ended.Succeeded
-                    ? ReplayPlaybackReasonCode.StartException
-                    : ReplayPlaybackReasonCode.EndedPublishFailed,
-                ended.Exception
-            );
-        }
-
-        RunCleanup(observeCleanupFailure, cleanupSteps);
+        Run(observeCleanupFailure, cleanupSteps);
         return ended;
     }
 
-    internal static void RunCleanup(
+    internal static void Run(
         Action<string, Exception>? observeCleanupFailure,
         params ReplayPlaybackCleanupStep[] cleanupSteps
     )

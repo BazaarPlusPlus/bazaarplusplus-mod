@@ -15,6 +15,9 @@ var ghostBattleFilterType = RequireType(
     "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelGhostBattleFilter"
 );
 var runHeroFilterType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelRunHeroFilter");
+var heroPresentationType = RequireType(
+    "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelHeroPresentation"
+);
 var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
 var dependenciesType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelDependencies");
 var dataServiceType = RequireType(
@@ -23,6 +26,13 @@ var dataServiceType = RequireType(
 
 TestRunHeroFilterShowsAllWhenEmpty();
 TestRunHeroFilterMatchesCaseInsensitiveHeroOnly();
+TestRunHeroFilterMatchesLegacyOnlyHistory();
+TestRunHeroFilterMatchesCanonicalOnlyHistory();
+TestRunHeroFilterMatchesMixedAliasHistoryWithoutRewritingRecords();
+TestRunHeroFilterRejectsHistoryWithoutTheDragons();
+TestRunHeroRosterAddsOneCanonicalTheDragonsAfterTheExistingSeven();
+TestRunHeroPresentationTreatsAliasesAsSelectedAndDisplaysCanonicalName();
+TestCoordinatorCanonicalizesAliasFilterState();
 TestStateSelectedRunUsesFilteredRunList();
 TestCoordinatorRunSelectionUsesFilteredSpace();
 TestGhostDayFilterRequiresDayTenOrLaterAndKeepsOutcomeFilter();
@@ -44,6 +54,138 @@ void TestRunHeroFilterMatchesCaseInsensitiveHeroOnly()
 
     Assert(RunHeroMatches("vanessa", vanessa), "Hero matching should ignore case.");
     Assert(!RunHeroMatches("Vanessa", mak), "Hero filter should exclude other heroes.");
+}
+
+void TestRunHeroFilterMatchesLegacyOnlyHistory()
+{
+    var legacy = CreateRun("legacy", "Hero8");
+
+    Assert(
+        RunHeroMatches("TheDragons", legacy),
+        "The canonical filter should include legacy-only The Dragons history."
+    );
+}
+
+void TestRunHeroFilterMatchesCanonicalOnlyHistory()
+{
+    var canonical = CreateRun("canonical", "TheDragons");
+
+    Assert(
+        RunHeroMatches("Hero8", canonical),
+        "The legacy filter input should include canonical-only The Dragons history."
+    );
+}
+
+void TestRunHeroFilterMatchesMixedAliasHistoryWithoutRewritingRecords()
+{
+    var legacy = CreateRun("legacy", "Hero8");
+    var canonical = CreateRun("canonical", "TheDragons");
+    var records = new[] { legacy, canonical };
+
+    var matches = records.Where(run => RunHeroMatches("TheDragons", run)).ToArray();
+
+    Assert(matches.Length == 2, "A canonical filter should include both alias forms.");
+    Assert(GetString(legacy, "Hero") == "Hero8", "Filtering must not rewrite the legacy run hero.");
+    Assert(
+        GetString(canonical, "Hero") == "TheDragons",
+        "Filtering must not rewrite the canonical run hero."
+    );
+}
+
+void TestRunHeroFilterRejectsHistoryWithoutTheDragons()
+{
+    var vanessa = CreateRun("vanessa", "Vanessa");
+
+    Assert(
+        !RunHeroMatches("TheDragons", vanessa),
+        "The Dragons filter should reject history with no matching alias."
+    );
+}
+
+void TestRunHeroRosterAddsOneCanonicalTheDragonsAfterTheExistingSeven()
+{
+    var roster = (IEnumerable)
+        heroPresentationType
+            .GetProperty(
+                "RunFilterHeroIds",
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+            )!
+            .GetValue(null)!;
+    var heroIds = roster.Cast<string>().ToArray();
+
+    Assert(
+        heroIds.SequenceEqual([
+            "Vanessa",
+            "Pygmalien",
+            "Dooley",
+            "Mak",
+            "Jules",
+            "Karnok",
+            "Stelle",
+            "TheDragons",
+        ]),
+        "History should preserve the existing seven hero order and append one canonical The Dragons chip."
+    );
+    Assert(
+        heroIds.Count(hero => hero == "TheDragons") == 1,
+        "History should expose exactly one canonical The Dragons chip."
+    );
+    Assert(
+        !heroIds.Contains("Hero8"),
+        "History should never expose a separate legacy The Dragons chip."
+    );
+}
+
+void TestRunHeroPresentationTreatsAliasesAsSelectedAndDisplaysCanonicalName()
+{
+    Assert(
+        (bool)InvokeStatic(heroPresentationType, "IsSelected", "Hero8", "TheDragons")!,
+        "A canonical chip should stay selected for legacy filter state."
+    );
+    Assert(
+        (bool)InvokeStatic(heroPresentationType, "IsSelected", "TheDragons", "Hero8")!,
+        "Alias-selected state should be symmetric."
+    );
+    Assert(
+        (string)InvokeStatic(heroPresentationType, "DisplayName", "Hero8")! == "The Dragons",
+        "Legacy history should display the canonical native The Dragons name."
+    );
+    Assert(
+        (string)InvokeStatic(heroPresentationType, "DisplayName", "TheDragons")! == "The Dragons",
+        "Canonical history should display the native The Dragons name."
+    );
+}
+
+void TestCoordinatorCanonicalizesAliasFilterState()
+{
+    var state =
+        Activator.CreateInstance(stateType)
+        ?? throw new InvalidOperationException("HistoryPanelState should construct.");
+    var dataService = Construct(dataServiceType, null, null);
+    // Single 7-arg ctor arity match (issue #167): runState, dataService, replayService,
+    // serverHealthProbe, accountLinkClient, isBazaarDbAccountLinkAvailable, combatReplayDirectoryPath.
+    var dependencies = Construct(dependenciesType, null, dataService, null, null, null, null, null);
+    var coordinator =
+        Activator.CreateInstance(
+            coordinatorType,
+            state,
+            dependencies,
+            (Action)(() => { }),
+            (Action)(() => { }),
+            (Action<bool>)(_ => { })
+        ) ?? throw new InvalidOperationException("HistoryPanelCoordinator should construct.");
+
+    Invoke(coordinatorType, coordinator, "SetRunHeroFilter", "Hero8");
+    Assert(
+        GetNullableString(state, "SelectedRunHero") == "TheDragons",
+        "Legacy filter input should persist as canonical History UI state."
+    );
+
+    Invoke(coordinatorType, coordinator, "SetRunHeroFilter", "TheDragons");
+    Assert(
+        GetNullableString(state, "SelectedRunHero") == null,
+        "Selecting either alias again should toggle the canonical filter off."
+    );
 }
 
 void TestStateSelectedRunUsesFilteredRunList()
@@ -70,7 +212,9 @@ void TestCoordinatorRunSelectionUsesFilteredSpace()
     stateType.GetProperty("SelectedRunHero")!.SetValue(state, "Vanessa");
 
     var dataService = Construct(dataServiceType, null, null);
-    var dependencies = Construct(dependenciesType, null, dataService, null, null);
+    // Single 7-arg ctor arity match (issue #167): runState, dataService, replayService,
+    // serverHealthProbe, accountLinkClient, isBazaarDbAccountLinkAvailable, combatReplayDirectoryPath.
+    var dependencies = Construct(dependenciesType, null, dataService, null, null, null, null, null);
     var coordinator =
         Activator.CreateInstance(
             coordinatorType,
@@ -241,6 +385,14 @@ string? GetString(object? instance, string propertyName) =>
         instance?.GetType().GetProperty(propertyName)?.GetValue(instance)
         ?? throw new InvalidOperationException($"{propertyName} should exist.")
     );
+
+string? GetNullableString(object instance, string propertyName)
+{
+    var property =
+        instance.GetType().GetProperty(propertyName)
+        ?? throw new InvalidOperationException($"{propertyName} should exist.");
+    return (string?)property.GetValue(instance);
+}
 
 Type RequireType(string fullName) =>
     modAssembly.GetType(fullName)

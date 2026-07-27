@@ -45,6 +45,8 @@ dotnet run --project tests\ChoiceScreenPedestalResolver.Tests\ChoiceScreenPedest
 
 When building from an isolated ticket worktree, explicitly pass `-p:BPPInstallerSourcePath="<absolute-path-to>/bazaarplusplus-installer/src-tauri/resources"` to projects that reference the main mod. The default sibling installer path does not exist beside ticket worktrees.
 
+When running `./run.sh test` (full suite) from an isolated worktree, `run.sh` does not forward `-p:` properties, and injecting `BPPInstallerSourcePath` via environment variable also has no effect — create a `bazaarplusplus-installer` symlink in the worktree's parent directory pointing at the real installer repo. Each new worktree also needs `ln -sfn <main-checkout>/decompiled <worktree>/decompiled` (`decompiled/` is a gitignored local artifact; `NativeCardPreviewCompatibility.Tests` hard-depends on it). Missing either link surfaces as MSB3030 or a missing decompiled source file — easy to misread as a code regression.
+
 Test projects under `tests/` are split per-feature. Some use xUnit + `Microsoft.NET.Test.Sdk` (run via `dotnet test`), others are executable (run via `dotnet run --project`). Check whether the csproj has `Microsoft.NET.Test.Sdk` to determine which.
 
 When changing a direct dependency, edit `Directory.Packages.props`, run `./run.sh restore-locks`, and review the six changed `src/**/packages.lock.json` files with the version change. Do not generate lock files for test projects. Before committing, run `./run.sh restore-locked` so dependency graph drift fails locally, then run the standard build and test commands.
@@ -54,6 +56,8 @@ When changing a direct dependency, edit `Directory.Packages.props`, run `./run.s
 This mod is a **BepInEx 5.x plugin** (`BepInEx.Core` 5.\*). At runtime, BepInEx writes all console output to disk at `<GameDir>\BepInEx\LogOutput.log` — the sibling of the `BepInEx\plugins\` folder the build copies into. To debug, read that file; mod log lines are structured events shaped `[BPP][<Scope>] event=<id> field=value ...` (logged via `BppLog` → BepInEx `ManualLogSource`). `Debug`-level events only emit from Debug builds; `Info`/`Warning`/`Error` always emit.
 
 For runtime validation that needs launching the game, always launch The Bazaar through Steam (App ID 1617400) so Steam runtime state is present. On macOS: `open "steam://run/1617400"`. On Windows: `start steam://run/1617400`. Do not launch `TheBazaar.app` directly or use `run_bepinex.sh` on macOS — these bypass Steam runtime and cause subtle failures.
+
+BazaarAgent replay smoke has three traps: `POST /v1/replay/record` accepts only the raw bytes of `GhostBattlePayloads/*.ghost.mpack.gz` (`CombatReplays/*.payload.mpack.gz` fails with missing battle manifest); `POST /v1/replay/continue` must send an empty body (`curl --data ''`, else HttpListener returns 411 Length Required); terminal replay log events lag the menu return by several seconds — poll, do not assert immediately. Before smoking, check the timestamp on `BepInEx/plugins/BazaarPlusPlus.version` so the game is running this build.
 
 ## Architecture
 
@@ -77,6 +81,7 @@ Structure lives in `docs/ARCHITECTURE.md`; durable knowledge in `docs/MEMORY.md`
 - When replacing a subsystem or migrating to a prototype, remove the old implementation entirely and ship only the new version in-place — do not leave the old path as a fallback or stand up a merged build chain that runs both
 - Do not build standalone probe/diagnostic scaffolding to validate a hypothesis — add a temporary probe on the main path (the user builds + reloads to verify), or drop it and record it as a to-verify item in the design doc, then ship
 - When CJK text renders as tofu boxes, route the text to a CJK-capable font; do not "fix" it by editing the copy
+- When a degradation event is categorized, include the category field in its `BppLogStormPolicy` key; otherwise one category's failure can suppress later categories' logs during the storm window
 - Touch only the named target of a delete/change request; do not opportunistically widen scope or adjust unrelated config
 - Reuse the game's native UI components and the codebase's established prior-art patterns  instead of hand-rolling a new render/upload chain
 - After invoking a native Unity `Button.onClick` programmatically, verify the expected game-state transition before treating the action as successful — native listeners may return silently through interaction gates such as `AllowInteraction` without throwing

@@ -256,8 +256,11 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             return;
         }
 
-        var dispatchErrorBody = BuildDispatchErrorBody(result.Error);
-        pending.SetResponse(new BazaarAgentServerResponse(500, dispatchErrorBody));
+        var failureResponse = BazaarAgentDispatchFailureMapper.Map(result.FailureKind);
+        var dispatchErrorBody = BuildDispatchErrorBody(failureResponse.ErrorCode, result.Error);
+        pending.SetResponse(
+            new BazaarAgentServerResponse(failureResponse.HttpStatus, dispatchErrorBody)
+        );
         if (
             result.Diagnostic == BazaarAgentDispatchDiagnostic.DispatcherException
             && result.DiagnosticException is { } diagnosticException
@@ -282,9 +285,9 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         );
     }
 
-    private string BuildDispatchErrorBody(string? details)
+    private string BuildDispatchErrorBody(string errorCode, string? details)
     {
-        var envelope = new Dictionary<string, object?> { ["error"] = "internal" };
+        var envelope = new Dictionary<string, object?> { ["error"] = errorCode };
         if (details is not null)
             envelope["details"] = details;
         return JsonConvert.SerializeObject(envelope, _responseJson);

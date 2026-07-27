@@ -79,7 +79,8 @@
         "Karnok",
         "Mak",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells Crit items from any Hero",
       "portraitTemplateId": "f22fd14f-7e00-40cb-9e44-a46f34d64764",
@@ -286,7 +287,8 @@
         "Mak",
         "Pygmalien",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells items from this Hero",
       "portraitTemplateId": "4580fb31-b2ea-4f9b-9ab9-2979602f83d8",
@@ -523,7 +525,8 @@
         "Jules",
         "Karnok",
         "Mak",
-        "Pygmalien"
+        "Pygmalien",
+        "TheDragons"
       ],
       "description": "Sells Heal and Regen items",
       "portraitTemplateId": "2708055d-a8be-4c2f-a8d6-574e884a254e",
@@ -589,7 +592,8 @@
         "Mak",
         "Pygmalien",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells items from this Hero",
       "portraitTemplateId": "7fdc233f-b81f-4216-a646-4c807c2240da",
@@ -611,7 +615,7 @@
       "kind": "Merchant",
       "group": "other-hero",
       "order": 7,
-      "name": "Stickybeans",
+      "name": "The Dragons",
       "availableHeroes": [
         "Vanessa",
         "Dooley",
@@ -620,6 +624,37 @@
         "Mak",
         "Stelle",
         "Jules"
+      ],
+      "description": "Sells items from this Hero",
+      "portraitTemplateId": "85cdd52b-12c2-4b64-b308-a5788f791b81",
+      "sourceTemplateIds": [
+        "85cdd52b-12c2-4b64-b308-a5788f791b81"
+      ],
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "TheDragons"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "Merchant",
+      "group": "other-hero",
+      "order": 8,
+      "name": "Stickybeans",
+      "availableHeroes": [
+        "Vanessa",
+        "Dooley",
+        "Pygmalien",
+        "Karnok",
+        "Mak",
+        "Stelle",
+        "Jules",
+        "TheDragons"
       ],
       "description": "Sells items from other Heroes",
       "portraitTemplateId": "d0276b47-be8a-4bbc-ab55-9f92b352480a",
@@ -647,7 +682,8 @@
         "Mak",
         "Pygmalien",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells items from this Hero",
       "portraitTemplateId": "379d881b-4524-4db9-a606-47bd35749f44",
@@ -676,7 +712,8 @@
         "Karnok",
         "Pygmalien",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells Health and Shield items",
       "portraitTemplateId": "a4fa13f8-6beb-4b6c-839b-60af167628d9",
@@ -820,7 +857,8 @@
         "Karnok",
         "Pygmalien",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells items from this Hero",
       "portraitTemplateId": "4475cff5-6105-4f4a-978c-b282e36173eb",
@@ -1065,7 +1103,8 @@
         "Karnok",
         "Mak",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells items from this Hero",
       "portraitTemplateId": "f9074804-1812-445a-8688-b8c86f9c7711",
@@ -1195,7 +1234,8 @@
         "Karnok",
         "Mak",
         "Pygmalien",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells items from this Hero",
       "portraitTemplateId": "e48b3243-1e7e-4a97-bf4f-0699fd0b4616",
@@ -1268,7 +1308,8 @@
       "name": "The Tester",
       "availableHeroes": [
         "Dooley",
-        "Stelle"
+        "Stelle",
+        "TheDragons"
       ],
       "description": "Sells your Hero's Tech items",
       "portraitTemplateId": "41cdf4ee-7790-4da1-96f8-a46d3391a0d9",
@@ -1325,7 +1366,8 @@
         "Karnok",
         "Mak",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells Haste, Slow and Cooldown items",
       "portraitTemplateId": "3e871bbb-fb25-417f-8643-cb43456c3fc7",
@@ -1379,7 +1421,8 @@
         "Karnok",
         "Mak",
         "Pygmalien",
-        "Stelle"
+        "Stelle",
+        "TheDragons"
       ],
       "description": "Sells items from this Hero",
       "portraitTemplateId": "580ba494-a852-4d80-a82d-5cd66fcfd2f3",
@@ -1539,7 +1582,8 @@
         "Jules",
         "Karnok",
         "Pygmalien",
-        "Stelle"
+        "Stelle",
+        "TheDragons"
       ],
       "description": "Teaches Shield skills",
       "portraitTemplateId": "d3a78867-fd60-4a67-b03a-4200ba58674c",
@@ -1587,6 +1631,30 @@
     {
       "kind": "Trainer",
       "group": "trainer",
+      "order": 7,
+      "name": "Mama Bear",
+      "availableHeroes": [
+        "TheDragons"
+      ],
+      "description": "Teaches skills unique to The Dragons",
+      "portraitTemplateId": "386dd351-d08e-49a5-9a38-52c4e73d45b2",
+      "sourceTemplateIds": [
+        "386dd351-d08e-49a5-9a38-52c4e73d45b2"
+      ],
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "FixedHero",
+            "hero": "TheDragons"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "Trainer",
+      "group": "trainer",
       "order": 17,
       "name": "Malafang",
       "availableHeroes": [
@@ -1596,7 +1664,8 @@
         "Mak",
         "Pygmalien",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Teaches Burn skills",
       "portraitTemplateId": "294f81dd-eb9f-47a9-9b9c-fa9766291485",
@@ -1801,7 +1870,8 @@
         "Jules",
         "Karnok",
         "Mak",
-        "Pygmalien"
+        "Pygmalien",
+        "TheDragons"
       ],
       "description": "Teaches Health, Heal and Regen skills",
       "portraitTemplateId": "b46b862e-ba64-4e05-ad5e-b8dbc90517c9",
@@ -1862,7 +1932,8 @@
         "Karnok",
         "Mak",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Teaches Slow skills",
       "portraitTemplateId": "18f8471a-3914-419a-9296-14e624e86ac6",
@@ -1917,7 +1988,8 @@
         "Jules",
         "Karnok",
         "Mak",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Teaches Crit skills",
       "portraitTemplateId": "922b9031-c859-479c-95c4-18234a366c63",
@@ -1949,7 +2021,8 @@
         "Karnok",
         "Mak",
         "Stelle",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Teaches Haste and Charge skills",
       "portraitTemplateId": "86907ad1-f67a-48db-ac30-e5afe2de237a",

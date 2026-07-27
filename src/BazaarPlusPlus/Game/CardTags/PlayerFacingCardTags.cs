@@ -31,5 +31,6 @@ internal static class PlayerFacingCardTags
         ECardTag.Merchant,
         ECardTag.Property,
         ECardTag.Loot,
+        ECardTag.Instrument,
     };
 }

@@ -12,7 +12,7 @@ The code is the source of truth. Current implementation guidance lives in one ar
 
 ## Decision records (`adr/`)
 
-ADRs retain only the decision, its load-bearing rationale, guardrails, and current code evidence. They may be corrected or compressed during consolidation when the code has drifted. Superseded ADRs are collapsed into their successors (ADR-0005 lives on inside ADR-0006); retired files remain recoverable from git history and numbering is never reused.
+ADRs retain only the decision, its load-bearing rationale, guardrails, and current code evidence. They may be corrected or compressed during consolidation when the code has drifted. Superseded or absorbable ADRs are collapsed into the surviving record (ADR-0005 lives on inside ADR-0006; ADR-0008 inside ADR-0007); retired files remain recoverable from git history and numbering is never reused.
 
 | Path | Topic | Status |
 |---|---|---|
@@ -21,9 +21,10 @@ ADRs retain only the decision, its load-bearing rationale, guardrails, and curre
 | [adr/0003](adr/0003-history-panel-preview-overlay.md) | HistoryPanel ScreenSpaceOverlay preview | accepted |
 | [adr/0004](adr/0004-preview-visibility-three-state-mode.md) | three-state preview visibility | accepted |
 | [adr/0006](adr/0006-bazaaragent-as-its-own-plugin.md) | BazaarAgent as its own plugin (absorbs 0005) | accepted |
-| [adr/0007](adr/0007-bazaaragent-external-replay-video-recording.md) | external replay video recording | accepted |
-| [adr/0008](adr/0008-replay-continue-as-agent-action.md) | replay continue as agent `Continue` action | accepted |
+| [adr/0007](adr/0007-bazaaragent-external-replay-video-recording.md) | explicit replay exit: primitive endpoints + agent `Continue` action (absorbs 0008) | accepted |
 | [adr/0009](adr/0009-preserve-behavior-specific-boundaries.md) | rejected cosmetic unifications / preserved behavior boundaries | accepted |
+| [adr/0010](adr/0010-merged-destroy-collection-filter.md) | one Destroy chip covers the destroy-mechanic cluster | accepted |
+| [adr/0011](adr/0011-pure-decision-cores-for-timing-invariants.md) | timing invariants in pure decision cores, not MonoBehaviour glue | accepted |
 
 ## Future Work
 
