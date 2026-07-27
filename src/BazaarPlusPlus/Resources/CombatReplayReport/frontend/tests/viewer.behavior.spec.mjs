@@ -2194,8 +2194,8 @@ test("scopes the inspector to the exact clicked cluster", async ({
     };
   });
   expect(inspectorGeometry.inspectorWidth).toBeGreaterThanOrEqual(320);
-  expect(inspectorGeometry.inspectorWidth).toBeLessThanOrEqual(420);
-  expect(inspectorGeometry.headerHeight).toBeLessThanOrEqual(64);
+  expect(inspectorGeometry.inspectorWidth).toBeLessThanOrEqual(361);
+  expect(inspectorGeometry.headerHeight).toBeLessThanOrEqual(56);
   expect(inspectorGeometry.popoverLeft).toBeGreaterThanOrEqual(0);
   expect(inspectorGeometry.popoverTop).toBeGreaterThanOrEqual(0);
   expect(inspectorGeometry.popoverRight).toBeLessThanOrEqual(
@@ -2215,6 +2215,21 @@ test("scopes the inspector to the exact clicked cluster", async ({
   await expect(page.getByTestId("timeline-lane-1")).toHaveClass(
     /is-related-source/u,
   );
+  await expect(page.getByTestId("timeline-tooltip")).toBeHidden();
+  const canvasBoundsWithPopover = await canvas.boundingBox();
+  expect(canvasBoundsWithPopover).not.toBeNull();
+  await page.mouse.move(
+    canvasBoundsWithPopover.x + canvasBoundsWithPopover.width * 0.75,
+    canvasBoundsWithPopover.y + 3.5 * 52 - 9,
+  );
+  await expect(page.getByTestId("timeline-tooltip")).toBeHidden();
+
+  await page.getByTestId("frame-inspector-close").click();
+  await expect(page.getByTestId("frame-inspector")).toBeHidden();
+  await expect(page.getByTestId("frame-inspector-popover")).toBeHidden();
+  await expect(page.getByTestId("timeline-lane-1")).not.toHaveClass(
+    /is-related-source/u,
+  );
 
   await clickCluster(3.5 * 52 + 9, "1 events");
   await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
@@ -2228,7 +2243,25 @@ test("scopes the inspector to the exact clicked cluster", async ({
     "data-bpp-event-id",
     "dense-heal",
   );
-  await expect(page.getByTestId("frame-event-total")).toHaveText("1 events");
+  await expect(page.getByTestId("frame-event-total")).toHaveText("1 event");
+  await expect(
+    page
+      .getByTestId("focused-cluster-group")
+      .locator('[data-slot="accordion-trigger"]'),
+  ).toHaveCount(0);
+  const popoverMotion = await page
+    .getByTestId("frame-inspector-popover")
+    .evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        animationDuration: style.animationDuration,
+        animationName: style.animationName,
+      };
+    });
+  expect(popoverMotion.animationName).not.toBe("none");
+  expect(Number.parseFloat(popoverMotion.animationDuration)).toBeGreaterThanOrEqual(
+    0.15,
+  );
   await expect(page.getByTestId("event-source-entity")).toContainText(
     "Practice Shield",
   );
@@ -2484,6 +2517,7 @@ test("virtualizes the footer combat log and highlights every visible row from th
       '[data-bpp-test-id="combat-log-entry"][data-bpp-same-frame="true"]',
     ),
   ).toHaveCount(sameFrameHighlight.count);
+  await expect(page.getByTestId("frame-inspector-popover")).toBeVisible();
 
   const viewport = page.getByTestId("combat-log-viewport");
   const pinnedScrollTop = await viewport.evaluate((element) =>
@@ -2492,7 +2526,7 @@ test("virtualizes the footer combat log and highlights every visible row from th
   const ruler = page.getByTestId("timeline-ruler-canvas");
   const rulerBounds = await ruler.boundingBox();
   expect(rulerBounds).not.toBeNull();
-  await ruler.evaluate((element) => {
+  const previewAtRulerEnd = () => ruler.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
     element.dispatchEvent(new PointerEvent("pointermove", {
       bubbles: true,
@@ -2500,6 +2534,16 @@ test("virtualizes the footer combat log and highlights every visible row from th
       clientY: bounds.top + bounds.height * 0.5,
     }));
   });
+  await previewAtRulerEnd();
+  await expect(log).toHaveAttribute("data-bpp-follow-source", "pinned");
+  await expect(activeEntry).toHaveAttribute("data-index", selectedIndex);
+  expect(await viewport.evaluate((element) => element.scrollTop)).toBe(
+    pinnedScrollTop,
+  );
+
+  await page.getByTestId("frame-inspector-close").click();
+  await expect(page.getByTestId("frame-inspector-popover")).toBeHidden();
+  await previewAtRulerEnd();
   await expect(log).toHaveAttribute("data-bpp-follow-source", "hover");
   await expect(activeEntry).not.toHaveAttribute("data-index", selectedIndex);
   await expect
@@ -2533,7 +2577,7 @@ test("virtualizes the footer combat log and highlights every visible row from th
     )
     .toBe(true);
   await ruler.dispatchEvent("pointerout");
-  await expect(activeEntry).toHaveAttribute("data-index", selectedIndex);
+  await expect(activeEntry).toHaveAttribute("data-bpp-combat-ms", "2000");
 
   const scrollGeometry = await viewport.evaluate((element) => ({
     clientHeight: element.clientHeight,
@@ -2590,7 +2634,7 @@ test("keeps direct freeze applications in the combat log without countdown tick 
   await expect(detailRows.nth(1)).toContainText("Cash Cannon");
   await expect(page.getByTestId("frame-inspector-popover")).toBeVisible();
   await detailRows.nth(0).click();
-  await expect(page.getByTestId("frame-event-total")).toHaveText("1 events");
+  await expect(page.getByTestId("frame-event-total")).toHaveText("1 event");
   await expect(page.getByTestId("combat-log")).not.toContainText("-50ms");
 });
 

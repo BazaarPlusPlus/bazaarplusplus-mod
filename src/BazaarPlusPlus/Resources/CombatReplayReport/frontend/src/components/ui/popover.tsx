@@ -31,8 +31,8 @@ function PopoverContent({
         align={align}
         className={cn(
           "z-100 w-80 origin-(--radix-popover-content-transform-origin) rounded-panel border border-border bg-popover p-3 text-body text-popover-foreground shadow-float outline-none",
-          "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 motion-reduce:animate-none",
-          "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+          "fill-mode-both data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:animation-duration-200 data-[state=closed]:animation-duration-150 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-98 data-[state=closed]:zoom-out-98 data-[state=open]:ease-out data-[state=closed]:ease-in data-[state=closed]:pointer-events-none motion-reduce:animate-none",
+          "data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1",
           className,
         )}
         data-slot="popover-content"

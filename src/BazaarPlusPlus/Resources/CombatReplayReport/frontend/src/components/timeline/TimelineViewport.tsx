@@ -131,6 +131,7 @@ export function TimelineViewport({
     canvas: HTMLCanvasElement,
     clientX: number,
   ): void => {
+    if (state.inspectorOpen) return;
     const combatMs = combatMsAtPointer(
       canvas,
       clientX,
@@ -186,7 +187,7 @@ export function TimelineViewport({
             }}
             onPointerLeave={clearPreview}
             onPointerMove={(event) => {
-              if (!refs.stateCanvas.current) return;
+              if (state.inspectorOpen || !refs.stateCanvas.current) return;
               previewAtPointer(refs.stateCanvas.current, event.clientX);
             }}
             ref={refs.stateCanvas}
@@ -211,7 +212,7 @@ export function TimelineViewport({
             }
             onPointerLeave={clearPreview}
             onPointerMove={(event) => {
-              if (!refs.ruler.current) return;
+              if (state.inspectorOpen || !refs.ruler.current) return;
               previewAtPointer(refs.ruler.current, event.clientX);
             }}
             ref={refs.ruler}
@@ -261,9 +262,10 @@ export function TimelineViewport({
               refs.controller.current?.handlePointerDown(event.nativeEvent)
             }
             onPointerLeave={clearPreview}
-            onPointerMove={(event) =>
-              refs.controller.current?.handlePointerMove(event.nativeEvent)
-            }
+            onPointerMove={(event) => {
+              if (state.inspectorOpen) return;
+              refs.controller.current?.handlePointerMove(event.nativeEvent);
+            }}
             ref={refs.eventCanvas}
             role="img"
           />
@@ -313,7 +315,7 @@ export function TimelineViewport({
             }}
             onPointerLeave={clearPreview}
             onPointerMove={(event) => {
-              if (pinnedHeroLane === null) return;
+              if (state.inspectorOpen || pinnedHeroLane === null) return;
               refs.controller.current?.handleStickyHeroPointerMove(
                 event.nativeEvent,
                 event.currentTarget,

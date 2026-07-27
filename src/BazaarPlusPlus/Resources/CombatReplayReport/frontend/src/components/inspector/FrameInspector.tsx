@@ -1,4 +1,4 @@
-import { ArrowRight, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   useEffect,
   useLayoutEffect,
@@ -122,11 +122,11 @@ function EventRow({
   const amount = eventAmount(event);
   return (
     <article
-      className="border-b border-border/45 bg-brand-soft/7 px-3 py-2 shadow-[inset_2px_0_0_var(--color-brand-soft)] last:border-b-0"
+      className="border-b border-border/45 bg-surface-raised/45 px-2.5 py-2 last:border-b-0"
       data-bpp-event-id={event.id}
       data-bpp-test-id="focused-cluster-event"
     >
-      <div className="flex min-h-control-xs items-center gap-2">
+      <div className="flex min-h-control-xs items-center gap-1.5">
         {event.icon ? (
           <img alt="" className="size-icon-md object-contain" src={event.icon} />
         ) : (
@@ -146,29 +146,25 @@ function EventRow({
           </strong>
         )}
       </div>
-      <div
-        className="mt-1.5 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2"
+      <dl
+        className="mt-1.5 grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-2 gap-y-1"
         data-bpp-test-id="frame-event-relation"
       >
-        <div className="min-w-0">
-          <span className="mb-0.5 block text-nano font-medium uppercase tracking-wide text-muted-foreground/80">
-            {t("source")}
-          </span>
+        <dt className="text-nano font-medium uppercase tracking-wide text-muted-foreground/80">
+          {t("source")}
+        </dt>
+        <dd className="min-w-0">
           <EntityReference
             entityById={entityById}
             entityId={sourceId}
             fallback={t("sourceNotRecorded")}
             testId="event-source-entity"
           />
-        </div>
-        <ArrowRight
-          aria-hidden="true"
-          className="mt-4 size-icon-sm shrink-0 text-brand-soft/70"
-        />
-        <div className="min-w-0">
-          <span className="mb-0.5 block text-nano font-medium uppercase tracking-wide text-muted-foreground/80">
-            {t("target")}
-          </span>
+        </dd>
+        <dt className="text-nano font-medium uppercase tracking-wide text-muted-foreground/80">
+          {t("target")}
+        </dt>
+        <dd className="min-w-0">
           <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-1">
             {targetIds.length > 0 ? (
               targetIds.map((targetId) => (
@@ -189,20 +185,24 @@ function EventRow({
               />
             )}
           </span>
-        </div>
-      </div>
-      {event.triggerSourceId
-        && event.triggerSourceId !== event.sourceId && (
-          <div className="mt-1 flex min-w-0 items-center gap-1.5 pl-0.5 text-nano text-muted-foreground">
-            <span className="shrink-0">{t("triggerSource")}</span>
-            <EntityReference
-              entityById={entityById}
-              entityId={event.triggerSourceId}
-              fallback={t("sourceNotRecorded")}
-              testId="event-trigger-source-entity"
-            />
-          </div>
-        )}
+        </dd>
+        {event.triggerSourceId
+          && event.triggerSourceId !== event.sourceId && (
+            <>
+              <dt className="text-nano font-medium uppercase tracking-wide text-muted-foreground/80">
+                {t("triggerSource")}
+              </dt>
+              <dd className="min-w-0">
+                <EntityReference
+                  entityById={entityById}
+                  entityId={event.triggerSourceId}
+                  fallback={t("sourceNotRecorded")}
+                  testId="event-trigger-source-entity"
+                />
+              </dd>
+            </>
+          )}
+      </dl>
     </article>
   );
 }
@@ -261,43 +261,60 @@ export function FrameInspector({
     if (viewport) viewport.scrollTop = 0;
   }, [entityId, focusKey, frame]);
   const first = events[0];
+  const eventCountLabel = `${events.length} ${
+    events.length === 1 ? t("eventSingular") : t("event")
+  }`;
+  const renderGroupEvents = (
+    group: (typeof groups)[number],
+  ): React.JSX.Element[] =>
+    mergeInspectorEvents(group.events.slice(0, limit)).map((merged) => (
+      <EventRow
+        entityById={entityById}
+        event={merged.event}
+        key={merged.key}
+        mergedCount={merged.count}
+        mergedTargets={merged.targetIds}
+        t={t}
+      />
+    ));
+  const singleGroup = groups.length === 1 ? groups[0] : undefined;
 
   return (
     <div
-      className="flex max-h-[min(34rem,calc(100vh-2rem))] min-h-0 w-full flex-col overflow-hidden bg-popover"
+      className="flex max-h-[min(32rem,calc(100vh-2rem))] min-h-0 w-full flex-col overflow-hidden bg-popover"
       data-bpp-test-id="frame-inspector"
       ref={inspectorRef}
     >
       <header
-        className="shrink-0 border-b border-border/70 px-3 py-1.5"
+        className="shrink-0 border-b border-border/70 px-2.5 py-2"
         data-bpp-test-id="frame-inspector-header"
       >
-        <div className="flex items-start gap-2">
+        <div className="flex items-center gap-2">
           {inspectedEntity && (
             <EntityArt entity={inspectedEntity} size="compact" />
           )}
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <h2
-                className="truncate text-body font-semibold text-foreground"
-                data-bpp-test-id="frame-inspector-entity"
-              >
-                {inspectedEntity?.name || t("frameEvents")}
-              </h2>
-              {inspectedEntity && (
-                <Badge
-                  className="px-1.5 font-normal"
-                  data-bpp-test-id="frame-inspector-entity-type"
-                  variant="outline"
-                >
-                  {entityTypeLabel(inspectedEntity.type, t)}
-                </Badge>
-              )}
-            </div>
+            <h2
+              className="truncate text-body font-semibold text-foreground"
+              data-bpp-test-id="frame-inspector-entity"
+            >
+              {inspectedEntity?.name || t("frameEvents")}
+            </h2>
             <div
-              className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-micro text-muted-foreground"
+              className="mt-0.5 flex min-w-0 items-center gap-1.5 text-micro text-muted-foreground"
               data-bpp-test-id="frame-inspector-meta"
             >
+              {inspectedEntity && (
+                <>
+                  <span
+                    className="truncate"
+                    data-bpp-test-id="frame-inspector-entity-type"
+                  >
+                    {entityTypeLabel(inspectedEntity.type, t)}
+                  </span>
+                  <span aria-hidden="true">·</span>
+                </>
+              )}
               <span data-bpp-test-id="frame-inspector-time">
                 {first ? formatDuration(first.combatMs) : "—"}
               </span>
@@ -305,13 +322,25 @@ export function FrameInspector({
               <span data-bpp-test-id="frame-inspector-frame">
                 {frame === null ? "—" : `${t("frame")} ${frame}`}
               </span>
-              <span aria-hidden="true">·</span>
-              <span
-                className="text-foreground/85"
-                data-bpp-test-id="frame-event-total"
-              >
-                {events.length} {t("event")}
-              </span>
+              {events.length > 1 && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span
+                    className="truncate text-foreground/85"
+                    data-bpp-test-id="frame-event-total"
+                  >
+                    {eventCountLabel}
+                  </span>
+                </>
+              )}
+              {events.length === 1 && (
+                <span
+                  className="sr-only"
+                  data-bpp-test-id="frame-event-total"
+                >
+                  {eventCountLabel}
+                </span>
+              )}
             </div>
           </div>
           <Button
@@ -328,51 +357,49 @@ export function FrameInspector({
         </div>
       </header>
       <ScrollArea
-        className="max-h-[min(29rem,calc(100vh-7rem))] min-h-0"
+        className="max-h-[min(27rem,calc(100vh-6rem))] min-h-0"
         data-bpp-test-id="frame-event-list"
       >
-        <div>
-          <Accordion
-            className="divide-y divide-border/45"
-            defaultValue={groups.map((group) => group.token)}
-            key={`${entityId}:${frame ?? "none"}:${focusKey}`}
-            type="multiple"
-          >
-            {groups.map((group) => (
-              <AccordionItem
-                className="rounded-none border-x-0 border-y-0 bg-brand-soft/4 shadow-[inset_2px_0_0_var(--color-brand-soft)]"
-                data-bpp-event-token={group.token}
-                data-bpp-test-id="focused-cluster-group"
-                key={group.token}
-                value={group.token}
-              >
-                <AccordionTrigger className="min-h-control-md px-3 py-2 text-body hover:bg-accent/45">
-                  <SemanticIcon token={group.token} />
-                  <span className="min-w-0 truncate">{t(group.token)}</span>
-                  <Badge
-                    className="px-1.5 font-mono"
-                    variant="secondary"
-                  >
-                    ×{group.events.length}
-                  </Badge>
-                </AccordionTrigger>
-                <AccordionContent className="space-y-0 border-t border-border/45 p-0">
-                  {mergeInspectorEvents(
-                    group.events.slice(0, limit),
-                  ).map((merged) => (
-                    <EventRow
-                      entityById={entityById}
-                      event={merged.event}
-                      key={merged.key}
-                      mergedCount={merged.count}
-                      mergedTargets={merged.targetIds}
-                      t={t}
-                    />
-                  ))}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
+        <div className="bg-background/20">
+          {singleGroup ? (
+            <section
+              data-bpp-event-token={singleGroup.token}
+              data-bpp-test-id="focused-cluster-group"
+            >
+              {renderGroupEvents(singleGroup)}
+            </section>
+          ) : (
+            <Accordion
+              className="divide-y divide-border/45"
+              defaultValue={groups.map((group) => group.token)}
+              key={`${entityId}:${frame ?? "none"}:${focusKey}`}
+              type="multiple"
+            >
+              {groups.map((group) => (
+                <AccordionItem
+                  className="rounded-none border-x-0 border-y-0 bg-transparent"
+                  data-bpp-event-token={group.token}
+                  data-bpp-test-id="focused-cluster-group"
+                  key={group.token}
+                  value={group.token}
+                >
+                  <AccordionTrigger className="min-h-control-sm px-2.5 py-1.5 text-compact hover:bg-accent/45">
+                    <SemanticIcon token={group.token} />
+                    <span className="min-w-0 truncate">{t(group.token)}</span>
+                    <Badge
+                      className="px-1.5 font-mono"
+                      variant="secondary"
+                    >
+                      ×{group.events.length}
+                    </Badge>
+                  </AccordionTrigger>
+                  <AccordionContent className="space-y-0 border-t border-border/45 p-0">
+                    {renderGroupEvents(group)}
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          )}
           {events.length > limit && (
             <Button
               className="m-2 w-[calc(100%_-_1rem)]"

@@ -371,6 +371,11 @@ export const TimelineView = forwardRef<
     onPreviewCombatMs(null);
   };
 
+  useEffect(() => {
+    if (!state.inspectorOpen) return;
+    clearPreview();
+  }, [state.inspectorOpen]);
+
   return (
     <section
       className="flex min-h-0 flex-1 overflow-hidden border border-border bg-surface shadow-panel"
@@ -415,7 +420,7 @@ export const TimelineView = forwardRef<
         </PopoverAnchor>
         <PopoverContent
           align="start"
-          className="w-[min(420px,calc(100vw-1rem))] overflow-hidden p-0"
+          className="w-[min(360px,calc(100vw-1rem))] overflow-hidden p-0"
           collisionPadding={8}
           data-bpp-test-id="frame-inspector-popover"
           onOpenAutoFocus={(event) => event.preventDefault()}
