@@ -3725,6 +3725,18 @@ internal sealed class DictionarySourceCatalog : ICollectionSourceCatalog
 
     public bool TryGetBySourceKey(string sourceKey, out CollectionSourceEntry? entry) =>
         _entries.TryGetValue(sourceKey, out entry);
+
+    public IEnumerable<CollectionSourceEntry> For(CollectionSourceKind kind, EHero effectiveHero)
+    {
+        foreach (var entry in _entries.Values)
+        {
+            if (entry.Kind != kind)
+                continue;
+            if (!entry.IsVisibleForHero(effectiveHero))
+                continue;
+            yield return entry;
+        }
+    }
 }
 
 internal sealed class FakeOfferPoolResolver : ICollectionOfferPoolResolver

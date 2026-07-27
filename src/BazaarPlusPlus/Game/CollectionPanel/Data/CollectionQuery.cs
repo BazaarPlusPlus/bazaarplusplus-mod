@@ -17,6 +17,8 @@ internal interface ICollectionOfferPoolResolver
 internal interface ICollectionSourceCatalog
 {
     bool TryGetBySourceKey(string sourceKey, out CollectionSourceEntry? entry);
+
+    IEnumerable<CollectionSourceEntry> For(CollectionSourceKind kind, EHero effectiveHero);
 }
 
 internal sealed class CollectionFilterNormalization
