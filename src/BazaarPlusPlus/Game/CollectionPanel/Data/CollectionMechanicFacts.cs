@@ -4,6 +4,7 @@ using BazaarGameShared.Domain.Cards.Interfaces;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect.Actions;
 using BazaarGameShared.Domain.Effect.AuraActions;
+using BazaarGameShared.Domain.Effect.Trigger;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
 
@@ -38,7 +39,10 @@ internal static class CollectionMechanicFacts
         foreach (var abilityId in activeAbilityIds)
         {
             if (template.Abilities.TryGetValue(abilityId, out var ability) && ability != null)
+            {
                 facts |= ProjectActionFacts(ability.Action);
+                facts |= ProjectTriggerFacts(ability.Trigger);
+            }
 
             if ((facts & AllAbilityMechanics) == AllAbilityMechanics)
                 break;
@@ -98,6 +102,27 @@ internal static class CollectionMechanicFacts
         var facts = CollectionMechanic.None;
         foreach (var child in combined.Actions)
             facts |= ProjectActionFacts(child);
+        return facts;
+    }
+
+    // Destruction-reaction triggers only. TTriggerOnCardRepaired is deliberately excluded —
+    // the "was repaired" trigger is not part of the destroy cluster (repair *actions* arrive in
+    // a later slice).
+    private static CollectionMechanic ProjectTriggerFacts(TTriggerBase? trigger)
+    {
+        if (
+            trigger
+            is TTriggerOnBeforeCardDestroyed
+                or TTriggerOnCardDestroyed
+                or TTriggerOnCardPerformedDestruction
+        )
+            return CollectionMechanic.Destroy;
+        if (trigger is not TTriggerOr combined)
+            return CollectionMechanic.None;
+
+        var facts = CollectionMechanic.None;
+        foreach (var child in combined.Triggers)
+            facts |= ProjectTriggerFacts(child);
         return facts;
     }
 }
