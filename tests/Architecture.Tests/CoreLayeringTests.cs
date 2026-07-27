@@ -2328,16 +2328,13 @@ public class CoreLayeringTests
         );
 
         Assert.Contains("interface IEncounterPreviewModule", moduleSource);
+        Assert.Contains("EventPreviewResult ResolveEvent(EventPreviewQuery query)", moduleSource);
         Assert.Contains(
-            "EncounterPreviewResult ResolveEvent(EventPreviewQuery query)",
+            "EventPreviewResult ResolveStep(EncounterStepPreviewQuery query)",
             moduleSource
         );
         Assert.Contains(
-            "EncounterStepPreviewResult ResolveStep(EncounterStepPreviewQuery query)",
-            moduleSource
-        );
-        Assert.Contains(
-            "LevelUpPreviewResult ResolveLevelUp(LevelUpPreviewQuery query)",
+            "EventPreviewResult ResolveLevelUp(LevelUpPreviewQuery query)",
             moduleSource
         );
         Assert.Contains("class CardAbilityValueReader", abilityReaderSource);

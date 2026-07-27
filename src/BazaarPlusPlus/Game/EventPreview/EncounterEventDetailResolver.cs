@@ -40,9 +40,6 @@ internal static class EncounterEventDetailResolver
         return new EncounterOption(
             eventTemplate.TemplateId,
             EventPreviewLocalization.ResolveTitle(eventTemplate) ?? eventTemplate.InternalName,
-            sourceKey: null,
-            sourceKind: null,
-            eventTemplate.TemplateId,
             resultText,
             rewardFilter,
             choiceDetails,
@@ -111,8 +108,7 @@ internal static class EncounterEventDetailResolver
                             template.TemplateId,
                             EncounterPreviewText.OutcomeGainSkill(skillName),
                             resultText: string.Empty,
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         )
                     );
                     continue;
@@ -129,8 +125,7 @@ internal static class EncounterEventDetailResolver
                         Guid.Empty,
                         displayName: string.Empty,
                         resultText: QueryPoolResultText(pool),
-                        rewardFilter: pool.Filter,
-                        isSourceMatch: false
+                        rewardFilter: pool.Filter
                     )
                 );
             }
@@ -551,8 +546,7 @@ internal static class EncounterEventDetailResolver
                         template.TemplateId,
                         EncounterPreviewText.OutcomeGainSkill(skillName),
                         resultText: string.Empty,
-                        rewardFilter: null,
-                        isSourceMatch: false
+                        rewardFilter: null
                     )
                 );
                 continue;
@@ -602,7 +596,6 @@ internal static class EncounterEventDetailResolver
             displayName: string.Empty,
             resultText: string.Empty,
             rewardFilter: null,
-            isSourceMatch: false,
             pool: pool
         );
 
@@ -633,7 +626,6 @@ internal static class EncounterEventDetailResolver
                 EventPreviewLocalization.ResolveTitle(template) ?? template.InternalName,
                 StripHeroConditionPrefix(resultText, template.Heroes),
                 ResolveRewardFilter(template, resultText),
-                isSourceMatch: false,
                 prerequisiteSummary: "",
                 isEligible
             )

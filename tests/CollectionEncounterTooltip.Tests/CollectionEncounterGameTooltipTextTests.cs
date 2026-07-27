@@ -21,8 +21,7 @@ public sealed class EncounterPreviewTextFormatterTests
                 Guid.Parse("10000000-0000-0000-0000-0000000000f1"),
                 "闪亮!",
                 "获得+10 生命上限",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             )
         );
 
@@ -41,8 +40,7 @@ public sealed class EncounterPreviewTextFormatterTests
                 Guid.Parse("10000000-0000-0000-0000-0000000000f2"),
                 "收下",
                 "+10生命上限",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             )
         );
 
@@ -60,15 +58,13 @@ public sealed class EncounterPreviewTextFormatterTests
                 Guid.Parse("10000000-0000-0000-0000-000000000002"),
                 "Keep It for Luck",
                 "Gain 1 XP",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             ),
             new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000003"),
                 "Share It With a Friend",
                 "Get a Small Silver-tier Friend",
-                CreateRewardFilter(tiers: new[] { ETier.Silver }, summary: "Small Silver Friend"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: new[] { ETier.Silver }, summary: "Small Silver Friend")
             )
         );
 
@@ -96,22 +92,19 @@ public sealed class EncounterPreviewTextFormatterTests
                 Guid.Parse("10000000-0000-0000-0000-000000000005"),
                 "Open It",
                 "Get a Medium item",
-                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Medium Item"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Medium Item")
             ),
             new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000006"),
                 "Hunt for Reagents",
                 "Get a Silver-tier Reagent",
-                CreateRewardFilter(tiers: new[] { ETier.Silver }, summary: "Silver Reagent"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: new[] { ETier.Silver }, summary: "Silver Reagent")
             ),
             new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000007"),
                 "Sell It",
                 "Gain 4 Gold",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             )
         );
 
@@ -150,8 +143,7 @@ public sealed class EncounterPreviewTextFormatterTests
                 Guid.Parse("10000000-0000-0000-0000-000000000005"),
                 "打开它",
                 "获得一件中型物品",
-                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Medium Item"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Medium Item")
             )
         );
 
@@ -172,8 +164,7 @@ public sealed class EncounterPreviewTextFormatterTests
                 Guid.Parse("10000000-0000-0000-0000-000000000005"),
                 "Have a Late Night Treat",
                 "Get 2 Diamond-tier Food",
-                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food")
             )
         );
 
@@ -196,8 +187,7 @@ public sealed class EncounterPreviewTextFormatterTests
                 Guid.Parse("10000000-0000-0000-0000-000000000005"),
                 "深夜点心",
                 "获得2个钻石级食物",
-                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food")
             )
         );
 
@@ -230,8 +220,7 @@ public sealed class EncounterPreviewTextFormatterTests
                 Guid.Parse("10000000-0000-0000-0000-000000000005"),
                 "深夜点心",
                 resultText,
-                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food")
             )
         );
 
@@ -257,8 +246,7 @@ public sealed class EncounterPreviewTextFormatterTests
                     tiers: Array.Empty<ETier>(),
                     summary: "Rage Item",
                     usesDayTierTable: false
-                ),
-                isSourceMatch: false
+                )
             )
         );
 
@@ -285,8 +273,7 @@ public sealed class EncounterPreviewTextFormatterTests
                 CreateRewardFilter(
                     tiers: new[] { ETier.Bronze, ETier.Silver, ETier.Gold, ETier.Diamond },
                     summary: "Medium Bronze-Diamond Item"
-                ),
-                isSourceMatch: false
+                )
             )
         );
 
@@ -307,15 +294,13 @@ public sealed class EncounterPreviewTextFormatterTests
                 Guid.Parse("10000000-0000-0000-0000-000000000009"),
                 "Sell It",
                 "Gain 4 Gold",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             ),
             new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-00000000000a"),
                 "Add It to Your Bushel",
                 "(if you have a Bushel) Your Bushel gains 20 Heal",
                 rewardFilter: null,
-                isSourceMatch: false,
                 prerequisiteSummary: "",
                 isEligible: false
             )
@@ -338,9 +323,6 @@ public sealed class EncounterPreviewTextFormatterTests
         var option = new EncounterOption(
             Guid.Parse("10000000-0000-0000-0000-00000000000b"),
             "Mountain Pass",
-            sourceKey: null,
-            sourceKind: null,
-            Guid.Parse("10000000-0000-0000-0000-00000000000b"),
             "Aid a caravan descending the Great Plateau",
             rewardFilter: null,
             choiceDetails: null,
@@ -357,15 +339,13 @@ public sealed class EncounterPreviewTextFormatterTests
                             Guid.Parse("10000000-0000-0000-0000-00000000000c"),
                             "A Routine Job",
                             "Gain 2 XP",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
                         new EncounterChoiceDetail(
                             Guid.Parse("10000000-0000-0000-0000-00000000000d"),
                             "Generous Tip",
                             "Gain 10 Gold\nand 1 XP",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
                     }
                 ),
@@ -387,8 +367,7 @@ public sealed class EncounterPreviewTextFormatterTests
                             Guid.Parse("10000000-0000-0000-0000-00000000000e"),
                             "Clear the Way",
                             "(if you have Powder Keg) Gain 5 Gold",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
                     }
                 ),
@@ -418,9 +397,6 @@ public sealed class EncounterPreviewTextFormatterTests
         var option = new EncounterOption(
             Guid.Parse("10000000-0000-0000-0000-000000000004"),
             "Jungle Ruins",
-            sourceKey: null,
-            sourceKind: null,
-            Guid.Parse("10000000-0000-0000-0000-000000000004"),
             "You find abandoned ruins in the jungle",
             rewardFilter: null
         );
@@ -451,9 +427,6 @@ public sealed class EncounterPreviewTextFormatterTests
         new(
             Guid.Parse("10000000-0000-0000-0000-000000000001"),
             "A Strange Mushroom",
-            sourceKey: null,
-            sourceKind: null,
-            Guid.Parse("10000000-0000-0000-0000-000000000001"),
             "You find a strange mushroom in the Greenheart",
             rewardFilter: null,
             choices
@@ -488,7 +461,6 @@ public sealed class EncounterPreviewTextFormatterTests
                 displayName: string.Empty,
                 resultText: string.Empty,
                 rewardFilter: null,
-                isSourceMatch: false,
                 pool: new EncounterChoicePool(
                     isCombat: true,
                     optionCount: 14,
@@ -511,7 +483,6 @@ public sealed class EncounterPreviewTextFormatterTests
                 displayName: string.Empty,
                 resultText: string.Empty,
                 rewardFilter: null,
-                isSourceMatch: false,
                 pool: new EncounterChoicePool(
                     isCombat: false,
                     optionCount: 2,
@@ -521,15 +492,13 @@ public sealed class EncounterPreviewTextFormatterTests
                             Guid.NewGuid(),
                             "Aquatic Training",
                             "Your leftmost item gains the Aquatic type",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
                         new EncounterChoiceDetail(
                             Guid.NewGuid(),
                             "Apparel Training",
                             "Your leftmost item gains the Apparel type",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
                     }
                 )
@@ -545,7 +514,6 @@ public sealed class EncounterPreviewTextFormatterTests
                 displayName: string.Empty,
                 resultText: string.Empty,
                 rewardFilter: null,
-                isSourceMatch: false,
                 pool: new EncounterChoicePool(
                     isCombat: false,
                     optionCount: 16,
