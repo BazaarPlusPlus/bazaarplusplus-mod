@@ -224,9 +224,17 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void CollectionPanel_catalog_state_transitions_are_centralized()
+    public void CollectionViewState_catalog_state_transitions_are_centralized()
     {
-        var collectionPanelSource = File.ReadAllText(
+        var viewStateSource = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "CollectionPanel",
+                "CollectionViewState.cs"
+            )
+        );
+        var panelSource = File.ReadAllText(
             Path.Combine(
                 MainSourceRoot(RepoRoot()),
                 "Game",
@@ -234,51 +242,50 @@ public class CoreLayeringTests
                 "CollectionPanel.cs"
             )
         );
-        var prepareForOpen = WithoutWhitespace(
-            MethodSource(
-                collectionPanelSource,
-                "private void PrepareCatalogReadinessForOpen()",
-                "private void Close()"
-            )
-        );
-        var loadPanel = WithoutWhitespace(
-            MethodSource(
-                collectionPanelSource,
-                "private IEnumerator LoadPanelAsync(int generation)",
-                "private bool IsLoadGenerationCurrent(int generation)"
-            )
-        );
-        var invalidateCatalog = WithoutWhitespace(
-            MethodSource(
-                collectionPanelSource,
-                "private void InvalidateCatalog(CollectionPanelLogReasonCode reasonCode)",
-                "// Facet availability is a pure projection"
-            )
-        );
+
         var setCatalogState = WithoutWhitespace(
             MethodSource(
-                collectionPanelSource,
+                viewStateSource,
                 "private void SetCatalogState(",
-                "private void AcceptCatalog("
+                "private void SetStatus("
             )
         );
         var setCatalogCards = WithoutWhitespace(
             MethodSource(
-                collectionPanelSource,
+                viewStateSource,
                 "private void SetCatalogCards(",
                 "private void SetCatalogState("
             )
         );
         var acceptCatalog = WithoutWhitespace(
-            MethodSource(collectionPanelSource, "private void AcceptCatalog(", "\n    }\n}")
+            MethodSource(
+                viewStateSource,
+                "public CollectionRenderOutcome AcceptCatalog(",
+                "public CollectionRenderOutcome CatalogUnavailable()"
+            )
+        );
+        var resetCatalog = WithoutWhitespace(
+            MethodSource(
+                viewStateSource,
+                "public void ResetCatalog()",
+                "public void NoteCatalogLoadCancelled()"
+            )
+        );
+        var prepareForOpen = WithoutWhitespace(
+            MethodSource(
+                viewStateSource,
+                "public void PrepareCatalogForOpen(",
+                "public CollectionRenderOutcome? SetActiveTab("
+            )
         );
 
-        // Each field has one declaration initializer and one live assignment. Cards/facets use a
-        // subordinate helper whose only caller is SetCatalogState.
-        Assert.Equal(2, AssignmentCount(collectionPanelSource, "_catalogReadiness"));
-        Assert.Equal(2, AssignmentCount(collectionPanelSource, "_availableHeroes"));
-        Assert.Equal(2, AssignmentCount(collectionPanelSource, "_catalogCards"));
-        Assert.Equal(2, AssignmentCount(collectionPanelSource, "_facetAvailability"));
+        // Catalog readiness/heroes/cards/facets live only on CollectionViewState. Each field has
+        // one declaration initializer and one live assignment; cards/facets use a subordinate
+        // helper whose only caller is SetCatalogState.
+        Assert.Equal(2, AssignmentCount(viewStateSource, "_catalogReadiness"));
+        Assert.Equal(2, AssignmentCount(viewStateSource, "_availableHeroes"));
+        Assert.Equal(2, AssignmentCount(viewStateSource, "_catalogCards"));
+        Assert.Equal(2, AssignmentCount(viewStateSource, "_facetAvailability"));
         Assert.Contains("_catalogReadiness=readiness;", setCatalogState);
         Assert.Contains(
             "_availableHeroes=CollectionHeroSelectionRoster.ResolveAvailableHeroes(readiness,cards);",
@@ -289,33 +296,35 @@ public class CoreLayeringTests
             "_facetAvailability=CollectionFacetAvailability.SnapshotFor(cards);",
             setCatalogCards
         );
-        Assert.DoesNotContain("_catalogReadiness=", loadPanel);
+        Assert.Contains("SetCatalogCards(cards);", setCatalogState);
+        Assert.Equal(2, viewStateSource.Split("SetCatalogCards(").Length - 1);
 
         Assert.Contains(
-            "SetCatalogState(CollectionCatalogReadiness.Accepted,cached.Cards);",
+            "SetCatalogState(CollectionCatalogReadiness.Accepted,cachedCards);",
             prepareForOpen
         );
         Assert.Contains(
             "SetCatalogState(CollectionCatalogReadiness.Loading,Array.Empty<CollectionCardVm>());",
             prepareForOpen
-        );
-        Assert.Contains(
-            "SetCatalogState(CollectionCatalogReadiness.Unavailable,Array.Empty<CollectionCardVm>());",
-            loadPanel
-        );
-        Assert.Contains(
-            "SetCatalogState(CollectionCatalogReadiness.Loading,Array.Empty<CollectionCardVm>());",
-            invalidateCatalog
         );
         Assert.Contains(
             "SetCatalogState(CollectionCatalogReadiness.Accepted,cards);",
             acceptCatalog
         );
+        Assert.Contains(
+            "SetCatalogState(CollectionCatalogReadiness.Loading,Array.Empty<CollectionCardVm>());",
+            resetCatalog
+        );
 
-        // Catalog cards and their derived facets may be assigned by SetCatalogCards, but that
-        // helper itself must remain private to the centralized state transition.
-        Assert.Equal(2, collectionPanelSource.Split("SetCatalogCards(").Length - 1);
-        Assert.Contains("SetCatalogCards(cards);", setCatalogState);
+        // Panel must forward catalog transitions into CollectionViewState; it must not own the
+        // catalog field assignments.
+        Assert.DoesNotContain("_catalogReadiness", panelSource);
+        Assert.DoesNotContain("_catalogCards", panelSource);
+        Assert.DoesNotContain("_facetAvailability", panelSource);
+        Assert.Contains("_viewState.AcceptCatalog(", panelSource);
+        Assert.Contains("_viewState.CatalogUnavailable()", panelSource);
+        Assert.Contains("_viewState.ResetCatalog()", panelSource);
+        Assert.Contains("_viewState.PrepareCatalogForOpen(", panelSource);
     }
 
     [Fact]

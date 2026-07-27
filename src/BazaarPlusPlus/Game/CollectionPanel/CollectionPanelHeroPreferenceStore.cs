@@ -7,16 +7,6 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
-internal interface ICollectionPanelHeroPreferenceStore
-{
-    CollectionPanelHeroPreferenceLoadResult Load(
-        CollectionCatalogReadiness catalogReadiness,
-        IReadOnlyCollection<EHero> availableHeroes
-    );
-
-    void Save(EHero hero);
-}
-
 internal sealed class CollectionPanelHeroPreferenceStore : ICollectionPanelHeroPreferenceStore
 {
     private readonly HashSet<CollectionPanelLogReasonCode> _reportedPreferenceReasons = [];
