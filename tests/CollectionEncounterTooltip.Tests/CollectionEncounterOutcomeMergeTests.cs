@@ -107,13 +107,7 @@ public class EncounterOutcomeMergeTests
             new HashSet<Guid>(),
             new List<EncounterChoiceDetail>
             {
-                new(
-                    Guid.NewGuid(),
-                    displayName: "Reward",
-                    resultText: text,
-                    rewardFilter: null,
-                    isSourceMatch: false
-                ),
+                new(Guid.NewGuid(), displayName: "Reward", resultText: text, rewardFilter: null),
             }
         );
 
@@ -212,8 +206,7 @@ public class EncounterOutcomeMergeTests
                     Guid.NewGuid(),
                     displayName: nameless ? string.Empty : text,
                     resultText: nameless ? text : string.Empty,
-                    rewardFilter: null,
-                    isSourceMatch: false
+                    rewardFilter: null
                 ),
             }
         );
@@ -234,8 +227,7 @@ public class EncounterOutcomeMergeTests
                     Guid.NewGuid(),
                     displayName: title,
                     resultText: string.Empty,
-                    rewardFilter: null,
-                    isSourceMatch: false
+                    rewardFilter: null
                 ),
             }
         );
