@@ -13,6 +13,7 @@ internal static class FsrUpscalingProfiles
             GraphicsUpscalingMode.FsrUltraQuality => new(true, 0.77f),
             GraphicsUpscalingMode.FsrQuality => new(true, 0.67f),
             GraphicsUpscalingMode.FsrBalanced => new(true, 0.59f),
+            GraphicsUpscalingMode.FsrPerformance => new(true, 0.5f),
             _ => new(false, 1f),
         };
 }

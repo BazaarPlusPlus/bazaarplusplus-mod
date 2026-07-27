@@ -12,6 +12,7 @@ public sealed class FsrUpscalingProfilesTests
         AssertProfile(GraphicsUpscalingMode.FsrUltraQuality, 0.77f);
         AssertProfile(GraphicsUpscalingMode.FsrQuality, 0.67f);
         AssertProfile(GraphicsUpscalingMode.FsrBalanced, 0.59f);
+        AssertProfile(GraphicsUpscalingMode.FsrPerformance, 0.5f);
     }
 
     private static void AssertProfile(GraphicsUpscalingMode mode, float expectedRenderScale)

@@ -8,4 +8,5 @@ internal enum GraphicsUpscalingMode
     FsrUltraQuality,
     FsrQuality,
     FsrBalanced,
+    FsrPerformance,
 }

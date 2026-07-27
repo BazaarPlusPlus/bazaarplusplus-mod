@@ -24,6 +24,7 @@ internal static class GraphicsUpscalingSettingsDockEntry
                 GraphicsUpscalingMode.FsrUltraQuality,
                 GraphicsUpscalingMode.FsrQuality,
                 GraphicsUpscalingMode.FsrBalanced,
+                GraphicsUpscalingMode.FsrPerformance,
             },
             config => config.GraphicsUpscalingModeConfig?.Value ?? GraphicsUpscalingMode.Native,
             (config, mode) =>
@@ -55,6 +56,7 @@ internal static class GraphicsUpscalingSettingsDockEntry
                 GraphicsUpscalingMode.FsrUltraQuality => "超高质量 · 77%",
                 GraphicsUpscalingMode.FsrQuality => "质量 · 67%",
                 GraphicsUpscalingMode.FsrBalanced => "均衡 · 59%",
+                GraphicsUpscalingMode.FsrPerformance => "性能 · 50%",
                 _ => "原生",
             };
         }
@@ -65,6 +67,7 @@ internal static class GraphicsUpscalingSettingsDockEntry
             GraphicsUpscalingMode.FsrUltraQuality => "ULTRA QUALITY · 77%",
             GraphicsUpscalingMode.FsrQuality => "QUALITY · 67%",
             GraphicsUpscalingMode.FsrBalanced => "BALANCED · 59%",
+            GraphicsUpscalingMode.FsrPerformance => "PERFORMANCE · 50%",
             _ => "NATIVE",
         };
     }

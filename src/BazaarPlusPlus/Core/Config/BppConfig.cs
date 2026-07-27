@@ -197,7 +197,7 @@ internal sealed class BppConfig : IBppConfig
             "Graphics",
             "UpscalingMode",
             GraphicsUpscalingMode.Native,
-            "Desktop FSR 1 render-resolution upscaling mode for macOS and Windows. Native preserves the game's original URP settings. Ultra Quality renders at 77%, Quality at 67%, and Balanced at 59% per axis."
+            "Desktop FSR 1 render-resolution upscaling mode for macOS and Windows. Native preserves the game's original URP settings. Ultra Quality renders at 77%, Quality at 67%, Balanced at 59%, and Performance at 50% per axis."
         );
         GraphicsUpscalingSharpnessConfig = config.Bind(
             "Graphics",
