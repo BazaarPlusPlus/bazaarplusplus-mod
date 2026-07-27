@@ -495,7 +495,10 @@ public class CoreLayeringTests
         Assert.Contains("ReferenceEquals(cell.Vm, nextVisible[newIndex])", virtualizerSource);
         Assert.Contains("cell.Index = newIndex;", virtualizerSource);
         Assert.Contains("cell.HoverRelay?.Bind(cell.Session);", virtualizerSource);
-        Assert.Contains("Reposition(newIndex, cell);", virtualizerSource);
+        Assert.Contains(
+            "NativeCardCellFitter.Reposition(cell.CachedRect, cellRect, _scrollY);",
+            virtualizerSource
+        );
     }
 
     [Fact]
@@ -609,6 +612,12 @@ public class CoreLayeringTests
                 "CollectionGridVirtualizer.cs"
             )
         );
+        var fitMathSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "CollectionCardFitMath.cs")
+        );
+        var fitterSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "CollectionPanel", "Grid", "NativeCardCellFitter.cs")
+        );
         var badgeSource = File.ReadAllText(
             Path.Combine(
                 mainSource,
@@ -619,23 +628,17 @@ public class CoreLayeringTests
             )
         );
 
-        var applyCellScaleIndex = virtualizerSource.IndexOf(
-            "private void ApplyCellScale",
-            StringComparison.Ordinal
-        );
-        Assert.True(
-            applyCellScaleIndex >= 0,
-            "CollectionGridVirtualizer.ApplyCellScale should exist."
-        );
-        var oldClampIndex = virtualizerSource.IndexOf(
-            "natW * scale > maxWidth",
-            applyCellScaleIndex,
-            StringComparison.Ordinal
-        );
-        Assert.True(
-            oldClampIndex < 0,
-            "The old frame-width clamp shrinks Large item cards because their frame art overhangs the body."
-        );
+        // Measurement/fit methods must live in the fitter, not the virtualizer.
+        Assert.DoesNotContain("ResolveNativeVisualBounds", virtualizerSource);
+        Assert.DoesNotContain("TryMeasureSubtreeBounds", virtualizerSource);
+        Assert.DoesNotContain("private void ApplyCellScale", virtualizerSource);
+        Assert.Contains("NativeCardCellFitter.ApplyScale", virtualizerSource);
+        Assert.Contains("NativeCardCellFitter.Reposition", virtualizerSource);
+
+        Assert.Contains("bodyW * scale > maxWidth", fitMathSource);
+        Assert.DoesNotContain("natW * scale > maxWidth", fitMathSource);
+        Assert.Contains("frameHeightOverSocket", fitMathSource);
+        Assert.Contains("SetSizeWithCurrentAnchors", fitterSource);
 
         Assert.Contains("BadgeRootHeightScale", badgeSource);
         Assert.Contains("CollectionGridVirtualizer.FallbackNativeCardHeight / 200f", badgeSource);

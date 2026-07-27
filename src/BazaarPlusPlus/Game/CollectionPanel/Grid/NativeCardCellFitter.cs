@@ -1,0 +1,293 @@
+#nullable enable
+using BazaarPlusPlus.GameInterop.ItemBoardPreview;
+using UnityEngine;
+using UnityEngine.UI;
+
+namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
+
+// Unity adapter that measures a native card preview and fits it into a Collection grid cell.
+// Measurement chain (FrameContainer → RawImage → Aspect-ratio mutation fallback → root.rect →
+// sizeDelta → 1×1) and every Reposition re-measure are intentionally preserved call-for-call;
+// per-cell bounds caching is out of scope. Pure scale/position math lives in CollectionCardFitMath.
+internal static class NativeCardCellFitter
+{
+    // Shared with CollectionSourceAttributionBadge sizing (via the virtualizer re-export).
+    public const float FallbackNativeCardHeight = 484f;
+
+    public static void ApplyScale(RectTransform rect, CollectionGridRect cellRect, float gap)
+    {
+        if (rect == null)
+            return;
+        PrepareGridRect(rect);
+        var visualBounds = ResolveNativeVisualBounds(rect);
+        var scale = CollectionCardFitMath.ComputeScale(
+            visualBounds,
+            TryReadAspectRatio(rect),
+            cellRect,
+            gap,
+            CollectionGridConstants.CellContentInset,
+            ItemBoardSocketLayout.FrameHeightOverSocket
+        );
+        rect.localScale = new Vector3(scale, scale, 1f);
+    }
+
+    public static void Reposition(RectTransform rect, CollectionGridRect cellRect, float scrollY)
+    {
+        if (rect == null)
+            return;
+        PrepareGridRect(rect);
+        var visualBounds = ResolveNativeVisualBounds(rect);
+        var pos = CollectionCardFitMath.ComputeAnchoredPosition(
+            visualBounds,
+            rect.localScale.x,
+            rect.localScale.y,
+            cellRect,
+            scrollY
+        );
+        rect.anchoredPosition = new Vector2(pos.X, pos.Y);
+    }
+
+    private static void PrepareGridRect(RectTransform rect)
+    {
+        rect.anchorMin = new Vector2(0f, 1f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+    }
+
+    private static float? TryReadAspectRatio(RectTransform rect)
+    {
+        var fitter = rect.GetComponent<AspectRatioFitter>();
+        if (fitter == null)
+            return null;
+        return fitter.aspectRatio;
+    }
+
+    private static CardVisualBounds ResolveNativeVisualBounds(RectTransform root)
+    {
+        var frame = FindDescendant(root, "FrameContainer");
+        if (frame != null && TryMeasureSubtreeBounds(root, frame, out var frameBounds))
+            return frameBounds;
+        if (TryMeasureRawImageBounds(root, out var imageBounds))
+            return imageBounds;
+        if (TryResolveAspectRatioFallbackBounds(root, out var aspectBounds))
+            return aspectBounds;
+
+        var rootRect = root.rect;
+        if (IsUsableNativeSize(rootRect.width, rootRect.height))
+        {
+            return new CardVisualBounds(
+                Mathf.Max(1f, Mathf.Abs(rootRect.width)),
+                Mathf.Max(1f, Mathf.Abs(rootRect.height)),
+                rootRect.center.x,
+                rootRect.center.y
+            );
+        }
+
+        var sizeDelta = root.sizeDelta;
+        if (IsUsableNativeSize(sizeDelta.x, sizeDelta.y))
+        {
+            return new CardVisualBounds(
+                Mathf.Max(1f, Mathf.Abs(sizeDelta.x)),
+                Mathf.Max(1f, Mathf.Abs(sizeDelta.y)),
+                0f,
+                0f
+            );
+        }
+
+        return new CardVisualBounds(1f, 1f, 0f, 0f);
+    }
+
+    private static bool TryResolveAspectRatioFallbackBounds(
+        RectTransform root,
+        out CardVisualBounds bounds
+    )
+    {
+        var fitter = root.GetComponent<AspectRatioFitter>();
+        if (
+            fitter == null
+            || fitter.aspectRatio <= 0.01f
+            || float.IsNaN(fitter.aspectRatio)
+            || float.IsInfinity(fitter.aspectRatio)
+        )
+        {
+            bounds = default;
+            return false;
+        }
+
+        var width = Mathf.Max(1f, FallbackNativeCardHeight * fitter.aspectRatio);
+        var height = FallbackNativeCardHeight;
+        // Intentionally mutates root size — cards without measurable FrameContainer/RawImage
+        // rely on this SetSize being reapplied every Reposition. Do not cache past this call.
+        root.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+        root.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
+        var rect = root.rect;
+        bounds = new CardVisualBounds(width, height, rect.center.x, rect.center.y);
+        return true;
+    }
+
+    private static bool TryMeasureRawImageBounds(RectTransform root, out CardVisualBounds bounds)
+    {
+        var corners = new Vector3[4];
+        var minX = float.PositiveInfinity;
+        var minY = float.PositiveInfinity;
+        var maxX = float.NegativeInfinity;
+        var maxY = float.NegativeInfinity;
+        var found = false;
+
+        foreach (var image in root.GetComponentsInChildren<RawImage>(true))
+        {
+            if (image == null || image.rectTransform == null)
+                continue;
+            AccumulateSingleRectBounds(
+                root,
+                image.rectTransform,
+                corners,
+                ref minX,
+                ref minY,
+                ref maxX,
+                ref maxY,
+                ref found
+            );
+        }
+
+        if (!found || !IsUsableNativeSize(maxX - minX, maxY - minY))
+        {
+            bounds = default;
+            return false;
+        }
+
+        bounds = new CardVisualBounds(
+            Mathf.Max(1f, maxX - minX),
+            Mathf.Max(1f, maxY - minY),
+            (minX + maxX) * 0.5f,
+            (minY + maxY) * 0.5f
+        );
+        return true;
+    }
+
+    private static bool TryMeasureSubtreeBounds(
+        RectTransform root,
+        Transform subtree,
+        out CardVisualBounds bounds
+    )
+    {
+        var corners = new Vector3[4];
+        var minX = float.PositiveInfinity;
+        var minY = float.PositiveInfinity;
+        var maxX = float.NegativeInfinity;
+        var maxY = float.NegativeInfinity;
+        var found = false;
+
+        AccumulateRectBounds(
+            root,
+            subtree,
+            corners,
+            ref minX,
+            ref minY,
+            ref maxX,
+            ref maxY,
+            ref found
+        );
+        if (!found || !IsUsableNativeSize(maxX - minX, maxY - minY))
+        {
+            bounds = default;
+            return false;
+        }
+
+        bounds = new CardVisualBounds(
+            Mathf.Max(1f, maxX - minX),
+            Mathf.Max(1f, maxY - minY),
+            (minX + maxX) * 0.5f,
+            (minY + maxY) * 0.5f
+        );
+        return true;
+    }
+
+    private static void AccumulateSingleRectBounds(
+        RectTransform root,
+        RectTransform current,
+        Vector3[] corners,
+        ref float minX,
+        ref float minY,
+        ref float maxX,
+        ref float maxY,
+        ref bool found
+    )
+    {
+        var rect = current.rect;
+        if (!IsUsableNativeSize(rect.width, rect.height))
+            return;
+
+        current.GetWorldCorners(corners);
+        for (var i = 0; i < corners.Length; i++)
+        {
+            var local = root.InverseTransformPoint(corners[i]);
+            minX = Mathf.Min(minX, local.x);
+            minY = Mathf.Min(minY, local.y);
+            maxX = Mathf.Max(maxX, local.x);
+            maxY = Mathf.Max(maxY, local.y);
+        }
+        found = true;
+    }
+
+    private static void AccumulateRectBounds(
+        RectTransform root,
+        Transform current,
+        Vector3[] corners,
+        ref float minX,
+        ref float minY,
+        ref float maxX,
+        ref float maxY,
+        ref bool found
+    )
+    {
+        if (current is RectTransform currentRect)
+            AccumulateSingleRectBounds(
+                root,
+                currentRect,
+                corners,
+                ref minX,
+                ref minY,
+                ref maxX,
+                ref maxY,
+                ref found
+            );
+
+        foreach (Transform child in current)
+        {
+            AccumulateRectBounds(
+                root,
+                child,
+                corners,
+                ref minX,
+                ref minY,
+                ref maxX,
+                ref maxY,
+                ref found
+            );
+        }
+    }
+
+    private static Transform? FindDescendant(Transform root, string name)
+    {
+        foreach (Transform child in root)
+        {
+            if (child.name == name)
+                return child;
+
+            var descendant = FindDescendant(child, name);
+            if (descendant != null)
+                return descendant;
+        }
+
+        return null;
+    }
+
+    private static bool IsUsableNativeSize(float width, float height) =>
+        width > 0.01f
+        && height > 0.01f
+        && !float.IsNaN(width)
+        && !float.IsNaN(height)
+        && !float.IsInfinity(width)
+        && !float.IsInfinity(height);
+}

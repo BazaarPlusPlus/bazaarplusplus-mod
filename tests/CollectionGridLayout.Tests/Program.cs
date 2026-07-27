@@ -253,6 +253,143 @@ AssertEqual(0, empty.Count, "Empty layout has no cells.");
 AssertEqual(0, empty.ShelfCount, "Empty layout has no shelves.");
 AssertApprox(0f, empty.ContentHeight(100f, 10f), "Empty layout is zero tall.");
 
+// --- CollectionCardFitMath: scale + position (Unity-free pure rules) ---
+// Large outer-frame clamp: measured width includes flourishes wider than the body. Without the
+// body-width clamp (aspect-derived), frame-wide maxWidth would shrink Large cards shorter than
+// Medium; with it, scale stays height-driven when body fits, and only clamps when body overflows.
+const float frameHeightOverSocket = 1.03704f;
+const float gap = 14f;
+const float inset = CollectionGridConstants.CellContentInset;
+var largeCell = new CollectionGridRect(x: 0f, y: 0f, width: 300f, height: 200f);
+
+// Frame flourishes make measured width wide while body (aspect * bodyH) is narrower and fits.
+var largeFrameBounds = new CardVisualBounds(width: 600f, height: 310f, centerX: 0f, centerY: 0f);
+const float largeBodyAspect = 1.5f; // 3:2 body
+var largeScale = CollectionCardFitMath.ComputeScale(
+    largeFrameBounds,
+    largeBodyAspect,
+    largeCell,
+    gap,
+    inset,
+    frameHeightOverSocket
+);
+var largeTargetH = System.Math.Max(1f, largeCell.Height * (1f - 2f * inset));
+var largeHeightDriven = largeTargetH / largeFrameBounds.Height;
+AssertApprox(
+    largeHeightDriven,
+    largeScale,
+    "Large with body-aspect should keep height-driven scale when body width fits maxWidth."
+);
+
+// Same measured frame without aspect falls back to natW and clamps (frame wider than cell+gap).
+var frameClampedScale = CollectionCardFitMath.ComputeScale(
+    largeFrameBounds,
+    aspectRatio: null,
+    largeCell,
+    gap,
+    inset,
+    frameHeightOverSocket
+);
+AssertTrue(
+    frameClampedScale < largeHeightDriven - 0.001f,
+    "Without aspect, frame-width clamp must shrink scale below height-driven."
+);
+AssertApprox(
+    (largeCell.Width + gap) / largeFrameBounds.Width,
+    frameClampedScale,
+    "Null aspect should clamp by measured visual width against cellWidth+gap."
+);
+
+// Degenerate aspectRatio falls back to measured width (same as null).
+foreach (var badAspect in new[] { float.NaN, float.PositiveInfinity, 0f, 0.01f, -1f })
+{
+    var scale = CollectionCardFitMath.ComputeScale(
+        largeFrameBounds,
+        badAspect,
+        largeCell,
+        gap,
+        inset,
+        frameHeightOverSocket
+    );
+    AssertApprox(
+        frameClampedScale,
+        scale,
+        $"Degenerate aspectRatio {badAspect} should fall back to measured-width clamp."
+    );
+}
+
+// Zero / negative / non-finite visual height poisons targetH/natH → final scale guard returns 1f.
+foreach (
+    var badHeight in new[] { 0f, -10f, float.NaN, float.PositiveInfinity, float.NegativeInfinity }
+)
+{
+    var scale = CollectionCardFitMath.ComputeScale(
+        new CardVisualBounds(100f, badHeight, 0f, 0f),
+        aspectRatio: 1.5f,
+        largeCell,
+        gap,
+        inset,
+        frameHeightOverSocket
+    );
+    AssertApprox(1f, scale, $"Visual height {badHeight} must guard scale to 1f.");
+}
+
+// Body overflow clamp: narrow cell forces body-width clamp even with usable aspect.
+var narrowCell = new CollectionGridRect(x: 0f, y: 0f, width: 80f, height: 200f);
+var overflowBounds = new CardVisualBounds(width: 200f, height: 200f, centerX: 0f, centerY: 0f);
+var overflowScale = CollectionCardFitMath.ComputeScale(
+    overflowBounds,
+    aspectRatio: 2f,
+    narrowCell,
+    gap,
+    inset,
+    frameHeightOverSocket
+);
+var bodyH = overflowBounds.Height / frameHeightOverSocket;
+var bodyW = 2f * bodyH;
+var expectedOverflow = (narrowCell.Width + gap) / bodyW;
+AssertApprox(
+    expectedOverflow,
+    overflowScale,
+    "When body*heightScale exceeds maxWidth, scale must clamp to maxWidth/bodyW."
+);
+
+// Position: center-align with zero scroll and measured visual center at origin.
+var posCell = new CollectionGridRect(x: 100f, y: 40f, width: 200f, height: 100f);
+var centeredBounds = new CardVisualBounds(width: 50f, height: 50f, centerX: 0f, centerY: 0f);
+var (px, py) = CollectionCardFitMath.ComputeAnchoredPosition(
+    centeredBounds,
+    scaleX: 0.5f,
+    scaleY: 0.5f,
+    posCell,
+    scrollY: 0f
+);
+AssertApprox(200f, px, "Zero visual center + scale should place root at cell center X.");
+AssertApprox(-(40f + 50f), py, "Zero visual center should place root at cell center Y (negated).");
+
+// Scroll offset: content Y shifts up by scrollY, so screenTop drops and target Y rises.
+var (pxScrolled, pyScrolled) = CollectionCardFitMath.ComputeAnchoredPosition(
+    centeredBounds,
+    scaleX: 0.5f,
+    scaleY: 0.5f,
+    posCell,
+    scrollY: 20f
+);
+AssertApprox(px, pxScrolled, "Scroll should not move horizontal anchor.");
+AssertApprox(py + 20f, pyScrolled, "ScrollY should shift anchored Y by +scrollY.");
+
+// Non-zero visual center offsets placement by center*scale.
+var offsetBounds = new CardVisualBounds(width: 50f, height: 50f, centerX: 10f, centerY: -4f);
+var (pxOff, pyOff) = CollectionCardFitMath.ComputeAnchoredPosition(
+    offsetBounds,
+    scaleX: 2f,
+    scaleY: 3f,
+    posCell,
+    scrollY: 0f
+);
+AssertApprox(200f - 10f * 2f, pxOff, "Anchored X subtracts centerX * scaleX.");
+AssertApprox(-(40f + 50f) - (-4f) * 3f, pyOff, "Anchored Y subtracts centerY * scaleY.");
+
 System.Console.WriteLine("CollectionGridLayout checks passed.");
 
 static CollectionCardVm Item(ECardSize size) => new() { Type = ECardType.Item, Size = size };

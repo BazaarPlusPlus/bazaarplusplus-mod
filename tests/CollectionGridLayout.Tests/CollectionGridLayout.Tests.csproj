@@ -44,6 +44,10 @@
       Link="CollectionGridRetentionPlan.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionCardFitMath.cs"
+      Link="CollectionCardFitMath.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Tooltips\CollectionTierTooltipTextMerger.cs"
       Link="CollectionTierTooltipTextMerger.cs"
     />
