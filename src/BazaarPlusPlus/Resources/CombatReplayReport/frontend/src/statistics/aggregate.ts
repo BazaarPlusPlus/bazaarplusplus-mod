@@ -3,6 +3,7 @@ import {
   type NormalizedEntity,
   type NormalizedEvent,
 } from "../model/normalize.ts";
+import { damageKindFromType } from "../model/damage-semantics.ts";
 import { asFiniteNumber, asString } from "../model/value.ts";
 
 export type CombatSide = "player" | "opponent";
@@ -187,20 +188,6 @@ export function buildStatistics(model: StatisticsModel): CombatStatistics {
     CardFreeze: 3,
   };
 
-  function damageTypeKey(damageType: unknown): keyof DamageTypes {
-    const normalized = asString(damageType, "").toLowerCase();
-    if (normalized === "burn") return "burn";
-    if (normalized === "poison") return "poison";
-    if (
-      normalized === ""
-      || normalized === "damage"
-      || normalized === "crit"
-    ) {
-      return "direct";
-    }
-    return "other";
-  }
-
   for (const event of model.events) {
     if (event.kind.toLowerCase() === "health") {
       const target =
@@ -224,7 +211,7 @@ export function buildStatistics(model: StatisticsModel): CombatStatistics {
       ) {
         const damage = Math.abs(amount);
         output[targetSide][changedAttribute === "Health" ? 1 : 5] += damage;
-        damageTypes[targetSide][damageTypeKey(damageType)] += damage;
+        damageTypes[targetSide][damageKindFromType(damageType)] += damage;
       } else if (
         changedAttribute === "Health"
         && amount > 0

@@ -80,6 +80,7 @@ export function isCombatLogApplicationEvent(
   return (
     DIRECT_STATUS_APPLICATION_ACTIONS.has(event.action)
     || action.includes("burn")
+    || action.includes("poison")
     || action.includes("regen")
   );
 }
@@ -96,6 +97,9 @@ export function combatLogEventToken(
   const kind = event.kind.toLowerCase();
   const action = event.action.toLowerCase();
   if (kind === "effect-executed" && action.includes("burn")) return "burn";
+  if (kind === "effect-executed" && action.includes("poison")) {
+    return "poison";
+  }
   if (kind === "effect-executed" && action.includes("regen")) return "regen";
   if (kind === "player-attribute") {
     if (action !== "health") return "status";

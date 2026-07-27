@@ -385,7 +385,7 @@ export const COPY: Record<string, LocaleCopy> = {
     damageComposition: "Damage received by type",
     damageCompositionEmpty: "No damage type was recorded for this combat.",
     damageCompositionSingle: "Only one damage type occurred, so the viewer shows a direct summary instead of a single-color donut.",
-    damageDirect: "Direct",
+    damageDirect: "Direct damage",
     damageBurn: "Burn",
     damagePoison: "Poison",
     damageOther: "Other",

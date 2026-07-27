@@ -389,6 +389,29 @@ export function StatisticsCharts({
     }),
     [statistics, t],
   );
+  const damageTypeData = useMemo(
+    () => ({
+      categories: [
+        t("damageDirect"),
+        t("damageBurn"),
+        t("damagePoison"),
+        t("damageOther"),
+      ],
+      opponent: [
+        statistics.damageTypes.opponent.direct,
+        statistics.damageTypes.opponent.burn,
+        statistics.damageTypes.opponent.poison,
+        statistics.damageTypes.opponent.other,
+      ],
+      player: [
+        statistics.damageTypes.player.direct,
+        statistics.damageTypes.player.burn,
+        statistics.damageTypes.player.poison,
+        statistics.damageTypes.player.other,
+      ],
+    }),
+    [statistics, t],
+  );
   const outputOption = useMemo(
     () => comparisonChartOption({ ...outputData, t }),
     [outputData, t],
@@ -401,10 +424,14 @@ export function StatisticsCharts({
     }),
     [effectsData, t],
   );
+  const damageTypeOption = useMemo(
+    () => comparisonChartOption({ ...damageTypeData, t }),
+    [damageTypeData, t],
+  );
 
   return (
     <section
-      className="grid gap-2 md:grid-cols-2"
+      className="grid gap-2 md:grid-cols-3"
       data-bpp-test-id="statistics-chart-grid"
     >
       <ChartCard t={t} title={t("outputTotals")}>
@@ -424,6 +451,16 @@ export function StatisticsCharts({
           option={effectsOption}
           player={effectsData.player}
           testId="statistics-echarts-effects"
+          t={t}
+        />
+      </ChartCard>
+      <ChartCard t={t} title={t("damageComposition")}>
+        <ComparisonChart
+          categories={damageTypeData.categories}
+          opponent={damageTypeData.opponent}
+          option={damageTypeOption}
+          player={damageTypeData.player}
+          testId="statistics-echarts-damage-types"
           t={t}
         />
       </ChartCard>

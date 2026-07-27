@@ -11,6 +11,7 @@ import {
   formatDuration,
   formatMilliseconds,
 } from "../../i18n/format.ts";
+import { eventDamageKind } from "../../model/damage-semantics.ts";
 import type {
   NormalizedEntity,
   NormalizedEvent,
@@ -32,6 +33,37 @@ import { ScrollArea } from "../ui/scroll-area.tsx";
 import { mergeInspectorEvents } from "./frame-event-groups.ts";
 
 const PAGE_SIZE = 80;
+
+interface InspectorEventPresentation {
+  groupKey: string;
+  labelKey: string;
+  token: string;
+}
+
+function inspectorEventPresentation(
+  event: Pick<NormalizedEvent, "kind" | "action">,
+): InspectorEventPresentation {
+  const damageKind = eventDamageKind(event);
+  if (damageKind) {
+    return {
+      groupKey: `damage-${damageKind}`,
+      labelKey:
+        damageKind === "direct"
+          ? "damageDirect"
+          : damageKind === "burn"
+            ? "damageBurn"
+            : damageKind === "poison"
+              ? "damagePoison"
+              : "damageOther",
+      token:
+        damageKind === "burn" || damageKind === "poison"
+          ? damageKind
+          : "damage",
+    };
+  }
+  const token = eventKindToken(event);
+  return { groupKey: token, labelKey: token, token };
+}
 
 function EntityReference({
   entityById,
@@ -66,6 +98,54 @@ function EntityReference({
         {entity.name}
       </span>
     </span>
+  );
+}
+
+interface RelationNode {
+  ariaLabel: string;
+  entityId: string;
+  fallback: string;
+  testId: string;
+}
+
+function EventSourceTree({
+  entityById,
+  nodes,
+}: {
+  entityById: ReadonlyMap<string, NormalizedEntity>;
+  nodes: readonly RelationNode[];
+}): React.JSX.Element {
+  return (
+    <div
+      className="relative ml-2.5 mt-1.5 flex min-w-0 flex-col gap-1 pl-4"
+      data-bpp-test-id="frame-event-relation"
+    >
+      <span
+        aria-hidden="true"
+        className="absolute -top-[1.125rem] bottom-[1.125rem] left-0 border-l border-brand-soft/35"
+        data-bpp-test-id="frame-event-relation-line"
+      />
+      {nodes.map((node, index) => (
+        <div
+          aria-label={node.ariaLabel}
+          className="relative flex min-h-9 min-w-0 items-center"
+          key={`${node.testId}:${node.entityId}:${index}`}
+          role="group"
+        >
+          <span
+            aria-hidden="true"
+            className="absolute -left-4 top-1/2 w-3 border-t border-brand-soft/35"
+            data-bpp-test-id="frame-event-relation-branch"
+          />
+          <EntityReference
+            entityById={entityById}
+            entityId={node.entityId}
+            fallback={node.fallback}
+            testId={node.testId}
+          />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -107,19 +187,35 @@ function EventRow({
   event,
   entityById,
   mergedCount = 1,
-  mergedTargets,
   t,
 }: {
   event: NormalizedEvent;
   entityById: ReadonlyMap<string, NormalizedEntity>;
   mergedCount?: number;
-  mergedTargets?: readonly string[];
   t: (key: string) => string;
 }): React.JSX.Element {
-  const token = eventKindToken(event);
+  const presentation = inspectorEventPresentation(event);
   const sourceId = event.sourceId || event.triggerSourceId;
-  const targetIds = mergedTargets ?? event.targetIds;
   const amount = eventAmount(event);
+  const sourceNodes: RelationNode[] = [
+    {
+      ariaLabel: t("source"),
+      entityId: sourceId,
+      fallback: t("sourceNotRecorded"),
+      testId: "event-source-entity",
+    },
+  ];
+  if (
+    event.triggerSourceId
+    && event.triggerSourceId !== sourceId
+  ) {
+    sourceNodes.push({
+      ariaLabel: t("triggerSource"),
+      entityId: event.triggerSourceId,
+      fallback: t("sourceNotRecorded"),
+      testId: "event-trigger-source-entity",
+    });
+  }
   return (
     <article
       className="border-b border-border/45 bg-surface-raised/45 px-2.5 py-2 last:border-b-0"
@@ -130,10 +226,13 @@ function EventRow({
         {event.icon ? (
           <img alt="" className="size-icon-md object-contain" src={event.icon} />
         ) : (
-          <SemanticIcon token={token} />
+          <SemanticIcon token={presentation.token} />
         )}
-        <strong className="truncate text-compact text-foreground">
-          {t(token)}
+        <strong
+          className="truncate text-compact text-foreground"
+          data-bpp-test-id="frame-event-kind"
+        >
+          {t(presentation.labelKey)}
         </strong>
         {mergedCount > 1 && (
           <Badge className="px-1.5 font-mono" variant="secondary">
@@ -146,82 +245,7 @@ function EventRow({
           </strong>
         )}
       </div>
-      <div
-        className="mt-1.5 flex min-w-0 flex-col"
-        data-bpp-test-id="frame-event-relation"
-      >
-        <div
-          aria-label={t("source")}
-          className="min-w-0"
-          role="group"
-        >
-          <EntityReference
-            entityById={entityById}
-            entityId={sourceId}
-            fallback={t("sourceNotRecorded")}
-            testId="event-source-entity"
-          />
-        </div>
-        <div
-          aria-label={t("target")}
-          className="relative ml-3 mt-1 min-w-0 pl-4"
-          data-bpp-test-id="frame-event-target-branch"
-          role="group"
-        >
-          <span
-            aria-hidden="true"
-            className="absolute -top-1 bottom-1/2 left-0 border-l border-brand-soft/35"
-          />
-          <span
-            aria-hidden="true"
-            className="absolute left-0 top-1/2 w-3 border-t border-brand-soft/35"
-            data-bpp-test-id="frame-event-relation-line"
-          />
-          <span className="flex min-w-0 flex-wrap gap-x-2 gap-y-1">
-            {targetIds.length > 0 ? (
-              targetIds.map((targetId) => (
-                <EntityReference
-                  entityById={entityById}
-                  entityId={targetId}
-                  fallback={t("targetNotRecorded")}
-                  key={targetId}
-                  testId="event-target-entity"
-                />
-              ))
-            ) : (
-              <EntityReference
-                entityById={entityById}
-                entityId=""
-                fallback={t("targetNotRecorded")}
-                testId="event-target-entity"
-              />
-            )}
-          </span>
-        </div>
-        {event.triggerSourceId
-          && event.triggerSourceId !== event.sourceId && (
-            <div
-              aria-label={t("triggerSource")}
-              className="relative ml-3 mt-1 min-w-0 pl-4"
-              role="group"
-            >
-              <span
-                aria-hidden="true"
-                className="absolute -top-1 bottom-1/2 left-0 border-l border-brand-soft/35"
-              />
-              <span
-                aria-hidden="true"
-                className="absolute left-0 top-1/2 w-3 border-t border-brand-soft/35"
-              />
-              <EntityReference
-                entityById={entityById}
-                entityId={event.triggerSourceId}
-                fallback={t("sourceNotRecorded")}
-                testId="event-trigger-source-entity"
-              />
-            </div>
-          )}
-      </div>
+      <EventSourceTree entityById={entityById} nodes={sourceNodes} />
     </article>
   );
 }
@@ -262,15 +286,20 @@ export function FrameInspector({
     [focusedIdSet, frame, model.events],
   );
   const groups = useMemo(() => {
-    const result = new Map<string, NormalizedEvent[]>();
+    const result = new Map<
+      string,
+      InspectorEventPresentation & { events: NormalizedEvent[] }
+    >();
     for (const event of events) {
-      const token = eventKindToken(event);
-      const values = result.get(token) ?? [];
-      values.push(event);
-      result.set(token, values);
+      const presentation = inspectorEventPresentation(event);
+      const group = result.get(presentation.groupKey);
+      if (group) group.events.push(event);
+      else result.set(presentation.groupKey, {
+        ...presentation,
+        events: [event],
+      });
     }
-    return Array.from(result.entries())
-      .map(([token, group]) => ({ token, events: group }))
+    return Array.from(result.values())
       .sort((left, right) => right.events.length - left.events.length);
   }, [events]);
   useLayoutEffect(() => {
@@ -292,11 +321,11 @@ export function FrameInspector({
         event={merged.event}
         key={merged.key}
         mergedCount={merged.count}
-        mergedTargets={merged.targetIds}
         t={t}
       />
     ));
   const singleGroup = groups.length === 1 ? groups[0] : undefined;
+  const useGroupedAccordion = groups.length > 1 && events.length > 12;
 
   return (
     <div
@@ -382,29 +411,41 @@ export function FrameInspector({
         <div className="bg-background/20">
           {singleGroup ? (
             <section
-              data-bpp-event-token={singleGroup.token}
+              data-bpp-event-token={singleGroup.groupKey}
               data-bpp-test-id="focused-cluster-group"
             >
               {renderGroupEvents(singleGroup)}
             </section>
+          ) : !useGroupedAccordion ? (
+            groups.map((group) => (
+              <section
+                data-bpp-event-token={group.groupKey}
+                data-bpp-test-id="focused-cluster-group"
+                key={group.groupKey}
+              >
+                {renderGroupEvents(group)}
+              </section>
+            ))
           ) : (
             <Accordion
               className="divide-y divide-border/45"
-              defaultValue={groups.map((group) => group.token)}
+              defaultValue={groups.map((group) => group.groupKey)}
               key={`${entityId}:${frame ?? "none"}:${focusKey}`}
               type="multiple"
             >
               {groups.map((group) => (
                 <AccordionItem
                   className="rounded-none border-x-0 border-y-0 bg-transparent"
-                  data-bpp-event-token={group.token}
+                  data-bpp-event-token={group.groupKey}
                   data-bpp-test-id="focused-cluster-group"
-                  key={group.token}
-                  value={group.token}
+                  key={group.groupKey}
+                  value={group.groupKey}
                 >
                   <AccordionTrigger className="min-h-control-sm px-2.5 py-1.5 text-compact hover:bg-accent/45">
                     <SemanticIcon token={group.token} />
-                    <span className="min-w-0 truncate">{t(group.token)}</span>
+                    <span className="min-w-0 truncate">
+                      {t(group.labelKey)}
+                    </span>
                     <Badge
                       className="px-1.5 font-mono"
                       variant="secondary"

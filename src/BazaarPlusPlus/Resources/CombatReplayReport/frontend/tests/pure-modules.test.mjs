@@ -88,7 +88,14 @@ import {
   filterTimelineEntities,
   opponentBoundaryLane,
 } from "../src/timeline/lane-filter.ts";
-import { buildEntityActivity } from "../src/statistics/aggregate.ts";
+import {
+  buildEntityActivity,
+  buildStatistics,
+} from "../src/statistics/aggregate.ts";
+import {
+  damageKindFromType,
+  eventDamageKind,
+} from "../src/model/damage-semantics.ts";
 import { mergeInspectorEvents } from "../src/components/inspector/frame-event-groups.ts";
 import {
   buildCombatLogEntries,
@@ -127,6 +134,107 @@ function timelineEvent(overrides = {}) {
     ...overrides,
   };
 }
+
+test("damage semantics distinguish direct, burn, poison, and other outcomes", () => {
+  assert.equal(damageKindFromType("Damage"), "direct");
+  assert.equal(damageKindFromType("Crit"), "direct");
+  assert.equal(damageKindFromType("Burn"), "burn");
+  assert.equal(damageKindFromType("Poison"), "poison");
+  assert.equal(damageKindFromType("UnknownDamageType"), "other");
+  assert.equal(
+    eventDamageKind(
+      timelineEvent({ kind: "effect-executed", action: "PlayerDamage" }),
+    ),
+    "direct",
+  );
+  assert.equal(
+    eventDamageKind(
+      timelineEvent({ kind: "effect-executed", action: "PlayerBurnApply" }),
+    ),
+    "burn",
+  );
+  assert.equal(
+    eventDamageKind(
+      timelineEvent({ kind: "effect-executed", action: "PlayerPoisonApply" }),
+    ),
+    "poison",
+  );
+  assert.equal(
+    eventDamageKind(timelineEvent({ kind: "health", action: "Health:Burn" })),
+    "burn",
+  );
+  assert.equal(
+    eventDamageKind(timelineEvent({ kind: "status", action: "Damage" })),
+    null,
+  );
+
+  const entity = (id, side) => ({
+    id,
+    name: id,
+    type: "hero",
+    side,
+    span: 1,
+    asset: "",
+    hiddenFromTimeline: false,
+  });
+  const statistics = buildStatistics({
+    entities: [
+      entity("player", "player"),
+      entity("opponent", "opponent"),
+    ],
+    events: [
+      timelineEvent({
+        id: "direct",
+        kind: "health",
+        action: "Health:Damage",
+        targetIds: ["opponent"],
+        value: -100,
+      }),
+      timelineEvent({
+        id: "burn",
+        kind: "health",
+        action: "Health:Burn",
+        targetIds: ["opponent"],
+        value: -30,
+      }),
+      timelineEvent({
+        id: "poison",
+        kind: "health",
+        action: "Health:Poison",
+        targetIds: ["opponent"],
+        value: -20,
+      }),
+      timelineEvent({
+        id: "other",
+        kind: "health",
+        action: "Health:Reflect",
+        targetIds: ["opponent"],
+        value: -5,
+      }),
+      timelineEvent({
+        id: "opponent-direct",
+        kind: "health",
+        action: "Health:Damage",
+        targetIds: ["player"],
+        value: -70,
+      }),
+    ],
+  });
+  assert.deepEqual(statistics.damageTypes.opponent, {
+    direct: 100,
+    burn: 30,
+    poison: 20,
+    other: 5,
+  });
+  assert.deepEqual(statistics.damageTypes.player, {
+    direct: 70,
+    burn: 0,
+    poison: 0,
+    other: 0,
+  });
+  assert.equal(statistics.damageDealt.player, 155);
+  assert.equal(statistics.damageDealt.opponent, 70);
+});
 
 test("combat log merges only identical events from the same frame", () => {
   const base = timelineEvent({
@@ -170,7 +278,7 @@ test("combat log merges only identical events from the same frame", () => {
   assert.equal(entries.filter((entry) => entry.frame === 21).length, 1);
 });
 
-test("combat log preserves burn and regeneration applications alongside their health settlements", () => {
+test("combat log preserves burn, poison, and regeneration applications alongside their health settlements", () => {
   const events = [
     timelineEvent({
       id: "burn-application",
@@ -183,6 +291,18 @@ test("combat log preserves burn and regeneration applications alongside their he
       value: 16,
       iconSemanticKey: "burn",
       icon: "../report-assets/status-burn.png",
+    }),
+    timelineEvent({
+      id: "poison-application",
+      frame: 80,
+      combatMs: 4_000,
+      kind: "effect-executed",
+      action: "PlayerPoisonApply",
+      sourceId: "trail-mix",
+      targetIds: ["opponent"],
+      value: 9,
+      iconSemanticKey: "poison",
+      icon: "../report-assets/status-poison.png",
     }),
     timelineEvent({
       id: "regen-application",
@@ -217,13 +337,15 @@ test("combat log preserves burn and regeneration applications alongside their he
   ];
 
   assert.equal(combatLogEventToken(events[0]), "burn");
-  assert.equal(combatLogEventToken(events[1]), "regen");
-  assert.equal(combatLogEventToken(events[2]), "damage");
-  assert.equal(combatLogEventToken(events[3]), "heal");
+  assert.equal(combatLogEventToken(events[1]), "poison");
+  assert.equal(combatLogEventToken(events[2]), "regen");
+  assert.equal(combatLogEventToken(events[3]), "damage");
+  assert.equal(combatLogEventToken(events[4]), "heal");
   assert.equal(isCombatLogHealthSettlementEvent(events[0]), false);
   assert.equal(isCombatLogHealthSettlementEvent(events[1]), false);
-  assert.equal(isCombatLogHealthSettlementEvent(events[2]), true);
+  assert.equal(isCombatLogHealthSettlementEvent(events[2]), false);
   assert.equal(isCombatLogHealthSettlementEvent(events[3]), true);
+  assert.equal(isCombatLogHealthSettlementEvent(events[4]), true);
   assert.equal(
     isCombatLogHealthSettlementEvent(
       timelineEvent({ kind: "health", action: "Health:Damage" }),
@@ -236,6 +358,7 @@ test("combat log preserves burn and regeneration applications alongside their he
     Object.fromEntries(entries.map((entry) => [entry.action, entry.token])),
     {
       PlayerBurnApply: "burn",
+      PlayerPoisonApply: "poison",
       PlayerRegenApply: "regen",
       "Health:Burn": "damage",
       "Health:Regen": "heal",
@@ -244,6 +367,10 @@ test("combat log preserves burn and regeneration applications alongside their he
   assert.equal(
     entries.find((entry) => entry.action === "PlayerBurnApply")?.icon,
     "../report-assets/status-burn.png",
+  );
+  assert.equal(
+    entries.find((entry) => entry.action === "PlayerPoisonApply")?.icon,
+    "../report-assets/status-poison.png",
   );
   assert.equal(
     entries.find((entry) => entry.action === "PlayerRegenApply")?.icon,

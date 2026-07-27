@@ -231,6 +231,7 @@ const fixtureEnvelope = {
 let fixtureDirectory;
 let reportUrl;
 let chartReportUrl;
+let damageKindsReportUrl;
 let denseReportUrl;
 let statusApplicationReportUrl;
 let recordingReportUrl;
@@ -289,7 +290,37 @@ test.beforeAll(async ({ browserName }) => {
       sourceEntityId: "player-item",
       triggerSourceEntityId: "player-item",
       targetEntityIds: ["opponent-hero"],
-      value: -320,
+      value: -200,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "exact",
+    }),
+    schemaEvent({
+      eventId: "chart-player-burn",
+      frame: 111,
+      frameSequence: 0,
+      combatTimeMs: 5550,
+      kind: "health",
+      action: "Health:Burn",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-item",
+      targetEntityIds: ["opponent-hero"],
+      value: -70,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "exact",
+    }),
+    schemaEvent({
+      eventId: "chart-player-poison",
+      frame: 112,
+      frameSequence: 0,
+      combatTimeMs: 5600,
+      kind: "health",
+      action: "Health:Poison",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-item",
+      targetEntityIds: ["opponent-hero"],
+      value: -50,
       unit: "points",
       role: "received",
       attributionConfidence: "exact",
@@ -304,16 +335,92 @@ test.beforeAll(async ({ browserName }) => {
       sourceEntityId: "opponent-item",
       triggerSourceEntityId: "opponent-item",
       targetEntityIds: ["player-hero"],
-      value: -180,
+      value: -100,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "exact",
+    }),
+    schemaEvent({
+      eventId: "chart-opponent-burn",
+      frame: 121,
+      frameSequence: 0,
+      combatTimeMs: 6050,
+      kind: "health",
+      action: "Health:Burn",
+      sourceEntityId: "opponent-item",
+      triggerSourceEntityId: "opponent-item",
+      targetEntityIds: ["player-hero"],
+      value: -50,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "exact",
+    }),
+    schemaEvent({
+      eventId: "chart-opponent-poison",
+      frame: 122,
+      frameSequence: 0,
+      combatTimeMs: 6100,
+      kind: "health",
+      action: "Health:Poison",
+      sourceEntityId: "opponent-item",
+      triggerSourceEntityId: "opponent-item",
+      targetEntityIds: ["player-hero"],
+      value: -30,
       unit: "points",
       role: "received",
       attributionConfidence: "exact",
     }),
   );
-  chartEnvelope.battleDocument.rawRecordCount += 2;
+  chartEnvelope.battleDocument.rawRecordCount += 6;
   await writeFile(
     join(fixtureDirectory, "chart-report.html"),
     reportHtml(chartEnvelope),
+    "utf8",
+  );
+  const damageKindsEnvelope = structuredClone(fixtureEnvelope);
+  damageKindsEnvelope.battleDocument.events = [
+    schemaEvent({
+      ...damageKindsEnvelope.battleDocument.events[0],
+      eventId: "inspector-direct-damage",
+      value: 40,
+    }),
+    schemaEvent({
+      eventId: "inspector-burn",
+      frame: 40,
+      frameSequence: 1,
+      combatTimeMs: 2000,
+      kind: "effect-executed",
+      action: "PlayerBurnApply",
+      sourceEntityId: "player-skill",
+      triggerSourceEntityId: "player-skill",
+      targetEntityIds: ["opponent-hero"],
+      value: 12,
+      unit: "points",
+      role: "applied",
+      attributionConfidence: "exact",
+      iconSemanticKey: "status.burn",
+    }),
+    schemaEvent({
+      eventId: "inspector-poison",
+      frame: 40,
+      frameSequence: 2,
+      combatTimeMs: 2000,
+      kind: "effect-executed",
+      action: "PlayerPoisonApply",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-item",
+      targetEntityIds: ["opponent-hero"],
+      value: 6,
+      unit: "points",
+      role: "applied",
+      attributionConfidence: "exact",
+      iconSemanticKey: "status.poison",
+    }),
+  ];
+  damageKindsEnvelope.battleDocument.rawRecordCount = 3;
+  await writeFile(
+    join(fixtureDirectory, "damage-kinds-report.html"),
+    reportHtml(damageKindsEnvelope),
     "utf8",
   );
   const denseEnvelope = structuredClone(fixtureEnvelope);
@@ -543,6 +650,9 @@ test.beforeAll(async ({ browserName }) => {
   reportUrl = pathToFileURL(join(fixtureDirectory, "report.html")).href;
   chartReportUrl = pathToFileURL(
     join(fixtureDirectory, "chart-report.html"),
+  ).href;
+  damageKindsReportUrl = pathToFileURL(
+    join(fixtureDirectory, "damage-kinds-report.html"),
   ).href;
   denseReportUrl = pathToFileURL(
     join(fixtureDirectory, "dense-report.html"),
@@ -2105,6 +2215,10 @@ test("paints themed ECharts and a structured hover card", async ({
   await expect(
     page.getByTestId("statistics-echarts-effects").locator("canvas"),
   ).toHaveCount(1);
+  const damageTypesHost = page.getByTestId(
+    "statistics-echarts-damage-types",
+  );
+  await expect(damageTypesHost.locator("canvas")).toHaveCount(1);
   await expect(page.getByTestId("statistics-chart-legend").first()).toContainText(
     "Player",
   );
@@ -2122,10 +2236,14 @@ test("paints themed ECharts and a structured hover card", async ({
       };
     });
   expect(chartGeometry.height).toBeLessThan(180);
-  expect(chartGeometry.widths.every((width) => width > 400)).toBe(true);
+  expect(chartGeometry.widths).toHaveLength(3);
+  expect(chartGeometry.widths.every((width) => width > 280)).toBe(true);
   expect(
-    Math.abs(chartGeometry.yPositions[0] - chartGeometry.yPositions[1]),
-  ).toBeLessThan(0.5);
+    chartGeometry.yPositions.every(
+      (position) =>
+        Math.abs(position - chartGeometry.yPositions[0]) < 0.5,
+    ),
+  ).toBe(true);
   const paintedPixels = await host.locator("canvas").evaluate((canvas) => {
     const context = canvas.getContext("2d");
     if (!context) return 0;
@@ -2178,6 +2296,16 @@ test("paints themed ECharts and a structured hover card", async ({
   expect(tooltipSurface.borderColor).not.toBe("rgb(255, 255, 255)");
   expect(Number.parseFloat(tooltipSurface.borderRadius)).toBeGreaterThan(0);
   expect(tooltipSurface.color).not.toBe("rgb(0, 0, 0)");
+
+  await damageTypesHost.getByTestId("statistics-chart-hit-0").hover();
+  await expect(tooltip.locator(".bpp-chart-tooltip-title")).toHaveText(
+    "Direct damage",
+  );
+  const damageTypeRows = tooltip.locator(".bpp-chart-tooltip-row");
+  await expect(damageTypeRows.nth(0)).toContainText("Player");
+  await expect(damageTypeRows.nth(0)).toContainText("100");
+  await expect(damageTypeRows.nth(1)).toContainText("Opponent");
+  await expect(damageTypeRows.nth(1)).toContainText("200");
 
   const burnHeader = page.getByTestId("statistics-activity-sort-burn");
   expect(
@@ -2234,7 +2362,7 @@ test("keeps mounted ECharts instances across statistics rerenders and disposes o
         init: window.__BPP_VIEWER_TEST__?.echartsInitCount ?? -1,
       }))
     )
-    .toEqual({ dispose: 0, init: 2 });
+    .toEqual({ dispose: 0, init: 3 });
 
   await page.getByTestId("statistics-activity-sort-damage").click();
   await page.getByTestId("statistics-activity-group-by-side").click();
@@ -2246,7 +2374,7 @@ test("keeps mounted ECharts instances across statistics rerenders and disposes o
         init: window.__BPP_VIEWER_TEST__?.echartsInitCount ?? -1,
       }))
     )
-    .toEqual({ dispose: 0, init: 2 });
+    .toEqual({ dispose: 0, init: 3 });
 
   await page.getByTestId("report-tab-timeline").click();
   await expect
@@ -2256,7 +2384,80 @@ test("keeps mounted ECharts instances across statistics rerenders and disposes o
         init: window.__BPP_VIEWER_TEST__?.echartsInitCount ?? -1,
       }))
     )
-    .toEqual({ dispose: 2, init: 2 });
+    .toEqual({ dispose: 3, init: 3 });
+});
+
+test("distinguishes damage kinds and treats the selected lane as the implicit target", async ({
+  page,
+}) => {
+  await page.goto(`${damageKindsReportUrl}?lang=en`);
+  const canvas = page.getByTestId("timeline-canvas");
+  let point = null;
+  await expect
+    .poll(async () => {
+      const bounds = await canvas.boundingBox();
+      if (!bounds) return "";
+      point = {
+        x: bounds.x + bounds.width * 0.25,
+        y: bounds.y + 3.5 * 52 - 9,
+      };
+      await page.mouse.move(point.x, point.y);
+      return (
+        (await page.getByTestId("timeline-tooltip-count").textContent()) ?? ""
+      ).trim();
+    })
+    .toBe("3 events");
+  expect(point).not.toBeNull();
+  await page.mouse.click(point.x, point.y);
+
+  await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
+    "Fixture Opponent",
+  );
+  await expect(page.getByTestId("frame-event-kind")).toHaveText([
+    "Direct damage",
+    "Burn",
+    "Poison",
+  ]);
+  expect(
+    await page.getByTestId("focused-cluster-group").evaluateAll(
+      (elements) =>
+        elements.map((element) =>
+          element.getAttribute("data-bpp-event-token")
+        ),
+    ),
+  ).toEqual(["damage-direct", "damage-burn", "damage-poison"]);
+  await expect(page.getByTestId("focused-cluster-event")).toHaveCount(3);
+  await expect(page.getByTestId("event-source-entity")).toHaveCount(3);
+  await expect(page.getByTestId("event-target-entity")).toHaveCount(0);
+  await expect(
+    page
+      .getByTestId("frame-event-list")
+      .locator('[data-slot="accordion-trigger"]'),
+  ).toHaveCount(0);
+
+  const sourceTreeGeometry = await page
+    .getByTestId("focused-cluster-event")
+    .first()
+    .evaluate((element) => {
+      const line = element.querySelector(
+        '[data-bpp-test-id="frame-event-relation-line"]',
+      );
+      const branch = element.querySelector(
+        '[data-bpp-test-id="frame-event-relation-branch"]',
+      );
+      const source = element.querySelector(
+        '[data-bpp-test-id="event-source-entity"]',
+      );
+      const styles = (node) => node ? getComputedStyle(node) : null;
+      return {
+        branchWidth: styles(branch)?.borderTopWidth ?? "0px",
+        lineWidth: styles(line)?.borderLeftWidth ?? "0px",
+        sourceText: source?.textContent?.trim() ?? "",
+      };
+    });
+  expect(sourceTreeGeometry.branchWidth).not.toBe("0px");
+  expect(sourceTreeGeometry.lineWidth).not.toBe("0px");
+  expect(sourceTreeGeometry.sourceText).toContain("Training Blade");
 });
 
 test("scopes the inspector to the exact clicked cluster", async ({
@@ -2317,7 +2518,7 @@ test("scopes the inspector to the exact clicked cluster", async ({
   );
   await expect(page.getByTestId("focused-cluster-group")).toHaveAttribute(
     "data-bpp-event-token",
-    "damage",
+    "damage-direct",
   );
   await expect(page.getByTestId("focused-cluster-event")).toHaveCount(80);
   await expect(page.getByTestId("frame-event-list")).not.toContainText(
@@ -2332,9 +2533,7 @@ test("scopes the inspector to the exact clicked cluster", async ({
       .first()
       .locator('[data-entity-type="item"]'),
   ).toHaveCount(1);
-  await expect(page.getByTestId("event-target-entity").first()).toContainText(
-    "Fixture Opponent",
-  );
+  await expect(page.getByTestId("event-target-entity")).toHaveCount(0);
   await expect(
     page.getByTestId("focused-cluster-event").first().getByText("Source", {
       exact: true,
@@ -2352,24 +2551,27 @@ test("scopes the inspector to the exact clicked cluster", async ({
       const source = element.querySelector(
         '[data-bpp-test-id="event-source-entity"]',
       );
-      const target = element.querySelector(
-        '[data-bpp-test-id="event-target-entity"]',
-      );
       const line = element.querySelector(
         '[data-bpp-test-id="frame-event-relation-line"]',
       );
+      const branch = element.querySelector(
+        '[data-bpp-test-id="frame-event-relation-branch"]',
+      );
+      const eventBounds = element.getBoundingClientRect();
       const sourceBounds = source?.getBoundingClientRect();
-      const targetBounds = target?.getBoundingClientRect();
       const lineStyle = line ? getComputedStyle(line) : null;
+      const branchStyle = branch ? getComputedStyle(branch) : null;
       return {
+        eventLeft: eventBounds.left,
         sourceLeft: sourceBounds?.left ?? 0,
-        targetLeft: targetBounds?.left ?? 0,
-        lineWidth: lineStyle?.borderTopWidth ?? "0px",
+        branchWidth: branchStyle?.borderTopWidth ?? "0px",
+        lineWidth: lineStyle?.borderLeftWidth ?? "0px",
       };
     });
-  expect(relationGeometry.targetLeft).toBeGreaterThan(
-    relationGeometry.sourceLeft,
+  expect(relationGeometry.sourceLeft).toBeGreaterThan(
+    relationGeometry.eventLeft,
   );
+  expect(relationGeometry.branchWidth).not.toBe("0px");
   expect(relationGeometry.lineWidth).not.toBe("0px");
   await expect(page.getByTestId("timeline-lane-1")).toHaveClass(
     /is-related-source/u,
