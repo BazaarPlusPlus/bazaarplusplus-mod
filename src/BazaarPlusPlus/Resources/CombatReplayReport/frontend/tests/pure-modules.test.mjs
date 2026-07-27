@@ -96,7 +96,10 @@ import {
   damageKindFromType,
   eventDamageKind,
 } from "../src/model/damage-semantics.ts";
-import { mergeInspectorEvents } from "../src/components/inspector/frame-event-groups.ts";
+import {
+  mergeInspectorEvents,
+  summarizeDirectDamageGroup,
+} from "../src/components/inspector/frame-event-groups.ts";
 import {
   buildCombatLogEntries,
   combatLogEventToken,
@@ -716,6 +719,102 @@ test("inspector merge identity keeps unit, semantic icon, and attribution distin
   assert.deepEqual(
     merged.slice(1).map((group) => group.event.id),
     ["different-unit", "different-icon", "different-attribution"],
+  );
+});
+
+test("inspector summarizes provable direct damage without guessing per-source values", () => {
+  const silverStake = timelineEvent({
+    id: "silver-stake",
+    frame: 364,
+    sequence: 1,
+    kind: "effect-executed",
+    action: "PlayerDamage",
+    sourceId: "silver-stake-item",
+    triggerSourceId: "silver-stake-item",
+    targetIds: ["player-hero"],
+  });
+  const wolf = timelineEvent({
+    id: "wolf",
+    frame: 364,
+    sequence: 3,
+    kind: "effect-executed",
+    action: "PlayerDamage",
+    sourceId: "wolf-item",
+    triggerSourceId: "wolf-item",
+    targetIds: ["player-hero"],
+  });
+  const frameEvents = [
+    silverStake,
+    wolf,
+    timelineEvent({
+      id: "shield-damage-a",
+      frame: 364,
+      sequence: 8,
+      kind: "health",
+      action: "Shield:Damage",
+      targetIds: ["player-hero"],
+      value: -740,
+    }),
+    timelineEvent({
+      id: "shield-damage-b",
+      frame: 364,
+      sequence: 9,
+      kind: "health",
+      action: "Shield:Damage",
+      targetIds: ["player-hero"],
+      value: -690,
+    }),
+    timelineEvent({
+      id: "aggregate-shield-metric",
+      frame: 364,
+      sequence: 10,
+      kind: "player-attribute",
+      action: "Shield",
+      targetIds: ["player-hero"],
+      value: -1_430,
+    }),
+    timelineEvent({
+      id: "other-target-damage",
+      frame: 364,
+      sequence: 11,
+      kind: "health",
+      action: "Health:Damage",
+      targetIds: ["opponent-hero"],
+      value: -999,
+    }),
+  ];
+
+  const summary = summarizeDirectDamageGroup(
+    [silverStake, wolf],
+    frameEvents,
+    "player-hero",
+  );
+  assert.deepEqual(summary, {
+    amount: 1_430,
+    settlementEventIds: ["shield-damage-a", "shield-damage-b"],
+  });
+  assert.equal(
+    summarizeDirectDamageGroup(
+      [silverStake],
+      frameEvents,
+      "player-hero",
+    ),
+    null,
+  );
+  assert.equal(
+    summarizeDirectDamageGroup(
+      [
+        silverStake,
+        {
+          ...wolf,
+          sourceId: silverStake.sourceId,
+          triggerSourceId: silverStake.triggerSourceId,
+        },
+      ],
+      frameEvents,
+      "player-hero",
+    ),
+    null,
   );
 });
 

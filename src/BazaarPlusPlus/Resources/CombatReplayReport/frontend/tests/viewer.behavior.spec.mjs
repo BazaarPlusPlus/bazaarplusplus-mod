@@ -232,6 +232,7 @@ let fixtureDirectory;
 let reportUrl;
 let chartReportUrl;
 let damageKindsReportUrl;
+let directDamageSummaryReportUrl;
 let denseReportUrl;
 let statusApplicationReportUrl;
 let recordingReportUrl;
@@ -421,6 +422,90 @@ test.beforeAll(async ({ browserName }) => {
   await writeFile(
     join(fixtureDirectory, "damage-kinds-report.html"),
     reportHtml(damageKindsEnvelope),
+    "utf8",
+  );
+  const directDamageSummaryEnvelope = structuredClone(fixtureEnvelope);
+  directDamageSummaryEnvelope.battleDocument.entities.find(
+    (entity) => entity.entityId === "player-item",
+  ).name = "Silver Stake";
+  directDamageSummaryEnvelope.battleDocument.entities.find(
+    (entity) => entity.entityId === "player-skill",
+  ).name = "Wolf";
+  directDamageSummaryEnvelope.battleDocument.events = [
+    schemaEvent({
+      eventId: "direct-silver-stake",
+      frame: 40,
+      frameSequence: 0,
+      combatTimeMs: 2000,
+      kind: "effect-executed",
+      action: "PlayerDamage",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-item",
+      targetEntityIds: ["opponent-hero"],
+      unit: "points",
+      role: "applied",
+      attributionConfidence: "exact",
+      iconSemanticKey: "damage",
+    }),
+    schemaEvent({
+      eventId: "direct-wolf",
+      frame: 40,
+      frameSequence: 1,
+      combatTimeMs: 2000,
+      kind: "effect-executed",
+      action: "PlayerDamage",
+      sourceEntityId: "player-skill",
+      triggerSourceEntityId: "player-skill",
+      targetEntityIds: ["opponent-hero"],
+      unit: "points",
+      role: "applied",
+      attributionConfidence: "exact",
+      iconSemanticKey: "damage",
+    }),
+    schemaEvent({
+      eventId: "direct-shield-settlement-a",
+      frame: 40,
+      frameSequence: 8,
+      combatTimeMs: 2000,
+      kind: "health",
+      action: "Shield:Damage",
+      targetEntityIds: ["opponent-hero"],
+      value: -740,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+    }),
+    schemaEvent({
+      eventId: "direct-shield-settlement-b",
+      frame: 40,
+      frameSequence: 9,
+      combatTimeMs: 2000,
+      kind: "health",
+      action: "Shield:Damage",
+      targetEntityIds: ["opponent-hero"],
+      value: -690,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+    }),
+    schemaEvent({
+      eventId: "direct-shield-aggregate",
+      frame: 40,
+      frameSequence: 10,
+      combatTimeMs: 2000,
+      kind: "player-attribute",
+      action: "Shield",
+      targetEntityIds: ["opponent-hero"],
+      value: -1430,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+    }),
+  ];
+  directDamageSummaryEnvelope.battleDocument.rawRecordCount = 5;
+  await writeFile(
+    join(fixtureDirectory, "direct-damage-summary-report.html"),
+    reportHtml(directDamageSummaryEnvelope),
     "utf8",
   );
   const denseEnvelope = structuredClone(fixtureEnvelope);
@@ -653,6 +738,9 @@ test.beforeAll(async ({ browserName }) => {
   ).href;
   damageKindsReportUrl = pathToFileURL(
     join(fixtureDirectory, "damage-kinds-report.html"),
+  ).href;
+  directDamageSummaryReportUrl = pathToFileURL(
+    join(fixtureDirectory, "direct-damage-summary-report.html"),
   ).href;
   denseReportUrl = pathToFileURL(
     join(fixtureDirectory, "dense-report.html"),
@@ -2458,6 +2546,44 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
   expect(sourceTreeGeometry.branchWidth).not.toBe("0px");
   expect(sourceTreeGeometry.lineWidth).not.toBe("0px");
   expect(sourceTreeGeometry.sourceText).toContain("Training Blade");
+});
+
+test("groups same-frame direct damage sources under one exact total", async ({
+  page,
+}) => {
+  await page.goto(`${directDamageSummaryReportUrl}?lang=en`);
+  const canvas = page.getByTestId("timeline-canvas");
+  let point = null;
+  await expect
+    .poll(async () => {
+      const bounds = await canvas.boundingBox();
+      if (!bounds) return "";
+      point = {
+        x: bounds.x + bounds.width * 0.25,
+        y: bounds.y + 3.5 * 52 - 9,
+      };
+      await page.mouse.move(point.x, point.y);
+      return (
+        (await page.getByTestId("timeline-tooltip-count").textContent()) ?? ""
+      ).trim();
+    })
+    .toBe("2 events");
+  expect(point).not.toBeNull();
+  await page.mouse.click(point.x, point.y);
+
+  await expect(page.getByTestId("frame-event-total")).toHaveText("2 events");
+  await expect(page.getByTestId("focused-cluster-event")).toHaveCount(1);
+  await expect(page.getByTestId("frame-event-kind")).toHaveText(
+    "Direct damage",
+  );
+  await expect(page.getByTestId("frame-event-amount")).toHaveText("1,430");
+  await expect(page.getByTestId("event-source-entity")).toHaveText([
+    "Silver Stake",
+    "Wolf",
+  ]);
+  await expect(page.getByTestId("frame-event-relation-branch")).toHaveCount(2);
+  await expect(page.getByTestId("frame-event-list")).not.toContainText("740");
+  await expect(page.getByTestId("frame-event-list")).not.toContainText("690");
 });
 
 test("scopes the inspector to the exact clicked cluster", async ({

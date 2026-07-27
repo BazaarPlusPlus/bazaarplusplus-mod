@@ -10,6 +10,7 @@ import {
   formatCompactNumber,
   formatDuration,
   formatMilliseconds,
+  formatNumber,
 } from "../../i18n/format.ts";
 import { eventDamageKind } from "../../model/damage-semantics.ts";
 import type {
@@ -30,7 +31,10 @@ import {
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { ScrollArea } from "../ui/scroll-area.tsx";
-import { mergeInspectorEvents } from "./frame-event-groups.ts";
+import {
+  mergeInspectorEvents,
+  summarizeDirectDamageGroup,
+} from "./frame-event-groups.ts";
 
 const PAGE_SIZE = 80;
 
@@ -195,27 +199,7 @@ function EventRow({
   t: (key: string) => string;
 }): React.JSX.Element {
   const presentation = inspectorEventPresentation(event);
-  const sourceId = event.sourceId || event.triggerSourceId;
   const amount = eventAmount(event);
-  const sourceNodes: RelationNode[] = [
-    {
-      ariaLabel: t("source"),
-      entityId: sourceId,
-      fallback: t("sourceNotRecorded"),
-      testId: "event-source-entity",
-    },
-  ];
-  if (
-    event.triggerSourceId
-    && event.triggerSourceId !== sourceId
-  ) {
-    sourceNodes.push({
-      ariaLabel: t("triggerSource"),
-      entityId: event.triggerSourceId,
-      fallback: t("sourceNotRecorded"),
-      testId: "event-trigger-source-entity",
-    });
-  }
   return (
     <article
       className="border-b border-border/45 bg-surface-raised/45 px-2.5 py-2 last:border-b-0"
@@ -240,12 +224,96 @@ function EventRow({
           </Badge>
         )}
         {amount && (
-          <strong className="ml-auto shrink-0 font-mono text-compact text-brand-soft">
+          <strong
+            className="ml-auto shrink-0 font-mono text-compact text-brand-soft"
+            data-bpp-test-id="frame-event-amount"
+          >
             {amount}
           </strong>
         )}
       </div>
-      <EventSourceTree entityById={entityById} nodes={sourceNodes} />
+      <EventSourceTree
+        entityById={entityById}
+        nodes={sourceTreeNodes([event], t)}
+      />
+    </article>
+  );
+}
+
+function sourceTreeNodes(
+  events: readonly NormalizedEvent[],
+  t: (key: string) => string,
+): RelationNode[] {
+  const nodes: RelationNode[] = [];
+  const seen = new Set<string>();
+  for (const event of events) {
+    const sourceId = event.sourceId || event.triggerSourceId;
+    const sourceKey = `source:${sourceId}`;
+    if (!seen.has(sourceKey)) {
+      seen.add(sourceKey);
+      nodes.push({
+        ariaLabel: t("source"),
+        entityId: sourceId,
+        fallback: t("sourceNotRecorded"),
+        testId: "event-source-entity",
+      });
+    }
+    if (
+      event.triggerSourceId
+      && event.triggerSourceId !== sourceId
+    ) {
+      const triggerKey = `trigger:${event.triggerSourceId}`;
+      if (!seen.has(triggerKey)) {
+        seen.add(triggerKey);
+        nodes.push({
+          ariaLabel: t("triggerSource"),
+          entityId: event.triggerSourceId,
+          fallback: t("sourceNotRecorded"),
+          testId: "event-trigger-source-entity",
+        });
+      }
+    }
+  }
+  return nodes;
+}
+
+function DirectDamageGroupRow({
+  amount,
+  entityById,
+  events,
+  t,
+}: {
+  amount: number;
+  entityById: ReadonlyMap<string, NormalizedEntity>;
+  events: readonly NormalizedEvent[];
+  t: (key: string) => string;
+}): React.JSX.Element {
+  return (
+    <article
+      className="border-b border-border/45 bg-surface-raised/45 px-2.5 py-2 last:border-b-0"
+      data-bpp-event-id={events[0]?.id}
+      data-bpp-event-ids={events.map((event) => event.id).join(" ")}
+      data-bpp-test-id="focused-cluster-event"
+    >
+      <div className="flex min-h-control-xs items-center gap-1.5">
+        <SemanticIcon token="damage" />
+        <strong
+          className="truncate text-compact text-foreground"
+          data-bpp-test-id="frame-event-kind"
+        >
+          {t("damageDirect")}
+        </strong>
+        <strong
+          className="ml-auto shrink-0 font-mono text-compact text-brand-soft"
+          data-bpp-test-id="frame-event-amount"
+        >
+          {formatNumber(amount)}
+        </strong>
+      </div>
+      <EventSourceTree
+        entityById={entityById}
+        nodes={sourceTreeNodes(events, t)}
+      />
     </article>
   );
 }
@@ -278,12 +346,16 @@ export function FrameInspector({
     () => new Set(focusedEventIds),
     [focusedEventIds],
   );
+  const frameEvents = useMemo(
+    () => eventsAtFrame(model.events, frame),
+    [frame, model.events],
+  );
   const events = useMemo(
     () =>
-      eventsAtFrame(model.events, frame).filter((event) =>
+      frameEvents.filter((event) =>
         focusedIdSet.has(event.id),
       ),
-    [focusedIdSet, frame, model.events],
+    [focusedIdSet, frameEvents],
   );
   const groups = useMemo(() => {
     const result = new Map<
@@ -314,8 +386,27 @@ export function FrameInspector({
   }`;
   const renderGroupEvents = (
     group: (typeof groups)[number],
-  ): React.JSX.Element[] =>
-    mergeInspectorEvents(group.events.slice(0, limit)).map((merged) => (
+  ): React.JSX.Element | React.JSX.Element[] => {
+    const visibleEvents = group.events.slice(0, limit);
+    const directDamageSummary =
+      visibleEvents.length === group.events.length
+        ? summarizeDirectDamageGroup(
+          group.events,
+          frameEvents,
+          entityId,
+        )
+        : null;
+    if (directDamageSummary) {
+      return (
+        <DirectDamageGroupRow
+          amount={directDamageSummary.amount}
+          entityById={entityById}
+          events={group.events}
+          t={t}
+        />
+      );
+    }
+    return mergeInspectorEvents(visibleEvents).map((merged) => (
       <EventRow
         entityById={entityById}
         event={merged.event}
@@ -324,6 +415,7 @@ export function FrameInspector({
         t={t}
       />
     ));
+  };
   const singleGroup = groups.length === 1 ? groups[0] : undefined;
   const useGroupedAccordion = groups.length > 1 && events.length > 12;
 
