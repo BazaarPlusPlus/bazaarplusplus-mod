@@ -716,8 +716,27 @@ test.beforeAll(async ({ browserName }) => {
       attributionConfidence: "target-exact-source-unknown",
       iconSemanticKey: "status.critChance",
     }),
+    schemaEvent({
+      eventId: "structural-multi-target-haste",
+      frame: 100,
+      frameSequence: 0,
+      combatTimeMs: 5000,
+      kind: "effect-executed",
+      action: "CardHaste",
+      sourceEntityId: "opponent-item",
+      triggerSourceEntityId: "opponent-item",
+      targetEntityIds: [
+        "player-item-multicast",
+        "player-item-cooldown",
+      ],
+      value: 2000,
+      unit: "ms",
+      role: "applied",
+      attributionConfidence: "exact",
+      iconSemanticKey: "status.haste",
+    }),
   ];
-  structuralEnvelope.battleDocument.rawRecordCount = 5;
+  structuralEnvelope.battleDocument.rawRecordCount = 6;
   await writeFile(
     join(fixtureDirectory, "structural-report.html"),
     reportHtml(structuralEnvelope),
@@ -2370,8 +2389,9 @@ test("explains every activity metric on hover and keyboard focus", async ({
   await expect(tooltip).toBeVisible();
   await expect(tooltip).toHaveClass(/animate-in/);
   await expect(tooltip).toContainText("Burn");
-  await expect(tooltip).toContainText("Count");
-  await expect(tooltip).toContainText("0");
+  await expect(tooltip).toContainText(
+    "No affected targets were recorded",
+  );
 
   const quantifiedDamage = itemRow.getByTestId(
     "statistics-activity-value-damage",
@@ -2379,10 +2399,13 @@ test("explains every activity metric on hover and keyboard focus", async ({
   await quantifiedDamage.focus();
   await expect(tooltip).toBeVisible();
   await expect(tooltip).toContainText("Damage");
-  await expect(tooltip).toContainText("Total amount");
-  await expect(tooltip).toContainText("120");
-  await expect(tooltip).toContainText("Count");
-  await expect(tooltip).toContainText("1");
+  await expect(tooltip).toContainText("Effects by target");
+  await expect(
+    tooltip.getByTestId("statistics-activity-target-amount"),
+  ).toHaveText("120");
+  await expect(
+    tooltip.getByTestId("statistics-activity-target-count"),
+  ).toHaveText("×1");
 });
 
 test("activity rows expose button semantics and activate with Enter or Space", async ({
@@ -2896,6 +2919,20 @@ test("renders destroy and structural attributes consistently across timeline, in
   await expect(
     destroyRow.getByTestId("statistics-activity-value-destroy"),
   ).toContainText("×1");
+  await destroyRow
+    .getByTestId("statistics-activity-value-destroy")
+    .hover();
+  const activityTooltip = page.locator(
+    '[data-bpp-test-id="statistics-activity-cell-tooltip"]:not([data-state="closed"])',
+  );
+  await expect(activityTooltip).toBeVisible();
+  await expect(activityTooltip).toContainText("Effects by target");
+  await expect(
+    activityTooltip.getByTestId("statistics-activity-target-name"),
+  ).toHaveText(["Ice Swan"]);
+  await expect(
+    activityTooltip.getByTestId("statistics-activity-target-count"),
+  ).toHaveText(["×1"]);
 
   const zarlicRow = page
     .locator("[data-bpp-test-id^='statistics-activity-row-']")
@@ -2906,25 +2943,6 @@ test("renders destroy and structural attributes consistently across timeline, in
   await expect(
     zarlicRow.getByTestId("statistics-activity-value-multicast"),
   ).toContainText("-1");
-  await zarlicRow
-    .getByTestId("statistics-activity-value-multicast")
-    .hover();
-  const activityTooltip = page.locator(
-    '[data-bpp-test-id="statistics-activity-cell-tooltip"]:not([data-state="closed"])',
-  );
-  await expect(activityTooltip).toBeVisible();
-  await expect(activityTooltip).toContainText("Net change");
-  await expect(activityTooltip).toContainText("First → last");
-  await expect(
-    activityTooltip.getByTestId("statistics-activity-recorded-range"),
-  ).toHaveText("2 → 1");
-  await expect(activityTooltip).toContainText("Decreases");
-  await expect(
-    activityTooltip.getByTestId("statistics-activity-decrease"),
-  ).toContainText("-1");
-  await expect(
-    activityTooltip.getByTestId("statistics-activity-decrease"),
-  ).toContainText("×1");
 
   const sorbetRow = page
     .locator("[data-bpp-test-id^='statistics-activity-row-']")
@@ -2938,6 +2956,66 @@ test("renders destroy and structural attributes consistently across timeline, in
   await expect(
     page.getByTestId("statistics-activity-sort-destroy"),
   ).toContainText("Destroyed");
+});
+
+test("lists every affected target in an activity tooltip", async ({
+  page,
+}) => {
+  await page.goto(`${structuralReportUrl}?lang=en`);
+  await page.getByTestId("report-tab-statistics").click();
+  const sourceRow = page
+    .locator("[data-bpp-test-id^='statistics-activity-row-']")
+    .filter({ hasText: "Disintegration Ray" });
+  await sourceRow
+    .getByTestId("statistics-activity-value-haste")
+    .hover();
+  const tooltip = page.locator(
+    '[data-bpp-test-id="statistics-activity-cell-tooltip"]:not([data-state="closed"])',
+  );
+
+  await expect(tooltip).toBeVisible();
+  await expect(tooltip).toContainText("Effects by target");
+  await expect(
+    tooltip.getByTestId("statistics-activity-target-name"),
+  ).toHaveText(["Zarlic", "Sorbet"]);
+  await expect(
+    tooltip.getByTestId("statistics-activity-target-amount"),
+  ).toHaveText(["2s", "2s"]);
+  await expect(
+    tooltip.getByTestId("statistics-activity-target-count"),
+  ).toHaveText(["×1", "×1"]);
+});
+
+test("shows a target's structural transition in its activity tooltip", async ({
+  page,
+}) => {
+  await page.goto(`${structuralReportUrl}?lang=en`);
+  await page.getByTestId("report-tab-statistics").click();
+  const zarlicRow = page
+    .locator("[data-bpp-test-id^='statistics-activity-row-']")
+    .filter({ hasText: "Zarlic" });
+  await zarlicRow
+    .getByTestId("statistics-activity-value-multicast")
+    .hover();
+  const tooltip = page.locator(
+    '[data-bpp-test-id="statistics-activity-cell-tooltip"]:not([data-state="closed"])',
+  );
+
+  await expect(tooltip).toBeVisible();
+  await expect(
+    tooltip.getByTestId("statistics-activity-target-name"),
+  ).toHaveText(["Zarlic"]);
+  await expect(
+    tooltip.getByTestId("statistics-activity-target-transition"),
+  ).toHaveText("2 → 1");
+  await expect(
+    tooltip.getByTestId("statistics-activity-target-amount"),
+  ).toHaveText("-1");
+  await expect(
+    tooltip.getByTestId("statistics-activity-target-count"),
+  ).toHaveText("×1");
+  await expect(tooltip).not.toContainText("Average");
+  await expect(tooltip).not.toContainText("First → last");
 });
 
 test("groups same-frame direct damage sources under one exact total", async ({

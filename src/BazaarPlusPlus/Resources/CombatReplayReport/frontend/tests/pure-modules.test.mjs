@@ -1008,6 +1008,79 @@ test("entity activity falls back to an exact trigger source without overriding a
   assert.equal(rowById.get(directItem.id)?.amounts.haste, 500);
 });
 
+test("entity activity preserves every affected target without dividing a multi-target effect amount", () => {
+  const source = normalizeEntity(
+    {
+      entityId: "multi-target-source",
+      owner: "player",
+      type: "item",
+      name: "Coffee",
+    },
+    0,
+  );
+  const firstTarget = normalizeEntity(
+    {
+      entityId: "multi-target-first",
+      owner: "player",
+      type: "item",
+      name: "Microwave",
+    },
+    1,
+  );
+  const secondTarget = normalizeEntity(
+    {
+      entityId: "multi-target-second",
+      owner: "player",
+      type: "item",
+      name: "Trail Mix",
+    },
+    2,
+  );
+  const rows = buildEntityActivity({
+    entities: [source, firstTarget, secondTarget],
+    events: [
+      timelineEvent({
+        id: "multi-target-haste",
+        kind: "effect-executed",
+        action: "CardHaste",
+        sourceId: source.id,
+        targetIds: [firstTarget.id, secondTarget.id],
+        attributionConfidence: "exact",
+        value: 2_000,
+      }),
+    ],
+  });
+  const sourceRow = rows.find((row) => row.entity.id === source.id);
+
+  assert.equal(sourceRow?.counts.haste, 1);
+  assert.equal(sourceRow?.amounts.haste, 2_000);
+  assert.deepEqual(
+    sourceRow?.targetDetails.haste.map((detail) => ({
+      targetId: detail.targetId,
+      targetName: detail.target?.name,
+      count: detail.count,
+      amount: detail.amount,
+      quantifiedCount: detail.quantifiedCount,
+    })),
+    [
+      {
+        targetId: firstTarget.id,
+        targetName: "Microwave",
+        count: 1,
+        amount: 2_000,
+        quantifiedCount: 1,
+      },
+      {
+        targetId: secondTarget.id,
+        targetName: "Trail Mix",
+        count: 1,
+        amount: 2_000,
+        quantifiedCount: 1,
+      },
+    ],
+  );
+});
+
 test("entity activity separates structural attribute deltas and destroy actions", () => {
   const source = normalizeEntity(
     {
@@ -1035,7 +1108,7 @@ test("entity activity separates structural attribute deltas and destroy actions"
         kind: "effect-executed",
         action: "CardDisable",
         sourceId: source.id,
-        targetIds: [target.id],
+        removedTargetIds: [target.id],
         attributionConfidence: "exact",
       }),
       timelineEvent({
@@ -1077,26 +1150,40 @@ test("entity activity separates structural attribute deltas and destroy actions"
   assert.equal(rowById.get(target.id)?.amounts.multicast, -1);
   assert.equal(rowById.get(target.id)?.counts.multicast, 1);
   assert.deepEqual(
-    rowById.get(target.id)?.amountDetails.damageModifier,
-    {
-      increaseAmount: 20,
-      increaseCount: 1,
-      decreaseAmount: 0,
-      decreaseCount: 0,
-      firstRecordedValue: 10,
-      lastRecordedValue: 30,
-    },
+    rowById.get(source.id)?.targetDetails.destroy.map((detail) => ({
+      targetId: detail.targetId,
+      targetName: detail.target?.name,
+      count: detail.count,
+    })),
+    [{ targetId: target.id, targetName: "Ice Swan", count: 1 }],
   );
   assert.deepEqual(
-    rowById.get(target.id)?.amountDetails.multicast,
-    {
-      increaseAmount: 0,
-      increaseCount: 0,
-      decreaseAmount: -1,
-      decreaseCount: 1,
-      firstRecordedValue: 2,
-      lastRecordedValue: 1,
-    },
+    rowById.get(target.id)?.targetDetails.damageModifier.map((detail) => ({
+      targetId: detail.targetId,
+      amount: detail.amount,
+      firstPreviousValue: detail.firstPreviousValue,
+      lastCurrentValue: detail.lastCurrentValue,
+    })),
+    [{
+      targetId: target.id,
+      amount: 20,
+      firstPreviousValue: 10,
+      lastCurrentValue: 30,
+    }],
+  );
+  assert.deepEqual(
+    rowById.get(target.id)?.targetDetails.multicast.map((detail) => ({
+      targetId: detail.targetId,
+      amount: detail.amount,
+      firstPreviousValue: detail.firstPreviousValue,
+      lastCurrentValue: detail.lastCurrentValue,
+    })),
+    [{
+      targetId: target.id,
+      amount: -1,
+      firstPreviousValue: 2,
+      lastCurrentValue: 1,
+    }],
   );
 });
 

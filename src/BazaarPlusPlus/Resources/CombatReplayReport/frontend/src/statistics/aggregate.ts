@@ -240,13 +240,14 @@ export interface CombatStatistics {
   damageTypes: Record<CombatSide, DamageTypes>;
 }
 
-export interface ActivityAmountDetails {
-  increaseAmount: number;
-  increaseCount: number;
-  decreaseAmount: number;
-  decreaseCount: number;
-  firstRecordedValue: number | null;
-  lastRecordedValue: number | null;
+export interface ActivityTargetDetail {
+  targetId: string;
+  target: NormalizedEntity | null;
+  count: number;
+  amount: number;
+  quantifiedCount: number;
+  firstPreviousValue: number | null;
+  lastCurrentValue: number | null;
 }
 
 export function buildStatistics(model: StatisticsModel): CombatStatistics {
@@ -339,7 +340,7 @@ export interface EntityActivityRow {
   triggers: number;
   counts: Record<string, number>;
   amounts: Record<string, number>;
-  amountDetails: Record<string, ActivityAmountDetails>;
+  targetDetails: Record<string, ActivityTargetDetail[]>;
   quantifiedCounts: Record<string, number>;
 }
 
@@ -383,19 +384,12 @@ export function buildEntityActivity(
     if (!isActivityEntity(entity) || rows.has(entity.id)) continue;
     const counts: Record<string, number> = {};
     const amounts: Record<string, number> = {};
-    const amountDetails: Record<string, ActivityAmountDetails> = {};
+    const targetDetails: Record<string, ActivityTargetDetail[]> = {};
     const quantifiedCounts: Record<string, number> = {};
     for (const column of ACTIVITY_COLUMNS) {
       counts[column.key] = 0;
       amounts[column.key] = 0;
-      amountDetails[column.key] = {
-        increaseAmount: 0,
-        increaseCount: 0,
-        decreaseAmount: 0,
-        decreaseCount: 0,
-        firstRecordedValue: null,
-        lastRecordedValue: null,
-      };
+      targetDetails[column.key] = [];
       quantifiedCounts[column.key] = 0;
     }
     rows.set(entity.id, {
@@ -404,15 +398,22 @@ export function buildEntityActivity(
       triggers: 0,
       counts,
       amounts,
-      amountDetails,
+      targetDetails,
       quantifiedCounts,
     });
   }
+  const affectedTargetIds = (event: NormalizedEvent): string[] => {
+    const targetIds = Array.from(
+      new Set([...event.targetIds, ...event.removedTargetIds]),
+    );
+    return targetIds.length > 0 ? targetIds : [""];
+  };
   const applyEvent = (
     row: EntityActivityRow,
     event: NormalizedEvent,
     count: number,
     columnKey: string,
+    targetIds: readonly string[],
   ): void => {
     row.counts[columnKey] += count;
     const column = columnByKey.get(columnKey);
@@ -421,23 +422,7 @@ export function buildEntityActivity(
       && event.value !== undefined
       && event.value !== ""
       && Number.isFinite(asFiniteNumber(event.value, Number.NaN));
-    if (!column || !column.quantitative || !hasValue) return;
-    const value = asFiniteNumber(event.value, 0);
-    row.amounts[columnKey] +=
-      column.aggregation === "signed" ? value : Math.abs(value);
-    row.quantifiedCounts[columnKey] += count;
-    if (column.aggregation !== "signed") return;
-
-    const details = row.amountDetails[columnKey];
-    if (!details) return;
-    if (value > 0) {
-      details.increaseAmount += value;
-      details.increaseCount += count;
-    } else if (value < 0) {
-      details.decreaseAmount += value;
-      details.decreaseCount += count;
-    }
-
+    const value = hasValue ? asFiniteNumber(event.value, 0) : 0;
     const previousValue = asFiniteNumber(
       event.previousValue,
       Number.NaN,
@@ -446,14 +431,45 @@ export function buildEntityActivity(
       event.currentValue,
       Number.NaN,
     );
-    if (
-      details.firstRecordedValue === null
-      && Number.isFinite(previousValue)
-    ) {
-      details.firstRecordedValue = previousValue;
+    if (column?.quantitative && hasValue) {
+      row.amounts[columnKey] +=
+        column.aggregation === "signed" ? value : Math.abs(value);
+      row.quantifiedCounts[columnKey] += count;
     }
-    if (Number.isFinite(currentValue)) {
-      details.lastRecordedValue = currentValue;
+
+    const details = row.targetDetails[columnKey];
+    if (!details) return;
+    for (const targetId of new Set(targetIds)) {
+      let detail = details.find(
+        (candidate) => candidate.targetId === targetId,
+      );
+      if (!detail) {
+        detail = {
+          targetId,
+          target: entityMap.get(targetId) ?? null,
+          count: 0,
+          amount: 0,
+          quantifiedCount: 0,
+          firstPreviousValue: null,
+          lastCurrentValue: null,
+        };
+        details.push(detail);
+      }
+      detail.count += count;
+      if (!column?.quantitative || !hasValue) continue;
+      detail.amount +=
+        column.aggregation === "signed" ? value : Math.abs(value);
+      detail.quantifiedCount += count;
+      if (column.aggregation !== "signed") continue;
+      if (
+        detail.firstPreviousValue === null
+        && Number.isFinite(previousValue)
+      ) {
+        detail.firstPreviousValue = previousValue;
+      }
+      if (Number.isFinite(currentValue)) {
+        detail.lastCurrentValue = currentValue;
+      }
     }
   };
 
@@ -475,7 +491,15 @@ export function buildEntityActivity(
       const row = rows.get(source.id);
       if (!row) continue;
       row.triggers += count;
-      if (columnKey) applyEvent(row, event, count, columnKey);
+      if (columnKey) {
+        applyEvent(
+          row,
+          event,
+          count,
+          columnKey,
+          affectedTargetIds(event),
+        );
+      }
       continue;
     }
     if (kind !== "card-attribute" || !columnKey) continue;
@@ -483,7 +507,7 @@ export function buildEntityActivity(
       const target = entityMap.get(targetId);
       if (!target || !isActivityEntity(target)) continue;
       const row = rows.get(target.id);
-      if (row) applyEvent(row, event, count, columnKey);
+      if (row) applyEvent(row, event, count, columnKey, [target.id]);
     }
   }
   return Array.from(rows.values());
