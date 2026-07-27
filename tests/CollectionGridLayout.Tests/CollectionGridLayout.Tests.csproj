@@ -16,6 +16,10 @@
       Link="CollectionCardVm.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMechanic.cs"
+      Link="CollectionMechanic.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTabKind.cs"
       Link="CollectionTabKind.cs"
     />
