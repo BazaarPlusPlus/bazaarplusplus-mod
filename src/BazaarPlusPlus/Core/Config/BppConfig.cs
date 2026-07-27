@@ -8,6 +8,7 @@ internal sealed class BppConfig : IBppConfig
 {
     internal const PreviewVisibilityMode DefaultEnchantPreviewMode = PreviewVisibilityMode.Always;
     internal const SubtitlePosition DefaultVoiceSubtitlesPosition = SubtitlePosition.TopCenter;
+    internal const float DefaultFsrSharpness = 0.92f;
 
     public ConfigEntry<bool>? EnableNameOverrideConfig { get; private set; }
 
@@ -52,6 +53,10 @@ internal sealed class BppConfig : IBppConfig
         get;
         private set;
     }
+
+    public ConfigEntry<GraphicsUpscalingMode>? GraphicsUpscalingModeConfig { get; private set; }
+
+    public ConfigEntry<float>? GraphicsUpscalingSharpnessConfig { get; private set; }
 
     public ConfigEntry<bool>? BazaarDbUploadEnabled { get; private set; }
 
@@ -187,6 +192,21 @@ internal sealed class BppConfig : IBppConfig
             "Mode",
             LegendaryPositionDisplayMode.Default,
             "How BazaarPlusPlus should rewrite native Legendary leaderboard position labels. Default keeps the original value, Blank clears it, Fixed999999 forces 999999, and PositionWithRating shows '#position | rating'."
+        );
+        GraphicsUpscalingModeConfig = config.Bind(
+            "Graphics",
+            "UpscalingMode",
+            GraphicsUpscalingMode.Native,
+            "macOS-only FSR 1 render-resolution upscaling mode. Native preserves the game's original URP settings. Ultra Quality renders at 77%, Quality at 67%, and Balanced at 59% per axis."
+        );
+        GraphicsUpscalingSharpnessConfig = config.Bind(
+            "Graphics",
+            "FsrSharpness",
+            DefaultFsrSharpness,
+            new ConfigDescription(
+                "FSR 1 RCAS sharpening strength. 0 is softest and 1 is sharpest.",
+                new AcceptableValueRange<float>(0f, 1f)
+            )
         );
         // BazaarDB
         BazaarDbUploadEnabled = config.Bind(
