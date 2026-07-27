@@ -581,7 +581,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 
         // 1b. Continue — replay finished and awaiting the continue button. Surface it as a generic
         // Flow advance so the replay-agnostic agent can proceed; the dispatcher routes Continue to
-        // CombatReplayRuntime.TryContinueReplay (ADR-0008). No card, no target.
+        // CombatReplayRuntime.TryContinueReplay (ADR-0007). No card, no target.
         if (replayPhase == BazaarAgentReplayPhase.FinishedAwaitingContinue)
         {
             actions.Add(

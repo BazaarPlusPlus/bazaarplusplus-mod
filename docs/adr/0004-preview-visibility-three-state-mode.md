@@ -14,5 +14,5 @@ Enchant text can be useful always but can also be noisy or reveal irrelevant out
 
 - Resolve precedence centrally as upgrade key → enchant key → `Always` → matching enchant pedestal → normal ([policy](../../src/BazaarPlusPlus/Game/Tooltips/TooltipPreviewModePolicy.cs#L52-L74)).
 - `AutoOnPedestalChoice` follows the encounter probe’s current enchant-pedestal classification and uses its enchantment-type restrictions when available ([policy](../../src/BazaarPlusPlus/Game/Tooltips/TooltipPreviewModePolicy.cs#L76-L106), [probe](../../src/BazaarPlusPlus/GameInterop/Encounter/EncounterStateProbe.cs#L48-L96)).
-- Persist only `[EnchantPreview] Mode`; there is no legacy boolean migration or upgrade-mode config ([config](../../src/BazaarPlusPlus/Core/Config/BppConfig.cs#L9-L14), [binding](../../src/BazaarPlusPlus/Core/Config/BppConfig.cs#L68-L73)).
+- Persist only `[EnchantPreview] Mode`; there is no legacy boolean migration or upgrade-mode config ([config](../../src/BazaarPlusPlus/Core/Config/BppConfig.cs#L9-L15), [binding](../../src/BazaarPlusPlus/Core/Config/BppConfig.cs#L73-L78)).
 - Keep the settings ladder data-driven ([dock entry](../../src/BazaarPlusPlus/Game/ItemEnchantPreview/ItemEnchantPreviewSettingsDockEntry.cs#L9-L29)).

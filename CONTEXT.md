@@ -42,7 +42,7 @@ _Avoid_: remote battle, opponent battle
 ## Combat replay
 
 **Saved Replay Lifecycle**:
-The single pure owner (`SavedReplayLifecycle`) of a saved-replay playback session's state algebra — start progress, terminal ownership, the time-bounded duplicate-exit suppression window, and the pending menu-return deadline. The runtime feeds observations (time, state exits, scene readiness) and executes the returned decisions; replay exit itself still flows only through `CombatReplayRuntime.TryContinueReplay` per ADR-0007/0008.
+The single pure owner (`SavedReplayLifecycle`) of a saved-replay playback session's state algebra — start progress, terminal ownership, the time-bounded duplicate-exit suppression window, and the pending menu-return deadline. The runtime feeds observations (time, state exits, scene readiness) and executes the returned decisions; replay exit itself still flows only through `CombatReplayRuntime.TryContinueReplay` per ADR-0007 (which also absorbed ADR-0008's `Continue` agent action).
 _Avoid_: replay exit flags, source-text ownership pins
 
 ## Overlay panels
@@ -83,7 +83,7 @@ _Avoid_: upload activation bag, per-feed upload controller, pump static registry
 ## Collection panel
 
 **Collection View State**:
-The single owner of the Collection Panel's presentable state (`CollectionViewState`) — filter selections, search mode and debounce, catalog acceptance, and the derived render model. Commands and lifecycle events go in; a complete render outcome (view model plus scroll intents) comes out. The panel's Unity surface only forwards commands and applies outcomes; nothing outside the module reads or writes the filter.
+The single owner of the Collection Panel's presentable state (`CollectionViewState`) — filter selections, search mode and debounce, catalog acceptance, and the derived render model. Commands and lifecycle events go in; a complete render outcome (view model plus scroll intents) comes out. The panel's Unity surface only forwards commands and applies outcomes; grid read-back goes through the `ICollectionGridPort` projection contract (`Publish`/`Current`, with explicit empty-before-first-publish semantics). Nothing outside the module reads or writes the filter.
 _Avoid_: filter glue, panel command protocol, ApplyFilters/RefreshView pairing
 
 ## Collection sources
@@ -97,6 +97,12 @@ The set of card templates a source can offer, expressed through structured rules
 **Collection Source Kind**:
 The source category used by CollectionPanel source chips: `Merchant` maps to Item sources, `Trainer` maps to Skill sources.
 _Avoid_: merchant-kind tag filtering
+
+## Day tiers
+
+**Day Tier Resolver**:
+The shared GameInterop adapter (`GameInterop/DayTiers/GameDataDayTierResolver`) that resolves the current run day's item/skill tier distribution from live GameData into a normalized weight table plus `MaximumTier` — the highest usable Bronze-to-Diamond tier, not the largest probability. Successes are cached only within one game-data manager generation (the game swaps the manager reference after a GameData download); consumers (Collection's Day gate, Event Preview) fail open when the table is unavailable.
+_Avoid_: DayTierSchedule, hardcoded tier table
 
 ## Remote embedded data
 
