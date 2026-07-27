@@ -24,6 +24,8 @@ ADRs retain only the decision, its load-bearing rationale, guardrails, and curre
 | [adr/0007](adr/0007-bazaaragent-external-replay-video-recording.md) | external replay video recording | accepted |
 | [adr/0008](adr/0008-replay-continue-as-agent-action.md) | replay continue as agent `Continue` action | accepted |
 | [adr/0009](adr/0009-preserve-behavior-specific-boundaries.md) | rejected cosmetic unifications / preserved behavior boundaries | accepted |
+| [adr/0010](adr/0010-merged-destroy-collection-filter.md) | one Destroy chip covers the destroy-mechanic cluster | accepted |
+| [adr/0011](adr/0011-pure-decision-cores-for-timing-invariants.md) | timing invariants in pure decision cores, not MonoBehaviour glue | accepted |
 
 ## Future Work
 
