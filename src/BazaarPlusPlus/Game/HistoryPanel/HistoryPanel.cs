@@ -30,7 +30,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     private HistoryPanelReplayService _replayService = null!;
     private INativeCardPreviewHost _nativeCardPreviewHost = null!;
     private BppItemBoardPreview? _battleBoardPreview;
-    private IHistoryPanelRuntime? _runtime;
+    private IHistoryPanelRunState? _runState;
+    private string _combatReplayDirectoryPath = string.Empty;
     private Coroutine? _previewCoroutine;
     private IReadOnlyList<BPPSupporterSample> _supporters = Array.Empty<BPPSupporterSample>();
     private IOverlayPanelHandle? _overlayHandle;
@@ -64,7 +65,8 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     {
         EnsureInitialized();
         _dependencies = dependencies ?? throw new ArgumentNullException(nameof(dependencies));
-        _runtime = dependencies.Runtime;
+        _runState = dependencies.RunState;
+        _combatReplayDirectoryPath = dependencies.CombatReplayDirectoryPath ?? string.Empty;
         _dataService = dependencies.DataService;
         _replayService = dependencies.ReplayService;
         _nativeCardPreviewHost =
@@ -285,7 +287,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
         if (battle.Source != HistoryBattleSource.Ghost)
             return HistoryBattlePreviewProjection.BuildOpponent(battle.Snapshots, signature);
 
-        var replayDirectoryPath = _runtime?.CombatReplayDirectoryPath;
+        var replayDirectoryPath = _combatReplayDirectoryPath;
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
             return HistoryBattlePreviewProjection.BuildEmpty(signature);
 
