@@ -390,6 +390,73 @@ var (pxOff, pyOff) = CollectionCardFitMath.ComputeAnchoredPosition(
 AssertApprox(200f - 10f * 2f, pxOff, "Anchored X subtracts centerX * scaleX.");
 AssertApprox(-(40f + 50f) - (-4f) * 3f, pyOff, "Anchored Y subtracts centerY * scaleY.");
 
+// --- NativeCardCellBoundsCache: hit/miss matrix for the three invalidation hooks ---
+// Store once, then assert each scroll-style read hits and each named hook clears.
+var boundsCache = new NativeCardCellBoundsCache();
+AssertFalse(boundsCache.IsValid, "Fresh cache must start empty.");
+AssertFalse(
+    boundsCache.TryGet(out _, out _),
+    "TryGet on empty cache must miss (scroll path would skip measure)."
+);
+
+var storedBounds = new CardVisualBounds(width: 120f, height: 200f, centerX: 1f, centerY: -2f);
+const float storedAspect = 1.5f;
+boundsCache.Store(storedBounds, storedAspect);
+AssertTrue(boundsCache.IsValid, "Store must mark cache valid.");
+AssertTrue(boundsCache.TryGet(out var hitBounds, out var hitAspect), "Warm cache must hit.");
+AssertApprox(storedBounds.Width, hitBounds.Width, "Hit returns stored width.");
+AssertApprox(storedBounds.Height, hitBounds.Height, "Hit returns stored height.");
+AssertApprox(storedBounds.CenterX, hitBounds.CenterX, "Hit returns stored centerX.");
+AssertApprox(storedBounds.CenterY, hitBounds.CenterY, "Hit returns stored centerY.");
+AssertEqual(storedAspect, hitAspect, "Hit returns stored aspectRatio.");
+
+// Scroll-style reads (no invalidation) stay warm across many frames.
+for (var i = 0; i < 5; i++)
+{
+    AssertTrue(
+        boundsCache.TryGet(out _, out _),
+        $"Scroll frame {i} must hit warm cache (zero measure)."
+    );
+}
+
+// Hook matrix: each invalidation clears, re-store restores, other hooks independently clear.
+var hooks = new (string name, System.Action invalidate)[]
+{
+    ("InvalidateOnRebind", () => boundsCache.InvalidateOnRebind()),
+    ("InvalidateOnScaleDirty", () => boundsCache.InvalidateOnScaleDirty()),
+    ("InvalidateOnArtLoaded", () => boundsCache.InvalidateOnArtLoaded()),
+};
+foreach (var (name, invalidate) in hooks)
+{
+    boundsCache.Store(storedBounds, storedAspect);
+    AssertTrue(boundsCache.IsValid, $"{name}: pre-condition Store must warm cache.");
+    AssertTrue(boundsCache.TryGet(out _, out _), $"{name}: pre-condition TryGet must hit.");
+
+    invalidate();
+    AssertFalse(boundsCache.IsValid, $"{name} must clear IsValid.");
+    AssertFalse(boundsCache.TryGet(out _, out _), $"{name} must make subsequent TryGet miss.");
+
+    // After miss, Store restores a hit (simulates force remeasure on that hook).
+    boundsCache.Store(storedBounds, storedAspect);
+    AssertTrue(boundsCache.TryGet(out _, out _), $"{name}: re-Store after invalidate must hit.");
+}
+
+// Cross-hook: invalidate A, hit remains false until Store; invalidate B after re-Store still clears.
+boundsCache.Store(storedBounds, storedAspect);
+boundsCache.InvalidateOnRebind();
+AssertFalse(boundsCache.TryGet(out _, out _), "Rebind miss must not be restored by other hooks.");
+boundsCache.Store(storedBounds, storedAspect);
+boundsCache.InvalidateOnScaleDirty();
+AssertFalse(boundsCache.TryGet(out _, out _), "ScaleDirty after re-Store must miss.");
+boundsCache.Store(storedBounds, storedAspect);
+boundsCache.InvalidateOnArtLoaded();
+AssertFalse(boundsCache.TryGet(out _, out _), "ArtLoaded after re-Store must miss.");
+
+// Null aspect is a valid stored value (skills / no AspectRatioFitter).
+boundsCache.Store(storedBounds, aspectRatio: null);
+AssertTrue(boundsCache.TryGet(out _, out var nullAspect), "Null aspect Store must hit.");
+AssertEqual(null, nullAspect, "Stored null aspect must round-trip.");
+
 System.Console.WriteLine("CollectionGridLayout checks passed.");
 
 static CollectionCardVm Item(ECardSize size) => new() { Type = ECardType.Item, Size = size };

@@ -7,22 +7,40 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 
 // Unity adapter that measures a native card preview and fits it into a Collection grid cell.
 // Measurement chain (FrameContainer → RawImage → Aspect-ratio mutation fallback → root.rect →
-// sizeDelta → 1×1) and every Reposition re-measure are intentionally preserved call-for-call;
-// per-cell bounds caching is out of scope. Pure scale/position math lives in CollectionCardFitMath.
+// sizeDelta → 1×1) runs only on cache miss / force-remeasure. Scroll reposition reads the
+// per-cell NativeCardCellBoundsCache and does pure position math (zero measure).
+//
+// Aspect fallback decision (issue #166): SetSizeWithCurrentAnchors runs once when that branch
+// measures, then the resulting bounds are cached. Scroll frames do not re-SetSize. If in-game
+// smoke finds Aspect-fallback cards drifting without repeated SetSize, exempt that path from
+// the cache (or re-apply SetSize from cached width/height on reposition) — do not silently
+// change behavior without a recorded decision.
 internal static class NativeCardCellFitter
 {
     // Shared with CollectionSourceAttributionBadge sizing (via the virtualizer re-export).
     public const float FallbackNativeCardHeight = 484f;
 
-    public static void ApplyScale(RectTransform rect, CollectionGridRect cellRect, float gap)
+    // Diagnostic: increments only when ResolveNativeVisualBounds runs. Scroll-only reposition
+    // must leave this unchanged when the cell cache is warm.
+    internal static int MeasureInvocationCount { get; private set; }
+
+    internal static void ResetMeasureInvocationCount() => MeasureInvocationCount = 0;
+
+    public static void ApplyScale(
+        RectTransform rect,
+        CollectionGridRect cellRect,
+        float gap,
+        NativeCardCellBoundsCache boundsCache,
+        bool forceMeasure = false
+    )
     {
-        if (rect == null)
+        if (rect == null || boundsCache == null)
             return;
         PrepareGridRect(rect);
-        var visualBounds = ResolveNativeVisualBounds(rect);
+        var visualBounds = ResolveBounds(rect, boundsCache, forceMeasure, out var aspectRatio);
         var scale = CollectionCardFitMath.ComputeScale(
             visualBounds,
-            TryReadAspectRatio(rect),
+            aspectRatio,
             cellRect,
             gap,
             CollectionGridConstants.CellContentInset,
@@ -31,12 +49,26 @@ internal static class NativeCardCellFitter
         rect.localScale = new Vector3(scale, scale, 1f);
     }
 
-    public static void Reposition(RectTransform rect, CollectionGridRect cellRect, float scrollY)
+    // allowMeasure=false is the scroll path: never walk the measurement chain. Callers must
+    // keep the cache warm via ApplyScale / invalidation+remeasure on the three hooks.
+    public static void Reposition(
+        RectTransform rect,
+        CollectionGridRect cellRect,
+        float scrollY,
+        NativeCardCellBoundsCache boundsCache,
+        bool allowMeasure = true
+    )
     {
-        if (rect == null)
+        if (rect == null || boundsCache == null)
             return;
         PrepareGridRect(rect);
-        var visualBounds = ResolveNativeVisualBounds(rect);
+        if (!boundsCache.TryGet(out var visualBounds, out _))
+        {
+            if (!allowMeasure)
+                return;
+            visualBounds = MeasureAndStore(rect, boundsCache);
+        }
+
         var pos = CollectionCardFitMath.ComputeAnchoredPosition(
             visualBounds,
             rect.localScale.x,
@@ -45,6 +77,36 @@ internal static class NativeCardCellFitter
             scrollY
         );
         rect.anchoredPosition = new Vector2(pos.X, pos.Y);
+    }
+
+    private static CardVisualBounds ResolveBounds(
+        RectTransform rect,
+        NativeCardCellBoundsCache boundsCache,
+        bool forceMeasure,
+        out float? aspectRatio
+    )
+    {
+        if (!forceMeasure && boundsCache.TryGet(out var cached, out aspectRatio))
+            return cached;
+        return MeasureAndStore(rect, boundsCache, out aspectRatio);
+    }
+
+    private static CardVisualBounds MeasureAndStore(
+        RectTransform rect,
+        NativeCardCellBoundsCache boundsCache
+    ) => MeasureAndStore(rect, boundsCache, out _);
+
+    private static CardVisualBounds MeasureAndStore(
+        RectTransform rect,
+        NativeCardCellBoundsCache boundsCache,
+        out float? aspectRatio
+    )
+    {
+        MeasureInvocationCount++;
+        aspectRatio = TryReadAspectRatio(rect);
+        var visualBounds = ResolveNativeVisualBounds(rect);
+        boundsCache.Store(visualBounds, aspectRatio);
+        return visualBounds;
     }
 
     private static void PrepareGridRect(RectTransform rect)
@@ -116,8 +178,8 @@ internal static class NativeCardCellFitter
 
         var width = Mathf.Max(1f, FallbackNativeCardHeight * fitter.aspectRatio);
         var height = FallbackNativeCardHeight;
-        // Intentionally mutates root size — cards without measurable FrameContainer/RawImage
-        // rely on this SetSize being reapplied every Reposition. Do not cache past this call.
+        // One-time SetSize on measure (cached thereafter). See class comment for the #166
+        // decision if smoke finds Aspect-fallback cards needing repeated SetSize.
         root.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
         root.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
         var rect = root.rect;

@@ -130,6 +130,9 @@ internal static class CollectionItemLoadArtPatch
                 instance._cardImage.material = material;
 
             instance._gemGroupController?.Initialize(instance._clientCard);
+
+            // Bounds may change once art material is assigned; invalidate the cell fit cache.
+            marker.OnArtLoaded?.Invoke();
         }
         catch (Exception ex)
         {

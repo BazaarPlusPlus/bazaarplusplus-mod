@@ -215,16 +215,33 @@ internal sealed class CollectionGridVirtualizer
         // changed on a viewport resize, _scaleDirty). Skipping when nothing changed avoids
         // forcing a Canvas rebuild on idle frames. Slots track the same window so the grid
         // order is visible even where cards have not finished loading.
+        // Scroll-only frames use cached bounds (zero measure). Scale dirty invalidates every
+        // cell's bounds cache so ApplyScale remeasures once for the new unit/cellRect.
         // ReSharper disable once CompareOfFloatsByEqualityOperator
         if (_scrollY != _lastScrollY || _scaleDirty)
         {
             _lastScrollY = _scrollY;
             foreach (var pair in _realized)
             {
+                var cell = pair.Value;
                 var cellRect = _layout.ContentRectFor(pair.Key, _unit, _gap, _originX, _originY);
                 if (_scaleDirty)
-                    NativeCardCellFitter.ApplyScale(pair.Value.CachedRect, cellRect, _gap);
-                NativeCardCellFitter.Reposition(pair.Value.CachedRect, cellRect, _scrollY);
+                {
+                    cell.BoundsCache.InvalidateOnScaleDirty();
+                    NativeCardCellFitter.ApplyScale(
+                        cell.CachedRect,
+                        cellRect,
+                        _gap,
+                        cell.BoundsCache
+                    );
+                }
+                NativeCardCellFitter.Reposition(
+                    cell.CachedRect,
+                    cellRect,
+                    _scrollY,
+                    cell.BoundsCache,
+                    allowMeasure: false
+                );
             }
             _scaleDirty = false;
             SyncSlots(firstIdx, lastIdx);
@@ -461,9 +478,18 @@ internal sealed class CollectionGridVirtualizer
 
         var cell = new RealizedCell(index, vm, session, ++_perCellGeneration, hover, rect);
         _realized[index] = cell;
+        BindArtLoadedHook(cell);
+        // Fresh session: empty cache measures once here; scroll later reads the warm cache.
+        cell.BoundsCache.InvalidateOnRebind();
         var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
-        NativeCardCellFitter.ApplyScale(rect, cellRect, _gap);
-        NativeCardCellFitter.Reposition(rect, cellRect, _scrollY);
+        NativeCardCellFitter.ApplyScale(rect, cellRect, _gap, cell.BoundsCache);
+        NativeCardCellFitter.Reposition(
+            rect,
+            cellRect,
+            _scrollY,
+            cell.BoundsCache,
+            allowMeasure: false
+        );
         ShowCell(cell, _generation);
         return true;
     }
@@ -527,8 +553,22 @@ internal sealed class CollectionGridVirtualizer
             if (show.Status == NativePreviewActionStatus.Failed)
                 return;
             var cellRect = _layout.ContentRectFor(cell.Index, _unit, _gap, _originX, _originY);
-            NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap);
-            NativeCardCellFitter.Reposition(cell.CachedRect, cellRect, _scrollY);
+            // Show re-activates _cardImage / _frameContainer, so force a remeasure even if
+            // adopt already cached bounds against an inactive subtree.
+            NativeCardCellFitter.ApplyScale(
+                cell.CachedRect,
+                cellRect,
+                _gap,
+                cell.BoundsCache,
+                forceMeasure: true
+            );
+            NativeCardCellFitter.Reposition(
+                cell.CachedRect,
+                cellRect,
+                _scrollY,
+                cell.BoundsCache,
+                allowMeasure: false
+            );
             // Show(true) re-activates _cardImage / _frameContainer; the CanvasGroup at the
             // root was zeroed on Take, so the card still renders transparent. Hand the cell
             // off to TickFades to ramp it up.
@@ -579,8 +619,57 @@ internal sealed class CollectionGridVirtualizer
 
     private void RecycleCell(RealizedCell cell)
     {
+        ClearArtLoadedHook(cell);
         cell.HoverRelay?.Clear();
         cell.Session.Dispose();
+    }
+
+    private void BindArtLoadedHook(RealizedCell cell)
+    {
+        var root = cell.Session.Root;
+        if (root == null)
+            return;
+        var marker = root.GetComponent<CollectionPanelOwnedMarker>();
+        if (marker == null)
+            return;
+        // Capture the cell identity so a late art completion after recycle is ignored.
+        var generation = cell.Generation;
+        var session = cell.Session;
+        marker.OnArtLoaded = () => OnCellArtLoaded(session, generation);
+    }
+
+    private static void ClearArtLoadedHook(RealizedCell cell)
+    {
+        var root = cell.Session.Root;
+        if (root == null)
+            return;
+        var marker = root.GetComponent<CollectionPanelOwnedMarker>();
+        if (marker != null)
+            marker.OnArtLoaded = null;
+    }
+
+    private void OnCellArtLoaded(INativeCardPreviewSession session, int generation)
+    {
+        foreach (var pair in _realized)
+        {
+            var cell = pair.Value;
+            if (cell.Generation != generation || !ReferenceEquals(cell.Session, session))
+                continue;
+
+            cell.BoundsCache.InvalidateOnArtLoaded();
+            if (cell.CachedRect == null)
+                return;
+            var cellRect = _layout.ContentRectFor(cell.Index, _unit, _gap, _originX, _originY);
+            NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
+            NativeCardCellFitter.Reposition(
+                cell.CachedRect,
+                cellRect,
+                _scrollY,
+                cell.BoundsCache,
+                allowMeasure: false
+            );
+            return;
+        }
     }
 
     private void RecycleAll()
@@ -648,10 +737,18 @@ internal sealed class CollectionGridVirtualizer
             cell.Vm = _visible[newIndex];
             _sourceMatchesByCardId.TryGetValue(cell.Vm.Id, out var sourceMatches);
             CollectionSourceAttributionBadge.Bind(cell.Session.Root, sourceMatches);
+            // Same native instance retained: keep warm bounds cache; only cellRect changes.
+            BindArtLoadedHook(cell);
             _realized[newIndex] = cell;
             var cellRect = _layout.ContentRectFor(newIndex, _unit, _gap, _originX, _originY);
-            NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap);
-            NativeCardCellFitter.Reposition(cell.CachedRect, cellRect, _scrollY);
+            NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
+            NativeCardCellFitter.Reposition(
+                cell.CachedRect,
+                cellRect,
+                _scrollY,
+                cell.BoundsCache,
+                allowMeasure: false
+            );
         }
     }
 
@@ -712,6 +809,7 @@ internal sealed class CollectionGridVirtualizer
             Generation = generation;
             HoverRelay = hoverRelay;
             CachedRect = cachedRect;
+            BoundsCache = new NativeCardCellBoundsCache();
         }
 
         public int Index { get; set; }
@@ -720,6 +818,7 @@ internal sealed class CollectionGridVirtualizer
         public int Generation { get; }
         public CollectionCardHoverRelay HoverRelay { get; }
         public RectTransform CachedRect { get; }
+        public NativeCardCellBoundsCache BoundsCache { get; }
         public bool IsShown { get; set; }
 
         // Fade state. ShowCell sets FadeActive=true with FadeAlpha=0 right after the

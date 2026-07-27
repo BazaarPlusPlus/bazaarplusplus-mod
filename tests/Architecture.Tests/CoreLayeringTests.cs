@@ -495,10 +495,9 @@ public class CoreLayeringTests
         Assert.Contains("ReferenceEquals(cell.Vm, nextVisible[newIndex])", virtualizerSource);
         Assert.Contains("cell.Index = newIndex;", virtualizerSource);
         Assert.Contains("cell.HoverRelay?.Bind(cell.Session);", virtualizerSource);
-        Assert.Contains(
-            "NativeCardCellFitter.Reposition(cell.CachedRect, cellRect, _scrollY);",
-            virtualizerSource
-        );
+        Assert.Contains("NativeCardCellFitter.Reposition(", virtualizerSource);
+        Assert.Contains("cell.BoundsCache", virtualizerSource);
+        Assert.Contains("allowMeasure: false", virtualizerSource);
     }
 
     [Fact]
@@ -634,11 +633,17 @@ public class CoreLayeringTests
         Assert.DoesNotContain("private void ApplyCellScale", virtualizerSource);
         Assert.Contains("NativeCardCellFitter.ApplyScale", virtualizerSource);
         Assert.Contains("NativeCardCellFitter.Reposition", virtualizerSource);
+        // Per-cell bounds cache: scroll path must not remeasure (allowMeasure: false).
+        Assert.Contains("InvalidateOnScaleDirty", virtualizerSource);
+        Assert.Contains("InvalidateOnRebind", virtualizerSource);
+        Assert.Contains("InvalidateOnArtLoaded", virtualizerSource);
+        Assert.Contains("allowMeasure: false", virtualizerSource);
 
         Assert.Contains("bodyW * scale > maxWidth", fitMathSource);
         Assert.DoesNotContain("natW * scale > maxWidth", fitMathSource);
         Assert.Contains("frameHeightOverSocket", fitMathSource);
         Assert.Contains("SetSizeWithCurrentAnchors", fitterSource);
+        Assert.Contains("MeasureInvocationCount", fitterSource);
 
         Assert.Contains("BadgeRootHeightScale", badgeSource);
         Assert.Contains("CollectionGridVirtualizer.FallbackNativeCardHeight / 200f", badgeSource);
