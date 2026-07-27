@@ -1575,51 +1575,289 @@ var transformDestroyedTemplate = MechanicItemTemplate(
         ),
     }
 );
-AssertFalse(
+AssertTrue(
     CollectionCardVm.From(transformDestroyedTemplate).Mechanics.Has(CollectionMechanic.Destroy),
-    "TransformDestroyed and its derived template abilities should not project direct Destroy."
+    "TActionCardTransformDestroyed on an active base ability should project Destroy; nested spawn-template abilities remain unwalked."
 );
 
-var destroyRelatedOnlyTemplate = MechanicItemTemplate(
+// Destruction-reaction triggers (#156): each of the three destroy-cluster triggers matches
+// Destroy on its own, independent of the ability's action. Non-destroy actions below keep the
+// assertion focused on the trigger surface.
+var beforeDestroyedTriggerTemplate = MechanicItemTemplate(
     new Dictionary<ETier, TCardTier>
     {
-        [ETier.Bronze] = Tier(
-            attributes: new() { [ECardAttributeType.DestroyImmunity] = 1 },
-            abilityIds: new[]
-            {
-                "repair",
-                "before-destroyed",
-                "destroyed",
-                "performed-destruction",
-                "destroy-immunity",
-            }
-        ),
+        [ETier.Bronze] = Tier(abilityIds: new[] { "before-destroyed" }),
     },
     abilities: new()
     {
-        ["repair"] = Ability(new TActionCardRepair()),
         ["before-destroyed"] = Ability(
-            new TActionCardRepair(),
+            new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DamageAmount },
             new TTriggerOnBeforeCardDestroyed()
         ),
-        ["destroyed"] = Ability(new TActionCardRepair(), new TTriggerOnCardDestroyed()),
+    }
+);
+AssertTrue(
+    CollectionCardVm.From(beforeDestroyedTriggerTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "An active base ability triggered by TTriggerOnBeforeCardDestroyed should project Destroy."
+);
+
+var cardDestroyedTriggerTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "card-destroyed" }),
+    },
+    abilities: new()
+    {
+        ["card-destroyed"] = Ability(
+            new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DamageAmount },
+            new TTriggerOnCardDestroyed()
+        ),
+    }
+);
+AssertTrue(
+    CollectionCardVm.From(cardDestroyedTriggerTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "An active base ability triggered by TTriggerOnCardDestroyed should project Destroy."
+);
+
+var performedDestructionTriggerTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "performed-destruction" }),
+    },
+    abilities: new()
+    {
         ["performed-destruction"] = Ability(
-            new TActionCardRepair(),
+            new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DamageAmount },
             new TTriggerOnCardPerformedDestruction()
         ),
-        ["destroy-immunity"] = Ability(
-            new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DestroyImmunity }
-        ),
+    }
+);
+AssertTrue(
+    CollectionCardVm
+        .From(performedDestructionTriggerTemplate)
+        .Mechanics.Has(CollectionMechanic.Destroy),
+    "An active base ability triggered by TTriggerOnCardPerformedDestruction should project Destroy."
+);
+
+var orNestedDestructionTriggerTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "or-destroyed" }),
     },
+    abilities: new()
+    {
+        ["or-destroyed"] = Ability(
+            new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DamageAmount },
+            new TTriggerOr
+            {
+                Triggers = new List<TTriggerBase>
+                {
+                    new TTriggerOnCardFired(),
+                    new TTriggerOnCardDestroyed(),
+                },
+            }
+        ),
+    }
+);
+AssertTrue(
+    CollectionCardVm
+        .From(orNestedDestructionTriggerTemplate)
+        .Mechanics.Has(CollectionMechanic.Destroy),
+    "A destruction trigger nested inside TTriggerOr should project Destroy even when other branches are unrelated."
+);
+
+var orphanDestructionTriggerTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    abilities: new()
+    {
+        ["orphan-destroyed"] = Ability(
+            new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DamageAmount },
+            new TTriggerOnCardDestroyed()
+        ),
+    }
+);
+AssertFalse(
+    CollectionCardVm
+        .From(orphanDestructionTriggerTemplate)
+        .Mechanics.Has(CollectionMechanic.Destroy),
+    "An unreferenced base destruction-reaction ability should not project Destroy."
+);
+
+var enchantmentDestructionTriggerTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    enchantments: new()
+    {
+        [EEnchantmentType.Shiny] = new TEnchantment
+        {
+            Abilities = new Dictionary<string, TCardAbility>
+            {
+                ["enchanted-destroyed"] = Ability(
+                    new TActionCardModifyAttribute
+                    {
+                        AttributeType = ECardAttributeType.DamageAmount,
+                    },
+                    new TTriggerOnCardDestroyed()
+                ),
+            },
+        },
+    }
+);
+AssertFalse(
+    CollectionCardVm
+        .From(enchantmentDestructionTriggerTemplate)
+        .Mechanics.Has(CollectionMechanic.Destroy),
+    "Enchantment-provided destruction-reaction abilities should not pollute base Destroy facts."
+);
+
+var repairedTriggerTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier(abilityIds: new[] { "on-repaired" }) },
+    abilities: new()
+    {
+        ["on-repaired"] = Ability(
+            new TActionCardModifyAttribute { AttributeType = ECardAttributeType.DamageAmount },
+            new TTriggerOnCardRepaired()
+        ),
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(repairedTriggerTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "TTriggerOnCardRepaired should not project Destroy; only destruction-reaction triggers are in this slice."
+);
+
+// Remaining destroy-cluster action / tag / attribute surfaces (#157).
+var rootRepairTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier(abilityIds: new[] { "root-repair" }) },
+    abilities: new() { ["root-repair"] = Ability(new TActionCardRepair()) }
+);
+AssertTrue(
+    CollectionCardVm.From(rootRepairTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "A root TActionCardRepair in an active base ability should project Destroy."
+);
+
+var nestedRepairTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "nested-repair" }),
+    },
+    abilities: new()
+    {
+        ["nested-repair"] = Ability(
+            new TActionAnd
+            {
+                Actions = new List<ITAction>
+                {
+                    new TActionAnd { Actions = new List<ITAction> { new TActionCardRepair() } },
+                },
+            }
+        ),
+    }
+);
+AssertTrue(
+    CollectionCardVm.From(nestedRepairTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "A TActionCardRepair nested in combined actions should project Destroy."
+);
+
+var absorbDestroyTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
     hiddenTags: new() { EHiddenTag.AbsorbDestroy }
+);
+AssertTrue(
+    CollectionCardVm.From(absorbDestroyTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "The native AbsorbDestroy hidden tag should project Destroy."
+);
+AssertFalse(
+    CollectionKeywordWhitelist.Ordered.Contains(EHiddenTag.AbsorbDestroy),
+    "AbsorbDestroy must not appear as its own keyword chip; it surfaces only via Destroy."
+);
+
+var destroyImmunityTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(attributes: new() { [ECardAttributeType.DestroyImmunity] = 1 }),
+    }
+);
+AssertTrue(
+    CollectionCardVm.From(destroyImmunityTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "A positive base DestroyImmunity value at any supported tier should project Destroy."
+);
+
+var zeroDestroyImmunityTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(attributes: new() { [ECardAttributeType.DestroyImmunity] = 0 }),
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(zeroDestroyImmunityTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "A zero base DestroyImmunity value should not project Destroy."
+);
+
+var enchantmentRepairTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    enchantments: new()
+    {
+        [EEnchantmentType.Shiny] = new TEnchantment
+        {
+            Abilities = new Dictionary<string, TCardAbility>
+            {
+                ["enchanted-repair"] = Ability(new TActionCardRepair()),
+            },
+        },
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(enchantmentRepairTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "Enchantment-provided repair abilities should not pollute base Destroy facts."
+);
+
+var enchantmentReplaceDestroyedTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    enchantments: new()
+    {
+        [EEnchantmentType.Shiny] = new TEnchantment
+        {
+            Abilities = new Dictionary<string, TCardAbility>
+            {
+                ["enchanted-transform-destroyed"] = Ability(new TActionCardTransformDestroyed()),
+            },
+        },
+    }
+);
+AssertFalse(
+    CollectionCardVm
+        .From(enchantmentReplaceDestroyedTemplate)
+        .Mechanics.Has(CollectionMechanic.Destroy),
+    "Enchantment-provided replace-destroyed abilities should not pollute base Destroy facts."
+);
+
+var radiantDestroyImmunityTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() },
+    enchantments: new()
+    {
+        [EEnchantmentType.Radiant] = new TEnchantment
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DestroyImmunity] = 1,
+            },
+        },
+    }
+);
+AssertFalse(
+    CollectionCardVm.From(radiantDestroyImmunityTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "Radiant destroy immunity on an enchantment must not project base Destroy facts."
+);
+
+var tooltipOnlyDestroyTemplate = MechanicItemTemplate(
+    new Dictionary<ETier, TCardTier> { [ETier.Bronze] = Tier() }
 ) with
 {
+    InternalName = "Destroy Tooltip Card",
     InternalDescription = "Destroy another item when this tooltip is rendered.",
 };
-var destroyRelatedOnlyVm = CollectionCardVm.From(destroyRelatedOnlyTemplate);
 AssertFalse(
-    destroyRelatedOnlyVm.Mechanics.Has(CollectionMechanic.Destroy),
-    "Repair, destroy triggers, immunity, AbsorbDestroy, and tooltip text should not project direct Destroy."
+    CollectionCardVm.From(tooltipOnlyDestroyTemplate).Mechanics.Has(CollectionMechanic.Destroy),
+    "Destroy-related name or description text alone should not project Destroy."
 );
 
 var destroySkillTemplate = new TCardSkill
@@ -1656,6 +1894,68 @@ AssertTrue(
 AssertFalse(
     skillDestroyAvailability.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Destroy),
     "Skill Destroy facts should not leak into Item availability."
+);
+
+// #158: related-only Destroy facts (no TActionCardDestroy) still make the chip available.
+// Item/Skill stay independent; packages never contribute.
+var relatedOnlyRepairVm = CollectionCardVm.From(rootRepairTemplate);
+var relatedOnlyItemAvailability = CollectionFacetAvailability.SnapshotFor(
+    new[] { relatedOnlyRepairVm }
+);
+AssertTrue(
+    relatedOnlyItemAvailability.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Destroy),
+    "A card that matches Destroy only through a related mechanism should make the Destroy chip available on its tab."
+);
+AssertFalse(
+    relatedOnlyItemAvailability.MechanicsFor(ECardType.Skill).Contains(CollectionMechanic.Destroy),
+    "Related-only Item Destroy facts should not leak into Skill availability."
+);
+
+var relatedOnlySkillTemplate = new TCardSkill
+{
+    Id = Guid.NewGuid(),
+    Type = ECardType.Skill,
+    StartingTier = ETier.Bronze,
+    InternalName = "Repair Skill",
+    HiddenTags = new HashSet<EHiddenTag>(),
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Bronze] = Tier(abilityIds: new[] { "skill-repair" }),
+    },
+    Abilities = new Dictionary<string, TCardAbility>
+    {
+        ["skill-repair"] = Ability(new TActionCardRepair()),
+    },
+};
+var relatedOnlySkillVm = CollectionCardVm.From(relatedOnlySkillTemplate);
+var relatedOnlySkillAvailability = CollectionFacetAvailability.SnapshotFor(
+    new[] { relatedOnlySkillVm }
+);
+AssertTrue(
+    relatedOnlySkillAvailability.MechanicsFor(ECardType.Skill).Contains(CollectionMechanic.Destroy),
+    "Skill related-only Destroy availability should be derived independently from skill catalog facts."
+);
+AssertFalse(
+    relatedOnlySkillAvailability.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Destroy),
+    "Related-only Skill Destroy facts should not leak into Item availability."
+);
+
+var packageDestroyOnlyCard = Card(
+    "Package Destroy Related",
+    ETier.Bronze,
+    isPackage: true,
+    mechanics: CollectionMechanic.Destroy
+);
+var packageDestroyAvailability = CollectionFacetAvailability.SnapshotFor(
+    new[] { packageDestroyOnlyCard }
+);
+AssertFalse(
+    packageDestroyAvailability.MechanicsFor(ECardType.Item).Contains(CollectionMechanic.Destroy),
+    "Package cards must never contribute Destroy chip availability."
+);
+AssertFalse(
+    packageDestroyAvailability.MechanicsFor(ECardType.Skill).Contains(CollectionMechanic.Destroy),
+    "Package cards must never contribute Destroy chip availability on either tab."
 );
 
 var multicastOnlyMechanicCard = Card(
