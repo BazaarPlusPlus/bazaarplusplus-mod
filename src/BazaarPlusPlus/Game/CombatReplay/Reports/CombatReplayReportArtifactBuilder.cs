@@ -58,6 +58,22 @@ internal sealed class CombatReplayReportArtifactBuilder
         CombatReportJson.RefreshDocumentId(document);
         var videoRelativeUrl = _paths.BuildVideoRelativeUrl(candidate.Video.FinalVideoFilePath);
         _ = TypedReportSiblingUrl.Parse(videoRelativeUrl);
+        string? scrubVideoRelativeUrl = null;
+        if (
+            ReplayVideoScrubProxy.TryGetExistingFilePath(
+                candidate.Video.FinalVideoFilePath,
+                out var scrubVideoFilePath
+            )
+        )
+        {
+            ReportPhysicalFile.RequireBelowRoot(
+                _paths.VideoRootDirectoryPath,
+                scrubVideoFilePath,
+                "Recorded combat scrub proxy"
+            );
+            scrubVideoRelativeUrl = _paths.BuildVideoRelativeUrl(scrubVideoFilePath);
+            _ = TypedReportSiblingUrl.Parse(scrubVideoRelativeUrl);
+        }
         var exactSyncAnchors = ReplayVideoSyncMetadata.SelectExactAnchors(
             recordingId,
             candidate.BattleId,
@@ -69,6 +85,7 @@ internal sealed class CombatReplayReportArtifactBuilder
             RecordingId = recordingId,
             BattleId = candidate.BattleId,
             VideoRelativeUrl = videoRelativeUrl,
+            ScrubVideoRelativeUrl = scrubVideoRelativeUrl,
             SyncMetadataStatus = exactSyncAnchors.Count >= 2 ? "ReadyExact" : "ReadyUnsynced",
             SyncAnchors = exactSyncAnchors
                 .Select(anchor => new RecordingReportSyncAnchorV1
@@ -170,6 +187,20 @@ internal sealed class CombatReplayReportArtifactBuilder
             "Recorded combat video"
         );
         _ = TypedReportSiblingUrl.Parse(_paths.BuildVideoRelativeUrl(video.FinalVideoFilePath));
+        if (
+            ReplayVideoScrubProxy.TryGetExistingFilePath(
+                video.FinalVideoFilePath,
+                out var scrubVideoFilePath
+            )
+        )
+        {
+            ReportPhysicalFile.RequireBelowRoot(
+                _paths.VideoRootDirectoryPath,
+                scrubVideoFilePath,
+                "Recorded combat scrub proxy"
+            );
+            _ = TypedReportSiblingUrl.Parse(_paths.BuildVideoRelativeUrl(scrubVideoFilePath));
+        }
     }
 
     private ResolvedAsset ResolveAsset(PostCombatReportAssetFile asset)

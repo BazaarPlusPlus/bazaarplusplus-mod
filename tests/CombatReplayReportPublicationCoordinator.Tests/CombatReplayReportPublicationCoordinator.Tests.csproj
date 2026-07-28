@@ -59,6 +59,10 @@
       Link="ReplayVideoSyncMetadata.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoScrubProxy.cs"
+      Link="ReplayVideoScrubProxy.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportAssets/PostCombatReportAssetFile.cs"
       Link="PostCombatReportAssetFile.cs"
     />

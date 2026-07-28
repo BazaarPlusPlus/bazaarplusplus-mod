@@ -43,6 +43,7 @@ internal enum ReplayVideoLogStage
     CaptureRequest,
     RenderTextureRelease,
     MuxCallback,
+    ScrubProxy,
     MuxProbe,
     MuxDrain,
     DebugStem,

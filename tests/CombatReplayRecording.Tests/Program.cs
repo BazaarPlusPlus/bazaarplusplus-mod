@@ -47,6 +47,12 @@ var audioTapStopperType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Audio.ReplayAudioTapStopper"
 );
 var muxerType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer");
+var scrubProxyType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoScrubProxy"
+);
+var scrubProxyGeneratorType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoScrubProxyGenerator"
+);
 var muxResultType =
     muxerType.GetNestedType("MuxResult", BindingFlags.NonPublic)
     ?? throw new InvalidOperationException("ReplayVideoAudioMuxer.MuxResult should exist.");
@@ -78,6 +84,7 @@ RunReplayPresentationRestorationChecks(replaySavedStateNormalizerType);
 RunReplaySpawnSanitizationChecks(snapshotRehydratorType);
 RunReplayNativeBoardPresentationChecks(replayNativeBoardPresentationType);
 RunPortraitTimingSubscriptionDeduplicationChecks(playerAttributeRepairerType);
+RunScrubProxyChecks(scrubProxyType, scrubProxyGeneratorType);
 
 RunCurrentReplayRecordingStateChecks();
 RunReplayVideoPreflightReasonChecks();
@@ -133,6 +140,42 @@ static void RunPortraitTimingSubscriptionDeduplicationChecks(Type repairerType)
     Assert(
         preservedCalls == 1,
         "PortraitTimingReady deduplication must preserve unrelated subscribers."
+    );
+}
+
+static void RunScrubProxyChecks(Type proxyType, Type generatorType)
+{
+    var mainVideoPath = Path.Combine(
+        Path.GetTempPath(),
+        "bpp scrub proxy tests",
+        "battle.mp4"
+    );
+    var proxyPath = (string)
+        InvokeStatic(proxyType, "BuildFilePath", new object?[] { mainVideoPath })!;
+    Assert(
+        proxyPath.EndsWith(
+            Path.Combine("bpp scrub proxy tests", "battle.scrub.mp4"),
+            StringComparison.OrdinalIgnoreCase
+        ),
+        "The scrub proxy should use a deterministic sibling filename."
+    );
+
+    var arguments = (string)
+        InvokeStatic(
+            generatorType,
+            "BuildArguments",
+            new object?[] { mainVideoPath, proxyPath }
+        )!;
+    Assert(
+        arguments.Contains("-vf scale=-2:540:flags=fast_bilinear", StringComparison.Ordinal)
+            && arguments.Contains(
+                "-force_key_frames expr:gte(t,n_forced*0.25)",
+                StringComparison.Ordinal
+            )
+            && arguments.Contains("-an", StringComparison.Ordinal)
+            && arguments.Contains($"\"{mainVideoPath}\"", StringComparison.Ordinal)
+            && arguments.Contains($"\"{proxyPath}\"", StringComparison.Ordinal),
+        "The scrub proxy should be a silent 540p stream with 250 ms random-access points."
     );
 }
 

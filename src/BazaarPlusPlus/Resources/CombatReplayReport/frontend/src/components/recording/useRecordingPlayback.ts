@@ -44,11 +44,16 @@ export function useRecordingPlayback({
   visible: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const scrubVideoRef = useRef<HTMLVideoElement>(null);
+  const scrubLoadedRef = useRef(false);
+  const scrubFailedRef = useRef(false);
   const pendingPreviewMediaMsRef = useRef<number | null>(null);
   const previewSeekInFlightRef = useRef(false);
   const previewSeekTargetMediaMsRef = useRef<number | null>(null);
   const previewSeekUsedFastRef = useRef(false);
+  const previewSeekVideoRef = useRef<HTMLVideoElement | null>(null);
   const previewActiveRef = useRef(false);
+  const hideScrubAfterMainSeekRef = useRef(false);
   const drainPreviewSeekRef = useRef<() => void>(() => undefined);
   const requestedMediaMsRef = useRef(Number.NaN);
   const resumeMediaMsRef = useRef(0);
@@ -61,17 +66,37 @@ export function useRecordingPlayback({
 
   const exact = model.sync.status === "ReadyExact";
 
+  const setScrubVisible = useCallback((visible: boolean): void => {
+    const scrubVideo = scrubVideoRef.current;
+    if (!scrubVideo) return;
+    scrubVideo.style.display = visible ? "block" : "none";
+    scrubVideo.dataset.previewActive = visible ? "true" : "false";
+  }, []);
+
+  const selectPreviewVideo = useCallback((): HTMLVideoElement | null => {
+    if (
+      model.scrubVideoUrl
+      && scrubLoadedRef.current
+      && !scrubFailedRef.current
+      && scrubVideoRef.current
+    ) {
+      return scrubVideoRef.current;
+    }
+    return videoRef.current;
+  }, [model.scrubVideoUrl]);
+
   const drainPreviewSeek = useCallback((): void => {
     const mapped = pendingPreviewMediaMsRef.current;
     if (mapped === null) return;
-    const video = videoRef.current;
+    const mainVideo = videoRef.current;
+    const video = previewSeekVideoRef.current ?? selectPreviewVideo();
     if (
       !video
-      || !video.paused
+      || (mainVideo && !mainVideo.paused)
       || previewSeekInFlightRef.current
       || video.seeking
     ) {
-      if (video && !video.paused) {
+      if (mainVideo && !mainVideo.paused) {
         pendingPreviewMediaMsRef.current = null;
       } else if (video?.seeking) {
         previewSeekInFlightRef.current = true;
@@ -81,6 +106,10 @@ export function useRecordingPlayback({
     if (!previewActiveRef.current) {
       pendingPreviewMediaMsRef.current = null;
       return;
+    }
+    if (!previewSeekVideoRef.current) {
+      previewSeekVideoRef.current = video;
+      setScrubVisible(video === scrubVideoRef.current);
     }
     pendingPreviewMediaMsRef.current = null;
     if (Math.abs(video.currentTime * 1_000 - mapped) < 45) {
@@ -102,15 +131,16 @@ export function useRecordingPlayback({
       previewSeekTargetMediaMsRef.current = null;
       previewSeekUsedFastRef.current = false;
     }
-  }, []);
+  }, [selectPreviewVideo, setScrubVisible]);
   drainPreviewSeekRef.current = drainPreviewSeek;
 
   const cancelPreviewSeek = useCallback((): void => {
     pendingPreviewMediaMsRef.current = null;
-    previewSeekInFlightRef.current = videoRef.current?.seeking ?? false;
+    previewSeekInFlightRef.current = false;
     previewSeekTargetMediaMsRef.current = null;
     previewSeekUsedFastRef.current = false;
     previewActiveRef.current = false;
+    previewSeekVideoRef.current = null;
   }, []);
 
   const cancelPreview = useCallback((): void => {
@@ -118,14 +148,38 @@ export function useRecordingPlayback({
       previewActiveRef.current
       || pendingPreviewMediaMsRef.current !== null
       || previewSeekInFlightRef.current;
+    const previewVideo =
+      previewSeekVideoRef.current ?? videoRef.current;
+    const usedScrubVideo = previewVideo === scrubVideoRef.current;
+    const previewMediaMs =
+      previewVideo && Number.isFinite(previewVideo.currentTime)
+        ? Math.max(0, previewVideo.currentTime * 1_000)
+        : requestedMediaMsRef.current;
     cancelPreviewSeek();
     const video = videoRef.current;
-    if (!hadPendingPreview || !video) return;
-    const currentMediaMs = Math.max(0, video.currentTime * 1_000);
+    if (!hadPendingPreview || !video) {
+      if (!hideScrubAfterMainSeekRef.current) {
+        setScrubVisible(false);
+      }
+      return;
+    }
+    const currentMediaMs = Number.isFinite(previewMediaMs)
+      ? previewMediaMs
+      : Math.max(0, video.currentTime * 1_000);
     requestedMediaMsRef.current = currentMediaMs;
     resumeMediaMsRef.current = currentMediaMs;
     setMediaMs(currentMediaMs);
-  }, [cancelPreviewSeek]);
+    if (
+      usedScrubVideo
+      && Math.abs(video.currentTime * 1_000 - currentMediaMs) >= 1
+    ) {
+      hideScrubAfterMainSeekRef.current = true;
+      video.currentTime = currentMediaMs / 1_000;
+      if (video.seeking) return;
+    }
+    hideScrubAfterMainSeekRef.current = false;
+    setScrubVisible(false);
+  }, [cancelPreviewSeek, setScrubVisible]);
 
   const seekCombatMs = useCallback((
     combatMs: number,
@@ -141,20 +195,26 @@ export function useRecordingPlayback({
     requestedMediaMsRef.current = mapped;
     resumeMediaMsRef.current = mapped;
     if (preview) {
+      const previewVideo =
+        previewSeekVideoRef.current ?? selectPreviewVideo();
       if (
         alreadyRequested
         && (
           pendingPreviewMediaMsRef.current !== null
           || previewSeekInFlightRef.current
-          || !video
-          || Math.abs(video.currentTime * 1_000 - mapped) < 45
+          || !previewVideo
+          || Math.abs(previewVideo.currentTime * 1_000 - mapped) < 45
         )
       ) {
         return;
       }
       previewActiveRef.current = true;
+      if (!previewSeekVideoRef.current) {
+        previewSeekVideoRef.current = previewVideo;
+        setScrubVisible(previewVideo === scrubVideoRef.current);
+      }
       pendingPreviewMediaMsRef.current = mapped;
-      if (!video) {
+      if (!previewVideo) {
         setMediaMs(mapped);
         return;
       }
@@ -162,6 +222,8 @@ export function useRecordingPlayback({
       return;
     }
     cancelPreviewSeek();
+    hideScrubAfterMainSeekRef.current = false;
+    setScrubVisible(false);
     setMediaMs(mapped);
     if (!video) return;
     if (
@@ -175,10 +237,14 @@ export function useRecordingPlayback({
     cancelPreviewSeek,
     exact,
     model.sync.anchors,
+    selectPreviewVideo,
+    setScrubVisible,
   ]);
 
   const prepareToHide = useCallback((): void => {
     cancelPreviewSeek();
+    hideScrubAfterMainSeekRef.current = false;
+    setScrubVisible(false);
     const video = videoRef.current;
     if (video) {
       if (video.readyState >= 1) {
@@ -193,12 +259,20 @@ export function useRecordingPlayback({
     setSpeedOpen(false);
     setLoaded(false);
     setLoadFailed(false);
-  }, [cancelPreviewSeek]);
+  }, [cancelPreviewSeek, setScrubVisible]);
 
-  useEffect(
-    () => cancelPreviewSeek,
-    [cancelPreviewSeek],
-  );
+  useEffect(() => () => {
+    cancelPreviewSeek();
+    setScrubVisible(false);
+  }, [cancelPreviewSeek, setScrubVisible]);
+
+  useEffect(() => {
+    scrubLoadedRef.current = false;
+    scrubFailedRef.current = false;
+    previewSeekVideoRef.current = null;
+    hideScrubAfterMainSeekRef.current = false;
+    setScrubVisible(false);
+  }, [model.scrubVideoUrl, setScrubVisible]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -209,16 +283,22 @@ export function useRecordingPlayback({
   useEffect(() => {
     if (visible) return;
     cancelPreviewSeek();
+    hideScrubAfterMainSeekRef.current = false;
+    setScrubVisible(false);
     setPlaying(false);
     setSpeedOpen(false);
     setLoaded(false);
     setLoadFailed(false);
-  }, [cancelPreviewSeek, visible]);
+  }, [cancelPreviewSeek, setScrubVisible, visible]);
 
   const togglePlayback = async (): Promise<void> => {
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
+      if (previewActiveRef.current) {
+        cancelPreview();
+      }
+      setScrubVisible(false);
       await video.play().catch(() => undefined);
     } else {
       video.pause();
@@ -264,6 +344,8 @@ export function useRecordingPlayback({
       return;
     }
     cancelPreviewSeek();
+    hideScrubAfterMainSeekRef.current = false;
+    setScrubVisible(false);
     resumeMediaMsRef.current = nextMediaMs;
     requestedMediaMsRef.current = nextMediaMs;
     setMediaMs(nextMediaMs);
@@ -272,9 +354,18 @@ export function useRecordingPlayback({
     if (combatMs !== null) onPlaybackCombatTime(combatMs);
   };
 
-  const handleSeeked = (): void => {
-    const video = videoRef.current;
+  const handleSeeked = (video: HTMLVideoElement | null): void => {
     if (!video) return;
+
+    if (
+      video === videoRef.current
+      && hideScrubAfterMainSeekRef.current
+      && !previewActiveRef.current
+    ) {
+      hideScrubAfterMainSeekRef.current = false;
+      setScrubVisible(false);
+    }
+    if (video !== previewSeekVideoRef.current) return;
 
     previewSeekInFlightRef.current = false;
     if (!previewActiveRef.current) {
@@ -315,6 +406,8 @@ export function useRecordingPlayback({
 
   const handleEnded = (): void => {
     videoRef.current?.pause();
+    hideScrubAfterMainSeekRef.current = false;
+    setScrubVisible(false);
     setPlaying(false);
   };
 
@@ -327,6 +420,8 @@ export function useRecordingPlayback({
     }
     if (video) {
       cancelPreviewSeek();
+      hideScrubAfterMainSeekRef.current = false;
+      setScrubVisible(false);
       const requested = requestedMediaMsRef.current;
       const targetMediaMs = Number.isFinite(requested)
         ? requested
@@ -347,11 +442,59 @@ export function useRecordingPlayback({
     setLoaded(true);
   };
 
+  const handleScrubLoadedMetadata = (): void => {
+    const scrubVideo = scrubVideoRef.current;
+    if (!scrubVideo) return;
+    scrubLoadedRef.current = true;
+    scrubFailedRef.current = false;
+    scrubVideo.pause();
+    const mainVideo = videoRef.current;
+    const targetMediaMs = mainVideo
+      ? Math.max(0, mainVideo.currentTime * 1_000)
+      : Math.max(0, resumeMediaMsRef.current);
+    const durationMs = Number.isFinite(scrubVideo.duration)
+      ? scrubVideo.duration * 1_000
+      : targetMediaMs;
+    const clampedMediaMs = Math.min(targetMediaMs, durationMs);
+    if (Math.abs(scrubVideo.currentTime * 1_000 - clampedMediaMs) >= 1) {
+      scrubVideo.currentTime = clampedMediaMs / 1_000;
+    }
+  };
+
+  const handleScrubError = (): void => {
+    scrubLoadedRef.current = false;
+    scrubFailedRef.current = true;
+    if (previewSeekVideoRef.current !== scrubVideoRef.current) return;
+    const fallbackTarget =
+      pendingPreviewMediaMsRef.current
+      ?? previewSeekTargetMediaMsRef.current
+      ?? requestedMediaMsRef.current;
+    previewSeekVideoRef.current = videoRef.current;
+    previewSeekInFlightRef.current = false;
+    previewSeekTargetMediaMsRef.current = null;
+    previewSeekUsedFastRef.current = false;
+    pendingPreviewMediaMsRef.current = Number.isFinite(fallbackTarget)
+      ? fallbackTarget
+      : null;
+    setScrubVisible(false);
+    drainPreviewSeekRef.current();
+  };
+
+  const handlePlay = (): void => {
+    cancelPreviewSeek();
+    hideScrubAfterMainSeekRef.current = false;
+    setScrubVisible(false);
+    setPlaying(true);
+  };
+
   return {
     cancelPreview,
     handleEnded,
     handleLoadedMetadata,
     handleSeeked,
+    handleScrubError,
+    handleScrubLoadedMetadata,
+    handlePlay,
     handleTimeUpdate,
     loadFailed,
     loaded,
@@ -367,6 +510,7 @@ export function useRecordingPlayback({
     speedIndex,
     speedOpen,
     togglePlayback,
+    scrubVideoRef,
     videoRef,
   };
 }

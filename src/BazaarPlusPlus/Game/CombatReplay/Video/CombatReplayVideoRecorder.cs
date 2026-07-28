@@ -715,6 +715,11 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 recording.WavPaths ?? Array.Empty<string>(),
                 context.FfmpegExecutable
             );
+            var scrubProxy = ReplayVideoScrubProxyGenerator.Create(
+                context.FfmpegExecutable,
+                mux.FinalFilePath
+            );
+            LogScrubProxyResult(recording.Operation.RecordingId, scrubProxy);
             try
             {
                 var resolvedMetadata = TrySaveFinishMetadataFor(
@@ -752,6 +757,33 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         {
             CompleteFailedRecording(recording, result, ex);
         }
+    }
+
+    private static void LogScrubProxyResult(
+        string recordingId,
+        ReplayVideoScrubProxyResult result
+    )
+    {
+        Func<BazaarPlusPlus.Infrastructure.Logging.BppLogFieldValue[]> fields = () =>
+            [
+                CombatReplayVideoLogEvents.MuxRecordingId.Bind(recordingId),
+                CombatReplayVideoLogEvents.MuxStage.Bind(ReplayVideoLogStage.ScrubProxy),
+                CombatReplayVideoLogEvents.MuxReasonCode.Bind(result.ReasonCode),
+                CombatReplayVideoLogEvents.MuxPath.Bind(result.FilePath),
+                CombatReplayVideoLogEvents.MuxPendingCount.Bind(
+                    ReplayVideoAudioMuxer.PendingTaskCount
+                ),
+            ];
+        if (result.Exception == null)
+        {
+            BppLog.DebugEvent(CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved, fields);
+            return;
+        }
+        BppLog.DebugEvent(
+            CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
+            result.Exception,
+            fields
+        );
     }
 
     private static void CompleteEndedFailure(

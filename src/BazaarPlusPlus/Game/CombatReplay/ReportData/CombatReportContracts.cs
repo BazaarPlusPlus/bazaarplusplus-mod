@@ -249,6 +249,8 @@ public sealed class RecordingReportManifestV1
 
     public string VideoRelativeUrl { get; set; } = string.Empty;
 
+    public string? ScrubVideoRelativeUrl { get; set; }
+
     public string SyncMetadataStatus { get; set; } = "ReadyUnsynced";
 
     public int? Width { get; set; }

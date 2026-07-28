@@ -290,6 +290,7 @@ let markerLayoutReportUrl;
 let statusApplicationReportUrl;
 let structuralReportUrl;
 let recordingReportUrl;
+let scrubRecordingReportUrl;
 let navigationReportUrl;
 let scrollRecordingReportUrl;
 
@@ -887,6 +888,14 @@ test.beforeAll(async ({ browserName }) => {
     reportHtml(recordingEnvelope),
     "utf8",
   );
+  const scrubRecordingEnvelope = structuredClone(recordingEnvelope);
+  scrubRecordingEnvelope.recordingManifest.scrubVideoRelativeUrl =
+    "../CombatReplayVideos/behavior-recording/recording.scrub.mp4";
+  await writeFile(
+    join(fixtureDirectory, "scrub-recording-report.html"),
+    reportHtml(scrubRecordingEnvelope),
+    "utf8",
+  );
   const navigationEnvelope = structuredClone(fixtureEnvelope);
   navigationEnvelope.battleDocument.events = [
     schemaEvent({
@@ -978,6 +987,9 @@ test.beforeAll(async ({ browserName }) => {
   ).href;
   recordingReportUrl = pathToFileURL(
     join(fixtureDirectory, "recording-report.html"),
+  ).href;
+  scrubRecordingReportUrl = pathToFileURL(
+    join(fixtureDirectory, "scrub-recording-report.html"),
   ).href;
   navigationReportUrl = pathToFileURL(
     join(fixtureDirectory, "navigation-report.html"),
@@ -2388,6 +2400,153 @@ test("applies only the latest hover target while a Firefox-style seek is in flig
 
   await video.evaluate((element) => window.__bppSeekProbe.complete(element));
   expect(await seekCalls()).toHaveLength(2);
+});
+
+test("uses the scrub proxy for live hover and syncs the full video once on leave", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const states = new WeakMap();
+    const stateFor = (media) => {
+      let state = states.get(media);
+      if (!state) {
+        state = {
+          currentTime: 0,
+          paused: true,
+          seeking: false,
+          seekCalls: [],
+        };
+        states.set(media, state);
+      }
+      return state;
+    };
+    const beginSeek = (media, value, kind) => {
+      const state = stateFor(media);
+      state.currentTime = Number(value);
+      state.seeking = true;
+      state.seekCalls.push({ kind, seconds: Number(value) });
+    };
+    const nativeSetAttribute = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function setAttribute(name, value) {
+      if (this instanceof HTMLMediaElement && name === "src") return;
+      nativeSetAttribute.call(this, name, value);
+    };
+    Object.defineProperty(HTMLMediaElement.prototype, "src", {
+      configurable: true,
+      get() {
+        return "";
+      },
+      set() {},
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+      configurable: true,
+      get() {
+        return stateFor(this).currentTime;
+      },
+      set(value) {
+        beginSeek(this, value, "exact");
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "paused", {
+      configurable: true,
+      get() {
+        return stateFor(this).paused;
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "seeking", {
+      configurable: true,
+      get() {
+        return stateFor(this).seeking;
+      },
+    });
+    HTMLMediaElement.prototype.fastSeek = function fastSeek(value) {
+      beginSeek(this, value, "fast");
+    };
+    HTMLMediaElement.prototype.play = function play() {
+      stateFor(this).paused = false;
+      this.dispatchEvent(new Event("play"));
+      return Promise.resolve();
+    };
+    HTMLMediaElement.prototype.pause = function pause() {
+      stateFor(this).paused = true;
+      this.dispatchEvent(new Event("pause"));
+    };
+    window.addEventListener(
+      "error",
+      (event) => {
+        if (!(event.target instanceof HTMLMediaElement)) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      },
+      true,
+    );
+    window.__bppSeekProbe = {
+      calls(media) {
+        return [...stateFor(media).seekCalls];
+      },
+      complete(media) {
+        const state = stateFor(media);
+        state.seeking = false;
+        media.dispatchEvent(new Event("seeked"));
+        media.dispatchEvent(new Event("timeupdate"));
+      },
+      reset(media) {
+        const state = stateFor(media);
+        state.seeking = false;
+        state.seekCalls.length = 0;
+      },
+    };
+  });
+  await page.goto(`${scrubRecordingReportUrl}?lang=en`);
+  const fullVideo = page.getByTestId("recording-video");
+  const scrubVideo = page.getByTestId("recording-scrub-video");
+  await fullVideo.dispatchEvent("loadedmetadata");
+  await scrubVideo.dispatchEvent("loadedmetadata");
+  await fullVideo.evaluate((element) => window.__bppSeekProbe.reset(element));
+  await scrubVideo.evaluate((element) => window.__bppSeekProbe.reset(element));
+
+  const ruler = page.getByTestId("timeline-ruler-canvas");
+  const bounds = await ruler.boundingBox();
+  expect(bounds).not.toBeNull();
+  await page.mouse.move(
+    bounds.x + bounds.width * 0.3,
+    bounds.y + bounds.height / 2,
+  );
+  await expect
+    .poll(() =>
+      scrubVideo.evaluate((element) =>
+        window.__bppSeekProbe.calls(element)
+      )
+    )
+    .toHaveLength(1);
+  expect(
+    await scrubVideo.evaluate((element) =>
+      window.__bppSeekProbe.calls(element)[0]?.kind
+    ),
+  ).toBe("fast");
+  expect(
+    await fullVideo.evaluate((element) =>
+      window.__bppSeekProbe.calls(element)
+    ),
+  ).toHaveLength(0);
+  await expect(scrubVideo).toHaveAttribute("data-preview-active", "true");
+
+  await scrubVideo.evaluate((element) =>
+    window.__bppSeekProbe.complete(element)
+  );
+  await page.mouse.move(4, 4);
+  await expect
+    .poll(() =>
+      fullVideo.evaluate((element) =>
+        window.__bppSeekProbe.calls(element)
+      )
+    )
+    .toHaveLength(1);
+  await expect(scrubVideo).toHaveAttribute("data-preview-active", "true");
+  await fullVideo.evaluate((element) =>
+    window.__bppSeekProbe.complete(element)
+  );
+  await expect(scrubVideo).toHaveAttribute("data-preview-active", "false");
 });
 
 test("preserves the timeline viewport and recording navigation across tabs", async ({

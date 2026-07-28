@@ -77,7 +77,10 @@ export const RecordingWindow = forwardRef<
   const {
     handleEnded,
     handleLoadedMetadata,
+    handlePlay,
     handleSeeked,
+    handleScrubError,
+    handleScrubLoadedMetadata,
     handleTimeUpdate,
     loadFailed,
     loaded,
@@ -94,6 +97,7 @@ export const RecordingWindow = forwardRef<
     speedIndex,
     speedOpen,
     togglePlayback,
+    scrubVideoRef,
     videoRef,
   } = useRecordingPlayback({
     model,
@@ -292,14 +296,31 @@ export const RecordingWindow = forwardRef<
           onError={() => setLoadFailed(true)}
           onLoadedMetadata={() => handleLoadedMetadata(hostRef.current)}
           onPause={() => setPlaying(false)}
-          onPlay={() => setPlaying(true)}
-          onSeeked={handleSeeked}
+          onPlay={handlePlay}
+          onSeeked={() => handleSeeked(videoRef.current)}
           onTimeUpdate={handleTimeUpdate}
           playsInline
           preload="metadata"
           ref={videoRef}
           src={model.videoUrl}
         />
+        {model.scrubVideoUrl && (
+          <video
+            aria-hidden="true"
+            className="bpp-recording-scrub-video"
+            data-bpp-test-id="recording-scrub-video"
+            data-preview-active="false"
+            muted
+            onError={handleScrubError}
+            onLoadedMetadata={handleScrubLoadedMetadata}
+            onSeeked={() => handleSeeked(scrubVideoRef.current)}
+            playsInline
+            preload="metadata"
+            ref={scrubVideoRef}
+            src={model.scrubVideoUrl}
+            style={{ display: "none" }}
+          />
+        )}
         {!loaded && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 top-8 grid place-items-center bg-media/80 px-6 text-center text-compact text-muted-foreground">
             {t(loadFailed ? "recordingLoadError" : "recordingReady")}

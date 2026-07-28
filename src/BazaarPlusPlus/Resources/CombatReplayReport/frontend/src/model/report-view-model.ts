@@ -38,6 +38,7 @@ export interface ReportViewModel {
   events: NormalizedEvent[];
   metrics: NormalizedMetric[];
   videoUrl: string;
+  scrubVideoUrl: string;
   sync: RecordingSyncState;
 }
 
@@ -150,8 +151,12 @@ export function buildViewModel(
     battle.durationMs,
   );
   const videoUrl = safeVideoUrl(manifest.videoRelativeUrl);
+  const scrubVideoUrl = safeVideoUrl(manifest.scrubVideoRelativeUrl);
   const sync = normalizeSyncState(manifest, battle.battleId);
   if (manifest.videoRelativeUrl && !videoUrl) {
+    sync.issues.push("unsafeVideoPath");
+  }
+  if (manifest.scrubVideoRelativeUrl && !scrubVideoUrl) {
     sync.issues.push("unsafeVideoPath");
   }
 
@@ -177,6 +182,7 @@ export function buildViewModel(
     events,
     metrics,
     videoUrl,
+    scrubVideoUrl,
     sync,
   };
 }

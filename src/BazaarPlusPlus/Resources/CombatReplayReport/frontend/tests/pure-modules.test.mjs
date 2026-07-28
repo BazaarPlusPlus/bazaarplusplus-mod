@@ -97,6 +97,7 @@ import {
   opponentBoundaryLane,
 } from "../src/timeline/lane-filter.ts";
 import {
+  ACTIVITY_COLUMNS,
   buildEntityActivity,
   buildStatistics,
 } from "../src/statistics/aggregate.ts";
@@ -1072,6 +1073,13 @@ test("entity activity uses native recap totals without discarding event target d
   assert.equal(row?.targetDetails.damage[0]?.amount, 367);
 });
 
+test("statistics omits the unsupported joy activity column", () => {
+  assert.equal(
+    ACTIVITY_COLUMNS.some((column) => column.key === "joy"),
+    false,
+  );
+});
+
 test("entity activity preserves every affected target without dividing a multi-target effect amount", () => {
   const source = normalizeEntity(
     {
@@ -1805,11 +1813,24 @@ test("schema-v1 golden payload decodes without compatibility aliases", () => {
     report.videoUrl,
     "../CombatReplayVideos/cccccccccccccccccccccccccccccccc/battle.mp4",
   );
+  assert.equal(report.scrubVideoUrl, "");
   assert.equal(report.sync.status, "ReadyExact");
   assert.deepEqual(report.sync.anchors, [
     { combatMs: 0, mediaPtsMs: 0 },
     { combatMs: 150, mediaPtsMs: 150 },
   ]);
+});
+
+test("schema-v1 accepts an optional safe scrub proxy URL", () => {
+  const payload = structuredClone(schemaV1GoldenPayload);
+  payload.recordingManifest.scrubVideoRelativeUrl =
+    "../CombatReplayVideos/cccccccccccccccccccccccccccccccc/battle.scrub.mp4";
+  const report = buildViewModel(decodeEnvelope(payload), COPY.en);
+
+  assert.equal(
+    report.scrubVideoUrl,
+    "../CombatReplayVideos/cccccccccccccccccccccccccccccccc/battle.scrub.mp4",
+  );
 });
 
 test("schema-v1 decoder rejects removed aliases and malformed array entries", () => {

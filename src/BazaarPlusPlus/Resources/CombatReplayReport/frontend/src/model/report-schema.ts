@@ -68,6 +68,7 @@ export interface RecordingManifestV1 {
   recordingId: string;
   battleId: string;
   videoRelativeUrl: string;
+  scrubVideoRelativeUrl?: string;
   syncMetadataStatus: string;
   width?: number;
   height?: number;
@@ -542,7 +543,13 @@ function validateManifest(value: unknown, path: string): void {
       "syncAnchors",
       "assets",
     ],
-    ["width", "height", "framesPerSecond", "durationMs"],
+    [
+      "scrubVideoRelativeUrl",
+      "width",
+      "height",
+      "framesPerSecond",
+      "durationMs",
+    ],
   );
   validateSchemaVersion(manifest, path);
   for (const key of [
@@ -558,6 +565,9 @@ function validateManifest(value: unknown, path: string): void {
   optionalNumber(manifest, "height", path, true);
   optionalNumber(manifest, "framesPerSecond", path);
   optionalNumber(manifest, "durationMs", path, true);
+  if (manifest.scrubVideoRelativeUrl !== undefined) {
+    requiredString(manifest, "scrubVideoRelativeUrl", path);
+  }
   const anchors = requiredArray(manifest, "syncAnchors", path);
   anchors.forEach((anchor, index) =>
     validateSyncAnchor(anchor, `${path}.syncAnchors[${index}]`)

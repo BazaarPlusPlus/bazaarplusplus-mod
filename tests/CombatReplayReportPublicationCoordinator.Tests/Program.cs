@@ -33,6 +33,7 @@ try
     VerifyEventSemanticAssetBinding();
     VerifyResolvedAssetEnrichesEntityDisplayName();
     VerifyExactVideoSyncRequiresContiguousIdentityMatchedAnchors();
+    VerifyScrubProxyPublication();
 }
 finally
 {
@@ -80,6 +81,9 @@ void VerifySchemaV1GoldenFixture()
             Winner = "player",
             Loser = "opponent",
             RawRecordCount = 7,
+            // The golden payload predates optional native recap totals and remains a
+            // backwards-compatibility fixture for schema-v1 reports that omit them.
+            CardStats = null!,
             Entities =
             {
                 new CombatReportEntityV1
@@ -357,6 +361,35 @@ void VerifyRecordingGenerationIsolation()
     );
     VerifyEmbeddedDocumentIdentity(firstHtml);
     VerifyEmbeddedDocumentIdentity(secondHtml);
+}
+
+void VerifyScrubProxyPublication()
+{
+    var root = Path.Combine(sandbox, "scrub-proxy");
+    string? publishedHtml = null;
+    var coordinator = CreateCoordinator(root, (_, bytes) => publishedHtml = Utf8(bytes));
+    const string recordingId = "abababababababababababababababab";
+    const string battleId = "scrub-proxy-battle";
+
+    coordinator.TryCaptureDraft(
+        new PvpBattleManifest { BattleId = battleId },
+        new NetMessageCombatSim(),
+        out _
+    );
+    coordinator.ObserveVideoStarted(Started(recordingId, battleId));
+    coordinator.MarkAssetsReady(recordingId, battleId, Array.Empty<PostCombatReportAssetFile>());
+    var completed = Completed(root, recordingId, battleId);
+    var scrubProxyPath = ReplayVideoScrubProxy.BuildFilePath(completed.FinalFilePath);
+    File.WriteAllBytes(scrubProxyPath, new byte[] { 0, 0, 0, 1 });
+    coordinator.ObserveVideoTerminal(completed, "en");
+
+    var envelope = publishedHtml == null ? null : ParseEmbeddedEnvelope(publishedHtml);
+    Check(envelope != null, "A report with a scrub proxy must be published.");
+    Check(
+        envelope?.RecordingManifest.ScrubVideoRelativeUrl
+            == "../CombatReplayVideos/" + recordingId + ".scrub.mp4",
+        "The report manifest must reference the committed scrub proxy next to the source video."
+    );
 }
 
 void VerifyTransientPublicationRetries()
