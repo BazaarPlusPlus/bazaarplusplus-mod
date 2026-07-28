@@ -62,6 +62,26 @@ export interface ReportMetricSampleV1 {
   unit: string;
 }
 
+export interface ReportCardStatsV1 {
+  entityId: string;
+  damageDone: number;
+  shieldAdded: number;
+  healAdded: number;
+  joyAdded: number;
+  poisonAdded: number;
+  burnAdded: number;
+  hastedCardsCount: number;
+  slowedCardsCount: number;
+  frozenCardsCount: number;
+  useCount: number;
+  regenAdded: number;
+  rageAdded: number;
+}
+
+export interface NormalizedCardStats extends Omit<ReportCardStatsV1, "entityId"> {
+  entityId: string;
+}
+
 export interface ReportCombatantStateV1 {
   health?: number;
   rage?: number;
@@ -225,6 +245,28 @@ export function normalizeMetric(
     metric,
     value,
     unit: asString(raw.unit, "points"),
+  };
+}
+
+export function normalizeCardStats(
+  raw: ReportCardStatsV1,
+): NormalizedCardStats {
+  const nonNegativeInteger = (value: unknown): number =>
+    Math.max(0, Math.round(asFiniteNumber(value, 0)));
+  return {
+    entityId: asString(raw.entityId, ""),
+    damageDone: nonNegativeInteger(raw.damageDone),
+    shieldAdded: nonNegativeInteger(raw.shieldAdded),
+    healAdded: nonNegativeInteger(raw.healAdded),
+    joyAdded: nonNegativeInteger(raw.joyAdded),
+    poisonAdded: nonNegativeInteger(raw.poisonAdded),
+    burnAdded: nonNegativeInteger(raw.burnAdded),
+    hastedCardsCount: nonNegativeInteger(raw.hastedCardsCount),
+    slowedCardsCount: nonNegativeInteger(raw.slowedCardsCount),
+    frozenCardsCount: nonNegativeInteger(raw.frozenCardsCount),
+    useCount: nonNegativeInteger(raw.useCount),
+    regenAdded: nonNegativeInteger(raw.regenAdded),
+    rageAdded: nonNegativeInteger(raw.rageAdded),
   };
 }
 

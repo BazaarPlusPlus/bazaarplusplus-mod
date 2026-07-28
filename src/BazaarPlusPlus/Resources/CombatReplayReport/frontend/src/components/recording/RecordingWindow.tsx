@@ -77,6 +77,7 @@ export const RecordingWindow = forwardRef<
   const {
     handleEnded,
     handleLoadedMetadata,
+    handleSeeked,
     handleTimeUpdate,
     loadFailed,
     loaded,
@@ -292,6 +293,7 @@ export const RecordingWindow = forwardRef<
           onLoadedMetadata={() => handleLoadedMetadata(hostRef.current)}
           onPause={() => setPlaying(false)}
           onPlay={() => setPlaying(true)}
+          onSeeked={handleSeeked}
           onTimeUpdate={handleTimeUpdate}
           playsInline
           preload="metadata"

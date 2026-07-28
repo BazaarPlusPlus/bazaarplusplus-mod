@@ -11,8 +11,28 @@ import {
 } from "../../recording/sync.ts";
 import { RECORDING_SPEEDS } from "./RecordingControls.tsx";
 
-const PREVIEW_SEEK_INTERVAL_MS = 64;
-const PREVIEW_SEEK_RETRY_MS = 16;
+type FastSeekVideoElement = HTMLVideoElement & {
+  fastSeek?: (time: number) => void;
+};
+
+function issueVideoSeek(
+  video: HTMLVideoElement,
+  mediaMs: number,
+  preferFastSeek: boolean,
+): boolean {
+  const seconds = Math.max(0, mediaMs / 1_000);
+  const fastSeek = (video as FastSeekVideoElement).fastSeek;
+  if (preferFastSeek && typeof fastSeek === "function") {
+    try {
+      fastSeek.call(video, seconds);
+      return true;
+    } catch {
+      // Fall through to an exact standards-based seek.
+    }
+  }
+  video.currentTime = seconds;
+  return false;
+}
 
 export function useRecordingPlayback({
   model,
@@ -24,10 +44,12 @@ export function useRecordingPlayback({
   visible: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const previewTimerRef = useRef(0);
   const pendingPreviewMediaMsRef = useRef<number | null>(null);
-  const lastPreviewSeekAtRef = useRef(Number.NEGATIVE_INFINITY);
-  const applyPreviewSeekRef = useRef<() => void>(() => undefined);
+  const previewSeekInFlightRef = useRef(false);
+  const previewSeekTargetMediaMsRef = useRef<number | null>(null);
+  const previewSeekUsedFastRef = useRef(false);
+  const previewActiveRef = useRef(false);
+  const drainPreviewSeekRef = useRef<() => void>(() => undefined);
   const requestedMediaMsRef = useRef(Number.NaN);
   const resumeMediaMsRef = useRef(0);
   const [playing, setPlaying] = useState(false);
@@ -39,56 +61,63 @@ export function useRecordingPlayback({
 
   const exact = model.sync.status === "ReadyExact";
 
-  const schedulePreviewSeek = useCallback((): void => {
-    if (
-      previewTimerRef.current
-      || pendingPreviewMediaMsRef.current === null
-    ) {
-      return;
-    }
-    const elapsed = performance.now() - lastPreviewSeekAtRef.current;
-    const delay = Math.max(0, PREVIEW_SEEK_INTERVAL_MS - elapsed);
-    previewTimerRef.current = window.setTimeout(() => {
-      previewTimerRef.current = 0;
-      applyPreviewSeekRef.current();
-    }, delay);
-  }, []);
-
-  const applyPreviewSeek = useCallback((): void => {
+  const drainPreviewSeek = useCallback((): void => {
     const mapped = pendingPreviewMediaMsRef.current;
     if (mapped === null) return;
     const video = videoRef.current;
-    if (!video || !video.paused) {
+    if (
+      !video
+      || !video.paused
+      || previewSeekInFlightRef.current
+      || video.seeking
+    ) {
+      if (video && !video.paused) {
+        pendingPreviewMediaMsRef.current = null;
+      } else if (video?.seeking) {
+        previewSeekInFlightRef.current = true;
+      }
+      return;
+    }
+    if (!previewActiveRef.current) {
       pendingPreviewMediaMsRef.current = null;
       return;
     }
-    if (video.seeking) {
-      previewTimerRef.current = window.setTimeout(() => {
-        previewTimerRef.current = 0;
-        applyPreviewSeekRef.current();
-      }, PREVIEW_SEEK_RETRY_MS);
+    pendingPreviewMediaMsRef.current = null;
+    if (Math.abs(video.currentTime * 1_000 - mapped) < 45) {
+      setMediaMs(Math.max(0, video.currentTime * 1_000));
       return;
     }
-    pendingPreviewMediaMsRef.current = null;
-    lastPreviewSeekAtRef.current = performance.now();
-    setMediaMs(mapped);
-    if (Math.abs(video.currentTime * 1_000 - mapped) >= 45) {
-      video.currentTime = Math.max(0, mapped / 1_000);
-      if (window.__BPP_VIEWER_TEST__) {
-        window.__BPP_VIEWER_TEST__.recordingPreviewSeekCount += 1;
-      }
+
+    previewSeekTargetMediaMsRef.current = mapped;
+    previewSeekUsedFastRef.current = issueVideoSeek(
+      video,
+      mapped,
+      true,
+    );
+    previewSeekInFlightRef.current = video.seeking;
+    if (window.__BPP_VIEWER_TEST__) {
+      window.__BPP_VIEWER_TEST__.recordingPreviewSeekCount += 1;
+    }
+    if (!previewSeekInFlightRef.current) {
+      previewSeekTargetMediaMsRef.current = null;
+      previewSeekUsedFastRef.current = false;
     }
   }, []);
-  applyPreviewSeekRef.current = applyPreviewSeek;
+  drainPreviewSeekRef.current = drainPreviewSeek;
 
   const cancelPreviewSeek = useCallback((): void => {
-    window.clearTimeout(previewTimerRef.current);
-    previewTimerRef.current = 0;
     pendingPreviewMediaMsRef.current = null;
+    previewSeekInFlightRef.current = videoRef.current?.seeking ?? false;
+    previewSeekTargetMediaMsRef.current = null;
+    previewSeekUsedFastRef.current = false;
+    previewActiveRef.current = false;
   }, []);
 
   const cancelPreview = useCallback((): void => {
-    const hadPendingPreview = pendingPreviewMediaMsRef.current !== null;
+    const hadPendingPreview =
+      previewActiveRef.current
+      || pendingPreviewMediaMsRef.current !== null
+      || previewSeekInFlightRef.current;
     cancelPreviewSeek();
     const video = videoRef.current;
     if (!hadPendingPreview || !video) return;
@@ -116,18 +145,20 @@ export function useRecordingPlayback({
         alreadyRequested
         && (
           pendingPreviewMediaMsRef.current !== null
+          || previewSeekInFlightRef.current
           || !video
           || Math.abs(video.currentTime * 1_000 - mapped) < 45
         )
       ) {
         return;
       }
+      previewActiveRef.current = true;
       pendingPreviewMediaMsRef.current = mapped;
       if (!video) {
         setMediaMs(mapped);
         return;
       }
-      schedulePreviewSeek();
+      drainPreviewSeekRef.current();
       return;
     }
     cancelPreviewSeek();
@@ -144,7 +175,6 @@ export function useRecordingPlayback({
     cancelPreviewSeek,
     exact,
     model.sync.anchors,
-    schedulePreviewSeek,
   ]);
 
   const prepareToHide = useCallback((): void => {
@@ -222,7 +252,11 @@ export function useRecordingPlayback({
     // programmatic time updates must not feed back into the pinned playhead.
     // Only an actively playing recording owns playhead progression.
     if (video.paused) {
-      if (pendingPreviewMediaMsRef.current === null) {
+      if (
+        !previewActiveRef.current
+        && !previewSeekInFlightRef.current
+        && pendingPreviewMediaMsRef.current === null
+      ) {
         resumeMediaMsRef.current = nextMediaMs;
         requestedMediaMsRef.current = nextMediaMs;
         setMediaMs(nextMediaMs);
@@ -236,6 +270,47 @@ export function useRecordingPlayback({
     if (!exact) return;
     const combatMs = mapMediaToCombat(nextMediaMs, model.sync.anchors);
     if (combatMs !== null) onPlaybackCombatTime(combatMs);
+  };
+
+  const handleSeeked = (): void => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    previewSeekInFlightRef.current = false;
+    if (!previewActiveRef.current) {
+      previewSeekTargetMediaMsRef.current = null;
+      previewSeekUsedFastRef.current = false;
+      return;
+    }
+    if (pendingPreviewMediaMsRef.current !== null) {
+      drainPreviewSeekRef.current();
+      return;
+    }
+
+    const target = previewSeekTargetMediaMsRef.current;
+    if (
+      previewSeekUsedFastRef.current
+      && target !== null
+      && Math.abs(video.currentTime * 1_000 - target) >= 45
+    ) {
+      previewSeekUsedFastRef.current = issueVideoSeek(
+        video,
+        target,
+        false,
+      );
+      previewSeekInFlightRef.current = video.seeking;
+      if (window.__BPP_VIEWER_TEST__) {
+        window.__BPP_VIEWER_TEST__.recordingPreviewSeekCount += 1;
+      }
+      if (previewSeekInFlightRef.current) return;
+    }
+
+    previewSeekTargetMediaMsRef.current = null;
+    previewSeekUsedFastRef.current = false;
+    const currentMediaMs = Math.max(0, video.currentTime * 1_000);
+    resumeMediaMsRef.current = currentMediaMs;
+    requestedMediaMsRef.current = currentMediaMs;
+    setMediaMs(currentMediaMs);
   };
 
   const handleEnded = (): void => {
@@ -276,6 +351,7 @@ export function useRecordingPlayback({
     cancelPreview,
     handleEnded,
     handleLoadedMetadata,
+    handleSeeked,
     handleTimeUpdate,
     loadFailed,
     loaded,

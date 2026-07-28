@@ -23,8 +23,10 @@ declare global {
       hoverInputCount: number;
       previewDispatchCount: number;
       recordingPreviewSeekCount: number;
+      stateStaticDrawCount: number;
       timelineControllerCount: number;
       timelinePreprocessCount: number;
+      timelineStaticDrawCount: number;
       lastError?: string;
     };
   }
@@ -86,8 +88,10 @@ function boot(): void {
       hoverInputCount: 0,
       previewDispatchCount: 0,
       recordingPreviewSeekCount: 0,
+      stateStaticDrawCount: 0,
       timelineControllerCount: 0,
       timelinePreprocessCount: 0,
+      timelineStaticDrawCount: 0,
     };
     createRoot(root).render(
       <React.StrictMode>

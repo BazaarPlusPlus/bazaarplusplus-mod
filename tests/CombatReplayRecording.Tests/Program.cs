@@ -4,6 +4,13 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Data.Sqlite;
 
+if (args.Contains("--report-projection", StringComparer.Ordinal))
+{
+    ReportProjectionChecks.Run();
+    Console.WriteLine("Combat report projection checks passed.");
+    return;
+}
+
 var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
 var captureServiceType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayCaptureService");
 var loaderType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayLoader");

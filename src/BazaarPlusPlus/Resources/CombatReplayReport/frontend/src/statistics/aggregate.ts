@@ -1,5 +1,6 @@
 import {
   normalizeSide,
+  type NormalizedCardStats,
   type NormalizedEntity,
   type NormalizedEvent,
 } from "../model/normalize.ts";
@@ -11,6 +12,7 @@ export type CombatSide = "player" | "opponent";
 export interface StatisticsModel {
   entities: NormalizedEntity[];
   events: NormalizedEvent[];
+  cardStats?: ReadonlyMap<string, NormalizedCardStats>;
 }
 
 export interface ActivityColumn {
@@ -98,6 +100,26 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     semanticKey: "status.regen",
     eventKind: "effect-executed",
     actions: ["PlayerRegenApply"],
+    quantitative: true,
+    aggregation: "absolute",
+    unit: "points",
+  },
+  {
+    key: "joy",
+    label: "activityJoy",
+    token: "joy",
+    eventKind: "effect-executed",
+    actions: ["PlayerJoyApply"],
+    quantitative: true,
+    aggregation: "absolute",
+    unit: "points",
+  },
+  {
+    key: "rage",
+    label: "activityRage",
+    token: "rage",
+    eventKind: "effect-executed",
+    actions: ["PlayerRageApply"],
     quantitative: true,
     aggregation: "absolute",
     unit: "points",
@@ -342,6 +364,7 @@ export interface EntityActivityRow {
   amounts: Record<string, number>;
   targetDetails: Record<string, ActivityTargetDetail[]>;
   quantifiedCounts: Record<string, number>;
+  authoritativeValues: Record<string, number>;
 }
 
 export interface ActivitySortState {
@@ -386,6 +409,7 @@ export function buildEntityActivity(
     const amounts: Record<string, number> = {};
     const targetDetails: Record<string, ActivityTargetDetail[]> = {};
     const quantifiedCounts: Record<string, number> = {};
+    const authoritativeValues: Record<string, number> = {};
     for (const column of ACTIVITY_COLUMNS) {
       counts[column.key] = 0;
       amounts[column.key] = 0;
@@ -400,6 +424,7 @@ export function buildEntityActivity(
       amounts,
       targetDetails,
       quantifiedCounts,
+      authoritativeValues,
     });
   }
   const affectedTargetIds = (event: NormalizedEvent): string[] => {
@@ -510,6 +535,24 @@ export function buildEntityActivity(
       if (row) applyEvent(row, event, count, columnKey, [target.id]);
     }
   }
+  for (const row of rows.values()) {
+    const stats = model.cardStats?.get(row.entity.id);
+    if (!stats) continue;
+    row.triggers = stats.useCount;
+    Object.assign(row.authoritativeValues, {
+      damage: stats.damageDone,
+      shield: stats.shieldAdded,
+      heal: stats.healAdded,
+      joy: stats.joyAdded,
+      poison: stats.poisonAdded,
+      burn: stats.burnAdded,
+      haste: stats.hastedCardsCount,
+      slow: stats.slowedCardsCount,
+      freeze: stats.frozenCardsCount,
+      regen: stats.regenAdded,
+      rage: stats.rageAdded,
+    });
+  }
   return Array.from(rows.values());
 }
 
@@ -521,6 +564,9 @@ export function activityRowValue(
 ): string | number | null {
   if (key === "entity") return asString(row.entity.name, row.entity.id);
   if (key === "triggers") return row.triggers;
+  if (Object.prototype.hasOwnProperty.call(row.authoritativeValues, key)) {
+    return row.authoritativeValues[key];
+  }
   const column = columnByKey.get(key);
   if (metric === "amount" && column?.quantitative) {
     return row.quantifiedCounts[key] > 0 ? row.amounts[key] : null;

@@ -1,6 +1,7 @@
 import { COPY, type LocaleCopy } from "../i18n/catalog.ts";
 import {
   frameZeroMetricSamples,
+  normalizeCardStats,
   normalizeEntity,
   normalizeEvent,
   normalizeMetric,
@@ -8,6 +9,7 @@ import {
   type NormalizedEntity,
   type NormalizedEvent,
   type NormalizedMetric,
+  type NormalizedCardStats,
 } from "./normalize.ts";
 import { safeVideoUrl } from "./asset-paths.ts";
 import {
@@ -32,6 +34,7 @@ export interface ReportViewModel {
   frameCount: number;
   rawRecordCount: number;
   entities: NormalizedEntity[];
+  cardStats: ReadonlyMap<string, NormalizedCardStats>;
   events: NormalizedEvent[];
   metrics: NormalizedMetric[];
   videoUrl: string;
@@ -109,6 +112,12 @@ export function buildViewModel(
   const battle = envelope.battleDocument;
   const manifest = envelope.recordingManifest;
   const entities = battle.entities.map(normalizeEntity);
+  const cardStats = new Map(
+    (battle.cardStats ?? [])
+      .map(normalizeCardStats)
+      .filter((stats) => stats.entityId)
+      .map((stats) => [stats.entityId, stats] as const),
+  );
   fillMissingEntityNames(entities, copy);
   const events = battle.events.map(normalizeEvent);
   events.sort(
@@ -164,6 +173,7 @@ export function buildViewModel(
     frameCount: Math.max(0, Math.round(battle.frameCount)),
     rawRecordCount: Math.max(0, Math.round(battle.rawRecordCount)),
     entities,
+    cardStats,
     events,
     metrics,
     videoUrl,

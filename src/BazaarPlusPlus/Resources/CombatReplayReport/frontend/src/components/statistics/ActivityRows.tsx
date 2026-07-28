@@ -93,7 +93,10 @@ export function ActivityRows({
               </span>
             </div>
           </TableCell>
-          <TableCell className="px-2 py-1.5 text-right font-mono text-compact font-semibold text-foreground">
+          <TableCell
+            className="px-2 py-1.5 text-right font-mono text-compact font-semibold text-foreground"
+            data-bpp-test-id="statistics-activity-use-count"
+          >
             {formatNumber(row.triggers)}
           </TableCell>
           {ACTIVITY_COLUMNS.map((column) => (
@@ -101,6 +104,7 @@ export function ActivityRows({
               className="px-2 py-1.5 text-right"
               data-amount={row.amounts[column.key] ?? 0}
               data-count={row.counts[column.key] ?? 0}
+              data-native-value={row.authoritativeValues[column.key]}
               key={column.key}
             >
               <ActivityValue column={column} row={row} t={t} />

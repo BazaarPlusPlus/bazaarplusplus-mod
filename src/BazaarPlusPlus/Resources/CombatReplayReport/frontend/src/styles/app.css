@@ -318,12 +318,20 @@
     color-mix(in srgb, var(--color-brand-soft) 88%, transparent);
 }
 
-.bpp-event-canvas {
+.bpp-event-canvas,
+.bpp-event-overlay-canvas {
   grid-column: 2;
   grid-row: 3;
   display: block;
-  background: var(--color-background);
   touch-action: none;
+}
+
+.bpp-event-canvas {
+  background: var(--color-background);
+}
+
+.bpp-event-overlay-canvas {
+  z-index: 1;
 }
 
 .bpp-sticky-hero-label,

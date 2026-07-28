@@ -46,6 +46,12 @@ public sealed class CombatReportDocumentV1
 
     public List<CombatReportEntityV1> Entities { get; set; } = new();
 
+    /// <summary>
+    /// Authoritative per-card totals emitted by CombatSim. These are the same values consumed by
+    /// the native post-combat recap; event projection remains available for timeline detail only.
+    /// </summary>
+    public List<CombatReportCardStatsV1> CardStats { get; set; } = new();
+
     public List<CombatReportEventV1> Events { get; set; } = new();
 
     /// <summary>
@@ -123,6 +129,35 @@ public sealed class CombatReportEntityV1
     public string? AssetRelativeUrl { get; set; }
 
     public int Order { get; set; }
+}
+
+public sealed class CombatReportCardStatsV1
+{
+    public string EntityId { get; set; } = string.Empty;
+
+    public int DamageDone { get; set; }
+
+    public int ShieldAdded { get; set; }
+
+    public int HealAdded { get; set; }
+
+    public int JoyAdded { get; set; }
+
+    public int PoisonAdded { get; set; }
+
+    public int BurnAdded { get; set; }
+
+    public int HastedCardsCount { get; set; }
+
+    public int SlowedCardsCount { get; set; }
+
+    public int FrozenCardsCount { get; set; }
+
+    public int UseCount { get; set; }
+
+    public int RegenAdded { get; set; }
+
+    public int RageAdded { get; set; }
 }
 
 public sealed class CombatReportEventV1

@@ -162,6 +162,9 @@ export function ActivityValue({
   const amount = row.amounts[column.key] ?? 0;
   const details = row.targetDetails[column.key] ?? [];
   const quantified = row.quantifiedCounts[column.key] ?? 0;
+  const authoritative =
+    Object.prototype.hasOwnProperty.call(row.authoritativeValues, column.key);
+  const authoritativeValue = row.authoritativeValues[column.key] ?? 0;
   const partial = quantified > 0 && quantified < count;
   const signed = column.aggregation === "signed";
   const formattedAmount = formatActivityAmount(column, amount, signed);
@@ -186,13 +189,29 @@ export function ActivityValue({
     .replace("{total}", formatNumber(count));
   const accessibleValue = [
     metricLabel,
+    authoritative
+      ? `${t("activityNativeTotal")} ${
+        formatCompactNumber(authoritativeValue)
+      }`
+      : "",
     details.length > 0
       ? `${t("activityTargetEffects")} ${targetSummary}`
       : t("activityNoTargetEffects"),
-  ].join(" · ");
+  ].filter(Boolean).join(" · ");
 
   const visibleValue =
-    count === 0 ? (
+    authoritative ? (
+      authoritativeValue === 0 ? (
+        <span className="text-muted-foreground/25">·</span>
+      ) : (
+        <strong
+          className="font-mono text-compact text-foreground"
+          data-bpp-authoritative="native-card-stats"
+        >
+          {formatCompactNumber(authoritativeValue)}
+        </strong>
+      )
+    ) : count === 0 ? (
       <span className="text-muted-foreground/25">·</span>
     ) : column.quantitative && quantified > 0 ? (
       <span className="inline-flex flex-col items-end leading-none">
@@ -264,7 +283,11 @@ export function ActivityValue({
             </p>
           )}
         </div>
-        {column.quantitative && count > 0 && (
+        {authoritative ? (
+          <p className="border-t border-border/50 px-3 py-1.5 text-nano text-muted-foreground">
+            {t("activityNativeTotal")}
+          </p>
+        ) : column.quantitative && count > 0 && (
           <p className="border-t border-border/50 px-3 py-1.5 text-nano text-muted-foreground">
             {quantified === 0
               ? t("activityAmountUnavailable")

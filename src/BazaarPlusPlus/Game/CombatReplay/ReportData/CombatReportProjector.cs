@@ -145,6 +145,7 @@ internal sealed class CombatReportProjector
             Loser = combatMessage.Data?.Loser.ToString() ?? string.Empty,
             RawRecordCount = CountRawRecords(frames),
             Entities = BuildEntities(manifest),
+            CardStats = BuildCardStats(combatMessage.Data?.CardStats),
             Events = events,
             FrameZeroState = BuildFrameZeroState(frames),
             Metrics = metrics,
@@ -578,6 +579,43 @@ internal sealed class CombatReportProjector
         }
         return count;
     }
+
+    private static List<CombatReportCardStatsV1> BuildCardStats(
+        IReadOnlyDictionary<string, Dictionary<ECardStats, int>>? cardStats
+    )
+    {
+        if (cardStats == null)
+            return new List<CombatReportCardStatsV1>();
+
+        return cardStats
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair =>
+            {
+                var stats = pair.Value;
+                return new CombatReportCardStatsV1
+                {
+                    EntityId = pair.Key,
+                    DamageDone = Stat(stats, ECardStats.DamageDone),
+                    ShieldAdded = Stat(stats, ECardStats.ShieldAdded),
+                    HealAdded = Stat(stats, ECardStats.HealAdded),
+                    JoyAdded = Stat(stats, ECardStats.JoyAdded),
+                    PoisonAdded = Stat(stats, ECardStats.PoisonAdded),
+                    BurnAdded = Stat(stats, ECardStats.BurnAdded),
+                    HastedCardsCount = Stat(stats, ECardStats.HastedCardsCount),
+                    SlowedCardsCount = Stat(stats, ECardStats.SlowedCardsCount),
+                    FrozenCardsCount = Stat(stats, ECardStats.FrozenCardsCount),
+                    UseCount = Stat(stats, ECardStats.UseCount),
+                    RegenAdded = Stat(stats, ECardStats.RegenAdded),
+                    RageAdded = Stat(stats, ECardStats.RageAdded),
+                };
+            })
+            .ToList();
+    }
+
+    private static int Stat(
+        IReadOnlyDictionary<ECardStats, int>? stats,
+        ECardStats stat
+    ) => stats != null && stats.TryGetValue(stat, out var value) ? value : 0;
 
     private static int CountPlayerUpdateRecords(CombatSimPlayerUpdate? update)
     {

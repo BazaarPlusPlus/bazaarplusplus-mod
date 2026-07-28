@@ -1482,6 +1482,17 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 ),
                 new ReplayPlaybackCleanupStep("opening_state", ReplayOpeningStateRestorer.Cleanup)
             );
+            if (!attemptedBootstrapFromLobby)
+            {
+                try
+                {
+                    await ReplayBootstrap.HideReplayLoadingSceneAsync();
+                }
+                catch (Exception cleanupException)
+                {
+                    LogCleanupFailure("loading_scene", operation.BattleId, cleanupException);
+                }
+            }
             var failureReason =
                 ex is ReplayPlaybackPublishException publishException ? publishException.ReasonCode
                 : ex is ReplayPlaybackStartInterruptedException interrupted ? interrupted.ReasonCode
@@ -1534,26 +1545,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         ReplayPlaybackLogOperation operation
     )
     {
-        try
-        {
-            await ReplayNativeBoardPresentation.RebuildOpponentCollectiblesAsync();
-        }
-        catch (Exception ex)
-        {
-            operation.ReportDegradation(
-                ReplayPlaybackReasonCode.OpponentCollectiblesUnavailable,
-                ex
-            );
-        }
-
-        try
-        {
-            await _portraitController!.EnsureTemporaryOpponentPortraitAsync(manifest, operation);
-        }
-        catch (Exception ex)
-        {
-            operation.ReportDegradation(ReplayPlaybackReasonCode.OpponentPortraitUnavailable, ex);
-        }
+        var collectibles = PrepareSavedReplayOpponentCollectiblesAsync(operation);
+        var portrait = PrepareSavedReplayOpponentPortraitAsync(manifest, operation);
+        await Task.WhenAll(collectibles, portrait);
 
         try
         {
@@ -1566,6 +1560,38 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         catch (Exception ex)
         {
             operation.ReportDegradation(ReplayPlaybackReasonCode.PresentationWarmupFailed, ex);
+        }
+    }
+
+    private static async Task PrepareSavedReplayOpponentCollectiblesAsync(
+        ReplayPlaybackLogOperation operation
+    )
+    {
+        try
+        {
+            await ReplayNativeBoardPresentation.RebuildOpponentCollectiblesAsync();
+        }
+        catch (Exception ex)
+        {
+            operation.ReportDegradation(
+                ReplayPlaybackReasonCode.OpponentCollectiblesUnavailable,
+                ex
+            );
+        }
+    }
+
+    private async Task PrepareSavedReplayOpponentPortraitAsync(
+        PvpBattleManifest manifest,
+        ReplayPlaybackLogOperation operation
+    )
+    {
+        try
+        {
+            await _portraitController!.EnsureTemporaryOpponentPortraitAsync(manifest, operation);
+        }
+        catch (Exception ex)
+        {
+            operation.ReportDegradation(ReplayPlaybackReasonCode.OpponentPortraitUnavailable, ex);
         }
     }
 

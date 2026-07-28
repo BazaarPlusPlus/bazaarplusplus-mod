@@ -2,6 +2,7 @@ import {
   type ReportEntityV1,
   type ReportEventV1,
   type ReportFrameZeroStateV1,
+  type ReportCardStatsV1,
   type ReportMetricSampleV1,
 } from "./normalize.ts";
 import {
@@ -39,6 +40,7 @@ export interface ReportDocumentV1 {
   loser: string;
   rawRecordCount: number;
   entities: ReportEntityV1[];
+  cardStats?: ReportCardStatsV1[];
   events: ReportEventV1[];
   frameZeroState: ReportFrameZeroStateV1;
   metrics: ReportMetricSampleV1[];
@@ -386,6 +388,45 @@ function validateMetric(value: unknown, path: string): void {
   requiredString(metric, "unit", path);
 }
 
+function validateCardStats(value: unknown, path: string): void {
+  const stats = exactRecord(
+    value,
+    path,
+    [
+      "entityId",
+      "damageDone",
+      "shieldAdded",
+      "healAdded",
+      "joyAdded",
+      "poisonAdded",
+      "burnAdded",
+      "hastedCardsCount",
+      "slowedCardsCount",
+      "frozenCardsCount",
+      "useCount",
+      "regenAdded",
+      "rageAdded",
+    ],
+  );
+  requiredString(stats, "entityId", path);
+  for (const key of [
+    "damageDone",
+    "shieldAdded",
+    "healAdded",
+    "joyAdded",
+    "poisonAdded",
+    "burnAdded",
+    "hastedCardsCount",
+    "slowedCardsCount",
+    "frozenCardsCount",
+    "useCount",
+    "regenAdded",
+    "rageAdded",
+  ]) {
+    requiredNumber(stats, key, path, true);
+  }
+}
+
 function validateDocument(value: unknown, path: string): void {
   const documentModel = exactRecord(
     value,
@@ -409,7 +450,7 @@ function validateDocument(value: unknown, path: string): void {
       "frameZeroState",
       "metrics",
     ],
-    ["day", "result"],
+    ["day", "result", "cardStats"],
   );
   validateSchemaVersion(documentModel, path);
   requiredString(documentModel, "documentId", path);
@@ -434,6 +475,12 @@ function validateDocument(value: unknown, path: string): void {
   entities.forEach((entity, index) =>
     validateEntity(entity, `${path}.entities[${index}]`)
   );
+  if (Object.prototype.hasOwnProperty.call(documentModel, "cardStats")) {
+    const cardStats = requiredArray(documentModel, "cardStats", path);
+    cardStats.forEach((stats, index) =>
+      validateCardStats(stats, `${path}.cardStats[${index}]`)
+    );
+  }
   const events = requiredArray(documentModel, "events", path);
   events.forEach((event, index) =>
     validateEvent(event, `${path}.events[${index}]`)

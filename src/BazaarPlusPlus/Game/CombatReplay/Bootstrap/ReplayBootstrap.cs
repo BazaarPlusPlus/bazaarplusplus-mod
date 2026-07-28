@@ -13,7 +13,11 @@ internal static class ReplayBootstrap
     internal static async Task<bool> EnsureBootstrapReadyAsync()
     {
         if (IsBootstrapReady())
+        {
+            if (!SceneLoader.IsSceneLoaded(SceneID.GameplayLoading))
+                await SceneLoader.LoadSceneAdditive(SceneID.GameplayLoading);
             return false;
+        }
 
         Data.ResetRunData();
         if (!SceneLoader.IsSceneLoaded(SceneID.GameScene))
@@ -41,10 +45,14 @@ internal static class ReplayBootstrap
 
         await SceneLoader.SetActiveScene(SceneID.GameScene);
         SceneLoader.LoadingComplete();
-        if (SceneLoader.IsSceneLoaded(SceneID.GameplayLoading))
-            await SceneLoader.UnloadScene(SceneID.GameplayLoading);
 
         return true;
+    }
+
+    internal static async Task HideReplayLoadingSceneAsync()
+    {
+        if (SceneLoader.IsSceneLoaded(SceneID.GameplayLoading))
+            await SceneLoader.UnloadScene(SceneID.GameplayLoading);
     }
 
     internal static ReplayBootstrapContext ResolveDependencies(IReplayPlaybackOutcomeSink outcome)
@@ -142,17 +150,28 @@ internal static class ReplayBootstrap
         Singleton<BoardManager>.Instance.ShowReplayAndRecapButtons(show: false, deactivate: true);
         HealthBarBinder.HideEncounterPickerOverlays();
         HealthBarBinder.EnsureOpponentPortraitVisible();
-        await ObserveQualityStepAsync(
+        var healthBarPreparation = ObserveQualityStepAsync(
             () => HealthBarBinder.PrepareHealthBarsAsync(outcome),
             outcome,
             ReplayPlaybackReasonCode.PlayerAttributesUnavailable
         );
         Singleton<BoardManager>.Instance.ToggleOpponentPortrait(isVisible: true);
-        await AppStateHandlerInstaller.WaitForPresentationReadyAsync();
-        await ObserveQualityStepAsync(
+        var presentationReady = AppStateHandlerInstaller.WaitForPresentationReadyAsync();
+        var presentationWarmup = ObserveQualityStepAsync(
             () => PresentationWarmer.WarmPresentationAssetsAsync(manifest, sequence, outcome),
             outcome,
             ReplayPlaybackReasonCode.PresentationWarmupFailed
+        );
+        var audioWarmup = ObserveQualityStepAsync(
+            () => AudioBankWarmer.WarmAudioBanksAsync(outcome),
+            outcome,
+            ReplayPlaybackReasonCode.AudioWarmupFailed
+        );
+        await Task.WhenAll(
+            healthBarPreparation,
+            presentationReady,
+            presentationWarmup,
+            audioWarmup
         );
         ObserveQualityStep(
             () => ReplayPresentationRestorer.Refresh(manifest, sequence, outcome),
@@ -164,14 +183,10 @@ internal static class ReplayBootstrap
             outcome,
             ReplayPlaybackReasonCode.PresentationWarmupFailed
         );
-        await ObserveQualityStepAsync(
-            () => AudioBankWarmer.WarmAudioBanksAsync(outcome),
-            outcome,
-            ReplayPlaybackReasonCode.AudioWarmupFailed
-        );
         HealthBarBinder.HideEncounterPickerOverlays();
         HealthBarBinder.EnsureOpponentPortraitVisible();
         HealthBarBinder.RefillOpponentHealthBar();
+        await HideReplayLoadingSceneAsync();
         if (publishStarting != null)
         {
             var publishOutcome = publishStarting();

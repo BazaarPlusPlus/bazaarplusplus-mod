@@ -580,8 +580,8 @@ file static class VideoEncoderProfileTests
         var softwareArgs = Build(software, 30);
         TestReflection.Assert(
             softwareArgs
-                == "-hide_banner -loglevel warning -nostdin -y -f rawvideo -pixel_format rgba -video_size 2742x1624 -framerate 30 -i pipe:0 -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 23 -movflags +faststart out.mp4",
-            "The libx264 fallback must preserve the existing argument contract exactly."
+                == "-hide_banner -loglevel warning -nostdin -y -f rawvideo -pixel_format rgba -video_size 2742x1624 -framerate 30 -i pipe:0 -c:v libx264 -pix_fmt yuv420p -g 8 -preset veryfast -crf 23 -movflags +faststart out.mp4",
+            "The libx264 fallback must keep report hover seeks within a quarter-second GOP."
         );
 
         var candidateMethod = ProfileType.GetMethod(
@@ -603,6 +603,7 @@ file static class VideoEncoderProfileTests
             {
                 "-c:v h264_videotoolbox",
                 "-pix_fmt yuv420p",
+                "-g 15",
                 "-realtime 1",
                 "-b:v 24000k",
                 "-maxrate 30000k",

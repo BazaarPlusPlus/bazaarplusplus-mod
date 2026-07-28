@@ -30,6 +30,7 @@ export interface TimelineViewportRefs {
   stateCanvas: RefObject<HTMLCanvasElement | null>;
   ruler: RefObject<HTMLCanvasElement | null>;
   eventCanvas: RefObject<HTMLCanvasElement | null>;
+  interactionCanvas: RefObject<HTMLCanvasElement | null>;
   stickyHeroCanvas: RefObject<HTMLCanvasElement | null>;
   stickyHeroLabel: RefObject<HTMLDivElement | null>;
   tooltipHost: RefObject<HTMLDivElement | null>;
@@ -56,6 +57,7 @@ export function useTimelineViewportRefs(): TimelineViewportRefs {
     stateCanvas: useRef<HTMLCanvasElement>(null),
     ruler: useRef<HTMLCanvasElement>(null),
     eventCanvas: useRef<HTMLCanvasElement>(null),
+    interactionCanvas: useRef<HTMLCanvasElement>(null),
     stickyHeroCanvas: useRef<HTMLCanvasElement>(null),
     stickyHeroLabel: useRef<HTMLDivElement>(null),
     tooltipHost: useRef<HTMLDivElement>(null),
@@ -308,8 +310,15 @@ export function TimelineViewport({
               ))}
           </div>
           <canvas
-            aria-label={t("timelineTitle")}
+            aria-hidden="true"
             className="bpp-event-canvas"
+            data-bpp-side-boundary-lane={sideBoundaryLane ?? ""}
+            data-bpp-test-id="timeline-scene-canvas"
+            ref={refs.eventCanvas}
+          />
+          <canvas
+            aria-label={t("timelineTitle")}
+            className="bpp-event-overlay-canvas"
             data-bpp-side-boundary-lane={sideBoundaryLane ?? ""}
             data-bpp-test-id="timeline-canvas"
             onPointerDown={(event) =>
@@ -320,7 +329,7 @@ export function TimelineViewport({
               if (state.inspectorOpen) return;
               refs.controller.current?.handlePointerMove(event.nativeEvent);
             }}
-            ref={refs.eventCanvas}
+            ref={refs.interactionCanvas}
             role="img"
           />
           <div

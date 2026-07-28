@@ -169,18 +169,18 @@ void VerticalOrientationFlipPreservesRows()
 void ReadbackSourceOrientationContractsAreExplicit()
 {
     Check(
-        !ReportAssetPixelOrientation.RequiresVerticalFlip(
+        ReportAssetPixelOrientation.RequiresVerticalFlip(
             graphicsUvStartsAtTop: true,
             ReportAssetReadbackSource.UnitySprite
         ),
-        "Top-origin Unity sprites must preserve the accepted portrait/status orientation."
+        "Top-origin Unity sprite readbacks must be flipped into browser orientation."
     );
     Check(
-        ReportAssetPixelOrientation.RequiresVerticalFlip(
+        !ReportAssetPixelOrientation.RequiresVerticalFlip(
             graphicsUvStartsAtTop: false,
             ReportAssetReadbackSource.UnitySprite
         ),
-        "Bottom-origin Unity sprites must be normalized before browser encoding."
+        "Bottom-origin Unity sprite readbacks must preserve their browser orientation."
     );
 
     foreach (

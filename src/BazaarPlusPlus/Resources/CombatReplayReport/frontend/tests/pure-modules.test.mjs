@@ -1009,6 +1009,69 @@ test("entity activity falls back to an exact trigger source without overriding a
   assert.equal(rowById.get(directItem.id)?.amounts.haste, 500);
 });
 
+test("entity activity uses native recap totals without discarding event target detail", () => {
+  const source = normalizeEntity(
+    {
+      entityId: "native-stat-item",
+      owner: "player",
+      type: "item",
+      name: "Native Stat Item",
+    },
+    0,
+  );
+  const target = normalizeEntity(
+    {
+      entityId: "native-stat-target",
+      owner: "opponent",
+      type: "hero",
+      name: "Target",
+    },
+    1,
+  );
+  const cardStats = new Map([
+    [
+      source.id,
+      {
+        entityId: source.id,
+        damageDone: 525,
+        shieldAdded: 0,
+        healAdded: 0,
+        joyAdded: 0,
+        poisonAdded: 0,
+        burnAdded: 756,
+        hastedCardsCount: 65,
+        slowedCardsCount: 0,
+        frozenCardsCount: 0,
+        useCount: 8,
+        regenAdded: 0,
+        rageAdded: 0,
+      },
+    ],
+  ]);
+  const rows = buildEntityActivity({
+    entities: [source, target],
+    cardStats,
+    events: [
+      timelineEvent({
+        id: "partial-damage-detail",
+        kind: "effect-executed",
+        action: "PlayerDamage",
+        sourceId: source.id,
+        targetIds: [target.id],
+        attributionConfidence: "exact",
+        value: 367,
+      }),
+    ],
+  });
+  const row = rows.find((candidate) => candidate.entity.id === source.id);
+
+  assert.equal(row?.triggers, 8);
+  assert.equal(row?.authoritativeValues.damage, 525);
+  assert.equal(row?.authoritativeValues.burn, 756);
+  assert.equal(row?.authoritativeValues.haste, 65);
+  assert.equal(row?.targetDetails.damage[0]?.amount, 367);
+});
+
 test("entity activity preserves every affected target without dividing a multi-target effect amount", () => {
   const source = normalizeEntity(
     {

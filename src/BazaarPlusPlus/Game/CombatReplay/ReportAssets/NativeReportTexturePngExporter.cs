@@ -102,9 +102,9 @@ internal static class NativeReportTexturePngExporter
         cancellationToken.ThrowIfCancellationRequested();
         var width = renderTexture.width;
         var height = renderTexture.height;
-        // Raw material textures and offscreen camera targets have the opposite authored vertical
-        // convention from Unity Sprite geometry. Keep the source contract explicit so adding a new
-        // asset path cannot silently inherit the wrong normalization.
+        // Async GPU readback exposes top-origin render targets upside down to browser image
+        // encoders on D3D-style backends. Keep the source contract explicit so a future readback
+        // path cannot silently skip the platform normalization.
         var flipVertically = ReportAssetPixelOrientation.RequiresVerticalFlip(
             SystemInfo.graphicsUVStartsAtTop,
             readbackSource

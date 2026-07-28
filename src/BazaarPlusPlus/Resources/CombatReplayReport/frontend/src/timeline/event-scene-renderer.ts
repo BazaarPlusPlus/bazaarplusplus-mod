@@ -26,6 +26,7 @@ import { opponentBoundaryLane } from "./lane-filter.ts";
 
 export interface TimelineSceneOptions {
   canvas: HTMLCanvasElement;
+  overlayCanvas: HTMLCanvasElement;
   ruler: HTMLCanvasElement;
   stickyHeroCanvas: HTMLCanvasElement;
   model: ReportViewModel;
@@ -46,23 +47,17 @@ export interface TimelineSceneOptions {
   requestDraw: () => void;
 }
 
-export function drawTimelineScene(options: TimelineSceneOptions): void {
+export function drawTimelineStaticScene(options: TimelineSceneOptions): void {
   const {
     canvas,
-    ruler,
     model,
     entities,
-    width,
     laneHeight,
     clusters,
     markerClusters,
     statusRanges,
     heroHealthAreas,
     firstVisibleMs,
-    selectedVisualClusters,
-    hoverCluster,
-    playheadMs,
-    previewMs,
     showHeroHealth,
     requestDraw,
   } = options;
@@ -80,31 +75,6 @@ export function drawTimelineScene(options: TimelineSceneOptions): void {
   canvas.dataset.bppHeroHealthLanes = visibleHealthAreas
     .map((area) => `${area.side}:${area.lane}`)
     .join(",");
-
-  const selectedCluster =
-    selectedVisualClusters.values().next().value ?? null;
-  const highlighted = relatedLaneRoles(
-    hoverCluster ?? selectedCluster,
-    entities,
-  );
-  for (const [lane, roles] of highlighted) {
-    const isSource = roles.has("source") || roles.has("trigger");
-    context.fillStyle = withAlpha(
-      themeColor(isSource ? "brand-soft" : "player"),
-      isSource ? 0.12 : 0.07,
-    );
-    context.fillRect(
-      0,
-      lane * laneHeight,
-      size.width,
-      laneHeight,
-    );
-    context.fillStyle = withAlpha(
-      themeColor(isSource ? "brand-soft" : "success"),
-      0.8,
-    );
-    context.fillRect(0, lane * laneHeight, 2, laneHeight);
-  }
 
   context.strokeStyle = withAlpha(
     themeColor("muted-foreground"),
@@ -148,9 +118,61 @@ export function drawTimelineScene(options: TimelineSceneOptions): void {
     drawMarker(
       context,
       cluster,
-      cluster === hoverCluster || selectedVisualClusters.has(cluster),
+      false,
       requestDraw,
     );
+  }
+}
+
+export function drawTimelineOverlay(options: TimelineSceneOptions): void {
+  const {
+    overlayCanvas,
+    ruler,
+    model,
+    entities,
+    width,
+    laneHeight,
+    markerClusters,
+    selectedVisualClusters,
+    hoverCluster,
+    playheadMs,
+    previewMs,
+    requestDraw,
+  } = options;
+  const context = overlayCanvas.getContext("2d");
+  if (!context) return;
+  const size = beginLogicalDraw(overlayCanvas, context);
+  context.clearRect(0, 0, size.width, size.height);
+
+  const selectedCluster =
+    selectedVisualClusters.values().next().value ?? null;
+  const highlighted = relatedLaneRoles(
+    hoverCluster ?? selectedCluster,
+    entities,
+  );
+  for (const [lane, roles] of highlighted) {
+    const isSource = roles.has("source") || roles.has("trigger");
+    context.fillStyle = withAlpha(
+      themeColor(isSource ? "brand-soft" : "player"),
+      isSource ? 0.12 : 0.07,
+    );
+    context.fillRect(
+      0,
+      lane * laneHeight,
+      size.width,
+      laneHeight,
+    );
+    context.fillStyle = withAlpha(
+      themeColor(isSource ? "brand-soft" : "success"),
+      0.8,
+    );
+    context.fillRect(0, lane * laneHeight, 2, laneHeight);
+  }
+  for (const cluster of markerClusters) {
+    if (cluster !== hoverCluster && !selectedVisualClusters.has(cluster)) {
+      continue;
+    }
+    drawMarker(context, cluster, true, requestDraw);
   }
   if (
     shouldDrawTimelinePreview(
@@ -181,6 +203,7 @@ export function drawTimelineScene(options: TimelineSceneOptions): void {
 
 export function drawStickyHeroRow({
   canvas,
+  overlayCanvas,
   stickyHeroCanvas,
   entities,
   laneHeight,
@@ -189,6 +212,7 @@ export function drawStickyHeroRow({
 }: Pick<
   TimelineSceneOptions,
   | "canvas"
+  | "overlayCanvas"
   | "stickyHeroCanvas"
   | "entities"
   | "laneHeight"
@@ -217,6 +241,17 @@ export function drawStickyHeroRow({
     0,
     pinnedHeroLane * laneHeight * sourceScaleY,
     canvas.width,
+    laneHeight * sourceScaleY,
+    0,
+    0,
+    size.width,
+    size.height,
+  );
+  context.drawImage(
+    overlayCanvas,
+    0,
+    pinnedHeroLane * laneHeight * sourceScaleY,
+    overlayCanvas.width,
     laneHeight * sourceScaleY,
     0,
     0,

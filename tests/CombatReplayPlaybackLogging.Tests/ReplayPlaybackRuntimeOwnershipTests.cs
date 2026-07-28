@@ -185,6 +185,15 @@ public sealed class ReplayPlaybackRuntimeOwnershipTests
             "ReplayNativeBoardPresentation.Normalize(replayControlsVisible: true);",
             presentation
         );
+        Assert.Contains(
+            "var collectibles = PrepareSavedReplayOpponentCollectiblesAsync(operation);",
+            presentation
+        );
+        Assert.Contains(
+            "var portrait = PrepareSavedReplayOpponentPortraitAsync(manifest, operation);",
+            presentation
+        );
+        Assert.Contains("await Task.WhenAll(collectibles, portrait);", presentation);
 
         var visualPatchSource = Source(
             "src",
@@ -197,6 +206,47 @@ public sealed class ReplayPlaybackRuntimeOwnershipTests
             "ReplayNativeBoardPresentation.Normalize(replayControlsVisible: true);",
             visualPatchSource
         );
+    }
+
+    [Fact]
+    public void Saved_replay_loading_scene_covers_parallel_startup_warmup()
+    {
+        var bootstrapSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Game",
+            "CombatReplay",
+            "Bootstrap",
+            "ReplayBootstrap.cs"
+        );
+        var ensure = Segment(
+            bootstrapSource,
+            "internal static async Task<bool> EnsureBootstrapReadyAsync()",
+            "internal static async Task HideReplayLoadingSceneAsync()"
+        );
+        Assert.Contains("SceneLoader.LoadSceneAdditive(SceneID.GameplayLoading)", ensure);
+        Assert.DoesNotContain("UnloadScene(SceneID.GameplayLoading)", ensure);
+
+        var inject = Segment(
+            bootstrapSource,
+            "internal static async Task InjectSavedReplayAsync(",
+            "private static void ObserveQualityStep("
+        );
+        var parallelWarmup = inject.IndexOf("await Task.WhenAll(", StringComparison.Ordinal);
+        var hideLoading = inject.IndexOf(
+            "await HideReplayLoadingSceneAsync();",
+            StringComparison.Ordinal
+        );
+        var replay = inject.IndexOf("replayState.Replay();", StringComparison.Ordinal);
+        Assert.True(parallelWarmup >= 0, "Independent replay warmups must run concurrently.");
+        Assert.True(
+            hideLoading > parallelWarmup && replay > hideLoading,
+            "The loading scene must remain visible until warmup completes, then hide before replay starts."
+        );
+        Assert.Contains("healthBarPreparation", inject);
+        Assert.Contains("presentationReady", inject);
+        Assert.Contains("presentationWarmup", inject);
+        Assert.Contains("audioWarmup", inject);
     }
 
     [Fact]

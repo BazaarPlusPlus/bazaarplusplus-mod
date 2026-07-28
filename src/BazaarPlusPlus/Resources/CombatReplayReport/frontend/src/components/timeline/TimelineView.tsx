@@ -251,12 +251,14 @@ export const TimelineView = forwardRef<
 
   useLayoutEffect(() => {
     const canvas = viewportRefs.eventCanvas.current;
+    const overlayCanvas = viewportRefs.interactionCanvas.current;
     const ruler = viewportRefs.ruler.current;
     const labels = viewportRefs.labels.current;
     const stickyHeroCanvas = viewportRefs.stickyHeroCanvas.current;
     const stickyHeroLabel = viewportRefs.stickyHeroLabel.current;
     if (
       !canvas
+      || !overlayCanvas
       || !ruler
       || !labels
       || !stickyHeroCanvas
@@ -282,6 +284,7 @@ export const TimelineView = forwardRef<
     };
     const controller = new TimelineCanvasController({
       canvas,
+      overlayCanvas,
       ruler,
       model,
       entities,

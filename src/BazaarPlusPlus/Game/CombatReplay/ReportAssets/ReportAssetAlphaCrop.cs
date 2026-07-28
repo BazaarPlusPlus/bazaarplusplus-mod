@@ -20,8 +20,8 @@ internal static class ReportAssetPixelOrientation
     {
         return source switch
         {
-            ReportAssetReadbackSource.UnitySprite => !graphicsUvStartsAtTop,
-            ReportAssetReadbackSource.MaterialTexture
+            ReportAssetReadbackSource.UnitySprite
+            or ReportAssetReadbackSource.MaterialTexture
             or ReportAssetReadbackSource.OffscreenCamera => graphicsUvStartsAtTop,
             _ => throw new ArgumentOutOfRangeException(nameof(source), source, null),
         };

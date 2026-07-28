@@ -189,6 +189,24 @@ export interface StateBandRenderInput {
   highlightedMetric?: StateMetric | null;
 }
 
+interface StateBandStaticCache {
+  canvas: HTMLCanvasElement;
+  model: ReportViewModel;
+  grouped: GroupedMetricSamples;
+  width: number;
+  height: number;
+  scaleMode: StateScaleMode;
+  visibleKey: string;
+  highlightedMetric: StateMetric | null;
+  domain: StateDomain | null;
+  ticks: StateAxisTick[];
+}
+
+const staticCacheByCanvas = new WeakMap<
+  HTMLCanvasElement,
+  StateBandStaticCache
+>();
+
 export function drawStateBand(input: StateBandRenderInput): {
   domain: StateDomain | null;
   ticks: StateAxisTick[];
@@ -197,10 +215,6 @@ export function drawStateBand(input: StateBandRenderInput): {
   const context = input.canvas.getContext("2d");
   if (!context) return { domain: null, ticks: [] };
   const size = beginLogicalDraw(input.canvas, context);
-  context.clearRect(0, 0, size.width, size.height);
-  context.fillStyle = themeColor("surface");
-  context.fillRect(0, 0, size.width, size.height);
-
   const visibleMetrics = input.visibleMetrics ?? new Set(METRIC_ORDER);
   const visibleOrder = METRIC_ORDER.filter((metric) =>
     visibleMetrics.has(metric)
@@ -212,53 +226,108 @@ export function drawStateBand(input: StateBandRenderInput): {
       : null;
   input.canvas.dataset.bppVisibleMetrics = visibleOrder.join(",");
   input.canvas.dataset.bppHighlightedMetric = highlightedMetric ?? "";
-
-  const domain = sharedStateDomain(
-    input.grouped,
-    input.scaleMode,
-    visibleOrder,
-  );
-  const ticks = stateAxisTicks(domain, input.scaleMode);
-  if (domain) {
-    drawGrid(context, domain, size.width, size.height, ticks);
-    const drawOrder = highlightedMetric
-      ? [
-          ...visibleOrder.filter((metric) => metric !== highlightedMetric),
-          highlightedMetric,
-        ]
-      : visibleOrder;
-    for (const metric of drawOrder) {
-      const emphasis = highlightedMetric === null
-        ? "normal"
-        : metric === highlightedMetric
-          ? "highlighted"
-          : "muted";
-      drawStepLine(
-        context,
-        input.grouped.get(`player:${metric}`),
-        input.model,
-        size.width,
-        size.height,
-        domain,
-        input.scaleMode,
-        "player",
-        themeColor(METRIC_THEME_COLORS[metric]),
-        emphasis,
-      );
-      drawStepLine(
-        context,
-        input.grouped.get(`opponent:${metric}`),
-        input.model,
-        size.width,
-        size.height,
-        domain,
-        input.scaleMode,
-        "opponent",
-        themeColor(METRIC_THEME_COLORS[metric]),
-        emphasis,
-      );
+  const visibleKey = visibleOrder.join(",");
+  let cache = staticCacheByCanvas.get(input.canvas);
+  if (
+    !cache
+    || cache.model !== input.model
+    || cache.grouped !== input.grouped
+    || cache.width !== input.width
+    || cache.height !== input.height
+    || cache.scaleMode !== input.scaleMode
+    || cache.visibleKey !== visibleKey
+    || cache.highlightedMetric !== highlightedMetric
+  ) {
+    const staticCanvas = cache?.canvas ?? document.createElement("canvas");
+    resizeLogicalCanvas(staticCanvas, input.width, input.height);
+    const staticContext = staticCanvas.getContext("2d");
+    const domain = sharedStateDomain(
+      input.grouped,
+      input.scaleMode,
+      visibleOrder,
+    );
+    const ticks = stateAxisTicks(domain, input.scaleMode);
+    if (staticContext) {
+      const staticSize = beginLogicalDraw(staticCanvas, staticContext);
+      staticContext.clearRect(0, 0, staticSize.width, staticSize.height);
+      staticContext.fillStyle = themeColor("surface");
+      staticContext.fillRect(0, 0, staticSize.width, staticSize.height);
+      if (domain) {
+        drawGrid(
+          staticContext,
+          domain,
+          staticSize.width,
+          staticSize.height,
+          ticks,
+        );
+        const drawOrder = highlightedMetric
+          ? [
+              ...visibleOrder.filter((metric) => metric !== highlightedMetric),
+              highlightedMetric,
+            ]
+          : visibleOrder;
+        for (const metric of drawOrder) {
+          const emphasis = highlightedMetric === null
+            ? "normal"
+            : metric === highlightedMetric
+              ? "highlighted"
+              : "muted";
+          drawStepLine(
+            staticContext,
+            input.grouped.get(`player:${metric}`),
+            input.model,
+            staticSize.width,
+            staticSize.height,
+            domain,
+            input.scaleMode,
+            "player",
+            themeColor(METRIC_THEME_COLORS[metric]),
+            emphasis,
+          );
+          drawStepLine(
+            staticContext,
+            input.grouped.get(`opponent:${metric}`),
+            input.model,
+            staticSize.width,
+            staticSize.height,
+            domain,
+            input.scaleMode,
+            "opponent",
+            themeColor(METRIC_THEME_COLORS[metric]),
+            emphasis,
+          );
+        }
+      }
+    }
+    cache = {
+      canvas: staticCanvas,
+      model: input.model,
+      grouped: input.grouped,
+      width: input.width,
+      height: input.height,
+      scaleMode: input.scaleMode,
+      visibleKey,
+      highlightedMetric,
+      domain,
+      ticks,
+    };
+    staticCacheByCanvas.set(input.canvas, cache);
+    if (window.__BPP_VIEWER_TEST__) {
+      window.__BPP_VIEWER_TEST__.stateStaticDrawCount += 1;
     }
   }
+  context.clearRect(0, 0, size.width, size.height);
+  context.drawImage(
+    cache.canvas,
+    0,
+    0,
+    cache.canvas.width,
+    cache.canvas.height,
+    0,
+    0,
+    size.width,
+    size.height,
+  );
   if (
     shouldDrawTimelinePreview(
       input.playheadMs,
@@ -284,5 +353,5 @@ export function drawStateBand(input: StateBandRenderInput): {
     size.height,
     false,
   );
-  return { domain, ticks };
+  return { domain: cache.domain, ticks: cache.ticks };
 }

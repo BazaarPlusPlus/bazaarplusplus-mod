@@ -25,13 +25,15 @@ import {
 } from "./event-interaction.ts";
 import {
   drawStickyHeroRow,
-  drawTimelineScene,
+  drawTimelineOverlay,
+  drawTimelineStaticScene,
 } from "./event-scene-renderer.ts";
 import { combatMsAtPointer } from "./geometry.ts";
 import { layoutTimelineMarkers } from "./marker-layout.ts";
 
 interface ControllerOptions {
   canvas: HTMLCanvasElement;
+  overlayCanvas: HTMLCanvasElement;
   ruler: HTMLCanvasElement;
   model: ReportViewModel;
   entities: NormalizedEntity[];
@@ -68,6 +70,7 @@ type PendingHover =
 
 export class TimelineCanvasController {
   private readonly canvas: HTMLCanvasElement;
+  private readonly overlayCanvas: HTMLCanvasElement;
   private readonly ruler: HTMLCanvasElement;
   private readonly model: ReportViewModel;
   private readonly entities: NormalizedEntity[];
@@ -95,12 +98,14 @@ export class TimelineCanvasController {
   private showHeroHealth = true;
   private frameHandle = 0;
   private pendingHover: PendingHover | null = null;
+  private staticSceneDirty = true;
 
   constructor(options: ControllerOptions) {
     if (window.__BPP_VIEWER_TEST__) {
       window.__BPP_VIEWER_TEST__.timelineControllerCount += 1;
     }
     this.canvas = options.canvas;
+    this.overlayCanvas = options.overlayCanvas;
     this.ruler = options.ruler;
     this.model = options.model;
     this.entities = options.entities;
@@ -164,12 +169,17 @@ export class TimelineCanvasController {
       Math.max(this.laneHeight, this.entities.length * this.laneHeight),
     );
     resizeLogicalCanvas(
+      this.overlayCanvas,
+      this.width,
+      Math.max(this.laneHeight, this.entities.length * this.laneHeight),
+    );
+    resizeLogicalCanvas(
       this.stickyHeroCanvas,
       this.width,
       this.laneHeight,
     );
     this.syncRelatedHighlights();
-    this.requestDraw();
+    this.requestStaticDraw();
   }
 
   setPinnedHeroLane(lane: number | null): void {
@@ -190,7 +200,7 @@ export class TimelineCanvasController {
   setHeroHealthVisible(visible: boolean): void {
     if (visible === this.showHeroHealth) return;
     this.showHeroHealth = visible;
-    this.requestDraw();
+    this.requestStaticDraw();
   }
 
   setSelection(
@@ -390,6 +400,11 @@ export class TimelineCanvasController {
     });
   };
 
+  private requestStaticDraw = (): void => {
+    this.staticSceneDirty = true;
+    this.requestDraw();
+  };
+
   private flushPendingHover(): void {
     const pending = this.pendingHover;
     this.pendingHover = null;
@@ -433,8 +448,9 @@ export class TimelineCanvasController {
 
   private draw(): void {
     this.flushPendingHover();
-    drawTimelineScene({
+    const options = {
       canvas: this.canvas,
+      overlayCanvas: this.overlayCanvas,
       ruler: this.ruler,
       stickyHeroCanvas: this.stickyHeroCanvas,
       model: this.model,
@@ -452,6 +468,17 @@ export class TimelineCanvasController {
       previewMs: this.previewMs,
       pinnedHeroLane: this.pinnedHeroLane,
       showHeroHealth: this.showHeroHealth,
+      requestDraw: this.requestStaticDraw,
+    };
+    if (this.staticSceneDirty) {
+      this.staticSceneDirty = false;
+      drawTimelineStaticScene(options);
+      if (window.__BPP_VIEWER_TEST__) {
+        window.__BPP_VIEWER_TEST__.timelineStaticDrawCount += 1;
+      }
+    }
+    drawTimelineOverlay({
+      ...options,
       requestDraw: this.requestDraw,
     });
   }
@@ -459,6 +486,7 @@ export class TimelineCanvasController {
   private drawStickyHeroRow(): void {
     drawStickyHeroRow({
       canvas: this.canvas,
+      overlayCanvas: this.overlayCanvas,
       stickyHeroCanvas: this.stickyHeroCanvas,
       entities: this.entities,
       laneHeight: this.laneHeight,

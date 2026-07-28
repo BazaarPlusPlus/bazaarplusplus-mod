@@ -121,6 +121,16 @@ internal static class ReportProjectionChecks
         var combat = new CombatSim
         {
             Frames = new List<CombatSimFrame> { firstFrame, lateRageFrame },
+            CardStats =
+            {
+                [cardId.Value] = new Dictionary<ECardStats, int>
+                {
+                    [ECardStats.DamageDone] = 525,
+                    [ECardStats.BurnAdded] = 756,
+                    [ECardStats.HastedCardsCount] = 65,
+                    [ECardStats.UseCount] = 8,
+                },
+            },
         };
         var manifest = new PvpBattleManifest
         {
@@ -147,6 +157,16 @@ internal static class ReportProjectionChecks
             },
         ];
         var document = Project(manifest, new NetMessageCombatSim(combat));
+
+        var cardStats = document.CardStats.Single(entry => entry.EntityId == cardId.Value);
+        Require(
+            cardStats.DamageDone == 525
+                && cardStats.BurnAdded == 756
+                && cardStats.HastedCardsCount == 65
+                && cardStats.UseCount == 8
+                && cardStats.HealAdded == 0,
+            "The report must project the authoritative CombatSim card totals used by native recap."
+        );
 
         Require(
             document.FrameZeroState.Player.Health == 1_000

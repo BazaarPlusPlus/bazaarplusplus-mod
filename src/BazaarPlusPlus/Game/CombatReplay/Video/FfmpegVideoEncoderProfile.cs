@@ -153,6 +153,10 @@ internal static class FfmpegVideoEncoderArguments
         sb.Append($"-framerate {fps} ");
         sb.Append("-i pipe:0 ");
         sb.Append($"-c:v {profile.Codec} -pix_fmt {profile.PixelFormat} ");
+        // Reports seek this video continuously while the pointer moves. Keep the maximum GOP
+        // near 250 ms so exact HTML video seeks never need to decode several seconds of 4K frames.
+        var gopFrames = Math.Max(1, (int)Math.Ceiling(fps / 4d));
+        sb.Append($"-g {gopFrames} ");
 
         if (profile.Crf.HasValue)
         {

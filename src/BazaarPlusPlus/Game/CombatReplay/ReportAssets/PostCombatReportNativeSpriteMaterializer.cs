@@ -19,7 +19,7 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
     private const int RenderKeySchemaVersion = 1;
     private const string RendererVersion = "1";
     private const string CaptureProfileVersion = "1";
-    private const string EncoderVersion = "1";
+    private const string EncoderVersion = "2";
 
     private readonly string _gameBuild;
     private readonly ReportAssetCache _cache;
