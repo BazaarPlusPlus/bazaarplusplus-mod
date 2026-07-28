@@ -99,8 +99,7 @@ internal sealed class OpponentPortraitController
             return;
         }
 
-        if (Data.CurrentEncounterController != null)
-            Data.CurrentEncounterController.ShowCard(show: false);
+        ReplayNativeBoardPresentation.HideNativeEncounterPortrait();
 
         portraitController.gameObject.name = "ReplayOpponentPortrait";
         portraitController.gameObject.SetActive(true);

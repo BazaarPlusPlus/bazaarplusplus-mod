@@ -14,9 +14,11 @@ import {
 } from "../../i18n/format.ts";
 import { cn } from "../../lib/utils.ts";
 import {
+  eventAttributeSemantic,
   eventPresentation,
   type EventPresentation,
 } from "../../model/event-semantics.ts";
+import { attributeEventDiff } from "../../model/attribute-event-diff.ts";
 import type {
   NormalizedEntity,
   NormalizedEvent,
@@ -38,7 +40,6 @@ import {
   mergeInspectorEvents,
   summarizeDirectDamageGroup,
 } from "./frame-event-groups.ts";
-import { attributeEventDiff } from "./event-diff.ts";
 
 const PAGE_SIZE = 80;
 
@@ -70,7 +71,12 @@ function EntityReference({
       data-bpp-entity-id={entity.id}
       data-bpp-test-id={testId}
     >
-      <EntityArt entity={entity} size="compact" />
+      <span
+        className="grid size-6 shrink-0 place-items-center"
+        data-bpp-test-id="frame-event-entity-art-slot"
+      >
+        <EntityArt entity={entity} size="compact" squareSlot />
+      </span>
       <span className="truncate text-foreground/90" title={entity.name}>
         {entity.name}
       </span>
@@ -171,23 +177,25 @@ function EventKindIcon({
   return icon ? (
     <img
       alt=""
-      className="size-icon-md shrink-0 object-contain"
+      className="size-icon-lg shrink-0 object-contain"
       data-bpp-test-id="frame-event-native-icon"
       src={icon}
     />
   ) : (
-    <SemanticIcon token={token} />
+    <SemanticIcon className="size-icon-lg" token={token} />
   );
 }
 
 function EventRow({
   event,
   entityById,
+  fallbackIcon,
   mergedCount = 1,
   t,
 }: {
   event: NormalizedEvent;
   entityById: ReadonlyMap<string, NormalizedEntity>;
+  fallbackIcon?: string;
   mergedCount?: number;
   t: (key: string) => string;
 }): React.JSX.Element {
@@ -208,7 +216,10 @@ function EventRow({
       data-bpp-test-id="focused-cluster-event"
     >
       <div className="flex min-h-control-xs items-center gap-1.5">
-        <EventKindIcon icon={event.icon} token={presentation.token} />
+        <EventKindIcon
+          icon={event.icon || fallbackIcon || ""}
+          token={presentation.token}
+        />
         <strong
           className="truncate text-compact text-foreground"
           data-bpp-test-id="frame-event-kind"
@@ -356,6 +367,19 @@ export function FrameInspector({
     () => new Map(model.entities.map((entity) => [entity.id, entity])),
     [model.entities],
   );
+  const iconBySemanticKey = useMemo(() => {
+    const icons = new Map<string, string>();
+    for (const event of model.events) {
+      if (
+        event.iconSemanticKey
+        && event.icon
+        && !icons.has(event.iconSemanticKey)
+      ) {
+        icons.set(event.iconSemanticKey, event.icon);
+      }
+    }
+    return icons;
+  }, [model.events]);
   const inspectedEntity = entityById.get(entityId);
   const focusedIdSet = useMemo(
     () => new Set(focusedEventIds),
@@ -425,6 +449,9 @@ export function FrameInspector({
       <EventRow
         entityById={entityById}
         event={merged.event}
+        fallbackIcon={iconBySemanticKey.get(
+          eventAttributeSemantic(merged.event)?.nativeSemanticKey ?? "",
+        )}
         key={merged.key}
         mergedCount={merged.count}
         t={t}
@@ -441,12 +468,16 @@ export function FrameInspector({
       ref={inspectorRef}
     >
       <header
-        className="shrink-0 border-b border-border/70 px-2.5 py-2"
+        className="shrink-0 border-b border-border/70 px-2.5 py-1.5"
         data-bpp-test-id="frame-inspector-header"
       >
         <div className="flex items-center gap-2">
           {inspectedEntity && (
-            <EntityArt entity={inspectedEntity} size="compact" />
+            <EntityArt
+              entity={inspectedEntity}
+              size="inspector"
+              testId="frame-inspector-entity-art"
+            />
           )}
           <div className="min-w-0 flex-1">
             <h2

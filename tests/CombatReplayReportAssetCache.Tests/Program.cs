@@ -236,10 +236,16 @@ void StatusSemanticsUseExactNativeMappingsAndFailClosed()
     var expected = new (string Kind, string Action, string Stable, string Native)[]
     {
         ("player-attribute", "Burn", "status.burn", "BurnApplyAmount"),
+        ("player-attribute", "HealthMax", "status.heal", "HealAmount"),
         ("player-attribute", "Poison", "status.poison", "PoisonApplyAmount"),
         ("player-attribute", "HealthRegen", "status.regen", "RegenApplyAmount"),
+        ("player-attribute", "Rage", "status.rage", "RageApplyAmount"),
         ("player-attribute", "Shield", "status.shield", "ShieldApplyAmount"),
         ("card-attribute", "ChargeAmount", "status.charge", "ChargeAmount"),
+        ("card-attribute", "BurnApplyAmount", "status.burn", "BurnApplyAmount"),
+        ("card-attribute", "PoisonRemoveAmount", "status.poison", "PoisonApplyAmount"),
+        ("card-attribute", "RegenCrit", "status.regen", "RegenApplyAmount"),
+        ("card-attribute", "ShieldApplyAmount", "status.shield", "ShieldApplyAmount"),
         ("card-attribute", "Haste", "status.haste", "HasteAmount"),
         ("card-attribute", "SlowAmount", "status.slow", "SlowAmount"),
         ("card-attribute", "Freeze", "status.freeze", "FreezeAmount"),
@@ -305,7 +311,6 @@ void StatusSemanticsUseExactNativeMappingsAndFailClosed()
     var unsupported = new (string Kind, string Action)[]
     {
         ("player-attribute", "Health"),
-        ("player-attribute", "Rage"),
         ("skill-trigger", "CardFreeze"),
         ("card-attribute", "FreezeTargets"),
         ("card-attribute-extra", "Freeze"),

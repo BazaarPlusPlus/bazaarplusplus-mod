@@ -96,6 +96,7 @@ export function combatLogEventToken(
 ): string {
   const kind = event.kind.toLowerCase();
   const action = event.action.toLowerCase();
+  if (kind === "card-status-range") return "status";
   if (kind === "effect-executed" && action.includes("burn")) return "burn";
   if (kind === "effect-executed" && action.includes("poison")) {
     return "poison";

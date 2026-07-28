@@ -170,6 +170,13 @@ export function ActivityValue({
   const formattedAmount = formatActivityAmount(column, amount, signed);
   const partialPrefix =
     partial && column.aggregation === "absolute" ? "≥" : "";
+  const tooltipTotal = authoritative
+    ? formatCompactNumber(authoritativeValue)
+    : count === 0
+      ? "—"
+      : column.quantitative && quantified > 0
+        ? `${partialPrefix}${formattedAmount}`
+        : `×${formatNumber(count)}`;
   const metricLabel = t(column.label);
   const targetSummary = details
     .map((detail) => {
@@ -190,9 +197,7 @@ export function ActivityValue({
   const accessibleValue = [
     metricLabel,
     authoritative
-      ? `${t("activityNativeTotal")} ${
-        formatCompactNumber(authoritativeValue)
-      }`
+      ? `${t("activityPostCombatTotal")} ${tooltipTotal}`
       : "",
     details.length > 0
       ? `${t("activityTargetEffects")} ${targetSummary}`
@@ -255,6 +260,30 @@ export function ActivityValue({
           <strong className="text-compact text-foreground">
             {metricLabel}
           </strong>
+        </div>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-border/50 bg-muted/15 px-3 py-2">
+          <span
+            className="text-micro font-semibold uppercase tracking-wide text-muted-foreground"
+            data-bpp-test-id="statistics-activity-tooltip-total-label"
+          >
+            {authoritative ? t("activityPostCombatTotal") : t("activityAmount")}
+          </span>
+          <span className="flex flex-col items-end font-mono tabular-nums">
+            <strong
+              className="text-compact text-foreground"
+              data-bpp-test-id="statistics-activity-tooltip-total"
+            >
+              {tooltipTotal}
+            </strong>
+            {!authoritative && column.quantitative && quantified > 0 && (
+              <small
+                className="text-nano text-muted-foreground"
+                data-bpp-test-id="statistics-activity-tooltip-total-count"
+              >
+                ×{formatNumber(count)}
+              </small>
+            )}
+          </span>
         </div>
         <div className="flex items-center justify-between bg-muted/25 px-3 py-1.5">
           <span className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">

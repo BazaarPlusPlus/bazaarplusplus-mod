@@ -133,7 +133,7 @@ void TestButtonModelReplayRecordDeleteParity()
     var label = "Replay Label";
 
     AssertButtons(
-        BuildButtons(false, true, "", label, false, true, true, true, false, true),
+        BuildButtons(false, true, "", label, false, true, true, false, true),
         replayText: label,
         replayEnabled: true,
         recordText: "Record",
@@ -145,43 +145,43 @@ void TestButtonModelReplayRecordDeleteParity()
         deleteEnabled: true
     );
     AssertButtons(
-        BuildButtons(false, false, "", label, true, true, true, false, false, true),
+        BuildButtons(false, false, "", label, true, true, false, false, true),
         replayText: "In Run",
         replayEnabled: false,
         recordText: "Record",
         recordEnabled: true,
-        detailedReportText: "Record to create detailed report",
-        detailedReportVisible: true,
+        detailedReportText: "View detailed combat report",
+        detailedReportVisible: false,
         detailedReportEnabled: false,
         deleteText: "Delete",
         deleteEnabled: true
     );
     AssertButtons(
-        BuildButtons(false, false, "", label, false, false, false, false, true, true),
+        BuildButtons(false, false, "", label, false, false, false, true, true),
         replayText: label,
         replayEnabled: false,
         recordText: "Record",
         recordEnabled: false,
-        detailedReportText: "Record to create detailed report",
+        detailedReportText: "View detailed combat report",
         detailedReportVisible: false,
         detailedReportEnabled: false,
         deleteText: "Sure?",
         deleteEnabled: true
     );
     AssertButtons(
-        BuildButtons(false, false, "missing replay", label, false, true, true, false, false, false),
+        BuildButtons(false, false, "missing replay", label, false, true, false, false, false),
         replayText: "Unavailable",
         replayEnabled: false,
         recordText: "Record",
         recordEnabled: true,
-        detailedReportText: "Record to create detailed report",
-        detailedReportVisible: true,
+        detailedReportText: "View detailed combat report",
+        detailedReportVisible: false,
         detailedReportEnabled: false,
         deleteText: "Delete",
         deleteEnabled: false
     );
     AssertButtons(
-        BuildButtons(true, true, "", label, false, true, true, true, false, true),
+        BuildButtons(true, true, "", label, false, true, true, false, true),
         replayText: "Working...",
         replayEnabled: false,
         recordText: "Record",
@@ -284,7 +284,6 @@ object BuildButtons(
     string replayActionLabel,
     bool isInGameRun,
     bool canRecordSelectedBattle,
-    bool hasSelectedBattle,
     bool hasDetailedReport,
     bool isDeleteConfirmationActive,
     bool canDeleteSelectedRun
@@ -299,7 +298,6 @@ object BuildButtons(
         replayActionLabel,
         isInGameRun,
         canRecordSelectedBattle,
-        hasSelectedBattle,
         hasDetailedReport,
         isDeleteConfirmationActive,
         canDeleteSelectedRun
@@ -341,7 +339,7 @@ void AssertButtons(
     );
     Assert(
         GetBool(model, "DetailedReportButtonVisible") == detailedReportVisible,
-        "Detailed report visibility should follow battle selection, not report existence."
+        "Detailed report should only be visible when an artifact exists."
     );
     Assert(
         GetBool(model, "DetailedReportButtonEnabled") == detailedReportEnabled,

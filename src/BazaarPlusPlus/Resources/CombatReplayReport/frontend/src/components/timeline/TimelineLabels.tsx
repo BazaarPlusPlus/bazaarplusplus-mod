@@ -1,4 +1,7 @@
-import { useMemo, type RefObject } from "react";
+import {
+  useMemo,
+  type RefObject,
+} from "react";
 import type { ReportAction } from "../../app/report-reducer.ts";
 import type { ReportState } from "../../app/report-state.ts";
 import { formatCompactNumber, formatDuration } from "../../i18n/format.ts";
@@ -19,7 +22,6 @@ import { LANE_HEIGHT } from "../../timeline/constants.ts";
 import { cn } from "../../lib/utils.ts";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
-import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group.tsx";
 import { EntityArt } from "../semantic/EntityArt.tsx";
 
 export function heroLaneAtScroll(
@@ -119,6 +121,48 @@ export function LaneLabelContents({
   );
 }
 
+function StateScaleToggle({
+  value,
+  onValueChange,
+  t,
+}: {
+  value: ReportState["stateScale"];
+  onValueChange: (value: ReportState["stateScale"]) => void;
+  t: (key: string) => string;
+}): React.JSX.Element {
+  return (
+    <div
+      aria-label={t("stateScale")}
+      className="bpp-state-scale-tabs ml-auto"
+      data-bpp-state-scale-value={value}
+      data-bpp-test-id="state-scale-toggle"
+      role="tablist"
+    >
+      <span
+        aria-hidden="true"
+        className="bpp-state-scale-pill"
+        data-bpp-test-id="state-scale-toggle-pill"
+      />
+      {(["linear", "magnitude"] as const).map((scale) => (
+        <Button
+          aria-selected={value === scale}
+          className="bpp-state-scale-tab !h-5"
+          data-bpp-state-scale={scale}
+          data-bpp-test-id={`state-scale-${scale}`}
+          key={scale}
+          onClick={() => onValueChange(scale)}
+          role="tab"
+          size="xs"
+          type="button"
+          variant="ghost"
+        >
+          {t(scale === "linear" ? "linearScale" : "magnitudeScale")}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 export function StateLabels({
   model,
   combatMs,
@@ -159,24 +203,13 @@ export function StateLabels({
           {t("stateValues")} ·{" "}
           <span data-bpp-state-time>{formatDuration(combatMs)}</span>
         </span>
-        <ToggleGroup
-          aria-label={t("metricsTitle")}
-          className="ml-auto border border-border/70 bg-background/60"
-          onValueChange={(value) => {
-            if (value === "linear" || value === "magnitude") {
-              dispatch({ type: "select-scale", scale: value });
-            }
-          }}
-          size="xs"
-          type="single"
+        <StateScaleToggle
+          onValueChange={(scale) =>
+            dispatch({ type: "select-scale", scale })
+          }
+          t={t}
           value={scaleMode}
-        >
-          {(["linear", "magnitude"] as const).map((scale) => (
-            <ToggleGroupItem className="px-1.5" key={scale} value={scale}>
-              {t(scale === "linear" ? "linearScale" : "magnitudeScale")}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        />
       </div>
       <div className="grid h-[93px] grid-rows-6">
         {METRIC_ORDER.map((metric) => {

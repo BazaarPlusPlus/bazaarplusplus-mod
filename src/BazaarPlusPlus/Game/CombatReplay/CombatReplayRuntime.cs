@@ -859,7 +859,11 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void OnVideoRecordingStarted(CombatReplayVideoRecordingStarted started)
     {
-        _currentRecording.MarkRecordingStarted(started.RecordingId, started.BattleId);
+        _currentRecording.MarkRecordingStarted(
+            started.RecordingId,
+            started.BattleId,
+            started.Source
+        );
         _reportPublication?.ObserveVideoStarted(started);
 
         var pendingManifest = _pendingReportAssetManifest;
@@ -1342,6 +1346,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _pendingReportAssetManifest = recordVideo ? manifest : null;
         _pendingReportAssetRecordingId = null;
         _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
+        if (recordVideo)
+            _currentRecording.TrackManagedReplay(battleId, source);
         _playbackPublisher!.BeginSession(battleId, manifest, source, recordVideo);
         try
         {

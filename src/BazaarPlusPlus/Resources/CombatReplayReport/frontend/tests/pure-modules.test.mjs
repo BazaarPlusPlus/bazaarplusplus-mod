@@ -67,7 +67,10 @@ import {
   markerPoint,
 } from "../src/timeline/event-drawing.ts";
 import { layoutTimelineMarkers } from "../src/timeline/marker-layout.ts";
-import { hitTestTimelineClusters } from "../src/timeline/event-interaction.ts";
+import {
+  hitTestTimelineClusters,
+  timelineClusterAtCombatMs,
+} from "../src/timeline/event-interaction.ts";
 import {
   safeAssetUrl,
   safeVideoUrl,
@@ -105,12 +108,20 @@ import {
   damageKindFromType,
   eventDamageKind,
 } from "../src/model/damage-semantics.ts";
-import { eventPresentation } from "../src/model/event-semantics.ts";
+import {
+  CARD_ATTRIBUTE_ACTIONS,
+  PLAYER_ATTRIBUTE_ACTIONS,
+  cardAttributePolicy,
+  cardAttributeSemantic,
+  eventPresentation,
+  playerAttributePolicy,
+  playerAttributeSemantic,
+} from "../src/model/event-semantics.ts";
 import {
   mergeInspectorEvents,
   summarizeDirectDamageGroup,
 } from "../src/components/inspector/frame-event-groups.ts";
-import { attributeEventDiff } from "../src/components/inspector/event-diff.ts";
+import { attributeEventDiff } from "../src/model/attribute-event-diff.ts";
 import {
   buildCombatLogEntries,
   combatLogEventToken,
@@ -1620,6 +1631,16 @@ test("item art uses exact one, two, and three-slot geometry", () => {
     height: 36,
     span: 3,
   });
+  assert.deepEqual(entityArtDimensions("item", 1, "inspector"), {
+    width: 48,
+    height: 48,
+    span: 1,
+  });
+  assert.deepEqual(entityArtDimensions("skill", 1, "inspector"), {
+    width: 48,
+    height: 48,
+    span: 1,
+  });
   assert.equal(
     entityArtDimensions("skill", 1, "default").width <
       entityArtDimensions("item", 1, "default").width,
@@ -1663,6 +1684,18 @@ test("report entities and events normalize exact schema-v1 fields", () => {
   );
   assert.equal(hidden.name, "");
   assert.equal(hidden.hiddenFromTimeline, true);
+  const unnamedEffect = normalizeEntity(
+    {
+      entityId: "effect-2",
+      owner: "opponent",
+      name: "",
+      type: "effect",
+      order: 2,
+    },
+    2,
+  );
+  assert.equal(unnamedEffect.name, "");
+  assert.equal(unnamedEffect.hiddenFromTimeline, true);
 
   const event = normalizeEvent(
     {
@@ -1907,6 +1940,53 @@ test("timeline visibility and clustering preserve every underlying event", () =>
   assert.equal(
     isVisibleTimelineEvent(
       timelineEvent({
+        kind: "aura",
+        action: "Aura",
+        sourceId: "target",
+        targetIds: ["target"],
+      }),
+      entityById,
+    ),
+    false,
+    "raw aura bookkeeping must not obscure the concrete attribute diff",
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      timelineEvent({
+        kind: "effect-executed",
+        action: "PlayerModifyAttribute",
+        sourceId: "skill",
+        targetIds: ["hero"],
+      }),
+      entityById,
+    ),
+    false,
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      timelineEvent({
+        kind: "player-attribute",
+        action: "HealthMax",
+        targetIds: ["hero"],
+      }),
+      entityById,
+    ),
+    true,
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      timelineEvent({
+        kind: "player-attribute",
+        action: "EnragedDuration",
+        targetIds: ["hero"],
+      }),
+      entityById,
+    ),
+    false,
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      timelineEvent({
         kind: "health",
         action: "Damage",
         targetIds: ["target"],
@@ -1924,8 +2004,28 @@ test("timeline visibility and clustering preserve every underlying event", () =>
       }),
       entityById,
     ),
-    false,
+    true,
   );
+  for (const action of [
+    "Cooldown",
+    "Haste",
+    "Slow",
+    "Freeze",
+    "Chilled",
+  ]) {
+    assert.equal(
+      isVisibleTimelineEvent(
+        timelineEvent({
+          kind: "card-attribute",
+          action,
+          targetIds: ["target"],
+        }),
+        entityById,
+      ),
+      false,
+      `${action} live state must not become an individual marker`,
+    );
+  }
   assert.equal(
     isVisibleTimelineEvent(
       timelineEvent({
@@ -1957,7 +2057,7 @@ test("timeline visibility and clustering preserve every underlying event", () =>
       }),
       entityById,
     ),
-    false,
+    true,
   );
   assert.equal(
     isVisibleTimelineEvent(
@@ -2092,6 +2192,95 @@ test("timeline visibility and clustering preserve every underlying event", () =>
   assert.equal(visual[0].members.length, 2);
 });
 
+test("dense attribute markers keep native icons and resolve one semantic event", () => {
+  const entities = [
+    { id: "item", type: "item" },
+    { id: "hero", type: "hero" },
+  ];
+  const critIcon = "../report-assets/objects/aa/crit.png";
+  const regenIcon = "../report-assets/objects/bb/regen.png";
+  const critFirst = timelineEvent({
+    id: "crit-1",
+    frame: 260,
+    combatMs: 1_000,
+    kind: "card-attribute",
+    action: "CritChance",
+    value: 2,
+    previousValue: 78,
+    currentValue: 80,
+    targetIds: ["item"],
+    iconSemanticKey: "status.critChance",
+    icon: critIcon,
+  });
+  const critSecond = timelineEvent({
+    id: "crit-2",
+    frame: 261,
+    combatMs: 1_040,
+    kind: "card-attribute",
+    action: "CritChance",
+    value: 2,
+    previousValue: 80,
+    currentValue: 82,
+    targetIds: ["item"],
+  });
+  const regenApplication = timelineEvent({
+    id: "regen-application",
+    frame: 261,
+    sequence: 1,
+    combatMs: 1_040,
+    kind: "effect-executed",
+    action: "PlayerRegenApply",
+    targetIds: ["hero"],
+    iconSemanticKey: "status.regen",
+    icon: regenIcon,
+  });
+  const regenAmount = timelineEvent({
+    id: "regen-amount",
+    frame: 262,
+    combatMs: 1_080,
+    kind: "card-attribute",
+    action: "RegenApplyAmount",
+    value: 4,
+    previousValue: 109,
+    currentValue: 113,
+    targetIds: ["item"],
+  });
+  const clusters = buildClusters(
+    { durationMs: 2_000 },
+    [critFirst, critSecond, regenApplication, regenAmount],
+    entities,
+    1_000,
+    52,
+  );
+  const critClusters = clusters.filter(
+    (cluster) => cluster.groupKey === "attribute-CritChance",
+  );
+  const regenCluster = clusters.find(
+    (cluster) => cluster.groupKey === "attribute-RegenApplyAmount",
+  );
+  assert.equal(critClusters.length, 2);
+  assert.deepEqual(
+    critClusters.map((cluster) => cluster.icon),
+    [critIcon, critIcon],
+  );
+  assert.equal(regenCluster?.icon, regenIcon);
+  assert.equal(regenCluster?.labelKey, "attribute.RegenApplyAmount");
+
+  const visual = buildVisualClusters(clusters);
+  const critVisual = visual.find(
+    (cluster) => cluster.groupKey === "attribute-CritChance",
+  );
+  assert.equal(critVisual?.members?.length, 2);
+  assert.equal(critVisual?.icon, critIcon);
+  assert.equal(critVisual?.labelKey, "attributeCritChance");
+  assert.deepEqual(
+    timelineClusterAtCombatMs(critVisual, critSecond.combatMs).events.map(
+      (event) => event.id,
+    ),
+    ["crit-2"],
+  );
+});
+
 test("structural event semantics render destroy and attribute diffs explicitly", () => {
   const destroy = timelineEvent({
     kind: "effect-executed",
@@ -2130,6 +2319,164 @@ test("structural event semantics render destroy and attribute diffs explicitly",
     polarity: "increase",
     transitionText: "10 → 30",
   });
+
+  const burnAmount = timelineEvent({
+    kind: "card-attribute",
+    action: "BurnApplyAmount",
+    value: 20,
+    previousValue: 10,
+    currentValue: 30,
+  });
+  assert.deepEqual(eventPresentation(burnAmount), {
+    groupKey: "attribute-BurnApplyAmount",
+    labelKey: "attribute.BurnApplyAmount",
+    token: "attribute",
+  });
+  assert.deepEqual(attributeEventDiff(burnAmount), {
+    deltaText: "+20",
+    polarity: "increase",
+    transitionText: "10 → 30",
+  });
+  assert.equal(COPY.en["attribute.BurnApplyAmount"], "Burn applied");
+  assert.equal(COPY["zh-CN"]["attribute.BurnApplyAmount"], "施加燃烧");
+  assert.equal(
+    cardAttributeSemantic("BurnApplyAmount")?.nativeSemanticKey,
+    "status.burn",
+  );
+  assert.equal(
+    cardAttributeSemantic("ShieldApplyAmount")?.nativeSemanticKey,
+    "status.shield",
+  );
+});
+
+test("attribute policies classify the complete current enum inventory", () => {
+  assert.equal(PLAYER_ATTRIBUTE_ACTIONS.length, 40);
+  assert.equal(new Set(PLAYER_ATTRIBUTE_ACTIONS).size, 40);
+  assert.equal(CARD_ATTRIBUTE_ACTIONS.length, 89);
+  assert.equal(new Set(CARD_ATTRIBUTE_ACTIONS).size, 89);
+  assert.equal(
+    PLAYER_ATTRIBUTE_ACTIONS.every(
+      (action) => playerAttributePolicy(action).attributeClass !== "unknown",
+    ),
+    true,
+  );
+  assert.equal(
+    CARD_ATTRIBUTE_ACTIONS.every(
+      (action) => cardAttributePolicy(action).attributeClass !== "unknown",
+    ),
+    true,
+  );
+
+  assert.deepEqual(playerAttributePolicy("EnragedDuration"), {
+    attributeClass: "state",
+    timeline: "hidden",
+    inspectorVisible: false,
+    statisticsVisible: false,
+  });
+  assert.deepEqual(playerAttributePolicy("HealthMax"), {
+    attributeClass: "modifier",
+    timeline: "marker",
+    inspectorVisible: true,
+    statisticsVisible: false,
+  });
+  assert.deepEqual(cardAttributePolicy("Cooldown"), {
+    attributeClass: "state",
+    timeline: "hidden",
+    inspectorVisible: false,
+    statisticsVisible: false,
+  });
+  assert.deepEqual(cardAttributePolicy("Haste"), {
+    attributeClass: "state",
+    timeline: "range",
+    inspectorVisible: false,
+    statisticsVisible: false,
+  });
+  assert.deepEqual(cardAttributePolicy("DamageAmount"), {
+    attributeClass: "modifier",
+    timeline: "marker",
+    inspectorVisible: true,
+    statisticsVisible: true,
+  });
+  assert.deepEqual(cardAttributePolicy("CritChance"), {
+    attributeClass: "modifier",
+    timeline: "marker",
+    inspectorVisible: true,
+    statisticsVisible: true,
+  });
+  assert.equal(
+    cardAttributePolicy("BuyPrice").attributeClass,
+    "economy",
+  );
+  assert.equal(
+    cardAttributePolicy("Custom_4").attributeClass,
+    "diagnostic",
+  );
+  assert.equal(
+    cardAttributePolicy("FutureGameAttribute").attributeClass,
+    "unknown",
+  );
+
+  for (const action of PLAYER_ATTRIBUTE_ACTIONS) {
+    const descriptor = playerAttributePolicy(action);
+    if (!descriptor.inspectorVisible) continue;
+    const semantic = playerAttributeSemantic(action);
+    assert.notEqual(semantic, null, `missing player semantic for ${action}`);
+    for (const locale of Object.keys(COPY)) {
+      assert.ok(
+        COPY[locale][semantic.labelKey],
+        `missing ${locale} player label for ${action}`,
+      );
+    }
+  }
+  for (const action of CARD_ATTRIBUTE_ACTIONS) {
+    const descriptor = cardAttributePolicy(action);
+    if (!descriptor.inspectorVisible) continue;
+    const semantic = cardAttributeSemantic(action);
+    assert.notEqual(semantic, null, `missing card semantic for ${action}`);
+    for (const locale of Object.keys(COPY)) {
+      assert.ok(
+        COPY[locale][semantic.labelKey],
+        `missing ${locale} card label for ${action}`,
+      );
+    }
+  }
+});
+
+test("player max-health changes keep their diff without guessing an application source", () => {
+  const application = timelineEvent({
+    id: "pasta-application",
+    frame: 159,
+    kind: "effect-executed",
+    action: "PlayerModifyAttribute",
+    sourceId: "pasta",
+    triggerSourceId: "pasta",
+    targetIds: ["player-hero"],
+  });
+  const healthMax = timelineEvent({
+    id: "health-max",
+    frame: 159,
+    kind: "player-attribute",
+    action: "HealthMax",
+    targetIds: ["player-hero"],
+    value: 25,
+    previousValue: 4_095,
+    currentValue: 4_120,
+    unit: "points",
+  });
+
+  assert.deepEqual(eventPresentation(healthMax), {
+    groupKey: "player-attribute-HealthMax",
+    labelKey: "attributeHealthMax",
+    token: "attributeHealthMax",
+  });
+  assert.deepEqual(attributeEventDiff(healthMax), {
+    deltaText: "+25",
+    polarity: "increase",
+    transitionText: "4,095 → 4,120",
+  });
+  assert.equal(healthMax.sourceId, "");
+  assert.equal(healthMax.triggerSourceId, "");
+  assert.equal(application.sourceId, "pasta");
 });
 
 test("status ranges pair applications with their exact frame effects", () => {
@@ -2188,6 +2535,89 @@ test("status ranges pair applications with their exact frame effects", () => {
   assert.deepEqual(timelineClusterEventIds(ranges[0].cluster), [
     "haste-source",
   ]);
+});
+
+test("compact status ranges replace legacy samples without adding combat-log rows", () => {
+  const compactRange = timelineEvent({
+    id: "compact-haste",
+    frame: 10,
+    combatMs: 1_000,
+    kind: "card-status-range",
+    action: "Haste",
+    value: 2_000,
+    unit: "ms",
+    targetIds: ["target"],
+  });
+  const legacyStart = timelineEvent({
+    id: "legacy-start",
+    frame: 10,
+    combatMs: 1_000,
+    kind: "card-attribute",
+    action: "Haste",
+    previousValue: 0,
+    currentValue: 2_000,
+    targetIds: ["target"],
+  });
+  const legacyEnd = timelineEvent({
+    id: "legacy-end",
+    frame: 20,
+    combatMs: 3_000,
+    kind: "card-attribute",
+    action: "Haste",
+    previousValue: 50,
+    currentValue: 0,
+    targetIds: ["target"],
+  });
+  const application = timelineEvent({
+    id: "haste-application",
+    frame: 10,
+    combatMs: 1_000,
+    kind: "effect-executed",
+    action: "CardHaste",
+    sourceId: "skill",
+    targetIds: ["target"],
+  });
+  const entities = [
+    { id: "skill", type: "skill" },
+    { id: "target", type: "item" },
+  ];
+  const ranges = buildStatusRanges(
+    {
+      durationMs: 5_000,
+      events: [
+        compactRange,
+        legacyStart,
+        application,
+        legacyEnd,
+      ],
+    },
+    entities,
+    1_000,
+    54,
+  );
+
+  assert.equal(ranges.length, 1);
+  assert.equal(ranges[0].startMs, 1_000);
+  assert.equal(ranges[0].endMs, 3_000);
+  assert.deepEqual(
+    ranges[0].cluster.events.map((event) => event.id),
+    ["haste-application"],
+  );
+  assert.deepEqual(
+    ranges[0].cluster.relatedEvents.map((event) => event.id),
+    ["compact-haste"],
+  );
+  assert.equal(
+    isVisibleTimelineEvent(compactRange, new Map(
+      entities.map((entity) => [entity.id, entity]),
+    )),
+    false,
+  );
+  assert.equal(combatLogEventToken(compactRange), "status");
+  assert.equal(
+    isNarrativeCombatLogEntry(buildCombatLogEntries([compactRange])[0]),
+    false,
+  );
 });
 
 test("status range indexing preserves overlapping targets and removed-target attribution", () => {

@@ -29,6 +29,19 @@ internal static class ReplayNativeBoardPresentation
         return !replayControlsVisible;
     }
 
+    internal static void HideNativeEncounterPortrait()
+    {
+        var encounterPortrait = Data.CurrentEncounterController;
+        if (encounterPortrait?.gameObject == null)
+            return;
+
+        // ReplayState repeatedly calls ToggleOpponentPortrait(true), but that API only invokes
+        // ShowCard and cannot reactivate an inactive GameObject. Keep the stale encounter card
+        // structurally hidden for the full saved replay so it cannot cover the temporary hero.
+        encounterPortrait.ShowCard(show: false);
+        encounterPortrait.gameObject.SetActive(false);
+    }
+
     internal static void Normalize(bool replayControlsVisible)
     {
         var boardManager = Singleton<BoardManager>.Instance;
@@ -99,8 +112,7 @@ internal static class ReplayNativeBoardPresentation
         if (portrait.transform.parent != combatAnchor)
             portrait.transform.SetParent(combatAnchor, worldPositionStays: false);
 
-        if (Data.CurrentEncounterController != null)
-            Data.CurrentEncounterController.ShowCard(show: false);
+        HideNativeEncounterPortrait();
 
         portrait.gameObject.SetActive(true);
         portrait.ShowCard(show: true);

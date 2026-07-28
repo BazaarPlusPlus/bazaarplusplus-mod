@@ -27,6 +27,7 @@ internal sealed class CombatReportProjector
         var frames = combatMessage.Data?.Frames ?? new List<CombatSimFrame>();
         var events = new List<CombatReportEventV1>();
         var metrics = new List<CombatReportMetricSampleV1>();
+        var statusIntervals = new CombatReportCardStatusIntervalBuilder(FrameDurationMs);
         var globalSequence = 0;
 
         for (var frameIndex = 0; frameIndex < frames.Count; frameIndex++)
@@ -85,7 +86,13 @@ internal sealed class CombatReportProjector
                 )
                 {
                     var update = attributePair.Value;
-                    if (update.Delta == 0)
+                    statusIntervals.Observe(frameIndex, cardPair.Key.Value, update);
+                    if (
+                        update.Delta == 0
+                        || !CombatReportAttributePolicy.ShouldProjectCardTransition(
+                            update.AttributeType
+                        )
+                    )
                     {
                         rawIndex++;
                         continue;
@@ -115,6 +122,12 @@ internal sealed class CombatReportProjector
                 }
             }
         }
+
+        AppendStatusIntervals(
+            statusIntervals.Complete(Math.Max(0, (frames.Count - 1) * FrameDurationMs)),
+            ref globalSequence,
+            events
+        );
 
         var document = new CombatReportDocumentV1
         {
@@ -157,6 +170,44 @@ internal sealed class CombatReportProjector
         }
         CombatReportJson.RefreshDocumentId(document);
         return document;
+    }
+
+    private static void AppendStatusIntervals(
+        IReadOnlyList<CombatReportCardStatusInterval> intervals,
+        ref int globalSequence,
+        ICollection<CombatReportEventV1> events
+    )
+    {
+        var nextFrameSequence = events
+            .GroupBy(reportEvent => reportEvent.Frame)
+            .ToDictionary(
+                group => group.Key,
+                group => checked(group.Max(reportEvent => reportEvent.FrameSequence) + 1)
+            );
+        foreach (var interval in intervals)
+        {
+            nextFrameSequence.TryGetValue(interval.StartFrame, out var frameSequence);
+            events.Add(
+                NewEvent(
+                    "e" + globalSequence++,
+                    interval.StartFrame,
+                    frameSequence,
+                    interval.StartMs,
+                    "card-status-range",
+                    interval.AttributeType.ToString(),
+                    source: null,
+                    targets: new[] { interval.TargetEntityId },
+                    value: interval.EndMs - interval.StartMs,
+                    unit: "ms",
+                    role: "received",
+                    attribution: "target-exact-source-unknown",
+                    rawCategory: "derived-status-range",
+                    rawType: interval.AttributeType.ToString(),
+                    rawIndex: interval.RawIndex
+                )
+            );
+            nextFrameSequence[interval.StartFrame] = checked(frameSequence + 1);
+        }
     }
 
     private static CombatReportEventV1 ProjectSimEvent(
@@ -426,17 +477,41 @@ internal sealed class CombatReportProjector
             );
         }
 
+        var hasExplicitHealthAdjustment = update.HealthAdjustments.Any(adjustment =>
+            adjustment.AttributeChanged == EPlayerHealthChangeType.Health
+        );
         var attributeIndex = 0;
         foreach (var attributePair in update.Attributes.OrderBy(pair => (int)pair.Key))
         {
             var attribute = attributePair.Value;
+            var rawIndex = attributeIndex++;
             if (attribute.Delta == 0)
+                continue;
+
+            var action = attribute.AttributeType.ToString();
+            if (CombatReportAttributePolicy.IsPlayerChartMetric(attribute.AttributeType))
             {
-                attributeIndex++;
+                metrics.Add(
+                    new CombatReportMetricSampleV1
+                    {
+                        Frame = frame,
+                        CombatTimeMs = combatTimeMs,
+                        Combatant = combatant.ToLowerInvariant(),
+                        Metric = action,
+                        Value = attribute.CurrentValue,
+                    }
+                );
+            }
+            if (
+                !CombatReportAttributePolicy.ShouldProjectPlayerTransition(
+                    attribute.AttributeType,
+                    hasExplicitHealthAdjustment
+                )
+            )
+            {
                 continue;
             }
 
-            var action = attribute.AttributeType.ToString();
             events.Add(
                 NewEvent(
                     "e" + globalSequence++,
@@ -450,23 +525,13 @@ internal sealed class CombatReportProjector
                     value: attribute.Delta,
                     previousValue: attribute.PreviousValue,
                     currentValue: attribute.CurrentValue,
-                    unit: "points",
+                    unit: UnitForPlayerAttribute(attribute.AttributeType),
                     role: "received",
                     attribution: "target-exact-source-unknown",
                     rawCategory: "player-update",
                     rawType: nameof(CombatSimPlayerAttributeUpdate),
-                    rawIndex: attributeIndex++
+                    rawIndex: rawIndex
                 )
-            );
-            metrics.Add(
-                new CombatReportMetricSampleV1
-                {
-                    Frame = frame,
-                    CombatTimeMs = combatTimeMs,
-                    Combatant = combatant.ToLowerInvariant(),
-                    Metric = action,
-                    Value = attribute.CurrentValue,
-                }
             );
         }
     }
@@ -612,10 +677,8 @@ internal sealed class CombatReportProjector
             .ToList();
     }
 
-    private static int Stat(
-        IReadOnlyDictionary<ECardStats, int>? stats,
-        ECardStats stat
-    ) => stats != null && stats.TryGetValue(stat, out var value) ? value : 0;
+    private static int Stat(IReadOnlyDictionary<ECardStats, int>? stats, ECardStats stat) =>
+        stats != null && stats.TryGetValue(stat, out var value) ? value : 0;
 
     private static int CountPlayerUpdateRecords(CombatSimPlayerUpdate? update)
     {
@@ -866,10 +929,26 @@ internal sealed class CombatReportProjector
             case ECardAttributeType.FreezeAmount:
             case ECardAttributeType.FlatCooldownReduction:
                 return "ms";
+            case ECardAttributeType.Lifesteal:
+            case ECardAttributeType.PercentCooldownReduction:
+            case ECardAttributeType.PercentChargeReduction:
+            case ECardAttributeType.PercentHasteReduction:
+            case ECardAttributeType.PercentSlowReduction:
+            case ECardAttributeType.PercentFreezeReduction:
+            case ECardAttributeType.PercentTempoCostReduction:
+                return "percent";
             default:
                 return "points";
         }
     }
+
+    private static string UnitForPlayerAttribute(EPlayerAttributeType type) =>
+        type
+            is EPlayerAttributeType.CritChance
+                or EPlayerAttributeType.PercentDamageReduction
+                or EPlayerAttributeType.PercentTempoGainCooldownReduction
+            ? "percent"
+            : "points";
 
     private static string? HeroContentKey(string? hero)
     {

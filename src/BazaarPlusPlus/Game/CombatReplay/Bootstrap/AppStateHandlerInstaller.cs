@@ -1,6 +1,8 @@
 #nullable enable
 
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Infra.Messages.GameSimEvents;
 using TheBazaar;
 using UnityEngine;
 
@@ -54,8 +56,53 @@ internal static class AppStateHandlerInstaller
             await Data.OpponentSkillPresenationManager.Initialize(opponentSkills);
     }
 
-    internal static async Task WaitForPresentationReadyAsync()
+    internal static IReadOnlyCollection<string> CaptureExpectedCombatCardInstanceIds(
+        CombatSequenceMessages sequence
+    )
     {
+        var expected = Data.GetCards<ItemCard>(ECombatantId.Player, EInventorySection.Hand)
+            .Select(card => card.InstanceId.ToString())
+            .Where(instanceId => !string.IsNullOrWhiteSpace(instanceId))
+            .ToHashSet(StringComparer.Ordinal);
+
+        var spawnEvents = sequence.SpawnMessage?.Data?.Events;
+        if (spawnEvents == null)
+            return expected;
+
+        foreach (
+            var spawnEvent in spawnEvents
+                .OfType<GameSimEventCardSpawned>()
+                .Where(spawnEvent =>
+                    spawnEvent.CombatantId == ECombatantId.Opponent
+                    && spawnEvent.Section == EInventorySection.Hand
+                    && spawnEvent.Type != ECardType.SocketEffect
+                )
+        )
+        {
+            if (!string.IsNullOrWhiteSpace(spawnEvent.InstanceId))
+                expected.Add(spawnEvent.InstanceId);
+        }
+
+        return expected;
+    }
+
+    internal static bool ContainsAllExpectedCardIds(
+        IEnumerable<string> expected,
+        IEnumerable<string> observed
+    )
+    {
+        var observedIds = observed.ToHashSet(StringComparer.Ordinal);
+        return expected.All(observedIds.Contains);
+    }
+
+    internal static async Task WaitForPresentationReadyAsync(
+        IReadOnlyCollection<string> expectedCardInstanceIds
+    )
+    {
+        // ReplayState.OnEnter launches SpawnCombatCards as async void. Yield first so its
+        // BoardManager.SpawnCards work has actually entered the updating state before checking
+        // the negative "not busy" flags below.
+        await Task.Yield();
         await BootstrapManagerInitializer.WaitUntilAsync(
             () =>
             {
@@ -69,6 +116,13 @@ internal static class AppStateHandlerInstaller
                 var opponentSkillPresentationReady =
                     Data.OpponentSkillPresenationManager == null
                     || !Data.OpponentSkillPresenationManager.IsUpdatingSkillBoard;
+                var activeCardIds =
+                    Data.CardAndSkillLookup?.CardControllerDictionary.Where(pair =>
+                            pair.Value?.gameObject != null
+                            && pair.Value.gameObject.activeInHierarchy
+                        )
+                        .Select(pair => pair.Key.InstanceId.ToString())
+                    ?? Enumerable.Empty<string>();
 
                 return !boardManager.StorageMoving
                     && !boardManager.IsUpdatingBoard
@@ -77,13 +131,14 @@ internal static class AppStateHandlerInstaller
                     && opponentSkillPresentationReady
                     && !boardManager.isUpdatingPresentation
                     && !boardManager.IsCarpetUnrolling
-                    && !boardManager.HasCardsToReveal();
+                    && !boardManager.HasCardsToReveal()
+                    && ContainsAllExpectedCardIds(expectedCardInstanceIds, activeCardIds);
             },
             timeout: TimeSpan.FromSeconds(5)
         );
 
-        // Let one more frame pass so ReplayState.OnEnter fire-and-forget spawn work can settle
-        // before combat sim playback starts.
-        await Task.Delay(100);
+        // The controllers are mounted and active now; allow one render turn before removing the
+        // loading scene and publishing the recording start.
+        await Task.Yield();
     }
 }

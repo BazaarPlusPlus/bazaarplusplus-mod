@@ -1,12 +1,12 @@
 import { asFiniteNumber } from "../model/value.ts";
 import {
   baseEventKindToken,
-  cardAttributeSemantic,
+  eventAttributeSemantic,
+  eventAttributePolicy,
   eventPresentation,
   timelinePresentationToken,
 } from "../model/event-semantics.ts";
 import {
-  normalizeMetricName,
   type NormalizedEntity,
   type NormalizedEvent,
 } from "../model/normalize.ts";
@@ -61,6 +61,9 @@ export interface TimelineCluster {
   events: NormalizedEvent[];
   relatedEvents?: NormalizedEvent[];
   token: string;
+  groupKey?: string;
+  labelKey?: string;
+  iconSemanticKey?: string;
   icon: string;
   statusRange?: StatusRange;
   members?: TimelineCluster[];
@@ -82,6 +85,7 @@ export function eventTier(
 ): EventTier {
   const kind = event.kind.toLowerCase();
   if (kind === "health" || kind === "combatant-died") return 1;
+  if (kind === "card-status-range") return 3;
   const token = eventKindToken(event);
   if (token === "destroy") return 1;
   if (kind === "card-attribute" || token === "status") return 3;
@@ -150,24 +154,28 @@ export function timelineEventToken(
   return timelinePresentationToken(event);
 }
 
-function isMetricOnlyEvent(event: NormalizedEvent): boolean {
-  return (
-    event.kind.toLowerCase() === "player-attribute"
-    && Boolean(normalizeMetricName(event.action))
-  );
-}
-
 export function isVisibleTimelineEvent(
   event: NormalizedEvent,
   entityById: ReadonlyMap<string, TimelineEntity>,
 ): boolean {
-  if (isMetricOnlyEvent(event)) return false;
-  if (event.kind.toLowerCase() === "health") return false;
-  if (event.kind.toLowerCase() === "card-attribute") {
-    return cardAttributeSemantic(event.action)?.timelineVisible ?? false;
+  const kind = event.kind.toLowerCase();
+  if (kind === "player-attribute" || kind === "card-attribute") {
+    return eventAttributePolicy(event).timeline === "marker";
   }
+  // Aura records are execution/provenance bookkeeping. They do not identify the
+  // concrete attribute that changed, while the same frame's card/player attribute
+  // transition carries the exact subtype and before/after values. Rendering both
+  // creates a generic "Status change" marker that obscures the useful diff.
+  if (kind === "aura") return false;
+  if (kind === "card-status-range") return false;
+  if (event.kind.toLowerCase() === "health") return false;
   if (event.kind.toLowerCase() !== "effect-executed") return true;
-  if (event.action === "CardModifyAttribute") return false;
+  if (
+    event.action === "CardModifyAttribute"
+    || event.action === "PlayerModifyAttribute"
+  ) {
+    return false;
+  }
   if (
     event.action === "CardHaste"
     || event.action === "CardSlow"
@@ -248,6 +256,40 @@ export function buildStatusRanges(
     ranges.push(range);
   }
 
+  const explicitRangeKeys = new Set<string>();
+  for (const event of model.events) {
+    if (
+      event.kind.toLowerCase() !== "card-status-range"
+      || !STATUS_ACTIONS.has(event.action)
+    ) {
+      continue;
+    }
+    const targetId = event.targetIds.find((id) => entityIndex.has(id));
+    if (!targetId) continue;
+    const lane = entityIndex.get(targetId);
+    if (lane === undefined) continue;
+    const key = `${targetId}:${event.action}`;
+    explicitRangeKeys.add(key);
+    const range: StatusRange = {
+      action: event.action,
+      targetId,
+      lane,
+      startMs: event.combatMs,
+      endMs: model.durationMs,
+      startEvent: event,
+      lastEvent: event,
+      x: 0,
+      endX: 0,
+      laneHeight,
+      cluster: null,
+    };
+    closeRange(
+      range,
+      event.combatMs + Math.max(1, asFiniteNumber(event.value, 1)),
+      event,
+    );
+  }
+
   for (const event of model.events) {
     if (
       event.kind.toLowerCase() !== "card-attribute"
@@ -262,6 +304,7 @@ export function buildStatusRanges(
     const previous = asFiniteNumber(event.previousValue, 0);
     const current = asFiniteNumber(event.currentValue, 0);
     const key = `${targetId}:${event.action}`;
+    if (explicitRangeKeys.has(key)) continue;
     let range = active.get(key);
 
     if (previous <= 0 && current > 0) {
@@ -423,14 +466,34 @@ export function buildClusters(
   );
   const duration = Math.max(1, model.durationMs);
   const clusterMap = new Map<string, TimelineCluster>();
+  const iconBySemanticKey = new Map<string, string>();
+  for (const event of events) {
+    const semanticKey =
+      event.iconSemanticKey
+      || eventAttributeSemantic(event)?.nativeSemanticKey
+      || "";
+    if (semanticKey && event.icon && !iconBySemanticKey.has(semanticKey)) {
+      iconBySemanticKey.set(semanticKey, event.icon);
+    }
+  }
 
   for (const event of events) {
     const x = timelineXAtCombatMs(event.combatMs, duration, timelineWidth);
     const token = timelineEventToken(event);
+    const presentation = eventPresentation(event);
+    const iconSemanticKey =
+      event.iconSemanticKey
+      || eventAttributeSemantic(event)?.nativeSemanticKey
+      || "";
+    const icon =
+      event.icon
+      || iconBySemanticKey.get(iconSemanticKey)
+      || "";
     for (const endpoint of eventLaneEndpoints(event, entityIndex)) {
       const pixel = Math.round(x);
       const key =
-        `${event.frame}:${endpoint.lane}:${pixel}:${endpoint.role}:${token}`;
+        `${event.frame}:${endpoint.lane}:${pixel}:${endpoint.role}:`
+        + `${token}:${presentation.groupKey}:${iconSemanticKey}`;
       let cluster = clusterMap.get(key);
       if (!cluster) {
         cluster = {
@@ -440,12 +503,15 @@ export function buildClusters(
           role: endpoint.role,
           events: [],
           token,
-          icon: event.icon,
+          groupKey: presentation.groupKey,
+          labelKey: presentation.labelKey,
+          iconSemanticKey,
+          icon,
         };
         clusterMap.set(key, cluster);
       }
       cluster.events.push(event);
-      if (!cluster.icon && event.icon) cluster.icon = event.icon;
+      if (!cluster.icon && icon) cluster.icon = icon;
     }
   }
 
@@ -454,7 +520,8 @@ export function buildClusters(
     const icons = new Set(
       cluster.events.map((event) => event.icon).filter(Boolean),
     );
-    cluster.icon = icons.size === 1 ? Array.from(icons)[0] : "";
+    if (icons.size === 1) cluster.icon = Array.from(icons)[0];
+    else if (icons.size > 1) cluster.icon = "";
     cluster.tier = clusterEventTier(cluster.events);
     cluster.impact = clusterImpact(cluster.events);
   }
@@ -473,7 +540,10 @@ export function buildVisualClusters(
       visual.push(cluster);
       continue;
     }
-    const key = `${cluster.lane}:${cluster.role}:${cluster.token}`;
+    const key =
+      `${cluster.lane}:${cluster.role}:${cluster.token}:`
+      + `${cluster.groupKey ?? cluster.labelKey ?? ""}:`
+      + `${cluster.iconSemanticKey ?? ""}`;
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)?.push(cluster);
   }
@@ -500,6 +570,9 @@ export function buildVisualClusters(
           role: representative.role,
           events: mergedEvents,
           token: representative.token,
+          groupKey: representative.groupKey,
+          labelKey: representative.labelKey,
+          iconSemanticKey: representative.iconSemanticKey,
           icon: icons.size === 1 ? Array.from(icons)[0] : "",
           members: members.slice(),
           tier: clusterEventTier(mergedEvents),

@@ -9,14 +9,15 @@ const TOKEN_PRIORITY: Readonly<Record<string, number>> = {
   burn: 2,
   poison: 3,
   heal: 4,
-  shield: 5,
-  destroy: 6,
-  attribute: 7,
-  charge: 8,
-  haste: 9,
-  slow: 10,
-  freeze: 11,
-  status: 12,
+  attributeHealthMax: 5,
+  shield: 6,
+  destroy: 7,
+  attribute: 8,
+  charge: 9,
+  haste: 10,
+  slow: 11,
+  freeze: 12,
+  status: 13,
 };
 
 interface MarkerSlot {

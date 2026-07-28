@@ -33,7 +33,7 @@ internal static class ReportProjectionChecks
                     [EPlayerAttributeType.Health] = Attribute(
                         EPlayerAttributeType.Health,
                         1_000,
-                        1_000
+                        975
                     ),
                     [EPlayerAttributeType.HealthRegen] = Attribute(
                         EPlayerAttributeType.HealthRegen,
@@ -112,8 +112,8 @@ internal static class ReportProjectionChecks
                     [EPlayerAttributeType.Rage] = Attribute(EPlayerAttributeType.Rage, 7, 10),
                     [EPlayerAttributeType.Health] = Attribute(
                         EPlayerAttributeType.Health,
-                        1_000,
-                        1_020
+                        975,
+                        995
                     ),
                 },
             },
@@ -243,6 +243,282 @@ internal static class ReportProjectionChecks
 
         RunEffectValueAttributionChecks(manifest, cardId);
         RunStructuralStatusIconChecks(manifest, cardId);
+        RunAttributeProjectionPolicyChecks(manifest);
+    }
+
+    private static void RunAttributeProjectionPolicyChecks(PvpBattleManifest sourceManifest)
+    {
+        var policyType = typeof(CombatReportDocumentV1).Assembly.GetType(
+            "BazaarPlusPlus.Game.CombatReplay.ReportData.CombatReportAttributePolicy",
+            throwOnError: true
+        )!;
+        var classifyPlayer = policyType.GetMethod(
+            "Classify",
+            BindingFlags.Static | BindingFlags.NonPublic,
+            binder: null,
+            types: [typeof(EPlayerAttributeType)],
+            modifiers: null
+        )!;
+        var classifyCard = policyType.GetMethod(
+            "Classify",
+            BindingFlags.Static | BindingFlags.NonPublic,
+            binder: null,
+            types: [typeof(ECardAttributeType)],
+            modifiers: null
+        )!;
+        foreach (var attribute in Enum.GetValues<EPlayerAttributeType>())
+        {
+            Require(
+                classifyPlayer.Invoke(null, [attribute])?.ToString() != "Unknown",
+                $"Player attribute {attribute} must have an explicit report classification."
+            );
+        }
+        foreach (var attribute in Enum.GetValues<ECardAttributeType>())
+        {
+            Require(
+                classifyCard.Invoke(null, [attribute])?.ToString() != "Unknown",
+                $"Card attribute {attribute} must have an explicit report classification."
+            );
+        }
+
+        var cardId = new InstanceId("policy-target");
+        var extensionTargetId = new InstanceId("policy-extension-target");
+        var battleEndTargetId = new InstanceId("policy-battle-end-target");
+        CombatSimFrame FrameWith(
+            InstanceId targetId,
+            params CombatSimCardAttributeUpdate[] attributes
+        )
+        {
+            var frame = new CombatSimFrame();
+            frame.CardUpdates[targetId] = new CombatSimCardUpdate
+            {
+                CardInstanceId = targetId,
+                Attributes = attributes.ToDictionary(
+                    attribute => attribute.AttributeType,
+                    attribute => attribute
+                ),
+            };
+            return frame;
+        }
+
+        var document = Project(
+            new PvpBattleManifest
+            {
+                BattleId = "1234567890abcdef1234567890abcdef",
+                RecordedAtUtc = sourceManifest.RecordedAtUtc,
+            },
+            new NetMessageCombatSim(
+                new CombatSim
+                {
+                    Frames =
+                    [
+                        MergeFrames(
+                            FrameWith(
+                                cardId,
+                                CardAttribute(ECardAttributeType.Cooldown, 5_000, 4_950),
+                                CardAttribute(ECardAttributeType.Haste, 0, 2_000),
+                                CardAttribute(ECardAttributeType.Slow, 500, 450),
+                                CardAttribute(ECardAttributeType.Freeze, 0, 1_000),
+                                CardAttribute(ECardAttributeType.DamageAmount, 10, 20),
+                                CardAttribute(ECardAttributeType.Custom_0, 0, 1)
+                            ),
+                            FrameWith(
+                                extensionTargetId,
+                                CardAttribute(ECardAttributeType.Slow, 0, 100)
+                            )
+                        ),
+                        MergeFrames(
+                            FrameWith(
+                                cardId,
+                                CardAttribute(ECardAttributeType.Haste, 1_950, 3_000),
+                                CardAttribute(ECardAttributeType.Slow, 450, 400),
+                                CardAttribute(ECardAttributeType.Freeze, 950, 200)
+                            ),
+                            FrameWith(
+                                extensionTargetId,
+                                CardAttribute(ECardAttributeType.Slow, 50, 400)
+                            )
+                        ),
+                        MergeFrames(
+                            FrameWith(
+                                cardId,
+                                CardAttribute(ECardAttributeType.Haste, 2_950, 1_200),
+                                CardAttribute(ECardAttributeType.Slow, 400, 350)
+                            ),
+                            FrameWith(
+                                battleEndTargetId,
+                                CardAttribute(ECardAttributeType.Freeze, 0, 1_000)
+                            )
+                        ),
+                        FrameWith(
+                            cardId,
+                            CardAttribute(ECardAttributeType.Haste, 1_150, 1_100),
+                            CardAttribute(ECardAttributeType.Slow, 350, 300)
+                        ),
+                        FrameWith(
+                            cardId,
+                            CardAttribute(ECardAttributeType.Haste, 50, 0),
+                            CardAttribute(ECardAttributeType.Slow, 50, 0)
+                        ),
+                        FrameWith(cardId, CardAttribute(ECardAttributeType.Haste, 0, 500)),
+                        MergeFrames(
+                            new CombatSimFrame
+                            {
+                                PlayerUpdates = new CombatSimPlayerUpdate
+                                {
+                                    Attributes =
+                                    {
+                                        [EPlayerAttributeType.EnragedDuration] = Attribute(
+                                            EPlayerAttributeType.EnragedDuration,
+                                            1_000,
+                                            950
+                                        ),
+                                        [EPlayerAttributeType.Tempo] = Attribute(
+                                            EPlayerAttributeType.Tempo,
+                                            5,
+                                            6
+                                        ),
+                                        [EPlayerAttributeType.CritChance] = Attribute(
+                                            EPlayerAttributeType.CritChance,
+                                            10,
+                                            20
+                                        ),
+                                        [EPlayerAttributeType.Custom_3] = Attribute(
+                                            EPlayerAttributeType.Custom_3,
+                                            0,
+                                            1
+                                        ),
+                                    },
+                                },
+                            },
+                            FrameWith(cardId, CardAttribute(ECardAttributeType.Haste, 50, 0))
+                        ),
+                    ],
+                }
+            )
+        );
+        Require(
+            document.Events.All(reportEvent => reportEvent.Action != "Cooldown"),
+            "Per-frame Cooldown clock ticks must not become report events."
+        );
+        Require(
+            document.Events.All(reportEvent =>
+                reportEvent.Kind != "card-attribute"
+                || reportEvent.Action is not ("Haste" or "Slow" or "Freeze")
+            ),
+            "Raw status clock samples must not become discrete card-attribute events."
+        );
+        var statusRanges = document
+            .Events.Where(reportEvent => reportEvent.Kind == "card-status-range")
+            .OrderBy(reportEvent => reportEvent.TargetEntityIds.Single(), StringComparer.Ordinal)
+            .ThenBy(reportEvent => reportEvent.Action, StringComparer.Ordinal)
+            .ThenBy(reportEvent => reportEvent.CombatTimeMs)
+            .Select(reportEvent => new
+            {
+                Target = reportEvent.TargetEntityIds.Single(),
+                reportEvent.Action,
+                Start = reportEvent.CombatTimeMs,
+                Duration = reportEvent.Value,
+            })
+            .ToList();
+        Require(
+            statusRanges.Count == 6,
+            $"The complete raw status stream must collapse to exactly six active spans instead of per-frame changes (actual={statusRanges.Count})."
+        );
+        Require(
+            statusRanges.Any(range =>
+                range.Target == cardId.Value
+                && range.Action == "Haste"
+                && range.Start == 0
+                && range.Duration == 200
+            ),
+            "A status application followed by extension, reduction, normal ticking, and terminal zero must produce one exact interval."
+        );
+        Require(
+            statusRanges.Any(range =>
+                range.Target == cardId.Value
+                && range.Action == "Haste"
+                && range.Start == 250
+                && range.Duration == 50
+            ),
+            "A second active span must remain a separate compact interval."
+        );
+        Require(
+            statusRanges.Any(range =>
+                range.Target == cardId.Value
+                && range.Action == "Slow"
+                && range.Start == 0
+                && range.Duration == 200
+            ),
+            "A first observed positive-to-positive status must be treated as active from frame zero."
+        );
+        Require(
+            statusRanges.Any(range =>
+                range.Target == cardId.Value
+                && range.Action == "Freeze"
+                && range.Start == 0
+                && range.Duration == 250
+            ),
+            "A positive partial reduction without terminal zero must shorten the inferred interval."
+        );
+        Require(
+            statusRanges.Any(range =>
+                range.Target == extensionTargetId.Value
+                && range.Action == "Slow"
+                && range.Start == 0
+                && range.Duration == 300
+            ),
+            "A positive extension must lengthen the interval and clamp it to the report boundary."
+        );
+        Require(
+            statusRanges.Any(range =>
+                range.Target == battleEndTargetId.Value
+                && range.Action == "Freeze"
+                && range.Start == 100
+                && range.Duration == 200
+            ),
+            "An active status at battle end must clamp to the report boundary."
+        );
+        Require(
+            document.Events.Count(reportEvent => reportEvent.Action == "DamageAmount") == 1,
+            "Persistent modifier transitions must remain in the report."
+        );
+        var playerCritChance = document.Events.Single(reportEvent =>
+            reportEvent.Kind == "player-attribute" && reportEvent.Action == "CritChance"
+        );
+        Require(
+            playerCritChance.Unit == "percent"
+                && playerCritChance.IconSemanticKey == "status.critChance",
+            "Player percentage modifiers must retain their display unit."
+        );
+        Require(
+            document.Events.All(reportEvent =>
+                reportEvent.Action is not ("EnragedDuration" or "Tempo")
+            ),
+            "Unsupported player live-state clocks must fail closed instead of becoming generic status changes."
+        );
+        Require(
+            document.Events.All(reportEvent =>
+                !reportEvent.Action.StartsWith("Custom_", StringComparison.Ordinal)
+            ),
+            "Opaque diagnostic slots must fail closed until the report has a dedicated diagnostic disclosure."
+        );
+    }
+
+    private static CombatSimFrame MergeFrames(params CombatSimFrame[] frames)
+    {
+        var merged = new CombatSimFrame();
+        foreach (var frame in frames)
+        {
+            if (frame.PlayerUpdates != null)
+                merged.PlayerUpdates = frame.PlayerUpdates;
+            if (frame.OpponentUpdates != null)
+                merged.OpponentUpdates = frame.OpponentUpdates;
+            foreach (var pair in frame.CardUpdates)
+                merged.CardUpdates[pair.Key] = pair.Value;
+            merged.Events.AddRange(frame.Events);
+        }
+        return merged;
     }
 
     private static void RunStructuralStatusIconChecks(
@@ -277,6 +553,11 @@ internal static class ReportProjectionChecks
                     30
                 ),
                 [ECardAttributeType.Multicast] = CardAttribute(ECardAttributeType.Multicast, 2, 1),
+                [ECardAttributeType.Lifesteal] = CardAttribute(
+                    ECardAttributeType.Lifesteal,
+                    0,
+                    100
+                ),
                 [ECardAttributeType.PercentCooldownReduction] = CardAttribute(
                     ECardAttributeType.PercentCooldownReduction,
                     0,
@@ -318,6 +599,20 @@ internal static class ReportProjectionChecks
                 $"{pair.Key} must retain its native tooltip icon semantic."
             );
         }
+        Require(
+            document
+                .Events.Single(reportEvent =>
+                    reportEvent.Kind == "card-attribute" && reportEvent.Action == "Lifesteal"
+                )
+                .Unit == "percent"
+                && document
+                    .Events.Single(reportEvent =>
+                        reportEvent.Kind == "card-attribute"
+                        && reportEvent.Action == "PercentCooldownReduction"
+                    )
+                    .Unit == "percent",
+            "Card percentage modifiers must retain their display unit."
+        );
     }
 
     private static void RunEffectValueAttributionChecks(

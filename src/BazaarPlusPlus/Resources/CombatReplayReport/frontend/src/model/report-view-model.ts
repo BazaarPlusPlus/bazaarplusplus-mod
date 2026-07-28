@@ -73,7 +73,7 @@ function fillMissingEntityNames(
 ): void {
   const counters = new Map<string, number>();
   for (const entity of entities) {
-    if (entity.name) continue;
+    if (entity.name || entity.hiddenFromTimeline) continue;
     const type = asString(entity.type, "entity").toLowerCase();
     const key = `${normalizeSide(entity.side)}:${type}`;
     const ordinal = (counters.get(key) ?? 0) + 1;

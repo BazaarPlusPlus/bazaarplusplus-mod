@@ -1,4 +1,8 @@
-export type EntityArtSize = "compact" | "default" | "activity";
+export type EntityArtSize =
+  | "compact"
+  | "default"
+  | "activity"
+  | "inspector";
 
 type EntityArtGeometry = {
   height: number;
@@ -21,6 +25,11 @@ const ENTITY_ART_GEOMETRY: Record<EntityArtSize, EntityArtGeometry> = {
     height: 44,
     itemSlotWidth: 44,
     skillDiameter: 36,
+  },
+  inspector: {
+    height: 48,
+    itemSlotWidth: 48,
+    skillDiameter: 48,
   },
 };
 

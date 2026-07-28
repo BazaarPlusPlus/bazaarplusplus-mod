@@ -35,6 +35,7 @@ public sealed class CombatReplayReportRuntimeSourceTests
         );
         Assert.Contains("_pendingReportAssetManifest = recordVideo ? manifest : null", savedStart);
         Assert.Contains("_pendingReportAssetRecordingId = null", savedStart);
+        Assert.Contains("_currentRecording.TrackManagedReplay(battleId, source);", savedStart);
 
         var recordingStart = Segment(
             source,
@@ -114,6 +115,29 @@ public sealed class CombatReplayReportRuntimeSourceTests
             "SetOpponentBankVisible(boardManager, ShouldShowOpponentBank(replayControlsVisible));",
             nativePresentationSource
         );
+        Assert.Contains("encounterPortrait.gameObject.SetActive(false);", nativePresentationSource);
+
+        var healthBarSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Game",
+            "CombatReplay",
+            "PlaybackUi",
+            "HealthBarBinder.cs"
+        );
+        var ensurePortrait = Segment(
+            healthBarSource,
+            "internal static void EnsureOpponentPortraitVisible()",
+            "internal static async Task PrepareHealthBarsAsync("
+        );
+        Assert.Contains(
+            "ReplayNativeBoardPresentation.HideNativeEncounterPortrait();",
+            ensurePortrait
+        );
+        Assert.DoesNotContain(
+            "Data.CurrentEncounterController.ShowCard(show: true)",
+            ensurePortrait
+        );
 
         var presentation = Segment(
             runtimeSource,
@@ -171,6 +195,14 @@ public sealed class CombatReplayReportRuntimeSourceTests
             "internal static async Task InjectSavedReplayAsync(",
             "private static void ObserveQualityStep("
         );
+        var captureCards = inject.IndexOf(
+            "CaptureExpectedCombatCardInstanceIds(sequence)",
+            StringComparison.Ordinal
+        );
+        var pushReplay = inject.IndexOf(
+            "await AppState.TryPushState<ReplayState>();",
+            StringComparison.Ordinal
+        );
         var parallelWarmup = inject.IndexOf("await Task.WhenAll(", StringComparison.Ordinal);
         var hideLoading = inject.IndexOf(
             "await HideReplayLoadingSceneAsync();",
@@ -178,6 +210,14 @@ public sealed class CombatReplayReportRuntimeSourceTests
         );
         var replay = inject.IndexOf("replayState.Replay();", StringComparison.Ordinal);
         Assert.True(parallelWarmup >= 0, "Independent replay warmups must run concurrently.");
+        Assert.True(
+            captureCards >= 0 && captureCards < pushReplay,
+            "Expected combat cards must be captured before ReplayState disposes the pre-replay hand."
+        );
+        Assert.Contains(
+            "WaitForPresentationReadyAsync(\n            expectedCombatCardInstanceIds",
+            inject
+        );
         Assert.True(
             hideLoading > parallelWarmup && replay > hideLoading,
             "The loading scene must remain visible until warmup completes, then hide before replay starts."
@@ -250,6 +290,69 @@ public sealed class CombatReplayReportRuntimeSourceTests
 
         Assert.Contains("_pendingPreparedReportAssets", recordingStart);
         Assert.Contains("MarkAssetsReady(", recordingStart);
+    }
+
+    [Fact]
+    public void Recording_scope_blocks_native_hover_motion_and_tooltips()
+    {
+        var recorderSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Game",
+            "CombatReplay",
+            "Video",
+            "CombatReplayVideoRecorder.cs"
+        );
+        var beginSuppression = Segment(
+            recorderSource,
+            "private static IDisposable? BeginUiSuppression(",
+            "private void DisposeUiState()"
+        );
+        Assert.Contains("UiSuppressionScope.Begin(", beginSuppression);
+        Assert.Contains("ReplayRecordingHoverSuppression.Begin", beginSuppression);
+
+        var suppressionSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Game",
+            "CombatReplay",
+            "Video",
+            "ReplayRecordingHoverSuppression.cs"
+        );
+        Assert.Contains("tooltipParent.UnlockCardTooltipController();", suppressionSource);
+        Assert.Contains("tooltipParent.HideCardTooltipController();", suppressionSource);
+        Assert.Contains("controller.TriggerUnhover();", suppressionSource);
+        Assert.Contains("controller.ResetPosition();", suppressionSource);
+        Assert.Contains("renderer.OnPointerExit(null)", suppressionSource);
+
+        var patchSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Patches",
+            "Combat",
+            "ReplayRecordingHoverPatches.cs"
+        );
+        Assert.Contains(
+            "typeof(CardController), nameof(CardController.OnPointerEnter)",
+            patchSource
+        );
+        Assert.Contains(
+            "typeof(ItemController), nameof(ItemController.OnPointerMove)",
+            patchSource
+        );
+        Assert.Contains(
+            "typeof(SkillProxyRenderer), nameof(SkillProxyRenderer.OnPointerEnter)",
+            patchSource
+        );
+        Assert.Contains(
+            "typeof(RecapItemVisualController), nameof(RecapItemVisualController.OnPointerEnter)",
+            patchSource
+        );
+        Assert.Contains("nameof(TooltipParentComponent.ShowCardTooltipController)", patchSource);
+        Assert.Contains(
+            "nameof(TooltipParentComponent.ShowAuxiliaryTooltipController)",
+            patchSource
+        );
     }
 
     private static string RuntimeSource()

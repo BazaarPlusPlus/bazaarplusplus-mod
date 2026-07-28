@@ -71,19 +71,27 @@ var replayRunEconomyFallbackType = RequireType(
 var snapshotRehydratorType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Bootstrap.SnapshotRehydrator"
 );
+var appStateHandlerInstallerType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Bootstrap.AppStateHandlerInstaller"
+);
 var replayNativeBoardPresentationType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.PlaybackUi.ReplayNativeBoardPresentation"
 );
 var playerAttributeRepairerType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.PlaybackUi.PlayerAttributeRepairer"
 );
+var replayRecordingHoverSuppressionType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Video.ReplayRecordingHoverSuppression"
+);
 RunReplaySavedStateNormalizationChecks(replaySavedStateNormalizerType, manifestType);
 RunReplayOpeningStateSelectionChecks(replayOpeningStateRestorerType);
 RunReplayRunEconomyFallbackChecks(replayRunEconomyFallbackType, manifestType);
 RunReplayPresentationRestorationChecks(replaySavedStateNormalizerType);
 RunReplaySpawnSanitizationChecks(snapshotRehydratorType);
+RunReplayPresentationReadinessChecks(appStateHandlerInstallerType);
 RunReplayNativeBoardPresentationChecks(replayNativeBoardPresentationType);
 RunPortraitTimingSubscriptionDeduplicationChecks(playerAttributeRepairerType);
+RunReplayRecordingHoverSuppressionChecks(replayRecordingHoverSuppressionType);
 RunScrubProxyChecks(scrubProxyType, scrubProxyGeneratorType);
 
 RunCurrentReplayRecordingStateChecks();
@@ -110,6 +118,68 @@ static void RunReplayNativeBoardPresentationChecks(Type presentationType)
     Assert(
         !(bool)InvokeStatic(presentationType, "ShouldShowOpponentBank", new object?[] { true })!,
         "Saved replay playback should hide the opponent bank while replay controls are visible."
+    );
+}
+
+static void RunReplayRecordingHoverSuppressionChecks(Type suppressionType)
+{
+    var isActive = suppressionType.GetProperty(
+        "IsActive",
+        BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(isActive != null, "Replay recording hover suppression should expose its scoped state.");
+    Assert(
+        !(bool)isActive!.GetValue(null)!,
+        "Replay recording hover suppression should be inactive before recording."
+    );
+
+    using var first = (IDisposable)InvokeStatic(suppressionType, "Begin", [])!;
+    Assert(
+        (bool)isActive.GetValue(null)!,
+        "Beginning recording suppression should block native hover presentation."
+    );
+
+    using var second = (IDisposable)InvokeStatic(suppressionType, "Begin", [])!;
+    first.Dispose();
+    Assert(
+        (bool)isActive.GetValue(null)!,
+        "Nested recording suppression should remain active until the final lease is released."
+    );
+
+    second.Dispose();
+    Assert(
+        !(bool)isActive.GetValue(null)!,
+        "Recording hover behavior should be restored after the final lease is released."
+    );
+}
+
+static void RunReplayPresentationReadinessChecks(Type installerType)
+{
+    Assert(
+        (bool)
+            InvokeStatic(
+                installerType,
+                "ContainsAllExpectedCardIds",
+                new object?[]
+                {
+                    new[] { "player-card", "opponent-card" },
+                    new[] { "opponent-card", "player-card", "extra-card" },
+                }
+            )!,
+        "Replay presentation readiness should accept every expected active combat card regardless of order."
+    );
+    Assert(
+        !(bool)
+            InvokeStatic(
+                installerType,
+                "ContainsAllExpectedCardIds",
+                new object?[]
+                {
+                    new[] { "player-card", "opponent-card" },
+                    new[] { "player-card" },
+                }
+            )!,
+        "Replay presentation readiness must not start while an expected combat card is still absent."
     );
 }
 
@@ -2156,7 +2226,12 @@ static void RunCurrentReplayRecordingStateChecks()
         stateType,
         state,
         "MarkRecordingStarted",
-        new object?[] { "recording-current", "battle-current" }
+        new object?[]
+        {
+            "recording-current",
+            "battle-current",
+            Enum.Parse(sourceType, "CurrentNative"),
+        }
     );
     Invoke(stateType, state, "MarkReplayEnded", new object?[] { null });
 
@@ -2231,7 +2306,12 @@ static void RunCurrentReplayRecordingStateChecks()
         stateType,
         state,
         "MarkRecordingStarted",
-        new object?[] { "recording-again", "battle-current" }
+        new object?[]
+        {
+            "recording-again",
+            "battle-current",
+            Enum.Parse(sourceType, "CurrentNative"),
+        }
     );
     Invoke(stateType, state, "MarkReplayEnded", new object?[] { null });
 
@@ -2282,7 +2362,12 @@ static void RunCurrentReplayRecordingStateChecks()
         stateType,
         state,
         "MarkRecordingStarted",
-        new object?[] { "recording-third", "battle-current" }
+        new object?[]
+        {
+            "recording-third",
+            "battle-current",
+            Enum.Parse(sourceType, "CurrentNative"),
+        }
     );
     Invoke(stateType, state, "MarkReplayEnded", new object?[] { null });
     var successfulReplacement = Activator.CreateInstance(completedType, nonPublic: true)!;
@@ -2376,7 +2461,12 @@ static void RunCurrentReplayRecordingStateChecks()
         stateType,
         reorderedTerminalState,
         "MarkRecordingStarted",
-        new object?[] { "recording-current", "battle-current" }
+        new object?[]
+        {
+            "recording-current",
+            "battle-current",
+            Enum.Parse(sourceType, "CurrentNative"),
+        }
     );
     Invoke(stateType, reorderedTerminalState, "MarkReplayEnded", new object?[] { null });
     Invoke(stateType, reorderedTerminalState, "ApplyCompletion", new object?[] { completed });
@@ -2402,7 +2492,12 @@ static void RunCurrentReplayRecordingStateChecks()
         stateType,
         reorderedTerminalState,
         "MarkRecordingStarted",
-        new object?[] { "recording-again", "battle-current" }
+        new object?[]
+        {
+            "recording-again",
+            "battle-current",
+            Enum.Parse(sourceType, "CurrentNative"),
+        }
     );
     Invoke(stateType, reorderedTerminalState, "MarkReplayEnded", new object?[] { null });
     Invoke(
@@ -2430,6 +2525,80 @@ static void RunCurrentReplayRecordingStateChecks()
                 "ReportHtmlFilePath"
             ) == "/tmp/late-a.report.html",
         "A late report terminal for usable recording A must survive an armed then failed recording B."
+    );
+
+    var savedRecordingState = Activator.CreateInstance(stateType, nonPublic: true)!;
+    Invoke(
+        stateType,
+        savedRecordingState,
+        "TrackManagedReplay",
+        new object?[] { "battle-saved", Enum.Parse(sourceType, "LocalSaved") }
+    );
+    Invoke(stateType, savedRecordingState, "EnterReplayState", Array.Empty<object?>());
+    Invoke(
+        stateType,
+        savedRecordingState,
+        "MarkRecordingStarted",
+        new object?[]
+        {
+            "recording-saved",
+            "battle-saved",
+            Enum.Parse(sourceType, "LocalSaved"),
+        }
+    );
+    var savedRecording = Invoke(
+        stateType,
+        savedRecordingState,
+        "Snapshot",
+        Array.Empty<object?>()
+    )!;
+    Assert(
+        (bool)GetProperty(savedRecording.GetType(), savedRecording, "Visible")!
+            && !(bool)GetProperty(savedRecording.GetType(), savedRecording, "CanStart")!,
+        "A managed saved-replay recording should be visible without advertising the native record-again action."
+    );
+
+    var savedCompleted = Activator.CreateInstance(completedType, nonPublic: true)!;
+    SetProperty(completedType, savedCompleted, "RecordingId", "recording-saved");
+    SetProperty(completedType, savedCompleted, "BattleId", "battle-saved");
+    SetProperty(completedType, savedCompleted, "Source", Enum.Parse(sourceType, "LocalSaved"));
+    SetProperty(completedType, savedCompleted, "FinalFilePath", "/tmp/saved-replay.mp4");
+    SetProperty(completedType, savedCompleted, "ArtifactUsable", true);
+    SetProperty(completedType, savedCompleted, "MetadataStatus", Enum.Parse(metadataType, "Complete"));
+    SetProperty(completedType, savedCompleted, "ReasonCode", Enum.Parse(reasonType, "Completed"));
+    Invoke(stateType, savedRecordingState, "ApplyCompletion", new object?[] { savedCompleted });
+    var savedVideoReady = Invoke(
+        stateType,
+        savedRecordingState,
+        "Snapshot",
+        Array.Empty<object?>()
+    )!;
+    Assert(
+        (bool)GetProperty(savedVideoReady.GetType(), savedVideoReady, "CanReveal")!,
+        "A completed saved-replay recording should expose its video while report publication finishes."
+    );
+
+    Invoke(
+        stateType,
+        savedRecordingState,
+        "ApplyReportCompletion",
+        new object?[]
+        {
+            "recording-saved",
+            "battle-saved",
+            "/tmp/saved-replay.report.html",
+        }
+    );
+    var savedReportReady = Invoke(
+        stateType,
+        savedRecordingState,
+        "Snapshot",
+        Array.Empty<object?>()
+    )!;
+    Assert(
+        (bool)GetProperty(savedReportReady.GetType(), savedReportReady, "CanOpenReport")!
+            && !(bool)GetProperty(savedReportReady.GetType(), savedReportReady, "CanStart")!,
+        "A completed saved-replay report should become the primary action without enabling native recording."
     );
 }
 

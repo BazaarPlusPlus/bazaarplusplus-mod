@@ -1,12 +1,13 @@
 import {
   formatCompactNumber,
   formatMilliseconds,
-} from "../../i18n/format.ts";
+} from "../i18n/format.ts";
 import {
-  cardAttributeSemantic,
-} from "../../model/event-semantics.ts";
-import type { NormalizedEvent } from "../../model/normalize.ts";
-import { asFiniteNumber } from "../../model/value.ts";
+  eventAttributePolicy,
+  eventAttributeSemantic,
+} from "./event-semantics.ts";
+import type { NormalizedEvent } from "./normalize.ts";
+import { asFiniteNumber } from "./value.ts";
 
 export interface AttributeEventDiff {
   deltaText: string;
@@ -15,10 +16,10 @@ export interface AttributeEventDiff {
 }
 
 function formatAttributeValue(
-  event: Pick<NormalizedEvent, "action" | "unit">,
+  event: Pick<NormalizedEvent, "kind" | "action" | "unit">,
   value: number,
 ): string {
-  const semantic = cardAttributeSemantic(event.action);
+  const semantic = eventAttributeSemantic(event);
   if (semantic?.valueKind === "percent") {
     return `${formatCompactNumber(value)}%`;
   }
@@ -32,7 +33,12 @@ function formatAttributeValue(
 export function attributeEventDiff(
   event: NormalizedEvent,
 ): AttributeEventDiff | null {
-  if (event.kind.toLowerCase() !== "card-attribute") return null;
+  if (
+    !eventAttributePolicy(event).inspectorVisible
+    || !eventAttributeSemantic(event)
+  ) {
+    return null;
+  }
   const previous = asFiniteNumber(event.previousValue, Number.NaN);
   const current = asFiniteNumber(event.currentValue, Number.NaN);
   const delta = asFiniteNumber(

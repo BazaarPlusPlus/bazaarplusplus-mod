@@ -37,20 +37,16 @@ internal static class HealthBarBinder
         var replayPortrait = PlaybackUiState.ActiveOpponentPortrait;
         if (replayPortrait != null)
         {
-            if (Data.CurrentEncounterController != null)
-                Data.CurrentEncounterController.ShowCard(show: false);
+            ReplayNativeBoardPresentation.HideNativeEncounterPortrait();
 
             replayPortrait.gameObject.SetActive(true);
             replayPortrait.ShowCard(show: true);
             return;
         }
 
-        var encounterController = Data.CurrentEncounterController;
-        if (encounterController?.gameObject == null)
-            return;
-
-        encounterController.gameObject.SetActive(true);
-        encounterController.ShowCard(show: true);
+        // A saved replay's native encounter controller is the selected combat card (often a
+        // chest), not the opponent hero. Never surface that unrelated card as portrait fallback.
+        ReplayNativeBoardPresentation.HideNativeEncounterPortrait();
     }
 
     internal static async Task PrepareHealthBarsAsync(IReplayPlaybackOutcomeSink outcome)

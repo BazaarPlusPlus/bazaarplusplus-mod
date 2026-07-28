@@ -5,6 +5,7 @@ import {
   type NormalizedEvent,
 } from "../model/normalize.ts";
 import { damageKindFromType } from "../model/damage-semantics.ts";
+import { eventAttributePolicy } from "../model/event-semantics.ts";
 import { asFiniteNumber, asString } from "../model/value.ts";
 
 export type CombatSide = "player" | "opponent";
@@ -517,7 +518,13 @@ export function buildEntityActivity(
       }
       continue;
     }
-    if (kind !== "card-attribute" || !columnKey) continue;
+    if (
+      kind !== "card-attribute"
+      || !columnKey
+      || !eventAttributePolicy(event).statisticsVisible
+    ) {
+      continue;
+    }
     for (const targetId of new Set(event.targetIds)) {
       const target = entityMap.get(targetId);
       if (!target || !isActivityEntity(target)) continue;

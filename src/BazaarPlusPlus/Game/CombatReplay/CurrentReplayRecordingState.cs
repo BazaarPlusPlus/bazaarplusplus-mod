@@ -38,6 +38,7 @@ internal sealed class CurrentReplayRecordingState
     private string? _finalFilePath;
     private string? _reportHtmlFilePath;
     private string? _reason;
+    private CombatReplayPlaybackSource? _source;
     private bool _battlePersisted;
     private bool _replayStateActive;
     private bool _availabilityReady;
@@ -66,10 +67,34 @@ internal sealed class CurrentReplayRecordingState
         _finalFilePath = null;
         _reportHtmlFilePath = null;
         _reason = null;
+        _source = CombatReplayPlaybackSource.CurrentNative;
         _battlePersisted = false;
         _availabilityReady = false;
         _nativeReplayStarted = false;
         Phase = CurrentReplayRecordingPhase.AwaitingBattlePersistence;
+    }
+
+    internal void TrackManagedReplay(string battleId, CombatReplayPlaybackSource source)
+    {
+        if (string.IsNullOrWhiteSpace(battleId))
+            throw new ArgumentException("Battle id is required.", nameof(battleId));
+        if (source == CombatReplayPlaybackSource.CurrentNative)
+            throw new ArgumentException(
+                "Native replay recordings must be latched from the current battle.",
+                nameof(source)
+            );
+
+        _battleId = battleId;
+        _recordingId = null;
+        _artifactRecordingId = null;
+        _finalFilePath = null;
+        _reportHtmlFilePath = null;
+        _reason = null;
+        _source = source;
+        _battlePersisted = true;
+        _availabilityReady = false;
+        _nativeReplayStarted = false;
+        Phase = CurrentReplayRecordingPhase.Preparing;
     }
 
     internal void EnterReplayState()
@@ -122,6 +147,7 @@ internal sealed class CurrentReplayRecordingState
     {
         if (
             string.IsNullOrWhiteSpace(recordingId)
+            || _source != CombatReplayPlaybackSource.CurrentNative
             || !_replayStateActive
             || !_battlePersisted
             || !_availabilityReady
@@ -146,17 +172,43 @@ internal sealed class CurrentReplayRecordingState
 
     internal bool MarkNativeReplayStarted()
     {
-        if (Phase != CurrentReplayRecordingPhase.Armed || _recordingId == null)
+        if (
+            _source != CombatReplayPlaybackSource.CurrentNative
+            || Phase != CurrentReplayRecordingPhase.Armed
+            || _recordingId == null
+        )
             return false;
 
         _nativeReplayStarted = true;
         return true;
     }
 
-    internal void MarkRecordingStarted(string recordingId, string battleId)
+    internal void MarkRecordingStarted(
+        string recordingId,
+        string battleId,
+        CombatReplayPlaybackSource source
+    )
     {
-        if (!MatchesSession(recordingId, battleId) || !_nativeReplayStarted)
+        if (!MatchesBattle(battleId) || _source != source)
             return;
+
+        if (source == CombatReplayPlaybackSource.CurrentNative)
+        {
+            if (!MatchesSession(recordingId, battleId) || !_nativeReplayStarted)
+                return;
+        }
+        else
+        {
+            if (
+                !string.IsNullOrWhiteSpace(_recordingId)
+                && !string.Equals(_recordingId, recordingId, StringComparison.Ordinal)
+            )
+            {
+                return;
+            }
+
+            _recordingId = recordingId;
+        }
 
         Phase = CurrentReplayRecordingPhase.Recording;
         _reason = null;
@@ -199,7 +251,7 @@ internal sealed class CurrentReplayRecordingState
     internal void ApplyCompletion(CombatReplayVideoRecordingCompleted completion)
     {
         if (
-            completion.Source != CombatReplayPlaybackSource.CurrentNative
+            completion.Source != _source
             || !MatchesSession(completion.RecordingId, completion.BattleId)
         )
         {
@@ -262,6 +314,7 @@ internal sealed class CurrentReplayRecordingState
             visible && !string.IsNullOrWhiteSpace(_reportHtmlFilePath) && !HasActiveSession;
         var canStart =
             visible
+            && _source == CombatReplayPlaybackSource.CurrentNative
             && _battlePersisted
             && _availabilityReady
             && Phase
@@ -309,6 +362,7 @@ internal sealed class CurrentReplayRecordingState
         _finalFilePath = null;
         _reportHtmlFilePath = null;
         _reason = null;
+        _source = null;
         _battlePersisted = false;
         _replayStateActive = false;
         _availabilityReady = false;

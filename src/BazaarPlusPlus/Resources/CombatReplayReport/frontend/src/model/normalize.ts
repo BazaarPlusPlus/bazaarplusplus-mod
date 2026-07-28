@@ -154,9 +154,10 @@ export function normalizeEntity(
   const id = asString(raw.entityId, fallbackId);
   const capturedName = asString(raw.name, "");
   const type = asString(raw.type, "entity");
-  const hiddenFromTimeline =
-    type.toLowerCase() === "effect"
-    && /^\[[^\]]+\]\s+Socket Effect$/iu.test(capturedName);
+  // Report `effect` entities are socket-effect implementation records, not
+  // independent combatants. Older manifests often omitted their native
+  // "[Item] Socket Effect" name, which exposed meaningless "effect 1" lanes.
+  const hiddenFromTimeline = type.toLowerCase() === "effect";
   const name = capturedName === id || hiddenFromTimeline ? "" : capturedName;
   const side = normalizeSide(raw.owner);
   const span = Math.max(

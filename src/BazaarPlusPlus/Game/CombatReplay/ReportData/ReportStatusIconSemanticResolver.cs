@@ -46,6 +46,14 @@ internal static class ReportStatusIconSemanticResolver
         "status.multicast",
         "Multicast"
     );
+    private static readonly ReportStatusIconSemantic Joy = new("status.joy", "JoyApplyAmount");
+    private static readonly ReportStatusIconSemantic Gold = new("status.gold", "SellPrice");
+    private static readonly ReportStatusIconSemantic Tempo = new("status.tempo", "TempoCost");
+    private static readonly ReportStatusIconSemantic Experience = new(
+        "status.experience",
+        "Custom_8"
+    );
+    private static readonly ReportStatusIconSemantic Rage = new("status.rage", "RageApplyAmount");
 
     private static readonly IReadOnlyDictionary<string, ReportStatusIconSemantic> ByStableKey =
         new Dictionary<string, ReportStatusIconSemantic>(StringComparer.Ordinal)
@@ -65,6 +73,11 @@ internal static class ReportStatusIconSemanticResolver
             [CritChance.StableKey] = CritChance,
             [Destroy.StableKey] = Destroy,
             [Multicast.StableKey] = Multicast,
+            [Joy.StableKey] = Joy,
+            [Gold.StableKey] = Gold,
+            [Tempo.StableKey] = Tempo,
+            [Experience.StableKey] = Experience,
+            [Rage.StableKey] = Rage,
         };
 
     internal static bool TryResolve(
@@ -105,9 +118,18 @@ internal static class ReportStatusIconSemanticResolver
             semantic = action switch
             {
                 "Burn" => Burn,
+                "CritChance" => CritChance,
+                "DamageCrit" => Damage,
+                "Joy" or "JoyCrit" => Joy,
+                "HealthMax" => Heal,
+                "HealAmount" or "HealCrit" => Heal,
                 "Poison" => Poison,
                 "HealthRegen" => Regen,
-                "Shield" => Shield,
+                "Shield" or "ShieldCrit" => Shield,
+                "Gold" or "Income" => Gold,
+                "Tempo" => Tempo,
+                "Experience" => Experience,
+                "Rage" or "RageMax" => Rage,
                 _ => null!,
             };
             return semantic != null;
@@ -118,14 +140,33 @@ internal static class ReportStatusIconSemanticResolver
             semantic = action switch
             {
                 "Ammo" => Ammo,
+                "BurnApplyAmount" or "BurnRemoveAmount" or "BurnCrit" => Burn,
                 "CritChance" => CritChance,
-                "DamageAmount" => Damage,
+                "DamageAmount" or "DamageCrit" => Damage,
+                "HealAmount" or "HealCrit" => Heal,
+                "JoyApplyAmount" or "JoyRemoveAmount" or "JoyCrit" => Joy,
                 "Multicast" => Multicast,
                 "PercentCooldownReduction" => CooldownReduction,
+                "PoisonApplyAmount" or "PoisonRemoveAmount" or "PoisonCrit" => Poison,
+                "RageApplyAmount" or "RageRemoveAmount" => Rage,
+                "RegenApplyAmount" or "RegenRemoveAmount" or "RegenCrit" => Regen,
+                "ShieldApplyAmount" or "ShieldRemoveAmount" or "ShieldCrit" => Shield,
                 "ChargeAmount" => Charge,
                 "Haste" or "HasteAmount" => Haste,
                 "Slow" or "SlowAmount" => Slow,
                 "Freeze" or "FreezeAmount" => Freeze,
+                _ => null!,
+            };
+            return semantic != null;
+        }
+
+        if (string.Equals(kind, "card-status-range", StringComparison.Ordinal))
+        {
+            semantic = action switch
+            {
+                "Haste" => Haste,
+                "Slow" => Slow,
+                "Freeze" => Freeze,
                 _ => null!,
             };
             return semantic != null;

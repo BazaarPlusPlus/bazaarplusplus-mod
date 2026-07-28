@@ -19,6 +19,7 @@ import {
   timelineWidthAtZoom,
 } from "../../timeline/constants.ts";
 import { timelineXAtCombatMs } from "../../timeline/geometry.ts";
+import { timelineClusterAtCombatMs } from "../../timeline/event-interaction.ts";
 import { TimelineCanvasController } from "../../timeline/event-renderer.ts";
 import {
   drawStateBand,
@@ -293,7 +294,11 @@ export const TimelineView = forwardRef<
       stickyHeroLabel,
       onSelect: (cluster, combatMs, clientX, clientY) => {
         if (cluster?.events[0]) {
-          const event = cluster.events.reduce((nearest, candidate) =>
+          const semanticCluster = timelineClusterAtCombatMs(
+            cluster,
+            combatMs,
+          );
+          const event = semanticCluster.events.reduce((nearest, candidate) =>
             Math.abs(candidate.combatMs - combatMs)
               < Math.abs(nearest.combatMs - combatMs)
               ? candidate
@@ -303,8 +308,8 @@ export const TimelineView = forwardRef<
             type: "select-frame",
             frame: event.frame,
             combatMs: event.combatMs,
-            clusterEventIds: timelineClusterEventIds(cluster),
-            entityId: entities[cluster.lane]?.id ?? "",
+            clusterEventIds: timelineClusterEventIds(semanticCluster),
+            entityId: entities[semanticCluster.lane]?.id ?? "",
             anchor: clientX === undefined || clientY === undefined
               ? undefined
               : { x: clientX, y: clientY },
@@ -326,13 +331,29 @@ export const TimelineView = forwardRef<
           return;
         }
         refs.host.hidden = false;
-        refs.time.textContent = formatDuration(combatMs);
-        refs.label.textContent = cluster
-          ? translateRef.current(cluster.token)
+        const semanticCluster = cluster
+          ? timelineClusterAtCombatMs(cluster, combatMs)
+          : null;
+        const nearestEvent = semanticCluster?.events.reduce(
+          (nearest, candidate) =>
+            Math.abs(candidate.combatMs - combatMs)
+              < Math.abs(nearest.combatMs - combatMs)
+              ? candidate
+              : nearest,
+        );
+        const tooltipCombatMs = nearestEvent?.combatMs ?? combatMs;
+        refs.host.dataset.bppCombatMs = String(tooltipCombatMs);
+        refs.time.textContent = formatDuration(tooltipCombatMs);
+        refs.label.textContent = semanticCluster
+          ? translateRef.current(
+            semanticCluster.labelKey ?? semanticCluster.token,
+          )
           : translateRef.current("time");
-        refs.count.textContent = cluster
-          ? `${cluster.events.length} ${translateRef.current(
-            cluster.events.length === 1 ? "eventSingular" : "event",
+        refs.count.textContent = semanticCluster
+          ? `${semanticCluster.events.length} ${translateRef.current(
+            semanticCluster.events.length === 1
+              ? "eventSingular"
+              : "event",
           )}`
           : "";
         const bounds = viewportRefs.scroll.current?.getBoundingClientRect();

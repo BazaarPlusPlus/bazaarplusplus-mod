@@ -52,7 +52,6 @@ internal readonly struct HistoryPanelButtonModel
         string replayActionLabel,
         bool isInGameRun,
         bool canRecordSelectedBattle,
-        bool hasSelectedBattle,
         bool hasDetailedReport,
         bool isDeleteConfirmationActive,
         bool canDeleteSelectedRun
@@ -69,10 +68,8 @@ internal readonly struct HistoryPanelButtonModel
             canReplaySelectedBattle && !replayActionInProgress,
             HistoryPanelText.RecordAndReplay(),
             canRecordSelectedBattle && !replayActionInProgress,
-            hasDetailedReport
-                ? HistoryPanelText.ViewDetailedCombatReport()
-                : HistoryPanelText.RecordForDetailedCombatReport(),
-            hasSelectedBattle,
+            HistoryPanelText.ViewDetailedCombatReport(),
+            hasDetailedReport,
             hasDetailedReport && !replayActionInProgress,
             isDeleteConfirmationActive
                 ? HistoryPanelText.DeleteConfirm()

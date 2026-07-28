@@ -81,7 +81,11 @@ export function EntityArt({
       ) : (
         <span className="grid size-full place-items-center border border-brand/35 bg-surface-raised">
           <Fallback
-            className={size === "activity" ? "size-icon-lg" : undefined}
+            className={
+              size === "activity" || size === "inspector"
+                ? "size-icon-lg"
+                : undefined
+            }
             type={type}
           />
         </span>

@@ -142,6 +142,8 @@ internal static class ReplayBootstrap
         await AppStateHandlerInstaller.RebuildSkillPresentationAsync();
         bootstrapContext.TriggerCombatSequenceCreated();
         await Task.Delay(50);
+        var expectedCombatCardInstanceIds =
+            AppStateHandlerInstaller.CaptureExpectedCombatCardInstanceIds(sequence);
         await AppState.TryPushState<ReplayState>();
         if (AppState.CurrentState is not ReplayState replayState)
             throw new InvalidOperationException("ReplayState did not become active.");
@@ -156,7 +158,9 @@ internal static class ReplayBootstrap
             ReplayPlaybackReasonCode.PlayerAttributesUnavailable
         );
         Singleton<BoardManager>.Instance.ToggleOpponentPortrait(isVisible: true);
-        var presentationReady = AppStateHandlerInstaller.WaitForPresentationReadyAsync();
+        var presentationReady = AppStateHandlerInstaller.WaitForPresentationReadyAsync(
+            expectedCombatCardInstanceIds
+        );
         var presentationWarmup = ObserveQualityStepAsync(
             () => PresentationWarmer.WarmPresentationAssetsAsync(manifest, sequence, outcome),
             outcome,

@@ -34,6 +34,7 @@ const MARKER_COLOR_NAMES: Record<string, ThemeColorName> = {
   trigger: "rage",
   status: "status",
   attribute: "attribute",
+  attributeHealthMax: "heal",
 };
 
 const MARKER_GLYPHS: Record<string, string> = {
@@ -52,6 +53,7 @@ const MARKER_GLYPHS: Record<string, string> = {
   trigger: "◇",
   status: "∿",
   attribute: "±",
+  attributeHealthMax: "+",
 };
 
 function markerColor(token: string): string {
