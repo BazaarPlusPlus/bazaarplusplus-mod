@@ -468,10 +468,10 @@ export function FrameInspector({
       ref={inspectorRef}
     >
       <header
-        className="shrink-0 border-b border-border/70 px-2.5 py-1.5"
+        className="shrink-0 border-b border-border/70 px-2.5"
         data-bpp-test-id="frame-inspector-header"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex min-h-16 items-center gap-2">
           {inspectedEntity && (
             <EntityArt
               entity={inspectedEntity}

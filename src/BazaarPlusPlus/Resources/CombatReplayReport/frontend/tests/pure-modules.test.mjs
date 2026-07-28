@@ -1633,12 +1633,12 @@ test("item art uses exact one, two, and three-slot geometry", () => {
   });
   assert.deepEqual(entityArtDimensions("item", 1, "inspector"), {
     width: 48,
-    height: 48,
+    height: 64,
     span: 1,
   });
   assert.deepEqual(entityArtDimensions("skill", 1, "inspector"), {
-    width: 48,
-    height: 48,
+    width: 64,
+    height: 64,
     span: 1,
   });
   assert.equal(
@@ -2192,7 +2192,7 @@ test("timeline visibility and clustering preserve every underlying event", () =>
   assert.equal(visual[0].members.length, 2);
 });
 
-test("dense attribute markers keep native icons and resolve one semantic event", () => {
+test("timeline attribute markers stay generic while a same-frame member keeps every concrete event", () => {
   const entities = [
     { id: "item", type: "item" },
     { id: "hero", type: "hero" },
@@ -2236,8 +2236,9 @@ test("dense attribute markers keep native icons and resolve one semantic event",
   });
   const regenAmount = timelineEvent({
     id: "regen-amount",
-    frame: 262,
-    combatMs: 1_080,
+    frame: 261,
+    sequence: 2,
+    combatMs: 1_040,
     kind: "card-attribute",
     action: "RegenApplyAmount",
     value: 4,
@@ -2252,32 +2253,51 @@ test("dense attribute markers keep native icons and resolve one semantic event",
     1_000,
     52,
   );
-  const critClusters = clusters.filter(
-    (cluster) => cluster.groupKey === "attribute-CritChance",
+  const attributeClusters = clusters.filter(
+    (cluster) =>
+      cluster.lane === 0 && cluster.groupKey === "attribute",
   );
-  const regenCluster = clusters.find(
-    (cluster) => cluster.groupKey === "attribute-RegenApplyAmount",
-  );
-  assert.equal(critClusters.length, 2);
+  assert.equal(attributeClusters.length, 2);
   assert.deepEqual(
-    critClusters.map((cluster) => cluster.icon),
-    [critIcon, critIcon],
+    attributeClusters.map((cluster) => ({
+      events: cluster.events.map((event) => event.id),
+      icon: cluster.icon,
+      iconSemanticKey: cluster.iconSemanticKey,
+      labelKey: cluster.labelKey,
+      token: cluster.token,
+    })),
+    [
+      {
+        events: ["crit-1"],
+        icon: "",
+        iconSemanticKey: "",
+        labelKey: "attribute",
+        token: "attribute",
+      },
+      {
+        events: ["crit-2", "regen-amount"],
+        icon: "",
+        iconSemanticKey: "",
+        labelKey: "attribute",
+        token: "attribute",
+      },
+    ],
   );
-  assert.equal(regenCluster?.icon, regenIcon);
-  assert.equal(regenCluster?.labelKey, "attribute.RegenApplyAmount");
 
   const visual = buildVisualClusters(clusters);
-  const critVisual = visual.find(
-    (cluster) => cluster.groupKey === "attribute-CritChance",
+  const attributeVisual = visual.find(
+    (cluster) =>
+      cluster.lane === 0 && cluster.groupKey === "attribute",
   );
-  assert.equal(critVisual?.members?.length, 2);
-  assert.equal(critVisual?.icon, critIcon);
-  assert.equal(critVisual?.labelKey, "attributeCritChance");
+  assert.equal(attributeVisual?.members?.length, 2);
+  assert.equal(attributeVisual?.icon, "");
+  assert.equal(attributeVisual?.labelKey, "attribute");
   assert.deepEqual(
-    timelineClusterAtCombatMs(critVisual, critSecond.combatMs).events.map(
-      (event) => event.id,
-    ),
-    ["crit-2"],
+    timelineClusterAtCombatMs(
+      attributeVisual,
+      critSecond.combatMs,
+    ).events.map((event) => event.id),
+    ["crit-2", "regen-amount"],
   );
 });
 

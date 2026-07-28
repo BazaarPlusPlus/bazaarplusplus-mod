@@ -88,7 +88,13 @@ export function eventTier(
   if (kind === "card-status-range") return 3;
   const token = eventKindToken(event);
   if (token === "destroy") return 1;
-  if (kind === "card-attribute" || token === "status") return 3;
+  if (
+    kind === "card-attribute"
+    || kind === "player-attribute"
+    || token === "status"
+  ) {
+    return 3;
+  }
   return 2;
 }
 
@@ -151,6 +157,10 @@ export function eventKindToken(
 export function timelineEventToken(
   event: Pick<NormalizedEvent, "kind" | "action">,
 ): string {
+  const kind = event.kind.toLowerCase();
+  if (kind === "card-attribute" || kind === "player-attribute") {
+    return "attribute";
+  }
   return timelinePresentationToken(event);
 }
 
@@ -479,21 +489,28 @@ export function buildClusters(
 
   for (const event of events) {
     const x = timelineXAtCombatMs(event.combatMs, duration, timelineWidth);
+    const kind = event.kind.toLowerCase();
+    const isAttribute =
+      kind === "card-attribute" || kind === "player-attribute";
     const token = timelineEventToken(event);
     const presentation = eventPresentation(event);
-    const iconSemanticKey =
-      event.iconSemanticKey
-      || eventAttributeSemantic(event)?.nativeSemanticKey
-      || "";
-    const icon =
-      event.icon
-      || iconBySemanticKey.get(iconSemanticKey)
-      || "";
+    const groupKey = isAttribute ? "attribute" : presentation.groupKey;
+    const labelKey = isAttribute ? "attribute" : presentation.labelKey;
+    const iconSemanticKey = isAttribute
+      ? ""
+      : event.iconSemanticKey
+        || eventAttributeSemantic(event)?.nativeSemanticKey
+        || "";
+    const icon = isAttribute
+      ? ""
+      : event.icon
+        || iconBySemanticKey.get(iconSemanticKey)
+        || "";
     for (const endpoint of eventLaneEndpoints(event, entityIndex)) {
       const pixel = Math.round(x);
       const key =
         `${event.frame}:${endpoint.lane}:${pixel}:${endpoint.role}:`
-        + `${token}:${presentation.groupKey}:${iconSemanticKey}`;
+        + `${token}:${groupKey}:${iconSemanticKey}`;
       let cluster = clusterMap.get(key);
       if (!cluster) {
         cluster = {
@@ -503,8 +520,8 @@ export function buildClusters(
           role: endpoint.role,
           events: [],
           token,
-          groupKey: presentation.groupKey,
-          labelKey: presentation.labelKey,
+          groupKey,
+          labelKey,
           iconSemanticKey,
           icon,
         };
@@ -517,11 +534,16 @@ export function buildClusters(
 
   const built = Array.from(clusterMap.values());
   for (const cluster of built) {
-    const icons = new Set(
-      cluster.events.map((event) => event.icon).filter(Boolean),
-    );
-    if (icons.size === 1) cluster.icon = Array.from(icons)[0];
-    else if (icons.size > 1) cluster.icon = "";
+    if (cluster.token === "attribute") {
+      cluster.icon = "";
+      cluster.iconSemanticKey = "";
+    } else {
+      const icons = new Set(
+        cluster.events.map((event) => event.icon).filter(Boolean),
+      );
+      if (icons.size === 1) cluster.icon = Array.from(icons)[0];
+      else if (icons.size > 1) cluster.icon = "";
+    }
     cluster.tier = clusterEventTier(cluster.events);
     cluster.impact = clusterImpact(cluster.events);
   }

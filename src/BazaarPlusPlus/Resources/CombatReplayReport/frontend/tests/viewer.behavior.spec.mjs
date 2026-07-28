@@ -846,8 +846,26 @@ test.beforeAll(async ({ browserName }) => {
       role: "received",
       attributionConfidence: "target-exact-source-unknown",
     }),
+    schemaEvent({
+      eventId: "dense-regen-amount",
+      frame: 81,
+      frameSequence: 1,
+      combatTimeMs: 4080,
+      kind: "card-attribute",
+      action: "RegenApplyAmount",
+      targetEntityIds: ["player-item"],
+      value: 4,
+      previousValue: 109,
+      currentValue: 113,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+      iconSemanticKey: "status.regen",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png",
+    }),
   ];
-  attributeDensityEnvelope.battleDocument.rawRecordCount = 2;
+  attributeDensityEnvelope.battleDocument.rawRecordCount = 3;
   await writeFile(
     join(fixtureDirectory, "attribute-density-report.html"),
     reportHtml(attributeDensityEnvelope),
@@ -3706,71 +3724,63 @@ test("renders destroy and structural attributes consistently across timeline, in
   );
   await page.getByTestId("frame-inspector-close").click();
 
-  for (const attribute of [
-    {
-      dx: -7,
-      dy: -11,
-      label: "Damage stat",
-      amount: "+20",
-      transition: "10 → 30",
-      polarity: "increase",
-      icon:
-        "../report-assets/objects/44/4444444444444444444444444444444444444444444444444444444444444444.png",
-    },
-    {
-      dx: 7,
-      dy: 11,
-      label: "Multicast",
-      amount: "−1",
-      transition: "2 → 1",
-      polarity: "decrease",
-      icon:
-        "../report-assets/objects/55/5555555555555555555555555555555555555555555555555555555555555555.png",
-    },
-  ]) {
-    const attributePoint = await timelineMarkerPoint(page, {
-      combatMs: 4_000,
-      durationMs: 8_000,
-      entityId: "player-item-multicast",
-      dx: attribute.dx,
-      dy: attribute.dy,
-    });
-    expect(attributePoint).not.toBeNull();
-    await page.mouse.move(attributePoint.x, attributePoint.y);
-    await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
-      attribute.label,
-    );
-    await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
-      "1 event",
-    );
-    await expect(page.getByTestId("timeline-tooltip")).not.toContainText(
-      attribute.amount,
-    );
-    await page.mouse.click(attributePoint.x, attributePoint.y);
-    await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
-      "Zarlic",
-    );
-    await expect(page.getByTestId("focused-cluster-event")).toHaveCount(1);
-    await expect(page.getByTestId("frame-event-kind")).toHaveText(
-      attribute.label,
-    );
-    await expect(page.getByTestId("frame-event-amount")).toHaveText(
-      attribute.amount,
-    );
-    await expect(page.getByTestId("frame-event-transition")).toHaveText(
-      attribute.transition,
-    );
-    await expect(page.getByTestId("focused-cluster-event")).toHaveAttribute(
-      "data-bpp-diff-polarity",
-      attribute.polarity,
-    );
-    await expect(page.getByTestId("frame-event-native-icon")).toHaveAttribute(
-      "src",
-      attribute.icon,
-    );
-    await expect(page.getByTestId("event-source-entity")).toHaveCount(0);
-    await page.getByTestId("frame-inspector-close").click();
-  }
+  const attributePoint = await timelineMarkerPoint(page, {
+    combatMs: 4_000,
+    durationMs: 8_000,
+    entityId: "player-item-multicast",
+  });
+  expect(attributePoint).not.toBeNull();
+  await page.mouse.move(attributePoint.x, attributePoint.y);
+  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+    "Attribute change",
+  );
+  await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
+    "2 events",
+  );
+  await expect(page.getByTestId("timeline-tooltip")).not.toContainText(
+    "+20",
+  );
+  await expect(page.getByTestId("timeline-tooltip")).not.toContainText(
+    "−1",
+  );
+  await page.mouse.click(attributePoint.x, attributePoint.y);
+  await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
+    "Zarlic",
+  );
+  await expect(page.getByTestId("focused-cluster-event")).toHaveCount(2);
+  await expect(page.getByTestId("frame-event-kind")).toHaveText([
+    "Damage stat",
+    "Multicast",
+  ]);
+  await expect(page.getByTestId("frame-event-amount")).toHaveText([
+    "+20",
+    "−1",
+  ]);
+  await expect(page.getByTestId("frame-event-transition")).toHaveText([
+    "10 → 30",
+    "2 → 1",
+  ]);
+  await expect(
+    page.getByTestId("focused-cluster-event").nth(0),
+  ).toHaveAttribute("data-bpp-diff-polarity", "increase");
+  await expect(
+    page.getByTestId("focused-cluster-event").nth(1),
+  ).toHaveAttribute("data-bpp-diff-polarity", "decrease");
+  await expect(page.getByTestId("frame-event-native-icon")).toHaveCount(2);
+  await expect(
+    page.getByTestId("frame-event-native-icon").nth(0),
+  ).toHaveAttribute(
+    "src",
+    "../report-assets/objects/44/4444444444444444444444444444444444444444444444444444444444444444.png",
+  );
+  await expect(
+    page.getByTestId("frame-event-native-icon").nth(1),
+  ).toHaveAttribute(
+    "src",
+    "../report-assets/objects/55/5555555555555555555555555555555555555555555555555555555555555555.png",
+  );
+  await expect(page.getByTestId("event-source-entity")).toHaveCount(0);
+  await page.getByTestId("frame-inspector-close").click();
 
   await page.getByTestId("report-tab-statistics").click();
   const destroyRow = page
@@ -3818,7 +3828,7 @@ test("renders destroy and structural attributes consistently across timeline, in
   ).toContainText("Destroyed");
 });
 
-test("keeps dense attribute markers icon-only while hover and click resolve one event", async ({
+test("keeps dense attribute markers generic while inspector shows concrete native details", async ({
   page,
 }) => {
   await page.goto(`${attributeDensityReportUrl}?lang=en`);
@@ -3831,13 +3841,19 @@ test("keeps dense attribute markers icon-only while hover and click resolve one 
       combatMs: 4000,
       frame: "Frame 80",
       time: "4.00s",
-      transition: "78% → 80%",
+      count: "1 event",
+      kinds: ["Critical Chance"],
+      amounts: ["+2%"],
+      transitions: ["78% → 80%"],
     },
     {
       combatMs: 4080,
       frame: "Frame 81",
       time: "4.08s",
-      transition: "80% → 82%",
+      count: "2 events",
+      kinds: ["Critical Chance", "Regeneration Amount"],
+      amounts: ["+2%", "+4"],
+      transitions: ["80% → 82%", "109 → 113"],
     },
   ]) {
     const point = await timelineMarkerPoint(page, {
@@ -3848,13 +3864,13 @@ test("keeps dense attribute markers icon-only while hover and click resolve one 
     expect(point).not.toBeNull();
     await page.mouse.move(point.x, point.y);
     await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
-      "Critical Chance",
+      "Attribute change",
     );
     await expect(page.getByTestId("timeline-tooltip-time")).toHaveText(
       attribute.time,
     );
     await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
-      "1 event",
+      attribute.count,
     );
     await expect(page.getByTestId("timeline-tooltip")).not.toContainText(
       "+2%",
@@ -3867,18 +3883,35 @@ test("keeps dense attribute markers icon-only while hover and click resolve one 
     await expect(page.getByTestId("frame-inspector-frame")).toHaveText(
       attribute.frame,
     );
-    await expect(page.getByTestId("focused-cluster-event")).toHaveCount(1);
+    await expect(page.getByTestId("focused-cluster-event")).toHaveCount(
+      attribute.kinds.length,
+    );
     await expect(page.getByTestId("frame-event-kind")).toHaveText(
-      "Critical Chance",
+      attribute.kinds,
     );
-    await expect(page.getByTestId("frame-event-amount")).toHaveText("+2%");
+    await expect(page.getByTestId("frame-event-amount")).toHaveText(
+      attribute.amounts,
+    );
     await expect(page.getByTestId("frame-event-transition")).toHaveText(
-      attribute.transition,
+      attribute.transitions,
     );
-    await expect(page.getByTestId("frame-event-native-icon")).toHaveAttribute(
+    await expect(page.getByTestId("frame-event-native-icon")).toHaveCount(
+      attribute.kinds.length,
+    );
+    await expect(
+      page.getByTestId("frame-event-native-icon").nth(0),
+    ).toHaveAttribute(
       "src",
       "../report-assets/objects/99/9999999999999999999999999999999999999999999999999999999999999999.png",
     );
+    if (attribute.kinds.length > 1) {
+      await expect(
+        page.getByTestId("frame-event-native-icon").nth(1),
+      ).toHaveAttribute(
+        "src",
+        "../report-assets/objects/aa/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.png",
+      );
+    }
     await page.getByTestId("frame-inspector-close").click();
   }
 });
@@ -4163,6 +4196,14 @@ test("scopes the inspector to the exact clicked cluster", async ({
     const popoverBounds = popover?.getBoundingClientRect();
     return {
       artHeight: artBounds?.height ?? 0,
+      artTopGap:
+        artBounds && headerBounds
+          ? artBounds.top - headerBounds.top
+          : Number.POSITIVE_INFINITY,
+      artBottomGap:
+        artBounds && headerBounds
+          ? headerBounds.bottom - artBounds.bottom
+          : Number.POSITIVE_INFINITY,
       headerHeight: headerBounds?.height ?? 0,
       inspectorWidth: inspectorBounds?.width ?? 0,
       nativeIconHeight: nativeIconBounds?.height ?? 0,
@@ -4174,10 +4215,12 @@ test("scopes the inspector to the exact clicked cluster", async ({
   });
   expect(inspectorGeometry.inspectorWidth).toBeGreaterThanOrEqual(320);
   expect(inspectorGeometry.inspectorWidth).toBeLessThanOrEqual(361);
-  expect(inspectorGeometry.artHeight).toBeGreaterThanOrEqual(47.5);
-  expect(inspectorGeometry.artHeight).toBeLessThanOrEqual(48);
-  expect(inspectorGeometry.headerHeight).toBeGreaterThanOrEqual(60);
-  expect(inspectorGeometry.headerHeight).toBeLessThanOrEqual(64);
+  expect(inspectorGeometry.artHeight).toBeGreaterThanOrEqual(63.5);
+  expect(inspectorGeometry.artHeight).toBeLessThanOrEqual(64);
+  expect(inspectorGeometry.artTopGap).toBeCloseTo(0, 1);
+  expect(inspectorGeometry.artBottomGap).toBeLessThanOrEqual(1);
+  expect(inspectorGeometry.headerHeight).toBeGreaterThanOrEqual(64);
+  expect(inspectorGeometry.headerHeight).toBeLessThanOrEqual(65);
   expect(inspectorGeometry.nativeIconHeight).toBeCloseTo(20, 1);
   expect(inspectorGeometry.popoverLeft).toBeGreaterThanOrEqual(0);
   expect(inspectorGeometry.popoverTop).toBeGreaterThanOrEqual(0);
@@ -4641,7 +4684,7 @@ test("shows a max-health diff without guessing its same-frame source", async ({
   expect(point).not.toBeNull();
   await page.mouse.move(point.x, point.y);
   await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
-    "Max health",
+    "Attribute change",
   );
   await page.mouse.click(point.x, point.y);
 
@@ -4666,65 +4709,48 @@ test("shows a max-health diff without guessing its same-frame source", async ({
   );
 });
 
-test("shows concrete Welding Torch attribute diffs instead of raw aura status changes", async ({
+test("groups Welding Torch attributes in one generic marker and expands concrete native diffs", async ({
   page,
 }) => {
   await page.goto(`${statusApplicationReportUrl}?lang=en`);
   await page.getByTestId("timeline-scroll").evaluate((element) => {
     element.scrollLeft = element.scrollWidth - element.clientWidth;
   });
-  for (const attribute of [
-    {
-      dx: -7,
-      dy: -11,
-      label: "Burn applied",
-      amount: "−46",
-      transition: "860 → 814",
-    },
-    {
-      dx: 7,
-      dy: 11,
-      label: "Shield applied",
-      amount: "−230",
-      transition: "4,540 → 4,310",
-    },
-  ]) {
-    const point = await timelineMarkerPoint(page, {
-      combatMs: 8600,
-      durationMs: 9000,
-      entityId: "player-item",
-      dx: attribute.dx,
-      dy: attribute.dy,
-    });
-    expect(point).not.toBeNull();
-    await page.mouse.move(point.x, point.y);
-    await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
-      attribute.label,
-    );
-    await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
-      "1 event",
-    );
-    await page.mouse.click(point.x, point.y);
+  const point = await timelineMarkerPoint(page, {
+    combatMs: 8600,
+    durationMs: 9000,
+    entityId: "player-item",
+  });
+  expect(point).not.toBeNull();
+  await page.mouse.move(point.x, point.y);
+  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+    "Attribute change",
+  );
+  await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
+    "2 events",
+  );
+  await page.mouse.click(point.x, point.y);
 
-    await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
-      "Welding Torch",
-    );
-    await expect(page.getByTestId("focused-cluster-event")).toHaveCount(1);
-    await expect(page.getByTestId("frame-event-kind")).toHaveText(
-      attribute.label,
-    );
-    await expect(page.getByTestId("frame-event-amount")).toHaveText(
-      attribute.amount,
-    );
-    await expect(page.getByTestId("frame-event-transition")).toHaveText(
-      attribute.transition,
-    );
-    await expect(page.getByTestId("frame-event-native-icon")).toHaveCount(1);
-    await expect(page.getByTestId("frame-event-list")).not.toContainText(
-      "Status change",
-    );
-    await page.getByTestId("frame-inspector-close").click();
-  }
+  await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
+    "Welding Torch",
+  );
+  await expect(page.getByTestId("focused-cluster-event")).toHaveCount(2);
+  await expect(page.getByTestId("frame-event-kind")).toHaveText([
+    "Burn applied",
+    "Shield applied",
+  ]);
+  await expect(page.getByTestId("frame-event-amount")).toHaveText([
+    "−46",
+    "−230",
+  ]);
+  await expect(page.getByTestId("frame-event-transition")).toHaveText([
+    "860 → 814",
+    "4,540 → 4,310",
+  ]);
+  await expect(page.getByTestId("frame-event-native-icon")).toHaveCount(2);
+  await expect(page.getByTestId("frame-event-list")).not.toContainText(
+    "Status change",
+  );
 });
 
 test("keeps direct freeze applications in the combat log without countdown tick noise", async ({

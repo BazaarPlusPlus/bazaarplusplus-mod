@@ -27,9 +27,9 @@ const ENTITY_ART_GEOMETRY: Record<EntityArtSize, EntityArtGeometry> = {
     skillDiameter: 36,
   },
   inspector: {
-    height: 48,
+    height: 64,
     itemSlotWidth: 48,
-    skillDiameter: 48,
+    skillDiameter: 64,
   },
 };
 
