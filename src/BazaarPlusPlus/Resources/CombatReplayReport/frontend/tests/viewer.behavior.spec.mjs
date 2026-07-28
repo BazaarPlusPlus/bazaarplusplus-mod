@@ -3648,7 +3648,6 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
   ];
   for (const marker of markers) {
     let point = null;
-    let hoverAttempt = 0;
     await expect
       .poll(async () => {
         point = await timelineMarkerPoint(page, {
@@ -3659,11 +3658,8 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
           dy: marker.dy,
         });
         if (!point) return "";
-        await page.mouse.move(
-          point.x + ((hoverAttempt % 3) - 1) * 2,
-          point.y,
-        );
-        hoverAttempt += 1;
+        await page.mouse.move(1, 1);
+        await page.mouse.move(point.x, point.y);
         return (
           (await page
             .getByTestId("timeline-tooltip-label")
@@ -4649,6 +4645,7 @@ test("gives the timeline the viewport and keeps at least ten lanes visible", asy
 test("virtualizes the footer combat log and highlights every visible row from the active frame", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 2048, height: 1000 });
   await page.addInitScript(() => {
     const originalScrollTo = Element.prototype.scrollTo;
     window.__bppCombatLogScrollBehaviors = [];
@@ -4698,8 +4695,24 @@ test("virtualizes the footer combat log and highlights every visible row from th
           : source.left - kind.right,
     };
   });
-  expect(kindColumnGeometry.width).toBeLessThanOrEqual(78);
+  expect(kindColumnGeometry.width).toBeGreaterThanOrEqual(128);
+  expect(kindColumnGeometry.width).toBeLessThanOrEqual(193);
   expect(kindColumnGeometry.trailingGap).toBeLessThanOrEqual(9);
+  const truncatedKindLabels = await rows.evaluateAll((elements) =>
+    elements.flatMap((element) => {
+      const label = element.querySelector(
+        '[data-bpp-test-id="combat-log-kind"] .truncate',
+      );
+      if (
+        !(label instanceof HTMLElement)
+        || label.scrollWidth <= label.clientWidth
+      ) {
+        return [];
+      }
+      return [label.textContent?.trim() ?? ""];
+    })
+  );
+  expect(truncatedKindLabels).toEqual([]);
   const columnAlignment = await rows.evaluateAll((elements) => {
     const testIds = [
       "combat-log-time",

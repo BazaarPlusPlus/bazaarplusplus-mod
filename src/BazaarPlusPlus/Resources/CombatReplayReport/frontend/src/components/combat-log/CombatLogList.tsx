@@ -164,7 +164,10 @@ function CombatLogEntryColumns({
         data-bpp-test-id="combat-log-kind"
       >
         <CombatLogKindIcon entry={entry} />
-        <span className="truncate text-compact font-semibold text-foreground max-[600px]:sr-only">
+        <span
+          className="truncate text-compact font-semibold text-foreground max-[600px]:sr-only"
+          title={t(entry.token)}
+        >
           {t(entry.token)}
         </span>
       </span>
@@ -295,7 +298,7 @@ function CombatLogTargetDetail({
         target?.name ?? t("targetNotRecorded"),
         amount,
       ].filter(Boolean).join(" · ")}
-      className="grid h-8 w-full grid-cols-[4rem_4.75rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/15 bg-surface-raised/25 px-3 text-left font-normal transition-colors hover:bg-accent/35 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2"
+      className="grid h-8 w-full grid-cols-[4rem_clamp(8rem,20%,12rem)_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/15 bg-surface-raised/25 px-3 text-left font-normal transition-colors hover:bg-accent/35 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2"
       data-bpp-last-child={isLast ? "true" : "false"}
       data-bpp-parent-entry-id={parentEntryId}
       data-bpp-target-id={detail.targetIds[0] ?? ""}
@@ -626,7 +629,7 @@ export const CombatLogList = forwardRef<
                     aria-current={active ? "true" : undefined}
                     aria-expanded={expandable ? expanded : undefined}
                     className={cn(
-                      "grid h-9 w-full grid-cols-[4rem_4.75rem_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2",
+                      "grid h-9 w-full grid-cols-[4rem_clamp(8rem,20%,12rem)_minmax(0,1fr)_1rem_minmax(0,1fr)_4.5rem] items-center justify-stretch gap-x-2 gap-y-0 rounded-none border-b border-border/20 px-3 text-left font-normal transition-colors hover:bg-accent/40 max-[600px]:grid-cols-[3.5rem_1.25rem_minmax(0,1fr)_0.75rem_minmax(0,1fr)_auto] max-[600px]:gap-x-1.5 max-[600px]:px-2",
                       frameStart && "border-t border-t-border/55",
                       sameFrame && "bg-brand-soft/[0.07]",
                       active
