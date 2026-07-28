@@ -91,6 +91,7 @@ import {
 } from "../src/model/report.ts";
 import {
   entityArtDimensions,
+  intrinsicItemArtGeometry,
   maximumEntityArtWidth,
   normalizedEntityArtSpan,
 } from "../src/components/semantic/entity-art-geometry.ts";
@@ -153,6 +154,7 @@ function timelineEvent(overrides = {}) {
     removedTargetIds: [],
     role: "",
     attributionConfidence: "unknown",
+    isCritical: false,
     iconSemanticKey: "",
     icon: "",
     occurrences: 1,
@@ -1648,6 +1650,39 @@ test("item art uses exact one, two, and three-slot geometry", () => {
   );
 });
 
+test("inspector item art follows the exported asset aspect without cropping", () => {
+  const sourceGeometryBySpan = {
+    1: { width: 194, height: 378 },
+    2: { width: 362, height: 378 },
+    3: { width: 504, height: 366 },
+  };
+
+  for (const span of [1, 2, 3]) {
+    const source = sourceGeometryBySpan[span];
+    const geometry = intrinsicItemArtGeometry(
+      span,
+      "inspector",
+      source,
+    );
+
+    assert.equal(geometry.height, 64);
+    assert.equal(geometry.span, span);
+    assert.ok(
+      Math.abs(geometry.width - (source.width / source.height) * 64)
+        < 1e-9,
+    );
+  }
+
+  assert.deepEqual(
+    intrinsicItemArtGeometry(1, "inspector", { width: 1, height: 1 }),
+    {
+      width: 64,
+      height: 64,
+      span: 1,
+    },
+  );
+});
+
 test("report entities and events normalize exact schema-v1 fields", () => {
   assert.deepEqual(normalizeEntity({
     entityId: "item-1",
@@ -1705,6 +1740,7 @@ test("report entities and events normalize exact schema-v1 fields", () => {
       combatTimeMs: 1_250,
       kind: "effect-executed",
       action: "Damage",
+      isCritical: true,
       sourceEntityId: "source-1",
       targetEntityIds: ["target-1", "target-2"],
       removedTargetEntityIds: [],
@@ -1720,6 +1756,7 @@ test("report entities and events normalize exact schema-v1 fields", () => {
   );
   assert.equal(event.combatMs, 1_250);
   assert.equal(event.sourceId, "source-1");
+  assert.equal(event.isCritical, true);
   assert.deepEqual(event.targetIds, ["target-1", "target-2"]);
   assert.equal(event.occurrences, 1);
   assert.equal(eventTimeMs({
@@ -2136,6 +2173,66 @@ test("timeline visibility and clustering preserve every underlying event", () =>
       ids: timelineClusterEventIds(cluster),
     })),
     [{ lane: 2, role: "target", ids: ["hero-damage"] }],
+  );
+
+  const criticalItem = { id: "critical-item", type: "item" };
+  const criticalEntities = [criticalItem, ...entities];
+  const criticalEvent = timelineEvent({
+    id: "critical-damage",
+    kind: "effect-executed",
+    action: "PlayerDamage",
+    sourceId: "critical-item",
+    targetIds: ["hero"],
+    isCritical: true,
+    iconSemanticKey: "status.damage",
+    icon: "../report-assets/objects/aa/damage.png",
+  });
+  assert.deepEqual(
+    eventLaneEndpoints(
+      criticalEvent,
+      new Map(
+        criticalEntities.map((entity, index) => [entity.id, index]),
+      ),
+      new Map(criticalEntities.map((entity) => [entity.id, entity])),
+    ),
+    [
+      { lane: 3, role: "target" },
+      { lane: 0, role: "source" },
+    ],
+  );
+  assert.deepEqual(
+    buildClusters(
+      { durationMs: 2_000 },
+      [criticalEvent],
+      criticalEntities,
+      1_000,
+      54,
+    ).map((cluster) => ({
+      criticalSource: cluster.criticalSource,
+      groupKey: cluster.groupKey,
+      labelKey: cluster.labelKey,
+      lane: cluster.lane,
+      role: cluster.role,
+      tier: cluster.tier,
+    })),
+    [
+      {
+        criticalSource: true,
+        groupKey: "critical-damage-direct",
+        labelKey: "critical",
+        lane: 0,
+        role: "source",
+        tier: 1,
+      },
+      {
+        criticalSource: false,
+        groupKey: "damage-direct",
+        labelKey: "damageDirect",
+        lane: 3,
+        role: "target",
+        tier: 2,
+      },
+    ],
   );
 
   const events = [

@@ -44,6 +44,40 @@ internal sealed record ReportAssetRenderKey(
     IReadOnlyList<ReportAssetRenderAttribute> Attributes
 )
 {
+    internal static ReportAssetRenderKey CreateTemplateAsset(
+        int schemaVersion,
+        string gameBuild,
+        string gameDataIdentity,
+        string resolvedTemplateVersion,
+        string resolvedSkinIdentity,
+        string renderer,
+        string rendererVersion,
+        string assetType,
+        string templateId,
+        string size,
+        string variant,
+        ReportAssetCaptureProfile captureProfile
+    ) =>
+        new(
+            schemaVersion,
+            gameBuild,
+            gameDataIdentity,
+            resolvedTemplateVersion,
+            resolvedSkinIdentity,
+            renderer,
+            rendererVersion,
+            assetType,
+            templateId,
+            "und",
+            size,
+            "None",
+            "None",
+            "None",
+            variant,
+            captureProfile,
+            Array.Empty<ReportAssetRenderAttribute>()
+        );
+
     internal string CanonicalJson => ReportAssetCanonicalJson.Serialize(this);
 
     internal string RenderKeyHash => ReportAssetHash.Sha256Utf8(CanonicalJson);

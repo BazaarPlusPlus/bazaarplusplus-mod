@@ -123,6 +123,7 @@ export interface NormalizedEvent {
   removedTargetIds: string[];
   role: string;
   attributionConfidence: string;
+  isCritical: boolean;
   iconSemanticKey: string;
   icon: string;
   occurrences: number;
@@ -211,6 +212,7 @@ export function normalizeEvent(
       raw.attributionConfidence,
       "unknown",
     ).toLowerCase(),
+    isCritical: raw.isCritical === true,
     iconSemanticKey: asString(raw.iconSemanticKey, ""),
     icon: safeAssetUrl(raw.iconAssetRelativeUrl ?? ""),
     occurrences: 1,

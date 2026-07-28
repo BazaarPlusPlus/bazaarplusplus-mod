@@ -2284,6 +2284,9 @@ public class CoreLayeringTests
         var spriteMaterializerSource = File.ReadAllText(
             Path.Combine(reportAssetsDir, "PostCombatReportNativeSpriteMaterializer.cs")
         );
+        var nativeItemArtworkSource = File.ReadAllText(
+            Path.Combine(mainSource, "GameInterop", "CardPreview", "NativeItemVisualArtwork.cs")
+        );
         var runtimeSource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "CombatReplay", "CombatReplayRuntime.cs")
         );
@@ -2319,6 +2322,22 @@ public class CoreLayeringTests
         Assert.Contains("AsyncGPUReadback.Request", textureExporterSource);
         Assert.Contains("Graphics.Blit", textureExporterSource);
         Assert.Contains("SkillRendererVersion = \"2\"", exporterSource);
+        Assert.Contains("ItemRendererVersion = \"12\"", exporterSource);
+        Assert.Contains("\"urp-offscreen-template-art\"", exporterSource);
+        Assert.Contains("\"item-template-art\"", exporterSource);
+        Assert.Contains("ReportAssetRenderKey.CreateTemplateAsset", exporterSource);
+        Assert.Contains("ItemTransparentCropPaddingPixels = 0", exporterSource);
+        Assert.Contains("isSkill ? 0 : ItemTransparentCropPaddingPixels", exporterSource);
+        Assert.Contains("controller.ToggleFakeDropShadow(value: false)", exporterSource);
+        Assert.Contains("NativeItemVisualArtwork.TryGetIllustrationRenderer", exporterSource);
+        Assert.Contains("\"cardIllustrationRenderer\"", nativeItemArtworkSource);
+        Assert.Contains("handle.IllustrationRenderer.enabled = true", exporterSource);
+        Assert.Contains("enabledRenderers.Length != 1", exporterSource);
+        Assert.DoesNotContain("entry.Snapshot", exporterSource);
+        Assert.DoesNotContain("snapshot.Tier", exporterSource);
+        Assert.DoesNotContain("snapshot.Enchant", exporterSource);
+        Assert.DoesNotContain("snapshot.Socket", exporterSource);
+        Assert.DoesNotContain("snapshot.Attributes", exporterSource);
         Assert.Contains("ReportAssetReadbackSource.MaterialTexture", exporterSource);
         Assert.Contains("ReportAssetReadbackSource.OffscreenCamera", exporterSource);
         Assert.Contains("ReportAssetReadbackSource.UnitySprite", spriteMaterializerSource);

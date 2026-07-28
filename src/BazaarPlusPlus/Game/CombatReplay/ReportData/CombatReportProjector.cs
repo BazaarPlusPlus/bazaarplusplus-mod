@@ -238,6 +238,7 @@ internal sealed class CombatReportProjector
                     effectId: executed.EffectId,
                     executionContextId: executed.ExecutionContextId,
                     triggerSource: Value(executed.TriggerSource),
+                    isCritical: valueAttribution?.IsCritical,
                     rawCategory: "combat-event",
                     rawType: nameof(CombatSimEventEffectExecuted),
                     rawIndex: rawIndex

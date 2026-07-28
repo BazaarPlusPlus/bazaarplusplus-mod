@@ -6,7 +6,11 @@ using BazaarGameShared.Infra.Messages.Shared;
 
 namespace BazaarPlusPlus.Game.CombatReplay.ReportData;
 
-internal sealed record CombatReportEffectValueAttribution(long Value, string Unit);
+internal sealed record CombatReportEffectValueAttribution(
+    long Value,
+    string Unit,
+    bool? IsCritical = null
+);
 
 /// <summary>
 /// Correlates effect executions with the observable value transition emitted in the same frame.
@@ -154,18 +158,24 @@ internal static class CombatReportEffectValueAttributor
 
         long sum = 0;
         var matched = false;
+        var allCritical = true;
         for (var index = 0; index < update.HealthAdjustments.Count; index++)
         {
             var adjustment = update.HealthAdjustments[index];
             if (!predicate(adjustment))
                 continue;
             matched = true;
+            allCritical &= adjustment.IsCrit;
             sum = checked(sum + (absolute ? Math.Abs((long)adjustment.Amount) : adjustment.Amount));
         }
         if (!matched || sum <= 0)
             return false;
 
-        attribution = new CombatReportEffectValueAttribution(sum, "points");
+        attribution = new CombatReportEffectValueAttribution(
+            sum,
+            "points",
+            allCritical ? true : null
+        );
         return true;
     }
 

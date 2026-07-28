@@ -643,12 +643,14 @@ internal static class ReportProjectionChecks
                         AttributeChanged = EPlayerHealthChangeType.Shield,
                         DamageType = EDamageType.Damage,
                         Amount = -10,
+                        IsCrit = true,
                     },
                     new CombatSimPlayerHealthAdjustment
                     {
                         AttributeChanged = EPlayerHealthChangeType.Health,
                         DamageType = EDamageType.Damage,
                         Amount = -25,
+                        IsCrit = true,
                     },
                 },
                 Attributes =
@@ -708,6 +710,25 @@ internal static class ReportProjectionChecks
 
         var ambiguous = new CombatSimFrame
         {
+            PlayerUpdates = new CombatSimPlayerUpdate
+            {
+                HealthAdjustments =
+                {
+                    new CombatSimPlayerHealthAdjustment
+                    {
+                        AttributeChanged = EPlayerHealthChangeType.Shield,
+                        DamageType = EDamageType.Shield,
+                        Amount = 10,
+                        IsCrit = true,
+                    },
+                    new CombatSimPlayerHealthAdjustment
+                    {
+                        AttributeChanged = EPlayerHealthChangeType.Shield,
+                        DamageType = EDamageType.Shield,
+                        Amount = 20,
+                    },
+                },
+            },
             OpponentUpdates = new CombatSimPlayerUpdate
             {
                 Attributes =
@@ -730,6 +751,22 @@ internal static class ReportProjectionChecks
                 new InstanceId("other-source"),
                 new EffectTargetPlayer { Target = ECombatantId.Opponent },
                 "ambiguous-b"
+            )
+        );
+        ambiguous.Events.Add(
+            Executed(
+                EActionCommandType.PlayerShieldApply,
+                sourceCardId,
+                new EffectTargetPlayer { Target = ECombatantId.Player },
+                "ambiguous-shield-a"
+            )
+        );
+        ambiguous.Events.Add(
+            Executed(
+                EActionCommandType.PlayerShieldApply,
+                new InstanceId("other-source"),
+                new EffectTargetPlayer { Target = ECombatantId.Player },
+                "ambiguous-shield-b"
             )
         );
 
@@ -769,9 +806,10 @@ internal static class ReportProjectionChecks
             .Events.Where(reportEvent => reportEvent.Kind == "effect-executed")
             .ToList();
 
+        var damage = executedEvents.Single(reportEvent => reportEvent.EffectId == "damage");
         Require(
-            executedEvents.Single(reportEvent => reportEvent.EffectId == "damage").Value == 35,
-            "A unique direct-damage execution must receive the summed shield and health damage observed on its target."
+            damage.Value == 35 && damage.IsCritical == true,
+            "A unique direct-damage execution must receive the summed critical shield and health damage observed on its target."
         );
         Require(
             executedEvents.Single(reportEvent => reportEvent.EffectId == "burn").Value == 12,
@@ -797,6 +835,15 @@ internal static class ReportProjectionChecks
                 )
                 .All(reportEvent => reportEvent.Value == null),
             "A shared aggregate transition must not be split or copied across same-target executions."
+        );
+        Require(
+            executedEvents
+                .Where(reportEvent =>
+                    reportEvent.EffectId?.StartsWith("ambiguous-shield-", StringComparison.Ordinal)
+                    == true
+                )
+                .All(reportEvent => reportEvent.Value == null && reportEvent.IsCritical == null),
+            "A critical outcome must not be copied across ambiguous same-target executions."
         );
         Require(
             executedEvents.Single(reportEvent => reportEvent.EffectId == "negative-status").Value

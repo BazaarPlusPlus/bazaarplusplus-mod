@@ -120,6 +120,7 @@ export function mergeInspectorEvents(
       event.icon,
       event.attributionConfidence,
       event.role,
+      event.isCritical,
     ].join("\u001f");
     const existing = merged.get(key);
     if (existing) {

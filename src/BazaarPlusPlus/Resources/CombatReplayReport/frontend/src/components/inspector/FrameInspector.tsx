@@ -26,6 +26,10 @@ import type {
 import type { ReportViewModel } from "../../model/report.ts";
 import { eventsAtFrame } from "../../timeline/event-renderer.ts";
 import { EntityArt } from "../semantic/EntityArt.tsx";
+import {
+  entityArtDimensions,
+  intrinsicItemArtGeometry,
+} from "../semantic/entity-art-geometry.ts";
 import { SemanticIcon } from "../semantic/SemanticIcon.tsx";
 import {
   Accordion,
@@ -44,11 +48,13 @@ import {
 const PAGE_SIZE = 80;
 
 function EntityReference({
+  artColumnWidth,
   entityById,
   entityId,
   fallback,
   testId,
 }: {
+  artColumnWidth: number;
   entityById: ReadonlyMap<string, NormalizedEntity>;
   entityId: string;
   fallback: string;
@@ -72,14 +78,15 @@ function EntityReference({
       data-bpp-test-id={testId}
     >
       <span
-        className="grid size-6 shrink-0 items-center justify-items-start"
+        className="flex h-6 shrink-0 items-center justify-start"
         data-bpp-test-id="frame-event-entity-art-slot"
+        style={{ width: artColumnWidth }}
       >
         <EntityArt
           contentAlign="start"
           entity={entity}
+          itemFit="intrinsic"
           size="compact"
-          squareSlot
         />
       </span>
       <span className="truncate text-foreground/90" title={entity.name}>
@@ -104,6 +111,15 @@ function EventSourceTree({
   nodes: readonly RelationNode[];
 }): React.JSX.Element | null {
   if (nodes.length === 0) return null;
+  const artColumnWidth = Math.max(
+    ...nodes.map((node) => {
+      const entity = entityById.get(node.entityId);
+      if (!entity) return 0;
+      return entity.type.toLowerCase() === "item"
+        ? intrinsicItemArtGeometry(entity.span, "compact").width
+        : entityArtDimensions(entity.type, entity.span, "compact").width;
+    }),
+  );
   return (
     <div
       className="relative ml-2.5 mt-1.5 flex min-w-0 flex-col gap-1 pl-4"
@@ -127,6 +143,7 @@ function EventSourceTree({
             data-bpp-test-id="frame-event-relation-branch"
           />
           <EntityReference
+            artColumnWidth={artColumnWidth}
             entityById={entityById}
             entityId={node.entityId}
             fallback={node.fallback}
@@ -195,12 +212,14 @@ function EventRow({
   event,
   entityById,
   fallbackIcon,
+  inspectedEntityId,
   mergedCount = 1,
   t,
 }: {
   event: NormalizedEvent;
   entityById: ReadonlyMap<string, NormalizedEntity>;
   fallbackIcon?: string;
+  inspectedEntityId: string;
   mergedCount?: number;
   t: (key: string) => string;
 }): React.JSX.Element {
@@ -236,6 +255,15 @@ function EventRow({
             ×{mergedCount}
           </Badge>
         )}
+        {event.isCritical && (
+          <Badge
+            className="border-damage/35 bg-damage/10 px-1.5 text-damage"
+            data-bpp-test-id="frame-event-critical"
+            variant="outline"
+          >
+            {t("critical")}
+          </Badge>
+        )}
         {amount && (
           <strong
             className={cn(
@@ -262,7 +290,7 @@ function EventRow({
       )}
       <EventSourceTree
         entityById={entityById}
-        nodes={sourceTreeNodes([event], t)}
+        nodes={sourceTreeNodes([event], t, inspectedEntityId)}
       />
     </article>
   );
@@ -271,35 +299,72 @@ function EventRow({
 function sourceTreeNodes(
   events: readonly NormalizedEvent[],
   t: (key: string) => string,
+  inspectedEntityId: string,
 ): RelationNode[] {
   const nodes: RelationNode[] = [];
   const seen = new Set<string>();
+  function append(
+    ariaLabel: string,
+    entityId: string,
+    fallback: string,
+    testId: string,
+    role: string,
+  ): void {
+    if (!entityId || entityId === inspectedEntityId) return;
+    const key = `${role}:${entityId}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    nodes.push({
+      ariaLabel,
+      entityId,
+      fallback,
+      testId,
+    });
+  }
   for (const event of events) {
     const sourceId = event.sourceId || event.triggerSourceId;
-    const sourceKey = `source:${sourceId}`;
-    if (sourceId && !seen.has(sourceKey)) {
-      seen.add(sourceKey);
-      nodes.push({
-        ariaLabel: t("source"),
-        entityId: sourceId,
-        fallback: t("sourceNotRecorded"),
-        testId: "event-source-entity",
-      });
+    const inspectedSource =
+      inspectedEntityId === sourceId
+      || inspectedEntityId === event.triggerSourceId;
+    if (inspectedSource) {
+      for (const targetId of event.targetIds) {
+        append(
+          t("target"),
+          targetId,
+          t("targetNotRecorded"),
+          "event-target-entity",
+          "target",
+        );
+      }
+      for (const removedTargetId of event.removedTargetIds) {
+        append(
+          t("removedTarget"),
+          removedTargetId,
+          t("targetNotRecorded"),
+          "event-removed-target-entity",
+          "removed",
+        );
+      }
+      continue;
     }
+    append(
+      t("source"),
+      sourceId,
+      t("sourceNotRecorded"),
+      "event-source-entity",
+      "source",
+    );
     if (
       event.triggerSourceId
       && event.triggerSourceId !== sourceId
     ) {
-      const triggerKey = `trigger:${event.triggerSourceId}`;
-      if (!seen.has(triggerKey)) {
-        seen.add(triggerKey);
-        nodes.push({
-          ariaLabel: t("triggerSource"),
-          entityId: event.triggerSourceId,
-          fallback: t("sourceNotRecorded"),
-          testId: "event-trigger-source-entity",
-        });
-      }
+      append(
+        t("triggerSource"),
+        event.triggerSourceId,
+        t("sourceNotRecorded"),
+        "event-trigger-source-entity",
+        "trigger",
+      );
     }
   }
   return nodes;
@@ -309,11 +374,13 @@ function DirectDamageGroupRow({
   amount,
   entityById,
   events,
+  inspectedEntityId,
   t,
 }: {
   amount: number;
   entityById: ReadonlyMap<string, NormalizedEntity>;
   events: readonly NormalizedEvent[];
+  inspectedEntityId: string;
   t: (key: string) => string;
 }): React.JSX.Element {
   return (
@@ -334,6 +401,15 @@ function DirectDamageGroupRow({
         >
           {t("damageDirect")}
         </strong>
+        {events.some((event) => event.isCritical) && (
+          <Badge
+            className="border-damage/35 bg-damage/10 px-1.5 text-damage"
+            data-bpp-test-id="frame-event-critical"
+            variant="outline"
+          >
+            {t("critical")}
+          </Badge>
+        )}
         <strong
           className="ml-auto shrink-0 font-mono text-compact text-brand-soft"
           data-bpp-test-id="frame-event-amount"
@@ -343,7 +419,7 @@ function DirectDamageGroupRow({
       </div>
       <EventSourceTree
         entityById={entityById}
-        nodes={sourceTreeNodes(events, t)}
+        nodes={sourceTreeNodes(events, t, inspectedEntityId)}
       />
     </article>
   );
@@ -446,6 +522,7 @@ export function FrameInspector({
           amount={directDamageSummary.amount}
           entityById={entityById}
           events={group.events}
+          inspectedEntityId={entityId}
           t={t}
         />
       );
@@ -457,6 +534,7 @@ export function FrameInspector({
         fallbackIcon={iconBySemanticKey.get(
           eventAttributeSemantic(merged.event)?.nativeSemanticKey ?? "",
         )}
+        inspectedEntityId={entityId}
         key={merged.key}
         mergedCount={merged.count}
         t={t}
@@ -486,6 +564,7 @@ export function FrameInspector({
             <EntityArt
               contentAlign="start"
               entity={inspectedEntity}
+              itemFit="intrinsic"
               size="inspector"
               testId="frame-inspector-entity-art"
             />

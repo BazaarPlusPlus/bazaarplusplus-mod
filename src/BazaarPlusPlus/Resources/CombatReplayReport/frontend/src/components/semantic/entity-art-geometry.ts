@@ -10,6 +10,17 @@ type EntityArtGeometry = {
   skillDiameter: number;
 };
 
+type NativeItemArtSourceGeometry = {
+  height: number;
+  width: number;
+};
+
+export type IntrinsicItemArtGeometry = {
+  height: number;
+  span: number;
+  width: number;
+};
+
 const ENTITY_ART_GEOMETRY: Record<EntityArtSize, EntityArtGeometry> = {
   compact: {
     height: 24,
@@ -31,6 +42,15 @@ const ENTITY_ART_GEOMETRY: Record<EntityArtSize, EntityArtGeometry> = {
     itemSlotWidth: 48,
     skillDiameter: 64,
   },
+};
+
+const ITEM_ART_SOURCE_GEOMETRY: Record<
+  number,
+  NativeItemArtSourceGeometry
+> = {
+  1: { width: 194, height: 378 },
+  2: { width: 362, height: 378 },
+  3: { width: 504, height: 366 },
 };
 
 export const MAX_ENTITY_ART_SPAN = 3;
@@ -67,4 +87,23 @@ export function maximumEntityArtWidth(size: EntityArtSize): number {
   return (
     ENTITY_ART_GEOMETRY[size].itemSlotWidth * MAX_ENTITY_ART_SPAN
   );
+}
+
+export function intrinsicItemArtGeometry(
+  span: number,
+  size: EntityArtSize,
+  sourceGeometry?: NativeItemArtSourceGeometry,
+): IntrinsicItemArtGeometry {
+  const normalizedSpan = normalizedEntityArtSpan(span);
+  const source =
+    sourceGeometry ?? ITEM_ART_SOURCE_GEOMETRY[normalizedSpan];
+  const height = ENTITY_ART_GEOMETRY[size].height;
+  const safeSourceHeight = Math.max(1, source.height);
+  const safeSourceWidth = Math.max(1, source.width);
+
+  return {
+    width: (safeSourceWidth / safeSourceHeight) * height,
+    height,
+    span: normalizedSpan,
+  };
 }

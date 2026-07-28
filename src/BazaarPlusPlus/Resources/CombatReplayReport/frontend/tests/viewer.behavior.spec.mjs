@@ -796,8 +796,27 @@ test.beforeAll(async ({ browserName }) => {
       iconAssetRelativeUrl:
         "../report-assets/objects/88/8888888888888888888888888888888888888888888888888888888888888888.png",
     }),
+    schemaEvent({
+      eventId: "structural-critical-damage",
+      frame: 70,
+      frameSequence: 0,
+      combatTimeMs: 3500,
+      kind: "effect-executed",
+      action: "PlayerDamage",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-item",
+      targetEntityIds: ["opponent-hero"],
+      value: 240,
+      unit: "points",
+      isCritical: true,
+      role: "applied",
+      attributionConfidence: "exact",
+      iconSemanticKey: "status.damage",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/44/4444444444444444444444444444444444444444444444444444444444444444.png",
+    }),
   ];
-  structuralEnvelope.battleDocument.rawRecordCount = 8;
+  structuralEnvelope.battleDocument.rawRecordCount = 9;
   await writeFile(
     join(fixtureDirectory, "structural-report.html"),
     reportHtml(structuralEnvelope),
@@ -3724,6 +3743,46 @@ test("renders destroy and structural attributes consistently across timeline, in
   );
   await page.getByTestId("frame-inspector-close").click();
 
+  const criticalTargetPoint = await timelineMarkerPoint(page, {
+    combatMs: 3_500,
+    durationMs: 8_000,
+    entityId: "opponent-hero",
+  });
+  expect(criticalTargetPoint).not.toBeNull();
+  await page.mouse.move(criticalTargetPoint.x, criticalTargetPoint.y);
+  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+    "Direct damage",
+  );
+
+  const criticalPoint = await timelineMarkerPoint(page, {
+    combatMs: 3_500,
+    durationMs: 8_000,
+    entityId: "player-item",
+  });
+  expect(criticalPoint).not.toBeNull();
+  await page.mouse.move(criticalPoint.x, criticalPoint.y);
+  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+    "Critical",
+  );
+  await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
+    "1 event",
+  );
+  await page.mouse.click(criticalPoint.x, criticalPoint.y);
+  await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
+    "Ice Swan",
+  );
+  await expect(page.getByTestId("frame-event-kind")).toHaveText(
+    "Direct damage",
+  );
+  await expect(page.getByTestId("frame-event-critical")).toHaveText(
+    "Critical",
+  );
+  await expect(page.getByTestId("event-source-entity")).toHaveCount(0);
+  await expect(page.getByTestId("event-target-entity")).toHaveText(
+    "Fixture Opponent",
+  );
+  await page.getByTestId("frame-inspector-close").click();
+
   const attributePoint = await timelineMarkerPoint(page, {
     combatMs: 4_000,
     durationMs: 8_000,
@@ -4051,21 +4110,34 @@ test("groups same-frame direct damage sources under one exact total", async ({
       .getByTestId("event-source-entity")
       .first()
       .getByTestId("frame-event-entity-art-slot"),
-  ).toHaveCSS("width", "24px");
+  ).toHaveCSS("height", "24px");
   const sourceArtSlot = page
     .getByTestId("event-source-entity")
     .first()
     .getByTestId("frame-event-entity-art-slot");
   const sourceArt = sourceArtSlot.locator('[data-entity-art-align="start"]');
   await expect(sourceArt).toHaveCount(1);
-  const sourceArtLeftGap = await sourceArtSlot.evaluate((slot) => {
+  await expect(sourceArt).toHaveAttribute(
+    "data-entity-art-fit",
+    "intrinsic",
+  );
+  const sourceArtGeometry = await sourceArtSlot.evaluate((slot) => {
     const art = slot.querySelector('[data-entity-art-align="start"]');
-    if (!art) return Number.POSITIVE_INFINITY;
-    return (
-      art.getBoundingClientRect().left - slot.getBoundingClientRect().left
-    );
+    if (!art) {
+      return {
+        leftGap: Number.POSITIVE_INFINITY,
+        rightGap: Number.POSITIVE_INFINITY,
+      };
+    }
+    const slotBounds = slot.getBoundingClientRect();
+    const artBounds = art.getBoundingClientRect();
+    return {
+      leftGap: artBounds.left - slotBounds.left,
+      rightGap: slotBounds.right - artBounds.right,
+    };
   });
-  expect(sourceArtLeftGap).toBeCloseTo(0, 1);
+  expect(sourceArtGeometry.leftGap).toBeCloseTo(0, 1);
+  expect(sourceArtGeometry.rightGap).toBeCloseTo(0, 1);
   await expect(page.getByTestId("frame-event-relation-branch")).toHaveCount(2);
   await expect(page.getByTestId("frame-event-list")).not.toContainText("740");
   await expect(page.getByTestId("frame-event-list")).not.toContainText("690");
@@ -4767,6 +4839,10 @@ test("groups Welding Torch attributes in one generic marker and expands concrete
   );
   const headerArt = page.getByTestId("frame-inspector-entity-art");
   await expect(headerArt).toHaveAttribute("data-entity-art-align", "start");
+  await expect(headerArt).toHaveAttribute(
+    "data-entity-art-fit",
+    "intrinsic",
+  );
   const headerGeometry = await page
     .getByTestId("frame-inspector-header")
     .evaluate((header) => {
@@ -4776,6 +4852,7 @@ test("groups Welding Torch attributes in one generic marker and expands concrete
       const headerBounds = header.getBoundingClientRect();
       const artBounds = art?.getBoundingClientRect();
       return {
+        overflow: art ? getComputedStyle(art).overflow : "",
         leftGap: artBounds
           ? artBounds.left - headerBounds.left
           : Number.POSITIVE_INFINITY,
@@ -4787,6 +4864,7 @@ test("groups Welding Torch attributes in one generic marker and expands concrete
           : Number.POSITIVE_INFINITY,
       };
     });
+  expect(headerGeometry.overflow).toBe("visible");
   expect(headerGeometry.leftGap).toBeCloseTo(0, 1);
   expect(headerGeometry.topGap).toBeCloseTo(0, 1);
   expect(headerGeometry.bottomGap).toBeLessThanOrEqual(1);

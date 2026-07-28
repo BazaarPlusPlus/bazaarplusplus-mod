@@ -17,6 +17,7 @@ try
 {
     Directory.CreateDirectory(root);
     CanonicalKeyChangesForEveryRendererInput();
+    TemplateAssetKeysExcludeBattleState();
     AttributeOrderIsCanonical();
     TypedBindingsCannotConfuseStatusIconsWithEntities();
     StatusSemanticsUseExactNativeMappingsAndFailClosed();
@@ -70,6 +71,20 @@ void AlphaCropUsesVisibleBoundsInsteadOfCanvasGeometry()
     Check(
         bounds == new ReportAssetPixelBounds(2, 0, 4, 5),
         $"Alpha crop used the wrong padded bounds: {bounds}."
+    );
+    Check(
+        ReportAssetAlphaCrop.TryResolveBounds(
+            pixels,
+            width,
+            height,
+            padding: 0,
+            out var tightBounds
+        ),
+        "Alpha crop must support an edge-to-edge output without transparent padding."
+    );
+    Check(
+        tightBounds == new ReportAssetPixelBounds(3, 1, 2, 3),
+        $"Alpha crop used the wrong edge-to-edge bounds: {tightBounds}."
     );
 
     var cropped = ReportAssetAlphaCrop.Crop(pixels, width, height, bounds);
@@ -473,6 +488,31 @@ void CanonicalKeyChangesForEveryRendererInput()
             $"Changing {change.Name} must change the render-key hash."
         );
     }
+}
+
+void TemplateAssetKeysExcludeBattleState()
+{
+    var baseline = CreateKey();
+    var key = ReportAssetRenderKey.CreateTemplateAsset(
+        baseline.SchemaVersion,
+        baseline.GameBuild,
+        baseline.GameDataIdentity,
+        baseline.ResolvedTemplateVersion,
+        baseline.ResolvedSkinIdentity,
+        "urp-offscreen-template-art",
+        "12",
+        "item-template-art",
+        baseline.TemplateId,
+        baseline.Size,
+        "front|art:item-art|resolved-size:Medium",
+        baseline.CaptureProfile
+    );
+
+    Check(key.Locale == "und", "Template artwork must not vary by report locale.");
+    Check(key.Tier == "None", "Template artwork must not vary by battle tier.");
+    Check(key.Enchantment == "None", "Template artwork must not vary by enchantment.");
+    Check(key.Socket == "None", "Template artwork must not vary by board socket.");
+    Check(key.Attributes.Count == 0, "Template artwork must not include battle attributes.");
 }
 
 void AttributeOrderIsCanonical()

@@ -3,6 +3,7 @@ using System.Collections;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using TheBazaar.AppFramework;
 using TheBazaar.Game.CardFrames;
@@ -15,9 +16,9 @@ namespace BazaarPlusPlus.Game.CombatReplay.ReportAssets;
 
 /// <summary>
 /// Cache-first exporter for report card art. Skills copy their native ArtKey texture directly;
-/// items render the game's composed Collection ItemVisualsController through a private URP
-/// camera. No object in this pipeline is attached to a display canvas or captured from the main
-/// backbuffer.
+/// items render only the template illustration layer from the game's Collection
+/// ItemVisualsController through a private URP camera. No object in this pipeline is attached to a
+/// display canvas or captured from the main backbuffer.
 /// </summary>
 internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
 {
@@ -25,9 +26,9 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
     private const int RenderKeySchemaVersion = 1;
     private const int SkillOutputPixels = 512;
     private const int ItemOutputHeight = 512;
-    private const int ItemTransparentCropPaddingPixels = 8;
+    private const int ItemTransparentCropPaddingPixels = 0;
     private const string SkillRendererVersion = "2";
-    private const string ItemRendererVersion = "10";
+    private const string ItemRendererVersion = "12";
     private const string CaptureProfileVersion = "8";
     private const string EncoderVersion = "2.1.11";
     private static readonly WaitForEndOfFrame OffscreenFrameBoundary = new();
@@ -343,12 +344,7 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
         Task<OffscreenItemVisual?> createTask;
         try
         {
-            createTask = renderer.CreateAsync(
-                entry.Identity.Template,
-                ParseTier(entry.Snapshot.Tier),
-                ParseEnchantment(entry.Snapshot.Enchant),
-                token
-            );
+            createTask = renderer.CreateAsync(entry.Identity.Template, token);
         }
         catch (Exception ex)
         {
@@ -518,14 +514,28 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
         }
 
         var isSkill = snapshot.Type == ECardType.Skill;
-        var outputWidth = isSkill ? SkillOutputPixels : ResolveItemOutputWidth(snapshot.Size);
+        var outputWidth = isSkill
+            ? SkillOutputPixels
+            : ResolveItemOutputWidth(identity.Template.Size);
         var outputHeight = isSkill ? SkillOutputPixels : ItemOutputHeight;
-        var canonicalAttributes = ResolveRendererAttributes(snapshot)
-            .OrderBy(pair => pair.Key.ToString(), StringComparer.Ordinal)
-            .Select(pair => new ReportAssetRenderAttribute(pair.Key.ToString(), pair.Value))
-            .ToArray();
-        var profileName = isSkill ? "native-texture-copy" : "urp-offscreen-collection-visual";
-        var renderKey = new ReportAssetRenderKey(
+        var profileName = isSkill ? "native-texture-copy" : "urp-offscreen-template-art";
+        var captureProfile = new ReportAssetCaptureProfile(
+            profileName,
+            CaptureProfileVersion,
+            outputWidth,
+            outputHeight,
+            outputWidth,
+            outputHeight,
+            10000,
+            10000,
+            isSkill ? 0 : ItemTransparentCropPaddingPixels,
+            "#00000000",
+            isSkill ? -1 : _exportLayer,
+            QualitySettings.activeColorSpace.ToString(),
+            "imagesharp-png",
+            EncoderVersion
+        );
+        var renderKey = ReportAssetRenderKey.CreateTemplateAsset(
             RenderKeySchemaVersion,
             _gameBuild,
             identity.GameDataIdentity,
@@ -533,34 +543,13 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
             identity.ResolvedSkinIdentity,
             profileName,
             isSkill ? SkillRendererVersion : ItemRendererVersion,
-            isSkill ? "skill-art" : "item-card-preview",
+            isSkill ? "skill-art" : "item-template-art",
             templateId.ToString("N"),
-            "und",
-            snapshot.Size.ToString(),
-            ParseTier(snapshot.Tier).ToString(),
-            ParseEnchantment(snapshot.Enchant)?.ToString() ?? "None",
-            (snapshot.Socket ?? EContainerSocketId.Socket_0).ToString(),
+            identity.Template.Size.ToString(),
             $"front|art:{Normalize(identity.Template.ArtKey, "invalid-art-key")}|resolved-size:{identity.Template.Size}",
-            new ReportAssetCaptureProfile(
-                profileName,
-                CaptureProfileVersion,
-                outputWidth,
-                outputHeight,
-                outputWidth,
-                outputHeight,
-                10000,
-                10000,
-                isSkill ? 0 : 14,
-                "#00000000",
-                isSkill ? -1 : _exportLayer,
-                QualitySettings.activeColorSpace.ToString(),
-                "imagesharp-png",
-                EncoderVersion
-            ),
-            canonicalAttributes
+            captureProfile
         );
         entry = new MaterializationEntry(
-            snapshot,
             templateId,
             identity,
             isSkill,
@@ -579,19 +568,6 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
             _ => 280,
         };
 
-    private static Dictionary<ECardAttributeType, int> ResolveRendererAttributes(
-        PvpBattleCardSnapshot snapshot
-    )
-    {
-        var attributes = new Dictionary<ECardAttributeType, int>();
-        foreach (var pair in snapshot.Attributes ?? new Dictionary<string, int>())
-        {
-            if (Enum.TryParse<ECardAttributeType>(pair.Key, ignoreCase: false, out var attribute))
-                attributes[attribute] = pair.Value;
-        }
-        return attributes;
-    }
-
     private static IEnumerable<PvpBattleCardSnapshot> EnumerateReportCards(
         PvpBattleManifest manifest
     ) =>
@@ -603,26 +579,6 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
     private static IEnumerable<PvpBattleCardSnapshot> EnumerateCapture(
         PvpBattleCardSetCapture? capture
     ) => capture?.Items?.Where(snapshot => snapshot != null) ?? [];
-
-    private static ETier ParseTier(string? value) =>
-        !string.IsNullOrWhiteSpace(value)
-        && Enum.TryParse<ETier>(value, ignoreCase: false, out var tier)
-            ? tier
-            : ETier.Bronze;
-
-    private static EEnchantmentType? ParseEnchantment(string? value)
-    {
-        if (
-            string.IsNullOrWhiteSpace(value)
-            || string.Equals(value, "None", StringComparison.OrdinalIgnoreCase)
-        )
-        {
-            return null;
-        }
-        return Enum.TryParse<EEnchantmentType>(value, ignoreCase: false, out var enchantment)
-            ? enchantment
-            : null;
-    }
 
     private static void ReportFailure(
         string? battleId,
@@ -658,7 +614,6 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
         string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
 
     private sealed record MaterializationEntry(
-        PvpBattleCardSnapshot Snapshot,
         Guid TemplateId,
         PostCombatReportRenderIdentity Identity,
         bool IsSkill,
@@ -676,7 +631,8 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
 
     private sealed record OffscreenItemVisual(
         GameObject GameObject,
-        ItemVisualsController Controller
+        ItemVisualsController Controller,
+        Renderer IllustrationRenderer
     );
 
     private sealed class OffscreenItemPreviewRenderer : IDisposable
@@ -742,8 +698,6 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
 
         internal async Task<OffscreenItemVisual?> CreateAsync(
             TCardBase template,
-            ETier tier,
-            EEnchantmentType? enchantment,
             CancellationToken token
         )
         {
@@ -778,18 +732,29 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
 
                 await controller.Setup(
                     cardAsset,
-                    tier,
+                    template.StartingTier,
                     cardBackAsset: null,
                     isPremium: false,
-                    eEnchantmentType: enchantment
+                    eEnchantmentType: null
                 );
                 token.ThrowIfCancellationRequested();
+                if (
+                    !NativeItemVisualArtwork.TryGetIllustrationRenderer(
+                        controller,
+                        out var illustrationRenderer
+                    )
+                )
+                {
+                    throw new InvalidDataException(
+                        "Native collection item has no illustration renderer."
+                    );
+                }
 
                 itemObject.transform.SetParent(_root.transform, worldPositionStays: false);
                 itemObject.transform.SetLocalPositionAndRotation(Vector3.zero, Quaternion.identity);
                 itemObject.transform.localScale = Vector3.one;
                 controller.ShowCardArt(show: true);
-                controller.ToggleFakeDropShadow(value: true);
+                controller.ToggleFakeDropShadow(value: false);
                 Helpers.SetLayerRecursive(itemObject, _layer);
                 DisableEmbeddedCanvases(itemObject);
                 Helpers.SetAllRenderersEnabledState(
@@ -798,7 +763,7 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
                     includeInactive: true
                 );
 
-                var visual = new OffscreenItemVisual(itemObject, controller);
+                var visual = new OffscreenItemVisual(itemObject, controller, illustrationRenderer);
                 itemObject = null;
                 return visual;
             }
@@ -846,9 +811,14 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
                     DisableEmbeddedCanvases(handle.GameObject);
                     Helpers.SetAllRenderersEnabledState(
                         handle.GameObject,
-                        active: true,
+                        active: false,
                         includeInactive: true
                     );
+                    if (handle.IllustrationRenderer == null)
+                        throw new InvalidDataException(
+                            "Native collection item illustration renderer was destroyed."
+                        );
+                    handle.IllustrationRenderer.enabled = true;
                     FrameVisual(handle);
                     ValidateIsolation(handle);
                     _light.enabled = true;
@@ -1028,6 +998,16 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
                 throw new InvalidOperationException(
                     "Offscreen report camera isolation is invalid."
                 );
+            var enabledRenderers = handle
+                .GameObject.GetComponentsInChildren<Renderer>(includeInactive: true)
+                .Where(renderer => renderer != null && renderer.enabled)
+                .ToArray();
+            if (enabledRenderers.Length != 1 || enabledRenderers[0] != handle.IllustrationRenderer)
+            {
+                throw new InvalidOperationException(
+                    "Offscreen item export must enable only the template illustration renderer."
+                );
+            }
             if (
                 handle
                     .GameObject.GetComponentsInChildren<Canvas>(includeInactive: true)
