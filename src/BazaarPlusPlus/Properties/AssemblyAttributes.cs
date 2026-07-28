@@ -10,3 +10,5 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("LiveBuildRecommendations.Tests")]
 [assembly: InternalsVisibleTo("RunLoggingModule.Tests")]
 [assembly: InternalsVisibleTo("EndOfRunScreenshotGate.Tests")]
+[assembly: InternalsVisibleTo("RandomHeroPoolPatchCompatibility.Tests")]
+[assembly: InternalsVisibleTo("HistoryPanelFactory.Tests")]

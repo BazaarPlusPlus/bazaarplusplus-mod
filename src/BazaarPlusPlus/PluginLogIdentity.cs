@@ -20,6 +20,7 @@ internal static class PluginLogIdentity
             "PvpBattleRecorded" => PluginEventId.PvpBattleRecorded,
             "RunInitializedObserved" => PluginEventId.RunInitializedObserved,
             "RunLifecycleChanged" => PluginEventId.RunLifecycleChanged,
+            "UploadArmRequested" => PluginEventId.UploadArmRequested,
             _ => PluginEventId.Unknown,
         };
 

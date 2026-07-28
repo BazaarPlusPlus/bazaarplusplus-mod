@@ -100,65 +100,65 @@ using (var capture = new LogCapture())
 var uploadFeedType = RequireType(
     "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadFeed"
 );
-var uploadEligibilityMethod = uploadFeedType.GetMethod(
-    "IsEnabled",
+var createEnabledProbe = uploadFeedType.GetMethod(
+    "CreateEnabledProbe",
     BindingFlags.Static | BindingFlags.NonPublic,
     binder: null,
     [typeof(bool), typeof(Func<string?>), typeof(Func<string, bool>)],
     modifiers: null
 );
 Assert(
-    uploadEligibilityMethod != null,
-    "Screenshot upload feed should expose its upload eligibility boundary for tests."
+    createEnabledProbe != null,
+    "Screenshot upload feed should expose a session probe for the enablement matrix."
+);
+var sessionIsEnabled = createEnabledProbe!.ReturnType.GetProperty(
+    "IsEnabled",
+    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
 );
 Assert(
-    !(bool)
-        uploadEligibilityMethod!.Invoke(
-            null,
-            [false, new Func<string?>(() => "acct-linked"), new Func<string, bool>(_ => true)]
-        )!,
+    sessionIsEnabled != null,
+    "Upload feed session should expose IsEnabled for eligibility assertions."
+);
+bool ProbeEnabled(
+    bool uploadEnabled,
+    Func<string?> playerAccountIdResolver,
+    Func<string, bool> isAccountLinked
+)
+{
+    var session = createEnabledProbe.Invoke(
+        null,
+        [uploadEnabled, playerAccountIdResolver, isAccountLinked]
+    )!;
+    return (bool)sessionIsEnabled!.GetValue(session)!;
+}
+Assert(
+    !ProbeEnabled(false, () => "acct-linked", _ => true),
     "BazaarDB snapshot uploads should remain disabled when the upload setting is off."
 );
 Assert(
-    !(bool)
-        uploadEligibilityMethod.Invoke(
-            null,
-            [true, new Func<string?>(() => null), new Func<string, bool>(_ => true)]
-        )!,
+    !ProbeEnabled(true, () => null, _ => true),
     "BazaarDB snapshot uploads should remain disabled when no current game account is available."
 );
 Assert(
-    !(bool)
-        uploadEligibilityMethod.Invoke(
-            null,
-            [true, new Func<string?>(() => "acct-unlinked"), new Func<string, bool>(_ => false)]
-        )!,
+    !ProbeEnabled(true, () => "acct-unlinked", _ => false),
     "BazaarDB snapshot uploads should remain disabled when the current account is not linked."
 );
 Assert(
-    (bool)
-        uploadEligibilityMethod.Invoke(
-            null,
-            [true, new Func<string?>(() => "acct-linked"), new Func<string, bool>(_ => true)]
-        )!,
+    ProbeEnabled(true, () => "acct-linked", _ => true),
     "BazaarDB snapshot uploads should use the existing workflow when the current account is linked."
 );
 var linkedAccountId = "acct-linked-elsewhere";
 string? queriedAccountId = null;
 Assert(
-    !(bool)
-        uploadEligibilityMethod.Invoke(
-            null,
-            [
-                true,
-                new Func<string?>(() => " acct-current "),
-                new Func<string, bool>(accountId =>
-                {
-                    queriedAccountId = accountId;
-                    return string.Equals(accountId, linkedAccountId, StringComparison.Ordinal);
-                }),
-            ]
-        )!,
+    !ProbeEnabled(
+        true,
+        () => " acct-current ",
+        accountId =>
+        {
+            queriedAccountId = accountId;
+            return string.Equals(accountId, linkedAccountId, StringComparison.Ordinal);
+        }
+    ),
     "A link marker for another account must not enable BazaarDB snapshot uploads."
 );
 Assert(

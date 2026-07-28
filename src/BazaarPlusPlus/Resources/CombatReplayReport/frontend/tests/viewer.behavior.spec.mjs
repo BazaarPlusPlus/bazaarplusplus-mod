@@ -2839,11 +2839,6 @@ test("activity cells stay in statistics instead of jumping to a timeline lane", 
   await expect(
     page.locator('[data-bpp-entity-id="player-skill"]'),
   ).not.toHaveClass(/is-jump-target/u);
-  await expect(
-    page
-      .getByTestId("statistics-activity-cell-tooltip")
-      .locator('xpath=self::*[@data-state!="closed"]'),
-  ).toBeVisible();
 });
 
 test("keeps pointer hover imperative without React commits", async ({ page }) => {

@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.GameInterop.Encounter;
 
@@ -6,8 +7,8 @@ namespace BazaarPlusPlus.GameInterop;
 
 /// <summary>
 /// BazaarPlusPlus-side implementation of <see cref="IBazaarAgentGameProbe"/>. Wraps the
-/// internal encounter probe + type resolver, exposing only the public snapshot DTOs across
-/// the assembly boundary. Replay state reads live on <see cref="IBazaarAgentReplayRecorder"/>.
+/// internal encounter probe, type resolver, and hero identity adapter behind the public bridge
+/// contract. Replay state reads live on <see cref="IBazaarAgentReplayRecorder"/>.
 /// </summary>
 internal sealed class BazaarAgentGameProbe : IBazaarAgentGameProbe, IBazaarAgentTypedGameProbe
 {
@@ -54,4 +55,9 @@ internal sealed class BazaarAgentGameProbe : IBazaarAgentGameProbe, IBazaarAgent
 
     public string? ResolveEncounterType(string? encounterId) =>
         EncounterTypeResolver.Resolve(encounterId);
+
+    public BazaarAgentHeroResolution ResolveHero(string? heroId) =>
+        BazaarAgentHeroIdentity.Resolve(heroId);
+
+    public string ToAgentHeroId(EHero hero) => BazaarAgentHeroIdentity.ToAgentContextId(hero);
 }

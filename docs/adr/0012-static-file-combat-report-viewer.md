@@ -1,4 +1,4 @@
-# Serve combat reports as content-addressed static file artifacts
+# ADR-0012: Serve combat reports as content-addressed static file artifacts
 
 ## Context
 

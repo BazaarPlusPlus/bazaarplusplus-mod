@@ -29,10 +29,11 @@ internal sealed class CollectionFilterState
             ActiveTab =
                 value == ECardType.Skill ? CollectionTabKind.Skills : CollectionTabKind.Items;
     }
-    public HashSet<EHero> Heroes { get; } = new();
+    public EHero? SelectedHero { get; private set; }
     public HashSet<ETier> Tiers { get; } = new();
     public HashSet<ECardTag> Tags { get; } = new();
     public HashSet<EHiddenTag> Keywords { get; } = new();
+    public HashSet<CollectionMechanic> Mechanics { get; } = new();
     public CollectionFacetMatchMode TagMatchMode { get; set; } = CollectionFacetMatchMode.Any;
     public CollectionFacetMatchMode KeywordMatchMode { get; set; } = CollectionFacetMatchMode.Any;
 
@@ -47,17 +48,7 @@ internal sealed class CollectionFilterState
     public bool UseRunDayFilter { get; set; } = true;
     public CollectionSortPriority SortPriority { get; set; } = CollectionSortPriority.Quality;
 
-    public EHero? SelectedHero
-    {
-        get
-        {
-            if (Heroes.Count != 1)
-                return null;
-            foreach (var hero in Heroes)
-                return hero;
-            return null;
-        }
-    }
+    public EHero EffectiveHero => SelectedHero ?? EHero.Common;
 
     public string? GetSelectedSourceKey(ECardType activeType) =>
         activeType == ActiveType ? SelectedSourceKey : null;
@@ -83,8 +74,7 @@ internal sealed class CollectionFilterState
         if (selection == null)
             throw new System.ArgumentNullException(nameof(selection));
 
-        Heroes.Clear();
-        Heroes.Add(selection.SelectedHero ?? CollectionPanelSelectionState.DefaultHero);
+        SelectedHero = NormalizeConcreteHero(selection.SelectedHero);
 
         if (selection.SelectedSourceKind == CollectionSourceKind.Trainer)
         {
@@ -106,16 +96,11 @@ internal sealed class CollectionFilterState
         );
     }
 
-    public void ToggleHero(EHero hero)
+    public EHero ToggleHero(EHero hero)
     {
-        if (Heroes.Count == 1 && Heroes.Contains(hero))
-        {
-            Heroes.Clear();
-            return;
-        }
-
-        Heroes.Clear();
-        Heroes.Add(hero);
+        var concreteHero = NormalizeConcreteHero(hero);
+        SelectedHero = SelectedHero == concreteHero ? null : concreteHero;
+        return EffectiveHero;
     }
 
     public void ToggleSource(CollectionTabKind activeTab, string sourceKey)
@@ -165,4 +150,7 @@ internal sealed class CollectionFilterState
         }
         return false;
     }
+
+    private static EHero? NormalizeConcreteHero(EHero? hero) =>
+        hero.HasValue && hero.Value != EHero.Common ? hero.Value : null;
 }

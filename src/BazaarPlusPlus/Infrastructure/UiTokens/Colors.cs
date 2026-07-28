@@ -134,6 +134,7 @@ internal static class Colors
     public static Color HeroJulesBackground => FromRgb(180, 52, 236);
     public static Color HeroKarnokBackground => FromRgb(59, 136, 156);
     public static Color HeroStelleBackground => FromRgb(255, 235, 24);
+    public static Color HeroTheDragonsBackground => FromRgb(45, 210, 208);
     public static Color HeroDefaultBackground => FromRgb(57, 73, 97);
     public static Color HeroDarkText => Rgba(0.10f, 0.12f, 0.15f, 1f);
 

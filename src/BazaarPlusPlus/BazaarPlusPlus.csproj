@@ -44,6 +44,14 @@
       Include="Resources\DockButtons\replay-retry-icon.png"
       LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-retry-icon.png"
     />
+    <EmbeddedResource
+      Include="Resources\Collection\search.svg"
+      LogicalName="BazaarPlusPlus.Resources.Collection.search.svg"
+    />
+    <EmbeddedResource
+      Include="Resources\Collection\close.svg"
+      LogicalName="BazaarPlusPlus.Resources.Collection.close.svg"
+    />
   </ItemGroup>
 
   <!-- Project paths -->

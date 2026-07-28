@@ -36,7 +36,7 @@ public sealed class BazaarAgentHostPlugin : BaseUnityPlugin
 
         var options = new BazaarAgentBepInExOptions();
         var contextReader = new BazaarAgentGameContextReader(gameProbe, logger);
-        var dispatcher = new BazaarAgentGameActionDispatcher();
+        var dispatcher = new BazaarAgentGameActionDispatcher(gameProbe);
         // Replay control (record/continue) is the only path that may exit ReplayState, and only
         // on an explicit POST /v1/replay/continue. No tick-driven replay auto-advance exists.
         var replaySink = new BazaarAgentGameReplayControlSink();

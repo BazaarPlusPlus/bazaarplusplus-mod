@@ -33,9 +33,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private ReplayPlaybackPublisher? _playbackPublisher;
     private OpponentPortraitController? _portraitController;
     private ReplayPlaybackLogOperation? _activePlaybackOperation;
-    private PendingReplayMenuReturn? _pendingMenuReturn;
-    private ReplayPlaybackReasonCode _startupInterruptionReason;
-    private Exception? _startupInterruptionException;
+    private ReplayPlaybackLogOperation? _pendingMenuReturnOperation;
+    private readonly SavedReplayLifecycle _savedReplay = new();
     private Func<CombatReplayVideoRecorder?>? _videoRecorder;
     private readonly CurrentReplayRecordingState _currentRecording = new();
     private PvpBattleManifest? _currentRecordingManifest;
@@ -61,54 +60,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private Action? _invokeCurrentRecordingRecap;
     private bool _destroying;
 
-    private bool _returnToMenuAfterReplay;
-    private bool _bootstrappedReplayActive;
-
-    // Joint progress of a saved-replay playback session. "Start in progress" and "playback
-    // session active" overlap by design (the session is live for the whole start), so the
-    // states encode their combinations rather than one-hot flags:
-    //   Idle                -> no session, no start in flight
-    //   StartInProgress     -> StartReplayAsync running, playback session live
-    //   SavedPlaybackActive -> start finished, playback session live until ReplayState exits
-    //   StartFailureCleanup -> playback session cleared but StartReplayAsync is still
-    //                          unwinding (failure publish + bootstrap rollback)
-    private enum SavedReplayProgress
-    {
-        Idle,
-        StartInProgress,
-        SavedPlaybackActive,
-        StartFailureCleanup,
-    }
-
-    private SavedReplayProgress _savedReplayProgress;
-
-    // Latched while a replay exit is in flight but ReplayState has not actually been left yet
-    // (the bootstrapped exit path keeps CurrentState == ReplayState for the whole async
-    // menu-return). Guards against a second Exit(): after the first exit cleared the
-    // bootstrapped flags, a duplicate Exit() would run the original ReplayState.Exit() body
-    // (whose own _exitRequested was never set on the rerouted path) and dispatch the dead
-    // replay's despawn GameSim into the live state machine mid transition.
-    //
-    // The suppression is TIME-BOUNDED: ReturnToMainMenu awaits a network call internally and
-    // can silently fail, leaving the game parked in ReplayState forever. Past the window, a
-    // fresh Exit() (native click or continue endpoint) is allowed through again as the escape
-    // hatch — running the original Exit body is the lesser evil versus a permanently dead
-    // continue button.
-    private const float ReplayExitSuppressionWindowSeconds = 15f;
-    private bool _replayExitInProgress;
-    private float _replayExitRequestedAtRealtime;
-
-    private bool IsReplayExitSuppressionActive =>
-        _replayExitInProgress
-        && Time.realtimeSinceStartup - _replayExitRequestedAtRealtime
-            < ReplayExitSuppressionWindowSeconds;
-
-    private void LatchReplayExitInProgress()
-    {
-        _replayExitInProgress = true;
-        _replayExitRequestedAtRealtime = Time.realtimeSinceStartup;
-    }
-
     public static CombatReplayRuntime? Instance { get; private set; }
 
     // Sourced from the playback session (BeginSession sets it for both the local-saved and the
@@ -118,15 +69,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     public bool IsReplayPlaybackActive =>
         IsSavedReplayPlaybackActive || AppState.CurrentState is ReplayState;
 
-    public bool IsSavedReplayPlaybackActive =>
-        _savedReplayProgress
-            is SavedReplayProgress.StartInProgress
-                or SavedReplayProgress.SavedPlaybackActive;
+    public bool IsSavedReplayPlaybackActive => _savedReplay.IsSavedReplayPlaybackActive;
 
-    public bool IsReplayStartInProgress =>
-        _savedReplayProgress
-            is SavedReplayProgress.StartInProgress
-                or SavedReplayProgress.StartFailureCleanup;
+    public bool IsReplayStartInProgress => _savedReplay.IsReplayStartInProgress;
 
     public bool HasPendingPersistence => _persistence?.HasPendingPersistence == true;
 
@@ -282,8 +227,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         // The exit-in-progress latch clears itself once ReplayState is actually gone; this is
         // the only reliable signal on the bootstrapped exit path, where the state transition
         // happens via RunManager.ReturnToMainMenu without a normal ReplayState exit event.
-        if (_replayExitInProgress && AppState.CurrentState is not ReplayState)
-            _replayExitInProgress = false;
+        if (AppState.CurrentState is not ReplayState)
+            _savedReplay.ObserveReplayStateGone();
     }
 
     private void OnDestroy()
@@ -331,7 +276,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             );
         }
         _activePlaybackOperation = null;
-        _pendingMenuReturn = null;
+        _pendingMenuReturnOperation = null;
+        _savedReplay.ClearPendingMenuReturn();
         _persistence?.Dispose();
         _recordingStartedSubscription?.Dispose();
         _recordingStartedSubscription = null;
@@ -1248,9 +1194,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
 
         PlaybackUiState.InitializedBoardUiControllers.Clear();
-        _savedReplayProgress = SavedReplayProgress.SavedPlaybackActive;
-        _startupInterruptionReason = ReplayPlaybackReasonCode.None;
-        _startupInterruptionException = null;
+        _savedReplay.OnStartBegun();
         _ = StartReplayAsync(
             manifest,
             sequence,
@@ -1319,9 +1263,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
 
         PlaybackUiState.InitializedBoardUiControllers.Clear();
-        _savedReplayProgress = SavedReplayProgress.SavedPlaybackActive;
-        _startupInterruptionReason = ReplayPlaybackReasonCode.None;
-        _startupInterruptionException = null;
+        _savedReplay.OnStartBegun();
         _ = StartReplayAsync(
             manifest,
             sequence,
@@ -1367,7 +1309,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        if (IsReplayExitSuppressionActive)
+        var now = Time.realtimeSinceStartup;
+        if (_savedReplay.IsExitSuppressed(now))
         {
             reason = "Replay exit is already in progress.";
             return false;
@@ -1381,7 +1324,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             Singleton<BoardManager>.Instance?.ExitRecapReplayState();
 
         replay.Exit();
-        LatchReplayExitInProgress();
+        _savedReplay.NoteProgrammaticExitLatched(now);
         reason = string.Empty;
         return true;
     }
@@ -1396,15 +1339,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     )
     {
         var attemptedBootstrapFromLobby = false;
-        _savedReplayProgress = SavedReplayProgress.StartInProgress;
         _pendingReportAssetManifest = recordVideo ? manifest : null;
         _pendingReportAssetRecordingId = null;
         _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
         _playbackPublisher!.BeginSession(battleId, manifest, source, recordVideo);
         try
         {
-            _returnToMenuAfterReplay = false;
-            _bootstrappedReplayActive = false;
             ReplayOpeningStateRestorer.Cleanup();
             _portraitController!.Cleanup(battleId);
             _portraitController.ApplySelectedHeroOverride(manifest);
@@ -1412,7 +1352,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _runLifecycle!.RefreshRunStateFromCurrentState();
             attemptedBootstrapFromLobby = !ReplayBootstrap.IsBootstrapReady();
             var bootstrappedFromLobby = await ReplayBootstrap.EnsureBootstrapReadyAsync();
-            _returnToMenuAfterReplay = bootstrappedFromLobby;
+            _savedReplay.OnBootstrapResolved(bootstrappedFromLobby);
             var bootstrapContext = ReplayBootstrap.ResolveDependencies(operation);
             try
             {
@@ -1444,14 +1384,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
                 () => PrepareSavedReplayNativePresentationAsync(manifest, operation),
                 _playbackPublisher.PublishStarting
             );
-            if (_startupInterruptionReason != ReplayPlaybackReasonCode.None)
+            var interruption = _savedReplay.TakeStartupInterruption();
+            if (interruption != null)
             {
                 throw new ReplayPlaybackStartInterruptedException(
-                    _startupInterruptionReason,
-                    _startupInterruptionException
+                    interruption.Value.ReasonCode,
+                    interruption.Value.Exception
                 );
             }
-            _bootstrappedReplayActive = bootstrappedFromLobby;
+            _savedReplay.OnInjectionCommitted();
             if (operation.TryMarkStarted(out var started))
                 ReplayPlaybackLogWriter.EmitStarted(started);
         }
@@ -1461,15 +1402,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _pendingReportAssetManifest = null;
             _pendingReportAssetRecordingId = null;
             _pendingPreparedReportAssets = Array.Empty<PostCombatReportAssetFile>();
-            _returnToMenuAfterReplay = false;
-            _bootstrappedReplayActive = false;
-            _savedReplayProgress = SavedReplayProgress.StartFailureCleanup;
+            _savedReplay.OnStartFailed();
             // Unconditional: PublishEnded only publishes the event when "starting" was
             // published, but it must always clear the session (battle id) for a failed start.
-            var ended = ReplayPlaybackStateExitCoordinator.Handle(
-                startCoordinatorOwnsTerminal: false,
+            // Cleanup order is explicit on this path (ADR-0009) — not shared with state-exit.
+            var ended = ReplayPlaybackCleanup.PublishThenCleanup(
                 () => _playbackPublisher!.PublishEnded("start-failed", failed: true),
-                latchStartupInterruption: null,
                 (stage, cleanupException) =>
                     LogCleanupFailure(stage, operation.BattleId, cleanupException),
                 new ReplayPlaybackCleanupStep(
@@ -1529,14 +1467,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
         finally
         {
-            _startupInterruptionReason = ReplayPlaybackReasonCode.None;
-            _startupInterruptionException = null;
-            _savedReplayProgress = _savedReplayProgress switch
-            {
-                SavedReplayProgress.StartInProgress => SavedReplayProgress.SavedPlaybackActive,
-                SavedReplayProgress.StartFailureCleanup => SavedReplayProgress.Idle,
-                _ => _savedReplayProgress,
-            };
+            _ = _savedReplay.OnStartFinished();
         }
     }
 
@@ -1628,27 +1559,16 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _currentRecordingManifest = null;
         _invokeCurrentRecordingRecap = null;
 
-        var startCoordinatorOwnsTerminal =
-            _savedReplayProgress
-            is SavedReplayProgress.StartInProgress
-                or SavedReplayProgress.StartFailureCleanup;
-        _savedReplayProgress = _savedReplayProgress switch
-        {
-            SavedReplayProgress.StartInProgress => SavedReplayProgress.StartFailureCleanup,
-            SavedReplayProgress.SavedPlaybackActive => SavedReplayProgress.Idle,
-            _ => _savedReplayProgress,
-        };
+        var now = Time.realtimeSinceStartup;
+        var ownership = _savedReplay.BeginReplayStateExit(now);
         var operation = _activePlaybackOperation;
-        var ended = ReplayPlaybackStateExitCoordinator.Handle(
-            startCoordinatorOwnsTerminal,
+        // Cleanup order is explicit on this path (ADR-0009) — not shared with start-failure.
+        var ended = ReplayPlaybackCleanup.PublishThenCleanup(
             () =>
-                _playbackPublisher?.PublishEnded("state-exit", failed: startCoordinatorOwnsTerminal)
-                ?? ReplayPlaybackPublishOutcome.Success(),
-            (reason, exception) =>
-            {
-                _startupInterruptionReason = reason;
-                _startupInterruptionException = exception;
-            },
+                _playbackPublisher?.PublishEnded(
+                    "state-exit",
+                    failed: ownership.OwnsTerminalByStart
+                ) ?? ReplayPlaybackPublishOutcome.Success(),
             (stage, exception) => LogCleanupFailure(stage, operation?.BattleId, exception),
             new ReplayPlaybackCleanupStep(
                 "hero_restore",
@@ -1665,43 +1585,31 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             new ReplayPlaybackCleanupStep("opening_state", ReplayOpeningStateRestorer.Cleanup)
         );
 
-        if (startCoordinatorOwnsTerminal)
+        var decision = _savedReplay.OnReplayStateExited(now, ended.Succeeded, ended.Exception);
+        if (decision.Kind == SavedReplayStateExitKind.Defer)
             return;
 
-        if (_pendingMenuReturn != null)
+        if (operation == null)
             return;
 
-        if (!_returnToMenuAfterReplay || !_bootstrappedReplayActive)
+        if (decision.Kind == SavedReplayStateExitKind.CompleteNow)
         {
-            if (operation != null)
-            {
-                CompletePlaybackOperation(
-                    operation,
-                    ReplayPlaybackEndReasonCode.StateExit,
-                    ReplayRollbackStatus.NotRequired,
-                    !ended.Succeeded
-                        ? ReplayPlaybackReasonCode.EndedPublishFailed
-                        : ReplayPlaybackReasonCode.None,
-                    ended.Exception
-                );
-            }
-            return;
-        }
-
-        _returnToMenuAfterReplay = false;
-        _bootstrappedReplayActive = false;
-
-        if (operation != null)
-        {
-            BeginPendingMenuReturn(
+            CompletePlaybackOperation(
                 operation,
-                ReplayPlaybackEndReasonCode.StateExit,
-                !ended.Succeeded
-                    ? ReplayPlaybackReasonCode.EndedPublishFailed
-                    : ReplayPlaybackReasonCode.None,
-                !ended.Succeeded ? ended.Exception : null
+                decision.EndReasonCode,
+                ReplayRollbackStatus.NotRequired,
+                decision.FailureReason,
+                decision.Exception
             );
+            return;
         }
+
+        BeginPendingMenuReturn(
+            operation,
+            decision.EndReasonCode,
+            decision.FailureReason,
+            decision.Exception
+        );
     }
 
     private static void LogCleanupFailure(string stage, string? battleId, Exception exception)
@@ -1729,40 +1637,33 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (instance == null)
             return false;
 
-        // A replay exit is already in flight (the bootstrapped flags were cleared, but the
-        // async menu-return has not left ReplayState yet). Report "handled" so the Exit()
-        // prefix patch suppresses the original body — running it now would dispatch the dead
-        // replay's despawn GameSim into the live state machine mid transition. Time-bounded:
-        // see ReplayExitSuppressionWindowSeconds.
-        if (instance.IsReplayExitSuppressionActive && AppState.CurrentState is ReplayState)
-            return true;
-
-        if (!instance.IsSavedReplayPlaybackActive || !instance._bootstrappedReplayActive)
-            return false;
-
-        instance.ExitBootstrappedSavedReplayToMenu();
-        return true;
+        var now = Time.realtimeSinceStartup;
+        var inReplayState = AppState.CurrentState is ReplayState;
+        var decision = instance._savedReplay.RequestBootstrappedExit(now, inReplayState);
+        return decision switch
+        {
+            // Suppressed: report "handled" so the Exit() prefix patch suppresses the original body.
+            SavedReplayExitRequestDecision.Suppressed => true,
+            SavedReplayExitRequestDecision.NotActive => false,
+            SavedReplayExitRequestDecision.Proceed => instance.ExitBootstrappedSavedReplayToMenu(
+                now
+            ),
+            _ => false,
+        };
     }
 
-    private void ExitBootstrappedSavedReplayToMenu()
+    private bool ExitBootstrappedSavedReplayToMenu(float now)
     {
-        _returnToMenuAfterReplay = false;
-        _bootstrappedReplayActive = false;
-        _savedReplayProgress = SavedReplayProgress.Idle;
-        // Covers the native continue-click path too (it never goes through TryContinueReplay);
-        // Update() clears the latch once ReplayState is actually gone.
-        LatchReplayExitInProgress();
         // Bootstrapped saved replays exit through this manual path (the state-exit patch
         // intercepts the normal transition), so OnStateChanged's PublishEnded never fires for
         // them. Recorded sessions normally publish at native ReplayEnded; keep this idempotent
-        // publish as the exit fallback and to clear non-recorded playback sessions.
+        // fallback so ffmpeg is always finalized and non-recorded playback sessions are cleared.
+        // Cleanup order is explicit on this path (ADR-0009) — not shared with start-failure.
         var operation = _activePlaybackOperation;
-        var ended = ReplayPlaybackStateExitCoordinator.Handle(
-            startCoordinatorOwnsTerminal: false,
+        var ended = ReplayPlaybackCleanup.PublishThenCleanup(
             () =>
                 _playbackPublisher?.PublishEnded("saved-replay-exit", failed: false)
                 ?? ReplayPlaybackPublishOutcome.Success(),
-            latchStartupInterruption: null,
             (stage, exception) => LogCleanupFailure(stage, operation?.BattleId, exception),
             new ReplayPlaybackCleanupStep(
                 "hero_restore",
@@ -1779,17 +1680,18 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             new ReplayPlaybackCleanupStep("opening_state", ReplayOpeningStateRestorer.Cleanup)
         );
 
-        if (operation != null)
+        var decision = _savedReplay.OnReplayStateExited(now, ended.Succeeded, ended.Exception);
+        if (operation != null && decision.Kind == SavedReplayStateExitKind.BeginMenuReturn)
         {
             BeginPendingMenuReturn(
                 operation,
-                ReplayPlaybackEndReasonCode.SavedReplayExit,
-                !ended.Succeeded
-                    ? ReplayPlaybackReasonCode.EndedPublishFailed
-                    : ReplayPlaybackReasonCode.None,
-                !ended.Succeeded ? ended.Exception : null
+                decision.EndReasonCode,
+                decision.FailureReason,
+                decision.Exception
             );
         }
+
+        return true;
     }
 
     private void BeginPendingMenuReturn(
@@ -1799,9 +1701,14 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         Exception? priorException
     )
     {
+        // Lifecycle already armed the pending window when it emitted BeginMenuReturn. A sync
+        // dispatch failure must clear that window (OnMenuReturnDispatchFailed) so TickMenuReturn
+        // cannot later emit CompleteTimeout for an operation we complete here.
         var dispatch = TryBeginReturnToMainMenu();
         if (!dispatch.Succeeded)
         {
+            _savedReplay.OnMenuReturnDispatchFailed();
+            _pendingMenuReturnOperation = null;
             CompletePlaybackOperation(
                 operation,
                 endReasonCode,
@@ -1812,44 +1719,30 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return;
         }
 
-        _pendingMenuReturn = new PendingReplayMenuReturn(
-            operation,
-            endReasonCode,
-            priorFailureReason,
-            priorException,
-            Time.realtimeSinceStartup + ReplayExitSuppressionWindowSeconds
-        );
+        _pendingMenuReturnOperation = operation;
     }
 
     private void ObservePendingMenuReturn()
     {
-        var pending = _pendingMenuReturn;
-        if (pending == null)
+        var operation = _pendingMenuReturnOperation;
+        var decision = _savedReplay.TickMenuReturn(
+            Time.realtimeSinceStartup,
+            SceneLoader.IsSceneLoaded(SceneID.HeroSelectScene)
+        );
+
+        if (decision.Kind is SavedReplayMenuReturnKind.None or SavedReplayMenuReturnKind.Wait)
             return;
 
-        if (SceneLoader.IsSceneLoaded(SceneID.HeroSelectScene))
-        {
-            _pendingMenuReturn = null;
-            CompletePlaybackOperation(
-                pending.Operation,
-                pending.EndReasonCode,
-                ReplayRollbackStatus.NotRequired,
-                pending.PriorFailureReason,
-                pending.PriorException
-            );
-            return;
-        }
-
-        if (Time.realtimeSinceStartup < pending.DeadlineRealtimeSeconds)
+        _pendingMenuReturnOperation = null;
+        if (operation == null)
             return;
 
-        _pendingMenuReturn = null;
         CompletePlaybackOperation(
-            pending.Operation,
-            pending.EndReasonCode,
+            operation,
+            decision.EndReasonCode,
             ReplayRollbackStatus.NotRequired,
-            ReplayPlaybackReasonCode.MenuReturnFailed,
-            new TimeoutException("Replay menu return was not confirmed before the deadline.")
+            decision.FailureReason,
+            decision.Exception
         );
     }
 
@@ -1953,14 +1846,6 @@ internal readonly record struct ReplayMenuReturnOutcome(bool Succeeded, Exceptio
     internal static ReplayMenuReturnOutcome Failure(Exception exception) =>
         new(false, exception ?? throw new ArgumentNullException(nameof(exception)));
 }
-
-internal sealed record PendingReplayMenuReturn(
-    ReplayPlaybackLogOperation Operation,
-    ReplayPlaybackEndReasonCode EndReasonCode,
-    ReplayPlaybackReasonCode PriorFailureReason,
-    Exception? PriorException,
-    float DeadlineRealtimeSeconds
-);
 
 internal sealed class ReplayPlaybackStartInterruptedException : Exception
 {

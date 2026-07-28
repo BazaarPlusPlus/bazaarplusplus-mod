@@ -6,7 +6,6 @@ using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.Cards;
-using BazaarPlusPlus.GameInterop.ItemBoardPreview;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.UI;
@@ -28,7 +27,9 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Grid;
 // move directly to their new indices; removed and not-yet-shown cells are recycled.
 internal sealed class CollectionGridVirtualizer
 {
-    internal const float FallbackNativeCardHeight = 484f;
+    // Re-export of the fitter constant so existing consumers (attribution badge sizing) keep a
+    // stable name without reaching into measurement internals.
+    internal const float FallbackNativeCardHeight = NativeCardCellFitter.FallbackNativeCardHeight;
 
     private readonly CollectionGridOverlay _overlay;
     private readonly INativeCardPreviewScope _previewScope;
@@ -214,15 +215,33 @@ internal sealed class CollectionGridVirtualizer
         // changed on a viewport resize, _scaleDirty). Skipping when nothing changed avoids
         // forcing a Canvas rebuild on idle frames. Slots track the same window so the grid
         // order is visible even where cards have not finished loading.
+        // Scroll-only frames use cached bounds (zero measure). Scale dirty invalidates every
+        // cell's bounds cache so ApplyScale remeasures once for the new unit/cellRect.
         // ReSharper disable once CompareOfFloatsByEqualityOperator
         if (_scrollY != _lastScrollY || _scaleDirty)
         {
             _lastScrollY = _scrollY;
             foreach (var pair in _realized)
             {
+                var cell = pair.Value;
+                var cellRect = _layout.ContentRectFor(pair.Key, _unit, _gap, _originX, _originY);
                 if (_scaleDirty)
-                    ApplyCellScale(pair.Key, pair.Value);
-                Reposition(pair.Key, pair.Value);
+                {
+                    cell.BoundsCache.InvalidateOnScaleDirty();
+                    NativeCardCellFitter.ApplyScale(
+                        cell.CachedRect,
+                        cellRect,
+                        _gap,
+                        cell.BoundsCache
+                    );
+                }
+                NativeCardCellFitter.Reposition(
+                    cell.CachedRect,
+                    cellRect,
+                    _scrollY,
+                    cell.BoundsCache,
+                    allowMeasure: false
+                );
             }
             _scaleDirty = false;
             SyncSlots(firstIdx, lastIdx);
@@ -459,8 +478,18 @@ internal sealed class CollectionGridVirtualizer
 
         var cell = new RealizedCell(index, vm, session, ++_perCellGeneration, hover, rect);
         _realized[index] = cell;
-        ApplyCellScale(index, cell);
-        Reposition(index, cell);
+        BindArtLoadedHook(cell);
+        // Fresh session: empty cache measures once here; scroll later reads the warm cache.
+        cell.BoundsCache.InvalidateOnRebind();
+        var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
+        NativeCardCellFitter.ApplyScale(rect, cellRect, _gap, cell.BoundsCache);
+        NativeCardCellFitter.Reposition(
+            rect,
+            cellRect,
+            _scrollY,
+            cell.BoundsCache,
+            allowMeasure: false
+        );
         ShowCell(cell, _generation);
         return true;
     }
@@ -473,311 +502,6 @@ internal sealed class CollectionGridVirtualizer
             DisplaySpan = vm.Type == ECardType.Skill ? 1 : CardSizeSpan.Resolve(vm.Size),
             InstanceIdPrefix = "bpp-collection",
         };
-
-    // Scale the native card to fit its span cell, centered, never stretched. The cell is shrunk
-    // by CellContentInset on every side so the slot background reads as a frame around the card.
-    private void ApplyCellScale(int index, RealizedCell cell)
-    {
-        var rect = cell.CachedRect;
-        if (rect == null)
-            return;
-        PrepareGridRect(rect);
-        var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
-        var inset = CollectionGridConstants.CellContentInset;
-        var visualBounds = ResolveNativeVisualBounds(rect);
-        var natW = visualBounds.Width;
-        var natH = visualBounds.Height;
-
-        // Scale to the cell HEIGHT so every card in a shelf renders the same height. Clamp item
-        // cards by body width, not FrameContainer width: Large frame art has native side
-        // flourishes that overhang the 3:2 body and should not make only Large cards shorter.
-        var targetH = Mathf.Max(1f, cellRect.Height * (1f - 2f * inset));
-        var scale = targetH / natH;
-        var maxWidth = cellRect.Width + _gap;
-        var fitter = rect.GetComponent<AspectRatioFitter>();
-        var bodyH = natH / ItemBoardSocketLayout.FrameHeightOverSocket;
-        var bodyW = natW;
-        if (
-            fitter != null
-            && fitter.aspectRatio > 0.01f
-            && !float.IsNaN(fitter.aspectRatio)
-            && !float.IsInfinity(fitter.aspectRatio)
-        )
-        {
-            bodyW = fitter.aspectRatio * bodyH;
-        }
-        if (bodyW * scale > maxWidth)
-            scale = maxWidth / bodyW;
-        if (scale <= 0f || float.IsNaN(scale) || float.IsInfinity(scale))
-            scale = 1f;
-        rect.localScale = new Vector3(scale, scale, 1f);
-    }
-
-    private void Reposition(int index, RealizedCell cell)
-    {
-        var rect = cell.CachedRect;
-        if (rect == null)
-            return;
-        PrepareGridRect(rect);
-        var cellRect = _layout.ContentRectFor(index, _unit, _gap, _originX, _originY);
-        var screenTop = cellRect.Y - _scrollY;
-        var visualBounds = ResolveNativeVisualBounds(rect);
-        var targetCenter = new Vector2(
-            cellRect.X + cellRect.Width * 0.5f,
-            -(screenTop + cellRect.Height * 0.5f)
-        );
-
-        // Board pivot is top-left, so y goes negative. Place the measured native visual
-        // center in the cell center; item-card root RectTransforms can report a zero rect.
-        rect.anchoredPosition = new Vector2(
-            targetCenter.x - visualBounds.Center.x * rect.localScale.x,
-            targetCenter.y - visualBounds.Center.y * rect.localScale.y
-        );
-    }
-
-    private static void PrepareGridRect(RectTransform rect)
-    {
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-    }
-
-    private static NativeVisualBounds ResolveNativeVisualBounds(RectTransform root)
-    {
-        var frame = FindDescendant(root, "FrameContainer");
-        if (frame != null && TryMeasureSubtreeBounds(root, frame, out var frameBounds))
-            return frameBounds;
-        if (TryMeasureRawImageBounds(root, out var imageBounds))
-            return imageBounds;
-        if (TryResolveAspectRatioFallbackBounds(root, out var aspectBounds))
-            return aspectBounds;
-
-        var rootRect = root.rect;
-        if (IsUsableNativeSize(rootRect.width, rootRect.height))
-        {
-            return new NativeVisualBounds(
-                Mathf.Max(1f, Mathf.Abs(rootRect.width)),
-                Mathf.Max(1f, Mathf.Abs(rootRect.height)),
-                rootRect.center
-            );
-        }
-
-        var sizeDelta = root.sizeDelta;
-        if (IsUsableNativeSize(sizeDelta.x, sizeDelta.y))
-        {
-            return new NativeVisualBounds(
-                Mathf.Max(1f, Mathf.Abs(sizeDelta.x)),
-                Mathf.Max(1f, Mathf.Abs(sizeDelta.y)),
-                Vector2.zero
-            );
-        }
-
-        return new NativeVisualBounds(1f, 1f, Vector2.zero);
-    }
-
-    private static bool TryResolveAspectRatioFallbackBounds(
-        RectTransform root,
-        out NativeVisualBounds bounds
-    )
-    {
-        var fitter = root.GetComponent<AspectRatioFitter>();
-        if (
-            fitter == null
-            || fitter.aspectRatio <= 0.01f
-            || float.IsNaN(fitter.aspectRatio)
-            || float.IsInfinity(fitter.aspectRatio)
-        )
-        {
-            bounds = default;
-            return false;
-        }
-
-        var width = Mathf.Max(1f, FallbackNativeCardHeight * fitter.aspectRatio);
-        var height = FallbackNativeCardHeight;
-        root.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
-        root.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
-        var rect = root.rect;
-        bounds = new NativeVisualBounds(width, height, rect.center);
-        return true;
-    }
-
-    private static bool TryMeasureRawImageBounds(RectTransform root, out NativeVisualBounds bounds)
-    {
-        var corners = new Vector3[4];
-        var minX = float.PositiveInfinity;
-        var minY = float.PositiveInfinity;
-        var maxX = float.NegativeInfinity;
-        var maxY = float.NegativeInfinity;
-        var found = false;
-
-        foreach (var image in root.GetComponentsInChildren<RawImage>(true))
-        {
-            if (image == null || image.rectTransform == null)
-                continue;
-            AccumulateSingleRectBounds(
-                root,
-                image.rectTransform,
-                corners,
-                ref minX,
-                ref minY,
-                ref maxX,
-                ref maxY,
-                ref found
-            );
-        }
-
-        if (!found || !IsUsableNativeSize(maxX - minX, maxY - minY))
-        {
-            bounds = default;
-            return false;
-        }
-
-        bounds = new NativeVisualBounds(
-            Mathf.Max(1f, maxX - minX),
-            Mathf.Max(1f, maxY - minY),
-            new Vector2((minX + maxX) * 0.5f, (minY + maxY) * 0.5f)
-        );
-        return true;
-    }
-
-    private static bool TryMeasureSubtreeBounds(
-        RectTransform root,
-        Transform subtree,
-        out NativeVisualBounds bounds
-    )
-    {
-        var corners = new Vector3[4];
-        var minX = float.PositiveInfinity;
-        var minY = float.PositiveInfinity;
-        var maxX = float.NegativeInfinity;
-        var maxY = float.NegativeInfinity;
-        var found = false;
-
-        AccumulateRectBounds(
-            root,
-            subtree,
-            corners,
-            ref minX,
-            ref minY,
-            ref maxX,
-            ref maxY,
-            ref found
-        );
-        if (!found || !IsUsableNativeSize(maxX - minX, maxY - minY))
-        {
-            bounds = default;
-            return false;
-        }
-
-        bounds = new NativeVisualBounds(
-            Mathf.Max(1f, maxX - minX),
-            Mathf.Max(1f, maxY - minY),
-            new Vector2((minX + maxX) * 0.5f, (minY + maxY) * 0.5f)
-        );
-        return true;
-    }
-
-    private static void AccumulateSingleRectBounds(
-        RectTransform root,
-        RectTransform current,
-        Vector3[] corners,
-        ref float minX,
-        ref float minY,
-        ref float maxX,
-        ref float maxY,
-        ref bool found
-    )
-    {
-        var rect = current.rect;
-        if (!IsUsableNativeSize(rect.width, rect.height))
-            return;
-
-        current.GetWorldCorners(corners);
-        for (var i = 0; i < corners.Length; i++)
-        {
-            var local = root.InverseTransformPoint(corners[i]);
-            minX = Mathf.Min(minX, local.x);
-            minY = Mathf.Min(minY, local.y);
-            maxX = Mathf.Max(maxX, local.x);
-            maxY = Mathf.Max(maxY, local.y);
-        }
-        found = true;
-    }
-
-    private static void AccumulateRectBounds(
-        RectTransform root,
-        Transform current,
-        Vector3[] corners,
-        ref float minX,
-        ref float minY,
-        ref float maxX,
-        ref float maxY,
-        ref bool found
-    )
-    {
-        if (current is RectTransform currentRect)
-            AccumulateSingleRectBounds(
-                root,
-                currentRect,
-                corners,
-                ref minX,
-                ref minY,
-                ref maxX,
-                ref maxY,
-                ref found
-            );
-
-        foreach (Transform child in current)
-        {
-            AccumulateRectBounds(
-                root,
-                child,
-                corners,
-                ref minX,
-                ref minY,
-                ref maxX,
-                ref maxY,
-                ref found
-            );
-        }
-    }
-
-    private static Transform? FindDescendant(Transform root, string name)
-    {
-        foreach (Transform child in root)
-        {
-            if (child.name == name)
-                return child;
-
-            var descendant = FindDescendant(child, name);
-            if (descendant != null)
-                return descendant;
-        }
-
-        return null;
-    }
-
-    private static bool IsUsableNativeSize(float width, float height) =>
-        width > 0.01f
-        && height > 0.01f
-        && !float.IsNaN(width)
-        && !float.IsNaN(height)
-        && !float.IsInfinity(width)
-        && !float.IsInfinity(height);
-
-    private readonly struct NativeVisualBounds
-    {
-        public NativeVisualBounds(float width, float height, Vector2 center)
-        {
-            Width = width;
-            Height = height;
-            Center = center;
-        }
-
-        public float Width { get; }
-        public float Height { get; }
-        public Vector2 Center { get; }
-    }
 
     // Push the visible window's board-local cell rects to the slot layer. Driven by the layout
     // window (not the realized-card set), so every visible cell shows its display-case slot
@@ -828,8 +552,23 @@ internal sealed class CollectionGridVirtualizer
             var show = cell.Session.Show();
             if (show.Status == NativePreviewActionStatus.Failed)
                 return;
-            ApplyCellScale(cell.Index, cell);
-            Reposition(cell.Index, cell);
+            var cellRect = _layout.ContentRectFor(cell.Index, _unit, _gap, _originX, _originY);
+            // Show re-activates _cardImage / _frameContainer, so force a remeasure even if
+            // adopt already cached bounds against an inactive subtree.
+            NativeCardCellFitter.ApplyScale(
+                cell.CachedRect,
+                cellRect,
+                _gap,
+                cell.BoundsCache,
+                forceMeasure: true
+            );
+            NativeCardCellFitter.Reposition(
+                cell.CachedRect,
+                cellRect,
+                _scrollY,
+                cell.BoundsCache,
+                allowMeasure: false
+            );
             // Show(true) re-activates _cardImage / _frameContainer; the CanvasGroup at the
             // root was zeroed on Take, so the card still renders transparent. Hand the cell
             // off to TickFades to ramp it up.
@@ -880,8 +619,57 @@ internal sealed class CollectionGridVirtualizer
 
     private void RecycleCell(RealizedCell cell)
     {
+        ClearArtLoadedHook(cell);
         cell.HoverRelay?.Clear();
         cell.Session.Dispose();
+    }
+
+    private void BindArtLoadedHook(RealizedCell cell)
+    {
+        var root = cell.Session.Root;
+        if (root == null)
+            return;
+        var marker = root.GetComponent<CollectionPanelOwnedMarker>();
+        if (marker == null)
+            return;
+        // Capture the cell identity so a late art completion after recycle is ignored.
+        var generation = cell.Generation;
+        var session = cell.Session;
+        marker.OnArtLoaded = () => OnCellArtLoaded(session, generation);
+    }
+
+    private static void ClearArtLoadedHook(RealizedCell cell)
+    {
+        var root = cell.Session.Root;
+        if (root == null)
+            return;
+        var marker = root.GetComponent<CollectionPanelOwnedMarker>();
+        if (marker != null)
+            marker.OnArtLoaded = null;
+    }
+
+    private void OnCellArtLoaded(INativeCardPreviewSession session, int generation)
+    {
+        foreach (var pair in _realized)
+        {
+            var cell = pair.Value;
+            if (cell.Generation != generation || !ReferenceEquals(cell.Session, session))
+                continue;
+
+            cell.BoundsCache.InvalidateOnArtLoaded();
+            if (cell.CachedRect == null)
+                return;
+            var cellRect = _layout.ContentRectFor(cell.Index, _unit, _gap, _originX, _originY);
+            NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
+            NativeCardCellFitter.Reposition(
+                cell.CachedRect,
+                cellRect,
+                _scrollY,
+                cell.BoundsCache,
+                allowMeasure: false
+            );
+            return;
+        }
     }
 
     private void RecycleAll()
@@ -949,9 +737,18 @@ internal sealed class CollectionGridVirtualizer
             cell.Vm = _visible[newIndex];
             _sourceMatchesByCardId.TryGetValue(cell.Vm.Id, out var sourceMatches);
             CollectionSourceAttributionBadge.Bind(cell.Session.Root, sourceMatches);
+            // Same native instance retained: keep warm bounds cache; only cellRect changes.
+            BindArtLoadedHook(cell);
             _realized[newIndex] = cell;
-            ApplyCellScale(newIndex, cell);
-            Reposition(newIndex, cell);
+            var cellRect = _layout.ContentRectFor(newIndex, _unit, _gap, _originX, _originY);
+            NativeCardCellFitter.ApplyScale(cell.CachedRect, cellRect, _gap, cell.BoundsCache);
+            NativeCardCellFitter.Reposition(
+                cell.CachedRect,
+                cellRect,
+                _scrollY,
+                cell.BoundsCache,
+                allowMeasure: false
+            );
         }
     }
 
@@ -1012,6 +809,7 @@ internal sealed class CollectionGridVirtualizer
             Generation = generation;
             HoverRelay = hoverRelay;
             CachedRect = cachedRect;
+            BoundsCache = new NativeCardCellBoundsCache();
         }
 
         public int Index { get; set; }
@@ -1020,6 +818,7 @@ internal sealed class CollectionGridVirtualizer
         public int Generation { get; }
         public CollectionCardHoverRelay HoverRelay { get; }
         public RectTransform CachedRect { get; }
+        public NativeCardCellBoundsCache BoundsCache { get; }
         public bool IsShown { get; set; }
 
         // Fade state. ShowCell sets FadeActive=true with FadeAlpha=0 right after the

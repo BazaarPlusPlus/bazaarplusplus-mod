@@ -39,6 +39,12 @@ _Avoid_: screenshot gate, capture operation facade, patch-to-driver calls
 A PvP battle fetched from the mod backend in which the local player's uploaded build fought inside another player's run (the game's PvP is asynchronous — opponents are ghosts). Imported battles are flipped into local-player perspective and surfaced in HistoryPanel's Ghosts tab.
 _Avoid_: remote battle, opponent battle
 
+## Combat replay
+
+**Saved Replay Lifecycle**:
+The single pure owner (`SavedReplayLifecycle`) of a saved-replay playback session's state algebra — start progress, terminal ownership, the time-bounded duplicate-exit suppression window, and the pending menu-return deadline. The runtime feeds observations (time, state exits, scene readiness) and executes the returned decisions; replay exit itself still flows only through `CombatReplayRuntime.TryContinueReplay` per ADR-0007 (which also absorbed ADR-0008's `Continue` agent action).
+_Avoid_: replay exit flags, source-text ownership pins
+
 ## Overlay panels
 
 **Main Overlay Panel**:
@@ -68,6 +74,18 @@ _Avoid_: custom font, font selector
 **Cycling Settings Dock Entry**:
 The unified settings-dock concept for entries that cycle through an ordered value ladder on click, highlight when off-default, and render localized state. Features contribute data only, not behavior classes; a bool toggle is the two-value special case. Action buttons and lock toggles are not this concept.
 
+## Uploads
+
+**Upload Feed Session**:
+The behavior object (`IUploadFeedSession`) a feed returns from activation: feature enablement, one upload attempt, feed-private arm signals, and resource disposal. The background pump owns only the Unity cadence, the shutdown drain, and the shared gates (PTR channel precondition, run-lifecycle and `UploadArmRequested` arm signals); it never rewires feed internals.
+_Avoid_: upload activation bag, per-feed upload controller, pump static registry
+
+## Collection panel
+
+**Collection View State**:
+The single owner of the Collection Panel's presentable state (`CollectionViewState`) — filter selections, search mode and debounce, catalog acceptance, and the derived render model. Commands and lifecycle events go in; a complete render outcome (view model plus scroll intents) comes out. The panel's Unity surface only forwards commands and applies outcomes; grid read-back goes through the `ICollectionGridPort` projection contract (`Publish`/`Current`, with explicit empty-before-first-publish semantics). Nothing outside the module reads or writes the filter.
+_Avoid_: filter glue, panel command protocol, ApplyFilters/RefreshView pairing
+
 ## Collection sources
 
 **Collection Source Catalog**:
@@ -79,6 +97,12 @@ The set of card templates a source can offer, expressed through structured rules
 **Collection Source Kind**:
 The source category used by CollectionPanel source chips: `Merchant` maps to Item sources, `Trainer` maps to Skill sources.
 _Avoid_: merchant-kind tag filtering
+
+## Day tiers
+
+**Day Tier Resolver**:
+The shared GameInterop adapter (`GameInterop/DayTiers/GameDataDayTierResolver`) that resolves the current run day's item/skill tier distribution from live GameData into a normalized weight table plus `MaximumTier` — the highest usable Bronze-to-Diamond tier, not the largest probability. Successes are cached only within one game-data manager generation (the game swaps the manager reference after a GameData download); consumers (Collection's Day gate, Event Preview) fail open when the table is unavailable.
+_Avoid_: DayTierSchedule, hardcoded tier table
 
 ## Remote embedded data
 

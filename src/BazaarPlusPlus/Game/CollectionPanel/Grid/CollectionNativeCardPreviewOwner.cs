@@ -119,6 +119,8 @@ internal sealed class CollectionNativeCardPreviewOwner : INativeCardPreviewOwner
         }
 
         marker?.ReleaseCurrentArtKey();
+        if (marker != null)
+            marker.OnArtLoaded = null;
         if (cardPreview != null && marker?.CardMaterialOwnedByCache == true)
             cardPreview._cardMaterial = null!;
     }

@@ -46,6 +46,7 @@ internal enum PluginEventId
     PvpBattleRecorded,
     RunInitializedObserved,
     RunLifecycleChanged,
+    UploadArmRequested,
 }
 
 internal enum PluginHandlerId

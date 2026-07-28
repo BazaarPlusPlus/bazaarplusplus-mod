@@ -197,6 +197,7 @@ internal sealed partial class HistoryPanelUiToolkitView
             HeroVisual.Resolve(run.Hero).Text,
             true
         );
+        refs.HeroPill.tooltip = HistoryPanelHeroPresentation.DisplayName(run.Hero);
 
         ConfigureStatusPill(refs.StatusPill, run.RawStatus);
 

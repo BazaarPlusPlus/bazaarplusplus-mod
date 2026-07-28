@@ -19,15 +19,17 @@ internal sealed class RunBundleUploadFeed : IUploadFeed
 
     public UploadFeedKind Kind => UploadFeedKind.RunBundle;
 
-    public UploadFeedActivation? Activate(IBppServices services, UploadFeedLogState logState)
+    public IUploadFeedSession? Activate(
+        IBppServices services,
+        UploadFeedLogState logState,
+        UploadPumpCadence cadence
+    )
     {
         try
         {
             var databasePath = services.Paths.RunLogDatabasePath;
             var replayRootPath = services.Paths.CombatReplayDirectoryPath;
 
-            var startupDelaySeconds = Math.Max(5, ModApiUploadDefaults.StartupDelaySeconds);
-            var retryIntervalSeconds = Math.Max(1, ModApiUploadDefaults.IntervalSeconds);
             var requestTimeoutSeconds = Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds);
             if (
                 string.IsNullOrWhiteSpace(databasePath) || string.IsNullOrWhiteSpace(replayRootPath)
@@ -59,31 +61,70 @@ internal sealed class RunBundleUploadFeed : IUploadFeed
                         UploadLogEvents.FeedArmedRequestTimeoutMs.Bind(
                             requestTimeoutSeconds * 1000L
                         ),
-                        UploadLogEvents.FeedArmedStartupDelayMs.Bind(startupDelaySeconds * 1000L),
-                        UploadLogEvents.FeedArmedRetryIntervalMs.Bind(retryIntervalSeconds * 1000L),
+                        UploadLogEvents.FeedArmedStartupDelayMs.Bind(
+                            cadence.StartupDelaySeconds * 1000L
+                        ),
+                        UploadLogEvents.FeedArmedRetryIntervalMs.Bind(
+                            cadence.RetryIntervalSeconds * 1000L
+                        ),
                     ]
             );
 
-            return new UploadFeedActivation
-            {
-                UploadInBackgroundAsync = uploadService.UploadPendingRunBundlesInBackgroundAsync,
-                Disposable = uploadService,
-                ExtraArmHook = new UploadArmHook(
-                    (hookServices, arm) =>
-                        hookServices.EventBus.Subscribe<CombatReplayPersistenceDrained>(_ =>
-                        {
-                            if (hookServices.RunContext.IsInGameRun)
-                                return;
-
-                            arm();
-                        })
-                ),
-            };
+            return new Session(services, uploadService);
         }
         catch (Exception ex)
         {
             logState.ReportDegraded(null, UploadLogReasonCode.InitializationException, ex);
             return null;
+        }
+    }
+
+    private sealed class Session : IUploadFeedSession
+    {
+        private readonly IBppServices _services;
+        private readonly RunBundleUploadService _uploadService;
+        private IDisposable? _armSubscription;
+        private int _disposed;
+
+        public Session(IBppServices services, RunBundleUploadService uploadService)
+        {
+            _services = services ?? throw new ArgumentNullException(nameof(services));
+            _uploadService =
+                uploadService ?? throw new ArgumentNullException(nameof(uploadService));
+        }
+
+        public bool IsEnabled => true;
+
+        public Task<UploadAttemptResult> RunAttemptAsync(CancellationToken cancellationToken) =>
+            _uploadService.UploadPendingRunBundlesInBackgroundAsync(cancellationToken);
+
+        public IDisposable? SubscribeArmSignals(Action arm)
+        {
+            if (arm == null)
+                throw new ArgumentNullException(nameof(arm));
+
+            // Pump holds the returned handle and disposes it first on shutdown. Keep a reference
+            // so Dispose can idempotently fall back if the pump path is skipped.
+            var subscription = _services.EventBus.Subscribe<CombatReplayPersistenceDrained>(_ =>
+            {
+                if (_services.RunContext.IsInGameRun)
+                    return;
+
+                arm();
+            });
+            _armSubscription = subscription;
+            return subscription;
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+                return;
+
+            // Idempotent fallback: pump normally disposed this already before cancel/drain.
+            var armSubscription = Interlocked.Exchange(ref _armSubscription, null);
+            armSubscription?.Dispose();
+            _uploadService.Dispose();
         }
     }
 }

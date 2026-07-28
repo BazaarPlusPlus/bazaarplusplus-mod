@@ -59,19 +59,19 @@ internal sealed class HistoryPanelMount : IBppMountable
         }
 
         var panel = host.AddComponent<HistoryPanel>();
-        var runtime = new HistoryPanelRuntime(
-            services.RunContext,
-            services.Paths.RunLogDatabasePath,
-            services.Paths.CombatReplayDirectoryPath,
-            services.Paths.CombatReplayVideoDirectoryPath,
-            services.Paths.PluginsDirectoryPath,
-            () => combatReplayRuntime
-        );
+        var runState = new HistoryPanelRunState(services.RunContext);
 
+        // CombatReplayRuntime accessor is not a path and is not on services.Paths — pass it
+        // straight through to Factory. Paths are startup-stable strings.
         panel.Configure(
             HistoryPanelFactory.Create(
-                runtime,
+                runState,
                 onlineClient,
+                () => combatReplayRuntime,
+                services.Paths.RunLogDatabasePath ?? string.Empty,
+                services.Paths.CombatReplayDirectoryPath ?? string.Empty,
+                services.Paths.CombatReplayVideoDirectoryPath ?? string.Empty,
+                services.Paths.PluginsDirectoryPath ?? string.Empty,
                 _accountLinkClient(),
                 () =>
                     HistoryPanelDecisions.IsAccountLinkCardAvailable(

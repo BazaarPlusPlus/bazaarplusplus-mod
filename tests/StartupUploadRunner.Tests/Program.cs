@@ -3,13 +3,19 @@ using System.Diagnostics;
 using System.Net;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
+using BazaarPlusPlus.Core.Config;
+using BazaarPlusPlus.Core.Events;
+using BazaarPlusPlus.Core.GameState;
+using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.RunLogging.Upload;
 using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Upload;
+using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
 using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Models;
+using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Logging;
 
 AssertMetadataTypeMissing(
@@ -20,6 +26,14 @@ AssertMetadataTypeMissing(
     typeof(StartupUploadAttemptRunner).Assembly.Location,
     "BazaarPlusPlus.Game.Screenshots.Upload.BazaarDbSnapshotUploadController"
 );
+AssertMetadataTypeMissing(
+    typeof(StartupUploadAttemptRunner).Assembly.Location,
+    "BazaarPlusPlus.Game.Upload.UploadFeedActivation"
+);
+AssertMetadataTypeMissing(
+    typeof(StartupUploadAttemptRunner).Assembly.Location,
+    "BazaarPlusPlus.Game.Upload.UploadArmHook"
+);
 Assert(
     typeof(IUploadFeed).IsAssignableFrom(typeof(RunBundleUploadFeed)),
     "Run feed contract drifted."
@@ -28,7 +42,32 @@ Assert(
     typeof(IUploadFeed).IsAssignableFrom(typeof(BazaarDbSnapshotUploadFeed)),
     "Screenshot feed contract drifted."
 );
+
+// Avoid typeof(BackgroundUploadPump): loading MonoBehaviour pulls UnityEngine.CoreModule.
+Assert(
+    !MetadataContainsMember(
+        typeof(StartupUploadAttemptRunner).Assembly.Location,
+        "BazaarPlusPlus.Game.Upload.BackgroundUploadPump",
+        "ArmImmediate",
+        isMethod: true,
+        isStatic: true
+    ),
+    "Static ArmImmediate registry entrypoint must be removed."
+);
+Assert(
+    !MetadataContainsMember(
+        typeof(StartupUploadAttemptRunner).Assembly.Location,
+        "BazaarPlusPlus.Game.Upload.BackgroundUploadPump",
+        "CurrentByFeed",
+        isMethod: false,
+        isStatic: true
+    ),
+    "Static CurrentByFeed registry must be removed."
+);
 AssertUploadEventCatalog();
+AssertSessionSeamAndEnablementMatrix();
+PtrBuildDoesNotActivateAnyFeed();
+ArmEventOnlyHitsSameKind();
 
 SchedulingRetainsCompletedTaskUntilObservation();
 LiveRunDeferralDoesNotConsumeAttempt();
@@ -42,6 +81,131 @@ await PermanentRunBundleFailureStopsRetrying();
 
 Console.WriteLine("Startup upload runner tests passed.");
 return;
+
+static void AssertSessionSeamAndEnablementMatrix()
+{
+    // Both production feeds expose Activate → IUploadFeedSession (adapters prove the seam).
+    var activate = typeof(IUploadFeed).GetMethod(nameof(IUploadFeed.Activate));
+    Assert(activate != null, "IUploadFeed.Activate must exist.");
+    Assert(
+        activate!.ReturnType == typeof(IUploadFeedSession),
+        "IUploadFeed.Activate must return IUploadFeedSession (nullable)."
+    );
+    Assert(
+        typeof(IUploadFeedSession).GetProperty(nameof(IUploadFeedSession.IsEnabled)) != null,
+        "Session must expose IsEnabled."
+    );
+    Assert(
+        typeof(IUploadFeedSession).GetMethod(nameof(IUploadFeedSession.RunAttemptAsync)) != null,
+        "Session must expose RunAttemptAsync."
+    );
+    Assert(
+        typeof(IUploadFeedSession).GetMethod(nameof(IUploadFeedSession.SubscribeArmSignals))
+            != null,
+        "Session must expose SubscribeArmSignals."
+    );
+
+    using var disabled = BazaarDbSnapshotUploadFeed.CreateEnabledProbe(
+        false,
+        () => "acct-linked",
+        _ => true
+    );
+    Assert(!disabled.IsEnabled, "BazaarDb session stays off when the setting is disabled.");
+
+    using var noAccount = BazaarDbSnapshotUploadFeed.CreateEnabledProbe(
+        true,
+        () => null,
+        _ => true
+    );
+    Assert(!noAccount.IsEnabled, "BazaarDb session stays off without a profile account.");
+
+    using var unlinked = BazaarDbSnapshotUploadFeed.CreateEnabledProbe(
+        true,
+        () => "acct-unlinked",
+        _ => false
+    );
+    Assert(!unlinked.IsEnabled, "BazaarDb session stays off when the account is unlinked.");
+
+    using var linked = BazaarDbSnapshotUploadFeed.CreateEnabledProbe(
+        true,
+        () => "acct-linked",
+        _ => true
+    );
+    Assert(linked.IsEnabled, "BazaarDb session enables only when all three conditions hold.");
+    Assert(
+        linked.SubscribeArmSignals(() => { }) == null,
+        "BazaarDb session has no feed-private arm signals."
+    );
+}
+
+static void PtrBuildDoesNotActivateAnyFeed()
+{
+    var services = new FakeServices(GameBuildChannel.Ptr);
+    var cadence = new UploadPumpCadence(20, 180);
+    var logState = new UploadFeedLogState(UploadFeedKind.RunBundle);
+    var spy = new SpyUploadFeed(UploadFeedKind.RunBundle);
+
+    var session = UploadPumpBootstrap.ActivateIfAllowed(services, spy, logState, cadence);
+    Assert(session == null, "PTR builds must not activate any upload feed session.");
+    Assert(spy.ActivateCount == 0, "PTR builds must not call IUploadFeed.Activate.");
+
+    // Online path still reaches Activate (spy returns null without building real resources).
+    var online = new FakeServices(GameBuildChannel.Online);
+    _ = UploadPumpBootstrap.ActivateIfAllowed(
+        online,
+        spy,
+        new UploadFeedLogState(UploadFeedKind.BazaarDbSnapshot),
+        cadence
+    );
+    Assert(spy.ActivateCount == 1, "Non-PTR builds must call IUploadFeed.Activate.");
+}
+
+static void ArmEventOnlyHitsSameKind()
+{
+    Assert(
+        UploadPumpBootstrap.ShouldHonorArmRequest(
+            UploadFeedKind.BazaarDbSnapshot,
+            new UploadArmRequested(UploadFeedKind.BazaarDbSnapshot)
+        ),
+        "Arm events must hit the matching feed kind."
+    );
+    Assert(
+        !UploadPumpBootstrap.ShouldHonorArmRequest(
+            UploadFeedKind.RunBundle,
+            new UploadArmRequested(UploadFeedKind.BazaarDbSnapshot)
+        ),
+        "Arm events must not hit a different feed kind."
+    );
+    Assert(
+        !UploadPumpBootstrap.ShouldHonorArmRequest(
+            UploadFeedKind.BazaarDbSnapshot,
+            new UploadArmRequested(UploadFeedKind.RunBundle)
+        ),
+        "Arm events must not hit a different feed kind (reverse)."
+    );
+
+    var bus = new InMemoryBppEventBus();
+    var runBundleArms = 0;
+    var bazaarDbArms = 0;
+    using var runSub = bus.Subscribe<UploadArmRequested>(request =>
+    {
+        if (UploadPumpBootstrap.ShouldHonorArmRequest(UploadFeedKind.RunBundle, request))
+            runBundleArms++;
+    });
+    using var dbSub = bus.Subscribe<UploadArmRequested>(request =>
+    {
+        if (UploadPumpBootstrap.ShouldHonorArmRequest(UploadFeedKind.BazaarDbSnapshot, request))
+            bazaarDbArms++;
+    });
+
+    bus.Publish(new UploadArmRequested(UploadFeedKind.BazaarDbSnapshot));
+    Assert(runBundleArms == 0, "RunBundle pump must ignore BazaarDb arm events.");
+    Assert(bazaarDbArms == 1, "BazaarDb pump must honor its own arm event.");
+
+    bus.Publish(new UploadArmRequested(UploadFeedKind.RunBundle));
+    Assert(runBundleArms == 1, "RunBundle pump must honor its own arm event.");
+    Assert(bazaarDbArms == 1, "BazaarDb pump must ignore RunBundle arm events.");
+}
 
 static void SchedulingRetainsCompletedTaskUntilObservation()
 {
@@ -457,6 +621,68 @@ static bool MetadataContainsType(string assemblyPath, string fullName)
     return false;
 }
 
+static bool MetadataContainsMember(
+    string assemblyPath,
+    string fullTypeName,
+    string memberName,
+    bool isMethod,
+    bool isStatic
+)
+{
+    using var stream = File.OpenRead(assemblyPath);
+    using var peReader = new PEReader(stream);
+    var metadataReader = peReader.GetMetadataReader();
+    foreach (var typeHandle in metadataReader.TypeDefinitions)
+    {
+        var type = metadataReader.GetTypeDefinition(typeHandle);
+        var @namespace = metadataReader.GetString(type.Namespace);
+        var name = metadataReader.GetString(type.Name);
+        if (!string.Equals($"{@namespace}.{name}", fullTypeName, StringComparison.Ordinal))
+            continue;
+
+        if (isMethod)
+        {
+            foreach (var methodHandle in type.GetMethods())
+            {
+                var method = metadataReader.GetMethodDefinition(methodHandle);
+                if (
+                    !string.Equals(
+                        metadataReader.GetString(method.Name),
+                        memberName,
+                        StringComparison.Ordinal
+                    )
+                )
+                    continue;
+                var isMethodStatic =
+                    (method.Attributes & System.Reflection.MethodAttributes.Static) != 0;
+                if (isStatic == isMethodStatic)
+                    return true;
+            }
+        }
+        else
+        {
+            foreach (var fieldHandle in type.GetFields())
+            {
+                var field = metadataReader.GetFieldDefinition(fieldHandle);
+                if (
+                    !string.Equals(
+                        metadataReader.GetString(field.Name),
+                        memberName,
+                        StringComparison.Ordinal
+                    )
+                )
+                    continue;
+                var isFieldStatic =
+                    (field.Attributes & System.Reflection.FieldAttributes.Static) != 0;
+                if (isStatic == isFieldStatic)
+                    return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 static void Assert(bool condition, string message)
 {
     if (!condition)
@@ -499,6 +725,50 @@ internal sealed class LogCapture : IDisposable
 internal sealed class TestPayload
 {
     internal byte[] Bytes { get; init; } = [];
+}
+
+internal sealed class SpyUploadFeed : IUploadFeed
+{
+    public SpyUploadFeed(UploadFeedKind kind) => Kind = kind;
+
+    public UploadFeedKind Kind { get; }
+    public int ActivateCount { get; private set; }
+
+    public IUploadFeedSession? Activate(
+        IBppServices services,
+        UploadFeedLogState logState,
+        UploadPumpCadence cadence
+    )
+    {
+        ActivateCount++;
+        return null;
+    }
+}
+
+internal sealed class FakeServices : IBppServices
+{
+    public FakeServices(GameBuildChannel channel)
+    {
+        GameBuild = new FakeGameBuildInfo(channel);
+    }
+
+    public IBppEventBus EventBus => null!;
+    public IBppConfig Config => null!;
+    public IPathProvider Paths => null!;
+    public IRunContext RunContext => null!;
+    public IGameStateProbe GameStateProbe => null!;
+    public IEncounterStateProbe EncounterState => null!;
+    public IRunSnapshotProbe RunSnapshot => null!;
+    public IGameBuildInfo GameBuild { get; }
+    public ManualLogSource Logger => null!;
+}
+
+internal sealed class FakeGameBuildInfo : IGameBuildInfo
+{
+    public FakeGameBuildInfo(GameBuildChannel channel) => Channel = channel;
+
+    public string RawVersion => "test";
+    public GameBuildChannel Channel { get; }
 }
 
 internal sealed class FakeRunBundleUploadStore : IRunBundleUploadStore

@@ -1780,6 +1780,7 @@ static void RunReplayRunEconomyFallbackChecks(Type fallbackType, Type manifestTy
     }
     finally
     {
+        SqliteConnection.ClearAllPools();
         if (Directory.Exists(tempRoot))
             Directory.Delete(tempRoot, recursive: true);
     }
@@ -2740,6 +2741,7 @@ static void RunCurrentReplayVideoMetadataChecks()
     }
     finally
     {
+        SqliteConnection.ClearAllPools();
         Directory.Delete(root, recursive: true);
     }
 }

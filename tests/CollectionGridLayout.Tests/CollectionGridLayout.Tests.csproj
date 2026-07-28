@@ -16,6 +16,10 @@
       Link="CollectionCardVm.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMechanic.cs"
+      Link="CollectionMechanic.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTabKind.cs"
       Link="CollectionTabKind.cs"
     />
@@ -38,6 +42,14 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionGridRetentionPlan.cs"
       Link="CollectionGridRetentionPlan.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionCardFitMath.cs"
+      Link="CollectionCardFitMath.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\NativeCardCellBoundsCache.cs"
+      Link="NativeCardCellBoundsCache.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Tooltips\CollectionTierTooltipTextMerger.cs"

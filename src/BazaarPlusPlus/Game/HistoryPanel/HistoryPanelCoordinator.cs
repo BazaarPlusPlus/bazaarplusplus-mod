@@ -14,9 +14,10 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed class HistoryPanelCoordinator : IDisposable
 {
     private readonly HistoryPanelState _state;
-    private readonly IHistoryPanelRuntime _runtime;
+    private readonly IHistoryPanelRunState _runState;
     private readonly HistoryPanelDataService _dataService;
     private readonly HistoryPanelReplayService _replayService;
+    private readonly string _combatReportDirectoryPath;
     private readonly IHistoryPanelServerHealthProbe? _serverHealthProbe;
     private readonly BazaarDbLinkClient? _linkClient;
     private readonly BazaarDbAccountLinkStore _accountLinkStore = new();
@@ -36,9 +37,12 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _state = state ?? throw new ArgumentNullException(nameof(state));
         if (dependencies == null)
             throw new ArgumentNullException(nameof(dependencies));
-        _runtime = dependencies.Runtime;
+        _runState = dependencies.RunState;
         _dataService = dependencies.DataService;
         _replayService = dependencies.ReplayService;
+        _combatReportDirectoryPath = ResolveCombatReportDirectoryPath(
+            dependencies.CombatReplayDirectoryPath
+        );
         _serverHealthProbe = dependencies.ServerHealthProbe;
         _linkClient = dependencies.AccountLinkClient;
         _requestUiRefresh =
@@ -219,14 +223,10 @@ internal sealed class HistoryPanelCoordinator : IDisposable
 
     public void SetRunHeroFilter(string hero)
     {
-        var selectedHero = string.IsNullOrEmpty(hero) ? null : hero;
+        var selectedHero = HistoryPanelHeroPresentation.CanonicalFilterId(hero);
         _state.SelectedRunHero =
             selectedHero != null
-            && !string.Equals(
-                _state.SelectedRunHero,
-                selectedHero,
-                StringComparison.OrdinalIgnoreCase
-            )
+            && !HistoryPanelHeroPresentation.IsSelected(_state.SelectedRunHero, selectedHero)
                 ? selectedHero
                 : null;
         InvalidateFilteredRuns();
@@ -319,7 +319,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         return battle != null
             && _dataService.TryResolveLatestBattleReport(
                 battle.BattleId,
-                _runtime.CombatReportDirectoryPath,
+                _combatReportDirectoryPath,
                 out _,
                 out _
             );
@@ -333,7 +333,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         if (
             !_dataService.TryResolveLatestBattleReport(
                 battle.BattleId,
-                _runtime.CombatReportDirectoryPath,
+                _combatReportDirectoryPath,
                 out var resolvedReport,
                 out var resolveError
             )
@@ -365,13 +365,31 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         }
     }
 
+    private static string ResolveCombatReportDirectoryPath(string replayDirectoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(replayDirectoryPath))
+            return string.Empty;
+
+        try
+        {
+            var dataRoot = Path.GetDirectoryName(Path.GetFullPath(replayDirectoryPath));
+            return string.IsNullOrWhiteSpace(dataRoot)
+                ? string.Empty
+                : Path.Combine(dataRoot, "reports");
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
     public bool CanDeleteSelectedRun(HistoryRunRecord? selectedRun, out string reason)
     {
         return HistoryPanelDecisions.CanDeleteRun(
             _state.SectionMode,
             selectedRun,
-            _runtime.IsInGameRun,
-            _runtime.CurrentServerRunId,
+            _runState.IsInGameRun,
+            _runState.CurrentServerRunId,
             _dataService.IsAvailable,
             out reason
         );

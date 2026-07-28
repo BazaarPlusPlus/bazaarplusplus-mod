@@ -20,4 +20,6 @@ internal static class BppSettingsDockOrder
     internal const int VoiceSubtitlesEnglishFontScale = 13;
     internal const int VoiceSubtitlesChineseFontScale = 14;
     internal const int GameHistory = 15;
+    internal const int GraphicsUpscaling = 16;
+    internal const int GraphicsUpscalingSharpness = 17;
 }

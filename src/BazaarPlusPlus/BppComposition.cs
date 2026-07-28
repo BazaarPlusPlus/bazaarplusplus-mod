@@ -9,6 +9,7 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.EventPreview;
+using BazaarPlusPlus.Game.GraphicsUpscaling;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
@@ -158,7 +159,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_voiceSubtitlesModule);
         _featureRegistry.Register(_runLoggingModule);
 
-        _settingsDockRegistry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create(_eventBus));
         _settingsDockRegistry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(_settingsDockRegistry);
         _settingsDockRegistry.Register(ChineseLocaleModeSettingsDockEntry.Create(_eventBus));
@@ -177,8 +178,26 @@ internal sealed class BppComposition : IDisposable
         );
         _settingsDockRegistry.Register(LegendaryPositionSettingsDockEntry.Create());
         _settingsDockRegistry.Register(NameOverrideSettingsDockEntry.Create());
+        if (
+            UnityEngine.Application.platform
+            is UnityEngine.RuntimePlatform.OSXPlayer
+                or UnityEngine.RuntimePlatform.WindowsPlayer
+        )
+            GraphicsUpscalingSettingsDockEntry.RegisterAll(_settingsDockRegistry);
 
         _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
+        if (
+            UnityEngine.Application.platform
+            is UnityEngine.RuntimePlatform.OSXPlayer
+                or UnityEngine.RuntimePlatform.WindowsPlayer
+        )
+        {
+            _mountables.Register(
+                new ComponentMount<GraphicsUpscalingController>(
+                    (controller, services) => controller.Initialize(services.Config)
+                )
+            );
+        }
         _mountables.Register(
             new ComponentMount<EventPreviewStaticDataObserver>(
                 (observer, _) => observer.Initialize(_encounterPreviewModule)

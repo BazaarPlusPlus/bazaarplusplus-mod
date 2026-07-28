@@ -271,6 +271,31 @@ public class SettingsDockRegistryTests
     }
 
     [Fact]
+    public void HistoryPanelDockEntry_label_follows_the_current_history_hotkey()
+    {
+        var hotkeyDisplay = "F8";
+        try
+        {
+            L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
+            var history = new HistoryPanelSettingsDockEntry(() => hotkeyDisplay).Build(
+                new BppConfig()
+            );
+
+            Assert.Equal("Game History (Press F8 to open)", history.ResolveLabel("en"));
+            Assert.Equal("对局历史（按 F8 打开）", history.ResolveLabel("zh-CN"));
+
+            hotkeyDisplay = "MMB";
+
+            Assert.Equal("Game History (Press MMB to open)", history.ResolveLabel("en"));
+            Assert.Equal("对局历史（按 MMB 打开）", history.ResolveLabel("zh-CN"));
+        }
+        finally
+        {
+            L.Reset();
+        }
+    }
+
+    [Fact]
     public void EndOfRunScreenshot_uses_disabled_native_toggle_while_forced()
     {
         var configPath = Path.Combine(
@@ -472,7 +497,9 @@ public class SettingsDockRegistryTests
             var config = new BppConfig();
             config.Initialize(new ConfigFile(configPath, saveOnInit: false));
             var registry = new SettingsDockEntryRegistry();
-            registry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create());
+            registry.Register(
+                BazaarDbSnapshotUploadSettingsDockEntry.Create(new InMemoryBppEventBus())
+            );
             registry.Register(FixedSupporterListSettingsDockEntry.Create());
             VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
             registry.Register(ChineseLocaleModeSettingsDockEntry.Create(new InMemoryBppEventBus()));
@@ -758,7 +785,9 @@ public class SettingsDockRegistryTests
             var screenshotDefinition = new EndOfRunScreenshotSettingsDockEntry().Build(config);
             var dependencyDefinition =
                 dependencyKey == "BazaarDbUpload"
-                    ? BazaarDbSnapshotUploadSettingsDockEntry.Create().Build(config)
+                    ? BazaarDbSnapshotUploadSettingsDockEntry
+                        .Create(new InMemoryBppEventBus())
+                        .Build(config)
                     : FixedSupporterListSettingsDockEntry.Create().Build(config);
 
             Assert.False(screenshotDefinition.IsActive());
@@ -1318,7 +1347,9 @@ public class SettingsDockRegistryTests
                 VoiceSubtitlesEnglishFontScaleSettingsDockEntry.Create(),
             "VoiceSubtitlesChineseFontScale" =>
                 VoiceSubtitlesChineseFontScaleSettingsDockEntry.Create(),
-            "BazaarDbUpload" => BazaarDbSnapshotUploadSettingsDockEntry.Create(),
+            "BazaarDbUpload" => BazaarDbSnapshotUploadSettingsDockEntry.Create(
+                new InMemoryBppEventBus()
+            ),
             _ => throw new ArgumentOutOfRangeException(nameof(key), key, null),
         };
 
@@ -1327,7 +1358,9 @@ public class SettingsDockRegistryTests
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
         var registry = new SettingsDockEntryRegistry();
-        registry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create());
+        registry.Register(
+            BazaarDbSnapshotUploadSettingsDockEntry.Create(new InMemoryBppEventBus())
+        );
         registry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
         registry.Register(new EndOfRunScreenshotSettingsDockEntry());
