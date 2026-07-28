@@ -29,6 +29,7 @@ internal sealed class CombatReportProjector
         var metrics = new List<CombatReportMetricSampleV1>();
         var statusIntervals = new CombatReportCardStatusIntervalBuilder(FrameDurationMs);
         var globalSequence = 0;
+        var durationMs = checked(frames.Count * FrameDurationMs);
 
         for (var frameIndex = 0; frameIndex < frames.Count; frameIndex++)
         {
@@ -123,11 +124,7 @@ internal sealed class CombatReportProjector
             }
         }
 
-        AppendStatusIntervals(
-            statusIntervals.Complete(Math.Max(0, (frames.Count - 1) * FrameDurationMs)),
-            ref globalSequence,
-            events
-        );
+        AppendStatusIntervals(statusIntervals.Complete(durationMs), ref globalSequence, events);
 
         var document = new CombatReportDocumentV1
         {
@@ -153,7 +150,7 @@ internal sealed class CombatReportProjector
             },
             FrameDurationMs = FrameDurationMs,
             FrameCount = frames.Count,
-            DurationMs = Math.Max(0, (frames.Count - 1) * FrameDurationMs),
+            DurationMs = durationMs,
             Winner = combatMessage.Data?.Winner.ToString() ?? string.Empty,
             Loser = combatMessage.Data?.Loser.ToString() ?? string.Empty,
             RawRecordCount = CountRawRecords(frames),

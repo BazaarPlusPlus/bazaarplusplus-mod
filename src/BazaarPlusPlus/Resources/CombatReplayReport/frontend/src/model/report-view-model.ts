@@ -145,10 +145,16 @@ export function buildViewModel(
     (maximum, metric) => Math.max(maximum, metric.combatMs),
     0,
   );
+  const frameDurationMs = Math.max(
+    1,
+    Math.round(battle.frameDurationMs),
+  );
+  const frameCount = Math.max(0, Math.round(battle.frameCount));
   const durationMs = Math.max(
     eventDuration,
     metricDuration,
     battle.durationMs,
+    frameCount * frameDurationMs,
   );
   const videoUrl = safeVideoUrl(manifest.videoRelativeUrl);
   const scrubVideoUrl = safeVideoUrl(manifest.scrubVideoRelativeUrl);
@@ -174,8 +180,8 @@ export function buildViewModel(
     ),
     outcome: battle.summary.outcome.toLowerCase(),
     durationMs,
-    frameDurationMs: Math.max(1, Math.round(battle.frameDurationMs)),
-    frameCount: Math.max(0, Math.round(battle.frameCount)),
+    frameDurationMs,
+    frameCount,
     rawRecordCount: Math.max(0, Math.round(battle.rawRecordCount)),
     entities,
     cardStats,

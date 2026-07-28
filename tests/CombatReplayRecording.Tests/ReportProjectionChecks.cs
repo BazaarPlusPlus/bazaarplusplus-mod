@@ -244,6 +244,7 @@ internal static class ReportProjectionChecks
         RunEffectValueAttributionChecks(manifest, cardId);
         RunStructuralStatusIconChecks(manifest, cardId);
         RunAttributeProjectionPolicyChecks(manifest);
+        RunTerminalFrameDurationChecks(manifest.RecordedAtUtc, cardId);
     }
 
     private static void RunAttributeProjectionPolicyChecks(PvpBattleManifest sourceManifest)
@@ -466,7 +467,7 @@ internal static class ReportProjectionChecks
                 range.Target == extensionTargetId.Value
                 && range.Action == "Slow"
                 && range.Start == 0
-                && range.Duration == 300
+                && range.Duration == 350
             ),
             "A positive extension must lengthen the interval and clamp it to the report boundary."
         );
@@ -475,7 +476,7 @@ internal static class ReportProjectionChecks
                 range.Target == battleEndTargetId.Value
                 && range.Action == "Freeze"
                 && range.Start == 100
-                && range.Duration == 200
+                && range.Duration == 250
             ),
             "An active status at battle end must clamp to the report boundary."
         );
@@ -849,6 +850,51 @@ internal static class ReportProjectionChecks
             executedEvents.Single(reportEvent => reportEvent.EffectId == "negative-status").Value
                 == null,
             "Ambient negative status decay must never be reported as an applied amount."
+        );
+    }
+
+    private static void RunTerminalFrameDurationChecks(
+        DateTimeOffset recordedAtUtc,
+        InstanceId cardId
+    )
+    {
+        var terminalFrame = new CombatSimFrame();
+        terminalFrame.CardUpdates[cardId] = new CombatSimCardUpdate
+        {
+            CardInstanceId = cardId,
+            Attributes =
+            {
+                [ECardAttributeType.Haste] = CardAttribute(ECardAttributeType.Haste, 0, 100),
+            },
+        };
+        var document = Project(
+            new PvpBattleManifest
+            {
+                BattleId = "terminal-frame-duration",
+                RecordedAtUtc = recordedAtUtc,
+            },
+            new NetMessageCombatSim(
+                new CombatSim
+                {
+                    Frames = new List<CombatSimFrame> { new(), terminalFrame },
+                }
+            )
+        );
+
+        Require(
+            document.FrameCount == 2
+                && document.FrameDurationMs == 50
+                && document.DurationMs == 100,
+            "Report duration must include the complete terminal frame instead of ending at that frame's start."
+        );
+        var terminalStatus = document.Events.Single(reportEvent =>
+            reportEvent.Kind == "card-status-range"
+        );
+        Require(
+            terminalStatus.Frame == 1
+                && terminalStatus.CombatTimeMs == 50
+                && terminalStatus.Value == 50,
+            "A status observed in the terminal frame must retain that frame's full visible 50ms span."
         );
     }
 

@@ -294,6 +294,7 @@ let recordingReportUrl;
 let scrubRecordingReportUrl;
 let navigationReportUrl;
 let scrollRecordingReportUrl;
+let terminalFrameReportUrl;
 
 function serializedEnvelope(value) {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
@@ -333,6 +334,33 @@ test.beforeAll(async ({ browserName }) => {
   await writeFile(
     join(fixtureDirectory, "report.html"),
     reportHtml(fixtureEnvelope),
+    "utf8",
+  );
+  const terminalFrameEnvelope = structuredClone(fixtureEnvelope);
+  terminalFrameEnvelope.battleDocument.durationMs = 100;
+  terminalFrameEnvelope.battleDocument.frameCount = 3;
+  terminalFrameEnvelope.battleDocument.metrics = [];
+  terminalFrameEnvelope.battleDocument.events = [
+    schemaEvent({
+      eventId: "terminal-frame-shield",
+      frame: 2,
+      frameSequence: 0,
+      combatTimeMs: 100,
+      kind: "effect-executed",
+      action: "PlayerShieldApply",
+      sourceEntityId: "opponent-item",
+      triggerSourceEntityId: "opponent-item",
+      targetEntityIds: ["player-hero"],
+      value: 10,
+      unit: "points",
+      role: "applied",
+      attributionConfidence: "exact",
+    }),
+  ];
+  terminalFrameEnvelope.battleDocument.rawRecordCount = 1;
+  await writeFile(
+    join(fixtureDirectory, "terminal-frame-report.html"),
+    reportHtml(terminalFrameEnvelope),
     "utf8",
   );
   const chartEnvelope = structuredClone(fixtureEnvelope);
@@ -1210,6 +1238,9 @@ test.beforeAll(async ({ browserName }) => {
   scrollRecordingReportUrl = pathToFileURL(
     join(fixtureDirectory, "scroll-recording-report.html"),
   ).href;
+  terminalFrameReportUrl = pathToFileURL(
+    join(fixtureDirectory, "terminal-frame-report.html"),
+  ).href;
 });
 
 test.afterAll(async () => {
@@ -1253,6 +1284,41 @@ test("boots the file report with one assembled script and one stylesheet", async
   ).toHaveCount(0);
   expect(externalRequests).toEqual([]);
   expect(pageErrors).toEqual([]);
+});
+
+test("keeps the complete terminal frame inside the timeline domain", async ({
+  page,
+}) => {
+  await page.goto(`${terminalFrameReportUrl}?lang=en`);
+  const stateCanvas = page.getByTestId("state-band-canvas");
+  const logicalWidth = await stateCanvas.evaluate(
+    (canvas) =>
+      Number.parseFloat(canvas.style.width)
+      || canvas.getBoundingClientRect().width,
+  );
+  const terminalX = 14 + (100 / 150) * (logicalWidth - 78);
+  await page.getByTestId("timeline-scroll").evaluate(
+    (element, targetX) => {
+      element.scrollLeft = Math.max(
+        0,
+        targetX - element.clientWidth / 2,
+      );
+    },
+    terminalX,
+  );
+  const scrolledStateBounds = await stateCanvas.boundingBox();
+  expect(scrolledStateBounds).not.toBeNull();
+  await page.mouse.move(
+    scrolledStateBounds.x
+      + terminalX * (scrolledStateBounds.width / logicalWidth),
+    scrolledStateBounds.y + scrolledStateBounds.height / 2,
+  );
+  await expect(
+    page.getByTestId("state-band-labels").locator("[data-bpp-state-time]"),
+  ).toHaveText("0.10s");
+  await expect(
+    page.getByTestId("match-title").locator(".."),
+  ).toContainText("0.15s");
 });
 
 test("uses the shadcn primitive layer and keeps every lane label aligned", async ({

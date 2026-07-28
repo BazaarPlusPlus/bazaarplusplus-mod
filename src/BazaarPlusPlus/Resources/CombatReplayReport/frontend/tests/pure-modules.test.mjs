@@ -1892,6 +1892,17 @@ test("schema-v1 golden payload decodes without compatibility aliases", () => {
   ]);
 });
 
+test("view model keeps the complete terminal frame in legacy reports", () => {
+  const payload = structuredClone(schemaV1GoldenPayload);
+  payload.battleDocument.durationMs = 100;
+
+  const report = buildViewModel(decodeEnvelope(payload), COPY.en);
+
+  assert.equal(report.frameCount, 3);
+  assert.equal(report.frameDurationMs, 50);
+  assert.equal(report.durationMs, 150);
+});
+
 test("schema-v1 accepts an optional safe scrub proxy URL", () => {
   const payload = structuredClone(schemaV1GoldenPayload);
   payload.recordingManifest.scrubVideoRelativeUrl =
