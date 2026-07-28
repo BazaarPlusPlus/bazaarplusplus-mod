@@ -83,6 +83,12 @@ var playerAttributeRepairerType = RequireType(
 var replayRecordingHoverSuppressionType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Video.ReplayRecordingHoverSuppression"
 );
+var currentReplayPresentationReadinessType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.CurrentReplayPresentationReadiness"
+);
+var currentReplayPresentationReadinessSnapshotType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.CurrentReplayPresentationReadinessSnapshot"
+);
 RunReplaySavedStateNormalizationChecks(replaySavedStateNormalizerType, manifestType);
 RunReplayOpeningStateSelectionChecks(replayOpeningStateRestorerType);
 RunReplayRunEconomyFallbackChecks(replayRunEconomyFallbackType, manifestType);
@@ -92,6 +98,10 @@ RunReplayPresentationReadinessChecks(appStateHandlerInstallerType);
 RunReplayNativeBoardPresentationChecks(replayNativeBoardPresentationType);
 RunPortraitTimingSubscriptionDeduplicationChecks(playerAttributeRepairerType);
 RunReplayRecordingHoverSuppressionChecks(replayRecordingHoverSuppressionType);
+RunCurrentReplayPresentationReadinessChecks(
+    currentReplayPresentationReadinessType,
+    currentReplayPresentationReadinessSnapshotType
+);
 RunScrubProxyChecks(scrubProxyType, scrubProxyGeneratorType);
 
 RunCurrentReplayRecordingStateChecks();
@@ -150,6 +160,85 @@ static void RunReplayRecordingHoverSuppressionChecks(Type suppressionType)
     Assert(
         !(bool)isActive.GetValue(null)!,
         "Recording hover behavior should be restored after the final lease is released."
+    );
+}
+
+static void RunCurrentReplayPresentationReadinessChecks(Type readinessType, Type snapshotType)
+{
+    object Snapshot(
+        bool replayActive = true,
+        bool boardUpdating = false,
+        bool storageMoving = false,
+        bool hasCardsToReveal = false,
+        int expectedItems = 2,
+        int visibleItems = 2,
+        int faceUpItems = 2,
+        int settledItems = 2
+    ) =>
+        Activator.CreateInstance(
+            snapshotType,
+            replayActive,
+            boardUpdating,
+            storageMoving,
+            hasCardsToReveal,
+            expectedItems,
+            visibleItems,
+            faceUpItems,
+            settledItems
+        )
+        ?? throw new InvalidOperationException(
+            "Current replay presentation readiness snapshot should be constructible."
+        );
+
+    var ready = Snapshot();
+    Assert(
+        (bool)InvokeStatic(readinessType, "IsReady", [ready])!,
+        "Replay presentation should become ready only after every expected item is visible, face-up, and settled."
+    );
+    Assert(
+        !(bool)InvokeStatic(readinessType, "IsReady", [Snapshot(settledItems: 1)])!,
+        "A still-animating item should keep replay simulation behind the presentation gate."
+    );
+    Assert(
+        !(bool)InvokeStatic(readinessType, "IsReady", [Snapshot(boardUpdating: true)])!,
+        "Board mutation should keep replay simulation behind the presentation gate."
+    );
+    Assert(
+        (bool)
+            InvokeStatic(
+                readinessType,
+                "IsReady",
+                [Snapshot(expectedItems: 0, visibleItems: 0, faceUpItems: 0, settledItems: 0)]
+            )!,
+        "A replay with no item cards should not deadlock the presentation gate."
+    );
+
+    var oneStableFrame = (int)InvokeStatic(readinessType, "AdvanceStableFrameCount", [0, ready])!;
+    var requiredStableFrames = (int)(
+        readinessType
+            .GetField("RequiredStableFrames", BindingFlags.NonPublic | BindingFlags.Static)
+            ?.GetRawConstantValue()
+        ?? throw new InvalidOperationException(
+            "Replay presentation readiness should declare its stable-frame requirement."
+        )
+    );
+    Assert(
+        oneStableFrame < requiredStableFrames,
+        "One ready render sample should not start replay simulation."
+    );
+    Assert(
+        (int)InvokeStatic(readinessType, "AdvanceStableFrameCount", [oneStableFrame, ready])!
+            == requiredStableFrames,
+        "Consecutive ready render samples should release replay simulation."
+    );
+    Assert(
+        (int)
+            InvokeStatic(
+                readinessType,
+                "AdvanceStableFrameCount",
+                [oneStableFrame, Snapshot(faceUpItems: 1, settledItems: 1)]
+            )! == 0,
+        "Any regressed item should reset the consecutive presentation-ready count."
     );
 }
 
