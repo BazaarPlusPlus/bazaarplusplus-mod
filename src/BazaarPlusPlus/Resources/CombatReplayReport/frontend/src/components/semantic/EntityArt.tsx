@@ -35,11 +35,13 @@ function Fallback({
 }
 
 export function EntityArt({
+  contentAlign = "center",
   entity,
   size = "default",
   squareSlot = false,
   testId,
 }: {
+  contentAlign?: "center" | "start";
   entity: NormalizedEntity;
   size?: EntityArtSize;
   squareSlot?: boolean;
@@ -61,6 +63,7 @@ export function EntityArt({
             : "rounded-art border border-border/60 bg-muted/30",
       )}
       data-bpp-test-id={testId}
+      data-entity-art-align={contentAlign}
       data-entity-art-size={size}
       data-entity-span={dimensions.span}
       data-entity-type={type}
@@ -73,7 +76,10 @@ export function EntityArt({
       {asset && !failed ? (
         <img
           alt=""
-          className="block size-full object-contain [transform:none]"
+          className={cn(
+            "block size-full object-contain [transform:none]",
+            contentAlign === "start" ? "object-left" : "object-center",
+          )}
           loading="lazy"
           onError={() => setFailed(true)}
           src={asset}

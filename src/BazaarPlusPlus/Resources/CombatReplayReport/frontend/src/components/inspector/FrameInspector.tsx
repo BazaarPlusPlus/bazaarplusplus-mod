@@ -72,10 +72,15 @@ function EntityReference({
       data-bpp-test-id={testId}
     >
       <span
-        className="grid size-6 shrink-0 place-items-center"
+        className="grid size-6 shrink-0 items-center justify-items-start"
         data-bpp-test-id="frame-event-entity-art-slot"
       >
-        <EntityArt entity={entity} size="compact" squareSlot />
+        <EntityArt
+          contentAlign="start"
+          entity={entity}
+          size="compact"
+          squareSlot
+        />
       </span>
       <span className="truncate text-foreground/90" title={entity.name}>
         {entity.name}
@@ -468,12 +473,18 @@ export function FrameInspector({
       ref={inspectorRef}
     >
       <header
-        className="shrink-0 border-b border-border/70 px-2.5"
+        className="shrink-0 border-b border-border/70"
         data-bpp-test-id="frame-inspector-header"
       >
-        <div className="flex min-h-16 items-center gap-2">
+        <div
+          className={cn(
+            "flex min-h-16 items-center gap-2 pr-2.5",
+            !inspectedEntity && "pl-2.5",
+          )}
+        >
           {inspectedEntity && (
             <EntityArt
+              contentAlign="start"
               entity={inspectedEntity}
               size="inspector"
               testId="frame-inspector-entity-art"

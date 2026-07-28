@@ -4052,6 +4052,20 @@ test("groups same-frame direct damage sources under one exact total", async ({
       .first()
       .getByTestId("frame-event-entity-art-slot"),
   ).toHaveCSS("width", "24px");
+  const sourceArtSlot = page
+    .getByTestId("event-source-entity")
+    .first()
+    .getByTestId("frame-event-entity-art-slot");
+  const sourceArt = sourceArtSlot.locator('[data-entity-art-align="start"]');
+  await expect(sourceArt).toHaveCount(1);
+  const sourceArtLeftGap = await sourceArtSlot.evaluate((slot) => {
+    const art = slot.querySelector('[data-entity-art-align="start"]');
+    if (!art) return Number.POSITIVE_INFINITY;
+    return (
+      art.getBoundingClientRect().left - slot.getBoundingClientRect().left
+    );
+  });
+  expect(sourceArtLeftGap).toBeCloseTo(0, 1);
   await expect(page.getByTestId("frame-event-relation-branch")).toHaveCount(2);
   await expect(page.getByTestId("frame-event-list")).not.toContainText("740");
   await expect(page.getByTestId("frame-event-list")).not.toContainText("690");
@@ -4751,6 +4765,31 @@ test("groups Welding Torch attributes in one generic marker and expands concrete
   await expect(page.getByTestId("frame-event-list")).not.toContainText(
     "Status change",
   );
+  const headerArt = page.getByTestId("frame-inspector-entity-art");
+  await expect(headerArt).toHaveAttribute("data-entity-art-align", "start");
+  const headerGeometry = await page
+    .getByTestId("frame-inspector-header")
+    .evaluate((header) => {
+      const art = header.querySelector(
+        '[data-bpp-test-id="frame-inspector-entity-art"]',
+      );
+      const headerBounds = header.getBoundingClientRect();
+      const artBounds = art?.getBoundingClientRect();
+      return {
+        leftGap: artBounds
+          ? artBounds.left - headerBounds.left
+          : Number.POSITIVE_INFINITY,
+        topGap: artBounds
+          ? artBounds.top - headerBounds.top
+          : Number.POSITIVE_INFINITY,
+        bottomGap: artBounds
+          ? headerBounds.bottom - artBounds.bottom
+          : Number.POSITIVE_INFINITY,
+      };
+    });
+  expect(headerGeometry.leftGap).toBeCloseTo(0, 1);
+  expect(headerGeometry.topGap).toBeCloseTo(0, 1);
+  expect(headerGeometry.bottomGap).toBeLessThanOrEqual(1);
 });
 
 test("keeps direct freeze applications in the combat log without countdown tick noise", async ({
