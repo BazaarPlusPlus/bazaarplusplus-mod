@@ -75,9 +75,6 @@ export function LaneLabelContents({
 
   return (
     <>
-      <span className="bpp-lane-art-slot" data-bpp-test-id={artSlotTestId}>
-        <EntityArt entity={entity} testId={iconTestId} />
-      </span>
       <span className="bpp-lane-copy">
         {sticky
           ? (
@@ -107,9 +104,16 @@ export function LaneLabelContents({
             </>
           )}
       </span>
+      <span className="bpp-lane-art-slot" data-bpp-test-id={artSlotTestId}>
+        <EntityArt
+          entity={entity}
+          itemFit="intrinsic"
+          testId={iconTestId}
+        />
+      </span>
       <span
         className={cn(
-          "ml-auto h-7 w-0.5 rounded-full",
+          "h-7 w-0.5 rounded-full",
           side === "opponent"
             ? "bg-opponent/80"
             : side === "player"

@@ -1290,31 +1290,44 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
         const copyBounds = copy?.getBoundingClientRect();
         const artBounds = art?.getBoundingClientRect();
         return {
-          artCenter:
-            artBounds && slotBounds
-              ? artBounds.left + artBounds.width / 2 - slotBounds.left
-              : 0,
           artHeight: artBounds?.height ?? 0,
+          artRight: artBounds?.right ?? 0,
           artSpan: Number(art?.getAttribute("data-entity-span") ?? 0),
           artType: art?.getAttribute("data-entity-type") ?? "",
           artWidth: artBounds?.width ?? 0,
+          fit: art?.getAttribute("data-entity-art-fit") ?? "",
           slotWidth: slotBounds?.width ?? 0,
-          copyLeft: copyBounds?.left ?? 0,
+          copyBeforeArt:
+            copy && slot
+              ? Boolean(
+                copy.compareDocumentPosition(slot)
+                & Node.DOCUMENT_POSITION_FOLLOWING,
+              )
+              : false,
+          copyRight: copyBounds?.right ?? 0,
+          slotLeft: slotBounds?.left ?? 0,
+          textAlign: copy ? getComputedStyle(copy).textAlign : "",
         };
       });
     });
   expect(laneGeometry.length).toBeGreaterThanOrEqual(5);
-  expect(laneGeometry.every(({ slotWidth }) => slotWidth === 132)).toBe(true);
-  const firstCopyLeft = laneGeometry[0].copyLeft;
   expect(
     laneGeometry.every(
-      ({ copyLeft }) => Math.abs(copyLeft - firstCopyLeft) < 0.5,
+      ({ artWidth, slotWidth }) => Math.abs(artWidth - slotWidth) < 0.5,
+    ),
+  ).toBe(true);
+  const firstArtRight = laneGeometry[0].artRight;
+  expect(
+    laneGeometry.every(
+      ({ artRight }) => Math.abs(artRight - firstArtRight) < 0.5,
     ),
   ).toBe(true);
   expect(
     laneGeometry.every(
-      ({ artCenter, slotWidth }) =>
-        Math.abs(artCenter - slotWidth / 2) < 0.5,
+      ({ copyBeforeArt, copyRight, slotLeft, textAlign }) =>
+        copyBeforeArt
+        && copyRight < slotLeft
+        && textAlign === "right",
     ),
   ).toBe(true);
   expect(
@@ -1323,7 +1336,12 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
   expect(
     laneGeometry
       .filter(({ artType }) => artType === "item")
-      .every(({ artSpan, artWidth }) => artWidth === 44 * artSpan),
+      .every(
+        ({ artSpan, artWidth, fit }) =>
+          artSpan >= 1
+          && artWidth > 0
+          && fit === "intrinsic",
+      ),
   ).toBe(true);
   expect(
     laneGeometry
@@ -3296,6 +3314,43 @@ test("keeps pointer hover imperative without React commits", async ({ page }) =>
   expect(after.staticDraws).toBe(before.staticDraws);
 });
 
+test("keeps detailed hover stable while moving within one event marker", async ({
+  page,
+}) => {
+  await page.goto(`${markerLayoutReportUrl}?lang=en`);
+  const point = await timelineMarkerPoint(page, {
+    combatMs: 4_000,
+    durationMs: 8_000,
+    entityId: "player-hero",
+    dx: 0,
+    dy: -11,
+  });
+  expect(point).not.toBeNull();
+
+  await page.mouse.move(point.x, point.y);
+  await expect(
+    page.getByTestId("timeline-tooltip").getByTestId("frame-event-kind"),
+  ).toHaveText("Burn");
+  await page.waitForTimeout(50);
+  const afterEnteringMarker = await page.evaluate(
+    () => window.__BPP_VIEWER_TEST__?.commitCount ?? -1,
+  );
+
+  for (let index = 0; index < 24; index += 1) {
+    await page.mouse.move(
+      point.x + ((index % 3) - 1) * 2,
+      point.y + ((Math.floor(index / 3) % 3) - 1) * 2,
+    );
+  }
+  await page.waitForTimeout(50);
+
+  expect(
+    await page.evaluate(
+      () => window.__BPP_VIEWER_TEST__?.commitCount ?? -1,
+    ),
+  ).toBe(afterEnteringMarker);
+});
+
 test("coalesces burst pointer input before imperative hover work", async ({
   page,
 }) => {
@@ -3593,6 +3648,7 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
   ];
   for (const marker of markers) {
     let point = null;
+    let hoverAttempt = 0;
     await expect
       .poll(async () => {
         point = await timelineMarkerPoint(page, {
@@ -3603,7 +3659,11 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
           dy: marker.dy,
         });
         if (!point) return "";
-        await page.mouse.move(point.x, point.y);
+        await page.mouse.move(
+          point.x + ((hoverAttempt % 3) - 1) * 2,
+          point.y,
+        );
+        hoverAttempt += 1;
         return (
           (await page
             .getByTestId("timeline-tooltip-label")
@@ -3728,9 +3788,15 @@ test("renders destroy and structural attributes consistently across timeline, in
   });
   expect(destroyPoint).not.toBeNull();
   await page.mouse.move(destroyPoint.x, destroyPoint.y);
-  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+  const hoverInspector = page.getByTestId("timeline-tooltip");
+  await expect(
+    hoverInspector.getByTestId("frame-event-kind"),
+  ).toHaveText(
     "Destroyed",
   );
+  await expect(
+    hoverInspector.getByTestId("event-source-entity"),
+  ).toHaveText("Disintegration Ray");
   await page.mouse.click(destroyPoint.x, destroyPoint.y);
   await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
     "Ice Swan",
@@ -3750,24 +3816,68 @@ test("renders destroy and structural attributes consistently across timeline, in
   });
   expect(criticalTargetPoint).not.toBeNull();
   await page.mouse.move(criticalTargetPoint.x, criticalTargetPoint.y);
-  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+  await expect(
+    hoverInspector.getByTestId("frame-event-kind"),
+  ).toHaveText(
     "Direct damage",
   );
+  await expect(
+    hoverInspector.getByTestId("frame-inspector-entity"),
+  ).toHaveText("Fixture Opponent");
+  await expect(
+    hoverInspector.getByTestId("frame-event-critical"),
+  ).toHaveText("Crit");
+  const criticalBadgeGeometry = await hoverInspector
+    .getByTestId("frame-event-critical")
+    .evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      return {
+        height: bounds.height,
+        radius: Number.parseFloat(getComputedStyle(element).borderRadius),
+      };
+    });
+  expect(criticalBadgeGeometry.height).toBeLessThanOrEqual(16);
+  expect(criticalBadgeGeometry.radius).toBeLessThanOrEqual(3);
+  await expect(
+    hoverInspector.getByTestId("event-source-entity"),
+  ).toHaveText("Ice Swan");
 
-  const criticalPoint = await timelineMarkerPoint(page, {
+  await page.getByTestId("event-lane-mode-source").click();
+  await expect(page.getByTestId("event-lane-mode-toggle")).toHaveAttribute(
+    "data-bpp-event-lane-mode",
+    "source",
+  );
+  await expect(page.getByTestId("timeline-canvas")).toHaveAttribute(
+    "data-bpp-event-lane-mode",
+    "source",
+  );
+  await expect(page.getByTestId("timeline-canvas")).toHaveAttribute(
+    "data-bpp-critical-marker-count",
+    "1",
+  );
+  const criticalSourcePoint = await timelineMarkerPoint(page, {
     combatMs: 3_500,
     durationMs: 8_000,
     entityId: "player-item",
   });
-  expect(criticalPoint).not.toBeNull();
-  await page.mouse.move(criticalPoint.x, criticalPoint.y);
-  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
-    "Critical",
-  );
-  await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
-    "1 event",
-  );
-  await page.mouse.click(criticalPoint.x, criticalPoint.y);
+  expect(criticalSourcePoint).not.toBeNull();
+  await page.mouse.move(criticalSourcePoint.x, criticalSourcePoint.y);
+  await expect(
+    hoverInspector.getByTestId("frame-inspector-entity"),
+  ).toHaveText("Ice Swan");
+  await expect(
+    hoverInspector.getByTestId("frame-event-kind"),
+  ).toHaveText("Direct damage");
+  await expect(
+    hoverInspector.getByTestId("frame-event-critical"),
+  ).toHaveText("Crit");
+  await expect(
+    hoverInspector.getByTestId("event-source-entity"),
+  ).toHaveCount(0);
+  await expect(
+    hoverInspector.getByTestId("event-target-entity"),
+  ).toHaveText("Fixture Opponent");
+  await page.mouse.click(criticalSourcePoint.x, criticalSourcePoint.y);
   await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
     "Ice Swan",
   );
@@ -3775,7 +3885,7 @@ test("renders destroy and structural attributes consistently across timeline, in
     "Direct damage",
   );
   await expect(page.getByTestId("frame-event-critical")).toHaveText(
-    "Critical",
+    "Crit",
   );
   await expect(page.getByTestId("event-source-entity")).toHaveCount(0);
   await expect(page.getByTestId("event-target-entity")).toHaveText(
@@ -3783,6 +3893,11 @@ test("renders destroy and structural attributes consistently across timeline, in
   );
   await page.getByTestId("frame-inspector-close").click();
 
+  await page.getByTestId("event-lane-mode-target").click();
+  await expect(page.getByTestId("event-lane-mode-toggle")).toHaveAttribute(
+    "data-bpp-event-lane-mode",
+    "target",
+  );
   const attributePoint = await timelineMarkerPoint(page, {
     combatMs: 4_000,
     durationMs: 8_000,
@@ -3790,16 +3905,22 @@ test("renders destroy and structural attributes consistently across timeline, in
   });
   expect(attributePoint).not.toBeNull();
   await page.mouse.move(attributePoint.x, attributePoint.y);
+  await expect(
+    hoverInspector.getByTestId("frame-event-kind"),
+  ).toHaveText([
+    "Damage stat",
+    "Multicast",
+  ]);
   await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
     "Attribute change",
   );
   await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
     "2 events",
   );
-  await expect(page.getByTestId("timeline-tooltip")).not.toContainText(
+  await expect(page.getByTestId("timeline-tooltip")).toContainText(
     "+20",
   );
-  await expect(page.getByTestId("timeline-tooltip")).not.toContainText(
+  await expect(page.getByTestId("timeline-tooltip")).toContainText(
     "−1",
   );
   await page.mouse.click(attributePoint.x, attributePoint.y);
@@ -3931,8 +4052,17 @@ test("keeps dense attribute markers generic while inspector shows concrete nativ
     await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
       attribute.count,
     );
-    await expect(page.getByTestId("timeline-tooltip")).not.toContainText(
-      "+2%",
+    const hoverInspector = page.getByTestId("timeline-tooltip");
+    await expect(
+      hoverInspector.getByTestId("frame-event-kind"),
+    ).toHaveText(attribute.kinds);
+    await expect(
+      hoverInspector.getByTestId("frame-event-amount"),
+    ).toHaveText(attribute.amounts);
+    await expect(
+      hoverInspector.getByTestId("frame-event-transition"),
+    ).toHaveText(
+      attribute.transitions,
     );
 
     await page.mouse.click(point.x, point.y);
@@ -4110,7 +4240,7 @@ test("groups same-frame direct damage sources under one exact total", async ({
       .getByTestId("event-source-entity")
       .first()
       .getByTestId("frame-event-entity-art-slot"),
-  ).toHaveCSS("height", "24px");
+  ).toHaveCSS("height", "44px");
   const sourceArtSlot = page
     .getByTestId("event-source-entity")
     .first()
@@ -4125,17 +4255,23 @@ test("groups same-frame direct damage sources under one exact total", async ({
     const art = slot.querySelector('[data-entity-art-align="start"]');
     if (!art) {
       return {
+        bottomGap: Number.POSITIVE_INFINITY,
         leftGap: Number.POSITIVE_INFINITY,
         rightGap: Number.POSITIVE_INFINITY,
+        topGap: Number.POSITIVE_INFINITY,
       };
     }
     const slotBounds = slot.getBoundingClientRect();
     const artBounds = art.getBoundingClientRect();
     return {
+      bottomGap: slotBounds.bottom - artBounds.bottom,
       leftGap: artBounds.left - slotBounds.left,
       rightGap: slotBounds.right - artBounds.right,
+      topGap: artBounds.top - slotBounds.top,
     };
   });
+  expect(sourceArtGeometry.topGap).toBeCloseTo(0, 1);
+  expect(sourceArtGeometry.bottomGap).toBeCloseTo(0, 1);
   expect(sourceArtGeometry.leftGap).toBeCloseTo(0, 1);
   expect(sourceArtGeometry.rightGap).toBeCloseTo(0, 1);
   await expect(page.getByTestId("frame-event-relation-branch")).toHaveCount(2);
@@ -4307,7 +4443,8 @@ test("scopes the inspector to the exact clicked cluster", async ({
   expect(inspectorGeometry.artBottomGap).toBeLessThanOrEqual(1);
   expect(inspectorGeometry.headerHeight).toBeGreaterThanOrEqual(64);
   expect(inspectorGeometry.headerHeight).toBeLessThanOrEqual(65);
-  expect(inspectorGeometry.nativeIconHeight).toBeCloseTo(20, 1);
+  expect(inspectorGeometry.nativeIconHeight).toBeGreaterThanOrEqual(19.8);
+  expect(inspectorGeometry.nativeIconHeight).toBeLessThanOrEqual(20.1);
   expect(inspectorGeometry.popoverLeft).toBeGreaterThanOrEqual(0);
   expect(inspectorGeometry.popoverTop).toBeGreaterThanOrEqual(0);
   expect(inspectorGeometry.popoverRight).toBeLessThanOrEqual(

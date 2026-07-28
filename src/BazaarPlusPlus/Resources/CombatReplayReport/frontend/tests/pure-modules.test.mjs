@@ -62,6 +62,7 @@ import {
   timelineClusterEventIds,
 } from "../src/timeline/clusters.ts";
 import {
+  criticalIndicatorOffset,
   heroHealthAreaGeometry,
   markerImageBounds,
   markerPoint,
@@ -1977,6 +1978,33 @@ test("timeline visibility and clustering preserve every underlying event", () =>
   assert.equal(
     isVisibleTimelineEvent(
       timelineEvent({
+        kind: "effect-executed",
+        action: "CardHaste",
+        sourceId: "skill",
+        targetIds: ["target"],
+      }),
+      entityById,
+    ),
+    false,
+    "target mode uses the status range instead of a duplicate application",
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      timelineEvent({
+        kind: "effect-executed",
+        action: "CardHaste",
+        sourceId: "skill",
+        targetIds: ["target"],
+      }),
+      entityById,
+      "source",
+    ),
+    true,
+    "source mode keeps the attributable application event",
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      timelineEvent({
         kind: "aura",
         action: "Aura",
         sourceId: "target",
@@ -2147,6 +2175,29 @@ test("timeline visibility and clustering preserve every underlying event", () =>
       timelineEvent({
         sourceId: "skill",
         triggerSourceId: "skill",
+        targetIds: ["target"],
+      }),
+      new Map(entities.map((entity, index) => [entity.id, index])),
+      "source",
+    ),
+    [{ lane: 0, role: "source" }],
+  );
+  assert.deepEqual(
+    eventLaneEndpoints(
+      timelineEvent({
+        triggerSourceId: "skill",
+        targetIds: ["target"],
+      }),
+      new Map(entities.map((entity, index) => [entity.id, index])),
+      "source",
+    ),
+    [{ lane: 0, role: "trigger" }],
+  );
+  assert.deepEqual(
+    eventLaneEndpoints(
+      timelineEvent({
+        sourceId: "skill",
+        triggerSourceId: "skill",
       }),
       new Map(entities.map((entity, index) => [entity.id, index])),
     ),
@@ -2193,12 +2244,18 @@ test("timeline visibility and clustering preserve every underlying event", () =>
       new Map(
         criticalEntities.map((entity, index) => [entity.id, index]),
       ),
-      new Map(criticalEntities.map((entity) => [entity.id, entity])),
     ),
-    [
-      { lane: 3, role: "target" },
-      { lane: 0, role: "source" },
-    ],
+    [{ lane: 3, role: "target" }],
+  );
+  assert.deepEqual(
+    eventLaneEndpoints(
+      criticalEvent,
+      new Map(
+        criticalEntities.map((entity, index) => [entity.id, index]),
+      ),
+      "source",
+    ),
+    [{ lane: 0, role: "source" }],
   );
   assert.deepEqual(
     buildClusters(
@@ -2208,7 +2265,6 @@ test("timeline visibility and clustering preserve every underlying event", () =>
       1_000,
       54,
     ).map((cluster) => ({
-      criticalSource: cluster.criticalSource,
       groupKey: cluster.groupKey,
       labelKey: cluster.labelKey,
       lane: cluster.lane,
@@ -2217,15 +2273,6 @@ test("timeline visibility and clustering preserve every underlying event", () =>
     })),
     [
       {
-        criticalSource: true,
-        groupKey: "critical-damage-direct",
-        labelKey: "critical",
-        lane: 0,
-        role: "source",
-        tier: 1,
-      },
-      {
-        criticalSource: false,
         groupKey: "damage-direct",
         labelKey: "damageDirect",
         lane: 3,
@@ -2234,6 +2281,36 @@ test("timeline visibility and clustering preserve every underlying event", () =>
       },
     ],
   );
+  assert.deepEqual(
+    buildClusters(
+      { durationMs: 2_000 },
+      [criticalEvent],
+      criticalEntities,
+      1_000,
+      54,
+      "source",
+    ).map((cluster) => ({
+      groupKey: cluster.groupKey,
+      labelKey: cluster.labelKey,
+      lane: cluster.lane,
+      role: cluster.role,
+      tier: cluster.tier,
+      critical: cluster.events.some((event) => event.isCritical),
+    })),
+    [
+      {
+        groupKey: "damage-direct",
+        labelKey: "damageDirect",
+        lane: 0,
+        role: "source",
+        tier: 2,
+        critical: true,
+      },
+    ],
+  );
+  const criticalOffset = criticalIndicatorOffset(14);
+  assert.equal(criticalOffset.x, 10);
+  assert.ok(Math.abs(criticalOffset.y + 3.92) < 0.001);
 
   const events = [
     timelineEvent({

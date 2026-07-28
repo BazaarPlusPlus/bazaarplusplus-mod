@@ -55,7 +55,7 @@ async function assertThemeOwnership() {
   const literalCssTypography =
     /(?:font-size|line-height|font-family)\s*:(?!\s*var\()\s*/u;
   const stockRadius =
-    /\brounded(?!(?:-(?:full|none|panel|art|[trbl](?:-(?:none|panel))?))\b|-\[inherit\])(?:-(?:sm|md|lg|xl|2xl|3xl))?\b/u;
+    /\brounded(?!(?:-(?:full|none|panel|art|tag|[trbl](?:-(?:none|panel))?))\b|-\[inherit\])(?:-(?:sm|md|lg|xl|2xl|3xl))?\b/u;
   const retiredActivityTable = /\.bpp-activity-table\b/u;
   const rawInteractiveElement = /<(?:button|table)\b/u;
 

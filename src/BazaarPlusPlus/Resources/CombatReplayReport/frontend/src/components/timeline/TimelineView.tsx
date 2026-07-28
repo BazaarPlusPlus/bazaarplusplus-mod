@@ -48,6 +48,7 @@ import {
 import { heroLaneAtScroll } from "./TimelineLabels.tsx";
 import {
   TimelineViewport,
+  type TimelineHoverInspector,
   type TimelineTooltipRefs,
   useTimelineViewportRefs,
 } from "./TimelineViewport.tsx";
@@ -105,8 +106,15 @@ export const TimelineView = forwardRef<
   const [pinnedHeroLane, setPinnedHeroLane] = useState<number | null>(
     null,
   );
+  const [hoverInspector, setHoverInspector] =
+    useState<TimelineHoverInspector | null>(null);
+  const hoverInspectorKeyRef = useRef("");
   const pinnedHero =
     pinnedHeroLane === null ? null : entities[pinnedHeroLane] ?? null;
+  useEffect(() => {
+    hoverInspectorKeyRef.current = "";
+    setHoverInspector(null);
+  }, [state.eventLaneMode]);
   const sideBoundaryLane = useMemo(
     () => opponentBoundaryLane(entities),
     [entities],
@@ -180,11 +188,9 @@ export const TimelineView = forwardRef<
   ]);
   const drawStateRef = useRef(drawState);
   const previewCallbackRef = useRef(onPreviewCombatMs);
-  const translateRef = useRef(t);
   drawStateRef.current = drawState;
   visibleMetricsRef.current = visibleMetrics;
   previewCallbackRef.current = onPreviewCombatMs;
-  translateRef.current = t;
 
   const handleMetricHighlight = useCallback(
     (metric: StateMetric | null): void => {
@@ -268,20 +274,9 @@ export const TimelineView = forwardRef<
       return;
     }
     const tooltip = (): TimelineTooltipRefs | null => {
-      if (
-        !viewportRefs.tooltipHost.current
-        || !viewportRefs.tooltipTime.current
-        || !viewportRefs.tooltipLabel.current
-        || !viewportRefs.tooltipCount.current
-      ) {
-        return null;
-      }
-      return {
-        host: viewportRefs.tooltipHost.current,
-        time: viewportRefs.tooltipTime.current,
-        label: viewportRefs.tooltipLabel.current,
-        count: viewportRefs.tooltipCount.current,
-      };
+      return viewportRefs.tooltipHost.current
+        ? { host: viewportRefs.tooltipHost.current }
+        : null;
     };
     const controller = new TimelineCanvasController({
       canvas,
@@ -289,6 +284,7 @@ export const TimelineView = forwardRef<
       ruler,
       model,
       entities,
+      eventLaneMode: state.eventLaneMode,
       laneLabels: labels,
       stickyHeroCanvas,
       stickyHeroLabel,
@@ -324,13 +320,11 @@ export const TimelineView = forwardRef<
         previewCallbackRef.current(combatMs);
         const refs = tooltip();
         if (!refs) return;
-        refs.host.dataset.bppCombatMs =
-          combatMs === null ? "" : String(combatMs);
         if (combatMs === null) {
-          refs.host.hidden = true;
+          hoverInspectorKeyRef.current = "";
+          setHoverInspector(null);
           return;
         }
-        refs.host.hidden = false;
         const semanticCluster = cluster
           ? timelineClusterAtCombatMs(cluster, combatMs)
           : null;
@@ -343,28 +337,41 @@ export const TimelineView = forwardRef<
         );
         const tooltipCombatMs = nearestEvent?.combatMs ?? combatMs;
         refs.host.dataset.bppCombatMs = String(tooltipCombatMs);
-        refs.time.textContent = formatDuration(tooltipCombatMs);
-        refs.label.textContent = semanticCluster
-          ? translateRef.current(
-            semanticCluster.labelKey ?? semanticCluster.token,
-          )
-          : translateRef.current("time");
-        refs.count.textContent = semanticCluster
-          ? `${semanticCluster.events.length} ${translateRef.current(
-            semanticCluster.events.length === 1
-              ? "eventSingular"
-              : "event",
-          )}`
-          : "";
+        if (!semanticCluster || !nearestEvent) {
+          hoverInspectorKeyRef.current = "";
+          setHoverInspector(null);
+          return;
+        }
+        const eventIds = timelineClusterEventIds(semanticCluster);
+        const entityId = entities[semanticCluster.lane]?.id ?? "";
+        const inspectorKey =
+          `${entityId}:${nearestEvent.frame}:${eventIds.join(",")}`;
+        if (hoverInspectorKeyRef.current !== inspectorKey) {
+          hoverInspectorKeyRef.current = inspectorKey;
+          setHoverInspector({
+            combatMs: tooltipCombatMs,
+            entityId,
+            eventIds,
+            frame: nearestEvent.frame,
+            labelKey:
+              semanticCluster.labelKey ?? semanticCluster.token,
+          });
+        }
         const bounds = viewportRefs.scroll.current?.getBoundingClientRect();
         if (bounds) {
-          const left = Math.max(
-            8,
-            Math.min(bounds.width - 184, clientX - bounds.left + 12),
-          );
+          const pointerX = clientX - bounds.left;
+          const tooltipWidth = Math.min(360, Math.max(240, bounds.width - 16));
+          const preferredLeft = pointerX + 12;
+          const left =
+            preferredLeft + tooltipWidth <= bounds.width - 8
+              ? preferredLeft
+              : Math.max(8, pointerX - tooltipWidth - 12);
           const top = Math.max(
             8,
-            Math.min(bounds.height - 54, clientY - bounds.top + 12),
+            Math.min(
+              Math.max(8, bounds.height - 300),
+              clientY - bounds.top + 12,
+            ),
           );
           refs.host.style.transform = `translate(${left}px, ${top}px)`;
         }
@@ -389,11 +396,17 @@ export const TimelineView = forwardRef<
       controller.destroy();
       viewportRefs.controller.current = null;
     };
-  }, [dispatch, entities, heroLaneIndexes, model]);
+  }, [
+    dispatch,
+    entities,
+    heroLaneIndexes,
+    model,
+    state.eventLaneMode,
+  ]);
 
   useLayoutEffect(() => {
     viewportRefs.controller.current?.setLayout(timelineWidth, LANE_HEIGHT);
-  }, [entities, model, timelineWidth]);
+  }, [entities, model, state.eventLaneMode, timelineWidth]);
 
   useLayoutEffect(() => {
     viewportRefs.controller.current?.setPinnedHeroLane(pinnedHeroLane);
@@ -537,6 +550,7 @@ export const TimelineView = forwardRef<
         onMetricHighlight={handleMetricHighlight}
         onMetricToggle={handleMetricToggle}
         onPreviewCombatMs={onPreviewCombatMs}
+        hoverInspector={hoverInspector}
         pinnedHero={pinnedHero}
         pinnedHeroLane={pinnedHeroLane}
         refs={viewportRefs}
@@ -597,6 +611,7 @@ export const TimelineView = forwardRef<
         >
           <FrameInspector
             entityId={state.inspectedEntityId}
+            eventLaneMode={state.eventLaneMode}
             frame={state.selectedFrame}
             focusedEventIds={state.selectedClusterEventIds}
             model={model}

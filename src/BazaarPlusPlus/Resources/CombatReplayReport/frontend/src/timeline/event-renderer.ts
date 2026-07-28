@@ -10,6 +10,7 @@ import {
   type TimelineCluster,
 } from "./clusters.ts";
 import { resizeLogicalCanvas } from "./canvas.ts";
+import type { EventLaneMode } from "./event-lane-mode.ts";
 import {
   heroHealthAreaGeometry,
   type HeroHealthAreaGeometry,
@@ -37,6 +38,7 @@ interface ControllerOptions {
   ruler: HTMLCanvasElement;
   model: ReportViewModel;
   entities: NormalizedEntity[];
+  eventLaneMode: EventLaneMode;
   laneLabels: HTMLElement;
   stickyHeroCanvas: HTMLCanvasElement;
   stickyHeroLabel: HTMLElement;
@@ -74,6 +76,7 @@ export class TimelineCanvasController {
   private readonly ruler: HTMLCanvasElement;
   private readonly model: ReportViewModel;
   private readonly entities: NormalizedEntity[];
+  private readonly eventLaneMode: EventLaneMode;
   private readonly laneLabels: HTMLElement;
   private readonly stickyHeroCanvas: HTMLCanvasElement;
   private readonly stickyHeroLabel: HTMLElement;
@@ -109,6 +112,7 @@ export class TimelineCanvasController {
     this.ruler = options.ruler;
     this.model = options.model;
     this.entities = options.entities;
+    this.eventLaneMode = options.eventLaneMode;
     this.laneLabels = options.laneLabels;
     this.stickyHeroCanvas = options.stickyHeroCanvas;
     this.stickyHeroLabel = options.stickyHeroLabel;
@@ -126,14 +130,17 @@ export class TimelineCanvasController {
       this.entities.map((entity) => [entity.id, entity]),
     );
     const visible = this.model.events.filter((event) =>
-      isVisibleTimelineEvent(event, entityById),
+      isVisibleTimelineEvent(event, entityById, this.eventLaneMode),
     );
-    this.statusRanges = buildStatusRanges(
-      this.model,
-      this.entities,
-      this.width,
-      this.laneHeight,
-    );
+    this.statusRanges =
+      this.eventLaneMode === "target"
+        ? buildStatusRanges(
+          this.model,
+          this.entities,
+          this.width,
+          this.laneHeight,
+        )
+        : [];
     this.heroHealthAreas = heroHealthAreaGeometry(
       this.model,
       this.entities,
@@ -146,6 +153,7 @@ export class TimelineCanvasController {
       this.entities,
       this.width,
       this.laneHeight,
+      this.eventLaneMode,
     ).concat(
       this.statusRanges
         .map((range) => range.cluster)
@@ -153,6 +161,17 @@ export class TimelineCanvasController {
     );
     this.visualClusters = buildVisualClusters(this.clusters);
     this.markerClusters = layoutTimelineMarkers(this.visualClusters);
+    const criticalMarkerCount = this.markerClusters.filter((cluster) =>
+      cluster.events.some(
+        (event) =>
+          event.isCritical
+          && event.kind.toLowerCase() === "effect-executed",
+      )
+    ).length;
+    for (const target of [this.canvas, this.overlayCanvas]) {
+      target.dataset.bppEventLaneMode = this.eventLaneMode;
+      target.dataset.bppCriticalMarkerCount = String(criticalMarkerCount);
+    }
     this.firstVisibleMs = this.clusters.reduce(
       (min, cluster) =>
         Math.min(

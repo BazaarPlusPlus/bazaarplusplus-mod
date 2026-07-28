@@ -82,6 +82,7 @@
   --bpp-icon-lg: 1.25rem;
 
   --bpp-radius-art: 0.3125rem;
+  --bpp-radius-tag: 0.1875rem;
   --bpp-radius-panel: 0.375rem;
   --bpp-spacing-shell-gutter: 0.3125rem;
   --bpp-shadow-panel: 0 14px 34px rgb(0 0 0 / 28%);
@@ -169,6 +170,7 @@
   --spacing-icon-lg: var(--bpp-icon-lg);
 
   --radius-art: var(--bpp-radius-art);
+  --radius-tag: var(--bpp-radius-tag);
   --radius-panel: var(--bpp-radius-panel);
   --spacing-shell-gutter: var(--bpp-spacing-shell-gutter);
   --shadow-panel: var(--bpp-shadow-panel);

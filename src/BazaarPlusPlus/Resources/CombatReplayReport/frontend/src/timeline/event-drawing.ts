@@ -87,6 +87,16 @@ export function markerPoint(
   };
 }
 
+export function criticalIndicatorOffset(
+  markerSize: number,
+): { x: number; y: number } {
+  const size = Math.max(1, markerSize);
+  return {
+    x: size / 2 + 3,
+    y: -size * 0.28,
+  };
+}
+
 export function drawMarker(
   context: CanvasRenderingContext2D,
   cluster: TimelineCluster,
@@ -94,26 +104,26 @@ export function drawMarker(
   requestDraw: () => void,
 ): void {
   const tier = cluster.tier ?? 2;
+  const markerSize = tier === 1 ? 18 : tier === 3 ? 11 : 14;
   const color = markerColor(cluster.token);
   const marker = markerPoint(cluster);
   context.save();
   context.translate(marker.x, marker.y);
   const image = cachedTimelineImage(cluster.icon, requestDraw);
   if (image) {
-    const size = tier === 1 ? 18 : tier === 3 ? 11 : 14;
     const bounds = markerImageBounds(
       image.naturalWidth || image.width,
       image.naturalHeight || image.height,
-      size,
+      markerSize,
     );
     if (selected) {
       context.strokeStyle = themeColor("foreground");
       context.lineWidth = 1.5;
       context.strokeRect(
-        -size / 2 - 2,
-        -size / 2 - 2,
-        size + 4,
-        size + 4,
+        -markerSize / 2 - 2,
+        -markerSize / 2 - 2,
+        markerSize + 4,
+        markerSize + 4,
       );
     }
     context.drawImage(
@@ -141,6 +151,25 @@ export function drawMarker(
       context.lineWidth = 1.5;
       context.strokeRect(-half, -half, half * 2, half * 2);
     }
+  }
+  if (
+    cluster.events.some(
+      (event) =>
+        event.isCritical
+        && event.kind.toLowerCase() === "effect-executed",
+    )
+  ) {
+    const indicator = criticalIndicatorOffset(markerSize);
+    const fontSize = Math.max(8, Math.round(markerSize * 0.58));
+    context.font = `800 ${fontSize}px ${themeValue("--bpp-font-sans")}`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.lineWidth = 2.5;
+    context.lineJoin = "round";
+    context.strokeStyle = themeColor("background");
+    context.strokeText("!", indicator.x, indicator.y);
+    context.fillStyle = themeColor("damage");
+    context.fillText("!", indicator.x, indicator.y);
   }
   context.restore();
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type RefObject } from "react";
 import type { ReportAction } from "../../app/report-reducer.ts";
 import type { ReportState } from "../../app/report-state.ts";
+import { formatDuration } from "../../i18n/format.ts";
 import type { ReportViewModel } from "../../model/report.ts";
 import {
   normalizeSide,
@@ -16,6 +17,8 @@ import {
 import { TimelineCanvasController } from "../../timeline/event-renderer.ts";
 import { combatMsAtPointer } from "../../timeline/geometry.ts";
 import type { StateMetric } from "../../timeline/state-scale.ts";
+import { FrameInspector } from "../inspector/FrameInspector.tsx";
+import { EventLaneModeToggle } from "./EventLaneModeToggle.tsx";
 import { LaneFilterPopover } from "./LaneFilterPopover.tsx";
 import {
   LaneLabelContents,
@@ -34,18 +37,20 @@ export interface TimelineViewportRefs {
   stickyHeroCanvas: RefObject<HTMLCanvasElement | null>;
   stickyHeroLabel: RefObject<HTMLDivElement | null>;
   tooltipHost: RefObject<HTMLDivElement | null>;
-  tooltipTime: RefObject<HTMLSpanElement | null>;
-  tooltipLabel: RefObject<HTMLElement | null>;
-  tooltipCount: RefObject<HTMLSpanElement | null>;
   controller: RefObject<TimelineCanvasController | null>;
   preview: RefObject<number | null>;
 }
 
 export interface TimelineTooltipRefs {
   host: HTMLDivElement;
-  time: HTMLSpanElement;
-  label: HTMLElement;
-  count: HTMLSpanElement;
+}
+
+export interface TimelineHoverInspector {
+  combatMs: number;
+  entityId: string;
+  eventIds: string[];
+  frame: number;
+  labelKey: string;
 }
 
 export function useTimelineViewportRefs(): TimelineViewportRefs {
@@ -61,9 +66,6 @@ export function useTimelineViewportRefs(): TimelineViewportRefs {
     stickyHeroCanvas: useRef<HTMLCanvasElement>(null),
     stickyHeroLabel: useRef<HTMLDivElement>(null),
     tooltipHost: useRef<HTMLDivElement>(null),
-    tooltipTime: useRef<HTMLSpanElement>(null),
-    tooltipLabel: useRef<HTMLElement>(null),
-    tooltipCount: useRef<HTMLSpanElement>(null),
     controller: useRef<TimelineCanvasController>(null),
     preview: useRef<number | null>(null),
   };
@@ -88,6 +90,7 @@ export function TimelineViewport({
   onMetricHighlight,
   onMetricToggle,
   stateLabelCombatMs,
+  hoverInspector,
 }: {
   model: ReportViewModel;
   state: ReportState;
@@ -107,6 +110,7 @@ export function TimelineViewport({
   onMetricHighlight: (metric: StateMetric | null) => void;
   onMetricToggle: (metric: StateMetric) => void;
   stateLabelCombatMs: number;
+  hoverInspector: TimelineHoverInspector | null;
 }): React.JSX.Element {
   const pointerPreviewFrameRef = useRef(0);
   const pendingPointerPreviewRef = useRef<{
@@ -249,11 +253,18 @@ export function TimelineViewport({
           />
           <div className="bpp-lane-label-header">
             <span className="min-w-0 truncate">{t("entity")}</span>
-            <LaneFilterPopover
-              dispatch={dispatch}
-              state={state}
-              t={t}
-            />
+            <span className="ml-auto flex shrink-0 items-center gap-1">
+              <EventLaneModeToggle
+                dispatch={dispatch}
+                state={state}
+                t={t}
+              />
+              <LaneFilterPopover
+                dispatch={dispatch}
+                state={state}
+                t={t}
+              />
+            </span>
           </div>
           <canvas
             aria-label={t("time")}
@@ -394,28 +405,40 @@ export function TimelineViewport({
         </div>
       </div>
       <div
-        className="pointer-events-none absolute left-0 top-0 z-50 min-w-40 rounded-panel border border-brand-soft/25 bg-popover/98 px-2.5 py-2 text-micro shadow-float"
+        className="pointer-events-none absolute left-0 top-0 z-50 w-[min(360px,calc(100vw-1rem))] overflow-hidden rounded-panel border border-brand-soft/25 bg-popover/98 shadow-float"
         data-bpp-test-id="timeline-tooltip"
-        hidden
+        hidden={!hoverInspector}
         ref={refs.tooltipHost}
       >
-        <div className="flex items-center gap-2">
-          <strong
-            className="text-foreground"
-            data-bpp-test-id="timeline-tooltip-label"
-            ref={refs.tooltipLabel}
-          />
-          <span
-            data-bpp-test-id="timeline-tooltip-time"
-            className="ml-auto font-mono text-brand-soft"
-            ref={refs.tooltipTime}
-          />
-        </div>
-        <span
-          className="mt-0.5 block text-muted-foreground"
-          data-bpp-test-id="timeline-tooltip-count"
-          ref={refs.tooltipCount}
-        />
+        {hoverInspector && (
+          <>
+            <span className="sr-only">
+              <strong data-bpp-test-id="timeline-tooltip-label">
+                {t(hoverInspector.labelKey)}
+              </strong>
+              <span data-bpp-test-id="timeline-tooltip-time">
+                {formatDuration(hoverInspector.combatMs)}
+              </span>
+              <span data-bpp-test-id="timeline-tooltip-count">
+                {hoverInspector.eventIds.length}{" "}
+                {t(
+                  hoverInspector.eventIds.length === 1
+                    ? "eventSingular"
+                    : "event",
+                )}
+              </span>
+            </span>
+            <FrameInspector
+              entityId={hoverInspector.entityId}
+              eventLaneMode={state.eventLaneMode}
+              focusedEventIds={hoverInspector.eventIds}
+              frame={hoverInspector.frame}
+              model={model}
+              t={t}
+              variant="hover"
+            />
+          </>
+        )}
       </div>
     </div>
   );

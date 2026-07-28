@@ -4,6 +4,7 @@ import {
   DEFAULT_LANE_VISIBILITY,
   type LaneFilterKey,
 } from "../timeline/lane-filter.ts";
+import type { EventLaneMode } from "../timeline/event-lane-mode.ts";
 import type { StateScaleMode } from "../timeline/state-scale.ts";
 import {
   DEFAULT_TIME_ZOOM_INDEX,
@@ -29,6 +30,7 @@ export type ReportAction =
     }
   | { type: "select-time"; combatMs: number }
   | { type: "close-inspector" }
+  | { type: "set-event-lane-mode"; mode: EventLaneMode }
   | {
       type: "set-lane-visibility";
       filter: LaneFilterKey;
@@ -98,6 +100,18 @@ export function reportReducer(
         inspectorOpen: false,
         inspectorAnchor: null,
       };
+    case "set-event-lane-mode":
+      return state.eventLaneMode === action.mode
+        ? state
+        : {
+            ...state,
+            eventLaneMode: action.mode,
+            selectedFrame: null,
+            selectedClusterEventIds: [],
+            inspectedEntityId: "",
+            inspectorOpen: false,
+            inspectorAnchor: null,
+          };
     case "set-lane-visibility":
       return state.laneVisibility[action.filter] === action.visible
         ? state

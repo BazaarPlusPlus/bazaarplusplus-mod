@@ -10,6 +10,7 @@ import {
   type NormalizedEntity,
   type NormalizedEvent,
 } from "../model/normalize.ts";
+import type { EventLaneMode } from "./event-lane-mode.ts";
 import { timelineXAtCombatMs } from "./geometry.ts";
 
 export const STATUS_ACTIONS = new Set(["Haste", "Slow", "Freeze"]);
@@ -31,12 +32,6 @@ const COMBATANT_TARGET_ACTIONS = new Set([
   "PlayerShieldApply",
   "PlayerShieldRemove",
 ]);
-const CRITICAL_OUTCOME_ACTIONS = new Set([
-  "PlayerDamage",
-  "PlayerHeal",
-  "PlayerShieldApply",
-]);
-
 export type LaneRole =
   | "source"
   | "trigger"
@@ -76,7 +71,6 @@ export interface TimelineCluster {
   impact?: number;
   markerX?: number;
   markerY?: number;
-  criticalSource?: boolean;
 }
 
 /**
@@ -173,6 +167,7 @@ export function timelineEventToken(
 export function isVisibleTimelineEvent(
   event: NormalizedEvent,
   entityById: ReadonlyMap<string, TimelineEntity>,
+  eventLaneMode: EventLaneMode = "target",
 ): boolean {
   const kind = event.kind.toLowerCase();
   if (kind === "player-attribute" || kind === "card-attribute") {
@@ -197,7 +192,7 @@ export function isVisibleTimelineEvent(
     || event.action === "CardSlow"
     || event.action === "CardFreeze"
   ) {
-    return false;
+    return eventLaneMode === "source";
   }
   if (COMBATANT_TARGET_ACTIONS.has(event.action)) {
     return event.targetIds.some(
@@ -423,7 +418,7 @@ export function buildStatusRanges(
 export function eventLaneEndpoints(
   event: NormalizedEvent,
   entityIndex: ReadonlyMap<string, number>,
-  entityById?: ReadonlyMap<string, TimelineEntity>,
+  eventLaneMode: EventLaneMode = "target",
 ): LaneEndpoint[] {
   const endpoints: LaneEndpoint[] = [];
   function append(entityId: string, role: LaneRole): void {
@@ -434,18 +429,14 @@ export function eventLaneEndpoints(
     if (!existing) endpoints.push({ lane, role });
     else if (existing.role !== role) existing.role = "both";
   }
-  for (const targetId of event.targetIds) append(targetId, "target");
-  for (const removedTargetId of event.removedTargetIds) {
-    append(removedTargetId, "removed");
-  }
-  const sourceEntity = entityById?.get(event.sourceId);
-  if (
-    event.isCritical
-    && event.kind.toLowerCase() === "effect-executed"
-    && CRITICAL_OUTCOME_ACTIONS.has(event.action)
-    && sourceEntity?.type.toLowerCase() === "item"
-  ) {
-    append(event.sourceId, "source");
+  if (eventLaneMode === "source") {
+    if (event.sourceId) append(event.sourceId, "source");
+    else append(event.triggerSourceId, "trigger");
+  } else {
+    for (const targetId of event.targetIds) append(targetId, "target");
+    for (const removedTargetId of event.removedTargetIds) {
+      append(removedTargetId, "removed");
+    }
   }
   return endpoints;
 }
@@ -486,12 +477,10 @@ export function buildClusters(
   entities: readonly TimelineEntity[],
   timelineWidth: number,
   laneHeight: number,
+  eventLaneMode: EventLaneMode = "target",
 ): TimelineCluster[] {
   const entityIndex = new Map(
     entities.map((entity, index) => [entity.id, index] as const),
-  );
-  const entityById = new Map(
-    entities.map((entity) => [entity.id, entity] as const),
   );
   const duration = Math.max(1, model.durationMs);
   const clusterMap = new Map<string, TimelineCluster>();
@@ -529,20 +518,13 @@ export function buildClusters(
       const endpoint of eventLaneEndpoints(
         event,
         entityIndex,
-        entityById,
+        eventLaneMode,
       )
     ) {
-      const criticalSource = endpoint.role === "source"
-        && event.isCritical
-        && CRITICAL_OUTCOME_ACTIONS.has(event.action);
-      const endpointGroupKey = criticalSource
-        ? `critical-${groupKey}`
-        : groupKey;
-      const endpointLabelKey = criticalSource ? "critical" : labelKey;
       const pixel = Math.round(x);
       const key =
         `${event.frame}:${endpoint.lane}:${pixel}:${endpoint.role}:`
-        + `${token}:${endpointGroupKey}:${iconSemanticKey}`;
+        + `${token}:${groupKey}:${iconSemanticKey}`;
       let cluster = clusterMap.get(key);
       if (!cluster) {
         cluster = {
@@ -552,11 +534,10 @@ export function buildClusters(
           role: endpoint.role,
           events: [],
           token,
-          groupKey: endpointGroupKey,
-          labelKey: endpointLabelKey,
+          groupKey,
+          labelKey,
           iconSemanticKey,
           icon,
-          criticalSource,
         };
         clusterMap.set(key, cluster);
       }
@@ -577,9 +558,7 @@ export function buildClusters(
       if (icons.size === 1) cluster.icon = Array.from(icons)[0];
       else if (icons.size > 1) cluster.icon = "";
     }
-    cluster.tier = cluster.criticalSource
-      ? 1
-      : clusterEventTier(cluster.events);
+    cluster.tier = clusterEventTier(cluster.events);
     cluster.impact = clusterImpact(cluster.events);
   }
   return built.sort(
@@ -632,11 +611,8 @@ export function buildVisualClusters(
           iconSemanticKey: representative.iconSemanticKey,
           icon: icons.size === 1 ? Array.from(icons)[0] : "",
           members: members.slice(),
-          tier: representative.criticalSource
-            ? 1
-            : clusterEventTier(mergedEvents),
+          tier: clusterEventTier(mergedEvents),
           impact: clusterImpact(mergedEvents),
-          criticalSource: representative.criticalSource,
         });
       }
       members = [];

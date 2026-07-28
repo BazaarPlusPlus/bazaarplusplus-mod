@@ -25,6 +25,7 @@ import type {
 } from "../../model/normalize.ts";
 import type { ReportViewModel } from "../../model/report.ts";
 import { eventsAtFrame } from "../../timeline/event-renderer.ts";
+import type { EventLaneMode } from "../../timeline/event-lane-mode.ts";
 import { EntityArt } from "../semantic/EntityArt.tsx";
 import {
   entityArtDimensions,
@@ -78,7 +79,7 @@ function EntityReference({
       data-bpp-test-id={testId}
     >
       <span
-        className="flex h-6 shrink-0 items-center justify-start"
+        className="flex h-11 shrink-0 items-center justify-start"
         data-bpp-test-id="frame-event-entity-art-slot"
         style={{ width: artColumnWidth }}
       >
@@ -86,7 +87,7 @@ function EntityReference({
           contentAlign="start"
           entity={entity}
           itemFit="intrinsic"
-          size="compact"
+          size="default"
         />
       </span>
       <span className="truncate text-foreground/90" title={entity.name}>
@@ -103,11 +104,13 @@ interface RelationNode {
   testId: string;
 }
 
-function EventSourceTree({
+function EventRelationTree({
   entityById,
+  eventLaneMode,
   nodes,
 }: {
   entityById: ReadonlyMap<string, NormalizedEntity>;
+  eventLaneMode: EventLaneMode;
   nodes: readonly RelationNode[];
 }): React.JSX.Element | null {
   if (nodes.length === 0) return null;
@@ -116,8 +119,8 @@ function EventSourceTree({
       const entity = entityById.get(node.entityId);
       if (!entity) return 0;
       return entity.type.toLowerCase() === "item"
-        ? intrinsicItemArtGeometry(entity.span, "compact").width
-        : entityArtDimensions(entity.type, entity.span, "compact").width;
+        ? intrinsicItemArtGeometry(entity.span, "default").width
+        : entityArtDimensions(entity.type, entity.span, "default").width;
     }),
   );
   return (
@@ -127,19 +130,29 @@ function EventSourceTree({
     >
       <span
         aria-hidden="true"
-        className="absolute -top-[1.125rem] bottom-[1.125rem] left-0 border-l border-brand-soft/35"
+        className={cn(
+          "absolute -top-[1.125rem] bottom-[1.375rem] left-0 border-l",
+          eventLaneMode === "source"
+            ? "border-success/45"
+            : "border-brand-soft/35",
+        )}
         data-bpp-test-id="frame-event-relation-line"
       />
       {nodes.map((node, index) => (
         <div
           aria-label={node.ariaLabel}
-          className="relative flex min-h-9 min-w-0 items-center"
+          className="relative flex min-h-11 min-w-0 items-center"
           key={`${node.testId}:${node.entityId}:${index}`}
           role="group"
         >
           <span
             aria-hidden="true"
-            className="absolute -left-4 top-1/2 w-3 border-t border-brand-soft/35"
+            className={cn(
+              "absolute -left-4 top-1/2 w-3 border-t",
+              eventLaneMode === "source"
+                ? "border-success/45"
+                : "border-brand-soft/35",
+            )}
             data-bpp-test-id="frame-event-relation-branch"
           />
           <EntityReference
@@ -211,6 +224,7 @@ function EventKindIcon({
 function EventRow({
   event,
   entityById,
+  eventLaneMode,
   fallbackIcon,
   inspectedEntityId,
   mergedCount = 1,
@@ -218,6 +232,7 @@ function EventRow({
 }: {
   event: NormalizedEvent;
   entityById: ReadonlyMap<string, NormalizedEntity>;
+  eventLaneMode: EventLaneMode;
   fallbackIcon?: string;
   inspectedEntityId: string;
   mergedCount?: number;
@@ -257,7 +272,7 @@ function EventRow({
         )}
         {event.isCritical && (
           <Badge
-            className="border-damage/35 bg-damage/10 px-1.5 text-damage"
+            className="!h-4 !rounded-tag border-damage/35 bg-damage/10 !px-1 !py-0 !text-nano leading-none text-damage"
             data-bpp-test-id="frame-event-critical"
             variant="outline"
           >
@@ -288,18 +303,25 @@ function EventRow({
           {diff.transitionText}
         </div>
       )}
-      <EventSourceTree
+      <EventRelationTree
         entityById={entityById}
-        nodes={sourceTreeNodes([event], t, inspectedEntityId)}
+        eventLaneMode={eventLaneMode}
+        nodes={relationTreeNodes(
+          [event],
+          t,
+          inspectedEntityId,
+          eventLaneMode,
+        )}
       />
     </article>
   );
 }
 
-function sourceTreeNodes(
+function relationTreeNodes(
   events: readonly NormalizedEvent[],
   t: (key: string) => string,
   inspectedEntityId: string,
+  eventLaneMode: EventLaneMode,
 ): RelationNode[] {
   const nodes: RelationNode[] = [];
   const seen = new Set<string>();
@@ -326,7 +348,7 @@ function sourceTreeNodes(
     const inspectedSource =
       inspectedEntityId === sourceId
       || inspectedEntityId === event.triggerSourceId;
-    if (inspectedSource) {
+    if (inspectedSource || eventLaneMode === "source") {
       for (const targetId of event.targetIds) {
         append(
           t("target"),
@@ -373,12 +395,14 @@ function sourceTreeNodes(
 function DirectDamageGroupRow({
   amount,
   entityById,
+  eventLaneMode,
   events,
   inspectedEntityId,
   t,
 }: {
   amount: number;
   entityById: ReadonlyMap<string, NormalizedEntity>;
+  eventLaneMode: EventLaneMode;
   events: readonly NormalizedEvent[];
   inspectedEntityId: string;
   t: (key: string) => string;
@@ -403,7 +427,7 @@ function DirectDamageGroupRow({
         </strong>
         {events.some((event) => event.isCritical) && (
           <Badge
-            className="border-damage/35 bg-damage/10 px-1.5 text-damage"
+            className="!h-4 !rounded-tag border-damage/35 bg-damage/10 !px-1 !py-0 !text-nano leading-none text-damage"
             data-bpp-test-id="frame-event-critical"
             variant="outline"
           >
@@ -417,9 +441,15 @@ function DirectDamageGroupRow({
           {formatNumber(amount)}
         </strong>
       </div>
-      <EventSourceTree
+      <EventRelationTree
         entityById={entityById}
-        nodes={sourceTreeNodes(events, t, inspectedEntityId)}
+        eventLaneMode={eventLaneMode}
+        nodes={relationTreeNodes(
+          events,
+          t,
+          inspectedEntityId,
+          eventLaneMode,
+        )}
       />
     </article>
   );
@@ -428,17 +458,21 @@ function DirectDamageGroupRow({
 export function FrameInspector({
   model,
   entityId,
+  eventLaneMode,
   frame,
   focusedEventIds,
   onClose,
   t,
+  variant = "popover",
 }: {
   model: ReportViewModel;
   entityId: string;
+  eventLaneMode: EventLaneMode;
   frame: number | null;
   focusedEventIds: readonly string[];
-  onClose: () => void;
+  onClose?: () => void;
   t: (key: string) => string;
+  variant?: "popover" | "hover";
 }): React.JSX.Element {
   const inspectorRef = useRef<HTMLDivElement>(null);
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -521,6 +555,7 @@ export function FrameInspector({
         <DirectDamageGroupRow
           amount={directDamageSummary.amount}
           entityById={entityById}
+          eventLaneMode={eventLaneMode}
           events={group.events}
           inspectedEntityId={entityId}
           t={t}
@@ -531,6 +566,7 @@ export function FrameInspector({
       <EventRow
         entityById={entityById}
         event={merged.event}
+        eventLaneMode={eventLaneMode}
         fallbackIcon={iconBySemanticKey.get(
           eventAttributeSemantic(merged.event)?.nativeSemanticKey ?? "",
         )}
@@ -546,7 +582,13 @@ export function FrameInspector({
 
   return (
     <div
-      className="flex max-h-[min(32rem,calc(100vh-2rem))] min-h-0 w-full flex-col overflow-hidden bg-popover"
+      className={cn(
+        "flex min-h-0 w-full flex-col overflow-hidden bg-popover",
+        variant === "hover"
+          ? "max-h-[min(26rem,calc(100vh-1rem))]"
+          : "max-h-[min(32rem,calc(100vh-2rem))]",
+      )}
+      data-bpp-inspector-variant={variant}
       data-bpp-test-id="frame-inspector"
       ref={inspectorRef}
     >
@@ -619,21 +661,28 @@ export function FrameInspector({
               )}
             </div>
           </div>
-          <Button
-            aria-label={t("close")}
-            className="shrink-0"
-            data-bpp-test-id="frame-inspector-close"
-            onClick={onClose}
-            size="icon-xs"
-            type="button"
-            variant="ghost"
-          >
-            <X className="size-icon-sm" />
-          </Button>
+          {variant === "popover" && onClose && (
+            <Button
+              aria-label={t("close")}
+              className="shrink-0"
+              data-bpp-test-id="frame-inspector-close"
+              onClick={onClose}
+              size="icon-xs"
+              type="button"
+              variant="ghost"
+            >
+              <X className="size-icon-sm" />
+            </Button>
+          )}
         </div>
       </header>
       <ScrollArea
-        className="max-h-[min(27rem,calc(100vh-6rem))] min-h-0"
+        className={cn(
+          "min-h-0",
+          variant === "hover"
+            ? "max-h-[min(21rem,calc(100vh-5rem))]"
+            : "max-h-[min(27rem,calc(100vh-6rem))]",
+        )}
         data-bpp-test-id="frame-event-list"
       >
         <div className="bg-background/20">

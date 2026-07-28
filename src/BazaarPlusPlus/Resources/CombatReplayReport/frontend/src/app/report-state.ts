@@ -6,6 +6,10 @@ import {
   DEFAULT_LANE_VISIBILITY,
   type LaneVisibility,
 } from "../timeline/lane-filter.ts";
+import {
+  DEFAULT_EVENT_LANE_MODE,
+  type EventLaneMode,
+} from "../timeline/event-lane-mode.ts";
 import type { SupportedLocale } from "../model/report.ts";
 
 export type ReportTab = "timeline" | "statistics";
@@ -26,6 +30,7 @@ export interface ReportState {
   selectedCombatMs: number;
   inspectorOpen: boolean;
   inspectorAnchor: InspectorAnchor | null;
+  eventLaneMode: EventLaneMode;
   laneVisibility: LaneVisibility;
   activitySort: ActivitySortState;
   activityGroupBySide: boolean;
@@ -48,6 +53,7 @@ export function createInitialReportState(
     selectedCombatMs: 0,
     inspectorOpen: false,
     inspectorAnchor: null,
+    eventLaneMode: DEFAULT_EVENT_LANE_MODE,
     laneVisibility: { ...DEFAULT_LANE_VISIBILITY },
     activitySort: {
       key: "damage",
