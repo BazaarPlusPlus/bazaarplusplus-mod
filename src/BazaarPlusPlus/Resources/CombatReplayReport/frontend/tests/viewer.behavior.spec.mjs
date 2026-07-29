@@ -293,6 +293,7 @@ let attributeDensityReportUrl;
 let recordingReportUrl;
 let combatLogLayoutReportUrl;
 let scrubRecordingReportUrl;
+let settledTerminalRecordingReportUrl;
 let navigationReportUrl;
 let scrollRecordingReportUrl;
 let terminalFrameReportUrl;
@@ -1368,6 +1369,40 @@ test.beforeAll(async ({ browserName }) => {
     reportHtml(scrubRecordingEnvelope),
     "utf8",
   );
+  const settledTerminalRecordingEnvelope =
+    structuredClone(scrubRecordingEnvelope);
+  settledTerminalRecordingEnvelope.battleDocument.durationMs = 8050;
+  settledTerminalRecordingEnvelope.battleDocument.frameCount = 161;
+  settledTerminalRecordingEnvelope.recordingManifest.syncAnchors.splice(
+    -1,
+    0,
+    {
+      combatFrame: 160,
+      combatMs: 8000,
+      mediaPtsMs: 8250,
+      outputOrdinal: 161,
+    },
+    {
+      combatFrame: 160,
+      combatMs: 8000,
+      mediaPtsMs: 8500,
+      outputOrdinal: 162,
+    },
+    {
+      combatFrame: 160,
+      combatMs: 8000,
+      mediaPtsMs: 8750,
+      outputOrdinal: 163,
+    },
+  );
+  settledTerminalRecordingEnvelope.recordingManifest.syncAnchors.at(
+    -1,
+  ).outputOrdinal = 164;
+  await writeFile(
+    join(fixtureDirectory, "settled-terminal-recording-report.html"),
+    reportHtml(settledTerminalRecordingEnvelope),
+    "utf8",
+  );
   const navigationEnvelope = structuredClone(fixtureEnvelope);
   navigationEnvelope.battleDocument.events = [
     schemaEvent({
@@ -1468,6 +1503,9 @@ test.beforeAll(async ({ browserName }) => {
   ).href;
   scrubRecordingReportUrl = pathToFileURL(
     join(fixtureDirectory, "scrub-recording-report.html"),
+  ).href;
+  settledTerminalRecordingReportUrl = pathToFileURL(
+    join(fixtureDirectory, "settled-terminal-recording-report.html"),
   ).href;
   navigationReportUrl = pathToFileURL(
     join(fixtureDirectory, "navigation-report.html"),
@@ -2815,6 +2853,62 @@ test("paused recording preview cannot move the pinned solid axis", async ({
   );
 });
 
+test("playing recording pauses on the settled terminal frame", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const states = new WeakMap();
+    const stateFor = (media) => {
+      let state = states.get(media);
+      if (!state) {
+        state = { currentTime: 0, paused: true };
+        states.set(media, state);
+      }
+      return state;
+    };
+    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+      configurable: true,
+      get() {
+        return stateFor(this).currentTime;
+      },
+      set(value) {
+        stateFor(this).currentTime = Number(value);
+        queueMicrotask(() => this.dispatchEvent(new Event("timeupdate")));
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "paused", {
+      configurable: true,
+      get() {
+        return stateFor(this).paused;
+      },
+    });
+    HTMLMediaElement.prototype.play = function play() {
+      stateFor(this).paused = false;
+      this.dispatchEvent(new Event("play"));
+      return Promise.resolve();
+    };
+    HTMLMediaElement.prototype.pause = function pause() {
+      stateFor(this).paused = true;
+      this.dispatchEvent(new Event("pause"));
+    };
+  });
+  await page.goto(`${settledTerminalRecordingReportUrl}?lang=en`);
+  const video = page.getByTestId("recording-video");
+  await video.dispatchEvent("loadedmetadata");
+  await page.getByTestId("recording-play-toggle").click();
+  await expect(video).toHaveJSProperty("paused", false);
+
+  await video.evaluate((element) => {
+    element.currentTime = 8.8;
+  });
+
+  await expect(video).toHaveJSProperty("paused", true);
+  await expect(video).toHaveJSProperty("currentTime", 8.75);
+  await expect(page.getByTestId("recording-timecode")).toHaveText(
+    "00:08.750",
+  );
+});
+
 test("coalesces paused recording preview seeks at animation-frame cadence", async ({
   page,
 }) => {
@@ -3041,7 +3135,7 @@ test("applies only the latest hover target while a Firefox-style seek is in flig
   expect(await seekCalls()).toHaveLength(2);
 });
 
-test("seeks the first media sample of the terminal combat frame", async ({
+test("seeks a settled terminal preview beyond the final combat frame", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -3106,7 +3200,7 @@ test("seeks the first media sample of the terminal combat frame", async ({
       },
     };
   });
-  await page.goto(`${scrubRecordingReportUrl}?lang=en`);
+  await page.goto(`${settledTerminalRecordingReportUrl}?lang=en`);
   const fullVideo = page.getByTestId("recording-video");
   const scrubVideo = page.getByTestId("recording-scrub-video");
   await fullVideo.dispatchEvent("loadedmetadata");
@@ -3140,7 +3234,7 @@ test("seeks the first media sample of the terminal combat frame", async ({
     .poll(() =>
       scrubVideo.evaluate((element) => window.__bppSeekProbe.calls(element))
     )
-    .toEqual([{ kind: "exact", seconds: 8 }]);
+    .toEqual([{ kind: "exact", seconds: 8.75 }]);
   expect(
     await fullVideo.evaluate(
       (element) => window.__bppSeekProbe.calls(element),

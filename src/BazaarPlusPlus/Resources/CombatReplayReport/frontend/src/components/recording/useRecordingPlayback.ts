@@ -6,7 +6,7 @@ import {
 } from "react";
 import type { ReportViewModel } from "../../model/report.ts";
 import {
-  getTerminalCombatAnchor,
+  getSettledTerminalAnchor,
   mapCombatToMedia,
   mapMediaToCombat,
 } from "../../recording/sync.ts";
@@ -66,10 +66,10 @@ export function useRecordingPlayback({
   const [mediaMs, setMediaMs] = useState(0);
 
   const exact = model.sync.status === "ReadyExact";
-  const terminalAnchor = exact
-    ? getTerminalCombatAnchor(model.sync.anchors)
+  const settledTerminalAnchor = exact
+    ? getSettledTerminalAnchor(model.sync.anchors)
     : null;
-  const terminalMediaMs = terminalAnchor?.mediaPtsMs ?? null;
+  const terminalMediaMs = settledTerminalAnchor?.mediaPtsMs ?? null;
 
   const setScrubVisible = useCallback((visible: boolean): void => {
     const scrubVideo = scrubVideoRef.current;
@@ -315,15 +315,15 @@ export function useRecordingPlayback({
     if (!video) return;
     const nextMediaMs = video.currentTime * 1_000;
     if (
-      terminalAnchor
+      settledTerminalAnchor
       && !video.paused
-      && nextMediaMs >= terminalAnchor.mediaPtsMs
+      && nextMediaMs >= settledTerminalAnchor.mediaPtsMs
     ) {
-      const finalMediaMs = Math.max(0, terminalAnchor.mediaPtsMs);
+      const finalMediaMs = Math.max(0, settledTerminalAnchor.mediaPtsMs);
       resumeMediaMsRef.current = finalMediaMs;
       requestedMediaMsRef.current = finalMediaMs;
       setMediaMs(finalMediaMs);
-      onPlaybackCombatTime(terminalAnchor.combatMs);
+      onPlaybackCombatTime(settledTerminalAnchor.combatMs);
       if (Math.abs(nextMediaMs - finalMediaMs) >= 1) {
         video.currentTime = finalMediaMs / 1_000;
       }

@@ -18,6 +18,10 @@ export interface RecordingSyncState {
   issues: string[];
 }
 
+const MIN_SETTLED_TERMINAL_PLATFORM_MS = 1_000;
+const MAX_SETTLED_TERMINAL_PLATFORM_MS = 2_000;
+const TERMINAL_SETTLE_OFFSET_MS = 750;
+
 export function getTerminalCombatAnchor(
   anchors: readonly SyncAnchor[],
 ): SyncAnchor | null {
@@ -34,6 +38,37 @@ export function getTerminalCombatAnchor(
     index -= 1;
   }
   return anchors[index] ?? null;
+}
+
+export function getSettledTerminalAnchor(
+  anchors: readonly SyncAnchor[],
+): SyncAnchor | null {
+  const first = getTerminalCombatAnchor(anchors);
+  const last = anchors[anchors.length - 1];
+  if (!first || !last || last.combatMs !== first.combatMs) return first;
+
+  // Current recordings hold the final board for one second after CombatSim
+  // settles. Older reports either stop earlier or retain the native multi-
+  // second final-blow slowdown, so only the bounded modern platform opts into
+  // the later preview.
+  const platformDurationMs = last.mediaPtsMs - first.mediaPtsMs;
+  if (
+    platformDurationMs < MIN_SETTLED_TERMINAL_PLATFORM_MS
+    || platformDurationMs > MAX_SETTLED_TERMINAL_PLATFORM_MS
+  ) {
+    return first;
+  }
+
+  const targetMediaMs = first.mediaPtsMs + TERMINAL_SETTLE_OFFSET_MS;
+  for (const anchor of anchors) {
+    if (
+      anchor.combatMs === first.combatMs
+      && anchor.mediaPtsMs >= targetMediaMs
+    ) {
+      return anchor;
+    }
+  }
+  return first;
 }
 
 export function normalizeAnchors(manifest: unknown): SyncAnchor[] {
@@ -136,7 +171,7 @@ export function mapCombatToMedia(
     return left.mediaPtsMs + progress * (right.mediaPtsMs - left.mediaPtsMs);
   }
 
-  return getTerminalCombatAnchor(anchors)?.mediaPtsMs ?? null;
+  return getSettledTerminalAnchor(anchors)?.mediaPtsMs ?? null;
 }
 
 export function mapMediaToCombat(

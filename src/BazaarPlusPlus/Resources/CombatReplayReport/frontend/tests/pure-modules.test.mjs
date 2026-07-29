@@ -21,6 +21,7 @@ import {
   timelineWidthAtZoom,
 } from "../src/timeline/constants.ts";
 import {
+  getSettledTerminalAnchor,
   getTerminalCombatAnchor,
   mapCombatToMedia,
   mapMediaToCombat,
@@ -1492,7 +1493,7 @@ test("recording sync interpolates and clamps in both directions", () => {
   assert.equal(mapCombatToMedia(100, anchors.slice(0, 1)), null);
 });
 
-test("recording sync stops at the first sample of a terminal combat plateau", () => {
+test("recording sync keeps short terminal plateaus at their first sample", () => {
   const anchors = [
     { combatMs: 0, mediaPtsMs: 500 },
     { combatMs: 50, mediaPtsMs: 550 },
@@ -1505,6 +1506,39 @@ test("recording sync stops at the first sample of a terminal combat plateau", ()
   assert.equal(mapCombatToMedia(100, anchors), 600);
   assert.equal(mapCombatToMedia(101, anchors), 600);
   assert.equal(mapCombatToMedia(Number.POSITIVE_INFINITY, anchors), 600);
+});
+
+test("recording sync uses a settled frame beyond the final combat time", () => {
+  const anchors = [
+    { combatMs: 0, mediaPtsMs: 500 },
+    { combatMs: 50, mediaPtsMs: 550 },
+    { combatMs: 100, mediaPtsMs: 600 },
+    { combatMs: 100, mediaPtsMs: 850 },
+    { combatMs: 100, mediaPtsMs: 1_100 },
+    { combatMs: 100, mediaPtsMs: 1_350 },
+    { combatMs: 100, mediaPtsMs: 1_600 },
+  ];
+
+  assert.deepEqual(getTerminalCombatAnchor(anchors), anchors[2]);
+  assert.deepEqual(getSettledTerminalAnchor(anchors), anchors[5]);
+  assert.equal(mapCombatToMedia(100, anchors), 600);
+  assert.equal(mapCombatToMedia(101, anchors), 1_350);
+  assert.equal(mapCombatToMedia(Number.POSITIVE_INFINITY, anchors), 1_350);
+});
+
+test("recording sync does not infer a settled frame from legacy slow motion", () => {
+  const anchors = [
+    { combatMs: 0, mediaPtsMs: 500 },
+    { combatMs: 100, mediaPtsMs: 600 },
+    { combatMs: 100, mediaPtsMs: 1_350 },
+    { combatMs: 100, mediaPtsMs: 2_100 },
+    { combatMs: 100, mediaPtsMs: 2_850 },
+    { combatMs: 100, mediaPtsMs: 3_600 },
+  ];
+
+  assert.deepEqual(getTerminalCombatAnchor(anchors), anchors[1]);
+  assert.deepEqual(getSettledTerminalAnchor(anchors), anchors[1]);
+  assert.equal(mapCombatToMedia(101, anchors), 600);
 });
 
 test("recording sync rejects non-monotonic or mismatched exact metadata", () => {
