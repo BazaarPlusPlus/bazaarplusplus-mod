@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using BazaarPlusPlus.BazaarAgent;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 public class BazaarAgentHttpServerTests
@@ -301,6 +302,64 @@ public class BazaarAgentHttpServerTests
         req2.Headers.IfNoneMatch.Add(new EntityTagHeaderValue(etag!.Tag, isWeak: false));
         var res2 = await http.SendAsync(req2);
         Assert.Equal(HttpStatusCode.NotModified, res2.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAgentView_Caches_card_knowledge_per_returned_session()
+    {
+        using var f = new ServerFixture();
+        var card = new BazaarAgentCardSnapshot
+        {
+            InstanceId = "item-1",
+            Kind = BazaarAgentCardKind.Item,
+            TemplateId = "template-1",
+            DisplayName = "Test Item",
+            Size = "1",
+            Location = BazaarAgentCardLocation.Board,
+            Attributes = new Dictionary<string, int> { ["Damage"] = 10 },
+        };
+        f.SetSnapshot(
+            new BazaarAgentContextSnapshot(
+                new BazaarAgentContext
+                {
+                    TickId = 42,
+                    StateName = BazaarAgentRunStateName.Choice,
+                    BoardItems = new[] { card },
+                    AvailableActions = new[]
+                    {
+                        new BazaarAgentDecisionOption
+                        {
+                            ActionKind = BazaarAgentActionKind.SellItem,
+                            Group = BazaarAgentActionGroup.Sell,
+                            DisplayKey = "SellItem:item-1",
+                            CardInstanceId = card.InstanceId,
+                            Card = card,
+                        },
+                    },
+                }
+            )
+        );
+
+        using var http = Http();
+        var first = await http.GetAsync($"http://127.0.0.1:{f.Port}/v2/context");
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var sessionId = Assert.Single(first.Headers.GetValues("X-Bazaar-Agent-Session"));
+        var firstBody = JObject.Parse(await first.Content.ReadAsStringAsync());
+        Assert.Equal("3.0.0", firstBody.Value<string>("schemaVersion"));
+        Assert.Single((JArray)firstBody["cardKnowledge"]!);
+        Assert.Null(((JArray)firstBody["availableActions"]!)[0]!["card"]);
+        Assert.Null(((JArray)firstBody["availableActions"]!)[0]!["displayKey"]);
+        Assert.Null(firstBody["sellableItems"]);
+
+        var secondRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"http://127.0.0.1:{f.Port}/v2/context"
+        );
+        secondRequest.Headers.Add("X-Bazaar-Agent-Session", sessionId);
+        var second = await http.SendAsync(secondRequest);
+        var secondBody = JObject.Parse(await second.Content.ReadAsStringAsync());
+        Assert.Empty((JArray)secondBody["cardKnowledge"]!);
+        Assert.Equal(sessionId, secondBody.Value<string>("agentSessionId"));
     }
 
     // ---------------------------------------------------------------------------

@@ -26,6 +26,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
     private readonly BazaarAgentCommandQueue<BazaarAgentReplayCommand> _replayQueue;
     private readonly IBazaarAgentLogger _logger;
     private readonly BazaarAgentActivityFeed _activityFeed;
+    private readonly BazaarAgentAgentViewProjector _agentViewProjector = new();
     private readonly Func<string> _requestIdFactory;
     private readonly Func<
         HttpListenerContext,
@@ -193,6 +194,13 @@ public sealed class BazaarAgentHttpServer : IDisposable
                 await HandleGetContext(ctx, requestId).ConfigureAwait(false);
             }
             else if (
+                string.Equals(path, "/v2/context", StringComparison.OrdinalIgnoreCase)
+                && method == "GET"
+            )
+            {
+                await HandleGetAgentView(ctx, requestId).ConfigureAwait(false);
+            }
+            else if (
                 string.Equals(path, "/v1/actions", StringComparison.OrdinalIgnoreCase)
                 && method == "POST"
             )
@@ -278,6 +286,8 @@ public sealed class BazaarAgentHttpServer : IDisposable
     private static BazaarAgentHttpLogRoute ResolveLogRoute(string path)
     {
         if (string.Equals(path, "/v1/context", StringComparison.OrdinalIgnoreCase))
+            return BazaarAgentHttpLogRoute.Context;
+        if (string.Equals(path, "/v2/context", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.Context;
         if (string.Equals(path, "/v1/actions", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.Actions;
@@ -494,6 +504,47 @@ public sealed class BazaarAgentHttpServer : IDisposable
             tickId: snap.TickId,
             responseJson: body
         );
+    }
+
+    private async Task HandleGetAgentView(HttpListenerContext ctx, string requestId)
+    {
+        var snap = _snapshotGetter();
+        if (snap is null)
+        {
+            WriteErrorEnvelope(ctx, 503, "unavailable", null);
+            return;
+        }
+
+        var projection = _agentViewProjector.Project(
+            snap,
+            ctx.Request.Headers["X-Bazaar-Agent-Session"],
+            IsKnowledgeResetRequested(ctx.Request)
+        );
+        var body = JsonConvert.SerializeObject(projection.View, _json);
+        var bytes = Encoding.UTF8.GetBytes(body);
+        ctx.Response.StatusCode = 200;
+        ctx.Response.ContentType = "application/json; charset=utf-8";
+        ctx.Response.Headers["ETag"] = snap.ETag;
+        ctx.Response.Headers["X-Bazaar-Agent-Session"] = projection.AgentSessionId;
+        ctx.Response.Headers["X-Bazaar-Agent-Cache-Epoch"] = projection.CacheEpoch;
+        ctx.Response.ContentLength64 = bytes.Length;
+        await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+        _activityFeed.Publish(
+            "context.sent",
+            requestId,
+            "/v2/context",
+            $"Agent View {snap.Context.StateName} at tick {snap.TickId}",
+            statusCode: 200,
+            tickId: snap.TickId,
+            responseJson: body
+        );
+    }
+
+    private static bool IsKnowledgeResetRequested(HttpListenerRequest request)
+    {
+        var header = request.Headers["X-Bazaar-Agent-Reset-Knowledge"];
+        return string.Equals(header, "true", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(header, "1", StringComparison.Ordinal);
     }
 
     private async Task HandlePostActions(HttpListenerContext ctx, string requestId)
