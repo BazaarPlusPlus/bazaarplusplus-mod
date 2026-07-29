@@ -103,6 +103,10 @@ public static class BazaarAgentActionValidator
                     break;
                 }
             }
+            if (!found && kind == BazaarAgentActionKind.MoveItem)
+                found =
+                    BazaarAgentLayoutMoveValidator.Validate(snapshot, action).Code
+                    == BazaarAgentValidationCode.Ok;
             if (!found)
                 return Fail(
                     BazaarAgentValidationCode.StaleOrUnavailable,
@@ -131,12 +135,16 @@ public static class BazaarAgentActionValidator
                 }
             }
             if (matchedOption is null)
+            {
+                if (kind == BazaarAgentActionKind.MoveItem)
+                    return BazaarAgentLayoutMoveValidator.Validate(snapshot, action);
                 return Fail(
                     BazaarAgentValidationCode.StaleOrUnavailable,
                     409,
                     "no matching option for card-bearing action",
                     new Dictionary<string, object?> { ["currentTickId"] = snapshot.TickId }
                 );
+            }
         }
 
         // ── Rule 4: Hero / PlayMode (StartOrContinueRun only) ─────────────────

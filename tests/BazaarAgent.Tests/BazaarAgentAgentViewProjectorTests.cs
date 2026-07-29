@@ -5,6 +5,59 @@ using Xunit;
 public sealed class BazaarAgentAgentViewProjectorTests
 {
     [Fact]
+    public void Layout_validator_rejects_a_full_cross_inventory_drag_when_displaced_size_cannot_return()
+    {
+        BazaarAgentCardSnapshot CardAt(
+            string id,
+            int size,
+            BazaarAgentCardLocation location,
+            int socket
+        ) =>
+            new()
+            {
+                InstanceId = id,
+                Kind = BazaarAgentCardKind.Item,
+                Size = size.ToString(),
+                Location = location,
+                SocketId = "Socket_" + socket,
+                TemplateId = id,
+            };
+        var snapshot = new BazaarAgentContextSnapshot(
+            new BazaarAgentContext
+            {
+                BoardItems = new[]
+                {
+                    CardAt("b3a", 3, BazaarAgentCardLocation.Board, 0),
+                    CardAt("b3b", 3, BazaarAgentCardLocation.Board, 3),
+                    CardAt("b3c", 3, BazaarAgentCardLocation.Board, 6),
+                    CardAt("b1", 1, BazaarAgentCardLocation.Board, 9),
+                },
+                ChestItems = new[]
+                {
+                    CardAt("c2a", 2, BazaarAgentCardLocation.Chest, 0),
+                    CardAt("c2b", 2, BazaarAgentCardLocation.Chest, 2),
+                    CardAt("c2c", 2, BazaarAgentCardLocation.Chest, 4),
+                    CardAt("c2d", 2, BazaarAgentCardLocation.Chest, 6),
+                    CardAt("c2e", 2, BazaarAgentCardLocation.Chest, 8),
+                },
+            }
+        );
+
+        var result = BazaarAgentLayoutMoveValidator.Validate(
+            snapshot,
+            new BazaarAgentAction
+            {
+                ActionKind = BazaarAgentActionKind.MoveItem,
+                CardInstanceId = "b3a",
+                TargetSection = BazaarAgentTargetSection.Stash,
+                TargetSockets = new[] { "Socket_0", "Socket_1", "Socket_2" },
+            }
+        );
+
+        Assert.NotEqual(BazaarAgentValidationCode.Ok, result.Code);
+    }
+
+    [Fact]
     public void First_occurrence_in_a_session_includes_knowledge_but_a_move_does_not_repeat_it()
     {
         var projector = new BazaarAgentAgentViewProjector();

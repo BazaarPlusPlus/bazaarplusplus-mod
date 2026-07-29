@@ -262,6 +262,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             BazaarAgentActionObservation.Evaluate(
                 observation.Baseline.Context,
                 current?.Context,
+                observation.Action,
                 _clock.NowSeconds,
                 observation.DeadlineSeconds
             )

@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 
 namespace BazaarPlusPlus.BazaarAgent;
@@ -28,6 +29,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
     private readonly IBazaarAgentLogger _logger;
     private readonly BazaarAgentActivityFeed _activityFeed;
     private readonly BazaarAgentAgentViewProjector _agentViewProjector = new();
+    private readonly SemaphoreSlim _actionExecutionGate = new(1, 1);
     private readonly Func<string> _requestIdFactory;
     private readonly Func<
         HttpListenerContext,
@@ -216,6 +218,27 @@ public sealed class BazaarAgentHttpServer : IDisposable
                 await HandlePostActions(ctx, requestId).ConfigureAwait(false);
             }
             else if (
+                string.Equals(path, "/v2/actions", StringComparison.OrdinalIgnoreCase)
+                && method == "POST"
+            )
+            {
+                await HandlePostV2Action(ctx, requestId).ConfigureAwait(false);
+            }
+            else if (
+                string.Equals(path, "/v2/actions/sell-items", StringComparison.OrdinalIgnoreCase)
+                && method == "POST"
+            )
+            {
+                await HandlePostSellItems(ctx, requestId).ConfigureAwait(false);
+            }
+            else if (
+                string.Equals(path, "/v2/actions/set-layout", StringComparison.OrdinalIgnoreCase)
+                && method == "POST"
+            )
+            {
+                await HandlePostSetLayout(ctx, requestId).ConfigureAwait(false);
+            }
+            else if (
                 string.Equals(path, "/v1/replay/record", StringComparison.OrdinalIgnoreCase)
                 && method == "POST"
             )
@@ -300,6 +323,8 @@ public sealed class BazaarAgentHttpServer : IDisposable
         if (string.Equals(path, "/v2/cards/query", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.CardQuery;
         if (string.Equals(path, "/v1/actions", StringComparison.OrdinalIgnoreCase))
+            return BazaarAgentHttpLogRoute.Actions;
+        if (path.StartsWith("/v2/actions", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.Actions;
         if (string.Equals(path, "/v1/replay/record", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.ReplayRecord;
@@ -556,10 +581,21 @@ public sealed class BazaarAgentHttpServer : IDisposable
         string sessionId,
         string cacheEpoch,
         string body
+    ) =>
+        await WriteV2Response(ctx, 200, snapshot, sessionId, cacheEpoch, body)
+            .ConfigureAwait(false);
+
+    private static async Task WriteV2Response(
+        HttpListenerContext ctx,
+        int status,
+        BazaarAgentContextSnapshot snapshot,
+        string sessionId,
+        string cacheEpoch,
+        string body
     )
     {
         var bytes = Encoding.UTF8.GetBytes(body);
-        ctx.Response.StatusCode = 200;
+        ctx.Response.StatusCode = status;
         ctx.Response.ContentType = "application/json; charset=utf-8";
         ctx.Response.Headers["ETag"] = snapshot.ETag;
         ctx.Response.Headers["X-Bazaar-Agent-Session"] = sessionId;
@@ -679,6 +715,274 @@ public sealed class BazaarAgentHttpServer : IDisposable
 
         validationError = null;
         return true;
+    }
+
+    private async Task HandlePostV2Action(HttpListenerContext ctx, string requestId)
+    {
+        var action = await ReadJsonBody<BazaarAgentAction>(
+                ctx,
+                requestId,
+                BazaarAgentHttpLogRoute.Actions
+            )
+            .ConfigureAwait(false);
+        if (action is null)
+            return;
+
+        await _actionExecutionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var response = await _queue
+                .EnqueueAndAwaitAsync(requestId, action)
+                .ConfigureAwait(false);
+            await WriteV2ActionResponse(ctx, response).ConfigureAwait(false);
+        }
+        finally
+        {
+            _actionExecutionGate.Release();
+        }
+    }
+
+    private async Task HandlePostSellItems(HttpListenerContext ctx, string requestId)
+    {
+        var request = await ReadJsonBody<BazaarAgentSellItemsRequest>(
+                ctx,
+                requestId,
+                BazaarAgentHttpLogRoute.Actions
+            )
+            .ConfigureAwait(false);
+        if (request is null)
+            return;
+        var snapshot = _snapshotGetter();
+        if (snapshot is null)
+        {
+            WriteErrorEnvelope(ctx, 503, "unavailable", null);
+            return;
+        }
+        if (!TryBuildSellBatch(snapshot, request, out var actions, out var error))
+        {
+            WriteErrorEnvelope(ctx, 409, "stale-or-unavailable", error);
+            return;
+        }
+        await ExecuteBatch(ctx, requestId, actions).ConfigureAwait(false);
+    }
+
+    private async Task HandlePostSetLayout(HttpListenerContext ctx, string requestId)
+    {
+        var request = await ReadJsonBody<BazaarAgentSetLayoutRequest>(
+                ctx,
+                requestId,
+                BazaarAgentHttpLogRoute.Actions
+            )
+            .ConfigureAwait(false);
+        if (request is null)
+            return;
+        var snapshot = _snapshotGetter();
+        if (snapshot is null)
+        {
+            WriteErrorEnvelope(ctx, 503, "unavailable", null);
+            return;
+        }
+        if (!TryBuildLayoutBatch(snapshot, request, out var actions, out var error))
+        {
+            WriteErrorEnvelope(ctx, 409, "stale-or-unavailable", error);
+            return;
+        }
+        await ExecuteBatch(ctx, requestId, actions).ConfigureAwait(false);
+    }
+
+    private async Task<T?> ReadJsonBody<T>(
+        HttpListenerContext ctx,
+        string requestId,
+        BazaarAgentHttpLogRoute route
+    )
+        where T : class
+    {
+        var bytes = await ReadBodyWithCap(ctx, MaxBodyBytes, requestId, route)
+            .ConfigureAwait(false);
+        if (bytes is null)
+            return null;
+        try
+        {
+            var result = JsonConvert.DeserializeObject<T>(Encoding.UTF8.GetString(bytes), _json);
+            if (result is not null)
+                return result;
+        }
+        catch (JsonException) { }
+        WriteErrorEnvelope(ctx, 400, "invalid", "malformed or empty json");
+        return null;
+    }
+
+    private static bool TryBuildSellBatch(
+        BazaarAgentContextSnapshot snapshot,
+        BazaarAgentSellItemsRequest request,
+        out IReadOnlyList<BazaarAgentAction> actions,
+        out string? error
+    )
+    {
+        actions = Array.Empty<BazaarAgentAction>();
+        error = null;
+        if (request.ForTickId is { } tick && tick != snapshot.TickId)
+        {
+            error = "stale tickId";
+            return false;
+        }
+        if (request.CardInstanceIds is null || request.CardInstanceIds.Count is < 1 or > 16)
+        {
+            error = "cardInstanceIds must contain 1 to 16 cards";
+            return false;
+        }
+        if (
+            request.CardInstanceIds.Any(string.IsNullOrWhiteSpace)
+            || request.CardInstanceIds.Distinct().Count() != request.CardInstanceIds.Count
+        )
+        {
+            error = "cardInstanceIds must be nonblank and unique";
+            return false;
+        }
+        actions = request
+            .CardInstanceIds.Select(id => new BazaarAgentAction
+            {
+                ActionKind = BazaarAgentActionKind.SellItem,
+                CardInstanceId = id,
+                Reason = request.Reason,
+            })
+            .ToArray();
+        return true;
+    }
+
+    private static bool TryBuildLayoutBatch(
+        BazaarAgentContextSnapshot snapshot,
+        BazaarAgentSetLayoutRequest request,
+        out IReadOnlyList<BazaarAgentAction> actions,
+        out string? error
+    )
+    {
+        actions = Array.Empty<BazaarAgentAction>();
+        error = null;
+        if (request.ForTickId is { } tick && tick != snapshot.TickId)
+        {
+            error = "stale tickId";
+            return false;
+        }
+        if (request.Placements is null || request.Placements.Count is < 1 or > 16)
+        {
+            error = "placements must contain 1 to 16 moves";
+            return false;
+        }
+        if (
+            request.Placements.Any(placement => string.IsNullOrWhiteSpace(placement.CardInstanceId))
+            || request.Placements.Select(placement => placement.CardInstanceId).Distinct().Count()
+                != request.Placements.Count
+        )
+        {
+            error = "placements must use unique, nonblank cardInstanceIds";
+            return false;
+        }
+        var built = request
+            .Placements.Select(placement => new BazaarAgentAction
+            {
+                ActionKind = BazaarAgentActionKind.MoveItem,
+                CardInstanceId = placement.CardInstanceId,
+                TargetSection = placement.TargetSection,
+                TargetSockets = placement.TargetSockets,
+                Reason = request.Reason,
+            })
+            .ToArray();
+        foreach (var action in built)
+        {
+            if (
+                BazaarAgentLayoutMoveValidator.Validate(snapshot, action).Code
+                != BazaarAgentValidationCode.Ok
+            )
+            {
+                error = "layout contains an unreachable drag operation";
+                return false;
+            }
+        }
+        actions = built;
+        return true;
+    }
+
+    private async Task ExecuteBatch(
+        HttpListenerContext ctx,
+        string requestId,
+        IReadOnlyList<BazaarAgentAction> actions
+    )
+    {
+        await _actionExecutionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var steps = new List<BazaarAgentBatchActionStepResult>();
+            var status = 200;
+            foreach (var action in actions)
+            {
+                var response = await _queue
+                    .EnqueueAndAwaitAsync(requestId, action)
+                    .ConfigureAwait(false);
+                var confirmed =
+                    response.HttpStatus == 200
+                    && response.JsonBody.Contains("\"confirmed\":true", StringComparison.Ordinal);
+                steps.Add(
+                    new BazaarAgentBatchActionStepResult
+                    {
+                        ActionKind = action.ActionKind,
+                        CardInstanceId = action.CardInstanceId,
+                        Status = confirmed ? "confirmed" : "stopped",
+                        Error = confirmed ? null : response.JsonBody,
+                    }
+                );
+                if (!confirmed)
+                {
+                    status = response.HttpStatus;
+                    break;
+                }
+            }
+            var responseBody = JsonConvert.SerializeObject(
+                new BazaarAgentBatchActionResponse
+                {
+                    Status = steps.Count == actions.Count ? "completed" : "partially_completed",
+                    Steps = steps,
+                },
+                _json
+            );
+            await WriteV2ActionResponse(ctx, new BazaarAgentServerResponse(status, responseBody))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _actionExecutionGate.Release();
+        }
+    }
+
+    private async Task WriteV2ActionResponse(
+        HttpListenerContext ctx,
+        BazaarAgentServerResponse response
+    )
+    {
+        var snapshot = _snapshotGetter();
+        if (snapshot is null)
+        {
+            await WriteQueueResponse(ctx, response).ConfigureAwait(false);
+            return;
+        }
+        var projection = _agentViewProjector.Project(
+            snapshot,
+            ctx.Request.Headers["X-Bazaar-Agent-Session"],
+            IsKnowledgeResetRequested(ctx.Request)
+        );
+        var body = JsonConvert.SerializeObject(
+            new { result = JToken.Parse(response.JsonBody), nextDecision = projection.View },
+            _json
+        );
+        await WriteV2Response(
+                ctx,
+                response.HttpStatus,
+                snapshot,
+                projection.AgentSessionId,
+                projection.CacheEpoch,
+                body
+            )
+            .ConfigureAwait(false);
     }
 
     private async Task HandlePostActions(HttpListenerContext ctx, string requestId)
