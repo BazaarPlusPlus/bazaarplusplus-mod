@@ -1,6 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Game.CollectionPanel;
 
 internal sealed class CollectionPortraitFailureGate<TKey, TReason>

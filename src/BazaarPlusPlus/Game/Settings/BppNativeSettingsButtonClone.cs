@@ -2,6 +2,7 @@
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
 using UnityEngine.UI;
+using Object = UnityEngine.Object;
 
 namespace BazaarPlusPlus.Game.Settings;
 

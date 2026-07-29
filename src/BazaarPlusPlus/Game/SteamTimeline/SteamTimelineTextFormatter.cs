@@ -1,7 +1,5 @@
 #nullable enable
-using System;
 using System.Globalization;
-using System.Linq;
 using BazaarPlusPlus.GameInterop.SteamTimeline;
 
 namespace BazaarPlusPlus.Game.SteamTimeline;

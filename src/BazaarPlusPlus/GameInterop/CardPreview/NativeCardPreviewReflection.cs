@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using System.Reflection;
 using BazaarGameClient.Domain.Models.Cards;
 using HarmonyLib;
@@ -25,6 +24,9 @@ internal static class NativeCardPreviewReflection
     public static readonly MethodInfo? OnHoverMethod =
         CardPreviewBaseType != null ? AccessTools.Method(CardPreviewBaseType, "OnHover") : null;
 
+    public static readonly MethodInfo? OnHoverOutMethod =
+        CardPreviewBaseType != null ? AccessTools.Method(CardPreviewBaseType, "OnHoverOut") : null;
+
     public static readonly MethodInfo? ResizeMethod =
         CardPreviewBaseType != null ? AccessTools.Method(CardPreviewBaseType, "Resize") : null;
 
@@ -36,20 +38,6 @@ internal static class NativeCardPreviewReflection
 
     private static readonly FieldInfo? ClientCardField =
         CardPreviewBaseType != null ? AccessTools.Field(CardPreviewBaseType, "_clientCard") : null;
-
-    public static MethodInfo? ResolvePublicInstanceMethod(string name)
-    {
-        if (CardPreviewBaseType == null || string.IsNullOrWhiteSpace(name))
-            return null;
-
-        return CardPreviewBaseType.GetMethod(
-            name,
-            BindingFlags.Public | BindingFlags.Instance,
-            null,
-            Type.EmptyTypes,
-            null
-        );
-    }
 
     public static bool TryGetTooltipData(
         Component cardPreview,
@@ -139,11 +127,35 @@ internal static class NativeCardPreviewReflection
     public static bool TryInvokeOnHover(
         Component cardPreview,
         Action<NativeCardPreviewFailure>? reportFailure = null
+    ) =>
+        TryInvoke(
+            cardPreview,
+            OnHoverMethod,
+            NativeCardPreviewOperation.InvokeHover,
+            reportFailure
+        );
+
+    public static bool TryInvokeOnHoverOut(
+        Component cardPreview,
+        Action<NativeCardPreviewFailure>? reportFailure = null
+    ) =>
+        TryInvoke(
+            cardPreview,
+            OnHoverOutMethod,
+            NativeCardPreviewOperation.InvokeHoverOut,
+            reportFailure
+        );
+
+    private static bool TryInvoke(
+        Component cardPreview,
+        MethodInfo? method,
+        NativeCardPreviewOperation operation,
+        Action<NativeCardPreviewFailure>? reportFailure
     )
     {
-        if (!IsCardPreview(cardPreview) || OnHoverMethod is not { } method)
+        if (!IsCardPreview(cardPreview) || method == null)
         {
-            ReportUnavailable(reportFailure, NativeCardPreviewOperation.InvokeHover);
+            ReportUnavailable(reportFailure, operation);
             return false;
         }
 
@@ -154,16 +166,12 @@ internal static class NativeCardPreviewReflection
         }
         catch (TargetInvocationException ex)
         {
-            ReportException(
-                reportFailure,
-                NativeCardPreviewOperation.InvokeHover,
-                ex.InnerException ?? ex
-            );
+            ReportException(reportFailure, operation, ex.InnerException ?? ex);
             return false;
         }
         catch (Exception ex)
         {
-            ReportException(reportFailure, NativeCardPreviewOperation.InvokeHover, ex);
+            ReportException(reportFailure, operation, ex);
             return false;
         }
     }

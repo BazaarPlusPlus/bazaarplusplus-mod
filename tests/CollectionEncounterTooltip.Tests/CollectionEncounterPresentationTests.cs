@@ -1,11 +1,9 @@
-using System.Collections.Generic;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
-using Disposition = BazaarPlusPlus.Game.CollectionPanel.CollectionEncounterEventDetailResolver.ChoicePresentation;
+using Disposition = BazaarPlusPlus.Game.EventPreview.EncounterEventDetailResolver.ChoicePresentation;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public class CollectionEncounterPresentationTests
+public class EncounterPresentationTests
 {
     // Wishing Fountain: 21 "Make a Wish" price tiers, limit 3 — the 18 beyond-limit
     // same-title variants hide instead of rendering as a dimmed wall.
@@ -16,7 +14,7 @@ public class CollectionEncounterPresentationTests
         for (var i = 0; i < 21; i++)
             candidates.Add(("Make a Wish", true));
 
-        var result = CollectionEncounterEventDetailResolver.ResolvePresentation(candidates, 3);
+        var result = EncounterEventDetailResolver.ResolvePresentation(candidates, 3);
 
         Assert.Equal(3, CountOf(result, Disposition.Presented));
         Assert.Equal(0, CountOf(result, Disposition.Dimmed));
@@ -33,7 +31,7 @@ public class CollectionEncounterPresentationTests
             ("Option C", true),
         };
 
-        var result = CollectionEncounterEventDetailResolver.ResolvePresentation(candidates, 2);
+        var result = EncounterEventDetailResolver.ResolvePresentation(candidates, 2);
 
         Assert.Equal(
             new[] { Disposition.Presented, Disposition.Presented, Disposition.Dimmed },
@@ -51,7 +49,7 @@ public class CollectionEncounterPresentationTests
             ("Clear the Way", false),
         };
 
-        var result = CollectionEncounterEventDetailResolver.ResolvePresentation(candidates, 3);
+        var result = EncounterEventDetailResolver.ResolvePresentation(candidates, 3);
 
         Assert.Equal(
             new[] { Disposition.Presented, Disposition.Dimmed, Disposition.Dimmed },

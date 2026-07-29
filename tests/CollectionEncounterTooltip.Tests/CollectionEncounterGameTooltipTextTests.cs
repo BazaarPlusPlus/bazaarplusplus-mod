@@ -1,14 +1,13 @@
 using BazaarGameShared.Domain.Core.Types;
-using BazaarPlusPlus.Game.CollectionPanel;
-using BazaarPlusPlus.Game.CollectionPanel.Ui;
+using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.Localization;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionEncounterGameTooltipTextTests
+public sealed class EncounterPreviewTextFormatterTests
 {
-    public CollectionEncounterGameTooltipTextTests()
+    public EncounterPreviewTextFormatterTests()
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
     }
@@ -18,16 +17,15 @@ public sealed class CollectionEncounterGameTooltipTextTests
     {
         L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-0000000000f1"),
                 "闪亮!",
                 "获得+10 生命上限",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(option);
+        var text = EncounterPreviewTextFormatter.Build(option);
 
         Assert.Contains("<color=#FFD37E>闪亮!：</color>获得+ 10 生命上限", text);
         Assert.DoesNotContain("： ", text);
@@ -38,16 +36,15 @@ public sealed class CollectionEncounterGameTooltipTextTests
     {
         L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-0000000000f2"),
                 "收下",
                 "+10生命上限",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(option);
+        var text = EncounterPreviewTextFormatter.Build(option);
 
         Assert.Contains("收下：</color>+10生命上限", text);
         Assert.DoesNotContain("+ 10生命上限", text);
@@ -57,23 +54,21 @@ public sealed class CollectionEncounterGameTooltipTextTests
     public void Build_renders_one_compact_line_per_choice_without_meta_brackets()
     {
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000002"),
                 "Keep It for Luck",
                 "Gain 1 XP",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             ),
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000003"),
                 "Share It With a Friend",
                 "Get a Small Silver-tier Friend",
-                CreateRewardFilter(tiers: new[] { ETier.Silver }, summary: "Small Silver Friend"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: new[] { ETier.Silver }, summary: "Small Silver Friend")
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(
+        var text = EncounterPreviewTextFormatter.Build(
             option,
             result => $"<line-height=1.6em>«{result}»</line-height>"
         );
@@ -90,61 +85,93 @@ public sealed class CollectionEncounterGameTooltipTextTests
     }
 
     [Fact]
-    public void Build_appends_day_tier_only_for_day_driven_card_rewards()
+    public void Build_appends_day_tier_distribution_only_for_day_driven_card_rewards()
     {
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000005"),
                 "Open It",
                 "Get a Medium item",
-                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Medium Item"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Medium Item")
             ),
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000006"),
                 "Hunt for Reagents",
                 "Get a Silver-tier Reagent",
-                CreateRewardFilter(tiers: new[] { ETier.Silver }, summary: "Silver Reagent"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: new[] { ETier.Silver }, summary: "Silver Reagent")
             ),
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000007"),
                 "Sell It",
                 "Gain 4 Gold",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(
+        var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Silver
+            dayTiers: GameDataDayTierTable.FromWeights(0.9f, 0.1f, 0, 0)
         );
 
-        Assert.Contains("Get a Medium item (up to Silver)", text);
+        Assert.Contains("Get a Medium item (", text);
+        Assert.Contains("Bronze 90%", text);
+        Assert.Contains("Silver 10%", text);
+        Assert.DoesNotContain("up to Silver", text);
         Assert.Contains("Get a Silver-tier Reagent", text);
-        Assert.DoesNotContain("Get a Silver-tier Reagent (up to", text);
-        Assert.DoesNotContain("Gain 4 Gold (up to", text);
+        Assert.DoesNotContain("Get a Silver-tier Reagent (<color", text);
+        Assert.DoesNotContain("Gain 4 Gold (<color", text);
+    }
+
+    [Theory]
+    [InlineData("zh-CN", false, "（青铜 90% · 白银 10%）")]
+    [InlineData("zh-TW", true, "（青銅 90% · 白銀 10%）")]
+    public void Build_localizes_day_tier_distribution_suffix(
+        string language,
+        bool traditional,
+        string expected
+    )
+    {
+        L.Install(
+            new TestLanguageProvider(language),
+            new TestLocaleModeProvider(
+                traditional ? BppChineseLocaleMode.Taiwan : BppChineseLocaleMode.Mainland
+            )
+        );
+        var option = CreateOption(
+            new EncounterChoiceDetail(
+                Guid.Parse("10000000-0000-0000-0000-000000000005"),
+                "打开它",
+                "获得一件中型物品",
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Medium Item")
+            )
+        );
+
+        var text = EncounterPreviewTextFormatter.Build(
+            option,
+            colorizeResult: null,
+            dayTiers: GameDataDayTierTable.FromWeights(0.9f, 0.1f, 0, 0)
+        );
+
+        Assert.Contains(expected, text);
     }
 
     [Fact]
     public void Build_does_not_append_day_tier_when_result_text_already_names_a_tier()
     {
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000005"),
                 "Have a Late Night Treat",
                 "Get 2 Diamond-tier Food",
-                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food")
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(
+        var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Gold
+            dayTiers: GameDataDayTierTable.FromWeights(0.8f, 0.15f, 0.05f, 0f)
         );
 
         Assert.Contains("Get 2 Diamond-tier Food", text);
@@ -156,19 +183,18 @@ public sealed class CollectionEncounterGameTooltipTextTests
     {
         L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000005"),
                 "深夜点心",
                 "获得2个钻石级食物",
-                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food")
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(
+        var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Gold
+            dayTiers: GameDataDayTierTable.FromWeights(0.8f, 0.15f, 0.05f, 0f)
         );
 
         Assert.Contains("获得2个钻石级食物", text);
@@ -190,19 +216,18 @@ public sealed class CollectionEncounterGameTooltipTextTests
             : BppChineseLocaleMode.Mainland;
         L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider(mode));
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000005"),
                 "深夜点心",
                 resultText,
-                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food"),
-                isSourceMatch: false
+                CreateRewardFilter(tiers: Array.Empty<ETier>(), summary: "Food")
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(
+        var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Gold
+            dayTiers: GameDataDayTierTable.FromWeights(0.8f, 0.15f, 0.05f, 0f)
         );
 
         Assert.Contains(resultText, text);
@@ -213,7 +238,7 @@ public sealed class CollectionEncounterGameTooltipTextTests
     public void Build_does_not_append_day_tier_when_reward_ignores_day_tier_table()
     {
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000006"),
                 "Fight the Beast",
                 "Get a Rage item",
@@ -221,15 +246,14 @@ public sealed class CollectionEncounterGameTooltipTextTests
                     tiers: Array.Empty<ETier>(),
                     summary: "Rage Item",
                     usesDayTierTable: false
-                ),
-                isSourceMatch: false
+                )
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(
+        var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Gold
+            dayTiers: GameDataDayTierTable.FromWeights(0.8f, 0.15f, 0.05f, 0f)
         );
 
         Assert.Contains("Get a Rage item", text);
@@ -237,55 +261,52 @@ public sealed class CollectionEncounterGameTooltipTextTests
     }
 
     [Fact]
-    public void Build_shows_the_exact_tier_when_the_day_ceiling_leaves_one()
+    public void Build_shows_the_exact_runtime_distribution_when_only_bronze_is_weighted()
     {
         // A Bronze-Diamond span (e.g. from a not-Legendary complement) is day-driven:
         // on day 1 the effective tier is exactly Bronze.
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000008"),
                 "Trade It for Something",
                 "Get a Medium item",
                 CreateRewardFilter(
                     tiers: new[] { ETier.Bronze, ETier.Silver, ETier.Gold, ETier.Diamond },
                     summary: "Medium Bronze-Diamond Item"
-                ),
-                isSourceMatch: false
+                )
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(
+        var text = EncounterPreviewTextFormatter.Build(
             option,
             colorizeResult: null,
-            dayTierCeiling: ETier.Bronze
+            dayTiers: GameDataDayTierTable.FromWeights(1f, 0f, 0f, 0f)
         );
 
-        Assert.Contains("Get a Medium item (Bronze)", text);
+        Assert.Contains("Get a Medium item (Bronze 100%)", text);
     }
 
     [Fact]
     public void Build_renders_ineligible_options_as_flat_dimmed_lines()
     {
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-000000000009"),
                 "Sell It",
                 "Gain 4 Gold",
-                rewardFilter: null,
-                isSourceMatch: false
+                rewardFilter: null
             ),
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Parse("10000000-0000-0000-0000-00000000000a"),
                 "Add It to Your Bushel",
                 "(if you have a Bushel) Your Bushel gains 20 Heal",
                 rewardFilter: null,
-                isSourceMatch: false,
                 prerequisiteSummary: "",
                 isEligible: false
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(option, result => $"«{result}»");
+        var text = EncounterPreviewTextFormatter.Build(option, result => $"«{result}»");
 
         Assert.Contains(
             "<size=85%><line-height=1.4em><color=#8F8268>Add It to Your Bushel: (if you have a Bushel) Your Bushel gains 20 Heal</color></size>",
@@ -299,67 +320,61 @@ public sealed class CollectionEncounterGameTooltipTextTests
     [Fact]
     public void Build_renders_outcome_groups_with_percentages()
     {
-        var option = new CollectionEncounterOption(
+        var option = new EncounterOption(
             Guid.Parse("10000000-0000-0000-0000-00000000000b"),
             "Mountain Pass",
-            sourceKey: null,
-            sourceKind: null,
-            Guid.Parse("10000000-0000-0000-0000-00000000000b"),
             "Aid a caravan descending the Great Plateau",
             rewardFilter: null,
             choiceDetails: null,
             outcomeGroups: new[]
             {
-                new CollectionEncounterOutcomeView(
+                new EncounterOutcomeView(
                     percent: 40,
                     isEligible: true,
                     isCombatPool: false,
                     optionCount: 2,
                     new[]
                     {
-                        new CollectionEncounterChoiceDetail(
+                        new EncounterChoiceDetail(
                             Guid.Parse("10000000-0000-0000-0000-00000000000c"),
                             "A Routine Job",
                             "Gain 2 XP",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
-                        new CollectionEncounterChoiceDetail(
+                        new EncounterChoiceDetail(
                             Guid.Parse("10000000-0000-0000-0000-00000000000d"),
                             "Generous Tip",
                             "Gain 10 Gold\nand 1 XP",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
                     }
                 ),
-                new CollectionEncounterOutcomeView(
+                new EncounterOutcomeView(
                     percent: 50,
                     isEligible: true,
                     isCombatPool: true,
                     optionCount: 10,
-                    Array.Empty<CollectionEncounterChoiceDetail>()
+                    Array.Empty<EncounterChoiceDetail>()
                 ),
-                new CollectionEncounterOutcomeView(
+                new EncounterOutcomeView(
                     percent: null,
                     isEligible: false,
                     isCombatPool: false,
                     optionCount: 1,
                     new[]
                     {
-                        new CollectionEncounterChoiceDetail(
+                        new EncounterChoiceDetail(
                             Guid.Parse("10000000-0000-0000-0000-00000000000e"),
                             "Clear the Way",
                             "(if you have Powder Keg) Gain 5 Gold",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
                     }
                 ),
             }
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(option);
+        var text = EncounterPreviewTextFormatter.Build(option);
 
         Assert.Contains("Possible outcomes:", text);
         Assert.Contains("<color=#FFD37E>40%</color>", text);
@@ -379,20 +394,17 @@ public sealed class CollectionEncounterGameTooltipTextTests
     [Fact]
     public void Build_returns_empty_without_choice_details()
     {
-        var option = new CollectionEncounterOption(
+        var option = new EncounterOption(
             Guid.Parse("10000000-0000-0000-0000-000000000004"),
             "Jungle Ruins",
-            sourceKey: null,
-            sourceKind: null,
-            Guid.Parse("10000000-0000-0000-0000-000000000004"),
             "You find abandoned ruins in the jungle",
             rewardFilter: null
         );
 
-        Assert.Equal(string.Empty, CollectionEncounterGameTooltipText.Build(option));
+        Assert.Equal(string.Empty, EncounterPreviewTextFormatter.Build(option));
     }
 
-    private static CollectionEncounterRewardFilter CreateRewardFilter(
+    private static EncounterRewardFilter CreateRewardFilter(
         ETier[] tiers,
         string summary,
         bool usesDayTierTable = true
@@ -411,15 +423,10 @@ public sealed class CollectionEncounterGameTooltipTextTests
             usesDayTierTable
         );
 
-    private static CollectionEncounterOption CreateOption(
-        params CollectionEncounterChoiceDetail[] choices
-    ) =>
+    private static EncounterOption CreateOption(params EncounterChoiceDetail[] choices) =>
         new(
             Guid.Parse("10000000-0000-0000-0000-000000000001"),
             "A Strange Mushroom",
-            sourceKey: null,
-            sourceKind: null,
-            Guid.Parse("10000000-0000-0000-0000-000000000001"),
             "You find a strange mushroom in the Greenheart",
             rewardFilter: null,
             choices
@@ -449,21 +456,20 @@ public sealed class CollectionEncounterGameTooltipTextTests
     public void Choice_pool_renders_combat_summary()
     {
         var option = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Empty,
                 displayName: string.Empty,
                 resultText: string.Empty,
                 rewardFilter: null,
-                isSourceMatch: false,
-                pool: new CollectionEncounterChoicePool(
+                pool: new EncounterChoicePool(
                     isCombat: true,
                     optionCount: 14,
-                    Array.Empty<CollectionEncounterChoiceDetail>()
+                    Array.Empty<EncounterChoiceDetail>()
                 )
             )
         );
 
-        var text = CollectionEncounterGameTooltipText.Build(option);
+        var text = EncounterPreviewTextFormatter.Build(option);
 
         Assert.Contains("Fight a monster (14 possible)", text);
     }
@@ -472,54 +478,50 @@ public sealed class CollectionEncounterGameTooltipTextTests
     public void Choice_pool_expands_small_entry_lists_and_counts_large_ones()
     {
         var small = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Empty,
                 displayName: string.Empty,
                 resultText: string.Empty,
                 rewardFilter: null,
-                isSourceMatch: false,
-                pool: new CollectionEncounterChoicePool(
+                pool: new EncounterChoicePool(
                     isCombat: false,
                     optionCount: 2,
                     new[]
                     {
-                        new CollectionEncounterChoiceDetail(
+                        new EncounterChoiceDetail(
                             Guid.NewGuid(),
                             "Aquatic Training",
                             "Your leftmost item gains the Aquatic type",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
-                        new CollectionEncounterChoiceDetail(
+                        new EncounterChoiceDetail(
                             Guid.NewGuid(),
                             "Apparel Training",
                             "Your leftmost item gains the Apparel type",
-                            rewardFilter: null,
-                            isSourceMatch: false
+                            rewardFilter: null
                         ),
                     }
                 )
             )
         );
-        var smallText = CollectionEncounterGameTooltipText.Build(small);
+        var smallText = EncounterPreviewTextFormatter.Build(small);
         Assert.Contains("one of 2:", smallText);
         Assert.Contains("Aquatic Training", smallText);
 
         var large = CreateOption(
-            new CollectionEncounterChoiceDetail(
+            new EncounterChoiceDetail(
                 Guid.Empty,
                 displayName: string.Empty,
                 resultText: string.Empty,
                 rewardFilter: null,
-                isSourceMatch: false,
-                pool: new CollectionEncounterChoicePool(
+                pool: new EncounterChoicePool(
                     isCombat: false,
                     optionCount: 16,
-                    Array.Empty<CollectionEncounterChoiceDetail>()
+                    Array.Empty<EncounterChoiceDetail>()
                 )
             )
         );
-        var largeText = CollectionEncounterGameTooltipText.Build(large);
+        var largeText = EncounterPreviewTextFormatter.Build(large);
         Assert.Contains("Random reward (16 options)", largeText);
         Assert.DoesNotContain("one of", largeText);
     }

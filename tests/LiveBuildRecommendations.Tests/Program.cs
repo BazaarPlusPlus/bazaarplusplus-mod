@@ -1,12 +1,20 @@
 using System.Collections;
 using System.Reflection;
+using BazaarPlusPlus.Game.LiveBuildPanel;
+using BazaarPlusPlus.Game.LiveBuildPanel.Data;
+using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
+using BazaarPlusPlus.GameInterop.Heroes;
+using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
+using BazaarPlusPlus.Infrastructure.UiTokens;
 
 // Behavior tests for the analyzer-v4 ten-win build corpus consumed by LiveBuildPanel.
 // The payload is the compact string-table + schema-driven array-row format emitted by
 // bazaarplusplus-analyzers/src/bpp/stages/analyze/mod_builds.py at
 // analyzer-v4/mod/tenwin_builds.json. Every assertion drives the public
 // BuildRecommendationRepository.FindRecommendations surface (parse + recall + scoring +
-// board projection) or the per-instance cache/remote hooks, via reflection over the internal type.
+// board projection). Catalog lifecycle is tested through IRemoteEmbeddedCatalog in the dedicated
+// RemoteEmbeddedCatalog.Tests project; this feature project keeps parser/query/summary and manual
+// refresh product policy coverage.
 
 TenWinBuildTests.Run();
 
@@ -31,15 +39,15 @@ internal static class TenWinBuildTests
         TestLiveStateRankingOutranksScore();
         TestBoardContractMapsTierEnchantSize();
         TestNullSlotAndTierDoNotCrash();
-        TestFreshCacheIsUsedWithoutRemoteDownload();
-        TestStaleCacheUsesStaleAndQueuesBackgroundRefresh();
-        TestManualRefreshBypassesFreshCache();
-        TestRefreshServiceWrapsManualRefreshOutcome();
-        TestRefreshServiceLimitsToOnePullPerSession();
-        TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh();
-        TestColdStartFallsBackToEmbeddedThenRemote();
+        TestRefreshServicePreservesSessionProductSemantics();
+        TestPanelInvalidationRejectsUiContinuationWithoutCancelingCatalogRefresh();
         TestEmbeddedSeedResourceIsBundledAndParses();
         TestCorpusSummaryIncludesPerHeroBuildCounts();
+        TestMixedAliasCorpusMergesCanonicalFirstByBuildIdentity();
+        TestNonPlayableCorpusKeysCannotBeQueried();
+        TestHeroStripProjectionAndTooltipsUseCanonicalPresentation();
+        TestLegacyCacheAndCanonicalRemoteFixturesShareOneIdentity();
+        TestExistingSevenHeroesKeepRecommendationResults();
 
         Console.WriteLine("LiveBuild recommendation checks passed.");
     }
@@ -86,18 +94,8 @@ internal static class TenWinBuildTests
 
     private static void TestDefaultCachePathUsesTenwinBuildsFileName()
     {
-        var repositoryType = GetRepositoryType();
-        var buildPathMethod = repositoryType.GetMethod(
-            "BuildDefaultTenWinCacheFilePath",
-            BindingFlags.NonPublic | BindingFlags.Static
-        );
-        Assert(
-            buildPathMethod != null,
-            "Repository should expose default ten-win cache path construction."
-        );
-
         var gameRootPath = Path.Combine(Path.GetTempPath(), $"bpp-game-root-{Guid.NewGuid():N}");
-        var cachePath = (string)buildPathMethod!.Invoke(null, [gameRootPath])!;
+        var cachePath = TenWinBuildCatalogFactory.BuildCacheFilePath(gameRootPath);
 
         Assert(
             cachePath == Path.Combine(gameRootPath, "BazaarPlusPlusV4", "tenwin_builds.json"),
@@ -105,13 +103,98 @@ internal static class TenWinBuildTests
         );
     }
 
+    private static void TestRefreshServicePreservesSessionProductSemantics()
+    {
+        var corpus = TenWinBuildCorpus.Parse(ScorePayload("CacheHero", 333))!;
+        using var catalog = new StubCatalog(corpus);
+        var repository = new BuildRecommendationRepository(catalog);
+        var service = new BuildRecommendationRefreshService();
+
+        catalog.Enqueue(
+            CatalogRefreshResult<TenWinBuildCorpus>.Failure(
+                new CatalogIssue(
+                    CatalogIssueKind.RemoteDownloadFailed,
+                    new InvalidOperationException("refresh-boom")
+                )
+            )
+        );
+        var failure = service
+            .RefreshAsync(repository, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert(!failure.Succeeded, "A failed pull should surface as a product failure.");
+        Assert(
+            failure.Error?.Contains("refresh-boom") == true,
+            "The failure should retain its typed diagnostic detail."
+        );
+
+        catalog.Enqueue(
+            CatalogRefreshResult<TenWinBuildCorpus>.Published(
+                Snapshot(corpus, CatalogSource.Remote),
+                degraded: false
+            )
+        );
+        var firstSuccess = service
+            .RefreshAsync(repository, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert(
+            firstSuccess.Outcome == BuildRecommendationRefreshOutcome.Updated,
+            "The first successful remote pull must be Updated even when the payload is identical."
+        );
+        Assert(catalog.RefreshCount == 2, "Failure must not consume the session pull allowance.");
+
+        var gated = service
+            .RefreshAsync(repository, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+        Assert(
+            gated.Outcome == BuildRecommendationRefreshOutcome.NoChange,
+            "Only a session-gated pull should report NoChange."
+        );
+        Assert(catalog.RefreshCount == 2, "The gated pull must perform zero downloads.");
+    }
+
+    private static void TestPanelInvalidationRejectsUiContinuationWithoutCancelingCatalogRefresh()
+    {
+        var initialCorpus = TenWinBuildCorpus.Parse(ScorePayload("InitialHero", 111))!;
+        var refreshedCorpus = TenWinBuildCorpus.Parse(ScorePayload("RefreshedHero", 222))!;
+        using var catalog = new BlockingCatalog(initialCorpus);
+        var repository = new BuildRecommendationRepository(catalog);
+        var service = new BuildRecommendationRefreshService();
+        var continuation = new LiveBuildRefreshContinuationGate();
+        var operationVersion = continuation.Capture();
+
+        var refresh = service.RefreshAsync(repository, CancellationToken.None);
+        catalog.Started.GetAwaiter().GetResult();
+        continuation.Invalidate();
+        catalog.Complete(refreshedCorpus);
+
+        var result = refresh.GetAwaiter().GetResult();
+        Assert(
+            result.Succeeded,
+            "The plugin-lifetime catalog refresh should finish after panel loss."
+        );
+        Assert(
+            !continuation.IsCurrent(operationVersion),
+            "The destroyed panel must reject its stale UI continuation."
+        );
+        var summary = repository.GetCorpusSummary();
+        Assert(summary.HasValue, "The shared repository should retain the refreshed snapshot.");
+        var loadedSummary = summary.GetValueOrDefault();
+        Assert(
+            loadedSummary.HeroBuildCounts.Any(row => row.Hero == "RefreshedHero"),
+            "The shared snapshot should publish even though the initiating panel was destroyed."
+        );
+    }
+
     private static void TestSingleCardSelectionResolvesViaCardIndex()
     {
         WithCorpus(
-            MainRecallPayload("RecallHero"),
+            MainRecallPayload("Vanessa"),
             (repositoryType, repository) =>
             {
-                var scores = ScoresOf(Find(repositoryType, repository, "RecallHero", [GuidA]));
+                var scores = ScoresOf(Find(repositoryType, repository, "Vanessa", [GuidA]));
                 // cardIndex[A] = [build0(score100), build1(score200)] -> ranked by score desc.
                 Assert(
                     scores.SequenceEqual([200L, 100L]),
@@ -124,12 +207,10 @@ internal static class TenWinBuildTests
     private static void TestMultiCardSelectionPrefersIntersection()
     {
         WithCorpus(
-            MainRecallPayload("RecallHero"),
+            MainRecallPayload("Vanessa"),
             (repositoryType, repository) =>
             {
-                var scores = ScoresOf(
-                    Find(repositoryType, repository, "RecallHero", [GuidA, GuidB])
-                );
+                var scores = ScoresOf(Find(repositoryType, repository, "Vanessa", [GuidA, GuidB]));
                 // cardIndex[A]=[0,1], cardIndex[B]=[0,2] -> intersection {0} (score100).
                 Assert(
                     scores.SequenceEqual([100L]),
@@ -145,7 +226,7 @@ internal static class TenWinBuildTests
         var payload = Payload(
             cards: $"[\"{GuidA}\",\"{GuidB}\"]",
             enchantments: "[null]",
-            hero: "DisjointHero",
+            hero: "Dooley",
             builds: $"[{Build("[0]", "[[0,0,1,0,1]]", 10)},{Build("[1]", "[[1,0,1,0,1]]", 20)}]",
             cardIndex: "[[0,[0]],[1,[1]]]"
         );
@@ -153,9 +234,7 @@ internal static class TenWinBuildTests
             payload,
             (repositoryType, repository) =>
             {
-                var scores = ScoresOf(
-                    Find(repositoryType, repository, "DisjointHero", [GuidA, GuidB])
-                );
+                var scores = ScoresOf(Find(repositoryType, repository, "Dooley", [GuidA, GuidB]));
                 Assert(
                     scores.Count == 2,
                     $"Disjoint intersection should fall back to the union of both builds; got {scores.Count}."
@@ -167,14 +246,12 @@ internal static class TenWinBuildTests
     private static void TestUnionFallbackKeepsResultsWhenOneSelectedCardUncovered()
     {
         WithCorpus(
-            MainRecallPayload("RecallHero"),
+            MainRecallPayload("Vanessa"),
             (repositoryType, repository) =>
             {
                 // C is present in cards[] but absent from this hero's cardIndex -> uncovered.
                 // The literal intersection is empty, so union over the covered card (A) must still return results.
-                var scores = ScoresOf(
-                    Find(repositoryType, repository, "RecallHero", [GuidA, GuidC])
-                );
+                var scores = ScoresOf(Find(repositoryType, repository, "Vanessa", [GuidA, GuidC]));
                 Assert(
                     scores.Count == 2,
                     $"An uncovered selected card must not empty the result while A has coverage; got {scores.Count}."
@@ -186,16 +263,16 @@ internal static class TenWinBuildTests
     private static void TestSelectingOnlyUncoveredCardsReturnsEmpty()
     {
         WithCorpus(
-            MainRecallPayload("RecallHero"),
+            MainRecallPayload("Vanessa"),
             (repositoryType, repository) =>
             {
                 // D is absent from cards[] entirely; C is in cards[] but not in cardIndex. Neither has coverage.
                 Assert(
-                    ScoresOf(Find(repositoryType, repository, "RecallHero", [GuidD])).Count == 0,
+                    ScoresOf(Find(repositoryType, repository, "Vanessa", [GuidD])).Count == 0,
                     "An unknown selected card should return no recommendation."
                 );
                 Assert(
-                    ScoresOf(Find(repositoryType, repository, "RecallHero", [GuidC])).Count == 0,
+                    ScoresOf(Find(repositoryType, repository, "Vanessa", [GuidC])).Count == 0,
                     "A selected card with no historical coverage should return no recommendation."
                 );
             }
@@ -205,21 +282,20 @@ internal static class TenWinBuildTests
     private static void TestLiveStateRankingOutranksScore()
     {
         WithCorpus(
-            MainRecallPayload("RecallHero"),
+            MainRecallPayload("Vanessa"),
             (repositoryType, repository) =>
             {
                 // Selecting A returns build0(score100, contains B) and build1(score200, A only).
                 // With no live state, build1 wins on score.
                 Assert(
-                    ScoresOf(Find(repositoryType, repository, "RecallHero", [GuidA])).First()
-                        == 200L,
+                    ScoresOf(Find(repositoryType, repository, "Vanessa", [GuidA])).First() == 200L,
                     "Without live state the higher-score build ranks first."
                 );
 
                 // Put B on the board: build0 gains live-state weight and must outrank the higher-score build1.
                 var liveState = LiveState(repositoryType, board: [GuidB], stash: [], shop: []);
                 var ranked = ScoresOf(
-                    Find(repositoryType, repository, "RecallHero", [GuidA], liveState)
+                    Find(repositoryType, repository, "Vanessa", [GuidA], liveState)
                 );
                 Assert(
                     ranked.First() == 100L,
@@ -234,7 +310,7 @@ internal static class TenWinBuildTests
         var payload = Payload(
             cards: $"[\"{GuidA}\"]",
             enchantments: "[null,\"Fiery\"]",
-            hero: "BoardHero",
+            hero: "Mak",
             // layout: cardRef0, slot3, tier5(Legendary), enchantRef1(Fiery), size2(Medium)
             builds: $"[{Build("[0]", "[[0,3,5,1,2]]", 1)}]",
             cardIndex: "[[0,[0]]]"
@@ -243,7 +319,7 @@ internal static class TenWinBuildTests
             payload,
             (repositoryType, repository) =>
             {
-                var recommendation = Find(repositoryType, repository, "BoardHero", [GuidA])
+                var recommendation = Find(repositoryType, repository, "Mak", [GuidA])
                     .Cast<object>()
                     .Single();
                 var board = Prop(recommendation, "Board")!;
@@ -294,7 +370,7 @@ internal static class TenWinBuildTests
         var payload = Payload(
             cards: $"[\"{GuidA}\"]",
             enchantments: "[null]",
-            hero: "NullHero",
+            hero: "Jules",
             // layout: cardRef0, slot null, tier null, enchantRef0, size1
             builds: $"[{Build("[0]", "[[0,null,null,0,1]]", 5)}]",
             cardIndex: "[[0,[0]]]"
@@ -303,7 +379,7 @@ internal static class TenWinBuildTests
             payload,
             (repositoryType, repository) =>
             {
-                var recommendation = Find(repositoryType, repository, "NullHero", [GuidA])
+                var recommendation = Find(repositoryType, repository, "Jules", [GuidA])
                     .Cast<object>()
                     .Single();
                 var board = Prop(recommendation, "Board")!;
@@ -320,399 +396,30 @@ internal static class TenWinBuildTests
         );
     }
 
-    private static void TestFreshCacheIsUsedWithoutRemoteDownload()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-        File.WriteAllText(cachePath, ScorePayload("CacheHero", 111));
-        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-19));
-
-        Configure(
-            repository,
-            cachePath,
-            now,
-            _ => throw new InvalidOperationException("Fresh cache should not download.")
-        );
-        try
-        {
-            var scores = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                scores.SequenceEqual([111L]),
-                "Fresh cache should answer recommendations without a download."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static void TestStaleCacheUsesStaleAndQueuesBackgroundRefresh()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-        File.WriteAllText(cachePath, ScorePayload("CacheHero", 111));
-        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-21));
-
-        var downloaded = false;
-        Func<Task>? queuedRefresh = null;
-        var queuedRefreshCount = 0;
-        var remotePayload = ScorePayload("CacheHero", 222);
-        ConfigureWithBackgroundRefresh(
-            repository,
-            cachePath,
-            now,
-            _ =>
-            {
-                downloaded = true;
-                return remotePayload;
-            },
-            refresh =>
-            {
-                queuedRefreshCount++;
-                queuedRefresh = refresh;
-            }
-        );
-
-        try
-        {
-            var stale = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(!downloaded, "Stale cache should not block on a synchronous download.");
-            Assert(
-                queuedRefreshCount == 1,
-                "Stale cache should queue exactly one background refresh."
-            );
-            Assert(queuedRefresh != null, "The queued refresh should be executable.");
-            Assert(
-                stale.SequenceEqual([111L]),
-                "Stale cache data should answer until the refresh completes."
-            );
-            Assert(
-                File.ReadAllText(cachePath) != remotePayload,
-                "Normal loading should not rewrite the disk cache."
-            );
-
-            queuedRefresh!().GetAwaiter().GetResult();
-            var refreshed = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(downloaded, "The queued refresh should download remote data.");
-            Assert(
-                refreshed.SequenceEqual([222L]),
-                "The background refresh should replace the in-memory corpus."
-            );
-            Assert(
-                File.ReadAllText(cachePath) == remotePayload,
-                "The background refresh should replace the disk cache."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static void TestManualRefreshBypassesFreshCache()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-        File.WriteAllText(cachePath, ScorePayload("CacheHero", 111));
-        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
-
-        var downloaded = false;
-        var remotePayload = ScorePayload("CacheHero", 222);
-        Configure(
-            repository,
-            cachePath,
-            now,
-            _ =>
-            {
-                downloaded = true;
-                return remotePayload;
-            }
-        );
-
-        try
-        {
-            var cached = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                cached.SequenceEqual([111L]),
-                "Fresh cache should load before a manual refresh."
-            );
-            Assert(!downloaded, "Loading a fresh cache should not download.");
-
-            var refreshed = ManualRefresh(repository, out var error);
-            Assert(refreshed, $"Manual refresh should succeed: {error}");
-            Assert(downloaded, "Manual refresh should download remote data.");
-
-            var after = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                after.SequenceEqual([222L]),
-                "Manual refresh should replace the in-memory corpus."
-            );
-            Assert(
-                File.ReadAllText(cachePath) == remotePayload,
-                "Manual refresh should replace the disk cache."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    // The LiveBuildPanel manual pull consumes the shared refresh service; its result wrapper must
-    // surface the repository's failure detail instead of swallowing it.
-    private static void TestRefreshServiceWrapsManualRefreshOutcome()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath(); // no cache on disk; downloads drive the outcome.
-
-        Configure(
-            repository,
-            cachePath,
-            now,
-            _ => throw new InvalidOperationException("refresh-boom")
-        );
-
-        try
-        {
-            var failure = RunRefreshService(repositoryType, repository);
-            Assert(!GetResultSucceeded(failure), "A throwing download should fail the refresh.");
-            Assert(
-                GetResultError(failure)?.Contains("refresh-boom") == true,
-                "The refresh failure should carry the underlying error detail."
-            );
-
-            Configure(repository, cachePath, now, _ => ScorePayload("CacheHero", 333));
-            var success = RunRefreshService(repositoryType, repository);
-            Assert(GetResultSucceeded(success), "A valid download should succeed the refresh.");
-            Assert(
-                GetResultError(success) == null,
-                "A successful refresh should not carry an error."
-            );
-
-            var after = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                after.SequenceEqual([333L]),
-                "A successful service refresh should update the repository corpus."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static void TestRefreshServiceLimitsToOnePullPerSession()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-
-        var serviceType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildRecommendationRefreshService"
-        );
-        Assert(serviceType != null, "BuildRecommendationRefreshService should exist.");
-        var service =
-            Activator.CreateInstance(serviceType!)
-            ?? throw new InvalidOperationException("Refresh service should be constructible.");
-        var refreshAsync = serviceType!.GetMethod("RefreshAsync")!;
-
-        try
-        {
-            // The first manual pull of the session really downloads and succeeds.
-            Configure(repository, cachePath, now, _ => ScorePayload("CacheHero", 333));
-            var first = InvokeRefreshService(refreshAsync, service, repository);
-            Assert(GetResultSucceeded(first), "The first session pull should really succeed.");
-
-            // The download would now throw, but the once-per-session limit short-circuits to a
-            // synthetic success without touching the repository again.
-            Configure(
-                repository,
-                cachePath,
-                now,
-                _ => throw new InvalidOperationException("must-not-redownload")
-            );
-            var second = InvokeRefreshService(refreshAsync, service, repository);
-            Assert(
-                GetResultSucceeded(second),
-                "A second session pull should fake-succeed without re-downloading."
-            );
-            Assert(
-                GetResultError(second) == null,
-                "A rate-limited pull should not carry an error."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static object InvokeRefreshService(
-        MethodInfo refreshAsync,
-        object service,
-        object repository
-    )
-    {
-        var task = (System.Threading.Tasks.Task)
-            refreshAsync.Invoke(service, [repository, System.Threading.CancellationToken.None])!;
-        task.GetAwaiter().GetResult();
-        return task.GetType().GetProperty("Result")!.GetValue(task)!;
-    }
-
-    private static object RunRefreshService(Type repositoryType, object repository)
-    {
-        var serviceType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.BuildRecommendationRefreshService"
-        );
-        Assert(serviceType != null, "BuildRecommendationRefreshService should exist.");
-        var service =
-            Activator.CreateInstance(serviceType!)
-            ?? throw new InvalidOperationException("Refresh service should be constructible.");
-        var refreshAsync = serviceType!.GetMethod("RefreshAsync");
-        Assert(refreshAsync != null, "Refresh service should expose RefreshAsync.");
-
-        var task = (System.Threading.Tasks.Task)
-            refreshAsync!.Invoke(service, [repository, System.Threading.CancellationToken.None])!;
-        task.GetAwaiter().GetResult();
-        return task.GetType().GetProperty("Result")!.GetValue(task)!;
-    }
-
-    private static bool GetResultSucceeded(object result) =>
-        (bool)result.GetType().GetProperty("Succeeded")!.GetValue(result)!;
-
-    private static string? GetResultError(object result) =>
-        (string?)result.GetType().GetProperty("Error")!.GetValue(result);
-
-    private static void TestColdStartWithNoCacheNorEmbeddedReturnsEmptyAndQueuesRefresh()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath(); // never created on disk -> cold start.
-
-        Func<Task>? queuedRefresh = null;
-        var queuedRefreshCount = 0;
-        var remotePayload = ScorePayload("CacheHero", 222);
-        ConfigureWithBackgroundRefresh(
-            repository,
-            cachePath,
-            now,
-            _ => remotePayload,
-            refresh =>
-            {
-                queuedRefreshCount++;
-                queuedRefresh = refresh;
-            }
-        );
-        SetEmbedded(repository, () => null); // no embedded seed available either.
-
-        try
-        {
-            var cold = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                cold.Count == 0,
-                "A cold start with no cache and no embedded seed should return no recommendation."
-            );
-            Assert(queuedRefreshCount == 1, "A cold start should queue a background refresh.");
-
-            queuedRefresh!().GetAwaiter().GetResult();
-            var afterRefresh = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                afterRefresh.SequenceEqual([222L]),
-                "After the cold-start refresh the corpus should populate."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
-    private static void TestColdStartFallsBackToEmbeddedThenRemote()
-    {
-        var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath(); // never created on disk -> cold start.
-
-        Func<Task>? queuedRefresh = null;
-        var remotePayload = ScorePayload("CacheHero", 222);
-        ConfigureWithBackgroundRefresh(
-            repository,
-            cachePath,
-            now,
-            _ => remotePayload,
-            refresh => queuedRefresh = refresh
-        );
-        SetEmbedded(repository, () => ScorePayload("CacheHero", 555));
-
-        try
-        {
-            // No cache on disk: the bundled seed answers immediately while a refresh is queued.
-            var cold = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                cold.SequenceEqual([555L]),
-                "A cold start with no cache should fall back to the embedded seed."
-            );
-
-            queuedRefresh!().GetAwaiter().GetResult();
-            var afterRefresh = ScoresOf(Find(repositoryType, repository, "CacheHero", [GuidA]));
-            Assert(
-                afterRefresh.SequenceEqual([222L]),
-                "The background refresh should replace the embedded seed with remote data."
-            );
-        }
-        finally
-        {
-            Reset(repository);
-            TryDelete(cachePath);
-        }
-    }
-
     private static void TestEmbeddedSeedResourceIsBundledAndParses()
     {
-        var repositoryType = GetRepositoryType();
-        var readSeed = repositoryType.GetMethod(
-            "ReadEmbeddedSeedForTests",
-            BindingFlags.NonPublic | BindingFlags.Static
+        var source = new AssemblyResourceCatalogSource(
+            typeof(TenWinBuildCorpus).Assembly,
+            TenWinBuildCatalogFactory.EmbeddedResourceName
         );
-        Assert(readSeed != null, "Repository should expose the embedded seed reader.");
-        var json = (string?)readSeed!.Invoke(null, null);
+        var json = source.ReadAsync(CancellationToken.None).AsTask().GetAwaiter().GetResult();
         Assert(
             !string.IsNullOrWhiteSpace(json),
             "The bundled tenwin_builds.json seed should be embedded in the assembly."
         );
 
-        var corpusType = repositoryType.Assembly.GetType(
-            "BazaarPlusPlus.Game.LiveBuildPanel.Recommendations.TenWinBuildCorpus"
-        )!;
-        var parse = corpusType.GetMethod("Parse", BindingFlags.Public | BindingFlags.Static)!;
-        var corpus = parse.Invoke(null, [json]);
+        var corpus = TenWinBuildCorpus.Parse(json);
         Assert(corpus != null, "The bundled seed should parse with the production corpus parser.");
-        var heroCount = (int)corpusType.GetProperty("HeroCount")!.GetValue(corpus)!;
-        Assert(heroCount > 0, "The bundled seed should contain at least one hero.");
+        Assert(corpus!.HeroCount > 0, "The bundled seed should contain at least one hero.");
         Assert(
-            corpusType.GetProperty("GeneratedAtUtc")!.GetValue(corpus) != null,
+            corpus.GeneratedAtUtc != null,
             "The bundled seed should carry a parseable generatedAt timestamp."
         );
-        var buildCount = (int)corpusType.GetProperty("BuildCount")!.GetValue(corpus)!;
-        Assert(buildCount > 0, "The bundled seed should count at least one build.");
+        Assert(corpus.BuildCount > 0, "The bundled seed should count at least one build.");
+        Assert(
+            corpus.HeroBuildCounts.All(row => row.Hero != "Hero8"),
+            "Any The Dragons data present in the embedded seed must use the canonical summary identity."
+        );
     }
 
     private static void TestCorpusSummaryIncludesPerHeroBuildCounts()
@@ -746,6 +453,266 @@ internal static class TenWinBuildTests
                     "Hero count rows should preserve exact hero names and counts."
                 );
             }
+        );
+    }
+
+    private static void TestMixedAliasCorpusMergesCanonicalFirstByBuildIdentity()
+    {
+        var canonicalBuild0 = Build("[0]", "[[0,0,1,0,1]]", 900);
+        var canonicalBuild1 = Build("[1]", "[[1,1,1,0,1]]", 800);
+        var legacyBuild0 = Build("[2]", "[[2,2,1,0,1]]", 100);
+        var legacyBuild1 = Build("[2]", "[[2,3,1,0,1]]", 200);
+        var legacyBuild2 = Build("[0]", "[[0,4,1,0,1]]", 600);
+        var canonicalHero = $$"""
+            "TheDragons": {
+              "builds": [{{canonicalBuild0}},{{canonicalBuild1}}],
+              "card_index": [[0,[0]],[1,[1]]]
+            }
+            """;
+        var legacyHero = $$"""
+            "Hero8": {
+              "builds": [{{legacyBuild0}},{{legacyBuild1}},{{legacyBuild2}}],
+              "card_index": [[0,[2]],[2,[0,1]]]
+            }
+            """;
+
+        foreach (
+            var heroes in new[] { $"{legacyHero},{canonicalHero}", $"{canonicalHero},{legacyHero}" }
+        )
+        {
+            WithCorpus(
+                PayloadWithHeroes(
+                    cards: $"[\"{GuidA}\",\"{GuidB}\",\"{GuidC}\"]",
+                    enchantments: "[null]",
+                    heroes: heroes
+                ),
+                (repositoryType, repository) =>
+                {
+                    var canonicalScores = ScoresOf(
+                        Find(repositoryType, repository, "TheDragons", [GuidA])
+                    );
+                    var legacyScores = ScoresOf(Find(repositoryType, repository, "Hero8", [GuidA]));
+                    Assert(
+                        canonicalScores.SequenceEqual([900L, 600L]),
+                        "Canonical alias entries should win duplicate build IDs, while a legacy-only "
+                            + $"build ID remains queryable; got [{string.Join(",", canonicalScores)}]."
+                    );
+                    Assert(
+                        legacyScores.SequenceEqual(canonicalScores),
+                        "Legacy and canonical runtime queries should resolve the same merged build set."
+                    );
+
+                    var summary = repositoryType
+                        .GetMethod("GetCorpusSummary")!
+                        .Invoke(repository, null)!;
+                    Assert(
+                        (int)Prop(summary, "HeroCount")! == 1,
+                        "Both aliases should contribute one canonical hero."
+                    );
+                    Assert(
+                        (int)Prop(summary, "BuildCount")! == 3,
+                        "Duplicate alias build IDs should not inflate the total build count."
+                    );
+                    var heroCounts = ((IEnumerable)Prop(summary, "HeroBuildCounts")!)
+                        .Cast<object>()
+                        .Select(row => ((string)Prop(row, "Hero")!, (int)Prop(row, "BuildCount")!))
+                        .ToList();
+                    Assert(
+                        heroCounts.SequenceEqual([("TheDragons", 3)]),
+                        "Summary should expose one canonical TheDragons count row."
+                    );
+                }
+            );
+        }
+    }
+
+    private static void TestNonPlayableCorpusKeysCannotBeQueried()
+    {
+        var build = Build("[0]", "[[0,0,1,0,1]]", 500);
+        WithCorpus(
+            PayloadWithHeroes(
+                cards: $"[\"{GuidA}\"]",
+                enchantments: "[null]",
+                heroes: $$"""
+                    "Common": {
+                      "builds": [{{build}}],
+                      "card_index": [[0,[0]]]
+                    },
+                    "UnknownHero": {
+                      "builds": [{{build}}],
+                      "card_index": [[0,[0]]]
+                    }
+                """
+            ),
+            (repositoryType, repository) =>
+            {
+                Assert(
+                    !Find(repositoryType, repository, "Common", [GuidA]).Cast<object>().Any(),
+                    "Common corpus rows must not be queryable as playable recommendations."
+                );
+                Assert(
+                    !Find(repositoryType, repository, "UnknownHero", [GuidA]).Cast<object>().Any(),
+                    "Unknown corpus rows must not be queryable as playable recommendations."
+                );
+            }
+        );
+    }
+
+    private static void TestHeroStripProjectionAndTooltipsUseCanonicalPresentation()
+    {
+        var withBuilds = new TenWinCorpusSummary(
+            generatedAtUtc: null,
+            buildCount: 18,
+            heroCount: 4,
+            [
+                new TenWinHeroBuildCount("Hero8", 4),
+                new TenWinHeroBuildCount("Vanessa", 2),
+                new TenWinHeroBuildCount("Common", 5),
+                new TenWinHeroBuildCount("UnknownHero", 7),
+            ]
+        );
+        var visible = LiveBuildHeroPresentation.SelectHeroBuildCounts(withBuilds);
+        Assert(
+            visible.Select(entry => entry.Hero).SequenceEqual(["Hero8", "Vanessa"]),
+            "The hero strip should retain only playable heroes with actual builds."
+        );
+
+        var emptyDragons = new TenWinCorpusSummary(
+            generatedAtUtc: null,
+            buildCount: 2,
+            heroCount: 2,
+            [new TenWinHeroBuildCount("TheDragons", 0), new TenWinHeroBuildCount("Vanessa", 2)]
+        );
+        Assert(
+            LiveBuildHeroPresentation
+                .SelectHeroBuildCounts(emptyDragons)
+                .Select(entry => entry.Hero)
+                .SequenceEqual(["Vanessa"]),
+            "The Dragons tile should be omitted when its merged corpus has no builds."
+        );
+
+        Assert(
+            LiveBuildHeroPresentation.DisplayName("Hero8") == "The Dragons",
+            "A legacy tile or tooltip identity should display the canonical native hero name."
+        );
+        var tooltip = LiveBuildPanelText.CorpusSummaryTooltip(withBuilds);
+        Assert(
+            tooltip.Contains("The Dragons 4", StringComparison.Ordinal)
+                && !tooltip.Contains("Hero8", StringComparison.Ordinal),
+            "The corpus summary tooltip must not expose the transitional alias."
+        );
+
+        var badge = HeroVisual.Resolve("Hero8");
+        Assert(
+            badge.ShortCode == "DRA" && badge.Background == Colors.HeroTheDragonsBackground,
+            "The Dragons corpus tile should use the shared DRA badge and native cyan."
+        );
+    }
+
+    private static void TestLegacyCacheAndCanonicalRemoteFixturesShareOneIdentity()
+    {
+        var parser = new TenWinBuildCatalogParser();
+        var embeddedDocument = ScorePayload("Hero8", 222);
+        var embedded = parser.Parse(embeddedDocument, CatalogSource.Embedded);
+        Assert(embedded.Succeeded, "A legacy embedded-seed fixture should remain parseable.");
+        AssertAliasQueriesShareScore(embedded.Value!, 222);
+
+        var legacyCacheDocument = ScorePayload("Hero8", 333);
+        var legacyCache = parser.Parse(legacyCacheDocument, CatalogSource.Cache);
+        Assert(legacyCache.Succeeded, "A legacy local-cache fixture should remain parseable.");
+        Assert(
+            legacyCacheDocument.Contains("\"Hero8\"", StringComparison.Ordinal),
+            "Parsing must not rewrite the user's raw legacy cache document."
+        );
+        AssertAliasQueriesShareScore(legacyCache.Value!, 333);
+
+        var canonicalRemoteDocument = ScorePayload("TheDragons", 444);
+        var canonicalRemote = parser.Parse(canonicalRemoteDocument, CatalogSource.Remote);
+        Assert(canonicalRemote.Succeeded, "A canonical remote fixture should parse.");
+        AssertAliasQueriesShareScore(canonicalRemote.Value!, 444);
+    }
+
+    private static void TestExistingSevenHeroesKeepRecommendationResults()
+    {
+        var heroIds = new[]
+        {
+            "Vanessa",
+            "Pygmalien",
+            "Dooley",
+            "Mak",
+            "Jules",
+            "Karnok",
+            "Stelle",
+        };
+        var builds =
+            $"[{Build("[0,1]", "[[0,0,1,0,1],[1,1,1,0,1]]", 100)},"
+            + $"{Build("[0]", "[[0,0,1,0,1]]", 200)},"
+            + $"{Build("[1]", "[[1,0,1,0,1]]", 150)}]";
+        var heroes = string.Join(
+            ",",
+            heroIds
+                .Reverse()
+                .Select(hero =>
+                    $$"""
+                        "{{hero}}": {
+                          "builds": {{builds}},
+                          "card_index": [[0,[0,1]],[1,[0,2]]]
+                        }
+                        """
+                )
+        );
+
+        WithCorpus(
+            PayloadWithHeroes(
+                cards: $"[\"{GuidA}\",\"{GuidB}\"]",
+                enchantments: "[null]",
+                heroes: heroes
+            ),
+            (repositoryType, repository) =>
+            {
+                foreach (var hero in heroIds)
+                {
+                    var scores = ScoresOf(Find(repositoryType, repository, hero, [GuidA]));
+                    Assert(
+                        scores.SequenceEqual([200L, 100L]),
+                        $"{hero} recommendation recall/ranking should remain unchanged."
+                    );
+                }
+
+                var summary = repositoryType
+                    .GetMethod("GetCorpusSummary")!
+                    .Invoke(repository, null)!;
+                Assert(
+                    (int)Prop(summary, "HeroCount")! == 7
+                        && (int)Prop(summary, "BuildCount")! == 21,
+                    "The existing seven heroes should retain their distinct hero/build counts."
+                );
+            }
+        );
+    }
+
+    private static void AssertAliasQueriesShareScore(TenWinBuildCorpus corpus, long expectedScore)
+    {
+        using var catalog = new StubCatalog(corpus);
+        var repository = new BuildRecommendationRepository(catalog);
+        foreach (var alias in new[] { "Hero8", "TheDragons" })
+        {
+            var scores = repository
+                .FindRecommendations(alias, [Guid.Parse(GuidA)])
+                .Select(recommendation => recommendation.Score)
+                .ToArray();
+            Assert(
+                scores.SequenceEqual([expectedScore]),
+                $"{alias} should query the same canonical source fixture."
+            );
+        }
+
+        var summary = repository.GetCorpusSummary()!.Value;
+        Assert(
+            summary.HeroCount == 1
+                && summary.BuildCount == 1
+                && summary.HeroBuildCounts.Single().Hero == "TheDragons",
+            "A single-alias source fixture should project one canonical hero/build count."
         );
     }
 
@@ -868,32 +835,119 @@ internal static class TenWinBuildTests
         )!;
     }
 
-    private static object NewRepository(Type repositoryType) =>
-        Activator.CreateInstance(repositoryType)!;
-
     private static void WithCorpus(string payload, Action<Type, object> body)
     {
         var repositoryType = GetRepositoryType();
-        var repository = NewRepository(repositoryType);
-        var now = new DateTime(2026, 06, 07, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = TempCachePath();
-        File.WriteAllText(cachePath, payload);
-        File.SetLastWriteTimeUtc(cachePath, now.AddHours(-1));
-        Configure(
-            repository,
-            cachePath,
-            now,
-            _ => throw new InvalidOperationException("Fresh cache should not download.")
+        var corpus = TenWinBuildCorpus.Parse(payload)!;
+        using var catalog = new StubCatalog(corpus);
+        body(repositoryType, new BuildRecommendationRepository(catalog));
+    }
+
+    private static CatalogSnapshot<TenWinBuildCorpus> Snapshot(
+        TenWinBuildCorpus corpus,
+        CatalogSource source
+    ) =>
+        new(
+            corpus,
+            source,
+            new DateTime(2026, 7, 18, 12, 0, 0, DateTimeKind.Utc),
+            IsStale: false,
+            Issue: null
         );
-        try
+
+    private sealed class StubCatalog : IRemoteEmbeddedCatalog<TenWinBuildCorpus>
+    {
+        private readonly Queue<CatalogRefreshResult<TenWinBuildCorpus>> _refreshes = new();
+        private CatalogSnapshot<TenWinBuildCorpus>? _snapshot;
+
+        internal StubCatalog(TenWinBuildCorpus corpus)
         {
-            body(repositoryType, repository);
+            _snapshot = Snapshot(corpus, CatalogSource.Cache);
         }
-        finally
+
+        internal int RefreshCount { get; private set; }
+
+        internal void Enqueue(CatalogRefreshResult<TenWinBuildCorpus> result) =>
+            _refreshes.Enqueue(result);
+
+        public bool TryGet(out CatalogSnapshot<TenWinBuildCorpus> snapshot)
         {
-            Reset(repository);
-            TryDelete(cachePath);
+            if (_snapshot.HasValue)
+            {
+                snapshot = _snapshot.Value;
+                return true;
+            }
+
+            snapshot = default;
+            return false;
         }
+
+        public ValueTask WarmAsync(CancellationToken cancellationToken = default) => default;
+
+        public ValueTask<CatalogRefreshResult<TenWinBuildCorpus>> RefreshAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            RefreshCount++;
+            var result = _refreshes.Dequeue();
+            if (result.Snapshot.HasValue)
+                _snapshot = result.Snapshot.Value;
+            return ValueTask.FromResult(result);
+        }
+
+        public void Dispose() => _snapshot = null;
+    }
+
+    private sealed class BlockingCatalog : IRemoteEmbeddedCatalog<TenWinBuildCorpus>
+    {
+        private readonly TaskCompletionSource<bool> _started = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource<CatalogRefreshResult<TenWinBuildCorpus>> _refresh =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private CatalogSnapshot<TenWinBuildCorpus>? _snapshot;
+
+        internal BlockingCatalog(TenWinBuildCorpus corpus)
+        {
+            _snapshot = Snapshot(corpus, CatalogSource.Cache);
+        }
+
+        internal Task Started => _started.Task;
+
+        internal void Complete(TenWinBuildCorpus corpus) =>
+            _refresh.SetResult(
+                CatalogRefreshResult<TenWinBuildCorpus>.Published(
+                    Snapshot(corpus, CatalogSource.Remote),
+                    degraded: false
+                )
+            );
+
+        public bool TryGet(out CatalogSnapshot<TenWinBuildCorpus> snapshot)
+        {
+            if (_snapshot.HasValue)
+            {
+                snapshot = _snapshot.Value;
+                return true;
+            }
+
+            snapshot = default;
+            return false;
+        }
+
+        public ValueTask WarmAsync(CancellationToken cancellationToken = default) => default;
+
+        public async ValueTask<CatalogRefreshResult<TenWinBuildCorpus>> RefreshAsync(
+            CancellationToken cancellationToken = default
+        )
+        {
+            _started.TrySetResult(true);
+            var result = await _refresh.Task.ConfigureAwait(false);
+            if (result.Snapshot.HasValue)
+                _snapshot = result.Snapshot.Value;
+            return result;
+        }
+
+        public void Dispose() => _snapshot = null;
     }
 
     private static IEnumerable Find(
@@ -935,88 +989,6 @@ internal static class TenWinBuildTests
 
     private static object? Prop(object target, string name) =>
         target.GetType().GetProperty(name)!.GetValue(target);
-
-    private static string TempCachePath() =>
-        Path.Combine(Path.GetTempPath(), $"bpp-tenwin-{Guid.NewGuid():N}.json");
-
-    private static void Configure(
-        object repository,
-        string cachePath,
-        DateTime utcNow,
-        Func<string, string> downloadJson
-    ) =>
-        Invoke(
-            repository,
-            "ConfigureTenWinRemoteForTests",
-            cachePath,
-            (Func<DateTime>)(() => utcNow),
-            WrapDownload(downloadJson)
-        );
-
-    private static void ConfigureWithBackgroundRefresh(
-        object repository,
-        string cachePath,
-        DateTime utcNow,
-        Func<string, string> downloadJson,
-        Action<Func<Task>> queueBackgroundRefresh
-    ) =>
-        Invoke(
-            repository,
-            "ConfigureTenWinRemoteForTests",
-            cachePath,
-            (Func<DateTime>)(() => utcNow),
-            WrapDownload(downloadJson),
-            queueBackgroundRefresh
-        );
-
-    private static Func<string, Task<string>> WrapDownload(Func<string, string> downloadJson) =>
-        url => Task.FromResult(downloadJson(url));
-
-    private static void Reset(object repository) => Invoke(repository, "ResetTenWinRemoteForTests");
-
-    private static void SetEmbedded(object repository, Func<string?> loader) =>
-        Invoke(repository, "SetEmbeddedJsonForTests", loader);
-
-    private static bool ManualRefresh(object repository, out string? error)
-    {
-        var method = repository
-            .GetType()
-            .GetMethod(
-                "TryRefreshFinalBuildsFromRemoteAsync",
-                BindingFlags.NonPublic | BindingFlags.Instance
-            );
-        Assert(method != null, "Repository should expose a manual remote refresh.");
-        var task = (System.Threading.Tasks.Task)method!.Invoke(repository, null)!;
-        task.GetAwaiter().GetResult();
-        var result = task.GetType().GetProperty("Result")!.GetValue(task)!;
-        error = (string?)result.GetType().GetField("Item2")!.GetValue(result);
-        return (bool)result.GetType().GetField("Item1")!.GetValue(result)!;
-    }
-
-    private static void Invoke(object target, string methodName, params object[] parameters)
-    {
-        var method = target
-            .GetType()
-            .GetMethods(BindingFlags.NonPublic | BindingFlags.Instance)
-            .FirstOrDefault(m =>
-                m.Name == methodName && m.GetParameters().Length == parameters.Length
-            );
-        Assert(
-            method != null,
-            $"Expected {target.GetType().FullName}.{methodName} ({parameters.Length} args) to exist."
-        );
-        method!.Invoke(target, parameters);
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-                File.Delete(path);
-        }
-        catch { }
-    }
 
     private static void Assert(bool condition, string message)
     {

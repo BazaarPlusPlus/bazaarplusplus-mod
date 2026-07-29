@@ -48,6 +48,10 @@ internal interface IBppConfig
 
     ConfigEntry<LegendaryPositionDisplayMode>? LegendaryPositionDisplayModeConfig { get; }
 
+    ConfigEntry<GraphicsUpscalingMode>? GraphicsUpscalingModeConfig { get; }
+
+    ConfigEntry<float>? GraphicsUpscalingSharpnessConfig { get; }
+
     ConfigEntry<bool>? BazaarDbUploadEnabled { get; }
 
     ConfigEntry<bool>? UseFixedSupporterListConfig { get; }

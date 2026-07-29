@@ -1,7 +1,5 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarGameShared.Domain.Cards;
-using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;

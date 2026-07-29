@@ -1,7 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
-using System.Threading;
-
 namespace BazaarPlusPlus.BazaarAgent;
 
 public sealed class BazaarAgentContextSnapshot

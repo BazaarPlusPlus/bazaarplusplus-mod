@@ -60,6 +60,38 @@ RequireContains(
     constructAndInstantiateUICardBody,
     "selectedItem.transform.SetParent(parentTransform, worldPositionStays: false);"
 );
+RequireContains(
+    assetLoaderPath,
+    assetLoaderText,
+    "internal async Task<GameObject> InstantiateAssetAsyncByReference(AssetReference assetReference)"
+);
+
+var cardPreviewBasePath = Path.Combine(
+    repoRoot,
+    "decompiled",
+    "TheBazaarRuntime",
+    "TheBazaar.UI",
+    "CardPreviewBase.cs"
+);
+if (!File.Exists(cardPreviewBasePath))
+{
+    throw new InvalidOperationException(
+        $"Required decompiled source file is missing: {cardPreviewBasePath}"
+    );
+}
+
+var cardPreviewBaseText = File.ReadAllText(cardPreviewBasePath);
+RequireContains(
+    cardPreviewBasePath,
+    cardPreviewBaseText,
+    "public async Task SetUp(TCardBase card, bool isPremium, TCardInstance cardInstance, CancellationToken ct"
+);
+RequireContains(cardPreviewBasePath, cardPreviewBaseText, "public void Show(bool show)");
+RequireContains(cardPreviewBasePath, cardPreviewBaseText, "public abstract void Resize();");
+RequireContains(cardPreviewBasePath, cardPreviewBaseText, "public void OnHover()");
+RequireContains(cardPreviewBasePath, cardPreviewBaseText, "public void OnHoverOut()");
+RequireContains(cardPreviewBasePath, cardPreviewBaseText, "protected Card _clientCard;");
+RequireContains(cardPreviewBasePath, cardPreviewBaseText, "private CardTooltipData _tooltipData;");
 
 var sourceRoot = Path.Combine(repoRoot, "src", "BazaarPlusPlus");
 if (!Directory.Exists(sourceRoot))

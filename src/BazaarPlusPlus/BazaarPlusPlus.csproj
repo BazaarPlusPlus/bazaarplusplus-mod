@@ -9,11 +9,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <TargetFramework>netstandard2.1</TargetFramework>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-    <RestoreAdditionalProjectSources>
-      https://api.nuget.org/v3/index.json;
-      https://nuget.bepinex.dev/v3/index.json;
-    </RestoreAdditionalProjectSources>
-    <NoWarn>CS0436</NoWarn>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Krafs.Publicizer generates IgnoresAccessChecksToAttribute into AssemblyInfo, while
+         MonoMod.Utils provides the same type. Scope this generated-source conflict to the
+         publicized plugin project instead of weakening the repository warning gate. -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
     <BuildProductionPackage Condition="'$(BuildProductionPackage)' == ''"
       >false</BuildProductionPackage>
   </PropertyGroup>
@@ -23,7 +23,34 @@
   <!-- Embedded resources -->
   <ItemGroup>
     <EmbeddedResource Include="Data\CollectionSources\collection-sources.json" />
-    <EmbeddedResource Include="Resources\DockButtons\collection-panel-icon.png" />
+    <EmbeddedResource
+      Include="Resources\DockButtons\collection-panel-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.collection-panel-icon.png"
+    />
+    <EmbeddedResource
+      Include="Resources\DockButtons\replay-export-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-export-icon.png"
+    />
+    <EmbeddedResource
+      Include="Resources\DockButtons\replay-recording-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-recording-icon.png"
+    />
+    <EmbeddedResource
+      Include="Resources\DockButtons\replay-view-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-view-icon.png"
+    />
+    <EmbeddedResource
+      Include="Resources\DockButtons\replay-retry-icon.png"
+      LogicalName="BazaarPlusPlus.Resources.DockButtons.replay-retry-icon.png"
+    />
+    <EmbeddedResource
+      Include="Resources\Collection\search.svg"
+      LogicalName="BazaarPlusPlus.Resources.Collection.search.svg"
+    />
+    <EmbeddedResource
+      Include="Resources\Collection\close.svg"
+      LogicalName="BazaarPlusPlus.Resources.Collection.close.svg"
+    />
   </ItemGroup>
 
   <!-- Project paths -->
@@ -47,56 +74,24 @@
       >$(WindowsFfmpegZip)</HostFfmpegZip>
     <HostFfmpegZip Condition="'$(HostFfmpegZip)' == ''">$(MacFfmpegZip)</HostFfmpegZip>
   </PropertyGroup>
-  <!-- Candidate install paths for common Steam locations -->
-  <PropertyGroup>
-    <!-- macOS -->
-    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
-    <MacGamePathDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar</MacGamePathDefault>
-    <!-- Windows -->
-    <WinSteamManagedC>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed</WinSteamManagedC>
-    <WinGamePathC>C:\Program Files (x86)\Steam\steamapps\common\The Bazaar</WinGamePathC>
-    <WinSteamManagedD>D:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed</WinSteamManagedD>
-    <WinGamePathD>D:\Program Files (x86)\Steam\steamapps\common\The Bazaar</WinGamePathD>
-    <WinSteamManagedE>E:\Program Files (x86)\Steam\steamapps\common\The Bazaar\TheBazaar_Data\Managed</WinSteamManagedE>
-    <WinGamePathE>E:\Program Files (x86)\Steam\steamapps\common\The Bazaar</WinGamePathE>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(WinSteamManagedC)\Assembly-CSharp.dll')">
-    <ManagedPath>$(WinSteamManagedC)</ManagedPath>
-    <GamePath>$(WinGamePathC)</GamePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(WinSteamManagedD)\Assembly-CSharp.dll')">
-    <ManagedPath>$(WinSteamManagedD)</ManagedPath>
-    <GamePath>$(WinGamePathD)</GamePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(WinSteamManagedE)\Assembly-CSharp.dll')">
-    <ManagedPath>$(WinSteamManagedE)</ManagedPath>
-    <GamePath>$(WinGamePathE)</GamePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/Assembly-CSharp.dll')">
-    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
-    <GamePath>$(MacGamePathDefault)</GamePath>
-  </PropertyGroup>
-
   <!-- Package references -->
   <ItemGroup>
-    <PackageReference Include="BepInEx.Analyzers" Version="1.*" PrivateAssets="all" />
-    <PackageReference Include="BepInEx.Core" Version="5.*" />
-    <PackageReference Include="BepInEx.PluginInfoProps" Version="2.*" />
-    <PackageReference Include="Krafs.Publicizer" Version="2.3.0" PrivateAssets="all" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.11" />
-    <PackageReference Include="UnityEngine.Modules" Version="2022.3.40" IncludeAssets="compile" />
-    <PackageReference Include="NETStandard.Library" Version="2.0.3" />
+    <PackageReference Include="BepInEx.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="BepInEx.Core" />
+    <PackageReference Include="BepInEx.PluginInfoProps" />
+    <PackageReference Include="Krafs.Publicizer" PrivateAssets="all" />
+    <PackageReference Include="SixLabors.ImageSharp" />
+    <PackageReference Include="UnityEngine.Modules" IncludeAssets="compile" />
+    <PackageReference Include="NETStandard.Library" />
     <PackageReference
       Include="System.Runtime.CompilerServices.Unsafe"
-      Version="6.0.0"
       PrivateAssets="all"
       ExcludeAssets="runtime"
     />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.28" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
-    <PackageReference Include="SourceGear.sqlite3" Version="3.50.4.5" GeneratePathProperty="true" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
+    <PackageReference Include="SourceGear.sqlite3" GeneratePathProperty="true" />
+    <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
 
   <ItemGroup>

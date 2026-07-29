@@ -1,6 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Game.Supporters;
 
 internal static class BPPSupporterFixedList

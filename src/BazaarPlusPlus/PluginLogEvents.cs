@@ -48,6 +48,7 @@ internal enum PluginEventId
     RunLifecycleChanged,
     LivePvpPlaybackStartedObserved,
     LivePvpPlaybackEndedObserved,
+    UploadArmRequested,
 }
 
 internal enum PluginHandlerId
@@ -58,7 +59,7 @@ internal enum PluginHandlerId
     CombatReplayModule,
     CombatReplayVideoRecorder,
     CombatStatusBarModule,
-    EndOfRunScreenshotController,
+    EndOfRunCaptureDriver,
     HistoryPanelMount,
     RunBundleUploadFeed,
     RunLifecycleModule,

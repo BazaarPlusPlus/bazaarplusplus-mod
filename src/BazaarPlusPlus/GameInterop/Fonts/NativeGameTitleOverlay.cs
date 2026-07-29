@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -89,7 +88,10 @@ internal sealed class NativeGameTitleOverlay : IDisposable
         _title.fontStyle = FontStyles.Normal;
         _title.alignment = TextAlignmentOptions.MidlineLeft;
         _title.textWrappingMode = TextWrappingModes.NoWrap;
-        _title.overflowMode = TextOverflowModes.Ellipsis;
+        // TMP's Ellipsis mode can cache an empty mesh when this inactive overlay still has its
+        // default 200x50 rect. Masking keeps the title bounded without persisting that first-frame
+        // truncation after the real UI Toolkit geometry arrives.
+        _title.overflowMode = TextOverflowModes.Masking;
         _title.richText = false;
         _title.raycastTarget = false;
         _title.color = color;
@@ -151,8 +153,24 @@ internal sealed class NativeGameTitleOverlay : IDisposable
 
     internal void SetText(string? text)
     {
-        if (!_disposed)
-            _title.text = text ?? string.Empty;
+        if (_disposed)
+            return;
+
+        _title.text = text ?? string.Empty;
+        if (!string.IsNullOrEmpty(_title.text))
+        {
+            // The native locale fallbacks populate glyphs lazily. Resolve coverage and preferred
+            // values before the forced rebuild so an all-CJK title cannot produce a zero-vertex
+            // mesh on the first clean game launch.
+            _title.font?.HasCharacters(
+                _title.text,
+                out _,
+                searchFallbacks: true,
+                tryAddCharacter: true
+            );
+            _title.GetPreferredValues(_title.text);
+        }
+        _title.ForceMeshUpdate(ignoreActiveState: true, forceTextReparsing: true);
     }
 
     internal void SetVisible(bool visible)
@@ -160,6 +178,15 @@ internal sealed class NativeGameTitleOverlay : IDisposable
         if (_disposed)
             return;
         _root.SetActive(visible);
+        if (visible)
+        {
+            // The layout anchor normally starts under a display:none panel. Its first Attach-time
+            // SyncBounds therefore has no usable geometry, and ancestor display changes do not
+            // reliably emit a GeometryChangedEvent for the transparent child. Retry after the
+            // next UI Toolkit layout pass so the native title cannot remain permanently hidden.
+            SyncBounds();
+            _layoutAnchor?.schedule.Execute(SyncBounds);
+        }
         _canvasGroup.alpha = visible && _hasValidBounds ? _requestedAlpha : 0f;
     }
 
@@ -168,6 +195,8 @@ internal sealed class NativeGameTitleOverlay : IDisposable
         if (_disposed)
             return;
         _requestedAlpha = Mathf.Clamp01(alpha);
+        if (_root.activeSelf && !_hasValidBounds)
+            SyncBounds();
         _canvasGroup.alpha = _root.activeSelf && _hasValidBounds ? _requestedAlpha : 0f;
     }
 
@@ -179,9 +208,18 @@ internal sealed class NativeGameTitleOverlay : IDisposable
             return;
 
         var worldBound = _layoutAnchor.worldBound;
-        if (worldBound.width <= 0f || worldBound.height <= 0f)
+        if (
+            !IsFinite(worldBound.x)
+            || !IsFinite(worldBound.y)
+            || !IsFinite(worldBound.width)
+            || !IsFinite(worldBound.height)
+            || worldBound.width <= 0f
+            || worldBound.height <= 0f
+        )
             return;
-        var pixelsPerPoint = Mathf.Max(0.01f, _layoutAnchor.scaledPixelsPerPoint);
+        var pixelsPerPoint = _layoutAnchor.scaledPixelsPerPoint;
+        if (!IsFinite(pixelsPerPoint) || pixelsPerPoint <= 0f)
+            return;
         _rootRect.sizeDelta = new Vector2(
             Mathf.Max(1f, Screen.width),
             Mathf.Max(1f, Screen.height)
@@ -191,13 +229,15 @@ internal sealed class NativeGameTitleOverlay : IDisposable
             Mathf.Round(Screen.height - worldBound.yMax * pixelsPerPoint)
         );
         _titleRect.sizeDelta = new Vector2(
-            Mathf.Max(1f, Mathf.Round(worldBound.width * pixelsPerPoint)),
-            Mathf.Max(1f, Mathf.Round(worldBound.height * pixelsPerPoint))
+            Mathf.Max(1f, Mathf.Ceil(worldBound.width * pixelsPerPoint)),
+            Mathf.Max(1f, Mathf.Ceil(worldBound.height * pixelsPerPoint))
         );
         _title.fontSize = _fontSizePoints * pixelsPerPoint;
         _hasValidBounds = true;
         _canvasGroup.alpha = _root.activeSelf ? _requestedAlpha : 0f;
     }
+
+    private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
     private void Detach()
     {

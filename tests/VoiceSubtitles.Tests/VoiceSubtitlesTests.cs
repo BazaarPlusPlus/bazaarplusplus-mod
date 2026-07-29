@@ -4,6 +4,7 @@ using System.Text;
 using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
+using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 using BepInEx.Logging;
 using Xunit;
 
@@ -14,32 +15,22 @@ public sealed class VoiceSubtitlesTests
     [Fact]
     public void Embedded_seed_loads_a_valid_nonempty_catalog()
     {
-        var repositoryType = GetRequiredType(
-            "BazaarPlusPlus.Game.VoiceSubtitles.VoiceLinesRepository"
-        );
-        var loadEmbeddedSeed = GetRequiredStaticMethod(repositoryType, "LoadEmbeddedSeed");
-
-        var lines = Assert.IsAssignableFrom<Array>(loadEmbeddedSeed.Invoke(null, null));
+        var lines = LoadEmbeddedLines();
 
         Assert.NotEmpty(lines);
-        var first = lines.GetValue(0);
-        Assert.NotNull(first);
-        Assert.False(string.IsNullOrWhiteSpace(GetString(first, "Stem")));
-        Assert.False(string.IsNullOrWhiteSpace(GetString(first, "English")));
-        Assert.False(string.IsNullOrWhiteSpace(GetString(first, "Chinese")));
-        Assert.True(GetSingle(first, "DurationSeconds") > 0);
+        var first = lines[0];
+        Assert.False(string.IsNullOrWhiteSpace(first.Stem));
+        Assert.False(string.IsNullOrWhiteSpace(first.English));
+        Assert.False(string.IsNullOrWhiteSpace(first.Chinese));
+        Assert.True(first.DurationSeconds > 0);
     }
 
     [Fact]
     public void Embedded_seed_computed_content_hash_uses_sha256_format()
     {
-        var repositoryType = GetRequiredType(
-            "BazaarPlusPlus.Game.VoiceSubtitles.VoiceLinesRepository"
-        );
         var documentType = GetRequiredType("BazaarPlusPlus.Game.VoiceSubtitles.VoiceLinesDocument");
-        var loadEmbeddedSeed = GetRequiredStaticMethod(repositoryType, "LoadEmbeddedSeed");
         var computeContentHash = GetRequiredStaticMethod(documentType, "ComputeContentHash");
-        var lines = Assert.IsAssignableFrom<Array>(loadEmbeddedSeed.Invoke(null, null));
+        var lines = LoadEmbeddedLines();
 
         var contentHash = Assert.IsType<string>(computeContentHash.Invoke(null, [lines]));
 
@@ -84,16 +75,9 @@ public sealed class VoiceSubtitlesTests
     [Fact]
     public void Default_cache_path_uses_game_root_data_directory()
     {
-        var repositoryType = GetRequiredType(
-            "BazaarPlusPlus.Game.VoiceSubtitles.VoiceLinesRepository"
-        );
-        var buildCachePath = GetRequiredStaticMethod(
-            repositoryType,
-            "BuildDefaultVoiceLinesCacheFilePath"
-        );
         var gameRoot = Path.Combine(Path.GetTempPath(), $"bpp-game-root-{Guid.NewGuid():N}");
 
-        var cachePath = Assert.IsType<string>(buildCachePath.Invoke(null, [gameRoot]));
+        var cachePath = VoiceLinesCatalogFactory.BuildCacheFilePath(gameRoot);
 
         Assert.Equal(Path.Combine(gameRoot, "BazaarPlusPlusV4", "voice-lines.json"), cachePath);
     }
@@ -112,48 +96,35 @@ public sealed class VoiceSubtitlesTests
     [Fact]
     public void Fresh_cache_loads_without_remote_refresh()
     {
-        WithRepositoryCache(
-            cacheAge: TimeSpan.FromHours(1),
-            (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
-            {
-                var loadForTests = GetRequiredInstanceMethod(
-                    repositoryType,
-                    "LoadVoiceLinesForTests"
-                );
+        var observer = new VoiceLinesCatalogObserver();
+        var lines = LoadEmbeddedLines();
 
-                var result = loadForTests.Invoke(repository, null);
-                Assert.NotNull(result);
-
-                Assert.True(GetInt32(result!, "Item1") > 0);
-                Assert.Equal("cache", GetString(result!, "Item2"));
-                Assert.False(GetBool(result!, "Item3"));
-                Assert.False(downloadCalled());
-                Assert.Empty(queuedRefreshes);
-            }
+        observer.OnInitialLoad(
+            CatalogInitialLoadResult<VoiceLine[]>.Published(Snapshot(lines, CatalogSource.Cache))
         );
+
+        Assert.Equal(lines[0].Stem, VoiceLineCatalog.Resolve(lines[0].Stem, "Hero", "Test").Stem);
+        VoiceLineCatalog.Reset();
     }
 
     [Fact]
     public void Fresh_catalog_warm_up_emits_one_structured_ready_event()
     {
-        WithRepositoryCache(
-            cacheAge: TimeSpan.FromHours(1),
-            (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
-            {
-                using var capture = new LogCapture();
-
-                GetRequiredInstanceMethod(repositoryType, "LoadVoiceLinesInBackground")
-                    .Invoke(repository, null);
-
-                var ready = Assert.Single(capture.Events("voice_subtitles.catalog.ready"));
-                Assert.Equal(LogLevel.Info, ready.Level);
-                Assert.Contains("source=cache", ready.Data?.ToString());
-                Assert.Contains("line_count=", ready.Data?.ToString());
-                Assert.DoesNotContain(cachePath, ready.Data?.ToString());
-                Assert.Empty(capture.Events("voice_subtitles.catalog.degraded"));
-                Assert.Empty(capture.Events("voice_subtitles.catalog.failed"));
-            }
+        using var capture = new LogCapture();
+        var observer = new VoiceLinesCatalogObserver();
+        observer.OnInitialLoad(
+            CatalogInitialLoadResult<VoiceLine[]>.Published(
+                Snapshot(LoadEmbeddedLines(), CatalogSource.Cache)
+            )
         );
+
+        var ready = Assert.Single(capture.Events("voice_subtitles.catalog.ready"));
+        Assert.Equal(LogLevel.Info, ready.Level);
+        Assert.Contains("source=cache", ready.Data?.ToString());
+        Assert.Contains("line_count=", ready.Data?.ToString());
+        Assert.Empty(capture.Events("voice_subtitles.catalog.degraded"));
+        Assert.Empty(capture.Events("voice_subtitles.catalog.failed"));
+        VoiceLineCatalog.Reset();
     }
 
     [Fact]
@@ -210,60 +181,53 @@ public sealed class VoiceSubtitlesTests
     [Fact]
     public void Stale_catalog_emits_one_degradation_then_one_remote_recovery()
     {
-        WithRepositoryCache(
-            cacheAge: TimeSpan.FromHours(21),
-            (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
-            {
-                using var capture = new LogCapture();
-
-                GetRequiredInstanceMethod(repositoryType, "LoadVoiceLinesInBackground")
-                    .Invoke(repository, null);
-
-                var degraded = Assert.Single(capture.Events("voice_subtitles.catalog.degraded"));
-                Assert.Equal(LogLevel.Warning, degraded.Level);
-                Assert.Contains("reason_code=cache_stale", degraded.Data?.ToString());
-                Assert.Contains("source=cache", degraded.Data?.ToString());
-                Assert.Contains("endpoint=voice_catalog", degraded.Data?.ToString());
-                Assert.Empty(capture.Events("voice_subtitles.catalog.ready"));
-                Assert.DoesNotContain(cachePath, degraded.Data?.ToString());
-                Assert.DoesNotContain("expiresAtUtc", degraded.Data?.ToString());
-
-                Assert.Single(queuedRefreshes)().GetAwaiter().GetResult();
-
-                var recovered = Assert.Single(capture.Events("voice_subtitles.catalog.recovered"));
-                Assert.Equal(LogLevel.Info, recovered.Level);
-                Assert.Contains("reason_code=cache_stale", recovered.Data?.ToString());
-                Assert.Contains("source=cache", recovered.Data?.ToString());
-                Assert.Contains("line_count=", recovered.Data?.ToString());
-                Assert.DoesNotContain("http", recovered.Data?.ToString());
-                Assert.True(downloadCalled());
-            }
+        using var capture = new LogCapture();
+        var observer = new VoiceLinesCatalogObserver();
+        var lines = LoadEmbeddedLines();
+        observer.OnInitialLoad(
+            CatalogInitialLoadResult<VoiceLine[]>.Published(
+                Snapshot(
+                    lines,
+                    CatalogSource.Cache,
+                    isStale: true,
+                    new CatalogIssue(CatalogIssueKind.CacheStale)
+                )
+            )
         );
+
+        var degraded = Assert.Single(capture.Events("voice_subtitles.catalog.degraded"));
+        Assert.Equal(LogLevel.Warning, degraded.Level);
+        Assert.Contains("reason_code=cache_stale", degraded.Data?.ToString());
+        Assert.Contains("source=cache", degraded.Data?.ToString());
+        Assert.Contains("endpoint=voice_catalog", degraded.Data?.ToString());
+
+        observer.OnRefreshCompleted(
+            CatalogRefreshTrigger.Background,
+            CatalogRefreshResult<VoiceLine[]>.Published(
+                Snapshot(lines, CatalogSource.Remote),
+                degraded: false
+            )
+        );
+
+        var recovered = Assert.Single(capture.Events("voice_subtitles.catalog.recovered"));
+        Assert.Equal(LogLevel.Info, recovered.Level);
+        Assert.Contains("reason_code=cache_stale", recovered.Data?.ToString());
+        Assert.Contains("source=cache", recovered.Data?.ToString());
+        Assert.Contains("line_count=", recovered.Data?.ToString());
+        VoiceLineCatalog.Reset();
     }
 
     [Fact]
     public void No_usable_catalog_emits_one_terminal_failed_event()
     {
-        var repositoryType = typeof(VoiceLinesRepository);
-        var repository = new VoiceLinesRepository();
-        var now = new DateTime(2026, 7, 3, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = Path.Combine(Path.GetTempPath(), $"voice-lines-{Guid.NewGuid():N}.json");
-        var queuedRefreshes = new List<Func<Task>>();
-        GetRequiredInstanceMethod(repositoryType, "ConfigureVoiceLinesSourcesForTests")
-            .Invoke(
-                repository,
-                [
-                    cachePath,
-                    (Func<DateTime>)(() => now),
-                    (Func<string, Task<string>>)(_ => Task.FromResult(string.Empty)),
-                    (Func<string?>)(() => null),
-                    (Action<Func<Task>>)(refresh => queuedRefreshes.Add(refresh)),
-                ]
-            );
         using var capture = new LogCapture();
+        var observer = new VoiceLinesCatalogObserver();
 
-        GetRequiredInstanceMethod(repositoryType, "LoadVoiceLinesInBackground")
-            .Invoke(repository, null);
+        observer.OnInitialLoad(
+            CatalogInitialLoadResult<VoiceLine[]>.Unavailable(
+                new CatalogIssue(CatalogIssueKind.EmbeddedMissing)
+            )
+        );
 
         var failed = Assert.Single(capture.Events("voice_subtitles.catalog.failed"));
         Assert.Equal(LogLevel.Error, failed.Level);
@@ -271,57 +235,40 @@ public sealed class VoiceSubtitlesTests
         Assert.Contains("source=embedded", failed.Data?.ToString());
         Assert.Empty(capture.Events("voice_subtitles.catalog.ready"));
         Assert.Empty(capture.Events("voice_subtitles.catalog.degraded"));
-        Assert.Single(queuedRefreshes);
     }
 
     [Fact]
     public async Task Cache_write_failure_is_independent_from_catalog_health()
     {
-        var repositoryType = typeof(VoiceLinesRepository);
-        var repository = new VoiceLinesRepository();
-        var embeddedJson = Assert.IsType<string>(
-            GetRequiredStaticMethod(repositoryType, "ReadEmbeddedSeedJsonForTests")
-                .Invoke(null, null)
+        await Task.Yield();
+        using var capture = new LogCapture();
+        var observer = new VoiceLinesCatalogObserver();
+        var lines = LoadEmbeddedLines();
+        observer.OnInitialLoad(
+            CatalogInitialLoadResult<VoiceLine[]>.Published(Snapshot(lines, CatalogSource.Embedded))
         );
-        var cacheDirectory = Path.Combine(
-            Path.GetTempPath(),
-            $"voice-lines-cache-directory-{Guid.NewGuid():N}"
+        observer.OnRefreshCompleted(
+            CatalogRefreshTrigger.Background,
+            CatalogRefreshResult<VoiceLine[]>.Published(
+                Snapshot(
+                    lines,
+                    CatalogSource.Remote,
+                    issue: new CatalogIssue(
+                        CatalogIssueKind.CacheWriteFailed,
+                        new IOException("write failed")
+                    )
+                ),
+                degraded: true
+            )
         );
-        Directory.CreateDirectory(cacheDirectory);
-        var queuedRefreshes = new List<Func<Task>>();
-        try
-        {
-            GetRequiredInstanceMethod(repositoryType, "ConfigureVoiceLinesSourcesForTests")
-                .Invoke(
-                    repository,
-                    [
-                        cacheDirectory,
-                        (Func<DateTime>)(() => DateTime.UtcNow),
-                        (Func<string, Task<string>>)(_ => Task.FromResult(embeddedJson)),
-                        (Func<string?>)(() => embeddedJson),
-                        (Action<Func<Task>>)(refresh => queuedRefreshes.Add(refresh)),
-                    ]
-                );
-            using var capture = new LogCapture();
 
-            GetRequiredInstanceMethod(repositoryType, "LoadVoiceLinesInBackground")
-                .Invoke(repository, null);
-            await Assert.Single(queuedRefreshes)();
-
-            var cacheDegraded = Assert.Single(
-                capture.Events("voice_subtitles.catalog_cache.degraded")
-            );
-            Assert.Equal(LogLevel.Warning, cacheDegraded.Level);
-            Assert.Contains("reason_code=write_failed", cacheDegraded.Data?.ToString());
-            Assert.DoesNotContain(cacheDirectory, cacheDegraded.Data?.ToString());
-            Assert.Empty(capture.Events("voice_subtitles.catalog.degraded"));
-            Assert.Empty(capture.Events("voice_subtitles.catalog.recovered"));
-            Assert.Single(capture.Events("voice_subtitles.catalog.ready"));
-        }
-        finally
-        {
-            Directory.Delete(cacheDirectory, recursive: true);
-        }
+        var cacheDegraded = Assert.Single(capture.Events("voice_subtitles.catalog_cache.degraded"));
+        Assert.Equal(LogLevel.Warning, cacheDegraded.Level);
+        Assert.Contains("reason_code=write_failed", cacheDegraded.Data?.ToString());
+        Assert.Empty(capture.Events("voice_subtitles.catalog.degraded"));
+        Assert.Empty(capture.Events("voice_subtitles.catalog.recovered"));
+        Assert.Single(capture.Events("voice_subtitles.catalog.ready"));
+        VoiceLineCatalog.Reset();
     }
 
     [Fact]
@@ -372,53 +319,38 @@ public sealed class VoiceSubtitlesTests
     [Fact]
     public void Stale_cache_loads_and_requests_background_refresh()
     {
-        WithRepositoryCache(
-            cacheAge: TimeSpan.FromHours(21),
-            (repositoryType, repository, cachePath, downloadCalled, queuedRefreshes) =>
-            {
-                var loadForTests = GetRequiredInstanceMethod(
-                    repositoryType,
-                    "LoadVoiceLinesForTests"
-                );
+        var observer = new VoiceLinesCatalogObserver();
+        var lines = LoadEmbeddedLines();
+        using var capture = new LogCapture();
 
-                var result = loadForTests.Invoke(repository, null);
-                Assert.NotNull(result);
+        observer.OnRefreshQueued(new CatalogIssue(CatalogIssueKind.CacheStale));
 
-                Assert.True(GetInt32(result!, "Item1") > 0);
-                Assert.Equal("cache", GetString(result!, "Item2"));
-                Assert.True(GetBool(result!, "Item3"));
-                Assert.False(downloadCalled());
-                Assert.Empty(queuedRefreshes);
-            }
-        );
+        Assert.Single(capture.Events("voice_subtitles.catalog_refresh.started"));
+        VoiceLineCatalog.Reset();
     }
 
     [Fact]
     public void Catalog_resolves_a_stem_from_embedded_seed()
     {
-        var repositoryType = GetRequiredType(
-            "BazaarPlusPlus.Game.VoiceSubtitles.VoiceLinesRepository"
-        );
-        var catalogType = GetRequiredType("BazaarPlusPlus.Game.VoiceSubtitles.VoiceLineCatalog");
-        var loadEmbeddedSeed = GetRequiredStaticMethod(repositoryType, "LoadEmbeddedSeed");
-        var replaceCatalog = GetRequiredStaticMethod(catalogType, "ReplaceCatalog");
-        var resolveDetailed = GetRequiredStaticMethod(catalogType, "ResolveDetailed");
-        var lines = Assert.IsAssignableFrom<Array>(loadEmbeddedSeed.Invoke(null, null));
+        var lines = LoadEmbeddedLines();
+        try
+        {
+            VoiceLineCatalog.ReplaceCatalog(lines, "embedded-test");
+            var first = lines[0];
+            var resolution = VoiceLineCatalog.ResolveDetailed(
+                "event:/VO/Test/" + first.Stem,
+                "Hero",
+                "Tutorial"
+            );
 
-        replaceCatalog.Invoke(null, new object[] { lines, "embedded-test" });
-        var first = lines.GetValue(0) ?? throw new InvalidOperationException("Catalog was empty.");
-        var stem = GetString(first, "Stem");
-        var resolution = resolveDetailed.Invoke(
-            null,
-            new object[] { "event:/VO/Test/" + stem, "Hero", "Tutorial" }
-        );
-        Assert.NotNull(resolution);
-        var line = GetPropertyValue(resolution, "Line");
-        Assert.NotNull(line);
-
-        Assert.Equal(stem, GetString(line, "Stem"));
-        Assert.Equal("event-stem", GetString(resolution, "Strategy"));
-        Assert.Equal("embedded-test", GetString(resolution, "CatalogName"));
+            Assert.Equal(first.Stem, resolution.Line.Stem);
+            Assert.Equal("event-stem", resolution.Strategy);
+            Assert.Equal("embedded-test", resolution.CatalogName);
+        }
+        finally
+        {
+            VoiceLineCatalog.Reset();
+        }
     }
 
     [Fact]
@@ -556,55 +488,108 @@ public sealed class VoiceSubtitlesTests
         }
     }
 
-    private static void WithRepositoryCache(
-        TimeSpan cacheAge,
-        Action<Type, object, string, Func<bool>, List<Func<Task>>> run
-    )
+    [Fact]
+    public async Task Module_stop_prevents_late_remote_catalog_publish()
     {
-        var repositoryType = GetRequiredType(
-            "BazaarPlusPlus.Game.VoiceSubtitles.VoiceLinesRepository"
+        var remote = new BlockingRemoteSource();
+        var catalog = new RemoteEmbeddedCatalog<VoiceLine[]>(
+            new VoiceLinesCatalogParser(),
+            new MissingEmbeddedSource(),
+            new EmptyCache(),
+            remote,
+            new FixedClock(),
+            new RecordingScheduler(),
+            new VoiceLinesCatalogObserver(),
+            TimeSpan.FromHours(20)
         );
-        var repository =
-            Activator.CreateInstance(repositoryType)
-            ?? throw new InvalidOperationException("Could not create VoiceLinesRepository.");
-        var readEmbeddedJson = GetRequiredStaticMethod(
-            repositoryType,
-            "ReadEmbeddedSeedJsonForTests"
-        );
-        var configure = GetRequiredInstanceMethod(
-            repositoryType,
-            "ConfigureVoiceLinesRemoteForTests"
-        );
-        var embeddedJson = Assert.IsType<string>(readEmbeddedJson.Invoke(null, null));
-        var now = new DateTime(2026, 7, 3, 12, 0, 0, DateTimeKind.Utc);
-        var cachePath = Path.Combine(Path.GetTempPath(), $"voice-lines-{Guid.NewGuid():N}.json");
-        var queuedRefreshes = new List<Func<Task>>();
-        var downloadCalled = false;
+        var module = new VoiceSubtitlesModule(catalog);
+        var refresh = catalog.RefreshAsync().AsTask();
+        await remote.Started;
 
-        try
+        module.Stop();
+        remote.Complete(
+            BuildVoiceLinesJson(
+                1,
+                ContentHashFor(("999_LatePublishOnly", "Late.", "迟到。", 1.0)),
+                ("999_LatePublishOnly", "Late.", "迟到。", 1.0)
+            )
+        );
+
+        Assert.False((await refresh).Succeeded);
+        Assert.True(
+            string.IsNullOrEmpty(
+                VoiceLineCatalog.Resolve("999_LatePublishOnly", "Hero", "Test").Stem
+            )
+        );
+    }
+
+    private static VoiceLine[] LoadEmbeddedLines()
+    {
+        var json = LoadEmbeddedJson();
+        Assert.False(string.IsNullOrWhiteSpace(json));
+        return VoiceLinesDocument.Parse(json!, VoiceCatalogSource.Embedded);
+    }
+
+    private static string? LoadEmbeddedJson() =>
+        new AssemblyResourceCatalogSource(
+            typeof(VoiceLine).Assembly,
+            VoiceLinesCatalogFactory.EmbeddedResourceName
+        )
+            .ReadAsync(CancellationToken.None)
+            .AsTask()
+            .GetAwaiter()
+            .GetResult();
+
+    private static CatalogSnapshot<VoiceLine[]> Snapshot(
+        VoiceLine[] lines,
+        CatalogSource source,
+        bool isStale = false,
+        CatalogIssue? issue = null
+    ) => new(lines, source, new DateTime(2026, 7, 18, 12, 0, 0, DateTimeKind.Utc), isStale, issue);
+
+    private sealed class BlockingRemoteSource : IRemoteCatalogSource
+    {
+        private readonly TaskCompletionSource<string?> _completion = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        private readonly TaskCompletionSource<bool> _started = new(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+
+        internal Task Started => _started.Task;
+
+        public ValueTask<string?> DownloadAsync(CancellationToken cancellationToken)
         {
-            File.WriteAllText(cachePath, embeddedJson, new UTF8Encoding(false));
-            File.SetLastWriteTimeUtc(cachePath, now.Subtract(cacheAge));
-
-            Func<DateTime> utcNow = () => now;
-            Func<string, Task<string>> downloadJsonAsync = _ =>
-            {
-                downloadCalled = true;
-                return Task.FromResult(embeddedJson);
-            };
-            Action<Func<Task>> queueBackgroundRefresh = refresh => queuedRefreshes.Add(refresh);
-            configure.Invoke(
-                repository,
-                [cachePath, utcNow, downloadJsonAsync, queueBackgroundRefresh]
-            );
-
-            run(repositoryType, repository, cachePath, () => downloadCalled, queuedRefreshes);
+            _started.TrySetResult(true);
+            return new(_completion.Task);
         }
-        finally
-        {
-            if (File.Exists(cachePath))
-                File.Delete(cachePath);
-        }
+
+        internal void Complete(string? document) => _completion.SetResult(document);
+    }
+
+    private sealed class MissingEmbeddedSource : IEmbeddedCatalogSource
+    {
+        public ValueTask<string?> ReadAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<string?>(null);
+    }
+
+    private sealed class EmptyCache : ILocalCatalogCache
+    {
+        public ValueTask<CatalogCacheDocument?> ReadAsync(CancellationToken cancellationToken) =>
+            ValueTask.FromResult<CatalogCacheDocument?>(null);
+
+        public ValueTask WriteAsync(string document, CancellationToken cancellationToken) =>
+            ValueTask.CompletedTask;
+    }
+
+    private sealed class FixedClock : ICatalogClock
+    {
+        public DateTime UtcNow => new(2026, 7, 18, 12, 0, 0, DateTimeKind.Utc);
+    }
+
+    private sealed class RecordingScheduler : ICatalogRefreshScheduler
+    {
+        public void Queue(Func<Task> refresh) { }
     }
 
     private static string BuildVoiceLinesJson(

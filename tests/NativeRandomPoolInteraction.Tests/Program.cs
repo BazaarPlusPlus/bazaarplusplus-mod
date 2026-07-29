@@ -92,15 +92,11 @@ static void PatchRoutingDistinguishesProgrammaticCallsAndPoolEdits()
         "The game's final random selection flag must stay on the native route."
     );
     Assert(
-        !NativePoolInteractionRouting.ShouldRunNativeAction(
-            NativePoolInteractionRoute.PoolEdit
-        ),
+        !NativePoolInteractionRouting.ShouldRunNativeAction(NativePoolInteractionRoute.PoolEdit),
         "A random-pool card edit must suppress the native select/equip action."
     );
     Assert(
-        NativePoolInteractionRouting.ShouldRunNativeAction(
-            NativePoolInteractionRoute.NativeAction
-        ),
+        NativePoolInteractionRouting.ShouldRunNativeAction(NativePoolInteractionRoute.NativeAction),
         "Normal and programmatic callbacks must continue into the native action."
     );
 }

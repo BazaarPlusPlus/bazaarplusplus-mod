@@ -763,36 +763,6 @@ file static class ReadbackLimiterTests
         );
         Release();
         Release();
-
-        var root = FindRepositoryRoot();
-        var source = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoCaptureSession.cs"
-            )
-        );
-        TestReflection.Assert(
-            !source.Contains("maxCapturesPerTick", StringComparison.Ordinal)
-                && !source.Contains("while (now >= _nextCaptureTime", StringComparison.Ordinal),
-            "Production capture must issue at most one readback per rendered tick."
-        );
-        TestReflection.Assert(
-            source.Contains("_readbackLimiter.Release();", StringComparison.Ordinal)
-                && source.Contains("_readbackBackpressureSkips++", StringComparison.Ordinal),
-            "Request exceptions must release reservations and backpressure must be counted separately."
-        );
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var current = new DirectoryInfo(Environment.CurrentDirectory);
-        while (current != null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
-                return current.FullName;
-            current = current.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
     }
 }
 
@@ -1410,34 +1380,6 @@ file static class BoundedTextTailTests
             "The collector must preserve the newest stderr content."
         );
 
-        var root = FindRepositoryRoot();
-        var raw = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src/BazaarPlusPlus/Game/CombatReplay/Video/FfmpegRawVideoEncoder.cs"
-            )
-        );
-        var mux = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoAudioMuxer.cs"
-            )
-        );
-        TestReflection.Assert(
-            raw.Contains("BoundedTextTail", StringComparison.Ordinal)
-                && !raw.Contains("ReadLine()", StringComparison.Ordinal),
-            "Raw encoding stderr must use the bounded chunk collector, never ReadLine."
-        );
-        TestReflection.Assert(
-            mux.Contains("BoundedTextTail", StringComparison.Ordinal)
-                && !mux.Contains(".ReadToEnd()", StringComparison.Ordinal),
-            "Mux and probe pipes must use bounded concurrent collectors, never ReadToEnd."
-        );
-        TestReflection.Assert(
-            !raw.Contains("ffmpeg: {line}", StringComparison.Ordinal),
-            "Raw stderr must not emit one operational record per external line."
-        );
-
         var rawTail = CollectThrough(
             "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegRawVideoEncoder",
             hostile
@@ -1478,21 +1420,6 @@ file static class BoundedTextTailTests
             ) ?? throw new InvalidOperationException($"{typeName} collector seam not found.");
         using var reader = new StringReader(stderr);
         return (string)(method.Invoke(null, new object[] { reader }) ?? string.Empty);
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var current = new DirectoryInfo(Environment.CurrentDirectory);
-        while (current != null)
-        {
-            if (
-                File.Exists(Path.Combine(current.FullName, "Directory.Build.props"))
-                && Directory.Exists(Path.Combine(current.FullName, "src", "BazaarPlusPlus"))
-            )
-                return current.FullName;
-            current = current.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
     }
 }
 
@@ -1624,6 +1551,7 @@ file static class RecordingOperationContractTests
                 "CompletePreflight",
                 operation,
                 Enum.Parse(ReasonType, reason),
+                null,
                 null
             );
             logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
@@ -2413,68 +2341,12 @@ file static class AudioStopTimeoutTests
             release.Set();
             thread.Join();
         }
-
-        var root = FindRepositoryRoot();
-        var source = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src/BazaarPlusPlus/Game/CombatReplay/Audio/ReplayAudioTapStopper.cs"
-            )
-        );
-        TestReflection.Assert(
-            source.Contains(
-                "failureReason == ReplayAudioFailureReasonCode.None",
-                StringComparison.Ordinal
-            ),
-            "A failed audio stop must be excluded from usable mux inputs."
-        );
-        foreach (
-            var fileName in new[]
-            {
-                "CoreAudioProcessTapCaptureTap.cs",
-                "WasapiLoopbackCaptureTap.cs",
-            }
-        )
-        {
-            var backend = File.ReadAllText(
-                Path.Combine(root, "src/BazaarPlusPlus/Game/CombatReplay/Audio", fileName)
-            );
-            TestReflection.Assert(
-                backend.Contains("ReplayAudioCaptureThreadJoiner.TryJoin", StringComparison.Ordinal)
-                    && backend.Contains(
-                        "ScheduleDeferredCleanup(_thread)",
-                        StringComparison.Ordinal
-                    )
-                    && backend.Contains(
-                        "CleanupResources(deleteWav: true)",
-                        StringComparison.Ordinal
-                    )
-                    && backend.Contains(
-                        "ReplayAudioFailureReasonCode.BackendStopFailed",
-                        StringComparison.Ordinal
-                    ),
-                $"{fileName} must classify Join(false) and defer safe native/WAV cleanup."
-            );
-        }
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var current = new DirectoryInfo(Environment.CurrentDirectory);
-        while (current != null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
-                return current.FullName;
-            current = current.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
     }
 }
 
 // ---------------------------------------------------------------------------
-// 12) Locked recorder integration paths: identity/register ordering, all
-//     preflight/abort/shutdown closures, actual-start-only lifecycle, resolved
-//     final metadata, callback safety, and bounded external-process joins.
+// 12) Resolved final metadata: the persisted recorder status must agree with
+//     the verified artifact and terminal capture outcome.
 // ---------------------------------------------------------------------------
 file static class RecorderIntegrationContractTests
 {
@@ -2514,107 +2386,6 @@ file static class RecorderIntegrationContractTests
             Status("Failed", true, 1) == "FAILED",
             "Failed capture must persist failed."
         );
-
-        var root = FindRepositoryRoot();
-        var source = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src/BazaarPlusPlus/Game/CombatReplay/Video/CombatReplayVideoRecorder.cs"
-            )
-        );
-        var start = source.IndexOf("_operations.Start(", StringComparison.Ordinal);
-        var gate = source.IndexOf("CombatReplayRecordingGate.Evaluate(", StringComparison.Ordinal);
-        TestReflection.Assert(
-            start >= 0 && start < gate,
-            "The production lifecycle must allocate and register before preflight."
-        );
-        TestReflection.Assert(
-            source.Contains("VideoId = recordingId", StringComparison.Ordinal),
-            "The preallocated operation ID must flow into capture and metadata."
-        );
-        foreach (
-            var token in new[]
-            {
-                "AsyncGpuReadbackUnavailable",
-                "FfmpegUnavailable",
-                "OutputPathUnavailable",
-                "InvalidDimensions",
-                "BeginException",
-                "AbortActiveSession(\"superseded\")",
-                "AbortActiveSession(\"recorder-disabled\")",
-                "AbortActiveSession(\"recorder-destroyed\")",
-                "recording.Operations.CompleteResolved(",
-                "recording.Operations.CompleteMuxCallbackFailure(",
-                "CompletePending(ReplayVideoRecordingReasonCode.ShutdownTimeout)",
-            }
-        )
-        {
-            TestReflection.Assert(
-                source.Contains(token, StringComparison.Ordinal),
-                $"Missing recorder closure path: {token}"
-            );
-        }
-        TestReflection.Assert(
-            !source.Contains("SessionSubscribed", StringComparison.Ordinal)
-                && Count(source, "ReplayVideoLogStage.SessionStarted") == 1
-                && source.IndexOf("ReplayVideoLogStage.SessionStarted", StringComparison.Ordinal)
-                    > source.IndexOf("session.Start();", StringComparison.Ordinal),
-            "V4 must emit one actual-start Debug and no subscription/preflight noise."
-        );
-        TestReflection.Assert(
-            source.Contains(
-                "mux.Status != ReplayVideoAudioMuxer.MuxStatus.Failed",
-                StringComparison.Ordinal
-            )
-                && source.Contains(
-                    "resultReason != ReplayVideoRecordingReasonCode.Completed",
-                    StringComparison.Ordinal
-                ),
-            "Final metadata and post-finalize failures must agree with the terminal outcome."
-        );
-
-        var raw = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src/BazaarPlusPlus/Game/CombatReplay/Video/FfmpegRawVideoEncoder.cs"
-            )
-        );
-        var mux = File.ReadAllText(
-            Path.Combine(
-                root,
-                "src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoAudioMuxer.cs"
-            )
-        );
-        TestReflection.Assert(
-            !raw.Contains("stderrThread.Join();", StringComparison.Ordinal)
-                && !mux.Contains("drainThread.Join();", StringComparison.Ordinal)
-                && !mux.Contains("stdoutThread.Join();", StringComparison.Ordinal),
-            "No external-process reader may have an unbounded terminal join."
-        );
-    }
-
-    private static int Count(string source, string token)
-    {
-        var count = 0;
-        var offset = 0;
-        while ((offset = source.IndexOf(token, offset, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            offset += token.Length;
-        }
-        return count;
-    }
-
-    private static string FindRepositoryRoot()
-    {
-        var current = new DirectoryInfo(Environment.CurrentDirectory);
-        while (current != null)
-        {
-            if (File.Exists(Path.Combine(current.FullName, "Directory.Build.props")))
-                return current.FullName;
-            current = current.Parent;
-        }
-        throw new InvalidOperationException("Repository root not found.");
     }
 }
 

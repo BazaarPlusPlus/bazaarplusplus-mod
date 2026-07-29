@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Linq;
 using BazaarPlusPlus.ModApi;
 
 internal static class CodecTests

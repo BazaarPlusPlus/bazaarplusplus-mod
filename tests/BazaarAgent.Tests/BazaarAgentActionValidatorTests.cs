@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarPlusPlus.BazaarAgent;
 using Xunit;
 
@@ -199,6 +198,26 @@ public class BazaarAgentActionValidatorTests
             PlayMode = "unranked",
         };
         var result = BazaarAgentActionValidator.Validate(snap, action, 0);
+        Assert.Equal(BazaarAgentValidationCode.Ok, result.Code);
+    }
+
+    [Theory]
+    [InlineData("Hero8")]
+    [InlineData("TheDragons")]
+    [InlineData("hero8")]
+    [InlineData("thedragons")]
+    public void Rule4_StartOrContinueRun_DragonsAliases_Pass(string heroId)
+    {
+        var snap = MakeSnap(1, SimpleOption(BazaarAgentActionKind.StartOrContinueRun));
+        var action = new BazaarAgentAction
+        {
+            ActionKind = BazaarAgentActionKind.StartOrContinueRun,
+            Hero = heroId,
+            PlayMode = "Unranked",
+        };
+
+        var result = BazaarAgentActionValidator.Validate(snap, action, 0);
+
         Assert.Equal(BazaarAgentValidationCode.Ok, result.Code);
     }
 

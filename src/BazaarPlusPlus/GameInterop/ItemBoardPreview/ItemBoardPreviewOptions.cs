@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 
@@ -71,7 +70,7 @@ internal enum ItemBoardPreviewFailureReason
     SpanUnavailable,
     PlacementUnavailable,
     AggregateException,
-    HandleUnavailable,
+    SessionUnavailable,
     CardException,
 }
 

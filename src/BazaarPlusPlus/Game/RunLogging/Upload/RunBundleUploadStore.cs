@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
@@ -402,6 +399,8 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase, IRunBundleUploadSt
             PlayerRating = manifest.Participants.PlayerRating,
             PlayerLevel = manifest.Participants.PlayerLevel,
             PlayerPrestige = manifest.Participants.PlayerPrestige,
+            PlayerIncome = manifest.Participants.PlayerIncome,
+            PlayerGold = manifest.Participants.PlayerGold,
             PlayerVictories = manifest.Participants.PlayerVictories,
             OpponentName = manifest.Participants.OpponentName,
             OpponentAccountId = manifest.Participants.OpponentAccountId,
@@ -447,6 +446,8 @@ internal sealed class RunBundleUploadStore : SqliteStoreBase, IRunBundleUploadSt
                 PlayerRating = manifest.Participants.PlayerRating,
                 PlayerLevel = manifest.Participants.PlayerLevel,
                 PlayerPrestige = manifest.Participants.PlayerPrestige,
+                PlayerIncome = manifest.Participants.PlayerIncome,
+                PlayerGold = manifest.Participants.PlayerGold,
                 PlayerVictories = manifest.Participants.PlayerVictories,
                 OpponentName = manifest.Participants.OpponentName,
                 OpponentAccountId = manifest.Participants.OpponentAccountId,

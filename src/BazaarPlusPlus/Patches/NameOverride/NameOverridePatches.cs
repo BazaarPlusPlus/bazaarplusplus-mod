@@ -1,10 +1,8 @@
 #pragma warning disable CS0436
 #nullable enable
-using System;
 using System.Reflection;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
-using BazaarPlusPlus.Patches;
 using HarmonyLib;
 using TheBazaar;
 

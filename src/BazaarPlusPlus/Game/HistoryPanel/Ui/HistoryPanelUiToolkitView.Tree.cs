@@ -1,8 +1,6 @@
 #nullable enable
-using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.Supporters.Ui;
 using BazaarPlusPlus.GameInterop.Heroes;
-using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -756,8 +754,8 @@ internal sealed partial class HistoryPanelUiToolkitView
         _runsFilterRow.style.marginTop = UiSpacing.Sm;
         _filterSlot.Add(_runsFilterRow);
 
-        _heroChips = new Button[HeroRoster.Length];
-        for (var i = 0; i < HeroRoster.Length; i++)
+        _heroChips = new Button[HeroRoster.Count];
+        for (var i = 0; i < HeroRoster.Count; i++)
         {
             var heroName = HeroRoster[i];
             var heroChip = CreateButton(
@@ -767,7 +765,7 @@ internal sealed partial class HistoryPanelUiToolkitView
                 Sizes.ButtonCompactHeight,
                 fixedWidth: false
             );
-            heroChip.tooltip = heroName;
+            heroChip.tooltip = HistoryPanelHeroPresentation.DisplayName(heroName);
             if (i > 0)
                 heroChip.style.marginLeft = UiSpacing.Xs;
             _runsFilterRow.Add(heroChip);

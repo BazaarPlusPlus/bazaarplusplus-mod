@@ -1,7 +1,5 @@
 #nullable enable
-using System;
 using System.Diagnostics;
-using System.Threading;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
 

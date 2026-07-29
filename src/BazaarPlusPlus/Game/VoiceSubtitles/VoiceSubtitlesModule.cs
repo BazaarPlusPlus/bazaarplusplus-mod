@@ -1,12 +1,21 @@
 #nullable enable
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
+using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 
 namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
 internal sealed class VoiceSubtitlesModule : IBppFeature
 {
-    private readonly VoiceLinesRepository _repository = new();
+    private readonly IRemoteEmbeddedCatalog<VoiceLine[]> _catalog;
+
+    internal VoiceSubtitlesModule()
+        : this(VoiceLinesCatalogFactory.Create(BepInEx.Paths.GameRootPath)) { }
+
+    internal VoiceSubtitlesModule(IRemoteEmbeddedCatalog<VoiceLine[]> catalog)
+    {
+        _catalog = catalog;
+    }
 
     public void Start()
     {
@@ -15,12 +24,13 @@ internal sealed class VoiceSubtitlesModule : IBppFeature
         VoiceLineVoObserverBridge.Configure(
             new VoiceSubtitleObserverCallbacks(ResolveLine, VoiceSubtitlesGate.IsEnabled, QueueShow)
         );
-        _repository.BeginLoad();
+        _ = _catalog.WarmAsync(CancellationToken.None).AsTask();
     }
 
     public void Stop()
     {
         VoiceLineVoObserverBridge.Configure(VoiceSubtitleObserverCallbacks.Empty);
+        _catalog.Dispose();
         VoiceLineDisplay.Reset();
         VoiceLineCatalog.Reset();
     }

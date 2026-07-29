@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 using System.Collections.Concurrent;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.VoiceSubtitles.Settings;
@@ -17,7 +16,6 @@ internal static class VoiceLineDisplay
 {
     private const float ScaleComparisonTolerance = 0.0001f;
     private const float BilingualChineseScaleMultiplier = 1.08f;
-    private const float CenteredChineseTrailingPunctuationWidthRatio = 0.5f;
     internal const int MaxQueuedShows = 8;
 
     private static GameObject? _labelRoot;
@@ -28,7 +26,6 @@ internal static class VoiceLineDisplay
     private static bool _mountedFromVersionLabel;
     private static int _nextDisplayId;
     private static float _secondLineOffset = -28f;
-    private static float _centeredChineseWidthReduction;
     private static RectTransform? _sourceRect;
     private static TextMeshProUGUI? _sourceLabel;
     private static readonly ConcurrentQueue<VoiceSubtitleCue> QueuedShows = new();
@@ -251,7 +248,6 @@ internal static class VoiceLineDisplay
         _chineseUiLabel = null;
         _lifetime = null;
         _mountedFromVersionLabel = false;
-        _centeredChineseWidthReduction = 0f;
         _sourceRect = null;
         _sourceLabel = null;
     }
@@ -331,6 +327,7 @@ internal static class VoiceLineDisplay
             settings.LanguageMode == SubtitleLanguageMode.EnglishOnly
                 ? string.Empty
                 : line.Chinese.Trim();
+        chinese = ConvertCenteredChineseTrailingPunctuation(chinese, settings.Position);
 
         if (string.IsNullOrEmpty(english) && string.IsNullOrEmpty(chinese))
             return DisplayText.Empty;
@@ -514,18 +511,8 @@ internal static class VoiceLineDisplay
         }
 
         _secondLineOffset = -lineHeight;
-        _centeredChineseWidthReduction = ResolveCenteredChineseWidthReduction(
-            settings.Position,
-            chineseFontSize,
-            currentText
-        );
         ConfigureLineRect(english?.rectTransform, 0f, lineHeight);
-        ConfigureLineRect(
-            chineseUi?.rectTransform,
-            _secondLineOffset,
-            lineHeight,
-            _centeredChineseWidthReduction
-        );
+        ConfigureLineRect(chineseUi?.rectTransform, _secondLineOffset, lineHeight);
     }
 
     private static TextMeshProUGUI? CreateEnglishLabel(Transform parent)
@@ -566,12 +553,7 @@ internal static class VoiceLineDisplay
         return labelObject;
     }
 
-    private static void ConfigureLineRect(
-        RectTransform? rect,
-        float yOffset,
-        float lineHeight,
-        float widthReduction = 0f
-    )
+    private static void ConfigureLineRect(RectTransform? rect, float yOffset, float lineHeight)
     {
         if (rect == null)
             return;
@@ -579,8 +561,8 @@ internal static class VoiceLineDisplay
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(1f, 1f);
         rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(widthReduction, yOffset);
-        rect.sizeDelta = new Vector2(-widthReduction, Math.Max(48f, lineHeight));
+        rect.anchoredPosition = new Vector2(0f, yOffset);
+        rect.sizeDelta = new Vector2(0f, Math.Max(48f, lineHeight));
         rect.localScale = Vector3.one;
         rect.localRotation = Quaternion.identity;
     }
@@ -617,8 +599,7 @@ internal static class VoiceLineDisplay
             ConfigureLineRect(
                 _chineseUiLabel.rectTransform,
                 chineseOffset,
-                Math.Abs(_secondLineOffset),
-                _centeredChineseWidthReduction
+                Math.Abs(_secondLineOffset)
             );
         }
     }
@@ -701,27 +682,39 @@ internal static class VoiceLineDisplay
         return settings.ChineseFontScale;
     }
 
-    private static float ResolveCenteredChineseWidthReduction(
-        SubtitlePosition position,
-        float chineseFontSize,
-        DisplayText? currentText
+    internal static string ConvertCenteredChineseTrailingPunctuation(
+        string chinese,
+        SubtitlePosition position
     )
     {
-        if (
-            position != SubtitlePosition.TopCenter
-            || !currentText.HasValue
-            || string.IsNullOrEmpty(currentText.Value.Chinese)
-        )
-        {
-            return 0f;
-        }
+        if (position != SubtitlePosition.TopCenter || string.IsNullOrEmpty(chinese))
+            return chinese;
 
-        // Centered Chinese subtitles almost always end with Chinese punctuation. The
-        // punctuation consumes a full character slot but has less visual weight, so
-        // keeping the right edge fixed and removing half a character from the measured
-        // row width makes the centered line look more balanced.
-        return chineseFontSize * CenteredChineseTrailingPunctuationWidthRatio;
+        var punctuationIndex = chinese.Length - 1;
+        while (punctuationIndex >= 0 && IsClosingQuote(chinese[punctuationIndex]))
+            punctuationIndex--;
+
+        if (punctuationIndex < 0)
+            return chinese;
+
+        var halfwidthPunctuation = chinese[punctuationIndex] switch
+        {
+            '。' => '｡', // U+3002 IDEOGRAPHIC FULL STOP -> U+FF61 HALFWIDTH IDEOGRAPHIC FULL STOP
+            '！' => '!',
+            '？' => '?',
+            _ => '\0',
+        };
+        if (halfwidthPunctuation == '\0')
+            return chinese;
+
+        // This is display-only. Let TMP center the actual narrower punctuation advance
+        // instead of shifting a whole Chinese row by a guessed fixed width.
+        return chinese.Substring(0, punctuationIndex)
+            + halfwidthPunctuation
+            + chinese.Substring(punctuationIndex + 1);
     }
+
+    private static bool IsClosingQuote(char value) => value is '」' or '』' or '”' or '’';
 
     private static bool AreScalesEquivalent(float left, float right) =>
         Math.Abs(left - right) <= ScaleComparisonTolerance;

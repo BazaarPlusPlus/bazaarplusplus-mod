@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using BazaarPlusPlus.Core.GameState;
 using HarmonyLib;

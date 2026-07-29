@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using BazaarPlusPlus.BazaarAgent;
 using Xunit;
 

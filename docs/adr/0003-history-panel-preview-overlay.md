@@ -1,17 +1,17 @@
-# Render HistoryPanel previews via ScreenSpaceOverlay, not an offscreen RenderTexture
+# ADR-0003: Render native board previews in a screen-space overlay
 
-The HistoryPanel battle-board preview renders the game's native `CardPreviewBase` into an independent `ScreenSpaceOverlay` Canvas whose position is synced to the UI Toolkit preview container's `worldBound`. We deliberately do **not** render cards with an offscreen Camera into a `RenderTexture` blitted into a UI Toolkit `Image`.
+Status: Accepted
 
-## Context
+## Decision
 
-An offscreen-RT migration was designed and implemented (the "clone fewer levels" approach: HistoryPanel owns its host Canvas + socket layout and reuses only the `CardPreviewBase` prefab, awaiting the real `SetUp` art-load task instead of the game's fragile reveal coroutine). The goal was a self-contained native render not coupled to the live game tooltip canvas.
+Render History and LiveBuild native card previews in a dedicated `ScreenSpaceOverlay` canvas positioned over their UI Toolkit containers. Do not render the uGUI card prefab through an offscreen camera into a `RenderTexture`.
 
-It failed on a hard platform constraint: **under URP, an offscreen `Camera → RenderTexture` cannot render uGUI** (`CardPreviewBase` is uGUI), so the texture came back empty. The RT path was abandoned and reverted to a `ScreenSpaceOverlay` Canvas + `worldBound→clip` coordinate sync.
+## Why
 
-## Consequences
+The offscreen-camera prototype produced an empty texture under URP because the reused `CardPreviewBase` is uGUI, not scene geometry. The overlay keeps native rendering while letting UI Toolkit own layout.
 
-- `GameInterop/ItemBoardPreview/BppItemBoardPreview.cs` + `ItemBoardPreviewSurface.cs` own a `ScreenSpaceOverlay` Canvas; the overlay tracks the UI Toolkit container via `scaledPixelsPerPoint`, so it follows `PanelSettings.match` automatically (see [history-panel.md](../archive/features/history-panel.md) §布局, §预览渲染).
-- RT-era code was deleted: `NativeBoardWidth`/`NativeBoardHeight` constants survive in `GameInterop/ItemBoardPreview/ItemBoardSocketLayout.cs`; `HistoryPanelPreviewTextureGeometry` itself is gone, along with `ResolveTextureSize` / `ResolveBoardPlacement` and their tests, `Game/PreviewSurface/`, and `Game/MonsterPreview/Architecture/`.
-- **Do not re-propose the offscreen-RT path** unless the project leaves URP or Unity gains offscreen uGUI rendering. The HistoryPanel preview stack is intentionally decoupled from the monster/CardSet preview path (see [monster-preview.md](../archive/features/monster-preview.md)).
+## Guardrails
 
-Related layout history: [docs/design/archive/2026-05-29-historypanel-fullscreen-responsive-design.md](../archive/design/archive/2026-05-29-historypanel-fullscreen-responsive-design.md). (The detailed offscreen-RT migration spec was pruned; this ADR is the record of that decision.)
+- `ItemBoardPreviewSurface` owns the overlay canvas ([surface](../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewSurface.cs#L296-L337)). Views convert `worldBound` points to physical pixels with `scaledPixelsPerPoint` before updating the surface ([History view](../../src/BazaarPlusPlus/Game/HistoryPanel/Ui/HistoryPanelUiToolkitView.cs#L192-L206), [LiveBuild view](../../src/BazaarPlusPlus/Game/LiveBuildPanel/Ui/LiveBuildPanelView.cs#L785-L796)).
+- Reuse the shared native-card preview host; do not create a feature-local prefab/render pipeline.
+- Do not re-propose offscreen uGUI-to-RT unless the render pipeline or Unity capability changes.

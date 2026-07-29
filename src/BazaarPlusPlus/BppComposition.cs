@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Paths;
@@ -10,10 +9,12 @@ using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.CombatStatusBar;
 using BazaarPlusPlus.Game.EventPreview;
+using BazaarPlusPlus.Game.GraphicsUpscaling;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.LiveBuildPanel;
+using BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.OverlayPanels;
@@ -30,16 +31,18 @@ using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.CardPreview;
+using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.GameInterop.RunSnapshot;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
+using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 using BazaarPlusPlus.ModApi.Clients;
+using BazaarPlusPlus.Patches;
 using BazaarPlusPlus.Patches.Tooltips;
-using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
 using BepInEx.Logging;
-using UnityEngine;
 
 namespace BazaarPlusPlus;
 
@@ -53,6 +56,9 @@ internal sealed class BppComposition : IDisposable
     private readonly EncounterStateProbe _encounterStateProbe = new();
     private readonly RunSnapshotProbe _runSnapshotProbe = new();
     private readonly BppStaticCardMapProvider _staticCardMapProvider = new();
+    private readonly IGameDataDayTierResolver _dayTierResolver = new GameDataDayTierResolver(
+        new GameDataDayTierSource()
+    );
     private readonly BppRuntimeServices _services;
     private readonly BppFeatureRegistry _featureRegistry = new();
     private readonly BppMountableRegistry _mountables = new();
@@ -61,8 +67,15 @@ internal sealed class BppComposition : IDisposable
     private readonly CombatReplayModule _combatReplayModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
     private readonly SteamTimelineModule _steamTimelineModule;
+    private readonly RunLoggingModule _runLoggingModule;
+    private readonly EncounterPreviewModule _encounterPreviewModule;
+    private readonly INativeCardPreviewHost _nativeCardPreviewHost;
+    private readonly EndOfRunCaptureWorkflow _endOfRunCaptureWorkflow;
+    private readonly BppPatchFeatures _patchFeatures;
     private readonly VoiceSubtitlesModule _voiceSubtitlesModule;
     private readonly VoiceSubtitlesInteropModule _voiceSubtitlesInteropModule;
+    private readonly IRemoteEmbeddedCatalog<TenWinBuildCorpus> _buildRecommendationCatalog;
+    private readonly BuildRecommendationRepository _buildRecommendationRepository;
     private ModOnlineClient? _onlineClientRef;
     private BazaarDbLinkClient? _accountLinkClientRef;
     private PvpBattleCatalog? _pvpBattleCatalog;
@@ -78,6 +91,7 @@ internal sealed class BppComposition : IDisposable
 
     public BppMountableRegistry Mountables => _mountables;
     public SettingsDockEntryRegistry SettingsDockRegistry => _settingsDockRegistry;
+    public BppPatchFeatures PatchFeatures => _patchFeatures;
     public ModOnlineClient? OnlineClient => _onlineClientRef;
     public BazaarDbLinkClient? AccountLinkClient => _accountLinkClientRef;
 
@@ -112,6 +126,34 @@ internal sealed class BppComposition : IDisposable
         _steamTimelineModule = new SteamTimelineModule(_services);
         _voiceSubtitlesModule = new VoiceSubtitlesModule();
         _voiceSubtitlesInteropModule = new VoiceSubtitlesInteropModule();
+        _nativeCardPreviewHost = new NativeCardPreviewHost(new NativeTooltipDataFactoryAdapter());
+        _buildRecommendationCatalog = TenWinBuildCatalogFactory.Create(BepInEx.Paths.GameRootPath);
+        _buildRecommendationRepository = new BuildRecommendationRepository(
+            _buildRecommendationCatalog
+        );
+        var encounterPreviewCachePath = System.IO.Path.Combine(
+            System.IO.Path.GetDirectoryName(
+                _paths.RunLogDatabasePath
+                    ?? throw new InvalidOperationException(
+                        "Run log database path is not initialized."
+                    )
+            )!,
+            "EncounterPreview",
+            "preview-plans.json"
+        );
+        _encounterPreviewModule = new EncounterPreviewModule(
+            _services,
+            _staticCardMapProvider,
+            _dayTierResolver,
+            encounterPreviewCachePath
+        );
+        _endOfRunCaptureWorkflow = new EndOfRunCaptureWorkflow(_services);
+        _patchFeatures = new BppPatchFeatures(_encounterPreviewModule, _endOfRunCaptureWorkflow);
+        _runLoggingModule = new RunLoggingModule(
+            _services,
+            PvpBattleCatalog,
+            () => _combatReplayModule.Runtime?.HasPendingPersistence == true
+        );
 
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
@@ -119,8 +161,9 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_steamTimelineModule);
         _featureRegistry.Register(_voiceSubtitlesInteropModule);
         _featureRegistry.Register(_voiceSubtitlesModule);
+        _featureRegistry.Register(_runLoggingModule);
 
-        _settingsDockRegistry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create());
+        _settingsDockRegistry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create(_eventBus));
         _settingsDockRegistry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(_settingsDockRegistry);
         _settingsDockRegistry.Register(ChineseLocaleModeSettingsDockEntry.Create(_eventBus));
@@ -142,26 +185,29 @@ internal sealed class BppComposition : IDisposable
         );
         _settingsDockRegistry.Register(LegendaryPositionSettingsDockEntry.Create());
         _settingsDockRegistry.Register(NameOverrideSettingsDockEntry.Create());
+        if (
+            UnityEngine.Application.platform
+            is UnityEngine.RuntimePlatform.OSXPlayer
+                or UnityEngine.RuntimePlatform.WindowsPlayer
+        )
+            GraphicsUpscalingSettingsDockEntry.RegisterAll(_settingsDockRegistry);
 
         _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
-        var encounterPreviewCachePath = System.IO.Path.Combine(
-            System.IO.Path.GetDirectoryName(
-                _paths.RunLogDatabasePath
-                    ?? throw new InvalidOperationException(
-                        "Run log database path is not initialized."
-                    )
-            )!,
-            "EncounterPreview",
-            "preview-plans.json"
-        );
+        if (
+            UnityEngine.Application.platform
+            is UnityEngine.RuntimePlatform.OSXPlayer
+                or UnityEngine.RuntimePlatform.WindowsPlayer
+        )
+        {
+            _mountables.Register(
+                new ComponentMount<GraphicsUpscalingController>(
+                    (controller, services) => controller.Initialize(services.Config)
+                )
+            );
+        }
         _mountables.Register(
-            new ComponentMount<EventPreviewPlanController>(
-                (controller, services) =>
-                    controller.Initialize(
-                        services,
-                        _staticCardMapProvider,
-                        encounterPreviewCachePath
-                    )
+            new ComponentMount<EventPreviewStaticDataObserver>(
+                (observer, _) => observer.Initialize(_encounterPreviewModule)
             )
         );
         // The overlay host must mount before every Main Overlay Panel mount below: panels
@@ -169,14 +215,21 @@ internal sealed class BppComposition : IDisposable
         var overlayPanelHostMount = new OverlayPanelHostMount();
         _mountables.Register(overlayPanelHostMount);
         _mountables.Register(
-            new CollectionPanelMount(() => overlayPanelHostMount.Host, _staticCardMapProvider)
+            new CollectionPanelMount(
+                () => overlayPanelHostMount.Host,
+                _staticCardMapProvider,
+                _nativeCardPreviewHost,
+                _dayTierResolver
+            )
         );
         _mountables.Register(
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
         );
         _mountables.Register(new ComponentMount<CombatStatusBar>((c, s) => c.Initialize(s)));
         _mountables.Register(
-            new ComponentMount<EndOfRunScreenshotController>((c, s) => c.Initialize(s))
+            new ComponentMount<EndOfRunCaptureDriver>(
+                (driver, services) => driver.Initialize(_endOfRunCaptureWorkflow, services)
+            )
         );
         _mountables.Register(
             new ComponentMount<MainMenuVersionCheckController>((c, _) => c.Initialize())
@@ -186,18 +239,22 @@ internal sealed class BppComposition : IDisposable
                 combatReplayRuntime: () => _combatReplayModule.Runtime,
                 onlineClient: () => _onlineClientRef,
                 accountLinkClient: () => _accountLinkClientRef,
-                overlayHost: () => overlayPanelHostMount.Host
+                overlayHost: () => overlayPanelHostMount.Host,
+                nativeCardPreviewHost: _nativeCardPreviewHost
             )
         );
-        _mountables.Register(new LiveBuildPanelMount(() => overlayPanelHostMount.Host));
+        _mountables.Register(
+            new LiveBuildPanelMount(
+                () => overlayPanelHostMount.Host,
+                _buildRecommendationRepository,
+                _nativeCardPreviewHost
+            )
+        );
         _mountables.Register(new ComponentMount<VoiceLineDisplayDispatcher>());
         _mountables.Register(new ComponentMount<VersionLabelScanner>());
         _mountables.Register(
-            new ComponentMount<RunLoggingController>((c, s) => c.Initialize(s, PvpBattleCatalog))
-        );
-        _mountables.Register(
             new ComponentMount<TooltipModifierRefreshController>(
-                (c, s) => c.Initialize(s.Config, s.EncounterState)
+                (c, s) => c.Initialize(s.Config, s.EncounterState, _nativeCardPreviewHost)
             )
         );
 
@@ -229,5 +286,8 @@ internal sealed class BppComposition : IDisposable
         BazaarAgentGameBridge.Current = null;
         BazaarAgentGameBridge.CurrentRecorder = null;
         _featureRegistry.Stop();
+        _endOfRunCaptureWorkflow.Dispose();
+        _encounterPreviewModule.Dispose();
+        _buildRecommendationCatalog.Dispose();
     }
 }

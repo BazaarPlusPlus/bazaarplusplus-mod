@@ -9,21 +9,20 @@
 
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
-    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/BazaarGameShared.dll')">
-    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile
-      Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewSpec.cs"
-      Link="NativeCardPreviewSpec.cs"
+      Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewSubject.cs"
+      Link="NativeCardPreviewSubject.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewOutcome.cs"
       Link="NativeCardPreviewOutcome.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewContracts.cs"
+      Link="NativeCardPreviewContracts.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoard.cs"
@@ -40,6 +39,10 @@
     <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardPreviewMapper.cs"
       Link="BppItemBoardPreviewMapper.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewBatchAcquirer.cs"
+      Link="ItemBoardPreviewBatchAcquirer.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoardSlotPlanner.cs"
@@ -82,10 +85,6 @@
       Link="ItemBoardPreviewGenerationGuard.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardPreviewInitialization.cs"
-      Link="ItemBoardPreviewInitialization.cs"
-    />
-    <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/ItemBoardSocketResolver.cs"
       Link="ItemBoardSocketResolver.cs"
     />
@@ -97,13 +96,18 @@
       Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/BppOverlaySorting.cs"
       Link="BppOverlaySorting.cs"
     />
-    <Compile Include="NativeCardPreviewHandleStub.cs" />
     <Compile Include="Program.cs" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
+    </Reference>
+    <Reference Include="BazaarGameClient">
+      <HintPath>$(ManagedPath)/BazaarGameClient.dll</HintPath>
+    </Reference>
+    <Reference Include="TheBazaarRuntime">
+      <HintPath>$(ManagedPath)/TheBazaarRuntime.dll</HintPath>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
       <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>

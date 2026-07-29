@@ -1,8 +1,4 @@
 #nullable enable
-using System;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Http;
 using Newtonsoft.Json;

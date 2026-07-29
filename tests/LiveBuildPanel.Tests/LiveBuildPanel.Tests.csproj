@@ -5,18 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <RestoreAdditionalProjectSources>
-      https://api.nuget.org/v3/index.json;
-      https://nuget.bepinex.dev/v3/index.json;
-    </RestoreAdditionalProjectSources>
-  </PropertyGroup>
-
-  <PropertyGroup>
-    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/BazaarGameShared.dll')">
-    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -39,6 +27,14 @@
     <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveBuildRefreshSeverity.cs"
       Link="LiveBuildRefreshSeverity.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildRefreshContinuationGate.cs"
+      Link="LiveBuildRefreshContinuationGate.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/LiveBuildHeroPresentation.cs"
+      Link="LiveBuildHeroPresentation.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/LiveBuildPanel/Data/LiveItemBoardRowVm.cs"
@@ -129,6 +125,18 @@
       Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/BppOverlaySorting.cs"
       Link="BppOverlaySorting.cs"
     />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/UiTokens/Colors.cs"
+      Link="Colors.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/Heroes/HeroVisual.cs"
+      Link="HeroVisual.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/Heroes/TheDragonsHeroIdentity.cs"
+      Link="TheDragonsHeroIdentity.cs"
+    />
     <Compile Include="Program.cs" />
   </ItemGroup>
 
@@ -136,6 +144,9 @@
     <ProjectReference Include="../../src/BazaarPlusPlus/BazaarPlusPlus.csproj" />
     <Reference Include="BazaarGameShared">
       <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
+    </Reference>
+    <Reference Include="TheBazaarRuntime">
+      <HintPath>$(ManagedPath)/TheBazaarRuntime.dll</HintPath>
     </Reference>
   </ItemGroup>
 </Project>

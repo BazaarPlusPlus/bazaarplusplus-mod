@@ -1,10 +1,7 @@
 #nullable enable
-using System;
 using System.Net;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
-using System.Threading.Tasks;
 using BazaarPlusPlus.BazaarAgent;
 using Xunit;
 
@@ -155,10 +152,7 @@ public class BazaarAgentHttpServerTests
     [Fact]
     public void Failed_start_cleanup_does_not_report_a_second_stop_failure()
     {
-        using var portOwner = new System.Net.Sockets.TcpListener(
-            System.Net.IPAddress.Loopback,
-            0
-        );
+        using var portOwner = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
         portOwner.Start();
         var port = ((System.Net.IPEndPoint)portOwner.LocalEndpoint).Port;
         using var queue = new BazaarAgentCommandQueue<BazaarAgentAction>(5000);

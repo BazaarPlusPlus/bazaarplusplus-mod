@@ -1,13 +1,8 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
-using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -15,30 +10,26 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed class HistoryPanelReplayService
 {
     private readonly Func<CombatReplayRuntime?> _runtimeAccessor;
-    private readonly Func<string?> _replayDirectoryPathAccessor;
-    private readonly Func<string?> _pluginsDirectoryPathAccessor;
-    private readonly Func<string?> _videoDirectoryPathAccessor;
+    private readonly string _replayDirectoryPath;
+    private readonly string _pluginsDirectoryPath;
+    private readonly string _videoDirectoryPath;
     private readonly GhostBattleSyncService? _ghostSyncService;
 
     public HistoryPanelReplayService(
         Func<CombatReplayRuntime?> runtimeAccessor,
-        Func<string?> replayDirectoryPathAccessor,
-        Func<string?> pluginsDirectoryPathAccessor,
-        Func<string?> videoDirectoryPathAccessor,
+        string replayDirectoryPath,
+        string pluginsDirectoryPath,
+        string videoDirectoryPath,
         GhostBattleSyncService? ghostSyncService = null
     )
     {
         _runtimeAccessor =
             runtimeAccessor ?? throw new ArgumentNullException(nameof(runtimeAccessor));
-        _replayDirectoryPathAccessor =
-            replayDirectoryPathAccessor
-            ?? throw new ArgumentNullException(nameof(replayDirectoryPathAccessor));
-        _pluginsDirectoryPathAccessor =
-            pluginsDirectoryPathAccessor
-            ?? throw new ArgumentNullException(nameof(pluginsDirectoryPathAccessor));
-        _videoDirectoryPathAccessor =
-            videoDirectoryPathAccessor
-            ?? throw new ArgumentNullException(nameof(videoDirectoryPathAccessor));
+        // Paths are startup-stable strings (no Func wrappers). Null coalesces to empty so
+        // downstream IsNullOrWhiteSpace checks stay fail-open without ArgumentNullException.
+        _replayDirectoryPath = replayDirectoryPath ?? string.Empty;
+        _pluginsDirectoryPath = pluginsDirectoryPath ?? string.Empty;
+        _videoDirectoryPath = videoDirectoryPath ?? string.Empty;
         _ghostSyncService = ghostSyncService;
     }
 
@@ -46,8 +37,8 @@ internal sealed class HistoryPanelReplayService
     // actual-settings encoder profile in the background. Per-refresh gates only read warm state.
     public void PrewarmRecordingAvailability()
     {
-        var pluginsDirectoryPath = _pluginsDirectoryPathAccessor();
-        var videoDirectoryPath = _videoDirectoryPathAccessor();
+        var pluginsDirectoryPath = _pluginsDirectoryPath;
+        var videoDirectoryPath = _videoDirectoryPath;
         var hasSettings = ReplayVideoCaptureSettingsCache.TryCaptureCurrent(
             out var captureSettings
         );
@@ -92,10 +83,7 @@ internal sealed class HistoryPanelReplayService
             return false;
         }
 
-        var gate = CombatReplayRecordingGate.Evaluate(
-            _pluginsDirectoryPathAccessor(),
-            _videoDirectoryPathAccessor()
-        );
+        var gate = CombatReplayRecordingGate.Evaluate(_pluginsDirectoryPath, _videoDirectoryPath);
         if (!gate.CanRecord)
         {
             reason = HistoryPanelText.RecordingUnavailable();
@@ -203,7 +191,7 @@ internal sealed class HistoryPanelReplayService
                 HistoryPanelReplayReasonCode.RuntimeUnavailable
             );
 
-        var replayDirectoryPath = _replayDirectoryPathAccessor();
+        var replayDirectoryPath = _replayDirectoryPath;
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
             return HistoryPanelReplayAttemptResult.Failure(
                 HistoryPanelText.CombatReplayDirectoryUnavailable(),
@@ -307,7 +295,7 @@ internal sealed class HistoryPanelReplayService
         if (battleIds.Count == 0)
             return new ReplayPayloadCleanupResult(0, null);
 
-        var replayDirectoryPath = _replayDirectoryPathAccessor();
+        var replayDirectoryPath = _replayDirectoryPath;
         if (string.IsNullOrWhiteSpace(replayDirectoryPath))
         {
             return new ReplayPayloadCleanupResult(

@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure;
@@ -198,6 +197,7 @@ internal sealed partial class HistoryPanelUiToolkitView
             HeroVisual.Resolve(run.Hero).Text,
             true
         );
+        refs.HeroPill.tooltip = HistoryPanelHeroPresentation.DisplayName(run.Hero);
 
         ConfigureStatusPill(refs.StatusPill, run.RawStatus);
 

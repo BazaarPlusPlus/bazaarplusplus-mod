@@ -1,26 +1,25 @@
-using BazaarPlusPlus.Game.CollectionPanel.Ui;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionTooltipMarkupTests
+public sealed class TooltipMarkupTests
 {
     [Fact]
     public void Prose_renderer_distinguishes_paragraphs_lists_and_nested_lists()
     {
-        var text = CollectionTooltipMarkup.Render(
-            new CollectionTooltipMarkup.Block[]
+        var text = TooltipMarkup.Render(
+            new TooltipMarkup.Block[]
             {
-                new CollectionTooltipMarkup.Paragraph("Intro"),
-                new CollectionTooltipMarkup.ListBlock(
+                new TooltipMarkup.Paragraph("Intro"),
+                new TooltipMarkup.ListBlock(
                     "Choose one:",
                     new[]
                     {
-                        new CollectionTooltipMarkup.ListItem(
+                        new TooltipMarkup.ListItem(
                             "first",
-                            new[] { new CollectionTooltipMarkup.ListItem("detail") }
+                            new[] { new TooltipMarkup.ListItem("detail") }
                         ),
-                        new CollectionTooltipMarkup.ListItem("second"),
+                        new TooltipMarkup.ListItem("second"),
                     }
                 ),
             }
@@ -40,13 +39,13 @@ public sealed class CollectionTooltipMarkupTests
     [Fact]
     public void Font_scaling_wraps_the_complete_semantic_element()
     {
-        var text = CollectionTooltipMarkup.Render(
-            new CollectionTooltipMarkup.Block[]
+        var text = TooltipMarkup.Render(
+            new TooltipMarkup.Block[]
             {
-                new CollectionTooltipMarkup.Paragraph("Full size"),
-                new CollectionTooltipMarkup.ListBlock(
+                new TooltipMarkup.Paragraph("Full size"),
+                new TooltipMarkup.ListBlock(
                     null,
-                    new[] { new CollectionTooltipMarkup.ListItem("dimmed") },
+                    new[] { new TooltipMarkup.ListItem("dimmed") },
                     fontSizePercent: 85
                 ),
             }
@@ -64,20 +63,18 @@ public sealed class CollectionTooltipMarkupTests
     public void Unknown_block_type_fails_instead_of_rendering_an_empty_block()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            CollectionTooltipMarkup.Render(
-                new CollectionTooltipMarkup.Block[] { new UnknownBlock() }
-            )
+            TooltipMarkup.Render(new TooltipMarkup.Block[] { new UnknownBlock() })
         );
     }
 
     [Fact]
     public void Paragraph_gap_uses_the_preceding_elements_font_size()
     {
-        var text = CollectionTooltipMarkup.Render(
-            new CollectionTooltipMarkup.Block[]
+        var text = TooltipMarkup.Render(
+            new TooltipMarkup.Block[]
             {
-                new CollectionTooltipMarkup.Paragraph("Small", fontSizePercent: 85),
-                new CollectionTooltipMarkup.Paragraph("Full"),
+                new TooltipMarkup.Paragraph("Small", fontSizePercent: 85),
+                new TooltipMarkup.Paragraph("Full"),
             }
         );
 
@@ -91,15 +88,15 @@ public sealed class CollectionTooltipMarkupTests
     [Fact]
     public void List_item_gap_uses_the_preceding_items_font_size()
     {
-        var text = CollectionTooltipMarkup.Render(
-            new CollectionTooltipMarkup.Block[]
+        var text = TooltipMarkup.Render(
+            new TooltipMarkup.Block[]
             {
-                new CollectionTooltipMarkup.ListBlock(
+                new TooltipMarkup.ListBlock(
                     null,
                     new[]
                     {
-                        new CollectionTooltipMarkup.ListItem("Small", fontSizePercent: 85),
-                        new CollectionTooltipMarkup.ListItem("Full"),
+                        new TooltipMarkup.ListItem("Small", fontSizePercent: 85),
+                        new TooltipMarkup.ListItem("Full"),
                     }
                 ),
             }
@@ -118,13 +115,13 @@ public sealed class CollectionTooltipMarkupTests
     {
         Assert.Equal(
             "Gain <color=green>Health</color>",
-            CollectionTooltipMarkup.NormalizeInlineFragment(
+            TooltipMarkup.NormalizeInlineFragment(
                 "<line-height=1.6em>Gain <color=green>Health</color></line-height>"
             )
         );
     }
 
-    private sealed class UnknownBlock : CollectionTooltipMarkup.Block
+    private sealed class UnknownBlock : TooltipMarkup.Block
     {
         public UnknownBlock()
             : base(fontSizePercent: 100) { }

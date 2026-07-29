@@ -1,9 +1,9 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.OverlayPanels;
+using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Clients;
 using UnityEngine;
@@ -16,19 +16,23 @@ internal sealed class HistoryPanelMount : IBppMountable
     private readonly Func<ModOnlineClient?> _onlineClient;
     private readonly Func<BazaarDbLinkClient?> _accountLinkClient;
     private readonly Func<OverlayPanelHost?> _overlayHost;
+    private readonly INativeCardPreviewHost _nativeCardPreviewHost;
     private IDisposable? _localeChangedSubscription;
 
     public HistoryPanelMount(
         Func<CombatReplayRuntime?> combatReplayRuntime,
         Func<ModOnlineClient?> onlineClient,
         Func<BazaarDbLinkClient?> accountLinkClient,
-        Func<OverlayPanelHost?> overlayHost
+        Func<OverlayPanelHost?> overlayHost,
+        INativeCardPreviewHost nativeCardPreviewHost
     )
     {
         _combatReplayRuntime = combatReplayRuntime;
         _onlineClient = onlineClient;
         _accountLinkClient = accountLinkClient;
         _overlayHost = overlayHost;
+        _nativeCardPreviewHost =
+            nativeCardPreviewHost ?? throw new ArgumentNullException(nameof(nativeCardPreviewHost));
     }
 
     public void Mount(GameObject host, IBppServices services)
@@ -55,26 +59,27 @@ internal sealed class HistoryPanelMount : IBppMountable
         }
 
         var panel = host.AddComponent<HistoryPanel>();
-        var runtime = new HistoryPanelRuntime(
-            services.RunContext,
-            services.Paths.RunLogDatabasePath,
-            services.Paths.CombatReplayDirectoryPath,
-            services.Paths.CombatReplayVideoDirectoryPath,
-            services.Paths.PluginsDirectoryPath,
-            () => combatReplayRuntime
-        );
+        var runState = new HistoryPanelRunState(services.RunContext);
 
+        // CombatReplayRuntime accessor is not a path and is not on services.Paths — pass it
+        // straight through to Factory. Paths are startup-stable strings.
         panel.Configure(
             HistoryPanelFactory.Create(
-                runtime,
+                runState,
                 onlineClient,
+                () => combatReplayRuntime,
+                services.Paths.RunLogDatabasePath ?? string.Empty,
+                services.Paths.CombatReplayDirectoryPath ?? string.Empty,
+                services.Paths.CombatReplayVideoDirectoryPath ?? string.Empty,
+                services.Paths.PluginsDirectoryPath ?? string.Empty,
                 _accountLinkClient(),
                 () =>
                     HistoryPanelDecisions.IsAccountLinkCardAvailable(
                         services.Config.BazaarDbUploadEnabled?.Value ?? false,
                         services.GameBuild.Channel
                     )
-            )
+            ),
+            _nativeCardPreviewHost
         );
         // Register with the host only once fully configured; an unconfigured panel (skip paths
         // above) must stay invisible to overlay lifecycle routing.

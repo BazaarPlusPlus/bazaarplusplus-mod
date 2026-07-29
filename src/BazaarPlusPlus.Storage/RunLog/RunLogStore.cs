@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.Storage.Paths;
 using BazaarPlusPlus.Storage.Sqlite;
 using Microsoft.Data.Sqlite;

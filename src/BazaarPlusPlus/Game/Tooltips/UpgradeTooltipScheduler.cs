@@ -1,6 +1,5 @@
 #nullable enable
 using System.Collections;
-using System.Collections.Generic;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.GameState;

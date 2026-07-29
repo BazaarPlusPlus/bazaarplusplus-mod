@@ -10,7 +10,7 @@ using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Localization;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
 public sealed class AggregateItemMissingTypesTextTests
 {
@@ -49,6 +49,18 @@ public sealed class AggregateItemMissingTypesTextTests
     public void Build_returns_null_when_every_type_is_present()
     {
         Assert.Null(AggregateItemMissingTypesText.Build(AggregateItemMissingTypesText.ItemTypes));
+    }
+
+    [Fact]
+    public void Instrument_is_a_formal_aggregate_item_type()
+    {
+        Assert.Contains(ECardTag.Instrument, AggregateItemMissingTypesText.ItemTypes);
+
+        var content = AggregateItemMissingTypesText.Build(
+            AggregateItemMissingTypesText.ItemTypes.Where(tag => tag != ECardTag.Instrument)
+        );
+
+        Assert.Equal("Missing Types: Instrument", content);
     }
 
     [Fact]

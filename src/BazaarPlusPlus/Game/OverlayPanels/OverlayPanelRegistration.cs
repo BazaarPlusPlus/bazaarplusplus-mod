@@ -1,6 +1,5 @@
 #nullable enable
 
-using System;
 using BazaarPlusPlus.Game.Input;
 
 namespace BazaarPlusPlus.Game.OverlayPanels;

@@ -9,7 +9,7 @@
   <ItemGroup>
     <!-- The production ModApi project references MessagePack compile-only (the game ships the
          runtime DLL). The standalone test host has no game DLL, so it needs the runtime asset. -->
-    <PackageReference Include="MessagePack" Version="3.1.7" />
+    <PackageReference Include="MessagePack" />
   </ItemGroup>
 
   <ItemGroup>

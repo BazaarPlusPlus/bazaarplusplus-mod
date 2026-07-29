@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public class CollectionEncounterOutcomeMergeTests
+public class EncounterOutcomeMergeTests
 {
     private static readonly Guid MonsterA = Guid.Parse("a0000000-0000-0000-0000-000000000001");
     private static readonly Guid MonsterB = Guid.Parse("a0000000-0000-0000-0000-000000000002");
@@ -16,8 +12,8 @@ public class CollectionEncounterOutcomeMergeTests
     {
         // Mountain Pass shape: 25% fight + 25% fight + 40% loot + 10% skill; the
         // two combat groups carry no visible monster names, so they collapse to 50%.
-        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
-            new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>
+        var views = EncounterEventDetailResolver.BuildOutcomeViews(
+            new List<EncounterEventDetailResolver.OutcomeGroupResolution>
             {
                 Combat(weight: 25, ids: new[] { MonsterA }),
                 Combat(weight: 25, ids: new[] { MonsterB }),
@@ -38,8 +34,8 @@ public class CollectionEncounterOutcomeMergeTests
     [Fact]
     public void Merged_combat_percent_rounds_the_summed_weight_not_the_parts()
     {
-        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
-            new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>
+        var views = EncounterEventDetailResolver.BuildOutcomeViews(
+            new List<EncounterEventDetailResolver.OutcomeGroupResolution>
             {
                 Combat(weight: 33, ids: new[] { MonsterA }),
                 Combat(weight: 33, ids: new[] { MonsterB }),
@@ -55,8 +51,8 @@ public class CollectionEncounterOutcomeMergeTests
     [Fact]
     public void Overlapping_monster_pools_do_not_inflate_the_option_count()
     {
-        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
-            new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>
+        var views = EncounterEventDetailResolver.BuildOutcomeViews(
+            new List<EncounterEventDetailResolver.OutcomeGroupResolution>
             {
                 Combat(weight: 50, ids: new[] { MonsterA, MonsterB }),
                 Combat(weight: 50, ids: new[] { MonsterB }),
@@ -72,8 +68,8 @@ public class CollectionEncounterOutcomeMergeTests
     [Fact]
     public void Ineligible_combat_pools_stay_separate_from_eligible_ones()
     {
-        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
-            new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>
+        var views = EncounterEventDetailResolver.BuildOutcomeViews(
+            new List<EncounterEventDetailResolver.OutcomeGroupResolution>
             {
                 Combat(weight: 60, ids: new[] { MonsterA }),
                 Combat(weight: 40, ids: new[] { MonsterB }, eligible: false),
@@ -87,7 +83,7 @@ public class CollectionEncounterOutcomeMergeTests
         Assert.Null(views[1].Percent);
     }
 
-    private static CollectionEncounterEventDetailResolver.OutcomeGroupResolution Combat(
+    private static EncounterEventDetailResolver.OutcomeGroupResolution Combat(
         uint weight,
         Guid[] ids,
         bool eligible = true
@@ -97,10 +93,10 @@ public class CollectionEncounterOutcomeMergeTests
             eligible,
             isCombatPool: true,
             new HashSet<Guid>(ids),
-            new List<CollectionEncounterChoiceDetail>()
+            new List<EncounterChoiceDetail>()
         );
 
-    private static CollectionEncounterEventDetailResolver.OutcomeGroupResolution Rewards(
+    private static EncounterEventDetailResolver.OutcomeGroupResolution Rewards(
         uint weight,
         string text
     ) =>
@@ -109,15 +105,9 @@ public class CollectionEncounterOutcomeMergeTests
             eligible: true,
             isCombatPool: false,
             new HashSet<Guid>(),
-            new List<CollectionEncounterChoiceDetail>
+            new List<EncounterChoiceDetail>
             {
-                new(
-                    Guid.NewGuid(),
-                    displayName: "Reward",
-                    resultText: text,
-                    rewardFilter: null,
-                    isSourceMatch: false
-                ),
+                new(Guid.NewGuid(), displayName: "Reward", resultText: text, rewardFilter: null),
             }
         );
 
@@ -126,15 +116,12 @@ public class CollectionEncounterOutcomeMergeTests
     [Fact]
     public void Large_title_only_clusters_collapse_into_one_pool_view()
     {
-        var resolutions = new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>();
+        var resolutions = new List<EncounterEventDetailResolver.OutcomeGroupResolution>();
         for (var i = 0; i < 10; i++)
             resolutions.Add(TitleOnly(weight: 3, title: $"NPC {i}'s Package"));
         resolutions.Add(Rewards(weight: 10, text: "Gain 5 Gold"));
 
-        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
-            resolutions,
-            totalWeight: 40
-        );
+        var views = EncounterEventDetailResolver.BuildOutcomeViews(resolutions, totalWeight: 40);
 
         Assert.Equal(2, views.Count);
         Assert.Equal(10, views[0].OptionCount);
@@ -146,12 +133,12 @@ public class CollectionEncounterOutcomeMergeTests
     [Fact]
     public void Large_ineligible_title_only_clusters_collapse_into_one_dimmed_pool_view()
     {
-        var resolutions = new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>();
+        var resolutions = new List<EncounterEventDetailResolver.OutcomeGroupResolution>();
         for (var i = 0; i < 10; i++)
             resolutions.Add(TitleOnly(weight: 3, title: $"NPC {i}'s Package", eligible: false));
 
         var view = Assert.Single(
-            CollectionEncounterEventDetailResolver.BuildOutcomeViews(resolutions, totalWeight: 0)
+            EncounterEventDetailResolver.BuildOutcomeViews(resolutions, totalWeight: 0)
         );
 
         Assert.False(view.IsEligible);
@@ -163,7 +150,7 @@ public class CollectionEncounterOutcomeMergeTests
     [Fact]
     public void Large_title_only_clusters_with_different_eligibility_collapse_separately()
     {
-        var resolutions = new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>();
+        var resolutions = new List<EncounterEventDetailResolver.OutcomeGroupResolution>();
         for (var i = 0; i < 10; i++)
         {
             if (i < 9)
@@ -171,10 +158,7 @@ public class CollectionEncounterOutcomeMergeTests
             resolutions.Add(TitleOnly(weight: 1, title: $"Unavailable {i}", eligible: false));
         }
 
-        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
-            resolutions,
-            totalWeight: 9
-        );
+        var views = EncounterEventDetailResolver.BuildOutcomeViews(resolutions, totalWeight: 9);
 
         Assert.Equal(2, views.Count);
         var eligible = views[0];
@@ -192,32 +176,25 @@ public class CollectionEncounterOutcomeMergeTests
     [Fact]
     public void Multi_spawn_events_without_real_alternatives_suppress()
     {
-        var single = new List<CollectionEncounterOutcomeView>
-        {
-            View(100, "Random item", nameless: true),
-        };
-        var namelessPair = new List<CollectionEncounterOutcomeView>
+        var single = new List<EncounterOutcomeView> { View(100, "Random item", nameless: true) };
+        var namelessPair = new List<EncounterOutcomeView>
         {
             View(50, "Random item", nameless: true),
             View(50, "Random item", nameless: true),
         };
-        var named = new List<CollectionEncounterOutcomeView>
+        var named = new List<EncounterOutcomeView>
         {
             View(10, "Treasure Chest", nameless: false),
             View(90, "Random item", nameless: true),
         };
 
-        Assert.True(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(single, 2));
-        Assert.True(
-            CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 3)
-        );
-        Assert.False(CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(named, 2));
-        Assert.False(
-            CollectionEncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 1)
-        );
+        Assert.True(EncounterEventDetailResolver.ShouldSuppressOutcomeViews(single, 2));
+        Assert.True(EncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 3));
+        Assert.False(EncounterEventDetailResolver.ShouldSuppressOutcomeViews(named, 2));
+        Assert.False(EncounterEventDetailResolver.ShouldSuppressOutcomeViews(namelessPair, 1));
     }
 
-    private static CollectionEncounterOutcomeView View(int percent, string text, bool nameless) =>
+    private static EncounterOutcomeView View(int percent, string text, bool nameless) =>
         new(
             percent,
             isEligible: true,
@@ -225,17 +202,16 @@ public class CollectionEncounterOutcomeMergeTests
             optionCount: 1,
             new[]
             {
-                new CollectionEncounterChoiceDetail(
+                new EncounterChoiceDetail(
                     Guid.NewGuid(),
                     displayName: nameless ? string.Empty : text,
                     resultText: nameless ? text : string.Empty,
-                    rewardFilter: null,
-                    isSourceMatch: false
+                    rewardFilter: null
                 ),
             }
         );
 
-    private static CollectionEncounterEventDetailResolver.OutcomeGroupResolution TitleOnly(
+    private static EncounterEventDetailResolver.OutcomeGroupResolution TitleOnly(
         uint weight,
         string title,
         bool eligible = true
@@ -245,14 +221,13 @@ public class CollectionEncounterOutcomeMergeTests
             eligible,
             isCombatPool: false,
             new HashSet<Guid>(),
-            new List<CollectionEncounterChoiceDetail>
+            new List<EncounterChoiceDetail>
             {
                 new(
                     Guid.NewGuid(),
                     displayName: title,
                     resultText: string.Empty,
-                    rewardFilter: null,
-                    isSourceMatch: false
+                    rewardFilter: null
                 ),
             }
         );
@@ -262,8 +237,8 @@ public class CollectionEncounterOutcomeMergeTests
     [Fact]
     public void Same_content_groups_merge_with_summed_weights()
     {
-        var views = CollectionEncounterEventDetailResolver.BuildOutcomeViews(
-            new List<CollectionEncounterEventDetailResolver.OutcomeGroupResolution>
+        var views = EncounterEventDetailResolver.BuildOutcomeViews(
+            new List<EncounterEventDetailResolver.OutcomeGroupResolution>
             {
                 Rewards(weight: 2, text: "Aila's Package"),
                 Rewards(weight: 1, text: "Aila's Package"),

@@ -7,6 +7,7 @@ internal static class Sizes
     public const float OperationRailWidthPercent = 32f;
     public const float OperationRailMinWidth = 360f;
     public const float OperationRailMaxWidth = 680f;
+    public const float CollectionOperationRailMinWidth = 420f;
     public const float LiveBuildRailWidthPercent = 25f;
     public const float HistorySelectorRowHeightPercent = 67f;
     public const float HistorySelectorRowMinHeight = 270f;
@@ -35,6 +36,8 @@ internal static class Sizes
     public const float ButtonFooterHeight = 36f;
     public const float RunsTabWidth = 72f;
     public const float CollectionSortButtonWidth = 60f;
+    public const float CollectionSearchButtonSize = ButtonStandardHeight;
+    public const float CollectionSearchIconSize = 18f;
     public const float GhostAllButtonWidth = 70f;
     public const float GhostFilterButtonWidth = 78f;
     public const float ServerHealthButtonWidth = 108f;

@@ -1,9 +1,7 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
+using BazaarPlusPlus.GameInterop.Heroes;
 using Newtonsoft.Json.Linq;
 
 namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
@@ -19,9 +17,10 @@ namespace BazaarPlusPlus.Game.LiveBuildPanel.Recommendations;
 /// <c>builds</c> array; <c>card_index</c> maps a card ref to the build IDs that contain it.
 /// The wire format is whole-tree snake_case at <c>schema_version</c> 2.
 ///
-/// This type is pure (System + Newtonsoft only, zero game/Unity references): it owns parsing,
-/// recall, and scoring. Projection of a matched build onto a renderable board lives in
-/// <see cref="BuildRecommendationRepository"/>, which couples to the game item-board types.
+/// This type owns parsing, recall, and scoring. Its only game-facing dependency is the shared
+/// compatibility boundary that canonicalizes The Dragons corpus keys. Projection of a matched build
+/// onto a renderable board lives in <see cref="BuildRecommendationRepository"/>, which couples to
+/// the game item-board types.
 /// </summary>
 internal sealed class TenWinBuildCorpus
 {
@@ -143,7 +142,13 @@ internal sealed class TenWinBuildCorpus
         }
 
         var heroes = new Dictionary<string, TenWinHero>(StringComparer.Ordinal);
-        foreach (var heroProperty in heroesObj.Properties())
+        foreach (
+            var heroProperty in heroesObj
+                .Properties()
+                .OrderBy(property => CanonicalizeHeroId(property.Name), StringComparer.Ordinal)
+                .ThenBy(AliasMergePriority)
+                .ThenBy(property => property.Name, StringComparer.Ordinal)
+        )
         {
             if (heroProperty.Value is not JObject heroObj)
                 continue;
@@ -157,7 +162,11 @@ internal sealed class TenWinBuildCorpus
                 stats
             );
             var cardIndex = ParseCardIndex(heroObj["card_index"] as JArray);
-            heroes[heroProperty.Name] = new TenWinHero(builds, cardIndex);
+            var canonicalHero = CanonicalizeHeroId(heroProperty.Name);
+            var parsedHero = new TenWinHero(builds, cardIndex);
+            heroes[canonicalHero] = heroes.TryGetValue(canonicalHero, out var existing)
+                ? MergeHeroes(existing, parsedHero, refByTemplateId)
+                : parsedHero;
         }
 
         return new TenWinBuildCorpus(cards, refByTemplateId, heroes, ParseGeneratedAt(root));
@@ -203,7 +212,10 @@ internal sealed class TenWinBuildCorpus
         BuildLiveState liveState
     )
     {
-        if (string.IsNullOrWhiteSpace(hero) || !_heroes.TryGetValue(hero!, out var heroData))
+        if (
+            string.IsNullOrWhiteSpace(hero)
+            || !_heroes.TryGetValue(CanonicalizeHeroId(hero!), out var heroData)
+        )
             return Array.Empty<TenWinBuildMatch>();
 
         var distinctSelected = selectedTemplateIds
@@ -252,6 +264,54 @@ internal sealed class TenWinBuildCorpus
             .ThenByDescending(match => match.Build.Stats.Score)
             .ThenBy(match => match.Build.BuildId)
             .ToList();
+    }
+
+    private static string CanonicalizeHeroId(string heroId) =>
+        TheDragonsHeroIdentity.IsAlias(heroId) ? TheDragonsHeroIdentity.CanonicalId : heroId;
+
+    // A mixed transition corpus is merged independently of JObject/dictionary enumeration order:
+    // the exact canonical key wins a shared implicit BuildId, then any other alias contributes only
+    // IDs that were absent. The final ordinal tie-break keeps malformed case variants deterministic.
+    private static int AliasMergePriority(JProperty property) =>
+        string.Equals(property.Name, TheDragonsHeroIdentity.CanonicalId, StringComparison.Ordinal)
+            ? 0
+        : TheDragonsHeroIdentity.IsAlias(property.Name) ? 1
+        : 0;
+
+    private static TenWinHero MergeHeroes(
+        TenWinHero preferred,
+        TenWinHero fallback,
+        IReadOnlyDictionary<Guid, int> refByTemplateId
+    )
+    {
+        var buildsById = new Dictionary<int, TenWinBuild>();
+        foreach (var build in preferred.Builds)
+            buildsById.TryAdd(build.BuildId, build);
+        foreach (var build in fallback.Builds)
+            buildsById.TryAdd(build.BuildId, build);
+
+        var builds = buildsById.Values.OrderBy(build => build.BuildId).ToArray();
+        var cardIndex = new Dictionary<int, List<int>>();
+        foreach (var build in builds)
+        {
+            foreach (var templateId in build.TemplateIdSet)
+            {
+                if (!refByTemplateId.TryGetValue(templateId, out var cardRef))
+                    continue;
+
+                if (!cardIndex.TryGetValue(cardRef, out var buildIds))
+                {
+                    buildIds = new List<int>();
+                    cardIndex[cardRef] = buildIds;
+                }
+                buildIds.Add(build.BuildId);
+            }
+        }
+
+        return new TenWinHero(
+            builds,
+            cardIndex.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<int>)pair.Value)
+        );
     }
 
     private static HashSet<int> IntersectAll(IReadOnlyList<IReadOnlyList<int>> sets)

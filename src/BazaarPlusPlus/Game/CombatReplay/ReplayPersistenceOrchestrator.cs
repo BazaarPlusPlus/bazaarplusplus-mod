@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.PvpBattles;
@@ -17,13 +15,19 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
     private readonly CombatReplayPayloadStore _payloadStore;
     private readonly BattleReplaySyncStateStore? _syncStateStore;
     private readonly CombatReplayPersistenceQueue _persistenceQueue;
+    private readonly Action<PvpBattleManifest, bool, Exception?>? _resultObserver;
     private readonly object _drainGate = new();
     private bool _disposed;
 
-    public ReplayPersistenceOrchestrator(IBppServices services, IPvpBattleCatalog battleCatalog)
+    public ReplayPersistenceOrchestrator(
+        IBppServices services,
+        IPvpBattleCatalog battleCatalog,
+        Action<PvpBattleManifest, bool, Exception?>? resultObserver = null
+    )
     {
         _services = services ?? throw new ArgumentNullException(nameof(services));
         _battleCatalog = battleCatalog ?? throw new ArgumentNullException(nameof(battleCatalog));
+        _resultObserver = resultObserver;
 
         var combatReplayDirectoryPath =
             services.Paths.CombatReplayDirectoryPath
@@ -67,6 +71,7 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
 
     private void DrainPendingResults(bool publishSideEffects)
     {
+        List<PersistenceResultNotification>? notifications = null;
         lock (_drainGate)
         {
             var processedAny = false;
@@ -75,6 +80,17 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                 processedAny = true;
                 if (!result.Succeeded)
                 {
+                    if (publishSideEffects)
+                    {
+                        notifications ??= new List<PersistenceResultNotification>();
+                        notifications.Add(
+                            new PersistenceResultNotification(
+                                result.Manifest,
+                                Succeeded: false,
+                                result.Error
+                            )
+                        );
+                    }
                     BppLog.ErrorEvent(
                         CombatReplayLogEvents.PersistenceFailed,
                         result.Error!,
@@ -87,6 +103,18 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                         )
                     );
                     continue;
+                }
+
+                if (publishSideEffects)
+                {
+                    notifications ??= new List<PersistenceResultNotification>();
+                    notifications.Add(
+                        new PersistenceResultNotification(
+                            result.Manifest,
+                            Succeeded: true,
+                            Error: null
+                        )
+                    );
                 }
 
                 if (publishSideEffects)
@@ -132,6 +160,26 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
                 }
             }
         }
+
+        if (notifications == null)
+            return;
+        for (var index = 0; index < notifications.Count; index++)
+        {
+            var notification = notifications[index];
+            NotifyResultObserver(notification.Manifest, notification.Succeeded, notification.Error);
+        }
+    }
+
+    private void NotifyResultObserver(PvpBattleManifest manifest, bool succeeded, Exception? error)
+    {
+        try
+        {
+            _resultObserver?.Invoke(manifest, succeeded, error);
+        }
+        catch
+        {
+            // Persistence remains authoritative even if a UI-facing observer fails.
+        }
     }
 
     public void Dispose()
@@ -172,4 +220,10 @@ internal sealed class ReplayPersistenceOrchestrator : IDisposable
         if (accumulator.TryBuildResult(out var result))
             ReplayPersistenceLogWriter.EmitOrphanCleanupDegraded(result);
     }
+
+    private readonly record struct PersistenceResultNotification(
+        PvpBattleManifest Manifest,
+        bool Succeeded,
+        Exception? Error
+    );
 }

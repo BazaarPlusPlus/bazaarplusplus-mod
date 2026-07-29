@@ -1,4 +1,3 @@
-using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.ItemBoardPreview;
@@ -11,7 +10,8 @@ TestSignatureGate_CompletedSuccessfully_Caches();
 TestGenerationGuard_FreshSnapshotIsCurrent();
 TestGenerationGuard_BumpInvalidatesPriorSnapshot();
 TestGenerationGuard_ParallelBumpsAreSerialised();
-TestInitialization_MissingSetUpReportsCallerOwnedFailure();
+TestBatchAcquirer_UsesFakeHostAndPreservesPartialResults().GetAwaiter().GetResult();
+TestBatchAcquirer_ConvertsScopeCancellationToCanceledResult().GetAwaiter().GetResult();
 TestSocketResolver_HonoursRequestedIndex();
 TestSocketResolver_FallsBackWhenNoRequest();
 TestSocketResolver_ClampsIntoRange();
@@ -38,23 +38,68 @@ TestSlotGridTargetHeight_ClampsToSlotHeightInShortContainer();
 
 Console.WriteLine("HistoryPanelPreview checks passed.");
 
-static void TestInitialization_MissingSetUpReportsCallerOwnedFailure()
+static async Task TestBatchAcquirer_UsesFakeHostAndPreservesPartialResults()
 {
-    NativeCardPreviewFailure? failure = null;
-
-    Assert(
-        !ItemBoardPreviewInitialization.CanInitialize(
-            setUpMethod: null,
-            reported => failure = reported
+    var firstSession = new FakeSession();
+    var secondSession = new FakeSession();
+    var failure = new NativeCardPreviewFailure(
+        NativeCardPreviewOperation.SetUp,
+        NativeCardPreviewFailureReason.SetUpException,
+        Guid.NewGuid()
+    );
+    var scope = new FakeScope(
+        subject => Acquired(firstSession),
+        subject => new ValueTask<NativeCardAcquireResult>(
+            new NativeCardAcquireResult(NativeCardAcquireStatus.Failed, null, failure)
         ),
-        "Missing native SetUp reflection must reject ItemBoard initialization."
+        subject => Acquired(secondSession)
+    );
+    INativeCardPreviewHost host = new FakeHost(scope);
+    var openedScope = host.OpenScope(new FakeOwner());
+    var subjects = new[] { Subject(), Subject(), Subject() };
+
+    var results = await ItemBoardPreviewBatchAcquirer.AcquireAsync(openedScope, subjects);
+
+    Assert(results.Length == 3, "Batch acquisition should preserve every input result.");
+    Assert(
+        ReferenceEquals(results[0].Session, firstSession)
+            && ReferenceEquals(results[2].Session, secondSession),
+        "Successful acquisitions should expose only the opaque sessions returned by the host scope."
     );
     Assert(
-        failure?.Operation == NativeCardPreviewOperation.SetUp
-            && failure.Reason == NativeCardPreviewFailureReason.ReflectionUnavailable,
-        "Missing native SetUp reflection must reach the caller-owned card-preview reporter."
+        results[1].Session == null && ReferenceEquals(results[1].NativeFailure, failure),
+        "A partial native failure must not discard successful sibling sessions."
+    );
+
+    results[0].Session!.Dispose();
+    results[2].Session!.Dispose();
+    Assert(
+        firstSession.DisposeCount == 1 && secondSession.DisposeCount == 1,
+        "Consumer cleanup should dispose each acquired session exactly once."
     );
 }
+
+static async Task TestBatchAcquirer_ConvertsScopeCancellationToCanceledResult()
+{
+    var scope = new FakeScope(subject => throw new OperationCanceledException());
+    var results = await ItemBoardPreviewBatchAcquirer.AcquireAsync(scope, new[] { Subject() });
+
+    Assert(
+        results.Length == 1 && results[0].Canceled && results[0].Session == null,
+        "A standard scope cancellation should remain distinguishable from a typed native failure."
+    );
+}
+
+static ValueTask<NativeCardAcquireResult> Acquired(INativeCardPreviewSession session) =>
+    new(new NativeCardAcquireResult(NativeCardAcquireStatus.Acquired, session, Failure: null));
+
+static NativeCardPreviewSubject Subject() =>
+    new()
+    {
+        TemplateId = Guid.NewGuid(),
+        Tier = ETier.Bronze,
+        DisplaySpan = 1,
+    };
 
 static void TestSignatureGate_NullAggregate_DoesNotCache()
 {
@@ -532,3 +577,65 @@ static void Assert(bool condition, string message)
 
 static bool Approx(float actual, float expected, float tolerance = 0.0001f) =>
     Math.Abs(actual - expected) <= tolerance;
+
+internal sealed class FakeHost(INativeCardPreviewScope scope) : INativeCardPreviewHost
+{
+    public NativeCardMeasureResult Measure(NativeCardPreviewSubject subject) =>
+        new(NativeCardMeasureStatus.Measured, subject.DisplaySpan, null);
+
+    public INativeCardPreviewScope OpenScope(INativeCardPreviewOwner owner) => scope;
+
+    public NativeTooltipRefreshResult RefreshHoveredTooltip(NativeTooltipRefreshRequest request) =>
+        new(NativeTooltipRefreshStatus.NoHoveredPreview, null, null);
+}
+
+internal sealed class FakeScope(
+    params Func<NativeCardPreviewSubject, ValueTask<NativeCardAcquireResult>>[] outcomes
+) : INativeCardPreviewScope
+{
+    private readonly Queue<
+        Func<NativeCardPreviewSubject, ValueTask<NativeCardAcquireResult>>
+    > _outcomes = new(outcomes);
+
+    public ValueTask<NativeCardAcquireResult> AcquireAsync(
+        NativeCardPreviewSubject subject,
+        CancellationToken cancellationToken = default
+    ) => _outcomes.Dequeue()(subject);
+
+    public ValueTask DisposeAsync() => default;
+}
+
+internal sealed class FakeSession : INativeCardPreviewSession
+{
+    public int DisposeCount { get; private set; }
+    public UnityEngine.GameObject Root => null!;
+    public UnityEngine.RectTransform Rect => null!;
+
+    public NativePreviewActionResult Show() => Applied();
+
+    public NativePreviewActionResult Hide() => Applied();
+
+    public NativePreviewActionResult HoverEnter() => Applied();
+
+    public NativePreviewActionResult HoverExit() => Applied();
+
+    public void Dispose() => DisposeCount++;
+
+    private static NativePreviewActionResult Applied() =>
+        new(NativePreviewActionStatus.Applied, null);
+}
+
+internal sealed class FakeOwner : INativeCardPreviewOwner
+{
+    public int Layer => 0;
+
+    public UnityEngine.Transform? ResolveParent(NativeCardPreviewSubject subject) => null;
+
+    public void PrepareWhileInactive(NativeCardPreviewOwnerContext context) { }
+
+    public void OnAcquired(NativeCardPreviewOwnerContext context) { }
+
+    public void BeforeRelease(NativeCardPreviewOwnerContext context) { }
+
+    public void ReportFailure(NativeCardPreviewFailure failure) { }
+}

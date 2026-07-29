@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Settings;
 
 namespace BazaarPlusPlus.Game.QuestPreview;

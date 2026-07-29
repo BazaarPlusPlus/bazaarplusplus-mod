@@ -1,12 +1,10 @@
 #nullable enable
-using System;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
-using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
@@ -19,13 +17,20 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
     private TooltipPreviewMode _lastMode;
     private IBppConfig? _config;
     private IEncounterStateProbe? _encounterState;
+    private INativeCardPreviewHost? _nativeCardPreviewHost;
     private bool _hasResolvedInputs;
     private ResolveInputs _lastInputs;
 
-    internal void Initialize(IBppConfig config, IEncounterStateProbe encounterState)
+    internal void Initialize(
+        IBppConfig config,
+        IEncounterStateProbe encounterState,
+        INativeCardPreviewHost nativeCardPreviewHost
+    )
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _encounterState = encounterState ?? throw new ArgumentNullException(nameof(encounterState));
+        _nativeCardPreviewHost =
+            nativeCardPreviewHost ?? throw new ArgumentNullException(nameof(nativeCardPreviewHost));
     }
 
     private void Update()
@@ -95,7 +100,7 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         ChoiceScreenPedestalKind PedestalKind
     );
 
-    private static void TryRefreshCurrentItemTooltip(
+    private void TryRefreshCurrentItemTooltip(
         IBppConfig? config,
         IEncounterStateProbe? encounterState,
         TooltipPreviewRefreshMode mode
@@ -134,81 +139,38 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         );
     }
 
-    private static bool TryRefreshHoveredPreviewTooltip(
+    private bool TryRefreshHoveredPreviewTooltip(
         TooltipParentComponent tooltipParent,
         TooltipPreviewRefreshMode mode
     )
     {
-        var cardPreview = NativeCardPreviewHoverTracker.Current;
-        if (cardPreview == null)
+        if (_nativeCardPreviewHost == null)
             return false;
 
-        if (
-            !NativeCardPreviewReflection.TryGetTooltipData(
-                cardPreview,
-                out var currentTooltipData,
-                TooltipCardPreviewLogWriter.Reporter
+        var result = _nativeCardPreviewHost.RefreshHoveredTooltip(
+            new NativeTooltipRefreshRequest(
+                tooltipParent,
+                mode switch
+                {
+                    TooltipPreviewRefreshMode.Enchant => NativeTooltipRefreshMode.Enchant,
+                    TooltipPreviewRefreshMode.Upgrade => NativeTooltipRefreshMode.Upgrade,
+                    _ => NativeTooltipRefreshMode.Normal,
+                }
             )
-            || !NativeCardPreviewReflection.TryGetClientCard(
-                cardPreview,
-                out var clientCard,
-                TooltipCardPreviewLogWriter.Reporter
-            )
-        )
-            return false;
-
-        var primaryController = Traverse
-            .Create(tooltipParent)
-            .Property("CardTooltipController")
-            .GetValue<CardTooltipController>();
-        if (
-            primaryController?.CurrentTooltipData == null
-            || !ReferenceEquals(primaryController.CurrentTooltipData, currentTooltipData)
-        )
-            return false;
-
-        if (!NativeCardPreviewReflection.CanInvokeOnHover(cardPreview))
-            return false;
-
-        var refreshedTooltipData = CardTooltipDataFactory.Create(
-            clientCard,
-            currentTooltipData,
-            mode
         );
-        if (ReferenceEquals(refreshedTooltipData, currentTooltipData))
-            return false;
-
-        if (
-            !NativeCardPreviewReflection.TrySetTooltipData(
-                cardPreview,
-                refreshedTooltipData,
-                TooltipCardPreviewLogWriter.Reporter
-            )
-        )
-            return false;
-
-        tooltipParent.HideCardTooltipController();
-        if (
-            !NativeCardPreviewReflection.TryInvokeOnHover(
-                cardPreview,
-                TooltipCardPreviewLogWriter.Reporter
-            )
-        )
+        if (result.Status == NativeTooltipRefreshStatus.Refreshed && result.Card != null)
         {
-            NativeCardPreviewReflection.TrySetTooltipData(
-                cardPreview,
-                currentTooltipData,
-                TooltipCardPreviewLogWriter.Reporter
+            TooltipPreviewTargetResolver.Report(
+                TooltipPreviewTargetOutcome.Resolved,
+                TooltipLogReasonCode.PreviewCardMatched,
+                result.Card
             );
-            return false;
+            return true;
         }
 
-        TooltipPreviewTargetResolver.Report(
-            TooltipPreviewTargetOutcome.Resolved,
-            TooltipLogReasonCode.PreviewCardMatched,
-            clientCard
-        );
-        return true;
+        return result.Status
+            is NativeTooltipRefreshStatus.NoChange
+                or NativeTooltipRefreshStatus.Failed;
     }
 
     private static bool TryResolveRefreshTarget(

@@ -1,17 +1,18 @@
-# Mount MonoBehaviour features through a one-line mountable registry
+# ADR-0002: Mount Unity components through the mountable registry
 
-`MonoBehaviour` features are registered as `IBppMountable` entries in `BppComposition` and mounted in one pass by `BppMountableRegistry.MountAll(host)`, rather than hand-wired imperatively in `Plugin.cs`. A normal feature can be turned on or off by adding or removing one `_mountables.Register(...)` line at composition time; features that need physical install isolation can put that registration behind a build property.
+Status: Accepted
 
-## Context
+## Decision
 
-Non-`MonoBehaviour` modules already had a clean pattern: `IBppFeature` (`Start()`/`Stop()`) + `BppFeatureRegistry`, owned by `BppComposition`. `MonoBehaviour` features had no equivalent — each of ~10 (AutoBazaar, combat replay, history panel, status bar, run logging, screenshots, tooltip refresh, video recorder, …) was hand-wired in three places in `Plugin.cs` (`using`, `AttachRuntimeComponents`, `DetachRuntimeComponents`). To DLL-disable one you had to touch all three, and a cfg flag like `AutoBazaarEnabled` only gated the inner HTTP listener — the `MonoBehaviour`, its `Update` tick, snapshot publisher, and reflection probes still loaded and ran every frame.
+Use `IBppFeature`/`BppFeatureRegistry` for non-Unity start/stop modules and `IBppMountable`/`BppMountableRegistry` for Unity components. Register both in `BppComposition`; use `ComponentMount<T>` for the common add-initialize-destroy lifecycle and a bespoke mount only when a feature owns additional dependencies or objects.
 
-AutoBazaar was the first user (see [archived spec](../archive/design/archive/2026-05-22-autobazaar-mountable-and-encounter-decoupling-design.md)). The same change also extracted AutoBazaar's incidental encounter reads into a pull-based `IEncounterStateProbe`; that adapter now lives under `GameInterop/Encounter/`, matching its game-runtime read surface. This is the probe surface that [ADR-0001](0001-encounter-status-probe-not-timeline-tracker.md) settles on and that [tooltip-preview.md](../archive/features/tooltip-preview.md) consumes.
+## Why
 
-## Consequences
+Hand-wiring every `MonoBehaviour` across `Plugin` attach/detach paths scattered lifecycle ownership and made omission incomplete. A composition-owned registration makes the installed lifecycle visible in one place.
 
-- A feature's entire lifecycle (no component attached, no tick, no probes, no listener) is controlled by the presence of its registration line. AutoBazaar goes further: its host registration, source compilation, project reference, and artifact copy are all guarded by `--with-bazaaragent` so default builds physically omit the host (see [bazaar-agent.md](../archive/features/bazaar-agent.md)).
-- **As-built divergence from the spec**: the spec scoped this to AutoBazaar only and listed migrating the other features as a non-goal. In practice the abstraction generalized to a `ComponentMount<T>` helper and ~9 features now register through it (`ComponentMount<RunLoggingController>`, `ComponentMount<CombatStatusBar>`, ...); only `HistoryPanelMount`, `CollectionPanelMount`, and `LiveBuildPanelMount` stay bespoke (`HistoryPanelMount` needs `Func<>` lazy resolution of the online client + combat replay runtime; `CollectionPanelMount` needs to subscribe to `ChineseLocaleModeChanged` so the catalog cache and UI labels regenerate when the locale is cycled). The current registrations live in `BppComposition.cs`.
-- New features are expected to register here rather than re-introduce hand-wiring in `Plugin.cs`. The only bootstrap-special case is `CombatReplayRuntime`, which must be constructed before `composition.Start()`.
+## Guardrails
 
-Full design history: [docs/design/archive/2026-05-22-autobazaar-mountable-and-encounter-decoupling-design.md](../archive/design/archive/2026-05-22-autobazaar-mountable-and-encounter-decoupling-design.md).
+- Mount in registration order and unmount in reverse order ([registry](../../src/BazaarPlusPlus/Core/Runtime/BppMountableRegistry.cs#L6-L23)); current mount failure behavior is deliberately pinned by [composition tests](../../tests/CompositionRuntime.Tests/BppMountableRegistryTests.cs#L25-L66).
+- Keep simple components on [`ComponentMount<T>`](../../src/BazaarPlusPlus/Core/Runtime/ComponentMount.cs#L11-L33); Collection, History, LiveBuild, and upload workflows retain bespoke mounts because they own additional dependencies or component lifecycles ([composition](../../src/BazaarPlusPlus/BppComposition.cs#L188-L245)).
+- `CombatReplayRuntime` remains the bootstrap exception because other modules need it before mountables run ([Plugin](../../src/BazaarPlusPlus/Plugin.cs#L78-L98)).
+- BazaarAgent is not a mountable here; its independent plugin lifecycle is ADR-0006.

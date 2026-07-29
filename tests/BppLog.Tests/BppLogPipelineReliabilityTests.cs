@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using BazaarPlusPlus.Infrastructure.Logging;
 using Xunit;
 

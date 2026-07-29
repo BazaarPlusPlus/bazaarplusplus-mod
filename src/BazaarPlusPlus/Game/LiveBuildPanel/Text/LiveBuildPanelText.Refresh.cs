@@ -1,9 +1,6 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using BazaarPlusPlus.Game.LiveBuildPanel.Data;
 using BazaarPlusPlus.Localization;
 
@@ -126,7 +123,9 @@ internal static partial class LiveBuildPanelText
         parts.AddRange(
             summary
                 .HeroBuildCounts.Where(count => !string.IsNullOrWhiteSpace(count.Hero))
-                .Select(count => $"{count.Hero} {count.BuildCount}")
+                .Select(count =>
+                    $"{LiveBuildHeroPresentation.DisplayName(count.Hero)} {count.BuildCount}"
+                )
         );
         return string.Join(" · ", parts);
     }

@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.BazaarAgent;
 
 public enum BazaarAgentValidationCode
@@ -33,6 +30,8 @@ public static class BazaarAgentActionValidator
         "Dooley",
         "Mak",
         "Karnok",
+        "TheDragons",
+        "Hero8",
     };
 
     private static readonly HashSet<string> _validPlayModes = new(StringComparer.OrdinalIgnoreCase)

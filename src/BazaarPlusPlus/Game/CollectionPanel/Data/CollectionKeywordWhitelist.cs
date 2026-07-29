@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
 namespace BazaarPlusPlus.Game.CollectionPanel.Data;
@@ -33,7 +32,7 @@ internal static class CollectionKeywordWhitelist
         EHiddenTag.Gold,
         EHiddenTag.Income,
         EHiddenTag.Value,
-        EHiddenTag.Multicast,
+        EHiddenTag.Tempo,
         EHiddenTag.QuestReference,
         EHiddenTag.FlyingReference,
         EHiddenTag.HasteReference,
@@ -50,12 +49,12 @@ internal static class CollectionKeywordWhitelist
         EHiddenTag.CritReference,
         EHiddenTag.AmmoReference,
         EHiddenTag.RageReference,
+        EHiddenTag.TempoReference,
         EHiddenTag.EconomyReference,
         EHiddenTag.PotionReference,
     };
 
-    public static bool IsRelatedKeyword(EHiddenTag tag) =>
-        tag == EHiddenTag.Multicast || IsReferenceKeyword(tag);
+    public static bool IsRelatedKeyword(EHiddenTag tag) => IsReferenceKeyword(tag);
 
     public static bool IsReferenceKeyword(EHiddenTag tag) =>
         tag
@@ -75,6 +74,7 @@ internal static class CollectionKeywordWhitelist
                 or EHiddenTag.CritReference
                 or EHiddenTag.AmmoReference
                 or EHiddenTag.RageReference
+                or EHiddenTag.TempoReference
                 or EHiddenTag.EconomyReference
                 or EHiddenTag.PotionReference;
 }

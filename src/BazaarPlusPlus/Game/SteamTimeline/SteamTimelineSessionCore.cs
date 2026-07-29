@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using BazaarPlusPlus.GameInterop.SteamTimeline;
 
 namespace BazaarPlusPlus.Game.SteamTimeline;

@@ -1,4 +1,7 @@
 using System.Reflection;
+using BazaarGameShared;
+using BazaarGameShared.TempoNet.Models;
+using BazaarPlusPlus.Game.Lobby.RandomHeroSkinPool;
 
 var dependencyDirectories = ResolveDependencyDirectories();
 AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
@@ -95,10 +98,8 @@ var programmaticScopeType = assembly.GetType(
 foreach (var methodName in new[] { "Enter", "Restore", "IsActive" })
 {
     Assert(
-        programmaticScopeType.GetMethod(
-            methodName,
-            BindingFlags.NonPublic | BindingFlags.Static
-        ) != null,
+        programmaticScopeType.GetMethod(methodName, BindingFlags.NonPublic | BindingFlags.Static)
+            != null,
         $"Hero programmatic-selection scope must expose {methodName}."
     );
 }
@@ -145,7 +146,144 @@ foreach (
     );
 }
 
+InvalidToyDefaultDoesNotBlockProductionOpeningLoadout();
+FailedToyCategoryDoesNotBlockProductionOpeningLoadout();
+ValidToyPoolOverridesProductionOpeningLoadout();
+
 Console.WriteLine("RandomHeroPool patch compatibility checks passed.");
+
+static void InvalidToyDefaultDoesNotBlockProductionOpeningLoadout()
+{
+    var request = CreateNativeOpeningRequest();
+    var candidates = CreateOpeningCandidates();
+    candidates[BazaarInventoryTypes.ECollectionType.Toys] =
+    [
+        new RandomizedCollectibleCandidate(string.Empty, IsDefault: true),
+    ];
+
+    ApplyProductionOpeningLoadout(request, candidates);
+
+    Assert(
+        request.heroSkinId == "selected-hero-skin",
+        "Production ordering must override HeroSkins before an invalid Toy category."
+    );
+    Assert(
+        request.stashId == "only-selected-stash",
+        "An invalid Toy default must not leave the native full-owned-pool Stash in the request."
+    );
+    Assert(
+        request.toyId == "native-owned-toy",
+        "An invalid Toy default must not create an illegal Toy selection."
+    );
+}
+
+static void FailedToyCategoryDoesNotBlockProductionOpeningLoadout()
+{
+    var request = CreateNativeOpeningRequest();
+    var degradedKinds = new List<BazaarInventoryTypes.ECollectionType>();
+
+    ApplyProductionOpeningLoadout(
+        request,
+        CreateOpeningCandidates(),
+        degradedKinds,
+        failedKind: BazaarInventoryTypes.ECollectionType.Toys
+    );
+
+    Assert(
+        request.heroSkinId == "selected-hero-skin",
+        "A failed Toy category must not restore the native full-owned-pool HeroSkin."
+    );
+    Assert(
+        request.stashId == "only-selected-stash",
+        "A failed Toy category must not leave the native full-owned-pool Stash."
+    );
+    Assert(
+        degradedKinds.SequenceEqual([BazaarInventoryTypes.ECollectionType.Toys]),
+        "A category failure must report the concrete failed category exactly once."
+    );
+}
+
+static void ValidToyPoolOverridesProductionOpeningLoadout()
+{
+    var request = CreateNativeOpeningRequest();
+    var candidates = CreateOpeningCandidates();
+    candidates[BazaarInventoryTypes.ECollectionType.Toys] =
+    [
+        new RandomizedCollectibleCandidate("selected-toy", IsDefault: false),
+        new RandomizedCollectibleCandidate("other-owned-toy", IsDefault: false),
+    ];
+    var selectedIds = CreateSelectedIds();
+    selectedIds[BazaarInventoryTypes.ECollectionType.Toys] = ["selected-toy"];
+
+    ApplyProductionOpeningLoadout(request, candidates, selectedIds: selectedIds);
+
+    Assert(
+        request.toyId == "selected-toy",
+        "A valid saved Toy pool must override the native full-owned-pool Toy."
+    );
+}
+
+static EquipLoadoutRequest CreateNativeOpeningRequest() =>
+    new()
+    {
+        heroSkinId = "native-owned-hero-skin",
+        toyId = "native-owned-toy",
+        stashId = "native-owned-stash",
+    };
+
+static Dictionary<
+    BazaarInventoryTypes.ECollectionType,
+    RandomizedCollectibleCandidate[]
+> CreateOpeningCandidates() =>
+    new()
+    {
+        [BazaarInventoryTypes.ECollectionType.HeroSkins] =
+        [
+            new RandomizedCollectibleCandidate("selected-hero-skin", IsDefault: false),
+        ],
+        [BazaarInventoryTypes.ECollectionType.Stash] =
+        [
+            new RandomizedCollectibleCandidate("only-selected-stash", IsDefault: false),
+            new RandomizedCollectibleCandidate("other-owned-stash", IsDefault: false),
+        ],
+    };
+
+static Dictionary<BazaarInventoryTypes.ECollectionType, string[]> CreateSelectedIds() =>
+    new()
+    {
+        [BazaarInventoryTypes.ECollectionType.HeroSkins] = ["selected-hero-skin"],
+        [BazaarInventoryTypes.ECollectionType.Stash] = ["only-selected-stash"],
+    };
+
+static void ApplyProductionOpeningLoadout(
+    EquipLoadoutRequest request,
+    IReadOnlyDictionary<
+        BazaarInventoryTypes.ECollectionType,
+        RandomizedCollectibleCandidate[]
+    > candidates,
+    ICollection<BazaarInventoryTypes.ECollectionType>? degradedKinds = null,
+    IReadOnlyDictionary<BazaarInventoryTypes.ECollectionType, string[]>? selectedIds = null,
+    BazaarInventoryTypes.ECollectionType? failedKind = null
+)
+{
+    var effectiveSelectedIds = selectedIds ?? CreateSelectedIds();
+    RandomHeroSkinPoolRuntime.ApplyToRandomizedLoadout(
+        request,
+        kind =>
+        {
+            if (kind == failedKind)
+                throw new InvalidOperationException("Simulated category failure.");
+
+            return candidates.TryGetValue(kind, out var available)
+                ? available
+                : Array.Empty<RandomizedCollectibleCandidate>();
+        },
+        kind => effectiveSelectedIds.TryGetValue(kind, out var selected) ? selected : null,
+        (_, _) => { },
+        _ => 0,
+        (kind, _) => degradedKinds?.Add(kind)
+    );
+}
 
 static void AssertPatchMethod(Assembly assembly, string typeName, string methodName)
 {

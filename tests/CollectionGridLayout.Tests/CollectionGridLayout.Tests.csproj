@@ -4,25 +4,20 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RestoreAdditionalProjectSources>
-      https://api.nuget.org/v3/index.json;
-      https://nuget.bepinex.dev/v3/index.json;
-    </RestoreAdditionalProjectSources>
   </PropertyGroup>
 
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
-    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/Assembly-CSharp.dll')">
-    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardVm.cs"
       Link="CollectionCardVm.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMechanic.cs"
+      Link="CollectionMechanic.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionTabKind.cs"
@@ -47,6 +42,14 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionGridRetentionPlan.cs"
       Link="CollectionGridRetentionPlan.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\CollectionCardFitMath.cs"
+      Link="CollectionCardFitMath.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Grid\NativeCardCellBoundsCache.cs"
+      Link="NativeCardCellBoundsCache.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Tooltips\CollectionTierTooltipTextMerger.cs"

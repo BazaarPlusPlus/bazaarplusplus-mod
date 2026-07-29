@@ -2,8 +2,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 
 var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
@@ -47,6 +45,30 @@ var muxResultType =
 var replayVideoCaptureStatusType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureStatus"
 );
+var replaySavedStateNormalizerType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Bootstrap.ReplaySavedStateNormalizer"
+);
+var replayOpeningStateRestorerType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Bootstrap.ReplayOpeningStateRestorer"
+);
+var replayRunEconomyFallbackType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Bootstrap.ReplayRunEconomyFallback"
+);
+var snapshotRehydratorType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Bootstrap.SnapshotRehydrator"
+);
+
+RunReplaySavedStateNormalizationChecks(replaySavedStateNormalizerType, manifestType);
+RunReplayOpeningStateSelectionChecks(replayOpeningStateRestorerType);
+RunReplayRunEconomyFallbackChecks(replayRunEconomyFallbackType, manifestType);
+RunReplayPresentationRestorationChecks(replaySavedStateNormalizerType);
+RunReplaySpawnSanitizationChecks(snapshotRehydratorType);
+
+RunCurrentReplayRecordingStateChecks();
+RunReplayVideoPreflightReasonChecks();
+RunCurrentReplayRecordingUiLogChecks();
+RunCurrentReplayVideoMetadataChecks();
+RunSystemFileRevealCommandChecks();
 
 Assert(
     (bool)InvokeStatic(audioTapStopperType, "IsUsable", new object?[] { false, "present.wav" })!
@@ -227,13 +249,6 @@ Assert(
         && cardSetCaptureType.GetProperty("Source") != null,
     "PvpBattleCardSetCapture should expose Items, Status, and Source."
 );
-Assert(
-    matcherType != null
-        && collectorType != null
-        && manifestFactoryType != null
-        && payloadFactoryType != null,
-    "The PVP battle matcher, collector, and factories should exist."
-);
 var shouldRefreshPlayerCaptureMethod = collectorType.GetMethod(
     "ShouldRefreshPlayerCapture",
     BindingFlags.NonPublic | BindingFlags.Static
@@ -245,9 +260,7 @@ Assert(
 Assert(
     catalogType.GetMethod("Save") != null
         && catalogType.GetMethod("TryLoad") != null
-        && catalogType.GetMethod("ListRecentBattles") != null
-        && catalogInterfaceType != null
-        && catalogStoreType != null,
+        && catalogType.GetMethod("ListRecentBattles") != null,
     "The PVP battle catalog read side should expose Save, TryLoad, and ListRecentBattles."
 );
 Assert(
@@ -370,11 +383,11 @@ Assert(
 );
 Assert(
     abandonedResults.Any(result =>
-        !(bool)GetProperty(persistenceResultType, result, "Succeeded")
+        !(bool)GetRequiredProperty(persistenceResultType, result, "Succeeded")
         && string.Equals(
             (string?)GetProperty(
                 manifestType,
-                GetProperty(persistenceResultType, result, "Manifest"),
+                GetRequiredProperty(persistenceResultType, result, "Manifest"),
                 "BattleId"
             ),
             "battle-dispose-abandoned",
@@ -411,11 +424,11 @@ while (TryDequeuePersistenceResult(persistenceQueueType, queue!, out var result)
 
 Assert(
     queueResults.Any(result =>
-        (bool)GetProperty(persistenceResultType, result, "Succeeded")
+        (bool)GetRequiredProperty(persistenceResultType, result, "Succeeded")
         && string.Equals(
             (string?)GetProperty(
                 manifestType,
-                GetProperty(persistenceResultType, result, "Manifest"),
+                GetRequiredProperty(persistenceResultType, result, "Manifest"),
                 "BattleId"
             ),
             "battle-dispose-slow",
@@ -433,7 +446,7 @@ Assert(
     "Forced shutdown abandonment should not roll back payloads when the manifest save was never attempted."
 );
 Assert(
-    !(bool)GetProperty(persistenceQueueType, queue!, "HasPendingPersistence"),
+    !(bool)GetRequiredProperty(persistenceQueueType, queue!, "HasPendingPersistence"),
     "After draining the completed queue results from disposal, replay persistence should no longer report outstanding work."
 );
 var tempRoot = Path.Combine(
@@ -527,6 +540,8 @@ try
         playerName: "Local Player",
         playerAccountId: "player-account-001",
         playerPrestige: 18,
+        playerIncome: 11,
+        playerGold: 99,
         playerVictories: 3,
         opponentName: "Test Opponent",
         opponentHero: "Vanessa",
@@ -578,6 +593,8 @@ try
     var battleProjectionType = battleProjection.GetType();
     Assert(
         Equals(GetProperty(battleProjectionType, battleProjection, "PlayerPrestige"), 18)
+            && Equals(GetProperty(battleProjectionType, battleProjection, "PlayerIncome"), 11)
+            && Equals(GetProperty(battleProjectionType, battleProjection, "PlayerGold"), 99)
             && Equals(GetProperty(battleProjectionType, battleProjection, "PlayerVictories"), 3)
             && Equals(GetProperty(battleProjectionType, battleProjection, "OpponentPrestige"), 12)
             && Equals(GetProperty(battleProjectionType, battleProjection, "OpponentVictories"), 6),
@@ -597,6 +614,11 @@ try
     var artifactParticipantsType = artifactParticipants.GetType();
     Assert(
         Equals(GetProperty(artifactParticipantsType, artifactParticipants, "PlayerPrestige"), 18)
+            && Equals(
+                GetProperty(artifactParticipantsType, artifactParticipants, "PlayerIncome"),
+                11
+            )
+            && Equals(GetProperty(artifactParticipantsType, artifactParticipants, "PlayerGold"), 99)
             && Equals(
                 GetProperty(artifactParticipantsType, artifactParticipants, "PlayerVictories"),
                 3
@@ -633,6 +655,8 @@ try
     var loadedParticipantsType = loadedParticipants.GetType();
     Assert(
         Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerPrestige"), 18)
+            && Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerIncome"), 11)
+            && Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerGold"), 99)
             && Equals(GetProperty(loadedParticipantsType, loadedParticipants, "PlayerVictories"), 3)
             && Equals(
                 GetProperty(loadedParticipantsType, loadedParticipants, "OpponentPrestige"),
@@ -687,6 +711,22 @@ try
                 "battle-001"
             ) == 18,
             "battles should persist the player prestige."
+        );
+        Assert(
+            GetInt32(
+                connection,
+                "SELECT player_income FROM battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 11,
+            "battles should persist the player income."
+        );
+        Assert(
+            GetInt32(
+                connection,
+                "SELECT player_gold FROM battles WHERE battle_id = $battleId;",
+                "battle-001"
+            ) == 99,
+            "battles should persist the player gold."
         );
         Assert(
             GetInt32(
@@ -846,11 +886,9 @@ try
         "AttachToRun should backfill the saved battle row once the owning run exists."
     );
     var reboundBattles = (
-        (System.Collections.IEnumerable)Invoke(
-            catalogType,
-            battleCatalog!,
-            "ListByRunId",
-            new object?[] { "run-001" }
+        (System.Collections.IEnumerable)(
+            Invoke(catalogType, battleCatalog!, "ListByRunId", new object?[] { "run-001" })
+            ?? throw new InvalidOperationException("ListByRunId should return a collection.")
         )
     )
         .Cast<object>()
@@ -962,19 +1000,41 @@ try
         encounterId: "encounter-pve",
         opponentName: "PvE Opponent"
     );
+    var openingSocketEffects = new[]
+    {
+        new ReplaySocketFixture(
+            "socket-player-heat",
+            "template-player-heat",
+            "Player",
+            "Hand",
+            "Socket_2"
+        ),
+        new ReplaySocketFixture(
+            "socket-opponent-chill",
+            "template-opponent-chill",
+            "Opponent",
+            "Hand",
+            "Socket_7"
+        ),
+    };
     var combatStart = CreateGameSimMessage(
         "PVPCombat",
         day: 3,
         hour: 4,
         encounterId: "encounter-live",
-        opponentName: "Rival"
+        opponentName: "Rival",
+        playerLevel: 7,
+        opponentLevel: 9,
+        socketEffects: openingSocketEffects
     );
     var combatEnd = CreateGameSimMessage(
         "Encounter",
         day: 3,
         hour: 5,
         encounterId: null,
-        opponentName: null
+        opponentName: null,
+        playerLevel: 7,
+        opponentLevel: 9
     );
 
     var ignoredResult = Invoke(
@@ -1116,6 +1176,8 @@ try
     SetProperty(candidateType, participantCandidate!, "PlayerRank", "Legendary 5");
     SetProperty(candidateType, participantCandidate!, "PlayerRating", 502);
     SetProperty(candidateType, participantCandidate!, "PlayerPrestige", 18);
+    SetProperty(candidateType, participantCandidate!, "PlayerIncome", 11);
+    SetProperty(candidateType, participantCandidate!, "PlayerGold", 99);
     SetProperty(candidateType, participantCandidate!, "PlayerVictories", 3);
     SetProperty(candidateType, participantCandidate!, "OpponentName", "Snapshot Opponent");
     SetProperty(candidateType, participantCandidate!, "OpponentHero", "Vanessa");
@@ -1143,8 +1205,10 @@ try
     );
     Assert(
         Equals(GetProperty(participantsType, participants, "PlayerPrestige"), 18)
+            && Equals(GetProperty(participantsType, participants, "PlayerIncome"), 11)
+            && Equals(GetProperty(participantsType, participants, "PlayerGold"), 99)
             && Equals(GetProperty(participantsType, participants, "PlayerVictories"), 3),
-        "BuildParticipants should preserve player prestige and victories captured on the opening candidate."
+        "BuildParticipants should preserve player economy, prestige, and victories captured on the opening candidate."
     );
     Assert(
         string.Equals(
@@ -1181,6 +1245,34 @@ try
         GetFieldValue(loadedSequence!.GetType(), loadedSequence, "DespawnMessage") != null,
         "Loaded replay sequences should include the closing GameSim."
     );
+    var loadedSpawnMessage = GetFieldValue(
+        loadedSequence.GetType(),
+        loadedSequence,
+        "SpawnMessage"
+    )!;
+    var loadedDespawnMessage = GetFieldValue(
+        loadedSequence.GetType(),
+        loadedSequence,
+        "DespawnMessage"
+    )!;
+    AssertReplaySavedState(
+        loadedSpawnMessage,
+        expectedDay: 3,
+        expectedHour: 4,
+        expectedPlayerLevel: 7,
+        expectedOpponentLevel: 9,
+        failureMessage: "Capture -> payload -> loader should preserve the opening saved state."
+    );
+    AssertReplaySavedState(
+        loadedDespawnMessage,
+        expectedDay: 3,
+        expectedHour: 5,
+        expectedPlayerLevel: 7,
+        expectedOpponentLevel: 9,
+        failureMessage: "Capture -> payload -> loader should preserve the closing saved state."
+    );
+    foreach (var socketEffect in openingSocketEffects)
+        AssertSocketEffectSpawnPreserved(loadedSpawnMessage, socketEffect);
 
     Invoke(payloadStoreType, payloadStore!, "Save", new object?[] { completedPayload! });
     Invoke(catalogType, battleCatalog!, "Save", new object?[] { completedManifest! });
@@ -1202,6 +1294,8 @@ try
         playerName: "Local Player",
         playerAccountId: "player-account-001",
         playerPrestige: 18,
+        playerIncome: 11,
+        playerGold: 99,
         playerVictories: 3,
         opponentName: "Missing Payload Opponent",
         opponentHero: "Pygmalien",
@@ -1249,11 +1343,9 @@ try
     );
     Invoke(catalogType, battleCatalog!, "Save", new object?[] { missingPayloadManifest! });
     var savedReplays = (
-        (System.Collections.IEnumerable)Invoke(
-            controllerType,
-            controller!,
-            "ListRecentBattles",
-            Array.Empty<object?>()
+        (System.Collections.IEnumerable)(
+            Invoke(controllerType, controller!, "ListRecentBattles", Array.Empty<object?>())
+            ?? throw new InvalidOperationException("ListRecentBattles should return a collection.")
         )
     )
         .Cast<object>()
@@ -1363,6 +1455,787 @@ static Type RequireType(string fullName)
         ?? throw new InvalidOperationException($"Type not found: {fullName}");
 }
 
+static void RunReplaySavedStateNormalizationChecks(Type normalizerType, Type manifestType)
+{
+    Assert(
+        Equals(InvokeStatic(normalizerType, "ResolvePositiveUInt", new object?[] { 8u, 3 }), 8u)
+            && Equals(
+                InvokeStatic(normalizerType, "ResolvePositiveUInt", new object?[] { 0u, 3 }),
+                3u
+            )
+            && Equals(
+                InvokeStatic(normalizerType, "ResolvePositiveUInt", new object?[] { 0u, null }),
+                0u
+            ),
+        "Replay saved-state normalization should prefer a positive raw value and only then use the manifest fallback."
+    );
+    Assert(
+        Equals(InvokeStatic(normalizerType, "ResolveLevel", new object?[] { 10, 5 }), 10)
+            && Equals(InvokeStatic(normalizerType, "ResolveLevel", new object?[] { 0, 5 }), 5)
+            && Equals(
+                InvokeStatic(normalizerType, "ResolveLevel", new object?[] { null, null }),
+                1
+            ),
+        "Replay level normalization should prefer positive raw data, use manifest metadata as a fallback, and finally use level one."
+    );
+
+    var normalizeMethod = normalizerType.GetMethod(
+        "Normalize",
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(normalizeMethod != null, "ReplaySavedStateNormalizer.Normalize should exist.");
+    var sequenceType = normalizeMethod!.GetParameters()[1].ParameterType;
+    var manifest = CreateReplayStateManifest(
+        manifestType,
+        day: 3,
+        hour: 4,
+        playerLevel: 5,
+        opponentLevel: 6
+    );
+
+    var validRawSequence = CreateCombatSequence(
+        sequenceType,
+        CreateGameSimMessage(
+            "PVPCombat",
+            day: 8,
+            hour: 9,
+            encounterId: "normalizer-valid-spawn",
+            opponentName: "Valid Opponent",
+            playerLevel: 10,
+            opponentLevel: 11
+        ),
+        CreateGameSimMessage(
+            "Encounter",
+            day: 12,
+            hour: 13,
+            encounterId: null,
+            opponentName: null,
+            playerLevel: 14,
+            opponentLevel: 15
+        )
+    );
+    InvokeStatic(normalizerType, "Normalize", new[] { manifest, validRawSequence });
+    AssertSequenceSavedState(
+        validRawSequence,
+        spawnDay: 8,
+        spawnHour: 9,
+        spawnPlayerLevel: 10,
+        spawnOpponentLevel: 11,
+        despawnDay: 12,
+        despawnHour: 13,
+        despawnPlayerLevel: 14,
+        despawnOpponentLevel: 15,
+        message: "Positive raw replay state should win over manifest metadata for both saved messages."
+    );
+
+    var fallbackSequence = CreateCombatSequence(
+        sequenceType,
+        CreateGameSimMessage(
+            "PVPCombat",
+            day: 0,
+            hour: 0,
+            encounterId: "normalizer-fallback-spawn",
+            opponentName: "Fallback Opponent",
+            playerLevel: null,
+            opponentLevel: 0
+        ),
+        CreateGameSimMessage(
+            "Encounter",
+            day: 0,
+            hour: 0,
+            encounterId: null,
+            opponentName: null,
+            playerLevel: -2,
+            opponentLevel: null
+        )
+    );
+    InvokeStatic(normalizerType, "Normalize", new[] { manifest, fallbackSequence });
+    AssertSequenceSavedState(
+        fallbackSequence,
+        spawnDay: 3,
+        spawnHour: 4,
+        spawnPlayerLevel: 5,
+        spawnOpponentLevel: 6,
+        despawnDay: 3,
+        despawnHour: 4,
+        despawnPlayerLevel: 5,
+        despawnOpponentLevel: 6,
+        message: "Manifest state should repair missing or invalid values in both saved replay messages."
+    );
+
+    var legacySequence = CreateCombatSequence(
+        sequenceType,
+        CreateGameSimMessage(
+            "PVPCombat",
+            day: 0,
+            hour: 0,
+            encounterId: "normalizer-legacy-spawn",
+            opponentName: "Legacy Opponent"
+        ),
+        CreateGameSimMessage("Encounter", day: 0, hour: 0, encounterId: null, opponentName: null)
+    );
+    InvokeStatic(normalizerType, "Normalize", new object?[] { null, legacySequence });
+    AssertSequenceSavedState(
+        legacySequence,
+        spawnDay: 0,
+        spawnHour: 0,
+        spawnPlayerLevel: 1,
+        spawnOpponentLevel: 1,
+        despawnDay: 0,
+        despawnHour: 0,
+        despawnPlayerLevel: 1,
+        despawnOpponentLevel: 1,
+        message: "A legacy replay without manifest metadata should remain loadable and receive safe level defaults."
+    );
+    InvokeStatic(normalizerType, "Normalize", new object?[] { manifest, null });
+}
+
+static void RunReplayRunEconomyFallbackChecks(Type fallbackType, Type manifestType)
+{
+    var tempRoot = Path.Combine(
+        Path.GetTempPath(),
+        "bpp-replay-run-economy-fallback-tests",
+        Guid.NewGuid().ToString("N")
+    );
+    Directory.CreateDirectory(tempRoot);
+    var dbPath = Path.Combine(tempRoot, "bazaarplusplus.db");
+    try
+    {
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            var schemaType =
+                Type.GetType("BazaarPlusPlus.Storage.RunLog.RunLogSchema, BazaarPlusPlus.Storage")
+                ?? throw new InvalidOperationException("RunLogSchema should be loadable.");
+            InvokeStatic(schemaType, "EnsureInitialized", new object?[] { connection });
+
+            using var insert = connection.CreateCommand();
+            insert.CommandText = """
+                INSERT INTO runs (
+                    run_id,
+                    started_at_utc,
+                    last_seen_at_utc,
+                    status,
+                    completed,
+                    hero,
+                    game_mode,
+                    income,
+                    gold,
+                    last_seq
+                ) VALUES (
+                    'run-economy-001',
+                    '2026-07-17T01:00:00.0000000+00:00',
+                    '2026-07-17T01:00:00.0000000+00:00',
+                    'active',
+                    0,
+                    'Jules',
+                    'Ranked',
+                    5,
+                    21,
+                    0
+                );
+                """;
+            insert.ExecuteNonQuery();
+        }
+
+        var missingEconomyManifest = Activator.CreateInstance(manifestType)!;
+        SetProperty(manifestType, missingEconomyManifest, "RunId", "run-economy-001");
+        var missingParticipants =
+            GetProperty(manifestType, missingEconomyManifest, "Participants")
+            ?? throw new InvalidOperationException("Manifest should include participants.");
+        var participantsType = missingParticipants.GetType();
+
+        InvokeStatic(
+            fallbackType,
+            "ApplyMissingRunEconomy",
+            new object?[] { missingEconomyManifest, dbPath, null }
+        );
+        Assert(
+            Equals(GetProperty(participantsType, missingParticipants, "PlayerIncome"), 5)
+                && Equals(GetProperty(participantsType, missingParticipants, "PlayerGold"), 21),
+            "Replay run economy fallback should fill missing legacy manifest income/gold from the run row."
+        );
+
+        var preciseEconomyManifest = Activator.CreateInstance(manifestType)!;
+        SetProperty(manifestType, preciseEconomyManifest, "RunId", "run-economy-001");
+        var preciseParticipants =
+            GetProperty(manifestType, preciseEconomyManifest, "Participants")
+            ?? throw new InvalidOperationException("Manifest should include participants.");
+        SetProperty(preciseParticipants.GetType(), preciseParticipants, "PlayerIncome", 11);
+        SetProperty(preciseParticipants.GetType(), preciseParticipants, "PlayerGold", 99);
+        InvokeStatic(
+            fallbackType,
+            "ApplyMissingRunEconomy",
+            new object?[] { preciseEconomyManifest, dbPath, null }
+        );
+        Assert(
+            Equals(
+                GetProperty(preciseParticipants.GetType(), preciseParticipants, "PlayerIncome"),
+                11
+            )
+                && Equals(
+                    GetProperty(preciseParticipants.GetType(), preciseParticipants, "PlayerGold"),
+                    99
+                ),
+            "Replay run economy fallback should not overwrite precise battle-level income/gold."
+        );
+    }
+    finally
+    {
+        if (Directory.Exists(tempRoot))
+            Directory.Delete(tempRoot, recursive: true);
+    }
+}
+
+static void RunReplayOpeningStateSelectionChecks(Type restorerType)
+{
+    var playerInitialized = CreatePlayerInitializedEvent("Player", "Vanessa");
+    var socketsUnlocked = CreateSocketsUnlockedEvent("Hand", "Socket_2");
+    var firstPlayerSocket = CreateCardSpawnEvent(
+        "opening-player-socket",
+        "opening-player-heat",
+        "SocketEffect",
+        "Player",
+        "Hand",
+        "Socket_2"
+    );
+    var duplicatePlayerSocket = CreateCardSpawnEvent(
+        "opening-player-socket",
+        "opening-player-duplicate",
+        "SocketEffect",
+        "Player",
+        "Hand",
+        "Socket_3"
+    );
+    var opponentSocket = CreateCardSpawnEvent(
+        "opening-opponent-socket",
+        "opening-opponent-chill",
+        "SocketEffect",
+        "Opponent",
+        "Stash",
+        "Socket_7"
+    );
+    var ordinaryItem = CreateCardSpawnEvent(
+        "opening-ordinary-item",
+        "opening-ordinary-template",
+        "Item",
+        "Opponent",
+        "Hand",
+        "Socket_4"
+    );
+    var events = CreateGameSimEventList(
+        playerInitialized,
+        socketsUnlocked,
+        firstPlayerSocket,
+        duplicatePlayerSocket,
+        opponentSocket,
+        ordinaryItem
+    );
+
+    var selectedOpeningEvents = AsObjects(
+        InvokeStatic(restorerType, "SelectOpeningEvents", new[] { events })
+    );
+    Assert(
+        selectedOpeningEvents.Count == 2
+            && selectedOpeningEvents.Any(value =>
+                value.GetType().Name == "GameSimEventPlayerInitialized"
+            )
+            && selectedOpeningEvents.Any(value =>
+                value.GetType().Name == "GameSimEventSocketsUnlocked"
+            ),
+        "Replay opening-state restoration should select only the native initialization events."
+    );
+
+    var selectedSocketEvents = AsObjects(
+        InvokeStatic(restorerType, "SelectSocketEffectSpawnEvents", new[] { events })
+    );
+    Assert(
+        selectedSocketEvents.Count == 2,
+        "Replay socket restoration should select one spawn event per socket-effect instance across both combatants."
+    );
+    var selectedPlayerSocket = selectedSocketEvents.Single(value =>
+        string.Equals(
+            GetProperty(value.GetType(), value, "InstanceId")?.ToString(),
+            "opening-player-socket",
+            StringComparison.Ordinal
+        )
+    );
+    Assert(
+        string.Equals(
+            GetProperty(selectedPlayerSocket.GetType(), selectedPlayerSocket, "TemplateId")
+                ?.ToString(),
+            "opening-player-heat",
+            StringComparison.Ordinal
+        ),
+        "Replay socket selection should keep the first complete event when duplicate instance ids appear."
+    );
+    Assert(
+        AsObjects(
+            InvokeStatic(restorerType, "SelectSocketEffectSpawnEvents", new object?[] { null })
+        ).Count == 0,
+        "Replay socket selection should accept missing opening event lists from legacy payloads."
+    );
+
+    var snapshotManifest = CreateSocketEffectSnapshotManifest(
+        playerSnapshots:
+        [
+            new ReplaySocketFixture(
+                "opening-snapshot-only",
+                "opening-snapshot-only-heat",
+                "Player",
+                "Hand",
+                "Socket_1"
+            ),
+            new ReplaySocketFixture(
+                "opening-player-socket",
+                "opening-player-snapshot-source",
+                "Player",
+                "Hand",
+                "Socket_2"
+            ),
+        ],
+        opponentSnapshots:
+        [
+            new ReplaySocketFixture(
+                "opening-player-socket",
+                "opening-opponent-duplicate-source",
+                "Opponent",
+                "Hand",
+                "Socket_5"
+            ),
+            new ReplaySocketFixture(
+                "opening-opponent-snapshot",
+                "opening-opponent-snapshot-chill",
+                "Opponent",
+                "Hand",
+                "Socket_7"
+            ),
+        ]
+    );
+    var selectedSocketSnapshots = AsObjects(
+        InvokeStatic(restorerType, "SelectSocketEffectSnapshots", new[] { snapshotManifest })
+    );
+    var selectedSnapshotIds = selectedSocketSnapshots
+        .Select(value => GetProperty(value.GetType(), value, "InstanceId")?.ToString())
+        .ToList();
+    Assert(
+        selectedSnapshotIds.Count == 3
+            && selectedSnapshotIds.Any(value =>
+                string.Equals(value, "opening-snapshot-only", StringComparison.Ordinal)
+            )
+            && selectedSnapshotIds.Any(value =>
+                string.Equals(value, "opening-player-socket", StringComparison.Ordinal)
+            )
+            && selectedSnapshotIds.Any(value =>
+                string.Equals(value, "opening-opponent-snapshot", StringComparison.Ordinal)
+            ),
+        "Replay socket restoration should select snapshot-only effects from both hand captures and deduplicate instance ids."
+    );
+    var selectedRawDuplicateSnapshot = selectedSocketSnapshots.Single(value =>
+        string.Equals(
+            GetProperty(value.GetType(), value, "InstanceId")?.ToString(),
+            "opening-player-socket",
+            StringComparison.Ordinal
+        )
+    );
+    Assert(
+        selectedSocketEvents.Any(value =>
+            string.Equals(
+                GetProperty(value.GetType(), value, "InstanceId")?.ToString(),
+                "opening-player-socket",
+                StringComparison.Ordinal
+            )
+        )
+            && string.Equals(
+                GetProperty(
+                    selectedRawDuplicateSnapshot.GetType(),
+                    selectedRawDuplicateSnapshot,
+                    "TemplateId"
+                )
+                    ?.ToString(),
+                "opening-player-snapshot-source",
+                StringComparison.Ordinal
+            ),
+        "Snapshot selection should retain the first PlayerHand source when a raw event and the opponent snapshot duplicate the same instance id."
+    );
+    Assert(
+        AsObjects(
+            InvokeStatic(restorerType, "SelectSocketEffectSnapshots", new object?[] { null })
+        ).Count == 0,
+        "Replay socket snapshot selection should accept legacy manifests without snapshots."
+    );
+}
+
+static void RunReplayPresentationRestorationChecks(Type normalizerType)
+{
+    Assert(
+        Equals(InvokeStatic(normalizerType, "ResolveOpeningLevel", new object?[] { 7, 8 }), 7),
+        "Replay presentation should restore a valid opening level instead of the closing level."
+    );
+    Assert(
+        Equals(InvokeStatic(normalizerType, "ResolveOpeningLevel", new object?[] { 0, 8 }), 8)
+            && Equals(
+                InvokeStatic(normalizerType, "ResolveOpeningLevel", new object?[] { -1, 8 }),
+                8
+            )
+            && Equals(
+                InvokeStatic(normalizerType, "ResolveOpeningLevel", new object?[] { null, 8 }),
+                8
+            ),
+        "Replay presentation should preserve the current level when the opening level is missing or invalid."
+    );
+}
+
+static void RunReplaySpawnSanitizationChecks(Type snapshotRehydratorType)
+{
+    var sanitizeMethod = snapshotRehydratorType.GetMethod(
+        "SanitizeSpawnEvents",
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(sanitizeMethod != null, "SnapshotRehydrator.SanitizeSpawnEvents should exist.");
+    var sequenceType = sanitizeMethod!.GetParameters()[0].ParameterType;
+    var spawnMessage = CreateGameSimMessage(
+        "PVPCombat",
+        day: 3,
+        hour: 4,
+        encounterId: "sanitizer-socket-preservation",
+        opponentName: "Sanitizer Opponent"
+    );
+    AddGameSimEvent(
+        spawnMessage,
+        CreateCardSpawnEvent(
+            "sanitizer-player-socket",
+            "sanitizer-player-heat",
+            "SocketEffect",
+            "Player",
+            "Stash",
+            "Socket_2"
+        )
+    );
+    AddGameSimEvent(
+        spawnMessage,
+        CreateCardSpawnEvent(
+            "sanitizer-opponent-socket",
+            "sanitizer-opponent-chill",
+            "SocketEffect",
+            "Opponent",
+            "Stash",
+            "Socket_7"
+        )
+    );
+    AddGameSimEvent(
+        spawnMessage,
+        CreateCardSpawnEvent(
+            "sanitizer-opponent-skill",
+            "sanitizer-opponent-skill-template",
+            "Skill",
+            "Opponent",
+            "Stash",
+            null
+        )
+    );
+    var sequence = CreateCombatSequence(
+        sequenceType,
+        spawnMessage,
+        CreateGameSimMessage("Encounter", day: 3, hour: 5, encounterId: null, opponentName: null)
+    );
+
+    InvokeStatic(
+        snapshotRehydratorType,
+        "SanitizeSpawnEvents",
+        new object?[] { sequence, "sanitizer-test" }
+    );
+    var remainingIds = ReadGameSimEvents(spawnMessage)
+        .Where(value => value.GetType().Name == "GameSimEventCardSpawned")
+        .Select(value => GetProperty(value.GetType(), value, "InstanceId")?.ToString())
+        .ToHashSet(StringComparer.Ordinal);
+    Assert(
+        remainingIds.Contains("sanitizer-player-socket")
+            && remainingIds.Contains("sanitizer-opponent-socket"),
+        "Spawn sanitization must preserve player and opponent socket-effect data even outside the hand section."
+    );
+    Assert(
+        !remainingIds.Contains("sanitizer-opponent-skill"),
+        "Spawn sanitization should continue removing unrelated opponent non-hand spawns."
+    );
+}
+
+static void RunCurrentReplayRecordingStateChecks()
+{
+    var stateType = RequireType("BazaarPlusPlus.Game.CombatReplay.CurrentReplayRecordingState");
+    var completedType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.CombatReplayVideoRecordingCompleted"
+    );
+    var sourceType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPlaybackSource");
+    var metadataType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoMetadataStatus"
+    );
+    var reasonType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingReasonCode"
+    );
+    var state = Activator.CreateInstance(stateType, nonPublic: true)!;
+
+    Invoke(stateType, state, "LatchBattle", new object?[] { "battle-current" });
+    Invoke(stateType, state, "EnterReplayState", Array.Empty<object?>());
+    Invoke(stateType, state, "MarkBattlePersistence", new object?[] { "battle-stale", true, null });
+    var awaiting = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        GetProperty(awaiting.GetType(), awaiting, "Phase")!.ToString()
+            == "AwaitingBattlePersistence",
+        "A stale persistence completion must not unlock the current battle."
+    );
+
+    Invoke(
+        stateType,
+        state,
+        "MarkBattlePersistence",
+        new object?[] { "battle-current", true, null }
+    );
+    Invoke(stateType, state, "SetAvailability", new object?[] { true, null });
+    var ready = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        (bool)GetProperty(ready.GetType(), ready, "CanStart")!,
+        "A persisted current battle with a ready recorder should become recordable."
+    );
+
+    Assert(
+        (bool)Invoke(stateType, state, "TryArm", new object?[] { "recording-current" })!,
+        "The ready current battle should arm once."
+    );
+    Assert(
+        !(bool)Invoke(stateType, state, "TryArm", new object?[] { "recording-second" })!,
+        "A current battle must reject a second arm while the first is active."
+    );
+    Assert(
+        (bool)Invoke(stateType, state, "MarkNativeReplayStarted", Array.Empty<object?>())!,
+        "The native replay start should bind to the armed recording."
+    );
+    Invoke(
+        stateType,
+        state,
+        "MarkRecordingStarted",
+        new object?[] { "recording-current", "battle-current" }
+    );
+    Invoke(stateType, state, "MarkReplayEnded", new object?[] { null });
+
+    var completed = Activator.CreateInstance(completedType, nonPublic: true)!;
+    SetProperty(completedType, completed, "RecordingId", "recording-current");
+    SetProperty(completedType, completed, "BattleId", "battle-current");
+    SetProperty(completedType, completed, "Source", Enum.Parse(sourceType, "CurrentNative"));
+    SetProperty(completedType, completed, "FinalFilePath", "/tmp/current-replay.mp4");
+    SetProperty(completedType, completed, "ArtifactUsable", true);
+    SetProperty(completedType, completed, "MetadataStatus", Enum.Parse(metadataType, "Complete"));
+    SetProperty(completedType, completed, "ReasonCode", Enum.Parse(reasonType, "Completed"));
+    Invoke(stateType, state, "ApplyCompletion", new object?[] { completed });
+    Invoke(stateType, state, "SetAvailability", new object?[] { true, null });
+    var succeeded = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        (bool)GetProperty(succeeded.GetType(), succeeded, "CanReveal")!,
+        "A usable completed artifact should turn the button into reveal-video mode."
+    );
+
+    Invoke(stateType, state, "LeaveReplayState", Array.Empty<object?>());
+    var reset = Invoke(stateType, state, "Snapshot", Array.Empty<object?>())!;
+    Assert(
+        !(bool)GetProperty(reset.GetType(), reset, "Visible")!,
+        "Leaving ReplayState should remove the temporary current-battle button."
+    );
+}
+
+static void RunReplayVideoPreflightReasonChecks()
+{
+    var operationType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingOperation"
+    );
+    var completionType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingCompletion"
+    );
+    var terminalType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingTerminal"
+    );
+    var sourceType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPlaybackSource");
+    var reasonType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingReasonCode"
+    );
+    var operation = Activator.CreateInstance(
+        operationType,
+        BindingFlags.Instance | BindingFlags.NonPublic,
+        binder: null,
+        args:
+        [
+            "recording-preflight-reason",
+            "battle-preflight-reason",
+            Enum.Parse(sourceType, "CurrentNative"),
+            DateTimeOffset.UtcNow,
+        ],
+        culture: null
+    )!;
+    var completion = Activator.CreateInstance(completionType, nonPublic: true)!;
+    SetProperty(completionType, completion, "ReasonCode", Enum.Parse(reasonType, "Aborted"));
+    SetProperty(completionType, completion, "Reason", "native-recap-close-timeout");
+
+    var tryComplete =
+        operationType.GetMethod(
+            "TryComplete",
+            BindingFlags.Instance | BindingFlags.NonPublic,
+            binder: null,
+            types: [completionType, terminalType.MakeByRefType()],
+            modifiers: null
+        )
+        ?? throw new InvalidOperationException(
+            "ReplayVideoRecordingOperation.TryComplete should expose its terminal result."
+        );
+    object?[] arguments = [completion, null];
+    Assert(
+        (bool)tryComplete.Invoke(operation, arguments)!,
+        "A preflight cancellation should complete its recording operation."
+    );
+    var terminal = arguments[1]!;
+    Assert(
+        string.Equals(
+            GetProperty(terminalType, terminal, "Reason")?.ToString(),
+            "native-recap-close-timeout",
+            StringComparison.Ordinal
+        ),
+        "A preflight cancellation should preserve its specific ended reason for downstream diagnostics."
+    );
+}
+
+static void RunCurrentReplayRecordingUiLogChecks()
+{
+    var logStateType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.CurrentReplayRecordingUiLogState"
+    );
+
+    var ready = InvokeStatic(logStateType, "ResolveLayoutReason", new object?[] { true, null });
+    Assert(
+        ready?.ToString() == "None",
+        "An available current-recording layout should have no failure reason."
+    );
+
+    var missingFootprint = InvokeStatic(
+        logStateType,
+        "ResolveLayoutReason",
+        new object?[] { false, "collection-footprint-unavailable" }
+    );
+    Assert(
+        missingFootprint?.ToString() == "TargetFootprintUnavailable",
+        "A missing clone footprint should remain distinguishable in Release diagnostics."
+    );
+
+    var obstructed = InvokeStatic(
+        logStateType,
+        "ResolveLayoutReason",
+        new object?[] { false, "native-button-path" }
+    );
+    Assert(
+        obstructed?.ToString() == "Obstructed",
+        "A native layout blocker should map to the bounded obstruction reason."
+    );
+}
+
+static void RunSystemFileRevealCommandChecks()
+{
+    var revealerType = RequireType("BazaarPlusPlus.GameInterop.Files.SystemFileRevealer");
+    var platformType = RequireType("BazaarPlusPlus.GameInterop.Files.SystemFileRevealPlatform");
+    foreach (var platformName in new[] { "MacOS", "Windows", "Linux" })
+    {
+        var command = InvokeStatic(
+            revealerType,
+            "BuildCommand",
+            new object?[] { Enum.Parse(platformType, platformName), "/tmp/video file.mp4" }
+        )!;
+        var commandType = command.GetType();
+        var fileName = (string)GetProperty(commandType, command, "FileName")!;
+        var arguments = (string)GetProperty(commandType, command, "Arguments")!;
+        Assert(
+            !string.IsNullOrWhiteSpace(fileName),
+            $"{platformName} reveal command needs an executable."
+        );
+        Assert(
+            arguments.Contains('"'),
+            $"{platformName} reveal command must quote paths with spaces."
+        );
+    }
+}
+
+static void RunCurrentReplayVideoMetadataChecks()
+{
+    var storeType = RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.CombatReplayVideoMetadataStore"
+    );
+    var startedType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.VideoRecordingStarted");
+    var finishedType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.VideoRecordingFinished");
+    var root = Path.Combine(
+        Path.GetTempPath(),
+        "bpp-current-replay-video-metadata-tests",
+        Guid.NewGuid().ToString("N")
+    );
+    Directory.CreateDirectory(root);
+    var databasePath = Path.Combine(root, "run.db");
+    try
+    {
+        var store = Activator.CreateInstance(storeType, databasePath)!;
+        var started = Activator.CreateInstance(startedType, nonPublic: true)!;
+        SetProperty(startedType, started, "VideoId", "video-current");
+        SetProperty(startedType, started, "BattleId", "battle-current");
+        SetProperty(startedType, started, "Source", "CurrentNative");
+        SetProperty(startedType, started, "VideoRelativePath", "2026-07-15/battle-current.mp4");
+        SetProperty(startedType, started, "Width", 1920);
+        SetProperty(startedType, started, "Height", 1080);
+        SetProperty(startedType, started, "Fps", 60);
+        SetProperty(startedType, started, "Codec", "h264_videotoolbox");
+        SetProperty(startedType, started, "StartedAtUtc", DateTimeOffset.UtcNow);
+        Invoke(storeType, store, "SaveStart", new object?[] { started });
+
+        var finished = Activator.CreateInstance(finishedType, nonPublic: true)!;
+        SetProperty(finishedType, finished, "VideoId", "video-current");
+        SetProperty(finishedType, finished, "VideoRelativePath", "2026-07-15/battle-current.mp4");
+        SetProperty(finishedType, finished, "EndedAtUtc", DateTimeOffset.UtcNow);
+        SetProperty(finishedType, finished, "DurationMs", 1234L);
+        SetProperty(finishedType, finished, "CapturedFrames", 60);
+        SetProperty(finishedType, finished, "DroppedFrames", 0);
+        SetProperty(finishedType, finished, "FileSizeBytes", 4096L);
+        SetProperty(finishedType, finished, "Status", "COMPLETED");
+        Invoke(storeType, store, "SaveFinish", new object?[] { finished });
+
+        using var connection = new SqliteConnection($"Data Source={databasePath}");
+        connection.Open();
+        using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT battle_id, source, video_relative_path, fps, status
+            FROM combat_replay_videos
+            WHERE video_id = 'video-current';
+            """;
+        using var reader = command.ExecuteReader();
+        Assert(reader.Read(), "The current replay recording should create a database row.");
+        Assert(
+            reader.GetString(0) == "battle-current",
+            "The video row must keep the exact battle id."
+        );
+        Assert(
+            reader.GetString(1) == "CurrentNative",
+            "The video row must identify the current native replay source."
+        );
+        Assert(
+            reader.GetString(2).EndsWith("battle-current.mp4", StringComparison.Ordinal),
+            "The video row must retain the exported file path."
+        );
+        Assert(
+            reader.GetInt32(3) == 60,
+            "The video row must retain the resolved recording frame rate."
+        );
+        Assert(
+            reader.GetString(4) == "COMPLETED",
+            "Completed current replay videos must be listable by the Tauri query."
+        );
+    }
+    finally
+    {
+        Directory.Delete(root, recursive: true);
+    }
+}
+
 static object? Invoke(Type type, object instance, string methodName, object?[] args)
 {
     var method = type.GetMethod(
@@ -1457,6 +2330,12 @@ static object? GetProperty(Type type, object instance, string name)
     return property!.GetValue(instance);
 }
 
+static object GetRequiredProperty(Type type, object instance, string name)
+{
+    return GetProperty(type, instance, name)
+        ?? throw new InvalidOperationException($"Property returned null: {type.FullName}.{name}");
+}
+
 static object? GetFieldValue(Type type, object instance, string name)
 {
     var field = type.GetField(
@@ -1465,6 +2344,95 @@ static object? GetFieldValue(Type type, object instance, string name)
     );
     Assert(field != null, $"Field not found: {type.FullName}.{name}");
     return field!.GetValue(instance);
+}
+
+static object CreateSocketEffectSnapshotManifest(
+    IReadOnlyList<ReplaySocketFixture> playerSnapshots,
+    IReadOnlyList<ReplaySocketFixture> opponentSnapshots
+)
+{
+    var manifestType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleManifest");
+    var snapshotsType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleSnapshots");
+    var cardSetCaptureType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSetCapture");
+    var captureStatusType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureStatus");
+    var captureSourceType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCaptureSource");
+    var snapshots = Activator.CreateInstance(snapshotsType)!;
+    SetProperty(
+        snapshotsType,
+        snapshots,
+        "PlayerHand",
+        CreateCardSetCapture(
+            cardSetCaptureType,
+            captureStatusType,
+            captureSourceType,
+            "Captured",
+            "OpeningMessage",
+            CreateSocketSnapshotList(playerSnapshots)
+        )
+    );
+    SetProperty(
+        snapshotsType,
+        snapshots,
+        "OpponentHand",
+        CreateCardSetCapture(
+            cardSetCaptureType,
+            captureStatusType,
+            captureSourceType,
+            "Captured",
+            "LiveRetry",
+            CreateSocketSnapshotList(opponentSnapshots)
+        )
+    );
+
+    var manifest = Activator.CreateInstance(manifestType)!;
+    SetProperty(manifestType, manifest, "Snapshots", snapshots);
+    return manifest;
+}
+
+static object CreateSocketSnapshotList(IReadOnlyList<ReplaySocketFixture> fixtures)
+{
+    var snapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSnapshot");
+    var listType = typeof(List<>).MakeGenericType(snapshotType);
+    var list = Activator.CreateInstance(listType)!;
+    foreach (var fixture in fixtures)
+    {
+        var snapshot = Activator.CreateInstance(snapshotType)!;
+        SetProperty(snapshotType, snapshot, "InstanceId", fixture.InstanceId);
+        SetProperty(snapshotType, snapshot, "TemplateId", fixture.TemplateId);
+        SetProperty(
+            snapshotType,
+            snapshot,
+            "Type",
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.ECardType",
+                "BazaarGameShared",
+                "SocketEffect"
+            )
+        );
+        SetProperty(
+            snapshotType,
+            snapshot,
+            "Section",
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.EInventorySection",
+                "BazaarGameShared",
+                fixture.Section
+            )
+        );
+        SetProperty(
+            snapshotType,
+            snapshot,
+            "Socket",
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.EContainerSocketId",
+                "BazaarGameShared",
+                fixture.Socket
+            )
+        );
+        Invoke(listType, list, "Add", new[] { snapshot });
+    }
+
+    return list;
 }
 
 static object CreateSnapshotList(string instanceId, string templateId)
@@ -1545,6 +2513,8 @@ static object CreateManifestFixture(
     string playerName,
     string playerAccountId,
     int playerPrestige,
+    int playerIncome,
+    int playerGold,
     int playerVictories,
     string opponentName,
     string opponentHero,
@@ -1571,6 +2541,8 @@ static object CreateManifestFixture(
     SetProperty(participantsType, participants, "PlayerName", playerName);
     SetProperty(participantsType, participants, "PlayerAccountId", playerAccountId);
     SetProperty(participantsType, participants, "PlayerPrestige", playerPrestige);
+    SetProperty(participantsType, participants, "PlayerIncome", playerIncome);
+    SetProperty(participantsType, participants, "PlayerGold", playerGold);
     SetProperty(participantsType, participants, "PlayerVictories", playerVictories);
     SetProperty(participantsType, participants, "OpponentName", opponentName);
     SetProperty(participantsType, participants, "OpponentHero", opponentHero);
@@ -1604,14 +2576,6 @@ static object CreateManifestFixture(
     SetProperty(manifestType, manifest, "Outcome", outcome);
     SetProperty(manifestType, manifest, "Snapshots", snapshots);
     return manifest;
-}
-
-static int ReadSnapshotCount(Type recordType, object instance, string propertyName)
-{
-    return ((System.Collections.IEnumerable?)GetProperty(recordType, instance, propertyName))
-            ?.Cast<object>()
-            .Count()
-        ?? 0;
 }
 
 static object SingleBattleProjection(object uploadSnapshot)
@@ -1658,26 +2622,6 @@ static int GetInt32(SqliteConnection connection, string sql, string battleId)
     );
 }
 
-static bool ColumnExists(SqliteConnection connection, string tableName, string columnName)
-{
-    using var command = connection.CreateCommand();
-    command.CommandText = $"PRAGMA table_info({tableName});";
-    using var reader = command.ExecuteReader();
-    while (reader.Read())
-    {
-        if (
-            string.Equals(
-                reader.GetString(reader.GetOrdinal("name")),
-                columnName,
-                StringComparison.Ordinal
-            )
-        )
-            return true;
-    }
-
-    return false;
-}
-
 static void Assert(bool condition, string message)
 {
     if (!condition)
@@ -1689,7 +2633,10 @@ static object CreateGameSimMessage(
     uint day,
     uint hour,
     string? encounterId,
-    string? opponentName
+    string? opponentName,
+    int? playerLevel = null,
+    int? opponentLevel = null,
+    IReadOnlyList<ReplaySocketFixture>? socketEffects = null
 )
 {
     var gameSimType = RequireExternalType(
@@ -1726,6 +2673,27 @@ static object CreateGameSimMessage(
     SetField(simUpdateRunType, run, "Day", day);
     SetField(simUpdateRunType, run, "Hour", hour);
     SetField(gameSimType, gameSim, "Run", run);
+
+    SetGameSimPlayerLevel(gameSimType, gameSim, "Player", playerLevel);
+    SetGameSimPlayerLevel(gameSimType, gameSim, "Opponent", opponentLevel);
+    if (socketEffects != null)
+    {
+        foreach (var socketEffect in socketEffects)
+        {
+            AddGameSimEventToData(
+                gameSimType,
+                gameSim,
+                CreateCardSpawnEvent(
+                    socketEffect.InstanceId,
+                    socketEffect.TemplateId,
+                    "SocketEffect",
+                    socketEffect.CombatantId,
+                    socketEffect.Section,
+                    socketEffect.Socket
+                )
+            );
+        }
+    }
 
     var runState = Activator.CreateInstance(simUpdateRunStateType)!;
     SetField(
@@ -1783,6 +2751,318 @@ static object CreatePvpOpponent(Type simPvpOpponentType, Type loadoutType, strin
     )!;
 }
 
+static object CreateReplayStateManifest(
+    Type manifestType,
+    int day,
+    int hour,
+    int? playerLevel,
+    int? opponentLevel
+)
+{
+    var participantsType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleParticipants");
+    var participants = Activator.CreateInstance(participantsType)!;
+    SetProperty(participantsType, participants, "PlayerLevel", playerLevel);
+    SetProperty(participantsType, participants, "OpponentLevel", opponentLevel);
+
+    var manifest = Activator.CreateInstance(manifestType)!;
+    SetProperty(manifestType, manifest, "Day", day);
+    SetProperty(manifestType, manifest, "Hour", hour);
+    SetProperty(manifestType, manifest, "Participants", participants);
+    return manifest;
+}
+
+static object CreateCombatSequence(Type sequenceType, object spawnMessage, object despawnMessage)
+{
+    return Activator.CreateInstance(
+            sequenceType,
+            spawnMessage,
+            despawnMessage,
+            CreateCombatSimMessage()
+        ) ?? throw new InvalidOperationException("CombatSequenceMessages should be constructible.");
+}
+
+static void AssertSequenceSavedState(
+    object sequence,
+    uint spawnDay,
+    uint spawnHour,
+    int spawnPlayerLevel,
+    int spawnOpponentLevel,
+    uint despawnDay,
+    uint despawnHour,
+    int despawnPlayerLevel,
+    int despawnOpponentLevel,
+    string message
+)
+{
+    var sequenceType = sequence.GetType();
+    var spawnMessage = GetFieldValue(sequenceType, sequence, "SpawnMessage")!;
+    var despawnMessage = GetFieldValue(sequenceType, sequence, "DespawnMessage")!;
+    AssertReplaySavedState(
+        spawnMessage,
+        spawnDay,
+        spawnHour,
+        spawnPlayerLevel,
+        spawnOpponentLevel,
+        message
+    );
+    AssertReplaySavedState(
+        despawnMessage,
+        despawnDay,
+        despawnHour,
+        despawnPlayerLevel,
+        despawnOpponentLevel,
+        message
+    );
+}
+
+static void AssertReplaySavedState(
+    object netMessage,
+    uint expectedDay,
+    uint expectedHour,
+    int expectedPlayerLevel,
+    int expectedOpponentLevel,
+    string failureMessage
+)
+{
+    var gameSim = GetGameSimData(netMessage);
+    var gameSimType = gameSim.GetType();
+    var run = GetFieldValue(gameSimType, gameSim, "Run")!;
+    var runType = run.GetType();
+    Assert(
+        Equals(GetFieldValue(runType, run, "Day"), expectedDay)
+            && Equals(GetFieldValue(runType, run, "Hour"), expectedHour)
+            && ReadGameSimPlayerLevel(gameSim, "Player") == expectedPlayerLevel
+            && ReadGameSimPlayerLevel(gameSim, "Opponent") == expectedOpponentLevel,
+        failureMessage
+    );
+}
+
+static void AssertSocketEffectSpawnPreserved(object message, ReplaySocketFixture expected)
+{
+    var socketEvent = ReadGameSimEvents(message)
+        .SingleOrDefault(value =>
+            value.GetType().Name == "GameSimEventCardSpawned"
+            && string.Equals(
+                GetProperty(value.GetType(), value, "InstanceId")?.ToString(),
+                expected.InstanceId,
+                StringComparison.Ordinal
+            )
+        );
+    Assert(socketEvent != null, $"Socket-effect spawn should preserve {expected.InstanceId}.");
+    var eventType = socketEvent!.GetType();
+    Assert(
+        string.Equals(
+            GetProperty(eventType, socketEvent, "TemplateId")?.ToString(),
+            expected.TemplateId,
+            StringComparison.Ordinal
+        )
+            && string.Equals(
+                GetProperty(eventType, socketEvent, "Type")?.ToString(),
+                "SocketEffect",
+                StringComparison.Ordinal
+            )
+            && string.Equals(
+                GetProperty(eventType, socketEvent, "CombatantId")?.ToString(),
+                expected.CombatantId,
+                StringComparison.Ordinal
+            )
+            && string.Equals(
+                GetProperty(eventType, socketEvent, "Section")?.ToString(),
+                expected.Section,
+                StringComparison.Ordinal
+            )
+            && string.Equals(
+                GetProperty(eventType, socketEvent, "Socket")?.ToString(),
+                expected.Socket,
+                StringComparison.Ordinal
+            ),
+        $"Socket-effect spawn {expected.InstanceId} should preserve template, combatant, section, and socket."
+    );
+}
+
+static object GetGameSimData(object message)
+{
+    return GetProperty(message.GetType(), message, "Data")
+        ?? throw new InvalidOperationException("NetMessageGameSim should expose Data.");
+}
+
+static int? ReadGameSimPlayerLevel(object gameSim, string playerFieldName)
+{
+    var player = GetFieldValue(gameSim.GetType(), gameSim, playerFieldName)!;
+    var attributes = (System.Collections.IDictionary?)GetFieldValue(
+        player.GetType(),
+        player,
+        "Attributes"
+    );
+    var levelType = ParseEnum(
+        "BazaarGameShared.Domain.Core.Types.EPlayerAttributeType",
+        "BazaarGameShared",
+        "Level"
+    );
+    return attributes != null && attributes.Contains(levelType)
+        ? Convert.ToInt32(attributes[levelType])
+        : null;
+}
+
+static void SetGameSimPlayerLevel(
+    Type gameSimType,
+    object gameSim,
+    string playerFieldName,
+    int? level
+)
+{
+    if (!level.HasValue)
+        return;
+
+    var player = GetFieldValue(gameSimType, gameSim, playerFieldName)!;
+    var attributes = (System.Collections.IDictionary?)GetFieldValue(
+        player.GetType(),
+        player,
+        "Attributes"
+    );
+    Assert(attributes != null, "SimUpdatePlayer should expose an attributes dictionary.");
+    attributes![
+        ParseEnum(
+            "BazaarGameShared.Domain.Core.Types.EPlayerAttributeType",
+            "BazaarGameShared",
+            "Level"
+        )
+    ] = level.Value;
+}
+
+static object CreatePlayerInitializedEvent(string combatantId, string hero)
+{
+    var eventType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.GameSimEventPlayerInitialized",
+        "BazaarGameShared"
+    );
+    var value = Activator.CreateInstance(eventType)!;
+    SetField(
+        eventType,
+        value,
+        "CombatantId",
+        ParseEnum(
+            "BazaarGameShared.Domain.Core.Types.ECombatantId",
+            "BazaarGameShared",
+            combatantId
+        )
+    );
+    SetField(
+        eventType,
+        value,
+        "Hero",
+        ParseEnum("BazaarGameShared.Domain.Core.Types.EHero", "BazaarGameShared", hero)
+    );
+    return value;
+}
+
+static object CreateSocketsUnlockedEvent(string section, string socket)
+{
+    var eventType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.GameSimEventSocketsUnlocked",
+        "BazaarGameShared"
+    );
+    var socketType = RequireExternalType(
+        "BazaarGameShared.Domain.Core.Types.EContainerSocketId",
+        "BazaarGameShared"
+    );
+    var socketSetType = typeof(HashSet<>).MakeGenericType(socketType);
+    var socketSet = Activator.CreateInstance(socketSetType)!;
+    Invoke(socketSetType, socketSet, "Add", new[] { Enum.Parse(socketType, socket) });
+    return Activator.CreateInstance(
+            eventType,
+            socketSet,
+            (ushort)1,
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.EInventorySection",
+                "BazaarGameShared",
+                section
+            )
+        )
+        ?? throw new InvalidOperationException(
+            "GameSimEventSocketsUnlocked should be constructible."
+        );
+}
+
+static object CreateCardSpawnEvent(
+    string instanceId,
+    string templateId,
+    string cardType,
+    string combatantId,
+    string? section,
+    string? socket
+)
+{
+    var eventType = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.GameSimEventCardSpawned",
+        "BazaarGameShared"
+    );
+    return Activator.CreateInstance(
+            eventType,
+            instanceId,
+            templateId,
+            ParseEnum("BazaarGameShared.Domain.Core.Types.ECardType", "BazaarGameShared", cardType),
+            ParseEnum(
+                "BazaarGameShared.Domain.Core.Types.ECombatantId",
+                "BazaarGameShared",
+                combatantId
+            ),
+            section == null
+                ? null
+                : ParseEnum(
+                    "BazaarGameShared.Domain.Core.Types.EInventorySection",
+                    "BazaarGameShared",
+                    section
+                ),
+            socket == null
+                ? null
+                : ParseEnum(
+                    "BazaarGameShared.Domain.Core.Types.EContainerSocketId",
+                    "BazaarGameShared",
+                    socket
+                )
+        )
+        ?? throw new InvalidOperationException("GameSimEventCardSpawned should be constructible.");
+}
+
+static object CreateGameSimEventList(params object[] events)
+{
+    var eventInterface = RequireExternalType(
+        "BazaarGameShared.Infra.Messages.GameSimEvents.IGameSimEvent",
+        "BazaarGameShared"
+    );
+    var listType = typeof(List<>).MakeGenericType(eventInterface);
+    var list = (System.Collections.IList?)Activator.CreateInstance(listType);
+    Assert(list != null, "GameSim event list should be constructible.");
+    foreach (var value in events)
+        list!.Add(value);
+    return list!;
+}
+
+static void AddGameSimEvent(object message, object gameSimEvent)
+{
+    var gameSim = GetGameSimData(message);
+    AddGameSimEventToData(gameSim.GetType(), gameSim, gameSimEvent);
+}
+
+static void AddGameSimEventToData(Type gameSimType, object gameSim, object gameSimEvent)
+{
+    var events = (System.Collections.IList?)GetFieldValue(gameSimType, gameSim, "Events");
+    Assert(events != null, "GameSim should expose an event list.");
+    events!.Add(gameSimEvent);
+}
+
+static List<object> ReadGameSimEvents(object message)
+{
+    var gameSim = GetGameSimData(message);
+    return AsObjects(GetFieldValue(gameSim.GetType(), gameSim, "Events"));
+}
+
+static List<object> AsObjects(object? values)
+{
+    return ((System.Collections.IEnumerable?)values)?.Cast<object>().ToList() ?? [];
+}
+
 static Type RequireExternalType(string fullName, string assemblyName)
 {
     return Type.GetType($"{fullName}, {assemblyName}")
@@ -1804,6 +3084,14 @@ static void SetField(Type type, object instance, string name, object? value)
     Assert(field != null, $"Field not found: {type.FullName}.{name}");
     field!.SetValue(instance, value);
 }
+
+file sealed record ReplaySocketFixture(
+    string InstanceId,
+    string TemplateId,
+    string CombatantId,
+    string Section,
+    string Socket
+);
 
 file sealed class QueuePersistenceHarness
 {

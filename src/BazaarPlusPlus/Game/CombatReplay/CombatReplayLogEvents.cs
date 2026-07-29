@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
 
 namespace BazaarPlusPlus.Game.CombatReplay;
@@ -108,6 +106,55 @@ internal static class CombatReplayLogEvents
         BppLogFeatureScope.CombatReplay,
         "combat_replay.capture.failed",
         [CaptureFailedRunId, CaptureFailedReasonCode]
+    );
+
+    internal static readonly BppLogFieldDefinition CurrentRecordingUiPhase = Public(
+        0,
+        "phase",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition CurrentRecordingUiSnapshotVisible = Public(
+        1,
+        "snapshot_visible",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition CurrentRecordingUiLayoutAvailable = Public(
+        2,
+        "layout_available",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition CurrentRecordingUiLayoutReasonCode = Public(
+        3,
+        "layout_reason_code",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition CurrentRecordingUiCloneActive = Public(
+        4,
+        "clone_active",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition CurrentRecordingUiNativeReplayBound = Public(
+        5,
+        "native_replay_bound",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition CurrentRecordingUiIconAvailable = Public(
+        6,
+        "icon_available",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogEventDefinition CurrentRecordingUiObserved = new(
+        BppLogFeatureScope.CombatReplay,
+        "combat_replay.current_recording_ui.observed",
+        [
+            CurrentRecordingUiPhase,
+            CurrentRecordingUiSnapshotVisible,
+            CurrentRecordingUiLayoutAvailable,
+            CurrentRecordingUiLayoutReasonCode,
+            CurrentRecordingUiCloneActive,
+            CurrentRecordingUiNativeReplayBound,
+            CurrentRecordingUiIconAvailable,
+        ]
     );
 
     internal static readonly BppLogFieldDefinition RequestRejectedSource = Public(

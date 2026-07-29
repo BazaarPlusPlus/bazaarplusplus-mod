@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using System.Globalization;
 using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Game.Settings;

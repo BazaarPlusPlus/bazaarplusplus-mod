@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Core.GameState;
 
 internal enum EncounterProbeFailureReason

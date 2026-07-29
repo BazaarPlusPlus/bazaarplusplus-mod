@@ -1,9 +1,6 @@
 #nullable enable
-using System;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
-using System.Threading;
-using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using UnityEngine;
@@ -114,6 +111,7 @@ internal static class NativeCardPreviewRuntime
             var raw = method.Invoke(card, new object[] { template, false, instance, token });
             if (raw is Task task)
                 await task;
+            token.ThrowIfCancellationRequested();
             return null;
         }
         catch (OperationCanceledException)

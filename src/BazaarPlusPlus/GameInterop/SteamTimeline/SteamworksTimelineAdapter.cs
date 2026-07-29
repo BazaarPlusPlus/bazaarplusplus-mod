@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using Steamworks;
 
 namespace BazaarPlusPlus.GameInterop.SteamTimeline;

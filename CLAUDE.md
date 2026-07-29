@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Operating rules for AI agents working in this repository (`AGENTS.md` is a symlink to this file). Process rules live here; durable knowledge in `docs/MEMORY.md`, structure in `docs/ARCHITECTURE.md`.
 
 ## Build & Test Commands
 
@@ -22,8 +22,8 @@ dotnet test tests\Architecture.Tests\Architecture.Tests.csproj
 # Run an exe-runner test project (no Microsoft.NET.Test.Sdk)
 dotnet run --project tests\ChoiceScreenPedestalResolver.Tests\ChoiceScreenPedestalResolver.Tests.csproj
 
-# Format
-csharpier format .
+# Format with the repo-pinned CSharpier version
+./run.sh format
 ```
 
 `run.sh` works on macOS and Windows (Git Bash). Subcommands:
@@ -31,8 +31,11 @@ csharpier format .
 - `./run.sh build [--with-bazaaragent] [--fast]` — Debug build (`--fast` skips NuGet restore)
 - `./run.sh publish [--with-bazaaragent] [-p:Name=Value ...]` — production build: fetch remote embedded data, run seed gates, then `-t:BuildAll` (Debug + Release) with installer packaging
 - `./run.sh fetch-data [-p:Name=Value ...]` — refresh remote embedded data
+- `./run.sh restore-locks` — refresh committed NuGet lock files for the six published assemblies
+- `./run.sh restore-locked` — validate published-assembly restores in locked mode without updating lock files
 - `./run.sh test` — run all test projects under `tests/`
-- `./run.sh format` — csharpier format
+- `./run.sh format` — restore the repo-pinned CSharpier tool and format the source tree
+- `./run.sh format-check` — restore the repo-pinned CSharpier tool and fail on unformatted files
 - `./run.sh decompile [DllName]` — decompile a single game DLL (default: Assembly-CSharp)
 - `./run.sh decompile-all` — decompile all tracked game DLLs
 - `./run.sh decompile-ptr [DllName]` — decompile a single PTR game DLL into `decompiled-vptr/`
@@ -40,7 +43,13 @@ csharpier format .
 - `./run.sh snapshot-managed` — archive the installed Managed dir under `game-libs/`
 - `./run.sh build-matrix` — build the source tree against every archived Managed snapshot
 
+When building from an isolated ticket worktree, explicitly pass `-p:BPPInstallerSourcePath="<absolute-path-to>/bazaarplusplus-installer/src-tauri/resources"` to projects that reference the main mod. The default sibling installer path does not exist beside ticket worktrees.
+
+When running `./run.sh test` (full suite) from an isolated worktree, `run.sh` does not forward `-p:` properties, and injecting `BPPInstallerSourcePath` via environment variable also has no effect — create a `bazaarplusplus-installer` symlink in the worktree's parent directory pointing at the real installer repo. Each new worktree also needs `ln -sfn <main-checkout>/decompiled <worktree>/decompiled` (`decompiled/` is a gitignored local artifact; `NativeCardPreviewCompatibility.Tests` hard-depends on it). Missing either link surfaces as MSB3030 or a missing decompiled source file — easy to misread as a code regression.
+
 Test projects under `tests/` are split per-feature. Some use xUnit + `Microsoft.NET.Test.Sdk` (run via `dotnet test`), others are executable (run via `dotnet run --project`). Check whether the csproj has `Microsoft.NET.Test.Sdk` to determine which.
+
+When changing a direct dependency, edit `Directory.Packages.props`, run `./run.sh restore-locks`, and review the six changed `src/**/packages.lock.json` files with the version change. Do not generate lock files for test projects. Before committing, run `./run.sh restore-locked` so dependency graph drift fails locally, then run the standard build and test commands.
 
 ## Logs & Debugging
 
@@ -48,52 +57,16 @@ This mod is a **BepInEx 5.x plugin** (`BepInEx.Core` 5.\*). At runtime, BepInEx 
 
 For runtime validation that needs launching the game, always launch The Bazaar through Steam (App ID 1617400) so Steam runtime state is present. On macOS: `open "steam://run/1617400"`. On Windows: `start steam://run/1617400`. Do not launch `TheBazaar.app` directly or use `run_bepinex.sh` on macOS — these bypass Steam runtime and cause subtle failures.
 
+BazaarAgent replay smoke has three traps: `POST /v1/replay/record` accepts only the raw bytes of `GhostBattlePayloads/*.ghost.mpack.gz` (`CombatReplays/*.payload.mpack.gz` fails with missing battle manifest); `POST /v1/replay/continue` must send an empty body (`curl --data ''`, else HttpListener returns 411 Length Required); terminal replay log events lag the menu return by several seconds — poll, do not assert immediately. Before smoking, check the timestamp on `BepInEx/plugins/BazaarPlusPlus.version` so the game is running this build.
+
 ## Architecture
 
-**Four assemblies** ship unconditionally as the mod:
+Structure lives in `docs/ARCHITECTURE.md`; durable knowledge in `docs/MEMORY.md` (load first); vocabulary in `CONTEXT.md`; rationale in `docs/adr/`. This section keeps only the layering rules — traps, not maps:
 
-- `BazaarPlusPlus.dll` — the main BepInEx plugin; references game DLLs, Unity, BepInEx
-- `BazaarPlusPlus.ModApi.dll` — HTTP client + DTOs for the cloud backend; zero game/Unity/BepInEx references
-- `BazaarPlusPlus.Storage.dll` — SQLite persistence layer; zero game/Unity/BepInEx references
-- `BazaarPlusPlus.Localization.dll` — localization engine; zero game/Unity/BepInEx references
-
-Two BazaarAgent assemblies ship only when `./run.sh build --with-bazaaragent` or `./run.sh publish --with-bazaaragent` is used:
-
-- `BazaarPlusPlus.BazaarAgent.dll` — pure HTTP transport, DTO, validation, queue, and runtime controller; zero game/Unity/BepInEx references
-- `BazaarPlusPlus.BazaarAgentHost.dll` — optional BepInEx host bridge; installing the dll starts the fixed `127.0.0.1:47900` listener automatically
-
-All six projects live under `src/<AssemblyName>/`, each in its own directory so its default compile cone is its own source (no shared root-level globbing). The main plugin is `src/BazaarPlusPlus/` (`Plugin.cs`, `BppComposition.cs`, and the `Core/`, `Game/`, `GameInterop/`, `Infrastructure/`, `Patches/` layers); the five child assemblies are `src/BazaarPlusPlus.ModApi/`, `src/BazaarPlusPlus.Storage/`, `src/BazaarPlusPlus.Localization/`, `src/BazaarPlusPlus.BazaarAgent/`, and `src/BazaarPlusPlus.BazaarAgentHost/`. The root `Directory.Build.props` only carries the shared `BppVersion` and code-style flag; each project gets its own `obj/`/`bin/` under its own directory.
-
-**Plugin lifecycle** — `Plugin.cs` (BepInEx entry) → `BppComposition` (the manual composition root, no DI container). BppComposition wires:
-
-1. **Features** (`IBppFeature`) — non-Unity logic modules registered via `BppFeatureRegistry`. Started/stopped with the plugin.
-2. **Mountables** (`IBppMountable`) — Unity-aware components attached to the plugin's `GameObject` via `BppMountableRegistry`. Most use the generic `ComponentMount<T>` adapter.
-3. **Settings dock entries** (`ISettingsDockEntry`) — in-game settings UI entries registered via `SettingsDockEntryRegistry`.
-
-**Layer boundaries:**
-
-- `Core/` — pure abstractions (config, event bus, paths, runtime interfaces). Zero game DLL references.
-- `GameInterop/` — game DLL coupling layer (`BppClientCacheBridge`, `GameStateProbe`, `RunContextStore`, `IRunContext`, game-typed events like `CombatSimObserved`/`NetMessageObserved`, shared native adapters like encounter reads, static card data, card preview prefabs, hero portrait assets, and `EncounterPortraits/` — merchant/trainer encounter portrait sprite provider, `LiveCards/` — live-run card snapshot reads (used by LiveBuildPanel), and `BazaarAgent/` — the public cross-plugin facade (BazaarAgentGameBridge / IBazaarAgentGameProbe) consumed by the separate BazaarAgentHost plugin).
-- `Game/` — feature implementations organized by subdirectory (CombatReplay, HistoryPanel, RunLogging, Screenshots, Tooltips, etc.).
-- `Patches/` — Harmony patches, organized by feature area. `BppPatchHost` provides the static service locator that patches use to reach `IBppServices`.
-- `Infrastructure/` — cross-cutting utilities (logging, fonts, UI design tokens).
-- `Localization/` — zero-dependency localization engine extracted from `Game/Settings`. The `L` facade is installed at plugin startup with `L.Install(ILanguageProvider, ILocaleModeProvider)`, then owns string lookup, locale switching, and language-code / Chinese-mode resolution. Runtime providers live at the game/plugin edge (`GameLanguageProvider`, `ChineseLocaleModeProvider`); the localization assembly itself stays free of game, Unity, and BepInEx references.
-
-**Architecture layering rules:**
-
-- Put reusable adapters over The Bazaar/Unity runtime surfaces in `GameInterop/`: `AppState`/`Data` status reads, `ClientCache` reflection, static card data, native card-preview prefabs/reflection, shared game asset lookup, and game-typed event payloads.
-- Keep feature workflows, UI state, product policy, filtering/classification rules, upload decisions, and storage orchestration in `Game/`. Do not move logic into `GameInterop/` only because it mentions game enums or DTOs.
+- Put reusable adapters over The Bazaar/Unity runtime surfaces in `GameInterop/`. Keep feature workflows, UI state, product policy, filtering/classification rules, upload decisions, and storage orchestration in `Game/`. Do not move logic into `GameInterop/` only because it mentions game enums or DTOs.
 - If two features need the same runtime/prefab/static-data behavior, extract the adapter to `GameInterop/<Concept>/` and have both features consume that seam. Do not make one feature import another feature's internal implementation only to reuse a game-runtime adapter.
-- Patches may target feature services through `BppPatchHost`, but shared Harmony reflection helpers or native runtime adapters should live in `GameInterop/` or `Infrastructure/`, not inside a feature directory.
+- Patches may target feature services through `BppPatchHost` (the static service locator; never constructor injection), but shared Harmony reflection helpers or native runtime adapters live in `GameInterop/` or `Infrastructure/`, not inside a feature directory.
 - Add or extend architecture tests when establishing a new boundary that the compiler cannot enforce.
-
-**Key patterns:**
-
-- Game assemblies are publicized at build time (`<PublicizeAll>true</PublicizeAll>` via Krafs.Publicizer), so all `internal` game types/members are accessible.
-- `decompiled/` contains ILSpy output of game DLLs — read-only reference, never edited.
-- Harmony patches reach mod services through the static `BppPatchHost` (installed once at startup), not through constructor injection.
-- The event bus (`IBppEventBus`) is in-memory pub/sub used for decoupling features (combat frame events, run lifecycle changes, replay persistence signals).
-- `IEncounterStateProbe` is a pull-based status query ("where is the player now"), deliberately not a timeline tracker (see ADR-0001).
 
 # Project Rules
 
@@ -108,9 +81,12 @@ All six projects live under `src/<AssemblyName>/`, each in its own directory so 
 - When replacing a subsystem or migrating to a prototype, remove the old implementation entirely and ship only the new version in-place — do not leave the old path as a fallback or stand up a merged build chain that runs both
 - Do not build standalone probe/diagnostic scaffolding to validate a hypothesis — add a temporary probe on the main path (the user builds + reloads to verify), or drop it and record it as a to-verify item in the design doc, then ship
 - When CJK text renders as tofu boxes, route the text to a CJK-capable font; do not "fix" it by editing the copy
+- When a degradation event is categorized, include the category field in its `BppLogStormPolicy` key; otherwise one category's failure can suppress later categories' logs during the storm window
 - Touch only the named target of a delete/change request; do not opportunistically widen scope or adjust unrelated config
 - Reuse the game's native UI components and the codebase's established prior-art patterns  instead of hand-rolling a new render/upload chain
+- After invoking a native Unity `Button.onClick` programmatically, verify the expected game-state transition before treating the action as successful — native listeners may return silently through interaction gates such as `AllowInteraction` without throwing
 - On completion, follow the settled wrap-up: review your own diff, commit, merge the working branch to `master`, push, then delete branches already merged; do not commit before reviewing or when not asked
+- Format every Git commit message as Conventional Commits: `<type>(<scope>): <description>`.
 - Keep commits scoped: when `./run.sh format`/csharpier reformats files outside your change.
 - A long-running automation task must self-heal — auto-relaunch the game process on crash/exit and continue until the goal is met, rather than stopping on the first failure
 - Never build mod file-write paths from `Application.dataPath` — on macOS its parent is the `.app` bundle root, and unsealed writes there break `codesign` re-signing and the trampoline repair (blocking `./run.sh build` after every game update). Anchor writes on `BepInEx.Paths.GameRootPath` / the `<GameRoot>/BazaarPlusPlusV4/` data dir, which BepInEx special-cases on macOS to the directory containing the `.app`
@@ -129,7 +105,7 @@ The five canonical triage labels are used as-is: `needs-triage`, `needs-info`, `
 
 Single-context: vocabulary in `CONTEXT.md` at the root, decisions in `docs/adr/`. See `docs/agents/domain.md`. The full documentation map is `docs/README.md`.
 
-Durable project knowledge lives in `docs/MEMORY.md` (load first) with detail in `docs/ARCHITECTURE.md` (the structure/overview layer). `docs/archive/` is historical, never current. Task plans, feature requests, and bugs are GitHub issues (see Issue tracker above) — not repo docs; `docs/drafts/` is the write buffer for knowledge documents only (design records, root-cause analyses, decision analyses), swept by periodic consolidation runs. Day-to-day edit policy: `docs/ARCHITECTURE.md` and `docs/adr/` may be corrected anytime; `MEMORY.md` and `docs/README.md` are curated ONLY by consolidation runs — new knowledge goes to `drafts/`, not into them directly. Rationale lives only in `docs/adr/`; elsewhere link, don't restate. Keep `MEMORY.md` under 200 lines: merge, don't append. Boundaries: AGENTS.md/CLAUDE.md = process, MEMORY.md = knowledge, ARCHITECTURE.md = structure, issues = work.
+Durable project knowledge lives in `docs/MEMORY.md` (load first) with detail in `docs/ARCHITECTURE.md` (the structure/overview layer); historical working documents live only in git history. Task plans, feature requests, and bugs are GitHub issues (see Issue tracker above) — not repo docs; `docs/drafts/` is the temporary write buffer for knowledge documents only (design records, root-cause analyses, decision analyses). Consolidation promotes durable outcomes into MEMORY/ADR/ARCHITECTURE, moves actionable work to issues, and deletes the spent draft. Day-to-day edit policy: `docs/ARCHITECTURE.md` and `docs/adr/` may be corrected anytime; `MEMORY.md` and `docs/README.md` are curated ONLY by consolidation runs — new knowledge goes to `drafts/`, not into them directly. Rationale lives only in `docs/adr/`; elsewhere link, don't restate. Keep `MEMORY.md` under 200 lines: merge, don't append. Boundaries: AGENTS.md/CLAUDE.md = process, MEMORY.md = knowledge, ARCHITECTURE.md = structure, issues = work.
 
 # Rules Hygiene
 
@@ -160,4 +136,3 @@ Rules emerge from validated patterns, not one-off observations. The workflow is:
 1. Agent notes a pattern during a session
 2. Team validates the pattern in code review
 3. A dedicated commit adds the rule with context on why it exists
-

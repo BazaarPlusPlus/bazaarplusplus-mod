@@ -1,7 +1,7 @@
 #nullable enable
-using System.Text;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 
@@ -27,11 +27,30 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet ItemsTabText = new("Items", "物品", "物品");
     private static readonly LocalizedTextSet SkillsTabText = new("Skills", "技能", "技能");
     private static readonly LocalizedTextSet CloseText = new("Close", "关闭", "關閉");
-    private static readonly LocalizedTextSet SearchLabelText = new("Search", "搜索", "搜尋");
     private static readonly LocalizedTextSet SearchTooltipText = new(
         "Search names, descriptions, internal ids, tags, and related effects.",
         "搜索名称、描述、内部 ID、标签和相关效果。",
         "搜尋名稱、描述、內部 ID、標籤和相關效果。"
+    );
+    private static readonly LocalizedTextSet SearchButtonTooltipText = new(
+        "Open search",
+        "打开搜索",
+        "開啟搜尋"
+    );
+    private static readonly LocalizedTextSet CloseSearchTooltipText = new(
+        "Close search",
+        "关闭搜索",
+        "關閉搜尋"
+    );
+    private static readonly LocalizedTextSet ItemSearchPlaceholderText = new(
+        "Search items",
+        "搜索物品",
+        "搜尋物品"
+    );
+    private static readonly LocalizedTextSet SkillSearchPlaceholderText = new(
+        "Search skills",
+        "搜索技能",
+        "搜尋技能"
     );
 
     private static readonly LocalizedTextSet HeroHeaderText = new("Hero", "英雄", "英雄");
@@ -76,77 +95,6 @@ internal static class CollectionPanelText
     private static readonly LocalizedTextSet SortSizeText = new("Size", "尺寸", "尺寸");
     private static readonly LocalizedTextSet MerchantHeaderText = new("Merchant", "商人", "商人");
     private static readonly LocalizedTextSet TrainerHeaderText = new("Trainer", "训练师", "訓練師");
-    private static readonly LocalizedTextSet EncounterDayTierSuffixText = new(
-        "(up to {0})",
-        "（最高{0}）",
-        "（最高{0}）"
-    );
-    private static readonly LocalizedTextSet EncounterTierExactText = new(
-        "({0})",
-        "（{0}）",
-        "（{0}）"
-    );
-    private static readonly LocalizedTextSet LevelUpMaxHealthText = new(
-        "+ {0} Max Health",
-        "+ {0} 生命上限",
-        "+ {0} 生命上限"
-    );
-    private static readonly LocalizedTextSet LevelUpRandomPoolText = new(
-        "{0}× random reward ({1} options)",
-        "随机奖励 ×{0}（{1} 个选项）",
-        "隨機獎勵 ×{0}（{1} 個選項）"
-    );
-    private static readonly LocalizedTextSet LevelUpRandomPoolSingleText = new(
-        "Random reward ({0} options)",
-        "随机奖励（{0} 个选项）",
-        "隨機獎勵（{0} 個選項）"
-    );
-    private static readonly LocalizedTextSet LevelUpOneOfText = new(
-        "Choose one:",
-        "选择其一：",
-        "選擇其一："
-    );
-    private static readonly LocalizedTextSet OutcomesHeaderText = new(
-        "Possible outcomes:",
-        "随机结果：",
-        "隨機結果："
-    );
-    private static readonly LocalizedTextSet OutcomeCombatPoolText = new(
-        "Fight a monster ({0} possible)",
-        "战斗：随机怪物（{0} 种）",
-        "戰鬥：隨機怪物（{0} 種）"
-    );
-    private static readonly LocalizedTextSet OutcomeRandomItemText = new(
-        "Random item",
-        "随机物品",
-        "隨機物品"
-    );
-    private static readonly LocalizedTextSet OutcomeRandomSkillText = new(
-        "Random skill",
-        "随机技能",
-        "隨機技能"
-    );
-    private static readonly LocalizedTextSet OutcomeRandomRewardText = new(
-        "Random reward",
-        "随机奖励",
-        "隨機獎勵"
-    );
-    private static readonly LocalizedTextSet OutcomeSubPoolText = new(
-        "one of {0}:",
-        "以下 {0} 种随机其一：",
-        "以下 {0} 種隨機其一："
-    );
-    private static readonly LocalizedTextSet OutcomeGainSkillText = new(
-        "Gain skill: {0}",
-        "获得技能：{0}",
-        "獲得技能：{0}"
-    );
-    private static readonly LocalizedTextSet LevelUpBoardSlotsText = new(
-        "+ {0} board slots",
-        "+ {0} 个摊位格子",
-        "+ {0} 個攤位格子"
-    );
-
     private static readonly LocalizedTextSet CatalogLoadingText = new(
         "Loading card data...",
         "正在加载卡牌数据...",
@@ -178,9 +126,16 @@ internal static class CollectionPanelText
 
     internal static string Close() => Resolve(CloseText);
 
-    internal static string SearchLabel() => Resolve(SearchLabelText);
-
     internal static string SearchTooltip() => Resolve(SearchTooltipText);
+
+    internal static string SearchButtonTooltip() => Resolve(SearchButtonTooltipText);
+
+    internal static string CloseSearchTooltip() => Resolve(CloseSearchTooltipText);
+
+    internal static string SearchPlaceholder(ECardType activeType) =>
+        activeType == ECardType.Skill
+            ? Resolve(SkillSearchPlaceholderText)
+            : Resolve(ItemSearchPlaceholderText);
 
     internal static string HeroHeader() => Resolve(HeroHeaderText);
 
@@ -219,97 +174,6 @@ internal static class CollectionPanelText
 
     internal static string SourceHeader(ECardType activeType) =>
         activeType == ECardType.Skill ? Resolve(TrainerHeaderText) : Resolve(MerchantHeaderText);
-
-    internal static string EncounterDayTierSuffix(ETier tier) =>
-        string.Format(Resolve(EncounterDayTierSuffixText), Tier(tier));
-
-    internal static string EncounterTierExact(ETier tier) =>
-        string.Format(Resolve(EncounterTierExactText), Tier(tier));
-
-    internal static string LevelUpMaxHealth(int amount) =>
-        string.Format(Resolve(LevelUpMaxHealthText), amount);
-
-    internal static string LevelUpRandomPool(int count, int optionCount) =>
-        string.Format(Resolve(LevelUpRandomPoolText), count, optionCount);
-
-    internal static string LevelUpRandomPoolSingle(int optionCount) =>
-        string.Format(Resolve(LevelUpRandomPoolSingleText), optionCount);
-
-    internal static string LevelUpOneOf() => Resolve(LevelUpOneOfText);
-
-    internal static string OutcomesHeader() => Resolve(OutcomesHeaderText);
-
-    internal static string OutcomeCombatPool(int count) =>
-        string.Format(Resolve(OutcomeCombatPoolText), count);
-
-    internal static string OutcomeRandomItem() => Resolve(OutcomeRandomItemText);
-
-    internal static string OutcomeRandomSkill() => Resolve(OutcomeRandomSkillText);
-
-    internal static string OutcomeRandomReward() => Resolve(OutcomeRandomRewardText);
-
-    internal static string OutcomeSubPool(int count) =>
-        string.Format(Resolve(OutcomeSubPoolText), count);
-
-    internal static string OutcomeGainSkill(string skillName) =>
-        string.Format(Resolve(OutcomeGainSkillText), skillName);
-
-    internal static string LevelUpBoardSlots(int count) =>
-        string.Format(Resolve(LevelUpBoardSlotsText), count);
-
-    internal static string JoinTooltipLabel(string label, string detail) =>
-        LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode)
-            ? $"{label}：{detail}"
-            : $"{label}: {detail}";
-
-    internal static string JoinColoredTooltipLabel(string label, string detail, string color) =>
-        LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode)
-            ? $"<color={color}>{label}：</color>{detail}"
-            : $"<color={color}>{label}:</color> {detail}";
-
-    internal static string NormalizeRewardSpacing(string text)
-    {
-        if (string.IsNullOrEmpty(text))
-            return text;
-
-        var needsChange = false;
-        for (var index = 0; index + 1 < text.Length; index++)
-        {
-            if (NeedsSpaceAfterPlus(text, index))
-            {
-                needsChange = true;
-                break;
-            }
-        }
-
-        if (!needsChange)
-            return text;
-
-        var builder = new StringBuilder(text.Length + 4);
-        for (var index = 0; index < text.Length; index++)
-        {
-            builder.Append(text[index]);
-            if (NeedsSpaceAfterPlus(text, index))
-                builder.Append(' ');
-        }
-        return builder.ToString();
-    }
-
-    private static bool NeedsSpaceAfterPlus(string text, int plusIndex)
-    {
-        if (
-            plusIndex < 0
-            || plusIndex + 1 >= text.Length
-            || text[plusIndex] != '+'
-            || !char.IsDigit(text[plusIndex + 1])
-        )
-            return false;
-
-        var cursor = plusIndex + 2;
-        while (cursor < text.Length && char.IsDigit(text[cursor]))
-            cursor++;
-        return cursor < text.Length && char.IsWhiteSpace(text[cursor]);
-    }
 
     internal static string CatalogLoading() => Resolve(CatalogLoadingText);
 
@@ -354,8 +218,12 @@ internal static class CollectionPanelText
     // Tag labels intentionally have no entry here: chips resolve through the game's native
     // typography (GameInterop.TagTypography.NativeTagTypography), never a mod-side dictionary.
 
-    internal static string Hero(EHero hero) =>
-        hero switch
+    internal static string Hero(EHero hero)
+    {
+        if (TheDragonsHeroIdentity.IsTheDragons(hero))
+            return TheDragonsHeroIdentity.ResolveDisplayName(hero);
+
+        return hero switch
         {
             EHero.Common => FormatSimple("Common", "通用", "通用"),
             EHero.Vanessa => FormatSimple("Vanessa", "Vanessa", "Vanessa"),
@@ -367,6 +235,7 @@ internal static class CollectionPanelText
             EHero.Stelle => FormatSimple("Stelle", "Stelle", "Stelle"),
             _ => hero.ToString(),
         };
+    }
 
     internal static string MatchCount(int count)
     {

@@ -1,15 +1,11 @@
 #nullable enable
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using BazaarPlusPlus.Core.Events;
+using System.Collections.Concurrent;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay.Audio;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Infrastructure;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
@@ -28,13 +24,30 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     private List<string>? _activeAudioWavPaths;
     private string? _activeFfmpegExecutable;
     private ReplayVideoAudioMuxer? _muxer;
-    private readonly ReplayVideoRecordingLifecycle _operations = new();
+    private ReplayVideoRecordingLifecycle _operations = null!;
     private ReplayVideoRecordingOperation? _activeOperation;
+    private PreparedCurrentReplayRecording? _preparedCurrentReplay;
+    private readonly ConcurrentQueue<CombatReplayVideoRecordingCompleted> _completionEvents = new();
+    private readonly object _availabilitySync = new();
+    private CurrentReplayRecorderAvailability _currentReplayAvailability = new(
+        CurrentReplayRecorderAvailabilityPhase.Unavailable,
+        "Video recorder is unavailable."
+    );
+    private Task? _availabilityTask;
+    private int _availabilityGeneration;
+    private ReplayVideoCaptureSettings _availabilitySettings;
+    private string? _availabilityFfmpegExecutable;
+    private string? _availabilityVideoDirectory;
     private ReplayVideoAudioStatus _activeAudioStatus = ReplayVideoAudioStatus.Silent;
     private ReplayVideoMetadataStatus _activeMetadataStatus = ReplayVideoMetadataStatus.Unavailable;
     private ReplayVideoRecordingReasonCode? _activeDegradationReason;
     private Exception? _activeDegradationException;
     private Exception? _metadataInitializationException;
+
+    private void Awake()
+    {
+        _operations = new ReplayVideoRecordingLifecycle(null, OnOperationCompleted);
+    }
 
     public void Initialize(IBppServices services)
     {
@@ -60,6 +73,272 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         // and could not subscribe. Now that services are available, ensure we are subscribed.
         if (isActiveAndEnabled)
             EnsureEventSubscriptions();
+    }
+
+    private void Update()
+    {
+        var eventBus = _services?.EventBus;
+        if (eventBus == null)
+            return;
+
+        while (_completionEvents.TryDequeue(out var completed))
+            eventBus.Publish(completed);
+    }
+
+    internal CurrentReplayRecorderAvailability PrepareCurrentReplayRecordingAvailability()
+    {
+        var services = _services;
+        if (services == null || _metadataStore == null)
+        {
+            return SetAvailability(
+                CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                "Video database is unavailable."
+            );
+        }
+
+        if (!SystemInfo.supportsAsyncGPUReadback)
+        {
+            return SetAvailability(
+                CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                "This device does not support asynchronous video capture."
+            );
+        }
+
+        var videoDirectory = services.Paths.CombatReplayVideoDirectoryPath;
+        if (string.IsNullOrWhiteSpace(videoDirectory))
+        {
+            return SetAvailability(
+                CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                "Video output directory is unavailable."
+            );
+        }
+
+        if (!ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out var settings))
+        {
+            return SetAvailability(
+                CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                "The current game resolution cannot be recorded."
+            );
+        }
+
+        lock (_availabilitySync)
+        {
+            if (
+                _currentReplayAvailability.IsReady
+                && _availabilitySettings == settings
+                && string.Equals(
+                    _availabilityVideoDirectory,
+                    videoDirectory,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                return _currentReplayAvailability;
+            }
+
+            if (_availabilityTask is { IsCompleted: false } && _availabilitySettings == settings)
+                return _currentReplayAvailability;
+
+            _availabilitySettings = settings;
+            _availabilityVideoDirectory = videoDirectory;
+            _availabilityFfmpegExecutable = null;
+            _currentReplayAvailability = new CurrentReplayRecorderAvailability(
+                CurrentReplayRecorderAvailabilityPhase.Preparing,
+                "Preparing the video recorder."
+            );
+            var generation = ++_availabilityGeneration;
+            var pluginsDirectory = services.Paths.PluginsDirectoryPath;
+            _availabilityTask = Task.Run(() =>
+            {
+                try
+                {
+                    var ffmpeg = FfmpegLocator.Resolve(pluginsDirectory);
+                    if (string.IsNullOrWhiteSpace(ffmpeg))
+                    {
+                        SetAvailabilityIfCurrent(
+                            generation,
+                            CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                            "FFmpeg is unavailable."
+                        );
+                        return;
+                    }
+
+                    FfmpegVideoEncoderSelector.Prewarm(
+                        ffmpeg,
+                        videoDirectory,
+                        settings.Width,
+                        settings.Height,
+                        settings.Fps
+                    );
+                    lock (_availabilitySync)
+                    {
+                        if (
+                            generation != _availabilityGeneration
+                            || _availabilitySettings != settings
+                            || !string.Equals(
+                                _availabilityVideoDirectory,
+                                videoDirectory,
+                                StringComparison.Ordinal
+                            )
+                        )
+                        {
+                            return;
+                        }
+
+                        _availabilityFfmpegExecutable = ffmpeg;
+                        _currentReplayAvailability = new CurrentReplayRecorderAvailability(
+                            CurrentReplayRecorderAvailabilityPhase.Ready,
+                            null
+                        );
+                    }
+                }
+                catch (Exception ex)
+                {
+                    SetAvailabilityIfCurrent(
+                        generation,
+                        CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                        ex.Message
+                    );
+                }
+            });
+            return _currentReplayAvailability;
+        }
+    }
+
+    internal CurrentReplayRecorderAvailability GetCurrentReplayRecordingAvailability()
+    {
+        lock (_availabilitySync)
+            return _currentReplayAvailability;
+    }
+
+    internal CurrentReplayRecordingArmResult TryArmCurrentReplay(string battleId)
+    {
+        if (string.IsNullOrWhiteSpace(battleId))
+            return CurrentReplayRecordingArmResult.Failure("Battle id is unavailable.");
+        if (_activeOperation != null || _preparedCurrentReplay != null)
+            return CurrentReplayRecordingArmResult.Failure("A video recording is already active.");
+
+        var services = _services;
+        if (services == null || _metadataStore == null)
+            return CurrentReplayRecordingArmResult.Failure("Video recorder is unavailable.");
+
+        ReplayVideoCaptureSettings settings;
+        string? ffmpeg;
+        string? videoDirectory;
+        CurrentReplayRecorderAvailability availability;
+        lock (_availabilitySync)
+        {
+            availability = _currentReplayAvailability;
+            settings = _availabilitySettings;
+            ffmpeg = _availabilityFfmpegExecutable;
+            videoDirectory = _availabilityVideoDirectory;
+        }
+
+        if (
+            !availability.IsReady
+            || string.IsNullOrWhiteSpace(ffmpeg)
+            || string.IsNullOrWhiteSpace(videoDirectory)
+        )
+        {
+            return CurrentReplayRecordingArmResult.Failure(
+                availability.Reason ?? "Video recorder is still preparing."
+            );
+        }
+
+        if (!ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out var currentSettings))
+            return CurrentReplayRecordingArmResult.Failure(
+                "The current game resolution cannot be recorded."
+            );
+        if (currentSettings != settings)
+        {
+            PrepareCurrentReplayRecordingAvailability();
+            return CurrentReplayRecordingArmResult.Failure(
+                "Game video settings changed; preparing the recorder again."
+            );
+        }
+
+        var operation = _operations.Start(
+            battleId,
+            CombatReplayPlaybackSource.CurrentNative,
+            DateTimeOffset.UtcNow
+        );
+        try
+        {
+            var evt = new CombatReplayPlaybackStarting
+            {
+                BattleId = battleId,
+                Source = CombatReplayPlaybackSource.CurrentNative,
+                RecordVideo = true,
+            };
+            var request = BuildCaptureRequest(
+                operation.RecordingId,
+                evt,
+                ffmpeg,
+                videoDirectory,
+                settings
+            );
+            if (request == null)
+            {
+                _operations.CompletePreflight(
+                    operation,
+                    ReplayVideoRecordingReasonCode.InvalidDimensions
+                );
+                return CurrentReplayRecordingArmResult.Failure(
+                    "The current game resolution cannot be recorded."
+                );
+            }
+
+            try
+            {
+                _metadataStore.SaveStart(CreateStartedMetadata(request, services));
+            }
+            catch (Exception ex)
+            {
+                _operations.CompletePreflight(
+                    operation,
+                    ReplayVideoRecordingReasonCode.MetadataFailed,
+                    ex
+                );
+                return CurrentReplayRecordingArmResult.Failure(
+                    "The video database could not reserve this recording."
+                );
+            }
+
+            _preparedCurrentReplay = new PreparedCurrentReplayRecording(operation, request);
+            return CurrentReplayRecordingArmResult.Success(operation.RecordingId);
+        }
+        catch (Exception ex)
+        {
+            _operations.CompletePreflight(
+                operation,
+                ReplayVideoRecordingReasonCode.BeginException,
+                ex
+            );
+            return CurrentReplayRecordingArmResult.Failure(ex.Message);
+        }
+    }
+
+    internal void CancelArmedCurrentReplay(string recordingId, string reason)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new ArgumentException("A cancellation reason is required.", nameof(reason));
+
+        var prepared = _preparedCurrentReplay;
+        if (
+            prepared == null
+            || !string.Equals(prepared.Operation.RecordingId, recordingId, StringComparison.Ordinal)
+        )
+        {
+            return;
+        }
+
+        _preparedCurrentReplay = null;
+        TryMarkPreparedMetadataFailed(prepared, reason);
+        _operations.CompletePreflight(
+            prepared.Operation,
+            ReplayVideoRecordingReasonCode.Aborted,
+            reason: reason
+        );
     }
 
     private void OnEnable()
@@ -89,6 +368,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         _endedSubscription = null;
 
         AbortActiveSession("recorder-disabled");
+        CancelPreparedCurrentReplay(ReplayVideoRecordingReasonCode.Aborted);
     }
 
     private void OnDestroy()
@@ -149,6 +429,12 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         if (evt == null || string.IsNullOrWhiteSpace(evt.BattleId))
             return;
 
+        if (evt.Source == CombatReplayPlaybackSource.CurrentNative)
+        {
+            BeginPreparedCurrentReplay(evt);
+            return;
+        }
+
         if (_activeOperation != null)
             AbortActiveSession("superseded");
 
@@ -205,6 +491,70 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             {
                 _operations.TryComplete(
                     operation,
+                    new ReplayVideoRecordingCompletion
+                    {
+                        ReasonCode = ReplayVideoRecordingReasonCode.BeginException,
+                        AudioStatus = ReplayVideoAudioStatus.Failed,
+                        MetadataStatus = ReplayVideoMetadataStatus.Unavailable,
+                        Exception = ex,
+                    }
+                );
+            }
+        }
+    }
+
+    private void BeginPreparedCurrentReplay(CombatReplayPlaybackStarting evt)
+    {
+        var prepared = _preparedCurrentReplay;
+        _preparedCurrentReplay = null;
+        if (
+            prepared == null
+            || !string.Equals(prepared.Operation.BattleId, evt.BattleId, StringComparison.Ordinal)
+        )
+        {
+            if (prepared != null)
+            {
+                TryMarkPreparedMetadataFailed(prepared, "battle-id-mismatch");
+                _operations.CompletePreflight(
+                    prepared.Operation,
+                    ReplayVideoRecordingReasonCode.Aborted
+                );
+            }
+            return;
+        }
+
+        try
+        {
+            var services = _services;
+            if (services == null)
+            {
+                TryMarkPreparedMetadataFailed(prepared, "recorder-services-unavailable");
+                _operations.CompletePreflight(
+                    prepared.Operation,
+                    ReplayVideoRecordingReasonCode.OutputPathUnavailable
+                );
+                return;
+            }
+
+            BeginRecording(prepared.Operation, prepared.Request, services);
+            services.EventBus.Publish(
+                new CombatReplayVideoRecordingStarted
+                {
+                    RecordingId = prepared.Operation.RecordingId,
+                    BattleId = prepared.Operation.BattleId,
+                    Source = prepared.Operation.Source,
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            _activeDegradationException = ex;
+            AbortActiveSession("begin-exception");
+            TryMarkPreparedMetadataFailed(prepared, ex.Message);
+            if (!prepared.Operation.IsCompleted)
+            {
+                _operations.TryComplete(
+                    prepared.Operation,
                     new ReplayVideoRecordingCompletion
                     {
                         ReasonCode = ReplayVideoRecordingReasonCode.BeginException,
@@ -556,7 +906,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
 
         _uiSuppressionScope = BeginUiSuppression(operation.RecordingId);
 
-        _activeMetadataStatus = TrySaveStartMetadata(request, services);
+        _activeMetadataStatus =
+            operation.Source == CombatReplayPlaybackSource.CurrentNative
+                ? ReplayVideoMetadataStatus.Complete
+                : TrySaveStartMetadata(request, services);
         if (_activeMetadataStatus != ReplayVideoMetadataStatus.Complete)
         {
             _activeDegradationReason ??= ReplayVideoRecordingReasonCode.MetadataFailed;
@@ -654,28 +1007,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
 
         try
         {
-            var videoDirectoryPath = services.Paths.CombatReplayVideoDirectoryPath;
-            var relativePath = ComputeRelativePath(
-                videoDirectoryPath,
-                _activeRecordingFinalPath ?? request.FinalOutputFilePath
-            );
-
-            store.SaveStart(
-                new VideoRecordingStarted
-                {
-                    VideoId = request.VideoId,
-                    BattleId = request.BattleId,
-                    Source = request.Source.ToString(),
-                    VideoRelativePath = relativePath,
-                    Width = request.Width,
-                    Height = request.Height,
-                    Fps = request.Fps,
-                    Codec = request.EncoderProfile.Codec,
-                    Crf = request.EncoderProfile.Crf,
-                    Preset = request.EncoderProfile.Preset,
-                    StartedAtUtc = DateTimeOffset.UtcNow,
-                }
-            );
+            store.SaveStart(CreateStartedMetadata(request, services));
             return ReplayVideoMetadataStatus.Complete;
         }
         catch (Exception ex)
@@ -684,6 +1016,28 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             return ReplayVideoMetadataStatus.Failed;
         }
     }
+
+    private static VideoRecordingStarted CreateStartedMetadata(
+        ReplayVideoCaptureRequest request,
+        IBppServices services
+    ) =>
+        new()
+        {
+            VideoId = request.VideoId,
+            BattleId = request.BattleId,
+            Source = request.Source.ToString(),
+            VideoRelativePath = ComputeRelativePath(
+                services.Paths.CombatReplayVideoDirectoryPath,
+                request.FinalOutputFilePath
+            ),
+            Width = request.Width,
+            Height = request.Height,
+            Fps = request.Fps,
+            Codec = request.EncoderProfile.Codec,
+            Crf = request.EncoderProfile.Crf,
+            Preset = request.EncoderProfile.Preset,
+            StartedAtUtc = DateTimeOffset.UtcNow,
+        };
 
     // Parameterized so it is race-free under the async mux: every input is a value
     // captured on the main thread before instance fields are nulled. Safe to call on
@@ -1028,11 +1382,19 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         string recordingId,
         CombatReplayPlaybackStarting evt,
         string ffmpegExecutable,
-        string videoDirectoryPath
+        string videoDirectoryPath,
+        ReplayVideoCaptureSettings? preparedSettings = null
     )
     {
-        if (!ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out var captureSettings))
+        ReplayVideoCaptureSettings captureSettings;
+        if (preparedSettings.HasValue)
+        {
+            captureSettings = preparedSettings.Value;
+        }
+        else if (!ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out captureSettings))
+        {
             return null;
+        }
         var fps = captureSettings.Fps;
         var width = captureSettings.Width;
         var height = captureSettings.Height;
@@ -1126,6 +1488,107 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         return sb.ToString();
     }
 
+    private CurrentReplayRecorderAvailability SetAvailability(
+        CurrentReplayRecorderAvailabilityPhase phase,
+        string? reason
+    )
+    {
+        lock (_availabilitySync)
+        {
+            _availabilityGeneration++;
+            _currentReplayAvailability = new CurrentReplayRecorderAvailability(phase, reason);
+            if (phase != CurrentReplayRecorderAvailabilityPhase.Ready)
+                _availabilityFfmpegExecutable = null;
+            return _currentReplayAvailability;
+        }
+    }
+
+    private void SetAvailabilityIfCurrent(
+        int generation,
+        CurrentReplayRecorderAvailabilityPhase phase,
+        string? reason
+    )
+    {
+        lock (_availabilitySync)
+        {
+            if (generation != _availabilityGeneration)
+                return;
+            _currentReplayAvailability = new CurrentReplayRecorderAvailability(phase, reason);
+            if (phase != CurrentReplayRecorderAvailabilityPhase.Ready)
+                _availabilityFfmpegExecutable = null;
+        }
+    }
+
+    private void CancelPreparedCurrentReplay(ReplayVideoRecordingReasonCode reasonCode)
+    {
+        var prepared = _preparedCurrentReplay;
+        _preparedCurrentReplay = null;
+        if (prepared != null)
+        {
+            TryMarkPreparedMetadataFailed(prepared, reasonCode.ToString());
+            _operations.CompletePreflight(prepared.Operation, reasonCode);
+        }
+    }
+
+    private void TryMarkPreparedMetadataFailed(
+        PreparedCurrentReplayRecording prepared,
+        string error
+    )
+    {
+        var store = _metadataStore;
+        if (store == null)
+            return;
+
+        try
+        {
+            store.SaveFinish(
+                new VideoRecordingFinished
+                {
+                    VideoId = prepared.Operation.RecordingId,
+                    VideoRelativePath = ComputeRelativePath(
+                        _services?.Paths.CombatReplayVideoDirectoryPath,
+                        prepared.Request.FinalOutputFilePath
+                    ),
+                    EndedAtUtc = DateTimeOffset.UtcNow,
+                    DurationMs = 0,
+                    CapturedFrames = 0,
+                    DroppedFrames = 0,
+                    FileSizeBytes = null,
+                    Status = "FAILED",
+                    Error = error,
+                }
+            );
+        }
+        catch
+        {
+            // Best effort: the terminal observer still reports the reservation failure.
+        }
+    }
+
+    private void OnOperationCompleted(ReplayVideoRecordingTerminal terminal)
+    {
+        _completionEvents.Enqueue(
+            new CombatReplayVideoRecordingCompleted
+            {
+                RecordingId = terminal.RecordingId,
+                BattleId = terminal.BattleId,
+                Source = terminal.Source,
+                FinalFilePath = terminal.FinalFilePath,
+                ArtifactUsable = terminal.ArtifactUsable,
+                AudioStatus = terminal.AudioStatus,
+                MetadataStatus = terminal.MetadataStatus,
+                ReasonCode = terminal.ReasonCode,
+                Reason =
+                    terminal.Reason
+                    ?? (
+                        terminal.ReasonCode == ReplayVideoRecordingReasonCode.Completed
+                            ? null
+                            : terminal.ReasonCode.ToString()
+                    ),
+            }
+        );
+    }
+
     private readonly struct MetadataWriteOutcome
     {
         internal MetadataWriteOutcome(ReplayVideoMetadataStatus status, Exception? exception)
@@ -1145,6 +1608,11 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         string TempVideoPath,
         string FinalPath,
         IReadOnlyList<string>? WavPaths
+    );
+
+    private sealed record PreparedCurrentReplayRecording(
+        ReplayVideoRecordingOperation Operation,
+        ReplayVideoCaptureRequest Request
     );
 
     private sealed record EndedRecordingFinalizeContext(

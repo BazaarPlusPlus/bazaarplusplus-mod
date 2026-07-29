@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
 

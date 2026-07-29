@@ -1,6 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Infrastructure.Logging;
 
 internal sealed class OperationalHealthTracker<TKey, TReason>

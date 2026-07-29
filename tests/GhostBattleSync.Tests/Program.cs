@@ -1,8 +1,9 @@
 #nullable enable
 using System.Collections;
+using System.Globalization;
 using System.Net;
-using System.Net.Http;
 using System.Reflection;
+using BazaarPlusPlus.Localization;
 using Newtonsoft.Json.Linq;
 
 var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleSyncService");
@@ -59,6 +60,10 @@ var tryParseBattle = apiClientType.GetMethod(
     "TryParseBattle",
     BindingFlags.NonPublic | BindingFlags.Static
 );
+var tryParseUtcTimestamp = apiClientType.GetMethod(
+    "TryParseUtcTimestamp",
+    BindingFlags.NonPublic | BindingFlags.Static
+);
 var serializeArtifact = artifactCodecType.GetMethod(
     "Serialize",
     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
@@ -69,6 +74,10 @@ var resolveGhostBattleOutcome = coordinatorType.GetMethod(
 );
 var isGhostOpponentEliminated = formatterType.GetMethod(
     "IsGhostOpponentEliminated",
+    BindingFlags.Public | BindingFlags.Static
+);
+var formatTimestamp = formatterType.GetMethod(
+    "FormatTimestamp",
     BindingFlags.Public | BindingFlags.Static
 );
 Assert(
@@ -82,6 +91,10 @@ Assert(
 Assert(serializeArtifact != null, "RunBundleArtifactCodec should expose a serialize helper.");
 Assert(tryParseBattle != null, "GhostBattleClient should expose battle parsing logic.");
 Assert(
+    tryParseUtcTimestamp != null,
+    "GhostBattleClient should expose UTC timestamp parsing logic."
+);
+Assert(
     resolveGhostBattleOutcome != null,
     "HistoryPanelCoordinator should expose ghost-outcome resolution logic."
 );
@@ -89,6 +102,74 @@ Assert(
     isGhostOpponentEliminated != null,
     "HistoryPanelFormatter should expose ghost opponent elimination logic."
 );
+Assert(
+    formatTimestamp != null,
+    "HistoryPanelFormatter should expose localized timestamp formatting."
+);
+
+{
+    var unspecifiedUtc = new DateTime(2026, 7, 20, 14, 21, 0, DateTimeKind.Unspecified);
+    var parseArguments = new object?[] { new JValue(unspecifiedUtc), default(DateTimeOffset) };
+    Assert(
+        (bool)tryParseUtcTimestamp!.Invoke(null, parseArguments)!,
+        "Ghost timestamps represented as Json.NET Date tokens should parse."
+    );
+    Assert(
+        (DateTimeOffset)parseArguments[1]!
+            == new DateTimeOffset(2026, 7, 20, 14, 21, 0, TimeSpan.Zero),
+        "A timezone-less recorded_at_utc Date token should be interpreted as UTC."
+    );
+
+    parseArguments = new object?[]
+    {
+        new JValue("2026-07-20T22:21:00+08:00"),
+        default(DateTimeOffset),
+    };
+    Assert(
+        (bool)tryParseUtcTimestamp.Invoke(null, parseArguments)!,
+        "Ghost timestamps with an explicit offset should parse."
+    );
+    Assert(
+        (DateTimeOffset)parseArguments[1]!
+            == new DateTimeOffset(2026, 7, 20, 14, 21, 0, TimeSpan.Zero),
+        "An explicit recorded_at_utc offset should be normalized to UTC."
+    );
+}
+
+{
+    var language = new MutableLanguageProvider { CurrentLanguageCode = "zh-CN" };
+    var localeMode = new MutableLocaleModeProvider { CurrentMode = BppChineseLocaleMode.Mainland };
+    L.Install(language, localeMode);
+    try
+    {
+        var timestamp = new DateTimeOffset(2026, 7, 20, 14, 21, 0, TimeSpan.Zero);
+        var localTimestamp = timestamp.ToLocalTime();
+        Assert(
+            (string)formatTimestamp!.Invoke(null, [timestamp])!
+                == localTimestamp.ToString("g", CultureInfo.GetCultureInfo("zh-CN")),
+            "History timestamps should use the mainland-Chinese date/time format."
+        );
+
+        language.CurrentLanguageCode = "de-DE";
+        Assert(
+            (string)formatTimestamp.Invoke(null, [timestamp])!
+                == localTimestamp.ToString("g", CultureInfo.GetCultureInfo("de-DE")),
+            "History timestamps should follow the active game language."
+        );
+
+        language.CurrentLanguageCode = "zh-CN";
+        localeMode.CurrentMode = BppChineseLocaleMode.Taiwan;
+        Assert(
+            (string)formatTimestamp.Invoke(null, [timestamp])!
+                == localTimestamp.ToString("g", CultureInfo.GetCultureInfo("zh-TW")),
+            "History timestamps should honor the selected Chinese locale mode."
+        );
+    }
+    finally
+    {
+        L.Install(new MutableLanguageProvider(), new MutableLocaleModeProvider());
+    }
+}
 
 {
     var state =
@@ -101,10 +182,13 @@ Assert(
     var dataService =
         Activator.CreateInstance(dataServiceType, new object?[] { null, null })
         ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
+    // Single 7-arg ctor: (runState, dataService, replayService, serverHealthProbe?,
+    // accountLinkClient?, isBazaarDbAccountLinkAvailable?, combatReplayDirectoryPath).
+    // No ArgumentNullException guards — null-by-position is the pinned behavior anchor.
     var dependencies =
         Activator.CreateInstance(
             coordinatorDependenciesType,
-            new object?[] { null, dataService, null, null }
+            new object?[] { null, dataService, null, null, null, null, null }
         )
         ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
     var coordinator =
@@ -145,10 +229,13 @@ Assert(
     var dataService =
         Activator.CreateInstance(dataServiceType, new object?[] { null, null })
         ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
+    // Single 7-arg ctor: (runState, dataService, replayService, serverHealthProbe?,
+    // accountLinkClient?, isBazaarDbAccountLinkAvailable?, combatReplayDirectoryPath).
+    // No ArgumentNullException guards — null-by-position is the pinned behavior anchor.
     var dependencies =
         Activator.CreateInstance(
             coordinatorDependenciesType,
-            new object?[] { null, dataService, null, null }
+            new object?[] { null, dataService, null, null, null, null, null }
         )
         ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
     var coordinator =
@@ -242,6 +329,8 @@ battleParticipantsArtifactType.GetProperty("PlayerRank")!.SetValue(participantsA
 battleParticipantsArtifactType.GetProperty("PlayerRating")!.SetValue(participantsArtifact, 1200);
 battleParticipantsArtifactType.GetProperty("PlayerLevel")!.SetValue(participantsArtifact, 9);
 battleParticipantsArtifactType.GetProperty("PlayerPrestige")!.SetValue(participantsArtifact, 18);
+battleParticipantsArtifactType.GetProperty("PlayerIncome")!.SetValue(participantsArtifact, 11);
+battleParticipantsArtifactType.GetProperty("PlayerGold")!.SetValue(participantsArtifact, 99);
 battleParticipantsArtifactType.GetProperty("PlayerVictories")!.SetValue(participantsArtifact, 3);
 battleParticipantsArtifactType
     .GetProperty("OpponentName")!
@@ -378,6 +467,12 @@ Assert(
     (int?)extractedParticipantsType.GetProperty("PlayerPrestige")?.GetValue(extractedParticipants)
         == 18
         && (int?)
+            extractedParticipantsType.GetProperty("PlayerIncome")?.GetValue(extractedParticipants)
+            == 11
+        && (int?)
+            extractedParticipantsType.GetProperty("PlayerGold")?.GetValue(extractedParticipants)
+            == 99
+        && (int?)
             extractedParticipantsType
                 .GetProperty("PlayerVictories")
                 ?.GetValue(extractedParticipants) == 3
@@ -389,7 +484,7 @@ Assert(
             extractedParticipantsType
                 .GetProperty("OpponentVictories")
                 ?.GetValue(extractedParticipants) == 6,
-    "Artifact extraction should preserve participant prestige and victories."
+    "Artifact extraction should preserve participant economy, prestige, and victories."
 );
 
 var ghostPayloadStorePath = Path.Combine(
@@ -477,7 +572,8 @@ Assert(
     "GhostBattleImportRecord should preserve the raw remote player_account_id field."
 );
 
-var freshRecordedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-5).ToString("o");
+var freshRecordedAtUtcValue = DateTimeOffset.UtcNow.AddMinutes(-5);
+var freshRecordedAtUtc = freshRecordedAtUtcValue.ToString("o");
 var rawBattlePayload = JObject.Parse(
     $$"""
     {
@@ -494,12 +590,16 @@ var rawBattlePayload = JObject.Parse(
       "player_level": 9,
       "player_prestige": 18,
       "player_victories": 3,
+      "player_hand_item_count": 2,
+      "player_skill_count": 1,
       "opponent_hero": "Vanessa",
       "opponent_rank": "Legendary",
       "opponent_rating": 1500,
       "opponent_level": 12,
       "opponent_prestige": 12,
       "opponent_victories": 6,
+      "opponent_hand_item_count": 7,
+      "opponent_skill_count": 3,
       "opponent_account_id": "local-account-001",
       "combat_kind": "PVPCombat",
       "result": "Won",
@@ -513,6 +613,11 @@ var rawBattlePayload = JObject.Parse(
 var importRecord =
     tryParseBattle!.Invoke(null, [rawBattlePayload])
     ?? throw new InvalidOperationException("TryParseBattle should return an import record.");
+Assert(
+    (DateTimeOffset)importRecordType.GetProperty("RecordedAtUtc")!.GetValue(importRecord)!
+        == freshRecordedAtUtcValue,
+    "Ghost import should preserve the UTC instant after Json.NET creates a Date token."
+);
 Assert(
     (string?)importRecordType.GetProperty("PlayerName")?.GetValue(importRecord) == "RemoteGhost",
     "Ghost import should preserve remote player_name without flipping."
@@ -570,6 +675,13 @@ Assert(
         && (int?)importRecordType.GetProperty("OpponentPrestige")?.GetValue(importRecord) == 12
         && (int?)importRecordType.GetProperty("OpponentVictories")?.GetValue(importRecord) == 6,
     "Ghost import should preserve participant prestige and victories."
+);
+Assert(
+    (int?)importRecordType.GetProperty("PlayerHandItemCount")?.GetValue(importRecord) == 2
+        && (int?)importRecordType.GetProperty("PlayerSkillCount")?.GetValue(importRecord) == 1
+        && (int?)importRecordType.GetProperty("OpponentHandItemCount")?.GetValue(importRecord) == 7
+        && (int?)importRecordType.GetProperty("OpponentSkillCount")?.GetValue(importRecord) == 3,
+    "Ghost import should preserve participant item and skill summary counts."
 );
 
 var localWinRecordedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-4).ToString("o");
@@ -664,6 +776,17 @@ try
             && (int?)battleRecordType.GetProperty("OpponentVictories")?.GetValue(projectedBattle)
                 == 3,
         "Ghost repository reads should project participant prestige and victories into local-player perspective."
+    );
+    Assert(
+        (int)battleRecordType.GetProperty("PlayerHandItemCount")!.GetValue(projectedBattle)! == 7
+            && (int)battleRecordType.GetProperty("PlayerSkillCount")!.GetValue(projectedBattle)!
+                == 3
+            && (int)
+                battleRecordType.GetProperty("OpponentHandItemCount")!.GetValue(projectedBattle)!
+                == 2
+            && (int)battleRecordType.GetProperty("OpponentSkillCount")!.GetValue(projectedBattle)!
+                == 1,
+        "Ghost repository reads should project participant item and skill counts into local-player perspective."
     );
     Assert(
         (bool)isGhostOpponentEliminated!.Invoke(null, [projectedBattle])! is false,
@@ -951,7 +1074,7 @@ static void Assert(bool condition, string message)
         throw new InvalidOperationException(message);
 }
 
-sealed class RecordingHttpMessageHandler : HttpMessageHandler
+internal sealed class RecordingHttpMessageHandler : HttpMessageHandler
 {
     private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
 
@@ -967,4 +1090,14 @@ sealed class RecordingHttpMessageHandler : HttpMessageHandler
     {
         return Task.FromResult(_handler(request));
     }
+}
+
+internal sealed class MutableLanguageProvider : ILanguageProvider
+{
+    public string CurrentLanguageCode { get; set; } = string.Empty;
+}
+
+internal sealed class MutableLocaleModeProvider : ILocaleModeProvider
+{
+    public BppChineseLocaleMode CurrentMode { get; set; } = BppChineseLocaleMode.Mainland;
 }

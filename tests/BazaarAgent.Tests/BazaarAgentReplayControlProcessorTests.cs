@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
 using BazaarPlusPlus.BazaarAgent;
 using Xunit;
 
@@ -131,8 +128,7 @@ public class BazaarAgentReplayControlProcessorTests
             {
                 BazaarAgentReplayControlStatus.InvalidPayload =>
                     BazaarAgentLogReasonCode.ReplayInvalidPayload,
-                BazaarAgentReplayControlStatus.Rejected =>
-                    BazaarAgentLogReasonCode.ReplayRejected,
+                BazaarAgentReplayControlStatus.Rejected => BazaarAgentLogReasonCode.ReplayRejected,
                 _ => BazaarAgentLogReasonCode.ReplayUnavailable,
             },
             logEvent.Values[3].Value

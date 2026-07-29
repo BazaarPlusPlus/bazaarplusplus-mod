@@ -1,16 +1,10 @@
 #nullable enable
 
-using System;
-using System.Threading.Tasks;
 using BazaarGameShared.Infra.Messages;
-using BazaarGameShared.Infra.Messages.GameSimEvents;
-using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Game.CombatReplay.PlaybackUi;
 using BazaarPlusPlus.Game.CombatReplay.Warmup;
 using BazaarPlusPlus.Game.PvpBattles;
 using TheBazaar;
-using TheBazaar.AppFramework;
-using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Bootstrap;
 
@@ -79,6 +73,7 @@ internal static class ReplayBootstrap
         Func<ReplayPlaybackPublishOutcome>? publishStarting = null
     )
     {
+        ReplaySavedStateNormalizer.Normalize(manifest, sequence);
         ObserveQualityStep(
             () => PlayerAttributeRepairer.EnsureSequencePlayerAttributes(sequence, outcome),
             outcome,
@@ -88,6 +83,11 @@ internal static class ReplayBootstrap
         await bootstrapContext.HandleSpawnMessageAsync(sequence.SpawnMessage);
         ObserveQualityStep(
             () => PlayerAttributeRepairer.EnsureRunPlayerAttributes(outcome),
+            outcome,
+            ReplayPlaybackReasonCode.PlayerAttributesUnavailable
+        );
+        ObserveQualityStep(
+            () => PlayerAttributeRepairer.RestoreRecordedPlayerAttributes(manifest, outcome),
             outcome,
             ReplayPlaybackReasonCode.PlayerAttributesUnavailable
         );
@@ -118,6 +118,17 @@ internal static class ReplayBootstrap
             outcome,
             ReplayPlaybackReasonCode.OpponentSkillsUnavailable
         );
+        await ObserveQualityStepAsync(
+            () =>
+                ReplayOpeningStateRestorer.RestoreBeforeReplayAsync(
+                    bootstrapContext.GameSimHandler,
+                    sequence.SpawnMessage,
+                    manifest,
+                    outcome
+                ),
+            outcome,
+            ReplayPlaybackReasonCode.PresentationWarmupFailed
+        );
         SnapshotRehydrator.SanitizeSpawnEvents(sequence, outcome.BattleId);
         await AppStateHandlerInstaller.RebuildSkillPresentationAsync();
         bootstrapContext.TriggerCombatSequenceCreated();
@@ -137,6 +148,16 @@ internal static class ReplayBootstrap
         await AppStateHandlerInstaller.WaitForPresentationReadyAsync();
         await ObserveQualityStepAsync(
             () => PresentationWarmer.WarmPresentationAssetsAsync(manifest, sequence, outcome),
+            outcome,
+            ReplayPlaybackReasonCode.PresentationWarmupFailed
+        );
+        ObserveQualityStep(
+            () => ReplayPresentationRestorer.Refresh(manifest, sequence, outcome),
+            outcome,
+            ReplayPlaybackReasonCode.PresentationWarmupFailed
+        );
+        ObserveQualityStep(
+            () => ReplayOpeningStateRestorer.FinalizeAfterWarmup(outcome),
             outcome,
             ReplayPlaybackReasonCode.PresentationWarmupFailed
         );
@@ -202,6 +223,7 @@ internal static class ReplayBootstrap
         try
         {
             Exception? cleanupFailure = null;
+            ReplayOpeningStateRestorer.Cleanup();
             AppState.Reset();
             Data.ResetRunData();
             var socketCleanup = SocketBehaviorBridge.DisposeSocketBehavior(outcome);

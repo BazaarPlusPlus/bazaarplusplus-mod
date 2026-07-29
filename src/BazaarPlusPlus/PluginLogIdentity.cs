@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using System.Reflection;
 
 namespace BazaarPlusPlus;
@@ -23,6 +22,7 @@ internal static class PluginLogIdentity
             "RunLifecycleChanged" => PluginEventId.RunLifecycleChanged,
             "LivePvpPlaybackStartedObserved" => PluginEventId.LivePvpPlaybackStartedObserved,
             "LivePvpPlaybackEndedObserved" => PluginEventId.LivePvpPlaybackEndedObserved,
+            "UploadArmRequested" => PluginEventId.UploadArmRequested,
             _ => PluginEventId.Unknown,
         };
 
@@ -46,13 +46,8 @@ internal static class PluginLogIdentity
             return PluginHandlerId.CombatReplayVideoRecorder;
         if (OwnedBy(declaringTypeName, "BazaarPlusPlus.Game.CombatStatusBar.CombatStatusBarModule"))
             return PluginHandlerId.CombatStatusBarModule;
-        if (
-            OwnedBy(
-                declaringTypeName,
-                "BazaarPlusPlus.Game.Screenshots.EndOfRunScreenshotController"
-            )
-        )
-            return PluginHandlerId.EndOfRunScreenshotController;
+        if (OwnedBy(declaringTypeName, "BazaarPlusPlus.Game.Screenshots.EndOfRunCaptureDriver"))
+            return PluginHandlerId.EndOfRunCaptureDriver;
         if (OwnedBy(declaringTypeName, "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelMount"))
             return PluginHandlerId.HistoryPanelMount;
         if (OwnedBy(declaringTypeName, "BazaarPlusPlus.Game.RunLogging.Upload.RunBundleUploadFeed"))

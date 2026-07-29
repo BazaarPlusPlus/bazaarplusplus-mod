@@ -1,7 +1,5 @@
 #nullable enable
-using System;
 using System.Reflection;
-using System.Threading.Tasks;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
@@ -51,7 +49,12 @@ internal sealed class OpponentPortraitController
         var hero = Data.SimPvpOpponent?.Hero;
         if (!hero.HasValue || hero.Value == EHero.Common)
         {
-            if (!TryParseHeroName(manifest.Participants.OpponentHero, out var parsedHero))
+            if (
+                !CombatReplayHeroIdentity.TryParse(
+                    manifest.Participants.OpponentHero,
+                    out var parsedHero
+                )
+            )
             {
                 outcome.ReportDegradation(ReplayPlaybackReasonCode.OpponentPortraitUnavailable);
                 return;
@@ -144,7 +147,9 @@ internal sealed class OpponentPortraitController
         if (manifest?.Participants == null)
             return;
 
-        if (!TryParseHeroName(manifest.Participants.PlayerHero, out var replayHero))
+        if (
+            !CombatReplayHeroIdentity.TryParse(manifest.Participants.PlayerHero, out var replayHero)
+        )
             return;
 
         _originalSelectedHero = Data.SelectedHero;
@@ -181,7 +186,12 @@ internal sealed class OpponentPortraitController
         if (spawnMessage?.Data?.CurrentState?.PvpOpponent != null)
             return;
 
-        if (!TryParseHeroName(manifest.Participants.OpponentHero, out var opponentHero))
+        if (
+            !CombatReplayHeroIdentity.TryParse(
+                manifest.Participants.OpponentHero,
+                out var opponentHero
+            )
+        )
         {
             outcome.ReportDegradation(ReplayPlaybackReasonCode.OpponentIdentityUnavailable);
             return;
@@ -263,19 +273,6 @@ internal sealed class OpponentPortraitController
             throw new MissingMethodException("TheBazaar.RunConfigurationCache", "SetSelectedHero");
 
         setSelectedHeroMethod.Invoke(runConfig, new object[] { hero });
-    }
-
-    private static bool TryParseHeroName(string? heroName, out EHero hero)
-    {
-        if (!string.IsNullOrWhiteSpace(heroName))
-        {
-            var trimmed = heroName.Trim();
-            if (Enum.TryParse(trimmed, ignoreCase: true, out hero))
-                return true;
-        }
-
-        hero = default;
-        return false;
     }
 
     private static ERank? TryParseRank(string? rank)

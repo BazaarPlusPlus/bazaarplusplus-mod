@@ -1,15 +1,11 @@
 #pragma warning disable CS0436
 #nullable enable
-using System;
-using System.IO;
-using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CombatReplay;
-using BazaarPlusPlus.Game.HistoryPanel;
+using BazaarPlusPlus.Game.EventPreview;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.LegendaryPosition;
-using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Tooltips;
@@ -56,7 +52,7 @@ public class Plugin : BaseUnityPlugin
             _composition = new BppComposition(Logger, configFile, gameBuild);
 
             var services = _composition.Services;
-            BppPatchHost.Install(services);
+            BppPatchHost.Install(services, _composition.PatchFeatures);
 
             if (gameBuild.DetectionWarning != null)
             {
@@ -85,7 +81,8 @@ public class Plugin : BaseUnityPlugin
             combatReplayRuntime.Initialize(
                 services,
                 _composition.RunLifecycle,
-                _composition.PvpBattleCatalog
+                _composition.PvpBattleCatalog,
+                () => gameObject.GetComponent<Game.CombatReplay.Video.CombatReplayVideoRecorder>()
             );
             _composition.AttachCombatReplayRuntime(combatReplayRuntime);
 
@@ -163,16 +160,16 @@ public class Plugin : BaseUnityPlugin
             () => _composition?.Mountables.UnmountAll(gameObject)
         );
         failures.Run(
-            PluginTeardownStep.DestroyCombatReplayRuntime,
-            DestroyComponentIfPresent<CombatReplayRuntime>
-        );
-        failures.Run(
             PluginTeardownStep.DisposeComposition,
             () =>
             {
                 _composition?.Dispose();
                 _composition = null;
             }
+        );
+        failures.Run(
+            PluginTeardownStep.DestroyCombatReplayRuntime,
+            DestroyComponentIfPresent<CombatReplayRuntime>
         );
         failures.Run(PluginTeardownStep.DisposeOnlineServices, DisposeOnlineServices);
         failures.Run(PluginTeardownStep.UninstallStaticUtilities, UninstallStaticUtilities);
@@ -190,7 +187,9 @@ public class Plugin : BaseUnityPlugin
     {
         LegendaryPositionDisplayFormatter.Install(services.Config);
         L.Install(new GameLanguageProvider(), new ChineseLocaleModeProvider(services.Config));
-        CollectionLocalizationResolver.AttributeUnitLocalizer = BppTooltipText.TryLocalizeKeyword;
+        var attributeUnitLocalizer = BppTooltipText.TryLocalizeKeyword;
+        CollectionLocalizationResolver.AttributeUnitLocalizer = attributeUnitLocalizer;
+        EventPreviewLocalization.AttributeUnitLocalizer = attributeUnitLocalizer;
         BppSettingsDockCatalog.Install(services.Config, settingsDockRegistry);
         BPPSupporterCatalog.Install(services.Config);
         BppHotkeyService.Install(services.Config);
@@ -200,6 +199,8 @@ public class Plugin : BaseUnityPlugin
     {
         LegendaryPositionDisplayFormatter.Reset();
         L.Reset();
+        CollectionLocalizationResolver.AttributeUnitLocalizer = null;
+        EventPreviewLocalization.AttributeUnitLocalizer = null;
         BppSettingsDockCatalog.Reset();
         NativeSettingsLogState.Reset();
         BPPSupporterCatalog.Reset();

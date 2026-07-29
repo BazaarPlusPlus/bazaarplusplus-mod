@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Infrastructure.Logging;
 
 /// <summary>
@@ -41,6 +38,8 @@ internal sealed class BppLogFeatureScope
     internal static BppLogFeatureScope Supporters { get; } = new("Supporters", "supporters");
     internal static BppLogFeatureScope SteamTimeline { get; } =
         new("SteamTimeline", "steam_timeline");
+    internal static BppLogFeatureScope GraphicsUpscaling { get; } =
+        new("GraphicsUpscaling", "graphics_upscaling");
 
     private static readonly BppLogFeatureScope[] DeclaredScopes =
     [
@@ -67,6 +66,7 @@ internal sealed class BppLogFeatureScope
         Settings,
         Supporters,
         SteamTimeline,
+        GraphicsUpscaling,
     ];
 
     private BppLogFeatureScope(string prefixName, string eventIdPrefix)

@@ -1,14 +1,9 @@
 #pragma warning disable CS0436
 #nullable enable
-using System;
-using System.Collections.Generic;
-using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Lobby;
 using BazaarPlusPlus.Game.Lobby.RandomHeroPool;
-using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.UI;
-using UnityEngine;
 
 namespace BazaarPlusPlus.Patches.Lobby;
 
@@ -208,7 +203,7 @@ internal static class RandomHeroPoolSelectRandomHeroImmediatePatch
                 continue;
 
             unlockedHeroViews.Add(view);
-            unlockedHeroIds.Add(view.Hero.ToString());
+            unlockedHeroIds.Add(RandomHeroPoolPlayerPrefs.NormalizeHeroId(view.Hero.ToString()));
         }
 
         if (unlockedHeroViews.Count == 0)
@@ -223,7 +218,7 @@ internal static class RandomHeroPoolSelectRandomHeroImmediatePatch
         HeroItemView? selectedHeroView = null;
         foreach (var view in unlockedHeroViews)
         {
-            if (!string.Equals(view.Hero.ToString(), selectedHeroId, StringComparison.Ordinal))
+            if (!RandomHeroPoolHeroIdentity.Matches(view.Hero.ToString(), selectedHeroId))
                 continue;
 
             selectedHeroView = view;

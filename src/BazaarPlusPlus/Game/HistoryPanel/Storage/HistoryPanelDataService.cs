@@ -1,10 +1,7 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using BazaarPlusPlus.Game.HistoryPanel.Data;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
+using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.HistoryPanel.Storage;
 
@@ -12,14 +9,23 @@ internal sealed class HistoryPanelDataService
 {
     private readonly HistoryPanelRepository? _repository;
     private readonly GhostBattleSyncService? _ghostSyncService;
+    private readonly Func<string?>? _replayDirectoryPathAccessor;
 
     public HistoryPanelDataService(
         HistoryPanelRepository? repository,
         GhostBattleSyncService? ghostSyncService = null
     )
+        : this(repository, ghostSyncService, replayDirectoryPathAccessor: null) { }
+
+    public HistoryPanelDataService(
+        HistoryPanelRepository? repository,
+        GhostBattleSyncService? ghostSyncService,
+        Func<string?>? replayDirectoryPathAccessor = null
+    )
     {
         _repository = repository;
         _ghostSyncService = ghostSyncService;
+        _replayDirectoryPathAccessor = replayDirectoryPathAccessor;
     }
 
     public bool IsAvailable => _repository != null;
@@ -134,6 +140,8 @@ internal sealed class HistoryPanelDataService
         try
         {
             battles = _repository.ListRecentGhostBattles(limit);
+            if (BackfillDownloadedGhostBattleCounts(battles))
+                battles = _repository.ListRecentGhostBattles(limit);
             statusMessage = HistoryPanelText.LoadedGhostBattles(battles.Count);
             return true;
         }
@@ -143,6 +151,53 @@ internal sealed class HistoryPanelDataService
             error = ex;
             return false;
         }
+    }
+
+    private bool BackfillDownloadedGhostBattleCounts(IReadOnlyList<HistoryBattleRecord> battles)
+    {
+        if (_repository == null || battles.Count == 0)
+            return false;
+
+        var replayDirectoryPath = _replayDirectoryPathAccessor?.Invoke();
+        if (string.IsNullOrWhiteSpace(replayDirectoryPath))
+            return false;
+
+        GhostBattlePayloadStore? payloadStore = null;
+        var updated = false;
+        foreach (var battle in battles)
+        {
+            if (
+                battle.Source != HistoryBattleSource.Ghost
+                || !battle.ReplayDownloaded
+                || battle.SnapshotCounts.HasAnyRecordedCard
+            )
+                continue;
+
+            payloadStore ??= new GhostBattlePayloadStore(
+                GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)
+            );
+            var loadResult = payloadStore.LoadDetailed(battle.BattleId);
+            if (loadResult.Status != FileBackedPayloadLoadStatus.Loaded)
+                continue;
+
+            var snapshots = loadResult.Payload?.BattleManifest?.Snapshots;
+            if (snapshots == null)
+                continue;
+
+            var counts = HistoryBattlePreviewProjection.CountSnapshots(
+                snapshots.PlayerHand,
+                snapshots.PlayerSkills,
+                snapshots.OpponentHand,
+                snapshots.OpponentSkills
+            );
+            if (!counts.HasAnyRecordedCard)
+                continue;
+
+            _repository.MarkGhostReplayDownloaded(battle.BattleId, counts);
+            updated = true;
+        }
+
+        return updated;
     }
 
     public async Task<HistoryPanelAttemptResult> SyncGhostBattlesAsync(

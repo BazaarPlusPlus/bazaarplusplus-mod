@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Infrastructure.Logging;
 
 internal static class BppLogSchemaRules

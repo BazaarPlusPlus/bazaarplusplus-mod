@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.GameInterop.Fonts;
 
 internal static class UnicodeFontCoverage

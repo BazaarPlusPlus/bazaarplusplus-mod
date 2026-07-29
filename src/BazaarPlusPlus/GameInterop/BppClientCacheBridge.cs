@@ -1,10 +1,8 @@
 #nullable enable
-using System;
 using System.Collections.Concurrent;
 using System.Reflection;
 using BazaarGameShared.TempoNet.Enums;
 using BazaarGameShared.TempoNet.Models;
-using BazaarGameShared.TempoNet.Responses;
 using HarmonyLib;
 
 namespace BazaarPlusPlus.GameInterop;

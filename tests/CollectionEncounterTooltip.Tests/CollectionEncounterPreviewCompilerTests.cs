@@ -12,13 +12,12 @@ using BazaarGameShared.Domain.Spawning.SpawnFilters.Constraints;
 using BazaarGameShared.Domain.Spawning.SpawnGroups;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
 using BazaarGameShared.Domain.Values;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Newtonsoft.Json.Linq;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionEncounterPreviewCompilerTests
+public sealed class EncounterPreviewCompilerTests
 {
     [Fact]
     public void Compiles_event_structure_and_only_scans_event_steps_for_rewards()
@@ -75,7 +74,7 @@ public sealed class CollectionEncounterPreviewCompilerTests
         };
 
         var preparedIds = new List<Guid>();
-        var compiler = new CollectionEncounterPreviewPlanCompiler(source =>
+        var compiler = new EncounterPreviewPlanCompiler(source =>
         {
             var template = Assert.IsAssignableFrom<TCardBase>(source);
             preparedIds.Add(template.Id);

@@ -35,6 +35,14 @@ MANAGED="${BPP_MANAGED_PATH:-$MANAGED}"
 INSTALLER_SOURCE="${BPP_INSTALLER_SOURCE_PATH:-$SCRIPT_DIR/../bazaarplusplus-installer/src-tauri/resources}"
 GAME_SQLITE="$GAME_ROOT/BepInEx/plugins/libe_sqlite3.dylib"
 TRAMPOLINE_REPAIR_SCRIPT="$SCRIPT_DIR/scripts/repair-macos-trampoline.sh"
+PUBLISHED_PROJECTS=(
+    src/BazaarPlusPlus.Localization/BazaarPlusPlus.Localization.csproj
+    src/BazaarPlusPlus.ModApi/BazaarPlusPlus.ModApi.csproj
+    src/BazaarPlusPlus.Storage/BazaarPlusPlus.Storage.csproj
+    src/BazaarPlusPlus/BazaarPlusPlus.csproj
+    src/BazaarPlusPlus.BazaarAgent/BazaarPlusPlus.BazaarAgent.csproj
+    src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj
+)
 
 clear_macos_sqlite_quarantine() {
     [[ "$PLATFORM" == "macOS" ]] || return 0
@@ -271,8 +279,34 @@ test_all() {
     fi
 }
 
+restore_locks() {
+    local project
+    for project in "${PUBLISHED_PROJECTS[@]}"; do
+        echo -e "${CYAN}== Refreshing NuGet lock for ${GREEN}${project}${CYAN} ==${RESET}"
+        dotnet restore "$project" --force-evaluate
+    done
+}
+
+restore_locked() {
+    local project
+    for project in "${PUBLISHED_PROJECTS[@]}"; do
+        echo -e "${CYAN}== Validating NuGet lock for ${GREEN}${project}${CYAN} ==${RESET}"
+        dotnet restore "$project" --locked-mode
+    done
+}
+
+restore_dotnet_tools() {
+    dotnet tool restore
+}
+
 format() {
-    csharpier format .
+    restore_dotnet_tools
+    dotnet csharpier format .
+}
+
+format_check() {
+    restore_dotnet_tools
+    dotnet csharpier check .
 }
 
 check_ilspy() {
@@ -403,8 +437,11 @@ Usage:
   $0 build [--with-bazaaragent] [--fast]
   $0 publish [--with-bazaaragent] [-p:Name=Value ...]
   $0 fetch-data [-p:Name=Value ...]
+  $0 restore-locks
+  $0 restore-locked
   $0 test
   $0 format
+  $0 format-check
   $0 decompile [DllName]
   $0 decompile-all
   $0 decompile-ptr [DllName]
@@ -432,8 +469,11 @@ case "${1:-}" in
         shift
         parse_build_options "$@"
         ;;
-    test)       test_all ;;
-    format)     format ;;
+    restore-locks)  restore_locks ;;
+    restore-locked) restore_locked ;;
+    test)         test_all ;;
+    format)       format ;;
+    format-check) format_check ;;
     decompile)
         require_steam_branch public
         decompile "$@"

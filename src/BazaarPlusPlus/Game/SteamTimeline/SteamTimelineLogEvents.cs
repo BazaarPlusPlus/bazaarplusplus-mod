@@ -1,5 +1,4 @@
 #nullable enable
-using BazaarPlusPlus.GameInterop.SteamTimeline;
 using BazaarPlusPlus.Infrastructure.Logging;
 
 namespace BazaarPlusPlus.Game.SteamTimeline;

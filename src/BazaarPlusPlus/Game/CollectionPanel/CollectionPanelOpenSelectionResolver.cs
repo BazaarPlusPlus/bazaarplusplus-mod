@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Sources;
@@ -15,11 +13,11 @@ internal static class CollectionPanelOpenSelectionResolver
         Guid? currentEncounterTemplateId,
         IReadOnlyCollection<Guid>? choiceSelectionTemplateIds,
         IEnumerable<CollectionSourceEntry> entries,
-        EHero? rememberedHero = null
+        CollectionPanelHeroPreferenceLoadResult? rememberedPreference = null
     )
     {
         if (!isInGameRun)
-            return ResolveOutOfRunSelection(rememberedHero);
+            return ResolveOutOfRunSelection(rememberedPreference);
 
         if (!IsConcreteHero(currentHero))
             return CollectionPanelSelectionState.Default;
@@ -43,13 +41,17 @@ internal static class CollectionPanelOpenSelectionResolver
 
     internal static bool IsConcreteHero(EHero? hero) => hero.HasValue && hero.Value != EHero.Common;
 
-    private static CollectionPanelSelectionState ResolveOutOfRunSelection(EHero? rememberedHero)
+    private static CollectionPanelSelectionState ResolveOutOfRunSelection(
+        CollectionPanelHeroPreferenceLoadResult? rememberedPreference
+    )
     {
-        var hero =
-            rememberedHero.HasValue
-            && CollectionPanelHeroPreference.IsSupportedHero(rememberedHero.Value)
-                ? rememberedHero.Value
-                : CollectionPanelSelectionState.DefaultHero;
+        var status = rememberedPreference?.Status ?? CollectionPanelHeroPreferenceLoadStatus.Absent;
+        var hero = status switch
+        {
+            CollectionPanelHeroPreferenceLoadStatus.Resolved => rememberedPreference!.Hero,
+            CollectionPanelHeroPreferenceLoadStatus.KnownUnavailable => null,
+            _ => CollectionPanelSelectionState.DefaultHero,
+        };
 
         return new CollectionPanelSelectionState(
             hero,

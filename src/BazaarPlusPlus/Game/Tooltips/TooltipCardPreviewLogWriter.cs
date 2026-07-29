@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
 

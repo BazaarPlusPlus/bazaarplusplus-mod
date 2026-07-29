@@ -1,8 +1,5 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace BazaarPlusPlus.Infrastructure.Logging;
 
@@ -158,7 +155,10 @@ internal sealed class BppLogPipeline
                 {
                     if (
                         ReferenceEquals(pair.Value.Definition, definition)
-                        && (stormKey == null || string.Equals(pair.Key, stormKey, StringComparison.Ordinal))
+                        && (
+                            stormKey == null
+                            || string.Equals(pair.Key, stormKey, StringComparison.Ordinal)
+                        )
                     )
                         keys.Add(pair.Key);
                 }

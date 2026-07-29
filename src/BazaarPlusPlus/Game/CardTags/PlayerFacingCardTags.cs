@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Generic;
 using BazaarGameShared.Domain.Core.Types;
 
 namespace BazaarPlusPlus.Game.CardTags;
@@ -32,5 +31,6 @@ internal static class PlayerFacingCardTags
         ECardTag.Merchant,
         ECardTag.Property,
         ECardTag.Loot,
+        ECardTag.Instrument,
     };
 }

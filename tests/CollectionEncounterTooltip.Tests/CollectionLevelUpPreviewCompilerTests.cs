@@ -10,12 +10,11 @@ using BazaarGameShared.Domain.Spawning.SpawnFilters;
 using BazaarGameShared.Domain.Spawning.SpawnGroups;
 using BazaarGameShared.Domain.Spawning.SpawningContexts;
 using BazaarGameShared.Domain.Values;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionLevelUpPreviewCompilerTests
+public sealed class LevelUpPreviewCompilerTests
 {
     [Fact]
     public void Compiles_level_ups_with_current_level_key_and_shared_templates()
@@ -55,7 +54,7 @@ public sealed class CollectionLevelUpPreviewCompilerTests
             },
         };
 
-        var result = new CollectionEncounterPreviewPlanCompiler().Compile(
+        var result = new EncounterPreviewPlanCompiler().Compile(
             cards,
             new Dictionary<int, TLevelUp> { [2] = levelUp }
         );
@@ -80,7 +79,7 @@ public sealed class CollectionLevelUpPreviewCompilerTests
     {
         var levelUp = new TLevelUp { Level = 7, Rewards = new TSpawnContextQuery() };
 
-        var result = new CollectionEncounterPreviewPlanCompiler().Compile(
+        var result = new EncounterPreviewPlanCompiler().Compile(
             new Dictionary<Guid, ITCard>(),
             new Dictionary<int, TLevelUp> { [6] = levelUp }
         );

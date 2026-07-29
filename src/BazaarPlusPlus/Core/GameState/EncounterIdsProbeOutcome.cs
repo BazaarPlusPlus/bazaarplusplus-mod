@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Core.GameState;
 
 internal readonly record struct EncounterIdsProbeOutcome(

@@ -1,12 +1,11 @@
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Game;
-using BazaarPlusPlus.Game.CollectionPanel;
 using Xunit;
 
-namespace CollectionEncounterTooltip.Tests;
+namespace EncounterTooltip.Tests;
 
-public sealed class CollectionEncounterPreviewPlanLoaderTests : IDisposable
+public sealed class EncounterPreviewPlanLoaderTests : IDisposable
 {
     private readonly string _directory = Path.Combine(
         Path.GetTempPath(),
@@ -22,7 +21,7 @@ public sealed class CollectionEncounterPreviewPlanLoaderTests : IDisposable
         store.Save(identity, snapshot);
         var compileCalls = 0;
         var mapCalls = 0;
-        var loader = new CollectionEncounterPreviewPlanLoader(
+        var loader = new EncounterPreviewPlanLoader(
             store,
             (_, _) =>
             {
@@ -55,12 +54,12 @@ public sealed class CollectionEncounterPreviewPlanLoaderTests : IDisposable
         var compileCalls = 0;
         var mapCalls = 0;
         var snapshot = Snapshot();
-        var loader = new CollectionEncounterPreviewPlanLoader(
+        var loader = new EncounterPreviewPlanLoader(
             store,
             (_, _) =>
             {
                 compileCalls++;
-                return new CollectionEncounterPreviewCompileResult(snapshot, Array.Empty<Guid>());
+                return new EncounterPreviewCompileResult(snapshot, Array.Empty<Guid>());
             }
         );
 
@@ -82,37 +81,37 @@ public sealed class CollectionEncounterPreviewPlanLoaderTests : IDisposable
         Assert.NotNull(result.CompileResult);
     }
 
-    private CollectionEncounterPreviewCacheStore Store() =>
+    private EncounterPreviewCacheStore Store() =>
         new(Path.Combine(_directory, "preview-plans.json"));
 
-    private static CollectionEncounterPreviewCacheIdentity Identity(string etag) =>
+    private static EncounterPreviewCacheIdentity Identity(string etag) =>
         new("etag", "https://example.invalid/GameData.db.zip", etag, "build", "Online");
 
-    private static CollectionEncounterPreviewSnapshot Snapshot()
+    private static EncounterPreviewSnapshot Snapshot()
     {
         var id = Guid.Parse("60000000-0000-0000-0000-000000000001");
-        return new CollectionEncounterPreviewSnapshot(
+        return new EncounterPreviewSnapshot(
             new[]
             {
-                new CollectionEncounterPreviewEventPlan(
+                new EncounterPreviewEventPlan(
                     id,
                     isRandomSelectionEvent: false,
                     suppressRandomOutcome: false,
                     choiceLimit: 1,
-                    Array.Empty<CollectionEncounterOutcomeGroupData>(),
-                    Array.Empty<CollectionEncounterChoiceGroupData>()
+                    Array.Empty<EncounterOutcomeGroupData>(),
+                    Array.Empty<EncounterChoiceGroupData>()
                 ),
             },
             new[]
             {
-                new CollectionEncounterPreviewTemplatePlan(
+                new EncounterPreviewTemplatePlan(
                     id,
-                    CollectionEncounterPreviewTemplateKind.Event,
+                    EncounterPreviewTemplateKind.Event,
                     Array.Empty<EHero>(),
                     "Event",
-                    new CollectionEncounterPreviewLocalizedText(string.Empty, "Event"),
-                    new CollectionEncounterPreviewLocalizedText(string.Empty, "Event"),
-                    new Dictionary<string, CollectionEncounterPreviewAbilityValue>(),
+                    new EncounterPreviewLocalizedText(string.Empty, "Event"),
+                    new EncounterPreviewLocalizedText(string.Empty, "Event"),
+                    new Dictionary<string, EncounterPreviewAbilityValue>(),
                     rewardFilter: null
                 ),
             }

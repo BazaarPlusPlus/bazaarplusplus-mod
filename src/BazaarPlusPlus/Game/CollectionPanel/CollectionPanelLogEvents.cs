@@ -103,14 +103,12 @@ internal enum CollectionCardBindStage
 
 internal enum CollectionCardDisplayStage
 {
-    Setup,
     Show,
 }
 
 internal enum CollectionGridPerformancePhase
 {
     FirstWindowBind,
-    FirstWindowSetup,
 }
 
 internal enum CollectionCardArtStatus

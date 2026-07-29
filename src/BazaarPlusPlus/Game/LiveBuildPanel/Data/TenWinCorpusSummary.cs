@@ -1,8 +1,5 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
-
 namespace BazaarPlusPlus.Game.LiveBuildPanel.Data;
 
 /// <summary>Provenance summary of a loaded corpus for status/feedback surfaces.</summary>

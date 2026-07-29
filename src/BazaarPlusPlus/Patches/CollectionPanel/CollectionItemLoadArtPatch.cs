@@ -1,10 +1,7 @@
 #nullable enable
 #pragma warning disable CS0436
-using System;
-using System.Threading.Tasks;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
-using BazaarPlusPlus.Infrastructure;
 using HarmonyLib;
 using TheBazaar.UI;
 using Object = UnityEngine.Object;
@@ -133,6 +130,9 @@ internal static class CollectionItemLoadArtPatch
                 instance._cardImage.material = material;
 
             instance._gemGroupController?.Initialize(instance._clientCard);
+
+            // Bounds may change once art material is assigned; invalidate the cell fit cache.
+            marker.OnArtLoaded?.Invoke();
         }
         catch (Exception ex)
         {

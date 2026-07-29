@@ -4,19 +4,10 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RestoreAdditionalProjectSources>
-      https://api.nuget.org/v3/index.json;
-      https://nuget.bepinex.dev/v3/index.json;
-    </RestoreAdditionalProjectSources>
   </PropertyGroup>
 
   <PropertyGroup>
     <ProjectRoot>$(MSBuildThisFileDirectory)../../</ProjectRoot>
-    <MacSteamManagedDefault>$(HOME)/Library/Application Support/Steam/steamapps/common/The Bazaar/TheBazaar.app/Contents/Resources/Data/Managed</MacSteamManagedDefault>
-  </PropertyGroup>
-
-  <PropertyGroup Condition="'$(ManagedPath)' == '' and Exists('$(MacSteamManagedDefault)/Assembly-CSharp.dll')">
-    <ManagedPath>$(MacSteamManagedDefault)</ManagedPath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -33,6 +24,18 @@
       Link="CollectionDerivedKeywordFacts.cs"
     />
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMechanic.cs"
+      Link="CollectionMechanic.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionMechanicFacts.cs"
+      Link="CollectionMechanicFacts.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionKeywordFacetOption.cs"
+      Link="CollectionKeywordFacetOption.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionLocalizationResolver.cs"
       Link="CollectionLocalizationResolver.cs"
     />
@@ -47,6 +50,14 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionSearchRefreshGate.cs"
       Link="CollectionSearchRefreshGate.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionSearchModeState.cs"
+      Link="CollectionSearchModeState.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Ui\CollectionSearchSvgIconData.cs"
+      Link="CollectionSearchSvgIconData.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionQuery.cs"
@@ -85,8 +96,8 @@
       Link="CollectionFilterState.cs"
     />
     <Compile
-      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\DayTierSchedule.cs"
-      Link="DayTierSchedule.cs"
+      Include="..\..\src\BazaarPlusPlus\GameInterop\DayTiers\GameDataDayTierTable.cs"
+      Link="GameDataDayTierTable.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionPanelSelectionState.cs"
@@ -95,6 +106,18 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionPanelHeroPreference.cs"
       Link="CollectionPanelHeroPreference.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCatalogReadiness.cs"
+      Link="CollectionCatalogReadiness.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionHeroSelectionRoster.cs"
+      Link="CollectionHeroSelectionRoster.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Heroes\TheDragonsHeroIdentity.cs"
+      Link="TheDragonsHeroIdentity.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Sources\CollectionSourceEnums.cs"
@@ -131,6 +154,10 @@
     <Compile
       Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\PackageIdentity.cs"
       Link="PackageIdentity.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\CardAbilityValueReader.cs"
+      Link="CardAbilityValueReader.cs"
     />
     <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CardTags\PlayerFacingCardTags.cs"

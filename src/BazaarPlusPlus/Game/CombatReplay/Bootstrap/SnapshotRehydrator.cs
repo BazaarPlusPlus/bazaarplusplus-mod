@@ -1,17 +1,11 @@
 #nullable enable
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using BazaarGameClient.Domain.Models.Cards;
-using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Players;
 using BazaarGameShared.Infra.Messages;
 using BazaarGameShared.Infra.Messages.GameSimEvents;
-using BazaarGameShared.TempoNet.Enums;
-using BazaarGameShared.TempoNet.Models;
 using BazaarPlusPlus.Game.PvpBattles;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
@@ -111,6 +105,7 @@ internal static class SnapshotRehydrator
             is GameSimEventCardSpawned
             {
                 CombatantId: ECombatantId.Opponent,
+                Type: not ECardType.SocketEffect,
                 Section: not EInventorySection.Hand,
             };
     }

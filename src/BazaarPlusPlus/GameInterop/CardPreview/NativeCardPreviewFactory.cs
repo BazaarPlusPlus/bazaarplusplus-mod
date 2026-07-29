@@ -1,8 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Cards.Skill;
@@ -13,70 +9,100 @@ using UnityEngine;
 
 namespace BazaarPlusPlus.GameInterop.CardPreview;
 
+internal sealed class NativeCardPreviewResource
+{
+    internal NativeCardPreviewResource(
+        Component card,
+        RectTransform rect,
+        NativeCardPreviewKind kind,
+        NativeCardPreviewSubject subject,
+        INativeCardPreviewOwner owner,
+        NativeCardPreviewPresentation presentation
+    )
+    {
+        Card = card;
+        Root = card.gameObject;
+        Rect = rect;
+        Kind = kind;
+        Subject = subject;
+        Owner = owner;
+        Presentation = presentation;
+    }
+
+    internal Component Card { get; }
+    internal GameObject Root { get; }
+    internal RectTransform Rect { get; }
+    internal NativeCardPreviewKind Kind { get; }
+    internal NativeCardPreviewSubject Subject { get; }
+    internal INativeCardPreviewOwner Owner { get; }
+    internal NativeCardPreviewPresentation Presentation { get; }
+
+    internal NativeCardPreviewOwnerContext CreateOwnerContext()
+    {
+        NativeCardPreviewReflection.TryGetTooltipData(
+            Card,
+            out var tooltipData,
+            failure =>
+            {
+                try
+                {
+                    Owner.ReportFailure(failure);
+                }
+                catch
+                {
+                    // Diagnostics cannot prevent the owner from receiving its release hook.
+                }
+            }
+        );
+        return new NativeCardPreviewOwnerContext(Root, Rect, Subject, tooltipData);
+    }
+}
+
+internal readonly record struct NativeCardPreviewCoreAcquireOutcome(
+    NativeCardPreviewResource? Resource,
+    NativeCardPreviewFailure? Failure
+);
+
 internal sealed class NativeCardPreviewFactory
 {
     private readonly NativeCardPreviewPool _pool;
-    private readonly NativeCardPreviewAssetLoader _assetLoader;
+    private readonly NativeCardPreviewAssetLoader _assetLoader = new();
+    private int _instanceCounter;
 
-    public NativeCardPreviewFactory(NativeCardPreviewPool pool)
-    {
+    internal NativeCardPreviewFactory(NativeCardPreviewPool pool) =>
         _pool = pool ?? throw new ArgumentNullException(nameof(pool));
-        _assetLoader = new NativeCardPreviewAssetLoader();
-    }
 
-    public bool ReflectionReady => NativeCardPreviewReflection.SetUpMethod != null;
-
-    public bool TryResolveSpan(
-        NativeCardPreviewSpec? spec,
-        out int span,
-        out NativeCardPreviewFailure? failure
-    )
+    internal NativeCardMeasureResult Measure(NativeCardPreviewSubject? subject)
     {
-        span = 1;
-        if (!TryResolveTemplate(spec, out var template, out failure))
-            return false;
-
-        span = CardSizeSpan.Resolve(template.Size);
-        return true;
-    }
-
-    public Task<NativeCardPreviewCreateOutcome> CreateAsync(
-        NativeCardPreviewSpec? spec,
-        Transform parent,
-        int instanceIndex,
-        CancellationToken token = default,
-        Action<Component>? prepareBeforeActivate = null
-    )
-    {
-        if (parent == null || spec == null)
-            return Task.FromResult(NativeCardPreviewCreateOutcome.Unavailable());
-        if (!TryResolveTemplate(spec, out var template, out var failure))
+        if (!TryResolveTemplate(subject, out var template, out var failure))
         {
-            return Task.FromResult(
+            return new NativeCardMeasureResult(
                 failure == null
-                    ? NativeCardPreviewCreateOutcome.Unavailable()
-                    : NativeCardPreviewCreateOutcome.Degraded(failure)
+                    ? NativeCardMeasureStatus.Unavailable
+                    : NativeCardMeasureStatus.Failed,
+                1,
+                failure
             );
         }
 
-        return CreateAsync(template, spec, parent, instanceIndex, token, prepareBeforeActivate);
+        return new NativeCardMeasureResult(
+            NativeCardMeasureStatus.Measured,
+            CardSizeSpan.Resolve(template.Size),
+            null
+        );
     }
 
-    public async Task<NativeCardPreviewCreateOutcome> CreateAsync(
-        TCardBase template,
-        NativeCardPreviewSpec spec,
-        Transform parent,
-        int instanceIndex,
-        CancellationToken token = default,
-        Action<Component>? prepareBeforeActivate = null
+    internal async Task<NativeCardPreviewCoreAcquireOutcome> AcquireAsync(
+        NativeCardPreviewSubject? subject,
+        INativeCardPreviewOwner owner,
+        CancellationToken token = default
     )
     {
-        if (template == null || spec == null || parent == null)
-            return NativeCardPreviewCreateOutcome.Unavailable();
-
+        if (!TryResolveTemplate(subject, out var template, out var resolveFailure))
+            return new NativeCardPreviewCoreAcquireOutcome(null, resolveFailure);
         if (!TryResolveKind(template, out var kind))
         {
-            return NativeCardPreviewCreateOutcome.Degraded(
+            return Failed(
                 new NativeCardPreviewFailure(
                     NativeCardPreviewOperation.ResolveKind,
                     NativeCardPreviewFailureReason.UnsupportedCardType,
@@ -85,54 +111,47 @@ internal sealed class NativeCardPreviewFactory
             );
         }
 
-        var instance = BuildSyntheticInstance(spec, kind, instanceIndex);
+        var instance = BuildSyntheticInstance(subject!, kind, ++_instanceCounter);
+
+        Transform? parent;
+        try
+        {
+            parent = owner.ResolveParent(subject!);
+        }
+        catch (Exception ex)
+        {
+            return Failed(OwnerFailure(NativeCardPreviewOperation.OwnerPrepare, template.Id, ex));
+        }
+        if (parent == null)
+            return default;
+
         NativeCardPreviewFailure? instantiateFailure = null;
-        var lease = await _pool.TakeAsync(
+        var card = await _pool.TakeInactiveAsync(
             kind,
             parent,
             async () =>
             {
-                var outcome = await _assetLoader.InstantiateReadyCardAsync(instance, parent, token);
+                var outcome = await _assetLoader.InstantiateInactiveCardAsync(
+                    template,
+                    parent,
+                    token
+                );
                 instantiateFailure = outcome.Failure;
                 return outcome.Card;
             },
-            token,
-            prepareBeforeActivate
+            token
         );
-        if (!lease.HasValue)
-        {
-            return instantiateFailure == null
-                ? NativeCardPreviewCreateOutcome.Unavailable()
-                : NativeCardPreviewCreateOutcome.Degraded(instantiateFailure);
-        }
+        if (card == null)
+            return new NativeCardPreviewCoreAcquireOutcome(null, instantiateFailure);
 
-        var leased = lease.Value;
-        var card = leased.Card;
+        var prepared = false;
         var ownsCard = true;
         try
         {
-            if (!leased.AlreadySetUp)
-            {
-                var setUpFailure = await NativeCardPreviewRuntime.InvokeSetUpSafe(
-                    card,
-                    template,
-                    instance,
-                    token
-                );
-                if (setUpFailure != null)
-                    return NativeCardPreviewCreateOutcome.Degraded(setUpFailure);
-            }
-
-            token.ThrowIfCancellationRequested();
-
-            var resizeFailure = NativeCardPreviewRuntime.Resize(card, template.Id);
-            if (resizeFailure != null)
-                return NativeCardPreviewCreateOutcome.Degraded(resizeFailure);
-
             var rect = card.transform as RectTransform ?? card.GetComponent<RectTransform>();
             if (rect == null)
             {
-                return NativeCardPreviewCreateOutcome.Degraded(
+                return Failed(
                     new NativeCardPreviewFailure(
                         NativeCardPreviewOperation.ResolveRect,
                         NativeCardPreviewFailureReason.RectUnavailable,
@@ -141,42 +160,143 @@ internal sealed class NativeCardPreviewFactory
                 );
             }
 
-            ownsCard = false;
-            return NativeCardPreviewCreateOutcome.Ready(
-                new NativeCardPreviewHandle(card, rect, kind, Task.CompletedTask, spec)
+            NativeCardPreviewPresentation presentation;
+            try
+            {
+                presentation = NativeCardPreviewPresentation.Create(card);
+            }
+            catch (Exception ex)
+            {
+                return Failed(
+                    new NativeCardPreviewFailure(
+                        NativeCardPreviewOperation.Show,
+                        NativeCardPreviewFailureReason.Unexpected,
+                        template.Id,
+                        ex
+                    )
+                );
+            }
+
+            try
+            {
+                prepared = true;
+                owner.PrepareWhileInactive(
+                    new NativeCardPreviewOwnerContext(card.gameObject, rect, subject!, null)
+                );
+            }
+            catch (Exception ex)
+            {
+                return Failed(
+                    OwnerFailure(NativeCardPreviewOperation.OwnerPrepare, template.Id, ex)
+                );
+            }
+
+            card.transform.localScale = Vector3.one;
+            card.transform.localRotation = Quaternion.identity;
+            card.gameObject.SetActive(true);
+            NativeCardPreviewReflection.ApplyLayerRecursive(card.gameObject, owner.Layer);
+
+            var setUpFailure = await NativeCardPreviewRuntime.InvokeSetUpSafe(
+                card,
+                template,
+                instance,
+                token
             );
-        }
-        catch (OperationCanceledException)
-        {
-            return NativeCardPreviewCreateOutcome.Unavailable();
+            if (setUpFailure != null)
+                return Failed(setUpFailure);
+
+            token.ThrowIfCancellationRequested();
+            var resizeFailure = NativeCardPreviewRuntime.Resize(card, template.Id);
+            if (resizeFailure != null)
+                return Failed(resizeFailure);
+
+            var resource = new NativeCardPreviewResource(
+                card,
+                rect,
+                kind,
+                subject!,
+                owner,
+                presentation
+            );
+            try
+            {
+                owner.OnAcquired(resource.CreateOwnerContext());
+            }
+            catch (Exception ex)
+            {
+                return Failed(
+                    OwnerFailure(NativeCardPreviewOperation.OwnerAcquired, template.Id, ex)
+                );
+            }
+
+            ownsCard = false;
+            return new NativeCardPreviewCoreAcquireOutcome(resource, null);
         }
         finally
         {
             if (ownsCard)
-                _pool.Return(card, kind);
+            {
+                try
+                {
+                    if (prepared)
+                    {
+                        try
+                        {
+                            var rect =
+                                card.transform as RectTransform
+                                ?? card.GetComponent<RectTransform>();
+                            if (rect != null)
+                            {
+                                NativeCardPreviewReflection.TryGetTooltipData(
+                                    card,
+                                    out var tooltipData
+                                );
+                                owner.BeforeRelease(
+                                    new NativeCardPreviewOwnerContext(
+                                        card.gameObject,
+                                        rect,
+                                        subject!,
+                                        tooltipData
+                                    )
+                                );
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            try
+                            {
+                                owner.ReportFailure(
+                                    OwnerFailure(
+                                        NativeCardPreviewOperation.OwnerRelease,
+                                        template.Id,
+                                        ex
+                                    )
+                                );
+                            }
+                            catch
+                            {
+                                // Diagnostics cannot interrupt mandatory native cleanup.
+                            }
+                        }
+                    }
+                }
+                finally
+                {
+                    NativeCardPreviewPool.Destroy(card);
+                }
+            }
         }
     }
 
-    public NativeCardPreviewFailure? Show(NativeCardPreviewHandle? handle, bool show = true)
-    {
-        if (handle == null)
-            return null;
-        return NativeCardPreviewRuntime.Show(handle.Card, show, handle.Spec.TemplateId);
-    }
-
-    public void Return(NativeCardPreviewHandle? handle) => _pool.Return(handle);
-
-    public void DestroyAll() => _pool.DestroyAll();
-
-    private bool TryResolveTemplate(
-        NativeCardPreviewSpec? spec,
+    private static bool TryResolveTemplate(
+        NativeCardPreviewSubject? subject,
         out TCardBase template,
         out NativeCardPreviewFailure? failure
     )
     {
         template = null!;
         failure = null;
-        if (spec == null || spec.TemplateId == Guid.Empty)
+        if (subject == null || subject.TemplateId == Guid.Empty)
             return false;
 
         var staticData = BppStaticDataAccess.TryGetReadyManagerObject();
@@ -185,18 +305,18 @@ internal sealed class NativeCardPreviewFactory
             failure = new NativeCardPreviewFailure(
                 NativeCardPreviewOperation.ResolveTemplate,
                 NativeCardPreviewFailureReason.StaticDataUnavailable,
-                spec.TemplateId
+                subject.TemplateId
             );
             return false;
         }
 
-        var resolved = BppStaticDataAccess.GetCardTemplate(staticData, spec.TemplateId);
+        var resolved = BppStaticDataAccess.GetCardTemplate(staticData, subject.TemplateId);
         if (resolved == null)
         {
             failure = new NativeCardPreviewFailure(
                 NativeCardPreviewOperation.ResolveTemplate,
                 NativeCardPreviewFailureReason.TemplateUnavailable,
-                spec.TemplateId
+                subject.TemplateId
             );
             return false;
         }
@@ -213,48 +333,44 @@ internal sealed class NativeCardPreviewFactory
             kind = NativeCardPreviewKind.ForSkill();
             return true;
         }
+        if (template.Type != ECardType.Item)
+            return false;
 
-        if (template.Type == ECardType.Item)
-        {
-            kind = NativeCardPreviewKind.ForItem(ResolveCardSize(template.Size));
-            return true;
-        }
-
-        return false;
+        kind = NativeCardPreviewKind.ForItem(ResolveCardSize(template.Size));
+        return true;
     }
 
     private static TCardInstance BuildSyntheticInstance(
-        NativeCardPreviewSpec spec,
+        NativeCardPreviewSubject subject,
         NativeCardPreviewKind kind,
         int index
     )
     {
         var attributes =
-            spec.Attributes != null
-                ? new Dictionary<ECardAttributeType, int>(spec.Attributes)
+            subject.Attributes != null
+                ? new Dictionary<ECardAttributeType, int>(subject.Attributes)
                 : new Dictionary<ECardAttributeType, int>();
-        var instanceId = $"{spec.InstanceIdPrefix}-{Mathf.Max(0, index)}";
-
+        var instanceId = $"{subject.InstanceIdPrefix}-{Mathf.Max(0, index)}";
         if (kind.Type == ECardType.Skill)
         {
             return new TCardInstanceSkill
             {
-                TemplateId = spec.TemplateId,
+                TemplateId = subject.TemplateId,
                 TemplateVersion = string.Empty,
                 InstanceId = instanceId,
-                Tier = spec.Tier,
+                Tier = subject.Tier,
                 Attributes = attributes,
             };
         }
 
         return new TCardInstanceItem
         {
-            TemplateId = spec.TemplateId,
+            TemplateId = subject.TemplateId,
             TemplateVersion = string.Empty,
             InstanceId = instanceId,
-            Tier = spec.Tier,
-            SocketId = spec.SocketId ?? (EContainerSocketId)Mathf.Clamp(index, 0, 9),
-            EnchantmentType = spec.EnchantmentType,
+            Tier = subject.Tier,
+            SocketId = subject.SocketId ?? (EContainerSocketId)Mathf.Clamp(index, 0, 9),
+            EnchantmentType = subject.EnchantmentType,
             Attributes = attributes,
         };
     }
@@ -267,4 +383,13 @@ internal sealed class NativeCardPreviewFactory
             ECardSize.Large => ECardSize.Large,
             _ => ECardSize.Small,
         };
+
+    private static NativeCardPreviewCoreAcquireOutcome Failed(NativeCardPreviewFailure failure) =>
+        new(null, failure);
+
+    private static NativeCardPreviewFailure OwnerFailure(
+        NativeCardPreviewOperation operation,
+        Guid templateId,
+        Exception exception
+    ) => new(operation, NativeCardPreviewFailureReason.OwnerHookException, templateId, exception);
 }

@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -142,7 +141,7 @@ internal static class BppDockButtonVisuals
         return best;
     }
 
-    private static void ApplyIcon(Image icon, Sprite sprite)
+    internal static void ApplyIcon(Image icon, Sprite sprite)
     {
         icon.gameObject.name = IconObjectName;
         icon.enabled = true;

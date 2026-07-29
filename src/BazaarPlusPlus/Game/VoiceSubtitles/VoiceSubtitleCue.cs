@@ -1,6 +1,4 @@
 #nullable enable
-using System;
-
 namespace BazaarPlusPlus.Game.VoiceSubtitles;
 
 internal readonly struct VoiceSubtitleCue

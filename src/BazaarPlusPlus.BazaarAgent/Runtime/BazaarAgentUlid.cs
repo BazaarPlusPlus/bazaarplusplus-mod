@@ -1,5 +1,4 @@
 #nullable enable
-using System;
 using System.Security.Cryptography;
 
 namespace BazaarPlusPlus.BazaarAgent;

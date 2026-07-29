@@ -1,7 +1,5 @@
 #nullable enable
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Reflection;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core;
@@ -16,6 +14,13 @@ namespace BazaarPlusPlus.BazaarAgentHost;
 
 internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispatcher
 {
+    private readonly IBazaarAgentGameProbe _gameProbe;
+
+    internal BazaarAgentGameActionDispatcher(IBazaarAgentGameProbe gameProbe)
+    {
+        _gameProbe = gameProbe ?? throw new ArgumentNullException(nameof(gameProbe));
+    }
+
     /// <summary>Main thread only. Routes the action through AppState.CurrentState.*Command()
     /// so the game's UI animation + state-validation chain runs the same way a real click does.</summary>
     public BazaarAgentDispatchResult Execute(
@@ -38,7 +43,7 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
         }
     }
 
-    private static BazaarAgentDispatchResult Dispatch(
+    private BazaarAgentDispatchResult Dispatch(
         BazaarAgentAction action,
         BazaarAgentContextSnapshot snapshot
     )
@@ -52,9 +57,24 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
             {
                 if (action.Hero is { } heroStr)
                 {
-                    if (!Enum.TryParse<EHero>(heroStr, ignoreCase: true, out var hero))
-                        return new(false, "unknown hero");
-                    var setHeroErr = SetRunConfigSelectedHero(hero);
+                    var heroResolution = _gameProbe.ResolveHero(heroStr);
+                    if (heroResolution.Status == BazaarAgentHeroResolutionStatus.Unavailable)
+                    {
+                        return new(
+                            false,
+                            "hero unavailable in this game build",
+                            FailureKind: BazaarAgentDispatchFailureKind.Unavailable
+                        );
+                    }
+                    if (heroResolution.Status != BazaarAgentHeroResolutionStatus.Resolved)
+                    {
+                        return new(
+                            false,
+                            "unknown hero",
+                            FailureKind: BazaarAgentDispatchFailureKind.Invalid
+                        );
+                    }
+                    var setHeroErr = SetRunConfigSelectedHero(heroResolution.Hero);
                     if (setHeroErr is not null)
                         return new(false, setHeroErr);
                 }

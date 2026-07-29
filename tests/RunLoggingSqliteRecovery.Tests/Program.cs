@@ -180,7 +180,7 @@ static void Assert(bool condition, string message)
         throw new InvalidOperationException(message);
 }
 
-sealed class TempPathProvider : IPathProvider
+internal sealed class TempPathProvider : IPathProvider
 {
     private readonly string _dbPath;
 
