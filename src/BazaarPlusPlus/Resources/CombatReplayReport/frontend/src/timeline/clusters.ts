@@ -177,6 +177,7 @@ export function isVisibleTimelineEvent(
   entityById: ReadonlyMap<string, TimelineEntity>,
   eventLaneMode: EventLaneMode = "target",
 ): boolean {
+  if (event.timelineReplacedByDefeat) return false;
   const kind = event.kind.toLowerCase();
   if (event.resolvedAttributeAction) {
     return eventAttributePolicy(event).timeline === "marker";

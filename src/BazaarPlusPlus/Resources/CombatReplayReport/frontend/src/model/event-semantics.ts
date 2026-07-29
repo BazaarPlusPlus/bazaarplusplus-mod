@@ -537,6 +537,25 @@ export function eventPresentation(
     "kind" | "action" | "resolvedAttributeAction"
   >,
 ): EventPresentation {
+  const kind = event.kind.toLowerCase();
+  if (kind === "combatant-died") {
+    const action = event.action.toLowerCase();
+    return {
+      groupKey: "defeat",
+      labelKey:
+        action.endsWith(":direct")
+          ? "defeatDirect"
+          : action.endsWith(":burn")
+            ? "defeatBurn"
+            : action.endsWith(":poison")
+              ? "defeatPoison"
+              : action.endsWith(":other")
+                ? "defeatOther"
+                : "defeat",
+      token: "defeat",
+    };
+  }
+
   const damageKind = eventDamageKind(event);
   if (damageKind) {
     return {
@@ -556,7 +575,6 @@ export function eventPresentation(
     };
   }
 
-  const kind = event.kind.toLowerCase();
   if (event.resolvedAttributeAction) {
     const semantic = cardAttributeSemantic(event.resolvedAttributeAction);
     return {

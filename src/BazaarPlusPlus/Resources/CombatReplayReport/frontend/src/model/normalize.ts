@@ -128,6 +128,7 @@ export interface NormalizedEvent {
   iconSemanticKey: string;
   icon: string;
   occurrences: number;
+  timelineReplacedByDefeat?: boolean;
 }
 
 export interface NormalizedMetric {

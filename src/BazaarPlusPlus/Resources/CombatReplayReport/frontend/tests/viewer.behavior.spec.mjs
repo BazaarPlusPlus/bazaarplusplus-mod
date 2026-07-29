@@ -296,6 +296,7 @@ let scrubRecordingReportUrl;
 let navigationReportUrl;
 let scrollRecordingReportUrl;
 let terminalFrameReportUrl;
+let defeatReportUrl;
 
 function serializedEnvelope(value) {
   return JSON.stringify(value).replaceAll("<", "\\u003c");
@@ -335,6 +336,68 @@ test.beforeAll(async ({ browserName }) => {
   await writeFile(
     join(fixtureDirectory, "report.html"),
     reportHtml(fixtureEnvelope),
+    "utf8",
+  );
+  const defeatEnvelope = structuredClone(fixtureEnvelope);
+  defeatEnvelope.battleDocument.metrics.push({
+    frame: 139,
+    combatTimeMs: 6950,
+    combatant: "opponent",
+    metric: "health",
+    value: 300,
+    unit: "points",
+  });
+  defeatEnvelope.battleDocument.events.push(
+    schemaEvent({
+      eventId: "lethal-damage",
+      frame: 140,
+      frameSequence: 0,
+      combatTimeMs: 7000,
+      kind: "effect-executed",
+      action: "PlayerDamage",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-item",
+      targetEntityIds: ["opponent-hero"],
+      value: 300,
+      unit: "points",
+      role: "applied",
+      attributionConfidence: "exact",
+      iconSemanticKey: "status.damage",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/00/0000000000000000000000000000000000000000000000000000000000000000.png",
+    }),
+    schemaEvent({
+      eventId: "opponent-defeated",
+      frame: 140,
+      frameSequence: 1,
+      combatTimeMs: 7000,
+      kind: "combatant-died",
+      action: "Died",
+      targetEntityIds: ["opponent-hero"],
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+    }),
+    schemaEvent({
+      eventId: "lethal-health-settlement",
+      frame: 140,
+      frameSequence: 2,
+      combatTimeMs: 7000,
+      kind: "health",
+      action: "Health:Damage",
+      targetEntityIds: ["opponent-hero"],
+      value: -300,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+      iconSemanticKey: "status.damage",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/00/0000000000000000000000000000000000000000000000000000000000000000.png",
+    }),
+  );
+  defeatEnvelope.battleDocument.rawRecordCount += 3;
+  await writeFile(
+    join(fixtureDirectory, "defeat-report.html"),
+    reportHtml(defeatEnvelope),
     "utf8",
   );
   const terminalFrameEnvelope = structuredClone(fixtureEnvelope);
@@ -1383,6 +1446,9 @@ test.beforeAll(async ({ browserName }) => {
   terminalFrameReportUrl = pathToFileURL(
     join(fixtureDirectory, "terminal-frame-report.html"),
   ).href;
+  defeatReportUrl = pathToFileURL(
+    join(fixtureDirectory, "defeat-report.html"),
+  ).href;
 });
 
 test.afterAll(async () => {
@@ -1426,6 +1492,48 @@ test("boots the file report with one assembled script and one stylesheet", async
   ).toHaveCount(0);
   expect(externalRequests).toEqual([]);
   expect(pageErrors).toEqual([]);
+});
+
+test("shows the defeat cause on the defeated hero lane", async ({ page }) => {
+  await page.goto(`${defeatReportUrl}?lang=en`);
+  await expect(page.getByTestId("timeline-canvas")).toHaveAttribute(
+    "data-bpp-defeat-marker-count",
+    "1",
+  );
+  await page.getByTestId("timeline-scroll").evaluate((element) => {
+    element.scrollLeft = element.scrollWidth - element.clientWidth;
+  });
+  const point = await timelineMarkerPoint(page, {
+    combatMs: 7000,
+    durationMs: 8000,
+    entityId: "opponent-hero",
+    dy: 0,
+  });
+  expect(point).not.toBeNull();
+  await page.mouse.move(point.x, point.y);
+
+  const hoverInspector = page.getByTestId("timeline-tooltip");
+  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+    "Defeated by direct damage",
+  );
+  await expect(
+    hoverInspector.getByTestId("frame-inspector-entity"),
+  ).toHaveText("Fixture Opponent");
+  await expect(
+    hoverInspector.getByTestId("frame-event-kind"),
+  ).toHaveText("Defeated by direct damage");
+  await expect(
+    hoverInspector.getByTestId("frame-event-amount"),
+  ).toHaveText("300");
+  await expect(
+    hoverInspector.getByTestId("event-source-entity"),
+  ).toHaveText("Training Blade");
+  await expect(
+    hoverInspector.getByTestId("frame-event-native-icon"),
+  ).toHaveAttribute(
+    "src",
+    "../report-assets/objects/00/0000000000000000000000000000000000000000000000000000000000000000.png",
+  );
 });
 
 test("keeps the complete terminal frame inside the timeline domain", async ({

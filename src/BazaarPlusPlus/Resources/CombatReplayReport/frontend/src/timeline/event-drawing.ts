@@ -22,6 +22,7 @@ const MARKER_COLOR_NAMES: Record<string, ThemeColorName> = {
   damage: "damage",
   damageDirect: "damage",
   destroy: "damage",
+  defeat: "damage",
   burn: "burn",
   poison: "poison",
   heal: "heal",
@@ -41,6 +42,7 @@ const MARKER_GLYPHS: Record<string, string> = {
   damage: "✦",
   damageDirect: "✦",
   destroy: "×",
+  defeat: "☠",
   burn: "♨",
   poison: "●",
   heal: "+",
@@ -214,6 +216,19 @@ export function drawMarker(
     context.strokeText("!", indicator.x, indicator.y);
     context.fillStyle = themeColor("damage");
     context.fillText("!", indicator.x, indicator.y);
+  }
+  if (cluster.token === "defeat" && image) {
+    const indicator = criticalIndicatorOffset(markerSize);
+    const fontSize = Math.max(8, Math.round(markerSize * 0.62));
+    context.font = `900 ${fontSize}px ${themeValue("--bpp-font-sans")}`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    context.lineWidth = 2.5;
+    context.lineJoin = "round";
+    context.strokeStyle = themeColor("background");
+    context.strokeText("×", indicator.x, indicator.y);
+    context.fillStyle = themeColor("damage");
+    context.fillText("×", indicator.x, indicator.y);
   }
   context.restore();
 }

@@ -111,6 +111,7 @@ import {
   damageKindFromType,
   eventDamageKind,
 } from "../src/model/damage-semantics.ts";
+import { enrichDefeatEvents } from "../src/model/defeat-events.ts";
 import {
   CARD_ATTRIBUTE_ACTIONS,
   PLAYER_ATTRIBUTE_ACTIONS,
@@ -282,6 +283,208 @@ test("damage semantics distinguish direct, burn, poison, and other outcomes", ()
   });
   assert.equal(statistics.damageDealt.player, 155);
   assert.equal(statistics.damageDealt.opponent, 70);
+});
+
+test("defeat events identify the lethal settlement and only exact direct sources", () => {
+  const entities = [
+    {
+      id: "attacker",
+      name: "Primal Core",
+      type: "item",
+      side: "player",
+      span: 2,
+      asset: "",
+      hiddenFromTimeline: false,
+    },
+    {
+      id: "defender",
+      name: "Opponent",
+      type: "hero",
+      side: "opponent",
+      span: 1,
+      asset: "",
+      hiddenFromTimeline: false,
+    },
+  ];
+  const metrics = [
+    {
+      frame: 9,
+      combatMs: 450,
+      side: "opponent",
+      metric: "health",
+      value: 100,
+      unit: "points",
+    },
+  ];
+  const damage = timelineEvent({
+    id: "damage",
+    frame: 10,
+    sequence: 0,
+    combatMs: 500,
+    kind: "effect-executed",
+    action: "PlayerDamage",
+    sourceId: "attacker",
+    triggerSourceId: "attacker",
+    targetIds: ["defender"],
+    value: 120,
+    unit: "points",
+    iconSemanticKey: "status.damage",
+    icon: "damage.png",
+  });
+  const repeatedDamage = timelineEvent({
+    ...damage,
+    id: "damage-repeat",
+    sequence: 1,
+    value: 0,
+  });
+  const died = timelineEvent({
+    id: "died",
+    frame: 10,
+    sequence: 2,
+    combatMs: 500,
+    kind: "combatant-died",
+    action: "Died",
+    targetIds: ["defender"],
+  });
+  const settlement = timelineEvent({
+    id: "settlement",
+    frame: 10,
+    sequence: 3,
+    combatMs: 500,
+    kind: "health",
+    action: "Health:Damage",
+    targetIds: ["defender"],
+    value: -120,
+    unit: "points",
+    iconSemanticKey: "status.damage",
+    icon: "damage.png",
+  });
+
+  const enrichedEvents = enrichDefeatEvents(
+    [damage, repeatedDamage, died, settlement],
+    metrics,
+    entities,
+  );
+  const enriched = enrichedEvents.find((event) => event.id === "died");
+  const replacedDamage = enrichedEvents.find(
+    (event) => event.id === "damage",
+  );
+  const replacedRepeatedDamage = enrichedEvents.find(
+    (event) => event.id === "damage-repeat",
+  );
+
+  assert.equal(enriched?.action, "Died:Direct");
+  assert.equal(enriched?.sourceId, "attacker");
+  assert.equal(enriched?.triggerSourceId, "attacker");
+  assert.equal(enriched?.value, 120);
+  assert.equal(enriched?.icon, "damage.png");
+  assert.deepEqual(eventPresentation(enriched), {
+    groupKey: "defeat",
+    labelKey: "defeatDirect",
+    token: "defeat",
+  });
+  assert.equal(replacedDamage?.timelineReplacedByDefeat, true);
+  assert.equal(replacedRepeatedDamage?.timelineReplacedByDefeat, true);
+  assert.equal(
+    isVisibleTimelineEvent(
+      replacedDamage,
+      new Map(entities.map((entity) => [entity.id, entity])),
+    ),
+    false,
+  );
+});
+
+test("defeat inference finds the health crossing without borrowing DOT sources", () => {
+  const entities = [
+    {
+      id: "attacker",
+      name: "Poison source",
+      type: "item",
+      side: "player",
+      span: 1,
+      asset: "",
+      hiddenFromTimeline: false,
+    },
+    {
+      id: "defender",
+      name: "Defender",
+      type: "hero",
+      side: "opponent",
+      span: 1,
+      asset: "",
+      hiddenFromTimeline: false,
+    },
+  ];
+  const events = [
+    timelineEvent({
+      id: "poison-application",
+      frame: 10,
+      sequence: 0,
+      combatMs: 500,
+      kind: "effect-executed",
+      action: "PlayerPoisonApply",
+      sourceId: "attacker",
+      targetIds: ["defender"],
+      value: 10,
+    }),
+    timelineEvent({
+      id: "died",
+      frame: 10,
+      sequence: 1,
+      combatMs: 500,
+      kind: "combatant-died",
+      action: "Died",
+      targetIds: ["defender"],
+    }),
+    timelineEvent({
+      id: "poison-settlement",
+      frame: 10,
+      sequence: 2,
+      combatMs: 500,
+      kind: "health",
+      action: "Health:Poison",
+      targetIds: ["defender"],
+      value: -120,
+      unit: "points",
+      iconSemanticKey: "status.poison",
+      icon: "poison.png",
+    }),
+    timelineEvent({
+      id: "burn-settlement",
+      frame: 10,
+      sequence: 3,
+      combatMs: 500,
+      kind: "health",
+      action: "Health:Burn",
+      targetIds: ["defender"],
+      value: -300,
+      unit: "points",
+    }),
+  ];
+  const enriched = enrichDefeatEvents(
+    events,
+    [
+      {
+        frame: 9,
+        combatMs: 450,
+        side: "opponent",
+        metric: "health",
+        value: 100,
+        unit: "points",
+      },
+    ],
+    entities,
+  ).find((event) => event.id === "died");
+
+  assert.equal(enriched?.action, "Died:Poison");
+  assert.equal(enriched?.sourceId, "");
+  assert.equal(enriched?.value, 120);
+  assert.equal(enriched?.icon, "poison.png");
+  assert.deepEqual(eventPresentation(enriched), {
+    groupKey: "defeat",
+    labelKey: "defeatPoison",
+    token: "defeat",
+  });
 });
 
 test("combat log merges only identical events from the same frame", () => {

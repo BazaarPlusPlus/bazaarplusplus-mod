@@ -11,6 +11,7 @@ import {
   Smile,
   Snowflake,
   Sparkles,
+  Skull,
   Swords,
   Zap,
   type LucideIcon,
@@ -32,6 +33,7 @@ const ICONS: Record<string, LucideIcon> = {
   charge: Zap,
   damage: Swords,
   destroy: CircleOff,
+  defeat: Skull,
   freeze: Snowflake,
   haste: ClockArrowUp,
   heal: Plus,
@@ -72,6 +74,7 @@ const COLORS: Record<string, string> = {
   attributeMulticast: "text-attribute",
   attributeSlowReduction: "text-slow",
   destroy: "text-damage",
+  defeat: "text-damage",
 };
 
 export function SemanticIcon({

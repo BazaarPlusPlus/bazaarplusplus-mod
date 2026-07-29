@@ -177,9 +177,13 @@ export class TimelineCanvasController {
           && event.kind.toLowerCase() === "effect-executed",
       )
     ).length;
+    const defeatMarkerCount = this.markerClusters.filter(
+      (cluster) => cluster.token === "defeat",
+    ).length;
     for (const target of [this.canvas, this.overlayCanvas]) {
       target.dataset.bppEventLaneMode = this.eventLaneMode;
       target.dataset.bppCriticalMarkerCount = String(criticalMarkerCount);
+      target.dataset.bppDefeatMarkerCount = String(defeatMarkerCount);
     }
     this.firstVisibleMs = this.clusters.reduce(
       (min, cluster) =>

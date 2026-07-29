@@ -12,6 +12,7 @@ import {
   type NormalizedCardStats,
 } from "./normalize.ts";
 import { safeVideoUrl } from "./asset-paths.ts";
+import { enrichDefeatEvents } from "./defeat-events.ts";
 import {
   normalizeSyncState,
   type RecordingSyncState,
@@ -120,7 +121,7 @@ export function buildViewModel(
       .map((stats) => [stats.entityId, stats] as const),
   );
   fillMissingEntityNames(entities, copy);
-  const events = battle.events.map(normalizeEvent);
+  let events = battle.events.map(normalizeEvent);
   events.sort(
     (left, right) =>
       left.combatMs - right.combatMs
@@ -136,6 +137,7 @@ export function buildViewModel(
     (left, right) =>
       left.combatMs - right.combatMs || left.frame - right.frame,
   );
+  events = enrichDefeatEvents(events, metrics, entities);
 
   const eventDuration = events.reduce(
     (maximum, event) => Math.max(maximum, event.combatMs),
