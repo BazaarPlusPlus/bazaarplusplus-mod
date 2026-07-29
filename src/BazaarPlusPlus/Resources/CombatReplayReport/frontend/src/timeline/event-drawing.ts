@@ -52,9 +52,41 @@ const MARKER_GLYPHS: Record<string, string> = {
   skill: "◆",
   trigger: "◇",
   status: "∿",
-  attribute: "±",
   attributeHealthMax: "+",
 };
+
+function drawAttributeMarkerGlyph(
+  context: CanvasRenderingContext2D,
+  markerSize: number,
+  color: string,
+): void {
+  const size = Math.max(1, markerSize);
+  const halfWidth = size * 0.36;
+  const plusY = -size * 0.22;
+  const minusY = size * 0.3;
+  const plusHalfHeight = size * 0.22;
+  const drawPath = (): void => {
+    context.beginPath();
+    context.moveTo(-halfWidth, plusY);
+    context.lineTo(halfWidth, plusY);
+    context.moveTo(0, plusY - plusHalfHeight);
+    context.lineTo(0, plusY + plusHalfHeight);
+    context.moveTo(-halfWidth, minusY);
+    context.lineTo(halfWidth, minusY);
+    context.stroke();
+  };
+
+  context.save();
+  context.lineCap = "round";
+  context.lineJoin = "round";
+  context.strokeStyle = themeColor("background");
+  context.lineWidth = Math.max(3, size * 0.32);
+  drawPath();
+  context.strokeStyle = color;
+  context.lineWidth = Math.max(1.5, size * 0.16);
+  drawPath();
+  context.restore();
+}
 
 function markerColor(token: string): string {
   return themeColor(MARKER_COLOR_NAMES[token] ?? "status");
@@ -137,6 +169,14 @@ export function drawMarker(
       bounds.width,
       bounds.height,
     );
+  } else if (cluster.token === "attribute") {
+    drawAttributeMarkerGlyph(context, markerSize, color);
+    if (selected) {
+      const half = Math.max(7, markerSize * 0.65);
+      context.strokeStyle = themeColor("foreground");
+      context.lineWidth = 1.5;
+      context.strokeRect(-half, -half, half * 2, half * 2);
+    }
   } else {
     const fontSize =
       tier === 1
