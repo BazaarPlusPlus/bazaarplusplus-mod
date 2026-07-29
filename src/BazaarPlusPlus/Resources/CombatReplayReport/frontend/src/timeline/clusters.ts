@@ -1,6 +1,5 @@
 import { asFiniteNumber } from "../model/value.ts";
 import {
-  baseEventKindToken,
   eventAttributeSemantic,
   eventAttributePolicy,
   eventPresentation,
@@ -144,10 +143,6 @@ export function timelineClusterEventIds(
   );
 }
 
-export function kindToken(kind: unknown): string {
-  return baseEventKindToken(kind);
-}
-
 export function eventKindToken(
   event: Pick<
     NormalizedEvent,
@@ -238,7 +233,6 @@ export function buildStatusRanges(
   const entityIndex = new Map(
     entities.map((entity, index) => [entity.id, index] as const),
   );
-  const active = new Map<string, StatusRange>();
   const ranges: StatusRange[] = [];
   const applicationEvents = new Map<string, NormalizedEvent[]>();
 
@@ -279,7 +273,6 @@ export function buildStatusRanges(
     ranges.push(range);
   }
 
-  const explicitRangeKeys = new Set<string>();
   for (const event of model.events) {
     if (
       event.kind.toLowerCase() !== "card-status-range"
@@ -291,8 +284,6 @@ export function buildStatusRanges(
     if (!targetId) continue;
     const lane = entityIndex.get(targetId);
     if (lane === undefined) continue;
-    const key = `${targetId}:${event.action}`;
-    explicitRangeKeys.add(key);
     const range: StatusRange = {
       action: event.action,
       targetId,
@@ -310,76 +301,6 @@ export function buildStatusRanges(
       range,
       event.combatMs + Math.max(1, asFiniteNumber(event.value, 1)),
       event,
-    );
-  }
-
-  for (const event of model.events) {
-    if (
-      event.kind.toLowerCase() !== "card-attribute"
-      || !STATUS_ACTIONS.has(event.action)
-    ) {
-      continue;
-    }
-    const targetId = event.targetIds.find((id) => entityIndex.has(id));
-    if (!targetId) continue;
-    const lane = entityIndex.get(targetId);
-    if (lane === undefined) continue;
-    const previous = asFiniteNumber(event.previousValue, 0);
-    const current = asFiniteNumber(event.currentValue, 0);
-    const key = `${targetId}:${event.action}`;
-    if (explicitRangeKeys.has(key)) continue;
-    let range = active.get(key);
-
-    if (previous <= 0 && current > 0) {
-      if (range) closeRange(range, event.combatMs, event);
-      range = {
-        action: event.action,
-        targetId,
-        lane,
-        startMs: event.combatMs,
-        endMs: model.durationMs,
-        startEvent: event,
-        lastEvent: event,
-        x: 0,
-        endX: 0,
-        laneHeight,
-        cluster: null,
-      };
-      active.set(key, range);
-    } else if (!range && current > 0) {
-      range = {
-        action: event.action,
-        targetId,
-        lane,
-        startMs: event.combatMs,
-        endMs: model.durationMs,
-        startEvent: event,
-        lastEvent: event,
-        x: 0,
-        endX: 0,
-        laneHeight,
-        cluster: null,
-      };
-      active.set(key, range);
-    } else if (range) {
-      range.lastEvent = event;
-    }
-
-    if (range && current <= 0) {
-      closeRange(range, event.combatMs, event);
-      active.delete(key);
-    }
-  }
-
-  for (const range of active.values()) {
-    const remainingMs = Math.max(
-      0,
-      asFiniteNumber(range.lastEvent.currentValue, 0),
-    );
-    closeRange(
-      range,
-      Math.min(model.durationMs, range.lastEvent.combatMs + remainingMs),
-      range.lastEvent,
     );
   }
 

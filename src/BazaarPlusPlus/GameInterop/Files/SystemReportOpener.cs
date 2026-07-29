@@ -1,6 +1,7 @@
 #nullable enable
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using BazaarPlusPlus.Infrastructure.Files;
 
 namespace BazaarPlusPlus.GameInterop.Files;
 
@@ -78,20 +79,6 @@ internal sealed class ResolvedSystemReport
 
 internal static class SystemReportOpener
 {
-    internal static bool TryOpen(
-        string reportRootDirectoryPath,
-        CombatReportRecordingId recordingId,
-        out string reason
-    )
-    {
-        if (!TryResolve(reportRootDirectoryPath, recordingId, out var resolvedReport, out reason))
-        {
-            return false;
-        }
-
-        return TryOpen(resolvedReport!, out reason);
-    }
-
     internal static bool TryOpen(ResolvedSystemReport resolvedReport, out string reason)
     {
         if (resolvedReport == null)
@@ -106,7 +93,12 @@ internal static class SystemReportOpener
                 resolvedReport.RecordingId,
                 out var currentReport,
                 out reason
-            ) || !string.Equals(currentReport!.FullPath, resolvedReport.FullPath, PathComparison)
+            )
+            || !string.Equals(
+                currentReport!.FullPath,
+                resolvedReport.FullPath,
+                PhysicalPathPolicy.PathComparison
+            )
         )
         {
             reason = "Battle report is no longer a valid physical file.";
@@ -142,7 +134,9 @@ internal static class SystemReportOpener
 
         try
         {
-            var reportRoot = TrimEndingSeparators(Path.GetFullPath(reportRootDirectoryPath));
+            var reportRoot = PhysicalPathPolicy.TrimEndingSeparators(
+                Path.GetFullPath(reportRootDirectoryPath)
+            );
             if (!IsPhysicalDirectory(reportRoot))
             {
                 reason = "Battle report root is unavailable or is not a physical directory.";
@@ -151,11 +145,11 @@ internal static class SystemReportOpener
 
             var expectedFileName = recordingId.Value + ".html";
             var candidate = Path.GetFullPath(Path.Combine(reportRoot, expectedFileName));
-            var candidateParent = TrimEndingSeparators(
+            var candidateParent = PhysicalPathPolicy.TrimEndingSeparators(
                 Path.GetDirectoryName(candidate) ?? string.Empty
             );
             if (
-                !string.Equals(candidateParent, reportRoot, PathComparison)
+                !string.Equals(candidateParent, reportRoot, PhysicalPathPolicy.PathComparison)
                 || !string.Equals(
                     Path.GetFileName(candidate),
                     expectedFileName,
@@ -221,28 +215,6 @@ internal static class SystemReportOpener
         return (attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) == 0
             && new FileInfo(path).Length > 0;
     }
-
-    private static string TrimEndingSeparators(string path)
-    {
-        var root = Path.GetPathRoot(path);
-        while (
-            path.Length > (root?.Length ?? 0)
-            && (
-                path[path.Length - 1] == Path.DirectorySeparatorChar
-                || path[path.Length - 1] == Path.AltDirectorySeparatorChar
-            )
-        )
-        {
-            path = path.Substring(0, path.Length - 1);
-        }
-
-        return path;
-    }
-
-    private static StringComparison PathComparison =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
 
     private static SystemReportOpenPlatform DetectPlatform()
     {

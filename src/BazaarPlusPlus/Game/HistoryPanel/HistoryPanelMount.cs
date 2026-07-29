@@ -77,7 +77,8 @@ internal sealed class HistoryPanelMount : IBppMountable
                     HistoryPanelDecisions.IsAccountLinkCardAvailable(
                         services.Config.BazaarDbUploadEnabled?.Value ?? false,
                         services.GameBuild.Channel
-                    )
+                    ),
+                dataRootDirectoryPath: services.Paths.DataRootDirectoryPath ?? string.Empty
             ),
             _nativeCardPreviewHost
         );

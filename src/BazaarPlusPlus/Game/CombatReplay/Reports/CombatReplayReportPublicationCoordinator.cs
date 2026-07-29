@@ -421,7 +421,6 @@ internal sealed class CombatReplayReportPublicationCoordinator
                 return false;
 
             generation.Video = video;
-            generation.Locale = video.Locale;
             attemptCount = generation.AttemptCount;
             _inFlightRecordingIds.Add(video.RecordingId);
             return true;

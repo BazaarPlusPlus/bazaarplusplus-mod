@@ -5,7 +5,7 @@ Only React/TypeScript/Tailwind source belongs under `frontend/`; generated `view
 
 ```sh
 cd src/BazaarPlusPlus/Resources/CombatReplayReport/frontend
-npm run viewer:build
+npm ci
 npm run viewer:browsers:install
 npm test
 ```
@@ -50,7 +50,8 @@ cannot mix JavaScript and CSS from different builds. There is no legacy Viewer f
 stable alias. Game image assets remain immutable and content-addressed.
 
 Run the repository-level browser suite with `./run.sh viewer-test`. It uses direct `file://` reports
-in Chromium and WebKit.
+in Chromium and WebKit, blocks network access through CSP, and exercises the stable
+`data-bpp-test-id` contract.
 
 ## Release packaging
 

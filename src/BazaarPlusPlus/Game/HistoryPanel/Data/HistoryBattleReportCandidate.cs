@@ -9,22 +9,10 @@ namespace BazaarPlusPlus.Game.HistoryPanel.Data;
 /// </summary>
 internal sealed class HistoryBattleReportCandidate
 {
-    public HistoryBattleReportCandidate(
-        string recordingId,
-        DateTimeOffset startedAtUtc,
-        DateTimeOffset? endedAtUtc
-    )
-    {
+    public HistoryBattleReportCandidate(string recordingId) =>
         RecordingId = recordingId ?? string.Empty;
-        StartedAtUtc = startedAtUtc;
-        EndedAtUtc = endedAtUtc;
-    }
 
     public string RecordingId { get; }
-
-    public DateTimeOffset StartedAtUtc { get; }
-
-    public DateTimeOffset? EndedAtUtc { get; }
 
     internal bool TryGetTypedRecordingId(out CombatReportRecordingId recordingId) =>
         CombatReportRecordingId.TryParse(RecordingId, out recordingId);

@@ -11,6 +11,7 @@ using BazaarPlusPlus.GameInterop;
 // implements, and (3) source-level proof that Factory owns the degrade wiring.
 
 TestDependenciesSingleConstructorArityAndNullAssignment();
+TestDataServiceCarriesExplicitReportRoot();
 TestRunStateAdapterIsReadOnlyTwoMembers();
 TestEmptyDbPathDegradesRepositoryAndGhostSync();
 TestWhitespaceDbPathDegradesRepositoryAndGhostSync();
@@ -87,6 +88,22 @@ void TestDependenciesSingleConstructorArityAndNullAssignment()
     Assert(
         modAssembly.GetType("BazaarPlusPlus.Game.HistoryPanel.IHistoryPanelRuntime") == null,
         "IHistoryPanelRuntime must be replaced by IHistoryPanelRunState."
+    );
+}
+
+void TestDataServiceCarriesExplicitReportRoot()
+{
+    var reportRoot = Path.Combine(Path.GetTempPath(), "custom-bpp-data-root", "reports");
+    var dataService = new HistoryPanelDataService(
+        repository: null,
+        ghostSyncService: null,
+        replayDirectoryPathAccessor: null,
+        combatReportDirectoryPath: reportRoot
+    );
+
+    Assert(
+        dataService.CombatReportDirectoryPath == reportRoot,
+        "History report lookup must use the report root supplied by the path provider."
     );
 }
 
@@ -213,6 +230,13 @@ void TestFactorySourceWiresEmptyDbDegradeChain()
     Assert(
         source.Contains("combatReplayRuntimeAccessor", StringComparison.Ordinal),
         "Factory.Create must accept combatReplayRuntimeAccessor as a direct parameter (not via paths)."
+    );
+    Assert(
+        source.Contains(
+            "Path.Combine(dataRootDirectoryPath, \"reports\")",
+            StringComparison.Ordinal
+        ),
+        "Factory must derive the report root from the explicit data root, not a sibling replay path."
     );
     Assert(
         !source.Contains("IHistoryPanelRuntime", StringComparison.Ordinal),

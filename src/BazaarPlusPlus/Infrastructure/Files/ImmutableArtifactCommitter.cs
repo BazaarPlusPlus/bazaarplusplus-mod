@@ -1,6 +1,4 @@
 #nullable enable
-using System.Runtime.InteropServices;
-
 namespace BazaarPlusPlus.Infrastructure.Files;
 
 internal enum ImmutableArtifactCommitResult
@@ -28,7 +26,7 @@ internal sealed class ImmutableArtifactCommitter
 
         var root = RequirePhysicalRoot(rootDirectoryPath);
         var destination = Path.GetFullPath(destinationFilePath);
-        if (!IsBelowRoot(root, destination))
+        if (!PhysicalPathPolicy.IsBelowRoot(root, destination))
             throw new ArtifactPublicationException(
                 ArtifactPublicationFailureKind.PathEscapesRoot,
                 "Immutable artifact destination escaped its root."
@@ -133,7 +131,7 @@ internal sealed class ImmutableArtifactCommitter
                 nameof(rootDirectoryPath)
             );
 
-        var root = TrimEndingSeparators(Path.GetFullPath(rootDirectoryPath));
+        var root = PhysicalPathPolicy.TrimEndingSeparators(Path.GetFullPath(rootDirectoryPath));
         Directory.CreateDirectory(root);
         RequirePhysicalDirectory(root);
         return root;
@@ -141,15 +139,18 @@ internal sealed class ImmutableArtifactCommitter
 
     private static void EnsurePhysicalDirectoryChain(string root, string directoryPath)
     {
-        var directory = TrimEndingSeparators(Path.GetFullPath(directoryPath));
-        if (!string.Equals(root, directory, PathComparison) && !IsBelowRoot(root, directory))
+        var directory = PhysicalPathPolicy.TrimEndingSeparators(Path.GetFullPath(directoryPath));
+        if (
+            !string.Equals(root, directory, PhysicalPathPolicy.PathComparison)
+            && !PhysicalPathPolicy.IsBelowRoot(root, directory)
+        )
             throw new ArtifactPublicationException(
                 ArtifactPublicationFailureKind.PathEscapesRoot,
                 "Immutable artifact directory escaped its root."
             );
 
         RequirePhysicalDirectory(root);
-        if (string.Equals(root, directory, PathComparison))
+        if (string.Equals(root, directory, PhysicalPathPolicy.PathComparison))
             return;
 
         var relative = directory
@@ -230,32 +231,4 @@ internal sealed class ImmutableArtifactCommitter
             difference |= left[index] ^ right[index];
         return difference == 0;
     }
-
-    private static bool IsBelowRoot(string root, string candidatePath)
-    {
-        var prefix = root + Path.DirectorySeparatorChar;
-        return candidatePath.StartsWith(prefix, PathComparison);
-    }
-
-    private static string TrimEndingSeparators(string path)
-    {
-        var pathRoot = Path.GetPathRoot(path);
-        while (
-            path.Length > (pathRoot?.Length ?? 0)
-            && (
-                path[path.Length - 1] == Path.DirectorySeparatorChar
-                || path[path.Length - 1] == Path.AltDirectorySeparatorChar
-            )
-        )
-        {
-            path = path.Substring(0, path.Length - 1);
-        }
-
-        return path;
-    }
-
-    private static StringComparison PathComparison =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
 }

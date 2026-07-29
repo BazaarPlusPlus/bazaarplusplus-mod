@@ -4,13 +4,6 @@ using System.Linq.Expressions;
 using System.Reflection;
 using Microsoft.Data.Sqlite;
 
-if (args.Contains("--report-projection", StringComparer.Ordinal))
-{
-    ReportProjectionChecks.Run();
-    Console.WriteLine("Combat report projection checks passed.");
-    return;
-}
-
 var payloadStoreType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayPayloadStore");
 var captureServiceType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayCaptureService");
 var loaderType = RequireType("BazaarPlusPlus.Game.CombatReplay.CombatReplayLoader");
@@ -47,9 +40,7 @@ var audioTapStopperType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Audio.ReplayAudioTapStopper"
 );
 var muxerType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer");
-var scrubProxyType = RequireType(
-    "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoScrubProxy"
-);
+var scrubProxyType = RequireType("BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoScrubProxy");
 var scrubProxyGeneratorType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoScrubProxyGenerator"
 );
@@ -182,10 +173,12 @@ static void RunReplayRecordingMotionSuppressionChecks(Type suppressionType)
         "Recorded replay should hold the fully rendered terminal board for one second."
     );
     Assert(
-        suppressionType.GetMethod(
-            "HoldTerminalPresentationAsync",
-            BindingFlags.NonPublic | BindingFlags.Static
-        )?.ReturnType == typeof(Task),
+        suppressionType
+            .GetMethod(
+                "HoldTerminalPresentationAsync",
+                BindingFlags.NonPublic | BindingFlags.Static
+            )
+            ?.ReturnType == typeof(Task),
         "Recorded replay terminal hold should be asynchronous."
     );
 
@@ -313,11 +306,7 @@ static void RunReplayPresentationReadinessChecks(Type installerType)
             InvokeStatic(
                 installerType,
                 "ContainsAllExpectedCardIds",
-                new object?[]
-                {
-                    new[] { "player-card", "opponent-card" },
-                    new[] { "player-card" },
-                }
+                new object?[] { new[] { "player-card", "opponent-card" }, new[] { "player-card" } }
             )!,
         "Replay presentation readiness must not start while an expected combat card is still absent."
     );
@@ -404,11 +393,7 @@ static void RunPortraitTimingSubscriptionDeduplicationChecks(Type repairerType)
 
 static void RunScrubProxyChecks(Type proxyType, Type generatorType)
 {
-    var mainVideoPath = Path.Combine(
-        Path.GetTempPath(),
-        "bpp scrub proxy tests",
-        "battle.mp4"
-    );
+    var mainVideoPath = Path.Combine(Path.GetTempPath(), "bpp scrub proxy tests", "battle.mp4");
     var proxyPath = (string)
         InvokeStatic(proxyType, "BuildFilePath", new object?[] { mainVideoPath })!;
     Assert(
@@ -420,11 +405,7 @@ static void RunScrubProxyChecks(Type proxyType, Type generatorType)
     );
 
     var arguments = (string)
-        InvokeStatic(
-            generatorType,
-            "BuildArguments",
-            new object?[] { mainVideoPath, proxyPath }
-        )!;
+        InvokeStatic(generatorType, "BuildArguments", new object?[] { mainVideoPath, proxyPath })!;
     Assert(
         arguments.Contains("-vf scale=-2:540:flags=fast_bilinear", StringComparison.Ordinal)
             && arguments.Contains(
@@ -2728,12 +2709,7 @@ static void RunCurrentReplayRecordingStateChecks()
         stateType,
         savedRecordingState,
         "MarkRecordingStarted",
-        new object?[]
-        {
-            "recording-saved",
-            "battle-saved",
-            Enum.Parse(sourceType, "LocalSaved"),
-        }
+        new object?[] { "recording-saved", "battle-saved", Enum.Parse(sourceType, "LocalSaved") }
     );
     var savedRecording = Invoke(
         stateType,
@@ -2753,7 +2729,12 @@ static void RunCurrentReplayRecordingStateChecks()
     SetProperty(completedType, savedCompleted, "Source", Enum.Parse(sourceType, "LocalSaved"));
     SetProperty(completedType, savedCompleted, "FinalFilePath", "/tmp/saved-replay.mp4");
     SetProperty(completedType, savedCompleted, "ArtifactUsable", true);
-    SetProperty(completedType, savedCompleted, "MetadataStatus", Enum.Parse(metadataType, "Complete"));
+    SetProperty(
+        completedType,
+        savedCompleted,
+        "MetadataStatus",
+        Enum.Parse(metadataType, "Complete")
+    );
     SetProperty(completedType, savedCompleted, "ReasonCode", Enum.Parse(reasonType, "Completed"));
     Invoke(stateType, savedRecordingState, "ApplyCompletion", new object?[] { savedCompleted });
     var savedVideoReady = Invoke(
@@ -2771,12 +2752,7 @@ static void RunCurrentReplayRecordingStateChecks()
         stateType,
         savedRecordingState,
         "ApplyReportCompletion",
-        new object?[]
-        {
-            "recording-saved",
-            "battle-saved",
-            "/tmp/saved-replay.report.html",
-        }
+        new object?[] { "recording-saved", "battle-saved", "/tmp/saved-replay.report.html" }
     );
     var savedReportReady = Invoke(
         stateType,

@@ -8,16 +8,56 @@ const testDirectory = dirname(fileURLToPath(import.meta.url));
 const viewerArtifactDirectory = process.env.BPP_VIEWER_ARTIFACT_DIR
   ? resolve(process.env.BPP_VIEWER_ARTIFACT_DIR)
   : resolve(testDirectory, "../dist");
+const BEHAVIOR_FRAME_DURATION_MS = 50;
 
 function schemaEvent(event) {
   return {
+    combatTimeMs: event.frame * BEHAVIOR_FRAME_DURATION_MS,
+    frameSequence: 0,
     ...event,
     removedTargetEntityIds: event.removedTargetEntityIds ?? [],
     rawReference: event.rawReference ?? {
       category: "behavior-test",
       type: event.kind,
-      index: event.frameSequence,
+      index: event.frameSequence ?? 0,
     },
+  };
+}
+
+function installBasicMediaMock() {
+  const states = new WeakMap();
+  const stateFor = (media) => {
+    let state = states.get(media);
+    if (!state) {
+      state = { currentTime: 0, paused: true };
+      states.set(media, state);
+    }
+    return state;
+  };
+  Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+    configurable: true,
+    get() {
+      return stateFor(this).currentTime;
+    },
+    set(value) {
+      stateFor(this).currentTime = Number(value);
+      queueMicrotask(() => this.dispatchEvent(new Event("timeupdate")));
+    },
+  });
+  Object.defineProperty(HTMLMediaElement.prototype, "paused", {
+    configurable: true,
+    get() {
+      return stateFor(this).paused;
+    },
+  });
+  HTMLMediaElement.prototype.play = function play() {
+    stateFor(this).paused = false;
+    this.dispatchEvent(new Event("play"));
+    return Promise.resolve();
+  };
+  HTMLMediaElement.prototype.pause = function pause() {
+    stateFor(this).paused = true;
+    this.dispatchEvent(new Event("pause"));
   };
 }
 
@@ -79,7 +119,7 @@ const fixtureEnvelope = {
     battleId: "behavior-battle",
     recordedAtUtc: "2026-07-25T00:00:00Z",
     durationMs: 8000,
-    frameDurationMs: 50,
+    frameDurationMs: BEHAVIOR_FRAME_DURATION_MS,
     frameCount: 160,
     rawRecordCount: 12,
     summary: {
@@ -206,8 +246,6 @@ const fixtureEnvelope = {
       schemaEvent({
         eventId: "damage-1",
         frame: 40,
-        frameSequence: 0,
-        combatTimeMs: 2000,
         kind: "effect-executed",
         action: "PlayerDamage",
         sourceEntityId: "player-item",
@@ -224,8 +262,6 @@ const fixtureEnvelope = {
       schemaEvent({
         eventId: "charge-1",
         frame: 60,
-        frameSequence: 0,
-        combatTimeMs: 3000,
         kind: "effect-executed",
         action: "CardCharge",
         sourceEntityId: "player-skill",
@@ -239,8 +275,6 @@ const fixtureEnvelope = {
       schemaEvent({
         eventId: "burn-1",
         frame: 80,
-        frameSequence: 0,
-        combatTimeMs: 4000,
         kind: "effect-executed",
         action: "PlayerBurnApply",
         sourceEntityId: "opponent-item",
@@ -254,8 +288,6 @@ const fixtureEnvelope = {
       schemaEvent({
         eventId: "heal-1",
         frame: 100,
-        frameSequence: 0,
-        combatTimeMs: 5000,
         kind: "effect-executed",
         action: "PlayerHeal",
         sourceEntityId: "player-item",
@@ -322,6 +354,18 @@ function reportHtml(envelope) {
 </html>`;
 }
 
+async function writeReportFixture(fileName, envelope) {
+  await writeFile(
+    join(fixtureDirectory, fileName),
+    reportHtml(envelope),
+    "utf8",
+  );
+}
+
+function fixtureReportUrl(fileName) {
+  return pathToFileURL(join(fixtureDirectory, fileName)).href;
+}
+
 test.beforeAll(async ({ browserName }) => {
   fixtureDirectory = await mkdtemp(
     join(tmpdir(), `bpp-viewer-${process.pid}-${browserName}-`),
@@ -334,11 +378,7 @@ test.beforeAll(async ({ browserName }) => {
     join(viewerArtifactDirectory, "viewer.css"),
     join(fixtureDirectory, "viewer.css"),
   );
-  await writeFile(
-    join(fixtureDirectory, "report.html"),
-    reportHtml(fixtureEnvelope),
-    "utf8",
-  );
+  await writeReportFixture("report.html", fixtureEnvelope);
   const defeatEnvelope = structuredClone(fixtureEnvelope);
   defeatEnvelope.battleDocument.metrics.push({
     frame: 139,
@@ -352,8 +392,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "lethal-damage",
       frame: 140,
-      frameSequence: 0,
-      combatTimeMs: 7000,
       kind: "effect-executed",
       action: "PlayerDamage",
       sourceEntityId: "player-item",
@@ -371,7 +409,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "opponent-defeated",
       frame: 140,
       frameSequence: 1,
-      combatTimeMs: 7000,
       kind: "combatant-died",
       action: "Died",
       targetEntityIds: ["opponent-hero"],
@@ -382,7 +419,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "lethal-health-settlement",
       frame: 140,
       frameSequence: 2,
-      combatTimeMs: 7000,
       kind: "health",
       action: "Health:Damage",
       targetEntityIds: ["opponent-hero"],
@@ -396,21 +432,15 @@ test.beforeAll(async ({ browserName }) => {
     }),
   );
   defeatEnvelope.battleDocument.rawRecordCount += 3;
-  await writeFile(
-    join(fixtureDirectory, "defeat-report.html"),
-    reportHtml(defeatEnvelope),
-    "utf8",
-  );
+  await writeReportFixture("defeat-report.html", defeatEnvelope);
   const terminalFrameEnvelope = structuredClone(fixtureEnvelope);
-  terminalFrameEnvelope.battleDocument.durationMs = 100;
+  terminalFrameEnvelope.battleDocument.durationMs = 150;
   terminalFrameEnvelope.battleDocument.frameCount = 3;
   terminalFrameEnvelope.battleDocument.metrics = [];
   terminalFrameEnvelope.battleDocument.events = [
     schemaEvent({
       eventId: "terminal-frame-shield",
       frame: 2,
-      frameSequence: 0,
-      combatTimeMs: 100,
       kind: "effect-executed",
       action: "PlayerShieldApply",
       sourceEntityId: "opponent-item",
@@ -423,18 +453,15 @@ test.beforeAll(async ({ browserName }) => {
     }),
   ];
   terminalFrameEnvelope.battleDocument.rawRecordCount = 1;
-  await writeFile(
-    join(fixtureDirectory, "terminal-frame-report.html"),
-    reportHtml(terminalFrameEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "terminal-frame-report.html",
+    terminalFrameEnvelope,
   );
   const chartEnvelope = structuredClone(fixtureEnvelope);
   chartEnvelope.battleDocument.events.push(
     schemaEvent({
       eventId: "chart-player-damage",
       frame: 110,
-      frameSequence: 0,
-      combatTimeMs: 5500,
       kind: "health",
       action: "Health:Damage",
       sourceEntityId: "player-item",
@@ -448,8 +475,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "chart-player-burn",
       frame: 111,
-      frameSequence: 0,
-      combatTimeMs: 5550,
       kind: "health",
       action: "Health:Burn",
       sourceEntityId: "player-item",
@@ -463,8 +488,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "chart-player-poison",
       frame: 112,
-      frameSequence: 0,
-      combatTimeMs: 5600,
       kind: "health",
       action: "Health:Poison",
       sourceEntityId: "player-item",
@@ -478,8 +501,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "chart-opponent-damage",
       frame: 120,
-      frameSequence: 0,
-      combatTimeMs: 6000,
       kind: "health",
       action: "Health:Damage",
       sourceEntityId: "opponent-item",
@@ -493,8 +514,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "chart-opponent-burn",
       frame: 121,
-      frameSequence: 0,
-      combatTimeMs: 6050,
       kind: "health",
       action: "Health:Burn",
       sourceEntityId: "opponent-item",
@@ -508,8 +527,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "chart-opponent-poison",
       frame: 122,
-      frameSequence: 0,
-      combatTimeMs: 6100,
       kind: "health",
       action: "Health:Poison",
       sourceEntityId: "opponent-item",
@@ -522,11 +539,7 @@ test.beforeAll(async ({ browserName }) => {
     }),
   );
   chartEnvelope.battleDocument.rawRecordCount += 6;
-  await writeFile(
-    join(fixtureDirectory, "chart-report.html"),
-    reportHtml(chartEnvelope),
-    "utf8",
-  );
+  await writeReportFixture("chart-report.html", chartEnvelope);
   const damageKindsEnvelope = structuredClone(fixtureEnvelope);
   damageKindsEnvelope.battleDocument.events = [
     schemaEvent({
@@ -538,7 +551,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "inspector-burn",
       frame: 40,
       frameSequence: 1,
-      combatTimeMs: 2000,
       kind: "effect-executed",
       action: "PlayerBurnApply",
       sourceEntityId: "player-skill",
@@ -556,7 +568,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "inspector-poison",
       frame: 40,
       frameSequence: 2,
-      combatTimeMs: 2000,
       kind: "effect-executed",
       action: "PlayerPoisonApply",
       sourceEntityId: "player-item",
@@ -572,10 +583,9 @@ test.beforeAll(async ({ browserName }) => {
     }),
   ];
   damageKindsEnvelope.battleDocument.rawRecordCount = 3;
-  await writeFile(
-    join(fixtureDirectory, "damage-kinds-report.html"),
-    reportHtml(damageKindsEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "damage-kinds-report.html",
+    damageKindsEnvelope,
   );
   const directDamageSummaryEnvelope = structuredClone(fixtureEnvelope);
   directDamageSummaryEnvelope.battleDocument.entities.find(
@@ -588,8 +598,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "direct-silver-stake",
       frame: 40,
-      frameSequence: 0,
-      combatTimeMs: 2000,
       kind: "effect-executed",
       action: "PlayerDamage",
       sourceEntityId: "player-item",
@@ -606,7 +614,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "direct-wolf",
       frame: 40,
       frameSequence: 1,
-      combatTimeMs: 2000,
       kind: "effect-executed",
       action: "PlayerDamage",
       sourceEntityId: "player-skill",
@@ -623,7 +630,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "direct-shield-settlement-a",
       frame: 40,
       frameSequence: 8,
-      combatTimeMs: 2000,
       kind: "health",
       action: "Shield:Damage",
       targetEntityIds: ["opponent-hero"],
@@ -636,7 +642,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "direct-shield-settlement-b",
       frame: 40,
       frameSequence: 9,
-      combatTimeMs: 2000,
       kind: "health",
       action: "Shield:Damage",
       targetEntityIds: ["opponent-hero"],
@@ -649,7 +654,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "direct-shield-aggregate",
       frame: 40,
       frameSequence: 10,
-      combatTimeMs: 2000,
       kind: "player-attribute",
       action: "Shield",
       targetEntityIds: ["opponent-hero"],
@@ -660,10 +664,9 @@ test.beforeAll(async ({ browserName }) => {
     }),
   ];
   directDamageSummaryEnvelope.battleDocument.rawRecordCount = 5;
-  await writeFile(
-    join(fixtureDirectory, "direct-damage-summary-report.html"),
-    reportHtml(directDamageSummaryEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "direct-damage-summary-report.html",
+    directDamageSummaryEnvelope,
   );
   const denseEnvelope = structuredClone(fixtureEnvelope);
   const repeatedDamage = Array.from({ length: 80 }, (_, index) => ({
@@ -689,11 +692,7 @@ test.beforeAll(async ({ browserName }) => {
     ...denseEnvelope.battleDocument.events.slice(1),
   ];
   denseEnvelope.battleDocument.rawRecordCount = 93;
-  await writeFile(
-    join(fixtureDirectory, "dense-report.html"),
-    reportHtml(denseEnvelope),
-    "utf8",
-  );
+  await writeReportFixture("dense-report.html", denseEnvelope);
   const markerLayoutEnvelope = structuredClone(fixtureEnvelope);
   markerLayoutEnvelope.battleDocument.events = [
     ["marker-direct", "PlayerDamage"],
@@ -706,7 +705,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId,
       frame: 80,
       frameSequence,
-      combatTimeMs: 4000,
       kind: "effect-executed",
       action,
       sourceEntityId: "opponent-item",
@@ -721,8 +719,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "adjacent-shield-frame-61",
       frame: 61,
-      frameSequence: 0,
-      combatTimeMs: 3050,
       kind: "effect-executed",
       action: "PlayerShieldApply",
       sourceEntityId: "opponent-item",
@@ -736,8 +732,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "adjacent-shield-frame-62",
       frame: 62,
-      frameSequence: 0,
-      combatTimeMs: 3100,
       kind: "effect-executed",
       action: "PlayerShieldApply",
       sourceEntityId: "player-item",
@@ -751,10 +745,9 @@ test.beforeAll(async ({ browserName }) => {
     }),
   );
   markerLayoutEnvelope.battleDocument.rawRecordCount = 7;
-  await writeFile(
-    join(fixtureDirectory, "marker-layout-report.html"),
-    reportHtml(markerLayoutEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "marker-layout-report.html",
+    markerLayoutEnvelope,
   );
   const structuralEnvelope = structuredClone(fixtureEnvelope);
   structuralEnvelope.battleDocument.entities.find(
@@ -785,8 +778,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "structural-destroy",
       frame: 80,
-      frameSequence: 0,
-      combatTimeMs: 4000,
       kind: "effect-executed",
       action: "CardDisable",
       sourceEntityId: "opponent-item",
@@ -802,7 +793,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "structural-damage",
       frame: 80,
       frameSequence: 1,
-      combatTimeMs: 4000,
       kind: "card-attribute",
       action: "DamageAmount",
       targetEntityIds: ["player-item-multicast"],
@@ -820,7 +810,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "structural-multicast",
       frame: 80,
       frameSequence: 2,
-      combatTimeMs: 4000,
       kind: "card-attribute",
       action: "Multicast",
       targetEntityIds: ["player-item-multicast"],
@@ -838,7 +827,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "structural-cooldown",
       frame: 80,
       frameSequence: 3,
-      combatTimeMs: 4000,
       kind: "card-attribute",
       action: "PercentCooldownReduction",
       targetEntityIds: ["player-item-cooldown"],
@@ -854,7 +842,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "structural-crit",
       frame: 80,
       frameSequence: 4,
-      combatTimeMs: 4000,
       kind: "card-attribute",
       action: "CritChance",
       targetEntityIds: ["player-item-cooldown"],
@@ -870,7 +857,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "structural-ammo",
       frame: 80,
       frameSequence: 5,
-      combatTimeMs: 4000,
       kind: "card-attribute",
       action: "Ammo",
       targetEntityIds: ["player-item-cooldown"],
@@ -887,8 +873,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "structural-multi-target-haste",
       frame: 100,
-      frameSequence: 0,
-      combatTimeMs: 5000,
       kind: "effect-executed",
       action: "CardHaste",
       sourceEntityId: "opponent-item",
@@ -906,8 +890,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "structural-slow",
       frame: 110,
-      frameSequence: 0,
-      combatTimeMs: 5500,
       kind: "effect-executed",
       action: "CardSlow",
       sourceEntityId: "opponent-item",
@@ -924,8 +906,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "structural-critical-damage",
       frame: 70,
-      frameSequence: 0,
-      combatTimeMs: 3500,
       kind: "effect-executed",
       action: "PlayerDamage",
       sourceEntityId: "player-item",
@@ -942,11 +922,7 @@ test.beforeAll(async ({ browserName }) => {
     }),
   ];
   structuralEnvelope.battleDocument.rawRecordCount = 9;
-  await writeFile(
-    join(fixtureDirectory, "structural-report.html"),
-    reportHtml(structuralEnvelope),
-    "utf8",
-  );
+  await writeReportFixture("structural-report.html", structuralEnvelope);
   const attributeDensityEnvelope = structuredClone(fixtureEnvelope);
   attributeDensityEnvelope.battleDocument.entities.push({
     entityId: "unnamed-socket-effect",
@@ -960,8 +936,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "dense-crit-1",
       frame: 80,
-      frameSequence: 0,
-      combatTimeMs: 4000,
       kind: "card-attribute",
       action: "CritChance",
       targetEntityIds: ["player-item"],
@@ -978,7 +952,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "dense-crit-2",
       frame: 81,
-      frameSequence: 0,
       combatTimeMs: 4080,
       kind: "card-attribute",
       action: "CritChance",
@@ -1010,10 +983,9 @@ test.beforeAll(async ({ browserName }) => {
     }),
   ];
   attributeDensityEnvelope.battleDocument.rawRecordCount = 3;
-  await writeFile(
-    join(fixtureDirectory, "attribute-density-report.html"),
-    reportHtml(attributeDensityEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "attribute-density-report.html",
+    attributeDensityEnvelope,
   );
   const statusApplicationEnvelope = structuredClone(fixtureEnvelope);
   statusApplicationEnvelope.battleDocument.entities.find(
@@ -1035,8 +1007,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "freeze-application-1",
       frame: 169,
-      frameSequence: 0,
-      combatTimeMs: 8450,
       kind: "effect-executed",
       action: "CardFreeze",
       sourceEntityId: "player-skill",
@@ -1051,7 +1021,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "freeze-application-2",
       frame: 169,
       frameSequence: 1,
-      combatTimeMs: 8450,
       kind: "effect-executed",
       action: "CardFreeze",
       sourceEntityId: "player-skill",
@@ -1063,25 +1032,32 @@ test.beforeAll(async ({ browserName }) => {
       attributionConfidence: "exact",
     }),
     schemaEvent({
-      eventId: "freeze-countdown-tick",
-      frame: 170,
-      frameSequence: 0,
-      combatTimeMs: 8500,
-      kind: "card-attribute",
+      eventId: "freeze-range-1",
+      frame: 169,
+      frameSequence: 2,
+      kind: "card-status-range",
       action: "Freeze",
       targetEntityIds: ["opponent-item"],
-      previousValue: 1000,
-      currentValue: 950,
-      value: -50,
-      unit: "milliseconds",
+      value: 1000,
+      unit: "ms",
       role: "received",
-      attributionConfidence: "unavailable",
+      attributionConfidence: "target-exact-source-unknown",
+    }),
+    schemaEvent({
+      eventId: "freeze-range-2",
+      frame: 169,
+      frameSequence: 3,
+      kind: "card-status-range",
+      action: "Freeze",
+      targetEntityIds: ["opponent-item-2"],
+      value: 1000,
+      unit: "ms",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
     }),
     schemaEvent({
       eventId: "native-heal-settlement",
       frame: 171,
-      frameSequence: 0,
-      combatTimeMs: 8550,
       kind: "player-attribute",
       action: "Health",
       targetEntityIds: ["player-hero"],
@@ -1101,7 +1077,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "health-max-application",
       frame: 171,
       frameSequence: 1,
-      combatTimeMs: 8550,
       kind: "effect-executed",
       action: "PlayerModifyAttribute",
       sourceEntityId: "player-item",
@@ -1114,7 +1089,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "health-max-increase",
       frame: 171,
       frameSequence: 2,
-      combatTimeMs: 8550,
       kind: "player-attribute",
       action: "HealthMax",
       targetEntityIds: ["player-hero"],
@@ -1128,8 +1102,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "welding-torch-aura-e2",
       frame: 172,
-      frameSequence: 0,
-      combatTimeMs: 8600,
       kind: "aura",
       action: "Aura",
       sourceEntityId: "player-item",
@@ -1143,7 +1115,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "welding-torch-aura-1",
       frame: 172,
       frameSequence: 1,
-      combatTimeMs: 8600,
       kind: "aura",
       action: "Aura",
       sourceEntityId: "player-item",
@@ -1157,7 +1128,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "welding-torch-burn-amount",
       frame: 172,
       frameSequence: 2,
-      combatTimeMs: 8600,
       kind: "card-attribute",
       action: "BurnApplyAmount",
       targetEntityIds: ["player-item"],
@@ -1175,7 +1145,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "welding-torch-shield-amount",
       frame: 172,
       frameSequence: 3,
-      combatTimeMs: 8600,
       kind: "card-attribute",
       action: "ShieldApplyAmount",
       targetEntityIds: ["player-item"],
@@ -1192,8 +1161,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "source-mode-modify-attribute",
       frame: 173,
-      frameSequence: 0,
-      combatTimeMs: 8650,
       kind: "effect-executed",
       action: "CardModifyAttribute",
       sourceEntityId: "player-item",
@@ -1206,7 +1173,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "source-mode-reload",
       frame: 173,
       frameSequence: 1,
-      combatTimeMs: 8650,
       kind: "effect-executed",
       action: "CardReload",
       sourceEntityId: "player-item",
@@ -1219,7 +1185,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "source-mode-ammo",
       frame: 173,
       frameSequence: 2,
-      combatTimeMs: 8650,
       kind: "card-attribute",
       action: "Ammo",
       targetEntityIds: ["player-item"],
@@ -1237,7 +1202,6 @@ test.beforeAll(async ({ browserName }) => {
       eventId: "source-mode-damage",
       frame: 173,
       frameSequence: 3,
-      combatTimeMs: 8650,
       kind: "card-attribute",
       action: "DamageAmount",
       targetEntityIds: ["player-item"],
@@ -1254,8 +1218,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "source-mode-self-charge",
       frame: 174,
-      frameSequence: 0,
-      combatTimeMs: 8700,
       kind: "effect-executed",
       action: "CardCharge",
       sourceEntityId: "player-item",
@@ -1270,10 +1232,9 @@ test.beforeAll(async ({ browserName }) => {
   statusApplicationEnvelope.battleDocument.durationMs = 9000;
   statusApplicationEnvelope.battleDocument.frameCount = 180;
   statusApplicationEnvelope.battleDocument.rawRecordCount += 15;
-  await writeFile(
-    join(fixtureDirectory, "status-application-report.html"),
-    reportHtml(statusApplicationEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "status-application-report.html",
+    statusApplicationEnvelope,
   );
   const recordingEnvelope = structuredClone(fixtureEnvelope);
   recordingEnvelope.recordingManifest = {
@@ -1295,17 +1256,12 @@ test.beforeAll(async ({ browserName }) => {
       "../CombatReplayVideos/behavior-recording/recording.mp4",
     assets: [],
   };
-  await writeFile(
-    join(fixtureDirectory, "recording-report.html"),
-    reportHtml(recordingEnvelope),
-    "utf8",
-  );
+  await writeReportFixture("recording-report.html", recordingEnvelope);
   const combatLogLayoutEnvelope = structuredClone(recordingEnvelope);
   const combatLogPaddingEvents = Array.from({ length: 24 }, (_, index) =>
     schemaEvent({
       eventId: `combat-log-layout-damage-${index}`,
       frame: index + 1,
-      frameSequence: 0,
       combatTimeMs: (index + 1) * 50,
       kind: "effect-executed",
       action: "PlayerDamage",
@@ -1329,7 +1285,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: `combat-log-layout-${action}`,
       frame: 100 + index,
-      frameSequence: 0,
       combatTimeMs: 5000 + index * 50,
       kind: "card-attribute",
       action,
@@ -1350,10 +1305,9 @@ test.beforeAll(async ({ browserName }) => {
   ];
   combatLogLayoutEnvelope.battleDocument.rawRecordCount =
     combatLogLayoutEnvelope.battleDocument.events.length;
-  await writeFile(
-    join(fixtureDirectory, "combat-log-layout-report.html"),
-    reportHtml(combatLogLayoutEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "combat-log-layout-report.html",
+    combatLogLayoutEnvelope,
   );
   const scrubRecordingEnvelope = structuredClone(recordingEnvelope);
   scrubRecordingEnvelope.recordingManifest.scrubVideoRelativeUrl =
@@ -1364,10 +1318,9 @@ test.beforeAll(async ({ browserName }) => {
     mediaPtsMs: 9000,
     outputOrdinal: 161,
   });
-  await writeFile(
-    join(fixtureDirectory, "scrub-recording-report.html"),
-    reportHtml(scrubRecordingEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "scrub-recording-report.html",
+    scrubRecordingEnvelope,
   );
   const settledTerminalRecordingEnvelope =
     structuredClone(scrubRecordingEnvelope);
@@ -1398,18 +1351,15 @@ test.beforeAll(async ({ browserName }) => {
   settledTerminalRecordingEnvelope.recordingManifest.syncAnchors.at(
     -1,
   ).outputOrdinal = 164;
-  await writeFile(
-    join(fixtureDirectory, "settled-terminal-recording-report.html"),
-    reportHtml(settledTerminalRecordingEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "settled-terminal-recording-report.html",
+    settledTerminalRecordingEnvelope,
   );
   const navigationEnvelope = structuredClone(fixtureEnvelope);
   navigationEnvelope.battleDocument.events = [
     schemaEvent({
       eventId: "hidden-metric",
       frame: 10,
-      frameSequence: 0,
-      combatTimeMs: 500,
       kind: "player-attribute",
       action: "Health",
       targetEntityIds: ["player-hero"],
@@ -1421,8 +1371,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "hidden-health",
       frame: 20,
-      frameSequence: 0,
-      combatTimeMs: 1000,
       kind: "health",
       action: "Damage",
       sourceEntityId: "opponent-item",
@@ -1435,8 +1383,6 @@ test.beforeAll(async ({ browserName }) => {
     schemaEvent({
       eventId: "hidden-rage",
       frame: 30,
-      frameSequence: 0,
-      combatTimeMs: 1500,
       kind: "effect-executed",
       action: "PlayerRageApply",
       sourceEntityId: "player-skill",
@@ -1449,11 +1395,7 @@ test.beforeAll(async ({ browserName }) => {
     ...navigationEnvelope.battleDocument.events,
   ];
   navigationEnvelope.battleDocument.rawRecordCount += 3;
-  await writeFile(
-    join(fixtureDirectory, "navigation-report.html"),
-    reportHtml(navigationEnvelope),
-    "utf8",
-  );
+  await writeReportFixture("navigation-report.html", navigationEnvelope);
   const scrollRecordingEnvelope = structuredClone(recordingEnvelope);
   scrollRecordingEnvelope.battleDocument.entities.push(
     ...Array.from({ length: 28 }, (_, index) => ({
@@ -1465,60 +1407,41 @@ test.beforeAll(async ({ browserName }) => {
       order: index + 10,
     })),
   );
-  await writeFile(
-    join(fixtureDirectory, "scroll-recording-report.html"),
-    reportHtml(scrollRecordingEnvelope),
-    "utf8",
+  await writeReportFixture(
+    "scroll-recording-report.html",
+    scrollRecordingEnvelope,
   );
-  reportUrl = pathToFileURL(join(fixtureDirectory, "report.html")).href;
-  chartReportUrl = pathToFileURL(
-    join(fixtureDirectory, "chart-report.html"),
-  ).href;
-  damageKindsReportUrl = pathToFileURL(
-    join(fixtureDirectory, "damage-kinds-report.html"),
-  ).href;
-  directDamageSummaryReportUrl = pathToFileURL(
-    join(fixtureDirectory, "direct-damage-summary-report.html"),
-  ).href;
-  denseReportUrl = pathToFileURL(
-    join(fixtureDirectory, "dense-report.html"),
-  ).href;
-  markerLayoutReportUrl = pathToFileURL(
-    join(fixtureDirectory, "marker-layout-report.html"),
-  ).href;
-  statusApplicationReportUrl = pathToFileURL(
-    join(fixtureDirectory, "status-application-report.html"),
-  ).href;
-  structuralReportUrl = pathToFileURL(
-    join(fixtureDirectory, "structural-report.html"),
-  ).href;
-  attributeDensityReportUrl = pathToFileURL(
-    join(fixtureDirectory, "attribute-density-report.html"),
-  ).href;
-  recordingReportUrl = pathToFileURL(
-    join(fixtureDirectory, "recording-report.html"),
-  ).href;
-  combatLogLayoutReportUrl = pathToFileURL(
-    join(fixtureDirectory, "combat-log-layout-report.html"),
-  ).href;
-  scrubRecordingReportUrl = pathToFileURL(
-    join(fixtureDirectory, "scrub-recording-report.html"),
-  ).href;
-  settledTerminalRecordingReportUrl = pathToFileURL(
-    join(fixtureDirectory, "settled-terminal-recording-report.html"),
-  ).href;
-  navigationReportUrl = pathToFileURL(
-    join(fixtureDirectory, "navigation-report.html"),
-  ).href;
-  scrollRecordingReportUrl = pathToFileURL(
-    join(fixtureDirectory, "scroll-recording-report.html"),
-  ).href;
-  terminalFrameReportUrl = pathToFileURL(
-    join(fixtureDirectory, "terminal-frame-report.html"),
-  ).href;
-  defeatReportUrl = pathToFileURL(
-    join(fixtureDirectory, "defeat-report.html"),
-  ).href;
+  reportUrl = fixtureReportUrl("report.html");
+  chartReportUrl = fixtureReportUrl("chart-report.html");
+  damageKindsReportUrl = fixtureReportUrl("damage-kinds-report.html");
+  directDamageSummaryReportUrl = fixtureReportUrl(
+    "direct-damage-summary-report.html",
+  );
+  denseReportUrl = fixtureReportUrl("dense-report.html");
+  markerLayoutReportUrl = fixtureReportUrl("marker-layout-report.html");
+  statusApplicationReportUrl = fixtureReportUrl(
+    "status-application-report.html",
+  );
+  structuralReportUrl = fixtureReportUrl("structural-report.html");
+  attributeDensityReportUrl = fixtureReportUrl(
+    "attribute-density-report.html",
+  );
+  recordingReportUrl = fixtureReportUrl("recording-report.html");
+  combatLogLayoutReportUrl = fixtureReportUrl(
+    "combat-log-layout-report.html",
+  );
+  scrubRecordingReportUrl = fixtureReportUrl(
+    "scrub-recording-report.html",
+  );
+  settledTerminalRecordingReportUrl = fixtureReportUrl(
+    "settled-terminal-recording-report.html",
+  );
+  navigationReportUrl = fixtureReportUrl("navigation-report.html");
+  scrollRecordingReportUrl = fixtureReportUrl(
+    "scroll-recording-report.html",
+  );
+  terminalFrameReportUrl = fixtureReportUrl("terminal-frame-report.html");
+  defeatReportUrl = fixtureReportUrl("defeat-report.html");
 });
 
 test.afterAll(async () => {
@@ -2627,42 +2550,7 @@ test("updates the hover preview axis for adjacent pointer positions", async ({
 test("paused recording preview cannot move the pinned solid axis", async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    const states = new WeakMap();
-    const stateFor = (media) => {
-      let state = states.get(media);
-      if (!state) {
-        state = { currentTime: 0, paused: true };
-        states.set(media, state);
-      }
-      return state;
-    };
-    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
-      configurable: true,
-      get() {
-        return stateFor(this).currentTime;
-      },
-      set(value) {
-        stateFor(this).currentTime = Number(value);
-        queueMicrotask(() => this.dispatchEvent(new Event("timeupdate")));
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, "paused", {
-      configurable: true,
-      get() {
-        return stateFor(this).paused;
-      },
-    });
-    HTMLMediaElement.prototype.play = function play() {
-      stateFor(this).paused = false;
-      this.dispatchEvent(new Event("play"));
-      return Promise.resolve();
-    };
-    HTMLMediaElement.prototype.pause = function pause() {
-      stateFor(this).paused = true;
-      this.dispatchEvent(new Event("pause"));
-    };
-  });
+  await page.addInitScript(installBasicMediaMock);
   await page.goto(`${recordingReportUrl}?lang=en`);
 
   const recordingControls = page.getByTestId("recording-controls");
@@ -2856,42 +2744,7 @@ test("paused recording preview cannot move the pinned solid axis", async ({
 test("playing recording pauses on the settled terminal frame", async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    const states = new WeakMap();
-    const stateFor = (media) => {
-      let state = states.get(media);
-      if (!state) {
-        state = { currentTime: 0, paused: true };
-        states.set(media, state);
-      }
-      return state;
-    };
-    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
-      configurable: true,
-      get() {
-        return stateFor(this).currentTime;
-      },
-      set(value) {
-        stateFor(this).currentTime = Number(value);
-        queueMicrotask(() => this.dispatchEvent(new Event("timeupdate")));
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, "paused", {
-      configurable: true,
-      get() {
-        return stateFor(this).paused;
-      },
-    });
-    HTMLMediaElement.prototype.play = function play() {
-      stateFor(this).paused = false;
-      this.dispatchEvent(new Event("play"));
-      return Promise.resolve();
-    };
-    HTMLMediaElement.prototype.pause = function pause() {
-      stateFor(this).paused = true;
-      this.dispatchEvent(new Event("pause"));
-    };
-  });
+  await page.addInitScript(installBasicMediaMock);
   await page.goto(`${settledTerminalRecordingReportUrl}?lang=en`);
   const video = page.getByTestId("recording-video");
   await video.dispatchEvent("loadedmetadata");
@@ -3392,42 +3245,7 @@ test("uses the scrub proxy for live hover and syncs the full video once on leave
 test("preserves the timeline viewport and recording navigation across tabs", async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    const states = new WeakMap();
-    const stateFor = (media) => {
-      let state = states.get(media);
-      if (!state) {
-        state = { currentTime: 0, paused: true };
-        states.set(media, state);
-      }
-      return state;
-    };
-    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
-      configurable: true,
-      get() {
-        return stateFor(this).currentTime;
-      },
-      set(value) {
-        stateFor(this).currentTime = Number(value);
-        queueMicrotask(() => this.dispatchEvent(new Event("timeupdate")));
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, "paused", {
-      configurable: true,
-      get() {
-        return stateFor(this).paused;
-      },
-    });
-    HTMLMediaElement.prototype.play = function play() {
-      stateFor(this).paused = false;
-      this.dispatchEvent(new Event("play"));
-      return Promise.resolve();
-    };
-    HTMLMediaElement.prototype.pause = function pause() {
-      stateFor(this).paused = true;
-      this.dispatchEvent(new Event("pause"));
-    };
-  });
+  await page.addInitScript(installBasicMediaMock);
   await page.goto(`${scrollRecordingReportUrl}?lang=en`);
 
   const video = page.getByTestId("recording-video");
@@ -3471,42 +3289,7 @@ test("preserves the timeline viewport and recording navigation across tabs", asy
 test("remounts recording at the hidden selection with truthful playback UI", async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    const states = new WeakMap();
-    const stateFor = (media) => {
-      let state = states.get(media);
-      if (!state) {
-        state = { currentTime: 0, paused: true };
-        states.set(media, state);
-      }
-      return state;
-    };
-    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
-      configurable: true,
-      get() {
-        return stateFor(this).currentTime;
-      },
-      set(value) {
-        stateFor(this).currentTime = Number(value);
-        queueMicrotask(() => this.dispatchEvent(new Event("timeupdate")));
-      },
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, "paused", {
-      configurable: true,
-      get() {
-        return stateFor(this).paused;
-      },
-    });
-    HTMLMediaElement.prototype.play = function play() {
-      stateFor(this).paused = false;
-      this.dispatchEvent(new Event("play"));
-      return Promise.resolve();
-    };
-    HTMLMediaElement.prototype.pause = function pause() {
-      stateFor(this).paused = true;
-      this.dispatchEvent(new Event("pause"));
-    };
-  });
+  await page.addInitScript(installBasicMediaMock);
   await page.goto(`${recordingReportUrl}?lang=en`);
 
   const firstVideo = page.getByTestId("recording-video");
@@ -5811,7 +5594,7 @@ test("source mode expands uniquely paired attribute details and keeps self-targe
   ).toHaveText("Target");
 });
 
-test("keeps direct freeze applications in the combat log without countdown tick noise", async ({
+test("keeps direct freeze applications in the combat log while compact ranges stay hidden", async ({
   page,
 }) => {
   await page.goto(`${statusApplicationReportUrl}?lang=en`);

@@ -31,7 +31,6 @@ internal readonly record struct ReplayVideoScrubProxyResult(
 internal static class ReplayVideoScrubProxyGenerator
 {
     private const int ProcessTimeoutMs = 90_000;
-    private const long MinimumUsableFileSizeBytes = 1024;
 
     internal static ReplayVideoScrubProxyResult Create(
         string? ffmpegExecutable,
@@ -53,7 +52,7 @@ internal static class ReplayVideoScrubProxyGenerator
             );
         }
 
-        if (IsUsable(proxyFilePath))
+        if (ReplayVideoScrubProxy.IsUsable(proxyFilePath))
         {
             return new ReplayVideoScrubProxyResult(
                 true,
@@ -113,10 +112,7 @@ internal static class ReplayVideoScrubProxyGenerator
             };
             if (!process.Start())
             {
-                return Failure(
-                    proxyFilePath,
-                    ReplayVideoScrubProxyReasonCode.ProcessStartFailed
-                );
+                return Failure(proxyFilePath, ReplayVideoScrubProxyReasonCode.ProcessStartFailed);
             }
 
             stderrThread = new Thread(() =>
@@ -158,7 +154,7 @@ internal static class ReplayVideoScrubProxyGenerator
                     stderr.Value
                 );
             }
-            if (!IsUsable(temporaryFilePath))
+            if (!ReplayVideoScrubProxy.IsUsable(temporaryFilePath))
             {
                 return Failure(
                     proxyFilePath,
@@ -237,29 +233,7 @@ internal static class ReplayVideoScrubProxyGenerator
         int? exitCode = null,
         string? stderrTail = null,
         Exception? exception = null
-    ) =>
-        new(
-            false,
-            filePath,
-            reasonCode,
-            exitCode,
-            stderrTail ?? string.Empty,
-            exception
-        );
-
-    private static bool IsUsable(string filePath)
-    {
-        try
-        {
-            return File.Exists(filePath)
-                && new FileInfo(filePath).Length >= MinimumUsableFileSizeBytes;
-        }
-        catch (Exception ex)
-            when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
-        {
-            return false;
-        }
-    }
+    ) => new(false, filePath, reasonCode, exitCode, stderrTail ?? string.Empty, exception);
 
     private static void FinishStderrDrain(Process process, Thread stderrThread)
     {

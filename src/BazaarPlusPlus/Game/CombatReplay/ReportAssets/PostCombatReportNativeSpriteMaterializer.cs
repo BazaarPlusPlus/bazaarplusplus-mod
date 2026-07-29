@@ -36,7 +36,7 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
             );
 
         _gameBuild = Normalize(gameBuild, "unknown-build");
-        _cache = new ReportAssetCache(ResolveGlobalCacheRoot(outputRoot));
+        _cache = new ReportAssetCache(outputRoot);
         _materialization = new ReportAssetMaterializationCoordinator(_cache);
     }
 
@@ -416,24 +416,6 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
                 ? new NativeReportSpriteLoadOutcome(outcome.Sprite, outcome.StableNativeIdentity)
                 : NativeReportSpriteLoadOutcome.Unavailable
         );
-    }
-
-    private static string ResolveGlobalCacheRoot(string outputRoot)
-    {
-        var fullPath = Path.GetFullPath(outputRoot)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        if (
-            string.Equals(
-                Path.GetFileName(fullPath),
-                "card-previews",
-                StringComparison.OrdinalIgnoreCase
-            )
-        )
-        {
-            return Path.GetDirectoryName(fullPath)
-                ?? throw new InvalidOperationException("Report asset cache root has no parent.");
-        }
-        return fullPath;
     }
 
     private static string Normalize(string? value, string fallback) =>

@@ -90,21 +90,9 @@ try
     var newestMissingId = "ffffffffffffffffffffffffffffffff";
     var candidates = new[]
     {
-        new HistoryBattleReportCandidate(
-            newestMissingId,
-            DateTimeOffset.UtcNow,
-            DateTimeOffset.UtcNow
-        ),
-        new HistoryBattleReportCandidate(
-            "not-canonical",
-            DateTimeOffset.UtcNow.AddMinutes(-1),
-            DateTimeOffset.UtcNow.AddMinutes(-1)
-        ),
-        new HistoryBattleReportCandidate(
-            RecordingIdText,
-            DateTimeOffset.UtcNow.AddMinutes(-2),
-            DateTimeOffset.UtcNow.AddMinutes(-2)
-        ),
+        new HistoryBattleReportCandidate(newestMissingId),
+        new HistoryBattleReportCandidate("not-canonical"),
+        new HistoryBattleReportCandidate(RecordingIdText),
     };
     Assert(
         HistoryBattleReportLocator.TryResolveLatestReport(

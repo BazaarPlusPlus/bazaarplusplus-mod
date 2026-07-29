@@ -40,9 +40,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
         _runState = dependencies.RunState;
         _dataService = dependencies.DataService;
         _replayService = dependencies.ReplayService;
-        _combatReportDirectoryPath = ResolveCombatReportDirectoryPath(
-            dependencies.CombatReplayDirectoryPath
-        );
+        _combatReportDirectoryPath = dependencies.DataService.CombatReportDirectoryPath;
         _serverHealthProbe = dependencies.ServerHealthProbe;
         _linkClient = dependencies.AccountLinkClient;
         _requestUiRefresh =
@@ -362,24 +360,6 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 StatusSeverity.Failure
             );
             _requestUiRefresh();
-        }
-    }
-
-    private static string ResolveCombatReportDirectoryPath(string replayDirectoryPath)
-    {
-        if (string.IsNullOrWhiteSpace(replayDirectoryPath))
-            return string.Empty;
-
-        try
-        {
-            var dataRoot = Path.GetDirectoryName(Path.GetFullPath(replayDirectoryPath));
-            return string.IsNullOrWhiteSpace(dataRoot)
-                ? string.Empty
-                : Path.Combine(dataRoot, "reports");
-        }
-        catch
-        {
-            return string.Empty;
         }
     }
 

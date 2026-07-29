@@ -1,6 +1,5 @@
 #nullable enable
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Infrastructure.Files;
 
@@ -92,12 +91,16 @@ internal sealed class CombatReplayReportStartupRecovery
             );
 
         _paths = new StaticReportPaths(dataRootDirectoryPath);
-        _videoRootDirectoryPath = TrimEndingSeparators(Path.GetFullPath(videoRootDirectoryPath));
+        _videoRootDirectoryPath = PhysicalPathPolicy.TrimEndingSeparators(
+            Path.GetFullPath(videoRootDirectoryPath)
+        );
         if (
             !string.Equals(
                 _videoRootDirectoryPath,
-                TrimEndingSeparators(Path.GetFullPath(_paths.VideoRootDirectoryPath)),
-                PathComparison
+                PhysicalPathPolicy.TrimEndingSeparators(
+                    Path.GetFullPath(_paths.VideoRootDirectoryPath)
+                ),
+                PhysicalPathPolicy.PathComparison
             )
         )
         {
@@ -590,25 +593,4 @@ internal sealed class CombatReplayReportStartupRecovery
             ? exception.GetBaseException().GetType().Name
             : message;
     }
-
-    private static string TrimEndingSeparators(string path)
-    {
-        var root = Path.GetPathRoot(path);
-        while (
-            path.Length > (root?.Length ?? 0)
-            && (
-                path[path.Length - 1] == Path.DirectorySeparatorChar
-                || path[path.Length - 1] == Path.AltDirectorySeparatorChar
-            )
-        )
-        {
-            path = path.Substring(0, path.Length - 1);
-        }
-        return path;
-    }
-
-    private static StringComparison PathComparison =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
 }

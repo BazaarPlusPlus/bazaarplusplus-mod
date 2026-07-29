@@ -96,3 +96,28 @@ export function SemanticIcon({
     />
   );
 }
+
+export function NativeOrSemanticIcon({
+  nativeClassName,
+  nativeUrl,
+  semanticClassName,
+  testId,
+  token,
+}: {
+  nativeClassName?: string;
+  nativeUrl: string;
+  semanticClassName?: string;
+  testId?: string;
+  token: string;
+}): React.JSX.Element {
+  return nativeUrl ? (
+    <img
+      alt=""
+      className={cn("shrink-0 object-contain", nativeClassName)}
+      data-bpp-test-id={testId}
+      src={nativeUrl}
+    />
+  ) : (
+    <SemanticIcon className={semanticClassName} token={token} />
+  );
+}

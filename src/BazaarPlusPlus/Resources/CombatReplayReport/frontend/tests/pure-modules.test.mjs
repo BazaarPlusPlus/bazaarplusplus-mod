@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+import ts from "typescript";
 import {
   beginLogicalDraw,
   canvasBackingScale,
@@ -113,6 +116,7 @@ import {
 } from "../src/model/damage-semantics.ts";
 import { enrichDefeatEvents } from "../src/model/defeat-events.ts";
 import {
+  CARD_ATTRIBUTE_ACTIVITY_SEMANTICS,
   CARD_ATTRIBUTE_ACTIONS,
   PLAYER_ATTRIBUTE_ACTIONS,
   cardAttributePolicy,
@@ -164,6 +168,44 @@ function timelineEvent(overrides = {}) {
     occurrences: 1,
     ...overrides,
   };
+}
+
+function runtimeSourceFiles(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = join(directory, entry.name);
+    if (entry.isDirectory()) return runtimeSourceFiles(entryPath);
+    return /\.(?:ts|tsx)$/u.test(entry.name) ? [entryPath] : [];
+  });
+}
+
+function runtimeCopyKeyCandidates() {
+  const sourceDirectory = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "../src",
+  );
+  const catalogPath = join(sourceDirectory, "i18n/catalog.ts");
+  const candidates = new Set([
+    "entityEffect",
+    "entityHero",
+    "entityItem",
+    "entitySkill",
+  ]);
+  for (const sourcePath of runtimeSourceFiles(sourceDirectory)) {
+    if (sourcePath === catalogPath) continue;
+    const source = ts.createSourceFile(
+      sourcePath,
+      readFileSync(sourcePath, "utf8"),
+      ts.ScriptTarget.Latest,
+      true,
+      sourcePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+    );
+    const visit = (node) => {
+      if (ts.isStringLiteralLike(node)) candidates.add(node.text);
+      ts.forEachChild(node, visit);
+    };
+    visit(source);
+  }
+  return candidates;
 }
 
 test("damage semantics distinguish direct, burn, poison, and other outcomes", () => {
@@ -1946,9 +1988,19 @@ test("all supported locales expose the complete viewer copy contract", () => {
   for (const locale of locales) {
     assert.deepEqual(Object.keys(COPY[locale]).sort(), expectedKeys);
     assert.ok(COPY[locale].timelineTitle);
-    assert.ok(COPY[locale].statisticsTitle);
+    assert.ok(COPY[locale].statisticsTab);
     assert.ok(COPY[locale].recordingTitle);
   }
+});
+
+test("viewer base copy keys have a runtime producer", () => {
+  const candidates = runtimeCopyKeyCandidates();
+  const unreachable = Object.keys(COPY.en)
+    .filter((key) => !key.startsWith("attribute."))
+    .filter((key) => !candidates.has(key))
+    .sort();
+
+  assert.deepEqual(unreachable, []);
 });
 
 test("untrusted report values normalize without widening the input surface", () => {
@@ -2261,17 +2313,6 @@ test("schema-v1 golden payload decodes without compatibility aliases", () => {
     { combatMs: 0, mediaPtsMs: 0 },
     { combatMs: 150, mediaPtsMs: 150 },
   ]);
-});
-
-test("view model keeps the complete terminal frame in legacy reports", () => {
-  const payload = structuredClone(schemaV1GoldenPayload);
-  payload.battleDocument.durationMs = 100;
-
-  const report = buildViewModel(decodeEnvelope(payload), COPY.en);
-
-  assert.equal(report.frameCount, 3);
-  assert.equal(report.frameDurationMs, 50);
-  assert.equal(report.durationMs, 150);
 });
 
 test("schema-v1 accepts an optional safe scrub proxy URL", () => {
@@ -3186,7 +3227,7 @@ test("attribute policies classify the complete current enum inventory", () => {
   });
   assert.deepEqual(cardAttributePolicy("Haste"), {
     attributeClass: "state",
-    timeline: "range",
+    timeline: "hidden",
     inspectorVisible: false,
     statisticsVisible: false,
   });
@@ -3241,6 +3282,38 @@ test("attribute policies classify the complete current enum inventory", () => {
   }
 });
 
+test("card attribute activity columns come from the shared semantic registry", () => {
+  assert.deepEqual(
+    CARD_ATTRIBUTE_ACTIVITY_SEMANTICS.map((semantic) => ({
+      action: semantic.action,
+      aggregation: semantic.activity.aggregation,
+      key: semantic.activity.key,
+      label: semantic.labelKey,
+      semanticKey: semantic.nativeSemanticKey,
+      token: semantic.token,
+      unit: semantic.activity.unit,
+    })),
+    ACTIVITY_COLUMNS
+      .filter((column) => column.eventKind === "card-attribute")
+      .map((column) => ({
+        action: column.actions[0],
+        aggregation: column.aggregation,
+        key: column.key,
+        label: column.label,
+        semanticKey: column.semanticKey,
+        token: column.token,
+        unit: column.unit,
+      })),
+  );
+  assert.equal(
+    CARD_ATTRIBUTE_ACTIVITY_SEMANTICS.every(
+      (semantic) =>
+        cardAttributePolicy(semantic.action).statisticsVisible,
+    ),
+    true,
+  );
+});
+
 test("player max-health changes keep their diff without guessing an application source", () => {
   const application = timelineEvent({
     id: "pasta-application",
@@ -3278,67 +3351,9 @@ test("player max-health changes keep their diff without guessing an application 
   assert.equal(application.sourceId, "pasta");
 });
 
-test("status ranges pair applications with their exact frame effects", () => {
-  const hasteStart = timelineEvent({
-    id: "haste-start",
-    frame: 10,
-    combatMs: 1_000,
-    kind: "card-attribute",
-    action: "Haste",
-    previousValue: 0,
-    currentValue: 2_000,
-    targetIds: ["target"],
-  });
-  const apply = timelineEvent({
-    id: "haste-source",
-    frame: 10,
-    combatMs: 1_000,
-    kind: "effect-executed",
-    action: "CardHaste",
-    sourceId: "skill",
-    targetIds: ["target"],
-  });
-  const hasteEnd = timelineEvent({
-    id: "haste-end",
-    frame: 20,
-    combatMs: 3_000,
-    kind: "card-attribute",
-    action: "Haste",
-    previousValue: 2_000,
-    currentValue: 0,
-    targetIds: ["target"],
-  });
-  const ranges = buildStatusRanges(
-    {
-      durationMs: 5_000,
-      events: [hasteStart, apply, hasteEnd],
-    },
-    [
-      { id: "skill", type: "skill" },
-      { id: "target", type: "item" },
-    ],
-    1_000,
-    54,
-  );
-  assert.equal(ranges.length, 1);
-  assert.equal(ranges[0].startMs, 1_000);
-  assert.equal(ranges[0].endMs, 3_000);
-  assert.deepEqual(
-    ranges[0].cluster.events.map((event) => event.id),
-    ["haste-source"],
-  );
-  assert.deepEqual(
-    ranges[0].cluster.relatedEvents.map((event) => event.id),
-    ["haste-start"],
-  );
-  assert.deepEqual(timelineClusterEventIds(ranges[0].cluster), [
-    "haste-source",
-  ]);
-});
-
-test("compact status ranges replace legacy samples without adding combat-log rows", () => {
-  const compactRange = timelineEvent({
-    id: "compact-haste",
+test("compact status ranges pair applications with their exact frame effects", () => {
+  const hasteRange = timelineEvent({
+    id: "haste-range",
     frame: 10,
     combatMs: 1_000,
     kind: "card-status-range",
@@ -3347,28 +3362,8 @@ test("compact status ranges replace legacy samples without adding combat-log row
     unit: "ms",
     targetIds: ["target"],
   });
-  const legacyStart = timelineEvent({
-    id: "legacy-start",
-    frame: 10,
-    combatMs: 1_000,
-    kind: "card-attribute",
-    action: "Haste",
-    previousValue: 0,
-    currentValue: 2_000,
-    targetIds: ["target"],
-  });
-  const legacyEnd = timelineEvent({
-    id: "legacy-end",
-    frame: 20,
-    combatMs: 3_000,
-    kind: "card-attribute",
-    action: "Haste",
-    previousValue: 50,
-    currentValue: 0,
-    targetIds: ["target"],
-  });
-  const application = timelineEvent({
-    id: "haste-application",
+  const apply = timelineEvent({
+    id: "haste-source",
     frame: 10,
     combatMs: 1_000,
     kind: "effect-executed",
@@ -3383,61 +3378,58 @@ test("compact status ranges replace legacy samples without adding combat-log row
   const ranges = buildStatusRanges(
     {
       durationMs: 5_000,
-      events: [
-        compactRange,
-        legacyStart,
-        application,
-        legacyEnd,
-      ],
+      events: [hasteRange, apply],
     },
     entities,
     1_000,
     54,
   );
-
   assert.equal(ranges.length, 1);
   assert.equal(ranges[0].startMs, 1_000);
   assert.equal(ranges[0].endMs, 3_000);
   assert.deepEqual(
     ranges[0].cluster.events.map((event) => event.id),
-    ["haste-application"],
+    ["haste-source"],
   );
   assert.deepEqual(
     ranges[0].cluster.relatedEvents.map((event) => event.id),
-    ["compact-haste"],
+    ["haste-range"],
   );
+  assert.deepEqual(timelineClusterEventIds(ranges[0].cluster), [
+    "haste-source",
+  ]);
   assert.equal(
-    isVisibleTimelineEvent(compactRange, new Map(
+    isVisibleTimelineEvent(hasteRange, new Map(
       entities.map((entity) => [entity.id, entity]),
     )),
     false,
   );
-  assert.equal(combatLogEventToken(compactRange), "status");
+  assert.equal(combatLogEventToken(hasteRange), "status");
   assert.equal(
-    isNarrativeCombatLogEntry(buildCombatLogEntries([compactRange])[0]),
+    isNarrativeCombatLogEntry(buildCombatLogEntries([hasteRange])[0]),
     false,
   );
 });
 
 test("status range indexing preserves overlapping targets and removed-target attribution", () => {
-  const startA = timelineEvent({
-    id: "start-a",
+  const rangeA = timelineEvent({
+    id: "range-a",
     frame: 10,
     combatMs: 1_000,
-    kind: "card-attribute",
+    kind: "card-status-range",
     action: "Haste",
-    previousValue: 0,
-    currentValue: 2_000,
+    value: 2_000,
+    unit: "ms",
     targetIds: ["target-a"],
   });
-  const startB = timelineEvent({
-    id: "start-b",
+  const rangeB = timelineEvent({
+    id: "range-b",
     frame: 10,
     combatMs: 1_000,
-    kind: "card-attribute",
+    kind: "card-status-range",
     action: "Haste",
-    previousValue: 0,
-    currentValue: 3_000,
+    value: 3_000,
+    unit: "ms",
     targetIds: ["target-b"],
   });
   const multiTargetApply = timelineEvent({
@@ -3459,37 +3451,14 @@ test("status range indexing preserves overlapping targets and removed-target att
     sourceId: "skill",
     removedTargetIds: ["target-b"],
   });
-  const endA = timelineEvent({
-    id: "end-a",
-    frame: 20,
-    combatMs: 3_000,
-    kind: "card-attribute",
-    action: "Haste",
-    previousValue: 2_000,
-    currentValue: 0,
-    targetIds: ["target-a"],
-  });
-  const endB = timelineEvent({
-    id: "end-b",
-    frame: 30,
-    combatMs: 4_000,
-    kind: "card-attribute",
-    action: "Haste",
-    previousValue: 3_000,
-    currentValue: 0,
-    targetIds: ["target-b"],
-  });
-
   const ranges = buildStatusRanges(
     {
       durationMs: 5_000,
       events: [
-        startA,
-        startB,
+        rangeA,
+        rangeB,
         multiTargetApply,
         removedTargetApply,
-        endA,
-        endB,
       ],
     },
     [
@@ -3520,6 +3489,6 @@ test("status range indexing preserves overlapping targets and removed-target att
     ranges.map((range) =>
       range.cluster.relatedEvents.map((event) => event.id)
     ),
-    [["start-a"], ["start-b"]],
+    [["range-a"], ["range-b"]],
   );
 });

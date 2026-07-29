@@ -139,25 +139,12 @@ export function buildViewModel(
   );
   events = enrichDefeatEvents(events, metrics, entities);
 
-  const eventDuration = events.reduce(
-    (maximum, event) => Math.max(maximum, event.combatMs),
-    0,
-  );
-  const metricDuration = metrics.reduce(
-    (maximum, metric) => Math.max(maximum, metric.combatMs),
-    0,
-  );
   const frameDurationMs = Math.max(
     1,
     Math.round(battle.frameDurationMs),
   );
   const frameCount = Math.max(0, Math.round(battle.frameCount));
-  const durationMs = Math.max(
-    eventDuration,
-    metricDuration,
-    battle.durationMs,
-    frameCount * frameDurationMs,
-  );
+  const durationMs = battle.durationMs;
   const videoUrl = safeVideoUrl(manifest.videoRelativeUrl);
   const scrubVideoUrl = safeVideoUrl(manifest.scrubVideoRelativeUrl);
   const sync = normalizeSyncState(manifest, battle.battleId);

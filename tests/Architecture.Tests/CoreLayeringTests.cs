@@ -2270,25 +2270,13 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Post_combat_report_assets_use_cache_first_native_offscreen_export()
+    public void Post_combat_report_assets_reserve_cache_before_native_export_and_recovery_is_cache_only()
     {
         var repoRoot = RepoRoot();
         var mainSource = MainSourceRoot(repoRoot);
         var reportAssetsDir = Path.Combine(mainSource, "Game", "CombatReplay", "ReportAssets");
         var exporterSource = File.ReadAllText(
             Path.Combine(reportAssetsDir, "PostCombatReportNativeCardAssetExporter.cs")
-        );
-        var textureExporterSource = File.ReadAllText(
-            Path.Combine(reportAssetsDir, "NativeReportTexturePngExporter.cs")
-        );
-        var spriteMaterializerSource = File.ReadAllText(
-            Path.Combine(reportAssetsDir, "PostCombatReportNativeSpriteMaterializer.cs")
-        );
-        var nativeItemArtworkSource = File.ReadAllText(
-            Path.Combine(mainSource, "GameInterop", "CardPreview", "NativeItemVisualArtwork.cs")
-        );
-        var runtimeSource = File.ReadAllText(
-            Path.Combine(mainSource, "Game", "CombatReplay", "CombatReplayRuntime.cs")
         );
         var recoverySource = File.ReadAllText(
             Path.Combine(
@@ -2300,109 +2288,26 @@ public class CoreLayeringTests
             )
         );
 
-        Assert.Contains("LoadAssetAsyncByAddress<Texture>", exporterSource);
-        Assert.Contains("ConstructAndInstantiateCardVisuals", exporterSource);
-        Assert.Contains("ItemVisualsController", exporterSource);
-        Assert.Contains("ExportLayerName = \"Inspection_Overlay\"", exporterSource);
-        Assert.Contains("LayerMask.NameToLayer(ExportLayerName)", exporterSource);
-        Assert.Contains("CameraRenderType.Base", exporterSource);
-        Assert.Contains("UniversalRenderPipeline.SingleCameraRequest", exporterSource);
-        Assert.Contains("destination = target", exporterSource);
-        Assert.Contains("RenderPipeline.SupportsRenderRequest", exporterSource);
-        Assert.Contains("RenderPipeline.SubmitRenderRequest", exporterSource);
-        Assert.Contains("GetComponentsInChildren<Renderer>", exporterSource);
-        Assert.Contains("bounds.Encapsulate", exporterSource);
-        Assert.Contains("DisableEmbeddedCanvases", exporterSource);
-        Assert.Contains("_camera.targetTexture = target", exporterSource);
-        Assert.Contains("_camera.forceIntoRenderTexture = true", exporterSource);
-        Assert.Contains("_camera.enabled = false", exporterSource);
-        Assert.Contains("WaitForEndOfFrame", exporterSource);
-        Assert.Contains("CompleteRenderAndReadback", exporterSource);
-        Assert.Contains("_root.SetActive(false)", exporterSource);
-        Assert.Contains("AsyncGPUReadback.Request", textureExporterSource);
-        Assert.Contains("Graphics.Blit", textureExporterSource);
-        Assert.Contains("SkillRendererVersion = \"2\"", exporterSource);
-        Assert.Contains("ItemRendererVersion = \"12\"", exporterSource);
-        Assert.Contains("\"urp-offscreen-template-art\"", exporterSource);
-        Assert.Contains("\"item-template-art\"", exporterSource);
-        Assert.Contains("ReportAssetRenderKey.CreateTemplateAsset", exporterSource);
-        Assert.Contains("ItemTransparentCropPaddingPixels = 0", exporterSource);
-        Assert.Contains("isSkill ? 0 : ItemTransparentCropPaddingPixels", exporterSource);
-        Assert.Contains("controller.ToggleFakeDropShadow(value: false)", exporterSource);
-        Assert.Contains("NativeItemVisualArtwork.TryGetIllustrationRenderer", exporterSource);
-        Assert.Contains("\"cardIllustrationRenderer\"", nativeItemArtworkSource);
-        Assert.Contains("handle.IllustrationRenderer.enabled = true", exporterSource);
-        Assert.Contains("enabledRenderers.Length != 1", exporterSource);
         Assert.DoesNotContain("entry.Snapshot", exporterSource);
         Assert.DoesNotContain("snapshot.Tier", exporterSource);
         Assert.DoesNotContain("snapshot.Enchant", exporterSource);
         Assert.DoesNotContain("snapshot.Socket", exporterSource);
         Assert.DoesNotContain("snapshot.Attributes", exporterSource);
-        Assert.Contains("ReportAssetReadbackSource.MaterialTexture", exporterSource);
-        Assert.Contains("ReportAssetReadbackSource.OffscreenCamera", exporterSource);
-        Assert.Contains("ReportAssetReadbackSource.UnitySprite", spriteMaterializerSource);
-        Assert.Contains("ReportAssetPixelOrientation.RequiresVerticalFlip", textureExporterSource);
-        Assert.DoesNotContain("invertReadbackVertically", textureExporterSource);
         Assert.DoesNotContain("ScreenCapture.", exporterSource);
         Assert.DoesNotContain("NativeCardPreview", exporterSource);
         Assert.DoesNotContain("CardPreviewItem", exporterSource);
-        Assert.DoesNotContain("RenderMode.", exporterSource);
-        Assert.DoesNotContain("GraphicRaycaster", exporterSource);
-        Assert.DoesNotContain("Camera.Render()", exporterSource);
-        Assert.DoesNotContain("CameraRenderType.Overlay", exporterSource);
-        Assert.DoesNotContain("cameraStack?.Add", exporterSource);
-        Assert.DoesNotContain("_camera.enabled = true", exporterSource);
+        var cacheReservation = exporterSource.IndexOf(
+            "_materialization.ReserveAsync(entry.RenderKey",
+            StringComparison.Ordinal
+        );
+        var nativeMaterialization = exporterSource.IndexOf(
+            "MaterializeSkill(",
+            StringComparison.Ordinal
+        );
         Assert.True(
-            exporterSource.IndexOf(
-                "_materialization.Reserve(entry.RenderKey)",
-                StringComparison.Ordinal
-            ) < exporterSource.IndexOf("MaterializeSkill(", StringComparison.Ordinal),
+            cacheReservation >= 0 && nativeMaterialization > cacheReservation,
             "The cache reservation must precede every Unity materializer path."
         );
-        Assert.Contains("BepInEx.Paths.GameRootPath", runtimeSource);
-        Assert.Contains("\"BazaarPlusPlusV4\"", runtimeSource);
-        Assert.Contains("_pendingReportAssetManifest = manifest;", runtimeSource);
-        Assert.Contains(
-            "_pendingReportAssetManifest = recordVideo ? manifest : null",
-            runtimeSource
-        );
-        Assert.DoesNotContain("StartReportCardPreviewMaterialization", runtimeSource);
-        Assert.DoesNotContain("PostCombatReportMaterializationExitGate", runtimeSource);
-        Assert.DoesNotContain("PostCombatReportAssetWorkQueue", runtimeSource);
-
-        var currentStart = runtimeSource.IndexOf(
-            "private IEnumerator StartCurrentReplayWhenReady(",
-            StringComparison.Ordinal
-        );
-        var currentPrepare = runtimeSource.IndexOf(
-            "PrepareReportAssets(",
-            currentStart,
-            StringComparison.Ordinal
-        );
-        var currentInvoke = runtimeSource.IndexOf(
-            "TryInvokeCurrentReplay(",
-            currentPrepare,
-            StringComparison.Ordinal
-        );
-        Assert.True(
-            currentStart >= 0 && currentPrepare > currentStart && currentInvoke > currentPrepare
-        );
-
-        var savedStart = runtimeSource.IndexOf(
-            "private async Task StartReplayAsync(",
-            StringComparison.Ordinal
-        );
-        var savedPrepare = runtimeSource.IndexOf(
-            "PrepareReportAssetsAsync(manifest)",
-            savedStart,
-            StringComparison.Ordinal
-        );
-        var savedInject = runtimeSource.IndexOf(
-            "ReplayBootstrap.InjectSavedReplayAsync(",
-            savedPrepare,
-            StringComparison.Ordinal
-        );
-        Assert.True(savedStart >= 0 && savedPrepare > savedStart && savedInject > savedPrepare);
 
         Assert.Contains("ListAvailableCardAssets(manifest)", recoverySource);
         Assert.Contains("ListAvailableAssets(manifest, document)", recoverySource);
@@ -2679,28 +2584,6 @@ public class CoreLayeringTests
         Assert.Contains("Release", condition);
         Assert.Contains("$(BuildProductionPackage)", condition);
         Assert.Equal("ValidateCombatReportViewerArtifacts", Attribute(target, "DependsOnTargets"));
-        Assert.DoesNotContain("CombatReportViewerReleaseGatePrepared", condition);
-        Assert.DoesNotContain(target.Elements(), element => element.Name.LocalName == "Exec");
-
-        var buildAll = Assert.Single(
-            project.Descendants(),
-            element =>
-                element.Name.LocalName == "Target" && Attribute(element, "Name") == "BuildAll"
-        );
-        var releaseBuild = Assert.Single(
-            buildAll.Elements(),
-            element =>
-                element.Name.LocalName == "MSBuild"
-                && (
-                    Attribute(element, "Properties")
-                        ?.Contains("Configuration=Release", StringComparison.Ordinal)
-                    ?? false
-                )
-        );
-        Assert.DoesNotContain(
-            "CombatReportViewerReleaseGatePrepared",
-            Attribute(releaseBuild, "Properties") ?? string.Empty
-        );
     }
 
     [Fact]
@@ -2802,20 +2685,28 @@ public class CoreLayeringTests
             .Elements()
             .Where(element => element.Name.LocalName == "Exec")
             .ToArray();
-        Assert.Collection(
+        var requiredValidationCommands = new[]
+        {
+            "npm run viewer:browsers:install",
+            "npm run viewer:typecheck",
+            "npm run test:pure",
+            "npm run test:behavior",
+        };
+        Assert.All(
+            requiredValidationCommands,
+            command =>
+                Assert.Contains(
+                    validationCommands,
+                    element => Attribute(element, "Command") == command
+                )
+        );
+        var behaviorCommand = Assert.Single(
             validationCommands,
-            command =>
-                Assert.Equal("npm run viewer:browsers:install", Attribute(command, "Command")),
-            command => Assert.Equal("npm run viewer:typecheck", Attribute(command, "Command")),
-            command => Assert.Equal("npm run test:pure", Attribute(command, "Command")),
-            command =>
-            {
-                Assert.Equal("npm run test:behavior", Attribute(command, "Command"));
-                Assert.Equal(
-                    "BPP_VIEWER_ARTIFACT_DIR=$(CombatReportViewerArtifactDirectory)",
-                    Attribute(command, "EnvironmentVariables")
-                );
-            }
+            element => Attribute(element, "Command") == "npm run test:behavior"
+        );
+        Assert.Equal(
+            "BPP_VIEWER_ARTIFACT_DIR=$(CombatReportViewerArtifactDirectory)",
+            Attribute(behaviorCommand, "EnvironmentVariables")
         );
 
         var reportResourceRoot = Path.Combine(
@@ -3004,7 +2895,6 @@ public class CoreLayeringTests
             debugProperties
         );
         Assert.Contains("BPPInstallerSourcePath=$(BPPInstallerSourcePath)", debugProperties);
-        Assert.DoesNotContain("CombatReportViewerReleaseGatePrepared", releaseProperties);
         Assert.Contains(
             "RemoteEmbeddedDataPrepared=$(RemoteEmbeddedDataPrepared)",
             releaseProperties

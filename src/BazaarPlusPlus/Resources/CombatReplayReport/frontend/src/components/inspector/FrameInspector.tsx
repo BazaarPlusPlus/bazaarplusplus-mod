@@ -32,7 +32,10 @@ import {
   entityArtDimensions,
   intrinsicItemArtGeometry,
 } from "../semantic/entity-art-geometry.ts";
-import { SemanticIcon } from "../semantic/SemanticIcon.tsx";
+import {
+  NativeOrSemanticIcon,
+  SemanticIcon,
+} from "../semantic/SemanticIcon.tsx";
 import {
   Accordion,
   AccordionContent,
@@ -211,25 +214,6 @@ function eventAmount(event: NormalizedEvent): string {
     : formatCompactNumber(event.value);
 }
 
-function EventKindIcon({
-  icon,
-  token,
-}: {
-  icon: string;
-  token: string;
-}): React.JSX.Element {
-  return icon ? (
-    <img
-      alt=""
-      className="size-icon-lg shrink-0 object-contain"
-      data-bpp-test-id="frame-event-native-icon"
-      src={icon}
-    />
-  ) : (
-    <SemanticIcon className="size-icon-lg" token={token} />
-  );
-}
-
 function EventRow({
   event,
   entityById,
@@ -264,8 +248,11 @@ function EventRow({
       data-bpp-test-id="focused-cluster-event"
     >
       <div className="flex min-h-control-xs items-center gap-1.5">
-        <EventKindIcon
-          icon={event.icon || fallbackIcon || ""}
+        <NativeOrSemanticIcon
+          nativeClassName="size-icon-lg"
+          nativeUrl={event.icon || fallbackIcon || ""}
+          semanticClassName="size-icon-lg"
+          testId="frame-event-native-icon"
           token={presentation.token}
         />
         <strong
@@ -433,8 +420,11 @@ function DirectDamageGroupRow({
       data-bpp-test-id="focused-cluster-event"
     >
       <div className="flex min-h-control-xs items-center gap-1.5">
-        <EventKindIcon
-          icon={events.find((event) => Boolean(event.icon))?.icon ?? ""}
+        <NativeOrSemanticIcon
+          nativeClassName="size-icon-lg"
+          nativeUrl={events.find((event) => Boolean(event.icon))?.icon ?? ""}
+          semanticClassName="size-icon-lg"
+          testId="frame-event-native-icon"
           token="damage"
         />
         <strong

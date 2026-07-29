@@ -1,5 +1,4 @@
 #nullable enable
-using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using BazaarPlusPlus.Infrastructure.Files;
@@ -56,9 +55,9 @@ internal static class ReportPhysicalFile
         if (string.IsNullOrWhiteSpace(filePath))
             throw new ArgumentException("A physical file path is required.", nameof(filePath));
 
-        var root = TrimEndingSeparators(Path.GetFullPath(rootDirectoryPath));
+        var root = PhysicalPathPolicy.TrimEndingSeparators(Path.GetFullPath(rootDirectoryPath));
         var candidate = Path.GetFullPath(filePath);
-        if (!IsBelowRoot(root, candidate))
+        if (!PhysicalPathPolicy.IsBelowRoot(root, candidate))
             throw new ArtifactPublicationException(
                 ArtifactPublicationFailureKind.PathEscapesRoot,
                 description + " escaped its allowed root."
@@ -125,31 +124,4 @@ internal static class ReportPhysicalFile
                 description + " must be a directory."
             );
     }
-
-    private static bool IsBelowRoot(string root, string candidate)
-    {
-        var prefix = root + Path.DirectorySeparatorChar;
-        return candidate.StartsWith(prefix, PathComparison);
-    }
-
-    private static string TrimEndingSeparators(string path)
-    {
-        var pathRoot = Path.GetPathRoot(path);
-        while (
-            path.Length > (pathRoot?.Length ?? 0)
-            && (
-                path[path.Length - 1] == Path.DirectorySeparatorChar
-                || path[path.Length - 1] == Path.AltDirectorySeparatorChar
-            )
-        )
-        {
-            path = path.Substring(0, path.Length - 1);
-        }
-        return path;
-    }
-
-    private static StringComparison PathComparison =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
 }

@@ -165,7 +165,6 @@ internal sealed class CombatReportProjector
             if (ReportStatusIconSemanticResolver.TryResolve(reportEvent, out var iconSemantic))
                 reportEvent.IconSemanticKey = iconSemantic.StableKey;
         }
-        CombatReportJson.RefreshDocumentId(document);
         return document;
     }
 

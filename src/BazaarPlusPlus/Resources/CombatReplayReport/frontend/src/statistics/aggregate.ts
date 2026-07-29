@@ -5,7 +5,10 @@ import {
   type NormalizedEvent,
 } from "../model/normalize.ts";
 import { damageKindFromType } from "../model/damage-semantics.ts";
-import { eventAttributePolicy } from "../model/event-semantics.ts";
+import {
+  CARD_ATTRIBUTE_ACTIVITY_SEMANTICS,
+  eventAttributePolicy,
+} from "../model/event-semantics.ts";
 import { asFiniteNumber, asString } from "../model/value.ts";
 
 export type CombatSide = "player" | "opponent";
@@ -27,15 +30,6 @@ export interface ActivityColumn {
   quantitative: boolean;
   aggregation: "absolute" | "signed";
   unit: string;
-}
-
-export interface ActivityBaseColumn {
-  key: string;
-  label: string;
-  token?: string;
-  fallback?: string;
-  actions?: readonly string[];
-  quantitative?: boolean;
 }
 
 export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
@@ -159,61 +153,19 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     aggregation: "absolute",
     unit: "ms",
   },
-  {
-    key: "damageModifier",
-    label: "attributeDamage",
-    token: "attributeDamage",
-    semanticKey: "status.damage",
-    eventKind: "card-attribute",
-    actions: ["DamageAmount"],
-    quantitative: true,
-    aggregation: "signed",
-    unit: "points",
-  },
-  {
-    key: "cooldownReduction",
-    label: "attributeCooldownReduction",
-    token: "attributeCooldownReduction",
-    semanticKey: "status.cooldownReduction",
-    eventKind: "card-attribute",
-    actions: ["PercentCooldownReduction"],
-    quantitative: true,
-    aggregation: "signed",
-    unit: "percent",
-  },
-  {
-    key: "multicast",
-    label: "attributeMulticast",
-    token: "attributeMulticast",
-    semanticKey: "status.multicast",
-    eventKind: "card-attribute",
-    actions: ["Multicast"],
-    quantitative: true,
-    aggregation: "signed",
-    unit: "points",
-  },
-  {
-    key: "ammo",
-    label: "attributeAmmo",
-    token: "attributeAmmo",
-    semanticKey: "status.ammo",
-    eventKind: "card-attribute",
-    actions: ["Ammo"],
-    quantitative: true,
-    aggregation: "signed",
-    unit: "points",
-  },
-  {
-    key: "critChance",
-    label: "attributeCritChance",
-    token: "attributeCritChance",
-    semanticKey: "status.critChance",
-    eventKind: "card-attribute",
-    actions: ["CritChance"],
-    quantitative: true,
-    aggregation: "signed",
-    unit: "percent",
-  },
+  ...CARD_ATTRIBUTE_ACTIVITY_SEMANTICS.map(
+    (semantic): ActivityColumn => ({
+      key: semantic.activity.key,
+      label: semantic.labelKey,
+      token: semantic.token,
+      semanticKey: semantic.nativeSemanticKey,
+      eventKind: "card-attribute",
+      actions: [semantic.action],
+      quantitative: true,
+      aggregation: semantic.activity.aggregation,
+      unit: semantic.activity.unit,
+    }),
+  ),
   {
     key: "destroy",
     label: "destroy",
@@ -224,18 +176,6 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     quantitative: false,
     aggregation: "absolute",
     unit: "",
-  },
-];
-
-export const ACTIVITY_BASE_COLUMNS: readonly ActivityBaseColumn[] = [
-  { key: "entity", label: "activityEntity" },
-  {
-    key: "triggers",
-    label: "activityTriggers",
-    token: "trigger",
-    fallback: "#",
-    actions: [],
-    quantitative: false,
   },
 ];
 

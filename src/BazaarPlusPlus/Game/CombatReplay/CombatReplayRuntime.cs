@@ -56,6 +56,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private PostCombatReportNativeCardAssetExporter? _reportCardAssetExporter;
     private PostCombatReportNativeSpriteMaterializer? _reportNativeSpriteMaterializer;
     private CombatReplayReportPublicationCoordinator? _reportPublication;
+    private string _reportRootDirectoryPath = string.Empty;
     private readonly Dictionary<string, Task<bool>> _pendingReportDraftCaptures = new(
         StringComparer.Ordinal
     );
@@ -114,14 +115,17 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _persistence.PayloadStore,
             _loader
         );
-        var reportDataRoot = Path.Combine(BepInEx.Paths.GameRootPath, "BazaarPlusPlusV4");
-        var reportAssetRoot = Path.Combine(reportDataRoot, "report-assets");
+        var reportDataRoot = _services.Paths.DataRootDirectoryPath;
+        if (string.IsNullOrWhiteSpace(reportDataRoot))
+            throw new InvalidOperationException("BazaarPlusPlus data root is unavailable.");
+        var reportPaths = new StaticReportPaths(reportDataRoot);
+        _reportRootDirectoryPath = reportPaths.ReportsDirectoryPath;
         _reportCardAssetExporter = new PostCombatReportNativeCardAssetExporter(
-            reportAssetRoot,
+            reportPaths.AssetRootDirectoryPath,
             _services.GameBuild.RawVersion
         );
         _reportNativeSpriteMaterializer = new PostCombatReportNativeSpriteMaterializer(
-            reportAssetRoot,
+            reportPaths.AssetRootDirectoryPath,
             _services.GameBuild.RawVersion
         );
         _reportPublication = new CombatReplayReportPublicationCoordinator(reportDataRoot);
@@ -448,8 +452,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void TrackReportDraftCapture(string battleId, Task<bool> captureTask)
     {
-        // Projection and its document-id serialization are pure DTO work. Keep them off Unity's
-        // Update thread; only the completed immutable document is retained by the coordinator.
+        // Projection is pure DTO work. Keep it off Unity's Update thread; only the completed
+        // immutable document is retained by the coordinator.
         foreach (
             var completedBattleId in _pendingReportDraftCaptures
                 .Where(pair => pair.Value.IsCompleted)
@@ -725,7 +729,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     internal bool TryOpenCurrentReplayReport(out string reason)
     {
         var snapshot = _currentRecording.Snapshot();
-        var reportRootDirectoryPath = GetReportRootDirectoryPath();
+        var reportRootDirectoryPath = _reportRootDirectoryPath;
         reason = snapshot.Reason ?? "Battle report is unavailable.";
         if (
             !snapshot.CanOpenReport
@@ -1266,7 +1270,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private void OnReportPublicationTerminal(CombatReplayReportPublicationTerminal terminal)
     {
-        var reportRootDirectoryPath = GetReportRootDirectoryPath();
+        var reportRootDirectoryPath = _reportRootDirectoryPath;
         if (
             !terminal.Succeeded
             || string.IsNullOrWhiteSpace(reportRootDirectoryPath)
@@ -1290,9 +1294,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             resolvedReport!.FullPath
         );
     }
-
-    private static string GetReportRootDirectoryPath() =>
-        Path.Combine(BepInEx.Paths.GameRootPath, "BazaarPlusPlusV4", "reports");
 
     private IEnumerator PrepareReportAssets(
         PvpBattleManifest manifest,

@@ -1,8 +1,8 @@
 #nullable enable
-using System.Runtime.InteropServices;
 using BazaarPlusPlus.Game.CombatReplay.ReportAssets;
 using BazaarPlusPlus.Game.CombatReplay.ReportData;
 using BazaarPlusPlus.Game.CombatReplay.Video;
+using BazaarPlusPlus.Infrastructure.Files;
 using Newtonsoft.Json;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -229,7 +229,7 @@ internal sealed class CombatReplayReportArtifactBuilder
             !string.Equals(
                 Path.GetFullPath(asset.FilePath),
                 Path.GetFullPath(expectedObjectPath),
-                PathComparison
+                PhysicalPathPolicy.PathComparison
             )
         )
         {
@@ -460,11 +460,6 @@ internal sealed class CombatReplayReportArtifactBuilder
             return false;
         }
     }
-
-    private static StringComparison PathComparison =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
 
     private sealed record ResolvedAsset(
         RecordingReportAssetV1 ManifestAsset,

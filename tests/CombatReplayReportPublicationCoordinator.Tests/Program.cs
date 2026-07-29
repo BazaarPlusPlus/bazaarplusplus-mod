@@ -33,7 +33,9 @@ try
     VerifyEventSemanticAssetBinding();
     VerifyResolvedAssetEnrichesEntityDisplayName();
     VerifyExactVideoSyncRequiresContiguousIdentityMatchedAnchors();
+    VerifyScrubProxyUsabilityBoundaries();
     VerifyScrubProxyPublication();
+    VerifyFailedScrubProxyRegenerationFallsBackToSourceVideo();
 }
 finally
 {
@@ -380,7 +382,7 @@ void VerifyScrubProxyPublication()
     coordinator.MarkAssetsReady(recordingId, battleId, Array.Empty<PostCombatReportAssetFile>());
     var completed = Completed(root, recordingId, battleId);
     var scrubProxyPath = ReplayVideoScrubProxy.BuildFilePath(completed.FinalFilePath);
-    File.WriteAllBytes(scrubProxyPath, new byte[] { 0, 0, 0, 1 });
+    File.WriteAllBytes(scrubProxyPath, new byte[1024]);
     coordinator.ObserveVideoTerminal(completed, "en");
 
     var envelope = publishedHtml == null ? null : ParseEmbeddedEnvelope(publishedHtml);
@@ -389,6 +391,76 @@ void VerifyScrubProxyPublication()
         envelope?.RecordingManifest.ScrubVideoRelativeUrl
             == "../CombatReplayVideos/" + recordingId + ".scrub.mp4",
         "The report manifest must reference the committed scrub proxy next to the source video."
+    );
+}
+
+void VerifyScrubProxyUsabilityBoundaries()
+{
+    var root = Path.Combine(sandbox, "scrub-proxy-boundaries");
+    Directory.CreateDirectory(root);
+    var sourceVideoPath = Path.Combine(root, "boundary.mp4");
+    File.WriteAllBytes(sourceVideoPath, new byte[1024]);
+    var proxyPath = ReplayVideoScrubProxy.BuildFilePath(sourceVideoPath);
+
+    foreach (
+        var (length, expectedUsable) in new[]
+        {
+            (0, false),
+            (1, false),
+            (1023, false),
+            (1024, true),
+        }
+    )
+    {
+        File.WriteAllBytes(proxyPath, new byte[length]);
+        Check(
+            ReplayVideoScrubProxy.IsUsable(proxyPath) == expectedUsable,
+            $"A {length}-byte scrub proxy returned the wrong usability result."
+        );
+        Check(
+            ReplayVideoScrubProxy.TryGetExistingFilePath(sourceVideoPath, out _) == expectedUsable,
+            $"A {length}-byte scrub proxy returned the wrong publication result."
+        );
+    }
+}
+
+void VerifyFailedScrubProxyRegenerationFallsBackToSourceVideo()
+{
+    var root = Path.Combine(sandbox, "scrub-proxy-failed-regeneration");
+    string? publishedHtml = null;
+    var coordinator = CreateCoordinator(root, (_, bytes) => publishedHtml = Utf8(bytes));
+    const string recordingId = "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd";
+    const string battleId = "scrub-proxy-failed-regeneration-battle";
+
+    coordinator.TryCaptureDraft(
+        new PvpBattleManifest { BattleId = battleId },
+        new NetMessageCombatSim(),
+        out _
+    );
+    coordinator.ObserveVideoStarted(Started(recordingId, battleId));
+    coordinator.MarkAssetsReady(recordingId, battleId, Array.Empty<PostCombatReportAssetFile>());
+    var completed = Completed(root, recordingId, battleId);
+    var scrubProxyPath = ReplayVideoScrubProxy.BuildFilePath(completed.FinalFilePath);
+    File.WriteAllBytes(scrubProxyPath, new byte[1023]);
+
+    var regeneration = ReplayVideoScrubProxyGenerator.Create(null, completed.FinalFilePath);
+    Check(
+        !regeneration.Available
+            && regeneration.ReasonCode == ReplayVideoScrubProxyReasonCode.FfmpegUnavailable,
+        "An unusable old scrub stub must remain unavailable when regeneration cannot start."
+    );
+    coordinator.ObserveVideoTerminal(completed, "en");
+
+    var envelope = publishedHtml == null ? null : ParseEmbeddedEnvelope(publishedHtml);
+    Check(envelope != null, "A failed scrub regeneration must not block report publication.");
+    Check(
+        envelope?.RecordingManifest.ScrubVideoRelativeUrl == null,
+        "A failed scrub regeneration must omit the unusable proxy URL."
+    );
+    Check(
+        envelope?.RecordingManifest.VideoRelativeUrl
+            == "../CombatReplayVideos/" + recordingId + ".mp4",
+        "A failed scrub regeneration must retain the original video URL."
     );
 }
 

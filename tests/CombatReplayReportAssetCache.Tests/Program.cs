@@ -28,6 +28,8 @@ try
     await SameLineupSecondPassCreatesNoMaterializer();
     await CacheLockWaitDoesNotBlockCallingThread();
     await ConcurrentMissesSingleflight();
+    await ReservationFailureReleasesFollowers();
+    await FollowerCancellationDoesNotCancelSharedFlight();
     await CorruptMappingAndObjectAreQuarantinedAndRecovered();
     TruncatedAndCorruptPngsAreRejected();
     CacheDirectoryLinksAreRejected();
@@ -53,6 +55,36 @@ void Check(bool condition, string message)
 {
     if (!condition)
         failures.Add(message);
+}
+
+async Task<ReportAssetResolvedAsset?> ResolveWithReservationAsync(
+    ReportAssetMaterializationCoordinator coordinator,
+    ReportAssetRenderKey key,
+    Func<Func<string, CancellationToken, Task<ReportAssetProducedFile>>> materializerFactory,
+    CancellationToken cancellationToken = default
+)
+{
+    using var reservation = await coordinator.ReserveAsync(key, cancellationToken);
+    if (reservation.Kind == ReportAssetMaterializationReservationKind.Hit)
+        return reservation.ResolvedAsset;
+    if (reservation.Kind == ReportAssetMaterializationReservationKind.Follower)
+        return await reservation.Completion.WaitAsync(cancellationToken);
+
+    try
+    {
+        var materializer = materializerFactory();
+        var produced = await materializer(reservation.StagingFilePath, cancellationToken);
+        return await reservation.PublishAsync(
+            produced.PixelWidth,
+            produced.PixelHeight,
+            cancellationToken
+        );
+    }
+    catch
+    {
+        reservation.Fail();
+        throw;
+    }
 }
 
 void AlphaCropUsesVisibleBoundsInsteadOfCanvasGeometry()
@@ -557,7 +589,8 @@ async Task ThreeFreshCachesAreDeterministic()
         var cacheRoot = Path.Combine(root, "fresh-" + index);
         var cache = new ReportAssetCache(cacheRoot);
         var coordinator = new ReportAssetMaterializationCoordinator(cache);
-        var resolved = await coordinator.ResolveOrCreateAsync(
+        var resolved = await ResolveWithReservationAsync(
+            coordinator,
             key,
             () =>
                 async (path, _) =>
@@ -640,7 +673,8 @@ async Task SameLineupSecondPassCreatesNoMaterializer()
 
     async Task Resolve(ReportAssetRenderKey key)
     {
-        var resolved = await coordinator.ResolveOrCreateAsync(
+        var resolved = await ResolveWithReservationAsync(
+            coordinator,
             key,
             () =>
             {
@@ -685,7 +719,8 @@ async Task CacheLockWaitDoesNotBlockCallingThread()
     {
         var caller = new Thread(() =>
         {
-            operation = coordinator.ResolveOrCreateAsync(
+            operation = ResolveWithReservationAsync(
+                coordinator,
                 key,
                 () =>
                     async (path, _) =>
@@ -723,7 +758,8 @@ async Task ConcurrentMissesSingleflight()
     var tasks = Enumerable
         .Range(0, 64)
         .Select(_ =>
-            coordinator.ResolveOrCreateAsync(
+            ResolveWithReservationAsync(
+                coordinator,
                 key,
                 () =>
                 {
@@ -751,6 +787,84 @@ async Task ConcurrentMissesSingleflight()
         results.Select(result => result!.FilePath).Distinct(StringComparer.Ordinal).Count() == 1,
         "Every concurrent follower must resolve the same immutable object."
     );
+}
+
+async Task ReservationFailureReleasesFollowers()
+{
+    var cache = new ReportAssetCache(Path.Combine(root, "reservation-failure"));
+    var coordinator = new ReportAssetMaterializationCoordinator(cache);
+    var key = CreateKey() with { Variant = "reservation-failure" };
+
+    using var owner = coordinator.Reserve(key);
+    using var follower = coordinator.Reserve(key);
+    Check(
+        owner.Kind == ReportAssetMaterializationReservationKind.Owner
+            && follower.Kind == ReportAssetMaterializationReservationKind.Follower,
+        "A concurrent reservation must follow the active owner."
+    );
+
+    owner.Fail();
+    Check(
+        await follower.Completion == null,
+        "An owner failure must release followers with no resolved asset."
+    );
+
+    using var retry = coordinator.Reserve(key);
+    Check(
+        retry.Kind == ReportAssetMaterializationReservationKind.Owner,
+        "A failed flight must allow a later reservation to become owner."
+    );
+    retry.Fail();
+}
+
+async Task FollowerCancellationDoesNotCancelSharedFlight()
+{
+    var cache = new ReportAssetCache(Path.Combine(root, "reservation-cancellation"));
+    var coordinator = new ReportAssetMaterializationCoordinator(cache);
+    var key = CreateKey() with { Variant = "reservation-cancellation" };
+
+    using var owner = coordinator.Reserve(key);
+    using var follower = coordinator.Reserve(key);
+    using var cancellation = new CancellationTokenSource();
+    cancellation.Cancel();
+    var canceled = false;
+    try
+    {
+        _ = await follower.Completion.WaitAsync(cancellation.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        canceled = true;
+    }
+    Check(canceled, "A canceled follower wait must observe cancellation.");
+
+    WritePng(owner.StagingFilePath, 37, 53, 29);
+    var published = await owner.PublishAsync(37, 53);
+    var followerResult = await follower.Completion;
+    Check(
+        followerResult?.FilePath == published.FilePath,
+        "Canceling one follower wait must not cancel the shared owner flight."
+    );
+
+    var canceledKey = key with { Variant = "reservation-canceled-before-start" };
+    using var canceledBeforeStart = new CancellationTokenSource();
+    canceledBeforeStart.Cancel();
+    var reserveCanceled = false;
+    try
+    {
+        _ = await coordinator.ReserveAsync(canceledKey, canceledBeforeStart.Token);
+    }
+    catch (OperationCanceledException)
+    {
+        reserveCanceled = true;
+    }
+    Check(reserveCanceled, "A pre-canceled reservation must not start cache work.");
+    using var laterOwner = coordinator.Reserve(canceledKey);
+    Check(
+        laterOwner.Kind == ReportAssetMaterializationReservationKind.Owner,
+        "A canceled reservation must not leave a stale in-flight owner."
+    );
+    laterOwner.Fail();
 }
 
 async Task CorruptMappingAndObjectAreQuarantinedAndRecovered()
@@ -818,7 +932,8 @@ async Task CorruptMappingAndObjectAreQuarantinedAndRecovered()
     );
 
     async Task<ReportAssetResolvedAsset?> Materialize(int seed, Action? onCall = null) =>
-        await coordinator.ResolveOrCreateAsync(
+        await ResolveWithReservationAsync(
+            coordinator,
             key,
             () =>
                 async (path, _) =>

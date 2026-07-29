@@ -17,7 +17,8 @@ internal static class HistoryPanelFactory
         string combatReplayVideoDirectoryPath,
         string pluginsDirectoryPath,
         BazaarDbLinkClient? accountLinkClient = null,
-        Func<bool>? isBazaarDbAccountLinkAvailable = null
+        Func<bool>? isBazaarDbAccountLinkAvailable = null,
+        string dataRootDirectoryPath = ""
     )
     {
         if (runState == null)
@@ -31,6 +32,9 @@ internal static class HistoryPanelFactory
         var replayDirectoryPath = combatReplayDirectoryPath ?? string.Empty;
         var videoDirectoryPath = combatReplayVideoDirectoryPath ?? string.Empty;
         var pluginsPath = pluginsDirectoryPath ?? string.Empty;
+        var reportDirectoryPath = string.IsNullOrWhiteSpace(dataRootDirectoryPath)
+            ? string.Empty
+            : Path.Combine(dataRootDirectoryPath, "reports");
 
         // Null-degrade chain: empty/missing db path → no repository → no ghost sync →
         // data + replay services still construct, just without ghost capabilities.
@@ -42,7 +46,8 @@ internal static class HistoryPanelFactory
         var dataService = new HistoryPanelDataService(
             repository,
             ghostSyncService,
-            () => replayDirectoryPath
+            () => replayDirectoryPath,
+            reportDirectoryPath
         );
         var replayService = new HistoryPanelReplayService(
             combatReplayRuntimeAccessor,

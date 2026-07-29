@@ -1,6 +1,6 @@
 #nullable enable
-using System.Runtime.InteropServices;
 using System.Text;
+using BazaarPlusPlus.Infrastructure.Files;
 using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Reports;
@@ -24,7 +24,9 @@ internal sealed class StaticReportPaths
                 nameof(dataRootDirectoryPath)
             );
 
-        DataRootDirectoryPath = TrimEndingSeparators(Path.GetFullPath(dataRootDirectoryPath));
+        DataRootDirectoryPath = PhysicalPathPolicy.TrimEndingSeparators(
+            Path.GetFullPath(dataRootDirectoryPath)
+        );
         ReportsDirectoryPath = Path.Combine(DataRootDirectoryPath, "reports");
         ViewerRootDirectoryPath = Path.Combine(DataRootDirectoryPath, "report-viewer");
         AssetRootDirectoryPath = Path.Combine(DataRootDirectoryPath, "report-assets");
@@ -423,31 +425,9 @@ internal sealed class StaticReportPaths
 
     private static bool IsBelowRoot(string root, string candidatePath)
     {
-        var normalizedRoot = TrimEndingSeparators(Path.GetFullPath(root));
-        var prefix = normalizedRoot + Path.DirectorySeparatorChar;
-        return candidatePath.StartsWith(prefix, PathComparison);
+        var normalizedRoot = PhysicalPathPolicy.TrimEndingSeparators(Path.GetFullPath(root));
+        return PhysicalPathPolicy.IsBelowRoot(normalizedRoot, candidatePath);
     }
-
-    private static string TrimEndingSeparators(string path)
-    {
-        var root = Path.GetPathRoot(path);
-        while (
-            path.Length > (root?.Length ?? 0)
-            && (
-                path[path.Length - 1] == Path.DirectorySeparatorChar
-                || path[path.Length - 1] == Path.AltDirectorySeparatorChar
-            )
-        )
-        {
-            path = path.Substring(0, path.Length - 1);
-        }
-        return path;
-    }
-
-    private static StringComparison PathComparison =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
 
     private sealed class BufferedReportReader : IDisposable
     {

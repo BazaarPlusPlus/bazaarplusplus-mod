@@ -37,7 +37,7 @@ import {
 import { cn } from "../../lib/utils.ts";
 import { isVisibleTimelineEvent } from "../../timeline/clusters.ts";
 import { EntityArt } from "../semantic/EntityArt.tsx";
-import { SemanticIcon } from "../semantic/SemanticIcon.tsx";
+import { NativeOrSemanticIcon } from "../semantic/SemanticIcon.tsx";
 import { Button } from "../ui/button.tsx";
 
 export interface CombatLogHandle {
@@ -103,23 +103,6 @@ function MissingEntity({
   );
 }
 
-function CombatLogKindIcon({
-  entry,
-}: {
-  entry: CombatLogEntry;
-}): React.JSX.Element {
-  return entry.icon ? (
-    <img
-      alt=""
-      className="size-icon-md shrink-0 object-contain"
-      data-bpp-test-id="combat-log-kind-native-icon"
-      src={entry.icon}
-    />
-  ) : (
-    <SemanticIcon className="size-icon-sm" token={entry.token} />
-  );
-}
-
 function CombatLogEntryColumns({
   entry,
   entityById,
@@ -163,7 +146,13 @@ function CombatLogEntryColumns({
         className="flex min-w-0 items-center gap-1.5 overflow-hidden"
         data-bpp-test-id="combat-log-kind"
       >
-        <CombatLogKindIcon entry={entry} />
+        <NativeOrSemanticIcon
+          nativeClassName="size-icon-md"
+          nativeUrl={entry.icon}
+          semanticClassName="size-icon-sm"
+          testId="combat-log-kind-native-icon"
+          token={entry.token}
+        />
         <span
           className="truncate text-compact font-semibold text-foreground max-[600px]:sr-only"
           title={t(entry.token)}

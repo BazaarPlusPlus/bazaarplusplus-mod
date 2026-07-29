@@ -430,6 +430,7 @@ internal sealed class TempPathProvider : IPathProvider
 
     public TempPathProvider(string dbPath) => _dbPath = dbPath;
 
+    public string? DataRootDirectoryPath => null;
     public string? RunLogDatabasePath => _dbPath;
     public string? CombatReplayDirectoryPath => null;
     public string? ScreenshotsDirectoryPath => null;

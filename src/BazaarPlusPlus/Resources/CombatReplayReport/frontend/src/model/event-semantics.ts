@@ -14,7 +14,7 @@ export type AttributeClass =
   | "diagnostic"
   | "unknown";
 
-export type AttributeTimelinePolicy = "hidden" | "marker" | "range";
+export type AttributeTimelinePolicy = "hidden" | "marker";
 
 export interface AttributeEventPolicy {
   attributeClass: AttributeClass;
@@ -25,13 +25,24 @@ export interface AttributeEventPolicy {
 
 export interface CardAttributeSemantic {
   action: string;
-  activityKey?: string;
+  activity?: CardAttributeActivityDescriptor;
   labelKey: string;
   nativeSemanticKey?: string;
   token: string;
   timelineVisible: boolean;
   valueKind: "number" | "percent";
 }
+
+export interface CardAttributeActivityDescriptor {
+  aggregation: "absolute" | "signed";
+  key: string;
+  order: number;
+  unit: string;
+}
+
+export type CardAttributeActivitySemantic = CardAttributeSemantic & {
+  activity: CardAttributeActivityDescriptor;
+};
 
 export interface PlayerAttributeSemantic {
   action: string;
@@ -213,7 +224,6 @@ const CARD_STATE_SET = new Set<string>(CARD_STATE_ACTIONS);
 const CARD_MODIFIER_SET = new Set<string>(CARD_MODIFIER_ACTIONS);
 const CARD_ECONOMY_SET = new Set<string>(CARD_ECONOMY_ACTIONS);
 const CARD_DIAGNOSTIC_SET = new Set<string>(CARD_DIAGNOSTIC_ACTIONS);
-const CARD_RANGE_SET = new Set<string>(["Haste", "Slow", "Freeze"]);
 const PLAYER_PERCENT_ATTRIBUTE_SET = new Set<string>([
   "CritChance",
   "PercentDamageReduction",
@@ -278,7 +288,12 @@ const CARD_ATTRIBUTE_SEMANTICS: Readonly<
 > = {
   Ammo: {
     action: "Ammo",
-    activityKey: "ammo",
+    activity: {
+      aggregation: "signed",
+      key: "ammo",
+      order: 3,
+      unit: "points",
+    },
     labelKey: "attributeAmmo",
     nativeSemanticKey: "status.ammo",
     token: "attributeAmmo",
@@ -294,7 +309,12 @@ const CARD_ATTRIBUTE_SEMANTICS: Readonly<
   },
   CritChance: {
     action: "CritChance",
-    activityKey: "critChance",
+    activity: {
+      aggregation: "signed",
+      key: "critChance",
+      order: 4,
+      unit: "percent",
+    },
     labelKey: "attributeCritChance",
     nativeSemanticKey: "status.critChance",
     token: "attributeCritChance",
@@ -303,7 +323,12 @@ const CARD_ATTRIBUTE_SEMANTICS: Readonly<
   },
   DamageAmount: {
     action: "DamageAmount",
-    activityKey: "damageModifier",
+    activity: {
+      aggregation: "signed",
+      key: "damageModifier",
+      order: 0,
+      unit: "points",
+    },
     labelKey: "attributeDamage",
     nativeSemanticKey: "status.damage",
     token: "attributeDamage",
@@ -312,7 +337,12 @@ const CARD_ATTRIBUTE_SEMANTICS: Readonly<
   },
   Multicast: {
     action: "Multicast",
-    activityKey: "multicast",
+    activity: {
+      aggregation: "signed",
+      key: "multicast",
+      order: 2,
+      unit: "points",
+    },
     labelKey: "attributeMulticast",
     nativeSemanticKey: "status.multicast",
     token: "attributeMulticast",
@@ -321,7 +351,12 @@ const CARD_ATTRIBUTE_SEMANTICS: Readonly<
   },
   PercentCooldownReduction: {
     action: "PercentCooldownReduction",
-    activityKey: "cooldownReduction",
+    activity: {
+      aggregation: "signed",
+      key: "cooldownReduction",
+      order: 1,
+      unit: "percent",
+    },
     labelKey: "attributeCooldownReduction",
     nativeSemanticKey: "status.cooldownReduction",
     token: "attributeCooldownReduction",
@@ -343,6 +378,16 @@ const CARD_ATTRIBUTE_SEMANTICS: Readonly<
     valueKind: "percent",
   },
 };
+
+export const CARD_ATTRIBUTE_ACTIVITY_SEMANTICS: readonly CardAttributeActivitySemantic[] =
+  Object.values(CARD_ATTRIBUTE_SEMANTICS)
+    .filter(
+      (
+        semantic,
+      ): semantic is CardAttributeActivitySemantic =>
+        semantic.activity !== undefined,
+    )
+    .sort((left, right) => left.activity.order - right.activity.order);
 
 const PLAYER_ATTRIBUTE_SEMANTICS: Readonly<
   Record<string, PlayerAttributeSemantic>
@@ -418,12 +463,7 @@ export function playerAttributeSemantic(
 
 export function cardAttributePolicy(action: string): AttributeEventPolicy {
   if (CARD_STATE_SET.has(action)) {
-    return policy(
-      "state",
-      CARD_RANGE_SET.has(action) ? "range" : "hidden",
-      false,
-      false,
-    );
+    return policy("state", "hidden", false, false);
   }
   if (CARD_MODIFIER_SET.has(action)) {
     const semantic = cardAttributeSemantic(action);
@@ -431,7 +471,7 @@ export function cardAttributePolicy(action: string): AttributeEventPolicy {
       "modifier",
       semantic?.timelineVisible ? "marker" : "hidden",
       true,
-      Boolean(semantic?.activityKey),
+      Boolean(semantic?.activity),
     );
   }
   if (CARD_ECONOMY_SET.has(action)) {

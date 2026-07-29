@@ -75,42 +75,6 @@ internal sealed class ReportAssetMaterializationCoordinator
             cancellationToken
         );
 
-    internal async Task<ReportAssetResolvedAsset?> ResolveOrCreateAsync(
-        ReportAssetRenderKey key,
-        Func<Func<string, CancellationToken, Task<ReportAssetProducedFile>>> materializerFactory,
-        CancellationToken cancellationToken = default
-    )
-    {
-        if (materializerFactory == null)
-            throw new ArgumentNullException(nameof(materializerFactory));
-
-        using var reservation = await ReserveAsync(key, cancellationToken).ConfigureAwait(false);
-        if (reservation.Kind == ReportAssetMaterializationReservationKind.Hit)
-            return reservation.ResolvedAsset;
-        if (reservation.Kind == ReportAssetMaterializationReservationKind.Follower)
-            return await AwaitWithCancellation(reservation.Completion, cancellationToken)
-                .ConfigureAwait(false);
-
-        try
-        {
-            var materializer = materializerFactory();
-            if (materializer == null)
-                throw new InvalidOperationException(
-                    "Report asset materializer factory returned null."
-                );
-            var produced = await materializer(reservation.StagingFilePath, cancellationToken)
-                .ConfigureAwait(false);
-            return await reservation
-                .PublishAsync(produced.PixelWidth, produced.PixelHeight, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch
-        {
-            reservation.Fail();
-            throw;
-        }
-    }
-
     private static void CompleteFlight(
         string flightKey,
         InFlightMaterialization flight,
@@ -122,32 +86,6 @@ internal sealed class ReportAssetMaterializationCoordinator
         {
             InFlight.TryRemove(flightKey, out _);
         }
-    }
-
-    private static async Task<T> AwaitWithCancellation<T>(
-        Task<T> task,
-        CancellationToken cancellationToken
-    )
-    {
-        if (!cancellationToken.CanBeCanceled)
-            return await task.ConfigureAwait(false);
-        if (task.IsCompleted)
-            return await task.ConfigureAwait(false);
-
-        var cancellation = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        using (
-            cancellationToken.Register(
-                state => ((TaskCompletionSource<bool>)state!).TrySetResult(true),
-                cancellation
-            )
-        )
-        {
-            if (task != await Task.WhenAny(task, cancellation.Task).ConfigureAwait(false))
-                throw new OperationCanceledException(cancellationToken);
-        }
-        return await task.ConfigureAwait(false);
     }
 
     internal sealed class InFlightMaterialization

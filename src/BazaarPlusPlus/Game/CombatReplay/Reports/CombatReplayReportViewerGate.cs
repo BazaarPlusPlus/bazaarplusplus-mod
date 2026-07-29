@@ -1,5 +1,5 @@
 #nullable enable
-using System.Runtime.InteropServices;
+using BazaarPlusPlus.Infrastructure.Files;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 
@@ -24,13 +24,21 @@ internal static class CombatReplayReportViewerGate
 
         try
         {
-            var reportRoot = TrimEndingSeparators(Path.GetFullPath(reportRootDirectoryPath));
+            var reportRoot = PhysicalPathPolicy.TrimEndingSeparators(
+                Path.GetFullPath(reportRootDirectoryPath)
+            );
             var dataRoot = Path.GetDirectoryName(reportRoot);
             if (string.IsNullOrWhiteSpace(dataRoot))
                 return false;
 
             var paths = new StaticReportPaths(dataRoot);
-            if (!string.Equals(paths.ReportsDirectoryPath, reportRoot, PathComparison))
+            if (
+                !string.Equals(
+                    paths.ReportsDirectoryPath,
+                    reportRoot,
+                    PhysicalPathPolicy.PathComparison
+                )
+            )
                 return false;
 
             ReportPhysicalFile.RequireBelowRoot(reportRoot, reportFilePath, "Battle report");
@@ -144,26 +152,4 @@ internal static class CombatReplayReportViewerGate
             return false;
         }
     }
-
-    private static string TrimEndingSeparators(string path)
-    {
-        var root = Path.GetPathRoot(path);
-        while (
-            path.Length > (root?.Length ?? 0)
-            && (
-                path[path.Length - 1] == Path.DirectorySeparatorChar
-                || path[path.Length - 1] == Path.AltDirectorySeparatorChar
-            )
-        )
-        {
-            path = path.Substring(0, path.Length - 1);
-        }
-
-        return path;
-    }
-
-    private static StringComparison PathComparison =>
-        RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
-            ? StringComparison.OrdinalIgnoreCase
-            : StringComparison.Ordinal;
 }

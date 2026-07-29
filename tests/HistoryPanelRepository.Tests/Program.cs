@@ -162,6 +162,7 @@ try
     const string RootPrefixRecordingId = "00000000000000000000000000000006";
     const string TieARecordingId = "0000000000000000000000000000000a";
     const string TieZRecordingId = "0000000000000000000000000000000f";
+    const string MalformedTimestampRecordingId = "00000000000000000000000000000010";
     const string InvalidRecordingId = "not-a-canonical-recording-id";
 
     var reportRoot = Path.Combine(tempRoot, "reports");
@@ -277,6 +278,15 @@ try
             "2026-07-22T12:11:00.0000000+00:00",
             "COMPLETED"
         );
+        InsertVideo(
+            connection,
+            MalformedTimestampRecordingId,
+            "battle-malformed-timestamp",
+            "ignored-malformed-timestamp.mp4",
+            "not-a-timestamp",
+            "also-not-a-timestamp",
+            "COMPLETED"
+        );
     }
 
     var candidateRows = (
@@ -302,6 +312,25 @@ try
                 ValidOldRecordingId,
             ]),
         "Report candidates should exclude failed recordings and use deterministic newest-first ordering."
+    );
+
+    var malformedTimestampRows = (
+        (System.Collections.IEnumerable)(
+            repositoryType
+                .GetMethod("ListCompletedReportCandidates")!
+                .Invoke(repository, ["battle-malformed-timestamp"])!
+        )
+    )
+        .Cast<object>()
+        .ToList();
+    Assert(
+        malformedTimestampRows.Count == 1
+            && (string)
+                malformedTimestampRows[0]
+                    .GetType()
+                    .GetProperty("RecordingId")!
+                    .GetValue(malformedTimestampRows[0])! == MalformedTimestampRecordingId,
+        "Report candidate identity must not depend on parsing unused recording timestamps."
     );
 
     var dataServiceType = RequireType(

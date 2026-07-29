@@ -220,9 +220,7 @@ internal sealed partial class HistoryPanelRepository
         command.CommandTimeout = 2;
         command.CommandText = $"""
             SELECT
-                video_id,
-                started_at_utc,
-                ended_at_utc
+                video_id
             FROM {RunLogSchema.CombatReplayVideosTableName}
             WHERE battle_id = $battleId
               AND status = 'COMPLETED'
@@ -238,27 +236,10 @@ internal sealed partial class HistoryPanelRepository
         while (reader.Read())
         {
             var videoId = HistoryPanelRowMapper.SafeGetNullableString(reader, "video_id");
-            var startedAtText = HistoryPanelRowMapper.SafeGetNullableString(
-                reader,
-                "started_at_utc"
-            );
-            if (
-                string.IsNullOrWhiteSpace(videoId)
-                || !DateTimeOffset.TryParse(startedAtText, out var startedAtUtc)
-            )
-            {
+            if (string.IsNullOrWhiteSpace(videoId))
                 continue;
-            }
 
-            var endedAtText = HistoryPanelRowMapper.SafeGetNullableString(reader, "ended_at_utc");
-            DateTimeOffset? endedAtUtc = DateTimeOffset.TryParse(
-                endedAtText,
-                out var parsedEndedAtUtc
-            )
-                ? parsedEndedAtUtc
-                : null;
-
-            candidates.Add(new HistoryBattleReportCandidate(videoId, startedAtUtc, endedAtUtc));
+            candidates.Add(new HistoryBattleReportCandidate(videoId));
         }
 
         return candidates;

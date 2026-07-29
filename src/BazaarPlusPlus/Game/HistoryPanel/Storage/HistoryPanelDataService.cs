@@ -16,17 +16,24 @@ internal sealed class HistoryPanelDataService
         HistoryPanelRepository? repository,
         GhostBattleSyncService? ghostSyncService = null
     )
-        : this(repository, ghostSyncService, replayDirectoryPathAccessor: null) { }
+        : this(
+            repository,
+            ghostSyncService,
+            replayDirectoryPathAccessor: null,
+            combatReportDirectoryPath: string.Empty
+        ) { }
 
     public HistoryPanelDataService(
         HistoryPanelRepository? repository,
         GhostBattleSyncService? ghostSyncService,
-        Func<string?>? replayDirectoryPathAccessor = null
+        Func<string?>? replayDirectoryPathAccessor = null,
+        string combatReportDirectoryPath = ""
     )
     {
         _repository = repository;
         _ghostSyncService = ghostSyncService;
         _replayDirectoryPathAccessor = replayDirectoryPathAccessor;
+        CombatReportDirectoryPath = combatReportDirectoryPath ?? string.Empty;
     }
 
     public bool IsAvailable => _repository != null;
@@ -34,6 +41,8 @@ internal sealed class HistoryPanelDataService
     public bool DatabaseExists => _repository?.DatabaseExists ?? false;
 
     public bool CanSyncGhostBattles => _ghostSyncService != null;
+
+    internal string CombatReportDirectoryPath { get; }
 
     public bool TryLoadRecentRuns(
         int limit,

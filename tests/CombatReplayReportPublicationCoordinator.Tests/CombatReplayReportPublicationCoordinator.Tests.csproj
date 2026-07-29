@@ -15,6 +15,10 @@
       CopyToOutputDirectory="PreserveNewest"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Files/PhysicalPathPolicy.cs"
+      Link="PhysicalPathPolicy.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Reports/CombatReplayReportPublicationCoordinator.cs"
       Link="CombatReplayReportPublicationCoordinator.cs"
     />
@@ -61,6 +65,18 @@
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoScrubProxy.cs"
       Link="ReplayVideoScrubProxy.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Video/ReplayVideoScrubProxyGenerator.cs"
+      Link="ReplayVideoScrubProxyGenerator.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Video/BoundedTextTail.cs"
+      Link="BoundedTextTail.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/CombatReplay/Video/VideoProcessHelpers.cs"
+      Link="VideoProcessHelpers.cs"
     />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/CombatReplay/ReportAssets/PostCombatReportAssetFile.cs"

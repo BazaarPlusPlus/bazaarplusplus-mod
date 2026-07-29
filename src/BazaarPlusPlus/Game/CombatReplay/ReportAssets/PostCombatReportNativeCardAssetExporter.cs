@@ -55,7 +55,7 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
             throw new InvalidOperationException(
                 $"Required native report layer '{ExportLayerName}' is unavailable."
             );
-        _cache = new ReportAssetCache(ResolveGlobalCacheRoot(outputRoot));
+        _cache = new ReportAssetCache(outputRoot);
         _materialization = new ReportAssetMaterializationCoordinator(_cache);
     }
 
@@ -595,20 +595,6 @@ internal sealed class PostCombatReportNativeCardAssetExporter : IDisposable
             outputPath,
             exception: exception
         );
-
-    private static string ResolveGlobalCacheRoot(string outputRoot)
-    {
-        var fullPath = Path.GetFullPath(outputRoot)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return string.Equals(
-            Path.GetFileName(fullPath),
-            "card-previews",
-            StringComparison.OrdinalIgnoreCase
-        )
-            ? Path.GetDirectoryName(fullPath)
-                ?? throw new InvalidOperationException("Report asset cache root has no parent.")
-            : fullPath;
-    }
 
     private static string Normalize(string? value, string fallback) =>
         string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();

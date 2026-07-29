@@ -24,7 +24,6 @@ internal sealed class CombatReplayReportRecordingGeneration
     internal CombatReplayReportResolvedAssetSet? Assets { get; set; }
     internal bool AssetsResolutionStarted { get; set; }
     internal CombatReplayReportPendingVideoArtifact? Video { get; set; }
-    internal string Locale { get; set; } = "en";
     internal int AttemptCount { get; set; }
     internal long NextAttemptAtMilliseconds { get; set; }
 }

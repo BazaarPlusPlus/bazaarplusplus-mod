@@ -19,6 +19,7 @@ internal static class TempDirPathProviderTests
         {
             // IPathProvider is a pure Storage type — no BepInEx dependency.
             IPathProvider paths = new TempDirPathProvider(dbPath);
+            Assert(paths.DataRootDirectoryPath == null, "DataRootDirectoryPath should be null.");
             Assert(paths.RunLogDatabasePath == dbPath, "RunLogDatabasePath should match.");
             Assert(
                 paths.CombatReplayDirectoryPath == null,
@@ -146,6 +147,7 @@ internal sealed class TempDirPathProvider : IPathProvider
 
     public TempDirPathProvider(string dbPath) => _dbPath = dbPath;
 
+    public string? DataRootDirectoryPath => null;
     public string? RunLogDatabasePath => _dbPath;
     public string? CombatReplayDirectoryPath => null;
     public string? ScreenshotsDirectoryPath => null;

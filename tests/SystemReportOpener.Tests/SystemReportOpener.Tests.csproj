@@ -8,6 +8,10 @@
 
   <ItemGroup>
     <Compile
+      Include="../../src/BazaarPlusPlus/Infrastructure/Files/PhysicalPathPolicy.cs"
+      Link="PhysicalPathPolicy.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/Files/SystemReportOpener.cs"
       Link="SystemReportOpener.cs"
     />
