@@ -397,7 +397,7 @@ internal sealed class SteamTimelineModule : IBppFeature
 
         _heroTagAdded = adapter.TryAddGamePhaseTag(
             hero,
-            "steam_person",
+            "steam_crown",
             SteamTimelineTextFormatter.HeroGroup(_locale),
             SteamTimelineTextFormatter.MetadataPriority
         );
@@ -429,7 +429,7 @@ internal sealed class SteamTimelineModule : IBppFeature
         {
             adapter.TryAddGamePhaseTag(
                 resultLabel,
-                exit == SteamTimelineRunExit.Completed ? "steam_completed" : "steam_caution",
+                exit == SteamTimelineRunExit.Completed ? "steam_ribbon" : "steam_caution",
                 SteamTimelineTextFormatter.RunResultGroup(_locale),
                 SteamTimelineTextFormatter.MetadataPriority
             );

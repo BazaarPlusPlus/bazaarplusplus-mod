@@ -121,12 +121,12 @@ public sealed class SteamTimelineArchitectureTests
         Assert.Equal(
             new HashSet<string>(StringComparer.Ordinal)
             {
+                "steam_attack",
                 "steam_caution",
-                "steam_combat",
-                "steam_completed",
                 "steam_death",
-                "steam_person",
-                "steam_plus",
+                "steam_crown",
+                "steam_ribbon",
+                "steam_starburst",
                 "steam_trophy",
             },
             icons

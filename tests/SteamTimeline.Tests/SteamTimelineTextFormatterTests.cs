@@ -43,7 +43,7 @@ public sealed class SteamTimelineTextFormatterTests
 
         Assert.Equal("D8 · PvP Battle", started.Title);
         Assert.Equal("Vanessa vs Mak", started.Description);
-        Assert.Equal("steam_combat", started.Icon);
+        Assert.Equal("steam_attack", started.Icon);
         Assert.Equal(SteamTimelineClipPriority.Featured, started.ClipPriority);
         Assert.Equal("steam_trophy", completedRange.Icon);
         Assert.Equal(SteamTimelineClipPriority.Featured, completedRange.ClipPriority);
@@ -52,7 +52,7 @@ public sealed class SteamTimelineTextFormatterTests
     }
 
     [Fact]
-    public void Level_marker_uses_built_in_numeric_icon_and_chinese_copy()
+    public void Level_marker_uses_distinctive_built_in_icon_and_chinese_copy()
     {
         var text = SteamTimelineTextFormatter.LevelReached(
             6,
@@ -63,7 +63,7 @@ public sealed class SteamTimelineTextFormatterTests
 
         Assert.Equal("UP", text.Title);
         Assert.Equal("D4 · 6 级 · Vanessa", text.Description);
-        Assert.Equal("steam_6", text.Icon);
+        Assert.Equal("steam_starburst", text.Icon);
         Assert.Equal(SteamTimelineClipPriority.None, text.ClipPriority);
     }
 

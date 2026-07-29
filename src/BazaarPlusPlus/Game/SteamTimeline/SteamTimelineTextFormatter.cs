@@ -42,7 +42,7 @@ internal static class SteamTimelineTextFormatter
         return new SteamTimelineEventText(
             title,
             description,
-            "steam_combat",
+            "steam_attack",
             BattlePriority,
             SteamTimelineClipPriority.Featured
         );
@@ -129,11 +129,10 @@ internal static class SteamTimelineTextFormatter
     {
         var cleanHero = CleanDynamicLabel(hero);
         var description = BuildProgressDescription(level, day, cleanHero, locale);
-        var icon = level is >= 0 and <= 99 ? $"steam_{level}" : "steam_plus";
         return new SteamTimelineEventText(
             "UP",
             description,
-            icon,
+            "steam_starburst",
             LevelPriority,
             SteamTimelineClipPriority.None
         );
