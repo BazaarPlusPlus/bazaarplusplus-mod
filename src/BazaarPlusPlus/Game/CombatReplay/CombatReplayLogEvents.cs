@@ -195,6 +195,43 @@ internal static class CombatReplayLogEvents
         ]
     );
 
+    internal static readonly BppLogFieldDefinition ManagedRecordingPresentationGateBattleId =
+        Public(0, "battle_id", BppLogCardinality.High, BppLogCorrelationPolicy.Short);
+    internal static readonly BppLogFieldDefinition ManagedRecordingPresentationGateSource = Public(
+        1,
+        "source",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition ManagedRecordingPresentationGateOutcome = Public(
+        2,
+        "outcome",
+        BppLogCardinality.Low
+    );
+    internal static readonly BppLogFieldDefinition ManagedRecordingPresentationGateExpectedItems =
+        Public(3, "expected_items", BppLogCardinality.Low);
+    internal static readonly BppLogFieldDefinition ManagedRecordingPresentationGateVisibleItems =
+        Public(4, "visible_items", BppLogCardinality.Low);
+    internal static readonly BppLogFieldDefinition ManagedRecordingPresentationGateFaceUpItems =
+        Public(5, "face_up_items", BppLogCardinality.Low);
+    internal static readonly BppLogFieldDefinition ManagedRecordingPresentationGateSettledItems =
+        Public(6, "settled_items", BppLogCardinality.Low);
+    internal static readonly BppLogFieldDefinition ManagedRecordingPresentationGateElapsedMs =
+        Public(7, "elapsed_ms", BppLogCardinality.High);
+    internal static readonly BppLogEventDefinition ManagedRecordingPresentationGateResolved = new(
+        BppLogFeatureScope.CombatReplay,
+        "combat_replay.saved_recording.presentation_gate_resolved",
+        [
+            ManagedRecordingPresentationGateBattleId,
+            ManagedRecordingPresentationGateSource,
+            ManagedRecordingPresentationGateOutcome,
+            ManagedRecordingPresentationGateExpectedItems,
+            ManagedRecordingPresentationGateVisibleItems,
+            ManagedRecordingPresentationGateFaceUpItems,
+            ManagedRecordingPresentationGateSettledItems,
+            ManagedRecordingPresentationGateElapsedMs,
+        ]
+    );
+
     internal static readonly BppLogFieldDefinition RequestRejectedSource = Public(
         0,
         "source",

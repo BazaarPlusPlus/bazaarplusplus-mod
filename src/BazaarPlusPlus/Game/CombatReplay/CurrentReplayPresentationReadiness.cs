@@ -1,5 +1,7 @@
 #nullable enable
 
+using TheBazaar;
+
 namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal readonly record struct CurrentReplayPresentationReadinessSnapshot(
@@ -17,6 +19,30 @@ internal static class CurrentReplayPresentationReadiness
 {
     internal const int RequiredStableFrames = 2;
     internal const float TimeoutSeconds = 10f;
+    private const string CardIdleFaceUpStateName = "Card_Idle_Faceup_A";
+
+    internal static bool IsVisible(ItemController controller) =>
+        controller.gameObject.activeInHierarchy
+        && controller.IsCardVisible
+        && controller.PositionedInSocket;
+
+    internal static bool IsFaceUp(ItemController controller)
+    {
+        var animator = controller.Animator;
+        return IsVisible(controller)
+            && animator != null
+            && animator.isActiveAndEnabled
+            && animator.GetBool(AnimationParameterDefinitions.CardFaceUpParam);
+    }
+
+    internal static bool IsSettled(ItemController controller)
+    {
+        var animator = controller.Animator;
+        return IsFaceUp(controller)
+            && animator != null
+            && !animator.IsInTransition(0)
+            && animator.GetCurrentAnimatorStateInfo(0).IsName(CardIdleFaceUpStateName);
+    }
 
     internal static bool IsReady(CurrentReplayPresentationReadinessSnapshot snapshot) =>
         snapshot.ReplayActive

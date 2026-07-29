@@ -89,6 +89,9 @@ var currentReplayPresentationReadinessType = RequireType(
 var currentReplayPresentationReadinessSnapshotType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.CurrentReplayPresentationReadinessSnapshot"
 );
+var recordedReplayPresentationGatePolicyType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.RecordedReplayPresentationGatePolicy"
+);
 RunReplaySavedStateNormalizationChecks(replaySavedStateNormalizerType, manifestType);
 RunReplayOpeningStateSelectionChecks(replayOpeningStateRestorerType);
 RunReplayRunEconomyFallbackChecks(replayRunEconomyFallbackType, manifestType);
@@ -102,6 +105,7 @@ RunCurrentReplayPresentationReadinessChecks(
     currentReplayPresentationReadinessType,
     currentReplayPresentationReadinessSnapshotType
 );
+RunRecordedReplayPresentationGatePolicyChecks(recordedReplayPresentationGatePolicyType);
 RunScrubProxyChecks(scrubProxyType, scrubProxyGeneratorType);
 
 RunCurrentReplayRecordingStateChecks();
@@ -269,6 +273,55 @@ static void RunReplayPresentationReadinessChecks(Type installerType)
                 }
             )!,
         "Replay presentation readiness must not start while an expected combat card is still absent."
+    );
+}
+
+static void RunRecordedReplayPresentationGatePolicyChecks(Type policyType)
+{
+    string Resolve(
+        bool currentNativeReplayStarted,
+        bool savedReplayPlaybackActive,
+        bool managedReplayRecordsVideo
+    ) =>
+        InvokeStatic(
+            policyType,
+            "Resolve",
+            [currentNativeReplayStarted, savedReplayPlaybackActive, managedReplayRecordsVideo]
+        )
+            ?.ToString()
+        ?? string.Empty;
+
+    Assert(
+        Resolve(
+            currentNativeReplayStarted: true,
+            savedReplayPlaybackActive: false,
+            managedReplayRecordsVideo: false
+        ) == "CurrentNativeRecording",
+        "Current native replay recording should retain the presentation gate."
+    );
+    Assert(
+        Resolve(
+            currentNativeReplayStarted: false,
+            savedReplayPlaybackActive: true,
+            managedReplayRecordsVideo: true
+        ) == "ManagedSavedRecording",
+        "Record on a local-saved or imported replay must defer simulation behind the presentation gate."
+    );
+    Assert(
+        Resolve(
+            currentNativeReplayStarted: false,
+            savedReplayPlaybackActive: true,
+            managedReplayRecordsVideo: false
+        ) == "None",
+        "Replay without video recording should keep the native simulation path."
+    );
+    Assert(
+        Resolve(
+            currentNativeReplayStarted: false,
+            savedReplayPlaybackActive: false,
+            managedReplayRecordsVideo: true
+        ) == "None",
+        "A stale recording flag without an active saved replay must not defer unrelated combat."
     );
 }
 

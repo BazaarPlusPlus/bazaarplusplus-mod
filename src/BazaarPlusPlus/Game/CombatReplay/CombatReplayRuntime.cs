@@ -27,7 +27,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 {
     private const float CurrentReplayRecapPostRollSeconds = 3f;
     private const int StartupReportRecoveryBatchSize = 2;
-    private const string CardIdleFaceUpStateName = "Card_Idle_Faceup_A";
 
     private IBppServices? _services;
     private RunLifecycleModule? _runLifecycle;
@@ -794,7 +793,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        if (!_currentRecording.NativeReplayStarted)
+        var gateKind = RecordedReplayPresentationGatePolicy.Resolve(
+            _currentRecording.NativeReplayStarted,
+            _savedReplay.IsSavedReplayPlaybackActive,
+            _activePlaybackOperation?.RecordVideo == true
+        );
+        if (gateKind == RecordedReplayPresentationGateKind.None)
             return false;
 
         if (_currentReplaySimulationCompletion != null)
@@ -812,7 +816,13 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         try
         {
             _pendingCurrentReplayPresentationGate = StartCoroutine(
-                RunCurrentReplayPresentationGate(handler, message, cancellationToken, completion)
+                RunCurrentReplayPresentationGate(
+                    handler,
+                    message,
+                    cancellationToken,
+                    completion,
+                    gateKind
+                )
             );
             deferredSimulation = completion.Task;
             return true;
@@ -822,7 +832,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             _pendingCurrentReplayPresentationGate = null;
             _currentReplaySimulationCompletion = null;
             _deferredCurrentReplaySimulation = null;
-            BeginCurrentReplayRecordingAtPresentationBoundary();
+            if (gateKind == RecordedReplayPresentationGateKind.CurrentNativeRecording)
+                BeginCurrentReplayRecordingAtPresentationBoundary();
             return false;
         }
     }
@@ -831,7 +842,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         CombatSimHandler handler,
         NetMessageCombatSim message,
         CancellationTokenSource cancellationToken,
-        TaskCompletionSource<bool> completion
+        TaskCompletionSource<bool> completion,
+        RecordedReplayPresentationGateKind gateKind
     )
     {
         var waitForRenderedFrame = new WaitForEndOfFrame();
@@ -865,13 +877,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
 
         LogCurrentReplayPresentationGate(
+            gateKind,
             timedOut
                 ? CurrentReplayPresentationGateOutcome.TimedOut
                 : CurrentReplayPresentationGateOutcome.Ready,
             snapshot,
             Time.realtimeSinceStartup - startedAt
         );
-        BeginCurrentReplayRecordingAtPresentationBoundary();
+        if (gateKind == RecordedReplayPresentationGateKind.CurrentNativeRecording)
+            BeginCurrentReplayRecordingAtPresentationBoundary();
 
         // Give the recorder one complete, visually ready board frame before the first combat
         // action. This is a render boundary rather than a machine-dependent millisecond delay.
@@ -942,30 +956,16 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             if (Data.CardAndSkillLookup.GetCardController(card) is not ItemController controller)
                 continue;
 
-            var visible =
-                controller.gameObject.activeInHierarchy
-                && controller.IsCardVisible
-                && controller.PositionedInSocket;
+            var visible = CurrentReplayPresentationReadiness.IsVisible(controller);
             if (visible)
                 visibleItemCount++;
 
-            var animator = controller.Animator;
-            var faceUp =
-                visible
-                && animator != null
-                && animator.isActiveAndEnabled
-                && animator.GetBool(AnimationParameterDefinitions.CardFaceUpParam);
+            var faceUp = CurrentReplayPresentationReadiness.IsFaceUp(controller);
             if (faceUp)
                 faceUpItemCount++;
 
-            if (
-                faceUp
-                && !animator!.IsInTransition(0)
-                && animator.GetCurrentAnimatorStateInfo(0).IsName(CardIdleFaceUpStateName)
-            )
-            {
+            if (CurrentReplayPresentationReadiness.IsSettled(controller))
                 settledItemCount++;
-            }
         }
 
         return new CurrentReplayPresentationReadinessSnapshot(
@@ -1040,11 +1040,18 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     }
 
     private void LogCurrentReplayPresentationGate(
+        RecordedReplayPresentationGateKind gateKind,
         CurrentReplayPresentationGateOutcome outcome,
         CurrentReplayPresentationReadinessSnapshot snapshot,
         float elapsedSeconds
     )
     {
+        if (gateKind == RecordedReplayPresentationGateKind.ManagedSavedRecording)
+        {
+            LogManagedRecordingPresentationGate(outcome, snapshot, elapsedSeconds);
+            return;
+        }
+
         BppLogFieldValue[] Fields() =>
             [
                 CombatReplayLogEvents.CurrentRecordingPresentationGateRecordingId.Bind(
@@ -1077,7 +1084,52 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return;
         }
 
-        BppLog.DebugEvent(CombatReplayLogEvents.CurrentRecordingPresentationGateResolved, Fields);
+        BppLog.InfoEvent(CombatReplayLogEvents.CurrentRecordingPresentationGateResolved, Fields());
+    }
+
+    private void LogManagedRecordingPresentationGate(
+        CurrentReplayPresentationGateOutcome outcome,
+        CurrentReplayPresentationReadinessSnapshot snapshot,
+        float elapsedSeconds
+    )
+    {
+        var operation = _activePlaybackOperation;
+        BppLogFieldValue[] Fields() =>
+            [
+                CombatReplayLogEvents.ManagedRecordingPresentationGateBattleId.Bind(
+                    operation?.BattleId
+                ),
+                CombatReplayLogEvents.ManagedRecordingPresentationGateSource.Bind(
+                    operation?.Source
+                ),
+                CombatReplayLogEvents.ManagedRecordingPresentationGateOutcome.Bind(outcome),
+                CombatReplayLogEvents.ManagedRecordingPresentationGateExpectedItems.Bind(
+                    snapshot.ExpectedItemCount
+                ),
+                CombatReplayLogEvents.ManagedRecordingPresentationGateVisibleItems.Bind(
+                    snapshot.VisibleItemCount
+                ),
+                CombatReplayLogEvents.ManagedRecordingPresentationGateFaceUpItems.Bind(
+                    snapshot.FaceUpItemCount
+                ),
+                CombatReplayLogEvents.ManagedRecordingPresentationGateSettledItems.Bind(
+                    snapshot.SettledItemCount
+                ),
+                CombatReplayLogEvents.ManagedRecordingPresentationGateElapsedMs.Bind(
+                    Math.Max(0, (int)Math.Round(elapsedSeconds * 1000f))
+                ),
+            ];
+
+        if (outcome == CurrentReplayPresentationGateOutcome.TimedOut)
+        {
+            BppLog.WarnEvent(
+                CombatReplayLogEvents.ManagedRecordingPresentationGateResolved,
+                Fields()
+            );
+            return;
+        }
+
+        BppLog.InfoEvent(CombatReplayLogEvents.ManagedRecordingPresentationGateResolved, Fields());
     }
 
     private void OnNativeReplayStarted()
