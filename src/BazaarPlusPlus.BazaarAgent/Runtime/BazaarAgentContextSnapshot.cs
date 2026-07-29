@@ -62,6 +62,7 @@ public sealed class BazaarAgentContextSnapshotPublisher
             CanStartOrContinueRun = src.CanStartOrContinueRun,
             IsClientBusy = src.IsClientBusy,
             RunId = src.RunId,
+            GameModeId = src.GameModeId,
             StateName = src.StateName,
             PlayerHero = src.PlayerHero,
             Day = src.Day,
@@ -101,6 +102,7 @@ public sealed class BazaarAgentContextSnapshotPublisher
             && a.CanStartOrContinueRun == b.CanStartOrContinueRun
             && a.IsClientBusy == b.IsClientBusy
             && a.RunId == b.RunId
+            && a.GameModeId == b.GameModeId
             && a.StateName == b.StateName
             && a.PlayerHero == b.PlayerHero
             && a.Day == b.Day
@@ -130,6 +132,49 @@ public sealed class BazaarAgentContextSnapshotPublisher
             && CardsEqual(a.SellableItems, b.SellableItems)
             && CardsEqual(a.SelectionOptions, b.SelectionOptions)
             && OptionsEqual(a.AvailableActions, b.AvailableActions);
+    }
+
+    public static bool HasGameplayStateChanged(BazaarAgentContext before, BazaarAgentContext after)
+    {
+        if (before is null)
+            throw new ArgumentNullException(nameof(before));
+        if (after is null)
+            throw new ArgumentNullException(nameof(after));
+
+        // Busy/cooldown and AvailableActions are transport-facing signals. They can change solely
+        // because an accepted command is in flight, so none of them proves the game applied it.
+        return before.IsInRun != after.IsInRun
+            || before.HasActiveRun != after.HasActiveRun
+            || before.CanStartOrContinueRun != after.CanStartOrContinueRun
+            || before.RunId != after.RunId
+            || before.GameModeId != after.GameModeId
+            || before.StateName != after.StateName
+            || before.PlayerHero != after.PlayerHero
+            || before.Day != after.Day
+            || before.Hour != after.Hour
+            || before.Wins != after.Wins
+            || before.Losses != after.Losses
+            || before.PlayerGold != after.PlayerGold
+            || before.PlayerIncome != after.PlayerIncome
+            || before.PlayerHealth != after.PlayerHealth
+            || before.PlayerMaxHealth != after.PlayerMaxHealth
+            || before.PlayerPrestige != after.PlayerPrestige
+            || before.PlayerLevel != after.PlayerLevel
+            || before.SelectionIsFree != after.SelectionIsFree
+            || before.CanExit != after.CanExit
+            || before.CanReroll != after.CanReroll
+            || before.RerollCost != after.RerollCost
+            || before.RerollsRemaining != after.RerollsRemaining
+            || before.CurrentEncounterId != after.CurrentEncounterId
+            || before.CurrentEncounterType != after.CurrentEncounterType
+            || before.ReplayPhase != after.ReplayPhase
+            || before.ReplayBattleId != after.ReplayBattleId
+            || !SocketsEqual(before.InteractableTemplateIds, after.InteractableTemplateIds)
+            || !CardsEqual(before.BoardItems, after.BoardItems)
+            || !CardsEqual(before.ChestItems, after.ChestItems)
+            || !CardsEqual(before.PlayerSkills, after.PlayerSkills)
+            || !CardsEqual(before.SellableItems, after.SellableItems)
+            || !CardsEqual(before.SelectionOptions, after.SelectionOptions);
     }
 
     private static bool CardsEqual(

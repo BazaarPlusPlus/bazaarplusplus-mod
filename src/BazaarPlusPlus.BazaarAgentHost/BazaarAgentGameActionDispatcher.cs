@@ -48,6 +48,31 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
         BazaarAgentContextSnapshot snapshot
     )
     {
+        if (
+            action.ActionKind != BazaarAgentActionKind.Wait
+            && (AppState.IsWaitingForServerResponse || AppState.BlockInput)
+        )
+        {
+            return new(
+                false,
+                "client busy",
+                FailureKind: BazaarAgentDispatchFailureKind.Unavailable
+            );
+        }
+
+        if (
+            AppState.CurrentState is ReplayState
+            && action.ActionKind != BazaarAgentActionKind.Wait
+            && action.ActionKind != BazaarAgentActionKind.Continue
+        )
+        {
+            return new(
+                false,
+                "action not allowed during replay",
+                FailureKind: BazaarAgentDispatchFailureKind.Unavailable
+            );
+        }
+
         switch (action.ActionKind)
         {
             case BazaarAgentActionKind.Wait:

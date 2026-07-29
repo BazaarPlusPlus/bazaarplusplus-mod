@@ -69,6 +69,63 @@ public class BazaarAgentActionValidatorTests
     // ── Rule 2: actionKind in availableActions (Wait exempt) ─────────────────
 
     [Fact]
+    public void BusyClient_RejectsNonWaitActionAsUnavailable()
+    {
+        var context = new BazaarAgentContext
+        {
+            TickId = 1,
+            IsClientBusy = true,
+            AvailableActions = new[] { SimpleOption(BazaarAgentActionKind.Reroll) },
+        };
+        var snapshot = new BazaarAgentContextSnapshot(context);
+
+        var result = BazaarAgentActionValidator.Validate(
+            snapshot,
+            new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Reroll },
+            0
+        );
+
+        Assert.Equal(BazaarAgentValidationCode.Unavailable, result.Code);
+        Assert.Equal(503, result.HttpStatus);
+        Assert.Equal("client busy", result.Details);
+    }
+
+    [Fact]
+    public void BusyClient_AllowsWait()
+    {
+        var context = new BazaarAgentContext { TickId = 1, IsClientBusy = true };
+        var result = BazaarAgentActionValidator.Validate(
+            new BazaarAgentContextSnapshot(context),
+            new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Wait },
+            0
+        );
+
+        Assert.Equal(BazaarAgentValidationCode.Ok, result.Code);
+    }
+
+    [Fact]
+    public void Replay_RejectsLeakedNonFlowAction()
+    {
+        var context = new BazaarAgentContext
+        {
+            TickId = 7,
+            StateName = BazaarAgentRunStateName.Replay,
+            ReplayPhase = BazaarAgentReplayPhase.FinishedAwaitingContinue,
+            AvailableActions = new[] { SimpleOption(BazaarAgentActionKind.ExitState) },
+        };
+
+        var result = BazaarAgentActionValidator.Validate(
+            new BazaarAgentContextSnapshot(context),
+            new BazaarAgentAction { ActionKind = BazaarAgentActionKind.ExitState, ForTickId = 7 },
+            0
+        );
+
+        Assert.Equal(BazaarAgentValidationCode.StaleOrUnavailable, result.Code);
+        Assert.Equal(409, result.HttpStatus);
+        Assert.Equal("action not allowed during replay", result.Details);
+    }
+
+    [Fact]
     public void Rule2_Wait_ExemptFromAvailableActionsCheck()
     {
         // snapshot has NO AvailableActions at all, but Wait should still pass rule 2

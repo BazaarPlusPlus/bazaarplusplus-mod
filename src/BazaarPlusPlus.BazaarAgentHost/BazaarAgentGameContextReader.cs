@@ -103,9 +103,10 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         // and no active AppState — see BazaarAgentSceneProbe for the conservative check.
         bool canStartOrContinueRun = BazaarAgentSceneProbe.IsAtHeroSelectAndReadyForNewRun(logger);
 
-        string? runId = null;
-        if (run != null && run.GameModeId != default(Guid))
-            runId = run.GameModeId.ToString("D");
+        string? runId = gameProbe.GetCurrentServerRunId();
+        string? gameModeId =
+            run != null && run.GameModeId != default(Guid) ? run.GameModeId.ToString("D") : null;
+        bool isClientBusy = ReadClientBusy();
 
         // Player gold via attribute system
         int playerGold = run?.Player?.GetAttributeValue(EPlayerAttributeType.Gold) ?? 0;
@@ -154,9 +155,9 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         bool canSell = canHandleOp(StateOps.SellItem);
         bool canMove = canHandleOp(StateOps.MoveItem);
 
-        var boardItems = BuildBoardCards(run, playerGold, canSell, BazaarAgentCardLocation.Board);
-        var chestItems = BuildBoardCards(run, playerGold, canSell, BazaarAgentCardLocation.Chest);
-        var playerSkills = BuildSkillCards(run, canSell);
+        var boardItems = BuildBoardCards(run, canSell, BazaarAgentCardLocation.Board, gameProbe);
+        var chestItems = BuildBoardCards(run, canSell, BazaarAgentCardLocation.Chest, gameProbe);
+        var playerSkills = BuildSkillCards(run, canSell, gameProbe);
 
         var sellableItems = BuildSellableItems(boardItems, chestItems, canSell);
 
@@ -174,7 +175,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             selectionIsFree,
             canHandleOp(StateOps.SelectItem),
             occupiedHand,
-            occupiedStash
+            occupiedStash,
+            gameProbe
         );
 
         // Target-selection mode (upgrade/enchant): when AppState._iteractionFilter
@@ -193,6 +195,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         var actions = BuildActions(
             stateName,
             replayPhase,
+            isClientBusy,
             isInRun,
             canHandleOp,
             canReroll,
@@ -231,8 +234,9 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             IsInRun = isInRun,
             HasActiveRun = hasActiveRun,
             CanStartOrContinueRun = canStartOrContinueRun,
-            IsClientBusy = ReadClientBusy(),
+            IsClientBusy = isClientBusy,
             RunId = runId,
+            GameModeId = gameModeId,
             StateName = stateName,
             PlayerHero = run?.Player is { } player ? gameProbe.ToAgentHeroId(player.Hero) : null,
             Day = run == null ? null : unchecked((int)run.Day),
@@ -322,9 +326,9 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 
     private static IReadOnlyList<BazaarAgentCardSnapshot> BuildBoardCards(
         Run? run,
-        int playerGold,
         bool canSell,
-        BazaarAgentCardLocation location
+        BazaarAgentCardLocation location,
+        IBazaarAgentGameProbe gameProbe
     )
     {
         if (run?.Player == null)
@@ -356,7 +360,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
                     Kind = BazaarAgentCardKind.Item,
                     Type = card.Type.ToString(),
                     TemplateId = card.TemplateId.ToString("D"),
-                    DisplayName = card.Name,
+                    DisplayName = gameProbe.ResolveCardDisplayName(card),
                     Tier = card.Tier.ToString(),
                     Size = card.Size.ToString(),
                     Enchantment = card.Enchantment?.ToString(),
@@ -376,7 +380,11 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         return result;
     }
 
-    private static IReadOnlyList<BazaarAgentCardSnapshot> BuildSkillCards(Run? run, bool canSell)
+    private static IReadOnlyList<BazaarAgentCardSnapshot> BuildSkillCards(
+        Run? run,
+        bool canSell,
+        IBazaarAgentGameProbe gameProbe
+    )
     {
         if (run?.Player?.Skills == null)
             return Array.Empty<BazaarAgentCardSnapshot>();
@@ -394,7 +402,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
                     Kind = BazaarAgentCardKind.Skill,
                     Type = skill.Type.ToString(),
                     TemplateId = skill.TemplateId.ToString("D"),
-                    DisplayName = skill.Name,
+                    DisplayName = gameProbe.ResolveCardDisplayName(skill),
                     Tier = skill.Tier.ToString(),
                     Size = skill.Size.ToString(),
                     SocketId = null,
@@ -438,7 +446,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         bool selectionIsFree,
         bool canSelectItem,
         HashSet<int> occupiedHand,
-        HashSet<int> occupiedStash
+        HashSet<int> occupiedStash,
+        IBazaarAgentGameProbe gameProbe
     )
     {
         var result = new List<BazaarAgentCardSnapshot>();
@@ -523,7 +532,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
                     Kind = kind,
                     Type = card.Type.ToString(),
                     TemplateId = card.TemplateId.ToString("D"),
-                    DisplayName = card.Name,
+                    DisplayName = gameProbe.ResolveCardDisplayName(card),
                     Tier = card.Tier.ToString(),
                     Size = card.Size.ToString(),
                     Enchantment = (card as ItemCard)?.Enchantment?.ToString(),
@@ -556,6 +565,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
     private static IReadOnlyList<BazaarAgentDecisionOption> BuildActions(
         BazaarAgentRunStateName stateName,
         BazaarAgentReplayPhase replayPhase,
+        bool isClientBusy,
         bool isInRun,
         Func<StateOps, bool> canHandleOp,
         bool canReroll,
@@ -579,6 +589,11 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         // 1. Wait (always first)
         actions.Add(WaitOption());
 
+        // Native commands can silently decline input while the client is waiting for the server
+        // or has globally blocked input. Do not advertise actions that cannot be accepted.
+        if (isClientBusy)
+            return actions;
+
         // 1b. Continue — replay finished and awaiting the continue button. Surface it as a generic
         // Flow advance so the replay-agnostic agent can proceed; the dispatcher routes Continue to
         // CombatReplayRuntime.TryContinueReplay (ADR-0007). No card, no target.
@@ -593,6 +608,12 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
                 }
             );
         }
+
+        // Replay exit is explicit and owned by Continue. Native StateOps may still report generic
+        // inventory/exit operations as handleable after playback; none belong in the replay action
+        // surface (ADR-0007).
+        if (stateName == BazaarAgentRunStateName.Replay)
+            return actions;
 
         // 2. StartOrContinueRun
         if (canStartOrContinueRun)

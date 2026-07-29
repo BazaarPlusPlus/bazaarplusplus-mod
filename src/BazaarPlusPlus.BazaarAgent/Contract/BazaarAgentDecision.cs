@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.BazaarAgent;
 
 public static class BazaarAgentSchema
 {
-    public const string Version = "2.2.0";
+    public const string Version = "2.3.0";
 }
 
 public enum BazaarAgentActionKind
@@ -168,6 +168,7 @@ public sealed class BazaarAgentContext
     public bool IsClientBusy { get; init; }
 
     public string? RunId { get; init; }
+    public string? GameModeId { get; init; }
     public BazaarAgentRunStateName StateName { get; init; }
     public string? PlayerHero { get; init; }
     public int? Day { get; init; }

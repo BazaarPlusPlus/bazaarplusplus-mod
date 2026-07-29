@@ -257,7 +257,7 @@ internal sealed class BppComposition : IDisposable
         // BazaarAgentGameBridge. Published unconditionally — they are passive accessors that
         // nothing reads unless the host plugin is installed. The recorder's runtime accessor is
         // lazy on purpose: CombatReplayRuntime is attached after this constructor runs.
-        BazaarAgentGameBridge.Current = new BazaarAgentGameProbe(_encounterStateProbe);
+        BazaarAgentGameBridge.Current = new BazaarAgentGameProbe(_encounterStateProbe, _runContext);
         BazaarAgentGameBridge.CurrentRecorder = BazaarAgentReplayRecorderWiring.Create(
             () => _combatReplayModule.Runtime,
             _services

@@ -73,6 +73,24 @@ public static class BazaarAgentActionValidator
         if (!Enum.IsDefined(typeof(BazaarAgentActionKind), kind))
             return Fail(BazaarAgentValidationCode.Invalid, 400, "unknown actionKind");
 
+        // The context reader suppresses actions while busy, but retain this independent check for
+        // callers holding a synthetic or older snapshot.
+        if (kind != BazaarAgentActionKind.Wait && snapshot.Context.IsClientBusy)
+            return Fail(BazaarAgentValidationCode.Unavailable, 503, "client busy");
+
+        if (
+            snapshot.Context.StateName == BazaarAgentRunStateName.Replay
+            && kind != BazaarAgentActionKind.Wait
+            && kind != BazaarAgentActionKind.Continue
+        )
+        {
+            return Fail(
+                BazaarAgentValidationCode.StaleOrUnavailable,
+                409,
+                "action not allowed during replay"
+            );
+        }
+
         // ── Rule 2: actionKind in AvailableActions (Wait exempt) ──────────────
         if (kind != BazaarAgentActionKind.Wait)
         {

@@ -9,6 +9,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 {
     private const double ListenerReconcileDebounceSeconds = 0.5;
     private const double SnapshotPublishIntervalSeconds = 1.5;
+    private const double ActionObservationTimeoutSeconds = 10;
 
     private readonly IBazaarAgentOptions _options;
     private readonly IBazaarAgentContextReader _contextReader;
@@ -33,6 +34,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     private BazaarAgentHttpServer? _http;
     private BazaarAgentCommandQueue<BazaarAgentAction>? _queue;
     private BazaarAgentCommandQueue<BazaarAgentReplayCommand>? _replayQueue;
+    private PendingActionObservation? _pendingActionObservation;
     private int _currentPort = -1;
 
     public BazaarAgentRuntimeController(
@@ -68,44 +70,23 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         // the snapshot path may exit ReplayState.
         DrainReplayControlQueue();
 
-        if (_clock.NowSeconds - _lastTickTime < SnapshotPublishIntervalSeconds)
-            return false;
-        _lastTickTime = _clock.NowSeconds;
-
-        var cooldownLeft = ComputeCooldownLeft();
-        var context = _contextReader.Build(cooldownLeft);
-        var snapshot = _snapshots.Publish(context, out var isFirstSnapshot);
-        if (isFirstSnapshot)
-            _logger.TryEmit(BazaarAgentLogEvents.SnapshotReady(context.StateName));
-
-        _snapshotPublished?.Invoke();
-
-        var pending = _queue.TryDequeue();
-        if (pending is not null)
+        var snapshotPublished = false;
+        if (_clock.NowSeconds - _lastTickTime >= SnapshotPublishIntervalSeconds)
         {
-            // A dequeued command is claimed (its timeout is disarmed), so it MUST be answered
-            // here — an unhandled exception would leave the HTTP client waiting forever.
-            // Answer BEFORE logging: the logger itself can throw (e.g. disk-full inside the
-            // BepInEx log listener chain), and that must not swallow the response.
-            try
-            {
-                ProcessPending(pending, snapshot);
-            }
-            catch (Exception ex)
-            {
-                pending.SetResponse(new BazaarAgentServerResponse(500, "{\"error\":\"internal\"}"));
-                _logger.TryEmit(
-                    BazaarAgentLogEvents.ActionFailed(
-                        pending.RequestId,
-                        pending.Command.ActionKind,
-                        BazaarAgentLogReasonCode.ActionProcessingException,
-                        ex
-                    )
-                );
-            }
+            _lastTickTime = _clock.NowSeconds;
+            var cooldownLeft = ComputeCooldownLeft();
+            var context = _contextReader.Build(cooldownLeft);
+            var snapshot = _snapshots.Publish(context, out var isFirstSnapshot);
+            if (isFirstSnapshot)
+                _logger.TryEmit(BazaarAgentLogEvents.SnapshotReady(context.StateName));
+
+            _snapshotPublished?.Invoke();
+            snapshotPublished = true;
         }
 
-        return true;
+        TryCompleteActionObservation();
+        DrainActionQueue();
+        return snapshotPublished;
     }
 
     private void ReconcileListener()
@@ -154,6 +135,10 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
     private void StopListener()
     {
+        _pendingActionObservation?.Pending.SetResponse(
+            new BazaarAgentServerResponse(503, "{\"error\":\"unavailable\"}")
+        );
+        _pendingActionObservation = null;
         var report = _http?.Stop() ?? new BazaarAgentListenerStopReport();
         report.Capture(BazaarAgentListenerStopPhase.ActionQueueDispose, () => _queue?.Dispose());
         report.Capture(
@@ -212,6 +197,92 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         }
     }
 
+    private void DrainActionQueue()
+    {
+        var queue = _queue;
+        var snapshot = _snapshots.Current;
+        if (queue is null || snapshot is null || _pendingActionObservation is not null)
+            return;
+
+        var pending = queue.TryDequeue();
+        if (pending is null)
+            return;
+
+        // A dequeued command is claimed (its timeout is disarmed), so it MUST be answered here or
+        // retained by _pendingActionObservation until confirmation/timeout.
+        try
+        {
+            ProcessPending(pending, snapshot);
+        }
+        catch (Exception ex)
+        {
+            pending.SetResponse(new BazaarAgentServerResponse(500, "{\"error\":\"internal\"}"));
+            _logger.TryEmit(
+                BazaarAgentLogEvents.ActionFailed(
+                    pending.RequestId,
+                    pending.Command.ActionKind,
+                    BazaarAgentLogReasonCode.ActionProcessingException,
+                    ex
+                )
+            );
+        }
+    }
+
+    private void TryCompleteActionObservation()
+    {
+        var observation = _pendingActionObservation;
+        if (observation is null)
+            return;
+
+        var current = _snapshots.Current;
+        switch (
+            BazaarAgentActionObservation.Evaluate(
+                observation.Baseline.Context,
+                current?.Context,
+                _clock.NowSeconds,
+                observation.DeadlineSeconds
+            )
+        )
+        {
+            case BazaarAgentActionObservationStatus.Confirmed:
+                CompleteActionObservation(observation, current!, confirmed: true);
+                break;
+            case BazaarAgentActionObservationStatus.TimedOut:
+                CompleteActionObservation(
+                    observation,
+                    current ?? observation.Baseline,
+                    confirmed: false
+                );
+                break;
+        }
+    }
+
+    private void CompleteActionObservation(
+        PendingActionObservation observation,
+        BazaarAgentContextSnapshot observed,
+        bool confirmed
+    )
+    {
+        _pendingActionObservation = null;
+        var body = BuildOkBody(
+            observation.DecisionId,
+            observation.Baseline,
+            observation.Action,
+            executed: true,
+            confirmationStatus: confirmed ? "confirmed" : "accepted_but_unconfirmed",
+            observedTickId: observed.TickId
+        );
+        observation.Pending.SetResponse(new BazaarAgentServerResponse(confirmed ? 200 : 202, body));
+        LogDecision(
+            observation.Pending.RequestId,
+            observation.DecisionId,
+            observation.Baseline,
+            observation.Action,
+            executed: true,
+            error: confirmed ? null : "accepted_but_unconfirmed"
+        );
+    }
+
     private void ProcessPending(
         BazaarAgentPendingCommand<BazaarAgentAction> pending,
         BazaarAgentContextSnapshot snapshot
@@ -241,9 +312,27 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         if (result.Executed)
         {
             if (action.ActionKind != BazaarAgentActionKind.Wait)
+            {
                 _lastActionTime = _clock.NowSeconds;
 
-            var okBody = BuildOkBody(decisionId, snapshot, action, executed: true);
+                _pendingActionObservation = new PendingActionObservation(
+                    pending,
+                    decisionId,
+                    snapshot,
+                    action,
+                    _clock.NowSeconds + ActionObservationTimeoutSeconds
+                );
+                return;
+            }
+
+            var okBody = BuildOkBody(
+                decisionId,
+                snapshot,
+                action,
+                executed: true,
+                confirmationStatus: "confirmed",
+                observedTickId: snapshot.TickId
+            );
             pending.SetResponse(new BazaarAgentServerResponse(200, okBody));
             LogDecision(
                 pending.RequestId,
@@ -297,7 +386,9 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         string decisionId,
         BazaarAgentContextSnapshot snapshot,
         BazaarAgentAction action,
-        bool executed
+        bool executed,
+        string confirmationStatus,
+        ulong observedTickId
     )
     {
         var payload = new
@@ -306,6 +397,9 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             decisionId,
             executed,
             tickId = snapshot.TickId,
+            observedTickId,
+            confirmationStatus,
+            confirmed = confirmationStatus == "confirmed",
             actionKind = action.ActionKind.ToString(),
         };
         return JsonConvert.SerializeObject(payload, _responseJson);
@@ -360,6 +454,30 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
     private BazaarAgentDecisionLog GetOrCreateDecisionLog() =>
         _decisionLog ??= new BazaarAgentDecisionLog(_options.DecisionLogRoot);
+
+    private sealed class PendingActionObservation
+    {
+        internal PendingActionObservation(
+            BazaarAgentPendingCommand<BazaarAgentAction> pending,
+            string decisionId,
+            BazaarAgentContextSnapshot baseline,
+            BazaarAgentAction action,
+            double deadlineSeconds
+        )
+        {
+            Pending = pending;
+            DecisionId = decisionId;
+            Baseline = baseline;
+            Action = action;
+            DeadlineSeconds = deadlineSeconds;
+        }
+
+        internal BazaarAgentPendingCommand<BazaarAgentAction> Pending { get; }
+        internal string DecisionId { get; }
+        internal BazaarAgentContextSnapshot Baseline { get; }
+        internal BazaarAgentAction Action { get; }
+        internal double DeadlineSeconds { get; }
+    }
 
     public void Dispose()
     {

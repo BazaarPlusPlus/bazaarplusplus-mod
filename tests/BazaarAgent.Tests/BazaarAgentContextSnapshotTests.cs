@@ -168,6 +168,66 @@ public class BazaarAgentContextSnapshotTests
     }
 
     [Fact]
+    public void Publish_RunAndGameModeIdsAreIndependentAndCloned()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var first = pub.Publish(
+            new BazaarAgentContext { RunId = "run-1", GameModeId = "ranked-mode" }
+        );
+        var second = pub.Publish(
+            new BazaarAgentContext { RunId = "run-2", GameModeId = "ranked-mode" }
+        );
+
+        Assert.Equal("run-2", second.Context.RunId);
+        Assert.Equal("ranked-mode", second.Context.GameModeId);
+        Assert.NotEqual(first.TickId, second.TickId);
+    }
+
+    [Fact]
+    public void GameplayChange_IgnoresBusyCooldownAndAdvertisedActions()
+    {
+        var before = new BazaarAgentContext
+        {
+            StateName = BazaarAgentRunStateName.Choice,
+            PlayerGold = 10,
+            IsClientBusy = false,
+            ActionCooldownRemainingSeconds = 0,
+            AvailableActions = new[]
+            {
+                new BazaarAgentDecisionOption { ActionKind = BazaarAgentActionKind.Reroll },
+            },
+        };
+        var after = new BazaarAgentContext
+        {
+            StateName = BazaarAgentRunStateName.Choice,
+            PlayerGold = 10,
+            IsClientBusy = true,
+            ActionCooldownRemainingSeconds = 0.8,
+            AvailableActions = new[]
+            {
+                new BazaarAgentDecisionOption { ActionKind = BazaarAgentActionKind.Wait },
+            },
+        };
+
+        Assert.False(BazaarAgentContextSnapshotPublisher.HasGameplayStateChanged(before, after));
+    }
+
+    [Fact]
+    public void GameplayChange_DetectsInventoryMutation()
+    {
+        var before = new BazaarAgentContext
+        {
+            BoardItems = new[] { new BazaarAgentCardSnapshot { InstanceId = "item-1" } },
+        };
+        var after = new BazaarAgentContext
+        {
+            BoardItems = new[] { new BazaarAgentCardSnapshot { InstanceId = "item-2" } },
+        };
+
+        Assert.True(BazaarAgentContextSnapshotPublisher.HasGameplayStateChanged(before, after));
+    }
+
+    [Fact]
     public void Publish_DifferentStateName_BumpsTickId()
     {
         var pub = new BazaarAgentContextSnapshotPublisher();
