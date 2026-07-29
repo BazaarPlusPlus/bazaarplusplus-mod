@@ -36,18 +36,31 @@ Candidate mechanisms to distinguish:
 4. a seek completion or playback-state callback overwrites the latest hover
    target with the initial pinned time.
 
-Confirmed root cause in the localhost review surface:
+The first localhost diagnosis was incomplete:
 
 - the temporary preview was Python `http.server`, which answered a byte-range
   request with `200 OK` and the complete file instead of `206 Partial Content`;
 - both videos therefore buffered only their opening segment while paused, so a
   direct hover seek to an unbuffered terminal frame stayed at `0`;
 - the same report served by Vite returned `206 Partial Content` with
-  `Accept-Ranges: bytes`; terminal hover then produced combat `14.75s`, scrub
-  media `21.433s`, and never reset to zero.
+  `Accept-Ranges: bytes`, removing that failure mechanism.
 
-This failure is in the review server, not the Viewer mapping. Do not add a
-Viewer fallback that hides a server incapable of random media access.
+Runtime feedback on the Range-capable Vite surface exposed a second,
+Viewer-owned mechanism:
+
+- live hover uses `HTMLMediaElement.fastSeek()` for responsiveness;
+- the terminal combat time maps to the final sync anchor, which is the final
+  decodable video-frame timestamp (for the current report: `22.683s`, media
+  duration `22.700s`);
+- `fastSeek()` is keyframe-oriented and is not required to land on that exact
+  terminal timestamp. A browser may display an earlier keyframe (including the
+  opening frame) while the paused preview is at the terminal boundary;
+- the previous fallback depended on observing an in-flight seek and a later
+  `seeked` mismatch. That does not cover browsers which complete or report the
+  fast seek synchronously.
+
+The terminal preview must bypass `fastSeek()` and assign the exact final sync
+anchor. Intermediate hover remains on the scrub proxy's fast path.
 
 ### B. Replay simulation still starts before presentation is ready
 
@@ -129,6 +142,8 @@ Confirmed root cause:
 - The preview server proves byte-range support before the interaction check.
 - Combat preview time and the active scrub video's `currentTime` remain near
   the end; neither becomes zero.
+- The terminal hover issues one exact seek to the final sync anchor and does
+  not issue a fast seek; intermediate hover continues to use `fastSeek()`.
 - The terminal frame remains visible after seek completion and after leaving
   hover.
 - Retain pure upper-bound sync coverage and the behavior tests for the

@@ -2895,6 +2895,113 @@ test("applies only the latest hover target while a Firefox-style seek is in flig
   expect(await seekCalls()).toHaveLength(2);
 });
 
+test("uses an exact seek for the terminal timeline frame", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const states = new WeakMap();
+    const stateFor = (media) => {
+      let state = states.get(media);
+      if (!state) {
+        state = {
+          currentTime: 0,
+          paused: true,
+          seeking: false,
+          seekCalls: [],
+        };
+        states.set(media, state);
+      }
+      return state;
+    };
+    Object.defineProperty(HTMLMediaElement.prototype, "currentTime", {
+      configurable: true,
+      get() {
+        return stateFor(this).currentTime;
+      },
+      set(value) {
+        const state = stateFor(this);
+        state.currentTime = Number(value);
+        state.seeking = true;
+        state.seekCalls.push({ kind: "exact", seconds: Number(value) });
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "paused", {
+      configurable: true,
+      get() {
+        return stateFor(this).paused;
+      },
+    });
+    Object.defineProperty(HTMLMediaElement.prototype, "seeking", {
+      configurable: true,
+      get() {
+        return stateFor(this).seeking;
+      },
+    });
+    HTMLMediaElement.prototype.fastSeek = function fastSeek(value) {
+      const state = stateFor(this);
+      state.currentTime = 0;
+      state.seeking = false;
+      state.seekCalls.push({ kind: "fast", seconds: Number(value) });
+    };
+    window.__bppSeekProbe = {
+      calls(media) {
+        return [...stateFor(media).seekCalls];
+      },
+      complete(media) {
+        const state = stateFor(media);
+        state.seeking = false;
+        media.dispatchEvent(new Event("seeked"));
+        media.dispatchEvent(new Event("timeupdate"));
+      },
+      reset(media) {
+        const state = stateFor(media);
+        state.seeking = false;
+        state.seekCalls.length = 0;
+      },
+    };
+  });
+  await page.goto(`${scrubRecordingReportUrl}?lang=en`);
+  const fullVideo = page.getByTestId("recording-video");
+  const scrubVideo = page.getByTestId("recording-scrub-video");
+  await fullVideo.dispatchEvent("loadedmetadata");
+  await scrubVideo.dispatchEvent("loadedmetadata");
+  await fullVideo.evaluate((element) => {
+    window.__bppSeekProbe.complete(element);
+    window.__bppSeekProbe.reset(element);
+  });
+  await scrubVideo.evaluate((element) => {
+    window.__bppSeekProbe.complete(element);
+    window.__bppSeekProbe.reset(element);
+  });
+
+  await page.getByTestId("timeline-ruler-canvas").evaluate(
+    async (element) => {
+      const bounds = element.getBoundingClientRect();
+      element.dispatchEvent(
+        new PointerEvent("pointermove", {
+          bubbles: true,
+          clientX: bounds.right - 1,
+          clientY: bounds.top + bounds.height / 2,
+        }),
+      );
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      );
+    },
+  );
+
+  await expect
+    .poll(() =>
+      scrubVideo.evaluate((element) => window.__bppSeekProbe.calls(element))
+    )
+    .toEqual([{ kind: "exact", seconds: 8 }]);
+  expect(
+    await fullVideo.evaluate(
+      (element) => window.__bppSeekProbe.calls(element),
+    ),
+  ).toEqual([]);
+});
+
 test("uses the scrub proxy for live hover and syncs the full video once on leave", async ({
   page,
 }) => {

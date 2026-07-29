@@ -65,6 +65,9 @@ export function useRecordingPlayback({
   const [mediaMs, setMediaMs] = useState(0);
 
   const exact = model.sync.status === "ReadyExact";
+  const terminalMediaMs = exact
+    ? model.sync.anchors[model.sync.anchors.length - 1]?.mediaPtsMs ?? null
+    : null;
 
   const setScrubVisible = useCallback((visible: boolean): void => {
     const scrubVideo = scrubVideoRef.current;
@@ -121,7 +124,7 @@ export function useRecordingPlayback({
     previewSeekUsedFastRef.current = issueVideoSeek(
       video,
       mapped,
-      true,
+      terminalMediaMs === null || mapped < terminalMediaMs - 1,
     );
     previewSeekInFlightRef.current = video.seeking;
     if (window.__BPP_VIEWER_TEST__) {
@@ -131,7 +134,7 @@ export function useRecordingPlayback({
       previewSeekTargetMediaMsRef.current = null;
       previewSeekUsedFastRef.current = false;
     }
-  }, [selectPreviewVideo, setScrubVisible]);
+  }, [selectPreviewVideo, setScrubVisible, terminalMediaMs]);
   drainPreviewSeekRef.current = drainPreviewSeek;
 
   const cancelPreviewSeek = useCallback((): void => {
