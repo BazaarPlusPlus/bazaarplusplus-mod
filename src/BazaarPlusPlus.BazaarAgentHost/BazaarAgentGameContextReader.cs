@@ -226,6 +226,19 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             );
         }
 
+        // A combat summary is deliberately consumed only once the game has returned to an
+        // actionable state. This keeps combat-frame churn out of Agent View while preserving the
+        // completed battle as context for the next decision.
+        var lastBattle =
+            stateName
+                is not BazaarAgentRunStateName.Combat
+                    and not BazaarAgentRunStateName.PvpCombat
+            && actions.Any(action => action.ActionKind != BazaarAgentActionKind.Wait)
+                ? ProjectBattleSummary(
+                    BazaarAgentGameBridge.CurrentBattleSummarySource?.TakeCompletedSummary()
+                )
+                : null;
+
         return new BazaarAgentContext
         {
             SchemaVersion = BazaarAgentSchema.Version,
@@ -266,12 +279,70 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             SellableItems = sellableItems,
             SelectionOptions = selectionOptions,
             AvailableActions = actions,
+            LastBattle = lastBattle,
         };
     }
 
     // -------------------------------------------------------------------------
     // Replay phase
     // -------------------------------------------------------------------------
+
+    private static BazaarAgentBattleSummary? ProjectBattleSummary(
+        BazaarAgentBattleSummarySnapshot? source
+    )
+    {
+        if (source is null)
+            return null;
+
+        BazaarPlusPlus.BazaarAgent.BazaarAgentBattleValueChange? ProjectValue(
+            BazaarPlusPlus.GameInterop.BazaarAgentBattleValueChange? value
+        ) =>
+            value is null
+                ? null
+                : new BazaarPlusPlus.BazaarAgent.BazaarAgentBattleValueChange
+                {
+                    Start = value.Start,
+                    End = value.End,
+                };
+
+        BazaarAgentBattleAttributes ProjectAttributes(
+            BazaarAgentBattleAttributesSnapshot attributes
+        ) =>
+            new()
+            {
+                Health = ProjectValue(attributes.Health),
+                MaxHealth = ProjectValue(attributes.MaxHealth),
+                Shield = ProjectValue(attributes.Shield),
+                Burn = ProjectValue(attributes.Burn),
+                Poison = ProjectValue(attributes.Poison),
+            };
+
+        BazaarAgentBattleCombatant ProjectCombatant(BazaarAgentBattleCombatantSnapshot combatant) =>
+            new()
+            {
+                OpeningCards = combatant
+                    .OpeningCards.Select(card => new BazaarAgentBattleCard
+                    {
+                        InstanceId = card.InstanceId,
+                        TemplateId = card.TemplateId,
+                        Type = card.Type,
+                        Size = card.Size,
+                        Section = card.Section,
+                        SocketId = card.SocketId,
+                        Attributes = new Dictionary<string, int>(card.Attributes),
+                    })
+                    .ToArray(),
+                Attributes = ProjectAttributes(combatant.Attributes),
+            };
+
+        return new BazaarAgentBattleSummary
+        {
+            BattleType = source.BattleType,
+            Result = source.Result,
+            Player = ProjectCombatant(source.Player),
+            Opponent = ProjectCombatant(source.Opponent),
+        };
+    }
 
     private static (BazaarAgentReplayPhase Phase, string? BattleId) ReadReplayPhase()
     {

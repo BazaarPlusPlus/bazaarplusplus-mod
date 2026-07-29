@@ -64,6 +64,7 @@ internal sealed class BppComposition : IDisposable
     private readonly SettingsDockEntryRegistry _settingsDockRegistry = new();
     private readonly RunLifecycleModule _runLifecycle;
     private readonly CombatReplayModule _combatReplayModule;
+    private readonly BazaarAgentCombatSummaryModule _bazaarAgentCombatSummaryModule;
     private readonly CombatStatusBarModule _combatStatusBarModule;
     private readonly RunLoggingModule _runLoggingModule;
     private readonly EncounterPreviewModule _encounterPreviewModule;
@@ -120,6 +121,7 @@ internal sealed class BppComposition : IDisposable
 
         _runLifecycle = new RunLifecycleModule(_eventBus, _gameStateProbe, _runContext);
         _combatReplayModule = new CombatReplayModule(_eventBus);
+        _bazaarAgentCombatSummaryModule = new BazaarAgentCombatSummaryModule(_eventBus);
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
         _voiceSubtitlesModule = new VoiceSubtitlesModule();
         _voiceSubtitlesInteropModule = new VoiceSubtitlesInteropModule();
@@ -154,6 +156,7 @@ internal sealed class BppComposition : IDisposable
 
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
+        _featureRegistry.Register(_bazaarAgentCombatSummaryModule);
         _featureRegistry.Register(_combatStatusBarModule);
         _featureRegistry.Register(_voiceSubtitlesInteropModule);
         _featureRegistry.Register(_voiceSubtitlesModule);
@@ -262,6 +265,7 @@ internal sealed class BppComposition : IDisposable
             () => _combatReplayModule.Runtime,
             _services
         );
+        BazaarAgentGameBridge.CurrentBattleSummarySource = _bazaarAgentCombatSummaryModule;
     }
 
     public void AttachCombatReplayRuntime(CombatReplayRuntime runtime) =>
@@ -278,6 +282,7 @@ internal sealed class BppComposition : IDisposable
     {
         BazaarAgentGameBridge.Current = null;
         BazaarAgentGameBridge.CurrentRecorder = null;
+        BazaarAgentGameBridge.CurrentBattleSummarySource = null;
         _featureRegistry.Stop();
         _endOfRunCaptureWorkflow.Dispose();
         _encounterPreviewModule.Dispose();

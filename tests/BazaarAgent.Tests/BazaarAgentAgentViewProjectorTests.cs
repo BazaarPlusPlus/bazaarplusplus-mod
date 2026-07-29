@@ -82,6 +82,44 @@ public sealed class BazaarAgentAgentViewProjectorTests
     }
 
     [Fact]
+    public void Agent_view_carries_the_completed_battle_summary_without_card_knowledge_churn()
+    {
+        var projector = new BazaarAgentAgentViewProjector();
+        var view = projector
+            .Project(
+                new BazaarAgentContextSnapshot(
+                    new BazaarAgentContext
+                    {
+                        StateName = BazaarAgentRunStateName.Choice,
+                        LastBattle = new BazaarAgentBattleSummary
+                        {
+                            BattleType = "pve",
+                            Result = "loss",
+                            Opponent = new BazaarAgentBattleCombatant
+                            {
+                                Attributes = new BazaarAgentBattleAttributes
+                                {
+                                    Poison = new BazaarAgentBattleValueChange
+                                    {
+                                        Start = 2,
+                                        End = 7,
+                                    },
+                                },
+                            },
+                        },
+                    }
+                ),
+                "agent-a"
+            )
+            .View;
+
+        Assert.Empty(view.CardKnowledge);
+        Assert.Equal("pve", view.LastBattle?.BattleType);
+        Assert.Equal("loss", view.LastBattle?.Result);
+        Assert.Equal(5, view.LastBattle?.Opponent.Attributes.Poison?.Delta);
+    }
+
+    [Fact]
     public void Semantic_change_emits_a_complete_replacement_with_a_new_knowledge_id()
     {
         var projector = new BazaarAgentAgentViewProjector();

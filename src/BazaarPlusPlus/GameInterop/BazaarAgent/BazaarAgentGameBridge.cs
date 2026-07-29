@@ -17,4 +17,7 @@ public static class BazaarAgentGameBridge
     /// initialized or after it has been disposed. Read lazily per call by the host — the
     /// combat-replay runtime behind it is attached after this is published.</summary>
     public static IBazaarAgentReplayRecorder? CurrentRecorder { get; internal set; }
+
+    /// <summary>One-shot live-combat summary handoff for the BazaarAgent host.</summary>
+    public static IBazaarAgentBattleSummarySource? CurrentBattleSummarySource { get; internal set; }
 }

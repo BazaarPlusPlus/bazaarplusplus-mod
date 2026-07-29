@@ -92,6 +92,7 @@ public sealed class BazaarAgentContextSnapshotPublisher
             SellableItems = src.SellableItems,
             SelectionOptions = src.SelectionOptions,
             AvailableActions = src.AvailableActions,
+            LastBattle = src.LastBattle,
         };
 
     private static bool EqualsIgnoreTimeAndTick(BazaarAgentContext a, BazaarAgentContext b)
@@ -131,7 +132,8 @@ public sealed class BazaarAgentContextSnapshotPublisher
             && CardsEqual(a.PlayerSkills, b.PlayerSkills)
             && CardsEqual(a.SellableItems, b.SellableItems)
             && CardsEqual(a.SelectionOptions, b.SelectionOptions)
-            && OptionsEqual(a.AvailableActions, b.AvailableActions);
+            && OptionsEqual(a.AvailableActions, b.AvailableActions)
+            && ReferenceEquals(a.LastBattle, b.LastBattle);
     }
 
     public static bool HasGameplayStateChanged(BazaarAgentContext before, BazaarAgentContext after)
@@ -174,7 +176,8 @@ public sealed class BazaarAgentContextSnapshotPublisher
             || !CardsEqual(before.ChestItems, after.ChestItems)
             || !CardsEqual(before.PlayerSkills, after.PlayerSkills)
             || !CardsEqual(before.SellableItems, after.SellableItems)
-            || !CardsEqual(before.SelectionOptions, after.SelectionOptions);
+            || !CardsEqual(before.SelectionOptions, after.SelectionOptions)
+            || !ReferenceEquals(before.LastBattle, after.LastBattle);
     }
 
     private static bool CardsEqual(

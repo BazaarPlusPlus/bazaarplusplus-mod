@@ -54,6 +54,41 @@ public class BazaarAgentContextSnapshotTests
     }
 
     [Fact]
+    public void Publish_OneShotBattleSummary_BumpsTickOnArrivalAndRemoval()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var baseline = pub.Publish(MakeChoice());
+        var withBattle = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.Choice,
+                PlayerGold = 10,
+                LastBattle = new BazaarAgentBattleSummary
+                {
+                    BattleType = "pvp",
+                    Result = "win",
+                    Player = new BazaarAgentBattleCombatant
+                    {
+                        Attributes = new BazaarAgentBattleAttributes
+                        {
+                            Health = new BazaarAgentBattleValueChange { Start = 100, End = 80 },
+                            Shield = new BazaarAgentBattleValueChange { Start = 10, End = 0 },
+                        },
+                    },
+                },
+            }
+        );
+        var consumed = pub.Publish(MakeChoice());
+
+        Assert.Equal(1UL, baseline.TickId);
+        Assert.Equal(2UL, withBattle.TickId);
+        Assert.Equal(3UL, consumed.TickId);
+        Assert.Equal("win", withBattle.Context.LastBattle?.Result);
+        Assert.Equal(-20, withBattle.Context.LastBattle?.Player.Attributes.Health?.Delta);
+        Assert.Null(consumed.Context.LastBattle);
+    }
+
+    [Fact]
     public void Publish_ReplayPhaseChange_BumpsTickIdAndClonesFields()
     {
         var pub = new BazaarAgentContextSnapshotPublisher();

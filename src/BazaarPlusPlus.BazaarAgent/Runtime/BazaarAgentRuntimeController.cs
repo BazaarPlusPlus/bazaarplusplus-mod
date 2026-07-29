@@ -87,7 +87,15 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             if (previous is null || snapshot.TickId != previous.TickId)
             {
 #if DEBUG
-                TryCaptureContext(snapshot);
+                // Combat detail arrives as a single LastBattle boundary summary on the next
+                // actionable context. Persisting every Combat/PvpCombat snapshot only records
+                // animation churn and duplicates the useful opening/final data.
+                if (
+                    snapshot.Context.StateName
+                    is not BazaarAgentRunStateName.Combat
+                        and not BazaarAgentRunStateName.PvpCombat
+                )
+                    TryCaptureContext(snapshot);
 #endif
                 _activityFeed.Publish(
                     "context.observed",

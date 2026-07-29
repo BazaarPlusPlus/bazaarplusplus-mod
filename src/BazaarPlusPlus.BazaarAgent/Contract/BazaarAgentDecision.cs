@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.BazaarAgent;
 
 public static class BazaarAgentSchema
 {
-    public const string Version = "2.3.0";
+    public const string Version = "2.4.0";
 }
 
 public enum BazaarAgentActionKind
@@ -212,6 +212,9 @@ public sealed class BazaarAgentContext
         System.Array.Empty<BazaarAgentCardSnapshot>();
     public IReadOnlyList<BazaarAgentDecisionOption> AvailableActions { get; init; } =
         System.Array.Empty<BazaarAgentDecisionOption>();
+
+    /// <summary>One-shot summary supplied with the first actionable state after a live combat.</summary>
+    public BazaarAgentBattleSummary? LastBattle { get; init; }
 }
 
 public sealed class BazaarAgentAction

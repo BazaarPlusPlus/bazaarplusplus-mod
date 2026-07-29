@@ -272,7 +272,7 @@ public class BazaarAgentHttpServerTests
         Assert.Equal("\"42\"", res.Headers.ETag?.ToString());
         Assert.Equal("application/json", res.Content.Headers.ContentType?.MediaType);
         var body = await res.Content.ReadAsStringAsync();
-        Assert.Contains("\"schemaVersion\":\"2.3.0\"", body);
+        Assert.Contains("\"schemaVersion\":\"2.4.0\"", body);
         Assert.Contains("\"tickId\":42", body);
         Assert.Contains("\"stateName\":\"Choice\"", body);
         Assert.DoesNotContain("\"isEnabled\"", body);
@@ -345,7 +345,7 @@ public class BazaarAgentHttpServerTests
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         var sessionId = Assert.Single(first.Headers.GetValues("X-Bazaar-Agent-Session"));
         var firstBody = JObject.Parse(await first.Content.ReadAsStringAsync());
-        Assert.Equal("3.0.0", firstBody.Value<string>("schemaVersion"));
+        Assert.Equal("3.1.0", firstBody.Value<string>("schemaVersion"));
         Assert.Single((JArray)firstBody["cardKnowledge"]!);
         Assert.Null(((JArray)firstBody["availableActions"]!)[0]!["card"]);
         Assert.Null(((JArray)firstBody["availableActions"]!)[0]!["displayKey"]);

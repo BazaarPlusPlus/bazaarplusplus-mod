@@ -190,6 +190,7 @@ public sealed class BazaarAgentAgentViewProjector
                 })
                 .ToArray(),
             CardKnowledge = knowledge,
+            LastBattle = context.LastBattle,
         };
     }
 
