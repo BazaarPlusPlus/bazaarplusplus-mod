@@ -362,6 +362,55 @@ public class BazaarAgentHttpServerTests
         Assert.Equal(sessionId, secondBody.Value<string>("agentSessionId"));
     }
 
+    [Fact]
+    public async Task PostCardQuery_Resolves_multiple_cards_and_preserves_per_item_errors()
+    {
+        using var f = new ServerFixture();
+        f.SetSnapshot(
+            new BazaarAgentContextSnapshot(
+                new BazaarAgentContext
+                {
+                    TickId = 42,
+                    BoardItems = new[]
+                    {
+                        new BazaarAgentCardSnapshot
+                        {
+                            InstanceId = "item-1",
+                            Kind = BazaarAgentCardKind.Item,
+                            TemplateId = "template-1",
+                            DisplayName = "Test Item",
+                            Location = BazaarAgentCardLocation.Board,
+                            Attributes = new Dictionary<string, int> { ["Damage"] = 10 },
+                        },
+                    },
+                }
+            )
+        );
+
+        using var http = Http();
+        using var request = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"http://127.0.0.1:{f.Port}/v2/cards/query"
+        )
+        {
+            Content = new StringContent(
+                "{\"instanceIds\":[\"item-1\",\"missing-item\"]}",
+                Encoding.UTF8,
+                "application/json"
+            ),
+        };
+        var response = await http.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = JObject.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(42UL, body.Value<ulong>("tickId"));
+        Assert.Equal("item-1", body["results"]![0]!["instanceId"]!.Value<string>());
+        Assert.True(body["results"]![0]!["found"]!.Value<bool>());
+        Assert.False(body["results"]![1]!["found"]!.Value<bool>());
+        Assert.Equal("not_found", body["results"]![1]!["error"]!.Value<string>());
+        Assert.Single((JArray)body["cardKnowledge"]!);
+    }
+
     // ---------------------------------------------------------------------------
     // Case 4: POST 200 round-trip through queue
     // ---------------------------------------------------------------------------

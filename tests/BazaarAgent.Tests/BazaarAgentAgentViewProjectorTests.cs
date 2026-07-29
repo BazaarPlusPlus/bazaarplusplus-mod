@@ -115,6 +115,25 @@ public sealed class BazaarAgentAgentViewProjectorTests
         );
     }
 
+    [Fact]
+    public void Explicit_batch_query_returns_full_knowledge_and_marks_it_seen_for_context()
+    {
+        var projector = new BazaarAgentAgentViewProjector();
+        var snapshot = Snapshot(Card());
+
+        var query = projector.Query(snapshot, "agent-a", new[] { "item-1", "missing-item" });
+        var found = query.Response.Results[0];
+        var missing = query.Response.Results[1];
+
+        Assert.True(found.Found);
+        Assert.NotNull(found.Card);
+        Assert.False(missing.Found);
+        Assert.Equal("not_found", missing.Error);
+        var knowledge = Assert.Single(query.Response.CardKnowledge);
+        Assert.Equal(knowledge.KnowledgeId, found.Card!.KnowledgeId);
+        Assert.Empty(projector.Project(snapshot, "agent-a").View.CardKnowledge);
+    }
+
     private static BazaarAgentContextSnapshot Snapshot(BazaarAgentCardSnapshot card) =>
         new(
             new BazaarAgentContext

@@ -12,6 +12,7 @@ namespace BazaarPlusPlus.BazaarAgent;
 public sealed class BazaarAgentHttpServer : IDisposable
 {
     private const int MaxBodyBytes = 65536;
+    private const int MaximumCardQueryItems = 64;
     private static long _fallbackRequestSequence;
 
     private static readonly JsonSerializerSettings _json = new()
@@ -201,6 +202,13 @@ public sealed class BazaarAgentHttpServer : IDisposable
                 await HandleGetAgentView(ctx, requestId).ConfigureAwait(false);
             }
             else if (
+                string.Equals(path, "/v2/cards/query", StringComparison.OrdinalIgnoreCase)
+                && method == "POST"
+            )
+            {
+                await HandlePostCardQuery(ctx, requestId).ConfigureAwait(false);
+            }
+            else if (
                 string.Equals(path, "/v1/actions", StringComparison.OrdinalIgnoreCase)
                 && method == "POST"
             )
@@ -289,6 +297,8 @@ public sealed class BazaarAgentHttpServer : IDisposable
             return BazaarAgentHttpLogRoute.Context;
         if (string.Equals(path, "/v2/context", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.Context;
+        if (string.Equals(path, "/v2/cards/query", StringComparison.OrdinalIgnoreCase))
+            return BazaarAgentHttpLogRoute.CardQuery;
         if (string.Equals(path, "/v1/actions", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.Actions;
         if (string.Equals(path, "/v1/replay/record", StringComparison.OrdinalIgnoreCase))
@@ -521,14 +531,14 @@ public sealed class BazaarAgentHttpServer : IDisposable
             IsKnowledgeResetRequested(ctx.Request)
         );
         var body = JsonConvert.SerializeObject(projection.View, _json);
-        var bytes = Encoding.UTF8.GetBytes(body);
-        ctx.Response.StatusCode = 200;
-        ctx.Response.ContentType = "application/json; charset=utf-8";
-        ctx.Response.Headers["ETag"] = snap.ETag;
-        ctx.Response.Headers["X-Bazaar-Agent-Session"] = projection.AgentSessionId;
-        ctx.Response.Headers["X-Bazaar-Agent-Cache-Epoch"] = projection.CacheEpoch;
-        ctx.Response.ContentLength64 = bytes.Length;
-        await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+        await WriteAgentViewResponse(
+                ctx,
+                snap,
+                projection.AgentSessionId,
+                projection.CacheEpoch,
+                body
+            )
+            .ConfigureAwait(false);
         _activityFeed.Publish(
             "context.sent",
             requestId,
@@ -540,11 +550,135 @@ public sealed class BazaarAgentHttpServer : IDisposable
         );
     }
 
+    private static async Task WriteAgentViewResponse(
+        HttpListenerContext ctx,
+        BazaarAgentContextSnapshot snapshot,
+        string sessionId,
+        string cacheEpoch,
+        string body
+    )
+    {
+        var bytes = Encoding.UTF8.GetBytes(body);
+        ctx.Response.StatusCode = 200;
+        ctx.Response.ContentType = "application/json; charset=utf-8";
+        ctx.Response.Headers["ETag"] = snapshot.ETag;
+        ctx.Response.Headers["X-Bazaar-Agent-Session"] = sessionId;
+        ctx.Response.Headers["X-Bazaar-Agent-Cache-Epoch"] = cacheEpoch;
+        ctx.Response.ContentLength64 = bytes.Length;
+        await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+    }
+
     private static bool IsKnowledgeResetRequested(HttpListenerRequest request)
     {
         var header = request.Headers["X-Bazaar-Agent-Reset-Knowledge"];
         return string.Equals(header, "true", StringComparison.OrdinalIgnoreCase)
             || string.Equals(header, "1", StringComparison.Ordinal);
+    }
+
+    private async Task HandlePostCardQuery(HttpListenerContext ctx, string requestId)
+    {
+        var body = await ReadBodyWithCap(
+                ctx,
+                MaxBodyBytes,
+                requestId,
+                BazaarAgentHttpLogRoute.CardQuery
+            )
+            .ConfigureAwait(false);
+        if (body is null)
+            return;
+
+        var json = Encoding.UTF8.GetString(body);
+        BazaarAgentCardQueryRequest? request;
+        try
+        {
+            request = JsonConvert.DeserializeObject<BazaarAgentCardQueryRequest>(json, _json);
+        }
+        catch (JsonException)
+        {
+            WriteErrorEnvelope(ctx, 400, "invalid", "malformed json");
+            return;
+        }
+
+        if (!TryValidateCardQuery(request, out var validationError))
+        {
+            WriteErrorEnvelope(ctx, 400, "invalid", validationError);
+            return;
+        }
+
+        var snap = _snapshotGetter();
+        if (snap is null)
+        {
+            WriteErrorEnvelope(ctx, 503, "unavailable", null);
+            return;
+        }
+
+        _activityFeed.Publish(
+            "cards.query.received",
+            requestId,
+            "/v2/cards/query",
+            $"Card query for {request!.InstanceIds.Count} instances",
+            requestJson: json
+        );
+        var projection = _agentViewProjector.Query(
+            snap,
+            ctx.Request.Headers["X-Bazaar-Agent-Session"],
+            request!.InstanceIds,
+            IsKnowledgeResetRequested(ctx.Request)
+        );
+        var responseJson = JsonConvert.SerializeObject(projection.Response, _json);
+        await WriteAgentViewResponse(
+                ctx,
+                snap,
+                projection.AgentSessionId,
+                projection.CacheEpoch,
+                responseJson
+            )
+            .ConfigureAwait(false);
+        _activityFeed.Publish(
+            "cards.query.completed",
+            requestId,
+            "/v2/cards/query",
+            $"Card query resolved at tick {snap.TickId}",
+            statusCode: 200,
+            tickId: snap.TickId,
+            requestJson: json,
+            responseJson: responseJson
+        );
+    }
+
+    private static bool TryValidateCardQuery(
+        BazaarAgentCardQueryRequest? request,
+        out string? validationError
+    )
+    {
+        if (request?.InstanceIds is null || request.InstanceIds.Count == 0)
+        {
+            validationError = "instanceIds is required";
+            return false;
+        }
+        if (request.InstanceIds.Count > MaximumCardQueryItems)
+        {
+            validationError = $"instanceIds supports at most {MaximumCardQueryItems}";
+            return false;
+        }
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var instanceId in request.InstanceIds)
+        {
+            if (string.IsNullOrWhiteSpace(instanceId))
+            {
+                validationError = "instanceIds cannot contain blank values";
+                return false;
+            }
+            if (!seen.Add(instanceId))
+            {
+                validationError = "instanceIds cannot contain duplicates";
+                return false;
+            }
+        }
+
+        validationError = null;
+        return true;
     }
 
     private async Task HandlePostActions(HttpListenerContext ctx, string requestId)

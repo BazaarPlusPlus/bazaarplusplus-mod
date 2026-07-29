@@ -35,6 +35,69 @@ public sealed class BazaarAgentAgentViewProjector
         }
     }
 
+    public BazaarAgentCardQueryProjection Query(
+        BazaarAgentContextSnapshot snapshot,
+        string? requestedSessionId,
+        IReadOnlyList<string> instanceIds,
+        bool resetKnowledge = false
+    )
+    {
+        if (snapshot is null)
+            throw new ArgumentNullException(nameof(snapshot));
+        if (instanceIds is null)
+            throw new ArgumentNullException(nameof(instanceIds));
+
+        lock (_gate)
+        {
+            var sessionId = NormalizeSessionId(requestedSessionId);
+            if (resetKnowledge)
+                _sessions.Remove(sessionId);
+
+            var session = GetOrCreateSession(sessionId);
+            var cardsByInstanceId = IndexCards(snapshot.Context);
+            var results = new List<BazaarAgentCardQueryResult>(instanceIds.Count);
+            var knowledge = new Dictionary<string, BazaarAgentCardKnowledge>(
+                StringComparer.Ordinal
+            );
+            foreach (var instanceId in instanceIds)
+            {
+                if (!cardsByInstanceId.TryGetValue(instanceId, out var card))
+                {
+                    results.Add(
+                        new BazaarAgentCardQueryResult
+                        {
+                            InstanceId = instanceId,
+                            Error = "not_found",
+                        }
+                    );
+                    continue;
+                }
+
+                var detail = BuildKnowledge(card);
+                session.SeenKnowledgeIds.Add(detail.KnowledgeId);
+                knowledge.TryAdd(detail.KnowledgeId, detail);
+                results.Add(
+                    new BazaarAgentCardQueryResult
+                    {
+                        InstanceId = instanceId,
+                        Found = true,
+                        Card = CreateCardRef(card, detail.KnowledgeId),
+                    }
+                );
+            }
+
+            var response = new BazaarAgentCardQueryResponse
+            {
+                AgentSessionId = sessionId,
+                CacheEpoch = session.CacheEpoch,
+                TickId = snapshot.TickId,
+                Results = results,
+                CardKnowledge = knowledge.Values.ToArray(),
+            };
+            return new BazaarAgentCardQueryProjection(response, sessionId, session.CacheEpoch);
+        }
+    }
+
     private SessionKnowledge GetOrCreateSession(string sessionId)
     {
         if (_sessions.TryGetValue(sessionId, out var existing))
@@ -74,28 +137,7 @@ public sealed class BazaarAgentAgentViewProjector
                 knowledge.Add(detail);
             }
 
-            return new BazaarAgentCardRef
-            {
-                InstanceId = card.InstanceId,
-                Kind = card.Kind,
-                TemplateId = card.TemplateId,
-                DisplayName = card.DisplayName,
-                Size = card.Size,
-                Location = card.Location,
-                SocketId = card.SocketId,
-                Order = card.Order,
-                KnowledgeId = detail.KnowledgeId,
-                BuyPrice = card.BuyPrice,
-                SellPrice = card.SellPrice,
-                CanAfford = card.CanAfford,
-                CanFit = card.CanFit,
-                CanSelect = card.CanSelect,
-                IsFree = card.IsFree,
-                TargetSection = card.TargetSection,
-                TargetSockets = card.TargetSockets,
-                UnavailableReason = card.UnavailableReason,
-                CanSell = card.CanSell,
-            };
+            return CreateCardRef(card, detail.KnowledgeId);
         }
 
         return new BazaarAgentAgentView
@@ -150,6 +192,56 @@ public sealed class BazaarAgentAgentViewProjector
             CardKnowledge = knowledge,
         };
     }
+
+    private static Dictionary<string, BazaarAgentCardSnapshot> IndexCards(
+        BazaarAgentContext context
+    )
+    {
+        var result = new Dictionary<string, BazaarAgentCardSnapshot>(StringComparer.Ordinal);
+        foreach (
+            var card in context
+                .BoardItems.Concat(context.ChestItems)
+                .Concat(context.PlayerSkills)
+                .Concat(context.SelectionOptions)
+                .Concat(
+                    context
+                        .AvailableActions.Where(static option => option.Card is not null)
+                        .Select(static option => option.Card!)
+                )
+        )
+        {
+            if (!string.IsNullOrWhiteSpace(card.InstanceId))
+                result.TryAdd(card.InstanceId, card);
+        }
+        return result;
+    }
+
+    private static BazaarAgentCardRef CreateCardRef(
+        BazaarAgentCardSnapshot card,
+        string knowledgeId
+    ) =>
+        new()
+        {
+            InstanceId = card.InstanceId,
+            Kind = card.Kind,
+            TemplateId = card.TemplateId,
+            DisplayName = card.DisplayName,
+            Size = card.Size,
+            Location = card.Location,
+            SocketId = card.SocketId,
+            Order = card.Order,
+            KnowledgeId = knowledgeId,
+            BuyPrice = card.BuyPrice,
+            SellPrice = card.SellPrice,
+            CanAfford = card.CanAfford,
+            CanFit = card.CanFit,
+            CanSelect = card.CanSelect,
+            IsFree = card.IsFree,
+            TargetSection = card.TargetSection,
+            TargetSockets = card.TargetSockets,
+            UnavailableReason = card.UnavailableReason,
+            CanSell = card.CanSell,
+        };
 
     private static BazaarAgentCardKnowledge BuildKnowledge(BazaarAgentCardSnapshot card)
     {
@@ -286,6 +378,12 @@ public sealed class BazaarAgentAgentViewProjector
 
 public readonly record struct BazaarAgentAgentViewProjection(
     BazaarAgentAgentView View,
+    string AgentSessionId,
+    string CacheEpoch
+);
+
+public readonly record struct BazaarAgentCardQueryProjection(
+    BazaarAgentCardQueryResponse Response,
     string AgentSessionId,
     string CacheEpoch
 );
