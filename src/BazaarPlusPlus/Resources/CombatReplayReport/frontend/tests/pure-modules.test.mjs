@@ -1417,18 +1417,22 @@ test("dense timeline markers use distinct laid-out hit targets", () => {
   const laneCenter = visual[0].y;
   assert.deepEqual(
     Array.from(new Set(points.map(({ y }) => y))).sort((a, b) => a - b),
-    [laneCenter - 11, laneCenter + 11],
+    [
+      laneCenter - 20,
+      laneCenter - 10,
+      laneCenter,
+      laneCenter + 10,
+      laneCenter + 20,
+    ],
   );
-  for (let left = 0; left < points.length; left += 1) {
-    for (let right = left + 1; right < points.length; right += 1) {
-      assert.ok(
-        Math.hypot(
-          points[left].x - points[right].x,
-          points[left].y - points[right].y,
-        ) >= 19,
-      );
-    }
-  }
+  assert.deepEqual(
+    markers.map(({ markerSizeCap }) => markerSizeCap),
+    [9, 9, 9, 9, 9],
+  );
+  assert.deepEqual(
+    points.map(({ x }) => x),
+    visual.map(({ x }) => x),
+  );
   const hitIndex = createHitIndex(markers);
   for (let index = 0; index < markers.length; index += 1) {
     assert.equal(
@@ -1439,6 +1443,67 @@ test("dense timeline markers use distinct laid-out hit targets", () => {
         laneHeight: 52,
       }),
       markers[index],
+    );
+  }
+});
+
+test("timeline marker stacks enumerate density without changing event time", () => {
+  const entities = [
+    { id: "source", type: "item" },
+    { id: "target", type: "hero" },
+  ];
+  const expected = [
+    { count: 1, offsets: [0], sizeCaps: [undefined] },
+    { count: 2, offsets: [-11, 11], sizeCaps: [18, 18] },
+    { count: 3, offsets: [-16, 0, 16], sizeCaps: [14, 14, 14] },
+    { count: 4, offsets: [-18, -6, 6, 18], sizeCaps: [11, 11, 11, 11] },
+    { count: 5, offsets: [-20, -10, 0, 10, 20], sizeCaps: [9, 9, 9, 9, 9] },
+  ];
+  const actions = [
+    "PlayerDamage",
+    "PlayerBurnApply",
+    "PlayerPoisonApply",
+    "PlayerHeal",
+    "PlayerShieldApply",
+  ];
+
+  for (const { count, offsets, sizeCaps } of expected) {
+    const events = Array.from({ length: count }, (_, sequence) =>
+      timelineEvent({
+        id: `event-${count}-${sequence}`,
+        action: actions[sequence],
+        combatMs: 1_000 + sequence,
+        frame: 20,
+        kind: "effect-executed",
+        sequence,
+        sourceId: "source",
+        targetIds: ["target"],
+      })
+    );
+    const visual = buildVisualClusters(
+      buildClusters(
+        { durationMs: 2_000 },
+        events,
+        entities,
+        1_000,
+        52,
+      ),
+    );
+    const markers = layoutTimelineMarkers(visual);
+    const points = markers.map(markerPoint);
+    const laneCenter = visual[0].y;
+
+    assert.deepEqual(
+      points.map(({ x }) => x),
+      visual.map(({ x }) => x),
+    );
+    assert.deepEqual(
+      points.map(({ y }) => y - laneCenter),
+      offsets,
+    );
+    assert.deepEqual(
+      markers.map(({ markerSizeCap }) => markerSizeCap),
+      sizeCaps,
     );
   }
 });

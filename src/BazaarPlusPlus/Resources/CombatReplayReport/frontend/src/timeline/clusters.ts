@@ -71,6 +71,7 @@ export interface TimelineCluster {
   impact?: number;
   markerX?: number;
   markerY?: number;
+  markerSizeCap?: number;
 }
 
 /**

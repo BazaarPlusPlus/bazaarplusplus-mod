@@ -104,7 +104,11 @@ export function drawMarker(
   requestDraw: () => void,
 ): void {
   const tier = cluster.tier ?? 2;
-  const markerSize = tier === 1 ? 18 : tier === 3 ? 11 : 14;
+  const baseMarkerSize = tier === 1 ? 18 : tier === 3 ? 11 : 14;
+  const markerSize = Math.min(
+    baseMarkerSize,
+    cluster.markerSizeCap ?? baseMarkerSize,
+  );
   const color = markerColor(cluster.token);
   const marker = markerPoint(cluster);
   context.save();

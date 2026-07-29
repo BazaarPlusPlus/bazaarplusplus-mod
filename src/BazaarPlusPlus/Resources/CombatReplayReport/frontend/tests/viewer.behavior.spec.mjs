@@ -3842,23 +3842,23 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
   const markers = [
     {
       dx: 0,
-      dy: -11,
+      dy: -16,
       label: "Direct damage",
       groupToken: "damage-direct",
       icon:
         "../report-assets/objects/00/0000000000000000000000000000000000000000000000000000000000000000.png",
     },
     {
-      dx: -10,
-      dy: 11,
+      dx: 0,
+      dy: 0,
       label: "Burn",
       groupToken: "damage-burn",
       icon:
         "../report-assets/objects/11/1111111111111111111111111111111111111111111111111111111111111111.png",
     },
     {
-      dx: 10,
-      dy: 11,
+      dx: 0,
+      dy: 16,
       label: "Poison",
       groupToken: "damage-poison",
       icon:
@@ -3951,11 +3951,11 @@ test("lays out five same-time lane markers as separate hit targets", async ({
 }) => {
   await page.goto(`${markerLayoutReportUrl}?lang=en`);
   const markers = [
-    { dx: -20, dy: -11, label: "Direct damage" },
-    { dx: 0, dy: -11, label: "Burn" },
-    { dx: 20, dy: -11, label: "Poison" },
-    { dx: -10, dy: 11, label: "Healing" },
-    { dx: 10, dy: 11, label: "Shield" },
+    { dy: -20, label: "Direct damage" },
+    { dy: -10, label: "Burn" },
+    { dy: 0, label: "Poison" },
+    { dy: 10, label: "Healing" },
+    { dy: 20, label: "Shield" },
   ];
   const points = [];
   for (const marker of markers) {
@@ -3966,7 +3966,6 @@ test("lays out five same-time lane markers as separate hit targets", async ({
           combatMs: 4_000,
           durationMs: 8_000,
           entityId: "player-hero",
-          dx: marker.dx,
           dy: marker.dy,
         });
         if (!point) return "";
@@ -3982,16 +3981,8 @@ test("lays out five same-time lane markers as separate hit targets", async ({
     );
     points.push(point);
   }
-  for (let left = 0; left < points.length; left += 1) {
-    for (let right = left + 1; right < points.length; right += 1) {
-      expect(
-        Math.hypot(
-          points[left].x - points[right].x,
-          points[left].y - points[right].y,
-        ),
-      ).toBeGreaterThan(16);
-    }
-  }
+  expect(new Set(points.map(({ x }) => x)).size).toBe(1);
+  expect(new Set(points.map(({ y }) => y)).size).toBe(5);
 });
 
 test("renders destroy and structural attributes consistently across timeline, inspector, and statistics", async ({
@@ -5367,8 +5358,14 @@ test("source mode expands uniquely paired attribute details and keeps self-targe
     durationMs: 9000,
     entityId: "player-item",
   });
+  const chargePoint = await timelineMarkerPoint(page, {
+    combatMs: 8700,
+    durationMs: 9000,
+    entityId: "player-item",
+  });
   expect(attributePoint).not.toBeNull();
-  await page.mouse.move(attributePoint.x, attributePoint.y);
+  expect(chargePoint).not.toBeNull();
+  await page.mouse.move(attributePoint.x, attributePoint.y - 11);
   await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
     "Attribute change",
   );
@@ -5406,13 +5403,7 @@ test("source mode expands uniquely paired attribute details and keeps self-targe
     hoverInspector.getByTestId("event-source-entity"),
   ).toHaveCount(0);
 
-  const chargePoint = await timelineMarkerPoint(page, {
-    combatMs: 8700,
-    durationMs: 9000,
-    entityId: "player-item",
-  });
-  expect(chargePoint).not.toBeNull();
-  await page.mouse.move(chargePoint.x, chargePoint.y);
+  await page.mouse.move(chargePoint.x, chargePoint.y + 11);
   await expect(hoverInspector.getByTestId("frame-event-kind")).toHaveText(
     "Charge",
   );
