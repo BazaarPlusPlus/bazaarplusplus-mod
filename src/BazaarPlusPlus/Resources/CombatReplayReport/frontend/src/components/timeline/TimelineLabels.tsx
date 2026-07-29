@@ -111,16 +111,6 @@ export function LaneLabelContents({
           testId={iconTestId}
         />
       </span>
-      <span
-        className={cn(
-          "h-7 w-0.5 rounded-full",
-          side === "opponent"
-            ? "bg-opponent/80"
-            : side === "player"
-              ? "bg-player/85"
-              : "bg-faint/70",
-        )}
-      />
     </>
   );
 }

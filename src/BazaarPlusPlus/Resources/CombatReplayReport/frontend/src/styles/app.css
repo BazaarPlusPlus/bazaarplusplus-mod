@@ -325,14 +325,14 @@
   .bpp-lane-label {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto 2px;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     column-gap: 0.625rem;
     overflow: hidden;
     border-bottom: 1px solid
       color-mix(in srgb, var(--color-border) 58%, transparent);
     background: var(--color-surface-soft);
-    padding: 0 0.625rem;
+    padding: 0 0 0 0.625rem;
     transition:
       background 140ms ease,
       box-shadow 140ms ease;
@@ -343,6 +343,7 @@
     width: max-content;
     height: 44px;
     place-items: center end;
+    justify-self: end;
     overflow: hidden;
   }
 
@@ -350,11 +351,6 @@
     min-width: 0;
     align-self: center;
     text-align: right;
-  }
-
-  .bpp-lane-label > :last-child {
-    margin-left: 0;
-    justify-self: end;
   }
 
   .bpp-lane-label.is-side-boundary::before {
@@ -437,7 +433,7 @@
   z-index: 36;
   grid-column: 1;
   grid-row: 3;
-  grid-template-columns: minmax(0, 1fr) auto 3px;
+  grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 0.625rem;
   border-right: 1px solid var(--color-line-strong);
   background: linear-gradient(

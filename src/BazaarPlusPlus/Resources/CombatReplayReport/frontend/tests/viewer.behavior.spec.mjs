@@ -1404,6 +1404,7 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
   const laneGeometry = await page
     .getByTestId("timeline-lane-labels")
     .evaluate((labels) => {
+      const labelsBounds = labels.getBoundingClientRect();
       const rows = Array.from(
         labels.querySelectorAll("[data-bpp-lane-index]"),
       );
@@ -1414,6 +1415,7 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
         const slotBounds = slot?.getBoundingClientRect();
         const copyBounds = copy?.getBoundingClientRect();
         const artBounds = art?.getBoundingClientRect();
+        const rowBounds = row.getBoundingClientRect();
         return {
           artHeight: artBounds?.height ?? 0,
           artRight: artBounds?.right ?? 0,
@@ -1430,6 +1432,9 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
               )
               : false,
           copyRight: copyBounds?.right ?? 0,
+          labelDividerGap:
+            labelsBounds.right - (artBounds?.right ?? 0),
+          rowRightGap: rowBounds.right - (artBounds?.right ?? 0),
           slotLeft: slotBounds?.left ?? 0,
           textAlign: copy ? getComputedStyle(copy).textAlign : "",
         };
@@ -1445,6 +1450,13 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
   expect(
     laneGeometry.every(
       ({ artRight }) => Math.abs(artRight - firstArtRight) < 0.5,
+    ),
+  ).toBe(true);
+  expect(
+    laneGeometry.every(
+      ({ labelDividerGap, rowRightGap }) =>
+        Math.abs(rowRightGap) < 0.5
+        && Math.abs(labelDividerGap - 1) < 0.5,
     ),
   ).toBe(true);
   expect(
@@ -1877,7 +1889,11 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
     const rulerBounds = ruler.getBoundingClientRect();
     const labelBounds = label.getBoundingClientRect();
     const canvasBounds = canvas.getBoundingClientRect();
+    const artBounds = label
+      .querySelector(".bpp-lane-art-slot")
+      ?.getBoundingClientRect();
     return {
+      artDividerGap: labelBounds.right - (artBounds?.right ?? 0),
       canvasHeight: canvasBounds.height,
       canvasRatio:
         canvas.width / Number.parseFloat(canvas.style.width),
@@ -1893,6 +1909,7 @@ test("pins one aligned hero lane and replaces it at the opponent section", async
   expect(Math.abs(geometry.canvasTop - geometry.rulerBottom)).toBeLessThan(1);
   expect(geometry.labelHeight).toBe(52);
   expect(geometry.canvasHeight).toBe(52);
+  expect(Math.abs(geometry.artDividerGap - 1)).toBeLessThan(0.5);
   expect(geometry.canvasRatio).toBeCloseTo(2, 1);
 
   await timelineScroll.evaluate((scroll, lane) => {
