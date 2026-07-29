@@ -25,6 +25,8 @@ public sealed class BazaarAgentStructuredLoggingTests
                 "Error|request_id:Public:High:Short,action_kind:Public:Low:None,battle_id:Public:High:Short,reason_code:Public:Low:None",
             ["agent.decision_log.append_failed"] =
                 "Error|decision_id:Public:High:Short,run_id:Public:High:Short,request_id:Public:High:Short,reason_code:Public:Low:None",
+            ["agent.context_capture.failed"] =
+                "Error|tick_id:Public:High:None,state:Public:Low:None,reason_code:Public:Low:None",
             ["agent.listener.failed"] = "Error|port:Public:Low:None,reason_code:Public:Low:None",
             ["agent.http_request.failed"] =
                 "Error|request_id:Public:High:Short,route:Public:Low:None,method:Public:Low:None,reason_code:Public:Low:None",
@@ -136,6 +138,7 @@ public sealed class BazaarAgentStructuredLoggingTests
             ["agent.action.failed"] = "request_id",
             ["agent.replay_request.failed"] = "request_id,battle_id",
             ["agent.decision_log.append_failed"] = "decision_id,run_id",
+            ["agent.context_capture.failed"] = "state,reason_code",
             ["agent.listener.degraded"] = "port,reason_code",
             ["agent.listener.stop_degraded"] = "reason_code",
             ["agent.listener.failed"] = "",

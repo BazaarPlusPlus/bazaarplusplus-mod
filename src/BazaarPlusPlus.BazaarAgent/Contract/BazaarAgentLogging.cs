@@ -44,6 +44,7 @@ public enum BazaarAgentLogReasonCode
     HttpResponseCloseException,
     RejectedBodyDrainException,
     DecisionLogAppendException,
+    ContextCaptureWriteException,
     ContextBuildException,
     SceneProbeException,
     ClientCacheTypeUnavailable,
@@ -515,6 +516,34 @@ public static class BazaarAgentLogEvents
         DecisionLogReasonCode
     );
 
+    private static readonly BazaarAgentLogFieldDefinition ContextCaptureTickId = new(
+        "tick_id",
+        BazaarAgentLogFieldPrivacy.Public,
+        BazaarAgentLogCardinality.High,
+        BazaarAgentLogCorrelation.None
+    );
+    private static readonly BazaarAgentLogFieldDefinition ContextCaptureState = new(
+        "state",
+        BazaarAgentLogFieldPrivacy.Public,
+        BazaarAgentLogCardinality.Low,
+        BazaarAgentLogCorrelation.None
+    );
+    private static readonly BazaarAgentLogFieldDefinition ContextCaptureReasonCode = new(
+        "reason_code",
+        BazaarAgentLogFieldPrivacy.Public,
+        BazaarAgentLogCardinality.Low,
+        BazaarAgentLogCorrelation.None
+    );
+
+    public static readonly BazaarAgentLogEventDefinition ContextCaptureFailedDefinition = new(
+        BazaarAgentLogSeverity.Error,
+        "agent.context_capture.failed",
+        new BazaarAgentLogStormPolicy(ContextCaptureState, ContextCaptureReasonCode),
+        ContextCaptureTickId,
+        ContextCaptureState,
+        ContextCaptureReasonCode
+    );
+
     private static readonly BazaarAgentLogFieldDefinition ContextDegradedReasonCode = new(
         "reason_code",
         BazaarAgentLogFieldPrivacy.Public,
@@ -805,6 +834,19 @@ public static class BazaarAgentLogEvents
             DecisionLogRunId.Bind(runId),
             DecisionLogRequestId.Bind(requestId),
             DecisionLogReasonCode.Bind(BazaarAgentLogReasonCode.DecisionLogAppendException)
+        );
+
+    public static BazaarAgentLogEvent ContextCaptureFailed(
+        ulong tickId,
+        BazaarAgentRunStateName state,
+        Exception exception
+    ) =>
+        new(
+            ContextCaptureFailedDefinition,
+            exception,
+            ContextCaptureTickId.Bind(tickId),
+            ContextCaptureState.Bind(state),
+            ContextCaptureReasonCode.Bind(BazaarAgentLogReasonCode.ContextCaptureWriteException)
         );
 
     public static BazaarAgentLogEvent ContextDegraded(Exception exception) =>

@@ -32,6 +32,9 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     private double _lastActionTime = double.NegativeInfinity;
     private double _lastListenerReconcileTime = double.NegativeInfinity;
     private BazaarAgentDecisionLog? _decisionLog;
+#if DEBUG
+    private BazaarAgentContextCapture? _contextCapture;
+#endif
     private BazaarAgentHttpServer? _http;
     private BazaarAgentCommandQueue<BazaarAgentAction>? _queue;
     private BazaarAgentCommandQueue<BazaarAgentReplayCommand>? _replayQueue;
@@ -83,6 +86,9 @@ public sealed class BazaarAgentRuntimeController : IDisposable
                 _logger.TryEmit(BazaarAgentLogEvents.SnapshotReady(context.StateName));
             if (previous is null || snapshot.TickId != previous.TickId)
             {
+#if DEBUG
+                TryCaptureContext(snapshot);
+#endif
                 _activityFeed.Publish(
                     "context.observed",
                     requestId: "",
@@ -471,6 +477,27 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
     private BazaarAgentDecisionLog GetOrCreateDecisionLog() =>
         _decisionLog ??= new BazaarAgentDecisionLog(_options.DecisionLogRoot);
+
+#if DEBUG
+    private void TryCaptureContext(BazaarAgentContextSnapshot snapshot)
+    {
+        try
+        {
+            _contextCapture ??= new BazaarAgentContextCapture(_options.DecisionLogRoot);
+            _contextCapture.Capture(snapshot);
+        }
+        catch (Exception ex)
+        {
+            _logger.TryEmit(
+                BazaarAgentLogEvents.ContextCaptureFailed(
+                    snapshot.TickId,
+                    snapshot.Context.StateName,
+                    ex
+                )
+            );
+        }
+    }
+#endif
 
     private sealed class PendingActionObservation
     {
