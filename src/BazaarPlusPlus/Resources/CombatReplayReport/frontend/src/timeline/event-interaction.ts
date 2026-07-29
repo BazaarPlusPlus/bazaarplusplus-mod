@@ -15,25 +15,6 @@ export interface TimelinePoint {
   y: number;
 }
 
-export function timelineClusterAtCombatMs(
-  cluster: TimelineCluster,
-  combatMs: number,
-): TimelineCluster {
-  const candidates = (cluster.members ?? []).filter(
-    (candidate) => candidate.events.length > 0,
-  );
-  if (candidates.length === 0) return cluster;
-  const distance = (candidate: TimelineCluster): number =>
-    Math.min(
-      ...candidate.events.map((event) =>
-        Math.abs(event.combatMs - combatMs)
-      ),
-    );
-  return candidates.reduce((nearest, candidate) =>
-    distance(candidate) < distance(nearest) ? candidate : nearest
-  );
-}
-
 export function timelinePointAtPointer({
   event,
   canvas,

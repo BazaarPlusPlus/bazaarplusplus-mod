@@ -19,7 +19,6 @@ import {
   timelineWidthAtZoom,
 } from "../../timeline/constants.ts";
 import { timelineXAtCombatMs } from "../../timeline/geometry.ts";
-import { timelineClusterAtCombatMs } from "../../timeline/event-interaction.ts";
 import { TimelineCanvasController } from "../../timeline/event-renderer.ts";
 import {
   drawStateBand,
@@ -290,11 +289,7 @@ export const TimelineView = forwardRef<
       stickyHeroLabel,
       onSelect: (cluster, combatMs, clientX, clientY) => {
         if (cluster?.events[0]) {
-          const semanticCluster = timelineClusterAtCombatMs(
-            cluster,
-            combatMs,
-          );
-          const event = semanticCluster.events.reduce((nearest, candidate) =>
+          const event = cluster.events.reduce((nearest, candidate) =>
             Math.abs(candidate.combatMs - combatMs)
               < Math.abs(nearest.combatMs - combatMs)
               ? candidate
@@ -304,8 +299,8 @@ export const TimelineView = forwardRef<
             type: "select-frame",
             frame: event.frame,
             combatMs: event.combatMs,
-            clusterEventIds: timelineClusterEventIds(semanticCluster),
-            entityId: entities[semanticCluster.lane]?.id ?? "",
+            clusterEventIds: timelineClusterEventIds(cluster),
+            entityId: entities[cluster.lane]?.id ?? "",
             anchor: clientX === undefined || clientY === undefined
               ? undefined
               : { x: clientX, y: clientY },
@@ -325,10 +320,7 @@ export const TimelineView = forwardRef<
           setHoverInspector(null);
           return;
         }
-        const semanticCluster = cluster
-          ? timelineClusterAtCombatMs(cluster, combatMs)
-          : null;
-        const nearestEvent = semanticCluster?.events.reduce(
+        const nearestEvent = cluster?.events.reduce(
           (nearest, candidate) =>
             Math.abs(candidate.combatMs - combatMs)
               < Math.abs(nearest.combatMs - combatMs)
@@ -337,13 +329,13 @@ export const TimelineView = forwardRef<
         );
         const tooltipCombatMs = nearestEvent?.combatMs ?? combatMs;
         refs.host.dataset.bppCombatMs = String(tooltipCombatMs);
-        if (!semanticCluster || !nearestEvent) {
+        if (!cluster || !nearestEvent) {
           hoverInspectorKeyRef.current = "";
           setHoverInspector(null);
           return;
         }
-        const eventIds = timelineClusterEventIds(semanticCluster);
-        const entityId = entities[semanticCluster.lane]?.id ?? "";
+        const eventIds = timelineClusterEventIds(cluster);
+        const entityId = entities[cluster.lane]?.id ?? "";
         const inspectorKey =
           `${entityId}:${nearestEvent.frame}:${eventIds.join(",")}`;
         if (hoverInspectorKeyRef.current !== inspectorKey) {
@@ -354,7 +346,7 @@ export const TimelineView = forwardRef<
             eventIds,
             frame: nearestEvent.frame,
             labelKey:
-              semanticCluster.labelKey ?? semanticCluster.token,
+              cluster.labelKey ?? cluster.token,
           });
         }
         const bounds = viewportRefs.scroll.current?.getBoundingClientRect();

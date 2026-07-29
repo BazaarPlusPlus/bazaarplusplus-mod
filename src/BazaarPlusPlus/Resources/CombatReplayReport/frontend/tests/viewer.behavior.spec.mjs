@@ -716,8 +716,40 @@ test.beforeAll(async ({ browserName }) => {
       role: "applied",
       attributionConfidence: "exact",
     })
+  ).concat(
+    schemaEvent({
+      eventId: "adjacent-shield-frame-61",
+      frame: 61,
+      frameSequence: 0,
+      combatTimeMs: 3050,
+      kind: "effect-executed",
+      action: "PlayerShieldApply",
+      sourceEntityId: "opponent-item",
+      triggerSourceEntityId: "opponent-item",
+      targetEntityIds: ["player-hero"],
+      value: 61,
+      unit: "points",
+      role: "applied",
+      attributionConfidence: "exact",
+    }),
+    schemaEvent({
+      eventId: "adjacent-shield-frame-62",
+      frame: 62,
+      frameSequence: 0,
+      combatTimeMs: 3100,
+      kind: "effect-executed",
+      action: "PlayerShieldApply",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-item",
+      targetEntityIds: ["player-hero"],
+      value: 466,
+      unit: "points",
+      isCritical: true,
+      role: "applied",
+      attributionConfidence: "exact",
+    }),
   );
-  markerLayoutEnvelope.battleDocument.rawRecordCount = 5;
+  markerLayoutEnvelope.battleDocument.rawRecordCount = 7;
   await writeFile(
     join(fixtureDirectory, "marker-layout-report.html"),
     reportHtml(markerLayoutEnvelope),
@@ -3791,6 +3823,51 @@ test("keeps detailed hover stable while moving within one event marker", async (
   ).toBe(afterEnteringMarker);
 });
 
+test("keeps adjacent-frame marker details stable across each painted icon", async ({
+  page,
+}) => {
+  await page.goto(`${markerLayoutReportUrl}?lang=en`);
+  const markers = [
+    {
+      combatMs: 3050,
+      dy: -15,
+      time: "3.05s",
+      amount: "61",
+      source: "Practice Shield",
+    },
+    {
+      combatMs: 3100,
+      dy: 15,
+      time: "3.10s",
+      amount: "466",
+      source: "Training Blade",
+    },
+  ];
+
+  for (const marker of markers) {
+    const point = await timelineMarkerPoint(page, {
+      combatMs: marker.combatMs,
+      durationMs: 8000,
+      entityId: "player-hero",
+      dy: marker.dy,
+    });
+    expect(point).not.toBeNull();
+    for (let dx = -8; dx <= 8; dx += 2) {
+      await page.mouse.move(point.x + dx, point.y);
+      const tooltip = page.getByTestId("timeline-tooltip");
+      await expect(tooltip.getByTestId("timeline-tooltip-time")).toHaveText(
+        marker.time,
+      );
+      await expect(tooltip.getByTestId("frame-event-amount")).toHaveText(
+        marker.amount,
+      );
+      await expect(tooltip.getByTestId("event-source-entity")).toContainText(
+        marker.source,
+      );
+    }
+  }
+});
+
 test("coalesces burst pointer input before imperative hover work", async ({
   page,
 }) => {
@@ -4490,6 +4567,7 @@ test("keeps dense attribute markers generic while inspector shows concrete nativ
   for (const attribute of [
     {
       combatMs: 4000,
+      dy: -15,
       frame: "Frame 80",
       time: "4.00s",
       count: "1 event",
@@ -4499,6 +4577,7 @@ test("keeps dense attribute markers generic while inspector shows concrete nativ
     },
     {
       combatMs: 4080,
+      dy: 15,
       frame: "Frame 81",
       time: "4.08s",
       count: "2 events",
@@ -4511,6 +4590,7 @@ test("keeps dense attribute markers generic while inspector shows concrete nativ
       combatMs: attribute.combatMs,
       durationMs: 8000,
       entityId: "player-item",
+      dy: attribute.dy,
     });
     expect(point).not.toBeNull();
     await page.mouse.move(point.x, point.y);
@@ -5501,6 +5581,7 @@ test("groups Welding Torch attributes in one generic marker and expands concrete
     combatMs: 8600,
     durationMs: 9000,
     entityId: "player-item",
+    dy: -15,
   });
   expect(point).not.toBeNull();
   await page.mouse.move(point.x, point.y);

@@ -71,7 +71,6 @@ import {
 import { layoutTimelineMarkers } from "../src/timeline/marker-layout.ts";
 import {
   hitTestTimelineClusters,
-  timelineClusterAtCombatMs,
 } from "../src/timeline/event-interaction.ts";
 import {
   safeAssetUrl,
@@ -2707,12 +2706,12 @@ test("timeline visibility and clustering preserve every underlying event", () =>
     { ...clusters[0], x: 100, events: [events[0]] },
     { ...clusters[0], x: 120, events: [events[1]] },
   ]);
-  assert.equal(visual.length, 1);
+  assert.equal(visual.length, 2);
   assert.deepEqual(
-    visual[0].events.map((event) => event.id),
-    ["damage-1", "damage-2"],
+    visual.map((cluster) => cluster.events.map((event) => event.id)),
+    [["damage-1"], ["damage-2"]],
   );
-  assert.equal(visual[0].members.length, 2);
+  assert.deepEqual(visual.map((cluster) => cluster.x), [100, 120]);
 });
 
 test("source mode resolves only unique same-target attribute executions", () => {
@@ -2956,20 +2955,95 @@ test("timeline attribute markers stay generic while a same-frame member keeps ev
   );
 
   const visual = buildVisualClusters(clusters);
-  const attributeVisual = visual.find(
+  const attributeVisual = visual.filter(
     (cluster) =>
       cluster.lane === 0 && cluster.groupKey === "attribute",
   );
-  assert.equal(attributeVisual?.members?.length, 2);
-  assert.equal(attributeVisual?.icon, "");
-  assert.equal(attributeVisual?.labelKey, "attribute");
+  assert.equal(attributeVisual.length, 2);
   assert.deepEqual(
-    timelineClusterAtCombatMs(
-      attributeVisual,
-      critSecond.combatMs,
-    ).events.map((event) => event.id),
+    attributeVisual.map((cluster) => cluster.events.map((event) => event.id)),
+    [["crit-1"], ["crit-2", "regen-amount"]],
+  );
+  assert.deepEqual(
+    attributeVisual.map((cluster) => cluster.icon),
+    ["", ""],
+  );
+  assert.deepEqual(
+    attributeVisual.map((cluster) => cluster.labelKey),
+    ["attribute", "attribute"],
+  );
+  assert.deepEqual(
+    attributeVisual[1].events.map((event) => event.id),
     ["crit-2", "regen-amount"],
   );
+});
+
+test("adjacent-frame markers keep one hit identity across their painted width", () => {
+  const entities = [
+    { id: "source-a", type: "item" },
+    { id: "source-b", type: "item" },
+    { id: "target", type: "hero" },
+  ];
+  const events = [
+    timelineEvent({
+      id: "shield-frame-61",
+      frame: 61,
+      combatMs: 3_050,
+      kind: "effect-executed",
+      action: "PlayerShieldApply",
+      sourceId: "source-a",
+      targetIds: ["target"],
+      value: 61,
+    }),
+    timelineEvent({
+      id: "shield-frame-62",
+      frame: 62,
+      combatMs: 3_100,
+      kind: "effect-executed",
+      action: "PlayerShieldApply",
+      sourceId: "source-b",
+      targetIds: ["target"],
+      value: 466,
+    }),
+  ];
+  const markers = layoutTimelineMarkers(
+    buildVisualClusters(
+      buildClusters(
+        { durationMs: 8_000 },
+        events,
+        entities,
+        1_000,
+        52,
+      ),
+    ),
+  );
+
+  assert.equal(markers.length, 2);
+  assert.deepEqual(
+    markers.map((cluster) => cluster.events.map((event) => event.id)),
+    [["shield-frame-61"], ["shield-frame-62"]],
+  );
+  assert.deepEqual(
+    markers.map((cluster) => markerPoint(cluster).y - cluster.y),
+    [-15, 15],
+  );
+
+  const hitIndex = createHitIndex(markers);
+  for (const marker of markers) {
+    const point = markerPoint(marker);
+    for (let dx = -9; dx <= 9; dx += 1) {
+      assert.equal(
+        hitTestTimelineClusters({
+          x: point.x + dx,
+          y: point.y,
+          hitIndex,
+          visualClusters: markers,
+          laneHeight: 52,
+        }),
+        marker,
+      );
+    }
+  }
 });
 
 test("structural event semantics render destroy and attribute diffs explicitly", () => {

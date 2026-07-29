@@ -66,7 +66,6 @@ export interface TimelineCluster {
   iconSemanticKey?: string;
   icon: string;
   statusRange?: StatusRange;
-  members?: TimelineCluster[];
   tier?: EventTier;
   impact?: number;
   markerX?: number;
@@ -584,71 +583,7 @@ export function buildClusters(
 export function buildVisualClusters(
   clusters: readonly TimelineCluster[],
 ): TimelineCluster[] {
-  const grouped = new Map<string, TimelineCluster[]>();
-  const visual: TimelineCluster[] = [];
-  for (const cluster of clusters) {
-    if (cluster.statusRange) {
-      visual.push(cluster);
-      continue;
-    }
-    const key =
-      `${cluster.lane}:${cluster.role}:${cluster.token}:`
-      + `${cluster.groupKey ?? cluster.labelKey ?? ""}:`
-      + `${cluster.iconSemanticKey ?? ""}`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)?.push(cluster);
-  }
-  for (const row of grouped.values()) {
-    row.sort((left, right) => left.x - right.x);
-    let members: TimelineCluster[] = [];
-    let firstX = 0;
-    function flush(): void {
-      if (members.length === 0) return;
-      if (members.length === 1) {
-        visual.push(members[0]);
-      } else {
-        const representative = members[0];
-        const icons = new Set(
-          members.map((member) => member.icon).filter(Boolean),
-        );
-        const mergedEvents = members.flatMap((member) => member.events);
-        visual.push({
-          lane: representative.lane,
-          x:
-            members.reduce((sum, member) => sum + member.x, 0)
-            / members.length,
-          y: representative.y,
-          role: representative.role,
-          events: mergedEvents,
-          token: representative.token,
-          groupKey: representative.groupKey,
-          labelKey: representative.labelKey,
-          iconSemanticKey: representative.iconSemanticKey,
-          icon: icons.size === 1 ? Array.from(icons)[0] : "",
-          members: members.slice(),
-          tier: clusterEventTier(mergedEvents),
-          impact: clusterImpact(mergedEvents),
-        });
-      }
-      members = [];
-    }
-    for (const cluster of row) {
-      if (members.length === 0) {
-        firstX = cluster.x;
-        members.push(cluster);
-        continue;
-      }
-      if (cluster.x - firstX <= 30) {
-        members.push(cluster);
-      } else {
-        flush();
-        firstX = cluster.x;
-        members.push(cluster);
-      }
-    }
-    flush();
-  }
-  return visual.sort(
+  return clusters.slice().sort(
     (left, right) => left.x - right.x || left.lane - right.lane,
   );
 }
