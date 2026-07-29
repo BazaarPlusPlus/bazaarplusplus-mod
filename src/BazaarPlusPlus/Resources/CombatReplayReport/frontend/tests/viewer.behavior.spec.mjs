@@ -1093,10 +1093,87 @@ test.beforeAll(async ({ browserName }) => {
       iconAssetRelativeUrl:
         "../report-assets/objects/33/3333333333333333333333333333333333333333333333333333333333333333.png",
     }),
+    schemaEvent({
+      eventId: "source-mode-modify-attribute",
+      frame: 173,
+      frameSequence: 0,
+      combatTimeMs: 8650,
+      kind: "effect-executed",
+      action: "CardModifyAttribute",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-skill",
+      targetEntityIds: ["player-item"],
+      role: "applied",
+      attributionConfidence: "exact",
+    }),
+    schemaEvent({
+      eventId: "source-mode-reload",
+      frame: 173,
+      frameSequence: 1,
+      combatTimeMs: 8650,
+      kind: "effect-executed",
+      action: "CardReload",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-skill",
+      targetEntityIds: ["player-item"],
+      role: "applied",
+      attributionConfidence: "exact",
+    }),
+    schemaEvent({
+      eventId: "source-mode-ammo",
+      frame: 173,
+      frameSequence: 2,
+      combatTimeMs: 8650,
+      kind: "card-attribute",
+      action: "Ammo",
+      targetEntityIds: ["player-item"],
+      value: 1,
+      previousValue: 0,
+      currentValue: 1,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+      iconSemanticKey: "status.ammo",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/77/7777777777777777777777777777777777777777777777777777777777777777.png",
+    }),
+    schemaEvent({
+      eventId: "source-mode-damage",
+      frame: 173,
+      frameSequence: 3,
+      combatTimeMs: 8650,
+      kind: "card-attribute",
+      action: "DamageAmount",
+      targetEntityIds: ["player-item"],
+      value: 5,
+      previousValue: 170,
+      currentValue: 175,
+      unit: "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+      iconSemanticKey: "status.damage",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/44/4444444444444444444444444444444444444444444444444444444444444444.png",
+    }),
+    schemaEvent({
+      eventId: "source-mode-self-charge",
+      frame: 174,
+      frameSequence: 0,
+      combatTimeMs: 8700,
+      kind: "effect-executed",
+      action: "CardCharge",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-skill",
+      targetEntityIds: ["player-item"],
+      value: 500,
+      unit: "milliseconds",
+      role: "applied",
+      attributionConfidence: "exact",
+    }),
   );
   statusApplicationEnvelope.battleDocument.durationMs = 9000;
   statusApplicationEnvelope.battleDocument.frameCount = 180;
-  statusApplicationEnvelope.battleDocument.rawRecordCount += 10;
+  statusApplicationEnvelope.battleDocument.rawRecordCount += 15;
   await writeFile(
     join(fixtureDirectory, "status-application-report.html"),
     reportHtml(statusApplicationEnvelope),
@@ -3828,6 +3905,9 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
     await expect(page.getByTestId("focused-cluster-event")).toHaveCount(1);
     await expect(page.getByTestId("event-source-entity")).toHaveCount(1);
     await expect(page.getByTestId("event-target-entity")).toHaveCount(0);
+    await expect(page.getByTestId("frame-event-relation-role")).toHaveText(
+      "Source",
+    );
     await expect(page.getByTestId("frame-event-native-icon")).toHaveAttribute(
       "src",
       marker.icon,
@@ -4050,6 +4130,9 @@ test("renders destroy and structural attributes consistently across timeline, in
   await expect(
     hoverInspector.getByTestId("event-target-entity"),
   ).toHaveText("Fixture Opponent");
+  await expect(
+    hoverInspector.getByTestId("frame-event-relation-role"),
+  ).toHaveText("Target");
   await page.mouse.click(criticalSourcePoint.x, criticalSourcePoint.y);
   await expect(page.getByTestId("frame-inspector-entity")).toHaveText(
     "Ice Swan",
@@ -4063,6 +4146,9 @@ test("renders destroy and structural attributes consistently across timeline, in
   await expect(page.getByTestId("event-source-entity")).toHaveCount(0);
   await expect(page.getByTestId("event-target-entity")).toHaveText(
     "Fixture Opponent",
+  );
+  await expect(page.getByTestId("frame-event-relation-role")).toHaveText(
+    "Target",
   );
   await page.getByTestId("frame-inspector-close").click();
 
@@ -4530,7 +4616,7 @@ test("scopes the inspector to the exact clicked cluster", async ({
     page.getByTestId("focused-cluster-event").first().getByText("Source", {
       exact: true,
     }),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
   await expect(
     page.getByTestId("focused-cluster-event").first().getByText("Target", {
       exact: true,
@@ -5265,6 +5351,77 @@ test("groups Welding Torch attributes in one generic marker and expands concrete
   expect(headerGeometry.leftGap).toBeCloseTo(0, 1);
   expect(headerGeometry.topGap).toBeCloseTo(0, 1);
   expect(headerGeometry.bottomGap).toBeLessThanOrEqual(1);
+});
+
+test("source mode expands uniquely paired attribute details and keeps self-targets explicit", async ({
+  page,
+}) => {
+  await page.goto(`${statusApplicationReportUrl}?lang=en`);
+  await page.getByTestId("event-lane-mode-source").click();
+  await page.getByTestId("timeline-scroll").evaluate((element) => {
+    element.scrollLeft = element.scrollWidth - element.clientWidth;
+  });
+
+  const attributePoint = await timelineMarkerPoint(page, {
+    combatMs: 8650,
+    durationMs: 9000,
+    entityId: "player-item",
+  });
+  expect(attributePoint).not.toBeNull();
+  await page.mouse.move(attributePoint.x, attributePoint.y);
+  await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
+    "Attribute change",
+  );
+  await expect(page.getByTestId("timeline-tooltip-count")).toHaveText(
+    "2 events",
+  );
+  const hoverInspector = page.getByTestId("timeline-tooltip");
+  await expect(hoverInspector.getByTestId("frame-event-kind")).toHaveText([
+    "Damage stat",
+    "Reload",
+  ]);
+  await expect(hoverInspector.getByTestId("frame-event-amount")).toHaveText([
+    "+5",
+    "+1",
+  ]);
+  await expect(
+    hoverInspector.getByTestId("frame-event-transition"),
+  ).toHaveText([
+    "170 → 175",
+    "0 → 1",
+  ]);
+  await expect(
+    hoverInspector.getByTestId("frame-event-native-icon"),
+  ).toHaveCount(2);
+  await expect(
+    hoverInspector.getByTestId("event-target-entity"),
+  ).toHaveText([
+    "Welding Torch",
+    "Welding Torch",
+  ]);
+  await expect(
+    hoverInspector.getByTestId("frame-event-relation-role"),
+  ).toHaveText(["Target", "Target"]);
+  await expect(
+    hoverInspector.getByTestId("event-source-entity"),
+  ).toHaveCount(0);
+
+  const chargePoint = await timelineMarkerPoint(page, {
+    combatMs: 8700,
+    durationMs: 9000,
+    entityId: "player-item",
+  });
+  expect(chargePoint).not.toBeNull();
+  await page.mouse.move(chargePoint.x, chargePoint.y);
+  await expect(hoverInspector.getByTestId("frame-event-kind")).toHaveText(
+    "Charge",
+  );
+  await expect(
+    hoverInspector.getByTestId("event-target-entity"),
+  ).toHaveText("Welding Torch");
+  await expect(
+    hoverInspector.getByTestId("frame-event-relation-role"),
+  ).toHaveText("Target");
 });
 
 test("keeps direct freeze applications in the combat log without countdown tick noise", async ({

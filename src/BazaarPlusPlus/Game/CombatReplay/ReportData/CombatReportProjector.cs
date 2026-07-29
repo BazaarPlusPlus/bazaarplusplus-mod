@@ -229,6 +229,8 @@ internal sealed class CombatReportProjector
                     Value(executed.Source),
                     TargetValues(executed.Target),
                     value: valueAttribution?.Value,
+                    previousValue: valueAttribution?.PreviousValue,
+                    currentValue: valueAttribution?.CurrentValue,
                     unit: valueAttribution?.Unit,
                     role: "applied",
                     attribution: "exact",

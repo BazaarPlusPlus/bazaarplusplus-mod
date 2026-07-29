@@ -19,6 +19,7 @@ import {
   type EventPresentation,
 } from "../../model/event-semantics.ts";
 import { attributeEventDiff } from "../../model/attribute-event-diff.ts";
+import { resolveSourceModeAttributeEvents } from "../../model/effect-attribute-details.ts";
 import type {
   NormalizedEntity,
   NormalizedEvent,
@@ -101,6 +102,7 @@ interface RelationNode {
   ariaLabel: string;
   entityId: string;
   fallback: string;
+  relationLabel: string;
   testId: string;
 }
 
@@ -162,6 +164,13 @@ function EventRelationTree({
             fallback={node.fallback}
             testId={node.testId}
           />
+          <span
+            className="pointer-events-none absolute top-0.5 truncate text-nano font-medium uppercase tracking-wide text-muted-foreground"
+            data-bpp-test-id="frame-event-relation-role"
+            style={{ left: artColumnWidth + 8 }}
+          >
+            {node.relationLabel}
+          </span>
         </div>
       ))}
     </div>
@@ -331,8 +340,14 @@ function relationTreeNodes(
     fallback: string,
     testId: string,
     role: string,
+    allowInspectedEntity = false,
   ): void {
-    if (!entityId || entityId === inspectedEntityId) return;
+    if (
+      !entityId
+      || (!allowInspectedEntity && entityId === inspectedEntityId)
+    ) {
+      return;
+    }
     const key = `${role}:${entityId}`;
     if (seen.has(key)) return;
     seen.add(key);
@@ -340,6 +355,7 @@ function relationTreeNodes(
       ariaLabel,
       entityId,
       fallback,
+      relationLabel: ariaLabel,
       testId,
     });
   }
@@ -356,6 +372,7 @@ function relationTreeNodes(
           t("targetNotRecorded"),
           "event-target-entity",
           "target",
+          eventLaneMode === "source",
         );
       }
       for (const removedTargetId of event.removedTargetIds) {
@@ -365,6 +382,7 @@ function relationTreeNodes(
           t("targetNotRecorded"),
           "event-removed-target-entity",
           "removed",
+          eventLaneMode === "source",
         );
       }
       continue;
@@ -500,9 +518,16 @@ export function FrameInspector({
     () => new Set(focusedEventIds),
     [focusedEventIds],
   );
-  const frameEvents = useMemo(
+  const rawFrameEvents = useMemo(
     () => eventsAtFrame(model.events, frame),
     [frame, model.events],
+  );
+  const frameEvents = useMemo(
+    () =>
+      eventLaneMode === "source"
+        ? resolveSourceModeAttributeEvents(rawFrameEvents)
+        : rawFrameEvents,
+    [eventLaneMode, rawFrameEvents],
   );
   const events = useMemo(
     () =>

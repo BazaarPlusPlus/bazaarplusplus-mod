@@ -466,8 +466,14 @@ export function playerAttributePolicy(action: string): AttributeEventPolicy {
 }
 
 export function eventAttributePolicy(
-  event: Pick<NormalizedEvent, "kind" | "action">,
+  event: Pick<
+    NormalizedEvent,
+    "kind" | "action" | "resolvedAttributeAction"
+  >,
 ): AttributeEventPolicy {
+  if (event.resolvedAttributeAction) {
+    return cardAttributePolicy(event.resolvedAttributeAction);
+  }
   const kind = event.kind.toLowerCase();
   if (kind === "card-attribute") {
     return cardAttributePolicy(event.action);
@@ -479,8 +485,14 @@ export function eventAttributePolicy(
 }
 
 export function eventAttributeSemantic(
-  event: Pick<NormalizedEvent, "kind" | "action">,
+  event: Pick<
+    NormalizedEvent,
+    "kind" | "action" | "resolvedAttributeAction"
+  >,
 ): CardAttributeSemantic | PlayerAttributeSemantic | null {
+  if (event.resolvedAttributeAction) {
+    return cardAttributeSemantic(event.resolvedAttributeAction);
+  }
   const kind = event.kind.toLowerCase();
   if (kind === "card-attribute") {
     return cardAttributeSemantic(event.action);
@@ -520,7 +532,10 @@ export function baseEventKindToken(kind: unknown): string {
 }
 
 export function eventPresentation(
-  event: Pick<NormalizedEvent, "kind" | "action">,
+  event: Pick<
+    NormalizedEvent,
+    "kind" | "action" | "resolvedAttributeAction"
+  >,
 ): EventPresentation {
   const damageKind = eventDamageKind(event);
   if (damageKind) {
@@ -542,6 +557,20 @@ export function eventPresentation(
   }
 
   const kind = event.kind.toLowerCase();
+  if (event.resolvedAttributeAction) {
+    const semantic = cardAttributeSemantic(event.resolvedAttributeAction);
+    return {
+      groupKey:
+        event.action === "CardReload"
+          ? "attribute-reload"
+          : `attribute-${event.resolvedAttributeAction}`,
+      labelKey:
+        event.action === "CardReload"
+          ? "reload"
+          : semantic?.labelKey ?? "attribute",
+      token: semantic?.token ?? "attribute",
+    };
+  }
   if (
     kind === "effect-executed"
     && (event.action === "CardDisable" || event.action === "CardDestroy")
@@ -585,8 +614,12 @@ export function eventPresentation(
 }
 
 export function timelinePresentationToken(
-  event: Pick<NormalizedEvent, "kind" | "action">,
+  event: Pick<
+    NormalizedEvent,
+    "kind" | "action" | "resolvedAttributeAction"
+  >,
 ): string {
+  if (event.resolvedAttributeAction) return "attribute";
   if (event.kind.toLowerCase() === "card-attribute") {
     return "attribute";
   }

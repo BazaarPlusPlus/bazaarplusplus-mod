@@ -149,14 +149,21 @@ export function kindToken(kind: unknown): string {
 }
 
 export function eventKindToken(
-  event: Pick<NormalizedEvent, "kind" | "action">,
+  event: Pick<
+    NormalizedEvent,
+    "kind" | "action" | "resolvedAttributeAction"
+  >,
 ): string {
   return eventPresentation(event).token;
 }
 
 export function timelineEventToken(
-  event: Pick<NormalizedEvent, "kind" | "action">,
+  event: Pick<
+    NormalizedEvent,
+    "kind" | "action" | "resolvedAttributeAction"
+  >,
 ): string {
+  if (event.resolvedAttributeAction) return "attribute";
   const kind = event.kind.toLowerCase();
   if (kind === "card-attribute" || kind === "player-attribute") {
     return "attribute";
@@ -170,6 +177,9 @@ export function isVisibleTimelineEvent(
   eventLaneMode: EventLaneMode = "target",
 ): boolean {
   const kind = event.kind.toLowerCase();
+  if (event.resolvedAttributeAction) {
+    return eventAttributePolicy(event).timeline === "marker";
+  }
   if (kind === "player-attribute" || kind === "card-attribute") {
     return eventAttributePolicy(event).timeline === "marker";
   }
@@ -183,6 +193,7 @@ export function isVisibleTimelineEvent(
   if (event.kind.toLowerCase() !== "effect-executed") return true;
   if (
     event.action === "CardModifyAttribute"
+    || event.action === "CardReload"
     || event.action === "PlayerModifyAttribute"
   ) {
     return false;
@@ -499,7 +510,9 @@ export function buildClusters(
     const x = timelineXAtCombatMs(event.combatMs, duration, timelineWidth);
     const kind = event.kind.toLowerCase();
     const isAttribute =
-      kind === "card-attribute" || kind === "player-attribute";
+      kind === "card-attribute"
+      || kind === "player-attribute"
+      || Boolean(event.resolvedAttributeAction);
     const token = timelineEventToken(event);
     const presentation = eventPresentation(event);
     const groupKey = isAttribute ? "attribute" : presentation.groupKey;

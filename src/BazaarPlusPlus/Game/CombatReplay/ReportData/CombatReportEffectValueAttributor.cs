@@ -9,7 +9,9 @@ namespace BazaarPlusPlus.Game.CombatReplay.ReportData;
 internal sealed record CombatReportEffectValueAttribution(
     long Value,
     string Unit,
-    bool? IsCritical = null
+    bool? IsCritical = null,
+    long? PreviousValue = null,
+    long? CurrentValue = null
 );
 
 /// <summary>
@@ -140,6 +142,8 @@ internal static class CombatReportEffectValueAttributor
                     ECardAttributeType.Freeze,
                     out attribution
                 );
+            case EActionCommandType.CardReload:
+                return TryResolveCardReload(frame, executed.Target, out attribution);
             default:
                 return false;
         }
@@ -224,6 +228,33 @@ internal static class CombatReportEffectValueAttributor
         return true;
     }
 
+    private static bool TryResolveCardReload(
+        CombatSimFrame frame,
+        IEffectTarget? target,
+        out CombatReportEffectValueAttribution attribution
+    )
+    {
+        attribution = null!;
+        if (target is not EffectTargetCard card)
+            return false;
+        if (
+            !frame.CardUpdates.TryGetValue(card.Target, out var update)
+            || !update.Attributes.TryGetValue(ECardAttributeType.Ammo, out var transition)
+            || transition.Delta <= 0
+        )
+        {
+            return false;
+        }
+
+        attribution = new CombatReportEffectValueAttribution(
+            transition.Delta,
+            "points",
+            PreviousValue: transition.PreviousValue,
+            CurrentValue: transition.CurrentValue
+        );
+        return true;
+    }
+
     private static CombatSimPlayerUpdate? PlayerUpdate(
         CombatSimFrame frame,
         IEffectTarget? target
@@ -255,5 +286,6 @@ internal static class CombatReportEffectValueAttributor
                 or EActionCommandType.PlayerRegenApply
                 or EActionCommandType.CardHaste
                 or EActionCommandType.CardSlow
-                or EActionCommandType.CardFreeze;
+                or EActionCommandType.CardFreeze
+                or EActionCommandType.CardReload;
 }

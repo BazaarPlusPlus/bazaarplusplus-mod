@@ -1,4 +1,8 @@
-import type { NormalizedEntity } from "../model/normalize.ts";
+import { resolveSourceModeAttributeEvents } from "../model/effect-attribute-details.ts";
+import type {
+  NormalizedEntity,
+  NormalizedEvent,
+} from "../model/normalize.ts";
 import type { ReportViewModel } from "../model/report.ts";
 import {
   buildClusters,
@@ -77,6 +81,7 @@ export class TimelineCanvasController {
   private readonly model: ReportViewModel;
   private readonly entities: NormalizedEntity[];
   private readonly eventLaneMode: EventLaneMode;
+  private readonly layoutEvents: NormalizedEvent[];
   private readonly laneLabels: HTMLElement;
   private readonly stickyHeroCanvas: HTMLCanvasElement;
   private readonly stickyHeroLabel: HTMLElement;
@@ -113,6 +118,10 @@ export class TimelineCanvasController {
     this.model = options.model;
     this.entities = options.entities;
     this.eventLaneMode = options.eventLaneMode;
+    this.layoutEvents =
+      this.eventLaneMode === "source"
+        ? resolveSourceModeAttributeEvents(this.model.events)
+        : this.model.events;
     this.laneLabels = options.laneLabels;
     this.stickyHeroCanvas = options.stickyHeroCanvas;
     this.stickyHeroLabel = options.stickyHeroLabel;
@@ -129,7 +138,7 @@ export class TimelineCanvasController {
     const entityById = new Map(
       this.entities.map((entity) => [entity.id, entity]),
     );
-    const visible = this.model.events.filter((event) =>
+    const visible = this.layoutEvents.filter((event) =>
       isVisibleTimelineEvent(event, entityById, this.eventLaneMode),
     );
     this.statusRanges =

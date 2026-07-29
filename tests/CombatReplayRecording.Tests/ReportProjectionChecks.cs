@@ -700,12 +700,21 @@ internal static class ReportProjectionChecks
                 "charge"
             )
         );
+        quantified.Events.Add(
+            Executed(
+                EActionCommandType.CardReload,
+                sourceCardId,
+                new EffectTargetCard { Target = targetCardId },
+                "reload"
+            )
+        );
         quantified.CardUpdates[targetCardId] = new CombatSimCardUpdate
         {
             CardInstanceId = targetCardId,
             Attributes =
             {
                 [ECardAttributeType.Slow] = CardAttribute(ECardAttributeType.Slow, 0, 1_950),
+                [ECardAttributeType.Ammo] = CardAttribute(ECardAttributeType.Ammo, 0, 1),
             },
         };
 
@@ -828,6 +837,14 @@ internal static class ReportProjectionChecks
         Require(
             executedEvents.Single(reportEvent => reportEvent.EffectId == "charge").Value == null,
             "Charge must remain count-only while the raw frame does not expose an unambiguous applied amount."
+        );
+        var reload = executedEvents.Single(reportEvent => reportEvent.EffectId == "reload");
+        Require(
+            reload.Value == 1
+                && reload.Unit == "points"
+                && reload.PreviousValue == 0
+                && reload.CurrentValue == 1,
+            "A unique reload execution must retain the exact positive Ammo transition and its before/after values."
         );
         Require(
             executedEvents

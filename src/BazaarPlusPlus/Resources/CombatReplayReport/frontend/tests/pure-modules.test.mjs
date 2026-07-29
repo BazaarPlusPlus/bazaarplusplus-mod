@@ -124,6 +124,7 @@ import {
   summarizeDirectDamageGroup,
 } from "../src/components/inspector/frame-event-groups.ts";
 import { attributeEventDiff } from "../src/model/attribute-event-diff.ts";
+import { resolveSourceModeAttributeEvents } from "../src/model/effect-attribute-details.ts";
 import {
   buildCombatLogEntries,
   combatLogEventToken,
@@ -2375,6 +2376,154 @@ test("timeline visibility and clustering preserve every underlying event", () =>
     ["damage-1", "damage-2"],
   );
   assert.equal(visual[0].members.length, 2);
+});
+
+test("source mode resolves only unique same-target attribute executions", () => {
+  const events = [
+    timelineEvent({
+      id: "reload",
+      frame: 221,
+      combatMs: 11_050,
+      kind: "effect-executed",
+      action: "CardReload",
+      sourceId: "miss-isles",
+      triggerSourceId: "primal-core",
+      targetIds: ["miss-isles"],
+    }),
+    timelineEvent({
+      id: "modify",
+      frame: 221,
+      sequence: 1,
+      combatMs: 11_050,
+      kind: "effect-executed",
+      action: "CardModifyAttribute",
+      sourceId: "miss-isles",
+      triggerSourceId: "primal-core",
+      targetIds: ["miss-isles"],
+    }),
+    timelineEvent({
+      id: "ammo",
+      frame: 221,
+      sequence: 2,
+      combatMs: 11_050,
+      kind: "card-attribute",
+      action: "Ammo",
+      value: 1,
+      previousValue: 0,
+      currentValue: 1,
+      unit: "points",
+      targetIds: ["miss-isles"],
+      iconSemanticKey: "status.ammo",
+      icon: "ammo.png",
+    }),
+    timelineEvent({
+      id: "damage",
+      frame: 221,
+      sequence: 3,
+      combatMs: 11_050,
+      kind: "card-attribute",
+      action: "DamageAmount",
+      value: 5,
+      previousValue: 170,
+      currentValue: 175,
+      unit: "points",
+      targetIds: ["miss-isles"],
+      iconSemanticKey: "status.damage",
+      icon: "damage.png",
+    }),
+  ];
+
+  const resolved = resolveSourceModeAttributeEvents(events);
+  assert.deepEqual(
+    resolved.map((event) => ({
+      action: event.action,
+      currentValue: event.currentValue,
+      id: event.id,
+      previousValue: event.previousValue,
+      resolvedAttributeAction: event.resolvedAttributeAction,
+      value: event.value,
+    })),
+    [
+      {
+        action: "CardReload",
+        currentValue: 1,
+        id: "reload",
+        previousValue: 0,
+        resolvedAttributeAction: "Ammo",
+        value: 1,
+      },
+      {
+        action: "CardModifyAttribute",
+        currentValue: 175,
+        id: "modify",
+        previousValue: 170,
+        resolvedAttributeAction: "DamageAmount",
+        value: 5,
+      },
+      {
+        action: "Ammo",
+        currentValue: 1,
+        id: "ammo",
+        previousValue: 0,
+        resolvedAttributeAction: undefined,
+        value: 1,
+      },
+      {
+        action: "DamageAmount",
+        currentValue: 175,
+        id: "damage",
+        previousValue: 170,
+        resolvedAttributeAction: undefined,
+        value: 5,
+      },
+    ],
+  );
+  assert.equal(eventPresentation(resolved[0]).labelKey, "reload");
+  assert.equal(eventPresentation(resolved[1]).labelKey, "attributeDamage");
+  assert.equal(timelineEventToken(resolved[0]), "attribute");
+  assert.equal(
+    isVisibleTimelineEvent(
+      resolved[0],
+      new Map([["miss-isles", { id: "miss-isles", type: "item" }]]),
+      "source",
+    ),
+    true,
+  );
+  assert.equal(
+    isVisibleTimelineEvent(
+      events[0],
+      new Map([["miss-isles", { id: "miss-isles", type: "item" }]]),
+      "source",
+    ),
+    false,
+  );
+  const clusters = buildClusters(
+    { durationMs: 20_000 },
+    resolved.slice(0, 2),
+    [{ id: "miss-isles", type: "item" }],
+    1_000,
+    52,
+    "source",
+  );
+  assert.equal(clusters.length, 1);
+  assert.equal(clusters[0].labelKey, "attribute");
+  assert.equal(clusters[0].icon, "");
+  assert.deepEqual(
+    clusters[0].events.map((event) => event.id),
+    ["reload", "modify"],
+  );
+
+  const ambiguous = resolveSourceModeAttributeEvents([
+    events[1],
+    timelineEvent({
+      ...events[1],
+      id: "modify-2",
+      sequence: 4,
+    }),
+    events[3],
+  ]);
+  assert.equal(ambiguous[0].resolvedAttributeAction, undefined);
+  assert.equal(ambiguous[1].resolvedAttributeAction, undefined);
 });
 
 test("timeline attribute markers stay generic while a same-frame member keeps every concrete event", () => {

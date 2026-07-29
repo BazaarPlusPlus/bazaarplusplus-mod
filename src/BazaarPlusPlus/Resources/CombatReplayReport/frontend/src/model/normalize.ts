@@ -113,6 +113,7 @@ export interface NormalizedEvent {
   combatMs: number;
   kind: string;
   action: string;
+  resolvedAttributeAction?: string;
   value: unknown;
   previousValue: unknown;
   currentValue: unknown;
