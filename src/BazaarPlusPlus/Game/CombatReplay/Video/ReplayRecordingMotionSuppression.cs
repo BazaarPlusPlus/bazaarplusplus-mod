@@ -4,6 +4,8 @@ namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
 internal static class ReplayRecordingMotionSuppression
 {
+    internal const int TerminalPresentationHoldMilliseconds = 1000;
+
     private static int _leaseCount;
 
     internal static bool IsActive => Volatile.Read(ref _leaseCount) > 0;
@@ -13,6 +15,9 @@ internal static class ReplayRecordingMotionSuppression
         Interlocked.Increment(ref _leaseCount);
         return new Lease();
     }
+
+    internal static Task HoldTerminalPresentationAsync() =>
+        Task.Delay(TerminalPresentationHoldMilliseconds);
 
     private sealed class Lease : IDisposable
     {

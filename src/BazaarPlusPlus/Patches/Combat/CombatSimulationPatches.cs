@@ -73,7 +73,7 @@ class ReplayRecordingFinalBlowReturnPatch
             return true;
 
         Singleton<GameServiceManager>.Instance?.EnforceMaxTimeScale(1f);
-        __result = Task.CompletedTask;
+        __result = ReplayRecordingMotionSuppression.HoldTerminalPresentationAsync();
         return false;
     }
 }

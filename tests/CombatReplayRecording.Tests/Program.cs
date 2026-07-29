@@ -173,6 +173,22 @@ static void RunReplayRecordingHoverSuppressionChecks(Type suppressionType)
 
 static void RunReplayRecordingMotionSuppressionChecks(Type suppressionType)
 {
+    var terminalHold = suppressionType.GetField(
+        "TerminalPresentationHoldMilliseconds",
+        BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(
+        terminalHold?.GetRawConstantValue() is 1000,
+        "Recorded replay should hold the fully rendered terminal board for one second."
+    );
+    Assert(
+        suppressionType.GetMethod(
+            "HoldTerminalPresentationAsync",
+            BindingFlags.NonPublic | BindingFlags.Static
+        )?.ReturnType == typeof(Task),
+        "Recorded replay terminal hold should be asynchronous."
+    );
+
     var isActive = suppressionType.GetProperty(
         "IsActive",
         BindingFlags.NonPublic | BindingFlags.Static

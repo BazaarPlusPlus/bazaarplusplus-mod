@@ -357,7 +357,11 @@ public sealed class CombatReplayReportRuntimeSourceTests
             "Singleton<GameServiceManager>.Instance?.EnforceMaxTimeScale(1f);",
             combatSimulationPatchSource
         );
-        Assert.Contains("__result = Task.CompletedTask;", combatSimulationPatchSource);
+        Assert.Contains(
+            "__result = ReplayRecordingMotionSuppression.HoldTerminalPresentationAsync();",
+            combatSimulationPatchSource
+        );
+        Assert.DoesNotContain("__result = Task.CompletedTask;", combatSimulationPatchSource);
         Assert.Contains(
             "typeof(SkillProxyRenderer), nameof(SkillProxyRenderer.OnPointerEnter)",
             patchSource
