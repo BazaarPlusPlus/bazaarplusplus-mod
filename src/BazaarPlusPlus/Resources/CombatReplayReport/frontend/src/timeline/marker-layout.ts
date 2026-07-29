@@ -1,7 +1,7 @@
 import type { TimelineCluster } from "./clusters.ts";
+import { EVENT_HIT_RADIUS } from "./constants.ts";
 
-const DENSE_GROUP_WIDTH = 20;
-const MARKER_ROW_OFFSET = 11;
+const DENSE_GROUP_MAX_GAP = EVENT_HIT_RADIUS * 2 + 12;
 const TOKEN_PRIORITY: Readonly<Record<string, number>> = {
   damageDirect: 0,
   damage: 1,
@@ -27,19 +27,19 @@ interface MarkerSlot {
 function denseMarkerSlots(count: number): MarkerSlot[] {
   if (count === 2) {
     return [
-      { y: -MARKER_ROW_OFFSET, sizeCap: 18 },
-      { y: MARKER_ROW_OFFSET, sizeCap: 18 },
+      { y: -15, sizeCap: 18 },
+      { y: 15, sizeCap: 18 },
     ];
   }
   if (count === 3) {
     return [
-      { y: -16, sizeCap: 14 },
+      { y: -17, sizeCap: 14 },
       { y: 0, sizeCap: 14 },
-      { y: 16, sizeCap: 14 },
+      { y: 17, sizeCap: 14 },
     ];
   }
   if (count === 4) {
-    return [-18, -6, 6, 18].map((y) => ({ y, sizeCap: 11 }));
+    return [-19, -6, 6, 19].map((y) => ({ y, sizeCap: 11 }));
   }
   if (count === 5) {
     return [-20, -10, 0, 10, 20].map((y) => ({ y, sizeCap: 9 }));
@@ -74,7 +74,6 @@ export function layoutTimelineMarkers(
     cluster.markerX = cluster.x;
     cluster.markerY = cluster.y;
     cluster.markerSizeCap = undefined;
-    if (cluster.statusRange) continue;
     const lane = laneGroups.get(cluster.lane);
     if (lane) lane.push(cluster);
     else laneGroups.set(cluster.lane, [cluster]);
@@ -90,24 +89,24 @@ export function layoutTimelineMarkers(
         || left.token.localeCompare(right.token),
     );
     let group: TimelineCluster[] = [];
-    let firstX = 0;
+    let previousX = 0;
     const flush = (): void => {
       if (group.length > 1) layoutDenseGroup(group);
       group = [];
     };
     for (const cluster of lane) {
       if (group.length === 0) {
-        firstX = cluster.x;
+        previousX = cluster.x;
         group.push(cluster);
         continue;
       }
-      if (cluster.x - firstX <= DENSE_GROUP_WIDTH) {
+      if (cluster.x - previousX <= DENSE_GROUP_MAX_GAP) {
         group.push(cluster);
       } else {
         flush();
-        firstX = cluster.x;
         group.push(cluster);
       }
+      previousX = cluster.x;
     }
     flush();
   }

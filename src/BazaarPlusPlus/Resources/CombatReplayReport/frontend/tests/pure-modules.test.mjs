@@ -1454,9 +1454,9 @@ test("timeline marker stacks enumerate density without changing event time", () 
   ];
   const expected = [
     { count: 1, offsets: [0], sizeCaps: [undefined] },
-    { count: 2, offsets: [-11, 11], sizeCaps: [18, 18] },
-    { count: 3, offsets: [-16, 0, 16], sizeCaps: [14, 14, 14] },
-    { count: 4, offsets: [-18, -6, 6, 18], sizeCaps: [11, 11, 11, 11] },
+    { count: 2, offsets: [-15, 15], sizeCaps: [18, 18] },
+    { count: 3, offsets: [-17, 0, 17], sizeCaps: [14, 14, 14] },
+    { count: 4, offsets: [-19, -6, 6, 19], sizeCaps: [11, 11, 11, 11] },
     { count: 5, offsets: [-20, -10, 0, 10, 20], sizeCaps: [9, 9, 9, 9, 9] },
   ];
   const actions = [
@@ -1506,6 +1506,59 @@ test("timeline marker stacks enumerate density without changing event time", () 
       sizeCaps,
     );
   }
+});
+
+test("timeline marker stacks follow adjacent visual collisions transitively", () => {
+  const clusters = [
+    {
+      lane: 0,
+      statusRange: {},
+      token: "haste",
+      x: 100,
+      y: 52,
+    },
+    { lane: 0, token: "burn", x: 148, y: 52 },
+    {
+      lane: 0,
+      statusRange: {},
+      token: "slow",
+      x: 196,
+      y: 52,
+    },
+  ];
+  const markers = layoutTimelineMarkers(clusters);
+
+  assert.deepEqual(
+    markers.map(({ markerX }) => markerX),
+    [100, 148, 196],
+  );
+  assert.deepEqual(
+    markers.map(({ markerY }) => markerY),
+    [35, 52, 69],
+  );
+  assert.deepEqual(
+    markers.map(({ markerSizeCap }) => markerSizeCap),
+    [14, 14, 14],
+  );
+});
+
+test("timeline marker stacks bound six-or-more density to the lane height", () => {
+  const clusters = Array.from({ length: 6 }, (_, index) => ({
+    lane: 0,
+    token: `token-${index}`,
+    x: 100 + index,
+    y: 52,
+  }));
+  const markers = layoutTimelineMarkers(clusters);
+  const offsets = markers.map(({ markerY }) => markerY - 52);
+
+  assert.equal(offsets[0], -21);
+  assert.equal(offsets.at(-1), 21);
+  assert.equal(new Set(offsets).size, 6);
+  assert.deepEqual(
+    markers.map(({ markerSizeCap }) => markerSizeCap),
+    [7, 7, 7, 7, 7, 7],
+  );
 });
 
 test("native timeline markers preserve their aspect ratio around the center", () => {

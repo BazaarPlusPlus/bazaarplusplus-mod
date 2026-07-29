@@ -3842,7 +3842,7 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
   const markers = [
     {
       dx: 0,
-      dy: -16,
+      dy: -17,
       label: "Direct damage",
       groupToken: "damage-direct",
       icon:
@@ -3858,7 +3858,7 @@ test("distinguishes damage kinds and treats the selected lane as the implicit ta
     },
     {
       dx: 0,
-      dy: 16,
+      dy: 17,
       label: "Poison",
       groupToken: "damage-poison",
       icon:
@@ -5365,7 +5365,7 @@ test("source mode expands uniquely paired attribute details and keeps self-targe
   });
   expect(attributePoint).not.toBeNull();
   expect(chargePoint).not.toBeNull();
-  await page.mouse.move(attributePoint.x, attributePoint.y - 11);
+  await page.mouse.move(attributePoint.x, attributePoint.y - 15);
   await expect(page.getByTestId("timeline-tooltip-label")).toHaveText(
     "Attribute change",
   );
@@ -5403,7 +5403,7 @@ test("source mode expands uniquely paired attribute details and keeps self-targe
     hoverInspector.getByTestId("event-source-entity"),
   ).toHaveCount(0);
 
-  await page.mouse.move(chargePoint.x, chargePoint.y + 11);
+  await page.mouse.move(chargePoint.x, chargePoint.y + 15);
   await expect(hoverInspector.getByTestId("frame-event-kind")).toHaveText(
     "Charge",
   );
