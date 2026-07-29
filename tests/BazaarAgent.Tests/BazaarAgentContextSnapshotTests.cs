@@ -54,7 +54,7 @@ public class BazaarAgentContextSnapshotTests
     }
 
     [Fact]
-    public void Publish_OneShotBattleSummary_BumpsTickOnArrivalAndRemoval()
+    public void Publish_BattleSummary_IsStableUntilTheHostAcknowledgesIt()
     {
         var pub = new BazaarAgentContextSnapshotPublisher();
         var baseline = pub.Publish(MakeChoice());
@@ -78,14 +78,23 @@ public class BazaarAgentContextSnapshotTests
                 },
             }
         );
-        var consumed = pub.Publish(MakeChoice());
+        var repeated = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.Choice,
+                PlayerGold = 10,
+                LastBattle = withBattle.Context.LastBattle,
+            }
+        );
+        var acknowledged = pub.Publish(MakeChoice());
 
         Assert.Equal(1UL, baseline.TickId);
         Assert.Equal(2UL, withBattle.TickId);
-        Assert.Equal(3UL, consumed.TickId);
+        Assert.Same(withBattle, repeated);
+        Assert.Equal(3UL, acknowledged.TickId);
         Assert.Equal("win", withBattle.Context.LastBattle?.Result);
         Assert.Equal(-20, withBattle.Context.LastBattle?.Player.Attributes.Health?.Delta);
-        Assert.Null(consumed.Context.LastBattle);
+        Assert.Null(acknowledged.Context.LastBattle);
     }
 
     [Fact]

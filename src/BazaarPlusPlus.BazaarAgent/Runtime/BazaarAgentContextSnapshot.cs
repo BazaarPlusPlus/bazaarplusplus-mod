@@ -88,6 +88,8 @@ public sealed class BazaarAgentContextSnapshotPublisher
             InteractableTemplateIds = src.InteractableTemplateIds,
             BoardItems = src.BoardItems,
             ChestItems = src.ChestItems,
+            LockedBoardSockets = src.LockedBoardSockets,
+            LockedChestSockets = src.LockedChestSockets,
             PlayerSkills = src.PlayerSkills,
             SellableItems = src.SellableItems,
             SelectionOptions = src.SelectionOptions,
@@ -129,6 +131,8 @@ public sealed class BazaarAgentContextSnapshotPublisher
             && SocketsEqual(a.InteractableTemplateIds, b.InteractableTemplateIds)
             && CardsEqual(a.BoardItems, b.BoardItems)
             && CardsEqual(a.ChestItems, b.ChestItems)
+            && SocketsEqual(a.LockedBoardSockets, b.LockedBoardSockets)
+            && SocketsEqual(a.LockedChestSockets, b.LockedChestSockets)
             && CardsEqual(a.PlayerSkills, b.PlayerSkills)
             && CardsEqual(a.SellableItems, b.SellableItems)
             && CardsEqual(a.SelectionOptions, b.SelectionOptions)
@@ -174,6 +178,8 @@ public sealed class BazaarAgentContextSnapshotPublisher
             || !SocketsEqual(before.InteractableTemplateIds, after.InteractableTemplateIds)
             || !CardsEqual(before.BoardItems, after.BoardItems)
             || !CardsEqual(before.ChestItems, after.ChestItems)
+            || !SocketsEqual(before.LockedBoardSockets, after.LockedBoardSockets)
+            || !SocketsEqual(before.LockedChestSockets, after.LockedChestSockets)
             || !CardsEqual(before.PlayerSkills, after.PlayerSkills)
             || !CardsEqual(before.SellableItems, after.SellableItems)
             || !CardsEqual(before.SelectionOptions, after.SelectionOptions)

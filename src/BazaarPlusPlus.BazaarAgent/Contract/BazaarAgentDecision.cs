@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.BazaarAgent;
 
 public static class BazaarAgentSchema
 {
-    public const string Version = "2.4.0";
+    public const string Version = "2.5.0";
 }
 
 public enum BazaarAgentActionKind
@@ -204,6 +204,8 @@ public sealed class BazaarAgentContext
         System.Array.Empty<BazaarAgentCardSnapshot>();
     public IReadOnlyList<BazaarAgentCardSnapshot> ChestItems { get; init; } =
         System.Array.Empty<BazaarAgentCardSnapshot>();
+    public IReadOnlyList<string> LockedBoardSockets { get; init; } = System.Array.Empty<string>();
+    public IReadOnlyList<string> LockedChestSockets { get; init; } = System.Array.Empty<string>();
     public IReadOnlyList<BazaarAgentCardSnapshot> PlayerSkills { get; init; } =
         System.Array.Empty<BazaarAgentCardSnapshot>();
     public IReadOnlyList<BazaarAgentCardSnapshot> SellableItems { get; init; } =

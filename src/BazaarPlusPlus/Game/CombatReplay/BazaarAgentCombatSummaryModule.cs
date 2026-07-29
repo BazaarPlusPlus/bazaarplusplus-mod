@@ -43,13 +43,20 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
         }
     }
 
-    public BazaarAgentBattleSummarySnapshot? TakeCompletedSummary()
+    public BazaarAgentBattleSummarySnapshot? GetCompletedSummary()
     {
         lock (_gate)
+            return _completed;
+    }
+
+    public void AcknowledgeCompletedSummary(string summaryId)
+    {
+        if (string.IsNullOrWhiteSpace(summaryId))
+            return;
+        lock (_gate)
         {
-            var completed = _completed;
-            _completed = null;
-            return completed;
+            if (string.Equals(_completed?.SummaryId, summaryId, StringComparison.Ordinal))
+                _completed = null;
         }
     }
 
@@ -126,42 +133,18 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
         }
 
         // The opening GameSim reliably carries the opponent's spawned cards, but the local board
-        // can already exist when its event arrives. Mirror the replay capture's live fallback so
-        // the player opening lineup is still complete in that ordering.
-        if (owner == ECombatantId.Player && cards.Count == 0)
+        // and skills can already exist when its event arrives. Merge both live captures for the
+        // player even when some item spawn events were present.
+        if (owner == ECombatantId.Player)
         {
             foreach (var card in Data.GetCards<Card>(ECombatantId.Player, EInventorySection.Hand))
             {
-                cards[card.InstanceId.ToString()] = new BazaarAgentBattleCardSnapshot
-                {
-                    InstanceId = card.InstanceId.ToString(),
-                    TemplateId = card.TemplateId.ToString(),
-                    Type = card.Type.ToString(),
-                    Size = card.Size.ToString(),
-                    Section = card.Section?.ToString(),
-                    SocketId = card.LeftSocketId?.ToString(),
-                    Attributes = card.Attributes.ToDictionary(
-                        pair => pair.Key.ToString(),
-                        pair => pair.Value
-                    ),
-                };
+                cards.TryAdd(card.InstanceId.ToString(), CreateLiveCardSnapshot(card));
             }
 
             foreach (var skill in Data.Run?.Player?.Skills?.Where(skill => skill is not null) ?? [])
             {
-                cards[skill.InstanceId.ToString()] = new BazaarAgentBattleCardSnapshot
-                {
-                    InstanceId = skill.InstanceId.ToString(),
-                    TemplateId = skill.TemplateId.ToString(),
-                    Type = skill.Type.ToString(),
-                    Size = skill.Size.ToString(),
-                    Section = skill.Section?.ToString(),
-                    SocketId = skill.LeftSocketId?.ToString(),
-                    Attributes = skill.Attributes.ToDictionary(
-                        pair => pair.Key.ToString(),
-                        pair => pair.Value
-                    ),
-                };
+                cards[skill.InstanceId.ToString()] = CreateLiveCardSnapshot(skill);
             }
         }
 
@@ -186,6 +169,21 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
             Attributes = Attributes(update),
         };
 
+    private static BazaarAgentBattleCardSnapshot CreateLiveCardSnapshot(Card card) =>
+        new()
+        {
+            InstanceId = card.InstanceId.ToString(),
+            TemplateId = card.TemplateId.ToString(),
+            Type = card.Type.ToString(),
+            Size = card.Size.ToString(),
+            Section = card.Section?.ToString(),
+            SocketId = card.LeftSocketId?.ToString(),
+            Attributes = card.Attributes.ToDictionary(
+                pair => pair.Key.ToString(),
+                pair => pair.Value
+            ),
+        };
+
     private static IReadOnlyDictionary<string, int> Attributes(SimUpdateCard? update) =>
         update?.Attributes.ToDictionary(pair => pair.Key.ToString(), pair => pair.Value.Value)
         ?? new Dictionary<string, int>();
@@ -196,6 +194,7 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
     ) =>
         new()
         {
+            SummaryId = Guid.NewGuid().ToString("N"),
             BattleType = opening.BattleType,
             Result = message.Data.Winner switch
             {

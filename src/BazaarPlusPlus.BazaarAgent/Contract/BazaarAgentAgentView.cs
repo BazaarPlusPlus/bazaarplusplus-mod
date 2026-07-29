@@ -4,7 +4,7 @@ namespace BazaarPlusPlus.BazaarAgent;
 /// <summary>Schema for the compact, cache-aware Agent View served from <c>GET /v2/context</c>.</summary>
 public static class BazaarAgentAgentViewSchema
 {
-    public const string Version = "3.1.0";
+    public const string Version = "3.2.0";
 }
 
 /// <summary>
@@ -71,11 +71,13 @@ public sealed class BazaarAgentCompactDecisionOption
 }
 
 /// <summary>
-/// A one-shot summary of the most recently completed live combat. It is attached to the first
-/// actionable post-combat decision and is never emitted for intermediate combat frames.
+/// A summary of the most recently completed live combat. It remains attached to actionable
+/// post-combat decisions until the first confirmed non-Wait action acknowledges it, and is never
+/// emitted for intermediate combat frames.
 /// </summary>
 public sealed class BazaarAgentBattleSummary
 {
+    public string SummaryId { get; init; } = "";
     public string BattleType { get; init; } = "unknown";
     public string? Result { get; init; }
     public BazaarAgentBattleCombatant Player { get; init; } = new();
@@ -163,6 +165,8 @@ public sealed class BazaarAgentAgentView
         System.Array.Empty<BazaarAgentCardRef>();
     public IReadOnlyList<BazaarAgentCardRef> ChestItems { get; init; } =
         System.Array.Empty<BazaarAgentCardRef>();
+    public IReadOnlyList<string> LockedBoardSockets { get; init; } = System.Array.Empty<string>();
+    public IReadOnlyList<string> LockedChestSockets { get; init; } = System.Array.Empty<string>();
     public IReadOnlyList<BazaarAgentCardRef> PlayerSkills { get; init; } =
         System.Array.Empty<BazaarAgentCardRef>();
     public IReadOnlyList<BazaarAgentCardRef> SelectionOptions { get; init; } =

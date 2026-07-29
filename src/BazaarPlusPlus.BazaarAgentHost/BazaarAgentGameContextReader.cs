@@ -19,11 +19,15 @@ namespace BazaarPlusPlus.BazaarAgentHost;
 /// Reads live game state and produces an <see cref="BazaarAgentContext"/> snapshot.
 /// Main thread only. Pure read — never mutates any state.
 /// </summary>
-internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
+internal sealed class BazaarAgentGameContextReader
+    : IBazaarAgentContextReader,
+        IBazaarAgentBattleSummaryAcknowledger
 {
     private readonly IBazaarAgentGameProbe _gameProbe;
     private readonly IBazaarAgentLogger _logger;
     private readonly BazaarAgentDegradationLogState _logState = new();
+    private string? _lastBattleSummaryId;
+    private BazaarAgentBattleSummary? _lastBattle;
 
     public BazaarAgentGameContextReader(IBazaarAgentGameProbe gameProbe, IBazaarAgentLogger logger)
     {
@@ -50,11 +54,21 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         }
     }
 
+    public void AcknowledgeLastBattle()
+    {
+        var summaryId = _lastBattleSummaryId;
+        if (summaryId is null)
+            return;
+        BazaarAgentGameBridge.CurrentBattleSummarySource?.AcknowledgeCompletedSummary(summaryId);
+        _lastBattleSummaryId = null;
+        _lastBattle = null;
+    }
+
     // -------------------------------------------------------------------------
     // Core builder
     // -------------------------------------------------------------------------
 
-    private static BazaarAgentContext BuildCore(
+    private BazaarAgentContext BuildCore(
         IBazaarAgentGameProbe gameProbe,
         IBazaarAgentLogger logger,
         double actionCooldownRemainingSeconds
@@ -167,6 +181,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         var stashContainer = (run?.Player?.Stash as CardContainer)?.Container;
         var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
         var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
+        var lockedHand = GetLockedSockets(handContainer);
+        var lockedStash = GetLockedSockets(stashContainer);
 
         // Selection set
         List<BazaarAgentCardSnapshot> selectionOptions = BuildSelectionOptions(
@@ -234,9 +250,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
                 is not BazaarAgentRunStateName.Combat
                     and not BazaarAgentRunStateName.PvpCombat
             && actions.Any(action => action.ActionKind != BazaarAgentActionKind.Wait)
-                ? ProjectBattleSummary(
-                    BazaarAgentGameBridge.CurrentBattleSummarySource?.TakeCompletedSummary()
-                )
+                ? GetLastBattleSummary()
                 : null;
 
         return new BazaarAgentContext
@@ -275,6 +289,8 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
             InteractableTemplateIds = interactionFilter is not null ? interactionFilterList : null,
             BoardItems = boardItems,
             ChestItems = chestItems,
+            LockedBoardSockets = lockedHand,
+            LockedChestSockets = lockedStash,
             PlayerSkills = playerSkills,
             SellableItems = sellableItems,
             SelectionOptions = selectionOptions,
@@ -287,12 +303,29 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
     // Replay phase
     // -------------------------------------------------------------------------
 
-    private static BazaarAgentBattleSummary? ProjectBattleSummary(
+    private BazaarAgentBattleSummary? GetLastBattleSummary()
+    {
+        var source = BazaarAgentGameBridge.CurrentBattleSummarySource?.GetCompletedSummary();
+        if (source is null)
+        {
+            _lastBattleSummaryId = null;
+            _lastBattle = null;
+            return null;
+        }
+        if (_lastBattleSummaryId == source.SummaryId && _lastBattle is not null)
+            return _lastBattle;
+
+        _lastBattleSummaryId = source.SummaryId;
+        _lastBattle = ProjectBattleSummary(source);
+        return _lastBattle;
+    }
+
+    private static BazaarAgentBattleSummary ProjectBattleSummary(
         BazaarAgentBattleSummarySnapshot? source
     )
     {
         if (source is null)
-            return null;
+            throw new ArgumentNullException(nameof(source));
 
         BazaarPlusPlus.BazaarAgent.BazaarAgentBattleValueChange? ProjectValue(
             BazaarPlusPlus.GameInterop.BazaarAgentBattleValueChange? value
@@ -337,6 +370,7 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
 
         return new BazaarAgentBattleSummary
         {
+            SummaryId = source.SummaryId,
             BattleType = source.BattleType,
             Result = source.Result,
             Player = ProjectCombatant(source.Player),
@@ -1021,6 +1055,17 @@ internal sealed class BazaarAgentGameContextReader : IBazaarAgentContextReader
         }
 
         return result;
+    }
+
+    private static IReadOnlyList<string> GetLockedSockets(SocketedContainer? container)
+    {
+        if (container is null)
+            return Array.Empty<string>();
+        return Enumerable
+            .Range(0, container.Sockets.Length)
+            .Where(container.IsSocketLocked)
+            .Select(socket => "Socket_" + socket.ToString(CultureInfo.InvariantCulture))
+            .ToArray();
     }
 
     private static IEnumerable<BazaarAgentCardSnapshot> SellableSnapshotsFrom(

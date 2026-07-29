@@ -305,6 +305,12 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             observedTickId: observed.TickId
         );
         observation.Pending.SetResponse(new BazaarAgentServerResponse(confirmed ? 200 : 202, body));
+        if (
+            confirmed
+            && observation.Action.ActionKind != BazaarAgentActionKind.Wait
+            && _contextReader is IBazaarAgentBattleSummaryAcknowledger acknowledger
+        )
+            acknowledger.AcknowledgeLastBattle();
         LogDecision(
             observation.Pending.RequestId,
             observation.DecisionId,

@@ -272,7 +272,7 @@ public class BazaarAgentHttpServerTests
         Assert.Equal("\"42\"", res.Headers.ETag?.ToString());
         Assert.Equal("application/json", res.Content.Headers.ContentType?.MediaType);
         var body = await res.Content.ReadAsStringAsync();
-        Assert.Contains("\"schemaVersion\":\"2.4.0\"", body);
+        Assert.Contains("\"schemaVersion\":\"2.5.0\"", body);
         Assert.Contains("\"tickId\":42", body);
         Assert.Contains("\"stateName\":\"Choice\"", body);
         Assert.DoesNotContain("\"isEnabled\"", body);
@@ -345,7 +345,7 @@ public class BazaarAgentHttpServerTests
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         var sessionId = Assert.Single(first.Headers.GetValues("X-Bazaar-Agent-Session"));
         var firstBody = JObject.Parse(await first.Content.ReadAsStringAsync());
-        Assert.Equal("3.1.0", firstBody.Value<string>("schemaVersion"));
+        Assert.Equal("3.2.0", firstBody.Value<string>("schemaVersion"));
         Assert.Single((JArray)firstBody["cardKnowledge"]!);
         Assert.Null(((JArray)firstBody["availableActions"]!)[0]!["card"]);
         Assert.Null(((JArray)firstBody["availableActions"]!)[0]!["displayKey"]);
@@ -447,6 +447,147 @@ public class BazaarAgentHttpServerTests
         var body = await res.Content.ReadAsStringAsync();
         Assert.Contains("\"ok\":true", body);
         Assert.Contains("\"decisionId\":\"01\"", body);
+    }
+
+    [Fact]
+    public async Task SetLayout_RechecksConfirmedStepsAgainstTheLatestSnapshot()
+    {
+        using var f = new ServerFixture();
+        BazaarAgentCardSnapshot Card(string id, int socket) =>
+            new()
+            {
+                InstanceId = id,
+                Size = "Small",
+                Location = BazaarAgentCardLocation.Board,
+                SocketId = "Socket_" + socket,
+            };
+        f.SetSnapshot(
+            new BazaarAgentContextSnapshot(
+                new BazaarAgentContext
+                {
+                    TickId = 1,
+                    BoardItems = new[] { Card("one", 0), Card("two", 1) },
+                }
+            )
+        );
+
+        var dispatchSteps = Task.Run(async () =>
+        {
+            for (var step = 0; step < 2; step++)
+            {
+                BazaarAgentPendingCommand<BazaarAgentAction>? pending = null;
+                for (var attempt = 0; attempt < 100 && pending is null; attempt++)
+                {
+                    pending = f.Queue.TryDequeue();
+                    if (pending is null)
+                        await Task.Delay(10);
+                }
+                Assert.NotNull(pending);
+                if (step == 0)
+                {
+                    f.SetSnapshot(
+                        new BazaarAgentContextSnapshot(
+                            new BazaarAgentContext
+                            {
+                                TickId = 2,
+                                BoardItems = new[] { Card("two", 1) },
+                                ChestItems = new[]
+                                {
+                                    new BazaarAgentCardSnapshot
+                                    {
+                                        InstanceId = "one",
+                                        Size = "Small",
+                                        Location = BazaarAgentCardLocation.Chest,
+                                        SocketId = "Socket_0",
+                                    },
+                                },
+                            }
+                        )
+                    );
+                }
+                else
+                {
+                    f.SetSnapshot(
+                        new BazaarAgentContextSnapshot(
+                            new BazaarAgentContext
+                            {
+                                TickId = 3,
+                                BoardItems = new[] { Card("two", 0) },
+                                ChestItems = new[]
+                                {
+                                    new BazaarAgentCardSnapshot
+                                    {
+                                        InstanceId = "one",
+                                        Size = "Small",
+                                        Location = BazaarAgentCardLocation.Chest,
+                                        SocketId = "Socket_0",
+                                    },
+                                },
+                            }
+                        )
+                    );
+                }
+                pending!.SetResponse(new BazaarAgentServerResponse(200, "{\"confirmed\":true}"));
+            }
+        });
+
+        using var http = Http();
+        var response = await http.PostAsync(
+            $"http://127.0.0.1:{f.Port}/v2/actions/set-layout",
+            new StringContent(
+                "{\"placements\":[{\"cardInstanceId\":\"one\",\"targetSection\":\"Stash\",\"targetSockets\":[\"Socket_0\"]},{\"cardInstanceId\":\"two\",\"targetSection\":\"Hand\",\"targetSockets\":[\"Socket_0\"]}]}",
+                Encoding.UTF8,
+                "application/json"
+            )
+        );
+
+        var rawBody = await response.Content.ReadAsStringAsync();
+        Assert.True(response.StatusCode == HttpStatusCode.OK, rawBody);
+        var body = JObject.Parse(rawBody);
+        Assert.Equal("completed", body["result"]?["status"]?.Value<string>());
+        Assert.Equal(2, ((JArray)body["result"]!["steps"]!).Count);
+        Assert.Equal(3UL, body["nextDecision"]?["tickId"]?.Value<ulong>());
+        await dispatchSteps;
+    }
+
+    [Fact]
+    public async Task SetLayout_RejectsALockedTargetWithoutQueuingAnAction()
+    {
+        using var f = new ServerFixture();
+        f.SetSnapshot(
+            new BazaarAgentContextSnapshot(
+                new BazaarAgentContext
+                {
+                    TickId = 1,
+                    BoardItems = new[]
+                    {
+                        new BazaarAgentCardSnapshot
+                        {
+                            InstanceId = "one",
+                            Size = "Small",
+                            Location = BazaarAgentCardLocation.Board,
+                            SocketId = "Socket_0",
+                        },
+                    },
+                    LockedChestSockets = new[] { "Socket_0" },
+                }
+            )
+        );
+
+        using var http = Http();
+        var response = await http.PostAsync(
+            $"http://127.0.0.1:{f.Port}/v2/actions/set-layout",
+            new StringContent(
+                "{\"placements\":[{\"cardInstanceId\":\"one\",\"targetSection\":\"Stash\",\"targetSockets\":[\"Socket_0\"]}]}",
+                Encoding.UTF8,
+                "application/json"
+            )
+        );
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = JObject.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("partially_completed", body["result"]?["status"]?.Value<string>());
+        Assert.Null(f.Queue.TryDequeue());
     }
 
     // ---------------------------------------------------------------------------

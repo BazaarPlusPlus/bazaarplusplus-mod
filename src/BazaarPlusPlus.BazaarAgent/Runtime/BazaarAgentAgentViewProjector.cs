@@ -177,6 +177,8 @@ public sealed class BazaarAgentAgentViewProjector
             InteractableTemplateIds = context.InteractableTemplateIds,
             BoardItems = context.BoardItems.Select(ProjectCard).ToArray(),
             ChestItems = context.ChestItems.Select(ProjectCard).ToArray(),
+            LockedBoardSockets = context.LockedBoardSockets,
+            LockedChestSockets = context.LockedChestSockets,
             PlayerSkills = context.PlayerSkills.Select(ProjectCard).ToArray(),
             SelectionOptions = context.SelectionOptions.Select(ProjectCard).ToArray(),
             AvailableActions = context

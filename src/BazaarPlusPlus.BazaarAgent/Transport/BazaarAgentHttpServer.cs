@@ -787,7 +787,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
             WriteErrorEnvelope(ctx, 409, "stale-or-unavailable", error);
             return;
         }
-        await ExecuteBatch(ctx, requestId, actions).ConfigureAwait(false);
+        await ExecuteSetLayout(ctx, requestId, actions).ConfigureAwait(false);
     }
 
     private async Task<T?> ReadJsonBody<T>(
@@ -888,19 +888,96 @@ public sealed class BazaarAgentHttpServer : IDisposable
                 Reason = request.Reason,
             })
             .ToArray();
-        foreach (var action in built)
-        {
-            if (
-                BazaarAgentLayoutMoveValidator.Validate(snapshot, action).Code
-                != BazaarAgentValidationCode.Ok
-            )
-            {
-                error = "layout contains an unreachable drag operation";
-                return false;
-            }
-        }
         actions = built;
         return true;
+    }
+
+    private async Task ExecuteSetLayout(
+        HttpListenerContext ctx,
+        string requestId,
+        IReadOnlyList<BazaarAgentAction> targetPlacements
+    )
+    {
+        await _actionExecutionGate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var steps = new List<BazaarAgentBatchActionStepResult>();
+            var status = 200;
+            var maximumSteps = targetPlacements.Count * 4;
+            while (steps.Count < maximumSteps)
+            {
+                var snapshot = _snapshotGetter();
+                if (snapshot is null)
+                {
+                    status = 503;
+                    break;
+                }
+
+                var pendingTargets = targetPlacements
+                    .Where(action => !IsAtLayoutTarget(snapshot.Context, action))
+                    .ToArray();
+                if (pendingTargets.Length == 0)
+                    break;
+
+                var next = pendingTargets.FirstOrDefault(action =>
+                    BazaarAgentLayoutMoveValidator.Validate(snapshot, action).Code
+                    == BazaarAgentValidationCode.Ok
+                );
+                if (next is null)
+                {
+                    status = 409;
+                    steps.Add(
+                        new BazaarAgentBatchActionStepResult
+                        {
+                            ActionKind = BazaarAgentActionKind.MoveItem,
+                            Status = "stopped",
+                            Error = "no remaining target placement is reachable",
+                        }
+                    );
+                    break;
+                }
+
+                var response = await _queue
+                    .EnqueueAndAwaitAsync(requestId, next)
+                    .ConfigureAwait(false);
+                var confirmed = IsConfirmed(response);
+                steps.Add(
+                    new BazaarAgentBatchActionStepResult
+                    {
+                        ActionKind = next.ActionKind,
+                        CardInstanceId = next.CardInstanceId,
+                        Status = confirmed ? "confirmed" : "stopped",
+                        Error = confirmed ? null : response.JsonBody,
+                    }
+                );
+                if (!confirmed)
+                {
+                    status = response.HttpStatus;
+                    break;
+                }
+            }
+
+            var finalSnapshot = _snapshotGetter();
+            var completed =
+                finalSnapshot is not null
+                && targetPlacements.All(action => IsAtLayoutTarget(finalSnapshot.Context, action));
+            if (!completed && steps.Count == maximumSteps)
+                status = 409;
+            var responseBody = JsonConvert.SerializeObject(
+                new BazaarAgentBatchActionResponse
+                {
+                    Status = completed ? "completed" : "partially_completed",
+                    Steps = steps,
+                },
+                _json
+            );
+            await WriteV2ActionResponse(ctx, new BazaarAgentServerResponse(status, responseBody))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _actionExecutionGate.Release();
+        }
     }
 
     private async Task ExecuteBatch(
@@ -919,9 +996,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
                 var response = await _queue
                     .EnqueueAndAwaitAsync(requestId, action)
                     .ConfigureAwait(false);
-                var confirmed =
-                    response.HttpStatus == 200
-                    && response.JsonBody.Contains("\"confirmed\":true", StringComparison.Ordinal);
+                var confirmed = IsConfirmed(response);
                 steps.Add(
                     new BazaarAgentBatchActionStepResult
                     {
@@ -952,6 +1027,25 @@ public sealed class BazaarAgentHttpServer : IDisposable
         {
             _actionExecutionGate.Release();
         }
+    }
+
+    private static bool IsConfirmed(BazaarAgentServerResponse response) =>
+        response.HttpStatus == 200
+        && response.JsonBody.Contains("\"confirmed\":true", StringComparison.Ordinal);
+
+    private static bool IsAtLayoutTarget(BazaarAgentContext context, BazaarAgentAction action)
+    {
+        var targetLocation =
+            action.TargetSection == BazaarAgentTargetSection.Hand
+                ? BazaarAgentCardLocation.Board
+                : BazaarAgentCardLocation.Chest;
+        var card = context
+            .BoardItems.Concat(context.ChestItems)
+            .FirstOrDefault(card => card.InstanceId == action.CardInstanceId);
+        return card is not null
+            && card.Location == targetLocation
+            && action.TargetSockets is { Count: > 0 }
+            && string.Equals(card.SocketId, action.TargetSockets[0], StringComparison.Ordinal);
     }
 
     private async Task WriteV2ActionResponse(

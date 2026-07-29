@@ -38,6 +38,23 @@ public static class BazaarAgentLayoutMoveValidator
             action.TargetSection == BazaarAgentTargetSection.Hand
                 ? snapshot.Context.BoardItems
                 : snapshot.Context.ChestItems;
+        var destinationLocks =
+            action.TargetSection == BazaarAgentTargetSection.Hand
+                ? snapshot.Context.LockedBoardSockets
+                : snapshot.Context.LockedChestSockets;
+        if (
+            targetSockets.Any(socket =>
+                destinationLocks.Any(locked =>
+                    string.Equals(
+                        locked,
+                        "Socket_"
+                            + socket.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        StringComparison.Ordinal
+                    )
+                )
+            )
+        )
+            return Fail("target contains a locked socket");
         var targetIsSource = ReferenceEquals(source, destination);
         if (targetIsSource)
         {
@@ -48,7 +65,7 @@ public static class BazaarAgentLayoutMoveValidator
 
         var destinationSlots = Occupancy(destination);
         var sourceFreeSlots =
-            SocketCount - Occupancy(source).Count(static item => item is not null) + size;
+            SocketCount - OccupiedOrLockedSocketCount(snapshot.Context, source) + size;
         var displaced = targetSockets
             .Select(socket => destinationSlots[socket])
             .Where(static item => item is not null)
@@ -76,6 +93,24 @@ public static class BazaarAgentLayoutMoveValidator
                 result[index] = card.InstanceId;
         }
         return result;
+    }
+
+    private static int OccupiedOrLockedSocketCount(
+        BazaarAgentContext context,
+        IReadOnlyList<BazaarAgentCardSnapshot> cards
+    )
+    {
+        var occupied = Occupancy(cards)
+            .Select((item, index) => item is not null ? index : -1)
+            .Where(static index => index >= 0)
+            .ToHashSet();
+        var locks = ReferenceEquals(cards, context.BoardItems)
+            ? context.LockedBoardSockets
+            : context.LockedChestSockets;
+        foreach (var socket in locks)
+            if (TryParseSocket(socket, out var index))
+                occupied.Add(index);
+        return occupied.Count;
     }
 
     private static bool TryParseSockets(

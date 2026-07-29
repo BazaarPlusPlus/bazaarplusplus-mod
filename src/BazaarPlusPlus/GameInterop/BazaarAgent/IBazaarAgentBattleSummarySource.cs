@@ -2,16 +2,19 @@
 namespace BazaarPlusPlus.GameInterop;
 
 /// <summary>
-/// One-shot handoff for a completed live combat. The BazaarAgent host consumes the summary only
-/// after the game has returned to an actionable non-combat state.
+/// Handoff for a completed live combat. The host keeps the summary in its decision context until
+/// the first confirmed post-combat action acknowledges it.
 /// </summary>
 public interface IBazaarAgentBattleSummarySource
 {
-    BazaarAgentBattleSummarySnapshot? TakeCompletedSummary();
+    BazaarAgentBattleSummarySnapshot? GetCompletedSummary();
+
+    void AcknowledgeCompletedSummary(string summaryId);
 }
 
 public sealed class BazaarAgentBattleSummarySnapshot
 {
+    public string SummaryId { get; init; } = "";
     public string BattleType { get; init; } = "unknown";
     public string? Result { get; init; }
     public BazaarAgentBattleCombatantSnapshot Player { get; init; } = new();

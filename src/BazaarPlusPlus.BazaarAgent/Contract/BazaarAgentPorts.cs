@@ -30,6 +30,12 @@ public interface IBazaarAgentContextReader
     BazaarAgentContext Build(double actionCooldownRemainingSeconds);
 }
 
+/// <summary>Optional capability for context readers that retain a post-combat summary.</summary>
+public interface IBazaarAgentBattleSummaryAcknowledger
+{
+    void AcknowledgeLastBattle();
+}
+
 public interface IBazaarAgentActionDispatcher
 {
     BazaarAgentDispatchResult Execute(

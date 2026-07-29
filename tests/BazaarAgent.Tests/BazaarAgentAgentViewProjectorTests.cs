@@ -58,6 +58,40 @@ public sealed class BazaarAgentAgentViewProjectorTests
     }
 
     [Fact]
+    public void Layout_validator_rejects_a_locked_target_socket()
+    {
+        var snapshot = new BazaarAgentContextSnapshot(
+            new BazaarAgentContext
+            {
+                BoardItems = new[]
+                {
+                    new BazaarAgentCardSnapshot
+                    {
+                        InstanceId = "item-1",
+                        Size = "Small",
+                        Location = BazaarAgentCardLocation.Board,
+                        SocketId = "Socket_0",
+                    },
+                },
+                LockedChestSockets = new[] { "Socket_3" },
+            }
+        );
+
+        var result = BazaarAgentLayoutMoveValidator.Validate(
+            snapshot,
+            new BazaarAgentAction
+            {
+                ActionKind = BazaarAgentActionKind.MoveItem,
+                CardInstanceId = "item-1",
+                TargetSection = BazaarAgentTargetSection.Stash,
+                TargetSockets = new[] { "Socket_3" },
+            }
+        );
+
+        Assert.NotEqual(BazaarAgentValidationCode.Ok, result.Code);
+    }
+
+    [Fact]
     public void First_occurrence_in_a_session_includes_knowledge_but_a_move_does_not_repeat_it()
     {
         var projector = new BazaarAgentAgentViewProjector();
@@ -91,6 +125,7 @@ public sealed class BazaarAgentAgentViewProjectorTests
                     new BazaarAgentContext
                     {
                         StateName = BazaarAgentRunStateName.Choice,
+                        LockedBoardSockets = new[] { "Socket_8" },
                         LastBattle = new BazaarAgentBattleSummary
                         {
                             BattleType = "pve",
@@ -117,6 +152,7 @@ public sealed class BazaarAgentAgentViewProjectorTests
         Assert.Equal("pve", view.LastBattle?.BattleType);
         Assert.Equal("loss", view.LastBattle?.Result);
         Assert.Equal(5, view.LastBattle?.Opponent.Attributes.Poison?.Delta);
+        Assert.Equal(new[] { "Socket_8" }, view.LockedBoardSockets);
     }
 
     [Fact]
