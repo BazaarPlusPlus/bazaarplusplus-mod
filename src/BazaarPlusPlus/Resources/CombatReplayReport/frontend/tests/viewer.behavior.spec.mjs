@@ -291,6 +291,7 @@ let statusApplicationReportUrl;
 let structuralReportUrl;
 let attributeDensityReportUrl;
 let recordingReportUrl;
+let combatLogLayoutReportUrl;
 let scrubRecordingReportUrl;
 let navigationReportUrl;
 let scrollRecordingReportUrl;
@@ -1126,6 +1127,61 @@ test.beforeAll(async ({ browserName }) => {
     reportHtml(recordingEnvelope),
     "utf8",
   );
+  const combatLogLayoutEnvelope = structuredClone(recordingEnvelope);
+  const combatLogPaddingEvents = Array.from({ length: 24 }, (_, index) =>
+    schemaEvent({
+      eventId: `combat-log-layout-damage-${index}`,
+      frame: index + 1,
+      frameSequence: 0,
+      combatTimeMs: (index + 1) * 50,
+      kind: "effect-executed",
+      action: "PlayerDamage",
+      sourceEntityId: "player-item",
+      triggerSourceEntityId: "player-item",
+      targetEntityIds: ["opponent-hero"],
+      value: index + 1,
+      unit: "points",
+      role: "applied",
+      attributionConfidence: "exact",
+    })
+  );
+  const combatLogLongLabelEvents = [
+    "PercentCooldownReduction",
+    "PercentFreezeReduction",
+    "PercentSlowReduction",
+    "CritChance",
+    "DamageAmount",
+    "Multicast",
+  ].map((action, index) =>
+    schemaEvent({
+      eventId: `combat-log-layout-${action}`,
+      frame: 100 + index,
+      frameSequence: 0,
+      combatTimeMs: 5000 + index * 50,
+      kind: "card-attribute",
+      action,
+      targetEntityIds: ["player-item"],
+      value: index + 1,
+      previousValue: 10,
+      currentValue: 11 + index,
+      unit: action.includes("Percent") || action === "CritChance"
+        ? "percent"
+        : "points",
+      role: "received",
+      attributionConfidence: "target-exact-source-unknown",
+    })
+  );
+  combatLogLayoutEnvelope.battleDocument.events = [
+    ...combatLogPaddingEvents,
+    ...combatLogLongLabelEvents,
+  ];
+  combatLogLayoutEnvelope.battleDocument.rawRecordCount =
+    combatLogLayoutEnvelope.battleDocument.events.length;
+  await writeFile(
+    join(fixtureDirectory, "combat-log-layout-report.html"),
+    reportHtml(combatLogLayoutEnvelope),
+    "utf8",
+  );
   const scrubRecordingEnvelope = structuredClone(recordingEnvelope);
   scrubRecordingEnvelope.recordingManifest.scrubVideoRelativeUrl =
     "../CombatReplayVideos/behavior-recording/recording.scrub.mp4";
@@ -1228,6 +1284,9 @@ test.beforeAll(async ({ browserName }) => {
   ).href;
   recordingReportUrl = pathToFileURL(
     join(fixtureDirectory, "recording-report.html"),
+  ).href;
+  combatLogLayoutReportUrl = pathToFileURL(
+    join(fixtureDirectory, "combat-log-layout-report.html"),
   ).href;
   scrubRecordingReportUrl = pathToFileURL(
     join(fixtureDirectory, "scrub-recording-report.html"),
@@ -4761,8 +4820,8 @@ test("virtualizes the footer combat log and highlights every visible row from th
           : source.left - kind.right,
     };
   });
-  expect(kindColumnGeometry.width).toBeGreaterThanOrEqual(128);
-  expect(kindColumnGeometry.width).toBeLessThanOrEqual(193);
+  expect(kindColumnGeometry.width).toBeGreaterThanOrEqual(160);
+  expect(kindColumnGeometry.width).toBeLessThanOrEqual(225);
   expect(kindColumnGeometry.trailingGap).toBeLessThanOrEqual(9);
   const truncatedKindLabels = await rows.evaluateAll((elements) =>
     elements.flatMap((element) => {
@@ -4969,6 +5028,76 @@ test("virtualizes the footer combat log and highlights every visible row from th
   await expect(page.getByTestId("combat-log-resume")).toBeHidden();
   await viewport.press("PageDown");
   await expect(page.getByTestId("combat-log-resume")).toBeVisible();
+});
+
+test("keeps long combat log kinds readable beside the recording pane", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.goto(`${combatLogLayoutReportUrl}?lang=en`);
+  await page.getByTestId("combat-log-dock-toggle").click();
+
+  const log = page.getByTestId("combat-log");
+  const recordingHost = page.getByTestId("footer-recording-host");
+  const viewport = page.getByTestId("combat-log-viewport");
+  await expect(log).toBeVisible();
+  await expect(recordingHost).toBeVisible();
+
+  const workbenchWidths = await page.evaluate(() => {
+    const logElement = document.querySelector(
+      '[data-bpp-test-id="combat-log"]',
+    );
+    const recordingElement = document.querySelector(
+      '[data-bpp-test-id="footer-recording-host"]',
+    );
+    return {
+      log: logElement?.getBoundingClientRect().width ?? Number.NaN,
+      recording:
+        recordingElement?.getBoundingClientRect().width ?? Number.NaN,
+    };
+  });
+  expect(workbenchWidths.log).toBeLessThan(700);
+  expect(workbenchWidths.recording).toBeGreaterThan(300);
+
+  await viewport.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const expectedLabels = [
+    "Cooldown reduction",
+    "Freeze resistance",
+    "Slow resistance",
+    "Critical Chance",
+    "Damage stat",
+    "Multicast",
+  ];
+  await expect
+    .poll(() =>
+      page.getByTestId("combat-log-kind").allTextContents()
+    )
+    .toEqual(expect.arrayContaining(expectedLabels));
+
+  const labelGeometry = await page
+    .getByTestId("combat-log-kind")
+    .evaluateAll((elements, expected) =>
+      elements.flatMap((element) => {
+        const label = element.querySelector(".truncate");
+        const text = label?.textContent?.trim() ?? "";
+        if (!(label instanceof HTMLElement) || !expected.includes(text)) {
+          return [];
+        }
+        return [{
+          text,
+          clientWidth: label.clientWidth,
+          scrollWidth: label.scrollWidth,
+        }];
+      }), expectedLabels);
+  expect(labelGeometry.map(({ text }) => text)).toEqual(expectedLabels);
+  for (const geometry of labelGeometry) {
+    expect(
+      geometry.scrollWidth,
+      `${geometry.text} should not be truncated`,
+    ).toBeLessThanOrEqual(geometry.clientWidth);
+  }
 });
 
 test("shows a max-health diff without guessing its same-frame source", async ({
