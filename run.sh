@@ -91,7 +91,8 @@ build() {
     # so building it builds and deploys all three. A default build builds only the main
     # plugin, whose build actively scrubs both host dlls from the plugins folder.
     if [[ "$bazaaragent" == "true" ]]; then
-        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj ${args[@]+"${args[@]}"}
+        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj ${args[@]+"${args[@]}"} \
+            -p:RequireBazaarAgentDashboard=true
     else
         dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj ${args[@]+"${args[@]}"}
     fi
@@ -190,7 +191,8 @@ publish() {
         -p:RemoteEmbeddedDataPrepared=true
     )
     if [[ "$bazaaragent" == "true" ]]; then
-        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj "${build_args[@]}"
+        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj "${build_args[@]}" \
+            -p:RequireBazaarAgentDashboard=true
     else
         dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj "${build_args[@]}"
     fi

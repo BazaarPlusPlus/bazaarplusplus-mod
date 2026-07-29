@@ -25,7 +25,7 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 
 ### 外部集成（默认不安装）
 
-- **BazaarAgent HTTP 接口**：独立的 host BepInEx 插件，在本地回环 `127.0.0.1:47900` 提供 HTTP 服务，允许外部工具读取当前决策上下文并发起动作；mod 本身不做策略决策。按需用 `./run.sh build --with-bazaaragent` 构建，默认构建不产出（并主动清除）host dll。详见 [docs/ARCHITECTURE.md#bazaaragent-optional-host](docs/ARCHITECTURE.md#bazaaragent-optional-host)。
+- **BazaarAgent HTTP 接口与活动浏览器**：独立的 host BepInEx 插件，在本地回环 `127.0.0.1:47900` 提供 HTTP 服务，允许外部工具读取当前决策上下文并发起动作；浏览器访问 `http://127.0.0.1:47900/` 可实时查看 Host/Agent 的结构化协议活动。mod 本身不做策略决策。按需用 `./run.sh build --with-bazaaragent` 构建，默认构建不产出（并主动清除）host dll；已构建的前端资源受版本控制，位于 `src/BazaarPlusPlus.BazaarAgent/Dashboard/dist/` 并嵌入 DLL。详见 [docs/ARCHITECTURE.md#bazaaragent-optional-host](docs/ARCHITECTURE.md#bazaaragent-optional-host)。
 
 ## 安装与配置
 

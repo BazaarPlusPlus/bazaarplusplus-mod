@@ -1,6 +1,7 @@
 #nullable enable
 using System.Globalization;
 using System.Net;
+using System.Reflection;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -24,6 +25,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
     private readonly BazaarAgentCommandQueue<BazaarAgentAction> _queue;
     private readonly BazaarAgentCommandQueue<BazaarAgentReplayCommand> _replayQueue;
     private readonly IBazaarAgentLogger _logger;
+    private readonly BazaarAgentActivityFeed _activityFeed;
     private readonly Func<string> _requestIdFactory;
     private readonly Func<
         HttpListenerContext,
@@ -52,9 +54,18 @@ public sealed class BazaarAgentHttpServer : IDisposable
         Func<BazaarAgentContextSnapshot?> snapshotGetter,
         BazaarAgentCommandQueue<BazaarAgentAction> queue,
         BazaarAgentCommandQueue<BazaarAgentReplayCommand> replayQueue,
-        IBazaarAgentLogger logger
+        IBazaarAgentLogger logger,
+        BazaarAgentActivityFeed? activityFeed = null
     )
-        : this(port, snapshotGetter, queue, replayQueue, logger, BazaarAgentUlid.New) { }
+        : this(
+            port,
+            snapshotGetter,
+            queue,
+            replayQueue,
+            logger,
+            requestIdFactory: BazaarAgentUlid.New,
+            activityFeed: activityFeed
+        ) { }
 
     internal BazaarAgentHttpServer(
         int port,
@@ -70,7 +81,8 @@ public sealed class BazaarAgentHttpServer : IDisposable
             BazaarAgentHttpLogRoute,
             Task<byte[]?>
         >? requestBodyReaderOverride = null,
-        Func<HttpListenerContext, int, string, string?, Exception?>? errorEnvelopeWriter = null
+        Func<HttpListenerContext, int, string, string?, Exception?>? errorEnvelopeWriter = null,
+        BazaarAgentActivityFeed? activityFeed = null
     )
     {
         Port = port;
@@ -78,6 +90,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
         _queue = queue;
         _replayQueue = replayQueue;
         _logger = logger;
+        _activityFeed = activityFeed ?? new BazaarAgentActivityFeed();
         _requestIdFactory =
             requestIdFactory ?? throw new ArgumentNullException(nameof(requestIdFactory));
         _requestBodyReaderOverride = requestBodyReaderOverride;
@@ -168,7 +181,11 @@ public sealed class BazaarAgentHttpServer : IDisposable
             var method = ctx.Request.HttpMethod;
             route = ResolveLogRoute(path);
             logMethod = ResolveLogMethod(method);
-            if (
+            if (method == "GET" && IsDashboardPath(path))
+            {
+                await HandleDashboardGet(ctx, path).ConfigureAwait(false);
+            }
+            else if (
                 string.Equals(path, "/v1/context", StringComparison.OrdinalIgnoreCase)
                 && method == "GET"
             )
@@ -271,6 +288,11 @@ public sealed class BazaarAgentHttpServer : IDisposable
         return BazaarAgentHttpLogRoute.Unknown;
     }
 
+    private static bool IsDashboardPath(string path) =>
+        string.Equals(path, "/", StringComparison.Ordinal)
+        || string.Equals(path, "/dashboard", StringComparison.OrdinalIgnoreCase)
+        || path.StartsWith("/dashboard/", StringComparison.OrdinalIgnoreCase);
+
     private static string NextFallbackRequestId() =>
         "f"
         + Interlocked
@@ -284,6 +306,160 @@ public sealed class BazaarAgentHttpServer : IDisposable
         if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogMethod.Post;
         return BazaarAgentHttpLogMethod.Other;
+    }
+
+    private async Task HandleDashboardGet(HttpListenerContext ctx, string path)
+    {
+        if (string.Equals(path, "/dashboard/api/bootstrap", StringComparison.OrdinalIgnoreCase))
+        {
+            var current = _snapshotGetter();
+            var snapshot = _activityFeed.GetSince(0, maximumEvents: 512);
+            var currentContextJson = current is null
+                ? null
+                : JsonConvert.SerializeObject(current.Context, _json);
+            await WriteDashboardJson(
+                    ctx,
+                    new
+                    {
+                        snapshot.LatestSequence,
+                        snapshot.EarliestSequence,
+                        currentContextJson,
+                        snapshot.Events,
+                    }
+                )
+                .ConfigureAwait(false);
+            return;
+        }
+
+        if (string.Equals(path, "/dashboard/api/events", StringComparison.OrdinalIgnoreCase))
+        {
+            var after = ParseNonNegativeLong(ctx.Request.QueryString["after"]);
+            var waitMilliseconds = ClampInt(ctx.Request.QueryString["waitMs"], 25000, 0, 25000);
+            var snapshot = await _activityFeed
+                .WaitForEventsAsync(after, maximumEvents: 128, waitMilliseconds)
+                .ConfigureAwait(false);
+            await WriteDashboardJson(
+                    ctx,
+                    new
+                    {
+                        snapshot.LatestSequence,
+                        snapshot.EarliestSequence,
+                        snapshot.Events,
+                    }
+                )
+                .ConfigureAwait(false);
+            return;
+        }
+
+        var relativePath =
+            string.Equals(path, "/", StringComparison.Ordinal)
+            || string.Equals(path, "/dashboard", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, "/dashboard/", StringComparison.OrdinalIgnoreCase)
+                ? "index.html"
+                : path["/dashboard/".Length..];
+        await WriteDashboardAsset(ctx, relativePath).ConfigureAwait(false);
+    }
+
+    private static long ParseNonNegativeLong(string? text)
+    {
+        return long.TryParse(
+            text,
+            NumberStyles.Integer,
+            CultureInfo.InvariantCulture,
+            out var value
+        )
+            ? Math.Max(0, value)
+            : 0;
+    }
+
+    private static int ClampInt(string? text, int defaultValue, int minimum, int maximum)
+    {
+        if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            return defaultValue;
+        return Math.Clamp(parsed, minimum, maximum);
+    }
+
+    private static async Task WriteDashboardJson(HttpListenerContext ctx, object payload)
+    {
+        var body = JsonConvert.SerializeObject(payload, _json);
+        var bytes = Encoding.UTF8.GetBytes(body);
+        ConfigureDashboardHeaders(ctx.Response, "application/json; charset=utf-8", "no-store");
+        ctx.Response.StatusCode = 200;
+        ctx.Response.ContentLength64 = bytes.Length;
+        await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+    }
+
+    private static async Task WriteDashboardAsset(HttpListenerContext ctx, string relativePath)
+    {
+        if (
+            string.IsNullOrWhiteSpace(relativePath)
+            || relativePath.Contains("..", StringComparison.Ordinal)
+            || relativePath.Contains('\\')
+        )
+        {
+            WriteErrorEnvelopeStatic(ctx, 404, "not-found", "unknown dashboard asset");
+            return;
+        }
+
+        var resourceName = "BazaarPlusPlus.BazaarAgent.Dashboard." + relativePath.TrimStart('/');
+        var assembly = typeof(BazaarAgentHttpServer).GetTypeInfo().Assembly;
+        await using var stream = assembly.GetManifestResourceStream(resourceName);
+        if (stream is null)
+        {
+            WriteErrorEnvelopeStatic(ctx, 503, "unavailable", "dashboard assets were not embedded");
+            return;
+        }
+
+        ConfigureDashboardHeaders(
+            ctx.Response,
+            DashboardContentType(relativePath),
+            string.Equals(relativePath, "index.html", StringComparison.OrdinalIgnoreCase)
+                ? "no-store"
+                : "public, max-age=31536000, immutable"
+        );
+        ctx.Response.StatusCode = 200;
+        ctx.Response.ContentLength64 = stream.Length;
+        await stream.CopyToAsync(ctx.Response.OutputStream).ConfigureAwait(false);
+    }
+
+    private static void ConfigureDashboardHeaders(
+        HttpListenerResponse response,
+        string contentType,
+        string cacheControl
+    )
+    {
+        response.ContentType = contentType;
+        response.Headers["Cache-Control"] = cacheControl;
+        response.Headers["Content-Security-Policy"] =
+            "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; "
+            + "script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'";
+        response.Headers["X-Content-Type-Options"] = "nosniff";
+    }
+
+    private static string DashboardContentType(string path)
+    {
+        var extension = Path.GetExtension(path);
+        return extension.ToLowerInvariant() switch
+        {
+            ".html" => "text/html; charset=utf-8",
+            ".js" => "text/javascript; charset=utf-8",
+            ".css" => "text/css; charset=utf-8",
+            ".svg" => "image/svg+xml",
+            ".png" => "image/png",
+            ".ico" => "image/x-icon",
+            ".woff2" => "font/woff2",
+            _ => "application/octet-stream",
+        };
+    }
+
+    private static void WriteErrorEnvelopeStatic(
+        HttpListenerContext ctx,
+        int status,
+        string code,
+        string? details
+    )
+    {
+        _ = TryWriteErrorEnvelopeCore(ctx, status, code, details);
     }
 
     private async Task HandleGetContext(HttpListenerContext ctx, string requestId)
@@ -309,6 +485,15 @@ public sealed class BazaarAgentHttpServer : IDisposable
         var bytes = Encoding.UTF8.GetBytes(body);
         ctx.Response.ContentLength64 = bytes.Length;
         await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+        _activityFeed.Publish(
+            "context.sent",
+            requestId,
+            "/v1/context",
+            $"Context {snap.Context.StateName} at tick {snap.TickId}",
+            statusCode: 200,
+            tickId: snap.TickId,
+            responseJson: body
+        );
     }
 
     private async Task HandlePostActions(HttpListenerContext ctx, string requestId)
@@ -323,10 +508,10 @@ public sealed class BazaarAgentHttpServer : IDisposable
         if (body is null)
             return;
 
+        var json = Encoding.UTF8.GetString(body);
         BazaarAgentAction? action;
         try
         {
-            var json = Encoding.UTF8.GetString(body);
             action = JsonConvert.DeserializeObject<BazaarAgentAction>(json, _json);
         }
         catch (JsonException)
@@ -341,7 +526,23 @@ public sealed class BazaarAgentHttpServer : IDisposable
             return;
         }
 
+        _activityFeed.Publish(
+            "action.received",
+            requestId,
+            "/v1/actions",
+            BuildActionSummary(action),
+            requestJson: json
+        );
         var res = await _queue.EnqueueAndAwaitAsync(requestId, action).ConfigureAwait(false);
+        _activityFeed.Publish(
+            res.HttpStatus >= 400 ? "request.rejected" : "action.completed",
+            requestId,
+            "/v1/actions",
+            BuildActionResultSummary(action, res.HttpStatus),
+            statusCode: res.HttpStatus,
+            requestJson: json,
+            responseJson: res.JsonBody
+        );
         await WriteQueueResponse(ctx, res).ConfigureAwait(false);
     }
 
@@ -369,25 +570,74 @@ public sealed class BazaarAgentHttpServer : IDisposable
         if (string.IsNullOrWhiteSpace(battleId))
             battleId = ctx.Request.QueryString["battleId"];
 
+        var requestMetadata = JsonConvert.SerializeObject(
+            new { battleId, payloadBytes = body.Length },
+            _json
+        );
+        _activityFeed.Publish(
+            "replay.received",
+            requestId,
+            "/v1/replay/record",
+            $"Replay record request ({body.Length.ToString(CultureInfo.InvariantCulture)} bytes)",
+            requestJson: requestMetadata
+        );
+
         var res = await _replayQueue
             .EnqueueAndAwaitAsync(
                 requestId,
                 new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, body, battleId)
             )
             .ConfigureAwait(false);
+        _activityFeed.Publish(
+            res.HttpStatus >= 400 ? "request.rejected" : "replay.completed",
+            requestId,
+            "/v1/replay/record",
+            $"Replay record completed with HTTP {res.HttpStatus.ToString(CultureInfo.InvariantCulture)}",
+            statusCode: res.HttpStatus,
+            requestJson: requestMetadata,
+            responseJson: res.JsonBody
+        );
         await WriteQueueResponse(ctx, res).ConfigureAwait(false);
     }
 
     private async Task HandlePostReplayContinue(HttpListenerContext ctx, string requestId)
     {
+        _activityFeed.Publish(
+            "replay.received",
+            requestId,
+            "/v1/replay/continue",
+            "Replay continue request"
+        );
         var res = await _replayQueue
             .EnqueueAndAwaitAsync(
                 requestId,
                 new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Continue, null, null)
             )
             .ConfigureAwait(false);
+        _activityFeed.Publish(
+            res.HttpStatus >= 400 ? "request.rejected" : "replay.completed",
+            requestId,
+            "/v1/replay/continue",
+            $"Replay continue completed with HTTP {res.HttpStatus.ToString(CultureInfo.InvariantCulture)}",
+            statusCode: res.HttpStatus,
+            responseJson: res.JsonBody
+        );
         await WriteQueueResponse(ctx, res).ConfigureAwait(false);
     }
+
+    private static string BuildActionSummary(BazaarAgentAction action)
+    {
+        var target = string.IsNullOrWhiteSpace(action.CardInstanceId)
+            ? ""
+            : " for " + action.CardInstanceId;
+        return "Action " + action.ActionKind + target;
+    }
+
+    private static string BuildActionResultSummary(BazaarAgentAction action, int statusCode) =>
+        "Action "
+        + action.ActionKind
+        + " completed with HTTP "
+        + statusCode.ToString(CultureInfo.InvariantCulture);
 
     // How much of an over-cap request body gets drained after a 413 so the client can read the
     // response instead of hitting a TCP reset, and for how long. Beyond either bound, closing

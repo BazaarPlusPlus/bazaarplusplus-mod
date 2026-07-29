@@ -18,6 +18,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     private readonly IBazaarAgentLogger _logger;
     private readonly IBazaarAgentClock _clock;
     private readonly Action? _snapshotPublished;
+    private readonly BazaarAgentActivityFeed _activityFeed = new();
     private readonly BazaarAgentContextSnapshotPublisher _snapshots = new();
     private readonly BazaarAgentListenerLogState _listenerLogState = new();
     private readonly JsonSerializerSettings _responseJson = new()
@@ -76,9 +77,24 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             _lastTickTime = _clock.NowSeconds;
             var cooldownLeft = ComputeCooldownLeft();
             var context = _contextReader.Build(cooldownLeft);
+            var previous = _snapshots.Current;
             var snapshot = _snapshots.Publish(context, out var isFirstSnapshot);
             if (isFirstSnapshot)
                 _logger.TryEmit(BazaarAgentLogEvents.SnapshotReady(context.StateName));
+            if (previous is null || snapshot.TickId != previous.TickId)
+            {
+                _activityFeed.Publish(
+                    "context.observed",
+                    requestId: "",
+                    route: "runtime/context",
+                    summary: "Host observed "
+                        + snapshot.Context.StateName
+                        + " at tick "
+                        + snapshot.TickId,
+                    tickId: snapshot.TickId,
+                    responseJson: JsonConvert.SerializeObject(snapshot.Context, _responseJson)
+                );
+            }
 
             _snapshotPublished?.Invoke();
             snapshotPublished = true;
@@ -120,7 +136,8 @@ public sealed class BazaarAgentRuntimeController : IDisposable
                 () => _snapshots.Current,
                 _queue,
                 _replayQueue,
-                _logger
+                _logger,
+                activityFeed: _activityFeed
             );
             _http.Start();
             _currentPort = desiredPort;
