@@ -1403,7 +1403,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             // to keep them out of the recording.
             return UiSuppressionScope.Begin(
                 () => BppUiChromeSuppression.Begin(BppUiChromeSuppressionMode.ReplayRecording),
-                ReplayRecordingHoverSuppression.Begin
+                ReplayRecordingHoverSuppression.Begin,
+                ReplayRecordingMotionSuppression.Begin
             );
         }
         catch (Exception ex)

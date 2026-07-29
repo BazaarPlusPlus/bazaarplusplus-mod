@@ -1262,6 +1262,12 @@ test.beforeAll(async ({ browserName }) => {
   const scrubRecordingEnvelope = structuredClone(recordingEnvelope);
   scrubRecordingEnvelope.recordingManifest.scrubVideoRelativeUrl =
     "../CombatReplayVideos/behavior-recording/recording.scrub.mp4";
+  scrubRecordingEnvelope.recordingManifest.syncAnchors.push({
+    combatFrame: 160,
+    combatMs: 8000,
+    mediaPtsMs: 9000,
+    outputOrdinal: 161,
+  });
   await writeFile(
     join(fixtureDirectory, "scrub-recording-report.html"),
     reportHtml(scrubRecordingEnvelope),
@@ -2895,7 +2901,7 @@ test("applies only the latest hover target while a Firefox-style seek is in flig
   expect(await seekCalls()).toHaveLength(2);
 });
 
-test("uses an exact seek for the terminal timeline frame", async ({
+test("seeks the first media sample of the terminal combat frame", async ({
   page,
 }) => {
   await page.addInitScript(() => {

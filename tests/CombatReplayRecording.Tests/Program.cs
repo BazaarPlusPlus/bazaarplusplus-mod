@@ -83,6 +83,9 @@ var playerAttributeRepairerType = RequireType(
 var replayRecordingHoverSuppressionType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Video.ReplayRecordingHoverSuppression"
 );
+var replayRecordingMotionSuppressionType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Video.ReplayRecordingMotionSuppression"
+);
 var currentReplayPresentationReadinessType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.CurrentReplayPresentationReadiness"
 );
@@ -101,6 +104,7 @@ RunReplayPresentationReadinessChecks(appStateHandlerInstallerType);
 RunReplayNativeBoardPresentationChecks(replayNativeBoardPresentationType);
 RunPortraitTimingSubscriptionDeduplicationChecks(playerAttributeRepairerType);
 RunReplayRecordingHoverSuppressionChecks(replayRecordingHoverSuppressionType);
+RunReplayRecordingMotionSuppressionChecks(replayRecordingMotionSuppressionType);
 RunCurrentReplayPresentationReadinessChecks(
     currentReplayPresentationReadinessType,
     currentReplayPresentationReadinessSnapshotType
@@ -164,6 +168,33 @@ static void RunReplayRecordingHoverSuppressionChecks(Type suppressionType)
     Assert(
         !(bool)isActive.GetValue(null)!,
         "Recording hover behavior should be restored after the final lease is released."
+    );
+}
+
+static void RunReplayRecordingMotionSuppressionChecks(Type suppressionType)
+{
+    var isActive = suppressionType.GetProperty(
+        "IsActive",
+        BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(isActive != null, "Replay recording motion suppression should expose scoped state.");
+    Assert(
+        !(bool)isActive!.GetValue(null)!,
+        "Replay recording motion suppression should be inactive before recording."
+    );
+
+    using var first = (IDisposable)InvokeStatic(suppressionType, "Begin", [])!;
+    using var second = (IDisposable)InvokeStatic(suppressionType, "Begin", [])!;
+    first.Dispose();
+    Assert(
+        (bool)isActive.GetValue(null)!,
+        "Nested recording motion suppression should survive until the final lease is released."
+    );
+
+    second.Dispose();
+    Assert(
+        !(bool)isActive.GetValue(null)!,
+        "Final-blow motion should be restored after the recording scope ends."
     );
 }
 

@@ -18,6 +18,24 @@ export interface RecordingSyncState {
   issues: string[];
 }
 
+export function getTerminalCombatAnchor(
+  anchors: readonly SyncAnchor[],
+): SyncAnchor | null {
+  const lastAnchor = anchors[anchors.length - 1];
+  if (!lastAnchor) return null;
+
+  // Capture can continue after the combat clock stops. Those trailing samples
+  // share one combat timestamp but already contain victory/outro animation.
+  let index = anchors.length - 1;
+  while (
+    index > 0
+    && anchors[index - 1].combatMs === lastAnchor.combatMs
+  ) {
+    index -= 1;
+  }
+  return anchors[index] ?? null;
+}
+
 export function normalizeAnchors(manifest: unknown): SyncAnchor[] {
   const rawAnchors = asArray(pick(manifest, ["syncAnchors", "anchors"], []));
   const anchors: SyncAnchor[] = [];
@@ -118,7 +136,7 @@ export function mapCombatToMedia(
     return left.mediaPtsMs + progress * (right.mediaPtsMs - left.mediaPtsMs);
   }
 
-  return anchors[anchors.length - 1].mediaPtsMs;
+  return getTerminalCombatAnchor(anchors)?.mediaPtsMs ?? null;
 }
 
 export function mapMediaToCombat(

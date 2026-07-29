@@ -310,6 +310,7 @@ public sealed class CombatReplayReportRuntimeSourceTests
         );
         Assert.Contains("UiSuppressionScope.Begin(", beginSuppression);
         Assert.Contains("ReplayRecordingHoverSuppression.Begin", beginSuppression);
+        Assert.Contains("ReplayRecordingMotionSuppression.Begin", beginSuppression);
 
         var suppressionSource = Source(
             "src",
@@ -340,6 +341,23 @@ public sealed class CombatReplayReportRuntimeSourceTests
             "typeof(ItemController), nameof(ItemController.OnPointerMove)",
             patchSource
         );
+
+        var combatSimulationPatchSource = Source(
+            "src",
+            "BazaarPlusPlus",
+            "Patches",
+            "Combat",
+            "CombatSimulationPatches.cs"
+        );
+        Assert.Contains(
+            "if (!ReplayRecordingMotionSuppression.IsActive)",
+            combatSimulationPatchSource
+        );
+        Assert.Contains(
+            "Singleton<GameServiceManager>.Instance?.EnforceMaxTimeScale(1f);",
+            combatSimulationPatchSource
+        );
+        Assert.Contains("__result = Task.CompletedTask;", combatSimulationPatchSource);
         Assert.Contains(
             "typeof(SkillProxyRenderer), nameof(SkillProxyRenderer.OnPointerEnter)",
             patchSource

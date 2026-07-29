@@ -3,6 +3,7 @@
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Game.CombatReplay;
+using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.GameInterop.Events;
 using HarmonyLib;
 using TheBazaar;
@@ -42,9 +43,37 @@ class CombatSimPatch
 [HarmonyPatch(typeof(FinalBlowSlowDownController), nameof(FinalBlowSlowDownController.Process))]
 class CombatFrameAdvancePatch
 {
+    [HarmonyPrefix]
+    static bool Prefix()
+    {
+        if (!ReplayRecordingMotionSuppression.IsActive)
+            return true;
+
+        Singleton<GameServiceManager>.Instance?.EnforceMaxTimeScale(1f);
+        return false;
+    }
+
     [HarmonyPostfix]
     static void Postfix()
     {
         BppPatchHost.Services.EventBus.Publish(CombatFrameAdvanced.Instance);
+    }
+}
+
+[HarmonyPatch(
+    typeof(FinalBlowSlowDownController),
+    nameof(FinalBlowSlowDownController.ReturnToNormalSpeed)
+)]
+class ReplayRecordingFinalBlowReturnPatch
+{
+    [HarmonyPrefix]
+    static bool Prefix(ref Task __result)
+    {
+        if (!ReplayRecordingMotionSuppression.IsActive)
+            return true;
+
+        Singleton<GameServiceManager>.Instance?.EnforceMaxTimeScale(1f);
+        __result = Task.CompletedTask;
+        return false;
     }
 }

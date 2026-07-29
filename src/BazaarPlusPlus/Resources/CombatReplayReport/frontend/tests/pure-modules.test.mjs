@@ -21,6 +21,7 @@ import {
   timelineWidthAtZoom,
 } from "../src/timeline/constants.ts";
 import {
+  getTerminalCombatAnchor,
   mapCombatToMedia,
   mapMediaToCombat,
   normalizeAnchors,
@@ -1287,6 +1288,21 @@ test("recording sync interpolates and clamps in both directions", () => {
   assert.equal(mapMediaToCombat(3_500, anchors), 2_000);
   assert.equal(mapMediaToCombat(12_000, anchors), 5_000);
   assert.equal(mapCombatToMedia(100, anchors.slice(0, 1)), null);
+});
+
+test("recording sync stops at the first sample of a terminal combat plateau", () => {
+  const anchors = [
+    { combatMs: 0, mediaPtsMs: 500 },
+    { combatMs: 50, mediaPtsMs: 550 },
+    { combatMs: 100, mediaPtsMs: 600 },
+    { combatMs: 100, mediaPtsMs: 650 },
+    { combatMs: 100, mediaPtsMs: 700 },
+  ];
+
+  assert.deepEqual(getTerminalCombatAnchor(anchors), anchors[2]);
+  assert.equal(mapCombatToMedia(100, anchors), 600);
+  assert.equal(mapCombatToMedia(101, anchors), 600);
+  assert.equal(mapCombatToMedia(Number.POSITIVE_INFINITY, anchors), 600);
 });
 
 test("recording sync rejects non-monotonic or mismatched exact metadata", () => {
