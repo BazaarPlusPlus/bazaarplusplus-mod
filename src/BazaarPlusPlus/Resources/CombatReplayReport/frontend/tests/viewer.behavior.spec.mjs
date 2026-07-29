@@ -3902,6 +3902,41 @@ test("renders destroy and structural attributes consistently across timeline, in
 }) => {
   await page.goto(`${structuralReportUrl}?lang=en`);
 
+  const eventLaneModeGeometry = await page.evaluate(() => {
+    const bounds = (testId) =>
+      document
+        .querySelector(`[data-bpp-test-id="${testId}"]`)
+        .getBoundingClientRect();
+    const toggle = bounds("event-lane-mode-toggle");
+    const pill = bounds("event-lane-mode-pill");
+    const filter = bounds("lane-filter-trigger");
+    return {
+      filterHeight: filter.height,
+      pillBottomInset: toggle.bottom - pill.bottom,
+      pillTopInset: pill.top - toggle.top,
+      toggleBottom: toggle.bottom,
+      toggleHeight: toggle.height,
+      toggleTop: toggle.top,
+      filterBottom: filter.bottom,
+      filterTop: filter.top,
+    };
+  });
+  expect(eventLaneModeGeometry.toggleHeight).toBe(28);
+  expect(eventLaneModeGeometry.filterHeight).toBe(28);
+  expect(
+    Math.abs(
+      eventLaneModeGeometry.toggleTop - eventLaneModeGeometry.filterTop,
+    ),
+  ).toBeLessThanOrEqual(0.5);
+  expect(
+    Math.abs(
+      eventLaneModeGeometry.toggleBottom -
+        eventLaneModeGeometry.filterBottom,
+    ),
+  ).toBeLessThanOrEqual(0.5);
+  expect(eventLaneModeGeometry.pillTopInset).toBe(3);
+  expect(eventLaneModeGeometry.pillBottomInset).toBe(3);
+
   const destroyPoint = await timelineMarkerPoint(page, {
     combatMs: 4_000,
     durationMs: 8_000,
