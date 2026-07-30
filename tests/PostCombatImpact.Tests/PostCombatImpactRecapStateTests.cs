@@ -11,9 +11,34 @@ public sealed class PostCombatImpactRecapStateTests
         var state = new PostCombatImpactRecapState();
         state.RecapStarted();
 
-        Assert.Equal(PostCombatImpactRecapTransition.None, state.Observe(isOpen: false));
-        Assert.Equal(PostCombatImpactRecapTransition.Show, state.Observe(isOpen: true));
-        Assert.Equal(PostCombatImpactRecapTransition.None, state.Observe(isOpen: true));
+        Assert.Equal(
+            PostCombatImpactRecapTransition.None,
+            state.Observe(isOpen: false, isMoving: false)
+        );
+        Assert.Equal(
+            PostCombatImpactRecapTransition.Show,
+            state.Observe(isOpen: true, isMoving: false)
+        );
+        Assert.Equal(
+            PostCombatImpactRecapTransition.None,
+            state.Observe(isOpen: true, isMoving: false)
+        );
+    }
+
+    [Fact]
+    public void Waits_for_native_recap_animation_to_finish_before_showing()
+    {
+        var state = new PostCombatImpactRecapState();
+        state.RecapStarted();
+
+        Assert.Equal(
+            PostCombatImpactRecapTransition.None,
+            state.Observe(isOpen: true, isMoving: true)
+        );
+        Assert.Equal(
+            PostCombatImpactRecapTransition.Show,
+            state.Observe(isOpen: true, isMoving: false)
+        );
     }
 
     [Fact]
@@ -21,9 +46,12 @@ public sealed class PostCombatImpactRecapStateTests
     {
         var state = new PostCombatImpactRecapState();
         state.RecapStarted();
-        state.Observe(isOpen: true);
+        state.Observe(isOpen: true, isMoving: false);
 
-        Assert.Equal(PostCombatImpactRecapTransition.Hide, state.Observe(isOpen: false));
+        Assert.Equal(
+            PostCombatImpactRecapTransition.Hide,
+            state.Observe(isOpen: false, isMoving: true)
+        );
     }
 
     [Fact]
@@ -33,6 +61,9 @@ public sealed class PostCombatImpactRecapStateTests
         state.RecapStarted();
 
         Assert.Equal(PostCombatImpactRecapTransition.Hide, state.RecapEnded());
-        Assert.Equal(PostCombatImpactRecapTransition.None, state.Observe(isOpen: false));
+        Assert.Equal(
+            PostCombatImpactRecapTransition.None,
+            state.Observe(isOpen: false, isMoving: false)
+        );
     }
 }

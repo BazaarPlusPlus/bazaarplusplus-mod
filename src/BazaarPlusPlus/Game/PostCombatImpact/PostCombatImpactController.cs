@@ -33,8 +33,13 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
     private void Update()
     {
-        var recapOpen = Singleton<BoardManager>.Instance?.IsRecapViewOpen == true;
-        Apply(_recapState.Observe(recapOpen));
+        var boardManager = Singleton<BoardManager>.Instance;
+        Apply(
+            _recapState.Observe(
+                boardManager?.IsRecapViewOpen == true,
+                boardManager?.StorageMoving == true
+            )
+        );
     }
 
     private void Apply(PostCombatImpactRecapTransition transition)

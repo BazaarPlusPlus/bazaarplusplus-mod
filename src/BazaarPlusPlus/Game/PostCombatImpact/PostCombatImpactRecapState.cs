@@ -26,10 +26,10 @@ internal sealed class PostCombatImpactRecapState
         return PostCombatImpactRecapTransition.Hide;
     }
 
-    internal PostCombatImpactRecapTransition Observe(bool isOpen)
+    internal PostCombatImpactRecapTransition Observe(bool isOpen, bool isMoving)
     {
         var transition = PostCombatImpactRecapTransition.None;
-        if (_awaitingOpen && isOpen)
+        if (_awaitingOpen && isOpen && !isMoving)
         {
             _awaitingOpen = false;
             transition = PostCombatImpactRecapTransition.Show;
