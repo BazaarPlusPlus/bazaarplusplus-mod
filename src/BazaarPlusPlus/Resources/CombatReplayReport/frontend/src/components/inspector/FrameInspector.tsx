@@ -263,7 +263,10 @@ function EventRow({
           {t(presentation.labelKey)}
         </strong>
         {mergedCount > 1 && (
-          <Badge className="px-1.5 font-mono" variant="secondary">
+          <Badge
+            className="px-1.5 font-data tabular-nums"
+            variant="secondary"
+          >
             ×{mergedCount}
           </Badge>
         )}
@@ -279,7 +282,7 @@ function EventRow({
         {amount && (
           <strong
             className={cn(
-              "ml-auto shrink-0 rounded-panel border px-1.5 py-0.5 font-mono text-compact",
+              "ml-auto shrink-0 rounded-panel border px-1.5 py-0.5 font-data text-compact tabular-nums",
               diff?.polarity === "increase"
                 ? "border-success/30 bg-success/10 text-success"
                 : diff?.polarity === "decrease"
@@ -294,7 +297,7 @@ function EventRow({
       </div>
       {diff && (
         <div
-          className="ml-7 mt-0.5 font-mono text-micro tabular-nums text-muted-foreground"
+          className="ml-7 mt-0.5 font-data text-micro tabular-nums text-muted-foreground"
           data-bpp-test-id="frame-event-transition"
         >
           {diff.transitionText}
@@ -444,7 +447,7 @@ function DirectDamageGroupRow({
           </Badge>
         )}
         <strong
-          className="ml-auto shrink-0 font-mono text-compact text-brand-soft"
+          className="ml-auto shrink-0 font-data text-compact tabular-nums text-brand-soft"
           data-bpp-test-id="frame-event-amount"
         >
           {formatNumber(amount)}
@@ -629,7 +632,7 @@ export function FrameInspector({
           )}
           <div className="min-w-0 flex-1">
             <h2
-              className="truncate text-body font-semibold text-foreground"
+              className="truncate font-display text-body font-semibold text-foreground"
               data-bpp-test-id="frame-inspector-entity"
             >
               {inspectedEntity?.name || t("frameEvents")}
@@ -649,18 +652,24 @@ export function FrameInspector({
                   <span aria-hidden="true">·</span>
                 </>
               )}
-              <span data-bpp-test-id="frame-inspector-time">
+              <span
+                className="font-data tabular-nums"
+                data-bpp-test-id="frame-inspector-time"
+              >
                 {first ? formatDuration(first.combatMs) : "—"}
               </span>
               <span aria-hidden="true">·</span>
-              <span data-bpp-test-id="frame-inspector-frame">
+              <span
+                className="font-mono"
+                data-bpp-test-id="frame-inspector-frame"
+              >
                 {frame === null ? "—" : `${t("frame")} ${frame}`}
               </span>
               {events.length > 1 && (
                 <>
                   <span aria-hidden="true">·</span>
                   <span
-                    className="truncate text-foreground/85"
+                    className="truncate font-data tabular-nums text-foreground/85"
                     data-bpp-test-id="frame-event-total"
                   >
                     {eventCountLabel}
@@ -742,7 +751,7 @@ export function FrameInspector({
                       {t(group.labelKey)}
                     </span>
                     <Badge
-                      className="px-1.5 font-mono"
+                      className="px-1.5 font-data tabular-nums"
                       variant="secondary"
                     >
                       ×{group.events.length}

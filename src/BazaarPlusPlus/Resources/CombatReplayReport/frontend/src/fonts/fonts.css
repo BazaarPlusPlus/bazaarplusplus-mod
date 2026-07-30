@@ -1,0 +1,17 @@
+@font-face {
+  font-family: "BPP Noto Sans";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 62.5% 100%;
+  font-display: swap;
+  src: url("./noto-sans-variable.ttf?inline") format("truetype");
+}
+
+@font-face {
+  font-family: "BPP Noto Serif";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 62.5% 100%;
+  font-display: swap;
+  src: url("./noto-serif-variable.ttf?inline") format("truetype");
+}

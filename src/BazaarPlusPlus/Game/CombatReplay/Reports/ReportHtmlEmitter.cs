@@ -36,7 +36,7 @@ internal sealed class ReportHtmlEmitter
             .Append(EscapeHtmlAttribute(normalizedLanguage))
             .Append("\">\n<head>\n");
         builder.Append(
-            "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'\">\n"
+            "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'\">\n"
         );
         builder.Append("<meta charset=\"utf-8\">\n");
         builder.Append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n");

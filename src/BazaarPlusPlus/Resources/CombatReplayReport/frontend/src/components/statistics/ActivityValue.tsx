@@ -112,7 +112,7 @@ function TargetDetail({
           {targetName}
         </span>
       </span>
-      <span className="flex min-w-20 flex-col items-end font-mono tabular-nums">
+      <span className="flex min-w-20 flex-col items-end font-data tabular-nums">
         {transition && (
           <strong
             className="text-compact text-foreground"
@@ -210,7 +210,7 @@ export function ActivityValue({
         <span className="text-muted-foreground/25">·</span>
       ) : (
         <strong
-          className="font-mono text-compact text-foreground"
+          className="font-data text-compact tabular-nums text-foreground"
           data-bpp-authoritative="native-card-stats"
         >
           {formatCompactNumber(authoritativeValue)}
@@ -220,16 +220,16 @@ export function ActivityValue({
       <span className="text-muted-foreground/25">·</span>
     ) : column.quantitative && quantified > 0 ? (
       <span className="inline-flex flex-col items-end leading-none">
-        <strong className="font-mono text-compact text-foreground">
+        <strong className="font-data text-compact tabular-nums text-foreground">
           {partialPrefix}
           {formattedAmount}
         </strong>
-        <small className="mt-1 font-mono text-nano text-muted-foreground">
+        <small className="mt-1 font-data text-nano tabular-nums text-muted-foreground">
           ×{formatNumber(count)}
         </small>
       </span>
     ) : (
-      <strong className="font-mono text-compact text-foreground/85">
+      <strong className="font-data text-compact tabular-nums text-foreground/85">
         ×{formatNumber(count)}
       </strong>
     );
@@ -263,12 +263,12 @@ export function ActivityValue({
         </div>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-b border-border/50 bg-muted/15 px-3 py-2">
           <span
-            className="text-micro font-semibold uppercase tracking-wide text-muted-foreground"
+            className="text-micro font-medium uppercase tracking-wide text-muted-foreground"
             data-bpp-test-id="statistics-activity-tooltip-total-label"
           >
             {authoritative ? t("activityPostCombatTotal") : t("activityAmount")}
           </span>
-          <span className="flex flex-col items-end font-mono tabular-nums">
+          <span className="flex flex-col items-end font-data tabular-nums">
             <strong
               className="text-compact text-foreground"
               data-bpp-test-id="statistics-activity-tooltip-total"
@@ -286,10 +286,10 @@ export function ActivityValue({
           </span>
         </div>
         <div className="flex items-center justify-between bg-muted/25 px-3 py-1.5">
-          <span className="text-micro font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="text-micro font-medium uppercase tracking-wide text-muted-foreground">
             {t("activityTargetEffects")}
           </span>
-          <span className="font-mono text-nano tabular-nums text-muted-foreground">
+          <span className="font-data text-nano tabular-nums text-muted-foreground">
             {formatNumber(details.length)}
           </span>
         </div>

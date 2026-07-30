@@ -207,7 +207,7 @@ export function drawMarker(
   ) {
     const indicator = criticalIndicatorOffset(markerSize);
     const fontSize = Math.max(8, Math.round(markerSize * 0.58));
-    context.font = `800 ${fontSize}px ${themeValue("--bpp-font-sans")}`;
+    context.font = `700 ${fontSize}px ${themeValue("--bpp-font-sans")}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.lineWidth = 2.5;
@@ -220,7 +220,7 @@ export function drawMarker(
   if (cluster.token === "defeat" && image) {
     const indicator = criticalIndicatorOffset(markerSize);
     const fontSize = Math.max(8, Math.round(markerSize * 0.62));
-    context.font = `900 ${fontSize}px ${themeValue("--bpp-font-sans")}`;
+    context.font = `700 ${fontSize}px ${themeValue("--bpp-font-sans")}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
     context.lineWidth = 2.5;
@@ -486,7 +486,7 @@ export function drawRuler(
   context.fillStyle = themeColor("surface");
   context.fillRect(0, 0, size.width, size.height);
   const step = chooseTickStep(model.durationMs, width);
-  context.font = `600 ${themeLengthPx("--bpp-text-compact")}px ${themeValue("--bpp-font-mono")}`;
+  context.font = `600 ${themeLengthPx("--bpp-text-compact")}px ${themeValue("--bpp-font-data")}`;
   context.fillStyle = themeColor("muted-foreground");
   context.textAlign = "center";
   context.textBaseline = "top";

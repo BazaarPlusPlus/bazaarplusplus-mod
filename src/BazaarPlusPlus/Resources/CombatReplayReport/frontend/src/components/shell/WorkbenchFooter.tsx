@@ -67,7 +67,7 @@ export function WorkbenchFooter({
           <ControlTooltip label={t("zoomReset")}>
             <Button
               aria-label={t("zoomReset")}
-              className="min-w-12 px-2 font-mono text-micro text-brand-soft"
+              className="min-w-12 px-2 font-data text-micro tabular-nums text-brand-soft"
               data-bpp-test-id="time-zoom-reset"
               onClick={() => dispatch({ type: "reset-zoom" })}
               size="xs"

@@ -82,7 +82,7 @@ export function ReportHeader({
           title={`${model.playerName} vs ${model.opponentName}`}
         >
           {model.playerName}
-          <span className="mx-1.5 font-normal text-muted-foreground">
+          <span className="mx-1.5 font-sans font-normal text-muted-foreground">
             {" vs "}
           </span>
           {model.opponentName}
@@ -95,7 +95,7 @@ export function ReportHeader({
         >
           {outcomeLabel}
         </Badge>
-        <span className="hidden shrink-0 font-mono text-compact text-muted-foreground xl:inline">
+        <span className="hidden shrink-0 font-data text-compact tabular-nums text-muted-foreground xl:inline">
           {formatDuration(model.durationMs)}
         </span>
       </div>
@@ -130,7 +130,9 @@ export function ReportHeader({
       </Tabs>
 
       <div className="hidden items-center gap-2 text-compact text-muted-foreground lg:flex">
-        <span>{formatNumber(model.events.length)} {t("event")}</span>
+        <span className="font-data tabular-nums">
+          {formatNumber(model.events.length)} {t("event")}
+        </span>
       </div>
 
       <span
@@ -159,7 +161,7 @@ export function ReportHeader({
             variant="outline"
           >
             <Languages className="hidden size-icon-sm sm:block" />
-            <span className="text-compact font-bold">
+            <span className="text-compact font-medium">
               {LOCALE_LABELS[state.locale]}
             </span>
           </Button>

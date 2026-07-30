@@ -11,6 +11,7 @@ import {
 import type { ReportAction } from "../../app/report-reducer.ts";
 import { TIME_ZOOM_STEPS, type ReportState } from "../../app/report-state.ts";
 import type { ReportViewModel } from "../../model/report.ts";
+import { onDocumentFontsReady } from "../../styles/font-readiness.ts";
 import {
   LANE_HEIGHT,
   LANE_LABEL_WIDTH,
@@ -384,7 +385,11 @@ export const TimelineView = forwardRef<
       selectionRef.current.eventIds,
     );
     controller.setPlayhead(playheadRef.current);
+    const stopFontReadyRefresh = onDocumentFontsReady(() => {
+      controller.refreshTypography();
+    });
     return () => {
+      stopFontReadyRefresh();
       controller.destroy();
       viewportRefs.controller.current = null;
     };

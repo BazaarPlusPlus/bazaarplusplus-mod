@@ -91,7 +91,7 @@ export function RecordingControls({
         </ControlTooltip>
       </ButtonGroup>
       <span
-        className="ml-1 min-w-[68px] text-center font-mono text-micro text-brand-soft"
+        className="ml-1 min-w-[68px] text-center font-data text-micro tabular-nums text-brand-soft"
         data-bpp-test-id="recording-timecode"
       >
         {mediaMsLabel}
@@ -101,7 +101,7 @@ export function RecordingControls({
           <PopoverTrigger asChild>
             <Button
               aria-label={t("playbackSpeed")}
-              className="ml-auto min-w-14 gap-1 px-2 font-mono text-micro text-brand-soft"
+              className="ml-auto min-w-14 gap-1 px-2 font-data text-micro tabular-nums text-brand-soft"
               data-bpp-test-id="recording-speed"
               size="xs"
               type="button"
@@ -125,7 +125,7 @@ export function RecordingControls({
               return (
                 <Button
                   aria-checked={selected}
-                  className="w-full justify-between px-2 font-mono"
+                  className="w-full justify-between px-2 font-data tabular-nums"
                   data-bpp-test-id={`recording-speed-option-${speed}`}
                   key={speed}
                   onClick={() => onSpeedChange(index)}

@@ -66,7 +66,7 @@ function FatalReport({ error }: { error: unknown }): React.JSX.Element {
     >
       <div className="flex w-full max-w-xl flex-col items-center gap-3 rounded-panel border border-danger/25 bg-card p-8 text-center shadow-float">
         <AlertTriangle className="size-8 text-danger" aria-hidden="true" />
-        <h1 className="text-headline font-semibold text-foreground">
+        <h1 className="font-display text-headline font-semibold text-foreground">
           {t("reportError")}
         </h1>
         <p className="text-body text-muted-foreground">{t("errorHint")}</p>

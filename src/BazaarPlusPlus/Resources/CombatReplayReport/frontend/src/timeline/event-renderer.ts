@@ -235,6 +235,11 @@ export class TimelineCanvasController {
     this.requestStaticDraw();
   }
 
+  refreshTypography(): void {
+    this.canvas.dataset.bppFontReadyRedrawn = "true";
+    this.requestStaticDraw();
+  }
+
   setSelection(
     frame: number | null,
     clusterEventIds: readonly string[],

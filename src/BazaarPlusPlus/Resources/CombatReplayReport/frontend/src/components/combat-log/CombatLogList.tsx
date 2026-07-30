@@ -130,7 +130,7 @@ function CombatLogEntryColumns({
   return (
     <>
       <span
-        className="inline-flex h-full min-w-0 items-center gap-1 font-mono text-micro text-brand-soft"
+        className="inline-flex h-full min-w-0 items-center gap-1 font-data text-micro tabular-nums text-brand-soft"
         data-bpp-test-id="combat-log-time"
       >
         {frameStart
@@ -154,7 +154,7 @@ function CombatLogEntryColumns({
           token={entry.token}
         />
         <span
-          className="truncate text-compact font-semibold text-foreground max-[600px]:sr-only"
+          className="truncate text-compact font-medium text-foreground max-[600px]:sr-only"
           title={t(entry.token)}
         >
           {t(entry.token)}
@@ -212,7 +212,7 @@ function CombatLogEntryColumns({
               <span data-bpp-test-id="combat-log-target-summary">
                 {t("combatLogTargets")}
               </span>
-              <strong className="font-mono text-micro text-foreground">
+              <strong className="font-data text-micro tabular-nums text-foreground">
                 ×{detailCount}
               </strong>
               <ChevronDown
@@ -250,7 +250,7 @@ function CombatLogEntryColumns({
           )}
       </span>
       <span
-        className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums"
+        className="flex shrink-0 items-center justify-end gap-1 font-data text-micro tabular-nums"
         data-bpp-test-id="combat-log-amount"
       >
         {amount && <strong className="text-foreground">{amount}</strong>}
@@ -335,7 +335,7 @@ function CombatLogTargetDetail({
             />
           )}
       </span>
-      <span className="flex shrink-0 items-center justify-end gap-1 font-mono text-micro tabular-nums">
+      <span className="flex shrink-0 items-center justify-end gap-1 font-data text-micro tabular-nums">
         {amount && <strong className="text-foreground">{amount}</strong>}
         {detail.count > 1 && (
           <span className="text-muted-foreground">×{detail.count}</span>

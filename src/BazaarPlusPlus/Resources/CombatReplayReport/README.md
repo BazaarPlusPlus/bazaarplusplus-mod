@@ -1,6 +1,6 @@
 # Combat report Viewer
 
-Only React/TypeScript/Tailwind source belongs under `frontend/`; generated `viewer.js` and
+Viewer source and its vendored font inputs belong under `frontend/`; generated `viewer.js` and
 `viewer.css` do not belong in source control. For standalone frontend development, run:
 
 ```sh
@@ -49,6 +49,10 @@ verifies or completes that generation before the report becomes visible, so an i
 cannot mix JavaScript and CSS from different builds. There is no legacy Viewer fallback or mutable
 stable alias. Game image assets remain immutable and content-addressed.
 
+The same shared Viewer stylesheet carries the complete upstream Noto Sans and Noto Serif variable
+fonts for every report that references that generation. The tracked TTF files are not subsetted or
+recompressed locally; provenance and the embedded OFL license live beside the font sources.
+
 Run the repository-level browser suite with `./run.sh viewer-test`. It uses direct `file://` reports
 in Chromium and WebKit, blocks network access through CSP, and exercises the stable
 `data-bpp-test-id` contract.
@@ -58,7 +62,8 @@ in Chromium and WebKit, blocks network access through CSP, and exercises the sta
 `./run.sh publish` performs one Release Viewer build under `obj/`. The production MSBuild gate then
 installs Chromium/WebKit when needed, runs typecheck and pure tests, and points the behavior suite
 at that exact staged directory through `BPP_VIEWER_ARTIFACT_DIR`. Only the artifact that passes
-those checks is embedded, together with the ECharts license notices, in `BazaarPlusPlus.dll`.
+those checks is embedded, together with the ECharts notices and Noto font license, in
+`BazaarPlusPlus.dll`.
 Standalone `npm test` remains the frontend-development path and validates a clean `dist/` build.
 
 The production MSBuild target copies that DLL into both platform payload trees, verifies both

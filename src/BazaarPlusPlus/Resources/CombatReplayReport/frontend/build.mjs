@@ -60,7 +60,7 @@ async function assertThemeOwnership() {
   const rawInteractiveElement = /<(?:button|table)\b/u;
 
   for (const file of sourceFiles) {
-    if (file === "styles/theme.css") continue;
+    if (file === "styles/theme.css" || file === "fonts/fonts.css") continue;
     const source = await readFile(join(sourceDirectory, file), "utf8");
     if (stockPalette.test(source)) {
       violations.push(`${file}: stock Tailwind palette`);

@@ -40,13 +40,13 @@ function GroupHeader({
           </strong>
           <span
             className={cn(
-              "text-nano font-bold uppercase tracking-wider",
+              "text-nano font-medium uppercase tracking-wider",
               side === "player" ? "text-player" : "text-opponent",
             )}
           >
             {t(side)}
           </span>
-          <span className="ml-auto font-mono text-micro text-muted-foreground">
+          <span className="ml-auto font-data text-micro tabular-nums text-muted-foreground">
             {formatNumber(total)} {t("activityTriggers")}
           </span>
         </div>
@@ -94,7 +94,7 @@ export function ActivityRows({
             </div>
           </TableCell>
           <TableCell
-            className="px-2 py-1.5 text-right font-mono text-compact font-semibold text-foreground"
+            className="px-2 py-1.5 text-right font-data text-compact font-semibold tabular-nums text-foreground"
             data-bpp-test-id="statistics-activity-use-count"
           >
             {formatNumber(row.triggers)}

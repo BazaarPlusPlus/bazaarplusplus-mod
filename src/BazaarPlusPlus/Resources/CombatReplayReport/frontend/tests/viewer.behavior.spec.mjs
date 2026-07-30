@@ -75,6 +75,19 @@ async function visibleGuideRatios(page, bounds) {
   };
 }
 
+async function installDelayedFontReady(page) {
+  await page.addInitScript(() => {
+    let releaseFonts;
+    const delayedReady = new Promise((resolve) => {
+      releaseFonts = resolve;
+    });
+    window.__BPP_VIEWER_TEST_FONT_READY__ = delayedReady;
+    window.__BPP_RELEASE_DOCUMENT_FONTS__ = () => {
+      releaseFonts(document.fonts);
+    };
+  });
+}
+
 async function timelineMarkerPoint(
   page,
   { combatMs, durationMs, entityId, dx = 0, dy = 0 },
@@ -343,7 +356,7 @@ function reportHtml(envelope) {
     <meta name="generator" content="BazaarPlusPlus 4.6.0-test">
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self'; font-src 'self' data:"
     >
     <link rel="stylesheet" href="./viewer.css">
     <script type="application/json" id="bpp-report-data">${serializedEnvelope(envelope)}</script>
@@ -1488,6 +1501,86 @@ test("boots the file report with one assembled script and one stylesheet", async
   expect(pageErrors).toEqual([]);
 });
 
+test("loads embedded fonts and repaints canvas renderers when fonts become ready", async ({
+  page,
+}) => {
+  await installDelayedFontReady(page);
+  await page.goto(`${reportUrl}?lang=en`);
+  const timelineCanvas = page.getByTestId("timeline-scene-canvas");
+  await expect(timelineCanvas).toBeAttached();
+  expect(
+    await page.evaluate(
+      () => typeof window.__BPP_RELEASE_DOCUMENT_FONTS__ === "function",
+    ),
+  ).toBe(true);
+  await expect(timelineCanvas).not.toHaveAttribute(
+    "data-bpp-font-ready-redrawn",
+    /.+/u,
+  );
+  const timelineDrawsBefore = await page.evaluate(
+    () => window.__BPP_VIEWER_TEST__?.timelineStaticDrawCount ?? -1,
+  );
+  await page.evaluate(() => window.__BPP_RELEASE_DOCUMENT_FONTS__?.());
+  await expect(timelineCanvas).toHaveAttribute(
+    "data-bpp-font-ready-redrawn",
+    "true",
+  );
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () => window.__BPP_VIEWER_TEST__?.timelineStaticDrawCount ?? -1,
+      )
+    )
+    .toBeGreaterThan(timelineDrawsBefore);
+
+  const loadedFamilies = await page.evaluate(async () => {
+    await document.fonts.ready;
+    return Array.from(document.fonts)
+      .filter((face) =>
+        face.family.includes("BPP Noto Sans")
+        || face.family.includes("BPP Noto Serif")
+      )
+      .map((face) => ({ family: face.family, status: face.status }));
+  });
+  expect(loadedFamilies.length).toBeGreaterThanOrEqual(2);
+  expect(loadedFamilies.every(({ status }) => status === "loaded")).toBe(true);
+  const appliedFamilies = await page.evaluate(() => ({
+    display: getComputedStyle(
+      document.querySelector('[data-bpp-test-id="match-title"]'),
+    ).fontFamily,
+    ui: getComputedStyle(
+      document.querySelector('[data-bpp-test-id="report-tab-timeline"]'),
+    ).fontFamily,
+  }));
+  expect(appliedFamilies.display).toContain("BPP Noto Serif");
+  expect(appliedFamilies.ui).toContain("BPP Noto Sans");
+
+  await page.goto(`${chartReportUrl}?lang=en`);
+  await page.getByTestId("report-tab-statistics").click();
+  const chartHosts = page.locator(
+    '[data-bpp-test-id^="statistics-echarts-"]',
+  );
+  const chartRenderHosts = chartHosts.locator(":scope > div:first-child");
+  await expect(chartHosts).toHaveCount(3);
+  await expect(chartRenderHosts).toHaveCount(3);
+  await expect(chartHosts.first().locator("canvas")).toHaveCount(1);
+  expect(
+    await chartRenderHosts.evaluateAll((hosts) =>
+      hosts.every(
+        (host) => host.dataset.bppFontReadyResized === undefined,
+      )
+    ),
+  ).toBe(true);
+  await page.evaluate(() => window.__BPP_RELEASE_DOCUMENT_FONTS__?.());
+  await expect
+    .poll(() =>
+      chartRenderHosts.evaluateAll((hosts) =>
+        hosts.map((host) => host.dataset.bppFontReadyResized)
+      )
+    )
+    .toEqual(["true", "true", "true"]);
+});
+
 test("shows the defeat cause on the defeated hero lane", async ({ page }) => {
   await page.goto(`${defeatReportUrl}?lang=en`);
   await expect(page.getByTestId("timeline-canvas")).toHaveAttribute(
@@ -1689,7 +1782,7 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
   );
   expect(activeTabStyle.borderBottomWidth).toBe("2px");
   expect(activeTabStyle.radius).toBe("0px");
-  expect(activeTabStyle.font).toContain("system-ui");
+  expect(activeTabStyle.font).toContain("BPP Noto Sans");
 
   const headerControlMetrics = await page.evaluate(() =>
     [

@@ -216,6 +216,11 @@ void VerifyHtmlEmitter()
             && Count(html, "<script") == 2,
         "HTML must contain only the inert data node and one external classic script."
     );
+    Check(
+        Count(html, "http-equiv=\"Content-Security-Policy\"") == 1
+            && html.Contains("font-src 'self' data:", StringComparison.Ordinal),
+        "The report CSP must allow only local and embedded data fonts."
+    );
 
     var start = html.IndexOf(
         "<script type=\"application/json\" id=\"bpp-report-data\">",
@@ -456,16 +461,29 @@ void VerifyViewerThirdPartyNoticesAreEmbedded()
     {
         "BazaarPlusPlus.Resources.CombatReplayReport.echarts-license.txt",
         "BazaarPlusPlus.Resources.CombatReplayReport.echarts-notice.txt",
+        "BazaarPlusPlus.Resources.CombatReplayReport.noto-ofl.txt",
     };
     foreach (var resourceName in requiredResources)
     {
         using var stream = assembly.GetManifestResourceStream(resourceName);
         Check(
             stream != null && stream.Length > 0,
-            "The Viewer bundle fixture must expose the required ECharts legal resource: "
+            "The Viewer bundle fixture must expose the required third-party legal resource: "
                 + resourceName
         );
     }
+
+    using var notoLicenseStream = assembly.GetManifestResourceStream(
+        "BazaarPlusPlus.Resources.CombatReplayReport.noto-ofl.txt"
+    );
+    using var notoLicenseReader =
+        notoLicenseStream == null ? null : new StreamReader(notoLicenseStream);
+    var notoLicense = notoLicenseReader?.ReadToEnd() ?? "";
+    Check(
+        notoLicense.Contains("SIL OPEN FONT LICENSE Version 1.1", StringComparison.Ordinal)
+            && notoLicense.Contains("The Noto Project Authors", StringComparison.Ordinal),
+        "The embedded Noto legal resource must preserve its license and copyright attribution."
+    );
 }
 
 void VerifyViewerStaticRuntimeBoundary()
@@ -477,12 +495,16 @@ void VerifyViewerStaticRuntimeBoundary()
     Check(
         script.Length > 100_000
             && stylesheet.Contains(".bpp-report-root", StringComparison.Ordinal)
+            && Count(stylesheet, "@font-face") >= 2
+            && stylesheet.Contains("BPP Noto Sans", StringComparison.Ordinal)
+            && stylesheet.Contains("BPP Noto Serif", StringComparison.Ordinal)
+            && Count(stylesheet, "data:font/ttf;base64,") >= 2
             && !script.Contains("fetch(", StringComparison.Ordinal)
             && !script.Contains("new Worker(", StringComparison.Ordinal)
             && !script.Contains("new SharedWorker(", StringComparison.Ordinal)
             && !script.Contains("import(", StringComparison.Ordinal)
             && !stylesheet.Contains("@import", StringComparison.Ordinal),
-        "The generated Viewer artifacts must preserve the static file:// runtime boundary."
+        "The generated Viewer artifacts must embed both Noto families while preserving the static file:// runtime boundary."
     );
 }
 

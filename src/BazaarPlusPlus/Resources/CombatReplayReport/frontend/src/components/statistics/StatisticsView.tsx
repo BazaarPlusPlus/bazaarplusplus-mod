@@ -46,10 +46,10 @@ function RecordCard({
         <Icon className="size-icon-lg text-brand-soft" />
       )}
       <div className="min-w-0">
-        <p className="text-nano font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="text-nano font-medium uppercase tracking-wider text-muted-foreground">
           {t(record.label)}
         </p>
-        <strong className="block font-mono text-headline text-foreground">
+        <strong className="block font-data text-headline tabular-nums text-foreground">
           {recordValue(record)}
         </strong>
         <p className="truncate text-micro text-muted-foreground">
@@ -86,7 +86,7 @@ function SideSummary({
           </small>
           <strong
             className={cn(
-              "font-mono text-metric",
+              "font-data text-metric tabular-nums",
               side === "player" ? "text-player" : "text-opponent",
             )}
           >
@@ -97,19 +97,19 @@ function SideSummary({
       <dl className="mt-3 grid grid-cols-3 gap-2 text-micro">
         <div className="rounded-panel border border-border/45 bg-background/30 p-2">
           <dt className="text-muted-foreground">{t("damageReceived")}</dt>
-          <dd className="mt-1 font-mono text-heading font-semibold text-foreground">
+          <dd className="mt-1 font-data text-heading font-semibold tabular-nums text-foreground">
             {formatCompactNumber(statistics.output[side][1])}
           </dd>
         </div>
         <div className="rounded-panel border border-border/45 bg-background/30 p-2">
           <dt className="text-muted-foreground">{t("healingReceived")}</dt>
-          <dd className="mt-1 font-mono text-heading font-semibold text-foreground">
+          <dd className="mt-1 font-data text-heading font-semibold tabular-nums text-foreground">
             {formatCompactNumber(statistics.output[side][3])}
           </dd>
         </div>
         <div className="rounded-panel border border-border/45 bg-background/30 p-2">
           <dt className="text-muted-foreground">{t("shieldReceived")}</dt>
-          <dd className="mt-1 font-mono text-heading font-semibold text-foreground">
+          <dd className="mt-1 font-data text-heading font-semibold tabular-nums text-foreground">
             {formatCompactNumber(statistics.output[side][4])}
           </dd>
         </div>

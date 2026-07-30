@@ -202,7 +202,7 @@ export function StateLabels({
       ref={rootRef}
     >
       <div className="flex h-control-xs items-center gap-1 border-b border-border/60 px-2">
-        <span className="min-w-0 truncate font-mono text-micro text-muted-foreground">
+        <span className="min-w-0 truncate font-data text-micro tabular-nums text-muted-foreground">
           {t("stateValues")} ·{" "}
           <span data-bpp-state-time>{formatDuration(combatMs)}</span>
         </span>
@@ -258,14 +258,14 @@ export function StateLabels({
                 {t(metric)}
               </strong>
               <span
-                className="text-right font-mono tabular-nums text-player"
+                className="text-right font-data tabular-nums text-player"
                 data-bpp-state-metric={metric}
                 data-bpp-state-side="player"
               >
                 {player === null ? "—" : formatCompactNumber(player)}
               </span>
               <span
-                className="text-right font-mono tabular-nums text-opponent"
+                className="text-right font-data tabular-nums text-opponent"
                 data-bpp-state-metric={metric}
                 data-bpp-state-side="opponent"
               >

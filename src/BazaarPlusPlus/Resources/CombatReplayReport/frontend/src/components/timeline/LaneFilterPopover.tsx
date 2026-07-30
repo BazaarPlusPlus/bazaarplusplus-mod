@@ -74,7 +74,7 @@ export function LaneFilterPopover({
             <span>{t("laneFilter")}</span>
             {hasFilters && (
               <span
-                className="grid min-w-4 place-items-center rounded-full bg-primary px-1 font-mono text-nano text-primary-foreground"
+                className="grid min-w-4 place-items-center rounded-full bg-primary px-1 font-data text-nano tabular-nums text-primary-foreground"
                 data-bpp-test-id="lane-filter-hidden-count"
               >
                 {hiddenCount}
@@ -106,7 +106,7 @@ export function LaneFilterPopover({
         <Separator />
         <div className="grid grid-cols-2 gap-x-2 p-2">
           <div>
-            <div className="px-2 pb-1 pt-0.5 text-micro font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="px-2 pb-1 pt-0.5 text-micro font-medium uppercase tracking-wide text-muted-foreground">
               {t("laneFilterSides")}
             </div>
             {LANE_FILTER_SIDES.map((filter) => (
@@ -120,7 +120,7 @@ export function LaneFilterPopover({
             ))}
           </div>
           <div>
-            <div className="px-2 pb-1 pt-0.5 text-micro font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="px-2 pb-1 pt-0.5 text-micro font-medium uppercase tracking-wide text-muted-foreground">
               {t("laneFilterTypes")}
             </div>
             {LANE_FILTER_TYPES.map((filter) => (

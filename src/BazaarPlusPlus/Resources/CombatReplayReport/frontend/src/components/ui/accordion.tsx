@@ -35,7 +35,7 @@ function AccordionTrigger({
     <AccordionPrimitive.Header className="flex">
       <AccordionPrimitive.Trigger
         className={cn(
-          "flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-body font-semibold text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 [&[data-state=open]>svg]:rotate-180",
+          "flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-body font-medium text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/50 [&[data-state=open]>svg]:rotate-180",
           className,
         )}
         data-slot="accordion-trigger"

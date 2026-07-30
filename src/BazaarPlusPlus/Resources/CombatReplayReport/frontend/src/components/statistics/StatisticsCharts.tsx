@@ -7,6 +7,7 @@ import * as echarts from "echarts/core";
 import { CanvasRenderer } from "echarts/renderers";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatCompactNumber } from "../../i18n/format.ts";
+import { onDocumentFontsReady } from "../../styles/font-readiness.ts";
 import {
   themeColors,
   themeLengthPx,
@@ -68,7 +69,12 @@ function useEChart(option: ChartOption): React.RefObject<HTMLDivElement | null> 
     }
     const observer = new ResizeObserver(() => chart.resize());
     observer.observe(host);
+    const stopFontReadyResize = onDocumentFontsReady(() => {
+      host.dataset.bppFontReadyResized = "true";
+      chart.resize();
+    });
     return () => {
+      stopFontReadyResize();
       observer.disconnect();
       chartRef.current = null;
       chart.dispose();
@@ -102,7 +108,7 @@ function comparisonChartOption({
   const microText = themeLengthPx("--text-micro");
   const nanoText = themeLengthPx("--text-nano");
   const fontFamily = themeValue("--bpp-font-sans");
-  const monoFamily = themeValue("--bpp-font-mono");
+  const dataFamily = themeValue("--bpp-font-data");
   const barStyle = (color: string) => ({
     backgroundStyle: {
       borderRadius: [0, radius, radius, 0],
@@ -122,7 +128,7 @@ function comparisonChartOption({
     label: {
       color,
       distance: 6,
-      fontFamily: monoFamily,
+      fontFamily: dataFamily,
       fontSize: nanoText,
       fontWeight: 700,
       formatter: ({ value }: { value?: unknown }) => {
@@ -144,7 +150,7 @@ function comparisonChartOption({
     xAxis: {
       axisLabel: {
         color: colors.faint,
-        fontFamily: monoFamily,
+        fontFamily: dataFamily,
         fontSize: nanoText,
         formatter: (value: unknown) =>
           formatCompactNumber(numericValue(value)),
@@ -348,7 +354,7 @@ function ChartCard({
   return (
     <Card className="gap-0 overflow-hidden border-foreground/7 bg-card/70 shadow-none">
       <header className="flex min-h-control-md items-center justify-between gap-3 border-b border-border/55 px-3 py-1.5">
-        <h3 className="min-w-0 truncate font-display text-body font-semibold text-foreground">
+        <h3 className="min-w-0 truncate font-display text-heading font-semibold text-foreground">
           {title}
         </h3>
         <ComparisonLegend t={t} />
