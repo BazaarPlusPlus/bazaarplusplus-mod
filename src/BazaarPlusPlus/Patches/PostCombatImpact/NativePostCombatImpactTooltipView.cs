@@ -7,7 +7,6 @@ using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using BazaarPlusPlus.Localization;
-using BazaarPlusPlus.Patches.Tooltips;
 using TheBazaar;
 using TheBazaar.UI.Tooltips;
 using TheBazaar.Utilities;
@@ -20,104 +19,201 @@ namespace BazaarPlusPlus.Patches.PostCombatImpact;
 
 internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactTooltipView
 {
-    private const string SectionKey = "post-combat-impact";
     private const float TargetIconSize = 34f;
-    private static readonly BppTooltipSections.Style SectionStyle = new()
-    {
-        FontScale = 0.82f,
-        SectionTopPaddingScale = 0.7f,
-        SectionBottomPaddingScale = 1.15f,
-        ShowNativeDivider = true,
-        DividerHorizontalInset = 12f,
-    };
+    private const float SourceIconSize = 48f;
+    private const float TooltipMinWidth = 420f;
+    private const float TooltipPreferredWidth = 460f;
+    private const float TooltipGap = 18f;
+
+    private static readonly List<UIPositioner.Side> PreferredSides =
+    [
+        UIPositioner.Side.Right,
+        UIPositioner.Side.Left,
+        UIPositioner.Side.Bottom,
+        UIPositioner.Side.Top,
+    ];
+
+    private static readonly List<UIPositioner.Side> AllowedOverflowSides =
+    [
+        UIPositioner.Side.Right,
+        UIPositioner.Side.Left,
+    ];
 
     private readonly PostCombatImpactCardArtProvider _artProvider = new();
-    private CardTooltipController? _activeController;
-    private string? _activeSourceId;
+    private AuxiliaryTooltipController? _activeAuxiliary;
+    private CardTooltipController? _activePrimary;
+    private GameObject? _contentRoot;
+    private TMP_Text? _nativeBodyText;
+    private bool _nativeBodyWasActive;
     private int _renderGeneration;
 
-    public bool Show(CardTooltipController controller, string sourceId, CombatImpactSource? source)
-    {
-        if (
-            ReferenceEquals(_activeController, controller)
-            && string.Equals(_activeSourceId, sourceId, StringComparison.Ordinal)
-        )
-            return true;
+    public string Header => T("本场影响", "Combat impact");
 
-        Hide();
-        var generation = ++_renderGeneration;
-        var shown = BppTooltipSections.TryShowCustom(
-            controller,
-            SectionKey,
-            controller.passiveEffectParent,
-            section => Build(section, source, generation),
-            SectionStyle
-        );
-        if (!shown)
+    public bool Show(
+        AuxiliaryTooltipController auxiliary,
+        CardTooltipController primary,
+        CombatImpactSource? source
+    )
+    {
+        if (auxiliary.auxParent == null || auxiliary.bodyText == null)
             return false;
 
-        _activeController = controller;
-        _activeSourceId = sourceId;
+        CleanupCustomContent();
+        var generation = ++_renderGeneration;
+        _activeAuxiliary = auxiliary;
+        _activePrimary = primary;
+        _nativeBodyText = auxiliary.bodyText;
+        _nativeBodyWasActive = _nativeBodyText.gameObject.activeSelf;
+        _nativeBodyText.gameObject.SetActive(false);
 
-        // Native Lock() rejects recap cards because their original CardController is
-        // deliberately hidden. The flag is the part RecapItemVisualController reads to
-        // keep this already-positioned native tooltip alive after pointer exit.
-        TempoUIUtility.ForceRebuildRecursive(controller.TooltipRectTransform);
-        controller.KeepTooltipWithinBounds();
-        controller.SetLockedFlag(true);
+        var root = CreateVertical("BppPostCombatImpactContent", auxiliary.auxParent.transform, 8f);
+        _contentRoot = root.gameObject;
+        AddLayout(
+            root.gameObject,
+            preferredHeight: -1f,
+            preferredWidth: TooltipPreferredWidth,
+            minWidth: TooltipMinWidth
+        );
+        Build(_nativeBodyText, root, source, generation);
+
+        primary.SetLockedFlag(true);
+        Canvas.ForceUpdateCanvases();
+        TempoUIUtility.ForceRebuildRecursive(auxiliary.PositioningRectTransform);
+        return true;
+    }
+
+    public bool Position(AuxiliaryTooltipController auxiliary, CardTooltipController primary)
+    {
+        if (
+            !ReferenceEquals(_activeAuxiliary, auxiliary)
+            || !ReferenceEquals(_activePrimary, primary)
+            || _contentRoot == null
+        )
+            return false;
+
+        Canvas.ForceUpdateCanvases();
+        TempoUIUtility.ForceRebuildRecursive(primary.PositioningRectTransform);
+        TempoUIUtility.ForceRebuildRecursive(auxiliary.PositioningRectTransform);
+        LayoutRebuilder.ForceRebuildLayoutImmediate(primary.PositioningRectTransform);
+        LayoutRebuilder.ForceRebuildLayoutImmediate(auxiliary.PositioningRectTransform);
+        var side = UIPositioner.PositionRectRelativeToAnother(
+            auxiliary.PositioningRectTransform,
+            primary.PositioningRectTransform,
+            auxiliary.PositioningCanvas,
+            new UIPositioner.Margin(TooltipGap),
+            PreferredSides,
+            AllowedOverflowSides
+        );
+        if (side == UIPositioner.Side.None)
+            return false;
+
+        auxiliary.KeepTooltipWithinBounds();
         return true;
     }
 
     public void Hide()
     {
-        _renderGeneration++;
-        if (_activeController != null)
-        {
-            _activeController.SetLockedFlag(false);
-            BppTooltipSections.Hide(_activeController, SectionKey);
-        }
-        _activeController = null;
-        _activeSourceId = null;
+        if (!CleanupCustomContent())
+            return;
+
+        Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
     }
 
     public bool OnNativeTooltipChanging(CardTooltipController controller)
     {
-        if (!ReferenceEquals(_activeController, controller))
+        if (!ReferenceEquals(_activePrimary, controller))
             return false;
+
         Hide();
         return true;
     }
 
+    public bool OnNativeAuxiliaryTooltipChanging(AuxiliaryTooltipController controller)
+    {
+        if (!ReferenceEquals(_activeAuxiliary, controller))
+            return false;
+
+        // The native caller owns the auxiliary host now. Remove our content and unlock the
+        // recap tooltip without completing the host's node sequence underneath that caller.
+        CleanupCustomContent();
+        return true;
+    }
+
+    private bool CleanupCustomContent()
+    {
+        var hadActiveContent = _activeAuxiliary != null || _contentRoot != null;
+        if (!hadActiveContent)
+            return false;
+
+        _renderGeneration++;
+        if (_activePrimary != null)
+            _activePrimary.SetLockedFlag(false);
+        if (_contentRoot != null)
+        {
+            _contentRoot.SetActive(false);
+            Object.Destroy(_contentRoot);
+        }
+        if (_nativeBodyText != null)
+            _nativeBodyText.gameObject.SetActive(_nativeBodyWasActive);
+
+        _activeAuxiliary = null;
+        _activePrimary = null;
+        _contentRoot = null;
+        _nativeBodyText = null;
+        _nativeBodyWasActive = false;
+        return true;
+    }
+
     private void Build(
-        BppTooltipSections.Section section,
+        TMP_Text textTemplate,
+        RectTransform root,
         CombatImpactSource? source,
         int generation
     )
     {
-        var root = CreateVertical("BppPostCombatImpactContent", section.Block.transform, 6f);
-        section.CustomContent = root.gameObject;
-
-        var title = CloneText(
-            section.Text.textObject,
-            root,
-            T("本场影响", "Combat impact"),
-            FontStyles.Bold,
-            1.08f
-        );
-        title.alignment = TextAlignmentOptions.Left;
-
         if (source == null)
         {
             var empty = CloneText(
-                section.Text.textObject,
+                textTemplate,
                 root,
                 T("本场未记录到可归因的影响", "No attributable impact recorded this combat"),
                 FontStyles.Normal,
-                0.84f
+                0.9f
             );
             empty.alpha = 0.72f;
             return;
         }
+
+        BuildSourceSummary(textTemplate, root, source, generation);
+        foreach (var group in source.Groups)
+            BuildGroup(textTemplate, root, group, generation);
+    }
+
+    private void BuildSourceSummary(
+        TMP_Text textTemplate,
+        RectTransform parent,
+        CombatImpactSource source,
+        int generation
+    )
+    {
+        var row = CreateHorizontal(
+            "ImpactSourceSummary",
+            parent,
+            10f,
+            preferredHeight: SourceIconSize + 4f
+        );
+        BuildEntityIcon(row, source.Entity, SourceIconSize, generation);
+
+        var textColumn = CreateVertical("ImpactSourceText", row, 0f);
+        AddLayout(textColumn.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
+        CloneText(
+            textTemplate,
+            textColumn,
+            source.Entity.Name,
+            FontStyles.Bold,
+            1f,
+            flexibleWidth: 1f
+        );
 
         var summaryParts = new List<string>();
         if (source.UseCount > 0)
@@ -126,16 +222,14 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             summaryParts.Add(T($"触发 {source.TriggerCount}", $"{source.TriggerCount} triggers"));
         summaryParts.Add(T($"{source.TotalCount} 个效果", $"{source.TotalCount} effects"));
         var summary = CloneText(
-            section.Text.textObject,
-            root,
+            textTemplate,
+            textColumn,
             string.Join(" · ", summaryParts),
             FontStyles.Normal,
-            0.82f
+            0.82f,
+            flexibleWidth: 1f
         );
         summary.alpha = 0.72f;
-
-        foreach (var group in source.Groups)
-            BuildGroup(section.Text.textObject, root, group, generation);
     }
 
     private void BuildGroup(
@@ -185,7 +279,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             9f,
             preferredHeight: TargetIconSize + 4f
         );
-        BuildTargetIcon(row, target.Entity, generation);
+        BuildEntityIcon(row, target.Entity, TargetIconSize, generation);
         CloneText(
             textTemplate,
             row,
@@ -206,17 +300,22 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         metric.alpha = 0.76f;
     }
 
-    private void BuildTargetIcon(RectTransform parent, CombatImpactEntity entity, int generation)
+    private void BuildEntityIcon(
+        RectTransform parent,
+        CombatImpactEntity entity,
+        float size,
+        int generation
+    )
     {
         var iconObject = new GameObject(
-            "ImpactTargetIcon",
+            "ImpactEntityIcon",
             typeof(RectTransform),
             typeof(CanvasRenderer),
             typeof(LayoutElement)
         );
         var rect = (RectTransform)iconObject.transform;
         rect.SetParent(parent, worldPositionStays: false);
-        AddLayout(iconObject, preferredHeight: TargetIconSize, preferredWidth: TargetIconSize);
+        AddLayout(iconObject, preferredHeight: size, preferredWidth: size);
 
         if (entity.Hero.HasValue)
         {
@@ -252,7 +351,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         }
         catch
         {
-            // Target art is optional; the native tooltip remains usable without it.
+            // Entity art is optional; the native tooltip remains usable without it.
         }
     }
 

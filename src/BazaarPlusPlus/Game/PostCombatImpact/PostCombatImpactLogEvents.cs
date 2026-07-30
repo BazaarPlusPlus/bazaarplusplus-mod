@@ -12,10 +12,17 @@ internal enum PostCombatImpactReasonCode
     RuntimeUnavailable,
     TooltipDataUnavailable,
     SourceIdUnavailable,
-    NativeTooltipCreateTimedOut,
-    TooltipSectionUnavailable,
-    RecapCardBound,
-    RecapPointerDownReceived,
+    MouseDeviceUnavailable,
+    PrimaryTooltipCreateTimedOut,
+    AuxiliaryTooltipCreateTimedOut,
+    AuxiliaryTooltipContentUnavailable,
+    AuxiliaryTooltipPositionUnavailable,
+    NativeAuxiliaryDisplaced,
+    NativeAuxiliaryHidden,
+    TooltipRenderException,
+    Dismissed,
+    RecapHoverObserved,
+    RecapRightButtonObserved,
 }
 
 [BppLogEventSource]
@@ -40,5 +47,12 @@ internal static class PostCombatImpactLogEvents
         BppLogFeatureScope.PostCombatImpact,
         "post_combat_impact.interaction.observed",
         [ReasonCode]
+    );
+
+    internal static readonly BppLogEventDefinition InteractionDegraded = new(
+        BppLogFeatureScope.PostCombatImpact,
+        "post_combat_impact.interaction.degraded",
+        [ReasonCode],
+        new BppLogStormPolicy([ReasonCode])
     );
 }

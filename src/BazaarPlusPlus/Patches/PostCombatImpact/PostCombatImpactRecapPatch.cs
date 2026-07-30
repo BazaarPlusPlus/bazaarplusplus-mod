@@ -1,81 +1,105 @@
 #nullable enable
 #pragma warning disable CS0436
-using System.Reflection;
 using BazaarGameClient.Domain.Models.Cards;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
-using UnityEngine.EventSystems;
 
 namespace BazaarPlusPlus.Patches.PostCombatImpact;
 
-[HarmonyPatch(typeof(RecapItemVisualController), nameof(RecapItemVisualController.Initialize))]
-internal static class PostCombatImpactRecapPatch
+[HarmonyPatch(typeof(RecapItemVisualController), nameof(RecapItemVisualController.OnPointerEnter))]
+internal static class PostCombatImpactRecapPointerEnterPatch
 {
-    // Initialize awaits card art before it finishes. Bind in a prefix so the recap card
-    // owns the right-click target for its entire visible lifetime.
-    [HarmonyPrefix]
-    private static void Prefix(
+    [HarmonyPostfix]
+    private static void Postfix(
         RecapItemVisualController __instance,
-        Card cardData,
-        CardController cardController
+        Card ___CardData,
+        CardTooltipData? ___cardTooltipData,
+        Vector3 ___tooltipOffset
     )
     {
-        if (cardData == null || cardController == null)
+        if (___CardData == null)
             return;
 
-        BppPatchHost.Features.PostCombatImpact.BindRecapCard(__instance, cardData, cardController);
-    }
-}
-
-[HarmonyPatch(typeof(SkillProxyRenderer), nameof(SkillProxyRenderer.OnPointerClick))]
-internal static class PostCombatImpactSkillClickPatch
-{
-    private static readonly FieldInfo? TooltipOffsetField = AccessTools.Field(
-        typeof(SkillProxyRenderer),
-        "_tooltipOffsetWorldSpace"
-    );
-
-    [HarmonyPrefix]
-    private static void Prefix(SkillProxyRenderer __instance, PointerEventData eventData)
-    {
-        var boardManager = Singleton<BoardManager>.Instance;
-        var card = __instance.Card;
-        if (
-            eventData.button != PointerEventData.InputButton.Right
-            || card == null
-            || boardManager == null
-            || !boardManager.IsRecapViewOpen
-        )
-            return;
-
-        var offset = TooltipOffsetField?.GetValue(__instance) is Vector3 nativeOffset
-            ? nativeOffset
-            : Vector3.zero;
-        var tooltipData = CardTooltipData.CreateCardTooltipData(card);
-        if (tooltipData == null)
-            return;
-
-        BppPatchHost.Features.PostCombatImpact.ShowDetails(
-            card,
-            __instance.transform,
-            offset,
-            tooltipData
+        BppPatchHost.Features.PostCombatImpact.SetHoveredRecapCard(
+            __instance,
+            ___CardData,
+            ___cardTooltipData,
+            ___tooltipOffset
         );
     }
 }
 
-[HarmonyPatch(
-    typeof(CardTooltipController),
-    nameof(CardTooltipController.RenderPassiveEffectTextBlock)
-)]
-internal static class PostCombatImpactTooltipRenderPatch
+[HarmonyPatch(typeof(RecapItemVisualController), nameof(RecapItemVisualController.OnPointerExit))]
+internal static class PostCombatImpactRecapPointerExitPatch
 {
     [HarmonyPrefix]
-    private static void Prefix(CardTooltipController __instance) =>
-        BppPatchHost.Features.PostCombatImpact.OnNativeTooltipChanging(__instance);
+    private static void Prefix(RecapItemVisualController __instance) =>
+        BppPatchHost.Features.PostCombatImpact.ClearHoveredRecapCard(__instance);
+}
+
+[HarmonyPatch(typeof(SkillProxyRenderer), nameof(SkillProxyRenderer.OnPointerEnter))]
+internal static class PostCombatImpactSkillPointerEnterPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(
+        SkillProxyRenderer __instance,
+        CardTooltipData? ____tooltipData,
+        Vector3 ____tooltipOffsetWorldSpace
+    )
+    {
+        var boardManager = Singleton<BoardManager>.Instance;
+        var card = __instance.Card;
+        if (card == null || boardManager == null || !boardManager.IsRecapViewOpen)
+            return;
+
+        BppPatchHost.Features.PostCombatImpact.SetHoveredSkill(
+            __instance,
+            card,
+            ____tooltipData,
+            ____tooltipOffsetWorldSpace
+        );
+    }
+}
+
+[HarmonyPatch(typeof(SkillProxyRenderer), nameof(SkillProxyRenderer.OnPointerExit))]
+internal static class PostCombatImpactSkillPointerExitPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(SkillProxyRenderer __instance) =>
+        BppPatchHost.Features.PostCombatImpact.ClearHoveredSkill(__instance);
+}
+
+[HarmonyPatch(
+    typeof(AuxiliaryTooltipController),
+    nameof(AuxiliaryTooltipController.ShowAuxiliaryTooltipController)
+)]
+internal static class PostCombatImpactAuxiliaryTooltipShowPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(
+        AuxiliaryTooltipController __instance,
+        Transform worldSpaceTransform,
+        string newHeader
+    ) =>
+        BppPatchHost.Features.PostCombatImpact.OnNativeAuxiliaryTooltipShowing(
+            __instance,
+            worldSpaceTransform,
+            newHeader
+        );
+}
+
+[HarmonyPatch(
+    typeof(AuxiliaryTooltipController),
+    nameof(AuxiliaryTooltipController.StartTooltipFadeOut)
+)]
+internal static class PostCombatImpactAuxiliaryTooltipHidePatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(AuxiliaryTooltipController __instance) =>
+        BppPatchHost.Features.PostCombatImpact.OnNativeAuxiliaryTooltipHiding(__instance);
 }
 
 [HarmonyPatch(typeof(CardTooltipController), nameof(CardTooltipController.ResetValues))]

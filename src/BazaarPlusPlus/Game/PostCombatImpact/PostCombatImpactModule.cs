@@ -16,15 +16,33 @@ internal interface IPostCombatImpactModule
 {
     bool TryGetSource(string instanceId, out CombatImpactSource source);
 
-    void BindRecapCard(
+    void SetHoveredRecapCard(
         RecapItemVisualController recapVisual,
         Card card,
-        CardController cardController
+        CardTooltipData? tooltipData,
+        Vector3 tooltipOffset
     );
 
-    void ShowDetails(Card card, Transform anchor, Vector3 offset, CardTooltipData tooltipData);
+    void ClearHoveredRecapCard(RecapItemVisualController recapVisual);
+
+    void SetHoveredSkill(
+        SkillProxyRenderer skill,
+        Card card,
+        CardTooltipData? tooltipData,
+        Vector3 tooltipOffset
+    );
+
+    void ClearHoveredSkill(SkillProxyRenderer skill);
 
     void OnNativeTooltipChanging(CardTooltipController controller);
+
+    void OnNativeAuxiliaryTooltipShowing(
+        AuxiliaryTooltipController controller,
+        Transform anchor,
+        string header
+    );
+
+    void OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller);
 }
 
 internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactModule
@@ -66,21 +84,36 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
         return true;
     }
 
-    public void BindRecapCard(
+    public void SetHoveredRecapCard(
         RecapItemVisualController recapVisual,
         Card card,
-        CardController cardController
-    ) => _runtime?.BindRecapCard(recapVisual, card, cardController);
+        CardTooltipData? tooltipData,
+        Vector3 tooltipOffset
+    ) => _runtime?.SetHoveredRecapCard(recapVisual, card, tooltipData, tooltipOffset);
 
-    public void ShowDetails(
+    public void ClearHoveredRecapCard(RecapItemVisualController recapVisual) =>
+        _runtime?.ClearHoveredRecapCard(recapVisual);
+
+    public void SetHoveredSkill(
+        SkillProxyRenderer skill,
         Card card,
-        Transform anchor,
-        Vector3 offset,
-        CardTooltipData tooltipData
-    ) => _runtime?.ShowDetails(card, anchor, offset, tooltipData);
+        CardTooltipData? tooltipData,
+        Vector3 tooltipOffset
+    ) => _runtime?.SetHoveredSkill(skill, card, tooltipData, tooltipOffset);
+
+    public void ClearHoveredSkill(SkillProxyRenderer skill) => _runtime?.ClearHoveredSkill(skill);
 
     public void OnNativeTooltipChanging(CardTooltipController controller) =>
         _runtime?.OnNativeTooltipChanging(controller);
+
+    public void OnNativeAuxiliaryTooltipShowing(
+        AuxiliaryTooltipController controller,
+        Transform anchor,
+        string header
+    ) => _runtime?.OnNativeAuxiliaryTooltipShowing(controller, anchor, header);
+
+    public void OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller) =>
+        _runtime?.OnNativeAuxiliaryTooltipHiding(controller);
 
     public void Start()
     {

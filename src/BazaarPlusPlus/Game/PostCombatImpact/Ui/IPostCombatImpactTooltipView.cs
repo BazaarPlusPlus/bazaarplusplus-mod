@@ -6,9 +6,19 @@ namespace BazaarPlusPlus.Game.PostCombatImpact.Ui;
 
 internal interface IPostCombatImpactTooltipView : IDisposable
 {
-    bool Show(CardTooltipController controller, string sourceId, CombatImpactSource? source);
+    string Header { get; }
+
+    bool Show(
+        AuxiliaryTooltipController auxiliary,
+        CardTooltipController primary,
+        CombatImpactSource? source
+    );
+
+    bool Position(AuxiliaryTooltipController auxiliary, CardTooltipController primary);
 
     void Hide();
 
     bool OnNativeTooltipChanging(CardTooltipController controller);
+
+    bool OnNativeAuxiliaryTooltipChanging(AuxiliaryTooltipController controller);
 }
