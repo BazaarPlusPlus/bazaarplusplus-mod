@@ -2230,6 +2230,10 @@ public class CoreLayeringTests
         );
         Assert.Contains("\"BackButton\"", patchSource);
         Assert.Contains("\"RecapButton\"", patchSource);
+        Assert.Contains(
+            "CombatReplayRuntime.Instance?.BindNativeRecapAction(recapButton.onClick.Invoke)",
+            patchSource
+        );
         Assert.Contains("StartCurrentReplayAfterRecapClosed", runtimeSource);
         Assert.Contains(
             "boardManager.IsRecapViewOpen || boardManager.StorageMoving",
@@ -2244,7 +2248,12 @@ public class CoreLayeringTests
         Assert.Contains("\"native-recap-close-timeout\"", runtimeSource);
         Assert.Contains("CancelArmedCurrentReplay(recordingId, endReason)", runtimeSource);
         Assert.Contains("Action invokeNativeRecap,", runtimeSource);
-        Assert.Contains("_invokeCurrentRecordingRecap = invokeNativeRecap;", runtimeSource);
+        Assert.Contains("_invokeRecordedReplayRecap = invokeNativeRecap;", runtimeSource);
+        Assert.Contains("_activePlaybackOperation?.RecordVideo == true", runtimeSource);
+        Assert.Contains(
+            "CompleteRecordedReplayAfterRecapSettles(currentNativeRecording)",
+            runtimeSource
+        );
         Assert.Contains("invokeNativeRecap();", runtimeSource);
         Assert.Contains("native-recap-not-started", runtimeSource);
         Assert.Contains("CurrentReplayTerminalHoldSeconds = 2f", runtimeSource);
