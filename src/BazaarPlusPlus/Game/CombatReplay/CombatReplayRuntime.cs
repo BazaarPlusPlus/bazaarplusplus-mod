@@ -41,6 +41,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private PvpBattleManifest? _currentRecordingManifest;
     private IDisposable? _recordingStartedSubscription;
     private IDisposable? _recordingCompletedSubscription;
+    private CombatReplayVideoRecordingStarted? _managedRecordingStarted;
+    private CombatReplayVideoRecordingCompleted? _managedRecordingCompleted;
+    private bool _managedRecordingFinalizing;
     private Coroutine? _pendingCurrentReplayStart;
     private Coroutine? _pendingCurrentReplayPresentationGate;
     private Coroutine? _pendingCurrentReplayRecapHold;
@@ -274,7 +277,70 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     internal CurrentReplayRecordingSnapshot GetCurrentReplayRecordingSnapshot()
     {
         RefreshCurrentReplayRecordingAvailability();
+        var managedSnapshot = GetManagedReplayRecordingSnapshot();
+        if (managedSnapshot.Visible)
+            return managedSnapshot;
         return _currentRecording.Snapshot();
+    }
+
+    private CurrentReplayRecordingSnapshot GetManagedReplayRecordingSnapshot()
+    {
+        var operation = _activePlaybackOperation;
+        if (
+            operation?.RecordVideo != true
+            || AppState.CurrentState is not ReplayState
+            || string.IsNullOrWhiteSpace(operation.BattleId)
+        )
+        {
+            return default;
+        }
+
+        var started =
+            _managedRecordingStarted is { } candidate
+            && string.Equals(candidate.BattleId, operation.BattleId, StringComparison.Ordinal)
+                ? candidate
+                : null;
+        var completed =
+            _managedRecordingCompleted is { } terminal
+            && string.Equals(terminal.BattleId, operation.BattleId, StringComparison.Ordinal)
+            && (
+                started == null
+                || string.Equals(
+                    terminal.RecordingId,
+                    started.RecordingId,
+                    StringComparison.Ordinal
+                )
+            )
+                ? terminal
+                : null;
+
+        var phase =
+            completed == null
+                ? _managedRecordingFinalizing
+                    ? CurrentReplayRecordingPhase.Finalizing
+                    : started == null
+                        ? CurrentReplayRecordingPhase.Preparing
+                        : CurrentReplayRecordingPhase.Recording
+                : !completed.ArtifactUsable
+                    ? CurrentReplayRecordingPhase.Failed
+                    : completed.MetadataStatus == ReplayVideoMetadataStatus.Complete
+                    && completed.ReasonCode == ReplayVideoRecordingReasonCode.Completed
+                        ? CurrentReplayRecordingPhase.Succeeded
+                        : CurrentReplayRecordingPhase.Degraded;
+        var finalFilePath = completed?.ArtifactUsable == true ? completed.FinalFilePath : null;
+        var canReveal =
+            phase is CurrentReplayRecordingPhase.Succeeded or CurrentReplayRecordingPhase.Degraded
+            && !string.IsNullOrWhiteSpace(finalFilePath);
+        return new CurrentReplayRecordingSnapshot(
+            phase,
+            operation.BattleId,
+            started?.RecordingId,
+            finalFilePath,
+            completed?.Reason,
+            Visible: true,
+            CanStart: false,
+            CanReveal: canReveal
+        );
     }
 
     internal void PrepareCurrentReplayRecordingAvailability()
@@ -502,7 +568,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     internal bool TryRevealCurrentReplayVideo(out string reason)
     {
-        var snapshot = _currentRecording.Snapshot();
+        var snapshot = GetCurrentReplayRecordingSnapshot();
         if (!snapshot.CanReveal || string.IsNullOrWhiteSpace(snapshot.FinalFilePath))
         {
             reason = snapshot.Reason ?? "Recorded video is unavailable.";
@@ -1096,6 +1162,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
 
         _invokeRecordedReplayRecap = null;
+        _managedRecordingFinalizing = true;
         _playbackPublisher?.PublishEnded(endReason, failed);
     }
 
@@ -1134,11 +1201,36 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private void OnVideoRecordingStarted(CombatReplayVideoRecordingStarted started)
     {
         _currentRecording.MarkRecordingStarted(started.RecordingId, started.BattleId);
+        if (
+            started.Source != CombatReplayPlaybackSource.CurrentNative
+            && _activePlaybackOperation?.RecordVideo == true
+            && string.Equals(
+                _activePlaybackOperation.BattleId,
+                started.BattleId,
+                StringComparison.Ordinal
+            )
+        )
+        {
+            _managedRecordingStarted = started;
+        }
     }
 
     private void OnVideoRecordingCompleted(CombatReplayVideoRecordingCompleted completed)
     {
         _currentRecording.ApplyCompletion(completed);
+        if (
+            completed.Source != CombatReplayPlaybackSource.CurrentNative
+            && _activePlaybackOperation?.RecordVideo == true
+            && string.Equals(
+                _activePlaybackOperation.BattleId,
+                completed.BattleId,
+                StringComparison.Ordinal
+            )
+        )
+        {
+            _managedRecordingCompleted = completed;
+            _managedRecordingFinalizing = false;
+        }
     }
 
     public bool ReplayLatest()
@@ -1193,6 +1285,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             CombatReplayPlaybackSource.LocalSaved,
             recordVideo
         );
+        ResetManagedRecordingUi();
         _activePlaybackOperation = operation;
         CombatSequenceMessages sequence;
         try
@@ -1261,6 +1354,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             CombatReplayPlaybackSource.ImportedGhost,
             recordVideo
         );
+        ResetManagedRecordingUi();
         _activePlaybackOperation = operation;
         CombatSequenceMessages sequence;
         try
@@ -1503,6 +1597,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
         _currentRecording.LeaveReplayState();
         _currentRecordingManifest = null;
+        ResetManagedRecordingUi();
 
         var now = Time.realtimeSinceStartup;
         var ownership = _savedReplay.BeginReplayStateExit(now);
@@ -1729,7 +1824,17 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
 
         if (ReferenceEquals(_activePlaybackOperation, operation))
+        {
             _activePlaybackOperation = null;
+            ResetManagedRecordingUi();
+        }
+    }
+
+    private void ResetManagedRecordingUi()
+    {
+        _managedRecordingStarted = null;
+        _managedRecordingCompleted = null;
+        _managedRecordingFinalizing = false;
     }
 
     private static void LogRequestRejected(

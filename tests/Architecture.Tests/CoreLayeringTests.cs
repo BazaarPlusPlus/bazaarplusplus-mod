@@ -2221,6 +2221,11 @@ public class CoreLayeringTests
             "_button.interactable = snapshot.CanReveal || (nativeActionsBound && snapshot.CanStart)",
             controllerSource
         );
+        Assert.Contains("GetManagedReplayRecordingSnapshot()", runtimeSource);
+        Assert.Contains("_activePlaybackOperation?.RecordVideo == true", runtimeSource);
+        Assert.Contains("_managedRecordingCompleted = completed;", runtimeSource);
+        Assert.Contains("var snapshot = GetCurrentReplayRecordingSnapshot();", runtimeSource);
+        Assert.Contains("CanStart: false", runtimeSource);
         Assert.True(
             controllerSource.IndexOf("if (snapshot.CanReveal)", StringComparison.Ordinal)
                 < controllerSource.IndexOf(

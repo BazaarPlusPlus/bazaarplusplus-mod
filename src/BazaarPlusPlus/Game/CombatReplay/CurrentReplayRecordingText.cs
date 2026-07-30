@@ -50,9 +50,9 @@ internal static class CurrentReplayRecordingText
                 "在檔案管理器中顯示錄影（存在警告）"
             ),
             CurrentReplayRecordingPhase.Failed => T(
-                "Recording unavailable — click to retry",
-                "录制不可用，点击重试",
-                "錄製不可用，點擊重試"
+                snapshot.CanStart ? "Recording unavailable — click to retry" : "Recording failed",
+                snapshot.CanStart ? "录制不可用，点击重试" : "录像失败",
+                snapshot.CanStart ? "錄製不可用，點擊重試" : "錄影失敗"
             ),
             _ => T("Video recording unavailable", "视频录制不可用", "影片錄製不可用"),
         };
