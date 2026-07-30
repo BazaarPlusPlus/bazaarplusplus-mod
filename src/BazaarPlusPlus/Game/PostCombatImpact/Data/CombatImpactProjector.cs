@@ -40,6 +40,11 @@ internal static class CombatImpactProjector
                     && ResolveTargetId(candidate.Target) == targetId
                 );
                 var resolved = ResolveValue(frame, item, kind, matchingActionCount == 1);
+                if (
+                    kind == CombatImpactKind.AttributeChange
+                    && !IsDisplayableAttributeChange(resolved)
+                )
+                    continue;
                 events.Add(
                     new CombatImpactEvent(
                         kind,
@@ -96,6 +101,10 @@ internal static class CombatImpactProjector
             )
         );
     }
+
+    private static bool IsDisplayableAttributeChange(ResolvedImpactValue resolved) =>
+        resolved.Value.HasValue
+        && !resolved.NativeAttributeKey.StartsWith("Custom_", StringComparison.Ordinal);
 
     internal static string PlayerId(ECombatantId combatant) => $"player:{combatant}";
 

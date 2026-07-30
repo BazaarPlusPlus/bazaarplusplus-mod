@@ -3005,6 +3005,7 @@ public class CoreLayeringTests
         Assert.Contains("boardManager.IsRecapViewOpen", recapPatch);
         Assert.Contains("AuxiliaryTooltipController", tooltipView);
         Assert.Contains("UIPositioner.PositionRectRelativeToAnother", tooltipView);
+        Assert.Contains("primary.RootCanvasComponent", tooltipView);
         Assert.Contains("BppPostCombatImpactContent", tooltipView);
         Assert.Contains("auxiliary.bodyText", tooltipView);
         Assert.Contains("primary.SetLockedFlag(true)", tooltipView);

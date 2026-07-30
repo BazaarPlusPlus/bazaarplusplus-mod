@@ -138,6 +138,37 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Omits_internal_custom_attribute_changes_without_player_facing_semantics()
+    {
+        var simulation = new CombatSim();
+        var target = InstanceId.TryParse("target");
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardModifyAttribute,
+                    new EffectTargetCard { Target = target }
+                )
+            );
+        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.Custom_0] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.Custom_0,
+                    PreviousValue = 0,
+                    CurrentValue = 3,
+                },
+            },
+        };
+
+        Assert.Empty(CombatImpactProjector.Project(simulation, Entities()).Sources);
+    }
+
+    [Fact]
     public void Keeps_control_duration_instead_of_treating_native_target_count_as_milliseconds()
     {
         var simulation = new CombatSim();

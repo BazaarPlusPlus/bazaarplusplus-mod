@@ -21,8 +21,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 {
     private const float TargetIconSize = 34f;
     private const float SourceIconSize = 48f;
-    private const float TooltipMinWidth = 420f;
-    private const float TooltipPreferredWidth = 460f;
+    private const float TooltipMinWidth = 620f;
+    private const float TooltipPreferredWidth = 660f;
     private const float TooltipGap = 18f;
 
     private static readonly List<UIPositioner.Side> PreferredSides =
@@ -45,6 +45,11 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private GameObject? _contentRoot;
     private TMP_Text? _nativeBodyText;
     private bool _nativeBodyWasActive;
+    private RectTransform? _nativeAuxParentRect;
+    private float _nativeAuxiliaryWidth;
+    private float _nativeAuxiliaryHeight;
+    private float _nativeAuxParentWidth;
+    private bool _nativeSizeCaptured;
     private int _renderGeneration;
 
     public string Header => T("本场影响", "Combat impact");
@@ -65,15 +70,20 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         _nativeBodyText = auxiliary.bodyText;
         _nativeBodyWasActive = _nativeBodyText.gameObject.activeSelf;
         _nativeBodyText.gameObject.SetActive(false);
+        CaptureAndApplyNativeSize(auxiliary);
 
         var root = CreateVertical("BppPostCombatImpactContent", auxiliary.auxParent.transform, 8f);
         _contentRoot = root.gameObject;
+        var background = root.gameObject.AddComponent<Image>();
+        background.color = new Color32(25, 17, 10, 248);
+        background.raycastTarget = false;
         AddLayout(
             root.gameObject,
             preferredHeight: -1f,
             preferredWidth: TooltipPreferredWidth,
             minWidth: TooltipMinWidth
         );
+        root.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, TooltipPreferredWidth);
         Build(_nativeBodyText, root, source, generation);
 
         primary.SetLockedFlag(true);
@@ -88,6 +98,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             !ReferenceEquals(_activeAuxiliary, auxiliary)
             || !ReferenceEquals(_activePrimary, primary)
             || _contentRoot == null
+            || primary.RootCanvasComponent == null
         )
             return false;
 
@@ -96,10 +107,11 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         TempoUIUtility.ForceRebuildRecursive(auxiliary.PositioningRectTransform);
         LayoutRebuilder.ForceRebuildLayoutImmediate(primary.PositioningRectTransform);
         LayoutRebuilder.ForceRebuildLayoutImmediate(auxiliary.PositioningRectTransform);
+        ApplyNativeHeight(auxiliary);
         var side = UIPositioner.PositionRectRelativeToAnother(
             auxiliary.PositioningRectTransform,
             primary.PositioningRectTransform,
-            auxiliary.PositioningCanvas,
+            primary.RootCanvasComponent,
             new UIPositioner.Margin(TooltipGap),
             PreferredSides,
             AllowedOverflowSides
@@ -155,6 +167,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         }
         if (_nativeBodyText != null)
             _nativeBodyText.gameObject.SetActive(_nativeBodyWasActive);
+        RestoreNativeSize();
 
         _activeAuxiliary = null;
         _activePrimary = null;
@@ -162,6 +175,70 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         _nativeBodyText = null;
         _nativeBodyWasActive = false;
         return true;
+    }
+
+    private void CaptureAndApplyNativeSize(AuxiliaryTooltipController auxiliary)
+    {
+        _nativeAuxParentRect = auxiliary.auxParent.transform as RectTransform;
+        _nativeAuxiliaryWidth = auxiliary.PositioningRectTransform.rect.width;
+        _nativeAuxiliaryHeight = auxiliary.PositioningRectTransform.rect.height;
+        _nativeAuxParentWidth = _nativeAuxParentRect?.rect.width ?? 0f;
+        _nativeSizeCaptured = true;
+
+        var layout = auxiliary.auxParent.GetComponent<VerticalLayoutGroup>();
+        var horizontalPadding = layout?.padding.horizontal ?? 0;
+        var frameWidth = TooltipPreferredWidth + horizontalPadding;
+        auxiliary.PositioningRectTransform.SetSizeWithCurrentAnchors(
+            RectTransform.Axis.Horizontal,
+            frameWidth
+        );
+        _nativeAuxParentRect?.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, frameWidth);
+    }
+
+    private void ApplyNativeHeight(AuxiliaryTooltipController auxiliary)
+    {
+        var contentHeight = _nativeAuxParentRect?.rect.height ?? 0f;
+        if (contentHeight <= 0f)
+            return;
+
+        auxiliary.PositioningRectTransform.SetSizeWithCurrentAnchors(
+            RectTransform.Axis.Vertical,
+            contentHeight
+        );
+    }
+
+    private void RestoreNativeSize()
+    {
+        if (!_nativeSizeCaptured)
+            return;
+
+        if (_activeAuxiliary != null && _nativeAuxiliaryWidth > 0f)
+        {
+            _activeAuxiliary.PositioningRectTransform.SetSizeWithCurrentAnchors(
+                RectTransform.Axis.Horizontal,
+                _nativeAuxiliaryWidth
+            );
+            if (_nativeAuxiliaryHeight > 0f)
+            {
+                _activeAuxiliary.PositioningRectTransform.SetSizeWithCurrentAnchors(
+                    RectTransform.Axis.Vertical,
+                    _nativeAuxiliaryHeight
+                );
+            }
+        }
+        if (_nativeAuxParentRect != null && _nativeAuxParentWidth > 0f)
+        {
+            _nativeAuxParentRect.SetSizeWithCurrentAnchors(
+                RectTransform.Axis.Horizontal,
+                _nativeAuxParentWidth
+            );
+        }
+
+        _nativeAuxParentRect = null;
+        _nativeAuxiliaryWidth = 0f;
+        _nativeAuxiliaryHeight = 0f;
+        _nativeAuxParentWidth = 0f;
+        _nativeSizeCaptured = false;
     }
 
     private void Build(
@@ -244,13 +321,24 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
         var header = CreateHorizontal("ImpactGroupHeader", groupRoot, 8f, preferredHeight: 34f);
         var (label, iconKey) = ResolveEffect(group);
-        var effectText =
+        var effectIcon =
             Data.TooltipTypography?.GetKeywordStringWithIconNoScale(
                 iconKey,
-                label,
+                string.Empty,
                 useNumberFont: false
-            ) ?? label;
-        CloneText(textTemplate, header, effectText, FontStyles.Bold, 0.96f, flexibleWidth: 1f);
+            ) ?? string.Empty;
+        var icon = CloneText(
+            textTemplate,
+            header,
+            effectIcon,
+            FontStyles.Normal,
+            0.96f,
+            minWidth: 34f
+        );
+        icon.alignment = TextAlignmentOptions.Center;
+        var labelColumn = CreateVertical("ImpactGroupLabel", header, 0f);
+        AddLayout(labelColumn.gameObject, preferredHeight: -1f, flexibleWidth: 1f, minWidth: 220f);
+        CloneText(textTemplate, labelColumn, label, FontStyles.Bold, 0.96f);
         var metric = CloneText(
             textTemplate,
             header,
@@ -280,14 +368,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             preferredHeight: TargetIconSize + 4f
         );
         BuildEntityIcon(row, target.Entity, TargetIconSize, generation);
-        CloneText(
-            textTemplate,
-            row,
-            target.Entity.Name,
-            FontStyles.Normal,
-            0.88f,
-            flexibleWidth: 1f
-        );
+        var nameColumn = CreateVertical("ImpactTargetName", row, 0f);
+        AddLayout(nameColumn.gameObject, preferredHeight: -1f, flexibleWidth: 1f, minWidth: 220f);
+        CloneText(textTemplate, nameColumn, target.Entity.Name, FontStyles.Normal, 0.88f);
         var metric = CloneText(
             textTemplate,
             row,
@@ -322,12 +405,14 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             var image = iconObject.AddComponent<Image>();
             image.preserveAspect = true;
             image.raycastTarget = false;
+            image.enabled = false;
             _ = LoadHero(image, entity.Hero.Value, generation);
             return;
         }
 
         var rawImage = iconObject.AddComponent<RawImage>();
         rawImage.raycastTarget = false;
+        rawImage.enabled = false;
         _ = LoadCardArt(rawImage, entity, generation);
     }
 
@@ -339,6 +424,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
         image.texture = art.Value.Texture;
         image.uvRect = art.Value.Uv;
+        image.enabled = true;
     }
 
     private async Task LoadHero(Image image, EHero hero, int generation)
@@ -347,7 +433,10 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         {
             var outcome = await HeroPortraitSpriteProvider.LoadDefaultPortraitAsync(hero);
             if (generation == _renderGeneration && image != null && outcome?.Sprite != null)
+            {
                 image.sprite = outcome.Sprite;
+                image.enabled = true;
+            }
         }
         catch
         {
@@ -370,6 +459,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         text.gameObject.SetActive(true);
         text.fontStyle = fontStyle;
         text.fontSize *= sizeScale;
+        text.color = new Color32(248, 238, 213, 255);
+        text.alpha = 1f;
         text.textWrappingMode = TextWrappingModes.NoWrap;
         text.overflowMode = TextOverflowModes.Ellipsis;
         text.raycastTarget = false;
