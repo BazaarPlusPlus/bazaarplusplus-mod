@@ -100,6 +100,15 @@ internal sealed class CombatReplayReportArtifactBuilder
                 })
                 .ToList(),
             Assets = candidate.Assets.ManifestAssets.Select(CloneManifestAsset).ToList(),
+            SemanticIcons = candidate
+                .Assets.EventSemanticAssets.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => new RecordingReportSemanticIconV1
+                {
+                    SemanticKey = pair.Key,
+                    ContentKey = pair.Value.ContentKey,
+                    RelativeUrl = pair.Value.RelativeUrl,
+                })
+                .ToList(),
         };
         var envelope = new EmbeddedReportEnvelopeV1
         {
@@ -300,6 +309,28 @@ internal sealed class CombatReplayReportArtifactBuilder
             )
             {
                 throw new InvalidDataException("The report asset manifest is inconsistent.");
+            }
+        }
+
+        var semanticIconKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var semanticIcon in envelope.RecordingManifest.SemanticIcons ?? [])
+        {
+            if (
+                string.IsNullOrWhiteSpace(semanticIcon.SemanticKey)
+                || !semanticIconKeys.Add(semanticIcon.SemanticKey)
+                || string.IsNullOrWhiteSpace(semanticIcon.ContentKey)
+                || string.IsNullOrWhiteSpace(semanticIcon.RelativeUrl)
+                || !manifestByContentKey.TryGetValue(semanticIcon.ContentKey, out var asset)
+                || !string.Equals(
+                    asset.RelativeUrl,
+                    semanticIcon.RelativeUrl,
+                    StringComparison.Ordinal
+                )
+            )
+            {
+                throw new InvalidDataException(
+                    "A semantic icon reference is absent from the recording manifest."
+                );
             }
         }
 

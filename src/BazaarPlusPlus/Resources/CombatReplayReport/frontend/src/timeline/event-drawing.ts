@@ -65,7 +65,7 @@ function drawAttributeMarkerGlyph(
   markerSize: number,
   color: string,
 ): void {
-  const size = Math.max(1, markerSize);
+  const size = attributeMarkerGlyphSize(markerSize);
   const halfWidth = size * 0.36;
   const plusY = -size * 0.22;
   const minusY = size * 0.3;
@@ -95,6 +95,10 @@ function drawAttributeMarkerGlyph(
 
 function markerColor(token: string): string {
   return themeColor(MARKER_COLOR_NAMES[token] ?? "status");
+}
+
+export function attributeMarkerGlyphSize(markerSize: number): number {
+  return Math.max(1, Math.round(markerSize * 0.8));
 }
 
 export function markerImageBounds(

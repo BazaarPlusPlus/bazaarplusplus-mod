@@ -25,6 +25,7 @@ import type {
   NormalizedEvent,
 } from "../../model/normalize.ts";
 import type { ReportViewModel } from "../../model/report.ts";
+import { indexSemanticIcons } from "../../model/semantic-icons.ts";
 import { eventsAtFrame } from "../../timeline/event-renderer.ts";
 import type { EventLaneMode } from "../../timeline/event-lane-mode.ts";
 import { EntityArt } from "../semantic/EntityArt.tsx";
@@ -34,7 +35,6 @@ import {
 } from "../semantic/entity-art-geometry.ts";
 import {
   NativeOrSemanticIcon,
-  SemanticIcon,
 } from "../semantic/SemanticIcon.tsx";
 import {
   Accordion,
@@ -495,18 +495,15 @@ export function FrameInspector({
     [model.entities],
   );
   const iconBySemanticKey = useMemo(() => {
-    const icons = new Map<string, string>();
-    for (const event of model.events) {
-      if (
-        event.iconSemanticKey
-        && event.icon
-        && !icons.has(event.iconSemanticKey)
-      ) {
-        icons.set(event.iconSemanticKey, event.icon);
-      }
-    }
-    return icons;
-  }, [model.events]);
+    return indexSemanticIcons(model.events, model.semanticIcons);
+  }, [model.events, model.semanticIcons]);
+  const nativeIconForEvent = (event: NormalizedEvent): string => {
+    const semanticKey =
+      event.iconSemanticKey
+      || eventAttributeSemantic(event)?.nativeSemanticKey
+      || "";
+    return event.icon || iconBySemanticKey.get(semanticKey) || "";
+  };
   const inspectedEntity = entityById.get(entityId);
   const focusedIdSet = useMemo(
     () => new Set(focusedEventIds),
@@ -586,9 +583,7 @@ export function FrameInspector({
         entityById={entityById}
         event={merged.event}
         eventLaneMode={eventLaneMode}
-        fallbackIcon={iconBySemanticKey.get(
-          eventAttributeSemantic(merged.event)?.nativeSemanticKey ?? "",
-        )}
+        fallbackIcon={nativeIconForEvent(merged.event)}
         inspectedEntityId={entityId}
         key={merged.key}
         mergedCount={merged.count}
@@ -746,7 +741,15 @@ export function FrameInspector({
                   value={group.groupKey}
                 >
                   <AccordionTrigger className="min-h-control-sm px-2.5 py-1.5 text-compact hover:bg-accent/45">
-                    <SemanticIcon token={group.token} />
+                    <NativeOrSemanticIcon
+                      nativeClassName="size-icon-md"
+                      nativeUrl={group.events
+                        .map(nativeIconForEvent)
+                        .find(Boolean) ?? ""}
+                      semanticClassName="size-icon-md"
+                      testId="frame-group-native-icon"
+                      token={group.token}
+                    />
                     <span className="min-w-0 truncate">
                       {t(group.labelKey)}
                     </span>

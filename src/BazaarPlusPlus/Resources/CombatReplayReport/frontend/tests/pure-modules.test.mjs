@@ -68,6 +68,7 @@ import {
   timelineClusterEventIds,
 } from "../src/timeline/clusters.ts";
 import {
+  attributeMarkerGlyphSize,
   criticalIndicatorOffset,
   heroHealthAreaGeometry,
   markerGlyphFontSize,
@@ -1344,6 +1345,15 @@ test("statistics omits the unsupported joy activity column", () => {
   );
 });
 
+test("every activity column declares its native icon semantic", () => {
+  assert.deepEqual(
+    ACTIVITY_COLUMNS
+      .filter((column) => !column.semanticKey)
+      .map((column) => column.key),
+    [],
+  );
+});
+
 test("entity activity preserves every affected target without dividing a multi-target effect amount", () => {
   const source = normalizeEntity(
     {
@@ -1979,6 +1989,8 @@ test("timeline marker renderers share one normal size and honor dense caps", () 
   assert.equal(markerRenderSize({ markerSizeCap: 8 }), 8);
   assert.equal(markerGlyphFontSize(8, 14), 8);
   assert.equal(markerGlyphFontSize(14, 12), 12);
+  assert.equal(attributeMarkerGlyphSize(14), 11);
+  assert.equal(attributeMarkerGlyphSize(8), 6);
 });
 
 test("hero health areas use side-local peaks and step geometry", () => {
@@ -2439,6 +2451,36 @@ test("schema-v1 accepts an optional safe scrub proxy URL", () => {
   );
 });
 
+test("schema-v1 exposes a safe optional semantic icon catalog", () => {
+  const payload = structuredClone(schemaV1GoldenPayload);
+  payload.recordingManifest.semanticIcons = [
+    {
+      semanticKey: "status.freeze",
+      contentKey:
+        "sha256-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      relativeUrl:
+        "../report-assets/objects/bb/"
+        + "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        + ".png",
+    },
+    {
+      semanticKey: "status.rage",
+      contentKey:
+        "sha256-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      relativeUrl: "../../unsafe.png",
+    },
+  ];
+  const report = buildViewModel(decodeEnvelope(payload), COPY.en);
+
+  assert.equal(
+    report.semanticIcons.get("status.freeze"),
+    "../report-assets/objects/bb/"
+      + "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      + ".png",
+  );
+  assert.equal(report.semanticIcons.has("status.rage"), false);
+});
+
 test("schema-v1 decoder rejects removed aliases and malformed array entries", () => {
   assertInvalidSchemaV1((payload) => {
     payload.battleDocument.entityTable = payload.battleDocument.entities;
@@ -2461,6 +2503,12 @@ test("schema-v1 decoder rejects removed aliases and malformed array entries", ()
     payload.battleDocument.events[0].targetEntityIds.push({
       entityId: "player-hero",
     });
+  });
+  assertInvalidSchemaV1((payload) => {
+    payload.recordingManifest.semanticIcons = [{
+      semanticKey: "status.freeze",
+      relativeUrl: "../report-assets/objects/aa/missing-content-key.png",
+    }];
   });
 });
 

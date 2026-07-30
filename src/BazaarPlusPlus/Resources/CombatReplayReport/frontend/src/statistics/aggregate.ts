@@ -103,6 +103,7 @@ export const ACTIVITY_COLUMNS: readonly ActivityColumn[] = [
     key: "rage",
     label: "activityRage",
     token: "rage",
+    semanticKey: "status.rage",
     eventKind: "effect-executed",
     actions: ["PlayerRageApply"],
     quantitative: true,

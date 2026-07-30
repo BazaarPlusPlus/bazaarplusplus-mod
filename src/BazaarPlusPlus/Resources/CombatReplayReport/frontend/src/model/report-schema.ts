@@ -62,6 +62,12 @@ export interface RecordingAssetV1 {
   sha256: string;
 }
 
+export interface RecordingSemanticIconV1 {
+  semanticKey: string;
+  contentKey: string;
+  relativeUrl: string;
+}
+
 export interface RecordingManifestV1 {
   schemaVersion: number;
   artifactId: string;
@@ -76,6 +82,7 @@ export interface RecordingManifestV1 {
   durationMs?: number;
   syncAnchors: RecordingSyncAnchorV1[];
   assets: RecordingAssetV1[];
+  semanticIcons?: RecordingSemanticIconV1[];
 }
 
 export interface ReportEnvelopeV1 {
@@ -529,6 +536,17 @@ function validateAsset(value: unknown, path: string): void {
   requiredString(asset, "sha256", path);
 }
 
+function validateSemanticIcon(value: unknown, path: string): void {
+  const icon = exactRecord(
+    value,
+    path,
+    ["semanticKey", "contentKey", "relativeUrl"],
+  );
+  requiredString(icon, "semanticKey", path);
+  requiredString(icon, "contentKey", path);
+  requiredString(icon, "relativeUrl", path);
+}
+
 function validateManifest(value: unknown, path: string): void {
   const manifest = exactRecord(
     value,
@@ -549,6 +567,7 @@ function validateManifest(value: unknown, path: string): void {
       "height",
       "framesPerSecond",
       "durationMs",
+      "semanticIcons",
     ],
   );
   validateSchemaVersion(manifest, path);
@@ -576,6 +595,12 @@ function validateManifest(value: unknown, path: string): void {
   assets.forEach((asset, index) =>
     validateAsset(asset, `${path}.assets[${index}]`)
   );
+  if (manifest.semanticIcons !== undefined) {
+    const semanticIcons = requiredArray(manifest, "semanticIcons", path);
+    semanticIcons.forEach((icon, index) =>
+      validateSemanticIcon(icon, `${path}.semanticIcons[${index}]`)
+    );
+  }
 }
 
 export function decodeEnvelope(value: unknown): ReportEnvelopeV1 {

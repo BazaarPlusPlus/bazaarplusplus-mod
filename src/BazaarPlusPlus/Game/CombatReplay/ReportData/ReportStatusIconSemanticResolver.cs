@@ -80,6 +80,9 @@ internal static class ReportStatusIconSemanticResolver
             [Rage.StableKey] = Rage,
         };
 
+    internal static IReadOnlyList<ReportStatusIconSemantic> All { get; } =
+        ByStableKey.Values.OrderBy(semantic => semantic.StableKey, StringComparer.Ordinal).ToList();
+
     internal static bool TryResolve(
         CombatReportEventV1? reportEvent,
         out ReportStatusIconSemantic semantic
@@ -186,6 +189,7 @@ internal static class ReportStatusIconSemanticResolver
                 "PlayerBurnApply" or "PlayerBurnRemove" => Burn,
                 "PlayerPoisonApply" or "PlayerPoisonRemove" => Poison,
                 "PlayerRegenApply" or "PlayerRegenRemove" => Regen,
+                "PlayerRageApply" => Rage,
                 "PlayerShieldApply" or "PlayerShieldRemove" => Shield,
                 _ => null!,
             };

@@ -63,7 +63,7 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
         _cancellation?.Dispose();
         _cancellation = new CancellationTokenSource();
         var token = _cancellation.Token;
-        var uniqueEntries = BuildBindings(manifest, document)
+        var uniqueEntries = BuildBindings(manifest)
             .GroupBy(entry => entry.RenderKey.RenderKeyHash, StringComparer.Ordinal)
             .Select(group => group.First())
             .ToList();
@@ -183,7 +183,7 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
         if (document == null)
             throw new ArgumentNullException(nameof(document));
 
-        return ResolveAvailableAssets(BuildAssetLookupCandidates(manifest, document));
+        return ResolveAvailableAssets(BuildAssetLookupCandidates(manifest));
     }
 
     internal Task<IReadOnlyList<PostCombatReportAssetFile>> ListAvailableAssetsAsync(
@@ -199,7 +199,7 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
 
         // Build bindings on the Unity thread because the render key includes activeColorSpace.
         // The worker receives only immutable cache lookup data and never touches Unity objects.
-        var candidates = BuildAssetLookupCandidates(manifest, document);
+        var candidates = BuildAssetLookupCandidates(manifest);
         return Task.Run(
             () =>
             {
@@ -211,10 +211,9 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
     }
 
     private IReadOnlyList<AssetLookupCandidate> BuildAssetLookupCandidates(
-        PvpBattleManifest manifest,
-        CombatReportDocumentV1 document
+        PvpBattleManifest manifest
     ) =>
-        BuildBindings(manifest, document)
+        BuildBindings(manifest)
             .Select(entry => new AssetLookupCandidate(
                 entry.BindingKind,
                 entry.BindingKey,
@@ -264,10 +263,7 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
         _cancellation = null;
     }
 
-    private IEnumerable<NativeSpriteBinding> BuildBindings(
-        PvpBattleManifest manifest,
-        CombatReportDocumentV1 document
-    )
+    private IEnumerable<NativeSpriteBinding> BuildBindings(PvpBattleManifest manifest)
     {
         if (TryBuildHeroBinding(manifest.Participants?.PlayerHero, "player:Player", out var player))
         {
@@ -284,23 +280,8 @@ internal sealed class PostCombatReportNativeSpriteMaterializer : IDisposable
             yield return opponent;
         }
 
-        var seenSemantics = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var reportEvent in document.Events ?? [])
-        {
-            ReportStatusIconSemantic semantic;
-            if (
-                !ReportStatusIconSemanticResolver.TryGetByStableKey(
-                    reportEvent.IconSemanticKey,
-                    out semantic
-                ) && !ReportStatusIconSemanticResolver.TryResolve(reportEvent, out semantic)
-            )
-            {
-                continue;
-            }
-            if (!seenSemantics.Add(semantic.StableKey))
-                continue;
+        foreach (var semantic in ReportStatusIconSemanticResolver.All)
             yield return BuildStatusBinding(semantic);
-        }
     }
 
     private bool TryBuildHeroBinding(

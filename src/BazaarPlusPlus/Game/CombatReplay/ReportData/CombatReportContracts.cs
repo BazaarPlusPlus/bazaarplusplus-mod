@@ -264,6 +264,12 @@ public sealed class RecordingReportManifestV1
     public List<RecordingReportSyncAnchorV1> SyncAnchors { get; set; } = new();
 
     public List<RecordingReportAssetV1> Assets { get; set; } = new();
+
+    /// <summary>
+    /// Optional complete native icon catalog for Viewer semantics. Older reports omit this and
+    /// the Viewer falls back to icons attached directly to recorded events.
+    /// </summary>
+    public List<RecordingReportSemanticIconV1>? SemanticIcons { get; set; }
 }
 
 public sealed class RecordingReportSyncAnchorV1
@@ -290,4 +296,13 @@ public sealed class RecordingReportAssetV1
     public int NaturalHeight { get; set; }
 
     public string Sha256 { get; set; } = string.Empty;
+}
+
+public sealed class RecordingReportSemanticIconV1
+{
+    public string SemanticKey { get; set; } = string.Empty;
+
+    public string ContentKey { get; set; } = string.Empty;
+
+    public string RelativeUrl { get; set; } = string.Empty;
 }

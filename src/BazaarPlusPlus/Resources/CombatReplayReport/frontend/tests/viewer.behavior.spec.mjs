@@ -334,6 +334,7 @@ let denseReportUrl;
 let markerLayoutReportUrl;
 let statusApplicationReportUrl;
 let structuralReportUrl;
+let semanticIconCatalogReportUrl;
 let attributeDensityReportUrl;
 let recordingReportUrl;
 let combatLogLayoutReportUrl;
@@ -393,6 +394,34 @@ test.beforeAll(async ({ browserName }) => {
     join(fixtureDirectory, "viewer.css"),
   );
   await writeReportFixture("report.html", fixtureEnvelope);
+  const semanticIconCatalogEnvelope = structuredClone(fixtureEnvelope);
+  semanticIconCatalogEnvelope.recordingManifest.semanticIcons = [
+    {
+      semanticKey: "status.freeze",
+      contentKey:
+        "sha256-fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe",
+      relativeUrl:
+        "../report-assets/objects/fe/fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe.png",
+    },
+    {
+      semanticKey: "status.rage",
+      contentKey:
+        "sha256-abababababababababababababababababababababababababababababababab",
+      relativeUrl:
+        "../report-assets/objects/ab/abababababababababababababababababababababababababababababababab.png",
+    },
+    {
+      semanticKey: "status.destroy",
+      contentKey:
+        "sha256-6666666666666666666666666666666666666666666666666666666666666666",
+      relativeUrl:
+        "../report-assets/objects/66/6666666666666666666666666666666666666666666666666666666666666666.png",
+    },
+  ];
+  await writeReportFixture(
+    "semantic-icon-catalog-report.html",
+    semanticIconCatalogEnvelope,
+  );
   const defeatEnvelope = structuredClone(fixtureEnvelope);
   defeatEnvelope.battleDocument.metrics.push({
     frame: 139,
@@ -1030,6 +1059,9 @@ test.beforeAll(async ({ browserName }) => {
       unit: "milliseconds",
       role: "applied",
       attributionConfidence: "exact",
+      iconSemanticKey: "status.freeze",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/fe/fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe.png",
     }),
     schemaEvent({
       eventId: "freeze-application-2",
@@ -1044,6 +1076,9 @@ test.beforeAll(async ({ browserName }) => {
       unit: "milliseconds",
       role: "applied",
       attributionConfidence: "exact",
+      iconSemanticKey: "status.freeze",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/fe/fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe.png",
     }),
     schemaEvent({
       eventId: "freeze-range-1",
@@ -1405,6 +1440,9 @@ test.beforeAll(async ({ browserName }) => {
       unit: "points",
       role: "applied",
       attributionConfidence: "exact",
+      iconSemanticKey: "status.rage",
+      iconAssetRelativeUrl:
+        "../report-assets/objects/ab/abababababababababababababababababababababababababababababababab.png",
     }),
     ...navigationEnvelope.battleDocument.events,
   ];
@@ -1437,6 +1475,9 @@ test.beforeAll(async ({ browserName }) => {
     "status-application-report.html",
   );
   structuralReportUrl = fixtureReportUrl("structural-report.html");
+  semanticIconCatalogReportUrl = fixtureReportUrl(
+    "semantic-icon-catalog-report.html",
+  );
   attributeDensityReportUrl = fixtureReportUrl(
     "attribute-density-report.html",
   );
@@ -4708,6 +4749,63 @@ test("lists every affected target in an activity tooltip", async ({
     await expect(
       page.getByTestId(`statistics-activity-sort-${key}`).locator("img"),
     ).toHaveAttribute("src", expected);
+  }
+});
+
+test("uses native freeze, rage, and destroy icons throughout activity statistics", async ({
+  page,
+}) => {
+  const cases = [
+    {
+      key: "freeze",
+      reportUrl: statusApplicationReportUrl,
+      entityName: "Petrifying Gaze",
+      src:
+        "../report-assets/objects/fe/fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe.png",
+    },
+    {
+      key: "rage",
+      reportUrl: navigationReportUrl,
+      entityName: "Quick Thinking",
+      src:
+        "../report-assets/objects/ab/abababababababababababababababababababababababababababababababab.png",
+    },
+    {
+      key: "destroy",
+      reportUrl: structuralReportUrl,
+      entityName: "Disintegration Ray",
+      src:
+        "../report-assets/objects/66/6666666666666666666666666666666666666666666666666666666666666666.png",
+    },
+  ];
+
+  await page.goto(`${semanticIconCatalogReportUrl}?lang=en`);
+  await page.getByTestId("report-tab-statistics").click();
+
+  for (const testCase of cases) {
+    await expect(
+      page.getByTestId(
+        `statistics-activity-sort-native-icon-${testCase.key}`,
+      ),
+    ).toHaveAttribute("src", testCase.src);
+  }
+
+  for (const testCase of cases) {
+    await page.goto(`${testCase.reportUrl}?lang=en`);
+    await page.getByTestId("report-tab-statistics").click();
+    const row = page
+      .locator("[data-bpp-test-id^='statistics-activity-row-']")
+      .filter({ hasText: testCase.entityName });
+    await row
+      .getByTestId(`statistics-activity-value-${testCase.key}`)
+      .hover();
+    const tooltip = page.locator(
+      '[data-bpp-test-id="statistics-activity-cell-tooltip"]:not([data-state="closed"])',
+    );
+    await expect(tooltip).toBeVisible();
+    await expect(
+      tooltip.getByTestId("statistics-activity-tooltip-native-icon"),
+    ).toHaveAttribute("src", testCase.src);
   }
 });
 

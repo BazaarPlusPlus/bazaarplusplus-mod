@@ -280,6 +280,37 @@ void TypedBindingsCannotConfuseStatusIconsWithEntities()
 
 void StatusSemanticsUseExactNativeMappingsAndFailClosed()
 {
+    var catalog = ReportStatusIconSemanticResolver
+        .All.Select(semantic => (semantic.StableKey, semantic.NativeAttributeKey))
+        .ToArray();
+    var expectedCatalog = new[]
+    {
+        ("status.ammo", "Ammo"),
+        ("status.burn", "BurnApplyAmount"),
+        ("status.charge", "ChargeAmount"),
+        ("status.cooldownReduction", "PercentCooldownReduction"),
+        ("status.critChance", "CritChance"),
+        ("status.damage", "DamageAmount"),
+        ("status.destroy", "DisableTargets"),
+        ("status.experience", "Custom_8"),
+        ("status.freeze", "FreezeAmount"),
+        ("status.gold", "SellPrice"),
+        ("status.haste", "HasteAmount"),
+        ("status.heal", "HealAmount"),
+        ("status.joy", "JoyApplyAmount"),
+        ("status.multicast", "Multicast"),
+        ("status.poison", "PoisonApplyAmount"),
+        ("status.rage", "RageApplyAmount"),
+        ("status.regen", "RegenApplyAmount"),
+        ("status.shield", "ShieldApplyAmount"),
+        ("status.slow", "SlowAmount"),
+        ("status.tempo", "TempoCost"),
+    };
+    Check(
+        catalog.SequenceEqual(expectedCatalog),
+        "The complete native status catalog must keep every exact game attribute mapping in deterministic order."
+    );
+
     var expected = new (string Kind, string Action, string Stable, string Native)[]
     {
         ("player-attribute", "Burn", "status.burn", "BurnApplyAmount"),
@@ -297,8 +328,10 @@ void StatusSemanticsUseExactNativeMappingsAndFailClosed()
         ("card-attribute", "SlowAmount", "status.slow", "SlowAmount"),
         ("card-attribute", "Freeze", "status.freeze", "FreezeAmount"),
         ("effect-executed", "CardFreeze", "status.freeze", "FreezeAmount"),
+        ("effect-executed", "CardDestroy", "status.destroy", "DisableTargets"),
         ("effect-executed", "PlayerDamage", "status.damage", "DamageAmount"),
         ("effect-executed", "PlayerHeal", "status.heal", "HealAmount"),
+        ("effect-executed", "PlayerRageApply", "status.rage", "RageApplyAmount"),
         ("effect-executed", "PlayerRegenRemove", "status.regen", "RegenApplyAmount"),
         ("health", "Health:Damage", "status.damage", "DamageAmount"),
         ("health", "Health:Heal", "status.heal", "HealAmount"),

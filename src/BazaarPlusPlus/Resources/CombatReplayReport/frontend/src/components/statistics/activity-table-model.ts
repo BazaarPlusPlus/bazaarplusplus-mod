@@ -1,4 +1,3 @@
-import type { NormalizedEvent } from "../../model/normalize.ts";
 import type {
   ActivityColumn,
   ActivitySortState,
@@ -26,22 +25,6 @@ export function nextActivitySort(
     direction:
       current.key === key && current.direction === "desc" ? "asc" : "desc",
   };
-}
-
-export function indexActivityIcons(
-  events: readonly NormalizedEvent[],
-): ReadonlyMap<string, string> {
-  const index = new Map<string, string>();
-  for (const event of events) {
-    if (
-      event.iconSemanticKey
-      && event.icon
-      && !index.has(event.iconSemanticKey)
-    ) {
-      index.set(event.iconSemanticKey, event.icon);
-    }
-  }
-  return index;
 }
 
 export function groupActivityRows(

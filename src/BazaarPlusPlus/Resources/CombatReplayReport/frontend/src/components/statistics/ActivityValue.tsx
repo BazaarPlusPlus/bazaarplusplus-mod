@@ -10,7 +10,7 @@ import type {
   EntityActivityRow,
 } from "../../statistics/aggregate.ts";
 import { EntityArt } from "../semantic/EntityArt.tsx";
-import { SemanticIcon } from "../semantic/SemanticIcon.tsx";
+import { NativeOrSemanticIcon } from "../semantic/SemanticIcon.tsx";
 import {
   Tooltip,
   TooltipContent,
@@ -152,10 +152,12 @@ function TargetDetail({
 export function ActivityValue({
   row,
   column,
+  nativeIconUrl,
   t,
 }: {
   row: EntityActivityRow;
   column: ActivityColumn;
+  nativeIconUrl: string;
   t: (key: string) => string;
 }): React.JSX.Element {
   const count = row.counts[column.key] ?? 0;
@@ -253,8 +255,11 @@ export function ActivityValue({
         sideOffset={8}
       >
         <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
-          <SemanticIcon
-            className="size-icon-md shrink-0"
+          <NativeOrSemanticIcon
+            nativeClassName="size-icon-md"
+            nativeUrl={nativeIconUrl}
+            semanticClassName="size-icon-md"
+            testId="statistics-activity-tooltip-native-icon"
             token={column.token ?? column.key}
           />
           <strong className="text-compact text-foreground">

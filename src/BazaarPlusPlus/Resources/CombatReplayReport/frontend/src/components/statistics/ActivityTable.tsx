@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "../../lib/utils.ts";
 import type { ReportViewModel } from "../../model/report.ts";
+import { indexSemanticIcons } from "../../model/semantic-icons.ts";
 import {
   ACTIVITY_COLUMNS,
   buildEntityActivity,
@@ -10,7 +11,7 @@ import {
   type ActivitySortState,
 } from "../../statistics/aggregate.ts";
 import type { ReportAction } from "../../app/report-reducer.ts";
-import { SemanticIcon } from "../semantic/SemanticIcon.tsx";
+import { NativeOrSemanticIcon } from "../semantic/SemanticIcon.tsx";
 import { Button } from "../ui/button.tsx";
 import { Card } from "../ui/card.tsx";
 import { Checkbox } from "../ui/checkbox.tsx";
@@ -24,7 +25,6 @@ import {
 import { ActivityRows, GroupRows } from "./ActivityRows.tsx";
 import {
   groupActivityRows,
-  indexActivityIcons,
   nextActivitySort,
 } from "./activity-table-model.ts";
 
@@ -47,8 +47,8 @@ export function ActivityTable({
     [],
   );
   const iconBySemanticKey = useMemo(() => {
-    return indexActivityIcons(model.events);
-  }, [model.events]);
+    return indexSemanticIcons(model.events, model.semanticIcons);
+  }, [model.events, model.semanticIcons]);
   const sortedRows = useMemo(
     () =>
       rows
@@ -97,18 +97,13 @@ export function ActivityTable({
         variant="tableHeader"
       >
         {typeof column !== "string" && (
-          iconUrl ? (
-            <img
-              alt=""
-              className="size-icon-md object-contain"
-              src={iconUrl}
-            />
-          ) : (
-            <SemanticIcon
-              className="size-icon-sm"
-              token={column.token ?? column.key}
-            />
-          )
+          <NativeOrSemanticIcon
+            nativeClassName="size-icon-md"
+            nativeUrl={iconUrl}
+            semanticClassName="size-icon-sm"
+            testId={`statistics-activity-sort-native-icon-${key}`}
+            token={column.token ?? column.key}
+          />
         )}
         <span className="whitespace-nowrap text-micro">{label}</span>
         <span
@@ -217,6 +212,7 @@ export function ActivityTable({
                 <GroupRows
                   columnCount={columnCount}
                   group={group}
+                  iconBySemanticKey={iconBySemanticKey}
                   key={group.side}
                   model={model}
                   t={t}
@@ -224,6 +220,7 @@ export function ActivityTable({
               ))
               : (
                 <ActivityRows
+                  iconBySemanticKey={iconBySemanticKey}
                   rows={sortedRows}
                   testIdPrefix="all"
                   t={t}

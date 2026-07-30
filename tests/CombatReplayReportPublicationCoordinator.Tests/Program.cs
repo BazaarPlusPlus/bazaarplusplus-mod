@@ -803,6 +803,9 @@ void VerifyEventSemanticAssetBinding()
         return;
     var envelope = ParseEmbeddedEnvelope(html);
     var reportEvent = envelope?.BattleDocument.Events.SingleOrDefault();
+    var semanticIcon = envelope?.RecordingManifest.SemanticIcons?.SingleOrDefault(icon =>
+        icon.SemanticKey == semanticKey
+    );
     Check(
         reportEvent != null
             && reportEvent.IconContentKey == "sha256-" + cached.ContentHash
@@ -813,8 +816,10 @@ void VerifyEventSemanticAssetBinding()
             )
             && envelope!.RecordingManifest.Assets.Any(asset =>
                 asset.SemanticRole == "status-effect-icon"
-            ),
-        "EventSemantic assets must bind every matching event and remain present in the manifest."
+            )
+            && semanticIcon?.ContentKey == "sha256-" + cached.ContentHash
+            && semanticIcon.RelativeUrl == reportEvent.IconAssetRelativeUrl,
+        "EventSemantic assets must bind every matching event and remain in the complete semantic icon catalog."
     );
     VerifyEmbeddedDocumentIdentity(html);
 }

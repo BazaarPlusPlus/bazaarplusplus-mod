@@ -56,10 +56,12 @@ function GroupHeader({
 }
 
 export function ActivityRows({
+  iconBySemanticKey,
   rows,
   testIdPrefix,
   t,
 }: {
+  iconBySemanticKey: ReadonlyMap<string, string>;
   rows: EntityActivityRow[];
   testIdPrefix: string;
   t: (key: string) => string;
@@ -107,7 +109,14 @@ export function ActivityRows({
               data-native-value={row.authoritativeValues[column.key]}
               key={column.key}
             >
-              <ActivityValue column={column} row={row} t={t} />
+              <ActivityValue
+                column={column}
+                nativeIconUrl={column.semanticKey
+                  ? iconBySemanticKey.get(column.semanticKey) ?? ""
+                  : ""}
+                row={row}
+                t={t}
+              />
             </TableCell>
           ))}
         </TableRow>
@@ -118,11 +127,13 @@ export function ActivityRows({
 
 export function GroupRows({
   group,
+  iconBySemanticKey,
   model,
   columnCount,
   t,
 }: {
   group: { side: CombatSide; rows: EntityActivityRow[] };
+  iconBySemanticKey: ReadonlyMap<string, string>;
   model: ReportViewModel;
   columnCount: number;
   t: (key: string) => string;
@@ -137,6 +148,7 @@ export function GroupRows({
         t={t}
       />
       <ActivityRows
+        iconBySemanticKey={iconBySemanticKey}
         rows={group.rows}
         testIdPrefix={group.side}
         t={t}

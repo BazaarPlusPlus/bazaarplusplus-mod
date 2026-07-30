@@ -11,7 +11,7 @@ import {
   type NormalizedMetric,
   type NormalizedCardStats,
 } from "./normalize.ts";
-import { safeVideoUrl } from "./asset-paths.ts";
+import { safeAssetUrl, safeVideoUrl } from "./asset-paths.ts";
 import { enrichDefeatEvents } from "./defeat-events.ts";
 import {
   normalizeSyncState,
@@ -37,6 +37,7 @@ export interface ReportViewModel {
   entities: NormalizedEntity[];
   cardStats: ReadonlyMap<string, NormalizedCardStats>;
   events: NormalizedEvent[];
+  semanticIcons: ReadonlyMap<string, string>;
   metrics: NormalizedMetric[];
   videoUrl: string;
   scrubVideoUrl: string;
@@ -138,6 +139,13 @@ export function buildViewModel(
       left.combatMs - right.combatMs || left.frame - right.frame,
   );
   events = enrichDefeatEvents(events, metrics, entities);
+  const semanticIcons = new Map<string, string>();
+  for (const icon of manifest.semanticIcons ?? []) {
+    const url = safeAssetUrl(icon.relativeUrl);
+    if (icon.semanticKey && url && !semanticIcons.has(icon.semanticKey)) {
+      semanticIcons.set(icon.semanticKey, url);
+    }
+  }
 
   const frameDurationMs = Math.max(
     1,
@@ -175,6 +183,7 @@ export function buildViewModel(
     entities,
     cardStats,
     events,
+    semanticIcons,
     metrics,
     videoUrl,
     scrubVideoUrl,
