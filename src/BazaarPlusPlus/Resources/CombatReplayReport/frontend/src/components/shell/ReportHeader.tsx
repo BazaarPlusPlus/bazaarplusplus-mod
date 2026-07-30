@@ -1,5 +1,5 @@
-import { Languages } from "lucide-react";
-import { useMemo } from "react";
+import { Check, ChevronDown, Languages } from "lucide-react";
+import { useMemo, useState } from "react";
 import type { SupportedLocale, ReportViewModel } from "../../model/report.ts";
 import type { NormalizedEntity } from "../../model/normalize.ts";
 import type { ReportAction } from "../../app/report-reducer.ts";
@@ -9,15 +9,23 @@ import { EntityArt } from "../semantic/EntityArt.tsx";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { ButtonGroup } from "../ui/button-group.tsx";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../ui/popover.tsx";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs.tsx";
 import { ControlTooltip } from "../ui/tooltip.tsx";
 
-const LOCALE_LABELS: Record<SupportedLocale, string> = {
-  en: "EN",
-  "zh-CN": "中",
-  "zh-Hant": "繁",
-};
-const LOCALE_ORDER: SupportedLocale[] = ["zh-CN", "zh-Hant", "en"];
+const LOCALE_OPTIONS: readonly {
+  locale: SupportedLocale;
+  compactLabel: string;
+  label: string;
+}[] = [
+  { locale: "zh-CN", compactLabel: "中", label: "简体中文" },
+  { locale: "zh-Hant", compactLabel: "繁", label: "繁體中文" },
+  { locale: "en", compactLabel: "EN", label: "English" },
+];
 
 function heroForSide(
   model: ReportViewModel,
@@ -50,6 +58,7 @@ export function ReportHeader({
   dispatch: React.Dispatch<ReportAction>;
   t: (key: string) => string;
 }): React.JSX.Element {
+  const [localeOpen, setLocaleOpen] = useState(false);
   const playerHero = useMemo(() => heroForSide(model, "player"), [model]);
   const opponentHero = useMemo(
     () => heroForSide(model, "opponent"),
@@ -68,10 +77,9 @@ export function ReportHeader({
           ? t("draw")
           : t("unknownOutcome");
   const isWin = model.outcome === "win" || model.outcome === "victory";
-  const nextLocale = (): SupportedLocale => {
-    const index = LOCALE_ORDER.indexOf(state.locale);
-    return LOCALE_ORDER[(index + 1) % LOCALE_ORDER.length];
-  };
+  const selectedLocale =
+    LOCALE_OPTIONS.find(({ locale }) => locale === state.locale)
+    ?? LOCALE_OPTIONS[0];
   return (
     <header className="relative z-30 flex h-12 shrink-0 items-center gap-1 rounded-panel border border-border border-b-foreground/10 bg-linear-to-b from-surface-raised to-surface px-2 shadow-panel sm:gap-2 sm:px-3 lg:gap-3">
       <div className="hidden min-w-0 flex-1 items-center gap-2 sm:flex">
@@ -148,24 +156,61 @@ export function ReportHeader({
         className="shrink-0"
         data-bpp-test-id="header-utility-toolbar"
       >
-        <ControlTooltip label={t("language")}>
-          <Button
-            aria-label={t("language")}
-            className="gap-1 px-2"
-            data-bpp-test-id="locale-switch"
-            onClick={() =>
-              dispatch({ type: "select-locale", locale: nextLocale() })
-            }
-            size="sm"
-            type="button"
-            variant="outline"
+        <Popover onOpenChange={setLocaleOpen} open={localeOpen}>
+          <ControlTooltip label={t("language")}>
+            <PopoverTrigger asChild>
+              <Button
+                aria-label={t("language")}
+                className="min-w-16 gap-1 px-2"
+                data-bpp-test-id="locale-switch"
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <Languages className="hidden size-icon-sm sm:block" />
+                <span className="text-compact font-medium">
+                  {selectedLocale.compactLabel}
+                </span>
+                <ChevronDown className="size-icon-xs text-muted-foreground" />
+              </Button>
+            </PopoverTrigger>
+          </ControlTooltip>
+          <PopoverContent
+            align="end"
+            className="w-36 p-1"
+            data-bpp-test-id="locale-popover"
+            side="bottom"
           >
-            <Languages className="hidden size-icon-sm sm:block" />
-            <span className="text-compact font-medium">
-              {LOCALE_LABELS[state.locale]}
-            </span>
-          </Button>
-        </ControlTooltip>
+            <div aria-label={t("language")} role="radiogroup">
+              {LOCALE_OPTIONS.map(({ locale, label }) => {
+                const selected = locale === state.locale;
+                return (
+                  <Button
+                    aria-checked={selected}
+                    className="w-full justify-between px-2"
+                    data-bpp-test-id={`locale-option-${locale}`}
+                    key={locale}
+                    onClick={() => {
+                      dispatch({ type: "select-locale", locale });
+                      setLocaleOpen(false);
+                    }}
+                    role="radio"
+                    size="sm"
+                    type="button"
+                    variant={selected ? "secondary" : "ghost"}
+                  >
+                    <span lang={locale}>{label}</span>
+                    <Check
+                      className={selected
+                        ? "size-icon-xs"
+                        : "size-icon-xs opacity-0"}
+                    />
+                  </Button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
       </ButtonGroup>
     </header>
   );

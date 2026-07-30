@@ -1858,6 +1858,40 @@ test("uses the shadcn primitive layer and keeps every lane label aligned", async
   await expect(page.getByTestId("timeline-zoom-toolbar")).toBeHidden();
 });
 
+test("selects the report language from an explicit locale list", async ({
+  page,
+}) => {
+  await page.goto(`${reportUrl}?lang=en`);
+  const trigger = page.getByTestId("locale-switch");
+  await expect(trigger).toContainText("EN");
+
+  await trigger.click();
+  const popover = page.getByTestId("locale-popover");
+  await expect(popover).toBeVisible();
+  const options = popover.getByRole("radio");
+  await expect(options).toHaveCount(3);
+  expect(await options.allTextContents()).toEqual([
+    "简体中文",
+    "繁體中文",
+    "English",
+  ]);
+  await expect(page.getByTestId("locale-option-en")).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+
+  await page.getByTestId("locale-option-zh-CN").click();
+  await expect(popover).toBeHidden();
+  await expect(trigger).toContainText("中");
+  await expect(page.getByTestId("report-tab-statistics")).toHaveText("统计");
+
+  await trigger.click();
+  await expect(page.getByTestId("locale-option-zh-CN")).toHaveAttribute(
+    "aria-checked",
+    "true",
+  );
+});
+
 test("separates both sides and filters lanes reversibly", async ({ page }) => {
   await page.setViewportSize({ width: 999, height: 857 });
   await page.goto(`${reportUrl}?lang=en`);
@@ -4084,6 +4118,7 @@ test("keeps mounted ECharts instances across statistics rerenders and disposes o
   await page.getByTestId("statistics-activity-sort-damage").click();
   await page.getByTestId("statistics-activity-group-by-side").click();
   await page.getByTestId("locale-switch").click();
+  await page.getByTestId("locale-option-zh-CN").click();
   await expect
     .poll(() =>
       page.evaluate(() => ({
