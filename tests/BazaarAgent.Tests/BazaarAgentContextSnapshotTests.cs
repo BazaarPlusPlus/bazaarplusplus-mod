@@ -54,6 +54,31 @@ public class BazaarAgentContextSnapshotTests
     }
 
     [Fact]
+    public void GetNextAfter_PreservesBothCombatBoundariesForAStalePoller()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var beforeCombat = pub.Publish(MakeChoice());
+        var opening = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.PvpCombat,
+                LastBattle = new BazaarAgentBattleSummary { Phase = "starting" },
+            }
+        );
+        var completed = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.Replay,
+                LastBattle = new BazaarAgentBattleSummary { Phase = "completed", Result = "win" },
+            }
+        );
+
+        Assert.Same(opening, pub.GetNextAfter(beforeCombat.TickId));
+        Assert.Same(completed, pub.GetNextAfter(opening.TickId));
+        Assert.Same(completed, pub.GetNextAfter(completed.TickId));
+    }
+
+    [Fact]
     public void Publish_BattleSummary_IsStableUntilTheHostAcknowledgesIt()
     {
         var pub = new BazaarAgentContextSnapshotPublisher();

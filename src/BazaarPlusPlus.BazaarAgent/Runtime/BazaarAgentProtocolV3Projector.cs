@@ -139,13 +139,11 @@ public sealed class BazaarAgentProtocolV3Projector
                 session,
                 full
             ),
-            Selection = BuildChanges(
-                current.SelectionOptions,
-                full ? null : previous!.SelectionOptions,
-                previousCards,
-                session,
-                full
-            ),
+            // Offers are transient. Always send their whole current row, rather than making the
+            // caller reconcile an offer-specific delta against a possibly stale selection cache.
+            Selection = current
+                .SelectionOptions.Select(card => ProjectCard(card, session))
+                .ToArray(),
             Operations = OperationsChanged(current, previous, full)
                 ? BuildOperations(current)
                 : null,
@@ -154,7 +152,7 @@ public sealed class BazaarAgentProtocolV3Projector
                 : null,
             LastBattle =
                 full || !ReferenceEquals(current.LastBattle, previous!.LastBattle)
-                    ? current.LastBattle
+                    ? ProjectBattle(current.LastBattle, session)
                     : null,
             BattleCleared =
                 !full && current.LastBattle is null && previous!.LastBattle is not null
@@ -259,11 +257,13 @@ public sealed class BazaarAgentProtocolV3Projector
         new()
         {
             Id = GetInstanceToken(session, card),
-            Template = GetTemplateToken(session, card.TemplateId),
-            Name = card.DisplayName ?? "",
+            Template = string.IsNullOrWhiteSpace(card.TemplateId)
+                ? null
+                : GetTemplateToken(session, card.TemplateId),
+            Name = string.IsNullOrWhiteSpace(card.DisplayName) ? null : card.DisplayName,
             IsFull = replace ? true : null,
             Slots = Slots(card),
-            Size = card.Size,
+            Size = ProjectedSize(card),
             Tier = card.Tier,
             Enchantment = card.Enchantment,
             Tags = card.Tags,
@@ -288,7 +288,10 @@ public sealed class BazaarAgentProtocolV3Projector
         {
             Id = GetInstanceToken(session, current),
             Slots = SequenceEqual(Slots(current), Slots(previous)) ? null : Slots(current),
-            Size = current.Size != previous.Size ? current.Size : null,
+            Size =
+                current.Kind != BazaarAgentCardKind.Skill && current.Size != previous.Size
+                    ? current.Size
+                    : null,
             Tier = current.Tier != previous.Tier ? current.Tier : null,
             Enchantment = current.Enchantment != previous.Enchantment ? current.Enchantment : null,
             Tags = SequenceEqual(current.Tags, previous.Tags) ? null : current.Tags,
@@ -315,7 +318,11 @@ public sealed class BazaarAgentProtocolV3Projector
         BazaarAgentCardSnapshot previous
     ) =>
         (Slots(current) is null && Slots(previous) is not null)
-        || (current.Size is null && previous.Size is not null)
+        || (
+            current.Kind != BazaarAgentCardKind.Skill
+            && current.Size is null
+            && previous.Size is not null
+        )
         || (current.Tier is null && previous.Tier is not null)
         || (current.Enchantment is null && previous.Enchantment is not null)
         || (current.Tags is null && previous.Tags is not null)
@@ -338,6 +345,9 @@ public sealed class BazaarAgentProtocolV3Projector
         var size = BazaarAgentCardSize.Parse(card.Size, fallback: 1);
         return Enumerable.Range(start, size).ToArray();
     }
+
+    private static string? ProjectedSize(BazaarAgentCardSnapshot card) =>
+        card.Kind == BazaarAgentCardKind.Skill ? null : card.Size;
 
     private static IReadOnlyList<string> BuildOperations(BazaarAgentContext context) =>
         context
@@ -362,6 +372,39 @@ public sealed class BazaarAgentProtocolV3Projector
             .Distinct(StringComparer.Ordinal)
             .OrderBy(static operation => operation, StringComparer.Ordinal)
             .ToArray();
+
+    private static BazaarAgentV3Battle? ProjectBattle(
+        BazaarAgentBattleSummary? battle,
+        Session session
+    )
+    {
+        if (battle is null)
+            return null;
+
+        BazaarAgentV3BattleCombatant ProjectCombatant(BazaarAgentBattleCombatant combatant) =>
+            new()
+            {
+                Board = combatant.Board.Select(card => ProjectCard(card, session)).ToArray(),
+                Skills = combatant.Skills.Select(card => ProjectCard(card, session)).ToArray(),
+                Attributes = HasValues(combatant.Attributes) ? combatant.Attributes : null,
+            };
+
+        return new BazaarAgentV3Battle
+        {
+            Phase = battle.Phase,
+            BattleType = battle.BattleType,
+            Result = battle.Result,
+            Player = ProjectCombatant(battle.Player),
+            Opponent = ProjectCombatant(battle.Opponent),
+        };
+    }
+
+    private static bool HasValues(BazaarAgentBattleAttributes attributes) =>
+        attributes.Health is not null
+        || attributes.MaxHealth is not null
+        || attributes.Shield is not null
+        || attributes.Burn is not null
+        || attributes.Poison is not null;
 
     private static IReadOnlyDictionary<string, BazaarAgentCardSnapshot> IndexCards(
         BazaarAgentContext context
@@ -444,7 +487,7 @@ public sealed class BazaarAgentProtocolV3Projector
         && left.TemplateId == right.TemplateId
         && left.DisplayName == right.DisplayName
         && left.Tier == right.Tier
-        && left.Size == right.Size
+        && (left.Kind == BazaarAgentCardKind.Skill || left.Size == right.Size)
         && left.Enchantment == right.Enchantment
         && left.SocketId == right.SocketId
         && left.Location == right.Location

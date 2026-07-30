@@ -27,6 +27,8 @@ internal sealed class BazaarAgentGameContextReader
     private readonly IBazaarAgentLogger _logger;
     private readonly BazaarAgentDegradationLogState _logState = new();
     private string? _lastBattleSummaryId;
+    private string? _lastBattlePhase;
+    private string? _emittedOpeningSummaryId;
     private BazaarAgentBattleSummary? _lastBattle;
 
     public BazaarAgentGameContextReader(IBazaarAgentGameProbe gameProbe, IBazaarAgentLogger logger)
@@ -56,11 +58,15 @@ internal sealed class BazaarAgentGameContextReader
 
     public void AcknowledgeLastBattle()
     {
-        var summaryId = _lastBattleSummaryId;
-        if (summaryId is null)
+        var summary = _lastBattle;
+        if (summary?.Phase != "completed" || _lastBattleSummaryId is null)
             return;
-        BazaarAgentGameBridge.CurrentBattleSummarySource?.AcknowledgeCompletedSummary(summaryId);
+        BazaarAgentGameBridge.CurrentBattleSummarySource?.AcknowledgeCompletedSummary(
+            _lastBattleSummaryId
+        );
         _lastBattleSummaryId = null;
+        _lastBattlePhase = null;
+        _emittedOpeningSummaryId = null;
         _lastBattle = null;
     }
 
@@ -241,16 +247,21 @@ internal sealed class BazaarAgentGameContextReader
             );
         }
 
-        // A combat summary is deliberately consumed only once the game has returned to an
-        // actionable state. This keeps combat-frame churn out of Agent View while preserving the
-        // completed battle as context for the next decision.
-        var lastBattle =
-            stateName
+        // Combat is communicated only at its two boundaries. A fast PVE simulation can finish
+        // before the next runtime tick sees Combat, so retain and emit its opening boundary as a
+        // virtual read-only combat context before the completed result.
+        var liveStateName = stateName;
+        var lastBattle = GetBattleBoundary(liveStateName);
+        bool isVirtualOpening =
+            lastBattle?.Phase == "starting"
+            && liveStateName
                 is not BazaarAgentRunStateName.Combat
-                    and not BazaarAgentRunStateName.PvpCombat
-            && actions.Count > 0
-                ? GetLastBattleSummary()
-                : null;
+                    and not BazaarAgentRunStateName.PvpCombat;
+        if (isVirtualOpening)
+            stateName =
+                lastBattle!.BattleType == "pvp"
+                    ? BazaarAgentRunStateName.PvpCombat
+                    : BazaarAgentRunStateName.Combat;
 
         return new BazaarAgentContext
         {
@@ -260,7 +271,7 @@ internal sealed class BazaarAgentGameContextReader
             IsInRun = isInRun,
             HasActiveRun = hasActiveRun,
             CanStartOrContinueRun = canStartOrContinueRun,
-            IsClientBusy = isClientBusy,
+            IsClientBusy = isVirtualOpening || isClientBusy,
             RunId = runId,
             GameModeId = gameModeId,
             StateName = stateName,
@@ -291,8 +302,12 @@ internal sealed class BazaarAgentGameContextReader
             LockedBoardSockets = lockedHand,
             PlayerSkills = playerSkills,
             SellableItems = sellableItems,
-            SelectionOptions = selectionOptions,
-            AvailableActions = actions,
+            SelectionOptions = isVirtualOpening
+                ? Array.Empty<BazaarAgentCardSnapshot>()
+                : selectionOptions,
+            AvailableActions = isVirtualOpening
+                ? Array.Empty<BazaarAgentDecisionOption>()
+                : actions,
             LastBattle = lastBattle,
         };
     }
@@ -301,19 +316,52 @@ internal sealed class BazaarAgentGameContextReader
     // Replay phase
     // -------------------------------------------------------------------------
 
-    private BazaarAgentBattleSummary? GetLastBattleSummary()
+    private BazaarAgentBattleSummary? GetBattleBoundary(BazaarAgentRunStateName liveStateName)
     {
-        var source = BazaarAgentGameBridge.CurrentBattleSummarySource?.GetCompletedSummary();
+        var source = BazaarAgentGameBridge.CurrentBattleSummarySource;
+        var opening = source?.GetOpeningSummary();
+        var completed = source?.GetCompletedSummary();
+
+        if (liveStateName is BazaarAgentRunStateName.Combat or BazaarAgentRunStateName.PvpCombat)
+        {
+            if (opening is not null)
+                _emittedOpeningSummaryId = opening.SummaryId;
+            return GetBattleSummary(opening);
+        }
+
+        // The combat can be simulated entirely between runtime ticks. Preserve ordering for the
+        // agent: starting is delivered first even though the live UI is already at Replay.
+        if (
+            opening is not null
+            && completed is not null
+            && !string.Equals(_emittedOpeningSummaryId, opening.SummaryId, StringComparison.Ordinal)
+        )
+        {
+            _emittedOpeningSummaryId = opening.SummaryId;
+            return GetBattleSummary(opening);
+        }
+
+        return GetBattleSummary(completed);
+    }
+
+    private BazaarAgentBattleSummary? GetBattleSummary(BazaarAgentBattleSummarySnapshot? source)
+    {
         if (source is null)
         {
             _lastBattleSummaryId = null;
+            _lastBattlePhase = null;
             _lastBattle = null;
             return null;
         }
-        if (_lastBattleSummaryId == source.SummaryId && _lastBattle is not null)
+        if (
+            _lastBattleSummaryId == source.SummaryId
+            && _lastBattlePhase == source.Phase
+            && _lastBattle is not null
+        )
             return _lastBattle;
 
         _lastBattleSummaryId = source.SummaryId;
+        _lastBattlePhase = source.Phase;
         _lastBattle = ProjectBattleSummary(source);
         return _lastBattle;
     }
@@ -348,20 +396,44 @@ internal sealed class BazaarAgentGameContextReader
                 Poison = ProjectValue(attributes.Poison),
             };
 
+        BazaarAgentCardSnapshot ProjectCard(
+            BazaarAgentBattleCardSnapshot card,
+            BazaarAgentCardKind kind,
+            BazaarAgentCardLocation location
+        ) =>
+            new()
+            {
+                InstanceId = card.InstanceId,
+                Kind = kind,
+                Type = card.Type,
+                TemplateId = card.TemplateId,
+                DisplayName = card.DisplayName,
+                Tier = card.Tier,
+                Size = card.Size,
+                Enchantment = card.Enchantment,
+                SocketId = card.SocketId,
+                Location = location,
+                Tags = card.Tags,
+                HiddenTags = card.HiddenTags,
+                Description = card.Description,
+                CooldownSeconds = card.CooldownSeconds,
+                Ammo = card.Ammo,
+                AmmoMax = card.AmmoMax,
+                SellPrice = card.SellPrice,
+            };
+
         BazaarAgentBattleCombatant ProjectCombatant(BazaarAgentBattleCombatantSnapshot combatant) =>
             new()
             {
-                OpeningCards = combatant
-                    .OpeningCards.Select(card => new BazaarAgentBattleCard
-                    {
-                        InstanceId = card.InstanceId,
-                        TemplateId = card.TemplateId,
-                        Type = card.Type,
-                        Size = card.Size,
-                        Section = card.Section,
-                        SocketId = card.SocketId,
-                        Attributes = new Dictionary<string, int>(card.Attributes),
-                    })
+                Board = combatant
+                    .Board.Select(card =>
+                        ProjectCard(card, BazaarAgentCardKind.Item, BazaarAgentCardLocation.Board)
+                    )
+                    .ToArray(),
+                Skills = combatant
+                    .Skills.Select(card =>
+                        ProjectCard(card, BazaarAgentCardKind.Skill, BazaarAgentCardLocation.Skill)
+                    )
                     .ToArray(),
                 Attributes = ProjectAttributes(combatant.Attributes),
             };
@@ -369,6 +441,7 @@ internal sealed class BazaarAgentGameContextReader
         return new BazaarAgentBattleSummary
         {
             SummaryId = source.SummaryId,
+            Phase = source.Phase,
             BattleType = source.BattleType,
             Result = source.Result,
             Player = ProjectCombatant(source.Player),
@@ -717,6 +790,11 @@ internal sealed class BazaarAgentGameContextReader
         // inventory/exit operations as handleable after playback; none belong in the replay action
         // surface (ADR-0007).
         if (stateName == BazaarAgentRunStateName.Replay)
+            return actions;
+
+        // The native StateOps mask can retain inventory bits for a frame while the combat board
+        // is already locked. Combat is a read-only boundary for the external agent.
+        if (stateName is BazaarAgentRunStateName.Combat or BazaarAgentRunStateName.PvpCombat)
             return actions;
 
         // 2. StartOrContinueRun

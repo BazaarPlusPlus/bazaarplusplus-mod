@@ -69,6 +69,15 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
             );
         }
 
+        if (AppState.CurrentState is CombatState or PVPCombatState)
+        {
+            return new(
+                false,
+                "action not allowed during combat",
+                FailureKind: BazaarAgentDispatchFailureKind.Unavailable
+            );
+        }
+
         switch (action.ActionKind)
         {
             case BazaarAgentActionKind.StartOrContinueRun:

@@ -81,37 +81,45 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             var cooldownLeft = ComputeCooldownLeft();
             var context = _contextReader.Build(cooldownLeft);
             var previous = _snapshots.Current;
-            var snapshot = _snapshots.Publish(context, out var isFirstSnapshot);
-            if (isFirstSnapshot)
-                _logger.TryEmit(BazaarAgentLogEvents.SnapshotReady(context.StateName));
-            if (previous is null || snapshot.TickId != previous.TickId)
+            var isCombat =
+                context.StateName
+                is BazaarAgentRunStateName.Combat
+                    or BazaarAgentRunStateName.PvpCombat;
+            var previousWasCombat =
+                previous?.Context.StateName
+                is BazaarAgentRunStateName.Combat
+                    or BazaarAgentRunStateName.PvpCombat;
+
+            // A battle emits exactly two contexts: a complete opening lineup and the completed
+            // result after combat. Never advance the revision for combat-frame health, tooltip,
+            // or animation changes. If the opening message has not been captured yet, retain the
+            // preceding actionable snapshot until it is available.
+            if (!isCombat || (!previousWasCombat && context.LastBattle?.Phase == "starting"))
             {
+                var snapshot = _snapshots.Publish(context, out var isFirstSnapshot);
+                if (isFirstSnapshot)
+                    _logger.TryEmit(BazaarAgentLogEvents.SnapshotReady(context.StateName));
+                if (previous is null || snapshot.TickId != previous.TickId)
+                {
 #if DEBUG
-                // Combat detail arrives as a single LastBattle boundary summary on the next
-                // actionable context. Persisting every Combat/PvpCombat snapshot only records
-                // animation churn and duplicates the useful opening/final data.
-                if (
-                    snapshot.Context.StateName
-                    is not BazaarAgentRunStateName.Combat
-                        and not BazaarAgentRunStateName.PvpCombat
-                )
                     TryCaptureContext(snapshot);
 #endif
-                _activityFeed.Publish(
-                    "context.observed",
-                    requestId: "",
-                    route: "runtime/context",
-                    summary: "Host observed "
-                        + snapshot.Context.StateName
-                        + " at tick "
-                        + snapshot.TickId,
-                    tickId: snapshot.TickId,
-                    responseJson: JsonConvert.SerializeObject(snapshot.Context, _responseJson)
-                );
-            }
+                    _activityFeed.Publish(
+                        "context.observed",
+                        requestId: "",
+                        route: "runtime/context",
+                        summary: "Host observed "
+                            + snapshot.Context.StateName
+                            + " at tick "
+                            + snapshot.TickId,
+                        tickId: snapshot.TickId,
+                        responseJson: JsonConvert.SerializeObject(snapshot.Context, _responseJson)
+                    );
+                }
 
-            _snapshotPublished?.Invoke();
-            snapshotPublished = true;
+                _snapshotPublished?.Invoke();
+                snapshotPublished = true;
+            }
         }
 
         TryCompleteActionObservation();
@@ -148,6 +156,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
             _http = new BazaarAgentHttpServer(
                 desiredPort,
                 () => _snapshots.Current,
+                _snapshots.GetNextAfter,
                 _queue,
                 _replayQueue,
                 _logger,

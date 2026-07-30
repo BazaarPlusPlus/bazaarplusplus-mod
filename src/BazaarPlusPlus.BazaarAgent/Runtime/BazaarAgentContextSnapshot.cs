@@ -20,9 +20,22 @@ public sealed class BazaarAgentContextSnapshot
 public sealed class BazaarAgentContextSnapshotPublisher
 {
     private ulong _tickId;
-    private BazaarAgentContextSnapshot? _current;
+    private SnapshotWindow _window = SnapshotWindow.Empty;
 
-    public BazaarAgentContextSnapshot? Current => Volatile.Read(ref _current);
+    public BazaarAgentContextSnapshot? Current => Volatile.Read(ref _window).Current;
+
+    /// <summary>
+    /// Returns the next available context after a caller's acknowledged revision. Retaining one
+    /// predecessor lets an agent observe both combat boundaries even when a short battle starts
+    /// and ends between its polls.
+    /// </summary>
+    public BazaarAgentContextSnapshot? GetNextAfter(ulong revision)
+    {
+        var window = Volatile.Read(ref _window);
+        return window.Previous is { } previous && previous.TickId > revision
+            ? previous
+            : window.Current;
+    }
 
     public BazaarAgentContextSnapshot Publish(BazaarAgentContext candidate) =>
         Publish(candidate, out _);
@@ -32,7 +45,8 @@ public sealed class BazaarAgentContextSnapshotPublisher
         out bool isFirstSnapshot
     )
     {
-        var current = _current;
+        var window = Volatile.Read(ref _window);
+        var current = window.Current;
         isFirstSnapshot = current is null;
         if (current is not null && EqualsIgnoreTimeAndTick(current.Context, candidate))
         {
@@ -41,14 +55,31 @@ public sealed class BazaarAgentContextSnapshotPublisher
         _tickId++;
         var stamped = CloneWithTickId(candidate, _tickId);
         var snap = new BazaarAgentContextSnapshot(stamped);
-        Volatile.Write(ref _current, snap);
+        Volatile.Write(ref _window, new SnapshotWindow(current, snap));
         return snap;
     }
 
     public void Reset()
     {
         _tickId = 0;
-        Volatile.Write(ref _current, null);
+        Volatile.Write(ref _window, SnapshotWindow.Empty);
+    }
+
+    private sealed class SnapshotWindow
+    {
+        public static readonly SnapshotWindow Empty = new(null, null);
+
+        public SnapshotWindow(
+            BazaarAgentContextSnapshot? previous,
+            BazaarAgentContextSnapshot? current
+        )
+        {
+            Previous = previous;
+            Current = current;
+        }
+
+        public BazaarAgentContextSnapshot? Previous { get; }
+        public BazaarAgentContextSnapshot? Current { get; }
     }
 
     private static BazaarAgentContext CloneWithTickId(BazaarAgentContext src, ulong tickId) =>

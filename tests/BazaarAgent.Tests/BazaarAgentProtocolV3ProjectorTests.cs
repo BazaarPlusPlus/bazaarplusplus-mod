@@ -251,12 +251,88 @@ public sealed class BazaarAgentProtocolV3ProjectorTests
         Assert.Null(exception);
     }
 
+    [Fact]
+    public void Selection_is_a_complete_replacement_in_every_context_response()
+    {
+        var projector = new BazaarAgentProtocolV3Projector();
+        var first = projector.Bootstrap(
+            Snapshot(
+                1,
+                Array.Empty<BazaarAgentCardSnapshot>(),
+                Array.Empty<BazaarAgentCardSnapshot>(),
+                selection: new[] { Card("offer-one", BazaarAgentCardLocation.Selection, "") }
+            )
+        );
+
+        var firstOffer = Assert.Single(first.View.Selection);
+        Assert.Equal("i00001", firstOffer.Id);
+        Assert.Equal("t00001", firstOffer.Template);
+        Assert.Equal("Test Item", firstOffer.Name);
+
+        Assert.True(
+            projector.TryProjectDelta(
+                Snapshot(
+                    2,
+                    Array.Empty<BazaarAgentCardSnapshot>(),
+                    Array.Empty<BazaarAgentCardSnapshot>(),
+                    selection: new[] { Card("offer-two", BazaarAgentCardLocation.Selection, "") }
+                ),
+                first.SessionId,
+                1,
+                out var next
+            )
+        );
+
+        var nextOffer = Assert.Single(next.View.Selection);
+        Assert.Equal("i00002", nextOffer.Id);
+        Assert.Equal("t00001", nextOffer.Template);
+        Assert.Equal("Test Item", nextOffer.Name);
+        Assert.Equal("Deal 10 damage.", nextOffer.Description);
+    }
+
+    [Fact]
+    public void Skill_omits_size_and_does_not_tokenize_missing_template_or_name()
+    {
+        var projector = new BazaarAgentProtocolV3Projector();
+        var projection = projector.Bootstrap(
+            Snapshot(
+                1,
+                Array.Empty<BazaarAgentCardSnapshot>(),
+                Array.Empty<BazaarAgentCardSnapshot>(),
+                playerSkills:
+                [
+                    new BazaarAgentCardSnapshot
+                    {
+                        InstanceId = "unknown-opponent-skill",
+                        Kind = BazaarAgentCardKind.Skill,
+                        TemplateId = "",
+                        DisplayName = "",
+                        Size = "Medium",
+                        Location = BazaarAgentCardLocation.Skill,
+                    },
+                ]
+            )
+        );
+
+        var skill = Assert.Single(projection.View.Skills!.Upsert!);
+        Assert.Null(skill.Template);
+        Assert.Null(skill.Name);
+        Assert.Null(skill.Size);
+
+        var json = JObject.Parse(JsonConvert.SerializeObject(projection.View));
+        var serializedSkill = json["skills"]!["upsert"]![0]!;
+        Assert.Null(serializedSkill["template"]);
+        Assert.Null(serializedSkill["name"]);
+        Assert.Null(serializedSkill["size"]);
+    }
+
     private static BazaarAgentContextSnapshot Snapshot(
         ulong revision,
         IReadOnlyList<BazaarAgentCardSnapshot> board,
         IReadOnlyList<BazaarAgentCardSnapshot> chest,
         BazaarAgentBattleSummary? battle = null,
-        IReadOnlyList<BazaarAgentCardSnapshot>? selection = null
+        IReadOnlyList<BazaarAgentCardSnapshot>? selection = null,
+        IReadOnlyList<BazaarAgentCardSnapshot>? playerSkills = null
     ) =>
         new(
             new BazaarAgentContext
@@ -266,6 +342,7 @@ public sealed class BazaarAgentProtocolV3ProjectorTests
                 PlayerGold = 10,
                 BoardItems = board,
                 ChestItems = chest,
+                PlayerSkills = playerSkills ?? Array.Empty<BazaarAgentCardSnapshot>(),
                 SelectionOptions = selection ?? Array.Empty<BazaarAgentCardSnapshot>(),
                 LastBattle = battle,
             }

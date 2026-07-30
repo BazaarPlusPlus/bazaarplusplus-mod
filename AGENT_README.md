@@ -39,7 +39,8 @@ target, loss limit, encounter order, or shop offer pool; inspect the current con
 Only `cooldownSeconds` greater than zero is emitted. `ammoMax` is emitted only when positive;
 when it is present, `ammo` is the current count and may be zero. `sellPrice` is emitted for
 sellable item cards. The protocol intentionally does not send raw attribute dictionaries,
-ability graphs, or per-card `canSelect`, `canFit`, `free`, and `canSell` flags.
+ability graphs, or per-card `canSelect`, `canFit`, `free`, and `canSell` flags — including in
+battle lineups. Battle cards use the same complete compact-card shape as ordinary cards.
 
 ## Starting The Host
 
@@ -96,7 +97,7 @@ revision stale before the other request arrives.
 
 ### Merging a Context
 
-`board`, `chest`, `skills`, and `selection` are independently optional delta groups. A group has:
+`board`, `chest`, and `skills` are independently optional delta groups. A group has:
 
 ```json
 {
@@ -112,10 +113,32 @@ revision stale before the other request arrives.
   replacement are cleared.
 - On a full snapshot, discard all cached groups before applying its upserts.
 - `state`, `operations`, `lockedBoardSlots`, and `battle` are also deltas. A missing property
-  means unchanged. `battleCleared: true` removes the cached battle summary.
+  means unchanged. `battleCleared: true` removes the cached battle boundary.
+
+`selection` is different: every Mod-to-Agent context contains the complete current offer row as
+an array of complete cards (or `[]` when no offer is present). It is never a delta group and must
+replace, rather than merge with, the agent's previous selection.
 
 Short IDs (`i00001`, `s00001`, `e00001`) are scoped to the session. Never reuse them after a
 bootstrap/resync.
+
+### Combat Boundaries
+
+Combat does not stream. At the start of `Combat` or `PvpCombat`, the host emits one `battle`
+object with `phase: "starting"`, `battleType`, and complete `player` / `opponent` lineups. Each
+lineup contains the full `board` and `skills` membership. Cards whose templates are supplied by
+the game carry the ordinary compact-card fields (`id`, `template`, `name`, `slots` where
+applicable, tier, tags, native description, cooldown, and ammo where applicable).
+Skills have neither `slots` nor `size`.
+
+The host publishes no further revisions or deltas during the combat itself. A poll therefore
+returns the existing revision until the battle has finished. If a short battle starts and ends
+between polls, the next two context responses still arrive in order: the retained `"starting"`
+boundary first, then the completed boundary. The first post-combat actionable context replaces
+`battle` with `phase: "completed"` and the same complete lineups plus `result` and
+combatant-level health / max-health / shield / burn / poison start-end values. It is the single
+post-combat decision snapshot. `battleCleared: true` is emitted only after the agent's next
+confirmed action acknowledges that completed boundary.
 
 ## Choosing Actions
 
@@ -168,8 +191,9 @@ a different move.
    fit exists or when preserving a coherent firing/trigger order matters.
 5. In `Pedestal` or target-selection states, select the eligible owned item; use its description
    and the encounter context to decide which effect benefits the current build.
-6. During `Combat` or `PvpCombat`, do not manufacture an action. Wait for the next actionable
-   state; use the optional `battle` summary after combat to update the build assessment.
+6. On a `battle.phase: "starting"` boundary, assess the complete two-sided lineup, then wait;
+   combat itself produces no context changes and no operations. On the `"completed"` boundary,
+   incorporate the result and combatant-level changes before choosing the next action.
 7. After every action, merge `next`, then repeat from the current context. Resync only when the
    response explicitly says `resync-required`; otherwise inspect current state before choosing
    again.

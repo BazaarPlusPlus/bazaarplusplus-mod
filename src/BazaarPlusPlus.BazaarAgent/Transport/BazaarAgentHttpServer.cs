@@ -23,6 +23,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
     };
 
     private readonly Func<BazaarAgentContextSnapshot?> _snapshotGetter;
+    private readonly Func<ulong, BazaarAgentContextSnapshot?> _nextSnapshotGetter;
     private readonly BazaarAgentCommandQueue<BazaarAgentAction> _queue;
     private readonly BazaarAgentCommandQueue<BazaarAgentReplayCommand> _replayQueue;
     private readonly IBazaarAgentLogger _logger;
@@ -63,6 +64,27 @@ public sealed class BazaarAgentHttpServer : IDisposable
         : this(
             port,
             snapshotGetter,
+            _ => snapshotGetter(),
+            queue,
+            replayQueue,
+            logger,
+            requestIdFactory: BazaarAgentUlid.New,
+            activityFeed: activityFeed
+        ) { }
+
+    public BazaarAgentHttpServer(
+        int port,
+        Func<BazaarAgentContextSnapshot?> snapshotGetter,
+        Func<ulong, BazaarAgentContextSnapshot?> nextSnapshotGetter,
+        BazaarAgentCommandQueue<BazaarAgentAction> queue,
+        BazaarAgentCommandQueue<BazaarAgentReplayCommand> replayQueue,
+        IBazaarAgentLogger logger,
+        BazaarAgentActivityFeed? activityFeed = null
+    )
+        : this(
+            port,
+            snapshotGetter,
+            nextSnapshotGetter,
             queue,
             replayQueue,
             logger,
@@ -73,6 +95,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
     internal BazaarAgentHttpServer(
         int port,
         Func<BazaarAgentContextSnapshot?> snapshotGetter,
+        Func<ulong, BazaarAgentContextSnapshot?>? nextSnapshotGetter,
         BazaarAgentCommandQueue<BazaarAgentAction> queue,
         BazaarAgentCommandQueue<BazaarAgentReplayCommand> replayQueue,
         IBazaarAgentLogger logger,
@@ -90,6 +113,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
     {
         Port = port;
         _snapshotGetter = snapshotGetter;
+        _nextSnapshotGetter = nextSnapshotGetter ?? (_ => snapshotGetter());
         _queue = queue;
         _replayQueue = replayQueue;
         _logger = logger;
@@ -499,7 +523,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
             );
             return;
         }
-        var snapshot = _snapshotGetter();
+        var snapshot = hasRevision ? _nextSnapshotGetter(revision) : _snapshotGetter();
         if (snapshot is null)
         {
             WriteErrorEnvelope(ctx, 503, "unavailable", null);

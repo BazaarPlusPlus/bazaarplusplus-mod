@@ -42,6 +42,7 @@ internal sealed class ServerFixture : IDisposable
         Server = new BazaarAgentHttpServer(
             Port,
             snapshotGetter ?? (() => CurrentSnapshot),
+            null,
             Queue,
             ReplayQueue,
             Logger,

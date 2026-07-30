@@ -31,8 +31,11 @@ public sealed class BazaarAgentV3Context
     [JsonProperty("skills", NullValueHandling = NullValueHandling.Ignore)]
     public BazaarAgentV3CardChanges? Skills { get; init; }
 
-    [JsonProperty("selection", NullValueHandling = NullValueHandling.Ignore)]
-    public BazaarAgentV3CardChanges? Selection { get; init; }
+    // Unlike owned card groups, selection is self-contained in every response so that an
+    // agent never has to reconstruct a transient offer row from prior deltas.
+    [JsonProperty("selection")]
+    public IReadOnlyList<BazaarAgentV3Card> Selection { get; init; } =
+        System.Array.Empty<BazaarAgentV3Card>();
 
     [JsonProperty("operations", NullValueHandling = NullValueHandling.Ignore)]
     public IReadOnlyList<string>? Operations { get; init; }
@@ -41,7 +44,7 @@ public sealed class BazaarAgentV3Context
     public IReadOnlyList<int>? LockedBoardSlots { get; init; }
 
     [JsonProperty("battle", NullValueHandling = NullValueHandling.Ignore)]
-    public BazaarAgentBattleSummary? LastBattle { get; init; }
+    public BazaarAgentV3Battle? LastBattle { get; init; }
 
     [JsonProperty("battleCleared", NullValueHandling = NullValueHandling.Ignore)]
     public bool? BattleCleared { get; init; }
@@ -107,6 +110,39 @@ public sealed class BazaarAgentV3Card
 
     [JsonProperty("sellPrice", NullValueHandling = NullValueHandling.Ignore)]
     public int? SellPrice { get; init; }
+}
+
+/// <summary>Complete immutable lineups emitted only at a combat start or completion boundary.</summary>
+public sealed class BazaarAgentV3Battle
+{
+    [JsonProperty("phase")]
+    public string Phase { get; init; } = "";
+
+    [JsonProperty("battleType")]
+    public string BattleType { get; init; } = "unknown";
+
+    [JsonProperty("result", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Result { get; init; }
+
+    [JsonProperty("player")]
+    public BazaarAgentV3BattleCombatant Player { get; init; } = new();
+
+    [JsonProperty("opponent")]
+    public BazaarAgentV3BattleCombatant Opponent { get; init; } = new();
+}
+
+public sealed class BazaarAgentV3BattleCombatant
+{
+    [JsonProperty("board")]
+    public IReadOnlyList<BazaarAgentV3Card> Board { get; init; } =
+        System.Array.Empty<BazaarAgentV3Card>();
+
+    [JsonProperty("skills")]
+    public IReadOnlyList<BazaarAgentV3Card> Skills { get; init; } =
+        System.Array.Empty<BazaarAgentV3Card>();
+
+    [JsonProperty("attributes", NullValueHandling = NullValueHandling.Ignore)]
+    public BazaarAgentBattleAttributes? Attributes { get; init; }
 }
 
 public sealed class BazaarAgentV3ActionRequest

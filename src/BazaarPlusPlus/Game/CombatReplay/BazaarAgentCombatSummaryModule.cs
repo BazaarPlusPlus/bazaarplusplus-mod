@@ -1,5 +1,8 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Cards;
+using BazaarGameShared.Domain.Cards.Encounter.Combat;
+using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Runs;
 using BazaarGameShared.Infra.Messages;
@@ -8,6 +11,7 @@ using BazaarGameShared.Infra.Messages.GameSimEvents;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.GameInterop;
+using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.Events;
 using TheBazaar;
 
@@ -22,8 +26,10 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
     private readonly IBppEventBus _eventBus;
     private readonly object _gate = new();
     private IDisposable? _messageSubscription;
-    private OpeningBattle? _opening;
+    private BazaarAgentBattleSummarySnapshot? _opening;
     private BazaarAgentBattleSummarySnapshot? _completed;
+    private IReadOnlyDictionary<EPlayerAttributeType, int>? _openingPlayerAttributes;
+    private IReadOnlyDictionary<EPlayerAttributeType, int>? _openingOpponentAttributes;
 
     public BazaarAgentCombatSummaryModule(IBppEventBus eventBus)
     {
@@ -40,7 +46,15 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
         {
             _opening = null;
             _completed = null;
+            _openingPlayerAttributes = null;
+            _openingOpponentAttributes = null;
         }
+    }
+
+    public BazaarAgentBattleSummarySnapshot? GetOpeningSummary()
+    {
+        lock (_gate)
+            return _opening;
     }
 
     public BazaarAgentBattleSummarySnapshot? GetCompletedSummary()
@@ -56,7 +70,11 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
         lock (_gate)
         {
             if (string.Equals(_completed?.SummaryId, summaryId, StringComparison.Ordinal))
+            {
                 _completed = null;
+                if (string.Equals(_opening?.SummaryId, summaryId, StringComparison.Ordinal))
+                    _opening = null;
+            }
         }
     }
 
@@ -66,70 +84,97 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
         {
             case NetMessageGameSim gameSim when IsCombatOpening(gameSim):
                 lock (_gate)
+                {
                     _opening = CaptureOpening(gameSim);
+                    _completed = null;
+                    _openingPlayerAttributes = new Dictionary<EPlayerAttributeType, int>(
+                        gameSim.Data.Player.Attributes
+                    );
+                    _openingOpponentAttributes = new Dictionary<EPlayerAttributeType, int>(
+                        gameSim.Data.Opponent.Attributes
+                    );
+                }
                 break;
             case NetMessageCombatSim combatSim:
                 lock (_gate)
                 {
                     if (_opening is null)
                         return;
-                    _completed = BuildSummary(_opening, combatSim);
-                    _opening = null;
+                    _completed = BuildSummary(
+                        _opening,
+                        combatSim,
+                        _openingPlayerAttributes ?? new Dictionary<EPlayerAttributeType, int>(),
+                        _openingOpponentAttributes ?? new Dictionary<EPlayerAttributeType, int>()
+                    );
+                    _openingPlayerAttributes = null;
+                    _openingOpponentAttributes = null;
                 }
                 break;
         }
     }
 
-    private static OpeningBattle CaptureOpening(NetMessageGameSim message)
+    private static BazaarAgentBattleSummarySnapshot CaptureOpening(NetMessageGameSim message)
     {
-        var player = CaptureCards(message, ECombatantId.Player);
-        var opponent = CaptureCards(message, ECombatantId.Opponent);
-        return new OpeningBattle(
-            message.Data.CurrentState?.StateName == ERunState.PVPCombat ? "pvp" : "pve",
-            player,
-            opponent,
-            new Dictionary<EPlayerAttributeType, int>(message.Data.Player.Attributes),
-            new Dictionary<EPlayerAttributeType, int>(message.Data.Opponent.Attributes)
-        );
+        return new BazaarAgentBattleSummarySnapshot
+        {
+            SummaryId = Guid.NewGuid().ToString("N"),
+            Phase = "starting",
+            BattleType =
+                message.Data.CurrentState?.StateName == ERunState.PVPCombat ? "pvp" : "pve",
+            Player = CaptureCombatant(message, ECombatantId.Player),
+            Opponent = CaptureCombatant(message, ECombatantId.Opponent),
+        };
     }
 
     private static bool IsCombatOpening(NetMessageGameSim message) =>
         message.Data.CurrentState?.StateName is ERunState.Combat or ERunState.PVPCombat;
 
-    private static IReadOnlyList<BazaarAgentBattleCardSnapshot> CaptureCards(
+    private static BazaarAgentBattleCombatantSnapshot CaptureCombatant(
         NetMessageGameSim message,
         ECombatantId owner
     )
     {
         var cards = new Dictionary<string, BazaarAgentBattleCardSnapshot>(StringComparer.Ordinal);
+        var skills = new Dictionary<string, BazaarAgentBattleCardSnapshot>(StringComparer.Ordinal);
+        var spawnedCards = message.Data.Events.OfType<GameSimEventCardSpawned>().ToArray();
+        var spawnedCardByInstanceId = spawnedCards
+            .GroupBy(evt => evt.InstanceId, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+        var equippedSkills = message
+            .Data.Events.OfType<GameSimEventPlayerSkillEquipped>()
+            .Where(evt => evt.Owner == owner)
+            .ToArray();
+        var opponentSkillTemplates =
+            owner == ECombatantId.Opponent
+                ? TryGetOpponentSkillTemplates(
+                    message.Data.CurrentState?.CurrentEncounterId,
+                    equippedSkills.Length
+                )
+                : Array.Empty<TCardInstanceSkill>();
         foreach (
-            var spawned in message
-                .Data.Events.OfType<GameSimEventCardSpawned>()
-                .Where(evt => evt.CombatantId == owner && evt.Section == EInventorySection.Hand)
+            var spawned in spawnedCards.Where(evt =>
+                evt.CombatantId == owner && evt.Section == EInventorySection.Hand
+            )
         )
         {
             message.Data.Cards.TryGetValue(spawned.InstanceId, out var update);
             cards[spawned.InstanceId] = CreateCard(spawned, update);
         }
 
-        foreach (
-            var equipped in message
-                .Data.Events.OfType<GameSimEventPlayerSkillEquipped>()
-                .Where(evt => evt.Owner == owner)
-        )
+        for (var index = 0; index < equippedSkills.Length; index++)
         {
-            if (cards.ContainsKey(equipped.InstanceId))
+            var equipped = equippedSkills[index];
+            if (skills.ContainsKey(equipped.InstanceId))
                 continue;
             message.Data.Cards.TryGetValue(equipped.InstanceId, out var update);
-            cards[equipped.InstanceId] = new BazaarAgentBattleCardSnapshot
-            {
-                InstanceId = equipped.InstanceId,
-                Type = "Skill",
-                Size = update?.Size?.ToString(),
-                Section = update?.Placement?.Section?.ToString(),
-                SocketId = update?.Placement?.Socket?.ToString(),
-                Attributes = Attributes(update),
-            };
+            spawnedCardByInstanceId.TryGetValue(equipped.InstanceId, out var spawned);
+            skills[equipped.InstanceId] = CreateCard(
+                spawned,
+                update,
+                instanceId: equipped.InstanceId,
+                fallbackType: "Skill",
+                fallbackSkill: opponentSkillTemplates.ElementAtOrDefault(index)
+            );
         }
 
         // The opening GameSim reliably carries the opponent's spawned cards, but the local board
@@ -144,30 +189,113 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
 
             foreach (var skill in Data.Run?.Player?.Skills?.Where(skill => skill is not null) ?? [])
             {
-                cards[skill.InstanceId.ToString()] = CreateLiveCardSnapshot(skill);
+                skills[skill.InstanceId.ToString()] = CreateLiveCardSnapshot(skill);
             }
         }
 
-        return cards
-            .Values.OrderBy(card => card.SocketId)
-            .ThenBy(card => card.InstanceId)
-            .ToArray();
+        return new BazaarAgentBattleCombatantSnapshot
+        {
+            Board = cards
+                .Values.OrderBy(card => card.SocketId)
+                .ThenBy(card => card.InstanceId)
+                .ToArray(),
+            Skills = skills.Values.OrderBy(card => card.InstanceId).ToArray(),
+        };
     }
 
     private static BazaarAgentBattleCardSnapshot CreateCard(
         GameSimEventCardSpawned spawned,
         SimUpdateCard? update
-    ) =>
-        new()
+    ) => CreateCard(spawned, update, spawned.InstanceId, spawned.Type.ToString());
+
+    private static BazaarAgentBattleCardSnapshot CreateCard(
+        GameSimEventCardSpawned? spawned,
+        SimUpdateCard? update,
+        string instanceId,
+        string fallbackType,
+        TCardInstanceSkill? fallbackSkill = null
+    )
+    {
+        var existing = TryGetExistingCard(instanceId);
+        var templateId =
+            spawned?.TemplateId
+            ?? (
+                existing?.TemplateId is Guid existingTemplateId && existingTemplateId != Guid.Empty
+                    ? existingTemplateId.ToString()
+                    : null
+            )
+            ?? (
+                fallbackSkill is { TemplateId: var skillTemplateId }
+                && skillTemplateId != Guid.Empty
+                    ? skillTemplateId.ToString()
+                    : null
+            )
+            ?? "";
+        var type =
+            spawned?.Type ?? existing?.Type ?? (fallbackSkill is null ? null : ECardType.Skill);
+
+        // The opening GameSim is observed before the client has always materialised opponent
+        // entities. Build an equivalent detached card from the native template and update data
+        // instead of serialising that partial transport record. This preserves the same rendered
+        // name and runtime-valued description used for the local board without mutating Data.
+        if (existing?.Template is not TCardBase && type is not null)
         {
-            InstanceId = spawned.InstanceId,
-            TemplateId = spawned.TemplateId,
-            Type = spawned.Type.ToString(),
+            var detached = TryCreateDetachedCard(
+                instanceId,
+                templateId,
+                type.Value,
+                update,
+                fallbackSkill
+            );
+            if (detached is not null)
+                existing = detached;
+        }
+
+        if (existing is not null)
+            return CreateLiveCardSnapshot(existing);
+
+        return new BazaarAgentBattleCardSnapshot
+        {
+            InstanceId = instanceId,
+            TemplateId = templateId,
+            Type = fallbackType,
             Size = update?.Size?.ToString(),
-            Section = update?.Placement?.Section?.ToString() ?? spawned.Section?.ToString(),
-            SocketId = update?.Placement?.Socket?.ToString() ?? spawned.Socket?.ToString(),
-            Attributes = Attributes(update),
+            Enchantment = update?.Enchantment?.ToString(),
+            Section = update?.Placement?.Section?.ToString() ?? spawned?.Section?.ToString(),
+            SocketId = update?.Placement?.Socket?.ToString() ?? spawned?.Socket?.ToString(),
+            Tags = update?.Tags?.Select(tag => tag.ToString()).ToArray() ?? Array.Empty<string>(),
         };
+    }
+
+    private static Card? TryCreateDetachedCard(
+        string instanceId,
+        string templateId,
+        ECardType type,
+        SimUpdateCard? update,
+        TCardInstanceSkill? fallbackSkill
+    )
+    {
+        if (string.IsNullOrWhiteSpace(templateId))
+            return null;
+
+        try
+        {
+            var card = DTOUtils.CreateCard(instanceId, templateId, type);
+            if (update?.InstanceId == instanceId)
+                card.Update(update);
+            if (fallbackSkill is not null)
+            {
+                card.Tier = fallbackSkill.Tier;
+                foreach (var attribute in fallbackSkill.Attributes ?? [])
+                    card.Attributes[attribute.Key] = attribute.Value;
+            }
+            return card;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     private static BazaarAgentBattleCardSnapshot CreateLiveCardSnapshot(Card card) =>
         new()
@@ -175,26 +303,32 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
             InstanceId = card.InstanceId.ToString(),
             TemplateId = card.TemplateId.ToString(),
             Type = card.Type.ToString(),
+            DisplayName = CardDisplayNameResolver.Resolve(card.Template as TCardBase),
+            Tier = card.Tier.ToString(),
             Size = card.Size.ToString(),
+            Enchantment = (card as ItemCard)?.Enchantment?.ToString(),
             Section = card.Section?.ToString(),
             SocketId = card.LeftSocketId?.ToString(),
-            Attributes = card.Attributes.ToDictionary(
-                pair => pair.Key.ToString(),
-                pair => pair.Value
-            ),
+            Tags = card.Tags?.Select(tag => tag.ToString()).ToArray() ?? Array.Empty<string>(),
+            HiddenTags =
+                card.HiddenTags?.Select(tag => tag.ToString()).ToArray() ?? Array.Empty<string>(),
+            Description = CardDescriptionResolver.Resolve(card),
+            CooldownSeconds = ReadCooldownSeconds(card),
+            Ammo = ReadAmmo(card),
+            AmmoMax = ReadAmmoMax(card),
+            SellPrice = card.GetAttributeValue(ECardAttributeType.SellPrice),
         };
 
-    private static IReadOnlyDictionary<string, int> Attributes(SimUpdateCard? update) =>
-        update?.Attributes.ToDictionary(pair => pair.Key.ToString(), pair => pair.Value.Value)
-        ?? new Dictionary<string, int>();
-
     private static BazaarAgentBattleSummarySnapshot BuildSummary(
-        OpeningBattle opening,
-        NetMessageCombatSim message
+        BazaarAgentBattleSummarySnapshot opening,
+        NetMessageCombatSim message,
+        IReadOnlyDictionary<EPlayerAttributeType, int> openingPlayerAttributes,
+        IReadOnlyDictionary<EPlayerAttributeType, int> openingOpponentAttributes
     ) =>
         new()
         {
-            SummaryId = Guid.NewGuid().ToString("N"),
+            SummaryId = opening.SummaryId,
+            Phase = "completed",
             BattleType = opening.BattleType,
             Result = message.Data.Winner switch
             {
@@ -204,20 +338,22 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
             },
             Player = new BazaarAgentBattleCombatantSnapshot
             {
-                OpeningCards = opening.PlayerCards,
+                Board = opening.Player.Board,
+                Skills = opening.Player.Skills,
                 Attributes = SummarizeAttributes(
                     message.Data.Frames,
                     static frame => frame.PlayerUpdates,
-                    opening.PlayerAttributes
+                    openingPlayerAttributes
                 ),
             },
             Opponent = new BazaarAgentBattleCombatantSnapshot
             {
-                OpeningCards = opening.OpponentCards,
+                Board = opening.Opponent.Board,
+                Skills = opening.Opponent.Skills,
                 Attributes = SummarizeAttributes(
                     message.Data.Frames,
                     static frame => frame.OpponentUpdates,
-                    opening.OpponentAttributes
+                    openingOpponentAttributes
                 ),
             },
         };
@@ -268,11 +404,63 @@ internal sealed class BazaarAgentCombatSummaryModule : IBppFeature, IBazaarAgent
                 or EPlayerAttributeType.Burn
                 or EPlayerAttributeType.Poison;
 
-    private sealed record OpeningBattle(
-        string BattleType,
-        IReadOnlyList<BazaarAgentBattleCardSnapshot> PlayerCards,
-        IReadOnlyList<BazaarAgentBattleCardSnapshot> OpponentCards,
-        IReadOnlyDictionary<EPlayerAttributeType, int> PlayerAttributes,
-        IReadOnlyDictionary<EPlayerAttributeType, int> OpponentAttributes
-    );
+    private static Card? TryGetExistingCard(string instanceId)
+    {
+        try
+        {
+            return Data.GetCard(instanceId);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static IReadOnlyList<TCardInstanceSkill> TryGetOpponentSkillTemplates(
+        string? encounterIdText,
+        int equippedSkillCount
+    )
+    {
+        if (equippedSkillCount == 0 || !Guid.TryParse(encounterIdText, out var encounterId))
+            return Array.Empty<TCardInstanceSkill>();
+
+        try
+        {
+            // GameSim carries the encounter's static template ID here, not an entity instance
+            // ID. Looking it up through Data.GetCard would therefore always miss this early.
+            if (
+                Data.GetStatic().GetCardById(encounterId)
+                is not TCardEncounterCombat { CombatantType: TCombatantMonster combatant }
+            )
+                return Array.Empty<TCardInstanceSkill>();
+
+            var skills = Data.GetStatic()
+                .GetMonsterById(combatant.MonsterTemplateId)
+                ?.Player.Skills;
+            return skills is { Count: var count } && count == equippedSkillCount
+                ? skills.ToArray()
+                : Array.Empty<TCardInstanceSkill>();
+        }
+        catch
+        {
+            // PvP does not have a local monster definition, and some state transitions can
+            // arrive before their encounter card is materialised.
+            return Array.Empty<TCardInstanceSkill>();
+        }
+    }
+
+    private static double? ReadCooldownSeconds(Card card)
+    {
+        var milliseconds = card.GetAttributeValue(ECardAttributeType.CooldownMax);
+        return milliseconds is > 0 ? milliseconds.Value / 1000d : null;
+    }
+
+    private static int? ReadAmmoMax(Card card)
+    {
+        var ammoMax = card.GetAttributeValue(ECardAttributeType.AmmoMax);
+        return ammoMax is > 0 ? ammoMax : null;
+    }
+
+    private static int? ReadAmmo(Card card) =>
+        ReadAmmoMax(card) is null ? null : card.GetAttributeValue(ECardAttributeType.Ammo) ?? 0;
 }
