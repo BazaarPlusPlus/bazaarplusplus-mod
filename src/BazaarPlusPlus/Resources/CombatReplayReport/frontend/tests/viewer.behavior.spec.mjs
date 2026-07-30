@@ -6101,6 +6101,7 @@ test("explains contextual controls where they are used", async ({ page }) => {
   await page.goto(`${reportUrl}?lang=en`);
   const tooltip = page.locator('[data-slot="tooltip-content"]:visible');
   const expectations = [
+    ["locale-switch", "Change language"],
     [
       "event-lane-mode-source",
       "Place events on their source entity",
@@ -6121,6 +6122,11 @@ test("explains contextual controls where they are used", async ({ page }) => {
   for (const [testId, text] of expectations) {
     await page.getByTestId(testId).hover();
     await expect(tooltip).toHaveText(text);
+    expect(
+      await tooltip.evaluate((element) =>
+        Number.parseFloat(getComputedStyle(element).fontSize)
+      ),
+    ).toBeLessThanOrEqual(11);
     await page.keyboard.press("Escape");
     await expect(tooltip).toBeHidden();
   }

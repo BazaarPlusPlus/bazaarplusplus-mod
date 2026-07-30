@@ -66,7 +66,9 @@ function ControlTooltip({
   return (
     <Tooltip disableHoverableContent>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      <TooltipContent className="px-2 py-1 text-micro">
+        {label}
+      </TooltipContent>
     </Tooltip>
   );
 }
