@@ -40,14 +40,14 @@ internal static class CurrentReplayRecordingText
                 "正在匯出影片…"
             ),
             CurrentReplayRecordingPhase.Succeeded => T(
-                "Show recorded video",
-                "查看已录制视频",
-                "查看已錄製影片"
+                "Show recorded video in file manager",
+                "在文件管理器中显示录像",
+                "在檔案管理器中顯示錄影"
             ),
             CurrentReplayRecordingPhase.Degraded => T(
-                "Show recorded video (completed with warnings)",
-                "查看已录制视频（存在警告）",
-                "查看已錄製影片（存在警告）"
+                "Show recorded video in file manager (completed with warnings)",
+                "在文件管理器中显示录像（存在警告）",
+                "在檔案管理器中顯示錄影（存在警告）"
             ),
             CurrentReplayRecordingPhase.Failed => T(
                 "Recording unavailable — click to retry",

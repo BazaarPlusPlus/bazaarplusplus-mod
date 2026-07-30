@@ -2215,11 +2215,21 @@ public class CoreLayeringTests
         Assert.DoesNotContain("_cloneRect.position + Vector3.up", controllerSource);
         Assert.Contains("CurrentReplayRecordingUiLogState", controllerSource);
         Assert.Contains("BindNativeActions(", controllerSource);
+        Assert.Contains("nativeRecapButton.onClick.Invoke", controllerSource);
         Assert.Contains("nativeRecapBackButton.onClick.Invoke", controllerSource);
-        Assert.DoesNotContain("nativeRecapButton", controllerSource);
-        Assert.Contains("_button.interactable = nativeActionsBound", controllerSource);
+        Assert.Contains(
+            "_button.interactable = snapshot.CanReveal || (nativeActionsBound && snapshot.CanStart)",
+            controllerSource
+        );
+        Assert.True(
+            controllerSource.IndexOf("if (snapshot.CanReveal)", StringComparison.Ordinal)
+                < controllerSource.IndexOf(
+                    "var nativeReplayButton = _nativeReplayButton;",
+                    StringComparison.Ordinal
+                )
+        );
         Assert.Contains("\"BackButton\"", patchSource);
-        Assert.DoesNotContain("\"RecapButton\"", patchSource);
+        Assert.Contains("\"RecapButton\"", patchSource);
         Assert.Contains("StartCurrentReplayAfterRecapClosed", runtimeSource);
         Assert.Contains(
             "boardManager.IsRecapViewOpen || boardManager.StorageMoving",
@@ -2233,26 +2243,26 @@ public class CoreLayeringTests
         Assert.Contains("\"native-replay-invoke-failed\"", runtimeSource);
         Assert.Contains("\"native-recap-close-timeout\"", runtimeSource);
         Assert.Contains("CancelArmedCurrentReplay(recordingId, endReason)", runtimeSource);
-        Assert.DoesNotContain("Action invokeNativeRecap,", runtimeSource);
-        Assert.DoesNotContain("invokeNativeRecap();", runtimeSource);
-        Assert.DoesNotContain("_invokeCurrentRecordingRecap", runtimeSource);
-        Assert.DoesNotContain("native-recap-not-started", runtimeSource);
+        Assert.Contains("Action invokeNativeRecap,", runtimeSource);
+        Assert.Contains("_invokeCurrentRecordingRecap = invokeNativeRecap;", runtimeSource);
+        Assert.Contains("invokeNativeRecap();", runtimeSource);
+        Assert.Contains("native-recap-not-started", runtimeSource);
         Assert.Contains("CurrentReplayTerminalHoldSeconds = 2f", runtimeSource);
-        Assert.Contains("CurrentReplayPostReverseHoldSeconds = 1f", runtimeSource);
+        Assert.Contains("CurrentReplayRecapStableHoldSeconds = 1f", runtimeSource);
         Assert.Contains(
             "new WaitForSecondsRealtime(CurrentReplayTerminalHoldSeconds)",
             runtimeSource
         );
         Assert.Contains(
-            "new WaitForSecondsRealtime(CurrentReplayPostReverseHoldSeconds)",
+            "new WaitForSecondsRealtime(CurrentReplayRecapStableHoldSeconds)",
             runtimeSource
         );
-        Assert.Contains("\"native-replay-post-reverse-hold-ended\"", runtimeSource);
+        Assert.Contains("recapTransitionObserved |= boardManager.StorageMoving", runtimeSource);
+        Assert.Contains("!boardManager.StorageMoving && !AppState.BlockInput", runtimeSource);
+        Assert.Contains("\"native-recap-transition-timeout\"", runtimeSource);
+        Assert.Contains("\"native-replay-recap-stable-hold-ended\"", runtimeSource);
         Assert.DoesNotContain("completion.TrySetCanceled", runtimeSource);
-        Assert.Contains(
-            "Replay recording is still capturing the post-replay board.",
-            runtimeSource
-        );
+        Assert.Contains("Replay recording is still capturing the recap.", runtimeSource);
         Assert.Contains("BeginCurrentReplayRecordingAtPresentationBoundary();", runtimeSource);
         Assert.Contains(
             "simulation = handler.Simulate(message, cancellationToken);",

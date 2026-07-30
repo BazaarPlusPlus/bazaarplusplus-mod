@@ -22,7 +22,8 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 internal sealed class CombatReplayRuntime : MonoBehaviour
 {
     internal const float CurrentReplayTerminalHoldSeconds = 2f;
-    internal const float CurrentReplayPostReverseHoldSeconds = 1f;
+    internal const float CurrentReplayRecapStableHoldSeconds = 1f;
+    private const float CurrentReplayRecapTransitionTimeoutSeconds = 10f;
 
     private IBppServices? _services;
     private RunLifecycleModule? _runLifecycle;
@@ -42,13 +43,14 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private IDisposable? _recordingCompletedSubscription;
     private Coroutine? _pendingCurrentReplayStart;
     private Coroutine? _pendingCurrentReplayPresentationGate;
-    private Coroutine? _pendingCurrentReplayPostReverseHold;
+    private Coroutine? _pendingCurrentReplayRecapHold;
     private TaskCompletionSource<bool>? _currentReplaySimulationCompletion;
     private NetMessageCombatSim? _deferredCurrentReplaySimulation;
     private NetMessageCombatSim? _permittedCurrentReplaySimulation;
     private IDisposable? _currentReplayPresentationHoverSuppression;
-    private bool _currentReplayPostReverseOwnsInputBlock;
-    private bool _currentReplayPostReversePreviousInputBlock;
+    private Action? _invokeCurrentRecordingRecap;
+    private bool _currentReplayRecapOwnsInputBlock;
+    private bool _currentReplayRecapPreviousInputBlock;
     private bool _destroying;
 
     public static CombatReplayRuntime? Instance { get; private set; }
@@ -133,7 +135,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             "Combat replay runtime was destroyed."
         );
         CancelCurrentReplayPresentationGate("Combat replay runtime was destroyed.");
-        CancelCurrentReplayPostReverseHold();
+        CancelCurrentReplayRecapHold();
+        _invokeCurrentRecordingRecap = null;
         DisposeCurrentReplayPresentationHoverSuppression();
         if (currentReplayWasActive)
         {
@@ -288,12 +291,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     internal bool TryStartCurrentReplayRecording(
         Action invokeNativeReplay,
+        Action invokeNativeRecap,
         Action invokeNativeRecapBack,
         out string reason
     )
     {
         if (invokeNativeReplay == null)
             throw new ArgumentNullException(nameof(invokeNativeReplay));
+        if (invokeNativeRecap == null)
+            throw new ArgumentNullException(nameof(invokeNativeRecap));
         if (invokeNativeRecapBack == null)
             throw new ArgumentNullException(nameof(invokeNativeRecapBack));
 
@@ -331,6 +337,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             CombatReplayPlaybackSource.CurrentNative,
             recordVideo: true
         );
+        _invokeCurrentRecordingRecap = invokeNativeRecap;
 
         var boardManager = Singleton<BoardManager>.Instance;
         if (boardManager is { } && (boardManager.IsRecapViewOpen || boardManager.StorageMoving))
@@ -471,6 +478,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _videoRecorder?.Invoke()?.CancelArmedCurrentReplay(recordingId, endReason);
         _playbackPublisher?.PublishEnded(endReason, failed: true);
         _currentRecording.RollbackArm(recordingId, reason);
+        _invokeCurrentRecordingRecap = null;
     }
 
     private void CancelPendingCurrentReplayStart(string endReason, string reason)
@@ -941,78 +949,146 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return;
         }
 
-        CancelCurrentReplayPostReverseHold();
-        _currentReplayPostReversePreviousInputBlock = AppState.BlockInput;
-        AppState.BlockInput = true;
-        _currentReplayPostReverseOwnsInputBlock = true;
+        CancelCurrentReplayRecapHold();
+        var invokeNativeRecap = _invokeCurrentRecordingRecap;
+        _invokeCurrentRecordingRecap = null;
+        if (invokeNativeRecap == null)
+        {
+            CompleteCurrentReplayRecording(
+                "native-recap-action-unavailable",
+                failed: true,
+                "The native recap action is unavailable."
+            );
+            return;
+        }
+
         try
         {
-            _pendingCurrentReplayPostReverseHold = StartCoroutine(
-                CompleteCurrentReplayRecordingAfterPostReverseHold()
+            invokeNativeRecap();
+            if (Singleton<BoardManager>.Instance?.IsRecapViewOpen != true)
+            {
+                CompleteCurrentReplayRecording(
+                    "native-recap-not-started",
+                    failed: true,
+                    "The native recap did not start."
+                );
+                return;
+            }
+
+            _pendingCurrentReplayRecapHold = StartCoroutine(
+                CompleteCurrentReplayRecordingAfterRecapSettles()
             );
         }
         catch (Exception ex)
         {
-            RestoreCurrentReplayPostReverseInput();
-            CompleteCurrentReplayRecording(
-                "native-replay-post-reverse-hold-start-failed",
-                failed: true,
-                ex.Message
-            );
+            CompleteCurrentReplayRecording("native-recap-invoke-failed", failed: true, ex.Message);
         }
     }
 
-    private IEnumerator CompleteCurrentReplayRecordingAfterPostReverseHold()
+    private IEnumerator CompleteCurrentReplayRecordingAfterRecapSettles()
     {
-        yield return new WaitForSecondsRealtime(CurrentReplayPostReverseHoldSeconds);
+        var timeoutAt = Time.realtimeSinceStartup + CurrentReplayRecapTransitionTimeoutSeconds;
+        var recapTransitionObserved = false;
+        while (true)
+        {
+            if (AppState.CurrentState is not ReplayState)
+            {
+                _pendingCurrentReplayRecapHold = null;
+                CompleteCurrentReplayRecording(
+                    "native-recap-state-exited",
+                    failed: true,
+                    "Replay state exited while the recap was opening."
+                );
+                yield break;
+            }
+
+            var boardManager = Singleton<BoardManager>.Instance;
+            if (boardManager == null || !boardManager.IsRecapViewOpen)
+            {
+                _pendingCurrentReplayRecapHold = null;
+                CompleteCurrentReplayRecording(
+                    "native-recap-closed-before-capture",
+                    failed: true,
+                    "The native recap closed before video capture completed."
+                );
+                yield break;
+            }
+
+            recapTransitionObserved |= boardManager.StorageMoving;
+            // ShowRecapView constructs recap cards asynchronously before setting StorageMoving.
+            // Require the transition to start and then finish; observing only a false value could
+            // mistake that asset-loading gap for a fully rendered recap. Recap() also owns the
+            // game's input block for its first 0.5 seconds, so wait for that lease to settle too.
+            if (recapTransitionObserved && !boardManager.StorageMoving && !AppState.BlockInput)
+                break;
+
+            if (Time.realtimeSinceStartup >= timeoutAt)
+            {
+                _pendingCurrentReplayRecapHold = null;
+                CompleteCurrentReplayRecording(
+                    "native-recap-transition-timeout",
+                    failed: true,
+                    "The native recap did not finish opening."
+                );
+                yield break;
+            }
+
+            yield return null;
+        }
+
+        _currentReplayRecapPreviousInputBlock = AppState.BlockInput;
+        AppState.BlockInput = true;
+        _currentReplayRecapOwnsInputBlock = true;
+        yield return new WaitForSecondsRealtime(CurrentReplayRecapStableHoldSeconds);
         yield return new WaitForEndOfFrame();
         // Resume once more after the final end-of-frame capture before publishing "ended";
         // otherwise coroutine ordering can stop the recorder just before that frame is queued.
         yield return null;
-        _pendingCurrentReplayPostReverseHold = null;
+        _pendingCurrentReplayRecapHold = null;
         try
         {
             CompleteCurrentReplayRecording(
-                "native-replay-post-reverse-hold-ended",
+                "native-replay-recap-stable-hold-ended",
                 failed: false,
                 reason: null
             );
         }
         finally
         {
-            RestoreCurrentReplayPostReverseInput();
+            RestoreCurrentReplayRecapInput();
         }
     }
 
     private void CompleteCurrentReplayRecording(string endReason, bool failed, string? reason)
     {
         DisposeCurrentReplayPresentationHoverSuppression();
+        _invokeCurrentRecordingRecap = null;
         var outcome = _playbackPublisher?.PublishEnded(endReason, failed);
         _currentRecording.MarkReplayEnded(
             outcome is { Succeeded: false } ? outcome.Value.Exception?.Message : reason
         );
     }
 
-    private void CancelCurrentReplayPostReverseHold()
+    private void CancelCurrentReplayRecapHold()
     {
-        var pending = _pendingCurrentReplayPostReverseHold;
+        var pending = _pendingCurrentReplayRecapHold;
         if (pending != null)
         {
-            _pendingCurrentReplayPostReverseHold = null;
+            _pendingCurrentReplayRecapHold = null;
             StopCoroutine(pending);
         }
 
-        RestoreCurrentReplayPostReverseInput();
+        RestoreCurrentReplayRecapInput();
     }
 
-    private void RestoreCurrentReplayPostReverseInput()
+    private void RestoreCurrentReplayRecapInput()
     {
-        if (!_currentReplayPostReverseOwnsInputBlock)
+        if (!_currentReplayRecapOwnsInputBlock)
             return;
 
-        AppState.BlockInput = _currentReplayPostReversePreviousInputBlock;
-        _currentReplayPostReverseOwnsInputBlock = false;
-        _currentReplayPostReversePreviousInputBlock = false;
+        AppState.BlockInput = _currentReplayRecapPreviousInputBlock;
+        _currentReplayRecapOwnsInputBlock = false;
+        _currentReplayRecapPreviousInputBlock = false;
     }
 
     private void OnVideoRecordingStarted(CombatReplayVideoRecordingStarted started)
@@ -1197,9 +1273,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        if (_pendingCurrentReplayPostReverseHold != null)
+        if (_pendingCurrentReplayRecapHold != null)
         {
-            reason = "Replay recording is still capturing the post-replay board.";
+            reason = "Replay recording is still capturing the recap.";
             return false;
         }
 
@@ -1374,7 +1450,8 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         CancelCurrentReplayPresentationGate(
             "Replay state exited before the recorded simulation completed."
         );
-        CancelCurrentReplayPostReverseHold();
+        CancelCurrentReplayRecapHold();
+        _invokeCurrentRecordingRecap = null;
         if (currentReplayWasActive)
         {
             var currentEnded = _playbackPublisher?.PublishEnded("replay-state-exit", failed: true);

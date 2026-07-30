@@ -19,6 +19,10 @@ internal static class CurrentReplayRecordingButtonPatch
         typeof(BoardRecapReplayButtonsController),
         "ReplayButton"
     );
+    private static readonly FieldInfo? RecapButtonField = AccessTools.Field(
+        typeof(BoardRecapReplayButtonsController),
+        "RecapButton"
+    );
     private static readonly FieldInfo? BackButtonField = AccessTools.Field(
         typeof(BoardRecapReplayButtonsController),
         "BackButton"
@@ -30,9 +34,16 @@ internal static class CurrentReplayRecordingButtonPatch
         if (__instance == null)
             return;
         var replayButton = ReplayButtonField?.GetValue(__instance) as Button;
+        var recapButton = RecapButtonField?.GetValue(__instance) as Button;
         var backButton = BackButtonField?.GetValue(__instance) as Button;
-        if (replayButton != null && backButton != null)
-            CurrentReplayRecordingButtonController.BindNativeActions(replayButton, backButton);
+        if (replayButton != null && recapButton != null && backButton != null)
+        {
+            CurrentReplayRecordingButtonController.BindNativeActions(
+                replayButton,
+                recapButton,
+                backButton
+            );
+        }
     }
 }
 
