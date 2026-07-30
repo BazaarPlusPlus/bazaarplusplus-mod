@@ -382,7 +382,7 @@ internal sealed class PostCombatImpactView : IDisposable
             targetName.style.marginLeft = 12f;
             targetName.style.flexGrow = 1f;
             targetRow.Add(targetName);
-            targetRow.Add(Label(FormatTargetMetric(target), 15f, Muted));
+            targetRow.Add(Label(FormatTargetMetric(group.Kind, target), 15f, Muted));
             column.Add(targetRow);
         }
         return column;
@@ -460,36 +460,47 @@ internal sealed class PostCombatImpactView : IDisposable
 
     private static string FormatSummaryValue(CombatImpactGroup group) =>
         group.AggregateValue.HasValue
-            ? FormatValue(group.AggregateValue.Value, group.Unit, group.ValueIsPartial)
+            ? FormatValue(
+                group.AggregateValue.Value,
+                group.Unit,
+                group.ValueIsPartial,
+                group.Kind == CombatImpactKind.AttributeChange
+            )
             : group.Count.ToString();
 
     private static string FormatGroupMetric(CombatImpactGroup group)
     {
         var count = T($"{group.Count} 次", $"{group.Count}×");
         return group.AggregateValue.HasValue
-            ? $"{count} · {FormatValue(group.AggregateValue.Value, group.Unit, group.ValueIsPartial)}"
+            ? $"{count} · {FormatValue(group.AggregateValue.Value, group.Unit, group.ValueIsPartial, group.Kind == CombatImpactKind.AttributeChange)}"
             : count;
     }
 
-    private static string FormatTargetMetric(CombatImpactTarget target)
+    private static string FormatTargetMetric(CombatImpactKind kind, CombatImpactTarget target)
     {
         var count = $"×{target.Count}";
         return target.AggregateValue.HasValue
-            ? $"{count} · {FormatValue(target.AggregateValue.Value, target.Unit, target.ValueIsPartial)}"
+            ? $"{count} · {FormatValue(target.AggregateValue.Value, target.Unit, target.ValueIsPartial, kind == CombatImpactKind.AttributeChange)}"
             : count;
     }
 
-    private static string FormatValue(int value, CombatImpactValueUnit unit, bool partial)
+    private static string FormatValue(
+        int value,
+        CombatImpactValueUnit unit,
+        bool partial,
+        bool showSign = false
+    )
     {
-        var prefix = partial ? "≥" : string.Empty;
+        var prefix = partial ? (showSign ? "≈" : "≥") : string.Empty;
+        var sign = showSign && value >= 0 ? "+" : string.Empty;
         return unit switch
         {
-            CombatImpactValueUnit.Milliseconds => value >= 1000
-                ? $"{prefix}{value / 1000f:0.##}s"
-                : $"{prefix}{value}ms",
+            CombatImpactValueUnit.Milliseconds => Math.Abs(value) >= 1000
+                ? $"{prefix}{sign}{value / 1000f:0.##}s"
+                : $"{prefix}{sign}{value}ms",
             CombatImpactValueUnit.PercentagePoints =>
                 $"{prefix}{(value >= 0 ? "+" : string.Empty)}{value}%",
-            _ => $"{prefix}{value:N0}",
+            _ => $"{prefix}{sign}{value:N0}",
         };
     }
 

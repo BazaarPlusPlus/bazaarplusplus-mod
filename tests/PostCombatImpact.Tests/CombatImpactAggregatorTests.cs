@@ -66,7 +66,7 @@ public sealed class CombatImpactAggregatorTests
 
         var group = Assert.Single(Assert.Single(report.Sources).Groups);
         Assert.Equal(240, group.AggregateValue);
-        Assert.True(group.ValueIsPartial);
+        Assert.False(group.ValueIsPartial);
         var target = Assert.Single(group.Targets);
         Assert.Equal(80, target.AggregateValue);
         Assert.True(target.ValueIsPartial);
@@ -80,7 +80,7 @@ public sealed class CombatImpactAggregatorTests
                 CombatImpactKind.AttributeChange,
                 "fairies",
                 "bread",
-                20,
+                -20,
                 nativeKey: "DamageAmount"
             ),
             Event(CombatImpactKind.AttributeChange, "fairies", "bread", 2, nativeKey: "CritChance"),
@@ -88,7 +88,9 @@ public sealed class CombatImpactAggregatorTests
 
         var groups = Assert.Single(report.Sources).Groups;
         Assert.Equal(2, groups.Count);
-        Assert.Contains(groups, group => group.NativeAttributeKey == "DamageAmount");
+        var damage = Assert.Single(groups, group => group.NativeAttributeKey == "DamageAmount");
+        Assert.Equal(-20, damage.AggregateValue);
+        Assert.Equal(-20, Assert.Single(damage.Targets).AggregateValue);
         Assert.Contains(groups, group => group.NativeAttributeKey == "CritChance");
     }
 
@@ -124,6 +126,23 @@ public sealed class CombatImpactAggregatorTests
             ["Fairies", "Bread Knife"],
             report.Sources.Select(source => source.Entity.Name)
         );
+    }
+
+    [Fact]
+    public void Collapses_large_event_volume_into_bounded_source_group_and_target_rows()
+    {
+        var events = Enumerable
+            .Range(0, 10_000)
+            .Select(_ => Event(CombatImpactKind.Burn, "fairies", "opponent", 1))
+            .ToArray();
+
+        var source = Assert.Single(Aggregate(events).Sources);
+        var group = Assert.Single(source.Groups);
+        var target = Assert.Single(group.Targets);
+
+        Assert.Equal(10_000, source.TotalCount);
+        Assert.Equal(10_000, group.Count);
+        Assert.Equal(10_000, target.Count);
     }
 
     private static CombatImpactReport Aggregate(

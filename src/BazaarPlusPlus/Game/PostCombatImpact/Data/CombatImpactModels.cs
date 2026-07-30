@@ -42,8 +42,7 @@ internal sealed record CombatImpactEvent(
     string TargetId,
     int? Value = null,
     CombatImpactValueUnit Unit = CombatImpactValueUnit.Amount,
-    string? NativeAttributeKey = null,
-    bool IsCritical = false
+    string? NativeAttributeKey = null
 );
 
 internal sealed record CombatImpactTarget(

@@ -93,8 +93,10 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(2, group.Count);
         Assert.Equal(200, group.AggregateValue);
-        Assert.True(group.ValueIsPartial);
-        Assert.Null(Assert.Single(group.Targets).AggregateValue);
+        Assert.False(group.ValueIsPartial);
+        var target = Assert.Single(group.Targets);
+        Assert.Null(target.AggregateValue);
+        Assert.True(target.ValueIsPartial);
     }
 
     [Fact]
@@ -133,6 +135,47 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal("CritChance", group.NativeAttributeKey);
         Assert.Equal(2, group.AggregateValue);
         Assert.Equal(CombatImpactValueUnit.PercentagePoints, group.Unit);
+    }
+
+    [Fact]
+    public void Keeps_control_duration_instead_of_treating_native_target_count_as_milliseconds()
+    {
+        var simulation = new CombatSim();
+        var target = InstanceId.TryParse("target");
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardSlow,
+                    new EffectTargetCard { Target = target }
+                )
+            );
+        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.Slow] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.Slow,
+                    PreviousValue = 0,
+                    CurrentValue = 1950,
+                },
+            },
+        };
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.SlowedCardsCount] = 1,
+        };
+
+        var group = Assert.Single(
+            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
+        );
+
+        Assert.Equal(CombatImpactKind.Slow, group.Kind);
+        Assert.Equal(CombatImpactValueUnit.Milliseconds, group.Unit);
+        Assert.Equal(1950, group.AggregateValue);
     }
 
     [Fact]

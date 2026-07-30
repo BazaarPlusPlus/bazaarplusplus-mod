@@ -47,8 +47,7 @@ internal static class CombatImpactProjector
                         targetId,
                         resolved.Value,
                         resolved.Unit,
-                        resolved.NativeAttributeKey,
-                        resolved.IsCritical
+                        resolved.NativeAttributeKey
                     )
                 );
 
@@ -61,8 +60,7 @@ internal static class CombatImpactProjector
                             targetId,
                             resolved.Value,
                             resolved.Unit,
-                            CombatImpactAggregator.NativeKey(CombatImpactKind.Critical),
-                            IsCritical: true
+                            CombatImpactAggregator.NativeKey(CombatImpactKind.Critical)
                         )
                     );
                 }
@@ -84,9 +82,6 @@ internal static class CombatImpactProjector
             AddTotal(stats, ECardStats.PoisonAdded, CombatImpactKind.Poison, totals);
             AddTotal(stats, ECardStats.HealAdded, CombatImpactKind.Healing, totals);
             AddTotal(stats, ECardStats.ShieldAdded, CombatImpactKind.Shield, totals);
-            AddTotal(stats, ECardStats.HastedCardsCount, CombatImpactKind.Haste, totals);
-            AddTotal(stats, ECardStats.SlowedCardsCount, CombatImpactKind.Slow, totals);
-            AddTotal(stats, ECardStats.FrozenCardsCount, CombatImpactKind.Freeze, totals);
             if (totals.Count > 0)
                 authoritative[sourceId] = totals;
         }

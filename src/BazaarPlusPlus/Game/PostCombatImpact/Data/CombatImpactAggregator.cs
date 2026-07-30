@@ -76,7 +76,13 @@ internal static class CombatImpactAggregator
         var knownValues = events.Where(item => item.Value.HasValue).ToArray();
         var unit = knownValues.FirstOrDefault()?.Unit ?? events[0].Unit;
         int? attributedTotal =
-            knownValues.Length == 0 ? null : knownValues.Sum(item => Math.Abs(item.Value!.Value));
+            knownValues.Length == 0
+                ? null
+                : knownValues.Sum(item =>
+                    key.Kind == CombatImpactKind.AttributeChange
+                        ? item.Value!.Value
+                        : Math.Abs(item.Value!.Value)
+                );
         var authoritativeTotal =
             authoritativeTotals != null && authoritativeTotals.TryGetValue(key.Kind, out var total)
                 ? Math.Abs(total)
@@ -84,14 +90,8 @@ internal static class CombatImpactAggregator
         var aggregateValue = authoritativeTotal ?? attributedTotal;
         var valueIsPartial =
             aggregateValue.HasValue
-            && (
-                knownValues.Length != events.Count
-                || (
-                    authoritativeTotal.HasValue
-                    && attributedTotal.HasValue
-                    && attributedTotal.GetValueOrDefault() != authoritativeTotal.GetValueOrDefault()
-                )
-            );
+            && !authoritativeTotal.HasValue
+            && knownValues.Length != events.Count;
 
         return new CombatImpactGroup(
             key.Kind,
@@ -113,10 +113,15 @@ internal static class CombatImpactAggregator
             return null;
 
         var knownValues = events.Where(item => item.Value.HasValue).ToArray();
+        var preserveSign = events[0].Kind == CombatImpactKind.AttributeChange;
         return new CombatImpactTarget(
             entity,
             events.Count,
-            knownValues.Length == 0 ? null : knownValues.Sum(item => Math.Abs(item.Value!.Value)),
+            knownValues.Length == 0
+                ? null
+                : knownValues.Sum(item =>
+                    preserveSign ? item.Value!.Value : Math.Abs(item.Value!.Value)
+                ),
             knownValues.FirstOrDefault()?.Unit ?? events[0].Unit,
             knownValues.Length != events.Count
         );
