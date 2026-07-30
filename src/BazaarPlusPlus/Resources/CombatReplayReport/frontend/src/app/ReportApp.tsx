@@ -35,9 +35,11 @@ import type { CombatLogEntry } from "../combat-log/entries.ts";
 export function ReportApp({
   envelope,
   initialLocale,
+  productGenerator,
 }: {
   envelope: ReportEnvelopeV1;
   initialLocale: SupportedLocale;
+  productGenerator: string;
 }): React.JSX.Element {
   const [state, dispatch] = useReducer(
     reportReducer,
@@ -151,6 +153,7 @@ export function ReportApp({
       <ReportHeader
         dispatch={dispatch}
         model={model}
+        productGenerator={productGenerator}
         state={state}
         t={t}
       />

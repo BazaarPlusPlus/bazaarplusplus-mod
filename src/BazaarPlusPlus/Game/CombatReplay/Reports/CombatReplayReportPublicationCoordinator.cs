@@ -62,14 +62,18 @@ internal sealed class CombatReplayReportPublicationCoordinator
     private readonly ConcurrentQueue<CombatReplayReportPublicationTerminal> _terminals = new();
     private long _sequence;
 
-    internal CombatReplayReportPublicationCoordinator(string dataRootDirectoryPath)
+    internal CombatReplayReportPublicationCoordinator(
+        string dataRootDirectoryPath,
+        string productVersion
+    )
         : this(
             dataRootDirectoryPath,
             ViewerArtifactBundle.CreateDefault(),
             null,
             null,
             action => _ = Task.Run(action),
-            GetMonotonicMilliseconds
+            GetMonotonicMilliseconds,
+            productVersion
         ) { }
 
     private static long GetMonotonicMilliseconds() =>
@@ -82,12 +86,13 @@ internal sealed class CombatReplayReportPublicationCoordinator
         Action? ensureViewerInstalled,
         Action<string, byte[]>? commitReport,
         Action<Action> schedule,
-        Func<long> monotonicMilliseconds
+        Func<long> monotonicMilliseconds,
+        string productVersion = ""
     )
     {
         var paths = new StaticReportPaths(dataRootDirectoryPath);
         var artifacts = viewerArtifacts ?? throw new ArgumentNullException(nameof(viewerArtifacts));
-        _artifactBuilder = new CombatReplayReportArtifactBuilder(paths, artifacts);
+        _artifactBuilder = new CombatReplayReportArtifactBuilder(paths, artifacts, productVersion);
         _schedule = schedule ?? throw new ArgumentNullException(nameof(schedule));
         _monotonicMilliseconds =
             monotonicMilliseconds ?? throw new ArgumentNullException(nameof(monotonicMilliseconds));

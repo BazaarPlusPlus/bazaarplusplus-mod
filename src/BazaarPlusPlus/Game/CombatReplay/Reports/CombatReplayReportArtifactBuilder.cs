@@ -17,15 +17,18 @@ namespace BazaarPlusPlus.Game.CombatReplay.Reports;
 internal sealed class CombatReplayReportArtifactBuilder
 {
     private readonly StaticReportPaths _paths;
+    private readonly string _productVersion;
     private readonly ViewerArtifactBundle _viewerArtifacts;
     private readonly ReportHtmlEmitter _htmlEmitter = new();
 
     internal CombatReplayReportArtifactBuilder(
         StaticReportPaths paths,
-        ViewerArtifactBundle viewerArtifacts
+        ViewerArtifactBundle viewerArtifacts,
+        string productVersion
     )
     {
         _paths = paths ?? throw new ArgumentNullException(nameof(paths));
+        _productVersion = productVersion?.Trim() ?? string.Empty;
         _viewerArtifacts =
             viewerArtifacts ?? throw new ArgumentNullException(nameof(viewerArtifacts));
     }
@@ -114,7 +117,8 @@ internal sealed class CombatReplayReportArtifactBuilder
             envelopeJson,
             _viewerArtifacts.BundleId,
             _viewerArtifacts.ScriptSha256,
-            _viewerArtifacts.StylesheetSha256
+            _viewerArtifacts.StylesheetSha256,
+            _productVersion
         );
 
         return new CombatReplayReportPublicationWorkItem(

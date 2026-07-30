@@ -13,7 +13,8 @@ internal sealed class ReportHtmlEmitter
         string embeddedReportEnvelopeJson,
         string viewerBundleId,
         string viewerScriptSha256,
-        string viewerStylesheetSha256
+        string viewerStylesheetSha256,
+        string productVersion = ""
     )
     {
         if (title == null)
@@ -39,6 +40,10 @@ internal sealed class ReportHtmlEmitter
         );
         builder.Append("<meta charset=\"utf-8\">\n");
         builder.Append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n");
+        builder
+            .Append("<meta name=\"generator\" content=\"")
+            .Append(EscapeHtmlAttribute(BuildGenerator(productVersion)))
+            .Append("\">\n");
         builder
             .Append("<meta name=\"")
             .Append(StaticReportPaths.ViewerBundleMetaName)
@@ -155,5 +160,13 @@ internal sealed class ReportHtmlEmitter
         if (normalized.StartsWith("zh", StringComparison.OrdinalIgnoreCase))
             return "zh-CN";
         return "en";
+    }
+
+    private static string BuildGenerator(string productVersion)
+    {
+        var normalizedVersion = productVersion?.Trim();
+        return string.IsNullOrEmpty(normalizedVersion)
+            ? "BazaarPlusPlus"
+            : "BazaarPlusPlus " + normalizedVersion;
     }
 }

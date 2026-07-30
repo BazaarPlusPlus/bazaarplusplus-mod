@@ -322,7 +322,11 @@ void VerifyRecordingGenerationIsolation()
 {
     var root = Path.Combine(sandbox, "generation-isolation");
     var published = new Dictionary<string, string>(StringComparer.Ordinal);
-    var coordinator = CreateCoordinator(root, (path, bytes) => published[path] = Utf8(bytes));
+    var coordinator = CreateCoordinator(
+        root,
+        (path, bytes) => published[path] = Utf8(bytes),
+        productVersion: "4.6.0-test"
+    );
     const string battleId = "same-battle";
     const string firstRecording = "11111111111111111111111111111111";
     const string secondRecording = "22222222222222222222222222222222";
@@ -352,6 +356,13 @@ void VerifyRecordingGenerationIsolation()
 
     var firstHtml = published[Path.Combine(root, "reports", firstRecording + ".html")];
     var secondHtml = published[Path.Combine(root, "reports", secondRecording + ".html")];
+    Check(
+        firstHtml.Contains(
+            "<meta name=\"generator\" content=\"BazaarPlusPlus 4.6.0-test\">",
+            StringComparison.Ordinal
+        ),
+        "Published reports must identify the exact BazaarPlusPlus plugin version."
+    );
     Check(
         firstHtml.Contains(firstAsset.ContentHash, StringComparison.Ordinal),
         "First recording must contain its own asset content key."
@@ -939,7 +950,8 @@ void VerifyExactVideoSyncRequiresContiguousIdentityMatchedAnchors()
 CombatReplayReportPublicationCoordinator CreateCoordinator(
     string root,
     Action<string, byte[]> commit,
-    Func<long>? clock = null
+    Func<long>? clock = null,
+    string productVersion = ""
 )
 {
     var script = Encoding.UTF8.GetBytes("/* viewer */");
@@ -951,7 +963,8 @@ CombatReplayReportPublicationCoordinator CreateCoordinator(
         () => { },
         commit,
         action => action(),
-        clock ?? (() => 0L)
+        clock ?? (() => 0L),
+        productVersion
     );
 }
 

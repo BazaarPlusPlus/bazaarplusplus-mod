@@ -144,7 +144,8 @@ void VerifyHtmlEmitter()
         envelope,
         viewerBundleId,
         TestViewerScriptSha256,
-        TestViewerStylesheetSha256
+        TestViewerStylesheetSha256,
+        " 4.6.0-dev\"<& "
     );
     var html = Encoding.UTF8.GetString(bytes);
     Check(
@@ -154,6 +155,14 @@ void VerifyHtmlEmitter()
     Check(
         html.Contains("<title>战斗 &lt;报告&gt; &amp; review</title>", StringComparison.Ordinal),
         "HTML title must be escaped."
+    );
+    Check(
+        Count(html, "name=\"generator\"") == 1
+            && html.Contains(
+                "<meta name=\"generator\" content=\"BazaarPlusPlus 4.6.0-dev&quot;&lt;&amp;\">",
+                StringComparison.Ordinal
+            ),
+        "HTML must expose one escaped product generator with the exact plugin version."
     );
     Check(
         Count(html, "id=\"bpp-report-data\"") == 1,

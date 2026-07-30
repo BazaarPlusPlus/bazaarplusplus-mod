@@ -46,11 +46,13 @@ function heroForSide(
 
 export function ReportHeader({
   model,
+  productGenerator,
   state,
   dispatch,
   t,
 }: {
   model: ReportViewModel;
+  productGenerator: string;
   state: ReportState;
   dispatch: React.Dispatch<ReportAction>;
   t: (key: string) => string;
@@ -165,6 +167,7 @@ export function ReportHeader({
               <PopoverTrigger asChild>
                 <Button
                   aria-label={t("help")}
+                  data-bpp-test-id="help-trigger"
                   size="icon-sm"
                   type="button"
                   variant="outline"
@@ -179,6 +182,15 @@ export function ReportHeader({
             <p className="text-foreground">{t("helpTimeline")}</p>
             <p className="mt-2">{t("helpEvents")}</p>
             {model.videoUrl && <p className="mt-2">{t("helpVideo")}</p>}
+            <p
+              className="mt-3 border-t border-border pt-3 text-compact"
+              data-bpp-test-id="report-product-info"
+            >
+              {t("productAttribution").replace(
+                "{product}",
+                productGenerator,
+              )}
+            </p>
           </PopoverContent>
         </Popover>
       </ButtonGroup>

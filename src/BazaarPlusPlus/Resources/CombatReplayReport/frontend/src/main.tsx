@@ -45,6 +45,14 @@ function reportRoot(): HTMLElement {
   return root;
 }
 
+function reportGenerator(): string {
+  return (
+    document
+      .querySelector<HTMLMetaElement>('meta[name="generator"]')
+      ?.content.trim() || "BazaarPlusPlus"
+  );
+}
+
 function FatalReport({ error }: { error: unknown }): React.JSX.Element {
   const locale = normalizeLocale(navigator.language || "en");
   const { t } = copyForLocale(locale);
@@ -97,7 +105,11 @@ function boot(): void {
       <React.StrictMode>
         <ErrorBoundary fallback={(error) => <FatalReport error={error} />}>
           <TooltipProvider>
-            <ReportApp envelope={envelope} initialLocale={initialLocale} />
+            <ReportApp
+              envelope={envelope}
+              initialLocale={initialLocale}
+              productGenerator={reportGenerator()}
+            />
           </TooltipProvider>
         </ErrorBoundary>
       </React.StrictMode>,

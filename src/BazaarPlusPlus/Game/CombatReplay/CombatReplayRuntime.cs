@@ -128,7 +128,10 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             reportPaths.AssetRootDirectoryPath,
             _services.GameBuild.RawVersion
         );
-        _reportPublication = new CombatReplayReportPublicationCoordinator(reportDataRoot);
+        _reportPublication = new CombatReplayReportPublicationCoordinator(
+            reportDataRoot,
+            BppPluginVersion.Current
+        );
 
         Events.StateChanged.AddListener(OnStateChanged, this);
         Events.ReplayStarted.AddListener(OnNativeReplayStarted, this);
