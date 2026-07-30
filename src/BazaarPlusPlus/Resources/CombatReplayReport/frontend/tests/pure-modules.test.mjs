@@ -76,6 +76,9 @@ import {
   markerPoint,
   markerRenderSize,
 } from "../src/timeline/event-drawing.ts";
+import {
+  ATTRIBUTE_MARKER_IMAGE_URL,
+} from "../src/timeline/attribute-marker-asset.ts";
 import { layoutTimelineMarkers } from "../src/timeline/marker-layout.ts";
 import {
   hitTestTimelineClusters,
@@ -1991,6 +1994,21 @@ test("timeline marker renderers share one normal size and honor dense caps", () 
   assert.equal(markerGlyphFontSize(14, 12), 12);
   assert.equal(attributeMarkerGlyphSize(14), 11);
   assert.equal(attributeMarkerGlyphSize(8), 6);
+});
+
+test("attribute markers embed the selected compact raster asset", () => {
+  const encoded = ATTRIBUTE_MARKER_IMAGE_URL.replace(
+    "data:image/png;base64,",
+    "",
+  );
+  const image = Buffer.from(encoded, "base64");
+  assert.deepEqual(
+    Array.from(image.subarray(0, 8)),
+    [137, 80, 78, 71, 13, 10, 26, 10],
+  );
+  assert.equal(image.readUInt32BE(16), 11);
+  assert.equal(image.readUInt32BE(20), 11);
+  assert.ok(image.byteLength < 1_024);
 });
 
 test("hero health areas use side-local peaks and step geometry", () => {

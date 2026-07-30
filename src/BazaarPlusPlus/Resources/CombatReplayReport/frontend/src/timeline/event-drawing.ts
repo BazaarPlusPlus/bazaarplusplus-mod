@@ -18,6 +18,7 @@ import {
   TIMELINE_RIGHT_INTERACTION_GUTTER,
   timelineXAtCombatMs,
 } from "./geometry.ts";
+import { ATTRIBUTE_MARKER_IMAGE_URL } from "./attribute-marker-asset.ts";
 import { cachedTimelineImage } from "./image-cache.ts";
 import type { StatusRange, TimelineCluster } from "./clusters.ts";
 
@@ -59,39 +60,6 @@ const MARKER_GLYPHS: Record<string, string> = {
   status: "∿",
   attributeHealthMax: "+",
 };
-
-function drawAttributeMarkerGlyph(
-  context: CanvasRenderingContext2D,
-  markerSize: number,
-  color: string,
-): void {
-  const size = attributeMarkerGlyphSize(markerSize);
-  const halfWidth = size * 0.36;
-  const plusY = -size * 0.22;
-  const minusY = size * 0.3;
-  const plusHalfHeight = size * 0.22;
-  const drawPath = (): void => {
-    context.beginPath();
-    context.moveTo(-halfWidth, plusY);
-    context.lineTo(halfWidth, plusY);
-    context.moveTo(0, plusY - plusHalfHeight);
-    context.lineTo(0, plusY + plusHalfHeight);
-    context.moveTo(-halfWidth, minusY);
-    context.lineTo(halfWidth, minusY);
-    context.stroke();
-  };
-
-  context.save();
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  context.strokeStyle = themeColor("background");
-  context.lineWidth = Math.max(3, size * 0.32);
-  drawPath();
-  context.strokeStyle = color;
-  context.lineWidth = Math.max(1.5, size * 0.16);
-  drawPath();
-  context.restore();
-}
 
 function markerColor(token: string): string {
   return themeColor(MARKER_COLOR_NAMES[token] ?? "status");
@@ -165,21 +133,29 @@ export function drawMarker(
   const marker = markerPoint(cluster);
   context.save();
   context.translate(marker.x, marker.y);
-  const image = cachedTimelineImage(cluster.icon, requestDraw);
+  const isAttribute = cluster.token === "attribute";
+  const image = cachedTimelineImage(
+    isAttribute ? ATTRIBUTE_MARKER_IMAGE_URL : cluster.icon,
+    requestDraw,
+  );
   if (image) {
+    const imageSize = isAttribute
+      ? attributeMarkerGlyphSize(markerSize)
+      : markerSize;
     const bounds = markerImageBounds(
       image.naturalWidth || image.width,
       image.naturalHeight || image.height,
-      markerSize,
+      imageSize,
     );
     if (selected) {
+      const selectionHalfSize = imageSize / 2 + 2;
       context.strokeStyle = themeColor("foreground");
       context.lineWidth = 1.5;
       context.strokeRect(
-        -markerSize / 2 - 2,
-        -markerSize / 2 - 2,
-        markerSize + 4,
-        markerSize + 4,
+        -selectionHalfSize,
+        -selectionHalfSize,
+        selectionHalfSize * 2,
+        selectionHalfSize * 2,
       );
     }
     context.drawImage(
@@ -189,15 +165,7 @@ export function drawMarker(
       bounds.width,
       bounds.height,
     );
-  } else if (cluster.token === "attribute") {
-    drawAttributeMarkerGlyph(context, markerSize, color);
-    if (selected) {
-      const half = Math.max(7, markerSize * 0.65);
-      context.strokeStyle = themeColor("foreground");
-      context.lineWidth = 1.5;
-      context.strokeRect(-half, -half, half * 2, half * 2);
-    }
-  } else {
+  } else if (!isAttribute) {
     const fontSize = markerGlyphFontSize(
       markerSize,
       themeLengthPx("--bpp-text-compact"),
