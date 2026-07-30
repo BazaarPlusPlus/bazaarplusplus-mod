@@ -2985,12 +2985,17 @@ public class CoreLayeringTests
         Assert.Contains("typeof(RecapItemVisualController)", recapPatch);
         Assert.Contains("typeof(SkillProxyRenderer)", recapPatch);
         Assert.Contains("nameof(CardTooltipController.RenderPassiveEffectTextBlock)", recapPatch);
-        Assert.Contains(
-            "PointerEventData.InputButton.Right",
-            File.ReadAllText(Path.Combine(featureRoot, "PostCombatImpactRecapClickTarget.cs"))
+        var recapClickTarget = File.ReadAllText(
+            Path.Combine(featureRoot, "PostCombatImpactRecapClickTarget.cs")
         );
+        Assert.Contains("IPointerDownHandler", recapClickTarget);
+        Assert.DoesNotContain("IPointerClickHandler", recapClickTarget);
+        Assert.Contains("PointerEventData.InputButton.Right", recapClickTarget);
         Assert.Contains("PointerEventData.InputButton.Right", recapPatch);
+        Assert.Contains("boardManager.IsRecapViewOpen", recapPatch);
         Assert.Contains("BppTooltipSections.TryShowCustom", tooltipView);
+        Assert.Contains("CombatImpactSource? source", tooltipView);
+        Assert.Contains("No attributable impact recorded this combat", tooltipView);
         Assert.Contains("controller.KeepTooltipWithinBounds()", tooltipView);
         Assert.Contains("Addressables.LoadAssetAsync<Texture>", artProvider);
         Assert.DoesNotContain("new GameObject(\"PostCombatImpactUiToolkitRoot", tooltipView);

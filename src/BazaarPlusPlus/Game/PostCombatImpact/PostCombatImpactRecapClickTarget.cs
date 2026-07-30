@@ -6,7 +6,7 @@ using UnityEngine.EventSystems;
 
 namespace BazaarPlusPlus.Game.PostCombatImpact;
 
-internal sealed class PostCombatImpactRecapClickTarget : MonoBehaviour, IPointerClickHandler
+internal sealed class PostCombatImpactRecapClickTarget : MonoBehaviour, IPointerDownHandler
 {
     private PostCombatImpactController? _owner;
     private Card? _card;
@@ -26,7 +26,7 @@ internal sealed class PostCombatImpactRecapClickTarget : MonoBehaviour, IPointer
         _tooltipOffset = tooltipOffset;
     }
 
-    public void OnPointerClick(PointerEventData eventData)
+    public void OnPointerDown(PointerEventData eventData)
     {
         if (
             eventData.button != PointerEventData.InputButton.Right
@@ -36,6 +36,6 @@ internal sealed class PostCombatImpactRecapClickTarget : MonoBehaviour, IPointer
         )
             return;
 
-        _owner.ShowDetails(_card, transform, _tooltipOffset, _tooltipData);
+        _owner.ShowRecapCardDetails(_card, transform, _tooltipOffset, _tooltipData);
     }
 }

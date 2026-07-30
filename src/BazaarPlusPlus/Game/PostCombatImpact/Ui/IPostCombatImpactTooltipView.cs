@@ -6,7 +6,7 @@ namespace BazaarPlusPlus.Game.PostCombatImpact.Ui;
 
 internal interface IPostCombatImpactTooltipView : IDisposable
 {
-    bool Show(CardTooltipController controller, CombatImpactSource source);
+    bool Show(CardTooltipController controller, string sourceId, CombatImpactSource? source);
 
     void Hide();
 

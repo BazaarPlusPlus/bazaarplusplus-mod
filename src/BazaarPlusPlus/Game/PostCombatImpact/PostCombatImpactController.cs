@@ -2,6 +2,7 @@
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
 using BazaarPlusPlus.Game.PostCombatImpact.Ui;
+using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
@@ -31,16 +32,34 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         CardController cardController
     )
     {
-        if (
-            cardController.CurrentTooltipData is not CardTooltipData tooltipData
-            || recapVisual == null
-        )
+        if (recapVisual == null)
             return;
+
+        var tooltipData =
+            cardController.CurrentTooltipData as CardTooltipData
+            ?? CardTooltipData.CreateCardTooltipData(card);
+        if (tooltipData == null)
+        {
+            LogInteraction(PostCombatImpactReasonCode.TooltipDataUnavailable);
+            return;
+        }
 
         var target =
             recapVisual.GetComponent<PostCombatImpactRecapClickTarget>()
             ?? recapVisual.gameObject.AddComponent<PostCombatImpactRecapClickTarget>();
         target.Initialize(this, card, tooltipData, cardController.TooltipOffset);
+        DebugInteraction(PostCombatImpactReasonCode.RecapCardBound);
+    }
+
+    internal void ShowRecapCardDetails(
+        Card card,
+        Transform anchor,
+        Vector3 offset,
+        CardTooltipData tooltipData
+    )
+    {
+        DebugInteraction(PostCombatImpactReasonCode.RecapPointerDownReceived);
+        ShowDetails(card, anchor, offset, tooltipData);
     }
 
     internal void ShowDetails(
@@ -51,13 +70,27 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     )
     {
         var boardManager = Singleton<BoardManager>.Instance;
-        if (
-            _module == null
-            || !_module.TryGetSource(card.InstanceId.Value, out var source)
-            || boardManager == null
-            || !boardManager.IsRecapViewOpen
-        )
+        if (boardManager == null || !boardManager.IsRecapViewOpen)
+        {
+            LogInteraction(PostCombatImpactReasonCode.RecapClosed);
             return;
+        }
+
+        if (_module == null)
+        {
+            LogInteraction(PostCombatImpactReasonCode.RuntimeUnavailable);
+            return;
+        }
+
+        if (card.InstanceId.Value is not { Length: > 0 } sourceId)
+        {
+            LogInteraction(PostCombatImpactReasonCode.SourceIdUnavailable);
+            return;
+        }
+
+        CombatImpactSource? source = null;
+        if (_module.TryGetSource(sourceId, out var matchedSource))
+            source = matchedSource;
 
         if (_pendingShow != null)
         {
@@ -69,7 +102,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         var tooltip = TheBazaar.Data.TooltipParentComponent?.GetCardTooltipController(card);
         if (tooltip != null)
         {
-            ShowInNativeTooltip(tooltip, source, recapVisual);
+            ShowInNativeTooltip(tooltip, sourceId, source, recapVisual);
             return;
         }
 
@@ -79,12 +112,13 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             offset,
             tooltipData
         );
-        _pendingShow = StartCoroutine(ShowWhenReady(card, source, recapVisual));
+        _pendingShow = StartCoroutine(ShowWhenReady(card, sourceId, source, recapVisual));
     }
 
     private System.Collections.IEnumerator ShowWhenReady(
         Card card,
-        CombatImpactSource source,
+        string sourceId,
+        CombatImpactSource? source,
         RecapItemVisualController? recapVisual
     )
     {
@@ -94,7 +128,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             var tooltip = TheBazaar.Data.TooltipParentComponent?.GetCardTooltipController(card);
             if (tooltip != null)
             {
-                ShowInNativeTooltip(tooltip, source, recapVisual);
+                ShowInNativeTooltip(tooltip, sourceId, source, recapVisual);
                 _pendingShow = null;
                 yield break;
             }
@@ -102,23 +136,33 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         }
 
         _pendingShow = null;
+        LogInteraction(PostCombatImpactReasonCode.NativeTooltipCreateTimedOut);
     }
 
     private void ShowInNativeTooltip(
         CardTooltipController tooltip,
-        CombatImpactSource source,
+        string sourceId,
+        CombatImpactSource? source,
         RecapItemVisualController? recapVisual
     )
     {
-        if (string.Equals(_selectedSourceId, source.Entity.Id, StringComparison.Ordinal))
+        if (string.Equals(_selectedSourceId, sourceId, StringComparison.Ordinal))
             return;
 
         ClearSelection();
-        if (_view?.Show(tooltip, source) != true)
+        if (_view?.Show(tooltip, sourceId, source) != true)
+        {
+            LogInteraction(PostCombatImpactReasonCode.TooltipSectionUnavailable);
             return;
+        }
 
         _selectedRecapVisual = recapVisual;
-        _selectedSourceId = source.Entity.Id;
+        _selectedSourceId = sourceId;
+        LogInteraction(
+            source == null
+                ? PostCombatImpactReasonCode.ShownWithoutAttributedImpact
+                : PostCombatImpactReasonCode.Shown
+        );
     }
 
     internal void OnNativeTooltipChanging(CardTooltipController controller)
@@ -152,6 +196,18 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     }
 
     private void OnRecapEnded() => HideDetails();
+
+    private static void LogInteraction(PostCombatImpactReasonCode reasonCode) =>
+        BppLog.InfoEvent(
+            PostCombatImpactLogEvents.InteractionObserved,
+            PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode)
+        );
+
+    private static void DebugInteraction(PostCombatImpactReasonCode reasonCode) =>
+        BppLog.DebugEvent(
+            PostCombatImpactLogEvents.InteractionObserved,
+            () => [PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode)]
+        );
 
     private void OnDestroy()
     {

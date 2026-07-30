@@ -36,11 +36,11 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private string? _activeSourceId;
     private int _renderGeneration;
 
-    public bool Show(CardTooltipController controller, CombatImpactSource source)
+    public bool Show(CardTooltipController controller, string sourceId, CombatImpactSource? source)
     {
         if (
             ReferenceEquals(_activeController, controller)
-            && string.Equals(_activeSourceId, source.Entity.Id, StringComparison.Ordinal)
+            && string.Equals(_activeSourceId, sourceId, StringComparison.Ordinal)
         )
             return true;
 
@@ -57,7 +57,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             return false;
 
         _activeController = controller;
-        _activeSourceId = source.Entity.Id;
+        _activeSourceId = sourceId;
 
         // Native Lock() rejects recap cards because their original CardController is
         // deliberately hidden. The flag is the part RecapItemVisualController reads to
@@ -90,7 +90,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
     private void Build(
         BppTooltipSections.Section section,
-        CombatImpactSource source,
+        CombatImpactSource? source,
         int generation
     )
     {
@@ -105,6 +105,19 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             1.08f
         );
         title.alignment = TextAlignmentOptions.Left;
+
+        if (source == null)
+        {
+            var empty = CloneText(
+                section.Text.textObject,
+                root,
+                T("本场未记录到可归因的影响", "No attributable impact recorded this combat"),
+                FontStyles.Normal,
+                0.84f
+            );
+            empty.alpha = 0.72f;
+            return;
+        }
 
         var summaryParts = new List<string>();
         if (source.UseCount > 0)

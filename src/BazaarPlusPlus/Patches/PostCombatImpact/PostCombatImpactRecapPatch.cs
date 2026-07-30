@@ -41,8 +41,14 @@ internal static class PostCombatImpactSkillClickPatch
     [HarmonyPrefix]
     private static void Prefix(SkillProxyRenderer __instance, PointerEventData eventData)
     {
+        var boardManager = Singleton<BoardManager>.Instance;
         var card = __instance.Card;
-        if (eventData.button != PointerEventData.InputButton.Right || card == null)
+        if (
+            eventData.button != PointerEventData.InputButton.Right
+            || card == null
+            || boardManager == null
+            || !boardManager.IsRecapViewOpen
+        )
             return;
 
         var offset = TooltipOffsetField?.GetValue(__instance) is Vector3 nativeOffset

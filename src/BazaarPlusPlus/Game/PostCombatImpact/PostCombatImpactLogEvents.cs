@@ -6,6 +6,16 @@ namespace BazaarPlusPlus.Game.PostCombatImpact;
 internal enum PostCombatImpactReasonCode
 {
     ProjectionException,
+    Shown,
+    ShownWithoutAttributedImpact,
+    RecapClosed,
+    RuntimeUnavailable,
+    TooltipDataUnavailable,
+    SourceIdUnavailable,
+    NativeTooltipCreateTimedOut,
+    TooltipSectionUnavailable,
+    RecapCardBound,
+    RecapPointerDownReceived,
 }
 
 [BppLogEventSource]
@@ -24,5 +34,11 @@ internal static class PostCombatImpactLogEvents
         "post_combat_impact.projection.degraded",
         [ReasonCode],
         new BppLogStormPolicy([ReasonCode])
+    );
+
+    internal static readonly BppLogEventDefinition InteractionObserved = new(
+        BppLogFeatureScope.PostCombatImpact,
+        "post_combat_impact.interaction.observed",
+        [ReasonCode]
     );
 }
