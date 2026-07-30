@@ -1,5 +1,8 @@
 #nullable enable
 using System.Collections;
+using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay.Bootstrap;
 using BazaarPlusPlus.Game.CombatReplay.PlaybackUi;
@@ -9,6 +12,7 @@ using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.GameInterop.Files;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Infrastructure.Logging;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;
@@ -17,7 +21,8 @@ namespace BazaarPlusPlus.Game.CombatReplay;
 
 internal sealed class CombatReplayRuntime : MonoBehaviour
 {
-    private const float CurrentReplayRecapPostRollSeconds = 3f;
+    internal const float CurrentReplayTerminalHoldSeconds = 2f;
+    internal const float CurrentReplayPostReverseHoldSeconds = 1f;
 
     private IBppServices? _services;
     private RunLifecycleModule? _runLifecycle;
@@ -36,8 +41,14 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     private IDisposable? _recordingStartedSubscription;
     private IDisposable? _recordingCompletedSubscription;
     private Coroutine? _pendingCurrentReplayStart;
-    private Coroutine? _pendingCurrentReplayRecapPostRoll;
-    private Action? _invokeCurrentRecordingRecap;
+    private Coroutine? _pendingCurrentReplayPresentationGate;
+    private Coroutine? _pendingCurrentReplayPostReverseHold;
+    private TaskCompletionSource<bool>? _currentReplaySimulationCompletion;
+    private NetMessageCombatSim? _deferredCurrentReplaySimulation;
+    private NetMessageCombatSim? _permittedCurrentReplaySimulation;
+    private IDisposable? _currentReplayPresentationHoverSuppression;
+    private bool _currentReplayPostReverseOwnsInputBlock;
+    private bool _currentReplayPostReversePreviousInputBlock;
     private bool _destroying;
 
     public static CombatReplayRuntime? Instance { get; private set; }
@@ -116,12 +127,15 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
     {
         ReplayOpeningStateRestorer.Cleanup();
         _destroying = true;
+        var currentReplayWasActive = _currentRecording.NativeReplayStarted;
         CancelPendingCurrentReplayStart(
             "native-replay-runtime-destroyed-before-start",
             "Combat replay runtime was destroyed."
         );
-        CancelCurrentReplayRecapPostRoll();
-        if (_currentRecording.NativeReplayStarted)
+        CancelCurrentReplayPresentationGate("Combat replay runtime was destroyed.");
+        CancelCurrentReplayPostReverseHold();
+        DisposeCurrentReplayPresentationHoverSuppression();
+        if (currentReplayWasActive)
         {
             _playbackPublisher?.PublishEnded("runtime-destroyed", failed: true);
             _currentRecording.MarkReplayEnded("Combat replay runtime was destroyed.");
@@ -274,15 +288,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     internal bool TryStartCurrentReplayRecording(
         Action invokeNativeReplay,
-        Action invokeNativeRecap,
         Action invokeNativeRecapBack,
         out string reason
     )
     {
         if (invokeNativeReplay == null)
             throw new ArgumentNullException(nameof(invokeNativeReplay));
-        if (invokeNativeRecap == null)
-            throw new ArgumentNullException(nameof(invokeNativeRecap));
         if (invokeNativeRecapBack == null)
             throw new ArgumentNullException(nameof(invokeNativeRecapBack));
 
@@ -320,7 +331,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             CombatReplayPlaybackSource.CurrentNative,
             recordVideo: true
         );
-        _invokeCurrentRecordingRecap = invokeNativeRecap;
 
         var boardManager = Singleton<BoardManager>.Instance;
         if (boardManager is { } && (boardManager.IsRecapViewOpen || boardManager.StorageMoving))
@@ -461,7 +471,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         _videoRecorder?.Invoke()?.CancelArmedCurrentReplay(recordingId, endReason);
         _playbackPublisher?.PublishEnded(endReason, failed: true);
         _currentRecording.RollbackArm(recordingId, reason);
-        _invokeCurrentRecordingRecap = null;
     }
 
     private void CancelPendingCurrentReplayStart(string endReason, string reason)
@@ -511,17 +520,399 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             PrepareCurrentReplayRecordingAvailability();
     }
 
+    internal bool TryDeferCurrentReplaySimulation(
+        CombatSimHandler handler,
+        NetMessageCombatSim message,
+        CancellationTokenSource cancellationToken,
+        out Task deferredSimulation
+    )
+    {
+        deferredSimulation = Task.CompletedTask;
+
+        // The coroutine invokes Simulate again after the presentation boundary. Permit exactly
+        // that message reference once so the Harmony prefix publishes CombatSimObserved once and
+        // then reaches the native method.
+        if (ReferenceEquals(_permittedCurrentReplaySimulation, message))
+        {
+            _permittedCurrentReplaySimulation = null;
+            return false;
+        }
+
+        if (
+            AppState.CurrentState is not ReplayState
+            || !_currentRecording.NativeReplayStarted
+            || _currentRecording.Snapshot().Phase != CurrentReplayRecordingPhase.Armed
+        )
+        {
+            return false;
+        }
+
+        if (_currentReplaySimulationCompletion != null)
+        {
+            if (!ReferenceEquals(_deferredCurrentReplaySimulation, message))
+                return false;
+
+            deferredSimulation = _currentReplaySimulationCompletion.Task;
+            return true;
+        }
+
+        var completion = new TaskCompletionSource<bool>();
+        _currentReplaySimulationCompletion = completion;
+        _deferredCurrentReplaySimulation = message;
+        try
+        {
+            _pendingCurrentReplayPresentationGate = StartCoroutine(
+                RunCurrentReplayPresentationGate(handler, message, cancellationToken, completion)
+            );
+            deferredSimulation = completion.Task;
+            return true;
+        }
+        catch
+        {
+            _pendingCurrentReplayPresentationGate = null;
+            _currentReplaySimulationCompletion = null;
+            _deferredCurrentReplaySimulation = null;
+            BeginCurrentReplayRecordingAtPresentationBoundary();
+            return false;
+        }
+    }
+
+    private IEnumerator RunCurrentReplayPresentationGate(
+        CombatSimHandler handler,
+        NetMessageCombatSim message,
+        CancellationTokenSource cancellationToken,
+        TaskCompletionSource<bool> completion
+    )
+    {
+        var waitForRenderedFrame = new WaitForEndOfFrame();
+        var startedAt = Time.realtimeSinceStartup;
+        var stableFrameCount = 0;
+        var snapshot = ObserveCurrentReplayPresentationReadiness();
+        var timedOut = false;
+
+        while (stableFrameCount < CurrentReplayPresentationReadiness.RequiredStableFrames)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                FailCurrentReplayPresentationGateBeforeRecording(
+                    "native-replay-simulation-canceled-before-recording"
+                );
+                // Native CombatSimHandler treats cancellation as a successful early return.
+                // Preserve that contract so ReplayState can still reverse the board and release
+                // its own input lock instead of faulting its async-void replay workflow.
+                CompleteDeferredCurrentReplaySimulation(completion);
+                yield break;
+            }
+
+            yield return waitForRenderedFrame;
+
+            snapshot = ObserveCurrentReplayPresentationReadiness();
+            stableFrameCount = CurrentReplayPresentationReadiness.AdvanceStableFrameCount(
+                stableFrameCount,
+                snapshot
+            );
+            if (stableFrameCount >= CurrentReplayPresentationReadiness.RequiredStableFrames)
+                break;
+
+            if (
+                Time.realtimeSinceStartup - startedAt
+                < CurrentReplayPresentationReadiness.TimeoutSeconds
+            )
+            {
+                continue;
+            }
+
+            timedOut = true;
+            break;
+        }
+
+        LogCurrentReplayPresentationGate(
+            timedOut
+                ? CurrentReplayPresentationGateOutcome.TimedOut
+                : CurrentReplayPresentationGateOutcome.Ready,
+            snapshot,
+            Time.realtimeSinceStartup - startedAt
+        );
+        BeginCurrentReplayRecordingAtPresentationBoundary();
+
+        // Cross the rendered-frame boundary, then resume on the next Update. Even if this
+        // coroutine runs before the recorder at EndOfFrame, the capture coroutine still queues
+        // the clean pre-action frame before Simulate is invoked.
+        yield return waitForRenderedFrame;
+        yield return null;
+
+        Task simulation;
+        try
+        {
+            _permittedCurrentReplaySimulation = message;
+            simulation = handler.Simulate(message, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            CompleteCurrentReplayRecording(
+                "native-replay-simulation-invoke-failed",
+                failed: true,
+                ex.Message
+            );
+            CompleteDeferredCurrentReplaySimulation(completion, exception: ex);
+            yield break;
+        }
+
+        while (!simulation.IsCompleted)
+            yield return null;
+
+        if (simulation.IsCanceled)
+        {
+            CompleteCurrentReplayRecording(
+                "native-replay-simulation-canceled",
+                failed: true,
+                "The native replay simulation was canceled."
+            );
+            CompleteDeferredCurrentReplaySimulation(completion);
+            yield break;
+        }
+
+        if (simulation.IsFaulted)
+        {
+            var exception =
+                simulation.Exception?.GetBaseException()
+                ?? new InvalidOperationException("The native replay simulation failed.");
+            CompleteCurrentReplayRecording(
+                "native-replay-simulation-failed",
+                failed: true,
+                exception.Message
+            );
+            CompleteDeferredCurrentReplaySimulation(completion, exception: exception);
+            yield break;
+        }
+
+        // Preserve the game's native terminal slow-motion, then hold the final board before
+        // ReplayState flips back to its post-combat presentation.
+        yield return new WaitForSecondsRealtime(CurrentReplayTerminalHoldSeconds);
+        yield return waitForRenderedFrame;
+        CompleteDeferredCurrentReplaySimulation(completion);
+    }
+
+    private static CurrentReplayPresentationReadinessSnapshot ObserveCurrentReplayPresentationReadiness()
+    {
+        var boardManager = Singleton<BoardManager>.Instance;
+        var replay = AppState.CurrentState as ReplayState;
+        if (boardManager == null || replay == null)
+        {
+            return new CurrentReplayPresentationReadinessSnapshot(
+                ReplayActive: false,
+                BoardUpdating: boardManager?.IsUpdatingBoard == true,
+                StorageMoving: boardManager?.StorageMoving == true,
+                BoardPresentationUpdating: boardManager?.isUpdatingPresentation == true,
+                CarpetUnrolling: boardManager?.IsCarpetUnrolling == true,
+                BoardRevealing: boardManager?.IsRevealing == true,
+                HasCardsToReveal: boardManager?.HasCardsToReveal() == true,
+                PlayerSkillBoardUpdating: Data.PlayerSkillPresentationManager?.IsUpdatingSkillBoard
+                    == true,
+                OpponentSkillBoardUpdating: Data.OpponentSkillPresenationManager?.IsUpdatingSkillBoard
+                    == true,
+                ExpectedItemCount: 0,
+                VisibleItemCount: 0,
+                FaceUpItemCount: 0,
+                SettledItemCount: 0,
+                ExpectedSkillCount: 0,
+                RegisteredSkillCount: 0,
+                ReadySkillCount: 0
+            );
+        }
+
+        var cards = Data.GetCards<Card>(ECombatantId.Player)
+            .Concat(Data.GetCards<Card>(ECombatantId.Opponent))
+            .ToArray();
+        var expectedItems = cards
+            .Where(card => card is ItemCard && card.Section == EInventorySection.Hand)
+            .ToArray();
+        var expectedSkills = cards.Where(card => card.Type == ECardType.Skill).ToArray();
+        var visibleItemCount = 0;
+        var faceUpItemCount = 0;
+        var settledItemCount = 0;
+        var registeredSkillCount = 0;
+        var readySkillCount = 0;
+
+        foreach (var card in expectedItems)
+        {
+            if (Data.CardAndSkillLookup.GetCardController(card) is not ItemController controller)
+                continue;
+
+            if (CurrentReplayPresentationReadiness.IsVisible(controller))
+                visibleItemCount++;
+            if (CurrentReplayPresentationReadiness.IsFaceUp(controller))
+                faceUpItemCount++;
+            if (CurrentReplayPresentationReadiness.IsSettled(controller))
+                settledItemCount++;
+        }
+
+        foreach (var skill in expectedSkills)
+        {
+            var renderer = Data.CardAndSkillLookup.GetSkillProxyRenderer(skill);
+            if (renderer == null)
+                continue;
+
+            registeredSkillCount++;
+            if (CurrentReplayPresentationReadiness.IsSkillReady(renderer))
+                readySkillCount++;
+        }
+
+        return new CurrentReplayPresentationReadinessSnapshot(
+            ReplayActive: replay.IsReplaying,
+            BoardUpdating: boardManager.IsUpdatingBoard,
+            StorageMoving: boardManager.StorageMoving,
+            BoardPresentationUpdating: boardManager.isUpdatingPresentation,
+            CarpetUnrolling: boardManager.IsCarpetUnrolling,
+            BoardRevealing: boardManager.IsRevealing,
+            HasCardsToReveal: boardManager.HasCardsToReveal(),
+            PlayerSkillBoardUpdating: Data.PlayerSkillPresentationManager?.IsUpdatingSkillBoard
+                == true,
+            OpponentSkillBoardUpdating: Data.OpponentSkillPresenationManager?.IsUpdatingSkillBoard
+                == true,
+            ExpectedItemCount: expectedItems.Length,
+            VisibleItemCount: visibleItemCount,
+            FaceUpItemCount: faceUpItemCount,
+            SettledItemCount: settledItemCount,
+            ExpectedSkillCount: expectedSkills.Length,
+            RegisteredSkillCount: registeredSkillCount,
+            ReadySkillCount: readySkillCount
+        );
+    }
+
+    private void BeginCurrentReplayRecordingAtPresentationBoundary()
+    {
+        var outcome = _playbackPublisher?.PublishStarting();
+        DisposeCurrentReplayPresentationHoverSuppression();
+        if (outcome is not { Succeeded: false })
+            return;
+
+        _playbackPublisher?.PublishEnded("starting-publish-failed", failed: true);
+        _currentRecording.MarkReplayEnded(outcome.Value.Exception?.Message);
+    }
+
+    private void FailCurrentReplayPresentationGateBeforeRecording(string endReason)
+    {
+        var recordingId = _currentRecording.RecordingId;
+        if (!string.IsNullOrWhiteSpace(recordingId))
+            _videoRecorder?.Invoke()?.CancelArmedCurrentReplay(recordingId, endReason);
+        _playbackPublisher?.PublishEnded(endReason, failed: true);
+        _currentRecording.MarkReplayEnded("Replay presentation was canceled before recording.");
+        DisposeCurrentReplayPresentationHoverSuppression();
+    }
+
+    private void CompleteDeferredCurrentReplaySimulation(
+        TaskCompletionSource<bool> completion,
+        Exception? exception = null
+    )
+    {
+        _pendingCurrentReplayPresentationGate = null;
+        _currentReplaySimulationCompletion = null;
+        _deferredCurrentReplaySimulation = null;
+        _permittedCurrentReplaySimulation = null;
+
+        if (exception != null)
+        {
+            completion.TrySetException(exception);
+            return;
+        }
+
+        completion.TrySetResult(true);
+    }
+
+    private void CancelCurrentReplayPresentationGate(string reason)
+    {
+        var hadPendingGate = _currentReplaySimulationCompletion != null;
+        if (_pendingCurrentReplayPresentationGate != null)
+        {
+            StopCoroutine(_pendingCurrentReplayPresentationGate);
+            _pendingCurrentReplayPresentationGate = null;
+        }
+
+        var completion = _currentReplaySimulationCompletion;
+        _currentReplaySimulationCompletion = null;
+        _deferredCurrentReplaySimulation = null;
+        _permittedCurrentReplaySimulation = null;
+        DisposeCurrentReplayPresentationHoverSuppression();
+        if (
+            hadPendingGate
+            && _currentRecording.Snapshot().Phase == CurrentReplayRecordingPhase.Armed
+            && !string.IsNullOrWhiteSpace(_currentRecording.RecordingId)
+        )
+        {
+            _videoRecorder
+                ?.Invoke()
+                ?.CancelArmedCurrentReplay(
+                    _currentRecording.RecordingId!,
+                    "native-replay-presentation-gate-canceled"
+                );
+        }
+        completion?.TrySetException(new InvalidOperationException(reason));
+    }
+
+    private void DisposeCurrentReplayPresentationHoverSuppression()
+    {
+        _currentReplayPresentationHoverSuppression?.Dispose();
+        _currentReplayPresentationHoverSuppression = null;
+    }
+
+    private void LogCurrentReplayPresentationGate(
+        CurrentReplayPresentationGateOutcome outcome,
+        CurrentReplayPresentationReadinessSnapshot snapshot,
+        float elapsedSeconds
+    )
+    {
+        BppLogFieldValue[] Fields() =>
+            [
+                CombatReplayLogEvents.CurrentRecordingPresentationGateRecordingId.Bind(
+                    _currentRecording.RecordingId
+                ),
+                CombatReplayLogEvents.CurrentRecordingPresentationGateOutcome.Bind(outcome),
+                CombatReplayLogEvents.CurrentRecordingPresentationGateExpectedItems.Bind(
+                    snapshot.ExpectedItemCount
+                ),
+                CombatReplayLogEvents.CurrentRecordingPresentationGateVisibleItems.Bind(
+                    snapshot.VisibleItemCount
+                ),
+                CombatReplayLogEvents.CurrentRecordingPresentationGateFaceUpItems.Bind(
+                    snapshot.FaceUpItemCount
+                ),
+                CombatReplayLogEvents.CurrentRecordingPresentationGateSettledItems.Bind(
+                    snapshot.SettledItemCount
+                ),
+                CombatReplayLogEvents.CurrentRecordingPresentationGateExpectedSkills.Bind(
+                    snapshot.ExpectedSkillCount
+                ),
+                CombatReplayLogEvents.CurrentRecordingPresentationGateRegisteredSkills.Bind(
+                    snapshot.RegisteredSkillCount
+                ),
+                CombatReplayLogEvents.CurrentRecordingPresentationGateReadySkills.Bind(
+                    snapshot.ReadySkillCount
+                ),
+                CombatReplayLogEvents.CurrentRecordingPresentationGateElapsedMs.Bind(
+                    Math.Max(0, (int)Math.Round(elapsedSeconds * 1000f))
+                ),
+            ];
+
+        if (outcome == CurrentReplayPresentationGateOutcome.TimedOut)
+        {
+            BppLog.WarnEvent(
+                CombatReplayLogEvents.CurrentRecordingPresentationGateResolved,
+                Fields()
+            );
+            return;
+        }
+
+        BppLog.InfoEvent(CombatReplayLogEvents.CurrentRecordingPresentationGateResolved, Fields());
+    }
+
     private void OnNativeReplayStarted()
     {
         if (!_currentRecording.MarkNativeReplayStarted())
             return;
 
-        var outcome = _playbackPublisher?.PublishStarting();
-        if (outcome is { Succeeded: false })
-        {
-            _playbackPublisher?.PublishEnded("starting-publish-failed", failed: true);
-            _currentRecording.MarkReplayEnded(outcome.Value.Exception?.Message);
-        }
+        DisposeCurrentReplayPresentationHoverSuppression();
+        _currentReplayPresentationHoverSuppression = ReplayRecordingHoverSuppression.Begin();
     }
 
     private void OnNativeReplayEnded()
@@ -529,67 +920,99 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         if (!_currentRecording.NativeReplayStarted)
             return;
 
-        var invokeNativeRecap = _invokeCurrentRecordingRecap;
-        _invokeCurrentRecordingRecap = null;
-        if (invokeNativeRecap == null)
+        DisposeCurrentReplayPresentationHoverSuppression();
+        if (_currentRecording.Snapshot().Phase == CurrentReplayRecordingPhase.Armed)
         {
+            var recordingId = _currentRecording.RecordingId;
+            if (!string.IsNullOrWhiteSpace(recordingId))
+            {
+                _videoRecorder
+                    ?.Invoke()
+                    ?.CancelArmedCurrentReplay(
+                        recordingId,
+                        "native-replay-ended-before-recording-started"
+                    );
+            }
             CompleteCurrentReplayRecording(
-                "native-recap-action-unavailable",
+                "native-replay-ended-before-recording-started",
                 failed: true,
-                "The native recap action is unavailable."
+                "The native replay ended before video capture started."
             );
             return;
         }
 
+        CancelCurrentReplayPostReverseHold();
+        _currentReplayPostReversePreviousInputBlock = AppState.BlockInput;
+        AppState.BlockInput = true;
+        _currentReplayPostReverseOwnsInputBlock = true;
         try
         {
-            invokeNativeRecap();
-            if (Singleton<BoardManager>.Instance?.IsRecapViewOpen != true)
-            {
-                CompleteCurrentReplayRecording(
-                    "native-recap-not-started",
-                    failed: true,
-                    "The native recap did not start."
-                );
-                return;
-            }
-            _pendingCurrentReplayRecapPostRoll = StartCoroutine(
-                CompleteCurrentReplayRecordingAfterRecapPostRoll()
+            _pendingCurrentReplayPostReverseHold = StartCoroutine(
+                CompleteCurrentReplayRecordingAfterPostReverseHold()
             );
         }
         catch (Exception ex)
         {
-            CompleteCurrentReplayRecording("native-recap-invoke-failed", failed: true, ex.Message);
+            RestoreCurrentReplayPostReverseInput();
+            CompleteCurrentReplayRecording(
+                "native-replay-post-reverse-hold-start-failed",
+                failed: true,
+                ex.Message
+            );
         }
     }
 
-    private IEnumerator CompleteCurrentReplayRecordingAfterRecapPostRoll()
+    private IEnumerator CompleteCurrentReplayRecordingAfterPostReverseHold()
     {
-        yield return new WaitForSecondsRealtime(CurrentReplayRecapPostRollSeconds);
-        _pendingCurrentReplayRecapPostRoll = null;
-        CompleteCurrentReplayRecording(
-            "native-replay-recap-post-roll-ended",
-            failed: false,
-            reason: null
-        );
+        yield return new WaitForSecondsRealtime(CurrentReplayPostReverseHoldSeconds);
+        yield return new WaitForEndOfFrame();
+        // Resume once more after the final end-of-frame capture before publishing "ended";
+        // otherwise coroutine ordering can stop the recorder just before that frame is queued.
+        yield return null;
+        _pendingCurrentReplayPostReverseHold = null;
+        try
+        {
+            CompleteCurrentReplayRecording(
+                "native-replay-post-reverse-hold-ended",
+                failed: false,
+                reason: null
+            );
+        }
+        finally
+        {
+            RestoreCurrentReplayPostReverseInput();
+        }
     }
 
     private void CompleteCurrentReplayRecording(string endReason, bool failed, string? reason)
     {
+        DisposeCurrentReplayPresentationHoverSuppression();
         var outcome = _playbackPublisher?.PublishEnded(endReason, failed);
         _currentRecording.MarkReplayEnded(
             outcome is { Succeeded: false } ? outcome.Value.Exception?.Message : reason
         );
     }
 
-    private void CancelCurrentReplayRecapPostRoll()
+    private void CancelCurrentReplayPostReverseHold()
     {
-        var pending = _pendingCurrentReplayRecapPostRoll;
-        if (pending == null)
+        var pending = _pendingCurrentReplayPostReverseHold;
+        if (pending != null)
+        {
+            _pendingCurrentReplayPostReverseHold = null;
+            StopCoroutine(pending);
+        }
+
+        RestoreCurrentReplayPostReverseInput();
+    }
+
+    private void RestoreCurrentReplayPostReverseInput()
+    {
+        if (!_currentReplayPostReverseOwnsInputBlock)
             return;
 
-        _pendingCurrentReplayRecapPostRoll = null;
-        StopCoroutine(pending);
+        AppState.BlockInput = _currentReplayPostReversePreviousInputBlock;
+        _currentReplayPostReverseOwnsInputBlock = false;
+        _currentReplayPostReversePreviousInputBlock = false;
     }
 
     private void OnVideoRecordingStarted(CombatReplayVideoRecordingStarted started)
@@ -774,9 +1197,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             return false;
         }
 
-        if (_pendingCurrentReplayRecapPostRoll != null)
+        if (_pendingCurrentReplayPostReverseHold != null)
         {
-            reason = "Replay recording is still capturing the recap.";
+            reason = "Replay recording is still capturing the post-replay board.";
             return false;
         }
 
@@ -947,8 +1370,12 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             "native-replay-state-exited-before-start",
             "Replay state exited before the native replay could start."
         );
-        CancelCurrentReplayRecapPostRoll();
-        if (_currentRecording.NativeReplayStarted)
+        var currentReplayWasActive = _currentRecording.NativeReplayStarted;
+        CancelCurrentReplayPresentationGate(
+            "Replay state exited before the recorded simulation completed."
+        );
+        CancelCurrentReplayPostReverseHold();
+        if (currentReplayWasActive)
         {
             var currentEnded = _playbackPublisher?.PublishEnded("replay-state-exit", failed: true);
             _currentRecording.MarkReplayEnded(
@@ -959,7 +1386,6 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         }
         _currentRecording.LeaveReplayState();
         _currentRecordingManifest = null;
-        _invokeCurrentRecordingRecap = null;
 
         var now = Time.realtimeSinceStartup;
         var ownership = _savedReplay.BeginReplayStateExit(now);

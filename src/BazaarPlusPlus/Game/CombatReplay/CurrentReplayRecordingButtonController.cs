@@ -15,7 +15,6 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     private const float DockButtonGap = BppSettingsDockPlacement.DefaultSiblingGap;
     private Button? _settingsButton;
     private Button? _nativeReplayButton;
-    private Button? _nativeRecapButton;
     private Button? _nativeRecapBackButton;
     private Button? _button;
     private RectTransform? _cloneRect;
@@ -59,11 +58,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         return controller;
     }
 
-    internal static void BindNativeActions(
-        Button nativeReplayButton,
-        Button nativeRecapButton,
-        Button nativeRecapBackButton
-    )
+    internal static void BindNativeActions(Button nativeReplayButton, Button nativeRecapBackButton)
     {
         foreach (
             var controller in FindObjectsOfType<CurrentReplayRecordingButtonController>(
@@ -72,7 +67,6 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         )
         {
             controller._nativeReplayButton = nativeReplayButton;
-            controller._nativeRecapButton = nativeRecapButton;
             controller._nativeRecapBackButton = nativeRecapBackButton;
             controller.Refresh();
         }
@@ -192,10 +186,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             _clone.SetActive(visible);
         if (visible && !wasActive)
             _lastSpriteId = null;
-        var nativeActionsBound =
-            _nativeReplayButton != null
-            && _nativeRecapButton != null
-            && _nativeRecapBackButton != null;
+        var nativeActionsBound = _nativeReplayButton != null && _nativeRecapBackButton != null;
         _uiLogState.Observe(
             snapshot,
             _layoutAvailable,
@@ -215,14 +206,8 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     {
         var runtime = CombatReplayRuntime.Instance;
         var nativeReplayButton = _nativeReplayButton;
-        var nativeRecapButton = _nativeRecapButton;
         var nativeRecapBackButton = _nativeRecapBackButton;
-        if (
-            runtime == null
-            || nativeReplayButton == null
-            || nativeRecapButton == null
-            || nativeRecapBackButton == null
-        )
+        if (runtime == null || nativeReplayButton == null || nativeRecapBackButton == null)
             return;
 
         var snapshot = runtime.GetCurrentReplayRecordingSnapshot();
@@ -231,7 +216,6 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         else if (snapshot.CanStart)
             runtime.TryStartCurrentReplayRecording(
                 nativeReplayButton.onClick.Invoke,
-                nativeRecapButton.onClick.Invoke,
                 nativeRecapBackButton.onClick.Invoke,
                 out _
             );

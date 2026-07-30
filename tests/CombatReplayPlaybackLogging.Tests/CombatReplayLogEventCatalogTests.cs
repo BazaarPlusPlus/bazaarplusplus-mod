@@ -22,6 +22,8 @@ public sealed class CombatReplayLogEventCatalogTests
                 "run_id:Public:High:Short|reason_code:Public:Low:None",
             ["combat_replay.current_recording_ui.observed"] =
                 "phase:Public:Low:None|snapshot_visible:Public:Low:None|layout_available:Public:Low:None|layout_reason_code:Public:Low:None|clone_active:Public:Low:None|native_replay_bound:Public:Low:None|icon_available:Public:Low:None",
+            ["combat_replay.current_recording.presentation_gate_resolved"] =
+                "recording_id:Public:High:Short|outcome:Public:Low:None|expected_items:Public:Low:None|visible_items:Public:Low:None|face_up_items:Public:Low:None|settled_items:Public:Low:None|expected_skills:Public:Low:None|registered_skills:Public:Low:None|ready_skills:Public:Low:None|elapsed_ms:Public:High:None",
             ["combat_replay.playback.request_rejected"] =
                 "source:Public:Low:None|reason_code:Public:Low:None|battle_id:Public:High:Short",
             ["combat_replay.external_record.accepted"] =

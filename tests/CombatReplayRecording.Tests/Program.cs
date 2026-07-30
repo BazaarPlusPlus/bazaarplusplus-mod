@@ -57,18 +57,194 @@ var replayRunEconomyFallbackType = RequireType(
 var snapshotRehydratorType = RequireType(
     "BazaarPlusPlus.Game.CombatReplay.Bootstrap.SnapshotRehydrator"
 );
+var replayRecordingHoverSuppressionType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.Video.ReplayRecordingHoverSuppression"
+);
+var currentReplayPresentationReadinessType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.CurrentReplayPresentationReadiness"
+);
+var currentReplayPresentationReadinessSnapshotType = RequireType(
+    "BazaarPlusPlus.Game.CombatReplay.CurrentReplayPresentationReadinessSnapshot"
+);
 
 RunReplaySavedStateNormalizationChecks(replaySavedStateNormalizerType, manifestType);
 RunReplayOpeningStateSelectionChecks(replayOpeningStateRestorerType);
 RunReplayRunEconomyFallbackChecks(replayRunEconomyFallbackType, manifestType);
 RunReplayPresentationRestorationChecks(replaySavedStateNormalizerType);
 RunReplaySpawnSanitizationChecks(snapshotRehydratorType);
+RunReplayRecordingHoverSuppressionChecks(replayRecordingHoverSuppressionType);
+RunCurrentReplayPresentationReadinessChecks(
+    currentReplayPresentationReadinessType,
+    currentReplayPresentationReadinessSnapshotType
+);
 
 RunCurrentReplayRecordingStateChecks();
 RunReplayVideoPreflightReasonChecks();
 RunCurrentReplayRecordingUiLogChecks();
 RunCurrentReplayVideoMetadataChecks();
 RunSystemFileRevealCommandChecks();
+
+static void RunReplayRecordingHoverSuppressionChecks(Type suppressionType)
+{
+    var isActive = suppressionType.GetProperty(
+        "IsActive",
+        BindingFlags.NonPublic | BindingFlags.Static
+    );
+    Assert(isActive != null, "Replay recording hover suppression should expose scoped state.");
+    Assert(
+        !(bool)isActive!.GetValue(null)!,
+        "Replay recording hover suppression should be inactive before recording."
+    );
+
+    using var first = (IDisposable)InvokeStatic(suppressionType, "Begin", [])!;
+    Assert(
+        (bool)isActive.GetValue(null)!,
+        "Beginning recording suppression should block native hover presentation."
+    );
+
+    using var second = (IDisposable)InvokeStatic(suppressionType, "Begin", [])!;
+    first.Dispose();
+    Assert(
+        (bool)isActive.GetValue(null)!,
+        "Nested recording suppression should remain active until the final lease is released."
+    );
+
+    second.Dispose();
+    Assert(
+        !(bool)isActive.GetValue(null)!,
+        "Native hover behavior should be restored after the final lease is released."
+    );
+}
+
+static void RunCurrentReplayPresentationReadinessChecks(Type readinessType, Type snapshotType)
+{
+    object Snapshot(
+        bool replayActive = true,
+        bool boardUpdating = false,
+        bool storageMoving = false,
+        bool boardPresentationUpdating = false,
+        bool carpetUnrolling = false,
+        bool boardRevealing = false,
+        bool hasCardsToReveal = false,
+        bool playerSkillBoardUpdating = false,
+        bool opponentSkillBoardUpdating = false,
+        int expectedItems = 2,
+        int visibleItems = 2,
+        int faceUpItems = 2,
+        int settledItems = 2,
+        int expectedSkills = 2,
+        int registeredSkills = 2,
+        int readySkills = 2
+    ) =>
+        Activator.CreateInstance(
+            snapshotType,
+            replayActive,
+            boardUpdating,
+            storageMoving,
+            boardPresentationUpdating,
+            carpetUnrolling,
+            boardRevealing,
+            hasCardsToReveal,
+            playerSkillBoardUpdating,
+            opponentSkillBoardUpdating,
+            expectedItems,
+            visibleItems,
+            faceUpItems,
+            settledItems,
+            expectedSkills,
+            registeredSkills,
+            readySkills
+        )
+        ?? throw new InvalidOperationException(
+            "Current replay presentation readiness snapshot should be constructible."
+        );
+
+    var ready = Snapshot();
+    Assert(
+        (bool)InvokeStatic(readinessType, "IsReady", [ready])!,
+        "Recording should become ready only after every expected item and skill is rendered."
+    );
+    Assert(
+        !(bool)InvokeStatic(readinessType, "IsReady", [Snapshot(settledItems: 1)])!,
+        "A still-animating item should keep simulation behind the recording gate."
+    );
+    Assert(
+        !(bool)InvokeStatic(readinessType, "IsReady", [Snapshot(readySkills: 1)])!,
+        "A registered skill without its rendered icon should keep simulation behind the gate."
+    );
+    Assert(
+        !(bool)
+            InvokeStatic(
+                readinessType,
+                "IsReady",
+                [Snapshot(registeredSkills: 1, readySkills: 1)]
+            )!,
+        "A missing skill renderer should keep simulation behind the recording gate."
+    );
+    Assert(
+        !(bool)
+            InvokeStatic(readinessType, "IsReady", [Snapshot(opponentSkillBoardUpdating: true)])!,
+        "Opponent skill-board mutation should keep simulation behind the recording gate."
+    );
+    Assert(
+        !(bool)InvokeStatic(readinessType, "IsReady", [Snapshot(carpetUnrolling: true)])!,
+        "Carpet motion should keep simulation behind the recording gate."
+    );
+    Assert(
+        (bool)
+            InvokeStatic(
+                readinessType,
+                "IsReady",
+                [
+                    Snapshot(
+                        expectedItems: 0,
+                        visibleItems: 0,
+                        faceUpItems: 0,
+                        settledItems: 0,
+                        expectedSkills: 0,
+                        registeredSkills: 0,
+                        readySkills: 0
+                    ),
+                ]
+            )!,
+        "A replay with no items or skills should not deadlock the presentation gate."
+    );
+
+    var oneStableFrame = (int)InvokeStatic(readinessType, "AdvanceStableFrameCount", [0, ready])!;
+    var requiredStableFrames = (int)(
+        readinessType
+            .GetField("RequiredStableFrames", BindingFlags.NonPublic | BindingFlags.Static)
+            ?.GetRawConstantValue()
+        ?? throw new InvalidOperationException(
+            "Replay presentation readiness should declare its stable-frame requirement."
+        )
+    );
+    Assert(
+        readinessType
+            .GetField("TimeoutSeconds", BindingFlags.NonPublic | BindingFlags.Static)
+            ?.GetRawConstantValue()
+            is 10f,
+        "Replay presentation readiness should retain a bounded ten-second degradation timeout."
+    );
+    Assert(
+        oneStableFrame < requiredStableFrames,
+        "One ready render sample should not release replay simulation."
+    );
+    Assert(
+        (int)InvokeStatic(readinessType, "AdvanceStableFrameCount", [oneStableFrame, ready])!
+            == requiredStableFrames,
+        "Consecutive ready render samples should release replay simulation."
+    );
+    Assert(
+        (int)
+            InvokeStatic(
+                readinessType,
+                "AdvanceStableFrameCount",
+                [oneStableFrame, Snapshot(readySkills: 1)]
+            )! == 0,
+        "Any presentation regression should reset the stable-frame count."
+    );
+}
 
 Assert(
     (bool)InvokeStatic(audioTapStopperType, "IsUsable", new object?[] { false, "present.wav" })!
