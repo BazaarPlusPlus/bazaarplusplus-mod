@@ -23,6 +23,7 @@ internal static class BppTooltipSections
         public GameObject Block = null!;
         public CardEffectTooltipController Text = null!;
         public GameObject? Divider;
+        public GameObject? CustomContent;
         public UnityEngine.UI.LayoutGroup? SourceLayout;
         public int SourceBottomPadding;
         public UnityEngine.UI.LayoutGroup? QuestGroupLayout;
@@ -77,6 +78,71 @@ internal static class BppTooltipSections
             return false;
         }
         section.Text.SetText(content);
+        if (section.CustomContent != null)
+        {
+            section.CustomContent.SetActive(false);
+            Object.Destroy(section.CustomContent);
+            section.CustomContent = null;
+        }
+        section.Text.gameObject.SetActive(true);
+        Commit(section, anchor);
+        return true;
+    }
+
+    public static bool TryShowCustom(
+        CardTooltipController controller,
+        string key,
+        GameObject? anchor,
+        Action<Section> build,
+        Style? style = null
+    )
+    {
+        if (anchor == null)
+            return false;
+
+        var section = Ensure(controller, key, anchor, style);
+        if (section == null)
+            return false;
+
+        ApplyHostPadding(section, style);
+        section.Text.ClearText();
+        section.Text.gameObject.SetActive(false);
+        if (section.CustomContent != null)
+        {
+            section.CustomContent.SetActive(false);
+            Object.Destroy(section.CustomContent);
+            section.CustomContent = null;
+        }
+
+        try
+        {
+            build(section);
+        }
+        catch (Exception ex)
+        {
+            if (section.CustomContent != null)
+            {
+                section.CustomContent.SetActive(false);
+                Object.Destroy(section.CustomContent);
+                section.CustomContent = null;
+            }
+            RestoreHostPadding(section);
+            section.Block.SetActive(false);
+            ReportHostDegraded(key, TooltipLogReasonCode.CustomContentBuildException, ex);
+            return false;
+        }
+        if (section.CustomContent == null)
+        {
+            Hide(controller, key);
+            return false;
+        }
+
+        Commit(section, anchor);
+        return true;
+    }
+
+    private static void Commit(Section section, GameObject anchor)
+    {
         var siblingIndex = anchor.transform.GetSiblingIndex() + 1;
         if (section.Divider != null)
         {
@@ -86,7 +152,6 @@ internal static class BppTooltipSections
         }
         section.Block.transform.SetSiblingIndex(siblingIndex);
         section.Block.SetActive(true);
-        return true;
     }
 
     public static void Hide(CardTooltipController controller, string key)
@@ -134,6 +199,8 @@ internal static class BppTooltipSections
             owned ??= new List<(CardTooltipController, string)>();
             owned.Add(entry.Key);
             RestoreHostPadding(entry.Value);
+            if (entry.Value.CustomContent != null)
+                Object.Destroy(entry.Value.CustomContent);
             if (entry.Value.Divider != null)
                 Object.Destroy(entry.Value.Divider);
             if (entry.Value.Block != null)
@@ -294,12 +361,19 @@ internal static class BppTooltipSections
         return section;
     }
 
-    private static void ReportHostDegraded(string key, TooltipLogReasonCode reasonCode) =>
-        BppLog.WarnEvent(
-            TooltipLogEvents.SectionHostDegraded,
-            TooltipLogEvents.SectionHostDegradedSectionId.Bind(ResolveSectionId(key)),
-            TooltipLogEvents.SectionHostDegradedReasonCode.Bind(reasonCode)
-        );
+    private static void ReportHostDegraded(
+        string key,
+        TooltipLogReasonCode reasonCode,
+        Exception? exception = null
+    )
+    {
+        var section = TooltipLogEvents.SectionHostDegradedSectionId.Bind(ResolveSectionId(key));
+        var reason = TooltipLogEvents.SectionHostDegradedReasonCode.Bind(reasonCode);
+        if (exception == null)
+            BppLog.WarnEvent(TooltipLogEvents.SectionHostDegraded, section, reason);
+        else
+            BppLog.WarnEvent(TooltipLogEvents.SectionHostDegraded, exception, section, reason);
+    }
 
     private static TooltipSectionId ResolveSectionId(string key) =>
         key switch
@@ -311,6 +385,7 @@ internal static class BppTooltipSections
             "aggregate-missing-types" => TooltipSectionId.AggregateMissingTypes,
             "encounter" => TooltipSectionId.EncounterPreview,
             "level-rewards" => TooltipSectionId.HeroLevelRewards,
+            "post-combat-impact" => TooltipSectionId.PostCombatImpact,
             _ => TooltipSectionId.Unknown,
         };
 

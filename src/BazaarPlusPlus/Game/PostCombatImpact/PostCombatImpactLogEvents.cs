@@ -6,7 +6,6 @@ namespace BazaarPlusPlus.Game.PostCombatImpact;
 internal enum PostCombatImpactReasonCode
 {
     ProjectionException,
-    NativeBackRejected,
 }
 
 [BppLogEventSource]
@@ -23,13 +22,6 @@ internal static class PostCombatImpactLogEvents
     internal static readonly BppLogEventDefinition ProjectionDegraded = new(
         BppLogFeatureScope.PostCombatImpact,
         "post_combat_impact.projection.degraded",
-        [ReasonCode],
-        new BppLogStormPolicy([ReasonCode])
-    );
-
-    internal static readonly BppLogEventDefinition CloseDegraded = new(
-        BppLogFeatureScope.PostCombatImpact,
-        "post_combat_impact.close.degraded",
         [ReasonCode],
         new BppLogStormPolicy([ReasonCode])
     );

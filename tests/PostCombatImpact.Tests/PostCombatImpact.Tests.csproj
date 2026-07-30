@@ -36,8 +36,8 @@
       Link="CombatImpactProjector.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/PostCombatImpactRecapState.cs"
-      Link="PostCombatImpactRecapState.cs"
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactMetricFormatter.cs"
+      Link="CombatImpactMetricFormatter.cs"
     />
   </ItemGroup>
 </Project>

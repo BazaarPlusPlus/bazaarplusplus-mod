@@ -40,6 +40,7 @@ using BazaarPlusPlus.GameInterop.VoiceSubtitles;
 using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Patches;
+using BazaarPlusPlus.Patches.PostCombatImpact;
 using BazaarPlusPlus.Patches.Tooltips;
 using BepInEx.Configuration;
 using BepInEx.Logging;
@@ -148,7 +149,11 @@ internal sealed class BppComposition : IDisposable
             encounterPreviewCachePath
         );
         _endOfRunCaptureWorkflow = new EndOfRunCaptureWorkflow(_services);
-        _patchFeatures = new BppPatchFeatures(_encounterPreviewModule, _endOfRunCaptureWorkflow);
+        _patchFeatures = new BppPatchFeatures(
+            _encounterPreviewModule,
+            _endOfRunCaptureWorkflow,
+            _postCombatImpactModule
+        );
         _runLoggingModule = new RunLoggingModule(
             _services,
             PvpBattleCatalog,
@@ -225,7 +230,8 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(new ComponentMount<CombatStatusBar>((c, s) => c.Initialize(s)));
         _mountables.Register(
             new ComponentMount<PostCombatImpactController>(
-                (c, _) => c.Initialize(_postCombatImpactModule)
+                (c, _) =>
+                    c.Initialize(_postCombatImpactModule, new NativePostCombatImpactTooltipView())
             )
         );
         _mountables.Register(

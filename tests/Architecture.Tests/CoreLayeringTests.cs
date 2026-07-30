@@ -2953,6 +2953,53 @@ public class CoreLayeringTests
         );
     }
 
+    [Fact]
+    public void Post_combat_impact_extends_the_native_recap_tooltip_instead_of_mounting_an_overlay()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var featureRoot = Path.Combine(sourceRoot, "Game", "PostCombatImpact");
+        var controller = File.ReadAllText(
+            Path.Combine(featureRoot, "PostCombatImpactController.cs")
+        );
+        var recapPatch = File.ReadAllText(
+            Path.Combine(sourceRoot, "Patches", "PostCombatImpact", "PostCombatImpactRecapPatch.cs")
+        );
+        var tooltipView = File.ReadAllText(
+            Path.Combine(
+                sourceRoot,
+                "Patches",
+                "PostCombatImpact",
+                "NativePostCombatImpactTooltipView.cs"
+            )
+        );
+        var artProvider = File.ReadAllText(
+            Path.Combine(featureRoot, "Ui", "PostCombatImpactCardArtProvider.cs")
+        );
+
+        Assert.False(
+            File.Exists(Path.Combine(featureRoot, "Ui", "PostCombatImpactView.cs")),
+            "The retired full-screen UI Toolkit overlay must not return."
+        );
+        Assert.DoesNotContain("UIDocument", controller);
+        Assert.DoesNotContain("PanelSettings", controller);
+        Assert.Contains("typeof(RecapItemVisualController)", recapPatch);
+        Assert.Contains("typeof(SkillProxyRenderer)", recapPatch);
+        Assert.Contains("nameof(CardTooltipController.RenderPassiveEffectTextBlock)", recapPatch);
+        Assert.Contains(
+            "PointerEventData.InputButton.Right",
+            File.ReadAllText(Path.Combine(featureRoot, "PostCombatImpactRecapClickTarget.cs"))
+        );
+        Assert.Contains("PointerEventData.InputButton.Right", recapPatch);
+        Assert.Contains("BppTooltipSections.TryShowCustom", tooltipView);
+        Assert.Contains("controller.KeepTooltipWithinBounds()", tooltipView);
+        Assert.Contains("Addressables.LoadAssetAsync<Texture>", artProvider);
+        Assert.DoesNotContain("new GameObject(\"PostCombatImpactUiToolkitRoot", tooltipView);
+        Assert.False(
+            File.Exists(Path.Combine(sourceRoot, "GameInterop", "Recap", "NativeRecapControls.cs")),
+            "The retired full-screen overlay's native Back bridge must not return."
+        );
+    }
+
     private static void ScanForAgentImports(string file, string baseDir, List<string> violations)
     {
         var relative = Path.GetRelativePath(baseDir, file).Replace('\\', '/');
