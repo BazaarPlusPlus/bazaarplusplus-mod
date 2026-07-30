@@ -1,0 +1,134 @@
+#nullable enable
+using Newtonsoft.Json;
+
+namespace BazaarPlusPlus.BazaarAgent;
+
+/// <summary>The replacement Agent protocol. The wire shape is intentionally terse because it is LLM context.</summary>
+public static class BazaarAgentProtocolV3
+{
+    public const string Version = "3";
+    public const string SessionHeader = "X-Bazaar-Agent-Session";
+    public const string RevisionHeader = "X-Bazaar-Agent-Revision";
+}
+
+public sealed class BazaarAgentV3Context
+{
+    [JsonProperty("revision")]
+    public ulong Revision { get; init; }
+
+    [JsonProperty("full", NullValueHandling = NullValueHandling.Ignore)]
+    public bool? IsFull { get; init; }
+
+    [JsonProperty("state", NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyDictionary<string, object?>? State { get; init; }
+
+    [JsonProperty("board", NullValueHandling = NullValueHandling.Ignore)]
+    public BazaarAgentV3CardChanges? Board { get; init; }
+
+    [JsonProperty("chest", NullValueHandling = NullValueHandling.Ignore)]
+    public BazaarAgentV3CardChanges? Chest { get; init; }
+
+    [JsonProperty("skills", NullValueHandling = NullValueHandling.Ignore)]
+    public BazaarAgentV3CardChanges? Skills { get; init; }
+
+    [JsonProperty("selection", NullValueHandling = NullValueHandling.Ignore)]
+    public BazaarAgentV3CardChanges? Selection { get; init; }
+
+    [JsonProperty("operations", NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyList<string>? Operations { get; init; }
+
+    [JsonProperty("lockedBoardSlots", NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyList<int>? LockedBoardSlots { get; init; }
+
+    [JsonProperty("battle", NullValueHandling = NullValueHandling.Ignore)]
+    public BazaarAgentBattleSummary? LastBattle { get; init; }
+
+    [JsonProperty("battleCleared", NullValueHandling = NullValueHandling.Ignore)]
+    public bool? BattleCleared { get; init; }
+}
+
+public sealed class BazaarAgentV3CardChanges
+{
+    [JsonProperty("upsert", NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyList<BazaarAgentV3Card>? Upsert { get; init; }
+
+    [JsonProperty("remove", NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyList<string>? Remove { get; init; }
+}
+
+/// <summary>Compact cards carry actionable summary data; full mechanics live in the rendered description.</summary>
+public sealed class BazaarAgentV3Card
+{
+    [JsonProperty("id")]
+    public string Id { get; init; } = "";
+
+    [JsonProperty("template", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Template { get; init; }
+
+    [JsonProperty("name", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Name { get; init; }
+
+    // A delta carrying this flag replaces the cached card rather than patching it.
+    [JsonProperty("replace", NullValueHandling = NullValueHandling.Ignore)]
+    public bool? IsFull { get; init; }
+
+    [JsonProperty("slots", NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyList<int>? Slots { get; init; }
+
+    [JsonProperty("size", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Size { get; init; }
+
+    [JsonProperty("tier", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Tier { get; init; }
+
+    [JsonProperty("enchantment", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Enchantment { get; init; }
+
+    [JsonProperty("tags", NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyList<string>? Tags { get; init; }
+
+    [JsonProperty("hiddenTags", NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyList<string>? HiddenTags { get; init; }
+
+    [JsonProperty("description", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Description { get; init; }
+
+    [JsonProperty("cooldownSeconds", NullValueHandling = NullValueHandling.Ignore)]
+    public double? CooldownSeconds { get; init; }
+
+    [JsonProperty("ammo", NullValueHandling = NullValueHandling.Ignore)]
+    public int? Ammo { get; init; }
+
+    [JsonProperty("ammoMax", NullValueHandling = NullValueHandling.Ignore)]
+    public int? AmmoMax { get; init; }
+
+    [JsonProperty("buyPrice", NullValueHandling = NullValueHandling.Ignore)]
+    public int? BuyPrice { get; init; }
+
+    [JsonProperty("sellPrice", NullValueHandling = NullValueHandling.Ignore)]
+    public int? SellPrice { get; init; }
+}
+
+public sealed class BazaarAgentV3ActionRequest
+{
+    [JsonProperty("op")]
+    public string Operation { get; set; } = "";
+
+    [JsonProperty("id", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Id { get; set; }
+
+    [JsonProperty("target", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Target { get; set; }
+
+    [JsonProperty("slot", NullValueHandling = NullValueHandling.Ignore)]
+    public int? StartSlot { get; set; }
+
+    [JsonProperty("hero", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Hero { get; set; }
+
+    [JsonProperty("mode", NullValueHandling = NullValueHandling.Ignore)]
+    public string? PlayMode { get; set; }
+
+    [JsonProperty("revision")]
+    public ulong Revision { get; set; }
+}

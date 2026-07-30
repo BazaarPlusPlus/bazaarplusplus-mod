@@ -116,8 +116,13 @@ public sealed class BazaarAgentContextCapture
             ),
             TagValueCount = allFullCardCopies.Sum(static card => card.Tags.Count),
             HiddenTagValueCount = allFullCardCopies.Sum(static card => card.HiddenTags.Count),
-            AttributeValueCount = allFullCardCopies.Sum(static card => card.Attributes.Count),
-            ActiveAbilityCount = allFullCardCopies.Sum(static card => card.ActiveAbilities.Count),
+            DescriptionCharacterCount = allFullCardCopies.Sum(static card =>
+                card.Description?.Length ?? 0
+            ),
+            CooldownValueCount = allFullCardCopies.Count(static card =>
+                card.CooldownSeconds is > 0
+            ),
+            AmmoCapacityCount = allFullCardCopies.Count(static card => card.AmmoMax is > 0),
             SectionBytes = new Dictionary<string, int>(StringComparer.Ordinal)
             {
                 ["boardItems"] = SerializedBytes(context.BoardItems),
@@ -188,8 +193,9 @@ public sealed class BazaarAgentContextCaptureMetrics
     public int TargetSocketValueCount { get; init; }
     public int TagValueCount { get; init; }
     public int HiddenTagValueCount { get; init; }
-    public int AttributeValueCount { get; init; }
-    public int ActiveAbilityCount { get; init; }
+    public int DescriptionCharacterCount { get; init; }
+    public int CooldownValueCount { get; init; }
+    public int AmmoCapacityCount { get; init; }
     public IReadOnlyDictionary<string, int> SectionBytes { get; init; } =
         new Dictionary<string, int>();
 }

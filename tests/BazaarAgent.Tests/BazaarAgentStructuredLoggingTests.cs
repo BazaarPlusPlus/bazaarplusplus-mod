@@ -69,7 +69,7 @@ public sealed class BazaarAgentStructuredLoggingTests
             BazaarAgentLogEvents
                 .ActionFailed(
                     "01JABCDEFGHJKMNPQRSTVWXYZ",
-                    BazaarAgentActionKind.Wait,
+                    BazaarAgentActionKind.Continue,
                     BazaarAgentLogReasonCode.ActionProcessingException
                 )
                 .Values is Array

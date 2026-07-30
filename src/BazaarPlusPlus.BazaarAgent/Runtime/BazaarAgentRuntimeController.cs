@@ -296,20 +296,9 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     )
     {
         _pendingActionObservation = null;
-        var body = BuildOkBody(
-            observation.DecisionId,
-            observation.Baseline,
-            observation.Action,
-            executed: true,
-            confirmationStatus: confirmed ? "confirmed" : "accepted_but_unconfirmed",
-            observedTickId: observed.TickId
-        );
+        var body = BuildOkBody(confirmed ? "confirmed" : "accepted");
         observation.Pending.SetResponse(new BazaarAgentServerResponse(confirmed ? 200 : 202, body));
-        if (
-            confirmed
-            && observation.Action.ActionKind != BazaarAgentActionKind.Wait
-            && _contextReader is IBazaarAgentBattleSummaryAcknowledger acknowledger
-        )
+        if (confirmed && _contextReader is IBazaarAgentBattleSummaryAcknowledger acknowledger)
             acknowledger.AcknowledgeLastBattle();
         LogDecision(
             observation.Pending.RequestId,
@@ -349,36 +338,13 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         var result = _dispatcher.Execute(action, snapshot);
         if (result.Executed)
         {
-            if (action.ActionKind != BazaarAgentActionKind.Wait)
-            {
-                _lastActionTime = _clock.NowSeconds;
-
-                _pendingActionObservation = new PendingActionObservation(
-                    pending,
-                    decisionId,
-                    snapshot,
-                    action,
-                    _clock.NowSeconds + ActionObservationTimeoutSeconds
-                );
-                return;
-            }
-
-            var okBody = BuildOkBody(
+            _lastActionTime = _clock.NowSeconds;
+            _pendingActionObservation = new PendingActionObservation(
+                pending,
                 decisionId,
                 snapshot,
                 action,
-                executed: true,
-                confirmationStatus: "confirmed",
-                observedTickId: snapshot.TickId
-            );
-            pending.SetResponse(new BazaarAgentServerResponse(200, okBody));
-            LogDecision(
-                pending.RequestId,
-                decisionId,
-                snapshot,
-                action,
-                executed: true,
-                error: null
+                _clock.NowSeconds + ActionObservationTimeoutSeconds
             );
             return;
         }
@@ -420,27 +386,9 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         return JsonConvert.SerializeObject(envelope, _responseJson);
     }
 
-    private string BuildOkBody(
-        string decisionId,
-        BazaarAgentContextSnapshot snapshot,
-        BazaarAgentAction action,
-        bool executed,
-        string confirmationStatus,
-        ulong observedTickId
-    )
+    private string BuildOkBody(string status)
     {
-        var payload = new
-        {
-            schemaVersion = BazaarAgentSchema.Version,
-            decisionId,
-            executed,
-            tickId = snapshot.TickId,
-            observedTickId,
-            confirmationStatus,
-            confirmed = confirmationStatus == "confirmed",
-            actionKind = action.ActionKind.ToString(),
-        };
-        return JsonConvert.SerializeObject(payload, _responseJson);
+        return JsonConvert.SerializeObject(new { status }, _responseJson);
     }
 
     private void LogDecision(

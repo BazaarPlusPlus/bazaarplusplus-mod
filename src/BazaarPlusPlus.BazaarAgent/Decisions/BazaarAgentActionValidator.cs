@@ -75,12 +75,11 @@ public static class BazaarAgentActionValidator
 
         // The context reader suppresses actions while busy, but retain this independent check for
         // callers holding a synthetic or older snapshot.
-        if (kind != BazaarAgentActionKind.Wait && snapshot.Context.IsClientBusy)
+        if (snapshot.Context.IsClientBusy)
             return Fail(BazaarAgentValidationCode.Unavailable, 503, "client busy");
 
         if (
             snapshot.Context.StateName == BazaarAgentRunStateName.Replay
-            && kind != BazaarAgentActionKind.Wait
             && kind != BazaarAgentActionKind.Continue
         )
         {
@@ -91,8 +90,7 @@ public static class BazaarAgentActionValidator
             );
         }
 
-        // ── Rule 2: actionKind in AvailableActions (Wait exempt) ──────────────
-        if (kind != BazaarAgentActionKind.Wait)
+        // ── Rule 2: actionKind in AvailableActions ────────────────────────────
         {
             var found = false;
             foreach (var opt in snapshot.Context.AvailableActions)
@@ -218,8 +216,8 @@ public static class BazaarAgentActionValidator
                 new Dictionary<string, object?> { ["currentTickId"] = snapshot.TickId }
             );
 
-        // ── Rule 8: cooldown (Wait exempt) ────────────────────────────────────
-        if (kind != BazaarAgentActionKind.Wait && cooldownRemainingSeconds > 0)
+        // ── Rule 8: cooldown ──────────────────────────────────────────────────
+        if (cooldownRemainingSeconds > 0)
             return Fail(
                 BazaarAgentValidationCode.Cooldown,
                 429,

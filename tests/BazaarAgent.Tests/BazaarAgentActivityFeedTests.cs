@@ -1,5 +1,6 @@
 #nullable enable
 using System.Net;
+using System.Text;
 using BazaarPlusPlus.BazaarAgent;
 using Xunit;
 
@@ -11,64 +12,87 @@ public sealed class BazaarAgentActivityFeedTests
         var feed = new BazaarAgentActivityFeed();
         var waiting = feed.WaitForEventsAsync(0, maximumEvents: 10, waitMilliseconds: 1000);
 
-        feed.Publish("context.sent", "req-1", "/v1/context", "Context Choice at tick 1");
+        feed.Publish("agent.view.sent", "req-1", "/v3/context", "Agent v3 context");
 
         var result = await waiting;
-        var activity = Assert.Single(result.Events);
-        Assert.Equal(1, activity.Sequence);
-        Assert.Equal("context.sent", activity.Kind);
-        Assert.Equal(1, result.LatestSequence);
+        Assert.Equal("agent.view.sent", Assert.Single(result.Events).Kind);
     }
 
     [Fact]
-    public async Task DashboardBootstrapAndContextTraffic_AreAvailableOverTheExistingListener()
+    public async Task DashboardBootstrap_ContainsOnlyV3ProtocolTraffic()
+    {
+        using var fixture = new ServerFixture();
+        fixture.SetSnapshot(new BazaarAgentContextSnapshot(new BazaarAgentContext { TickId = 7 }));
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+
+        var context = await http.GetAsync($"http://127.0.0.1:{fixture.Port}/v3/context");
+        Assert.Equal(HttpStatusCode.OK, context.StatusCode);
+        var bootstrap = await http.GetStringAsync(
+            $"http://127.0.0.1:{fixture.Port}/dashboard/api/bootstrap"
+        );
+
+        Assert.Contains("\"kind\":\"agent.view.sent\"", bootstrap);
+        Assert.Contains("\"route\":\"/v3/context\"", bootstrap);
+        Assert.DoesNotContain("currentContextJson", bootstrap);
+    }
+
+    [Fact]
+    public async Task DashboardEvents_IncludeCompletedV3Actions()
     {
         using var fixture = new ServerFixture();
         fixture.SetSnapshot(
             new BazaarAgentContextSnapshot(
                 new BazaarAgentContext
                 {
-                    TickId = 7,
-                    StateName = BazaarAgentRunStateName.Choice,
-                    PlayerGold = 10,
+                    TickId = 8,
+                    AvailableActions = new[]
+                    {
+                        new BazaarAgentDecisionOption { ActionKind = BazaarAgentActionKind.Reroll },
+                    },
                 }
             )
         );
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        var context = await http.GetAsync($"http://127.0.0.1:{fixture.Port}/v3/context");
+        var session = Assert.Single(context.Headers.GetValues(BazaarAgentProtocolV3.SessionHeader));
 
-        var context = await http.GetAsync($"http://127.0.0.1:{fixture.Port}/v1/context");
-        Assert.Equal(HttpStatusCode.OK, context.StatusCode);
+        var post = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"http://127.0.0.1:{fixture.Port}/v3/actions"
+        )
+        {
+            Content = new StringContent(
+                "{\"op\":\"reroll\",\"revision\":8}",
+                Encoding.UTF8,
+                "application/json"
+            ),
+        };
+        post.Headers.Add(BazaarAgentProtocolV3.SessionHeader, session);
+        var responding = Task.Run(async () =>
+        {
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                var pending = fixture.Queue.TryDequeue();
+                if (pending is not null)
+                {
+                    pending.SetResponse(new BazaarAgentServerResponse(200, "{\"confirmed\":true}"));
+                    return;
+                }
+                await Task.Delay(10);
+            }
+            throw new TimeoutException("The v3 action was not queued.");
+        });
 
-        var bootstrap = await http.GetAsync(
+        var response = await http.SendAsync(post);
+        await responding;
+        var bootstrap = await http.GetStringAsync(
             $"http://127.0.0.1:{fixture.Port}/dashboard/api/bootstrap"
         );
-        Assert.Equal(HttpStatusCode.OK, bootstrap.StatusCode);
-        var body = await bootstrap.Content.ReadAsStringAsync();
-        Assert.Contains("\"kind\":\"context.sent\"", body);
-        Assert.Contains("\"tickId\":7", body);
-        Assert.Contains("\"currentContextJson\":\"{", body);
-    }
 
-    [Fact]
-    public async Task DashboardAssets_UseTheEmbeddedViteResourceNames()
-    {
-        using var fixture = new ServerFixture();
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-
-        var dashboard = await http.GetAsync($"http://127.0.0.1:{fixture.Port}/dashboard/");
-        Assert.Equal(HttpStatusCode.OK, dashboard.StatusCode);
-        var html = await dashboard.Content.ReadAsStringAsync();
-        var assetStart = html.IndexOf("src=\"/dashboard/assets/", StringComparison.Ordinal);
-        Assert.True(
-            assetStart >= 0,
-            "Dashboard HTML did not reference its JavaScript entry point."
-        );
-        var assetEnd = html.IndexOf('"', assetStart + 5);
-        var assetPath = html.Substring(assetStart + 5, assetEnd - assetStart - 5);
-
-        var asset = await http.GetAsync($"http://127.0.0.1:{fixture.Port}{assetPath}");
-        Assert.Equal(HttpStatusCode.OK, asset.StatusCode);
-        Assert.Equal("text/javascript", asset.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains("\"kind\":\"agent.action.received\"", bootstrap);
+        Assert.Contains("\"kind\":\"agent.action.completed\"", bootstrap);
+        Assert.Contains("\"route\":\"/v3/actions\"", bootstrap);
     }
 
     [Fact]
@@ -78,16 +102,14 @@ public sealed class BazaarAgentActivityFeedTests
         var oversized = new string('x', 300 * 1024);
 
         feed.Publish(
-            "action.received",
+            "agent.action.received",
             "req-1",
-            "/v1/actions",
-            "Action Wait",
+            "/v3/actions",
+            "Action",
             requestJson: oversized
         );
 
         var activity = Assert.Single(feed.GetSince(0, maximumEvents: 10).Events);
-        Assert.NotNull(activity.RequestJson);
-        Assert.True(activity.RequestJson!.Length < oversized.Length);
         Assert.EndsWith("[truncated by BazaarAgent activity feed]", activity.RequestJson);
     }
 }

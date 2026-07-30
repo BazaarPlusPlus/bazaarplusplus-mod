@@ -249,7 +249,7 @@ public class BazaarAgentContextSnapshotTests
             ActionCooldownRemainingSeconds = 0.8,
             AvailableActions = new[]
             {
-                new BazaarAgentDecisionOption { ActionKind = BazaarAgentActionKind.Wait },
+                new BazaarAgentDecisionOption { ActionKind = BazaarAgentActionKind.Continue },
             },
         };
 
@@ -337,16 +337,8 @@ public class BazaarAgentContextSnapshotTests
                     Type = "Item",
                     Tags = new[] { "Weapon" },
                     HiddenTags = new[] { "Damage" },
-                    Attributes = new Dictionary<string, int> { ["DamageAmount"] = 10 },
-                    ActiveAbilities = new[]
-                    {
-                        new BazaarAgentCardAbilitySnapshot
-                        {
-                            Id = "a1",
-                            Action = "TActionDamage",
-                            Trigger = "TTriggerOnCardFired",
-                        },
-                    },
+                    Description = "Deal 10 damage.",
+                    CooldownSeconds = 6,
                 },
             },
         };
@@ -361,16 +353,8 @@ public class BazaarAgentContextSnapshotTests
                     Type = "Item",
                     Tags = new[] { "Weapon" },
                     HiddenTags = new[] { "Damage" },
-                    Attributes = new Dictionary<string, int> { ["DamageAmount"] = 12 },
-                    ActiveAbilities = new[]
-                    {
-                        new BazaarAgentCardAbilitySnapshot
-                        {
-                            Id = "a1",
-                            Action = "TActionDamage",
-                            Trigger = "TTriggerOnCardFired",
-                        },
-                    },
+                    Description = "Deal 12 damage.",
+                    CooldownSeconds = 6,
                 },
             },
         };
@@ -379,6 +363,53 @@ public class BazaarAgentContextSnapshotTests
         var s2 = pub.Publish(changed);
 
         Assert.NotEqual(s1.TickId, s2.TickId);
+    }
+
+    [Fact]
+    public void Publish_InternalCardHintsAndActionCooldownDiffer_DoesNotBumpTickId()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var first = new BazaarAgentContext
+        {
+            ActionCooldownRemainingSeconds = 1,
+            BoardItems = new[]
+            {
+                new BazaarAgentCardSnapshot
+                {
+                    InstanceId = "i1",
+                    Kind = BazaarAgentCardKind.Item,
+                    Description = "Deal 10 damage.",
+                    CanAfford = true,
+                    CanFit = true,
+                    CanSelect = true,
+                    CanSell = true,
+                    IsFree = true,
+                },
+            },
+        };
+        var second = new BazaarAgentContext
+        {
+            ActionCooldownRemainingSeconds = 0,
+            BoardItems = new[]
+            {
+                new BazaarAgentCardSnapshot
+                {
+                    InstanceId = "i1",
+                    Kind = BazaarAgentCardKind.Item,
+                    Description = "Deal 10 damage.",
+                    CanAfford = false,
+                    CanFit = false,
+                    CanSelect = false,
+                    CanSell = false,
+                    IsFree = false,
+                },
+            },
+        };
+
+        var s1 = pub.Publish(first);
+        var s2 = pub.Publish(second);
+
+        Assert.Equal(s1.TickId, s2.TickId);
     }
 
     [Fact]
@@ -392,7 +423,6 @@ public class BazaarAgentContextSnapshotTests
                 new BazaarAgentDecisionOption
                 {
                     ActionKind = BazaarAgentActionKind.MoveItem,
-                    Group = BazaarAgentActionGroup.Move,
                     DisplayKey = "MoveItem:i1",
                     CardInstanceId = "i1",
                     TargetSection = BazaarAgentTargetSection.Hand,
@@ -407,7 +437,6 @@ public class BazaarAgentContextSnapshotTests
                 new BazaarAgentDecisionOption
                 {
                     ActionKind = BazaarAgentActionKind.MoveItem,
-                    Group = BazaarAgentActionGroup.Move,
                     DisplayKey = "MoveItem:i1",
                     CardInstanceId = "i1",
                     TargetSection = BazaarAgentTargetSection.Hand,

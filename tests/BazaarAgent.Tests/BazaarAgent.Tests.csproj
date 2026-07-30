@@ -22,4 +22,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\BazaarPlusPlus.BazaarAgent\BazaarPlusPlus.BazaarAgent.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\GameInterop\Cards\CardDescriptionTextNormalizer.cs"
+      Link="CardDescriptionTextNormalizer.cs"
+    />
+  </ItemGroup>
 </Project>

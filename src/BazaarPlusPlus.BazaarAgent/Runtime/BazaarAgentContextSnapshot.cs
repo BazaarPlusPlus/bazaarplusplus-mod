@@ -89,7 +89,6 @@ public sealed class BazaarAgentContextSnapshotPublisher
             BoardItems = src.BoardItems,
             ChestItems = src.ChestItems,
             LockedBoardSockets = src.LockedBoardSockets,
-            LockedChestSockets = src.LockedChestSockets,
             PlayerSkills = src.PlayerSkills,
             SellableItems = src.SellableItems,
             SelectionOptions = src.SelectionOptions,
@@ -125,14 +124,12 @@ public sealed class BazaarAgentContextSnapshotPublisher
             && a.RerollsRemaining == b.RerollsRemaining
             && a.CurrentEncounterId == b.CurrentEncounterId
             && a.CurrentEncounterType == b.CurrentEncounterType
-            && a.ActionCooldownRemainingSeconds == b.ActionCooldownRemainingSeconds
             && a.ReplayPhase == b.ReplayPhase
             && a.ReplayBattleId == b.ReplayBattleId
             && SocketsEqual(a.InteractableTemplateIds, b.InteractableTemplateIds)
             && CardsEqual(a.BoardItems, b.BoardItems)
             && CardsEqual(a.ChestItems, b.ChestItems)
             && SocketsEqual(a.LockedBoardSockets, b.LockedBoardSockets)
-            && SocketsEqual(a.LockedChestSockets, b.LockedChestSockets)
             && CardsEqual(a.PlayerSkills, b.PlayerSkills)
             && CardsEqual(a.SellableItems, b.SellableItems)
             && CardsEqual(a.SelectionOptions, b.SelectionOptions)
@@ -179,7 +176,6 @@ public sealed class BazaarAgentContextSnapshotPublisher
             || !CardsEqual(before.BoardItems, after.BoardItems)
             || !CardsEqual(before.ChestItems, after.ChestItems)
             || !SocketsEqual(before.LockedBoardSockets, after.LockedBoardSockets)
-            || !SocketsEqual(before.LockedChestSockets, after.LockedChestSockets)
             || !CardsEqual(before.PlayerSkills, after.PlayerSkills)
             || !CardsEqual(before.SellableItems, after.SellableItems)
             || !CardsEqual(before.SelectionOptions, after.SelectionOptions)
@@ -214,18 +210,15 @@ public sealed class BazaarAgentContextSnapshotPublisher
             && a.Order == b.Order
             && SocketsEqual(a.Tags, b.Tags)
             && SocketsEqual(a.HiddenTags, b.HiddenTags)
-            && AttributesEqual(a.Attributes, b.Attributes)
-            && AbilitiesEqual(a.ActiveAbilities, b.ActiveAbilities)
+            && a.Description == b.Description
+            && a.CooldownSeconds == b.CooldownSeconds
+            && a.Ammo == b.Ammo
+            && a.AmmoMax == b.AmmoMax
             && a.BuyPrice == b.BuyPrice
             && a.SellPrice == b.SellPrice
-            && a.CanAfford == b.CanAfford
-            && a.CanFit == b.CanFit
-            && a.CanSelect == b.CanSelect
-            && a.IsFree == b.IsFree
             && a.TargetSection == b.TargetSection
             && a.TargetSockets == b.TargetSockets
-            && a.UnavailableReason == b.UnavailableReason
-            && a.CanSell == b.CanSell;
+            && a.UnavailableReason == b.UnavailableReason;
     }
 
     private static bool OptionsEqual(
@@ -240,8 +233,6 @@ public sealed class BazaarAgentContextSnapshotPublisher
             var x = a[i];
             var y = b[i];
             if (x.ActionKind != y.ActionKind)
-                return false;
-            if (x.Group != y.Group)
                 return false;
             if (x.DisplayKey != y.DisplayKey)
                 return false;
@@ -270,56 +261,6 @@ public sealed class BazaarAgentContextSnapshotPublisher
         for (var i = 0; i < a.Count; i++)
             if (a[i] != b[i])
                 return false;
-        return true;
-    }
-
-    private static bool AttributesEqual(
-        IReadOnlyDictionary<string, int> a,
-        IReadOnlyDictionary<string, int> b
-    )
-    {
-        if (ReferenceEquals(a, b))
-            return true;
-        if (a.Count != b.Count)
-            return false;
-        foreach (var kv in a)
-        {
-            if (!b.TryGetValue(kv.Key, out var value) || value != kv.Value)
-                return false;
-        }
-        return true;
-    }
-
-    private static bool AbilitiesEqual(
-        IReadOnlyList<BazaarAgentCardAbilitySnapshot> a,
-        IReadOnlyList<BazaarAgentCardAbilitySnapshot> b
-    )
-    {
-        if (ReferenceEquals(a, b))
-            return true;
-        if (a.Count != b.Count)
-            return false;
-        for (var i = 0; i < a.Count; i++)
-        {
-            var x = a[i];
-            var y = b[i];
-            if (x.Id != y.Id)
-                return false;
-            if (x.InternalName != y.InternalName)
-                return false;
-            if (x.InternalDescription != y.InternalDescription)
-                return false;
-            if (x.Trigger != y.Trigger)
-                return false;
-            if (x.Action != y.Action)
-                return false;
-            if (x.ActiveIn != y.ActiveIn)
-                return false;
-            if (x.WorksIn != y.WorksIn)
-                return false;
-            if (x.Priority != y.Priority)
-                return false;
-        }
         return true;
     }
 }

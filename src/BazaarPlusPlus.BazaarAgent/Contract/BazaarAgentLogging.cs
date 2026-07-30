@@ -65,7 +65,6 @@ public enum BazaarAgentReplayLogAction
 public enum BazaarAgentHttpLogRoute
 {
     Context,
-    CardQuery,
     Actions,
     ReplayRecord,
     ReplayContinue,

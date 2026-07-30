@@ -37,7 +37,7 @@ internal sealed class BazaarAgentGameContextReader
 
     /// <summary>
     /// Build a context from live game state. Never throws — exceptions produce a
-    /// degenerate context with <c>StateName=Unknown</c> and <c>AvailableActions=[Wait]</c>.
+    /// degenerate context with <c>StateName=Unknown</c> and no available actions.
     /// </summary>
     public BazaarAgentContext Build(double actionCooldownRemainingSeconds)
     {
@@ -92,8 +92,8 @@ internal sealed class BazaarAgentGameContextReader
         {
             bool canStartEarly = BazaarAgentSceneProbe.IsAtHeroSelectAndReadyForNewRun(logger);
             var lobbyActions = canStartEarly
-                ? new[] { WaitOption(), StartOrContinueRunOption() }
-                : new[] { WaitOption() };
+                ? new[] { StartOrContinueRunOption() }
+                : Array.Empty<BazaarAgentDecisionOption>();
             return new BazaarAgentContext
             {
                 SchemaVersion = BazaarAgentSchema.Version,
@@ -182,7 +182,6 @@ internal sealed class BazaarAgentGameContextReader
         var occupiedHand = GetOccupiedAndLockedSockets(handContainer);
         var occupiedStash = GetOccupiedAndLockedSockets(stashContainer);
         var lockedHand = GetLockedSockets(handContainer);
-        var lockedStash = GetLockedSockets(stashContainer);
 
         // Selection set
         List<BazaarAgentCardSnapshot> selectionOptions = BuildSelectionOptions(
@@ -249,7 +248,7 @@ internal sealed class BazaarAgentGameContextReader
             stateName
                 is not BazaarAgentRunStateName.Combat
                     and not BazaarAgentRunStateName.PvpCombat
-            && actions.Any(action => action.ActionKind != BazaarAgentActionKind.Wait)
+            && actions.Count > 0
                 ? GetLastBattleSummary()
                 : null;
 
@@ -290,7 +289,6 @@ internal sealed class BazaarAgentGameContextReader
             BoardItems = boardItems,
             ChestItems = chestItems,
             LockedBoardSockets = lockedHand,
-            LockedChestSockets = lockedStash,
             PlayerSkills = playerSkills,
             SellableItems = sellableItems,
             SelectionOptions = selectionOptions,
@@ -474,8 +472,10 @@ internal sealed class BazaarAgentGameContextReader
                     Order = order++,
                     Tags = BuildStringList(card.Tags),
                     HiddenTags = BuildStringList(card.HiddenTags),
-                    Attributes = BuildAttributes(card),
-                    ActiveAbilities = BuildActiveAbilities(card),
+                    Description = gameProbe.ResolveCardDescription(card),
+                    CooldownSeconds = ReadCooldownSeconds(card),
+                    Ammo = ReadAmmo(card),
+                    AmmoMax = ReadAmmoMax(card),
                     SellPrice = sellPrice,
                     CanSell = canSell && !card.HiddenTags.Contains(EHiddenTag.Unsellable),
                 }
@@ -515,8 +515,10 @@ internal sealed class BazaarAgentGameContextReader
                     Order = order++,
                     Tags = BuildStringList(skill.Tags),
                     HiddenTags = BuildStringList(skill.HiddenTags),
-                    Attributes = BuildAttributes(skill),
-                    ActiveAbilities = BuildActiveAbilities(skill),
+                    Description = gameProbe.ResolveCardDescription(skill),
+                    CooldownSeconds = ReadCooldownSeconds(skill),
+                    Ammo = ReadAmmo(skill),
+                    AmmoMax = ReadAmmoMax(skill),
                     SellPrice = sellPrice,
                     CanSell = canSell && !skill.HiddenTags.Contains(EHiddenTag.Unsellable),
                 }
@@ -646,11 +648,12 @@ internal sealed class BazaarAgentGameContextReader
                     Order = order++,
                     Tags = BuildStringList(card.Tags),
                     HiddenTags = BuildStringList(card.HiddenTags),
-                    Attributes = BuildAttributes(card),
-                    ActiveAbilities = BuildActiveAbilities(card),
+                    Description = gameProbe.ResolveCardDescription(card),
+                    CooldownSeconds = ReadCooldownSeconds(card),
+                    Ammo = ReadAmmo(card),
+                    AmmoMax = ReadAmmoMax(card),
                     BuyPrice = buyPrice,
                     SellPrice = sellPrice,
-                    CanAfford = canAfford,
                     CanFit = canFit,
                     CanSelect = canSelect,
                     IsFree = selectionIsFree,
@@ -691,9 +694,6 @@ internal sealed class BazaarAgentGameContextReader
     {
         var actions = new List<BazaarAgentDecisionOption>();
 
-        // 1. Wait (always first)
-        actions.Add(WaitOption());
-
         // Native commands can silently decline input while the client is waiting for the server
         // or has globally blocked input. Do not advertise actions that cannot be accepted.
         if (isClientBusy)
@@ -708,7 +708,6 @@ internal sealed class BazaarAgentGameContextReader
                 new BazaarAgentDecisionOption
                 {
                     ActionKind = BazaarAgentActionKind.Continue,
-                    Group = BazaarAgentActionGroup.Flow,
                     DisplayKey = "Continue",
                 }
             );
@@ -727,41 +726,18 @@ internal sealed class BazaarAgentGameContextReader
                 new BazaarAgentDecisionOption
                 {
                     ActionKind = BazaarAgentActionKind.StartOrContinueRun,
-                    Group = BazaarAgentActionGroup.Flow,
                     DisplayKey = "StartOrContinueRun",
                 }
             );
         }
 
-        // 3. AbandonRun
-        static bool isEndOrReplay(BazaarAgentRunStateName s) =>
-            s
-                is BazaarAgentRunStateName.Combat
-                    or BazaarAgentRunStateName.PvpCombat
-                    or BazaarAgentRunStateName.Replay
-                    or BazaarAgentRunStateName.EndRunVictory
-                    or BazaarAgentRunStateName.EndRunDefeat;
-
-        if (isInRun && !isEndOrReplay(stateName) && canHandleOp(StateOps.AbandonRun))
-        {
-            actions.Add(
-                new BazaarAgentDecisionOption
-                {
-                    ActionKind = BazaarAgentActionKind.AbandonRun,
-                    Group = BazaarAgentActionGroup.Flow,
-                    DisplayKey = "AbandonRun",
-                }
-            );
-        }
-
-        // 4. Reroll
+        // 3. Reroll
         if (canReroll)
         {
             actions.Add(
                 new BazaarAgentDecisionOption
                 {
                     ActionKind = BazaarAgentActionKind.Reroll,
-                    Group = BazaarAgentActionGroup.Reroll,
                     DisplayKey = "Reroll",
                 }
             );
@@ -774,7 +750,6 @@ internal sealed class BazaarAgentGameContextReader
                 new BazaarAgentDecisionOption
                 {
                     ActionKind = BazaarAgentActionKind.ExitState,
-                    Group = BazaarAgentActionGroup.Exit,
                     DisplayKey = "ExitState",
                 }
             );
@@ -791,7 +766,6 @@ internal sealed class BazaarAgentGameContextReader
                     new BazaarAgentDecisionOption
                     {
                         ActionKind = BazaarAgentActionKind.SellItem,
-                        Group = BazaarAgentActionGroup.Sell,
                         DisplayKey = $"SellItem:{card.InstanceId}",
                         CardInstanceId = card.InstanceId,
                         Card = card,
@@ -837,7 +811,6 @@ internal sealed class BazaarAgentGameContextReader
                         new BazaarAgentDecisionOption
                         {
                             ActionKind = BazaarAgentActionKind.SelectItem,
-                            Group = BazaarAgentActionGroup.Offer,
                             DisplayKey =
                                 $"SelectItem:{offer.InstanceId}:Hand:{string.Join(",", sockets)}",
                             CardInstanceId = offer.InstanceId,
@@ -860,7 +833,6 @@ internal sealed class BazaarAgentGameContextReader
                         new BazaarAgentDecisionOption
                         {
                             ActionKind = BazaarAgentActionKind.SelectItem,
-                            Group = BazaarAgentActionGroup.Offer,
                             DisplayKey =
                                 $"SelectItem:{offer.InstanceId}:Stash:{string.Join(",", sockets)}",
                             CardInstanceId = offer.InstanceId,
@@ -877,7 +849,6 @@ internal sealed class BazaarAgentGameContextReader
                     new BazaarAgentDecisionOption
                     {
                         ActionKind = BazaarAgentActionKind.SelectSkill,
-                        Group = BazaarAgentActionGroup.Offer,
                         DisplayKey = $"SelectSkill:{offer.InstanceId}",
                         CardInstanceId = offer.InstanceId,
                         Card = offer,
@@ -893,7 +864,6 @@ internal sealed class BazaarAgentGameContextReader
                     new BazaarAgentDecisionOption
                     {
                         ActionKind = BazaarAgentActionKind.SelectEncounter,
-                        Group = BazaarAgentActionGroup.Offer,
                         DisplayKey = $"SelectEncounter:{offer.InstanceId}",
                         CardInstanceId = offer.InstanceId,
                         Card = offer,
@@ -921,7 +891,6 @@ internal sealed class BazaarAgentGameContextReader
                     new BazaarAgentDecisionOption
                     {
                         ActionKind = BazaarAgentActionKind.CommitToPedestal,
-                        Group = BazaarAgentActionGroup.Pedestal,
                         DisplayKey = $"CommitToPedestal:{card.InstanceId}",
                         CardInstanceId = card.InstanceId,
                         Card = card,
@@ -936,7 +905,6 @@ internal sealed class BazaarAgentGameContextReader
                     new BazaarAgentDecisionOption
                     {
                         ActionKind = BazaarAgentActionKind.CommitToPedestal,
-                        Group = BazaarAgentActionGroup.Pedestal,
                         DisplayKey = $"CommitToPedestal:{card.InstanceId}",
                         CardInstanceId = card.InstanceId,
                         Card = card,
@@ -959,7 +927,6 @@ internal sealed class BazaarAgentGameContextReader
                 new BazaarAgentDecisionOption
                 {
                     ActionKind = BazaarAgentActionKind.ReturnToMenu,
-                    Group = BazaarAgentActionGroup.Flow,
                     DisplayKey = "ReturnToMenu",
                 }
             );
@@ -1002,7 +969,6 @@ internal sealed class BazaarAgentGameContextReader
                     new BazaarAgentDecisionOption
                     {
                         ActionKind = BazaarAgentActionKind.MoveItem,
-                        Group = BazaarAgentActionGroup.Move,
                         DisplayKey = $"MoveItem:{card.InstanceId}:Hand:{string.Join(",", sockets)}",
                         CardInstanceId = card.InstanceId,
                         TargetSection = BazaarAgentTargetSection.Hand,
@@ -1029,7 +995,6 @@ internal sealed class BazaarAgentGameContextReader
                     new BazaarAgentDecisionOption
                     {
                         ActionKind = BazaarAgentActionKind.MoveItem,
-                        Group = BazaarAgentActionGroup.Move,
                         DisplayKey =
                             $"MoveItem:{card.InstanceId}:Stash:{string.Join(",", sockets)}",
                         CardInstanceId = card.InstanceId,
@@ -1092,18 +1057,6 @@ internal sealed class BazaarAgentGameContextReader
         return -1;
     }
 
-    private static IReadOnlyDictionary<string, int> BuildAttributes(Card card)
-    {
-        var result = new SortedDictionary<string, int>(StringComparer.Ordinal);
-        if (card.Attributes == null)
-            return result;
-        foreach (var kv in card.Attributes)
-        {
-            result[kv.Key.ToString()] = kv.Value;
-        }
-        return result;
-    }
-
     private static IReadOnlyList<string> BuildStringList<T>(IEnumerable<T>? source)
     {
         if (source is null)
@@ -1119,53 +1072,25 @@ internal sealed class BazaarAgentGameContextReader
         return result;
     }
 
-    private static IReadOnlyList<BazaarAgentCardAbilitySnapshot> BuildActiveAbilities(Card card)
+    private static double? ReadCooldownSeconds(Card card)
     {
-        try
-        {
-            var result = new List<BazaarAgentCardAbilitySnapshot>();
-            foreach (var ability in card.GetActiveAbilities())
-            {
-                if (ability is null)
-                    continue;
-                result.Add(
-                    new BazaarAgentCardAbilitySnapshot
-                    {
-                        Id = ability.Id,
-                        InternalName = EmptyAsNull(ability.InternalName),
-                        InternalDescription = EmptyAsNull(ability.InternalDescription),
-                        Trigger = ability.Trigger?.GetType().Name,
-                        Action = ability.Action?.GetType().Name,
-                        ActiveIn = ability.ActiveIn.ToString(),
-                        WorksIn = ability.WorksIn.ToString(),
-                        Priority = ability.Priority.ToString(),
-                    }
-                );
-            }
-            result.Sort((x, y) => string.CompareOrdinal(x.Id, y.Id));
-            return result;
-        }
-        catch
-        {
-            return Array.Empty<BazaarAgentCardAbilitySnapshot>();
-        }
+        var milliseconds = card.GetAttributeValue(ECardAttributeType.CooldownMax);
+        return milliseconds is > 0 ? milliseconds.Value / 1000d : null;
     }
 
-    private static string? EmptyAsNull(string? value) => string.IsNullOrEmpty(value) ? null : value;
+    private static int? ReadAmmoMax(Card card)
+    {
+        var ammoMax = card.GetAttributeValue(ECardAttributeType.AmmoMax);
+        return ammoMax is > 0 ? ammoMax : null;
+    }
 
-    private static BazaarAgentDecisionOption WaitOption() =>
-        new()
-        {
-            ActionKind = BazaarAgentActionKind.Wait,
-            Group = BazaarAgentActionGroup.Wait,
-            DisplayKey = "Wait",
-        };
+    private static int? ReadAmmo(Card card) =>
+        ReadAmmoMax(card) is null ? null : card.GetAttributeValue(ECardAttributeType.Ammo) ?? 0;
 
     private static BazaarAgentDecisionOption StartOrContinueRunOption() =>
         new()
         {
             ActionKind = BazaarAgentActionKind.StartOrContinueRun,
-            Group = BazaarAgentActionGroup.Flow,
             DisplayKey = "StartOrContinueRun",
         };
 
@@ -1177,7 +1102,7 @@ internal sealed class BazaarAgentGameContextReader
             StateName = BazaarAgentRunStateName.Unknown,
             IsClientBusy = ReadClientBusy(),
             ActionCooldownRemainingSeconds = cooldown,
-            AvailableActions = new[] { WaitOption() },
+            AvailableActions = Array.Empty<BazaarAgentDecisionOption>(),
         };
 
     // Client-busy = waiting on a server round-trip OR input blocked by a transition/animation.

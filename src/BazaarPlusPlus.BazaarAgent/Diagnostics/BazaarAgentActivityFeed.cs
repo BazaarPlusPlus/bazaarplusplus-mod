@@ -106,18 +106,18 @@ public sealed class BazaarAgentActivityFeed
         signal.TrySetResult(activity.Sequence);
     }
 
-    public BazaarAgentActivitySnapshot GetSince(long afterSequence, int maximumEvents)
+    public BazaarAgentActivitySnapshot GetSince(
+        long afterSequence,
+        int maximumEvents,
+        Func<BazaarAgentActivityEvent, bool>? include = null
+    )
     {
         if (maximumEvents <= 0)
             throw new ArgumentOutOfRangeException(nameof(maximumEvents));
 
         lock (_sync)
         {
-            var startIndex = _events.FindIndex(activity => activity.Sequence > afterSequence);
-            var result =
-                startIndex < 0
-                    ? Array.Empty<BazaarAgentActivityEvent>()
-                    : _events.Skip(startIndex).Take(maximumEvents).ToArray();
+            var result = GetSinceUnsafe(afterSequence, maximumEvents, include).Events;
             var earliest = _events.Count == 0 ? _latestSequence : _events[0].Sequence;
             return new BazaarAgentActivitySnapshot(earliest, _latestSequence, result);
         }
@@ -126,33 +126,49 @@ public sealed class BazaarAgentActivityFeed
     public async Task<BazaarAgentActivitySnapshot> WaitForEventsAsync(
         long afterSequence,
         int maximumEvents,
-        int waitMilliseconds
+        int waitMilliseconds,
+        Func<BazaarAgentActivityEvent, bool>? include = null
     )
     {
-        var immediate = GetSince(afterSequence, maximumEvents);
-        if (immediate.Events.Count > 0 || waitMilliseconds <= 0)
-            return immediate;
-
-        Task<long> signal;
-        lock (_sync)
+        var deadlineUtc = DateTime.UtcNow.AddMilliseconds(Math.Max(0, waitMilliseconds));
+        while (true)
         {
-            var refreshed = GetSinceUnsafe(afterSequence, maximumEvents);
-            if (refreshed.Events.Count > 0)
-                return refreshed;
-            signal = _nextPublication.Task;
-        }
+            var immediate = GetSince(afterSequence, maximumEvents, include);
+            if (immediate.Events.Count > 0 || waitMilliseconds <= 0)
+                return immediate;
 
-        await Task.WhenAny(signal, Task.Delay(waitMilliseconds)).ConfigureAwait(false);
-        return GetSince(afterSequence, maximumEvents);
+            var remainingMilliseconds = (int)
+                Math.Ceiling((deadlineUtc - DateTime.UtcNow).TotalMilliseconds);
+            if (remainingMilliseconds <= 0)
+                return immediate;
+
+            Task<long> signal;
+            lock (_sync)
+            {
+                var refreshed = GetSinceUnsafe(afterSequence, maximumEvents, include);
+                if (refreshed.Events.Count > 0)
+                    return refreshed;
+                signal = _nextPublication.Task;
+            }
+
+            var completed = await Task.WhenAny(signal, Task.Delay(remainingMilliseconds))
+                .ConfigureAwait(false);
+            if (completed != signal)
+                return GetSince(afterSequence, maximumEvents, include);
+        }
     }
 
-    private BazaarAgentActivitySnapshot GetSinceUnsafe(long afterSequence, int maximumEvents)
+    private BazaarAgentActivitySnapshot GetSinceUnsafe(
+        long afterSequence,
+        int maximumEvents,
+        Func<BazaarAgentActivityEvent, bool>? include
+    )
     {
-        var startIndex = _events.FindIndex(activity => activity.Sequence > afterSequence);
-        var result =
-            startIndex < 0
-                ? Array.Empty<BazaarAgentActivityEvent>()
-                : _events.Skip(startIndex).Take(maximumEvents).ToArray();
+        var result = _events
+            .Where(activity => activity.Sequence > afterSequence)
+            .Where(activity => include is null || include(activity))
+            .Take(maximumEvents)
+            .ToArray();
         var earliest = _events.Count == 0 ? _latestSequence : _events[0].Sequence;
         return new BazaarAgentActivitySnapshot(earliest, _latestSequence, result);
     }

@@ -12,9 +12,7 @@ public static class BazaarAgentSchema
 
 public enum BazaarAgentActionKind
 {
-    Wait,
     StartOrContinueRun,
-    AbandonRun,
     SelectItem,
     SelectSkill,
     SelectEncounter,
@@ -25,19 +23,6 @@ public enum BazaarAgentActionKind
     ExitState,
     ReturnToMenu,
     Continue,
-}
-
-public enum BazaarAgentActionGroup
-{
-    Wait,
-    Flow,
-    Offer,
-    Route,
-    Pedestal,
-    Move,
-    Sell,
-    Reroll,
-    Exit,
 }
 
 public enum BazaarAgentRunStateName
@@ -109,10 +94,10 @@ public sealed class BazaarAgentCardSnapshot
     public int Order { get; init; }
     public IReadOnlyList<string> Tags { get; init; } = System.Array.Empty<string>();
     public IReadOnlyList<string> HiddenTags { get; init; } = System.Array.Empty<string>();
-    public IReadOnlyDictionary<string, int> Attributes { get; init; } =
-        new Dictionary<string, int>();
-    public IReadOnlyList<BazaarAgentCardAbilitySnapshot> ActiveAbilities { get; init; } =
-        System.Array.Empty<BazaarAgentCardAbilitySnapshot>();
+    public string? Description { get; init; }
+    public double? CooldownSeconds { get; init; }
+    public int? Ammo { get; init; }
+    public int? AmmoMax { get; init; }
 
     // Selection-only fields
     public int? BuyPrice { get; init; }
@@ -131,22 +116,9 @@ public sealed class BazaarAgentCardSnapshot
     public bool? CanSell { get; init; }
 }
 
-public sealed class BazaarAgentCardAbilitySnapshot
-{
-    public string Id { get; init; } = "";
-    public string? InternalName { get; init; }
-    public string? InternalDescription { get; init; }
-    public string? Trigger { get; init; }
-    public string? Action { get; init; }
-    public string? ActiveIn { get; init; }
-    public string? WorksIn { get; init; }
-    public string? Priority { get; init; }
-}
-
 public sealed class BazaarAgentDecisionOption
 {
     public BazaarAgentActionKind ActionKind { get; init; }
-    public BazaarAgentActionGroup Group { get; init; }
     public string DisplayKey { get; init; } = "";
     public string? CardInstanceId { get; init; }
     public BazaarAgentTargetSection? TargetSection { get; init; }
@@ -205,7 +177,6 @@ public sealed class BazaarAgentContext
     public IReadOnlyList<BazaarAgentCardSnapshot> ChestItems { get; init; } =
         System.Array.Empty<BazaarAgentCardSnapshot>();
     public IReadOnlyList<string> LockedBoardSockets { get; init; } = System.Array.Empty<string>();
-    public IReadOnlyList<string> LockedChestSockets { get; init; } = System.Array.Empty<string>();
     public IReadOnlyList<BazaarAgentCardSnapshot> PlayerSkills { get; init; } =
         System.Array.Empty<BazaarAgentCardSnapshot>();
     public IReadOnlyList<BazaarAgentCardSnapshot> SellableItems { get; init; } =

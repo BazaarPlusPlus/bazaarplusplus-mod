@@ -4,7 +4,7 @@ Status: Accepted; absorbs ADR-0008 (collapsed 2026-07-28)
 
 ## Decision
 
-Expose replay recording through the existing loopback server as three primitives: raw `POST /v1/replay/record`, replay phase/battle id in `GET /v1/context`, and explicit `POST /v1/replay/continue`. The mod owns no batch-recording state machine; an external caller serializes the loop and polls phase/output.
+Expose replay recording through the existing loopback server as three primitives: raw `POST /v1/replay/record`, replay phase/battle id in `GET /v3/context`, and explicit `POST /v1/replay/continue`. The mod owns no batch-recording state machine; an external caller serializes the loop and polls phase/output.
 
 For the ordinary action loop (absorbed from ADR-0008): when replay phase is `finishedAwaitingContinue`, publish a cardless `Continue` action in the `Flow` group. The external decision agent treats it as an opaque flow advance and remains replay-agnostic. Both entry points — the replay-control route and the agent action — converge on the same `CombatReplayRuntime.TryContinueReplay` facade.
 

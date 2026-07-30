@@ -76,4 +76,6 @@ internal sealed class BazaarAgentGameProbe : IBazaarAgentGameProbe, IBazaarAgent
         var name = CardDisplayNameResolver.Resolve(card.Template as TCardBase);
         return string.IsNullOrWhiteSpace(name) ? card.TemplateId.ToString("D") : name;
     }
+
+    public string? ResolveCardDescription(Card card) => CardDescriptionResolver.Resolve(card);
 }

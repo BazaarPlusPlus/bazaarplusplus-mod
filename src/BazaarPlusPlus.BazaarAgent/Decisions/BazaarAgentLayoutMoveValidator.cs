@@ -41,7 +41,7 @@ public static class BazaarAgentLayoutMoveValidator
         var destinationLocks =
             action.TargetSection == BazaarAgentTargetSection.Hand
                 ? snapshot.Context.LockedBoardSockets
-                : snapshot.Context.LockedChestSockets;
+                : Array.Empty<string>();
         if (
             targetSockets.Any(socket =>
                 destinationLocks.Any(locked =>
@@ -106,7 +106,7 @@ public static class BazaarAgentLayoutMoveValidator
             .ToHashSet();
         var locks = ReferenceEquals(cards, context.BoardItems)
             ? context.LockedBoardSockets
-            : context.LockedChestSockets;
+            : Array.Empty<string>();
         foreach (var socket in locks)
             if (TryParseSocket(socket, out var index))
                 occupied.Add(index);

@@ -7,7 +7,7 @@ public class BazaarAgentCommandQueueTests
     private const string RequestId = "01JABCDEFGHJKMNPQRSTVWXYZ";
 
     private static BazaarAgentAction WaitAction() =>
-        new() { ActionKind = BazaarAgentActionKind.Wait };
+        new() { ActionKind = BazaarAgentActionKind.Continue };
 
     private static BazaarAgentCommandQueue<BazaarAgentAction> NewQueue(int timeoutMs) =>
         new(timeoutMs);
@@ -20,7 +20,7 @@ public class BazaarAgentCommandQueueTests
         var pending = q.TryDequeue();
         Assert.NotNull(pending);
         Assert.False(pending!.IsDiscarded);
-        Assert.Equal(BazaarAgentActionKind.Wait, pending.Command.ActionKind);
+        Assert.Equal(BazaarAgentActionKind.Continue, pending.Command.ActionKind);
         pending.SetResponse(new BazaarAgentServerResponse(200, "{\"ok\":true}"));
         var res = await task;
         Assert.Equal(200, res.HttpStatus);

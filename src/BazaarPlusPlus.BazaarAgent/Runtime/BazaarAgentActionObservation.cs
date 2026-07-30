@@ -15,14 +15,17 @@ public static class BazaarAgentActionObservation
         BazaarAgentContext? current,
         double nowSeconds,
         double deadlineSeconds
-    ) =>
-        Evaluate(
-            baseline,
-            current,
-            new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Wait },
-            nowSeconds,
-            deadlineSeconds
-        );
+    )
+    {
+        if (
+            current is not null
+            && BazaarAgentContextSnapshotPublisher.HasGameplayStateChanged(baseline, current)
+        )
+            return BazaarAgentActionObservationStatus.Confirmed;
+        return nowSeconds >= deadlineSeconds
+            ? BazaarAgentActionObservationStatus.TimedOut
+            : BazaarAgentActionObservationStatus.Pending;
+    }
 
     public static BazaarAgentActionObservationStatus Evaluate(
         BazaarAgentContext baseline,

@@ -32,7 +32,7 @@ public class BazaarAgentDecisionLogTests
                 DecisionId = "01H",
                 RunId = null,
                 State = "Choice",
-                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Wait },
+                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Continue },
                 Executed = true,
             }
         );
@@ -49,7 +49,7 @@ public class BazaarAgentDecisionLogTests
             {
                 RunId = "abc123",
                 State = "Choice",
-                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Wait },
+                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Continue },
                 Executed = true,
             }
         );
@@ -68,7 +68,7 @@ public class BazaarAgentDecisionLogTests
             {
                 RunId = "../evil/run",
                 State = "Choice",
-                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Wait },
+                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Continue },
                 Executed = true,
             }
         );
@@ -91,7 +91,7 @@ public class BazaarAgentDecisionLogTests
             {
                 RunId = "....",
                 State = "X",
-                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Wait },
+                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Continue },
                 Executed = true,
             }
         );
@@ -113,7 +113,7 @@ public class BazaarAgentDecisionLogTests
                 RunId = "r1",
                 DecisionId = "D1",
                 State = "S",
-                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Wait },
+                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Continue },
                 Executed = true,
             }
         );
@@ -149,7 +149,7 @@ public class BazaarAgentDecisionLogTests
             {
                 RunId = "r2",
                 State = "X",
-                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Wait },
+                Action = new BazaarAgentAction { ActionKind = BazaarAgentActionKind.Continue },
                 Executed = true,
             }
         );

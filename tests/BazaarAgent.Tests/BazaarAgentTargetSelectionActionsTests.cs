@@ -35,7 +35,6 @@ public class BazaarAgentTargetSelectionActionsTests
         Assert.Single(emit);
         var o = emit[0];
         Assert.Equal(BazaarAgentActionKind.SelectItem, o.ActionKind);
-        Assert.Equal(BazaarAgentActionGroup.Offer, o.Group);
         Assert.Equal("itm_a", o.CardInstanceId);
         Assert.Equal(BazaarAgentTargetSection.Hand, o.TargetSection);
         Assert.NotNull(o.TargetSockets);
@@ -128,18 +127,16 @@ public class BazaarAgentTargetSelectionActionsTests
         new()
         {
             ActionKind = BazaarAgentActionKind.SelectItem,
-            Group = BazaarAgentActionGroup.Offer,
             DisplayKey = $"SelectItem:{instanceId}:{section}:{string.Join(",", sockets)}",
             CardInstanceId = instanceId,
             TargetSection = section,
             TargetSockets = sockets,
         };
 
-    private static readonly BazaarAgentDecisionOption WaitOpt = new()
+    private static readonly BazaarAgentDecisionOption ContinueOpt = new()
     {
-        ActionKind = BazaarAgentActionKind.Wait,
-        Group = BazaarAgentActionGroup.Wait,
-        DisplayKey = "Wait",
+        ActionKind = BazaarAgentActionKind.Continue,
+        DisplayKey = "Continue",
     };
 
     [Fact]
@@ -148,7 +145,7 @@ public class BazaarAgentTargetSelectionActionsTests
         // Common upgrade-encounter shape: filter = [offer_template_only]
         var actions = new[]
         {
-            WaitOpt,
+            ContinueOpt,
             SelectItemOption("itm_offer", BazaarAgentTargetSection.Hand, "Socket_3", "Socket_4"),
             SelectItemOption("itm_offer", BazaarAgentTargetSection.Hand, "Socket_4", "Socket_5"),
         };
@@ -161,7 +158,7 @@ public class BazaarAgentTargetSelectionActionsTests
             selectionOptionsCards: new[] { Snap("itm_offer", "tpl_X", size: "Medium") }
         );
 
-        Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.Wait);
+        Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.Continue);
         var selects = new List<BazaarAgentDecisionOption>(result);
         selects.RemoveAll(a => a.ActionKind != BazaarAgentActionKind.SelectItem);
         Assert.Equal(2, selects.Count);
@@ -173,7 +170,7 @@ public class BazaarAgentTargetSelectionActionsTests
     {
         var actions = new[]
         {
-            WaitOpt,
+            ContinueOpt,
             SelectItemOption("itm_a", BazaarAgentTargetSection.Hand, "Socket_3"),
             SelectItemOption("itm_b", BazaarAgentTargetSection.Hand, "Socket_4"),
         };
@@ -195,7 +192,7 @@ public class BazaarAgentTargetSelectionActionsTests
     public void Apply_EmitsOwnedCardSelectItem_WhenFilterContainsOwnedTemplate()
     {
         // BuySpecificCardCondition._canInteractWithOwnedCards=true variant
-        var actions = new[] { WaitOpt };
+        var actions = new[] { ContinueOpt };
         var owned = new[]
         {
             Snap(
@@ -224,7 +221,7 @@ public class BazaarAgentTargetSelectionActionsTests
     [Fact]
     public void Apply_DoesNotEmitOwnedSkillAsSelectItem()
     {
-        var actions = new[] { WaitOpt };
+        var actions = new[] { ContinueOpt };
         var skill = new[]
         {
             Snap("skl_owned", "tpl_SKILL", size: "Small", location: BazaarAgentCardLocation.Skill),
@@ -247,16 +244,14 @@ public class BazaarAgentTargetSelectionActionsTests
         var reroll = new BazaarAgentDecisionOption
         {
             ActionKind = BazaarAgentActionKind.Reroll,
-            Group = BazaarAgentActionGroup.Reroll,
             DisplayKey = "Reroll",
         };
         var exit = new BazaarAgentDecisionOption
         {
             ActionKind = BazaarAgentActionKind.ExitState,
-            Group = BazaarAgentActionGroup.Exit,
             DisplayKey = "ExitState",
         };
-        var actions = new[] { WaitOpt, reroll, exit };
+        var actions = new[] { ContinueOpt, reroll, exit };
         var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
             actions,
             new HashSet<string> { "tpl_X" },
@@ -266,7 +261,7 @@ public class BazaarAgentTargetSelectionActionsTests
             selectionOptionsCards: System.Array.Empty<BazaarAgentCardSnapshot>()
         );
 
-        Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.Wait);
+        Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.Continue);
         Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.Reroll);
         Assert.Contains(result, a => a.ActionKind == BazaarAgentActionKind.ExitState);
         Assert.DoesNotContain(result, a => a.ActionKind == BazaarAgentActionKind.SelectItem);
@@ -279,7 +274,7 @@ public class BazaarAgentTargetSelectionActionsTests
         // of the snapshot lists (e.g., card removed mid-build). Dropped.
         var actions = new[]
         {
-            WaitOpt,
+            ContinueOpt,
             SelectItemOption("itm_ghost", BazaarAgentTargetSection.Hand, "Socket_0"),
         };
         var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
@@ -309,7 +304,7 @@ public class BazaarAgentTargetSelectionActionsTests
             location: BazaarAgentCardLocation.Board
         );
         var alreadyKept = SelectItemOption("itm_o", BazaarAgentTargetSection.Hand, "Socket_3");
-        var actions = new[] { WaitOpt, alreadyKept };
+        var actions = new[] { ContinueOpt, alreadyKept };
         var result = BazaarAgentTargetSelectionActions.ApplyTargetSelectionFilter(
             actions,
             new HashSet<string> { "tpl_X" },

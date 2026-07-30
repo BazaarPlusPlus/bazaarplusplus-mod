@@ -48,10 +48,7 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
         BazaarAgentContextSnapshot snapshot
     )
     {
-        if (
-            action.ActionKind != BazaarAgentActionKind.Wait
-            && (AppState.IsWaitingForServerResponse || AppState.BlockInput)
-        )
+        if (AppState.IsWaitingForServerResponse || AppState.BlockInput)
         {
             return new(
                 false,
@@ -62,7 +59,6 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
 
         if (
             AppState.CurrentState is ReplayState
-            && action.ActionKind != BazaarAgentActionKind.Wait
             && action.ActionKind != BazaarAgentActionKind.Continue
         )
         {
@@ -75,9 +71,6 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
 
         switch (action.ActionKind)
         {
-            case BazaarAgentActionKind.Wait:
-                return new(true, null);
-
             case BazaarAgentActionKind.StartOrContinueRun:
             {
                 if (action.Hero is { } heroStr)
@@ -116,9 +109,6 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
                 GameInstance.Instance.StartNewRun();
                 return new(true, null);
             }
-
-            case BazaarAgentActionKind.AbandonRun:
-                return InvokeAppStateCommand("AbandonRunCommand");
 
             case BazaarAgentActionKind.SelectItem:
             {

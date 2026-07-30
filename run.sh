@@ -93,6 +93,10 @@ build() {
     if [[ "$bazaaragent" == "true" ]]; then
         dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj ${args[@]+"${args[@]}"} \
             -p:RequireBazaarAgentDashboard=true
+        # The main plugin deliberately scrubs optional host DLLs in its own Debug target.
+        # Re-run only the host copy target after the dependency graph has fully settled.
+        dotnet msbuild src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj \
+            -t:CopyHostToBepInExPlugins
     else
         dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj ${args[@]+"${args[@]}"}
     fi

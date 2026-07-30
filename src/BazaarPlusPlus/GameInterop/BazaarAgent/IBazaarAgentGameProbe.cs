@@ -35,6 +35,9 @@ public interface IBazaarAgentGameProbe
 
     /// <summary>Resolves a runtime card's native localized title with stable fallbacks.</summary>
     string ResolveCardDisplayName(Card card);
+
+    /// <summary>Resolves a runtime-valued card description using the native tooltip pipeline.</summary>
+    string? ResolveCardDescription(Card card);
 }
 
 public interface IBazaarAgentTypedGameProbe

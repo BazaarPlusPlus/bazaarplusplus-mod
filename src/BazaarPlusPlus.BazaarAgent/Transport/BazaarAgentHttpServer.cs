@@ -13,7 +13,6 @@ namespace BazaarPlusPlus.BazaarAgent;
 public sealed class BazaarAgentHttpServer : IDisposable
 {
     private const int MaxBodyBytes = 65536;
-    private const int MaximumCardQueryItems = 64;
     private static long _fallbackRequestSequence;
 
     private static readonly JsonSerializerSettings _json = new()
@@ -28,7 +27,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
     private readonly BazaarAgentCommandQueue<BazaarAgentReplayCommand> _replayQueue;
     private readonly IBazaarAgentLogger _logger;
     private readonly BazaarAgentActivityFeed _activityFeed;
-    private readonly BazaarAgentAgentViewProjector _agentViewProjector = new();
+    private readonly BazaarAgentProtocolV3Projector _protocolV3 = new();
     private readonly SemaphoreSlim _actionExecutionGate = new(1, 1);
     private readonly Func<string> _requestIdFactory;
     private readonly Func<
@@ -190,53 +189,18 @@ public sealed class BazaarAgentHttpServer : IDisposable
                 await HandleDashboardGet(ctx, path).ConfigureAwait(false);
             }
             else if (
-                string.Equals(path, "/v1/context", StringComparison.OrdinalIgnoreCase)
+                string.Equals(path, "/v3/context", StringComparison.OrdinalIgnoreCase)
                 && method == "GET"
             )
             {
-                await HandleGetContext(ctx, requestId).ConfigureAwait(false);
+                await HandleGetV3Context(ctx, requestId).ConfigureAwait(false);
             }
             else if (
-                string.Equals(path, "/v2/context", StringComparison.OrdinalIgnoreCase)
-                && method == "GET"
-            )
-            {
-                await HandleGetAgentView(ctx, requestId).ConfigureAwait(false);
-            }
-            else if (
-                string.Equals(path, "/v2/cards/query", StringComparison.OrdinalIgnoreCase)
+                string.Equals(path, "/v3/actions", StringComparison.OrdinalIgnoreCase)
                 && method == "POST"
             )
             {
-                await HandlePostCardQuery(ctx, requestId).ConfigureAwait(false);
-            }
-            else if (
-                string.Equals(path, "/v1/actions", StringComparison.OrdinalIgnoreCase)
-                && method == "POST"
-            )
-            {
-                await HandlePostActions(ctx, requestId).ConfigureAwait(false);
-            }
-            else if (
-                string.Equals(path, "/v2/actions", StringComparison.OrdinalIgnoreCase)
-                && method == "POST"
-            )
-            {
-                await HandlePostV2Action(ctx, requestId).ConfigureAwait(false);
-            }
-            else if (
-                string.Equals(path, "/v2/actions/sell-items", StringComparison.OrdinalIgnoreCase)
-                && method == "POST"
-            )
-            {
-                await HandlePostSellItems(ctx, requestId).ConfigureAwait(false);
-            }
-            else if (
-                string.Equals(path, "/v2/actions/set-layout", StringComparison.OrdinalIgnoreCase)
-                && method == "POST"
-            )
-            {
-                await HandlePostSetLayout(ctx, requestId).ConfigureAwait(false);
+                await HandlePostV3Action(ctx, requestId).ConfigureAwait(false);
             }
             else if (
                 string.Equals(path, "/v1/replay/record", StringComparison.OrdinalIgnoreCase)
@@ -316,15 +280,9 @@ public sealed class BazaarAgentHttpServer : IDisposable
 
     private static BazaarAgentHttpLogRoute ResolveLogRoute(string path)
     {
-        if (string.Equals(path, "/v1/context", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(path, "/v3/context", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.Context;
-        if (string.Equals(path, "/v2/context", StringComparison.OrdinalIgnoreCase))
-            return BazaarAgentHttpLogRoute.Context;
-        if (string.Equals(path, "/v2/cards/query", StringComparison.OrdinalIgnoreCase))
-            return BazaarAgentHttpLogRoute.CardQuery;
-        if (string.Equals(path, "/v1/actions", StringComparison.OrdinalIgnoreCase))
-            return BazaarAgentHttpLogRoute.Actions;
-        if (path.StartsWith("/v2/actions", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(path, "/v3/actions", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.Actions;
         if (string.Equals(path, "/v1/replay/record", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.ReplayRecord;
@@ -357,18 +315,17 @@ public sealed class BazaarAgentHttpServer : IDisposable
     {
         if (string.Equals(path, "/dashboard/api/bootstrap", StringComparison.OrdinalIgnoreCase))
         {
-            var current = _snapshotGetter();
-            var snapshot = _activityFeed.GetSince(0, maximumEvents: 512);
-            var currentContextJson = current is null
-                ? null
-                : JsonConvert.SerializeObject(current.Context, _json);
+            var snapshot = _activityFeed.GetSince(
+                0,
+                maximumEvents: 512,
+                include: IsDashboardProtocolActivity
+            );
             await WriteDashboardJson(
                     ctx,
                     new
                     {
                         snapshot.LatestSequence,
                         snapshot.EarliestSequence,
-                        currentContextJson,
                         snapshot.Events,
                     }
                 )
@@ -381,7 +338,12 @@ public sealed class BazaarAgentHttpServer : IDisposable
             var after = ParseNonNegativeLong(ctx.Request.QueryString["after"]);
             var waitMilliseconds = ClampInt(ctx.Request.QueryString["waitMs"], 25000, 0, 25000);
             var snapshot = await _activityFeed
-                .WaitForEventsAsync(after, maximumEvents: 128, waitMilliseconds)
+                .WaitForEventsAsync(
+                    after,
+                    maximumEvents: 128,
+                    waitMilliseconds: waitMilliseconds,
+                    include: IsDashboardProtocolActivity
+                )
                 .ConfigureAwait(false);
             await WriteDashboardJson(
                     ctx,
@@ -404,6 +366,9 @@ public sealed class BazaarAgentHttpServer : IDisposable
                 : path["/dashboard/".Length..];
         await WriteDashboardAsset(ctx, relativePath).ConfigureAwait(false);
     }
+
+    private static bool IsDashboardProtocolActivity(BazaarAgentActivityEvent activity) =>
+        activity.Kind.StartsWith("agent.", StringComparison.Ordinal);
 
     private static long ParseNonNegativeLong(string? text)
     {
@@ -507,234 +472,117 @@ public sealed class BazaarAgentHttpServer : IDisposable
         _ = TryWriteErrorEnvelopeCore(ctx, status, code, details);
     }
 
-    private async Task HandleGetContext(HttpListenerContext ctx, string requestId)
+    private async Task HandleGetV3Context(HttpListenerContext ctx, string requestId)
     {
-        var snap = _snapshotGetter();
-        if (snap is null)
+        var sessionId = ctx.Request.Headers[BazaarAgentProtocolV3.SessionHeader];
+        var hasSession = !string.IsNullOrWhiteSpace(sessionId);
+        var revisionText = ctx.Request.Headers[BazaarAgentProtocolV3.RevisionHeader];
+        var hasRevision = !string.IsNullOrWhiteSpace(revisionText);
+        if (hasSession != hasRevision)
+        {
+            WriteErrorEnvelope(
+                ctx,
+                409,
+                "resync-required",
+                "session and revision must be supplied together"
+            );
+            return;
+        }
+        ulong revision = 0;
+        if (hasRevision && !TryParseRevision(revisionText, out revision))
+        {
+            WriteErrorEnvelope(
+                ctx,
+                400,
+                "invalid",
+                "X-Bazaar-Agent-Revision must be an unsigned integer"
+            );
+            return;
+        }
+        var snapshot = _snapshotGetter();
+        if (snapshot is null)
         {
             WriteErrorEnvelope(ctx, 503, "unavailable", null);
             return;
         }
-
-        var inm = ctx.Request.Headers["If-None-Match"];
-        if (inm == snap.ETag)
+        BazaarAgentV3Projection projection;
+        if (!hasSession)
+            projection = _protocolV3.Bootstrap(snapshot);
+        else if (!_protocolV3.TryProjectDelta(snapshot, sessionId, revision, out projection))
         {
-            ctx.Response.StatusCode = 304;
+            WriteErrorEnvelope(ctx, 409, "resync-required", "session or revision is stale");
             return;
         }
-
-        ctx.Response.StatusCode = 200;
-        ctx.Response.ContentType = "application/json; charset=utf-8";
-        ctx.Response.Headers["ETag"] = snap.ETag;
-        var body = JsonConvert.SerializeObject(snap.Context, _json);
-        var bytes = Encoding.UTF8.GetBytes(body);
-        ctx.Response.ContentLength64 = bytes.Length;
-        await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+        var json = JsonConvert.SerializeObject(projection.View, _json);
+        await WriteV3Response(ctx, 200, snapshot, projection.SessionId, json).ConfigureAwait(false);
         _activityFeed.Publish(
-            "context.sent",
+            "agent.view.sent",
             requestId,
-            "/v1/context",
-            $"Context {snap.Context.StateName} at tick {snap.TickId}",
+            "/v3/context",
+            "Agent v3 context at revision "
+                + snapshot.TickId.ToString(CultureInfo.InvariantCulture),
             statusCode: 200,
-            tickId: snap.TickId,
-            responseJson: body
+            tickId: snapshot.TickId,
+            responseJson: json
         );
     }
 
-    private async Task HandleGetAgentView(HttpListenerContext ctx, string requestId)
+    private async Task HandlePostV3Action(HttpListenerContext ctx, string requestId)
     {
-        var snap = _snapshotGetter();
-        if (snap is null)
-        {
-            WriteErrorEnvelope(ctx, 503, "unavailable", null);
-            return;
-        }
-
-        var projection = _agentViewProjector.Project(
-            snap,
-            ctx.Request.Headers["X-Bazaar-Agent-Session"],
-            IsKnowledgeResetRequested(ctx.Request)
-        );
-        var body = JsonConvert.SerializeObject(projection.View, _json);
-        await WriteAgentViewResponse(
-                ctx,
-                snap,
-                projection.AgentSessionId,
-                projection.CacheEpoch,
-                body
-            )
-            .ConfigureAwait(false);
-        _activityFeed.Publish(
-            "context.sent",
-            requestId,
-            "/v2/context",
-            $"Agent View {snap.Context.StateName} at tick {snap.TickId}",
-            statusCode: 200,
-            tickId: snap.TickId,
-            responseJson: body
-        );
-    }
-
-    private static async Task WriteAgentViewResponse(
-        HttpListenerContext ctx,
-        BazaarAgentContextSnapshot snapshot,
-        string sessionId,
-        string cacheEpoch,
-        string body
-    ) =>
-        await WriteV2Response(ctx, 200, snapshot, sessionId, cacheEpoch, body)
-            .ConfigureAwait(false);
-
-    private static async Task WriteV2Response(
-        HttpListenerContext ctx,
-        int status,
-        BazaarAgentContextSnapshot snapshot,
-        string sessionId,
-        string cacheEpoch,
-        string body
-    )
-    {
-        var bytes = Encoding.UTF8.GetBytes(body);
-        ctx.Response.StatusCode = status;
-        ctx.Response.ContentType = "application/json; charset=utf-8";
-        ctx.Response.Headers["ETag"] = snapshot.ETag;
-        ctx.Response.Headers["X-Bazaar-Agent-Session"] = sessionId;
-        ctx.Response.Headers["X-Bazaar-Agent-Cache-Epoch"] = cacheEpoch;
-        ctx.Response.ContentLength64 = bytes.Length;
-        await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
-    }
-
-    private static bool IsKnowledgeResetRequested(HttpListenerRequest request)
-    {
-        var header = request.Headers["X-Bazaar-Agent-Reset-Knowledge"];
-        return string.Equals(header, "true", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(header, "1", StringComparison.Ordinal);
-    }
-
-    private async Task HandlePostCardQuery(HttpListenerContext ctx, string requestId)
-    {
-        var body = await ReadBodyWithCap(
-                ctx,
-                MaxBodyBytes,
-                requestId,
-                BazaarAgentHttpLogRoute.CardQuery
-            )
-            .ConfigureAwait(false);
-        if (body is null)
-            return;
-
-        var json = Encoding.UTF8.GetString(body);
-        BazaarAgentCardQueryRequest? request;
-        try
-        {
-            request = JsonConvert.DeserializeObject<BazaarAgentCardQueryRequest>(json, _json);
-        }
-        catch (JsonException)
-        {
-            WriteErrorEnvelope(ctx, 400, "invalid", "malformed json");
-            return;
-        }
-
-        if (!TryValidateCardQuery(request, out var validationError))
-        {
-            WriteErrorEnvelope(ctx, 400, "invalid", validationError);
-            return;
-        }
-
-        var snap = _snapshotGetter();
-        if (snap is null)
-        {
-            WriteErrorEnvelope(ctx, 503, "unavailable", null);
-            return;
-        }
-
-        _activityFeed.Publish(
-            "cards.query.received",
-            requestId,
-            "/v2/cards/query",
-            $"Card query for {request!.InstanceIds.Count} instances",
-            requestJson: json
-        );
-        var projection = _agentViewProjector.Query(
-            snap,
-            ctx.Request.Headers["X-Bazaar-Agent-Session"],
-            request!.InstanceIds,
-            IsKnowledgeResetRequested(ctx.Request)
-        );
-        var responseJson = JsonConvert.SerializeObject(projection.Response, _json);
-        await WriteAgentViewResponse(
-                ctx,
-                snap,
-                projection.AgentSessionId,
-                projection.CacheEpoch,
-                responseJson
-            )
-            .ConfigureAwait(false);
-        _activityFeed.Publish(
-            "cards.query.completed",
-            requestId,
-            "/v2/cards/query",
-            $"Card query resolved at tick {snap.TickId}",
-            statusCode: 200,
-            tickId: snap.TickId,
-            requestJson: json,
-            responseJson: responseJson
-        );
-    }
-
-    private static bool TryValidateCardQuery(
-        BazaarAgentCardQueryRequest? request,
-        out string? validationError
-    )
-    {
-        if (request?.InstanceIds is null || request.InstanceIds.Count == 0)
-        {
-            validationError = "instanceIds is required";
-            return false;
-        }
-        if (request.InstanceIds.Count > MaximumCardQueryItems)
-        {
-            validationError = $"instanceIds supports at most {MaximumCardQueryItems}";
-            return false;
-        }
-
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var instanceId in request.InstanceIds)
-        {
-            if (string.IsNullOrWhiteSpace(instanceId))
-            {
-                validationError = "instanceIds cannot contain blank values";
-                return false;
-            }
-            if (!seen.Add(instanceId))
-            {
-                validationError = "instanceIds cannot contain duplicates";
-                return false;
-            }
-        }
-
-        validationError = null;
-        return true;
-    }
-
-    private async Task HandlePostV2Action(HttpListenerContext ctx, string requestId)
-    {
-        var action = await ReadJsonBody<BazaarAgentAction>(
+        var request = await ReadJsonBody<BazaarAgentV3ActionRequest>(
                 ctx,
                 requestId,
                 BazaarAgentHttpLogRoute.Actions
             )
             .ConfigureAwait(false);
-        if (action is null)
+        if (request is null)
             return;
+        var snapshot = _snapshotGetter();
+        if (snapshot is null)
+        {
+            WriteErrorEnvelope(ctx, 503, "unavailable", null);
+            return;
+        }
+        var sessionId = ctx.Request.Headers[BazaarAgentProtocolV3.SessionHeader];
+        if (!_protocolV3.IsCurrentSession(sessionId, request.Revision, snapshot.TickId))
+        {
+            WriteErrorEnvelope(ctx, 409, "resync-required", "session or revision is stale");
+            return;
+        }
+        if (!TryTranslateV3Action(snapshot, sessionId, request, out var action, out var error))
+        {
+            WriteErrorEnvelope(ctx, 409, "stale-or-unavailable", error);
+            return;
+        }
 
+        var requestJson = JsonConvert.SerializeObject(request, _json);
+        _activityFeed.Publish(
+            "agent.action.received",
+            requestId,
+            "/v3/actions",
+            "Agent v3 action " + request.Operation,
+            requestJson: requestJson
+        );
         await _actionExecutionGate.WaitAsync().ConfigureAwait(false);
         try
         {
             var response = await _queue
-                .EnqueueAndAwaitAsync(requestId, action)
+                .EnqueueAndAwaitAsync(requestId, action!)
                 .ConfigureAwait(false);
-            await WriteV2ActionResponse(ctx, response).ConfigureAwait(false);
+            var responseJson = await WriteV3ActionResponse(ctx, response, request.Revision)
+                .ConfigureAwait(false);
+            _activityFeed.Publish(
+                response.HttpStatus >= 400 ? "agent.action.rejected" : "agent.action.completed",
+                requestId,
+                "/v3/actions",
+                "Agent v3 action "
+                    + request.Operation
+                    + " completed with HTTP "
+                    + response.HttpStatus,
+                statusCode: response.HttpStatus,
+                requestJson: requestJson,
+                responseJson: responseJson
+            );
         }
         finally
         {
@@ -742,52 +590,376 @@ public sealed class BazaarAgentHttpServer : IDisposable
         }
     }
 
-    private async Task HandlePostSellItems(HttpListenerContext ctx, string requestId)
+    private static bool TryParseRevision(string? value, out ulong revision) =>
+        ulong.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out revision);
+
+    private async Task<string> WriteV3ActionResponse(
+        HttpListenerContext ctx,
+        BazaarAgentServerResponse response,
+        ulong appliedRevision
+    )
     {
-        var request = await ReadJsonBody<BazaarAgentSellItemsRequest>(
-                ctx,
-                requestId,
-                BazaarAgentHttpLogRoute.Actions
-            )
-            .ConfigureAwait(false);
-        if (request is null)
-            return;
         var snapshot = _snapshotGetter();
         if (snapshot is null)
         {
-            WriteErrorEnvelope(ctx, 503, "unavailable", null);
-            return;
+            await WriteQueueResponse(ctx, response).ConfigureAwait(false);
+            return response.JsonBody;
         }
-        if (!TryBuildSellBatch(snapshot, request, out var actions, out var error))
+        if (response.HttpStatus >= 400)
         {
-            WriteErrorEnvelope(ctx, 409, "stale-or-unavailable", error);
-            return;
+            await WriteV3Response(
+                    ctx,
+                    response.HttpStatus,
+                    snapshot,
+                    ctx.Request.Headers[BazaarAgentProtocolV3.SessionHeader] ?? "",
+                    response.JsonBody
+                )
+                .ConfigureAwait(false);
+            return response.JsonBody;
         }
-        await ExecuteBatch(ctx, requestId, actions).ConfigureAwait(false);
+        if (
+            !_protocolV3.TryProjectDelta(
+                snapshot,
+                ctx.Request.Headers[BazaarAgentProtocolV3.SessionHeader],
+                appliedRevision,
+                out var projection
+            )
+        )
+        {
+            WriteErrorEnvelope(
+                ctx,
+                409,
+                "resync-required",
+                "context changed while applying action"
+            );
+            return "{\"error\":\"resync-required\"}";
+        }
+        var result = JToken.Parse(response.JsonBody);
+        var status = result.Value<string>("status") ?? "accepted";
+        var body = JsonConvert.SerializeObject(new { status, next = projection.View }, _json);
+        await WriteV3Response(ctx, response.HttpStatus, snapshot, projection.SessionId, body)
+            .ConfigureAwait(false);
+        return body;
     }
 
-    private async Task HandlePostSetLayout(HttpListenerContext ctx, string requestId)
+    private static async Task WriteV3Response(
+        HttpListenerContext ctx,
+        int status,
+        BazaarAgentContextSnapshot snapshot,
+        string sessionId,
+        string body
+    )
     {
-        var request = await ReadJsonBody<BazaarAgentSetLayoutRequest>(
-                ctx,
-                requestId,
-                BazaarAgentHttpLogRoute.Actions
+        var bytes = Encoding.UTF8.GetBytes(body);
+        ctx.Response.StatusCode = status;
+        ctx.Response.ContentType = "application/json; charset=utf-8";
+        ctx.Response.Headers["ETag"] = snapshot.ETag;
+        if (!string.IsNullOrWhiteSpace(sessionId))
+            ctx.Response.Headers[BazaarAgentProtocolV3.SessionHeader] = sessionId;
+        ctx.Response.ContentLength64 = bytes.Length;
+        await ctx.Response.OutputStream.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+    }
+
+    private bool TryTranslateV3Action(
+        BazaarAgentContextSnapshot snapshot,
+        string? sessionId,
+        BazaarAgentV3ActionRequest request,
+        out BazaarAgentAction? action,
+        out string? error
+    )
+    {
+        action = null;
+        error = null;
+        var operation = (request.Operation ?? "").Trim().ToLowerInvariant();
+        var context = snapshot.Context;
+        BazaarAgentActionKind kind;
+        switch (operation)
+        {
+            case "start":
+                kind = BazaarAgentActionKind.StartOrContinueRun;
+                break;
+            case "reroll":
+                kind = BazaarAgentActionKind.Reroll;
+                break;
+            case "exit":
+                kind = BazaarAgentActionKind.ExitState;
+                break;
+            case "menu":
+                kind = BazaarAgentActionKind.ReturnToMenu;
+                break;
+            case "continue":
+                kind = BazaarAgentActionKind.Continue;
+                break;
+            case "sell":
+                kind = BazaarAgentActionKind.SellItem;
+                break;
+            case "move":
+                kind = BazaarAgentActionKind.MoveItem;
+                break;
+            case "select":
+                return TryTranslateSelect(snapshot, sessionId, request, out action, out error);
+            default:
+                error = "unknown op";
+                return false;
+        }
+
+        string? instanceId = null;
+        BazaarAgentTargetSection? target = null;
+        IReadOnlyList<string>? sockets = null;
+        if (kind is BazaarAgentActionKind.SellItem or BazaarAgentActionKind.MoveItem)
+        {
+            if (!TryResolveOwnedCard(context, sessionId, request.Id, out var card, out instanceId))
+            {
+                error = "unknown or stale card id";
+                return false;
+            }
+            if (
+                kind == BazaarAgentActionKind.MoveItem
+                && !TryBuildPlacement(
+                    context,
+                    card!,
+                    request.Target,
+                    request.StartSlot,
+                    out target,
+                    out sockets,
+                    out error
+                )
             )
-            .ConfigureAwait(false);
-        if (request is null)
-            return;
-        var snapshot = _snapshotGetter();
-        if (snapshot is null)
-        {
-            WriteErrorEnvelope(ctx, 503, "unavailable", null);
-            return;
+                return false;
         }
-        if (!TryBuildLayoutBatch(snapshot, request, out var actions, out var error))
+        if (!context.AvailableActions.Any(option => option.ActionKind == kind))
         {
-            WriteErrorEnvelope(ctx, 409, "stale-or-unavailable", error);
-            return;
+            error = "op is not available";
+            return false;
         }
-        await ExecuteSetLayout(ctx, requestId, actions).ConfigureAwait(false);
+        action = new BazaarAgentAction
+        {
+            ActionKind = kind,
+            CardInstanceId = instanceId,
+            TargetSection = target,
+            TargetSockets = sockets,
+            Hero = request.Hero,
+            PlayMode = request.PlayMode,
+            ForTickId = request.Revision,
+        };
+        return true;
+    }
+
+    private bool TryTranslateSelect(
+        BazaarAgentContextSnapshot snapshot,
+        string? sessionId,
+        BazaarAgentV3ActionRequest request,
+        out BazaarAgentAction? action,
+        out string? error
+    )
+    {
+        action = null;
+        error = null;
+        if (!_protocolV3.TryResolveInstanceId(sessionId, request.Id ?? "", out var instanceId))
+        {
+            error = "unknown or stale card id";
+            return false;
+        }
+        var context = snapshot.Context;
+        var card = context
+            .SelectionOptions.Concat(context.BoardItems)
+            .Concat(context.ChestItems)
+            .Concat(context.PlayerSkills)
+            .FirstOrDefault(candidate => candidate.InstanceId == instanceId);
+        if (card is null)
+        {
+            error = "card is no longer present";
+            return false;
+        }
+
+        BazaarAgentTargetSection? target = null;
+        IReadOnlyList<string>? sockets = null;
+        BazaarAgentActionKind[] kinds;
+        if (
+            card.Kind == BazaarAgentCardKind.Item
+            && card.Location == BazaarAgentCardLocation.Selection
+        )
+        {
+            if (
+                !TryBuildPlacement(
+                    context,
+                    card,
+                    request.Target,
+                    request.StartSlot,
+                    out target,
+                    out sockets,
+                    out error
+                )
+            )
+                return false;
+            kinds = new[] { BazaarAgentActionKind.SelectItem };
+        }
+        else if (card.Kind == BazaarAgentCardKind.Skill)
+        {
+            kinds = new[] { BazaarAgentActionKind.SelectSkill };
+        }
+        else if (card.Kind == BazaarAgentCardKind.Encounter)
+        {
+            kinds = new[] { BazaarAgentActionKind.SelectEncounter };
+        }
+        else
+        {
+            kinds = new[]
+            {
+                BazaarAgentActionKind.SelectItem,
+                BazaarAgentActionKind.CommitToPedestal,
+            };
+        }
+
+        var option = context.AvailableActions.FirstOrDefault(option =>
+            kinds.Contains(option.ActionKind)
+            && option.CardInstanceId == instanceId
+            && (target is null || option.TargetSection == target)
+            && (sockets is null || SocketsEqual(option.TargetSockets, sockets))
+        );
+        if (option is null)
+        {
+            error = "select target is not available";
+            return false;
+        }
+        action = new BazaarAgentAction
+        {
+            ActionKind = option.ActionKind,
+            CardInstanceId = instanceId,
+            TargetSection = option.TargetSection,
+            TargetSockets = option.TargetSockets,
+            ForTickId = request.Revision,
+        };
+        return true;
+    }
+
+    private bool TryResolveOwnedCard(
+        BazaarAgentContext context,
+        string? sessionId,
+        string? token,
+        out BazaarAgentCardSnapshot? card,
+        out string? instanceId
+    )
+    {
+        card = null;
+        instanceId = null;
+        if (!_protocolV3.TryResolveInstanceId(sessionId, token ?? "", out var resolved))
+            return false;
+        card = context
+            .BoardItems.Concat(context.ChestItems)
+            .FirstOrDefault(candidate => candidate.InstanceId == resolved);
+        if (card is null)
+            return false;
+        instanceId = resolved;
+        return true;
+    }
+
+    private static bool TryBuildPlacement(
+        BazaarAgentContext context,
+        BazaarAgentCardSnapshot card,
+        string? targetText,
+        int? startSlot,
+        out BazaarAgentTargetSection? target,
+        out IReadOnlyList<string>? sockets,
+        out string? error
+    )
+    {
+        target = null;
+        sockets = null;
+        error = null;
+        if (string.Equals(targetText, "board", StringComparison.OrdinalIgnoreCase))
+        {
+            if (startSlot is null)
+            {
+                error = "board requires at";
+                return false;
+            }
+            target = BazaarAgentTargetSection.Hand;
+            sockets = BuildSockets(card.Size, startSlot.Value);
+            if (sockets is null)
+            {
+                error = "board at is outside the board";
+                return false;
+            }
+            return true;
+        }
+        if (string.Equals(targetText, "chest", StringComparison.OrdinalIgnoreCase))
+        {
+            if (startSlot is not null)
+            {
+                error = "chest does not accept at";
+                return false;
+            }
+            target = BazaarAgentTargetSection.Stash;
+            sockets = FindAutomaticChestSockets(context.ChestItems, card.Size);
+            if (sockets is null)
+            {
+                error = "chest has no automatic placement";
+                return false;
+            }
+            return true;
+        }
+        error = "to must be board or chest";
+        return false;
+    }
+
+    private static IReadOnlyList<string>? BuildSockets(string? sizeText, int start)
+    {
+        var size = BazaarAgentCardSize.Parse(sizeText, fallback: 0);
+        if (size is < 1 or > 3 || start < 0 || start + size > 10)
+            return null;
+        return Enumerable
+            .Range(start, size)
+            .Select(slot => "Socket_" + slot.ToString(CultureInfo.InvariantCulture))
+            .ToArray();
+    }
+
+    private static IReadOnlyList<string>? FindAutomaticChestSockets(
+        IReadOnlyList<BazaarAgentCardSnapshot> chest,
+        string? sizeText
+    )
+    {
+        var size = BazaarAgentCardSize.Parse(sizeText, fallback: 0);
+        if (size is < 1 or > 3)
+            return null;
+        var occupied = new bool[10];
+        foreach (var item in chest)
+        {
+            if (!TryParseSocket(item.SocketId, out var start))
+                continue;
+            var itemSize = BazaarAgentCardSize.Parse(item.Size, fallback: 0);
+            for (var slot = start; slot < start + itemSize && slot < occupied.Length; slot++)
+                occupied[slot] = true;
+        }
+        for (var start = 0; start <= occupied.Length - size; start++)
+            if (Enumerable.Range(start, size).All(slot => !occupied[slot]))
+                return BuildSockets(sizeText, start);
+        return null;
+    }
+
+    private static bool TryParseSocket(string? socket, out int slot)
+    {
+        slot = -1;
+        const string prefix = "Socket_";
+        return socket is not null
+            && socket.StartsWith(prefix, StringComparison.Ordinal)
+            && int.TryParse(
+                socket.AsSpan(prefix.Length),
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out slot
+            )
+            && slot is >= 0 and < 10;
+    }
+
+    private static bool SocketsEqual(IReadOnlyList<string>? left, IReadOnlyList<string>? right)
+    {
+        if (left is null || right is null || left.Count != right.Count)
+            return false;
+        for (var index = 0; index < left.Count; index++)
+            if (!string.Equals(left[index], right[index], StringComparison.Ordinal))
+                return false;
+        return true;
     }
 
     private async Task<T?> ReadJsonBody<T>(
@@ -810,323 +982,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         catch (JsonException) { }
         WriteErrorEnvelope(ctx, 400, "invalid", "malformed or empty json");
         return null;
-    }
-
-    private static bool TryBuildSellBatch(
-        BazaarAgentContextSnapshot snapshot,
-        BazaarAgentSellItemsRequest request,
-        out IReadOnlyList<BazaarAgentAction> actions,
-        out string? error
-    )
-    {
-        actions = Array.Empty<BazaarAgentAction>();
-        error = null;
-        if (request.ForTickId is { } tick && tick != snapshot.TickId)
-        {
-            error = "stale tickId";
-            return false;
-        }
-        if (request.CardInstanceIds is null || request.CardInstanceIds.Count is < 1 or > 16)
-        {
-            error = "cardInstanceIds must contain 1 to 16 cards";
-            return false;
-        }
-        if (
-            request.CardInstanceIds.Any(string.IsNullOrWhiteSpace)
-            || request.CardInstanceIds.Distinct().Count() != request.CardInstanceIds.Count
-        )
-        {
-            error = "cardInstanceIds must be nonblank and unique";
-            return false;
-        }
-        actions = request
-            .CardInstanceIds.Select(id => new BazaarAgentAction
-            {
-                ActionKind = BazaarAgentActionKind.SellItem,
-                CardInstanceId = id,
-                Reason = request.Reason,
-            })
-            .ToArray();
-        return true;
-    }
-
-    private static bool TryBuildLayoutBatch(
-        BazaarAgentContextSnapshot snapshot,
-        BazaarAgentSetLayoutRequest request,
-        out IReadOnlyList<BazaarAgentAction> actions,
-        out string? error
-    )
-    {
-        actions = Array.Empty<BazaarAgentAction>();
-        error = null;
-        if (request.ForTickId is { } tick && tick != snapshot.TickId)
-        {
-            error = "stale tickId";
-            return false;
-        }
-        if (request.Placements is null || request.Placements.Count is < 1 or > 16)
-        {
-            error = "placements must contain 1 to 16 moves";
-            return false;
-        }
-        if (
-            request.Placements.Any(placement => string.IsNullOrWhiteSpace(placement.CardInstanceId))
-            || request.Placements.Select(placement => placement.CardInstanceId).Distinct().Count()
-                != request.Placements.Count
-        )
-        {
-            error = "placements must use unique, nonblank cardInstanceIds";
-            return false;
-        }
-        var built = request
-            .Placements.Select(placement => new BazaarAgentAction
-            {
-                ActionKind = BazaarAgentActionKind.MoveItem,
-                CardInstanceId = placement.CardInstanceId,
-                TargetSection = placement.TargetSection,
-                TargetSockets = placement.TargetSockets,
-                Reason = request.Reason,
-            })
-            .ToArray();
-        actions = built;
-        return true;
-    }
-
-    private async Task ExecuteSetLayout(
-        HttpListenerContext ctx,
-        string requestId,
-        IReadOnlyList<BazaarAgentAction> targetPlacements
-    )
-    {
-        await _actionExecutionGate.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            var steps = new List<BazaarAgentBatchActionStepResult>();
-            var status = 200;
-            var maximumSteps = targetPlacements.Count * 4;
-            while (steps.Count < maximumSteps)
-            {
-                var snapshot = _snapshotGetter();
-                if (snapshot is null)
-                {
-                    status = 503;
-                    break;
-                }
-
-                var pendingTargets = targetPlacements
-                    .Where(action => !IsAtLayoutTarget(snapshot.Context, action))
-                    .ToArray();
-                if (pendingTargets.Length == 0)
-                    break;
-
-                var next = pendingTargets.FirstOrDefault(action =>
-                    BazaarAgentLayoutMoveValidator.Validate(snapshot, action).Code
-                    == BazaarAgentValidationCode.Ok
-                );
-                if (next is null)
-                {
-                    status = 409;
-                    steps.Add(
-                        new BazaarAgentBatchActionStepResult
-                        {
-                            ActionKind = BazaarAgentActionKind.MoveItem,
-                            Status = "stopped",
-                            Error = "no remaining target placement is reachable",
-                        }
-                    );
-                    break;
-                }
-
-                var response = await _queue
-                    .EnqueueAndAwaitAsync(requestId, next)
-                    .ConfigureAwait(false);
-                var confirmed = IsConfirmed(response);
-                steps.Add(
-                    new BazaarAgentBatchActionStepResult
-                    {
-                        ActionKind = next.ActionKind,
-                        CardInstanceId = next.CardInstanceId,
-                        Status = confirmed ? "confirmed" : "stopped",
-                        Error = confirmed ? null : response.JsonBody,
-                    }
-                );
-                if (!confirmed)
-                {
-                    status = response.HttpStatus;
-                    break;
-                }
-            }
-
-            var finalSnapshot = _snapshotGetter();
-            var completed =
-                finalSnapshot is not null
-                && targetPlacements.All(action => IsAtLayoutTarget(finalSnapshot.Context, action));
-            if (!completed && steps.Count == maximumSteps)
-                status = 409;
-            var responseBody = JsonConvert.SerializeObject(
-                new BazaarAgentBatchActionResponse
-                {
-                    Status = completed ? "completed" : "partially_completed",
-                    Steps = steps,
-                },
-                _json
-            );
-            await WriteV2ActionResponse(ctx, new BazaarAgentServerResponse(status, responseBody))
-                .ConfigureAwait(false);
-        }
-        finally
-        {
-            _actionExecutionGate.Release();
-        }
-    }
-
-    private async Task ExecuteBatch(
-        HttpListenerContext ctx,
-        string requestId,
-        IReadOnlyList<BazaarAgentAction> actions
-    )
-    {
-        await _actionExecutionGate.WaitAsync().ConfigureAwait(false);
-        try
-        {
-            var steps = new List<BazaarAgentBatchActionStepResult>();
-            var status = 200;
-            foreach (var action in actions)
-            {
-                var response = await _queue
-                    .EnqueueAndAwaitAsync(requestId, action)
-                    .ConfigureAwait(false);
-                var confirmed = IsConfirmed(response);
-                steps.Add(
-                    new BazaarAgentBatchActionStepResult
-                    {
-                        ActionKind = action.ActionKind,
-                        CardInstanceId = action.CardInstanceId,
-                        Status = confirmed ? "confirmed" : "stopped",
-                        Error = confirmed ? null : response.JsonBody,
-                    }
-                );
-                if (!confirmed)
-                {
-                    status = response.HttpStatus;
-                    break;
-                }
-            }
-            var responseBody = JsonConvert.SerializeObject(
-                new BazaarAgentBatchActionResponse
-                {
-                    Status = steps.Count == actions.Count ? "completed" : "partially_completed",
-                    Steps = steps,
-                },
-                _json
-            );
-            await WriteV2ActionResponse(ctx, new BazaarAgentServerResponse(status, responseBody))
-                .ConfigureAwait(false);
-        }
-        finally
-        {
-            _actionExecutionGate.Release();
-        }
-    }
-
-    private static bool IsConfirmed(BazaarAgentServerResponse response) =>
-        response.HttpStatus == 200
-        && response.JsonBody.Contains("\"confirmed\":true", StringComparison.Ordinal);
-
-    private static bool IsAtLayoutTarget(BazaarAgentContext context, BazaarAgentAction action)
-    {
-        var targetLocation =
-            action.TargetSection == BazaarAgentTargetSection.Hand
-                ? BazaarAgentCardLocation.Board
-                : BazaarAgentCardLocation.Chest;
-        var card = context
-            .BoardItems.Concat(context.ChestItems)
-            .FirstOrDefault(card => card.InstanceId == action.CardInstanceId);
-        return card is not null
-            && card.Location == targetLocation
-            && action.TargetSockets is { Count: > 0 }
-            && string.Equals(card.SocketId, action.TargetSockets[0], StringComparison.Ordinal);
-    }
-
-    private async Task WriteV2ActionResponse(
-        HttpListenerContext ctx,
-        BazaarAgentServerResponse response
-    )
-    {
-        var snapshot = _snapshotGetter();
-        if (snapshot is null)
-        {
-            await WriteQueueResponse(ctx, response).ConfigureAwait(false);
-            return;
-        }
-        var projection = _agentViewProjector.Project(
-            snapshot,
-            ctx.Request.Headers["X-Bazaar-Agent-Session"],
-            IsKnowledgeResetRequested(ctx.Request)
-        );
-        var body = JsonConvert.SerializeObject(
-            new { result = JToken.Parse(response.JsonBody), nextDecision = projection.View },
-            _json
-        );
-        await WriteV2Response(
-                ctx,
-                response.HttpStatus,
-                snapshot,
-                projection.AgentSessionId,
-                projection.CacheEpoch,
-                body
-            )
-            .ConfigureAwait(false);
-    }
-
-    private async Task HandlePostActions(HttpListenerContext ctx, string requestId)
-    {
-        var body = await ReadBodyWithCap(
-                ctx,
-                MaxBodyBytes,
-                requestId,
-                BazaarAgentHttpLogRoute.Actions
-            )
-            .ConfigureAwait(false);
-        if (body is null)
-            return;
-
-        var json = Encoding.UTF8.GetString(body);
-        BazaarAgentAction? action;
-        try
-        {
-            action = JsonConvert.DeserializeObject<BazaarAgentAction>(json, _json);
-        }
-        catch (JsonException)
-        {
-            WriteErrorEnvelope(ctx, 400, "invalid", "malformed json");
-            return;
-        }
-
-        if (action is null)
-        {
-            WriteErrorEnvelope(ctx, 400, "invalid", "empty body");
-            return;
-        }
-
-        _activityFeed.Publish(
-            "action.received",
-            requestId,
-            "/v1/actions",
-            BuildActionSummary(action),
-            requestJson: json
-        );
-        var res = await _queue.EnqueueAndAwaitAsync(requestId, action).ConfigureAwait(false);
-        _activityFeed.Publish(
-            res.HttpStatus >= 400 ? "request.rejected" : "action.completed",
-            requestId,
-            "/v1/actions",
-            BuildActionResultSummary(action, res.HttpStatus),
-            statusCode: res.HttpStatus,
-            requestJson: json,
-            responseJson: res.JsonBody
-        );
-        await WriteQueueResponse(ctx, res).ConfigureAwait(false);
     }
 
     private async Task HandlePostReplayRecord(HttpListenerContext ctx, string requestId)

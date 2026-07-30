@@ -18,11 +18,10 @@ public sealed class BazaarAgentContextCaptureTests
             DisplayName = "Test Item",
             Tags = new[] { "Weapon" },
             HiddenTags = new[] { "Hidden" },
-            Attributes = new Dictionary<string, int> { ["Damage"] = 5 },
-            ActiveAbilities = new[]
-            {
-                new BazaarAgentCardAbilitySnapshot { Id = "ability-1", Action = "DealDamage" },
-            },
+            Description = "Deal 5 damage.",
+            CooldownSeconds = 6,
+            Ammo = 0,
+            AmmoMax = 3,
         };
         var context = new BazaarAgentContext
         {
@@ -60,7 +59,9 @@ public sealed class BazaarAgentContextCaptureTests
         Assert.Equal(1, metrics.Value<int>("uniqueCardInstanceIds"));
         Assert.Equal(2, metrics.Value<int>("redundantFullCardCopies"));
         Assert.Equal(1, metrics.Value<int>("placementActionCount"));
-        Assert.Equal(3, metrics.Value<int>("activeAbilityCount"));
+        Assert.Equal(42, metrics.Value<int>("descriptionCharacterCount"));
+        Assert.Equal(3, metrics.Value<int>("cooldownValueCount"));
+        Assert.Equal(3, metrics.Value<int>("ammoCapacityCount"));
         Assert.True(metrics["sectionBytes"]!["availableActions"]!.Value<int>() > 0);
     }
 
