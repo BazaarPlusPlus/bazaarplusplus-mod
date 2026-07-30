@@ -3,6 +3,7 @@
 using BazaarGameShared.Infra.Messages;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.GameInterop.Events;
+using BazaarPlusPlus.GameInterop.Recap;
 using HarmonyLib;
 using TheBazaar;
 
@@ -26,5 +27,18 @@ class CombatFrameAdvancePatch
     static void Postfix()
     {
         BppPatchHost.Services.EventBus.Publish(CombatFrameAdvanced.Instance);
+    }
+}
+
+[HarmonyPatch(
+    typeof(BoardRecapReplayButtonsController),
+    nameof(BoardRecapReplayButtonsController.Show)
+)]
+internal static class NativeRecapControlsPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(BoardRecapReplayButtonsController __instance)
+    {
+        NativeRecapControls.Observe(__instance);
     }
 }

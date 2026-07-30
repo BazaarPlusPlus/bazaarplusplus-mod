@@ -56,6 +56,10 @@
       Link="CombatStatusBarLogEvents.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/PostCombatImpactLogEvents.cs"
+      Link="PostCombatImpactLogEvents.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Infrastructure/Logging/OperationalHealthTracker.cs"
       Link="Logging/OperationalHealthTracker.cs"
     />
