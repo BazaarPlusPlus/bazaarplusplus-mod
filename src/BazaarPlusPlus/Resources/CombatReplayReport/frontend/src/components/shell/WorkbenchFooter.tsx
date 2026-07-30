@@ -13,11 +13,7 @@ import {
 import { Button } from "../ui/button.tsx";
 import { ButtonGroup } from "../ui/button-group.tsx";
 import { Toggle } from "../ui/toggle.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../ui/tooltip.tsx";
+import { ControlTooltip } from "../ui/tooltip.tsx";
 
 export function WorkbenchFooter({
   dispatch,
@@ -55,102 +51,106 @@ export function WorkbenchFooter({
           className="shrink-0"
           data-bpp-test-id="timeline-zoom-toolbar"
         >
-          <Button
-            aria-label={t("zoomOut")}
-            data-bpp-test-id="time-zoom-out"
-            disabled={state.timeZoomIndex === 0}
-            onClick={() => dispatch({ type: "zoom", direction: -1 })}
-            size="icon-xs"
-            type="button"
-            variant="outline"
-          >
-            <Minus className="size-icon-sm" />
-          </Button>
-          <Button
-            aria-label={t("zoomReset")}
-            className="min-w-12 px-2 font-mono text-micro text-brand-soft"
-            data-bpp-test-id="time-zoom-reset"
-            onClick={() => dispatch({ type: "reset-zoom" })}
-            size="xs"
-            type="button"
-            variant="outline"
-          >
-            {Math.round(zoom * 100)}%
-          </Button>
-          <Button
-            aria-label={t("zoomIn")}
-            data-bpp-test-id="time-zoom-in"
-            disabled={
-              state.timeZoomIndex === TIME_ZOOM_STEPS.length - 1
-            }
-            onClick={() => dispatch({ type: "zoom", direction: 1 })}
-            size="icon-xs"
-            type="button"
-            variant="outline"
-          >
-            <Plus className="size-icon-sm" />
-          </Button>
+          <ControlTooltip label={t("zoomOut")}>
+            <Button
+              aria-label={t("zoomOut")}
+              data-bpp-test-id="time-zoom-out"
+              disabled={state.timeZoomIndex === 0}
+              onClick={() => dispatch({ type: "zoom", direction: -1 })}
+              size="icon-xs"
+              type="button"
+              variant="outline"
+            >
+              <Minus className="size-icon-sm" />
+            </Button>
+          </ControlTooltip>
+          <ControlTooltip label={t("zoomReset")}>
+            <Button
+              aria-label={t("zoomReset")}
+              className="min-w-12 px-2 font-mono text-micro text-brand-soft"
+              data-bpp-test-id="time-zoom-reset"
+              onClick={() => dispatch({ type: "reset-zoom" })}
+              size="xs"
+              type="button"
+              variant="outline"
+            >
+              {Math.round(zoom * 100)}%
+            </Button>
+          </ControlTooltip>
+          <ControlTooltip label={t("zoomIn")}>
+            <Button
+              aria-label={t("zoomIn")}
+              data-bpp-test-id="time-zoom-in"
+              disabled={
+                state.timeZoomIndex === TIME_ZOOM_STEPS.length - 1
+              }
+              onClick={() => dispatch({ type: "zoom", direction: 1 })}
+              size="icon-xs"
+              type="button"
+              variant="outline"
+            >
+              <Plus className="size-icon-sm" />
+            </Button>
+          </ControlTooltip>
         </ButtonGroup>
       )}
 
       {showTimelineTools && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Toggle
-              aria-label={t(
-                replayDockOpen ? "hideCombatLogDock" : "showCombatLogDock",
-              )}
-              className="ml-auto size-control-xs shrink-0 px-0"
-              data-bpp-test-id="combat-log-dock-toggle"
-              onPressedChange={(pressed) => {
-                if (pressed !== replayDockOpen) onToggleReplayDock();
-              }}
-              pressed={replayDockOpen}
-              size="xs"
-              variant="outline"
-            >
-              <ListVideo className="size-icon-sm" />
-            </Toggle>
-          </TooltipTrigger>
-          <TooltipContent>
-            {t(replayDockOpen ? "hideCombatLogDock" : "showCombatLogDock")}
-          </TooltipContent>
-        </Tooltip>
+        <ControlTooltip
+          label={t(
+            replayDockOpen ? "hideCombatLogDock" : "showCombatLogDock",
+          )}
+        >
+          <Toggle
+            aria-label={t(
+              replayDockOpen ? "hideCombatLogDock" : "showCombatLogDock",
+            )}
+            className="ml-auto size-control-xs shrink-0 px-0"
+            data-bpp-test-id="combat-log-dock-toggle"
+            onPressedChange={(pressed) => {
+              if (pressed !== replayDockOpen) onToggleReplayDock();
+            }}
+            pressed={replayDockOpen}
+            size="xs"
+            variant="outline"
+          >
+            <ListVideo className="size-icon-sm" />
+          </Toggle>
+        </ControlTooltip>
       )}
 
       {hasRecording && !replayDockOpen && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Toggle
-              aria-label={
-                recordingVisible
-                  ? t("hideRecording")
-                  : t("showRecording")
-              }
-              className={
-                showTimelineTools
-                  ? "size-control-xs shrink-0 px-0"
-                  : "ml-auto size-control-xs shrink-0 px-0"
-              }
-              data-bpp-test-id="recording-visibility-toggle"
-              onPressedChange={(pressed) => {
-                if (pressed !== recordingVisible) onToggleRecording();
-              }}
-              pressed={recordingVisible}
-              size="xs"
-              variant="outline"
-            >
-              {recordingVisible
-                ? <Video className="size-icon-sm" />
-                : <VideoOff className="size-icon-sm" />}
-            </Toggle>
-          </TooltipTrigger>
-          <TooltipContent>
+        <ControlTooltip
+          label={t(
+            recordingVisible
+              ? "hideRecording"
+              : "showRecording",
+          )}
+        >
+          <Toggle
+            aria-label={
+              recordingVisible
+                ? t("hideRecording")
+                : t("showRecording")
+            }
+            className={
+              showTimelineTools
+                ? "size-control-xs shrink-0 px-0"
+                : "ml-auto size-control-xs shrink-0 px-0"
+            }
+            data-bpp-test-id="recording-visibility-toggle"
+            onPressedChange={(pressed) => {
+              if (pressed !== recordingVisible) onToggleRecording();
+            }}
+            pressed={recordingVisible}
+            size="xs"
+            variant="outline"
+          >
             {recordingVisible
-              ? t("hideRecording")
-              : t("showRecording")}
-          </TooltipContent>
-        </Tooltip>
+              ? <Video className="size-icon-sm" />
+              : <VideoOff className="size-icon-sm" />}
+          </Toggle>
+        </ControlTooltip>
       )}
 
       <div

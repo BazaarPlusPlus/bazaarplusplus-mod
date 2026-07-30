@@ -13,6 +13,7 @@ import {
   type CombatLogHandle,
 } from "../combat-log/CombatLogList.tsx";
 import { Button } from "../ui/button.tsx";
+import { ControlTooltip } from "../ui/tooltip.tsx";
 
 const MIN_DOCK_HEIGHT = 190;
 const DEFAULT_DOCK_HEIGHT = 270;
@@ -116,59 +117,61 @@ export const FooterReplayDock = forwardRef<
       data-bpp-test-id="footer-replay-dock"
       style={{ height }}
     >
-      <Button
-        aria-label={t("resizeCombatLog")}
-        aria-orientation="horizontal"
-        aria-valuemax={bounds.maximum}
-        aria-valuemin={bounds.minimum}
-        aria-valuenow={height}
-        className="absolute inset-x-0 top-0 z-10 flex h-3 w-full touch-none cursor-row-resize items-center justify-center rounded-none border-0 bg-surface-raised/70 p-0 text-muted-foreground/70 opacity-100 transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:bg-accent/70 focus-visible:text-foreground"
-        data-bpp-test-id="footer-replay-dock-resize"
-        role="separator"
-        onPointerCancel={finishResize}
-        onPointerDown={(event) => {
-          if (event.button !== 0) return;
-          dragRef.current = {
-            pointerId: event.pointerId,
-            startY: event.clientY,
-            height,
-          };
-          event.currentTarget.setPointerCapture(event.pointerId);
-        }}
-        onPointerMove={(event) => {
-          const drag = dragRef.current;
-          if (!drag || drag.pointerId !== event.pointerId) return;
-          const nextBounds = dockHeightBounds();
-          setHeight(Math.max(
-            nextBounds.minimum,
-            Math.min(
-              nextBounds.maximum,
-              drag.height + drag.startY - event.clientY,
-            ),
-          ));
-        }}
-        onKeyDown={(event) => {
-          const nextBounds = dockHeightBounds();
-          const delta = event.shiftKey ? 40 : 12;
-          let nextHeight = height;
-          if (event.key === "ArrowUp") nextHeight += delta;
-          else if (event.key === "ArrowDown") nextHeight -= delta;
-          else if (event.key === "Home") nextHeight = nextBounds.minimum;
-          else if (event.key === "End") nextHeight = nextBounds.maximum;
-          else return;
-          event.preventDefault();
-          setHeight(Math.max(
-            nextBounds.minimum,
-            Math.min(nextHeight, nextBounds.maximum),
-          ));
-        }}
-        onPointerUp={finishResize}
-        size="icon-xs"
-        type="button"
-        variant="ghost"
-      >
-        <GripHorizontal className="h-2.5 w-8" />
-      </Button>
+      <ControlTooltip label={t("resizeCombatLog")}>
+        <Button
+          aria-label={t("resizeCombatLog")}
+          aria-orientation="horizontal"
+          aria-valuemax={bounds.maximum}
+          aria-valuemin={bounds.minimum}
+          aria-valuenow={height}
+          className="absolute inset-x-0 top-0 z-10 flex h-3 w-full touch-none cursor-row-resize items-center justify-center rounded-none border-0 bg-surface-raised/70 p-0 text-muted-foreground/70 opacity-100 transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:bg-accent/70 focus-visible:text-foreground"
+          data-bpp-test-id="footer-replay-dock-resize"
+          role="separator"
+          onPointerCancel={finishResize}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            dragRef.current = {
+              pointerId: event.pointerId,
+              startY: event.clientY,
+              height,
+            };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            const drag = dragRef.current;
+            if (!drag || drag.pointerId !== event.pointerId) return;
+            const nextBounds = dockHeightBounds();
+            setHeight(Math.max(
+              nextBounds.minimum,
+              Math.min(
+                nextBounds.maximum,
+                drag.height + drag.startY - event.clientY,
+              ),
+            ));
+          }}
+          onKeyDown={(event) => {
+            const nextBounds = dockHeightBounds();
+            const delta = event.shiftKey ? 40 : 12;
+            let nextHeight = height;
+            if (event.key === "ArrowUp") nextHeight += delta;
+            else if (event.key === "ArrowDown") nextHeight -= delta;
+            else if (event.key === "Home") nextHeight = nextBounds.minimum;
+            else if (event.key === "End") nextHeight = nextBounds.maximum;
+            else return;
+            event.preventDefault();
+            setHeight(Math.max(
+              nextBounds.minimum,
+              Math.min(nextHeight, nextBounds.maximum),
+            ));
+          }}
+          onPointerUp={finishResize}
+          size="icon-xs"
+          type="button"
+          variant="ghost"
+        >
+          <GripHorizontal className="h-2.5 w-8" />
+        </Button>
+      </ControlTooltip>
       <CombatLogList
         initialPlaybackActive={initialPlaybackActive}
         initialPlaybackCombatMs={initialPlaybackCombatMs}

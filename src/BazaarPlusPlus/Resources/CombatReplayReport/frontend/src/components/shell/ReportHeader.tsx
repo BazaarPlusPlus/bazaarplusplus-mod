@@ -1,7 +1,4 @@
-import {
-  HelpCircle,
-  Languages,
-} from "lucide-react";
+import { Languages } from "lucide-react";
 import { useMemo } from "react";
 import type { SupportedLocale, ReportViewModel } from "../../model/report.ts";
 import type { NormalizedEntity } from "../../model/normalize.ts";
@@ -12,17 +9,8 @@ import { EntityArt } from "../semantic/EntityArt.tsx";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { ButtonGroup } from "../ui/button-group.tsx";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../ui/popover.tsx";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../ui/tooltip.tsx";
+import { ControlTooltip } from "../ui/tooltip.tsx";
 
 const LOCALE_LABELS: Record<SupportedLocale, string> = {
   en: "EN",
@@ -44,6 +32,11 @@ function heroForSide(
   );
 }
 
+function compactProductGenerator(productGenerator: string): string {
+  const match = /^BazaarPlusPlus\s+(\d+\.\d+\.\d+)/u.exec(productGenerator);
+  return match ? `BPP ${match[1]}` : productGenerator;
+}
+
 export function ReportHeader({
   model,
   productGenerator,
@@ -61,6 +54,10 @@ export function ReportHeader({
   const opponentHero = useMemo(
     () => heroForSide(model, "opponent"),
     [model],
+  );
+  const productLabel = useMemo(
+    () => compactProductGenerator(productGenerator),
+    [productGenerator],
   );
   const outcomeLabel =
     model.outcome === "win" || model.outcome === "victory"
@@ -136,63 +133,37 @@ export function ReportHeader({
         <span>{formatNumber(model.events.length)} {t("event")}</span>
       </div>
 
+      <span
+        aria-label={productGenerator}
+        className="max-w-24 shrink-0 truncate font-mono text-nano text-muted-foreground/70"
+        data-bpp-test-id="report-product-info"
+        title={productGenerator}
+      >
+        {productLabel}
+      </span>
+
       <ButtonGroup
         className="shrink-0"
         data-bpp-test-id="header-utility-toolbar"
       >
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              aria-label={t("language")}
-              className="gap-1 px-2"
-              data-bpp-test-id="locale-switch"
-              onClick={() =>
-                dispatch({ type: "select-locale", locale: nextLocale() })
-              }
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              <Languages className="hidden size-icon-sm sm:block" />
-              <span className="text-compact font-bold">
-                {LOCALE_LABELS[state.locale]}
-              </span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{t("language")}</TooltipContent>
-        </Tooltip>
-        <Popover>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <PopoverTrigger asChild>
-                <Button
-                  aria-label={t("help")}
-                  data-bpp-test-id="help-trigger"
-                  size="icon-sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <HelpCircle className="size-icon-md" />
-                </Button>
-              </PopoverTrigger>
-            </TooltipTrigger>
-            <TooltipContent>{t("help")}</TooltipContent>
-          </Tooltip>
-          <PopoverContent>
-            <p className="text-foreground">{t("helpTimeline")}</p>
-            <p className="mt-2">{t("helpEvents")}</p>
-            {model.videoUrl && <p className="mt-2">{t("helpVideo")}</p>}
-            <p
-              className="mt-3 border-t border-border pt-3 text-compact"
-              data-bpp-test-id="report-product-info"
-            >
-              {t("productAttribution").replace(
-                "{product}",
-                productGenerator,
-              )}
-            </p>
-          </PopoverContent>
-        </Popover>
+        <ControlTooltip label={t("language")}>
+          <Button
+            aria-label={t("language")}
+            className="gap-1 px-2"
+            data-bpp-test-id="locale-switch"
+            onClick={() =>
+              dispatch({ type: "select-locale", locale: nextLocale() })
+            }
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Languages className="hidden size-icon-sm sm:block" />
+            <span className="text-compact font-bold">
+              {LOCALE_LABELS[state.locale]}
+            </span>
+          </Button>
+        </ControlTooltip>
       </ButtonGroup>
     </header>
   );

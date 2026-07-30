@@ -23,6 +23,7 @@ import { cn } from "../../lib/utils.ts";
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { EntityArt } from "../semantic/EntityArt.tsx";
+import { ControlTooltip } from "../ui/tooltip.tsx";
 
 export function heroLaneAtScroll(
   heroLaneIndexes: readonly number[],
@@ -138,20 +139,28 @@ function StateScaleToggle({
         data-bpp-test-id="state-scale-toggle-pill"
       />
       {(["linear", "magnitude"] as const).map((scale) => (
-        <Button
-          aria-selected={value === scale}
-          className="bpp-state-scale-tab !h-5"
-          data-bpp-state-scale={scale}
-          data-bpp-test-id={`state-scale-${scale}`}
+        <ControlTooltip
           key={scale}
-          onClick={() => onValueChange(scale)}
-          role="tab"
-          size="xs"
-          type="button"
-          variant="ghost"
+          label={t(
+            scale === "linear"
+              ? "linearScaleHint"
+              : "magnitudeScaleHint",
+          )}
         >
-          {t(scale === "linear" ? "linearScale" : "magnitudeScale")}
-        </Button>
+          <Button
+            aria-selected={value === scale}
+            className="bpp-state-scale-tab !h-5"
+            data-bpp-state-scale={scale}
+            data-bpp-test-id={`state-scale-${scale}`}
+            onClick={() => onValueChange(scale)}
+            role="tab"
+            size="xs"
+            type="button"
+            variant="ghost"
+          >
+            {t(scale === "linear" ? "linearScale" : "magnitudeScale")}
+          </Button>
+        </ControlTooltip>
       ))}
     </div>
   );

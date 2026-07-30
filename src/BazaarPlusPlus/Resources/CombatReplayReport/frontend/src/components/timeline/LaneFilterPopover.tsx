@@ -14,6 +14,7 @@ import {
   PopoverTrigger,
 } from "../ui/popover.tsx";
 import { Separator } from "../ui/separator.tsx";
+import { ControlTooltip } from "../ui/tooltip.tsx";
 
 function FilterOption({
   filter,
@@ -60,26 +61,28 @@ export function LaneFilterPopover({
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          aria-label={t("laneFilter")}
-          className="h-control-xs gap-1 px-2 normal-case tracking-normal"
-          data-bpp-test-id="lane-filter-trigger"
-          size="xs"
-          variant={hasFilters ? "secondary" : "ghost"}
-        >
-          <ListFilter />
-          <span>{t("laneFilter")}</span>
-          {hasFilters && (
-            <span
-              className="grid min-w-4 place-items-center rounded-full bg-primary px-1 font-mono text-nano text-primary-foreground"
-              data-bpp-test-id="lane-filter-hidden-count"
-            >
-              {hiddenCount}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
+      <ControlTooltip label={t("laneFilterHint")}>
+        <PopoverTrigger asChild>
+          <Button
+            aria-label={t("laneFilter")}
+            className="h-control-xs gap-1 px-2 normal-case tracking-normal"
+            data-bpp-test-id="lane-filter-trigger"
+            size="xs"
+            variant={hasFilters ? "secondary" : "ghost"}
+          >
+            <ListFilter />
+            <span>{t("laneFilter")}</span>
+            {hasFilters && (
+              <span
+                className="grid min-w-4 place-items-center rounded-full bg-primary px-1 font-mono text-nano text-primary-foreground"
+                data-bpp-test-id="lane-filter-hidden-count"
+              >
+                {hiddenCount}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
+      </ControlTooltip>
       <PopoverContent
         align="start"
         className="w-60 p-0"

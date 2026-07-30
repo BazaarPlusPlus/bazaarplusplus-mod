@@ -45,6 +45,7 @@ import {
 import { Badge } from "../ui/badge.tsx";
 import { Button } from "../ui/button.tsx";
 import { ScrollArea } from "../ui/scroll-area.tsx";
+import { ControlTooltip } from "../ui/tooltip.tsx";
 import {
   mergeInspectorEvents,
   summarizeDirectDamageGroup,
@@ -677,17 +678,19 @@ export function FrameInspector({
             </div>
           </div>
           {variant === "popover" && onClose && (
-            <Button
-              aria-label={t("close")}
-              className="shrink-0"
-              data-bpp-test-id="frame-inspector-close"
-              onClick={onClose}
-              size="icon-xs"
-              type="button"
-              variant="ghost"
-            >
-              <X className="size-icon-sm" />
-            </Button>
+            <ControlTooltip label={t("close")}>
+              <Button
+                aria-label={t("close")}
+                className="shrink-0"
+                data-bpp-test-id="frame-inspector-close"
+                onClick={onClose}
+                size="icon-xs"
+                type="button"
+                variant="ghost"
+              >
+                <X className="size-icon-sm" />
+              </Button>
+            </ControlTooltip>
           )}
         </div>
       </header>

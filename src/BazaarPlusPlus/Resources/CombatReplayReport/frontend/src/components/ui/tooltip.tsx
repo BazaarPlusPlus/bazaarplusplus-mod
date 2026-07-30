@@ -20,9 +20,13 @@ function Tooltip(props: React.ComponentProps<typeof TooltipPrimitive.Root>) {
   return <TooltipPrimitive.Root data-slot="tooltip" {...props} />;
 }
 
-function TooltipTrigger(
-  props: React.ComponentProps<typeof TooltipPrimitive.Trigger>,
-) {
+function TooltipTrigger({
+  asChild,
+  ...props
+}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
+  if (asChild) {
+    return <TooltipPrimitive.Trigger asChild {...props} />;
+  }
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
@@ -52,4 +56,25 @@ function TooltipContent({
   );
 }
 
-export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };
+function ControlTooltip({
+  children,
+  label,
+}: {
+  children: React.ReactElement;
+  label: React.ReactNode;
+}) {
+  return (
+    <Tooltip disableHoverableContent>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+export {
+  ControlTooltip,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+};

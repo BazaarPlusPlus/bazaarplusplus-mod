@@ -14,11 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "../ui/popover.tsx";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "../ui/tooltip.tsx";
+import { ControlTooltip } from "../ui/tooltip.tsx";
 
 export const RECORDING_SPEEDS = [0.5, 1, 1.5, 2] as const;
 
@@ -53,38 +49,46 @@ export function RecordingControls({
       data-bpp-test-id="recording-controls"
     >
       <ButtonGroup>
-        <Button
-          aria-label={t("previousEvent")}
-          data-bpp-test-id="recording-previous-event"
-          onClick={onPreviousEvent}
-          size="icon-xs"
-          type="button"
-          variant="outline"
+        <ControlTooltip label={t("previousEvent")}>
+          <Button
+            aria-label={t("previousEvent")}
+            data-bpp-test-id="recording-previous-event"
+            onClick={onPreviousEvent}
+            size="icon-xs"
+            type="button"
+            variant="outline"
+          >
+            <ChevronLeft className="size-icon-sm" />
+          </Button>
+        </ControlTooltip>
+        <ControlTooltip
+          label={playing ? t("pauseRecording") : t("playRecording")}
         >
-          <ChevronLeft className="size-icon-sm" />
-        </Button>
-        <Button
-          aria-label={playing ? t("pauseRecording") : t("playRecording")}
-          data-bpp-test-id="recording-play-toggle"
-          onClick={onTogglePlayback}
-          size="icon-xs"
-          type="button"
-          variant="outline"
-        >
-          {playing
-            ? <Pause className="size-icon-md" />
-            : <Play className="size-icon-md" />}
-        </Button>
-        <Button
-          aria-label={t("nextEvent")}
-          data-bpp-test-id="recording-next-event"
-          onClick={onNextEvent}
-          size="icon-xs"
-          type="button"
-          variant="outline"
-        >
-          <ChevronRight className="size-icon-sm" />
-        </Button>
+          <Button
+            aria-label={playing ? t("pauseRecording") : t("playRecording")}
+            data-bpp-test-id="recording-play-toggle"
+            onClick={onTogglePlayback}
+            size="icon-xs"
+            type="button"
+            variant="outline"
+          >
+            {playing
+              ? <Pause className="size-icon-md" />
+              : <Play className="size-icon-md" />}
+          </Button>
+        </ControlTooltip>
+        <ControlTooltip label={t("nextEvent")}>
+          <Button
+            aria-label={t("nextEvent")}
+            data-bpp-test-id="recording-next-event"
+            onClick={onNextEvent}
+            size="icon-xs"
+            type="button"
+            variant="outline"
+          >
+            <ChevronRight className="size-icon-sm" />
+          </Button>
+        </ControlTooltip>
       </ButtonGroup>
       <span
         className="ml-1 min-w-[68px] text-center font-mono text-micro text-brand-soft"
@@ -93,19 +97,21 @@ export function RecordingControls({
         {mediaMsLabel}
       </span>
       <Popover onOpenChange={onSpeedOpenChange} open={speedOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            aria-label={t("playbackSpeed")}
-            className="ml-auto min-w-14 gap-1 px-2 font-mono text-micro text-brand-soft"
-            data-bpp-test-id="recording-speed"
-            size="xs"
-            type="button"
-            variant="outline"
-          >
-            {RECORDING_SPEEDS[speedIndex]}×
-            <ChevronDown className="size-icon-xs" />
-          </Button>
-        </PopoverTrigger>
+        <ControlTooltip label={t("playbackSpeed")}>
+          <PopoverTrigger asChild>
+            <Button
+              aria-label={t("playbackSpeed")}
+              className="ml-auto min-w-14 gap-1 px-2 font-mono text-micro text-brand-soft"
+              data-bpp-test-id="recording-speed"
+              size="xs"
+              type="button"
+              variant="outline"
+            >
+              {RECORDING_SPEEDS[speedIndex]}×
+              <ChevronDown className="size-icon-xs" />
+            </Button>
+          </PopoverTrigger>
+        </ControlTooltip>
         <PopoverContent
           align="end"
           className="w-28 p-1"
@@ -140,21 +146,18 @@ export function RecordingControls({
           </div>
         </PopoverContent>
       </Popover>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            aria-label={t("fullscreenRecording")}
-            data-bpp-test-id="recording-fullscreen"
-            onClick={onFullscreen}
-            size="icon-xs"
-            type="button"
-            variant="ghost"
-          >
-            <Maximize2 className="size-icon-sm" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{t("fullscreenRecording")}</TooltipContent>
-      </Tooltip>
+      <ControlTooltip label={t("fullscreenRecording")}>
+        <Button
+          aria-label={t("fullscreenRecording")}
+          data-bpp-test-id="recording-fullscreen"
+          onClick={onFullscreen}
+          size="icon-xs"
+          type="button"
+          variant="ghost"
+        >
+          <Maximize2 className="size-icon-sm" />
+        </Button>
+      </ControlTooltip>
     </div>
   );
 }
