@@ -33,11 +33,6 @@ public enum BazaarAgentLogReasonCode
 {
     ActionDispatchException,
     ActionProcessingException,
-    ReplaySinkException,
-    ReplayProcessorException,
-    ReplayInvalidPayload,
-    ReplayRejected,
-    ReplayUnavailable,
     HttpHandlerException,
     HttpRequestBodyReadException,
     HttpErrorResponseWriteException,
@@ -56,18 +51,10 @@ public enum BazaarAgentLogReasonCode
     ListenerAcceptLoopException,
 }
 
-public enum BazaarAgentReplayLogAction
-{
-    Record,
-    Continue,
-}
-
 public enum BazaarAgentHttpLogRoute
 {
     Context,
     Actions,
-    ReplayRecord,
-    ReplayContinue,
     Unknown,
 }
 
@@ -84,7 +71,6 @@ public enum BazaarAgentListenerStopPhase
     ListenerStop,
     ListenerClose,
     ActionQueueDispose,
-    ReplayQueueDispose,
 }
 
 public sealed class BazaarAgentLogFieldDefinition
@@ -337,41 +323,6 @@ public static class BazaarAgentLogEvents
         ActionRequestId,
         ActionKind,
         ActionReasonCode
-    );
-
-    private static readonly BazaarAgentLogFieldDefinition ReplayRequestId = new(
-        "request_id",
-        BazaarAgentLogFieldPrivacy.Public,
-        BazaarAgentLogCardinality.High,
-        BazaarAgentLogCorrelation.Short
-    );
-    private static readonly BazaarAgentLogFieldDefinition ReplayActionKind = new(
-        "action_kind",
-        BazaarAgentLogFieldPrivacy.Public,
-        BazaarAgentLogCardinality.Low,
-        BazaarAgentLogCorrelation.None
-    );
-    private static readonly BazaarAgentLogFieldDefinition ReplayBattleId = new(
-        "battle_id",
-        BazaarAgentLogFieldPrivacy.Public,
-        BazaarAgentLogCardinality.High,
-        BazaarAgentLogCorrelation.Short
-    );
-    private static readonly BazaarAgentLogFieldDefinition ReplayReasonCode = new(
-        "reason_code",
-        BazaarAgentLogFieldPrivacy.Public,
-        BazaarAgentLogCardinality.Low,
-        BazaarAgentLogCorrelation.None
-    );
-
-    public static readonly BazaarAgentLogEventDefinition ReplayRequestFailedDefinition = new(
-        BazaarAgentLogSeverity.Error,
-        "agent.replay_request.failed",
-        new BazaarAgentLogStormPolicy(ReplayRequestId, ReplayBattleId),
-        ReplayRequestId,
-        ReplayActionKind,
-        ReplayBattleId,
-        ReplayReasonCode
     );
 
     private static readonly BazaarAgentLogFieldDefinition HttpRequestId = new(
@@ -749,26 +700,6 @@ public static class BazaarAgentLogEvents
     public static BazaarAgentLogEvent SnapshotReady(BazaarAgentRunStateName state) =>
         new(SnapshotReadyDefinition, exception: null, SnapshotState.Bind(state));
 
-    public static BazaarAgentLogEvent ReplayRequestFailed(
-        string requestId,
-        BazaarAgentReplayControlKind actionKind,
-        string? battleId,
-        BazaarAgentLogReasonCode reasonCode,
-        Exception? exception
-    ) =>
-        new(
-            ReplayRequestFailedDefinition,
-            exception,
-            ReplayRequestId.Bind(requestId),
-            ReplayActionKind.Bind(
-                actionKind == BazaarAgentReplayControlKind.Start
-                    ? BazaarAgentReplayLogAction.Record
-                    : BazaarAgentReplayLogAction.Continue
-            ),
-            ReplayBattleId.Bind(NormalizeBattleIdForLog(battleId)),
-            ReplayReasonCode.Bind(reasonCode)
-        );
-
     public static BazaarAgentLogEvent HttpRequestFailed(
         string requestId,
         BazaarAgentHttpLogRoute route,
@@ -926,7 +857,4 @@ public static class BazaarAgentLogEvents
             ListenerFailedPort.Bind(port),
             ListenerFailedReasonCode.Bind(BazaarAgentLogReasonCode.ListenerAcceptLoopException)
         );
-
-    private static string? NormalizeBattleIdForLog(string? battleId) =>
-        Guid.TryParseExact(battleId, "N", out var parsed) ? parsed.ToString("N") : null;
 }

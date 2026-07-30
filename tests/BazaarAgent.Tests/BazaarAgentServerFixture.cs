@@ -8,7 +8,6 @@ internal sealed class ServerFixture : IDisposable
     public int Port { get; }
     public BazaarAgentHttpServer Server { get; }
     public BazaarAgentCommandQueue<BazaarAgentAction> Queue { get; }
-    public BazaarAgentCommandQueue<BazaarAgentReplayCommand> ReplayQueue { get; }
     public CapturingBazaarAgentLogger Logger { get; } = new();
     private BazaarAgentContextSnapshot? _snapshot;
     public BazaarAgentContextSnapshot? CurrentSnapshot => _snapshot;
@@ -17,7 +16,6 @@ internal sealed class ServerFixture : IDisposable
 
     public ServerFixture(
         int timeoutMs = 5000,
-        int replayTimeoutMs = 5000,
         Func<BazaarAgentContextSnapshot?>? snapshotGetter = null,
         Func<string>? requestIdFactory = null,
         Func<
@@ -38,13 +36,11 @@ internal sealed class ServerFixture : IDisposable
     {
         Port = PickFreePort();
         Queue = new BazaarAgentCommandQueue<BazaarAgentAction>(timeoutMs);
-        ReplayQueue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(replayTimeoutMs);
         Server = new BazaarAgentHttpServer(
             Port,
             snapshotGetter ?? (() => CurrentSnapshot),
             null,
             Queue,
-            ReplayQueue,
             Logger,
             requestIdFactory ?? BazaarAgentUlid.New,
             requestBodyReaderOverride,
@@ -63,11 +59,6 @@ internal sealed class ServerFixture : IDisposable
         try
         {
             Queue.Dispose();
-        }
-        catch { }
-        try
-        {
-            ReplayQueue.Dispose();
         }
         catch { }
     }

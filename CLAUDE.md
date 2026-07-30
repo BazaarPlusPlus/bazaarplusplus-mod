@@ -57,7 +57,6 @@ This mod is a **BepInEx 5.x plugin** (`BepInEx.Core` 5.\*). At runtime, BepInEx 
 
 For runtime validation that needs launching the game, always launch The Bazaar through Steam (App ID 1617400) so Steam runtime state is present. On macOS: `open "steam://run/1617400"`. On Windows: `start steam://run/1617400`. Do not launch `TheBazaar.app` directly or use `run_bepinex.sh` on macOS — these bypass Steam runtime and cause subtle failures.
 
-BazaarAgent replay smoke has three traps: `POST /v1/replay/record` accepts only the raw bytes of `GhostBattlePayloads/*.ghost.mpack.gz` (`CombatReplays/*.payload.mpack.gz` fails with missing battle manifest); `POST /v1/replay/continue` must send an empty body (`curl --data ''`, else HttpListener returns 411 Length Required); terminal replay log events lag the menu return by several seconds — poll, do not assert immediately. Before smoking, check the timestamp on `BepInEx/plugins/BazaarPlusPlus.version` so the game is running this build.
 
 ## Architecture
 

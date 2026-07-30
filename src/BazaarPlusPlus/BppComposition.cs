@@ -265,6 +265,11 @@ internal sealed class BppComposition : IDisposable
             () => _combatReplayModule.Runtime,
             _services
         );
+        BazaarAgentGameBridge.CurrentEncounterPreview = new BazaarAgentEncounterPreview(
+            _encounterPreviewModule
+        );
+        BazaarAgentGameBridge.CurrentCombatEncounterPreview =
+            new BazaarAgentCombatEncounterPreview();
         BazaarAgentGameBridge.CurrentBattleSummarySource = _bazaarAgentCombatSummaryModule;
     }
 
@@ -282,6 +287,8 @@ internal sealed class BppComposition : IDisposable
     {
         BazaarAgentGameBridge.Current = null;
         BazaarAgentGameBridge.CurrentRecorder = null;
+        BazaarAgentGameBridge.CurrentEncounterPreview = null;
+        BazaarAgentGameBridge.CurrentCombatEncounterPreview = null;
         BazaarAgentGameBridge.CurrentBattleSummarySource = null;
         _featureRegistry.Stop();
         _endOfRunCaptureWorkflow.Dispose();

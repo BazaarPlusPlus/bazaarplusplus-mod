@@ -112,8 +112,24 @@ public sealed class BazaarAgentCardSnapshot
     public string? TargetSockets { get; init; }
     public string? UnavailableReason { get; init; }
 
+    // Combat-encounter selection only. This mirrors the native right-click monster board preview
+    // so an agent can compare the three PvE opponents before it commits to one.
+    public BazaarAgentCombatOpponentPreview? OpponentPreview { get; init; }
+
     // Owned (Board/Chest/Skill)
     public bool? CanSell { get; init; }
+}
+
+public sealed class BazaarAgentCombatOpponentPreview
+{
+    public IReadOnlyList<BazaarAgentCardSnapshot> Board { get; init; } =
+        System.Array.Empty<BazaarAgentCardSnapshot>();
+
+    public IReadOnlyList<BazaarAgentCardSnapshot> Skills { get; init; } =
+        System.Array.Empty<BazaarAgentCardSnapshot>();
+
+    public int? Health { get; init; }
+    public int? MaxHealth { get; init; }
 }
 
 public sealed class BazaarAgentDecisionOption
@@ -163,7 +179,7 @@ public sealed class BazaarAgentContext
     public double ActionCooldownRemainingSeconds { get; init; }
 
     /// <summary>Where combat-replay playback currently is; <c>finishedAwaitingContinue</c> means
-    /// <c>POST /v1/replay/continue</c> will finalize the replay (and any recording).</summary>
+    /// the V3 <c>continue</c> action will finalize the replay (and any recording).</summary>
     public BazaarAgentReplayPhase ReplayPhase { get; init; }
 
     /// <summary>Battle id of the active replay session, when one is active.</summary>

@@ -231,11 +231,10 @@ public sealed class BazaarAgentContextSnapshotPublisher
         return a.InstanceId == b.InstanceId
             && a.Kind == b.Kind
             && a.Type == b.Type
-            && a.TemplateId == b.TemplateId
-            && a.DisplayName == b.DisplayName
+            && (a.Kind != BazaarAgentCardKind.Skill || a.DisplayName == b.DisplayName)
             && a.Tier == b.Tier
-            && a.Size == b.Size
-            && a.Enchantment == b.Enchantment
+            && (a.Kind != BazaarAgentCardKind.Item || a.Size == b.Size)
+            && (a.Kind != BazaarAgentCardKind.Item || a.Enchantment == b.Enchantment)
             && a.SocketId == b.SocketId
             && a.Location == b.Location
             && a.Order == b.Order
@@ -249,7 +248,23 @@ public sealed class BazaarAgentContextSnapshotPublisher
             && a.SellPrice == b.SellPrice
             && a.TargetSection == b.TargetSection
             && a.TargetSockets == b.TargetSockets
-            && a.UnavailableReason == b.UnavailableReason;
+            && a.UnavailableReason == b.UnavailableReason
+            && OpponentPreviewEqual(a.OpponentPreview, b.OpponentPreview);
+    }
+
+    private static bool OpponentPreviewEqual(
+        BazaarAgentCombatOpponentPreview? a,
+        BazaarAgentCombatOpponentPreview? b
+    )
+    {
+        if (ReferenceEquals(a, b))
+            return true;
+        if (a is null || b is null)
+            return false;
+        return a.Health == b.Health
+            && a.MaxHealth == b.MaxHealth
+            && CardsEqual(a.Board, b.Board)
+            && CardsEqual(a.Skills, b.Skills);
     }
 
     private static bool OptionsEqual(

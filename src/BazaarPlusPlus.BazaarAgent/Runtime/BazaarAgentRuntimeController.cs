@@ -14,7 +14,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
     private readonly IBazaarAgentOptions _options;
     private readonly IBazaarAgentContextReader _contextReader;
     private readonly IBazaarAgentActionDispatcher _dispatcher;
-    private readonly IBazaarAgentReplayControlSink _replaySink;
     private readonly IBazaarAgentLogger _logger;
     private readonly IBazaarAgentClock _clock;
     private readonly Action? _snapshotPublished;
@@ -37,7 +36,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 #endif
     private BazaarAgentHttpServer? _http;
     private BazaarAgentCommandQueue<BazaarAgentAction>? _queue;
-    private BazaarAgentCommandQueue<BazaarAgentReplayCommand>? _replayQueue;
     private PendingActionObservation? _pendingActionObservation;
     private int _currentPort = -1;
 
@@ -45,7 +43,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         IBazaarAgentOptions options,
         IBazaarAgentContextReader contextReader,
         IBazaarAgentActionDispatcher dispatcher,
-        IBazaarAgentReplayControlSink replaySink,
         IBazaarAgentLogger logger,
         IBazaarAgentClock clock,
         Action? snapshotPublished = null
@@ -54,7 +51,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _contextReader = contextReader ?? throw new ArgumentNullException(nameof(contextReader));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
-        _replaySink = replaySink ?? throw new ArgumentNullException(nameof(replaySink));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _snapshotPublished = snapshotPublished;
@@ -67,12 +63,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         ReconcileListener();
         if (_http is null || _queue is null)
             return false;
-
-        // Replay control commands drain every tick, before the snapshot publish gate below —
-        // otherwise record/continue requests would be throttled to the 1.5 s snapshot cadence
-        // and time out. This is also the only place replay commands reach the game: nothing in
-        // the snapshot path may exit ReplayState.
-        DrainReplayControlQueue();
 
         var snapshotPublished = false;
         if (_clock.NowSeconds - _lastTickTime >= SnapshotPublishIntervalSeconds)
@@ -150,15 +140,11 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         try
         {
             _queue = new BazaarAgentCommandQueue<BazaarAgentAction>(desiredTimeoutMs);
-            _replayQueue = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(
-                BazaarAgentRuntimeDefaults.ReplayControlTimeoutMilliseconds
-            );
             _http = new BazaarAgentHttpServer(
                 desiredPort,
                 () => _snapshots.Current,
                 _snapshots.GetNextAfter,
                 _queue,
-                _replayQueue,
                 _logger,
                 activityFeed: _activityFeed
             );
@@ -181,10 +167,6 @@ public sealed class BazaarAgentRuntimeController : IDisposable
         _pendingActionObservation = null;
         var report = _http?.Stop() ?? new BazaarAgentListenerStopReport();
         report.Capture(BazaarAgentListenerStopPhase.ActionQueueDispose, () => _queue?.Dispose());
-        report.Capture(
-            BazaarAgentListenerStopPhase.ReplayQueueDispose,
-            () => _replayQueue?.Dispose()
-        );
 
         if (report.FirstException is { } firstException)
         {
@@ -199,42 +181,7 @@ public sealed class BazaarAgentRuntimeController : IDisposable
 
         _http = null;
         _queue = null;
-        _replayQueue = null;
         _currentPort = -1;
-    }
-
-    private void DrainReplayControlQueue()
-    {
-        var queue = _replayQueue;
-        if (queue is null)
-            return;
-
-        // At most ONE command per tick: a Start pays a multi-MB gzip+msgpack decode on the main
-        // thread, and replay control is strictly serial anyway — a burst of queued commands
-        // (retry storm, requests accumulated during a scene-load stall) must not stack several
-        // decodes into a single frame. The next command runs on the next Update, ~one frame later.
-        if (queue.TryDequeue() is { } pending)
-        {
-            // Claimed commands have their timeout disarmed and must always be answered.
-            // Answer BEFORE logging — the logger itself can throw.
-            try
-            {
-                BazaarAgentReplayControlProcessor.Process(pending, _replaySink, _logger);
-            }
-            catch (Exception ex)
-            {
-                pending.SetResponse(new BazaarAgentServerResponse(500, "{\"error\":\"internal\"}"));
-                _logger.TryEmit(
-                    BazaarAgentLogEvents.ReplayRequestFailed(
-                        pending.RequestId,
-                        pending.Command.Kind,
-                        pending.Command.BattleId,
-                        BazaarAgentLogReasonCode.ReplayProcessorException,
-                        ex
-                    )
-                );
-            }
-        }
     }
 
     private void DrainActionQueue()

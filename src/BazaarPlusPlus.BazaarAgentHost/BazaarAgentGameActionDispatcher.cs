@@ -15,10 +15,16 @@ namespace BazaarPlusPlus.BazaarAgentHost;
 internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispatcher
 {
     private readonly IBazaarAgentGameProbe _gameProbe;
+    private readonly BazaarAgentPedestalVisualRefresh _pedestalVisualRefresh;
 
-    internal BazaarAgentGameActionDispatcher(IBazaarAgentGameProbe gameProbe)
+    internal BazaarAgentGameActionDispatcher(
+        IBazaarAgentGameProbe gameProbe,
+        BazaarAgentPedestalVisualRefresh pedestalVisualRefresh
+    )
     {
         _gameProbe = gameProbe ?? throw new ArgumentNullException(nameof(gameProbe));
+        _pedestalVisualRefresh =
+            pedestalVisualRefresh ?? throw new ArgumentNullException(nameof(pedestalVisualRefresh));
     }
 
     /// <summary>Main thread only. Routes the action through AppState.CurrentState.*Command()
@@ -145,10 +151,17 @@ internal sealed class BazaarAgentGameActionDispatcher : IBazaarAgentActionDispat
                 );
 
             case BazaarAgentActionKind.CommitToPedestal:
-                return InvokeAppStateCommand(
-                    "CommitToPedestalCommand",
-                    new InstanceId(action.CardInstanceId ?? "")
-                );
+            {
+                var card = ResolveCard<ItemCard>(action.CardInstanceId);
+                if (card is null)
+                    return new(false, "item not found in Data.Entities");
+
+                _pedestalVisualRefresh.Arm(card);
+                var result = InvokeAppStateCommand("CommitToPedestalCommand", card.InstanceId);
+                if (!result.Executed)
+                    _pedestalVisualRefresh.Cancel(card);
+                return result;
+            }
 
             case BazaarAgentActionKind.MoveItem:
             {

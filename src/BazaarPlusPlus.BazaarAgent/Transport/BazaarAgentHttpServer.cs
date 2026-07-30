@@ -25,7 +25,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
     private readonly Func<BazaarAgentContextSnapshot?> _snapshotGetter;
     private readonly Func<ulong, BazaarAgentContextSnapshot?> _nextSnapshotGetter;
     private readonly BazaarAgentCommandQueue<BazaarAgentAction> _queue;
-    private readonly BazaarAgentCommandQueue<BazaarAgentReplayCommand> _replayQueue;
     private readonly IBazaarAgentLogger _logger;
     private readonly BazaarAgentActivityFeed _activityFeed;
     private readonly BazaarAgentProtocolV3Projector _protocolV3 = new();
@@ -57,7 +56,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         int port,
         Func<BazaarAgentContextSnapshot?> snapshotGetter,
         BazaarAgentCommandQueue<BazaarAgentAction> queue,
-        BazaarAgentCommandQueue<BazaarAgentReplayCommand> replayQueue,
         IBazaarAgentLogger logger,
         BazaarAgentActivityFeed? activityFeed = null
     )
@@ -66,7 +64,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
             snapshotGetter,
             _ => snapshotGetter(),
             queue,
-            replayQueue,
             logger,
             requestIdFactory: BazaarAgentUlid.New,
             activityFeed: activityFeed
@@ -77,7 +74,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         Func<BazaarAgentContextSnapshot?> snapshotGetter,
         Func<ulong, BazaarAgentContextSnapshot?> nextSnapshotGetter,
         BazaarAgentCommandQueue<BazaarAgentAction> queue,
-        BazaarAgentCommandQueue<BazaarAgentReplayCommand> replayQueue,
         IBazaarAgentLogger logger,
         BazaarAgentActivityFeed? activityFeed = null
     )
@@ -86,7 +82,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
             snapshotGetter,
             nextSnapshotGetter,
             queue,
-            replayQueue,
             logger,
             requestIdFactory: BazaarAgentUlid.New,
             activityFeed: activityFeed
@@ -97,7 +92,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         Func<BazaarAgentContextSnapshot?> snapshotGetter,
         Func<ulong, BazaarAgentContextSnapshot?>? nextSnapshotGetter,
         BazaarAgentCommandQueue<BazaarAgentAction> queue,
-        BazaarAgentCommandQueue<BazaarAgentReplayCommand> replayQueue,
         IBazaarAgentLogger logger,
         Func<string> requestIdFactory,
         Func<
@@ -115,7 +109,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         _snapshotGetter = snapshotGetter;
         _nextSnapshotGetter = nextSnapshotGetter ?? (_ => snapshotGetter());
         _queue = queue;
-        _replayQueue = replayQueue;
         _logger = logger;
         _activityFeed = activityFeed ?? new BazaarAgentActivityFeed();
         _requestIdFactory =
@@ -226,20 +219,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
             {
                 await HandlePostV3Action(ctx, requestId).ConfigureAwait(false);
             }
-            else if (
-                string.Equals(path, "/v1/replay/record", StringComparison.OrdinalIgnoreCase)
-                && method == "POST"
-            )
-            {
-                await HandlePostReplayRecord(ctx, requestId).ConfigureAwait(false);
-            }
-            else if (
-                string.Equals(path, "/v1/replay/continue", StringComparison.OrdinalIgnoreCase)
-                && method == "POST"
-            )
-            {
-                await HandlePostReplayContinue(ctx, requestId).ConfigureAwait(false);
-            }
             else
             {
                 WriteErrorEnvelope(ctx, 404, "not-found", "unknown route");
@@ -308,10 +287,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
             return BazaarAgentHttpLogRoute.Context;
         if (string.Equals(path, "/v3/actions", StringComparison.OrdinalIgnoreCase))
             return BazaarAgentHttpLogRoute.Actions;
-        if (string.Equals(path, "/v1/replay/record", StringComparison.OrdinalIgnoreCase))
-            return BazaarAgentHttpLogRoute.ReplayRecord;
-        if (string.Equals(path, "/v1/replay/continue", StringComparison.OrdinalIgnoreCase))
-            return BazaarAgentHttpLogRoute.ReplayContinue;
         return BazaarAgentHttpLogRoute.Unknown;
     }
 
@@ -1008,85 +983,6 @@ public sealed class BazaarAgentHttpServer : IDisposable
         return null;
     }
 
-    private async Task HandlePostReplayRecord(HttpListenerContext ctx, string requestId)
-    {
-        // Raw binary route: the body is a GhostBattlePayload msgpack+gzip blob, never JSON.
-        // It gets its own (much larger) cap and bypasses the action parser entirely.
-        var body = await ReadBodyWithCap(
-                ctx,
-                BazaarAgentRuntimeDefaults.MaxRecordBodyBytes,
-                requestId,
-                BazaarAgentHttpLogRoute.ReplayRecord
-            )
-            .ConfigureAwait(false);
-        if (body is null)
-            return;
-
-        if (body.Length == 0)
-        {
-            WriteErrorEnvelope(ctx, 400, "invalid", "empty body");
-            return;
-        }
-
-        var battleId = ctx.Request.Headers["X-Bpp-Battle-Id"];
-        if (string.IsNullOrWhiteSpace(battleId))
-            battleId = ctx.Request.QueryString["battleId"];
-
-        var requestMetadata = JsonConvert.SerializeObject(
-            new { battleId, payloadBytes = body.Length },
-            _json
-        );
-        _activityFeed.Publish(
-            "replay.received",
-            requestId,
-            "/v1/replay/record",
-            $"Replay record request ({body.Length.ToString(CultureInfo.InvariantCulture)} bytes)",
-            requestJson: requestMetadata
-        );
-
-        var res = await _replayQueue
-            .EnqueueAndAwaitAsync(
-                requestId,
-                new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, body, battleId)
-            )
-            .ConfigureAwait(false);
-        _activityFeed.Publish(
-            res.HttpStatus >= 400 ? "request.rejected" : "replay.completed",
-            requestId,
-            "/v1/replay/record",
-            $"Replay record completed with HTTP {res.HttpStatus.ToString(CultureInfo.InvariantCulture)}",
-            statusCode: res.HttpStatus,
-            requestJson: requestMetadata,
-            responseJson: res.JsonBody
-        );
-        await WriteQueueResponse(ctx, res).ConfigureAwait(false);
-    }
-
-    private async Task HandlePostReplayContinue(HttpListenerContext ctx, string requestId)
-    {
-        _activityFeed.Publish(
-            "replay.received",
-            requestId,
-            "/v1/replay/continue",
-            "Replay continue request"
-        );
-        var res = await _replayQueue
-            .EnqueueAndAwaitAsync(
-                requestId,
-                new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Continue, null, null)
-            )
-            .ConfigureAwait(false);
-        _activityFeed.Publish(
-            res.HttpStatus >= 400 ? "request.rejected" : "replay.completed",
-            requestId,
-            "/v1/replay/continue",
-            $"Replay continue completed with HTTP {res.HttpStatus.ToString(CultureInfo.InvariantCulture)}",
-            statusCode: res.HttpStatus,
-            responseJson: res.JsonBody
-        );
-        await WriteQueueResponse(ctx, res).ConfigureAwait(false);
-    }
-
     private static string BuildActionSummary(BazaarAgentAction action)
     {
         var target = string.IsNullOrWhiteSpace(action.CardInstanceId)
@@ -1105,8 +1001,7 @@ public sealed class BazaarAgentHttpServer : IDisposable
     // response instead of hitting a TCP reset, and for how long. Beyond either bound, closing
     // with unread data (and the reset that follows) is the lesser evil — the time bound keeps a
     // stalled client (declared length, never sends) from parking the handler task forever.
-    private const long MaxRejectedBodyDrainBytes =
-        2L * BazaarAgentRuntimeDefaults.MaxRecordBodyBytes;
+    private const long MaxRejectedBodyDrainBytes = 2L * MaxBodyBytes;
     private const int MaxRejectedBodyDrainMilliseconds = 5000;
 
     /// <summary>Reads the request body up to <paramref name="maxBytes"/>. Returns <c>null</c>

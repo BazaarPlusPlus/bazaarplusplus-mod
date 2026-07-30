@@ -31,11 +31,10 @@ public sealed class BazaarAgentV3Context
     [JsonProperty("skills", NullValueHandling = NullValueHandling.Ignore)]
     public BazaarAgentV3CardChanges? Skills { get; init; }
 
-    // Unlike owned card groups, selection is self-contained in every response so that an
-    // agent never has to reconstruct a transient offer row from prior deltas.
-    [JsonProperty("selection")]
-    public IReadOnlyList<BazaarAgentV3Card> Selection { get; init; } =
-        System.Array.Empty<BazaarAgentV3Card>();
+    // A present selection replaces the current offer row in full. Omission means its full
+    // previously received row remains valid; an empty array explicitly clears that row.
+    [JsonProperty("selection", NullValueHandling = NullValueHandling.Ignore)]
+    public IReadOnlyList<BazaarAgentV3Card>? Selection { get; init; }
 
     [JsonProperty("operations", NullValueHandling = NullValueHandling.Ignore)]
     public IReadOnlyList<string>? Operations { get; init; }
@@ -62,11 +61,17 @@ public sealed class BazaarAgentV3CardChanges
 /// <summary>Compact cards carry actionable summary data; full mechanics live in the rendered description.</summary>
 public sealed class BazaarAgentV3Card
 {
-    [JsonProperty("id")]
-    public string Id { get; init; } = "";
+    // Item / skill / encounter references are deliberately human-readable and are also the
+    // values callers POST as action ids. Exactly one of these is populated for a selection card;
+    // owned skills instead use Name as their delta key.
+    [JsonProperty("item", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Item { get; init; }
 
-    [JsonProperty("template", NullValueHandling = NullValueHandling.Ignore)]
-    public string? Template { get; init; }
+    [JsonProperty("skill", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Skill { get; init; }
+
+    [JsonProperty("encounter", NullValueHandling = NullValueHandling.Ignore)]
+    public string? Encounter { get; init; }
 
     [JsonProperty("name", NullValueHandling = NullValueHandling.Ignore)]
     public string? Name { get; init; }
@@ -110,6 +115,27 @@ public sealed class BazaarAgentV3Card
 
     [JsonProperty("sellPrice", NullValueHandling = NullValueHandling.Ignore)]
     public int? SellPrice { get; init; }
+
+    /// <summary>Static PvE monster lineup supplied with a combat-encounter offer.</summary>
+    [JsonProperty("opponent", NullValueHandling = NullValueHandling.Ignore)]
+    public BazaarAgentV3CombatOpponentPreview? Opponent { get; init; }
+}
+
+public sealed class BazaarAgentV3CombatOpponentPreview
+{
+    [JsonProperty("board")]
+    public IReadOnlyList<BazaarAgentV3Card> Board { get; init; } =
+        System.Array.Empty<BazaarAgentV3Card>();
+
+    [JsonProperty("skills")]
+    public IReadOnlyList<BazaarAgentV3Card> Skills { get; init; } =
+        System.Array.Empty<BazaarAgentV3Card>();
+
+    [JsonProperty("health", NullValueHandling = NullValueHandling.Ignore)]
+    public int? Health { get; init; }
+
+    [JsonProperty("maxHealth", NullValueHandling = NullValueHandling.Ignore)]
+    public int? MaxHealth { get; init; }
 }
 
 /// <summary>Complete immutable lineups emitted only at a combat start or completion boundary.</summary>

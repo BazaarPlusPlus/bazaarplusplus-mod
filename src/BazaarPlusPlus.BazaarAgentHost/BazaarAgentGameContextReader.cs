@@ -207,6 +207,19 @@ internal sealed class BazaarAgentGameContextReader
         ISet<string>? interactionFilter =
             interactionFilterList.Count > 0 ? new HashSet<string>(interactionFilterList) : null;
 
+        // PedestalState does not populate RunState.SelectionSet: native UI turns the already
+        // owned cards that PedestalState._validCards permits into direct click targets. Surface
+        // that same finite target set as selection so an agent never has to infer eligibility from
+        // the generic `select` operation or blindly probe its cached board/chest cards.
+        if (stateName == BazaarAgentRunStateName.Pedestal)
+        {
+            selectionOptions = BuildPedestalSelectionOptions(
+                targeting.PedestalEligibleInstanceIds,
+                boardItems,
+                chestItems
+            );
+        }
+
         // End-of-run advance: the end screen exposes no StateOps. Mirror the native button's guard
         // (SceneLoader not transitioning) — EndOfRunScreenController.ReturnToMenuClicked.
         var sceneLoader = Services.Get<SceneLoader>();
@@ -620,6 +633,22 @@ internal sealed class BazaarAgentGameContextReader
         return result;
     }
 
+    private static List<BazaarAgentCardSnapshot> BuildPedestalSelectionOptions(
+        ISet<string> eligibleIds,
+        IReadOnlyList<BazaarAgentCardSnapshot> boardItems,
+        IReadOnlyList<BazaarAgentCardSnapshot> chestItems
+    )
+    {
+        var result = new List<BazaarAgentCardSnapshot>();
+        foreach (var card in boardItems)
+            if (eligibleIds.Contains(card.InstanceId))
+                result.Add(card);
+        foreach (var card in chestItems)
+            if (eligibleIds.Contains(card.InstanceId))
+                result.Add(card);
+        return result;
+    }
+
     private static List<BazaarAgentCardSnapshot> BuildSelectionOptions(
         RunState? runState,
         int playerGold,
@@ -721,11 +750,16 @@ internal sealed class BazaarAgentGameContextReader
                     Order = order++,
                     Tags = BuildStringList(card.Tags),
                     HiddenTags = BuildStringList(card.HiddenTags),
-                    Description = gameProbe.ResolveCardDescription(card),
+                    Description = ResolveSelectionDescription(card, kind, gameProbe),
+                    OpponentPreview = card is CombatEncounterCard combatEncounter
+                        ? ResolveCombatOpponentPreview(combatEncounter)
+                        : null,
                     CooldownSeconds = ReadCooldownSeconds(card),
                     Ammo = ReadAmmo(card),
                     AmmoMax = ReadAmmoMax(card),
-                    BuyPrice = buyPrice,
+                    // The native selection context, not the displayed card's ordinary shop
+                    // attribute, determines what the agent will pay.
+                    BuyPrice = selectionIsFree ? 0 : buyPrice,
                     SellPrice = sellPrice,
                     CanFit = canFit,
                     CanSelect = canSelect,
@@ -737,6 +771,118 @@ internal sealed class BazaarAgentGameContextReader
         }
 
         return result;
+    }
+
+    private static BazaarAgentCombatOpponentPreview? ResolveCombatOpponentPreview(
+        CombatEncounterCard encounter
+    )
+    {
+        var preview = BazaarAgentGameBridge.CurrentCombatEncounterPreview?.Resolve(encounter);
+        if (preview is null)
+            return null;
+
+        BazaarAgentCardSnapshot ProjectCard(
+            BazaarAgentBattleCardSnapshot card,
+            BazaarAgentCardKind kind,
+            BazaarAgentCardLocation location,
+            int order
+        ) =>
+            new()
+            {
+                InstanceId = card.InstanceId,
+                Kind = kind,
+                Type = card.Type,
+                TemplateId = card.TemplateId,
+                DisplayName = card.DisplayName,
+                Tier = card.Tier,
+                Size = card.Size,
+                Enchantment = card.Enchantment,
+                SocketId = card.SocketId,
+                Location = location,
+                Order = order,
+                Tags = card.Tags,
+                HiddenTags = card.HiddenTags,
+                Description = card.Description,
+                CooldownSeconds = card.CooldownSeconds,
+                Ammo = card.Ammo,
+                AmmoMax = card.AmmoMax,
+            };
+
+        return new BazaarAgentCombatOpponentPreview
+        {
+            Board = preview
+                .Board.Select(
+                    (card, index) =>
+                        ProjectCard(
+                            card,
+                            BazaarAgentCardKind.Item,
+                            BazaarAgentCardLocation.Board,
+                            index
+                        )
+                )
+                .ToArray(),
+            Skills = preview
+                .Skills.Select(
+                    (card, index) =>
+                        ProjectCard(
+                            card,
+                            BazaarAgentCardKind.Skill,
+                            BazaarAgentCardLocation.Skill,
+                            index
+                        )
+                )
+                .ToArray(),
+            Health = preview.Health,
+            MaxHealth = preview.MaxHealth,
+        };
+    }
+
+    private static string? ResolveSelectionDescription(
+        Card card,
+        BazaarAgentCardKind kind,
+        IBazaarAgentGameProbe gameProbe
+    )
+    {
+        var nativeDescription = gameProbe.ResolveCardDescription(card);
+        if (kind != BazaarAgentCardKind.Encounter)
+            return nativeDescription;
+
+        var preview = card.Type switch
+        {
+            ECardType.EventEncounter => BazaarAgentGameBridge.CurrentEncounterPreview?.ResolveEvent(
+                card.TemplateId,
+                nativeDescription ?? string.Empty
+            ),
+            ECardType.EncounterStep => BazaarAgentGameBridge.CurrentEncounterPreview?.ResolveStep(
+                card.TemplateId,
+                nativeDescription ?? string.Empty
+            ),
+            _ => null,
+        };
+        return AppendDescription(
+            AppendDescription(nativeDescription, preview),
+            EncounterTypeSummary(card.Type)
+        );
+    }
+
+    private static string? EncounterTypeSummary(ECardType type) =>
+        type switch
+        {
+            ECardType.CombatEncounter => "NPC 战斗：选择后立即进入 PvE 战斗。",
+            ECardType.PvpEncounter => "玩家战斗：选择后立即进入 PvP 战斗。",
+            ECardType.PedestalEncounter => "基座：选择后从已有物品中选择目标进行升级或附魔。",
+            _ => null,
+        };
+
+    private static string? AppendDescription(string? first, string? second)
+    {
+        if (string.IsNullOrWhiteSpace(second))
+            return first;
+        if (string.IsNullOrWhiteSpace(first))
+            return second;
+        return string.Equals(first, second, StringComparison.Ordinal)
+            ? first
+            : $"{first}\n{second}";
     }
 
     // -------------------------------------------------------------------------
@@ -874,7 +1020,11 @@ internal sealed class BazaarAgentGameContextReader
             if (offer.CanSelect == false)
                 continue;
 
-            if (offer.Kind == BazaarAgentCardKind.Item && canHandleOp(StateOps.SelectItem))
+            if (
+                stateName != BazaarAgentRunStateName.Pedestal
+                && offer.Kind == BazaarAgentCardKind.Item
+                && canHandleOp(StateOps.SelectItem)
+            )
             {
                 // Enumerate legal placements (same logic as in BuildSelectionOptions but authoritative)
                 int size = BazaarAgentCardSize.Parse(offer.Size, fallback: 0);

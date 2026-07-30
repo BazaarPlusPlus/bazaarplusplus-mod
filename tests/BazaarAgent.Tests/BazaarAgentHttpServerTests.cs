@@ -19,7 +19,11 @@ public sealed class BazaarAgentHttpServerTests
         var session = Assert.Single(first.Headers.GetValues(BazaarAgentProtocolV3.SessionHeader));
         var firstJson = JObject.Parse(await first.Content.ReadAsStringAsync());
         Assert.True(firstJson.Value<bool>("full"));
-        Assert.Equal("i00001", firstJson["board"]!["upsert"]![0]!["id"]!.Value<string>());
+        Assert.NotNull(firstJson["selection"]);
+        Assert.Equal(
+            "Test Item#00001",
+            firstJson["board"]!["upsert"]![0]!["item"]!.Value<string>()
+        );
         Assert.Null(firstJson["schemaVersion"]);
         Assert.Null(firstJson["cardKnowledge"]);
 
@@ -34,8 +38,9 @@ public sealed class BazaarAgentHttpServerTests
         var nextJson = JObject.Parse(await next.Content.ReadAsStringAsync());
 
         Assert.Null(nextJson["full"]);
+        Assert.Null(nextJson["selection"]);
         Assert.Equal(2UL, nextJson.Value<ulong>("revision"));
-        Assert.Equal("i00001", nextJson["board"]!["upsert"]![0]!["id"]!.Value<string>());
+        Assert.Equal("Test Item#00001", nextJson["board"]!["upsert"]![0]!["item"]!.Value<string>());
         Assert.Equal(1, nextJson["board"]!["upsert"]![0]!["slots"]![0]!.Value<int>());
     }
 
@@ -155,7 +160,7 @@ public sealed class BazaarAgentHttpServerTests
             http,
             fixture.Port,
             session,
-            "{\"op\":\"select\",\"id\":\"i00001\",\"target\":\"board\",\"revision\":1}"
+            "{\"op\":\"select\",\"id\":\"Offer#00001\",\"target\":\"board\",\"revision\":1}"
         );
         Assert.Equal(HttpStatusCode.Conflict, invalid.StatusCode);
 
@@ -163,7 +168,7 @@ public sealed class BazaarAgentHttpServerTests
             http,
             fixture.Port,
             session,
-            "{\"op\":\"select\",\"id\":\"i00001\",\"target\":\"chest\",\"revision\":1}"
+            "{\"op\":\"select\",\"id\":\"Offer#00001\",\"target\":\"chest\",\"revision\":1}"
         );
         var pending = await Dequeue(fixture.Queue);
         Assert.Equal(BazaarAgentActionKind.SelectItem, pending.Command.ActionKind);

@@ -1273,11 +1273,10 @@ public class CoreLayeringTests
         );
     }
 
-    // External battle video recording depends on replays staying in the
-    // finishedAwaitingContinue phase until an explicit POST /v1/replay/continue: the recording
-    // only finalizes (moov atom) when ReplayState.Exit() runs, and the exit timing belongs to the
-    // external orchestrator. The host must therefore never exit ReplayState from its tick — the
-    // single allowed programmatic exit lives in CombatReplayRuntime.TryContinueReplay.
+    // Replays stay in the finishedAwaitingContinue phase until the V3 Continue action: the
+    // recording only finalizes (moov atom) when ReplayState.Exit() runs. The host must therefore
+    // never exit ReplayState from its tick — the single allowed programmatic exit lives in
+    // CombatReplayRuntime.TryContinueReplay.
     [Fact]
     public void BazaarAgentHost_never_exits_replay_state_and_main_mod_exits_only_via_continue()
     {
@@ -1297,8 +1296,8 @@ public class CoreLayeringTests
         }
         Assert.True(
             hostViolations.Count == 0,
-            "BazaarAgentHost must never exit ReplayState (snapshot ticks would race the external "
-                + "POST /v1/replay/continue and orphan in-flight recordings). Offending code:\n"
+            "BazaarAgentHost must never exit ReplayState (snapshot ticks would race the V3 "
+                + "Continue action and orphan in-flight recordings). Offending code:\n"
                 + string.Join("\n", hostViolations)
         );
 

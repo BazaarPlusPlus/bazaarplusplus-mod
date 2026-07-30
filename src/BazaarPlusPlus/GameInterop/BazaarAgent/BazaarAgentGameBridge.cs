@@ -18,6 +18,17 @@ public static class BazaarAgentGameBridge
     /// combat-replay runtime behind it is attached after this is published.</summary>
     public static IBazaarAgentReplayRecorder? CurrentRecorder { get; internal set; }
 
+    /// <summary>The dynamic encounter-preview facade for agent decision descriptions, or
+    /// <c>null</c> when BazaarPlusPlus has not initialized or has been disposed.</summary>
+    public static IBazaarAgentEncounterPreview? CurrentEncounterPreview { get; internal set; }
+
+    /// <summary>The pre-combat monster-board preview shown by native PvE encounter tooltips.</summary>
+    public static IBazaarAgentCombatEncounterPreview? CurrentCombatEncounterPreview
+    {
+        get;
+        internal set;
+    }
+
     /// <summary>One-shot live-combat summary handoff for the BazaarAgent host.</summary>
     public static IBazaarAgentBattleSummarySource? CurrentBattleSummarySource { get; internal set; }
 }

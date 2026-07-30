@@ -136,21 +136,4 @@ public class BazaarAgentCommandQueueTests
         q.TryDequeue()!.SetResponse(new BazaarAgentServerResponse(200, "{}"));
         await task;
     }
-
-    [Fact]
-    public async Task ReplayCommandPayload_RoundTripsThroughQueue()
-    {
-        var q = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(5_000);
-        var payload = new byte[] { 1, 2, 3 };
-        var task = q.EnqueueAndAwaitAsync(
-            RequestId,
-            new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, payload, "b-1")
-        );
-        var pending = q.TryDequeue()!;
-        Assert.Equal(BazaarAgentReplayControlKind.Start, pending.Command.Kind);
-        Assert.Equal(payload, pending.Command.Payload);
-        Assert.Equal("b-1", pending.Command.BattleId);
-        pending.SetResponse(new BazaarAgentServerResponse(202, "{}"));
-        Assert.Equal(202, (await task).HttpStatus);
-    }
 }
