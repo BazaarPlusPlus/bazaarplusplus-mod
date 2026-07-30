@@ -169,7 +169,10 @@ export class TimelineCanvasController {
         .filter((cluster): cluster is TimelineCluster => cluster !== null),
     );
     this.visualClusters = buildVisualClusters(this.clusters);
-    this.markerClusters = layoutTimelineMarkers(this.visualClusters);
+    this.markerClusters = layoutTimelineMarkers(
+      this.visualClusters,
+      this.laneHeight,
+    );
     const criticalMarkerCount = this.markerClusters.filter((cluster) =>
       cluster.events.some(
         (event) =>

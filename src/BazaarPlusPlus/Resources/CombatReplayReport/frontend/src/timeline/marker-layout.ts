@@ -1,7 +1,15 @@
 import type { TimelineCluster } from "./clusters.ts";
-import { EVENT_HIT_RADIUS } from "./constants.ts";
+import {
+  LANE_HEIGHT,
+  TIMELINE_MARKER_SIZE,
+} from "./constants.ts";
 
-const DENSE_GROUP_MAX_GAP = EVENT_HIT_RADIUS * 2 + 12;
+const MARKER_HALF_SIZE = TIMELINE_MARKER_SIZE / 2;
+// Critical and defeat markers draw a small trailing `!` / `×` outside the
+// native icon box. Reserve its full visual footprint when reusing a row.
+const MARKER_DECORATION_RIGHT_EXTENT = 16;
+const MARKER_LANE_PADDING = 4;
+const MAX_NORMAL_SIZE_ROWS = 4;
 const TOKEN_PRIORITY: Readonly<Record<string, number>> = {
   damageDirect: 0,
   damage: 1,
@@ -25,50 +33,100 @@ interface MarkerSlot {
   sizeCap: number;
 }
 
-function denseMarkerSlots(count: number): MarkerSlot[] {
-  if (count === 2) {
-    return [
-      { y: -15, sizeCap: 18 },
-      { y: 15, sizeCap: 18 },
-    ];
-  }
-  if (count === 3) {
-    return [
-      { y: -17, sizeCap: 14 },
-      { y: 0, sizeCap: 14 },
-      { y: 17, sizeCap: 14 },
-    ];
-  }
-  if (count === 4) {
-    return [-19, -6, 6, 19].map((y) => ({ y, sizeCap: 11 }));
-  }
-  if (count === 5) {
-    return [-20, -10, 0, 10, 20].map((y) => ({ y, sizeCap: 9 }));
-  }
+interface MarkerPlacement {
+  cluster: TimelineCluster;
+  row: number;
+}
 
-  const stackSpan = 42;
-  const step = stackSpan / Math.max(1, count - 1);
-  const sizeCap = Math.max(7, Math.min(9, Math.floor(step - 1)));
+export interface MarkerHorizontalBounds {
+  left: number;
+  right: number;
+}
+
+function hasTrailingDecoration(cluster: TimelineCluster): boolean {
+  return cluster.token === "defeat"
+    || (cluster.events?.some(
+      (event) =>
+        event.isCritical
+        && event.kind.toLowerCase() === "effect-executed",
+    ) ?? false);
+}
+
+export function markerHorizontalBounds(
+  cluster: TimelineCluster,
+): MarkerHorizontalBounds {
+  return {
+    left: cluster.x - MARKER_HALF_SIZE,
+    right: cluster.x
+      + (hasTrailingDecoration(cluster)
+        ? MARKER_DECORATION_RIGHT_EXTENT
+        : MARKER_HALF_SIZE),
+  };
+}
+
+function markerSlots(
+  count: number,
+  laneHeight: number,
+): MarkerSlot[] {
+  const preserveNormalSize = count <= MAX_NORMAL_SIZE_ROWS;
+  // Four 14px boxes need the full 52px lane. Their visual content overlaps by
+  // about one pixel, which is less disruptive than shrinking an isolated burst.
+  const lanePadding =
+    preserveNormalSize && count === MAX_NORMAL_SIZE_ROWS
+      ? 0
+      : MARKER_LANE_PADDING;
+  const usableHeight = Math.max(
+    1,
+    laneHeight - lanePadding * 2,
+  );
+  const sizeCap = preserveNormalSize
+    ? TIMELINE_MARKER_SIZE
+    : Math.max(
+      1,
+      Math.min(
+        TIMELINE_MARKER_SIZE,
+        Math.floor(usableHeight / Math.max(1, count)),
+      ),
+    );
+  if (count <= 1) return [{ y: 0, sizeCap }];
+
+  const span = Math.max(0, usableHeight - sizeCap);
+  const step = span / (count - 1);
   return Array.from({ length: count }, (_, index) => ({
-    y: -stackSpan / 2 + index * step,
+    y: -span / 2 + index * step,
     sizeCap,
   }));
 }
 
-function layoutDenseGroup(
-  group: readonly TimelineCluster[],
+function layoutCollisionComponent(
+  component: readonly TimelineCluster[],
+  laneHeight: number,
 ): void {
-  const anchorY = group[0]?.y ?? 0;
-  const slots = denseMarkerSlots(group.length);
-  group.forEach((cluster, index) => {
+  const placements: MarkerPlacement[] = [];
+  const rowRightEdges: number[] = [];
+
+  for (const cluster of component) {
+    const bounds = markerHorizontalBounds(cluster);
+    let row = rowRightEdges.findIndex(
+      (rightEdge) => bounds.left >= rightEdge,
+    );
+    if (row < 0) row = rowRightEdges.length;
+    rowRightEdges[row] = bounds.right;
+    placements.push({ cluster, row });
+  }
+
+  const anchorY = component[0]?.y ?? 0;
+  const slots = markerSlots(rowRightEdges.length, laneHeight);
+  for (const { cluster, row } of placements) {
     cluster.markerX = cluster.x;
-    cluster.markerY = anchorY + slots[index].y;
-    cluster.markerSizeCap = slots[index].sizeCap;
-  });
+    cluster.markerY = anchorY + slots[row].y;
+    cluster.markerSizeCap = slots[row].sizeCap;
+  }
 }
 
 export function layoutTimelineMarkers(
   clusters: readonly TimelineCluster[],
+  laneHeight = LANE_HEIGHT,
 ): TimelineCluster[] {
   const laneGroups = new Map<number, TimelineCluster[]>();
   for (const cluster of clusters) {
@@ -89,25 +147,31 @@ export function layoutTimelineMarkers(
           - (TOKEN_PRIORITY[right.token] ?? 99)
         || left.token.localeCompare(right.token),
     );
-    let group: TimelineCluster[] = [];
-    let previousX = 0;
+    let component: TimelineCluster[] = [];
+    let componentRightEdge = 0;
     const flush = (): void => {
-      if (group.length > 1) layoutDenseGroup(group);
-      group = [];
+      if (component.length > 0) {
+        layoutCollisionComponent(component, laneHeight);
+      }
+      component = [];
     };
     for (const cluster of lane) {
-      if (group.length === 0) {
-        previousX = cluster.x;
-        group.push(cluster);
+      const bounds = markerHorizontalBounds(cluster);
+      if (component.length === 0) {
+        componentRightEdge = bounds.right;
+        component.push(cluster);
         continue;
       }
-      if (cluster.x - previousX <= DENSE_GROUP_MAX_GAP) {
-        group.push(cluster);
+      if (bounds.left < componentRightEdge) {
+        component.push(cluster);
       } else {
         flush();
-        group.push(cluster);
+        component.push(cluster);
       }
-      previousX = cluster.x;
+      componentRightEdge = Math.max(
+        componentRightEdge,
+        bounds.right,
+      );
     }
     flush();
   }

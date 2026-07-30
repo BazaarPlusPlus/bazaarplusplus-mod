@@ -21,6 +21,7 @@ import {
   MAX_TIMELINE_WIDTH,
   MIN_TIMELINE_WIDTH,
   TIMELINE_BASE_DENSITY,
+  TIMELINE_MARKER_SIZE,
   timelineWidthAtZoom,
 } from "../src/timeline/constants.ts";
 import {
@@ -69,8 +70,10 @@ import {
 import {
   criticalIndicatorOffset,
   heroHealthAreaGeometry,
+  markerGlyphFontSize,
   markerImageBounds,
   markerPoint,
+  markerRenderSize,
 } from "../src/timeline/event-drawing.ts";
 import { layoutTimelineMarkers } from "../src/timeline/marker-layout.ts";
 import {
@@ -1712,16 +1715,16 @@ test("dense timeline markers use distinct laid-out hit targets", () => {
   assert.deepEqual(
     Array.from(new Set(points.map(({ y }) => y))).sort((a, b) => a - b),
     [
-      laneCenter - 20,
-      laneCenter - 10,
+      laneCenter - 18,
+      laneCenter - 9,
       laneCenter,
-      laneCenter + 10,
-      laneCenter + 20,
+      laneCenter + 9,
+      laneCenter + 18,
     ],
   );
   assert.deepEqual(
     markers.map(({ markerSizeCap }) => markerSizeCap),
-    [9, 9, 9, 9, 9],
+    [8, 8, 8, 8, 8],
   );
   assert.deepEqual(
     points.map(({ x }) => x),
@@ -1747,11 +1750,15 @@ test("timeline marker stacks enumerate density without changing event time", () 
     { id: "target", type: "hero" },
   ];
   const expected = [
-    { count: 1, offsets: [0], sizeCaps: [undefined] },
-    { count: 2, offsets: [-15, 15], sizeCaps: [18, 18] },
-    { count: 3, offsets: [-17, 0, 17], sizeCaps: [14, 14, 14] },
-    { count: 4, offsets: [-19, -6, 6, 19], sizeCaps: [11, 11, 11, 11] },
-    { count: 5, offsets: [-20, -10, 0, 10, 20], sizeCaps: [9, 9, 9, 9, 9] },
+    { count: 1, offsets: [0], sizeCaps: [14] },
+    { count: 2, offsets: [-15, 15], sizeCaps: [14, 14] },
+    { count: 3, offsets: [-15, 0, 15], sizeCaps: [14, 14, 14] },
+    {
+      count: 4,
+      offsets: [-19, -6.333, 6.333, 19],
+      sizeCaps: [14, 14, 14, 14],
+    },
+    { count: 5, offsets: [-18, -9, 0, 9, 18], sizeCaps: [8, 8, 8, 8, 8] },
   ];
   const actions = [
     "PlayerDamage",
@@ -1792,7 +1799,9 @@ test("timeline marker stacks enumerate density without changing event time", () 
       visual.map(({ x }) => x),
     );
     assert.deepEqual(
-      points.map(({ y }) => y - laneCenter),
+      points.map(({ y }) =>
+        Math.round((y - laneCenter) * 1_000) / 1_000
+      ),
       offsets,
     );
     assert.deepEqual(
@@ -1802,7 +1811,7 @@ test("timeline marker stacks enumerate density without changing event time", () 
   }
 });
 
-test("timeline marker stacks follow adjacent visual collisions transitively", () => {
+test("timeline marker rows reuse space across transitive collision chains", () => {
   const clusters = [
     {
       lane: 0,
@@ -1811,12 +1820,12 @@ test("timeline marker stacks follow adjacent visual collisions transitively", ()
       x: 100,
       y: 52,
     },
-    { lane: 0, token: "burn", x: 148, y: 52 },
+    { lane: 0, token: "burn", x: 112, y: 52 },
     {
       lane: 0,
       statusRange: {},
       token: "slow",
-      x: 196,
+      x: 124,
       y: 52,
     },
   ];
@@ -1824,11 +1833,11 @@ test("timeline marker stacks follow adjacent visual collisions transitively", ()
 
   assert.deepEqual(
     markers.map(({ markerX }) => markerX),
-    [100, 148, 196],
+    [100, 112, 124],
   );
   assert.deepEqual(
     markers.map(({ markerY }) => markerY),
-    [35, 52, 69],
+    [37, 67, 37],
   );
   assert.deepEqual(
     markers.map(({ markerSizeCap }) => markerSizeCap),
@@ -1836,7 +1845,98 @@ test("timeline marker stacks follow adjacent visual collisions transitively", ()
   );
 });
 
-test("timeline marker stacks bound six-or-more density to the lane height", () => {
+test("timeline marker rows include trailing critical and defeat decorations", () => {
+  const criticalEvent = {
+    kind: "effect-executed",
+    isCritical: true,
+  };
+  const criticalMarkers = layoutTimelineMarkers([
+    {
+      lane: 0,
+      token: "damageDirect",
+      events: [criticalEvent],
+      x: 100,
+      y: 52,
+    },
+    {
+      lane: 0,
+      token: "shield",
+      events: [],
+      x: 114,
+      y: 52,
+    },
+  ]);
+  const defeatMarkers = layoutTimelineMarkers([
+    {
+      lane: 0,
+      token: "defeat",
+      events: [],
+      x: 100,
+      y: 52,
+    },
+    {
+      lane: 0,
+      token: "shield",
+      events: [],
+      x: 114,
+      y: 52,
+    },
+  ]);
+
+  assert.notEqual(
+    criticalMarkers[0].markerY,
+    criticalMarkers[1].markerY,
+  );
+  assert.notEqual(
+    defeatMarkers[0].markerY,
+    defeatMarkers[1].markerY,
+  );
+  assert.deepEqual(
+    criticalMarkers.map(({ markerX }) => markerX),
+    [100, 114],
+  );
+  assert.deepEqual(
+    defeatMarkers.map(({ markerX }) => markerX),
+    [100, 114],
+  );
+});
+
+test("timeline marker hit testing keeps a trailing decoration with its event", () => {
+  const decorated = {
+    lane: 0,
+    token: "damageDirect",
+    events: [
+      {
+        kind: "effect-executed",
+        isCritical: true,
+      },
+    ],
+    x: 100,
+    y: 52,
+  };
+  const adjacent = {
+    lane: 0,
+    token: "shield",
+    events: [],
+    x: 123,
+    y: 52,
+  };
+  const markers = layoutTimelineMarkers([decorated, adjacent]);
+
+  assert.equal(markers[0].markerY, markers[1].markerY);
+  assert.equal(
+    hitTestTimelineClusters({
+      x: 115.5,
+      y: 48,
+      hitIndex: createHitIndex(markers),
+      visualClusters: markers,
+      laneHeight: 52,
+    }),
+    decorated,
+  );
+});
+
+test("timeline marker rows bound six-way density without overlap", () => {
   const clusters = Array.from({ length: 6 }, (_, index) => ({
     lane: 0,
     token: `token-${index}`,
@@ -1846,13 +1946,16 @@ test("timeline marker stacks bound six-or-more density to the lane height", () =
   const markers = layoutTimelineMarkers(clusters);
   const offsets = markers.map(({ markerY }) => markerY - 52);
 
-  assert.equal(offsets[0], -21);
-  assert.equal(offsets.at(-1), 21);
+  assert.equal(offsets[0], -18.5);
+  assert.equal(offsets.at(-1), 18.5);
   assert.equal(new Set(offsets).size, 6);
   assert.deepEqual(
     markers.map(({ markerSizeCap }) => markerSizeCap),
     [7, 7, 7, 7, 7, 7],
   );
+  for (let index = 1; index < offsets.length; index += 1) {
+    assert.ok(offsets[index] - offsets[index - 1] >= 7);
+  }
 });
 
 test("native timeline markers preserve their aspect ratio around the center", () => {
@@ -1867,6 +1970,15 @@ test("native timeline markers preserve their aspect ratio around the center", ()
   assert.ok(Math.abs(portrait.width - 13.517241379310345) < 0.000001);
   assert.equal(portrait.x, -portrait.width / 2);
   assert.equal(portrait.y, -7);
+});
+
+test("timeline marker renderers share one normal size and honor dense caps", () => {
+  for (const tier of [1, 2, 3]) {
+    assert.equal(markerRenderSize({ tier }), TIMELINE_MARKER_SIZE);
+  }
+  assert.equal(markerRenderSize({ markerSizeCap: 8 }), 8);
+  assert.equal(markerGlyphFontSize(8, 14), 8);
+  assert.equal(markerGlyphFontSize(14, 12), 12);
 });
 
 test("hero health areas use side-local peaks and step geometry", () => {

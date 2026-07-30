@@ -8,7 +8,10 @@ import {
   type ThemeColorName,
 } from "../styles/theme.ts";
 import { beginLogicalDraw, resizeLogicalCanvas } from "./canvas.ts";
-import { TIME_RULER_HEIGHT } from "./constants.ts";
+import {
+  TIME_RULER_HEIGHT,
+  TIMELINE_MARKER_SIZE,
+} from "./constants.ts";
 import {
   shouldDrawTimelinePreview,
   TIMELINE_LEFT_GUTTER,
@@ -121,6 +124,22 @@ export function markerPoint(
   };
 }
 
+export function markerRenderSize(
+  cluster: Pick<TimelineCluster, "markerSizeCap" | "tier">,
+): number {
+  return Math.min(
+    TIMELINE_MARKER_SIZE,
+    cluster.markerSizeCap ?? TIMELINE_MARKER_SIZE,
+  );
+}
+
+export function markerGlyphFontSize(
+  markerSize: number,
+  baseFontSize: number,
+): number {
+  return Math.min(markerSize, baseFontSize);
+}
+
 export function criticalIndicatorOffset(
   markerSize: number,
 ): { x: number; y: number } {
@@ -137,12 +156,7 @@ export function drawMarker(
   selected: boolean,
   requestDraw: () => void,
 ): void {
-  const tier = cluster.tier ?? 2;
-  const baseMarkerSize = tier === 1 ? 18 : tier === 3 ? 11 : 14;
-  const markerSize = Math.min(
-    baseMarkerSize,
-    cluster.markerSizeCap ?? baseMarkerSize,
-  );
+  const markerSize = markerRenderSize(cluster);
   const color = markerColor(cluster.token);
   const marker = markerPoint(cluster);
   context.save();
@@ -180,12 +194,10 @@ export function drawMarker(
       context.strokeRect(-half, -half, half * 2, half * 2);
     }
   } else {
-    const fontSize =
-      tier === 1
-        ? themeLengthPx("--bpp-text-body")
-        : tier === 3
-          ? themeLengthPx("--bpp-text-nano")
-          : themeLengthPx("--bpp-text-compact");
+    const fontSize = markerGlyphFontSize(
+      markerSize,
+      themeLengthPx("--bpp-text-compact"),
+    );
     context.font = `700 ${fontSize}px ${themeValue("--bpp-font-sans")}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
@@ -206,7 +218,7 @@ export function drawMarker(
     )
   ) {
     const indicator = criticalIndicatorOffset(markerSize);
-    const fontSize = Math.max(8, Math.round(markerSize * 0.58));
+    const fontSize = Math.max(5, Math.round(markerSize * 0.58));
     context.font = `700 ${fontSize}px ${themeValue("--bpp-font-sans")}`;
     context.textAlign = "center";
     context.textBaseline = "middle";
@@ -219,7 +231,7 @@ export function drawMarker(
   }
   if (cluster.token === "defeat" && image) {
     const indicator = criticalIndicatorOffset(markerSize);
-    const fontSize = Math.max(8, Math.round(markerSize * 0.62));
+    const fontSize = Math.max(5, Math.round(markerSize * 0.62));
     context.font = `700 ${fontSize}px ${themeValue("--bpp-font-sans")}`;
     context.textAlign = "center";
     context.textBaseline = "middle";

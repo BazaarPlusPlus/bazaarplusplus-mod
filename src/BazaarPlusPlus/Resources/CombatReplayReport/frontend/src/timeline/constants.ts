@@ -6,6 +6,7 @@ export const MIN_TIMELINE_WIDTH = 840;
 export const MAX_TIMELINE_WIDTH = 32_000;
 export const TIMELINE_BASE_DENSITY = 2;
 export const EVENT_HIT_RADIUS = 20;
+export const TIMELINE_MARKER_SIZE = 14;
 
 export function timelineWidthAtZoom(
   baseWidth: number,
