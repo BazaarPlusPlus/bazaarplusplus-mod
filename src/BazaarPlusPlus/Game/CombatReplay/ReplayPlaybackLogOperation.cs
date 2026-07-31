@@ -68,6 +68,7 @@ internal sealed class ReplayPlaybackLogOperation : IReplayPlaybackOutcomeSink
     }
 
     public string BattleId { get; }
+    internal bool RecordVideo => _recordVideo;
 
     internal bool IsTerminal
     {

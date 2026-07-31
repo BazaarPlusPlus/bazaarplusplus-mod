@@ -207,28 +207,35 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
         if (!visible)
             return;
 
-        _button.interactable = nativeActionsBound && (snapshot.CanStart || snapshot.CanReveal);
+        _button.interactable = snapshot.CanReveal || (nativeActionsBound && snapshot.CanStart);
         ApplyIcon(snapshot.Phase);
     }
 
     private void OnClicked()
     {
         var runtime = CombatReplayRuntime.Instance;
+        if (runtime == null)
+            return;
+
+        var snapshot = runtime.GetCurrentReplayRecordingSnapshot();
+        if (snapshot.CanReveal)
+        {
+            runtime.TryRevealCurrentReplayVideo(out _);
+            Refresh();
+            return;
+        }
+
         var nativeReplayButton = _nativeReplayButton;
         var nativeRecapButton = _nativeRecapButton;
         var nativeRecapBackButton = _nativeRecapBackButton;
         if (
-            runtime == null
-            || nativeReplayButton == null
+            nativeReplayButton == null
             || nativeRecapButton == null
             || nativeRecapBackButton == null
         )
             return;
 
-        var snapshot = runtime.GetCurrentReplayRecordingSnapshot();
-        if (snapshot.CanReveal)
-            runtime.TryRevealCurrentReplayVideo(out _);
-        else if (snapshot.CanStart)
+        if (snapshot.CanStart)
             runtime.TryStartCurrentReplayRecording(
                 nativeReplayButton.onClick.Invoke,
                 nativeRecapButton.onClick.Invoke,

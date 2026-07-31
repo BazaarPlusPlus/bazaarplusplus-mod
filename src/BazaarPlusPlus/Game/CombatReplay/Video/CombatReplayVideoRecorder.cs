@@ -1342,7 +1342,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             // it stays visible just like in a normal replay, so it is captured into the MP4 (the
             // recorder uses full-screen ScreenCapture). The remaining BPP overlays stay suppressed
             // to keep them out of the recording.
-            return BppUiChromeSuppression.Begin(BppUiChromeSuppressionMode.ReplayRecording);
+            return UiSuppressionScope.Begin(
+                () => BppUiChromeSuppression.Begin(BppUiChromeSuppressionMode.ReplayRecording),
+                ReplayRecordingHoverSuppression.Begin
+            );
         }
         catch (Exception ex)
         {

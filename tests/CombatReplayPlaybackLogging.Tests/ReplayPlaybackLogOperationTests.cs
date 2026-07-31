@@ -14,6 +14,7 @@ public sealed class ReplayPlaybackLogOperationTests
     {
         var operation = CreateOperation(recordVideo: true);
 
+        Assert.True(operation.RecordVideo);
         Assert.True(operation.TryMarkStarted(out var started));
         Assert.False(operation.TryMarkStarted(out _));
 
@@ -26,6 +27,7 @@ public sealed class ReplayPlaybackLogOperationTests
     public void Concurrent_start_attempts_produce_one_started_result()
     {
         var operation = CreateOperation();
+        Assert.False(operation.RecordVideo);
         var starts = new ConcurrentBag<ReplayPlaybackStartedResult>();
 
         Parallel.For(

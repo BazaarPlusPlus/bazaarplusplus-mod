@@ -2229,6 +2229,29 @@ public class CoreLayeringTests
         var runtimeSource = File.ReadAllText(
             Path.Combine(mainSource, "Game", "CombatReplay", "CombatReplayRuntime.cs")
         );
+        var videoRecorderSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CombatReplay",
+                "Video",
+                "CombatReplayVideoRecorder.cs"
+            )
+        );
+        var readinessSource = File.ReadAllText(
+            Path.Combine(
+                mainSource,
+                "Game",
+                "CombatReplay",
+                "CurrentReplayPresentationReadiness.cs"
+            )
+        );
+        var simulationPatchSource = File.ReadAllText(
+            Path.Combine(mainSource, "Patches", "Combat", "CombatSimulationPatches.cs")
+        );
+        var hoverPatchSource = File.ReadAllText(
+            Path.Combine(mainSource, "Patches", "Combat", "ReplayRecordingHoverPatches.cs")
+        );
         var projectSource = File.ReadAllText(Path.Combine(mainSource, "BazaarPlusPlus.csproj"));
 
         Assert.Contains("typeof(FightMenuDialog)", patchSource);
@@ -2255,9 +2278,28 @@ public class CoreLayeringTests
         Assert.Contains("BindNativeActions(", controllerSource);
         Assert.Contains("nativeRecapButton.onClick.Invoke", controllerSource);
         Assert.Contains("nativeRecapBackButton.onClick.Invoke", controllerSource);
-        Assert.Contains("_button.interactable = nativeActionsBound", controllerSource);
-        Assert.Contains("\"RecapButton\"", patchSource);
+        Assert.Contains(
+            "_button.interactable = snapshot.CanReveal || (nativeActionsBound && snapshot.CanStart)",
+            controllerSource
+        );
+        Assert.Contains("GetManagedReplayRecordingSnapshot()", runtimeSource);
+        Assert.Contains("_activePlaybackOperation?.RecordVideo == true", runtimeSource);
+        Assert.Contains("_managedRecordingCompleted = completed;", runtimeSource);
+        Assert.Contains("var snapshot = GetCurrentReplayRecordingSnapshot();", runtimeSource);
+        Assert.Contains("CanStart: false", runtimeSource);
+        Assert.True(
+            controllerSource.IndexOf("if (snapshot.CanReveal)", StringComparison.Ordinal)
+                < controllerSource.IndexOf(
+                    "var nativeReplayButton = _nativeReplayButton;",
+                    StringComparison.Ordinal
+                )
+        );
         Assert.Contains("\"BackButton\"", patchSource);
+        Assert.Contains("\"RecapButton\"", patchSource);
+        Assert.Contains(
+            "CombatReplayRuntime.Instance?.BindNativeRecapAction(recapButton.onClick.Invoke)",
+            patchSource
+        );
         Assert.Contains("StartCurrentReplayAfterRecapClosed", runtimeSource);
         Assert.Contains(
             "boardManager.IsRecapViewOpen || boardManager.StorageMoving",
@@ -2268,27 +2310,64 @@ public class CoreLayeringTests
             "!boardManager.IsRecapViewOpen && !boardManager.StorageMoving",
             runtimeSource
         );
-        Assert.Contains("invokeNativeRecap();", runtimeSource);
-        Assert.Contains("Singleton<BoardManager>.Instance?.IsRecapViewOpen != true", runtimeSource);
-        Assert.Contains("\"native-recap-not-started\"", runtimeSource);
         Assert.Contains("\"native-replay-invoke-failed\"", runtimeSource);
         Assert.Contains("\"native-recap-close-timeout\"", runtimeSource);
         Assert.Contains("CancelArmedCurrentReplay(recordingId, endReason)", runtimeSource);
-        Assert.Contains("CurrentReplayRecapPostRollSeconds = 3f", runtimeSource);
+        Assert.Contains("Action invokeNativeRecap,", runtimeSource);
+        Assert.Contains("_invokeRecordedReplayRecap = invokeNativeRecap;", runtimeSource);
+        Assert.Contains("_activePlaybackOperation?.RecordVideo == true", runtimeSource);
         Assert.Contains(
-            "new WaitForSecondsRealtime(CurrentReplayRecapPostRollSeconds)",
+            "CompleteRecordedReplayAfterRecapSettles(currentNativeRecording)",
             runtimeSource
         );
-        Assert.Contains("\"native-replay-recap-post-roll-ended\"", runtimeSource);
+        Assert.Contains("invokeNativeRecap();", runtimeSource);
+        Assert.Contains("native-recap-not-started", runtimeSource);
+        Assert.Contains("CurrentReplayTerminalHoldSeconds = 2f", runtimeSource);
+        Assert.Contains("CurrentReplayRecapStableHoldSeconds = 1f", runtimeSource);
+        Assert.Contains(
+            "new WaitForSecondsRealtime(CurrentReplayTerminalHoldSeconds)",
+            runtimeSource
+        );
+        Assert.Contains(
+            "new WaitForSecondsRealtime(CurrentReplayRecapStableHoldSeconds)",
+            runtimeSource
+        );
+        Assert.Contains("recapTransitionObserved |= boardManager.StorageMoving", runtimeSource);
+        Assert.Contains("!boardManager.StorageMoving && !AppState.BlockInput", runtimeSource);
+        Assert.Contains("\"native-recap-transition-timeout\"", runtimeSource);
+        Assert.Contains("\"native-replay-recap-stable-hold-ended\"", runtimeSource);
+        Assert.DoesNotContain("completion.TrySetCanceled", runtimeSource);
         Assert.Contains("Replay recording is still capturing the recap.", runtimeSource);
-        Assert.DoesNotContain("PublishEnded(\"native-replay-ended\"", runtimeSource);
+        Assert.Contains("BeginCurrentReplayRecordingAtPresentationBoundary();", runtimeSource);
+        Assert.Contains(
+            "simulation = handler.Simulate(message, cancellationToken);",
+            runtimeSource
+        );
         Assert.True(
-            runtimeSource.IndexOf("invokeNativeRecap();", StringComparison.Ordinal)
+            runtimeSource.IndexOf(
+                "simulation = handler.Simulate(message, cancellationToken);",
+                StringComparison.Ordinal
+            )
                 < runtimeSource.IndexOf(
-                    "new WaitForSecondsRealtime(CurrentReplayRecapPostRollSeconds)",
+                    "new WaitForSecondsRealtime(CurrentReplayTerminalHoldSeconds)",
                     StringComparison.Ordinal
                 )
         );
+        Assert.Contains("TryDeferCurrentReplaySimulation(", simulationPatchSource);
+        Assert.Contains(
+            "BppPatchHost.Services.EventBus.Publish(new CombatSimObserved",
+            simulationPatchSource
+        );
+        Assert.DoesNotContain("ReplayRecordingMotionSuppression", simulationPatchSource);
+        Assert.DoesNotContain("ReturnToNormalSpeed", simulationPatchSource);
+        Assert.Contains("ExpectedSkillCount", readinessSource);
+        Assert.Contains("RegisteredSkillCount", readinessSource);
+        Assert.Contains("ReadySkillCount", readinessSource);
+        Assert.Contains("SkillIconCurrentTextureField", readinessSource);
+        Assert.Contains("ReplayRecordingHoverSuppression.Begin", videoRecorderSource);
+        Assert.Contains("ShowCardTooltipController", hoverPatchSource);
+        Assert.Contains("ShowSecondaryCardTooltipController", hoverPatchSource);
+        Assert.Contains("ShowAuxiliaryTooltipController", hoverPatchSource);
         Assert.Contains(
             "settingsButton.gameObject.AddComponent<CurrentReplayRecordingButtonController>()",
             controllerSource
