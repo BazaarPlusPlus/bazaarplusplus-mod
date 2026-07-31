@@ -94,7 +94,7 @@ public sealed class BazaarAgentBepInExLoggerTests
         adapter.Emit(
             BazaarAgentLogEvents.ActionFailed(
                 "01JABCDEFGHJKMNPQRSTVWXYZ",
-                BazaarAgentActionKind.Wait,
+                BazaarAgentActionKind.Continue,
                 BazaarAgentLogReasonCode.ActionProcessingException,
                 exception
             )
@@ -135,7 +135,7 @@ public sealed class BazaarAgentBepInExLoggerTests
         adapter.Emit(
             BazaarAgentLogEvents.ActionFailed(
                 "01JABCDEFGHJKMNPQRSTVWXYZ",
-                BazaarAgentActionKind.Wait,
+                BazaarAgentActionKind.Continue,
                 BazaarAgentLogReasonCode.ActionProcessingException,
                 exception
             )
@@ -270,7 +270,7 @@ public sealed class BazaarAgentBepInExLoggerTests
         adapter.Emit(
             BazaarAgentLogEvents.ActionFailed(
                 "12345678-first",
-                BazaarAgentActionKind.Wait,
+                BazaarAgentActionKind.Continue,
                 BazaarAgentLogReasonCode.ActionProcessingException,
                 exception
             )
@@ -278,7 +278,7 @@ public sealed class BazaarAgentBepInExLoggerTests
         adapter.Emit(
             BazaarAgentLogEvents.ActionFailed(
                 "12345678-second",
-                BazaarAgentActionKind.Wait,
+                BazaarAgentActionKind.Continue,
                 BazaarAgentLogReasonCode.ActionProcessingException,
                 exception
             )
@@ -286,7 +286,7 @@ public sealed class BazaarAgentBepInExLoggerTests
         adapter.Emit(
             BazaarAgentLogEvents.ActionFailed(
                 "12345678-first",
-                BazaarAgentActionKind.Wait,
+                BazaarAgentActionKind.Continue,
                 BazaarAgentLogReasonCode.ActionProcessingException,
                 exception
             )

@@ -87,7 +87,7 @@ public sealed class BazaarAgentLogStormGuardTests
             guard.Emit(
                 BazaarAgentLogEvents.ActionFailed(
                     "request-" + index,
-                    BazaarAgentActionKind.Wait,
+                    BazaarAgentActionKind.Continue,
                     BazaarAgentLogReasonCode.ActionProcessingException,
                     new InvalidOperationException("failure")
                 ),

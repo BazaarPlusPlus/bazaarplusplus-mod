@@ -54,6 +54,75 @@ public class BazaarAgentContextSnapshotTests
     }
 
     [Fact]
+    public void GetNextAfter_PreservesBothCombatBoundariesForAStalePoller()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var beforeCombat = pub.Publish(MakeChoice());
+        var opening = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.PvpCombat,
+                LastBattle = new BazaarAgentBattleSummary { Phase = "starting" },
+            }
+        );
+        var completed = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.Replay,
+                LastBattle = new BazaarAgentBattleSummary { Phase = "completed", Result = "win" },
+            }
+        );
+
+        Assert.Same(opening, pub.GetNextAfter(beforeCombat.TickId));
+        Assert.Same(completed, pub.GetNextAfter(opening.TickId));
+        Assert.Same(completed, pub.GetNextAfter(completed.TickId));
+    }
+
+    [Fact]
+    public void Publish_BattleSummary_IsStableUntilTheHostAcknowledgesIt()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var baseline = pub.Publish(MakeChoice());
+        var withBattle = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.Choice,
+                PlayerGold = 10,
+                LastBattle = new BazaarAgentBattleSummary
+                {
+                    BattleType = "pvp",
+                    Result = "win",
+                    Player = new BazaarAgentBattleCombatant
+                    {
+                        Attributes = new BazaarAgentBattleAttributes
+                        {
+                            Health = new BazaarAgentBattleValueChange { Start = 100, End = 80 },
+                            Shield = new BazaarAgentBattleValueChange { Start = 10, End = 0 },
+                        },
+                    },
+                },
+            }
+        );
+        var repeated = pub.Publish(
+            new BazaarAgentContext
+            {
+                StateName = BazaarAgentRunStateName.Choice,
+                PlayerGold = 10,
+                LastBattle = withBattle.Context.LastBattle,
+            }
+        );
+        var acknowledged = pub.Publish(MakeChoice());
+
+        Assert.Equal(1UL, baseline.TickId);
+        Assert.Equal(2UL, withBattle.TickId);
+        Assert.Same(withBattle, repeated);
+        Assert.Equal(3UL, acknowledged.TickId);
+        Assert.Equal("win", withBattle.Context.LastBattle?.Result);
+        Assert.Equal(-20, withBattle.Context.LastBattle?.Player.Attributes.Health?.Delta);
+        Assert.Null(acknowledged.Context.LastBattle);
+    }
+
+    [Fact]
     public void Publish_ReplayPhaseChange_BumpsTickIdAndClonesFields()
     {
         var pub = new BazaarAgentContextSnapshotPublisher();
@@ -168,6 +237,66 @@ public class BazaarAgentContextSnapshotTests
     }
 
     [Fact]
+    public void Publish_RunAndGameModeIdsAreIndependentAndCloned()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var first = pub.Publish(
+            new BazaarAgentContext { RunId = "run-1", GameModeId = "ranked-mode" }
+        );
+        var second = pub.Publish(
+            new BazaarAgentContext { RunId = "run-2", GameModeId = "ranked-mode" }
+        );
+
+        Assert.Equal("run-2", second.Context.RunId);
+        Assert.Equal("ranked-mode", second.Context.GameModeId);
+        Assert.NotEqual(first.TickId, second.TickId);
+    }
+
+    [Fact]
+    public void GameplayChange_IgnoresBusyCooldownAndAdvertisedActions()
+    {
+        var before = new BazaarAgentContext
+        {
+            StateName = BazaarAgentRunStateName.Choice,
+            PlayerGold = 10,
+            IsClientBusy = false,
+            ActionCooldownRemainingSeconds = 0,
+            AvailableActions = new[]
+            {
+                new BazaarAgentDecisionOption { ActionKind = BazaarAgentActionKind.Reroll },
+            },
+        };
+        var after = new BazaarAgentContext
+        {
+            StateName = BazaarAgentRunStateName.Choice,
+            PlayerGold = 10,
+            IsClientBusy = true,
+            ActionCooldownRemainingSeconds = 0.8,
+            AvailableActions = new[]
+            {
+                new BazaarAgentDecisionOption { ActionKind = BazaarAgentActionKind.Continue },
+            },
+        };
+
+        Assert.False(BazaarAgentContextSnapshotPublisher.HasGameplayStateChanged(before, after));
+    }
+
+    [Fact]
+    public void GameplayChange_DetectsInventoryMutation()
+    {
+        var before = new BazaarAgentContext
+        {
+            BoardItems = new[] { new BazaarAgentCardSnapshot { InstanceId = "item-1" } },
+        };
+        var after = new BazaarAgentContext
+        {
+            BoardItems = new[] { new BazaarAgentCardSnapshot { InstanceId = "item-2" } },
+        };
+
+        Assert.True(BazaarAgentContextSnapshotPublisher.HasGameplayStateChanged(before, after));
+    }
+
+    [Fact]
     public void Publish_DifferentStateName_BumpsTickId()
     {
         var pub = new BazaarAgentContextSnapshotPublisher();
@@ -233,16 +362,8 @@ public class BazaarAgentContextSnapshotTests
                     Type = "Item",
                     Tags = new[] { "Weapon" },
                     HiddenTags = new[] { "Damage" },
-                    Attributes = new Dictionary<string, int> { ["DamageAmount"] = 10 },
-                    ActiveAbilities = new[]
-                    {
-                        new BazaarAgentCardAbilitySnapshot
-                        {
-                            Id = "a1",
-                            Action = "TActionDamage",
-                            Trigger = "TTriggerOnCardFired",
-                        },
-                    },
+                    Description = "Deal 10 damage.",
+                    CooldownSeconds = 6,
                 },
             },
         };
@@ -257,16 +378,8 @@ public class BazaarAgentContextSnapshotTests
                     Type = "Item",
                     Tags = new[] { "Weapon" },
                     HiddenTags = new[] { "Damage" },
-                    Attributes = new Dictionary<string, int> { ["DamageAmount"] = 12 },
-                    ActiveAbilities = new[]
-                    {
-                        new BazaarAgentCardAbilitySnapshot
-                        {
-                            Id = "a1",
-                            Action = "TActionDamage",
-                            Trigger = "TTriggerOnCardFired",
-                        },
-                    },
+                    Description = "Deal 12 damage.",
+                    CooldownSeconds = 6,
                 },
             },
         };
@@ -275,6 +388,53 @@ public class BazaarAgentContextSnapshotTests
         var s2 = pub.Publish(changed);
 
         Assert.NotEqual(s1.TickId, s2.TickId);
+    }
+
+    [Fact]
+    public void Publish_InternalCardHintsAndActionCooldownDiffer_DoesNotBumpTickId()
+    {
+        var pub = new BazaarAgentContextSnapshotPublisher();
+        var first = new BazaarAgentContext
+        {
+            ActionCooldownRemainingSeconds = 1,
+            BoardItems = new[]
+            {
+                new BazaarAgentCardSnapshot
+                {
+                    InstanceId = "i1",
+                    Kind = BazaarAgentCardKind.Item,
+                    Description = "Deal 10 damage.",
+                    CanAfford = true,
+                    CanFit = true,
+                    CanSelect = true,
+                    CanSell = true,
+                    IsFree = true,
+                },
+            },
+        };
+        var second = new BazaarAgentContext
+        {
+            ActionCooldownRemainingSeconds = 0,
+            BoardItems = new[]
+            {
+                new BazaarAgentCardSnapshot
+                {
+                    InstanceId = "i1",
+                    Kind = BazaarAgentCardKind.Item,
+                    Description = "Deal 10 damage.",
+                    CanAfford = false,
+                    CanFit = false,
+                    CanSelect = false,
+                    CanSell = false,
+                    IsFree = false,
+                },
+            },
+        };
+
+        var s1 = pub.Publish(first);
+        var s2 = pub.Publish(second);
+
+        Assert.Equal(s1.TickId, s2.TickId);
     }
 
     [Fact]
@@ -288,7 +448,6 @@ public class BazaarAgentContextSnapshotTests
                 new BazaarAgentDecisionOption
                 {
                     ActionKind = BazaarAgentActionKind.MoveItem,
-                    Group = BazaarAgentActionGroup.Move,
                     DisplayKey = "MoveItem:i1",
                     CardInstanceId = "i1",
                     TargetSection = BazaarAgentTargetSection.Hand,
@@ -303,7 +462,6 @@ public class BazaarAgentContextSnapshotTests
                 new BazaarAgentDecisionOption
                 {
                     ActionKind = BazaarAgentActionKind.MoveItem,
-                    Group = BazaarAgentActionGroup.Move,
                     DisplayKey = "MoveItem:i1",
                     CardInstanceId = "i1",
                     TargetSection = BazaarAgentTargetSection.Hand,

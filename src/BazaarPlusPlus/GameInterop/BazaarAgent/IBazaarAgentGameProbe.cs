@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Core.GameState;
 
@@ -28,6 +29,15 @@ public interface IBazaarAgentGameProbe
 
     /// <summary>Returns the stable agent-facing id for a current runtime hero.</summary>
     string ToAgentHeroId(EHero hero);
+
+    /// <summary>Returns the server-assigned id for the current run, when initialized.</summary>
+    string? GetCurrentServerRunId();
+
+    /// <summary>Resolves a runtime card's native localized title with stable fallbacks.</summary>
+    string ResolveCardDisplayName(Card card);
+
+    /// <summary>Resolves a runtime-valued card description using the native tooltip pipeline.</summary>
+    string? ResolveCardDescription(Card card);
 }
 
 public interface IBazaarAgentTypedGameProbe

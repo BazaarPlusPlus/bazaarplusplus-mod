@@ -7,7 +7,7 @@ public class BazaarAgentCommandQueueTests
     private const string RequestId = "01JABCDEFGHJKMNPQRSTVWXYZ";
 
     private static BazaarAgentAction WaitAction() =>
-        new() { ActionKind = BazaarAgentActionKind.Wait };
+        new() { ActionKind = BazaarAgentActionKind.Continue };
 
     private static BazaarAgentCommandQueue<BazaarAgentAction> NewQueue(int timeoutMs) =>
         new(timeoutMs);
@@ -20,7 +20,7 @@ public class BazaarAgentCommandQueueTests
         var pending = q.TryDequeue();
         Assert.NotNull(pending);
         Assert.False(pending!.IsDiscarded);
-        Assert.Equal(BazaarAgentActionKind.Wait, pending.Command.ActionKind);
+        Assert.Equal(BazaarAgentActionKind.Continue, pending.Command.ActionKind);
         pending.SetResponse(new BazaarAgentServerResponse(200, "{\"ok\":true}"));
         var res = await task;
         Assert.Equal(200, res.HttpStatus);
@@ -135,22 +135,5 @@ public class BazaarAgentCommandQueueTests
         );
         q.TryDequeue()!.SetResponse(new BazaarAgentServerResponse(200, "{}"));
         await task;
-    }
-
-    [Fact]
-    public async Task ReplayCommandPayload_RoundTripsThroughQueue()
-    {
-        var q = new BazaarAgentCommandQueue<BazaarAgentReplayCommand>(5_000);
-        var payload = new byte[] { 1, 2, 3 };
-        var task = q.EnqueueAndAwaitAsync(
-            RequestId,
-            new BazaarAgentReplayCommand(BazaarAgentReplayControlKind.Start, payload, "b-1")
-        );
-        var pending = q.TryDequeue()!;
-        Assert.Equal(BazaarAgentReplayControlKind.Start, pending.Command.Kind);
-        Assert.Equal(payload, pending.Command.Payload);
-        Assert.Equal("b-1", pending.Command.BattleId);
-        pending.SetResponse(new BazaarAgentServerResponse(202, "{}"));
-        Assert.Equal(202, (await task).HttpStatus);
     }
 }

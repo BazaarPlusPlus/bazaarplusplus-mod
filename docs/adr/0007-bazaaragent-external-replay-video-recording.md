@@ -1,12 +1,10 @@
-# ADR-0007: Replay exit is explicit — primitive replay-control endpoints plus the agent `Continue` action
+# ADR-0007: Replay exit is explicit through the agent `Continue` action
 
-Status: Accepted; absorbs ADR-0008 (collapsed 2026-07-28)
+Status: Accepted (amended 2026-07-31); absorbs ADR-0008 (collapsed 2026-07-28)
 
 ## Decision
 
-Expose replay recording through the existing loopback server as three primitives: raw `POST /v1/replay/record`, replay phase/battle id in `GET /v1/context`, and explicit `POST /v1/replay/continue`. The mod owns no batch-recording state machine; an external caller serializes the loop and polls phase/output.
-
-For the ordinary action loop (absorbed from ADR-0008): when replay phase is `finishedAwaitingContinue`, publish a cardless `Continue` action in the `Flow` group. The external decision agent treats it as an opaque flow advance and remains replay-agnostic. Both entry points — the replay-control route and the agent action — converge on the same `CombatReplayRuntime.TryContinueReplay` facade.
+The V1 replay-control endpoints were removed. When replay phase is `finishedAwaitingContinue`, V3 publishes a cardless `Continue` action in the `Flow` group. The external decision agent treats it as an opaque flow advance and remains replay-agnostic.
 
 ## Why
 
@@ -16,8 +14,6 @@ Once automatic replay exit was removed, the ordinary action loop had no legal wa
 
 ## Guardrails
 
-- The pure core queues raw replay commands and drains them before the ordinary snapshot cadence ([routes](../../src/BazaarPlusPlus.BazaarAgent/Transport/BazaarAgentHttpServer.cs#L175-L203), [controller](../../src/BazaarPlusPlus.BazaarAgent/Runtime/BazaarAgentRuntimeController.cs#L65-L75)).
-- Accept recording only after payload/battle-id and recording-capability guards; `record` acknowledges start and the caller polls `replayPhase` plus the output file.
 - `CombatReplayRuntime.TryContinueReplay` is the only programmatic `ReplayState` exit. It rejects while starting, playing, capturing recap post-roll, or already exiting ([runtime](../../src/BazaarPlusPlus/Game/CombatReplay/CombatReplayRuntime.cs#L763-L807)).
 - The host never calls `ReplayState.Exit()` directly; an architecture test pins the single-exit boundary ([test](../../tests/Architecture.Tests/CoreLayeringTests.cs#L1226-L1272)).
 - Emit `Continue` only at `FinishedAwaitingContinue` ([context reader](../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameContextReader.cs#L582-L595)); route it through `BazaarAgentGameBridge.CurrentRecorder.TryContinueReplay`; never add another exit path ([dispatcher](../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameActionDispatcher.cs#L168-L177)).

@@ -1223,11 +1223,60 @@ public class CoreLayeringTests
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "Reference");
     }
 
-    // External battle video recording depends on replays staying in the
-    // finishedAwaitingContinue phase until an explicit POST /v1/replay/continue: the recording
-    // only finalizes (moov atom) when ReplayState.Exit() runs, and the exit timing belongs to the
-    // external orchestrator. The host must therefore never exit ReplayState from its tick — the
-    // single allowed programmatic exit lives in CombatReplayRuntime.TryContinueReplay.
+    [Fact]
+    public void BazaarAgent_context_keeps_server_run_identity_separate_from_game_mode()
+    {
+        var repoRoot = RepoRoot();
+        var mainRoot = MainSourceRoot(repoRoot);
+        var hostRoot = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost");
+        var probe = File.ReadAllText(
+            Path.Combine(mainRoot, "GameInterop", "BazaarAgent", "BazaarAgentGameProbe.cs")
+        );
+        var contextReader = File.ReadAllText(
+            Path.Combine(hostRoot, "BazaarAgentGameContextReader.cs")
+        );
+
+        Assert.Contains("_runContext.CurrentServerRunId", probe);
+        Assert.Contains("CardDisplayNameResolver.Resolve", probe);
+        Assert.Contains("gameProbe.GetCurrentServerRunId()", contextReader);
+        Assert.Contains("gameProbe.ResolveCardDisplayName(card)", contextReader);
+        Assert.DoesNotContain("DisplayName = card.Name", contextReader);
+        Assert.Contains("GameModeId = gameModeId", contextReader);
+        Assert.DoesNotContain("runId = run.GameModeId", contextReader);
+    }
+
+    [Fact]
+    public void BazaarAgent_action_pipeline_preserves_busy_gates_and_frame_cadence()
+    {
+        var repoRoot = RepoRoot();
+        var coreRoot = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgent");
+        var hostRoot = ProjectRoot(repoRoot, "BazaarPlusPlus.BazaarAgentHost");
+        var validator = File.ReadAllText(
+            Path.Combine(coreRoot, "Decisions", "BazaarAgentActionValidator.cs")
+        );
+        var runtimeController = File.ReadAllText(
+            Path.Combine(coreRoot, "Runtime", "BazaarAgentRuntimeController.cs")
+        );
+        var dispatcher = File.ReadAllText(
+            Path.Combine(hostRoot, "BazaarAgentGameActionDispatcher.cs")
+        );
+
+        Assert.Contains("snapshot.Context.IsClientBusy", validator);
+        Assert.Contains("AppState.IsWaitingForServerResponse || AppState.BlockInput", dispatcher);
+        Assert.Contains(
+            "TryCompleteActionObservation();\n        DrainActionQueue();\n        return snapshotPublished;",
+            runtimeController
+        );
+        Assert.Contains(
+            "new BazaarAgentServerResponse(confirmed ? 200 : 202, body)",
+            runtimeController
+        );
+    }
+
+    // Replays stay in the finishedAwaitingContinue phase until the V3 Continue action: the
+    // recording only finalizes (moov atom) when ReplayState.Exit() runs. The host must therefore
+    // never exit ReplayState from its tick — the single allowed programmatic exit lives in
+    // CombatReplayRuntime.TryContinueReplay.
     [Fact]
     public void BazaarAgentHost_never_exits_replay_state_and_main_mod_exits_only_via_continue()
     {
@@ -1247,10 +1296,22 @@ public class CoreLayeringTests
         }
         Assert.True(
             hostViolations.Count == 0,
-            "BazaarAgentHost must never exit ReplayState (snapshot ticks would race the external "
-                + "POST /v1/replay/continue and orphan in-flight recordings). Offending code:\n"
+            "BazaarAgentHost must never exit ReplayState (snapshot ticks would race the V3 "
+                + "Continue action and orphan in-flight recordings). Offending code:\n"
                 + string.Join("\n", hostViolations)
         );
+
+        var contextReader = File.ReadAllText(
+            Path.Combine(hostDir, "BazaarAgentGameContextReader.cs")
+        );
+        var dispatcher = File.ReadAllText(
+            Path.Combine(hostDir, "BazaarAgentGameActionDispatcher.cs")
+        );
+        Assert.Contains(
+            "if (stateName == BazaarAgentRunStateName.Replay)\n            return actions;",
+            contextReader
+        );
+        Assert.Contains("AppState.CurrentState is ReplayState", dispatcher);
 
         // Main mod side: replay.Exit() appears exactly once, inside CombatReplayRuntime
         // (TryContinueReplay). The Harmony exit patch intercepts Exit; it must not invoke it.
