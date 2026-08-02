@@ -19,10 +19,9 @@ internal static class CombatImpactProjector
 
         foreach (var execution in executions)
         {
-            var fact = execution.Fact;
             if (
-                fact.AttributedSourceId == null
-                || fact.TargetId == null
+                execution.SourceId == null
+                || execution.TargetId == null
                 || !execution.Kind.HasValue
             )
                 continue;
@@ -35,13 +34,13 @@ internal static class CombatImpactProjector
             events.Add(
                 new CombatImpactEvent(
                     kind,
-                    fact.AttributedSourceId,
-                    fact.TargetId,
-                    fact.Value.HasValue ? SaturatingInt(fact.Value.Value) : null,
-                    fact.Unit ?? resolved.Unit,
+                    execution.SourceId,
+                    execution.TargetId,
+                    resolved.Value.HasValue ? SaturatingInt(resolved.Value.Value) : null,
+                    resolved.Unit,
                     resolved.NativeAttributeKey,
                     resolved.IsCritical,
-                    fact.ValueBasis
+                    resolved.Basis
                 )
                 {
                     Surface = resolved.Surface,
@@ -142,11 +141,6 @@ internal static class CombatImpactProjector
         );
     }
 
-    internal static IReadOnlyList<CombatImpactFact> ProjectFacts(
-        CombatSim simulation,
-        IReadOnlyDictionary<string, CombatImpactEntity> entities
-    ) => ProjectExecutions(simulation, entities).Select(execution => execution.Fact).ToArray();
-
     private static IReadOnlyList<ProjectedExecution> ProjectExecutions(
         CombatSim simulation,
         IReadOnlyDictionary<string, CombatImpactEntity> entities
@@ -154,25 +148,18 @@ internal static class CombatImpactProjector
     {
         var projections = new List<ProjectedExecution>();
         var cardAttributes = CreateCardAttributeTimeline(entities);
-        for (var frameIndex = 0; frameIndex < simulation.Frames.Count; frameIndex++)
+        foreach (var frame in simulation.Frames)
         {
-            var frame = simulation.Frames[frameIndex];
             ReconcileCardAttributeTimeline(frame, cardAttributes, usePreviousValue: true);
             var executed = frame.Events.OfType<CombatSimEventEffectExecuted>().ToArray();
-            for (var frameEventIndex = 0; frameEventIndex < frame.Events.Count; frameEventIndex++)
+            foreach (var item in executed)
             {
-                if (frame.Events[frameEventIndex] is not CombatSimEventEffectExecuted item)
-                    continue;
-
-                var directSourceId = item.Source?.Value;
-                var triggerSourceId = item.TriggerSource?.Value;
                 var attributedSourceId = ResolveActivitySource(
-                    directSourceId,
-                    triggerSourceId,
-                    entities,
-                    out var sourceAttribution
+                    item.Source?.Value,
+                    item.TriggerSource?.Value,
+                    entities
                 );
-                var target = ResolveTarget(item.Target);
+                var targetId = ResolveTargetId(item.Target);
                 var hasKind = TryResolveKind(item.ActionType, out var kind);
                 var resolved = hasKind
                     ? ResolveValue(frame, item, kind, IsTransitionUnique(executed, item), executed)
@@ -187,31 +174,10 @@ internal static class CombatImpactProjector
                     )
                 )
                     resolved = resolved with { NonCriticalValue = nonCriticalValue };
-                var unknownReason = CombatImpactUnknownReason.None;
-                if (attributedSourceId == null)
-                    unknownReason |= CombatImpactUnknownReason.UnattributedSource;
-                if (target.Id == null || !entities.ContainsKey(target.Id))
-                    unknownReason |= CombatImpactUnknownReason.UnresolvedTarget;
-                if (!resolved.Value.HasValue)
-                    unknownReason |= CombatImpactUnknownReason.ValueNotQuantified;
-
                 projections.Add(
                     new ProjectedExecution(
-                        new CombatImpactFact(
-                            frameIndex,
-                            frameEventIndex,
-                            item.ActionType,
-                            directSourceId,
-                            triggerSourceId,
-                            attributedSourceId,
-                            sourceAttribution,
-                            target.Kind,
-                            target.Id,
-                            resolved.Value,
-                            resolved.Value.HasValue ? resolved.Unit : null,
-                            resolved.Basis,
-                            unknownReason
-                        ),
+                        attributedSourceId,
+                        targetId,
                         hasKind ? kind : null,
                         resolved
                     )
@@ -425,22 +391,14 @@ internal static class CombatImpactProjector
     private static string? ResolveActivitySource(
         string? directSourceId,
         string? triggerSourceId,
-        IReadOnlyDictionary<string, CombatImpactEntity> entities,
-        out CombatImpactSourceAttribution attribution
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
         if (IsActivityEntity(directSourceId, entities))
-        {
-            attribution = CombatImpactSourceAttribution.Direct;
             return directSourceId;
-        }
         if (IsActivityEntity(triggerSourceId, entities))
-        {
-            attribution = CombatImpactSourceAttribution.Trigger;
             return triggerSourceId;
-        }
 
-        attribution = CombatImpactSourceAttribution.Unattributed;
         return null;
     }
 
@@ -471,8 +429,7 @@ internal static class CombatImpactProjector
                 var sourceId = ResolveActivitySource(
                     aura.Source?.Value,
                     aura.TriggerSource?.Value,
-                    entities,
-                    out _
+                    entities
                 );
                 if (sourceId == null)
                     continue;
@@ -677,7 +634,13 @@ internal static class CombatImpactProjector
 
     internal static string PlayerId(ECombatantId combatant) => $"player:{combatant}";
 
-    private static string? ResolveTargetId(IEffectTarget? target) => ResolveTarget(target).Id;
+    private static string? ResolveTargetId(IEffectTarget? target) =>
+        target switch
+        {
+            EffectTargetCard card => card.Target.Value,
+            EffectTargetPlayer player => PlayerId(player.Target),
+            _ => null,
+        };
 
     private static bool IsTransitionUnique(
         IReadOnlyList<CombatSimEventEffectExecuted> executed,
@@ -776,17 +739,6 @@ internal static class CombatImpactProjector
                 or EActionCommandType.CardFreeze
                 or EActionCommandType.CardReload;
     }
-
-    private static ResolvedTarget ResolveTarget(IEffectTarget? target) =>
-        target switch
-        {
-            EffectTargetCard card => new(CombatImpactTargetKind.Card, card.Target.Value),
-            EffectTargetPlayer player => new(
-                CombatImpactTargetKind.Player,
-                PlayerId(player.Target)
-            ),
-            _ => new(CombatImpactTargetKind.Unknown, null),
-        };
 
     internal static bool HasExplicitDisplayClassification(EActionCommandType action) =>
         TryResolveKind(action, out _) || IsExplicitlyIgnoredAction(action);
@@ -1296,10 +1248,9 @@ internal static class CombatImpactProjector
         CombatSimPlayerAttributeUpdate Change
     );
 
-    private readonly record struct ResolvedTarget(CombatImpactTargetKind Kind, string? Id);
-
     private readonly record struct ProjectedExecution(
-        CombatImpactFact Fact,
+        string? SourceId,
+        string? TargetId,
         CombatImpactKind? Kind,
         ResolvedImpactValue Resolved
     );

@@ -1,6 +1,5 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
-using BazaarGameShared.Domain.Effect;
 
 namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
 
@@ -28,20 +27,6 @@ internal enum CombatImpactValueUnit
     Applications,
 }
 
-internal enum CombatImpactSourceAttribution
-{
-    Unattributed,
-    Direct,
-    Trigger,
-}
-
-internal enum CombatImpactTargetKind
-{
-    Unknown,
-    Card,
-    Player,
-}
-
 internal enum CombatImpactEventSurface
 {
     AppliedEffect,
@@ -64,15 +49,6 @@ internal enum CombatImpactCoverage
     Partial,
 }
 
-[Flags]
-internal enum CombatImpactUnknownReason
-{
-    None = 0,
-    UnattributedSource = 1 << 0,
-    UnresolvedTarget = 1 << 1,
-    ValueNotQuantified = 1 << 2,
-}
-
 internal enum CombatImpactAuthoritativeBasis
 {
     TotalAmount,
@@ -90,22 +66,6 @@ internal sealed record CombatImpactEntity(
     int DisplaySpan = 1,
     EEnchantmentType? EnchantmentType = null,
     IReadOnlyDictionary<ECardAttributeType, int>? Attributes = null
-);
-
-internal sealed record CombatImpactFact(
-    int FrameIndex,
-    int FrameEventIndex,
-    EActionCommandType Action,
-    string? DirectSourceId,
-    string? TriggerSourceId,
-    string? AttributedSourceId,
-    CombatImpactSourceAttribution SourceAttribution,
-    CombatImpactTargetKind TargetKind,
-    string? TargetId,
-    long? Value,
-    CombatImpactValueUnit? Unit,
-    CombatImpactValueBasis ValueBasis,
-    CombatImpactUnknownReason UnknownReason
 );
 
 internal sealed record CombatImpactEvent(
@@ -135,13 +95,7 @@ internal sealed record CombatImpactTarget(
     int? ObservedValue,
     CombatImpactValueUnit Unit,
     CombatImpactCoverage ObservedCoverage
-)
-{
-    internal CombatImpactValueUnit? ObservedUnit => ObservedValue.HasValue ? Unit : null;
-
-    internal bool ObservedValueIsPartial =>
-        ObservedCoverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
-}
+);
 
 internal sealed record CombatImpactAuthoritativeMetric
 {
@@ -203,11 +157,6 @@ internal sealed record CombatImpactGroup(
 
     internal int? CriticalObservedValue { get; init; }
 
-    internal CombatImpactValueUnit? ObservedUnit => ObservedValue.HasValue ? Unit : null;
-
-    internal bool ObservedValueIsPartial =>
-        ObservedCoverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
-
     internal bool HasDivergentTargetCoverage =>
         UnresolvedTargetCount > 0
         || AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
@@ -233,13 +182,7 @@ internal sealed record CombatImpactIncomingSource(
     int? ObservedValue,
     CombatImpactValueUnit Unit,
     CombatImpactCoverage ObservedCoverage
-)
-{
-    internal CombatImpactValueUnit? ObservedUnit => ObservedValue.HasValue ? Unit : null;
-
-    internal bool ObservedValueIsPartial =>
-        ObservedCoverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
-}
+);
 
 internal sealed record CombatImpactIncomingGroup(
     CombatImpactKind Kind,
@@ -257,11 +200,6 @@ internal sealed record CombatImpactIncomingGroup(
     internal int CriticalCount { get; init; }
 
     internal int? CriticalObservedValue { get; init; }
-
-    internal CombatImpactValueUnit? ObservedUnit => ObservedValue.HasValue ? Unit : null;
-
-    internal bool ObservedValueIsPartial =>
-        ObservedCoverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
 }
 
 internal sealed record CombatImpactReceived(

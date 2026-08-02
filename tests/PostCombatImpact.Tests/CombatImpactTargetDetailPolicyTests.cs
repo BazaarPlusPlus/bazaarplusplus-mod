@@ -6,32 +6,37 @@ namespace PostCombatImpact.Tests;
 
 public sealed class CombatImpactTargetDetailPolicyTests
 {
-    [Fact]
-    public void Regen_targets_are_shown_only_for_card_attribute_changes()
-    {
-        Assert.False(
+    [Theory]
+    [InlineData(
+        (int)CombatImpactKind.AttributeChange,
+        "RegenApplyAmount",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        false
+    )]
+    [InlineData(
+        (int)CombatImpactKind.AttributeChange,
+        "RegenApplyAmount",
+        (int)CombatImpactEventSurface.CardAttribute,
+        true
+    )]
+    [InlineData(
+        (int)CombatImpactKind.DirectDamage,
+        "DamageAmount",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        false
+    )]
+    public void Target_rows_follow_effect_surface_policy(
+        int kindValue,
+        string nativeKey,
+        int surfaceValue,
+        bool expected
+    ) =>
+        Assert.Equal(
+            expected,
             CombatImpactTargetDetailPolicy.ShouldRender(
-                CombatImpactKind.AttributeChange,
-                "RegenApplyAmount",
-                CombatImpactEventSurface.AppliedEffect
-            )
-        );
-        Assert.True(
-            CombatImpactTargetDetailPolicy.ShouldRender(
-                CombatImpactKind.AttributeChange,
-                "RegenApplyAmount",
-                CombatImpactEventSurface.CardAttribute
-            )
-        );
-    }
-
-    [Fact]
-    public void Direct_damage_does_not_repeat_its_implicit_player_target() =>
-        Assert.False(
-            CombatImpactTargetDetailPolicy.ShouldRender(
-                CombatImpactKind.DirectDamage,
-                "DamageAmount",
-                CombatImpactEventSurface.AppliedEffect
+                (CombatImpactKind)kindValue,
+                nativeKey,
+                (CombatImpactEventSurface)surfaceValue
             )
         );
 }

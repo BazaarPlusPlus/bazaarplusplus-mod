@@ -41,10 +41,6 @@
       Link="CombatImpactMetricFormatter.cs"
     />
     <Compile
-      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityOwnerResolver.cs"
-      Link="CombatImpactEntityOwnerResolver.cs"
-    />
-    <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityName.cs"
       Link="CombatImpactEntityName.cs"
     />

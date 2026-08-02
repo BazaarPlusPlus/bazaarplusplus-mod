@@ -24,20 +24,6 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Entity_owner_uses_native_combatant_id_with_player_fallback()
-    {
-        Assert.Equal(ECombatantId.Player, CombatImpactEntityOwnerResolver.Resolve(null));
-        Assert.Equal(
-            ECombatantId.Player,
-            CombatImpactEntityOwnerResolver.Resolve(ECombatantId.Player)
-        );
-        Assert.Equal(
-            ECombatantId.Opponent,
-            CombatImpactEntityOwnerResolver.Resolve(ECombatantId.Opponent)
-        );
-    }
-
-    [Fact]
     public void Projects_uniquely_attributed_damage_and_derived_critical_presentation()
     {
         var simulation = new CombatSim();
@@ -53,9 +39,16 @@ public sealed class CombatImpactProjectorTests
                 new CombatSimPlayerHealthAdjustment
                 {
                     DamageType = EDamageType.Damage,
-                    AttributeChanged = EPlayerHealthChangeType.Health,
-                    Amount = -160,
+                    AttributeChanged = EPlayerHealthChangeType.Shield,
+                    Amount = -60,
                     IsCrit = true,
+                },
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -100,
+                    IsCrit = false,
                 },
             },
         };
@@ -77,7 +70,7 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(160, damage.AuthoritativeMetric?.Value);
         Assert.Equal(160, Assert.Single(damage.Targets).ObservedValue);
         Assert.Equal(1, damage.CriticalCount);
-        Assert.Equal(160, damage.CriticalObservedValue);
+        Assert.Equal(60, damage.CriticalObservedValue);
         Assert.Equal("Opponent", Assert.Single(damage.Targets).Entity.Name);
         Assert.Equal(1, source.EffectCount);
     }
@@ -339,62 +332,16 @@ public sealed class CombatImpactProjectorTests
                 source.Groups,
                 group => group.AuthoritativeMetric != null
             );
-            var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
-
             Assert.Equal(CombatImpactKind.AttributeChange, concrete.Kind);
             Assert.Equal(CombatImpactEventSurface.PlayerAttribute, concrete.Surface);
             Assert.Equal(attribute.ToString(), concrete.NativeAttributeKey);
             Assert.Equal(12, concrete.ObservedValue);
-            Assert.NotNull(concrete.ObservedUnit);
+            Assert.Equal(CombatImpactValueUnit.Amount, concrete.Unit);
             Assert.Equal(CombatImpactCoverage.LowerBound, concrete.ObservedCoverage);
             Assert.Equal(canonicalKey, authoritative.NativeAttributeKey);
             Assert.Equal(CombatImpactEventSurface.AppliedEffect, authoritative.Surface);
             Assert.Equal(20, authoritative.AuthoritativeMetric?.Value);
-            Assert.Equal(12, fact.Value);
-            Assert.NotNull(fact.Unit);
-            Assert.Equal(CombatImpactValueBasis.NetFrameDelta, fact.ValueBasis);
-            Assert.False(fact.UnknownReason.HasFlag(CombatImpactUnknownReason.ValueNotQuantified));
         }
-    }
-
-    [Fact]
-    public void Generic_player_modifier_ignores_live_health_when_resolving_max_health()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "source",
-                    EActionCommandType.PlayerModifyAttribute,
-                    Player(ECombatantId.Player)
-                )
-            );
-        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
-        {
-            Attributes =
-            {
-                [EPlayerAttributeType.Health] = new CombatSimPlayerAttributeUpdate
-                {
-                    AttributeType = EPlayerAttributeType.Health,
-                    PreviousValue = 5000,
-                    CurrentValue = 6128,
-                },
-                [EPlayerAttributeType.HealthMax] = new CombatSimPlayerAttributeUpdate
-                {
-                    AttributeType = EPlayerAttributeType.HealthMax,
-                    PreviousValue = 5000,
-                    CurrentValue = 6128,
-                },
-            },
-        };
-
-        var group = Assert.Single(
-            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
-        );
-
-        Assert.Equal("HealthMax", group.NativeAttributeKey);
-        Assert.Equal(1128, group.ObservedValue);
     }
 
     [Fact]
@@ -442,44 +389,6 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Sums_matching_health_adjustments_and_retains_the_critical_subset()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
-            );
-        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
-        {
-            HealthAdjustments =
-            {
-                new CombatSimPlayerHealthAdjustment
-                {
-                    DamageType = EDamageType.Damage,
-                    AttributeChanged = EPlayerHealthChangeType.Shield,
-                    Amount = -60,
-                    IsCrit = true,
-                },
-                new CombatSimPlayerHealthAdjustment
-                {
-                    DamageType = EDamageType.Damage,
-                    AttributeChanged = EPlayerHealthChangeType.Health,
-                    Amount = -100,
-                    IsCrit = false,
-                },
-            },
-        };
-
-        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
-        var damage = Assert.Single(source.Groups);
-
-        Assert.Equal(160, damage.ObservedValue);
-        Assert.Equal(1, damage.CriticalCount);
-        Assert.Equal(60, damage.CriticalObservedValue);
-    }
-
-    [Fact]
     public void Ambiguous_same_frame_values_are_not_assigned_to_targets()
     {
         var simulation = new CombatSim();
@@ -521,51 +430,6 @@ public sealed class CombatImpactProjectorTests
         var target = Assert.Single(group.Targets);
         Assert.Null(target.ObservedValue);
         Assert.Equal(CombatImpactCoverage.None, target.ObservedCoverage);
-    }
-
-    [Fact]
-    public void Generic_card_attribute_change_retains_occurrence_without_borrowing_transition()
-    {
-        var simulation = new CombatSim();
-        var target = InstanceId.TryParse("target");
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "source",
-                    EActionCommandType.CardModifyAttribute,
-                    new EffectTargetCard { Target = target }
-                )
-            );
-        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
-        {
-            CardInstanceId = target,
-            Attributes =
-            {
-                [ECardAttributeType.CritChance] = new CombatSimCardAttributeUpdate
-                {
-                    AttributeType = ECardAttributeType.CritChance,
-                    PreviousValue = 20,
-                    CurrentValue = 22,
-                },
-            },
-        };
-
-        var group = Assert.Single(
-            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
-        );
-
-        Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
-        Assert.Equal(CombatImpactEventSurface.CardAttribute, group.Surface);
-        Assert.Equal(ECardAttributeType.CritChance.ToString(), group.NativeAttributeKey);
-        Assert.Equal(1, group.Count);
-        Assert.Equal(2, group.ObservedValue);
-        Assert.Equal(CombatImpactValueUnit.PercentagePoints, group.ObservedUnit);
-        Assert.Equal(CombatImpactCoverage.LowerBound, group.ObservedCoverage);
-        var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
-        Assert.Equal(2, fact.Value);
-        Assert.Equal(CombatImpactValueUnit.PercentagePoints, fact.Unit);
-        Assert.Equal(CombatImpactValueBasis.NetFrameDelta, fact.ValueBasis);
     }
 
     [Fact]
@@ -636,10 +500,6 @@ public sealed class CombatImpactProjectorTests
 
         var report = CombatImpactProjector.Project(simulation, Entities());
         Assert.Empty(report.Sources);
-        var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
-
-        Assert.Equal(3, fact.Value);
-        Assert.Equal(CombatImpactValueBasis.NetFrameDelta, fact.ValueBasis);
     }
 
     [Fact]
@@ -679,9 +539,6 @@ public sealed class CombatImpactProjectorTests
         var report = CombatImpactProjector.Project(simulation, Entities());
 
         Assert.Empty(report.Sources);
-        Assert.Null(
-            Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities())).Value
-        );
     }
 
     [Theory]
@@ -745,35 +602,6 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Projects_destroy_as_targeted_count_without_invented_value()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "source",
-                    EActionCommandType.CardDestroy,
-                    new EffectTargetCard { Target = InstanceId.TryParse("target") }
-                )
-            );
-
-        var report = CombatImpactProjector.Project(simulation, Entities());
-        var group = Assert.Single(Assert.Single(report.Sources).Groups);
-
-        Assert.Equal(CombatImpactKind.Destroy, group.Kind);
-        Assert.Equal(1, group.Count);
-        Assert.Null(group.ObservedValue);
-        Assert.Equal("Bread Knife", Assert.Single(group.Targets).Entity.Name);
-        var received = Assert.Single(report.Received);
-        var incoming = Assert.Single(received.Groups);
-        Assert.Equal(CombatImpactKind.Destroy, incoming.Kind);
-        Assert.Equal(1, incoming.Count);
-        Assert.Null(incoming.ObservedValue);
-        Assert.Equal("Fairies", Assert.Single(incoming.Sources).Entity.Name);
-    }
-
-    [Fact]
     public void Merges_disable_and_destroy_occurrences_in_both_perspectives()
     {
         var simulation = new CombatSim();
@@ -807,7 +635,6 @@ public sealed class CombatImpactProjectorTests
         var causedTarget = Assert.Single(caused.Targets);
         Assert.Equal(2, causedTarget.Count);
         Assert.Null(caused.ObservedValue);
-        Assert.Null(caused.ObservedUnit);
         Assert.Equal(CombatImpactCoverage.None, caused.ObservedCoverage);
         Assert.Null(caused.AuthoritativeMetric);
         Assert.Equal("×2", CombatImpactMetricFormatter.Group(caused, chinese: false));
@@ -816,24 +643,12 @@ public sealed class CombatImpactProjectorTests
             CombatImpactMetricFormatter.Target(caused, causedTarget, chinese: false)
         );
 
-        Assert.All(
-            CombatImpactProjector.ProjectFacts(simulation, Entities()),
-            fact =>
-            {
-                Assert.Null(fact.Value);
-                Assert.Null(fact.Unit);
-                Assert.Equal(CombatImpactValueBasis.None, fact.ValueBasis);
-                Assert.Equal(CombatImpactUnknownReason.ValueNotQuantified, fact.UnknownReason);
-            }
-        );
-
         var received = Assert.Single(report.Received);
         var incoming = Assert.Single(received.Groups);
         Assert.Equal(CombatImpactKind.Destroy, incoming.Kind);
         Assert.Equal(2, incoming.Count);
         Assert.Equal(2, Assert.Single(incoming.Sources).Count);
         Assert.Null(incoming.ObservedValue);
-        Assert.Null(incoming.ObservedUnit);
         Assert.Equal(CombatImpactCoverage.None, incoming.ObservedCoverage);
         Assert.Equal("×2", CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false));
         Assert.Equal(
@@ -846,30 +661,43 @@ public sealed class CombatImpactProjectorTests
         );
     }
 
-    [Fact]
-    public void Falls_back_to_exact_trigger_source_when_direct_source_is_not_an_item_or_skill()
+    [Theory]
+    [InlineData("effect", "source", "source")]
+    [InlineData("source", "trigger", "source")]
+    [InlineData("effect", "missing", null)]
+    public void Source_attribution_prefers_an_activity_direct_source_then_trigger_source(
+        string directSource,
+        string triggerSource,
+        string? expectedSource
+    )
     {
         var simulation = new CombatSim();
         simulation
             .Frames[0]
             .Events.Add(
                 Executed(
-                    "effect",
+                    directSource,
                     EActionCommandType.PlayerDamage,
                     Player(ECombatantId.Opponent),
-                    triggerSource: "source"
+                    triggerSource
                 )
             );
         simulation.Frames[0].OpponentUpdates = Damage(-40);
 
-        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+        var sources = CombatImpactProjector.Project(simulation, Entities()).Sources;
+        if (expectedSource == null)
+        {
+            Assert.Empty(sources);
+            return;
+        }
 
-        Assert.Equal("Fairies", source.Entity.Name);
+        var source = Assert.Single(sources);
+        Assert.Equal(expectedSource, source.Entity.Id);
         Assert.Equal(40, Assert.Single(source.Groups).ObservedValue);
     }
 
     [Fact]
-    public void Facts_preserve_unclassified_and_unresolved_executions_before_display_filtering()
+    public void Filters_unclassified_actions_and_discloses_unresolved_targets()
     {
         var simulation = new CombatSim();
         simulation
@@ -896,97 +724,18 @@ public sealed class CombatImpactProjectorTests
 
         var report = CombatImpactProjector.Project(simulation, Entities());
 
-        Assert.Equal(2, CombatImpactProjector.ProjectFacts(simulation, Entities()).Count);
-        var unclassified = CombatImpactProjector.ProjectFacts(simulation, Entities())[0];
-        Assert.Equal(0, unclassified.FrameIndex);
-        Assert.Equal(0, unclassified.FrameEventIndex);
-        Assert.Equal(EActionCommandType.GameModifyTime, unclassified.Action);
-        Assert.Equal("effect", unclassified.DirectSourceId);
-        Assert.Equal("source", unclassified.TriggerSourceId);
-        Assert.Equal("source", unclassified.AttributedSourceId);
-        Assert.Equal(CombatImpactSourceAttribution.Trigger, unclassified.SourceAttribution);
-        Assert.Equal(CombatImpactTargetKind.Unknown, unclassified.TargetKind);
-        Assert.Null(unclassified.TargetId);
-        Assert.Null(unclassified.Value);
-        Assert.Null(unclassified.Unit);
-        Assert.Equal(CombatImpactValueBasis.None, unclassified.ValueBasis);
-        Assert.Equal(
-            CombatImpactUnknownReason.UnresolvedTarget
-                | CombatImpactUnknownReason.ValueNotQuantified,
-            unclassified.UnknownReason
-        );
-
-        var unresolvedTarget = CombatImpactProjector.ProjectFacts(simulation, Entities())[1];
-        Assert.Equal(1, unresolvedTarget.FrameEventIndex);
-        Assert.Equal(EActionCommandType.CardDestroy, unresolvedTarget.Action);
-        Assert.Equal("source", unresolvedTarget.AttributedSourceId);
-        Assert.Equal(CombatImpactSourceAttribution.Direct, unresolvedTarget.SourceAttribution);
-        Assert.Equal(CombatImpactTargetKind.Card, unresolvedTarget.TargetKind);
-        Assert.Equal("missing-target", unresolvedTarget.TargetId);
-        Assert.Equal(
-            CombatImpactUnknownReason.UnresolvedTarget
-                | CombatImpactUnknownReason.ValueNotQuantified,
-            unresolvedTarget.UnknownReason
-        );
-
         var displayed = Assert.Single(Assert.Single(report.Sources).Groups);
         Assert.Equal(CombatImpactKind.Destroy, displayed.Kind);
         Assert.Equal(1, displayed.UnresolvedTargetCount);
     }
 
-    [Fact]
-    public void Facts_disclose_missing_source_but_keep_exact_known_target()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "effect",
-                    EActionCommandType.CardHaste,
-                    CardTarget("target"),
-                    triggerSource: "missing"
-                )
-            );
-
-        var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
-
-        Assert.Equal("effect", fact.DirectSourceId);
-        Assert.Equal("missing", fact.TriggerSourceId);
-        Assert.Null(fact.AttributedSourceId);
-        Assert.Equal(CombatImpactSourceAttribution.Unattributed, fact.SourceAttribution);
-        Assert.Equal(CombatImpactTargetKind.Card, fact.TargetKind);
-        Assert.Equal("target", fact.TargetId);
-        Assert.Equal(
-            CombatImpactUnknownReason.UnattributedSource
-                | CombatImpactUnknownReason.ValueNotQuantified,
-            fact.UnknownReason
-        );
-    }
-
-    [Fact]
-    public void Keeps_valid_direct_source_when_trigger_source_is_also_an_activity_entity()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "source",
-                    EActionCommandType.PlayerDamage,
-                    Player(ECombatantId.Opponent),
-                    triggerSource: "trigger"
-                )
-            );
-        simulation.Frames[0].OpponentUpdates = Damage(-40);
-
-        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
-
-        Assert.Equal("Fairies", source.Entity.Name);
-    }
-
-    [Fact]
-    public void Player_heal_does_not_consume_regen_adjustments()
+    [Theory]
+    [InlineData(EDamageType.Regen, null)]
+    [InlineData(EDamageType.Heal, 50)]
+    public void Player_heal_matches_only_heal_adjustments(
+        EDamageType damageType,
+        int? expectedValue
+    )
     {
         var simulation = new CombatSim();
         simulation
@@ -1000,7 +749,7 @@ public sealed class CombatImpactProjectorTests
             {
                 new CombatSimPlayerHealthAdjustment
                 {
-                    DamageType = EDamageType.Regen,
+                    DamageType = damageType,
                     AttributeChanged = EPlayerHealthChangeType.Health,
                     Amount = 50,
                 },
@@ -1012,57 +761,11 @@ public sealed class CombatImpactProjectorTests
         );
 
         Assert.Equal(CombatImpactKind.Healing, group.Kind);
-        Assert.Null(group.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.None, group.ObservedCoverage);
-    }
-
-    [Fact]
-    public void Player_heal_resolves_matching_positive_health_adjustment()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed("source", EActionCommandType.PlayerHeal, Player(ECombatantId.Player))
-            );
-        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
-        {
-            HealthAdjustments =
-            {
-                new CombatSimPlayerHealthAdjustment
-                {
-                    DamageType = EDamageType.Heal,
-                    AttributeChanged = EPlayerHealthChangeType.Health,
-                    Amount = 50,
-                },
-            },
-        };
-
-        var group = Assert.Single(
-            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
+        Assert.Equal(expectedValue, group.ObservedValue);
+        Assert.Equal(
+            expectedValue.HasValue ? CombatImpactCoverage.Exact : CombatImpactCoverage.None,
+            group.ObservedCoverage
         );
-
-        Assert.Equal(50, group.ObservedValue);
-        Assert.False(group.ObservedValueIsPartial);
-    }
-
-    [Fact]
-    public void Omits_effect_when_neither_direct_nor_trigger_source_is_an_activity_entity()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "effect",
-                    EActionCommandType.PlayerDamage,
-                    Player(ECombatantId.Opponent),
-                    triggerSource: "missing"
-                )
-            );
-        simulation.Frames[0].OpponentUpdates = Damage(-40);
-
-        Assert.Empty(CombatImpactProjector.Project(simulation, Entities()).Sources);
     }
 
     [Fact]
@@ -1152,39 +855,6 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Preserves_multiple_exact_targets_in_one_effect_group()
-    {
-        var simulation = new CombatSim();
-        var first = InstanceId.TryParse("target");
-        var second = InstanceId.TryParse("target-2");
-        simulation
-            .Frames[0]
-            .Events.Add(Executed("source", EActionCommandType.CardHaste, CardTarget("target")));
-        simulation
-            .Frames[0]
-            .Events.Add(Executed("source", EActionCommandType.CardHaste, CardTarget("target-2")));
-        simulation.Frames[0].CardUpdates[first] = HasteUpdate(first, 950);
-        simulation.Frames[0].CardUpdates[second] = HasteUpdate(second, 1950);
-
-        var group = Assert.Single(
-            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
-        );
-
-        Assert.Equal(2, group.Targets.Count);
-        Assert.Equal(2, group.Count);
-        Assert.Contains(group.Targets, target => target.Entity.Id == "target");
-        Assert.Contains(group.Targets, target => target.Entity.Id == "target-2");
-        Assert.Equal(
-            950,
-            Assert.Single(group.Targets, target => target.Entity.Id == "target").ObservedValue
-        );
-        Assert.Equal(
-            1950,
-            Assert.Single(group.Targets, target => target.Entity.Id == "target-2").ObservedValue
-        );
-    }
-
-    [Fact]
     public void Positive_same_frame_haste_from_another_source_does_not_fan_out_targets()
     {
         var simulation = new CombatSim();
@@ -1241,7 +911,7 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(2, fairiesGroup.Count);
         Assert.Equal(1950, fairiesGroup.ObservedValue);
-        Assert.True(fairiesGroup.ObservedValueIsPartial);
+        Assert.Equal(CombatImpactCoverage.Partial, fairiesGroup.ObservedCoverage);
         Assert.Null(
             Assert
                 .Single(fairiesGroup.Targets, target => target.Entity.Id == "target")
@@ -1258,41 +928,7 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Facts_never_split_one_same_frame_transition_between_contested_executions()
-    {
-        var simulation = new CombatSim();
-        var target = InstanceId.TryParse("target");
-        simulation
-            .Frames[0]
-            .Events.Add(Executed("source", EActionCommandType.CardHaste, CardTarget("target")));
-        simulation
-            .Frames[0]
-            .Events.Add(Executed("trigger", EActionCommandType.CardHaste, CardTarget("target")));
-        simulation.Frames[0].CardUpdates[target] = HasteUpdate(target, 950);
-
-        var report = CombatImpactProjector.Project(simulation, Entities());
-
-        Assert.Equal(2, CombatImpactProjector.ProjectFacts(simulation, Entities()).Count);
-        Assert.All(
-            CombatImpactProjector.ProjectFacts(simulation, Entities()),
-            fact =>
-            {
-                Assert.Null(fact.Value);
-                Assert.Null(fact.Unit);
-                Assert.Equal(CombatImpactValueBasis.None, fact.ValueBasis);
-                Assert.True(
-                    fact.UnknownReason.HasFlag(CombatImpactUnknownReason.ValueNotQuantified)
-                );
-            }
-        );
-        Assert.All(
-            report.Sources.SelectMany(source => source.Groups),
-            group => Assert.Null(group.ObservedValue)
-        );
-    }
-
-    [Fact]
-    public void Fact_uses_observed_net_status_delta_when_decay_shares_the_frame()
+    public void Uses_observed_net_status_delta_when_decay_shares_the_frame()
     {
         var simulation = new CombatSim();
         var target = InstanceId.TryParse("target");
@@ -1314,68 +950,7 @@ public sealed class CombatImpactProjectorTests
         };
 
         var report = CombatImpactProjector.Project(simulation, Entities());
-        var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
-
-        Assert.Equal(950, fact.Value);
-        Assert.Equal(CombatImpactValueUnit.Milliseconds, fact.Unit);
-        Assert.Equal(CombatImpactValueBasis.NetFrameDelta, fact.ValueBasis);
-        Assert.Equal(CombatImpactUnknownReason.None, fact.UnknownReason);
         Assert.Equal(950, Assert.Single(Assert.Single(report.Sources).Groups).ObservedValue);
-    }
-
-    [Fact]
-    public void Missing_target_update_keeps_occurrence_without_inventing_value()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(Executed("source", EActionCommandType.CardHaste, CardTarget("target")));
-
-        var report = CombatImpactProjector.Project(simulation, Entities());
-        var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
-        var group = Assert.Single(Assert.Single(report.Sources).Groups);
-
-        Assert.Null(fact.Value);
-        Assert.Null(fact.Unit);
-        Assert.Equal(CombatImpactValueBasis.None, fact.ValueBasis);
-        Assert.True(fact.UnknownReason.HasFlag(CombatImpactUnknownReason.ValueNotQuantified));
-        Assert.Equal(1, group.Count);
-        Assert.Null(group.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.None, group.ObservedCoverage);
-    }
-
-    [Fact]
-    public void Generic_action_without_a_concrete_attribute_is_not_presented()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "source",
-                    EActionCommandType.PlayerModifyAttribute,
-                    Player(ECombatantId.Player)
-                )
-            );
-        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
-        {
-            HealthAdjustments =
-            {
-                new CombatSimPlayerHealthAdjustment
-                {
-                    DamageType = EDamageType.Heal,
-                    AttributeChanged = EPlayerHealthChangeType.Health,
-                    Amount = 80,
-                },
-            },
-        };
-
-        var report = CombatImpactProjector.Project(simulation, Entities());
-        var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
-        Assert.Null(fact.Value);
-        Assert.Null(fact.Unit);
-        Assert.Equal(CombatImpactValueBasis.None, fact.ValueBasis);
-        Assert.Empty(report.Sources);
     }
 
     [Fact]
@@ -1401,33 +976,10 @@ public sealed class CombatImpactProjectorTests
         };
 
         var report = CombatImpactProjector.Project(simulation, Entities());
-        var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
         var group = Assert.Single(Assert.Single(report.Sources).Groups);
 
-        Assert.Null(fact.Value);
-        Assert.Null(fact.Unit);
-        Assert.Equal(CombatImpactValueBasis.None, fact.ValueBasis);
         Assert.Equal(1, group.Count);
         Assert.Null(group.ObservedValue);
-    }
-
-    [Fact]
-    public void Exact_health_adjustment_is_marked_as_exact_evidence()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
-            );
-        simulation.Frames[0].OpponentUpdates = Damage(-40);
-
-        var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
-
-        Assert.Equal(40, fact.Value);
-        Assert.Equal(CombatImpactValueUnit.Amount, fact.Unit);
-        Assert.Equal(CombatImpactValueBasis.ExactAdjustment, fact.ValueBasis);
-        Assert.Equal(CombatImpactUnknownReason.None, fact.UnknownReason);
     }
 
     [Fact]
@@ -1471,12 +1023,13 @@ public sealed class CombatImpactProjectorTests
                 },
             };
 
-            var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
+            var group = Assert.Single(
+                Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
+            );
 
-            Assert.Equal(expected, fact.Value);
-            Assert.Equal(CombatImpactValueUnit.Amount, fact.Unit);
-            Assert.Equal(CombatImpactValueBasis.NetFrameDelta, fact.ValueBasis);
-            Assert.Equal(CombatImpactUnknownReason.None, fact.UnknownReason);
+            Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
+            Assert.Equal(expected, group.ObservedValue);
+            Assert.Equal(CombatImpactValueUnit.Amount, group.Unit);
         }
     }
 
@@ -1526,7 +1079,14 @@ public sealed class CombatImpactProjectorTests
         };
 
         var groups = Assert
-            .Single(CombatImpactProjector.Project(simulation, Entities()).Sources)
+            .Single(
+                CombatImpactProjector
+                    .Project(
+                        simulation,
+                        EntitiesWithSourceAttribute(ECardAttributeType.RegenApplyAmount, 4)
+                    )
+                    .Sources
+            )
             .Groups;
 
         var applied = Assert.Single(
@@ -1546,102 +1106,61 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(16, cardGain.ObservedValue);
         Assert.Equal(0, cardGain.CriticalCount);
         Assert.Equal("target", Assert.Single(cardGain.Targets).Entity.Id);
-    }
-
-    [Fact]
-    public void Ordinary_regen_gain_never_inherits_applied_regen_critical_recovery()
-    {
-        var simulation = new CombatSim();
-        var target = InstanceId.TryParse("target");
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed("source", EActionCommandType.CardModifyAttribute, CardTarget("target"))
-            );
-        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
-        {
-            CardInstanceId = target,
-            Attributes =
-            {
-                [ECardAttributeType.RegenApplyAmount] = new CombatSimCardAttributeUpdate
-                {
-                    AttributeType = ECardAttributeType.RegenApplyAmount,
-                    PreviousValue = 0,
-                    CurrentValue = 4,
-                },
-            },
-        };
-        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
-        {
-            [ECardStats.RegenAdded] = 8,
-        };
-
-        var groups = Assert
-            .Single(
-                CombatImpactProjector
-                    .Project(
-                        simulation,
-                        EntitiesWithSourceAttribute(ECardAttributeType.RegenApplyAmount, 4)
-                    )
-                    .Sources
-            )
-            .Groups;
-
         Assert.All(groups, group => Assert.Equal(0, group.CriticalCount));
-        Assert.Equal(
-            4,
-            Assert
-                .Single(groups, group => group.Surface == CombatImpactEventSurface.CardAttribute)
-                .ObservedValue
-        );
     }
 
-    [Fact]
-    public void Max_health_increase_and_decrease_contest_the_same_transition()
+    [Theory]
+    [InlineData(
+        EActionCommandType.PlayerMaxHealthIncrease,
+        EActionCommandType.PlayerMaxHealthDecrease,
+        ECombatantId.Player,
+        EPlayerAttributeType.HealthMax,
+        100,
+        110
+    )]
+    [InlineData(
+        EActionCommandType.PlayerBurnApply,
+        EActionCommandType.PlayerBurnRemove,
+        ECombatantId.Opponent,
+        EPlayerAttributeType.Burn,
+        10,
+        16
+    )]
+    public void Competing_player_actions_do_not_split_one_transition(
+        EActionCommandType firstAction,
+        EActionCommandType secondAction,
+        ECombatantId target,
+        EPlayerAttributeType attribute,
+        int previous,
+        int current
+    )
     {
         var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "source",
-                    EActionCommandType.PlayerMaxHealthIncrease,
-                    Player(ECombatantId.Player)
-                )
-            );
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "trigger",
-                    EActionCommandType.PlayerMaxHealthDecrease,
-                    Player(ECombatantId.Player)
-                )
-            );
-        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        simulation.Frames[0].Events.Add(Executed("source", firstAction, Player(target)));
+        simulation.Frames[0].Events.Add(Executed("trigger", secondAction, Player(target)));
+        var update = new CombatSimPlayerUpdate
         {
             Attributes =
             {
-                [EPlayerAttributeType.HealthMax] = new CombatSimPlayerAttributeUpdate
+                [attribute] = new CombatSimPlayerAttributeUpdate
                 {
-                    AttributeType = EPlayerAttributeType.HealthMax,
-                    PreviousValue = 100,
-                    CurrentValue = 110,
+                    AttributeType = attribute,
+                    PreviousValue = previous,
+                    CurrentValue = current,
                 },
             },
         };
+        if (target == ECombatantId.Player)
+            simulation.Frames[0].PlayerUpdates = update;
+        else
+            simulation.Frames[0].OpponentUpdates = update;
 
-        var facts = CombatImpactProjector.ProjectFacts(simulation, Entities());
+        var report = CombatImpactProjector.Project(simulation, Entities());
 
-        Assert.Equal(2, facts.Count);
+        Assert.NotEmpty(report.Sources);
         Assert.All(
-            facts,
-            fact =>
-            {
-                Assert.Null(fact.Value);
-                Assert.Null(fact.Unit);
-                Assert.Equal(CombatImpactValueBasis.None, fact.ValueBasis);
-            }
+            report.Sources.SelectMany(source => source.Groups),
+            group => Assert.Null(group.ObservedValue)
         );
     }
 
@@ -1666,103 +1185,11 @@ public sealed class CombatImpactProjectorTests
             950,
             Assert
                 .Single(
-                    CombatImpactProjector.ProjectFacts(simulation, Entities()),
-                    fact => fact.Action == EActionCommandType.CardHaste
-                )
-                .Value
-        );
-        Assert.Null(
-            Assert
-                .Single(
-                    CombatImpactProjector.ProjectFacts(simulation, Entities()),
-                    fact => fact.Action == EActionCommandType.CardModifyAttribute
-                )
-                .Value
-        );
-        Assert.Equal(
-            950,
-            Assert
-                .Single(
                     Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
                 )
                 .ObservedValue
         );
         Assert.DoesNotContain(report.Sources, source => source.Entity.Id == "trigger");
-    }
-
-    [Fact]
-    public void Card_reload_uses_only_a_unique_ammo_transition()
-    {
-        var simulation = new CombatSim();
-        var target = InstanceId.TryParse("target");
-        simulation
-            .Frames[0]
-            .Events.Add(Executed("source", EActionCommandType.CardReload, CardTarget("target")));
-        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
-        {
-            CardInstanceId = target,
-            Attributes =
-            {
-                [ECardAttributeType.Ammo] = new CombatSimCardAttributeUpdate
-                {
-                    AttributeType = ECardAttributeType.Ammo,
-                    PreviousValue = 2,
-                    CurrentValue = 5,
-                },
-            },
-        };
-
-        var fact = Assert.Single(CombatImpactProjector.ProjectFacts(simulation, Entities()));
-
-        Assert.Equal(3, fact.Value);
-        Assert.Equal(CombatImpactValueUnit.Amount, fact.Unit);
-        Assert.Equal(CombatImpactValueBasis.NetFrameDelta, fact.ValueBasis);
-    }
-
-    [Fact]
-    public void Apply_and_remove_actions_contest_the_same_player_attribute_transition()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "source",
-                    EActionCommandType.PlayerBurnApply,
-                    Player(ECombatantId.Opponent)
-                )
-            );
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "trigger",
-                    EActionCommandType.PlayerBurnRemove,
-                    Player(ECombatantId.Opponent)
-                )
-            );
-        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
-        {
-            Attributes =
-            {
-                [EPlayerAttributeType.Burn] = new CombatSimPlayerAttributeUpdate
-                {
-                    AttributeType = EPlayerAttributeType.Burn,
-                    PreviousValue = 10,
-                    CurrentValue = 16,
-                },
-            },
-        };
-
-        var report = CombatImpactProjector.Project(simulation, Entities());
-        var apply = Assert.Single(
-            CombatImpactProjector.ProjectFacts(simulation, Entities()),
-            fact => fact.Action == EActionCommandType.PlayerBurnApply
-        );
-
-        Assert.Null(apply.Value);
-        Assert.Equal(CombatImpactValueBasis.None, apply.ValueBasis);
-        Assert.Null(Assert.Single(Assert.Single(report.Sources).Groups).ObservedValue);
     }
 
     [Fact]
@@ -1798,23 +1225,6 @@ public sealed class CombatImpactProjectorTests
 
         var report = CombatImpactProjector.Project(simulation, Entities());
 
-        Assert.Equal(
-            9,
-            Assert
-                .Single(
-                    CombatImpactProjector.ProjectFacts(simulation, Entities()),
-                    fact => fact.Action == EActionCommandType.PlayerRageApply
-                )
-                .Value
-        );
-        Assert.Null(
-            Assert
-                .Single(
-                    CombatImpactProjector.ProjectFacts(simulation, Entities()),
-                    fact => fact.Action == EActionCommandType.PlayerModifyAttribute
-                )
-                .Value
-        );
         Assert.Equal(
             9,
             Assert
@@ -1928,119 +1338,44 @@ public sealed class CombatImpactProjectorTests
         );
 
         Assert.Equal("ReloadAmount", group.NativeAttributeKey);
+        Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
+        Assert.Equal(CombatImpactValueUnit.Amount, group.Unit);
         Assert.Equal(2, group.Count);
         Assert.Equal(3, group.ObservedValue);
-        Assert.True(group.ObservedValueIsPartial);
+        Assert.Equal(CombatImpactCoverage.Partial, group.ObservedCoverage);
     }
 
-    [Fact]
-    public void Aura_attribute_change_is_attributed_to_its_exact_activity_source()
+    [Theory]
+    [InlineData(ECardAttributeType.DamageAmount, 187, "Amount")]
+    [InlineData(ECardAttributeType.FlyingTargets, 2, "Amount")]
+    [InlineData(ECardAttributeType.DestroyTargets, 2, "Amount")]
+    [InlineData(ECardAttributeType.ForceUseTargets, 2, "Amount")]
+    [InlineData(ECardAttributeType.EnchantTargets, 2, "Amount")]
+    [InlineData(ECardAttributeType.UpgradeTargets, 2, "Amount")]
+    [InlineData(ECardAttributeType.DisableTargets, 2, "Amount")]
+    [InlineData(ECardAttributeType.RepairTargets, 2, "Amount")]
+    [InlineData(ECardAttributeType.TransformTargets, 2, "Amount")]
+    [InlineData(ECardAttributeType.EnchantRemoveTargets, 2, "Amount")]
+    [InlineData(ECardAttributeType.ChargeAmount, 1500, "Milliseconds")]
+    [InlineData(ECardAttributeType.HasteAmount, 1500, "Milliseconds")]
+    [InlineData(ECardAttributeType.SlowAmount, 1500, "Milliseconds")]
+    [InlineData(ECardAttributeType.FreezeAmount, 1500, "Milliseconds")]
+    [InlineData(ECardAttributeType.FlatCooldownReduction, 1500, "Milliseconds")]
+    [InlineData(ECardAttributeType.Lifesteal, 12, "PercentagePoints")]
+    public void Pr132_card_modifier_attributes_and_units_are_preserved(
+        ECardAttributeType attributeType,
+        int value,
+        string expectedUnit
+    )
     {
-        var simulation = new CombatSim();
-        var target = InstanceId.TryParse("target");
-        simulation
-            .Frames[0]
-            .Events.Add(
-                new CombatSimEventEffectAuraExecuted
-                {
-                    Source = InstanceId.TryParse("effect"),
-                    TriggerSource = InstanceId.TryParse("source"),
-                    AppliedTo = { CardTarget("target") },
-                }
-            );
-        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
-        {
-            CardInstanceId = target,
-            Attributes =
-            {
-                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
-                {
-                    AttributeType = ECardAttributeType.DamageAmount,
-                    PreviousValue = 0,
-                    CurrentValue = 187,
-                },
-            },
-        };
-
-        var group = Assert.Single(
-            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
-        );
+        var group = ProjectSingleAuraAttribute(attributeType, value);
 
         Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
         Assert.Equal(CombatImpactEventSurface.CardAttribute, group.Surface);
-        Assert.Equal("DamageAmount", group.NativeAttributeKey);
-        Assert.Equal(187, group.ObservedValue);
-        Assert.Equal("target", Assert.Single(group.Targets).Entity.Id);
-    }
-
-    [Theory]
-    [InlineData(ECardAttributeType.FlyingTargets)]
-    [InlineData(ECardAttributeType.DestroyTargets)]
-    [InlineData(ECardAttributeType.ForceUseTargets)]
-    [InlineData(ECardAttributeType.EnchantTargets)]
-    [InlineData(ECardAttributeType.UpgradeTargets)]
-    [InlineData(ECardAttributeType.DisableTargets)]
-    [InlineData(ECardAttributeType.RepairTargets)]
-    [InlineData(ECardAttributeType.TransformTargets)]
-    [InlineData(ECardAttributeType.EnchantRemoveTargets)]
-    public void Pr132_modifier_aura_attributes_are_preserved(ECardAttributeType attributeType)
-    {
-        var simulation = new CombatSim();
-        var target = InstanceId.TryParse("target");
-        simulation
-            .Frames[0]
-            .Events.Add(
-                new CombatSimEventEffectAuraExecuted
-                {
-                    Source = InstanceId.TryParse("source"),
-                    AppliedTo = { CardTarget("target") },
-                }
-            );
-        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
-        {
-            CardInstanceId = target,
-            Attributes =
-            {
-                [attributeType] = new CombatSimCardAttributeUpdate
-                {
-                    AttributeType = attributeType,
-                    PreviousValue = 0,
-                    CurrentValue = 2,
-                },
-            },
-        };
-
-        var group = Assert.Single(
-            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
-        );
-
-        Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
         Assert.Equal(attributeType.ToString(), group.NativeAttributeKey);
-        Assert.Equal(2, group.ObservedValue);
+        Assert.Equal(expectedUnit, group.Unit.ToString());
+        Assert.Equal(value, group.ObservedValue);
         Assert.Equal("target", Assert.Single(group.Targets).Entity.Id);
-    }
-
-    [Theory]
-    [InlineData(ECardAttributeType.ChargeAmount)]
-    [InlineData(ECardAttributeType.HasteAmount)]
-    [InlineData(ECardAttributeType.SlowAmount)]
-    [InlineData(ECardAttributeType.FreezeAmount)]
-    [InlineData(ECardAttributeType.FlatCooldownReduction)]
-    public void Pr132_duration_modifier_units_remain_milliseconds(ECardAttributeType attributeType)
-    {
-        var group = ProjectSingleAuraAttribute(attributeType, 1500);
-
-        Assert.Equal(CombatImpactValueUnit.Milliseconds, group.ObservedUnit);
-        Assert.Equal(1500, group.ObservedValue);
-    }
-
-    [Fact]
-    public void Pr132_lifesteal_modifier_unit_remains_percentage_points()
-    {
-        var group = ProjectSingleAuraAttribute(ECardAttributeType.Lifesteal, 12);
-
-        Assert.Equal(CombatImpactValueUnit.PercentagePoints, group.ObservedUnit);
-        Assert.Equal(12, group.ObservedValue);
     }
 
     [Fact]
@@ -2083,46 +1418,8 @@ public sealed class CombatImpactProjectorTests
         Assert.Empty(CombatImpactProjector.Project(simulation, Entities()).Sources);
     }
 
-    [Fact]
-    public void Aura_player_max_health_change_is_attributed_to_its_exact_activity_source()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                new CombatSimEventEffectAuraExecuted
-                {
-                    Source = InstanceId.TryParse("effect"),
-                    TriggerSource = InstanceId.TryParse("source"),
-                    AppliedTo = { Player(ECombatantId.Player) },
-                }
-            );
-        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
-        {
-            Attributes =
-            {
-                [EPlayerAttributeType.HealthMax] = new CombatSimPlayerAttributeUpdate
-                {
-                    AttributeType = EPlayerAttributeType.HealthMax,
-                    PreviousValue = 5000,
-                    CurrentValue = 6128,
-                },
-            },
-        };
-
-        var group = Assert.Single(
-            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
-        );
-
-        Assert.Equal("HealthMax", group.NativeAttributeKey);
-        Assert.Equal(1128, group.ObservedValue);
-        Assert.Equal(
-            CombatImpactProjector.PlayerId(ECombatantId.Player),
-            Assert.Single(group.Targets).Entity.Id
-        );
-    }
-
     [Theory]
+    [InlineData(EPlayerAttributeType.HealthMax)]
     [InlineData(EPlayerAttributeType.CritChance)]
     [InlineData(EPlayerAttributeType.DamageCrit)]
     [InlineData(EPlayerAttributeType.HealAmount)]

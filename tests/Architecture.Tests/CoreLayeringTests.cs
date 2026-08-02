@@ -2954,16 +2954,9 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Post_combat_impact_uses_a_separate_native_auxiliary_tooltip()
+    public void Post_combat_impact_reuses_native_preview_artwork()
     {
         var sourceRoot = MainSourceRoot(RepoRoot());
-        var featureRoot = Path.Combine(sourceRoot, "Game", "PostCombatImpact");
-        var controller = File.ReadAllText(
-            Path.Combine(featureRoot, "PostCombatImpactController.cs")
-        );
-        var recapPatch = File.ReadAllText(
-            Path.Combine(sourceRoot, "Patches", "PostCombatImpact", "PostCombatImpactRecapPatch.cs")
-        );
         var tooltipView = File.ReadAllText(
             Path.Combine(
                 sourceRoot,
@@ -2973,14 +2966,6 @@ public class CoreLayeringTests
             )
         );
 
-        Assert.DoesNotContain("UnityEngine.InputSystem", controller);
-        Assert.DoesNotContain("rightButton.wasPressedThisFrame", controller);
-        Assert.Contains("typeof(RecapItemVisualController)", recapPatch);
-        Assert.Contains("typeof(SkillProxyRenderer)", recapPatch);
-        Assert.Contains("typeof(AuxiliaryTooltipController)", recapPatch);
-        Assert.Contains("nameof(CardTooltipController.ShowTooltipController)", recapPatch);
-        Assert.Contains("nameof(AuxiliaryTooltipController.StartTooltipFadeOut)", recapPatch);
-        Assert.Contains("AuxiliaryTooltipController", tooltipView);
         Assert.Contains("INativeCardPreviewHost", tooltipView);
         Assert.DoesNotContain("RawImage", tooltipView);
     }

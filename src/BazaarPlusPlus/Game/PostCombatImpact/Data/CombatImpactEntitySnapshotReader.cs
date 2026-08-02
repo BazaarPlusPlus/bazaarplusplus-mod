@@ -27,7 +27,11 @@ internal static class CombatImpactEntitySnapshotReader
         var order = 0;
         var cards = TheBazaar
             .Data.Entities.Values.Where(card => card?.InstanceId.Value is { Length: > 0 })
-            .OrderBy(card => CombatImpactEntityOwnerResolver.Resolve(card!.Owner?.CombatantId))
+            .OrderBy(card =>
+                card!.Owner?.CombatantId == ECombatantId.Opponent
+                    ? ECombatantId.Opponent
+                    : ECombatantId.Player
+            )
             .ThenBy(card => card!.InstanceId.Value, StringComparer.Ordinal);
         foreach (var card in cards)
         {

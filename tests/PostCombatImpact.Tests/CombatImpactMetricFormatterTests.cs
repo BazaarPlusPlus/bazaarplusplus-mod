@@ -9,64 +9,91 @@ public sealed class CombatImpactMetricFormatterTests
 
     private static readonly CombatImpactEntity Target = new("target", "Target", "Item", null, 0);
 
-    [Fact]
-    public void Group_formats_fractional_seconds_to_two_decimal_places()
+    [Theory]
+    [InlineData(
+        950,
+        (int)CombatImpactValueUnit.Milliseconds,
+        (int)CombatImpactCoverage.Exact,
+        false,
+        false,
+        "0.95s"
+    )]
+    [InlineData(
+        1000,
+        (int)CombatImpactValueUnit.Milliseconds,
+        (int)CombatImpactCoverage.Exact,
+        false,
+        false,
+        "1s"
+    )]
+    [InlineData(
+        1100,
+        (int)CombatImpactValueUnit.Milliseconds,
+        (int)CombatImpactCoverage.Exact,
+        false,
+        false,
+        "1.10s"
+    )]
+    [InlineData(
+        950,
+        (int)CombatImpactValueUnit.Milliseconds,
+        (int)CombatImpactCoverage.LowerBound,
+        false,
+        false,
+        "0.95s*"
+    )]
+    [InlineData(
+        950,
+        (int)CombatImpactValueUnit.Milliseconds,
+        (int)CombatImpactCoverage.Partial,
+        false,
+        true,
+        "0.95s*"
+    )]
+    [InlineData(
+        20,
+        (int)CombatImpactValueUnit.PercentagePoints,
+        (int)CombatImpactCoverage.Partial,
+        true,
+        false,
+        "+20%"
+    )]
+    [InlineData(
+        -10,
+        (int)CombatImpactValueUnit.Amount,
+        (int)CombatImpactCoverage.LowerBound,
+        true,
+        false,
+        "-10"
+    )]
+    public void Values_use_product_sign_duration_and_precision_rules(
+        int value,
+        int unitValue,
+        int coverageValue,
+        bool showSign,
+        bool chinese,
+        string expected
+    )
     {
-        var group = new CombatImpactGroup(
-            CombatImpactKind.Freeze,
-            "FreezeAmount",
-            3,
-            8800,
-            CombatImpactValueUnit.Milliseconds,
-            CombatImpactCoverage.Exact,
-            null,
-            0,
-            Array.Empty<CombatImpactTarget>()
+        var formatted = CombatImpactMetricFormatter.Value(
+            value,
+            (CombatImpactValueUnit)unitValue,
+            (CombatImpactCoverage)coverageValue,
+            showSign,
+            chinese
         );
 
-        Assert.Equal("×3 · 8.80s", CombatImpactMetricFormatter.Group(group, chinese: false));
-        Assert.Equal("×3 · 8.80s", CombatImpactMetricFormatter.Group(group, chinese: true));
+        Assert.Equal(expected, formatted);
+        Assert.DoesNotContain("≥", formatted, StringComparison.Ordinal);
+        Assert.DoesNotContain("≈", formatted, StringComparison.Ordinal);
+        Assert.DoesNotContain("estimated", formatted, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("估算", formatted, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Partial_attribute_change_keeps_sign_without_mathematical_approximation_symbol()
+    public void Critical_counts_use_the_native_icon_inside_the_event_count()
     {
-        Assert.Equal(
-            "+20%",
-            CombatImpactMetricFormatter.Value(
-                20,
-                CombatImpactValueUnit.PercentagePoints,
-                CombatImpactCoverage.Partial,
-                showSign: true
-            )
-        );
-    }
-
-    [Fact]
-    public void Lower_bound_decrease_preserves_negative_direction()
-    {
-        var group = new CombatImpactGroup(
-            CombatImpactKind.AttributeChange,
-            "HealthMaxDecrease",
-            1,
-            -10,
-            CombatImpactValueUnit.Amount,
-            CombatImpactCoverage.LowerBound,
-            null,
-            0,
-            []
-        )
-        {
-            Surface = CombatImpactEventSurface.CardAttribute,
-        };
-
-        Assert.Equal("-10", CombatImpactMetricFormatter.Group(group, chinese: false));
-    }
-
-    [Fact]
-    public void Applied_regen_nests_critical_count_in_its_event_count()
-    {
-        var group = new CombatImpactGroup(
+        var appliedRegen = new CombatImpactGroup(
             CombatImpactKind.AttributeChange,
             "RegenApplyAmount",
             2,
@@ -87,161 +114,145 @@ public sealed class CombatImpactMetricFormatterTests
             CriticalCount = 1,
             CriticalObservedValue = 8,
         };
+        var damage = Group(
+            CombatImpactKind.DirectDamage,
+            count: 8,
+            observedValue: 640,
+            CombatImpactValueUnit.Amount
+        ) with
+        {
+            CriticalCount = 4,
+            CriticalObservedValue = 640,
+        };
 
         Assert.Equal(
             "×2 (1 <sprite name=Crit>) · +12 total",
-            CombatImpactMetricFormatter.Group(group, chinese: false, CritIcon)
+            CombatImpactMetricFormatter.Group(appliedRegen, chinese: false, CritIcon)
         );
         Assert.Equal(
             "×2（1 <sprite name=Crit>） · 总计 +12",
-            CombatImpactMetricFormatter.Group(group, chinese: true, CritIcon)
+            CombatImpactMetricFormatter.Group(appliedRegen, chinese: true, CritIcon)
+        );
+        Assert.Equal(
+            "×8 (4 <sprite name=Crit>) · 640",
+            CombatImpactMetricFormatter.Group(damage, chinese: false, CritIcon)
+        );
+        Assert.Equal(
+            "×8（4 <sprite name=Crit>） · 640",
+            CombatImpactMetricFormatter.Group(damage, chinese: true, CritIcon)
         );
     }
 
     [Fact]
-    public void Target_without_quantified_value_still_reports_count()
+    public void Target_breakdown_distinguishes_counts_from_authoritative_totals()
     {
-        var target = new CombatImpactTarget(
+        var unquantified = new CombatImpactTarget(
             Target,
             4,
             null,
             CombatImpactValueUnit.Amount,
             CombatImpactCoverage.None
         );
-        var group = Group(
+        var unquantifiedGroup = Group(
             CombatImpactKind.Destroy,
             count: 4,
             observedValue: null,
             CombatImpactValueUnit.Amount
         );
-
-        Assert.Equal("×4", CombatImpactMetricFormatter.Target(group, target, chinese: false));
-    }
-
-    [Fact]
-    public void Total_and_observed_target_are_labeled_as_different_bases()
-    {
-        var authoritative = new CombatImpactAuthoritativeMetric(
-            CombatImpactKind.Burn,
-            "BurnApplyAmount",
-            76,
-            CombatImpactValueUnit.Amount,
-            CombatImpactAuthoritativeBasis.TotalAmount
-        );
-        var target = new CombatImpactTarget(
+        var observed = new CombatImpactTarget(
             Target,
             10,
             69,
             CombatImpactValueUnit.Amount,
             CombatImpactCoverage.Exact
         );
-        var group = new CombatImpactGroup(
+        var divergentGroup = new CombatImpactGroup(
             CombatImpactKind.Burn,
             "BurnApplyAmount",
             10,
             69,
             CombatImpactValueUnit.Amount,
             CombatImpactCoverage.Partial,
-            authoritative,
+            new CombatImpactAuthoritativeMetric(
+                CombatImpactKind.Burn,
+                "BurnApplyAmount",
+                76,
+                CombatImpactValueUnit.Amount,
+                CombatImpactAuthoritativeBasis.TotalAmount
+            ),
             0,
-            [target]
+            [observed]
         );
 
-        Assert.Equal("×10 · 76 total", CombatImpactMetricFormatter.Group(group, chinese: false));
+        Assert.Equal(
+            "×4",
+            CombatImpactMetricFormatter.Target(unquantifiedGroup, unquantified, chinese: false)
+        );
+        Assert.Equal(
+            "×10 · 76 total",
+            CombatImpactMetricFormatter.Group(divergentGroup, chinese: false)
+        );
         Assert.Equal(
             "×10 · 69 recorded",
-            CombatImpactMetricFormatter.Target(group, target, chinese: false)
+            CombatImpactMetricFormatter.Target(divergentGroup, observed, chinese: false)
         );
     }
 
     [Fact]
-    public void Application_count_stays_separate_from_lower_bound_duration()
+    public void Authoritative_bases_do_not_retype_observed_duration_or_invent_counts()
     {
-        var authoritative = new CombatImpactAuthoritativeMetric(
+        var applications = new CombatImpactAuthoritativeMetric(
             CombatImpactKind.Haste,
             "HasteAmount",
             10,
             CombatImpactValueUnit.Applications,
             CombatImpactAuthoritativeBasis.ApplicationCount
         );
-        var group = new CombatImpactGroup(
+        var matching = new CombatImpactGroup(
             CombatImpactKind.Haste,
             "HasteAmount",
             10,
             9500,
             CombatImpactValueUnit.Milliseconds,
             CombatImpactCoverage.LowerBound,
-            authoritative,
+            applications,
             0,
-            Array.Empty<CombatImpactTarget>()
+            []
         );
-
-        var formatted = CombatImpactMetricFormatter.Group(group, chinese: false);
-        Assert.Equal("×10 · 9.50s*", formatted);
-        Assert.DoesNotContain("10ms", formatted, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void Divergent_application_count_is_labeled_without_retyping_duration()
-    {
-        var group = new CombatImpactGroup(
-            CombatImpactKind.Haste,
-            "HasteAmount",
-            7,
-            9500,
-            CombatImpactValueUnit.Milliseconds,
-            CombatImpactCoverage.LowerBound,
+        var divergent = matching with { Count = 7 };
+        var authoritativeOnly = new CombatImpactGroup(
+            CombatImpactKind.Burn,
+            "BurnApplyAmount",
+            0,
+            null,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.None,
             new CombatImpactAuthoritativeMetric(
-                CombatImpactKind.Haste,
-                "HasteAmount",
-                10,
-                CombatImpactValueUnit.Applications,
-                CombatImpactAuthoritativeBasis.ApplicationCount
+                CombatImpactKind.Burn,
+                "BurnApplyAmount",
+                76,
+                CombatImpactValueUnit.Amount,
+                CombatImpactAuthoritativeBasis.TotalAmount
             ),
             0,
             []
         );
 
+        Assert.Equal("×10 · 9.50s*", CombatImpactMetricFormatter.Group(matching, chinese: false));
         Assert.Equal(
             "×7 · 9.50s* · 10 applications",
-            CombatImpactMetricFormatter.Group(group, chinese: false)
+            CombatImpactMetricFormatter.Group(divergent, chinese: false)
         );
-    }
-
-    [Theory]
-    [InlineData(950, (int)CombatImpactCoverage.Exact, false, "0.95s")]
-    [InlineData(1000, (int)CombatImpactCoverage.Exact, false, "1s")]
-    [InlineData(1100, (int)CombatImpactCoverage.Exact, false, "1.10s")]
-    [InlineData(950, (int)CombatImpactCoverage.LowerBound, false, "0.95s*")]
-    [InlineData(950, (int)CombatImpactCoverage.Partial, true, "0.95s*")]
-    public void Duration_is_always_seconds_and_marks_reconstructed_values(
-        int milliseconds,
-        int coverageValue,
-        bool chinese,
-        string expected
-    )
-    {
-        var coverage = (CombatImpactCoverage)coverageValue;
-        var formatted = CombatImpactMetricFormatter.Value(
-            milliseconds,
-            CombatImpactValueUnit.Milliseconds,
-            coverage,
-            showSign: false,
-            chinese
+        Assert.Equal(
+            "76 total",
+            CombatImpactMetricFormatter.Group(authoritativeOnly, chinese: false)
         );
-
-        Assert.Equal(expected, formatted);
-        Assert.DoesNotContain("ms", formatted, StringComparison.Ordinal);
-        Assert.DoesNotContain("≥", formatted, StringComparison.Ordinal);
-        Assert.DoesNotContain("≈", formatted, StringComparison.Ordinal);
-        Assert.DoesNotContain("estimated", formatted, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("估算", formatted, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Caused_disclosures_explain_missing_targets_and_reconstructed_details()
+    public void Disclosures_are_conditional_and_localized_for_both_perspectives()
     {
-        var group = new CombatImpactGroup(
+        var reconstructed = new CombatImpactGroup(
             CombatImpactKind.Haste,
             "HasteAmount",
             3,
@@ -252,57 +263,12 @@ public sealed class CombatImpactMetricFormatterTests
             2,
             []
         );
-        var source = new CombatImpactSource(Target, 1, 3, [group]);
-
-        Assert.Equal(
-            [
-                "* Partial breakdown: 2 effects had no target data.",
-                "* Some details and durations are reconstructed from combat events and may not match the game totals exactly.",
-            ],
-            CombatImpactMetricFormatter.CausedDisclosures(source, chinese: false)
-        );
-        Assert.Equal(
-            [
-                "* 明细不完整：2 个效果缺少目标数据。",
-                "* 部分明细及持续时间由战斗事件推算，可能与游戏总计不完全一致。",
-            ],
-            CombatImpactMetricFormatter.CausedDisclosures(source, chinese: true)
-        );
-    }
-
-    [Fact]
-    public void Exact_details_do_not_show_a_disclosure()
-    {
-        var group = Group(
+        var exact = Group(
             CombatImpactKind.Burn,
             count: 1,
             observedValue: 4,
             CombatImpactValueUnit.Amount
         );
-        var source = new CombatImpactSource(Target, 1, 1, [group]);
-        var received = new CombatImpactReceived(
-            Target,
-            1,
-            [
-                new CombatImpactIncomingGroup(
-                    CombatImpactKind.Burn,
-                    "BurnApplyAmount",
-                    1,
-                    4,
-                    CombatImpactValueUnit.Amount,
-                    CombatImpactCoverage.Exact,
-                    []
-                ),
-            ]
-        );
-
-        Assert.Empty(CombatImpactMetricFormatter.CausedDisclosures(source, chinese: false));
-        Assert.Empty(CombatImpactMetricFormatter.ReceivedDisclosures(received, chinese: false));
-    }
-
-    [Fact]
-    public void Received_reconstruction_uses_the_same_localized_disclosure()
-    {
         var received = new CombatImpactReceived(
             Target,
             1,
@@ -319,6 +285,32 @@ public sealed class CombatImpactMetricFormatterTests
             ]
         );
 
+        Assert.Equal(
+            [
+                "* Partial breakdown: 2 effects had no target data.",
+                "* Some details and durations are reconstructed from combat events and may not match the game totals exactly.",
+            ],
+            CombatImpactMetricFormatter.CausedDisclosures(
+                new CombatImpactSource(Target, 1, 3, [reconstructed]),
+                chinese: false
+            )
+        );
+        Assert.Equal(
+            [
+                "* 明细不完整：2 个效果缺少目标数据。",
+                "* 部分明细及持续时间由战斗事件推算，可能与游戏总计不完全一致。",
+            ],
+            CombatImpactMetricFormatter.CausedDisclosures(
+                new CombatImpactSource(Target, 1, 3, [reconstructed]),
+                chinese: true
+            )
+        );
+        Assert.Empty(
+            CombatImpactMetricFormatter.CausedDisclosures(
+                new CombatImpactSource(Target, 1, 1, [exact]),
+                chinese: false
+            )
+        );
         Assert.Equal(
             ["* 部分明细及持续时间由战斗事件推算，可能与游戏总计不完全一致。"],
             CombatImpactMetricFormatter.ReceivedDisclosures(received, chinese: true)
@@ -349,31 +341,7 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Fact]
-    public void Authoritative_only_group_omits_fake_zero_occurrence_count()
-    {
-        var group = new CombatImpactGroup(
-            CombatImpactKind.Burn,
-            "BurnApplyAmount",
-            0,
-            null,
-            CombatImpactValueUnit.Amount,
-            CombatImpactCoverage.None,
-            new CombatImpactAuthoritativeMetric(
-                CombatImpactKind.Burn,
-                "BurnApplyAmount",
-                76,
-                CombatImpactValueUnit.Amount,
-                CombatImpactAuthoritativeBasis.TotalAmount
-            ),
-            0,
-            []
-        );
-
-        Assert.Equal("76 total", CombatImpactMetricFormatter.Group(group, chinese: false));
-    }
-
-    [Fact]
-    public void Incoming_group_omits_redundant_observed_label_without_source_card_stats()
+    public void Incoming_group_uses_the_same_count_and_value_notation_in_both_languages()
     {
         var group = new CombatImpactIncomingGroup(
             CombatImpactKind.Burn,
@@ -387,30 +355,6 @@ public sealed class CombatImpactMetricFormatterTests
 
         Assert.Equal("×10 · 69", CombatImpactMetricFormatter.IncomingGroup(group, chinese: false));
         Assert.Equal("×10 · 69", CombatImpactMetricFormatter.IncomingGroup(group, chinese: true));
-    }
-
-    [Fact]
-    public void Critical_count_uses_the_supplied_native_icon_without_copy()
-    {
-        var group = Group(
-            CombatImpactKind.DirectDamage,
-            count: 8,
-            observedValue: 640,
-            CombatImpactValueUnit.Amount
-        ) with
-        {
-            CriticalCount = 4,
-            CriticalObservedValue = 640,
-        };
-
-        Assert.Equal(
-            "×8 (4 <sprite name=Crit>) · 640",
-            CombatImpactMetricFormatter.Group(group, chinese: false, CritIcon)
-        );
-        Assert.Equal(
-            "×8（4 <sprite name=Crit>） · 640",
-            CombatImpactMetricFormatter.Group(group, chinese: true, CritIcon)
-        );
     }
 
     private static CombatImpactGroup Group(

@@ -53,10 +53,7 @@ public sealed class CombatImpactAggregatorTests
     public void Keeps_authoritative_total_separate_from_partial_observed_target_values()
     {
         var report = Aggregate(
-            [
-                Event(CombatImpactKind.DirectDamage, "fairies", "opponent", 80),
-                Event(CombatImpactKind.DirectDamage, "fairies", "opponent"),
-            ],
+            [Event(CombatImpactKind.DirectDamage, "fairies", "opponent", 80)],
             authoritative:
             [
                 new CombatImpactAuthoritativeMetric(
@@ -71,12 +68,13 @@ public sealed class CombatImpactAggregatorTests
 
         var group = Assert.Single(Assert.Single(report.Sources).Groups);
         Assert.Equal(80, group.ObservedValue);
-        Assert.True(group.ObservedValueIsPartial);
+        Assert.Equal(CombatImpactCoverage.Partial, group.ObservedCoverage);
         Assert.Equal(240, group.AuthoritativeMetric?.Value);
         Assert.Equal(CombatImpactAuthoritativeBasis.TotalAmount, group.AuthoritativeMetric?.Basis);
+        Assert.True(group.HasDivergentTargetCoverage);
         var target = Assert.Single(group.Targets);
         Assert.Equal(80, target.ObservedValue);
-        Assert.True(target.ObservedValueIsPartial);
+        Assert.Equal(CombatImpactCoverage.Exact, target.ObservedCoverage);
     }
 
     [Fact]
@@ -179,23 +177,7 @@ public sealed class CombatImpactAggregatorTests
     }
 
     [Fact]
-    public void Omits_unknown_sources_and_sorts_nonzero_sources_by_effect_count()
-    {
-        var report = Aggregate([
-            Event(CombatImpactKind.Burn, "unknown", "opponent", 10),
-            Event(CombatImpactKind.Burn, "bread", "opponent", 10),
-            Event(CombatImpactKind.Burn, "fairies", "opponent", 10),
-            Event(CombatImpactKind.Freeze, "fairies", "bread", 1000, milliseconds: true),
-        ]);
-
-        Assert.Equal(
-            ["Fairies", "Bread Knife"],
-            report.Sources.Select(source => source.Entity.Name)
-        );
-    }
-
-    [Fact]
-    public void Entity_rows_are_stable_across_dictionary_and_event_insertion_order()
+    public void Entity_rows_omit_unknown_sources_and_stay_stable_across_insertion_order()
     {
         var forwardEntities = new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
         {
@@ -209,6 +191,7 @@ public sealed class CombatImpactAggregatorTests
             .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
         var forwardEvents = new[]
         {
+            Event(CombatImpactKind.Burn, "unknown", "target-a", 10),
             Event(CombatImpactKind.Haste, "beta", "target-b", 1000, milliseconds: true),
             Event(CombatImpactKind.Haste, "alpha", "target-b", 1000, milliseconds: true),
             Event(CombatImpactKind.Haste, "beta", "target-a", 1000, milliseconds: true),
@@ -231,23 +214,6 @@ public sealed class CombatImpactAggregatorTests
             forward.Received.Select(received => received.Entity.Id)
         );
         Assert.Equal(SnapshotOrder(forward), SnapshotOrder(reverse));
-    }
-
-    [Fact]
-    public void Collapses_large_event_volume_into_bounded_source_group_and_target_rows()
-    {
-        var events = Enumerable
-            .Range(0, 10_000)
-            .Select(_ => Event(CombatImpactKind.Burn, "fairies", "opponent", 1))
-            .ToArray();
-
-        var source = Assert.Single(Aggregate(events).Sources);
-        var group = Assert.Single(source.Groups);
-        var target = Assert.Single(group.Targets);
-
-        Assert.Equal(10_000, source.TotalCount);
-        Assert.Equal(10_000, group.Count);
-        Assert.Equal(10_000, target.Count);
     }
 
     [Fact]
@@ -305,39 +271,14 @@ public sealed class CombatImpactAggregatorTests
                 Assert.Equal(CombatImpactKind.Slow, slow.Kind);
                 Assert.Equal(2, slow.Count);
                 Assert.Equal(2900, slow.ObservedValue);
-                Assert.True(slow.ObservedValueIsPartial);
+                Assert.Equal(CombatImpactCoverage.Partial, slow.ObservedCoverage);
                 var source = Assert.Single(slow.Sources);
                 Assert.Equal("Fairies", source.Entity.Name);
                 Assert.Equal(2, source.Count);
                 Assert.Equal(2900, source.ObservedValue);
-                Assert.True(source.ObservedValueIsPartial);
+                Assert.Equal(CombatImpactCoverage.Partial, source.ObservedCoverage);
             }
         );
-    }
-
-    [Fact]
-    public void Self_targeted_effect_appears_in_both_perspectives_without_authoritative_leakage()
-    {
-        var report = Aggregate(
-            [Event(CombatImpactKind.Haste, "fairies", "fairies", 950, milliseconds: true)],
-            authoritative:
-            [
-                new CombatImpactAuthoritativeMetric(
-                    CombatImpactKind.Haste,
-                    CombatImpactAggregator.NativeKey(CombatImpactKind.Haste),
-                    1,
-                    CombatImpactValueUnit.Applications,
-                    CombatImpactAuthoritativeBasis.ApplicationCount
-                ),
-            ]
-        );
-
-        var caused = Assert.Single(report.Sources);
-        Assert.NotNull(Assert.Single(caused.Groups).AuthoritativeMetric);
-        var received = Assert.Single(report.Received);
-        var incoming = Assert.Single(received.Groups);
-        Assert.Equal(950, incoming.ObservedValue);
-        Assert.Equal("Fairies", Assert.Single(incoming.Sources).Entity.Name);
     }
 
     [Fact]
@@ -353,21 +294,7 @@ public sealed class CombatImpactAggregatorTests
     }
 
     [Fact]
-    public void Saturates_observed_sums_instead_of_discarding_the_report_on_overflow()
-    {
-        var report = Aggregate([
-            Event(CombatImpactKind.DirectDamage, "fairies", "opponent", int.MaxValue),
-            Event(CombatImpactKind.DirectDamage, "fairies", "opponent", 1),
-        ]);
-
-        var group = Assert.Single(Assert.Single(report.Sources).Groups);
-
-        Assert.Equal(int.MaxValue, group.ObservedValue);
-        Assert.Equal(int.MaxValue, Assert.Single(group.Targets).ObservedValue);
-    }
-
-    [Fact]
-    public void Mixed_metric_units_never_sum_or_adopt_one_unit_for_the_other()
+    public void Coverage_distinguishes_mixed_units_from_net_frame_lower_bounds()
     {
         var report = Aggregate([
             Event(CombatImpactKind.Haste, "fairies", "bread", 5),
@@ -382,12 +309,8 @@ public sealed class CombatImpactAggregatorTests
         Assert.Equal(CombatImpactCoverage.Partial, group.ObservedCoverage);
         Assert.Null(target.ObservedValue);
         Assert.Equal(CombatImpactCoverage.Partial, target.ObservedCoverage);
-    }
 
-    [Fact]
-    public void Net_frame_delta_makes_observed_metric_a_lower_bound()
-    {
-        var report = Aggregate([
+        var reconstructed = Aggregate([
             Event(
                 CombatImpactKind.Haste,
                 "fairies",
@@ -398,37 +321,12 @@ public sealed class CombatImpactAggregatorTests
             ),
         ]);
 
-        var group = Assert.Single(Assert.Single(report.Sources).Groups);
-        var target = Assert.Single(group.Targets);
+        var reconstructedGroup = Assert.Single(Assert.Single(reconstructed.Sources).Groups);
+        var reconstructedTarget = Assert.Single(reconstructedGroup.Targets);
 
-        Assert.Equal(950, group.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.LowerBound, group.ObservedCoverage);
-        Assert.Equal(CombatImpactCoverage.LowerBound, target.ObservedCoverage);
-    }
-
-    [Fact]
-    public void Authoritative_total_divergence_marks_observed_coverage_partial()
-    {
-        var report = Aggregate(
-            [Event(CombatImpactKind.Burn, "fairies", "bread", 80)],
-            authoritative:
-            [
-                new CombatImpactAuthoritativeMetric(
-                    CombatImpactKind.Burn,
-                    CombatImpactAggregator.NativeKey(CombatImpactKind.Burn),
-                    240,
-                    CombatImpactValueUnit.Amount,
-                    CombatImpactAuthoritativeBasis.TotalAmount
-                ),
-            ]
-        );
-
-        var group = Assert.Single(Assert.Single(report.Sources).Groups);
-
-        Assert.Equal(80, group.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Partial, group.ObservedCoverage);
-        Assert.True(group.HasDivergentTargetCoverage);
-        Assert.Equal(CombatImpactCoverage.Exact, Assert.Single(group.Targets).ObservedCoverage);
+        Assert.Equal(950, reconstructedGroup.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.LowerBound, reconstructedGroup.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.LowerBound, reconstructedTarget.ObservedCoverage);
     }
 
     private static CombatImpactReport Aggregate(

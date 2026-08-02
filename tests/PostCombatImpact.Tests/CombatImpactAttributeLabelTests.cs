@@ -7,97 +7,91 @@ namespace PostCombatImpact.Tests;
 public sealed class CombatImpactAttributeLabelTests
 {
     [Theory]
-    [InlineData("HealthMax", "Max Health")]
-    [InlineData("HealthMaxIncrease", "Max Health")]
-    [InlineData("DamageAmount", "Damage")]
-    [InlineData("CritChance", "Crit Chance")]
-    [InlineData("BurnApplyAmount", "Burn")]
-    [InlineData("FlyingTargets", "Flying Targets")]
-    [InlineData("DestroyTargets", "Destroy Targets")]
-    [InlineData("ForceUseTargets", "Use Targets")]
-    [InlineData("PercentDamageReduction", "Damage Reduction")]
-    [InlineData("RerollCostModifier", "Reroll Cost")]
-    public void Internal_attribute_keys_use_player_facing_english_labels(
+    [InlineData(
+        "HealthMax",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Max Health",
+        "最大生命值"
+    )]
+    [InlineData(
+        "HealthMaxIncrease",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Max Health",
+        "最大生命值"
+    )]
+    [InlineData("DamageAmount", (int)CombatImpactEventSurface.AppliedEffect, "Damage", "伤害")]
+    [InlineData("CritChance", (int)CombatImpactEventSurface.AppliedEffect, "Crit Chance", "暴击率")]
+    [InlineData("BurnApplyAmount", (int)CombatImpactEventSurface.AppliedEffect, "Burn", "燃烧")]
+    [InlineData(
+        "FlyingTargets",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Flying Targets",
+        "起飞目标"
+    )]
+    [InlineData(
+        "DestroyTargets",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Destroy Targets",
+        "摧毁目标"
+    )]
+    [InlineData(
+        "ForceUseTargets",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Use Targets",
+        "使用目标"
+    )]
+    [InlineData(
+        "PercentDamageReduction",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Damage Reduction",
+        "伤害减免"
+    )]
+    [InlineData(
+        "RerollCostModifier",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Reroll Cost",
+        "刷新费用"
+    )]
+    [InlineData(
+        "DamageAmount",
+        (int)CombatImpactEventSurface.CardAttribute,
+        "Damage Gain",
+        "伤害增加"
+    )]
+    [InlineData(
+        "RegenApplyAmount",
+        (int)CombatImpactEventSurface.CardAttribute,
+        "Regen Gain",
+        "再生增加"
+    )]
+    [InlineData(
+        "CardModifyAttribute",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Card Attribute Change",
+        "卡牌属性变化"
+    )]
+    [InlineData(
+        "PlayerModifyAttribute",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Player Attribute Change",
+        "玩家属性变化"
+    )]
+    [InlineData(
+        "FutureAttributeValue",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Attribute Change",
+        "属性变化"
+    )]
+    public void Internal_keys_use_localized_player_facing_labels(
         string key,
-        string expected
-    ) =>
-        Assert.Equal(
-            expected,
-            CombatImpactAttributeLabel.Resolve(
-                key,
-                CombatImpactEventSurface.AppliedEffect,
-                chinese: false
-            )
-        );
-
-    [Theory]
-    [InlineData("HealthMax", "最大生命值")]
-    [InlineData("DamageAmount", "伤害")]
-    [InlineData("CritChance", "暴击率")]
-    [InlineData("FlyingTargets", "起飞目标")]
-    [InlineData("DestroyTargets", "摧毁目标")]
-    [InlineData("PercentDamageReduction", "伤害减免")]
-    public void Internal_attribute_keys_use_player_facing_chinese_labels(
-        string key,
-        string expected
-    ) =>
-        Assert.Equal(
-            expected,
-            CombatImpactAttributeLabel.Resolve(
-                key,
-                CombatImpactEventSurface.AppliedEffect,
-                chinese: true
-            )
-        );
-
-    [Theory]
-    [InlineData("DamageAmount", "Damage Gain", "伤害增加")]
-    [InlineData("RegenApplyAmount", "Regen Gain", "再生增加")]
-    public void Card_attribute_values_are_distinct_from_applied_effects(
-        string key,
+        int surfaceValue,
         string english,
         string chinese
     )
     {
-        Assert.Equal(
-            english,
-            CombatImpactAttributeLabel.Resolve(
-                key,
-                CombatImpactEventSurface.CardAttribute,
-                chinese: false
-            )
-        );
-        Assert.Equal(
-            chinese,
-            CombatImpactAttributeLabel.Resolve(
-                key,
-                CombatImpactEventSurface.CardAttribute,
-                chinese: true
-            )
-        );
-    }
+        var surface = (CombatImpactEventSurface)surfaceValue;
 
-    [Theory]
-    [InlineData("CardModifyAttribute", "Card Attribute Change", "卡牌属性变化")]
-    [InlineData("PlayerModifyAttribute", "Player Attribute Change", "玩家属性变化")]
-    [InlineData("FutureAttributeValue", "Attribute Change", "属性变化")]
-    public void Unresolved_keys_use_safe_generic_labels(string key, string english, string chinese)
-    {
-        Assert.Equal(
-            english,
-            CombatImpactAttributeLabel.Resolve(
-                key,
-                CombatImpactEventSurface.AppliedEffect,
-                chinese: false
-            )
-        );
-        Assert.Equal(
-            chinese,
-            CombatImpactAttributeLabel.Resolve(
-                key,
-                CombatImpactEventSurface.AppliedEffect,
-                chinese: true
-            )
-        );
+        Assert.Equal(english, CombatImpactAttributeLabel.Resolve(key, surface, chinese: false));
+        Assert.Equal(chinese, CombatImpactAttributeLabel.Resolve(key, surface, chinese: true));
     }
 }
