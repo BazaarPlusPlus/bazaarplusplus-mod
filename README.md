@@ -44,14 +44,6 @@ BazaarPlusPlus 是一个面向《The Bazaar》的 BepInEx 5 模组：战斗 UI �
 dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj -p:ManagedPath=/path/to/TheBazaar_Data/Managed
 ```
 
-发布或构建前如需使用经过审核的本地语音字幕 JSON，可覆盖远端 seed：
-
-```bash
-./run.sh publish -p:VoiceLinesSourcePath=/absolute/path/to/voice-lines.json
-```
-
-指定本地文件时，构建会使用与运行时相同的完整 schema、行数和 `contentHash` 校验；校验失败会直接终止构建。该选项只覆盖嵌入 seed，运行时缓存过期后的云端刷新策略不变。
-
 - `voice-lines.json` 与 `tenwin_builds.json` 不存入仓库，构建时从 `src/BazaarPlusPlus/obj/remote-data/` 的共享副本嵌入；副本缺失时自动下载一次，也可用 `./run.sh fetch-data` 手动刷新。
 - 直接依赖版本集中在 `Directory.Packages.props`；改动后用 `./run.sh restore-locks` 刷新发布程序集的锁文件，`./run.sh restore-locked` 校验。
 - 普通 Release 只编译；只有 `./run.sh publish` 会写入相邻 installer 仓库并生成 `BepInEx.zip`。
