@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
 using BazaarPlusPlus.Game.PostCombatImpact.Ui;
@@ -451,12 +452,21 @@ internal sealed class PostCombatImpactController : MonoBehaviour
                 request.Card,
                 request.TooltipData.GetTitle()
             );
+        var isSkill = request.Card.Type == ECardType.Skill;
 
         bool shown;
         try
         {
             auxiliary.AssignTooltipFrame(request.Card.Tier);
-            shown = _view.Show(auxiliary, primary, entityName, source, received, perspective);
+            shown = _view.Show(
+                auxiliary,
+                primary,
+                entityName,
+                isSkill,
+                source,
+                received,
+                perspective
+            );
         }
         catch (Exception ex)
         {

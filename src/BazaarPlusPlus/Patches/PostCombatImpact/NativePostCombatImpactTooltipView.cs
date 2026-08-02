@@ -169,6 +169,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         AuxiliaryTooltipController auxiliary,
         CardTooltipController primary,
         string entityName,
+        bool isSkill,
         CombatImpactSource? source,
         CombatImpactReceived? received,
         CombatImpactPerspective perspective
@@ -241,7 +242,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         var root = CreateVertical("BppPostCombatImpactContent", auxiliary.auxParent.transform, 8f);
         _contentRoot = root.gameObject;
         var rootLayout = root.GetComponent<VerticalLayoutGroup>();
-        rootLayout.padding = new RectOffset(0, 0, 14, 8);
+        rootLayout.padding = new RectOffset(0, 0, 14, 0);
         AddLayout(
             root.gameObject,
             preferredHeight: -1f,
@@ -261,6 +262,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             auxiliary.bodyText,
             causedRoot,
             entityName,
+            isSkill,
             source,
             _receivedPerspectiveAvailable,
             generation
@@ -270,6 +272,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             auxiliary.bodyText,
             receivedRoot,
             entityName,
+            isSkill,
             received,
             _receivedPerspectiveAvailable,
             generation
@@ -1022,6 +1025,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         TMP_Text bodyTemplate,
         RectTransform root,
         string entityName,
+        bool isSkill,
         CombatImpactSource? source,
         bool canSwitchPerspective,
         int generation
@@ -1032,6 +1036,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             bodyTemplate,
             root,
             CombatImpactPerspective.Caused,
+            isSkill,
             canSwitchPerspective
         );
         BuildIdentitySummary(
@@ -1073,6 +1078,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         TMP_Text bodyTemplate,
         RectTransform root,
         string entityName,
+        bool isSkill,
         CombatImpactReceived? received,
         bool canSwitchPerspective,
         int generation
@@ -1083,6 +1089,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             bodyTemplate,
             root,
             CombatImpactPerspective.Received,
+            isSkill,
             canSwitchPerspective
         );
         BuildIdentitySummary(
@@ -1134,6 +1141,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         TMP_Text bodyTemplate,
         RectTransform parent,
         CombatImpactPerspective perspective,
+        bool isSkill,
         bool canSwitchPerspective
     )
     {
@@ -1152,8 +1160,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             bodyTemplate,
             metadata,
             perspective == CombatImpactPerspective.Caused
-                ? T("此卡造成", "CAUSED BY THIS CARD")
-                : T("此卡受到", "RECEIVED BY THIS CARD"),
+                ? isSkill
+                    ? T("此技能造成", "CAUSED BY THIS SKILL")
+                    : T("此卡造成", "CAUSED BY THIS CARD")
+                : isSkill
+                    ? T("此技能受到", "RECEIVED BY THIS SKILL")
+                    : T("此卡受到", "RECEIVED BY THIS CARD"),
             ModeLabelFontScale,
             flexibleWidth: 1f
         );

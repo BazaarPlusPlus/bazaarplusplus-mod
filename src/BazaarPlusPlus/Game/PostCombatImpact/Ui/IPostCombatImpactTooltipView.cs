@@ -32,6 +32,7 @@ internal interface IPostCombatImpactTooltipView : IDisposable
         AuxiliaryTooltipController auxiliary,
         CardTooltipController primary,
         string entityName,
+        bool isSkill,
         CombatImpactSource? source,
         CombatImpactReceived? received,
         CombatImpactPerspective perspective
