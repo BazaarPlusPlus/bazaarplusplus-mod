@@ -1,4 +1,6 @@
 #nullable enable
+using System.Globalization;
+
 namespace BazaarPlusPlus.Game.CombatStatusBar;
 
 internal enum CombatStatusBarButtonKind
@@ -33,7 +35,8 @@ internal readonly record struct CombatStatusBarButtonVisuals(
 
 internal sealed partial class CombatStatusBar
 {
-    private static readonly float[] SpeedSteps = { 0.5f, 0.67f, 1f };
+    private static readonly float[] DefaultSpeedSteps = { 0.5f, 0.67f, 1f };
+    private static float[] SpeedSteps = (float[])DefaultSpeedSteps.Clone();
 
     private static string? _cachedElapsedText;
     private static long _cachedElapsedTicks;
@@ -140,7 +143,12 @@ internal sealed partial class CombatStatusBar
 
     internal static float NormalizeConfiguredDefaultSpeed(float configuredSpeed)
     {
-        return IsSupportedSpeedStep(configuredSpeed) ? configuredSpeed : 1f;
+        return IsSupportedSpeedStep(configuredSpeed) ? configuredSpeed : SpeedSteps[^1];
+    }
+
+    internal static void ConfigureCombatSpeedSteps(string? configuredSteps)
+    {
+        SpeedSteps = ParseCombatSpeedSteps(configuredSteps);
     }
 
     internal static string GetDisplayedTimeLabel()
@@ -172,6 +180,7 @@ internal sealed partial class CombatStatusBar
     {
         IsCombatPlaybackActive = false;
         IsCombatPaused = false;
+        SpeedSteps = (float[])DefaultSpeedSteps.Clone();
         CombatSpeedMultiplier = 1f;
         ProcessedCombatFrames = 0;
         TotalCombatFrames = 0;
@@ -271,6 +280,39 @@ internal sealed partial class CombatStatusBar
         }
 
         return false;
+    }
+
+    private static float[] ParseCombatSpeedSteps(string? configuredSteps)
+    {
+        if (string.IsNullOrWhiteSpace(configuredSteps))
+            return (float[])DefaultSpeedSteps.Clone();
+
+        var parsedSteps = new List<float>();
+        foreach (var token in configuredSteps.Split(','))
+        {
+            if (
+                !float.TryParse(
+                    token.Trim(),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out var step
+                )
+                || step <= 0f
+                || step > 1f
+                || float.IsNaN(step)
+                || float.IsInfinity(step)
+            )
+                continue;
+
+            if (!parsedSteps.Contains(step))
+                parsedSteps.Add(step);
+        }
+
+        if (parsedSteps.Count == 0)
+            return (float[])DefaultSpeedSteps.Clone();
+
+        parsedSteps.Sort();
+        return parsedSteps.ToArray();
     }
 
     static partial void PersistCombatSpeed(float speed);

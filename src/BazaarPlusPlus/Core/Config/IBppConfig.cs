@@ -30,6 +30,8 @@ internal interface IBppConfig
 
     ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; }
 
+    ConfigEntry<string>? CombatStatusBarSpeedMultiplierStepsConfig { get; }
+
     ConfigEntry<bool>? EndOfRunScreenshotEnabledConfig { get; }
 
     ConfigEntry<string>? EnchantPreviewHotkeyPathConfig { get; }

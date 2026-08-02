@@ -174,6 +174,22 @@ public sealed class CombatStatusBarStateTests : IDisposable
     }
 
     [Fact]
+    public void CombatSpeed_UsesConfiguredStepsAndFallsBack()
+    {
+        CombatStatusBar.ConfigureCombatSpeedSteps("1, 0.80, invalid, 0.60, 0.8, 1.25");
+
+        Assert.Equal(new[] { 0.6f, 0.8f, 1f }, CombatStatusBar.CombatSpeedSteps.ToArray());
+        Assert.Equal(1f, CombatStatusBar.NormalizeConfiguredDefaultSpeed(0.75f), 3);
+
+        CombatStatusBar.SetCombatSpeed(0.8f);
+        CombatStatusBar.StepCombatSpeed(-1);
+        Assert.Equal(0.6f, CombatStatusBar.CombatSpeedMultiplier, 3);
+
+        CombatStatusBar.ConfigureCombatSpeedSteps("invalid, -1, 0");
+        Assert.Equal(new[] { 0.5f, 0.67f, 1f }, CombatStatusBar.CombatSpeedSteps.ToArray());
+    }
+
+    [Fact]
     public void CombatSpeed_CanStepWithinBounds_AndOnlyOverridesDuringPlayback()
     {
         Assert.False(CombatStatusBar.ShouldOverrideCombatSpeed(1f));

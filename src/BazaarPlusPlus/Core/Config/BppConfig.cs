@@ -34,6 +34,8 @@ internal sealed class BppConfig : IBppConfig
 
     public ConfigEntry<float>? CombatStatusBarSpeedMultiplierConfig { get; private set; }
 
+    public ConfigEntry<string>? CombatStatusBarSpeedMultiplierStepsConfig { get; private set; }
+
     public ConfigEntry<bool>? EndOfRunScreenshotEnabledConfig { get; private set; }
 
     public ConfigEntry<string>? EnchantPreviewHotkeyPathConfig { get; private set; }
@@ -140,7 +142,13 @@ internal sealed class BppConfig : IBppConfig
             "CombatStatusBar",
             "SpeedMultiplier",
             1.0f,
-            "Default combat playback speed multiplier. The speed buttons cycle between 0.50, 0.67, and 1.00."
+            "Selected combat playback speed multiplier. The value must match one of the configured SpeedMultiplierSteps."
+        );
+        CombatStatusBarSpeedMultiplierStepsConfig = config.Bind(
+            "CombatStatusBar",
+            "SpeedMultiplierSteps",
+            "0.50,0.67,1.00",
+            "Comma-separated combat playback speed options used by the speed buttons. Values must be greater than 0 and no greater than 1."
         );
         EndOfRunScreenshotEnabledConfig = config.Bind(
             "Screenshots",
