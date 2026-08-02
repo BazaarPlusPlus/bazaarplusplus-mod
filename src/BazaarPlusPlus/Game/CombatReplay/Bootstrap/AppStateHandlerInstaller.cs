@@ -8,6 +8,8 @@ namespace BazaarPlusPlus.Game.CombatReplay.Bootstrap;
 
 internal static class AppStateHandlerInstaller
 {
+    private static readonly TimeSpan PresentationReadyTimeout = TimeSpan.FromSeconds(5);
+
     internal static void EnsureAppStateHandlersInitialized(NetMessageProcessor? processor = null)
     {
         if (ReplayBootstrap.TryGetAppStateField<GameSimHandler>("_gameSimHandler") != null)
@@ -79,9 +81,9 @@ internal static class AppStateHandlerInstaller
                     && !boardManager.IsCarpetUnrolling
                     && !boardManager.HasCardsToReveal();
             },
-            timeout: TimeSpan.FromSeconds(5)
+            timeout: PresentationReadyTimeout
         );
 
-        await ReplayItemPresentationReadiness.WaitForActiveSetupsAsync();
+        await ReplayItemPresentationReadiness.WaitForActiveSetupsAsync(PresentationReadyTimeout);
     }
 }

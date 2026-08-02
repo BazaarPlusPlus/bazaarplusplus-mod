@@ -38,7 +38,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     private int _hoverRevision;
     private int _suppressedHoverRevision = -1;
     private bool _nativeAuxiliaryTakeoverActive;
-    private CombatImpactPerspective _activePerspective = CombatImpactPerspective.Caused;
     private CombatImpactPerspective _requestedPerspective = CombatImpactPerspective.Caused;
 
     internal void Initialize(PostCombatImpactModule module, IPostCombatImpactTooltipView view)
@@ -104,7 +103,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             if (!_view.SetPerspective(perspective, _hoveredRequest.Anchor))
                 return;
             _requestedPerspective = perspective;
-            _activePerspective = perspective;
             LogInteraction(
                 perspective == CombatImpactPerspective.Received
                     ? PostCombatImpactReasonCode.PerspectiveReceived
@@ -114,6 +112,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         catch (Exception ex)
         {
             _requestedPerspective = activeBefore;
+            _suppressedHoverRevision = _hoverRevision;
             HideActiveSelection();
             LogInteractionFailure(PostCombatImpactReasonCode.TooltipRenderException, ex);
         }
@@ -485,7 +484,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         _selectedSourceId = request.SourceId;
         _activePrimaryTooltip = primary;
         _activeAuxiliaryTooltip = auxiliary;
-        _activePerspective = perspective;
         _pendingShow = null;
         _settlePresentation = StartCoroutine(
             SettleAndPositionPresentation(
@@ -577,6 +575,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         catch (Exception ex)
         {
             _settlePresentation = null;
+            _suppressedHoverRevision = revision;
             HideActiveSelection();
             LogInteractionFailure(PostCombatImpactReasonCode.TooltipRenderException, ex);
             yield break;
@@ -717,7 +716,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         _selectedSourceId = null;
         _activePrimaryTooltip = null;
         _activeAuxiliaryTooltip = null;
-        _activePerspective = CombatImpactPerspective.Caused;
     }
 
     internal void OnNativeTooltipPreparing(
@@ -772,7 +770,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             _selectedSourceId = null;
             _activePrimaryTooltip = null;
             _activeAuxiliaryTooltip = null;
-            _activePerspective = CombatImpactPerspective.Caused;
             LogInteraction(PostCombatImpactReasonCode.NativeAuxiliaryDisplaced);
         }
 
@@ -797,7 +794,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             _selectedSourceId = null;
             _activePrimaryTooltip = null;
             _activeAuxiliaryTooltip = null;
-            _activePerspective = CombatImpactPerspective.Caused;
             LogInteraction(PostCombatImpactReasonCode.NativeAuxiliaryHidden);
             if (shouldResumeStableHover)
             {
@@ -1010,7 +1006,6 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         _selectedSourceId = null;
         _activePrimaryTooltip = null;
         _activeAuxiliaryTooltip = null;
-        _activePerspective = CombatImpactPerspective.Caused;
     }
 
     private static bool IsRecapOpen()

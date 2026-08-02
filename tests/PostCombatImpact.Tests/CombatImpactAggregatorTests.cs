@@ -1,4 +1,3 @@
-using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
 using Xunit;
 
@@ -460,7 +459,6 @@ public sealed class CombatImpactAggregatorTests
                 entities,
                 events,
                 new Dictionary<string, int>(),
-                new Dictionary<string, int>(),
                 metrics
             )
         );
@@ -474,7 +472,6 @@ public sealed class CombatImpactAggregatorTests
             new CombatImpactProjectionInput(
                 entities,
                 events,
-                new Dictionary<string, int>(),
                 new Dictionary<string, int>(),
                 new Dictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>>()
             )
@@ -520,5 +517,5 @@ public sealed class CombatImpactAggregatorTests
         };
 
     private static CombatImpactEntity Entity(string id, string name, string type, int order) =>
-        new(id, name, type, null, null, ECombatantId.Player, order);
+        new(id, name, type, null, order);
 }

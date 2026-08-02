@@ -13,7 +13,6 @@ internal enum TooltipLogReasonCode
     InventoryReadException,
     PassiveEffectParentUnavailable,
     TextControllerUnavailable,
-    CustomContentBuildException,
     PreviewRefreshException,
     NoPrimaryController,
     NoItemTooltipData,
@@ -41,7 +40,6 @@ internal enum TooltipSectionId
     AggregateMissingTypes,
     EncounterPreview,
     HeroLevelRewards,
-    PostCombatImpact,
 }
 
 internal enum TooltipPreviewTargetOutcome

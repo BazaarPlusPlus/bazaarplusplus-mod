@@ -71,7 +71,6 @@ internal static class CombatImpactMetricFormatter
             group.Kind == CombatImpactKind.AttributeChange,
             chinese
         );
-        var authoritative = group.AuthoritativeMetric;
         var needsObservedBasis = group.HasDivergentTargetCoverage;
         if (needsObservedBasis)
             value = chinese ? $"已记录 {value}" : $"{value} recorded";
@@ -108,7 +107,7 @@ internal static class CombatImpactMetricFormatter
 
     private static string Count(int count, int criticalCount, bool chinese, string? criticalMarker)
     {
-        var baseCount = chinese ? $"{count} 次" : $"{count}×";
+        var baseCount = $"×{count}";
         if (criticalCount <= 0 || string.IsNullOrWhiteSpace(criticalMarker))
             return baseCount;
         return chinese
@@ -206,19 +205,14 @@ internal static class CombatImpactMetricFormatter
         var sign = showSign && value >= 0 ? "+" : string.Empty;
         return unit switch
         {
-            CombatImpactValueUnit.Milliseconds => Duration(value, coverage, sign, chinese),
+            CombatImpactValueUnit.Milliseconds => Duration(value, coverage, sign),
             CombatImpactValueUnit.PercentagePoints => $"{sign}{Integer(value)}%",
             CombatImpactValueUnit.Applications => Integer(value),
             _ => $"{sign}{Integer(value)}",
         };
     }
 
-    private static string Duration(
-        int milliseconds,
-        CombatImpactCoverage coverage,
-        string sign,
-        bool chinese
-    )
+    private static string Duration(int milliseconds, CombatImpactCoverage coverage, string sign)
     {
         var seconds = Number(milliseconds / 1000m);
         var footnoteMarker = IsEstimated(coverage) ? "*" : string.Empty;

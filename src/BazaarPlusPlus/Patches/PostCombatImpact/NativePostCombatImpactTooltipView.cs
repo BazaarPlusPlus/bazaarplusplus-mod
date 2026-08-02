@@ -90,8 +90,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
     public bool IsContentActive => _contentRoot?.activeInHierarchy == true;
 
-    public CombatImpactPerspective ActivePerspective => _activePerspective;
-
     public void PrepareNativePrimary(CardTooltipController primary)
     {
         if (primary == null)
@@ -804,69 +802,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             TempoUIUtility.ForceRebuildRecursive(auxiliary.PositioningRectTransform);
             LayoutRebuilder.ForceRebuildLayoutImmediate(auxiliary.PositioningRectTransform);
         }
-    }
-
-    private void ReconcileVerticalPlacement()
-    {
-        if (
-            _pairSide == PairSide.None
-            || _activeAuxiliary == null
-            || _activePrimary == null
-            || _activePrimary.RootCanvasComponent?.transform is not RectTransform canvasRect
-        )
-            return;
-
-        var canvasBounds = Inset(canvasRect.rect, CanvasMargin);
-        var primaryBounds = GetPrimaryVisibleBounds(_activePrimary, canvasRect);
-        var impactRect = _activeAuxiliary.backgroundImage.rectTransform;
-        var impactBounds = GetCanvasLocalBounds(impactRect, canvasRect);
-        var verticalDelta = primaryBounds.yMax - impactBounds.yMax;
-        if (!Mathf.Approximately(verticalDelta, 0f))
-        {
-            TranslateRect(
-                _activeAuxiliary.PositioningRectTransform,
-                canvasRect,
-                new Vector2(0f, verticalDelta)
-            );
-            impactBounds = GetCanvasLocalBounds(impactRect, canvasRect);
-        }
-
-        var containmentAdjustment = ResolveVerticalAdjustment(impactBounds, canvasBounds);
-        _topAlignmentAdjusted = Mathf.Abs(containmentAdjustment) > PlacementEpsilon;
-        if (!Mathf.Approximately(containmentAdjustment, 0f))
-        {
-            TranslateRect(
-                _activeAuxiliary.PositioningRectTransform,
-                canvasRect,
-                new Vector2(0f, containmentAdjustment)
-            );
-            impactBounds = GetCanvasLocalBounds(impactRect, canvasRect);
-        }
-
-        var pairBounds = Union(primaryBounds, impactBounds);
-        var screenBounds = canvasRect.rect;
-        var collides =
-            _pairSide == PairSide.ImpactRight
-                ? impactBounds.xMin < primaryBounds.xMax + TooltipGap - PlacementEpsilon
-                : impactBounds.xMax > primaryBounds.xMin - TooltipGap + PlacementEpsilon;
-        _pairOverflowed =
-            pairBounds.width > screenBounds.width
-            || pairBounds.height > screenBounds.height
-            || pairBounds.xMin < screenBounds.xMin - PlacementEpsilon
-            || pairBounds.xMax > screenBounds.xMax + PlacementEpsilon
-            || pairBounds.yMin < screenBounds.yMin - PlacementEpsilon
-            || pairBounds.yMax > screenBounds.yMax + PlacementEpsilon
-            || collides;
-        LogPlacementDegradationOnce(
-            _pairOverflowed,
-            ref _overflowDegradedLogged,
-            PostCombatImpactReasonCode.PairPlacementOverflowed
-        );
-        LogPlacementDegradationOnce(
-            _topAlignmentAdjusted,
-            ref _topAlignmentDegradedLogged,
-            PostCombatImpactReasonCode.PairTopAlignmentAdjusted
-        );
     }
 
     private bool TryCreateNativeBackground(
@@ -1723,9 +1658,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         string content,
         float fontScale,
         float flexibleWidth = 0f,
-        float minWidth = -1f,
-        bool autoSize = false,
-        float minimumFontScale = 1f
+        float minWidth = -1f
     )
     {
         var text = Object.Instantiate(template, parent, worldPositionStays: false);
@@ -1733,8 +1666,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         text.gameObject.SetActive(true);
         text.fontSize = Mathf.Max(1f, template.fontSize * fontScale);
         text.fontSizeMax = text.fontSize;
-        text.fontSizeMin = Mathf.Max(1f, text.fontSize * minimumFontScale);
-        text.enableAutoSizing = autoSize;
+        text.fontSizeMin = text.fontSize;
+        text.enableAutoSizing = false;
         text.color = new Color32(248, 238, 213, 255);
         text.alpha = 1f;
         text.margin = Vector4.zero;

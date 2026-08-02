@@ -34,7 +34,6 @@ internal static class CombatImpactEntitySnapshotReader
             if (card?.InstanceId.Value is not { Length: > 0 } instanceId)
                 continue;
 
-            var owner = CombatImpactEntityOwnerResolver.Resolve(card.Owner?.CombatantId);
             var template = card.Template;
             var name = ResolveTitle(template?.Localization?.Title);
             if (string.IsNullOrWhiteSpace(name))
@@ -47,9 +46,7 @@ internal static class CombatImpactEntitySnapshotReader
                 instanceId,
                 name!,
                 card.Type.ToString(),
-                template?.ArtKey,
                 null,
-                owner,
                 order++,
                 card.TemplateId,
                 card.Tier,
@@ -80,7 +77,7 @@ internal static class CombatImpactEntitySnapshotReader
     )
     {
         var id = CombatImpactProjector.PlayerId(combatant);
-        entities[id] = new CombatImpactEntity(id, name, "Hero", null, hero, combatant, order);
+        entities[id] = new CombatImpactEntity(id, name, "Hero", hero, order);
     }
 
     private static EHero? NormalizeHero(EHero? hero) =>

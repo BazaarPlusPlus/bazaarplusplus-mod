@@ -1,4 +1,3 @@
-using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
 using Xunit;
 
@@ -8,15 +7,7 @@ public sealed class CombatImpactMetricFormatterTests
 {
     private const string CritIcon = "<sprite name=Crit>";
 
-    private static readonly CombatImpactEntity Target = new(
-        "target",
-        "Target",
-        "Item",
-        null,
-        null,
-        ECombatantId.Player,
-        0
-    );
+    private static readonly CombatImpactEntity Target = new("target", "Target", "Item", null, 0);
 
     [Fact]
     public void Group_formats_fractional_seconds_to_two_decimal_places()
@@ -33,8 +24,8 @@ public sealed class CombatImpactMetricFormatterTests
             Array.Empty<CombatImpactTarget>()
         );
 
-        Assert.Equal("3× · 8.80s", CombatImpactMetricFormatter.Group(group, chinese: false));
-        Assert.Equal("3 次 · 8.80s", CombatImpactMetricFormatter.Group(group, chinese: true));
+        Assert.Equal("×3 · 8.80s", CombatImpactMetricFormatter.Group(group, chinese: false));
+        Assert.Equal("×3 · 8.80s", CombatImpactMetricFormatter.Group(group, chinese: true));
     }
 
     [Fact]
@@ -98,11 +89,11 @@ public sealed class CombatImpactMetricFormatterTests
         };
 
         Assert.Equal(
-            "2× (1 <sprite name=Crit>) · +12 total",
+            "×2 (1 <sprite name=Crit>) · +12 total",
             CombatImpactMetricFormatter.Group(group, chinese: false, CritIcon)
         );
         Assert.Equal(
-            "2 次（1 <sprite name=Crit>） · 总计 +12",
+            "×2（1 <sprite name=Crit>） · 总计 +12",
             CombatImpactMetricFormatter.Group(group, chinese: true, CritIcon)
         );
     }
@@ -156,7 +147,7 @@ public sealed class CombatImpactMetricFormatterTests
             [target]
         );
 
-        Assert.Equal("10× · 76 total", CombatImpactMetricFormatter.Group(group, chinese: false));
+        Assert.Equal("×10 · 76 total", CombatImpactMetricFormatter.Group(group, chinese: false));
         Assert.Equal(
             "×10 · 69 recorded",
             CombatImpactMetricFormatter.Target(group, target, chinese: false)
@@ -186,7 +177,7 @@ public sealed class CombatImpactMetricFormatterTests
         );
 
         var formatted = CombatImpactMetricFormatter.Group(group, chinese: false);
-        Assert.Equal("10× · 9.50s*", formatted);
+        Assert.Equal("×10 · 9.50s*", formatted);
         Assert.DoesNotContain("10ms", formatted, StringComparison.Ordinal);
     }
 
@@ -212,7 +203,7 @@ public sealed class CombatImpactMetricFormatterTests
         );
 
         Assert.Equal(
-            "7× · 9.50s* · 10 applications",
+            "×7 · 9.50s* · 10 applications",
             CombatImpactMetricFormatter.Group(group, chinese: false)
         );
     }
@@ -261,7 +252,7 @@ public sealed class CombatImpactMetricFormatterTests
             2,
             []
         );
-        var source = new CombatImpactSource(Target, 1, 0, 3, [group]);
+        var source = new CombatImpactSource(Target, 1, 3, [group]);
 
         Assert.Equal(
             [
@@ -288,7 +279,7 @@ public sealed class CombatImpactMetricFormatterTests
             observedValue: 4,
             CombatImpactValueUnit.Amount
         );
-        var source = new CombatImpactSource(Target, 1, 0, 1, [group]);
+        var source = new CombatImpactSource(Target, 1, 1, [group]);
         var received = new CombatImpactReceived(
             Target,
             1,
@@ -394,8 +385,8 @@ public sealed class CombatImpactMetricFormatterTests
             []
         );
 
-        Assert.Equal("10× · 69", CombatImpactMetricFormatter.IncomingGroup(group, chinese: false));
-        Assert.Equal("10 次 · 69", CombatImpactMetricFormatter.IncomingGroup(group, chinese: true));
+        Assert.Equal("×10 · 69", CombatImpactMetricFormatter.IncomingGroup(group, chinese: false));
+        Assert.Equal("×10 · 69", CombatImpactMetricFormatter.IncomingGroup(group, chinese: true));
     }
 
     [Fact]
@@ -413,11 +404,11 @@ public sealed class CombatImpactMetricFormatterTests
         };
 
         Assert.Equal(
-            "8× (4 <sprite name=Crit>) · 640",
+            "×8 (4 <sprite name=Crit>) · 640",
             CombatImpactMetricFormatter.Group(group, chinese: false, CritIcon)
         );
         Assert.Equal(
-            "8 次（4 <sprite name=Crit>） · 640",
+            "×8（4 <sprite name=Crit>） · 640",
             CombatImpactMetricFormatter.Group(group, chinese: true, CritIcon)
         );
     }

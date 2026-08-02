@@ -810,7 +810,7 @@ public sealed class CombatImpactProjectorTests
         Assert.Null(caused.ObservedUnit);
         Assert.Equal(CombatImpactCoverage.None, caused.ObservedCoverage);
         Assert.Null(caused.AuthoritativeMetric);
-        Assert.Equal("2×", CombatImpactMetricFormatter.Group(caused, chinese: false));
+        Assert.Equal("×2", CombatImpactMetricFormatter.Group(caused, chinese: false));
         Assert.Equal(
             "×2",
             CombatImpactMetricFormatter.Target(caused, causedTarget, chinese: false)
@@ -835,7 +835,7 @@ public sealed class CombatImpactProjectorTests
         Assert.Null(incoming.ObservedValue);
         Assert.Null(incoming.ObservedUnit);
         Assert.Equal(CombatImpactCoverage.None, incoming.ObservedCoverage);
-        Assert.Equal("2×", CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false));
+        Assert.Equal("×2", CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false));
         Assert.Equal(
             "×2",
             CombatImpactMetricFormatter.IncomingSource(
@@ -1047,36 +1047,6 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Counts_trigger_events_with_the_same_activity_source_fallback_rule()
-    {
-        var simulation = new CombatSim();
-        simulation
-            .Frames[0]
-            .Events.Add(
-                new CombatSimEventEffectTriggered
-                {
-                    Source = InstanceId.TryParse("effect"),
-                    TriggerSource = InstanceId.TryParse("source"),
-                }
-            );
-        simulation
-            .Frames[0]
-            .Events.Add(
-                Executed(
-                    "effect",
-                    EActionCommandType.PlayerDamage,
-                    Player(ECombatantId.Opponent),
-                    triggerSource: "source"
-                )
-            );
-        simulation.Frames[0].OpponentUpdates = Damage(-40);
-
-        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
-
-        Assert.Equal(1, source.TriggerCount);
-    }
-
-    [Fact]
     public void Omits_effect_when_neither_direct_nor_trigger_source_is_an_activity_entity()
     {
         var simulation = new CombatSim();
@@ -1150,8 +1120,8 @@ public sealed class CombatImpactProjectorTests
         };
         var entities = new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
         {
-            [zarlic] = new(zarlic, "Zarlic", "Item", null, null, ECombatantId.Player, 0),
-            [decoy] = new(decoy, "Other Food", "Item", null, null, ECombatantId.Player, 1),
+            [zarlic] = new(zarlic, "Zarlic", "Item", null, 0),
+            [decoy] = new(decoy, "Other Food", "Item", null, 1),
         };
 
         var report = CombatImpactProjector.Project(simulation, entities);
@@ -2417,34 +2387,16 @@ public sealed class CombatImpactProjectorTests
     private static IReadOnlyDictionary<string, CombatImpactEntity> Entities() =>
         new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
         {
-            ["source"] = new("source", "Fairies", "Skill", null, null, ECombatantId.Player, 0),
-            ["trigger"] = new(
-                "trigger",
-                "Trigger Item",
-                "Item",
-                null,
-                null,
-                ECombatantId.Player,
-                1
-            ),
-            ["effect"] = new("effect", "Effect", "Effect", null, null, ECombatantId.Player, 2),
-            ["target"] = new("target", "Bread Knife", "Item", null, null, ECombatantId.Opponent, 1),
-            ["target-2"] = new(
-                "target-2",
-                "The Eclipse",
-                "Item",
-                null,
-                null,
-                ECombatantId.Opponent,
-                2
-            ),
+            ["source"] = new("source", "Fairies", "Skill", null, 0),
+            ["trigger"] = new("trigger", "Trigger Item", "Item", null, 1),
+            ["effect"] = new("effect", "Effect", "Effect", null, 2),
+            ["target"] = new("target", "Bread Knife", "Item", null, 1),
+            ["target-2"] = new("target-2", "The Eclipse", "Item", null, 2),
             [CombatImpactProjector.PlayerId(ECombatantId.Player)] = new(
                 CombatImpactProjector.PlayerId(ECombatantId.Player),
                 "You",
                 "Hero",
                 null,
-                null,
-                ECombatantId.Player,
                 3
             ),
             [CombatImpactProjector.PlayerId(ECombatantId.Opponent)] = new(
@@ -2452,8 +2404,6 @@ public sealed class CombatImpactProjectorTests
                 "Opponent",
                 "Hero",
                 null,
-                null,
-                ECombatantId.Opponent,
                 4
             ),
         };

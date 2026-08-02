@@ -2973,7 +2973,6 @@ public class CoreLayeringTests
             )
         );
 
-        Assert.False(File.Exists(Path.Combine(featureRoot, "Ui", "PostCombatImpactView.cs")));
         Assert.DoesNotContain("UnityEngine.InputSystem", controller);
         Assert.DoesNotContain("rightButton.wasPressedThisFrame", controller);
         Assert.Contains("typeof(RecapItemVisualController)", recapPatch);
@@ -2984,9 +2983,6 @@ public class CoreLayeringTests
         Assert.Contains("AuxiliaryTooltipController", tooltipView);
         Assert.Contains("INativeCardPreviewHost", tooltipView);
         Assert.DoesNotContain("RawImage", tooltipView);
-        Assert.False(
-            File.Exists(Path.Combine(featureRoot, "Ui", "PostCombatImpactCardArtProvider.cs"))
-        );
     }
 
     private static void ScanForAgentImports(string file, string baseDir, List<string> violations)

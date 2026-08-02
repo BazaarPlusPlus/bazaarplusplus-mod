@@ -83,9 +83,7 @@ internal sealed record CombatImpactEntity(
     string Id,
     string Name,
     string TypeLabel,
-    string? ArtKey,
     EHero? Hero,
-    ECombatantId Owner,
     int Order,
     Guid TemplateId = default,
     ETier Tier = ETier.Bronze,
@@ -222,7 +220,6 @@ internal sealed record CombatImpactGroup(
 internal sealed record CombatImpactSource(
     CombatImpactEntity Entity,
     int UseCount,
-    int TriggerCount,
     int EffectCount,
     IReadOnlyList<CombatImpactGroup> Groups
 )
@@ -291,6 +288,5 @@ internal sealed record CombatImpactProjectionInput(
     IReadOnlyDictionary<string, CombatImpactEntity> Entities,
     IReadOnlyList<CombatImpactEvent> Events,
     IReadOnlyDictionary<string, int> UseCounts,
-    IReadOnlyDictionary<string, int> TriggerCounts,
     IReadOnlyDictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>> AuthoritativeMetrics
 );

@@ -54,8 +54,7 @@ internal static class CombatImpactAggregator
             input.AuthoritativeMetrics.GetValueOrDefault(sourceId)
             ?? Array.Empty<CombatImpactAuthoritativeMetric>();
         var groupKeys = new HashSet<GroupKey>(
-            events.Select(item => Key(item.Kind, item.NativeAttributeKey, item.Surface)),
-            GroupKeyComparer.Instance
+            events.Select(item => Key(item.Kind, item.NativeAttributeKey, item.Surface))
         );
         groupKeys.UnionWith(
             authoritativeMetrics.Select(metric => new GroupKey(
@@ -97,7 +96,6 @@ internal static class CombatImpactAggregator
         return new CombatImpactSource(
             sourceEntity,
             input.UseCounts.GetValueOrDefault(sourceId),
-            input.TriggerCounts.GetValueOrDefault(sourceId),
             events.Length,
             orderedGroups
         );
@@ -112,7 +110,7 @@ internal static class CombatImpactAggregator
     {
         var targets = events
             .GroupBy(item => item.TargetId, StringComparer.Ordinal)
-            .Select(group => BuildTarget(entities, group.ToArray(), includeObservedValues: true))
+            .Select(group => BuildTarget(entities, group.ToArray()))
             .Where(target => target != null)
             .Cast<CombatImpactTarget>()
             .OrderByDescending(target => target.Count)
@@ -122,7 +120,7 @@ internal static class CombatImpactAggregator
             .ToArray();
         var unresolvedTargetCount = Math.Max(0, events.Count - targets.Sum(target => target.Count));
 
-        var observed = BuildObserved(events, includeObservedValues: true);
+        var observed = BuildObserved(events);
         var coverage = observed.Coverage;
         if (
             authoritativeMetric?.Basis == CombatImpactAuthoritativeBasis.TotalAmount
@@ -171,18 +169,8 @@ internal static class CombatImpactAggregator
             .Events.Where(item => string.Equals(item.TargetId, targetId, StringComparison.Ordinal))
             .ToArray();
         var groups = events
-            .GroupBy(
-                item => Key(item.Kind, item.NativeAttributeKey, item.Surface),
-                GroupKeyComparer.Instance
-            )
-            .Select(group =>
-                BuildIncomingGroup(
-                    input.Entities,
-                    group.Key,
-                    group.ToArray(),
-                    includeObservedValues: true
-                )
-            )
+            .GroupBy(item => Key(item.Kind, item.NativeAttributeKey, item.Surface))
+            .Select(group => BuildIncomingGroup(input.Entities, group.Key, group.ToArray()))
             .ToList();
 
         var orderedGroups = groups
@@ -199,13 +187,12 @@ internal static class CombatImpactAggregator
     private static CombatImpactIncomingGroup BuildIncomingGroup(
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
         GroupKey key,
-        IReadOnlyList<CombatImpactEvent> events,
-        bool includeObservedValues
+        IReadOnlyList<CombatImpactEvent> events
     )
     {
         var sources = events
             .GroupBy(item => item.SourceId, StringComparer.Ordinal)
-            .Select(group => BuildIncomingSource(entities, group.ToArray(), includeObservedValues))
+            .Select(group => BuildIncomingSource(entities, group.ToArray()))
             .Where(source => source != null)
             .Cast<CombatImpactIncomingSource>()
             .OrderByDescending(source => source.Count)
@@ -213,7 +200,7 @@ internal static class CombatImpactAggregator
             .ThenBy(source => source.Entity.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(source => source.Entity.Id, StringComparer.Ordinal)
             .ToArray();
-        var observed = BuildObserved(events, includeObservedValues);
+        var observed = BuildObserved(events);
 
         var critical = BuildCritical(events);
         return new CombatImpactIncomingGroup(
@@ -274,14 +261,13 @@ internal static class CombatImpactAggregator
 
     private static CombatImpactIncomingSource? BuildIncomingSource(
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
-        IReadOnlyList<CombatImpactEvent> events,
-        bool includeObservedValues
+        IReadOnlyList<CombatImpactEvent> events
     )
     {
         if (!entities.TryGetValue(events[0].SourceId, out var entity))
             return null;
 
-        var observed = BuildObserved(events, includeObservedValues);
+        var observed = BuildObserved(events);
         return new CombatImpactIncomingSource(
             entity,
             events.Count,
@@ -293,14 +279,13 @@ internal static class CombatImpactAggregator
 
     private static CombatImpactTarget? BuildTarget(
         IReadOnlyDictionary<string, CombatImpactEntity> entities,
-        IReadOnlyList<CombatImpactEvent> events,
-        bool includeObservedValues
+        IReadOnlyList<CombatImpactEvent> events
     )
     {
         if (!entities.TryGetValue(events[0].TargetId, out var entity))
             return null;
 
-        var observed = BuildObserved(events, includeObservedValues);
+        var observed = BuildObserved(events);
         return new CombatImpactTarget(
             entity,
             events.Count,
@@ -310,15 +295,9 @@ internal static class CombatImpactAggregator
         );
     }
 
-    private static ObservedAggregate BuildObserved(
-        IReadOnlyList<CombatImpactEvent> events,
-        bool includeObservedValues
-    )
+    private static ObservedAggregate BuildObserved(IReadOnlyList<CombatImpactEvent> events)
     {
         var fallbackUnit = events.FirstOrDefault()?.Unit ?? CombatImpactValueUnit.Amount;
-        if (!includeObservedValues)
-            return new ObservedAggregate(null, fallbackUnit, CombatImpactCoverage.None);
-
         var knownValues = events.Where(item => item.Value.HasValue).ToArray();
         if (knownValues.Length == 0)
             return new ObservedAggregate(null, fallbackUnit, CombatImpactCoverage.None);
@@ -411,21 +390,4 @@ internal static class CombatImpactAggregator
     );
 
     private readonly record struct CriticalAggregate(int Count, ObservedAggregate Observed);
-
-    private sealed class GroupKeyComparer : IEqualityComparer<GroupKey>
-    {
-        internal static readonly GroupKeyComparer Instance = new();
-
-        public bool Equals(GroupKey x, GroupKey y) =>
-            x.Kind == y.Kind
-            && x.Surface == y.Surface
-            && string.Equals(x.NativeAttributeKey, y.NativeAttributeKey, StringComparison.Ordinal);
-
-        public int GetHashCode(GroupKey obj) =>
-            HashCode.Combine(
-                obj.Kind,
-                obj.Surface,
-                StringComparer.Ordinal.GetHashCode(obj.NativeAttributeKey)
-            );
-    }
 }

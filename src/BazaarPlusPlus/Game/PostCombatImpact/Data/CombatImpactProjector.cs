@@ -16,22 +16,6 @@ internal static class CombatImpactProjector
     {
         var executions = ProjectExecutions(simulation, entities);
         var events = new List<CombatImpactEvent>();
-        var triggerCounts = new Dictionary<string, int>(StringComparer.Ordinal);
-
-        foreach (var frame in simulation.Frames)
-        {
-            foreach (var triggered in frame.Events.OfType<CombatSimEventEffectTriggered>())
-            {
-                var sourceId = ResolveActivitySource(
-                    triggered.Source?.Value,
-                    triggered.TriggerSource?.Value,
-                    entities,
-                    out _
-                );
-                if (sourceId != null)
-                    triggerCounts[sourceId] = triggerCounts.GetValueOrDefault(sourceId) + 1;
-            }
-        }
 
         foreach (var execution in executions)
         {
@@ -154,13 +138,7 @@ internal static class CombatImpactProjector
         RecoverDroppedAppliedEffectCriticals(events, authoritative);
 
         return CombatImpactAggregator.Aggregate(
-            new CombatImpactProjectionInput(
-                entities,
-                events,
-                useCounts,
-                triggerCounts,
-                authoritative
-            )
+            new CombatImpactProjectionInput(entities, events, useCounts, authoritative)
         );
     }
 
