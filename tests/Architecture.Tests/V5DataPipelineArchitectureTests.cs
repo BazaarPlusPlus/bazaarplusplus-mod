@@ -34,17 +34,26 @@ public sealed class V5DataPipelineArchitectureTests
     }
 
     [Fact]
-    public void Supporter_temp_cache_is_the_only_production_v4_path_exception()
+    public void Supporter_temp_cache_uses_the_shared_v5_directory_name()
     {
         var sourceRoot = Path.Combine(RepoRoot(), "src");
-        var hits = Directory
-            .EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
-            .Where(path =>
-                File.ReadAllText(path).Contains("BazaarPlusPlusV4", StringComparison.Ordinal)
+        var legacyDirectoryName = "BazaarPlusPlus" + "V4";
+        Assert.DoesNotContain(
+            Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories),
+            path => File.ReadAllText(path).Contains(legacyDirectoryName, StringComparison.Ordinal)
+        );
+
+        var source = File.ReadAllText(
+            Path.Combine(
+                RepoRoot(),
+                "src",
+                "BazaarPlusPlus",
+                "Game",
+                "Supporters",
+                "BPPSupporterCatalog.cs"
             )
-            .Select(path => Path.GetRelativePath(RepoRoot(), path).Replace('\\', '/'))
-            .ToArray();
-        Assert.Equal(["src/BazaarPlusPlus/Game/Supporters/BPPSupporterCatalog.cs"], hits);
+        );
+        Assert.Contains("PathConstants.DataRootDirectoryName", source);
     }
 
     private static string ReadSources(string root) =>

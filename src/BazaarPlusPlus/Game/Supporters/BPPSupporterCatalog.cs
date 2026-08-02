@@ -3,6 +3,7 @@ using BazaarPlusPlus.Core.Config;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
 using BazaarPlusPlus.ModApi.Http;
+using BazaarPlusPlus.Storage.Paths;
 using Newtonsoft.Json;
 
 namespace BazaarPlusPlus.Game.Supporters;
@@ -14,7 +15,7 @@ internal static class BPPSupporterCatalog
     private static readonly TimeSpan CacheDuration = TimeSpan.FromHours(1);
     private static readonly string CacheDirectoryPath = Path.Combine(
         Path.GetTempPath(),
-        "BazaarPlusPlusV4"
+        PathConstants.DataRootDirectoryName
     );
     private static readonly string CacheFilePath = Path.Combine(
         CacheDirectoryPath,

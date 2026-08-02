@@ -272,7 +272,7 @@ Task<GhostReplayResult> GhostBundleConsumer.EnsureReplayAsync(string battleId, C
 - `TenWinBuildCatalogFactory.cs:42`、`VoiceLinesCatalogFactory.cs:42`。
 - 架构/隐私/远程 catalog 测试中的对应字面量。
 
-`%TEMP%/BazaarPlusPlusV4` supporter cache 不属于运行时数据管线，本次不改；架构门禁明确排除此文件，不能使用“全仓字符串为零”的错误断言。
+supporter 临时缓存也统一使用 `%TEMP%/BazaarPlusPlusV5`，避免本地路径继续携带旧数据根名称；它仍不属于运行时 Bundle 数据管线。
 
 ### 4.2 fresh schema
 

@@ -150,7 +150,6 @@ public sealed class RemoteEmbeddedCatalogArchitectureTests
         {
             var source = File.ReadAllText(factory);
             Assert.Contains("dataRootPath", source);
-            Assert.DoesNotContain("BazaarPlusPlusV4", source);
             Assert.DoesNotContain("Application.dataPath", source);
         }
     }
