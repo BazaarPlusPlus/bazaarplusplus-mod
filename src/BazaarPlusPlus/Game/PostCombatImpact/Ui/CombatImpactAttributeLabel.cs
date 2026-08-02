@@ -40,6 +40,13 @@ internal static class CombatImpactAttributeLabel
             "RageApplyAmount" or "Rage" => ("怒气", "Rage"),
             "RageRemoveAmount" => ("怒气移除量", "Rage Removal"),
             "RageMax" => ("最大怒气", "Max Rage"),
+            "Tempo" => ("节奏", "Tempo"),
+            "TempoApplyAmount" => surface == CombatImpactEventSurface.AppliedEffect
+                ? ("获得节奏", "Tempo Gained")
+                : ("节奏获取量", "Tempo Gain"),
+            "TempoRemoveAmount" => surface == CombatImpactEventSurface.AppliedEffect
+                ? ("消耗节奏", "Tempo Spent")
+                : ("节奏移除量", "Tempo Removal"),
             "Multicast" => ("多重施放", "Multicast"),
             "Lifesteal" => ("吸血", "Lifesteal"),
             "CritChance" => ("暴击率", "Crit Chance"),

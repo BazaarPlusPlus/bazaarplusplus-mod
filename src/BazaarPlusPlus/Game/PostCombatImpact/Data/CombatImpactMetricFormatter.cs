@@ -21,7 +21,7 @@ internal static class CombatImpactMetricFormatter
             var value = Value(
                 authoritative.Value,
                 authoritative.Unit,
-                showSign: group.Kind == CombatImpactKind.AttributeChange,
+                showSign: ShouldShowSign(group),
                 chinese
             );
             parts.Add(chinese ? $"总计 {value}" : $"{value} total");
@@ -31,12 +31,7 @@ internal static class CombatImpactMetricFormatter
             if (group.ObservedValue.HasValue)
             {
                 parts.Add(
-                    Value(
-                        group.ObservedValue.Value,
-                        group.Unit,
-                        group.Kind == CombatImpactKind.AttributeChange,
-                        chinese
-                    )
+                    Value(group.ObservedValue.Value, group.Unit, ShouldShowSign(group), chinese)
                 );
             }
 
@@ -62,12 +57,7 @@ internal static class CombatImpactMetricFormatter
         if (!target.ObservedValue.HasValue)
             return group.Kind == CombatImpactKind.AttributeChange ? string.Empty : count;
 
-        var value = Value(
-            target.ObservedValue.Value,
-            target.Unit,
-            group.Kind == CombatImpactKind.AttributeChange,
-            chinese
-        );
+        var value = Value(target.ObservedValue.Value, target.Unit, ShouldShowSign(group), chinese);
         var needsObservedBasis = group.HasDivergentTargetCoverage;
         if (needsObservedBasis)
             value = chinese ? $"已记录 {value}" : $"{value} recorded";
@@ -88,7 +78,7 @@ internal static class CombatImpactMetricFormatter
             var value = Value(
                 group.ObservedValue.Value,
                 group.Unit,
-                group.Kind == CombatImpactKind.AttributeChange,
+                ShouldShowSign(group),
                 chinese
             );
             parts.Add(value);
@@ -100,6 +90,23 @@ internal static class CombatImpactMetricFormatter
     private static bool ShouldShowCount(CombatImpactKind kind, CombatImpactEventSurface surface) =>
         kind != CombatImpactKind.AttributeChange
         || surface == CombatImpactEventSurface.AppliedEffect;
+
+    private static bool ShouldShowSign(CombatImpactGroup group) =>
+        ShouldShowSign(group.Kind, group.Surface, group.NativeAttributeKey);
+
+    private static bool ShouldShowSign(CombatImpactIncomingGroup group) =>
+        ShouldShowSign(group.Kind, group.Surface, group.NativeAttributeKey);
+
+    private static bool ShouldShowSign(
+        CombatImpactKind kind,
+        CombatImpactEventSurface surface,
+        string nativeAttributeKey
+    ) =>
+        kind == CombatImpactKind.AttributeChange
+        && !(
+            surface == CombatImpactEventSurface.AppliedEffect
+            && string.Equals(nativeAttributeKey, "TempoRemoveAmount", StringComparison.Ordinal)
+        );
 
     private static string Count(int count, int criticalCount, bool chinese, string? criticalMarker)
     {
@@ -121,12 +128,7 @@ internal static class CombatImpactMetricFormatter
         if (!source.ObservedValue.HasValue)
             return group.Kind == CombatImpactKind.AttributeChange ? string.Empty : count;
 
-        var value = Value(
-            source.ObservedValue.Value,
-            source.Unit,
-            group.Kind == CombatImpactKind.AttributeChange,
-            chinese
-        );
+        var value = Value(source.ObservedValue.Value, source.Unit, ShouldShowSign(group), chinese);
         return group.Kind == CombatImpactKind.AttributeChange ? value : $"{count} · {value}";
     }
 

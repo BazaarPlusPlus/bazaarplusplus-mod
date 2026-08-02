@@ -65,7 +65,8 @@ internal sealed record CombatImpactEntity(
     ETier Tier = ETier.Bronze,
     int DisplaySpan = 1,
     EEnchantmentType? EnchantmentType = null,
-    IReadOnlyDictionary<ECardAttributeType, int>? Attributes = null
+    IReadOnlyDictionary<ECardAttributeType, int>? Attributes = null,
+    ECombatantId? CombatantId = null
 );
 
 internal sealed record CombatImpactEvent(

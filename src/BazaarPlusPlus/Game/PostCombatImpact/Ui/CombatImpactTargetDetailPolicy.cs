@@ -22,6 +22,14 @@ internal static class CombatImpactTargetDetailPolicy
             kind != CombatImpactKind.AttributeChange
             || surface == CombatImpactEventSurface.CardAttribute
             || nativeAttributeKey
-                is not ("RegenApplyAmount" or "HealthMax" or "HealthRegen" or "Rage")
+                is not (
+                    "RegenApplyAmount"
+                    or "HealthMax"
+                    or "HealthRegen"
+                    or "Rage"
+                    or "Tempo"
+                    or "TempoApplyAmount"
+                    or "TempoRemoveAmount"
+                )
         );
 }

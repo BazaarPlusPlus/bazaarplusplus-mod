@@ -297,6 +297,7 @@ public sealed class CombatImpactProjectorTests
         {
             (EPlayerAttributeType.HealthRegen, ECardStats.RegenAdded, "RegenApplyAmount"),
             (EPlayerAttributeType.Rage, ECardStats.RageAdded, "RageApplyAmount"),
+            (EPlayerAttributeType.Tempo, ECardStats.TempoAdded, "TempoApplyAmount"),
         };
         foreach (var (attribute, statistic, canonicalKey) in cases)
         {
@@ -360,7 +361,9 @@ public sealed class CombatImpactProjectorTests
             [ECardStats.FrozenCardsCount] = 8,
             [ECardStats.RegenAdded] = 9,
             [ECardStats.RageAdded] = 10,
-            [ECardStats.UseCount] = 11,
+            [ECardStats.TempoAdded] = 11,
+            [ECardStats.TempoSpent] = 12,
+            [ECardStats.UseCount] = 13,
         };
 
         var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
@@ -370,10 +373,10 @@ public sealed class CombatImpactProjectorTests
             .Cast<CombatImpactAuthoritativeMetric>()
             .ToArray();
 
-        Assert.Equal(11, source.UseCount);
-        Assert.Equal(10, metrics.Length);
+        Assert.Equal(13, source.UseCount);
+        Assert.Equal(12, metrics.Length);
         Assert.Equal(
-            7,
+            9,
             metrics.Count(metric =>
                 metric.Basis == CombatImpactAuthoritativeBasis.TotalAmount
                 && metric.Unit == CombatImpactValueUnit.Amount
@@ -386,6 +389,176 @@ public sealed class CombatImpactProjectorTests
                 && metric.Unit == CombatImpactValueUnit.Applications
             )
         );
+        Assert.Contains(
+            metrics,
+            metric =>
+                metric.NativeAttributeKey == "TempoApplyAmount"
+                && metric.Value == 11
+                && metric.Basis == CombatImpactAuthoritativeBasis.TotalAmount
+        );
+        Assert.Contains(
+            metrics,
+            metric =>
+                metric.NativeAttributeKey == "TempoRemoveAmount"
+                && metric.Value == 12
+                && metric.Basis == CombatImpactAuthoritativeBasis.TotalAmount
+        );
+    }
+
+    [Fact]
+    public void Projects_tempo_gain_and_card_action_cost_spend_with_authoritative_totals()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        var gainFrame = new CombatSimFrame();
+        gainFrame.Events.Add(
+            Executed("source", EActionCommandType.PlayerTempoApply, Player(ECombatantId.Player))
+        );
+        gainFrame.PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.Tempo] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.Tempo,
+                    PreviousValue = 0,
+                    CurrentValue = 6,
+                },
+            },
+        };
+        simulation.Frames.Add(gainFrame);
+        var spendFrame = new CombatSimFrame();
+        spendFrame.Events.Add(
+            new CombatSimEventCardActionCostSpent
+            {
+                ExecutingCard = InstanceId.TryParse("source"),
+                PlayerAttributeSpent = EPlayerAttributeType.Tempo,
+                CardAttributeSpent = ECardAttributeType.TempoCost,
+            }
+        );
+        simulation.Frames.Add(spendFrame);
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.TempoAdded] = 6,
+            [ECardStats.TempoSpent] = 4,
+        };
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+
+        Assert.Equal(2, source.EffectCount);
+        var gained = Assert.Single(
+            source.Groups,
+            group => group.NativeAttributeKey == "TempoApplyAmount"
+        );
+        Assert.Equal(1, gained.Count);
+        Assert.Equal(6, gained.ObservedValue);
+        Assert.Equal(6, gained.AuthoritativeMetric?.Value);
+        Assert.Equal(
+            CombatImpactProjector.PlayerId(ECombatantId.Player),
+            Assert.Single(gained.Targets).Entity.Id
+        );
+
+        var spent = Assert.Single(
+            source.Groups,
+            group => group.NativeAttributeKey == "TempoRemoveAmount"
+        );
+        Assert.Equal(1, spent.Count);
+        Assert.Null(spent.ObservedValue);
+        Assert.Equal(4, spent.AuthoritativeMetric?.Value);
+        Assert.Equal(
+            CombatImpactProjector.PlayerId(ECombatantId.Player),
+            Assert.Single(spent.Targets).Entity.Id
+        );
+    }
+
+    [Fact]
+    public void Tempo_gain_does_not_claim_a_same_frame_delta_that_also_includes_cost_spend()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("source", EActionCommandType.PlayerTempoApply, Player(ECombatantId.Player))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventCardActionCostSpent
+                {
+                    ExecutingCard = InstanceId.TryParse("source"),
+                    PlayerAttributeSpent = EPlayerAttributeType.Tempo,
+                    CardAttributeSpent = ECardAttributeType.TempoCost,
+                }
+            );
+        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.Tempo] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.Tempo,
+                    PreviousValue = 5,
+                    CurrentValue = 7,
+                },
+            },
+        };
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.TempoAdded] = 6,
+            [ECardStats.TempoSpent] = 4,
+        };
+
+        var groups = Assert
+            .Single(CombatImpactProjector.Project(simulation, Entities()).Sources)
+            .Groups;
+
+        var gained = Assert.Single(groups, group => group.NativeAttributeKey == "TempoApplyAmount");
+        Assert.Null(gained.ObservedValue);
+        Assert.Equal(6, gained.AuthoritativeMetric?.Value);
+        var spent = Assert.Single(groups, group => group.NativeAttributeKey == "TempoRemoveAmount");
+        Assert.Null(spent.ObservedValue);
+        Assert.Equal(4, spent.AuthoritativeMetric?.Value);
+    }
+
+    [Fact]
+    public void Explicit_tempo_remove_reports_the_positive_amount_spent()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.PlayerTempoRemove,
+                    Player(ECombatantId.Player)
+                )
+            );
+        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.Tempo] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.Tempo,
+                    PreviousValue = 7,
+                    CurrentValue = 3,
+                },
+            },
+        };
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.TempoSpent] = 4,
+        };
+
+        var group = Assert.Single(
+            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
+        );
+
+        Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
+        Assert.Equal("TempoRemoveAmount", group.NativeAttributeKey);
+        Assert.Equal(4, group.ObservedValue);
+        Assert.Equal(4, group.AuthoritativeMetric?.Value);
+        Assert.Equal(CombatImpactValueUnit.Amount, group.Unit);
     }
 
     [Fact]
@@ -1362,6 +1535,11 @@ public sealed class CombatImpactProjectorTests
     [InlineData(ECardAttributeType.FreezeAmount, 1500, "Milliseconds")]
     [InlineData(ECardAttributeType.FlatCooldownReduction, 1500, "Milliseconds")]
     [InlineData(ECardAttributeType.Lifesteal, 12, "PercentagePoints")]
+    [InlineData(ECardAttributeType.TempoApplyAmount, 3, "Amount")]
+    [InlineData(ECardAttributeType.TempoRemoveAmount, 2, "Amount")]
+    [InlineData(ECardAttributeType.TempoCost, 2, "Amount")]
+    [InlineData(ECardAttributeType.FlatTempoCostReduction, 1, "Amount")]
+    [InlineData(ECardAttributeType.PercentTempoCostReduction, 20, "PercentagePoints")]
     public void Pr132_card_modifier_attributes_and_units_are_preserved(
         ECardAttributeType attributeType,
         int value,
@@ -1419,17 +1597,22 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Theory]
-    [InlineData(EPlayerAttributeType.HealthMax)]
-    [InlineData(EPlayerAttributeType.CritChance)]
-    [InlineData(EPlayerAttributeType.DamageCrit)]
-    [InlineData(EPlayerAttributeType.HealAmount)]
-    [InlineData(EPlayerAttributeType.ShieldCrit)]
-    [InlineData(EPlayerAttributeType.FlatDamageReduction)]
-    [InlineData(EPlayerAttributeType.RageMax)]
-    [InlineData(EPlayerAttributeType.Gold)]
-    [InlineData(EPlayerAttributeType.RerollCostModifier)]
+    [InlineData(EPlayerAttributeType.HealthMax, "Amount")]
+    [InlineData(EPlayerAttributeType.CritChance, "PercentagePoints")]
+    [InlineData(EPlayerAttributeType.DamageCrit, "Amount")]
+    [InlineData(EPlayerAttributeType.HealAmount, "Amount")]
+    [InlineData(EPlayerAttributeType.ShieldCrit, "Amount")]
+    [InlineData(EPlayerAttributeType.FlatDamageReduction, "Amount")]
+    [InlineData(EPlayerAttributeType.RageMax, "Amount")]
+    [InlineData(EPlayerAttributeType.Tempo, "Amount")]
+    [InlineData(EPlayerAttributeType.TempoGainCooldownMax, "Milliseconds")]
+    [InlineData(EPlayerAttributeType.FlatTempoGainCooldownReduction, "Milliseconds")]
+    [InlineData(EPlayerAttributeType.PercentTempoGainCooldownReduction, "PercentagePoints")]
+    [InlineData(EPlayerAttributeType.Gold, "Amount")]
+    [InlineData(EPlayerAttributeType.RerollCostModifier, "Amount")]
     public void Pr132_player_modifier_and_economy_aura_attributes_are_preserved(
-        EPlayerAttributeType attributeType
+        EPlayerAttributeType attributeType,
+        string expectedUnit
     )
     {
         var simulation = new CombatSim();
@@ -1462,6 +1645,7 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
         Assert.Equal(attributeType.ToString(), group.NativeAttributeKey);
         Assert.Equal(3, group.ObservedValue);
+        Assert.Equal(expectedUnit, group.Unit.ToString());
         Assert.Equal(
             CombatImpactProjector.PlayerId(ECombatantId.Player),
             Assert.Single(group.Targets).Entity.Id
@@ -1684,7 +1868,14 @@ public sealed class CombatImpactProjectorTests
     private static IReadOnlyDictionary<string, CombatImpactEntity> Entities() =>
         new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
         {
-            ["source"] = new("source", "Fairies", "Skill", null, 0),
+            ["source"] = new(
+                "source",
+                "Fairies",
+                "Skill",
+                null,
+                0,
+                CombatantId: ECombatantId.Player
+            ),
             ["trigger"] = new("trigger", "Trigger Item", "Item", null, 1),
             ["effect"] = new("effect", "Effect", "Effect", null, 2),
             ["target"] = new("target", "Bread Knife", "Item", null, 1),

@@ -20,6 +20,24 @@ public sealed class CombatImpactTargetDetailPolicyTests
         true
     )]
     [InlineData(
+        (int)CombatImpactKind.AttributeChange,
+        "TempoApplyAmount",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        false
+    )]
+    [InlineData(
+        (int)CombatImpactKind.AttributeChange,
+        "TempoRemoveAmount",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        false
+    )]
+    [InlineData(
+        (int)CombatImpactKind.AttributeChange,
+        "TempoApplyAmount",
+        (int)CombatImpactEventSurface.CardAttribute,
+        true
+    )]
+    [InlineData(
         (int)CombatImpactKind.DirectDamage,
         "DamageAmount",
         (int)CombatImpactEventSurface.AppliedEffect,

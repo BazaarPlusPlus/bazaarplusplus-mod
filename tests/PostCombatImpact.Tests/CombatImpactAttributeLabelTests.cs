@@ -23,6 +23,19 @@ public sealed class CombatImpactAttributeLabelTests
     [InlineData("CritChance", (int)CombatImpactEventSurface.AppliedEffect, "Crit Chance", "暴击率")]
     [InlineData("BurnApplyAmount", (int)CombatImpactEventSurface.AppliedEffect, "Burn", "燃烧")]
     [InlineData(
+        "TempoApplyAmount",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Tempo Gained",
+        "获得节奏"
+    )]
+    [InlineData(
+        "TempoRemoveAmount",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Tempo Spent",
+        "消耗节奏"
+    )]
+    [InlineData("Tempo", (int)CombatImpactEventSurface.PlayerAttribute, "Tempo", "节奏")]
+    [InlineData(
         "FlyingTargets",
         (int)CombatImpactEventSurface.AppliedEffect,
         "Flying Targets",
@@ -93,6 +106,8 @@ public sealed class CombatImpactAttributeLabelTests
     [InlineData("DamageAmount", -5, "Damage Loss", "伤害减少")]
     [InlineData("BurnRemoveAmount", 5, "Burn Removal", "燃烧移除量")]
     [InlineData("ShieldRemoveAmount", -5, "Shield Removal", "护盾移除量")]
+    [InlineData("TempoApplyAmount", 5, "Tempo Gain", "节奏获取量")]
+    [InlineData("TempoRemoveAmount", -5, "Tempo Removal", "节奏移除量")]
     public void Card_attribute_labels_distinguish_direction_without_redundant_removal_gain(
         string key,
         int changeValue,

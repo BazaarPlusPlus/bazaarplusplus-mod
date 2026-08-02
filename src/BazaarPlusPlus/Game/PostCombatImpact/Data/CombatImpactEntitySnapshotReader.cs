@@ -59,7 +59,8 @@ internal static class CombatImpactEntitySnapshotReader
                 item?.Enchantment,
                 card.Attributes == null
                     ? null
-                    : new Dictionary<ECardAttributeType, int>(card.Attributes)
+                    : new Dictionary<ECardAttributeType, int>(card.Attributes),
+                card.Owner?.CombatantId
             );
         }
 
@@ -82,7 +83,14 @@ internal static class CombatImpactEntitySnapshotReader
     )
     {
         var id = CombatImpactProjector.PlayerId(combatant);
-        entities[id] = new CombatImpactEntity(id, name, "Hero", hero, order);
+        entities[id] = new CombatImpactEntity(
+            id,
+            name,
+            "Hero",
+            hero,
+            order,
+            CombatantId: combatant
+        );
     }
 
     private static EHero? NormalizeHero(EHero? hero) =>

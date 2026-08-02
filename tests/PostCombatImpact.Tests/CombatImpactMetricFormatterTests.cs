@@ -93,6 +93,31 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Fact]
+    public void Tempo_spent_uses_an_unsigned_consumption_total()
+    {
+        var spent = new CombatImpactGroup(
+            CombatImpactKind.AttributeChange,
+            "TempoRemoveAmount",
+            2,
+            null,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.None,
+            new CombatImpactAuthoritativeMetric(
+                CombatImpactKind.AttributeChange,
+                "TempoRemoveAmount",
+                7,
+                CombatImpactValueUnit.Amount,
+                CombatImpactAuthoritativeBasis.TotalAmount
+            ),
+            0,
+            []
+        );
+
+        Assert.Equal("×2 · 7 total", CombatImpactMetricFormatter.Group(spent, chinese: false));
+        Assert.Equal("×2 · 总计 7", CombatImpactMetricFormatter.Group(spent, chinese: true));
+    }
+
+    [Fact]
     public void Target_breakdown_distinguishes_counts_from_authoritative_totals()
     {
         var unquantified = new CombatImpactTarget(

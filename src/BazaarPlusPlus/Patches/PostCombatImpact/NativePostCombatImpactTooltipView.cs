@@ -2035,6 +2035,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             "Health" or "HealthMax" or "HealAmount" => "HealAmount",
             "HealthRegen" => "RegenApplyAmount",
             "Rage" or "RageMax" => "RageApplyAmount",
+            "Tempo" => "TempoApplyAmount",
             "Burn" => "BurnApplyAmount",
             "Poison" => "PoisonApplyAmount",
             "Shield" => "ShieldApplyAmount",
