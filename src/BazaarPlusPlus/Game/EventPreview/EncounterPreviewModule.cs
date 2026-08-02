@@ -285,7 +285,8 @@ internal sealed class EncounterPreviewModule : IEncounterPreviewModule, IDisposa
                 snapshot,
                 _runtime.ReadCurrentHero(),
                 _runtime.ReadInventory(),
-                currentDay
+                currentDay,
+                ResolveLiveValue
             );
             if (option == null || (!option.HasChoiceDetails && !option.HasOutcomeGroups))
                 return new EventPreviewResult(EventPreviewAvailability.Unsupported, null);
@@ -293,6 +294,22 @@ internal sealed class EncounterPreviewModule : IEncounterPreviewModule, IDisposa
             return Presentation(
                 EncounterPreviewTextFormatter.Build(option, _runtime.ColorKeywords, dayTiers.Table)
             );
+
+            bool ResolveLiveValue(
+                Guid templateId,
+                string effectId,
+                bool isAura,
+                out string valueText,
+                out string? unit
+            ) =>
+                _runtime.TryEvaluateAbilityValue(
+                    source,
+                    templateId,
+                    effectId,
+                    isAura,
+                    out valueText,
+                    out unit
+                );
         }
         catch (Exception)
         {
@@ -334,7 +351,7 @@ internal sealed class EncounterPreviewModule : IEncounterPreviewModule, IDisposa
     {
         try
         {
-            if (!TryGetSnapshot(out _, out var snapshot, out var unavailable))
+            if (!TryGetSnapshot(out var source, out var snapshot, out var unavailable))
                 return new EventPreviewResult(unavailable, null);
             if (!snapshot.TryGetLevelUp(query.CurrentLevel, out var levelUpPlan))
                 return new EventPreviewResult(EventPreviewAvailability.Missing, null);
@@ -344,11 +361,28 @@ internal sealed class EncounterPreviewModule : IEncounterPreviewModule, IDisposa
                 id => snapshot.TryGetTemplate(id, out var template) ? template : null,
                 _runtime.ReadCurrentHero(),
                 _runtime.ColorKeywords,
-                query.CurrentLevel
+                query.CurrentLevel,
+                ResolveLiveValue
             );
             return string.IsNullOrWhiteSpace(content)
                 ? new EventPreviewResult(EventPreviewAvailability.Unsupported, null)
                 : new EventPreviewResult(EventPreviewAvailability.Available, content);
+
+            bool ResolveLiveValue(
+                Guid templateId,
+                string effectId,
+                bool isAura,
+                out string valueText,
+                out string? unit
+            ) =>
+                _runtime.TryEvaluateAbilityValue(
+                    source,
+                    templateId,
+                    effectId,
+                    isAura,
+                    out valueText,
+                    out unit
+                );
         }
         catch (Exception)
         {

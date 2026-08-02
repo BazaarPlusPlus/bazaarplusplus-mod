@@ -48,6 +48,60 @@ internal static class CardAbilityValueReader
         out CardAbilityValue result
     ) => TryRead(template, AurasProperty, auraId, out result);
 
+    internal static bool TryEvaluate(
+        TCardBase template,
+        string abilityId,
+        ValueContext context,
+        out CardAbilityValue result
+    ) => TryEvaluate(template, AbilitiesProperty, abilityId, context, out result);
+
+    internal static bool TryEvaluateAura(
+        TCardBase template,
+        string auraId,
+        ValueContext context,
+        out CardAbilityValue result
+    ) => TryEvaluate(template, AurasProperty, auraId, context, out result);
+
+    // Static card data cannot resolve values backed by the current run (player
+    // attributes, owned-card counts, aggregate card attributes). The native game
+    // evaluates those ITValue graphs against a ValueContext; use that same graph at
+    // presentation time instead of reimplementing each reference-value subtype.
+    private static bool TryEvaluate(
+        TCardBase template,
+        string effectsProperty,
+        string effectId,
+        ValueContext context,
+        out CardAbilityValue result
+    )
+    {
+        result = default;
+        if (effectId.IndexOf('.') >= 0)
+            return false;
+
+        var effects = template.GetType().GetProperty(effectsProperty)?.GetValue(template);
+        if (effects is not IEnumerable enumerable)
+            return false;
+
+        foreach (var entry in enumerable)
+        {
+            if (!TryReadEntry(entry, out var key, out var effect))
+                continue;
+            if (!string.Equals(key?.ToString(), effectId, StringComparison.Ordinal))
+                continue;
+
+            var action = effect?.GetType().GetProperty("Action")?.GetValue(effect);
+            if (action?.GetType().GetProperty("Value")?.GetValue(action) is not ITValue value)
+                return false;
+            if (!TryFormatScalar(value.GetValue(context), out var valueText))
+                return false;
+
+            result = new CardAbilityValue(valueText, ResolveAttributeUnit(action));
+            return true;
+        }
+
+        return false;
+    }
+
     private static bool TryRead(
         TCardBase template,
         string effectsProperty,

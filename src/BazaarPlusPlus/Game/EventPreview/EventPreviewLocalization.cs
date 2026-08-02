@@ -6,6 +6,14 @@ using BazaarPlusPlus.GameInterop.Cards;
 
 namespace BazaarPlusPlus.Game.EventPreview;
 
+internal delegate bool LiveAbilityValueResolver(
+    Guid templateId,
+    string effectId,
+    bool isAura,
+    out string valueText,
+    out string? unit
+);
+
 internal static class EventPreviewLocalization
 {
     internal static Func<string, string?>? AttributeUnitLocalizer { get; set; }
@@ -13,11 +21,18 @@ internal static class EventPreviewLocalization
     internal static string? ResolveTitle(EncounterPreviewTemplatePlan template) =>
         template == null ? null : PickText(template.Title);
 
-    internal static string? ResolveDescription(EncounterPreviewTemplatePlan template)
+    internal static string? ResolveDescription(
+        EncounterPreviewTemplatePlan template,
+        LiveAbilityValueResolver? resolveLiveValue = null
+    )
     {
         if (template == null)
             return null;
-        return FormatAbilityPlaceholders(template, PickText(template.Description));
+        return FormatAbilityPlaceholders(
+            template,
+            PickText(template.Description),
+            resolveLiveValue
+        );
     }
 
     internal static IReadOnlyDictionary<string, EncounterPreviewAbilityValue> CaptureAbilityValues(
@@ -90,7 +105,8 @@ internal static class EventPreviewLocalization
 
     private static string? FormatAbilityPlaceholders(
         EncounterPreviewTemplatePlan template,
-        string? text
+        string? text,
+        LiveAbilityValueResolver? resolveLiveValue
     ) =>
         FormatAbilityPlaceholders(
             text,
@@ -102,6 +118,21 @@ internal static class EventPreviewLocalization
                     unit = value.Unit;
                     return true;
                 }
+
+                const string AuraPrefix = "aura.";
+                var isAura = abilityId.StartsWith(AuraPrefix, StringComparison.Ordinal);
+                var effectId = isAura ? abilityId[AuraPrefix.Length..] : abilityId;
+                if (
+                    resolveLiveValue != null
+                    && resolveLiveValue(
+                        template.TemplateId,
+                        effectId,
+                        isAura,
+                        out valueText,
+                        out unit
+                    )
+                )
+                    return true;
 
                 valueText = string.Empty;
                 unit = null;
