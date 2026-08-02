@@ -613,7 +613,15 @@ internal sealed class FakeSession : INativeCardPreviewSession
 
     public NativePreviewActionResult Show() => Applied();
 
+    public NativePreviewActionResult ShowArtworkOnly() => Applied();
+
     public NativePreviewActionResult Hide() => Applied();
+
+    public NativeCardPreviewSlotFitResult FitInto(
+        UnityEngine.RectTransform slot,
+        NativeCardPreviewHorizontalAlignment horizontalAlignment =
+            NativeCardPreviewHorizontalAlignment.Center
+    ) => NativeCardPreviewSlotFitResult.Applied;
 
     public NativePreviewActionResult HoverEnter() => Applied();
 

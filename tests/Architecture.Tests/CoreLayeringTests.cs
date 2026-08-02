@@ -3093,6 +3093,23 @@ public class CoreLayeringTests
         );
     }
 
+    [Fact]
+    public void Post_combat_impact_reuses_native_preview_artwork()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var tooltipView = File.ReadAllText(
+            Path.Combine(
+                sourceRoot,
+                "Patches",
+                "PostCombatImpact",
+                "NativePostCombatImpactTooltipView.cs"
+            )
+        );
+
+        Assert.Contains("INativeCardPreviewHost", tooltipView);
+        Assert.DoesNotContain("RawImage", tooltipView);
+    }
+
     private static void ScanForAgentImports(string file, string baseDir, List<string> violations)
     {
         var relative = Path.GetRelativePath(baseDir, file).Replace('\\', '/');

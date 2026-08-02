@@ -30,6 +30,8 @@ internal sealed class BppLogFeatureScope
         new("ItemEnchantPreview", "item_enchant_preview");
     internal static BppLogFeatureScope CombatStatusBar { get; } =
         new("CombatStatusBar", "combat_status_bar");
+    internal static BppLogFeatureScope PostCombatImpact { get; } =
+        new("PostCombatImpact", "post_combat_impact");
     internal static BppLogFeatureScope BilingualItemNames { get; } =
         new("BilingualItemNames", "bilingual_item_names");
     internal static BppLogFeatureScope NameOverride { get; } = new("NameOverride", "name_override");
@@ -58,6 +60,7 @@ internal sealed class BppLogFeatureScope
         EventPreview,
         ItemEnchantPreview,
         CombatStatusBar,
+        PostCombatImpact,
         BilingualItemNames,
         NameOverride,
         Lobby,

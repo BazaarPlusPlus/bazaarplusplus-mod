@@ -19,6 +19,9 @@ internal static class UpgradeTooltipScheduler
         IEncounterStateProbe? encounterState
     )
     {
+        if (Singleton<BoardManager>.Instance?.IsRecapViewOpen == true)
+            return false;
+
         return TooltipPreviewModePolicy.Resolve(config, encounterState)
             == TooltipPreviewMode.Upgrade;
     }

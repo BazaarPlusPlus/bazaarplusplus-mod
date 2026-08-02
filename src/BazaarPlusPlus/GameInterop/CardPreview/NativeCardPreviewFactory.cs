@@ -238,7 +238,7 @@ internal sealed class NativeCardPreviewFactory
             {
                 try
                 {
-                    if (prepared)
+                    if (prepared && card != null)
                     {
                         try
                         {

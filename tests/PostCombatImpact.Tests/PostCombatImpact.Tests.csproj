@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/BazaarPlusPlus/BazaarPlusPlus.csproj" />
+    <Reference Include="BazaarGameShared">
+      <HintPath>$(ManagedPath)/BazaarGameShared.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="FixtureGenerator/**/*.cs" />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactModels.cs"
+      Link="CombatImpactModels.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactAggregator.cs"
+      Link="CombatImpactAggregator.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactProjector.cs"
+      Link="CombatImpactProjector.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactMetricFormatter.cs"
+      Link="CombatImpactMetricFormatter.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityName.cs"
+      Link="CombatImpactEntityName.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactAttributeLabel.cs"
+      Link="CombatImpactAttributeLabel.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactTargetDetailPolicy.cs"
+      Link="CombatImpactTargetDetailPolicy.cs"
+    />
+  </ItemGroup>
+</Project>

@@ -53,5 +53,9 @@
       Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewOutcome.cs"
       Link="NativeCardPreviewOutcome.cs"
     />
+    <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewSlotFitMath.cs"
+      Link="NativeCardPreviewSlotFitMath.cs"
+    />
   </ItemGroup>
 </Project>

@@ -37,6 +37,12 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
     {
         try
         {
+            if (Singleton<BoardManager>.Instance?.IsRecapViewOpen == true)
+            {
+                _hasResolvedInputs = false;
+                return;
+            }
+
             // TooltipPreviewModePolicy.Resolve is a pure function of these inputs, so the
             // resolved mode cannot change unless one of them changes. Skip re-resolving
             // (and the downstream refresh check) on frames where the inputs are identical.
