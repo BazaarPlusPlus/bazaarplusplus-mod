@@ -5,7 +5,12 @@ namespace BazaarPlusPlus.Game.PostCombatImpact.Ui;
 
 internal static class CombatImpactAttributeLabel
 {
-    internal static string Resolve(string key, CombatImpactEventSurface surface, bool chinese)
+    internal static string Resolve(
+        string key,
+        CombatImpactEventSurface surface,
+        int? changeValue,
+        bool chinese
+    )
     {
         var normalized =
             key.EndsWith("Increase", StringComparison.Ordinal) ? key[..^"Increase".Length]
@@ -27,13 +32,13 @@ internal static class CombatImpactAttributeLabel
             "FreezeAmount" => ("冻结", "Freeze"),
             "FreezeTargets" => ("冻结目标", "Freeze Targets"),
             "BurnApplyAmount" => ("燃烧", "Burn"),
-            "BurnRemoveAmount" => ("燃烧移除", "Burn Removal"),
+            "BurnRemoveAmount" => ("燃烧移除量", "Burn Removal"),
             "PoisonApplyAmount" => ("中毒", "Poison"),
-            "PoisonRemoveAmount" => ("中毒移除", "Poison Removal"),
+            "PoisonRemoveAmount" => ("中毒移除量", "Poison Removal"),
             "RegenApplyAmount" or "HealthRegen" => ("再生", "Regen"),
-            "RegenRemoveAmount" => ("再生移除", "Regen Removal"),
+            "RegenRemoveAmount" => ("再生移除量", "Regen Removal"),
             "RageApplyAmount" or "Rage" => ("怒气", "Rage"),
-            "RageRemoveAmount" => ("怒气移除", "Rage Removal"),
+            "RageRemoveAmount" => ("怒气移除量", "Rage Removal"),
             "RageMax" => ("最大怒气", "Max Rage"),
             "Multicast" => ("多重施放", "Multicast"),
             "Lifesteal" => ("吸血", "Lifesteal"),
@@ -43,10 +48,10 @@ internal static class CombatImpactAttributeLabel
             "HealAmount" => ("治疗", "Heal"),
             "HealCrit" => ("治疗暴击", "Heal Crit"),
             "JoyApplyAmount" => ("快乐", "Joy"),
-            "JoyRemoveAmount" => ("快乐移除", "Joy Removal"),
+            "JoyRemoveAmount" => ("快乐移除量", "Joy Removal"),
             "JoyCrit" => ("快乐暴击", "Joy Crit"),
             "ShieldApplyAmount" => ("护盾", "Shield"),
-            "ShieldRemoveAmount" => ("护盾移除", "Shield Removal"),
+            "ShieldRemoveAmount" => ("护盾移除量", "Shield Removal"),
             "ShieldCrit" => ("护盾暴击", "Shield Crit"),
             "ForceUseTargets" => ("使用目标", "Use Targets"),
             "EnchantTargets" => ("附魔目标", "Enchant Targets"),
@@ -91,17 +96,20 @@ internal static class CombatImpactAttributeLabel
             "TempoCost" => ("节奏消耗", "Tempo Cost"),
             "FlatTempoCostReduction" => ("固定节奏消耗缩减", "Flat Tempo Cost Reduction"),
             "PercentTempoCostReduction" => ("节奏消耗缩减", "Tempo Cost Reduction"),
-            "CardModifyAttribute" => ("卡牌属性变化", "Card Attribute Change"),
-            "PlayerModifyAttribute" => ("玩家属性变化", "Player Attribute Change"),
             _ => ("属性变化", "Attribute Change"),
         };
-        if (surface == CombatImpactEventSurface.CardAttribute && UsesCardGainWording(normalized))
-            return chinese ? $"{labels.Item1}增加" : $"{labels.Item2} Gain";
+        if (surface == CombatImpactEventSurface.CardAttribute && UsesDirectionalWording(normalized))
+        {
+            if (changeValue > 0)
+                return chinese ? $"{labels.Item1}增加" : $"{labels.Item2} Gain";
+            if (changeValue < 0)
+                return chinese ? $"{labels.Item1}减少" : $"{labels.Item2} Loss";
+        }
 
         return chinese ? labels.Item1 : labels.Item2;
     }
 
-    private static bool UsesCardGainWording(string key) =>
+    private static bool UsesDirectionalWording(string key) =>
         key
             is "AmmoMax"
                 or "ReloadAmount"
@@ -110,20 +118,14 @@ internal static class CombatImpactAttributeLabel
                 or "SlowAmount"
                 or "FreezeAmount"
                 or "BurnApplyAmount"
-                or "BurnRemoveAmount"
                 or "PoisonApplyAmount"
-                or "PoisonRemoveAmount"
                 or "RegenApplyAmount"
-                or "RegenRemoveAmount"
                 or "RageApplyAmount"
-                or "RageRemoveAmount"
                 or "Multicast"
                 or "Lifesteal"
                 or "CritChance"
                 or "DamageAmount"
                 or "HealAmount"
                 or "JoyApplyAmount"
-                or "JoyRemoveAmount"
-                or "ShieldApplyAmount"
-                or "ShieldRemoveAmount";
+                or "ShieldApplyAmount";
 }

@@ -65,18 +65,6 @@ public sealed class CombatImpactAttributeLabelTests
         "再生增加"
     )]
     [InlineData(
-        "CardModifyAttribute",
-        (int)CombatImpactEventSurface.AppliedEffect,
-        "Card Attribute Change",
-        "卡牌属性变化"
-    )]
-    [InlineData(
-        "PlayerModifyAttribute",
-        (int)CombatImpactEventSurface.AppliedEffect,
-        "Player Attribute Change",
-        "玩家属性变化"
-    )]
-    [InlineData(
         "FutureAttributeValue",
         (int)CombatImpactEventSurface.AppliedEffect,
         "Attribute Change",
@@ -91,7 +79,44 @@ public sealed class CombatImpactAttributeLabelTests
     {
         var surface = (CombatImpactEventSurface)surfaceValue;
 
-        Assert.Equal(english, CombatImpactAttributeLabel.Resolve(key, surface, chinese: false));
-        Assert.Equal(chinese, CombatImpactAttributeLabel.Resolve(key, surface, chinese: true));
+        Assert.Equal(
+            english,
+            CombatImpactAttributeLabel.Resolve(key, surface, changeValue: 1, chinese: false)
+        );
+        Assert.Equal(
+            chinese,
+            CombatImpactAttributeLabel.Resolve(key, surface, changeValue: 1, chinese: true)
+        );
+    }
+
+    [Theory]
+    [InlineData("DamageAmount", -5, "Damage Loss", "伤害减少")]
+    [InlineData("BurnRemoveAmount", 5, "Burn Removal", "燃烧移除量")]
+    [InlineData("ShieldRemoveAmount", -5, "Shield Removal", "护盾移除量")]
+    public void Card_attribute_labels_distinguish_direction_without_redundant_removal_gain(
+        string key,
+        int changeValue,
+        string english,
+        string chinese
+    )
+    {
+        Assert.Equal(
+            english,
+            CombatImpactAttributeLabel.Resolve(
+                key,
+                CombatImpactEventSurface.CardAttribute,
+                changeValue,
+                chinese: false
+            )
+        );
+        Assert.Equal(
+            chinese,
+            CombatImpactAttributeLabel.Resolve(
+                key,
+                CombatImpactEventSurface.CardAttribute,
+                changeValue,
+                chinese: true
+            )
+        );
     }
 }

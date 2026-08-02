@@ -23,10 +23,12 @@ namespace BazaarPlusPlus.Patches.PostCombatImpact;
 internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactTooltipView
 {
     private const float EntityPreviewHeight = 52f;
+    private const float SkillPreviewTrailingPadding = 4f;
     private const float TooltipPreferredWidth = 660f;
     private const float TooltipReadableWidth = 360f;
     private const float TooltipGap = 18f;
     private const float CanvasMargin = 16f;
+    private const int NativeBottomPaddingReduction = 4;
     private const float PlacementEpsilon = 0.5f;
     private const float VisibilityFadeDuration = 0.1f;
     private const float PanelTitleFontScale = 0.84f;
@@ -694,6 +696,18 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         // Match the frame's center instead of mirroring its serialized offset; mirroring doubles
         // any inset and makes the left/right content padding visibly asymmetric.
         _nativeAuxParentRect.anchoredPosition = frameRect.anchoredPosition;
+
+        var nativeLayout = auxiliary.auxParent.GetComponent<VerticalLayoutGroup>();
+        if (nativeLayout != null)
+        {
+            var padding = nativeLayout.padding;
+            nativeLayout.padding = new RectOffset(
+                padding.left,
+                padding.right,
+                padding.top,
+                Mathf.Max(0, padding.bottom - NativeBottomPaddingReduction)
+            );
+        }
     }
 
     private void ApplyTooltipWidth(AuxiliaryTooltipController auxiliary, float contentWidth)
@@ -1052,7 +1066,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             BuildEmptyState(
                 bodyTemplate,
                 root,
-                T("本场未造成效果", "No effects caused this combat")
+                T("本场未造成效果", "No effects caused in this combat")
             );
         }
         else
@@ -1100,7 +1114,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 ? T("0 个效果", "0 effects")
                 : T(
                     $"受到 {received.EffectCount} 个效果",
-                    $"{received.EffectCount} effects received"
+                    $"{received.EffectCount} effect{(received.EffectCount == 1 ? string.Empty : "s")} received"
                 )
         );
         AddDivider(root);
@@ -1197,8 +1211,18 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     {
         var parts = new List<string>();
         if (source.UseCount > 0)
-            parts.Add(T($"使用 {source.UseCount}", $"{source.UseCount} uses"));
-        parts.Add(T($"{source.TotalCount} 个效果", $"{source.TotalCount} effects"));
+            parts.Add(
+                T(
+                    $"使用 {source.UseCount} 次",
+                    $"{source.UseCount} use{(source.UseCount == 1 ? string.Empty : "s")}"
+                )
+            );
+        parts.Add(
+            T(
+                $"{source.TotalCount} 个效果",
+                $"{source.TotalCount} effect{(source.TotalCount == 1 ? string.Empty : "s")}"
+            )
+        );
         return string.Join(" · ", parts);
     }
 
@@ -1251,6 +1275,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             group.Kind,
             group.NativeAttributeKey,
             group.Surface,
+            group.AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
+                ? total.Value
+                : group.ObservedValue,
             CombatImpactMetricFormatter.Group(group, IsChinese(), CriticalMarker())
         );
         var detailRows = new List<GameObject>();
@@ -1295,6 +1322,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             group.Kind,
             group.NativeAttributeKey,
             group.Surface,
+            group.ObservedValue,
             CombatImpactMetricFormatter.IncomingGroup(group, IsChinese(), CriticalMarker())
         );
         var detailRows = new List<GameObject>();
@@ -1320,11 +1348,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         CombatImpactKind kind,
         string nativeAttributeKey,
         CombatImpactEventSurface surface,
+        int? changeValue,
         string metricText
     )
     {
         var header = CreateHorizontal("ImpactGroupHeader", parent, 10f, preferredHeight: 48f);
-        var (label, iconKey) = ResolveEffect(kind, nativeAttributeKey, surface);
+        var (label, iconKey) = ResolveEffect(kind, nativeAttributeKey, surface, changeValue);
         var effectIcon =
             Data.TooltipTypography?.GetKeywordStringWithIconNoScale(
                 iconKey,
@@ -1519,11 +1548,19 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         };
         _previewOwner.Register(subject, rect);
         _pendingPreviewCount++;
+        var trailingPadding = string.Equals(
+            entity.TypeLabel,
+            "Skill",
+            StringComparison.OrdinalIgnoreCase
+        )
+            ? SkillPreviewTrailingPadding
+            : 0f;
         _ = LoadNativePreview(
             _previewScope,
             _previewOwner,
             subject,
             rect,
+            trailingPadding,
             generation,
             _previewCancellation.Token
         );
@@ -1537,6 +1574,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         NativePreviewOwner owner,
         NativeCardPreviewSubject subject,
         RectTransform slot,
+        float trailingPadding,
         int generation,
         CancellationToken cancellationToken
     )
@@ -1588,7 +1626,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                     session.Rect,
                     slot,
                     out var visibleWidth
-                ) || !FitPreviewColumnToVisibleWidth(slot, visibleWidth)
+                ) || !FitPreviewColumnToVisibleWidth(slot, visibleWidth, trailingPadding)
             )
             {
                 session.Dispose();
@@ -1672,7 +1710,11 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             slot.gameObject.SetActive(false);
     }
 
-    private static bool FitPreviewColumnToVisibleWidth(RectTransform slot, float visibleWidth)
+    private static bool FitPreviewColumnToVisibleWidth(
+        RectTransform slot,
+        float visibleWidth,
+        float trailingPadding
+    )
     {
         if (
             slot == null
@@ -1682,11 +1724,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         )
             return false;
 
-        column.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, visibleWidth);
+        var columnWidth = visibleWidth + Mathf.Max(0f, trailingPadding);
+        column.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, columnWidth);
         if (column.TryGetComponent<LayoutElement>(out var layout))
         {
-            layout.minWidth = visibleWidth;
-            layout.preferredWidth = visibleWidth;
+            layout.minWidth = columnWidth;
+            layout.preferredWidth = columnWidth;
         }
 
         if (column.parent is RectTransform row)
@@ -1951,7 +1994,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private static (string Label, string IconKey) ResolveEffect(
         CombatImpactKind kind,
         string nativeAttributeKey,
-        CombatImpactEventSurface surface
+        CombatImpactEventSurface surface,
+        int? changeValue
     )
     {
         var iconKey = kind switch
@@ -1960,18 +2004,16 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             CombatImpactKind.AttributeChange => AttributeIconKey(nativeAttributeKey),
             _ => nativeAttributeKey,
         };
-        var display = NativeTagTypography.Resolve(
-            kind == CombatImpactKind.Destroy ? "Destroy" : nativeAttributeKey
-        );
         var label = kind switch
         {
             CombatImpactKind.Destroy => T("摧毁", "Destroy"),
             CombatImpactKind.AttributeChange => CombatImpactAttributeLabel.Resolve(
                 nativeAttributeKey,
                 surface,
+                changeValue,
                 IsChinese()
             ),
-            _ => display.Label,
+            _ => NativeTagTypography.Resolve(nativeAttributeKey).Label,
         };
         return (label, iconKey);
     }
@@ -1997,7 +2039,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             "Poison" => "PoisonApplyAmount",
             "Shield" => "ShieldApplyAmount",
             "DamageCrit" => "CritChance",
-            "CardModifyAttribute" or "PlayerModifyAttribute" => string.Empty,
             _ => key,
         };
 

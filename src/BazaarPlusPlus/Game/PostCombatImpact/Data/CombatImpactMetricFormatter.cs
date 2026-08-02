@@ -47,8 +47,8 @@ internal static class CombatImpactMetricFormatter
             {
                 parts.Add(
                     chinese
-                        ? $"{authoritative.Value} 次作用"
-                        : $"{authoritative.Value} applications"
+                        ? $"生效 {authoritative.Value} 次"
+                        : $"{authoritative.Value} application{(authoritative.Value == 1 ? string.Empty : "s")}"
                 );
             }
         }

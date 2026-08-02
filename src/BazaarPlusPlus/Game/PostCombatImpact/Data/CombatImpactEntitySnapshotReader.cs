@@ -2,6 +2,7 @@
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.GameInterop.Cards;
+using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Localization;
 using TheBazaar.Tooltips;
 
@@ -43,7 +44,7 @@ internal static class CombatImpactEntitySnapshotReader
             if (string.IsNullOrWhiteSpace(name))
                 name = template?.InternalName;
             if (string.IsNullOrWhiteSpace(name))
-                name = card.Type == ECardType.Skill ? "Skill" : "Item";
+                name = card.Type == ECardType.Skill ? T("技能", "Skill") : T("物品", "Item");
 
             var item = card as ItemCard;
             entities[instanceId] = new CombatImpactEntity(
@@ -67,7 +68,7 @@ internal static class CombatImpactEntitySnapshotReader
         var opponentHero = NormalizeHero(TheBazaar.Data.Run?.Opponent?.Hero);
         var opponentName = TheBazaar.Data.SimPvpOpponent?.Name;
         if (string.IsNullOrWhiteSpace(opponentName))
-            opponentName = opponentHero?.ToString() ?? T("对手", "Opponent");
+            opponentName = ResolveOpponentName(opponentHero);
         AddPlayer(entities, ECombatantId.Opponent, opponentHero, opponentName, order);
         return entities;
     }
@@ -87,10 +88,22 @@ internal static class CombatImpactEntitySnapshotReader
     private static EHero? NormalizeHero(EHero? hero) =>
         hero.HasValue && hero.Value != EHero.Common ? hero : null;
 
-    private static string T(string chinese, string english) =>
-        L.CurrentLanguageCode.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
-            ? chinese
-            : english;
+    private static string ResolveOpponentName(EHero? hero)
+    {
+        if (!hero.HasValue)
+            return T("对手", "Opponent");
+
+        var localized = TheDragonsHeroIdentity.ResolveDisplayName(hero.Value);
+        return
+            IsChinese() && string.Equals(localized, hero.Value.ToString(), StringComparison.Ordinal)
+            ? "对手"
+            : localized;
+    }
+
+    private static string T(string chinese, string english) => IsChinese() ? chinese : english;
+
+    private static bool IsChinese() =>
+        L.CurrentLanguageCode.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
 
     private static string? ResolveTitle(BazaarGameShared.Domain.Core.TLocalizableText? localizable)
     {

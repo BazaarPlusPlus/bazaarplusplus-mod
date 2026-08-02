@@ -169,6 +169,17 @@ public sealed class CombatImpactMetricFormatterTests
             []
         );
         var divergent = matching with { Count = 7 };
+        var singularApplication = matching with
+        {
+            Count = 0,
+            AuthoritativeMetric = new CombatImpactAuthoritativeMetric(
+                CombatImpactKind.Haste,
+                "HasteAmount",
+                1,
+                CombatImpactValueUnit.Applications,
+                CombatImpactAuthoritativeBasis.ApplicationCount
+            ),
+        };
         var authoritativeOnly = new CombatImpactGroup(
             CombatImpactKind.Burn,
             "BurnApplyAmount",
@@ -191,6 +202,14 @@ public sealed class CombatImpactMetricFormatterTests
         Assert.Equal(
             "×7 · 9.50s · 10 applications",
             CombatImpactMetricFormatter.Group(divergent, chinese: false)
+        );
+        Assert.Equal(
+            "×7 · 9.50s · 生效 10 次",
+            CombatImpactMetricFormatter.Group(divergent, chinese: true)
+        );
+        Assert.Equal(
+            "9.50s · 1 application",
+            CombatImpactMetricFormatter.Group(singularApplication, chinese: false)
         );
         Assert.Equal(
             "76 total",
