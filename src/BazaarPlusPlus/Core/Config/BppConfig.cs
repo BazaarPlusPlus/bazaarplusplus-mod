@@ -148,7 +148,7 @@ internal sealed class BppConfig : IBppConfig
             "CombatStatusBar",
             "SpeedMultiplierSteps",
             "0.50,0.67,1.00",
-            "Comma-separated combat playback speed options used by the speed buttons. Values must be greater than 0 and no greater than 1."
+            "Comma-separated positive combat playback speed options used by the speed buttons."
         );
         EndOfRunScreenshotEnabledConfig = config.Bind(
             "Screenshots",

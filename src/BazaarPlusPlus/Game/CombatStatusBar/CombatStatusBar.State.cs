@@ -143,7 +143,10 @@ internal sealed partial class CombatStatusBar
 
     internal static float NormalizeConfiguredDefaultSpeed(float configuredSpeed)
     {
-        return IsSupportedSpeedStep(configuredSpeed) ? configuredSpeed : SpeedSteps[^1];
+        if (IsSupportedSpeedStep(configuredSpeed))
+            return configuredSpeed;
+
+        return IsSupportedSpeedStep(1f) ? 1f : SpeedSteps[^1];
     }
 
     internal static void ConfigureCombatSpeedSteps(string? configuredSteps)
@@ -298,7 +301,6 @@ internal sealed partial class CombatStatusBar
                     out var step
                 )
                 || step <= 0f
-                || step > 1f
                 || float.IsNaN(step)
                 || float.IsInfinity(step)
             )
