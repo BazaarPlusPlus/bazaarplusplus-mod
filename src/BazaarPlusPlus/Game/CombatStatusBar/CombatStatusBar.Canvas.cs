@@ -1,5 +1,6 @@
 #nullable enable
 
+using System.Globalization;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.Infrastructure.UiTokens;
 using TMPro;
@@ -88,6 +89,7 @@ internal sealed partial class CombatStatusBar
 
     private string? _renderedTimeLabel;
     private string? _renderedTimeText;
+    private string? _renderedSpeedLabel;
     private string? _renderedPauseButtonText;
 
     private bool _hasAppliedVisualColors;
@@ -179,7 +181,6 @@ internal sealed partial class CombatStatusBar
             out _speedBackground,
             out _speedLabel
         );
-        SetLabel(_speedLabel, "Speed");
         CreateSpeedContent(speedContent);
 
         _speedDivider = CreateDivider(_barRoot);
@@ -243,6 +244,7 @@ internal sealed partial class CombatStatusBar
         _speedDivider = null;
         _renderedTimeLabel = null;
         _renderedTimeText = null;
+        _renderedSpeedLabel = null;
         _renderedPauseButtonText = null;
         _uiTypography = null;
         // EnsureUi rebuilds elements with placeholder colors, so force a full repaint.
@@ -287,6 +289,14 @@ internal sealed partial class CombatStatusBar
         {
             _renderedTimeLabel = timeLabel;
             SetLabel(_timeLabel, timeLabel);
+        }
+
+        var speedLabel =
+            $"Speed {CombatSpeedMultiplier.ToString("0.##", CultureInfo.InvariantCulture)}×";
+        if (!string.Equals(_renderedSpeedLabel, speedLabel, StringComparison.Ordinal))
+        {
+            _renderedSpeedLabel = speedLabel;
+            SetLabel(_speedLabel, speedLabel);
         }
 
         var timeText = GetDisplayedTimeText();
