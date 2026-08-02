@@ -16,6 +16,8 @@ internal interface IPostCombatImpactModule
 {
     bool TryGetSource(string instanceId, out CombatImpactSource source);
 
+    bool TryGetReceived(string instanceId, out CombatImpactReceived received);
+
     void SetHoveredRecapCard(
         RecapItemVisualController recapVisual,
         Card card,
@@ -23,7 +25,11 @@ internal interface IPostCombatImpactModule
         Vector3 tooltipOffset
     );
 
-    void ClearHoveredRecapCard(RecapItemVisualController recapVisual);
+    void ClearHoveredRecapCard(
+        RecapItemVisualController recapVisual,
+        PostCombatImpactHoverExitOrigin origin,
+        bool nativeTooltipLocked
+    );
 
     void SetHoveredSkill(
         SkillProxyRenderer skill,
@@ -32,7 +38,13 @@ internal interface IPostCombatImpactModule
         Vector3 tooltipOffset
     );
 
-    void ClearHoveredSkill(SkillProxyRenderer skill);
+    void ClearHoveredSkill(
+        SkillProxyRenderer skill,
+        PostCombatImpactHoverExitOrigin origin,
+        bool nativeTooltipLocked
+    );
+
+    void OnNativeTooltipPreparing(CardTooltipController controller, ITooltipData tooltipData);
 
     void OnNativeTooltipChanging(CardTooltipController controller);
 
@@ -84,6 +96,21 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
         return true;
     }
 
+    public bool TryGetReceived(string instanceId, out CombatImpactReceived received)
+    {
+        var match = LatestReport.Received.FirstOrDefault(candidate =>
+            string.Equals(candidate.Entity.Id, instanceId, StringComparison.Ordinal)
+        );
+        if (match == null)
+        {
+            received = null!;
+            return false;
+        }
+
+        received = match;
+        return true;
+    }
+
     public void SetHoveredRecapCard(
         RecapItemVisualController recapVisual,
         Card card,
@@ -91,8 +118,11 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
         Vector3 tooltipOffset
     ) => _runtime?.SetHoveredRecapCard(recapVisual, card, tooltipData, tooltipOffset);
 
-    public void ClearHoveredRecapCard(RecapItemVisualController recapVisual) =>
-        _runtime?.ClearHoveredRecapCard(recapVisual);
+    public void ClearHoveredRecapCard(
+        RecapItemVisualController recapVisual,
+        PostCombatImpactHoverExitOrigin origin,
+        bool nativeTooltipLocked
+    ) => _runtime?.ClearHoveredRecapCard(recapVisual, origin, nativeTooltipLocked);
 
     public void SetHoveredSkill(
         SkillProxyRenderer skill,
@@ -101,7 +131,16 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
         Vector3 tooltipOffset
     ) => _runtime?.SetHoveredSkill(skill, card, tooltipData, tooltipOffset);
 
-    public void ClearHoveredSkill(SkillProxyRenderer skill) => _runtime?.ClearHoveredSkill(skill);
+    public void ClearHoveredSkill(
+        SkillProxyRenderer skill,
+        PostCombatImpactHoverExitOrigin origin,
+        bool nativeTooltipLocked
+    ) => _runtime?.ClearHoveredSkill(skill, origin, nativeTooltipLocked);
+
+    public void OnNativeTooltipPreparing(
+        CardTooltipController controller,
+        ITooltipData tooltipData
+    ) => _runtime?.OnNativeTooltipPreparing(controller, tooltipData);
 
     public void OnNativeTooltipChanging(CardTooltipController controller) =>
         _runtime?.OnNativeTooltipChanging(controller);

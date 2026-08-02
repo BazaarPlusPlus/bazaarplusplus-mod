@@ -2972,54 +2972,20 @@ public class CoreLayeringTests
                 "NativePostCombatImpactTooltipView.cs"
             )
         );
-        var artProvider = File.ReadAllText(
-            Path.Combine(featureRoot, "Ui", "PostCombatImpactCardArtProvider.cs")
-        );
 
-        Assert.False(
-            File.Exists(Path.Combine(featureRoot, "Ui", "PostCombatImpactView.cs")),
-            "The retired full-screen UI Toolkit overlay must not return."
-        );
-        Assert.DoesNotContain("UIDocument", controller);
-        Assert.DoesNotContain("PanelSettings", controller);
+        Assert.False(File.Exists(Path.Combine(featureRoot, "Ui", "PostCombatImpactView.cs")));
+        Assert.DoesNotContain("UnityEngine.InputSystem", controller);
+        Assert.DoesNotContain("rightButton.wasPressedThisFrame", controller);
         Assert.Contains("typeof(RecapItemVisualController)", recapPatch);
-        Assert.Contains("nameof(RecapItemVisualController.OnPointerEnter)", recapPatch);
-        Assert.Contains("nameof(RecapItemVisualController.OnPointerExit)", recapPatch);
         Assert.Contains("typeof(SkillProxyRenderer)", recapPatch);
-        Assert.Contains("nameof(SkillProxyRenderer.OnPointerEnter)", recapPatch);
-        Assert.Contains("nameof(SkillProxyRenderer.OnPointerExit)", recapPatch);
         Assert.Contains("typeof(AuxiliaryTooltipController)", recapPatch);
+        Assert.Contains("nameof(CardTooltipController.ShowTooltipController)", recapPatch);
         Assert.Contains("nameof(AuxiliaryTooltipController.StartTooltipFadeOut)", recapPatch);
-        Assert.DoesNotContain(
-            "nameof(CardTooltipController.RenderPassiveEffectTextBlock)",
-            recapPatch
-        );
-        Assert.False(
-            File.Exists(Path.Combine(featureRoot, "PostCombatImpactRecapClickTarget.cs")),
-            "Recap item right-click must use native hover plus polled input, not a dynamic EventSystem handler."
-        );
-        Assert.Contains("Mouse.current", controller);
-        Assert.Contains("rightButton.wasPressedThisFrame", controller);
-        Assert.Contains("_pendingAuxiliaryAnchor", controller);
-        Assert.Contains("ReferenceEquals(auxiliary, _pendingAuxiliaryController)", controller);
-        Assert.Contains("boardManager.IsRecapViewOpen", recapPatch);
         Assert.Contains("AuxiliaryTooltipController", tooltipView);
-        Assert.Contains("UIPositioner.PositionRectRelativeToAnother", tooltipView);
-        Assert.Contains("primary.RootCanvasComponent", tooltipView);
-        Assert.Contains("BppPostCombatImpactContent", tooltipView);
-        Assert.Contains("auxiliary.bodyText", tooltipView);
-        Assert.Contains("primary.SetLockedFlag(true)", tooltipView);
-        Assert.Contains("OnNativeAuxiliaryTooltipChanging", tooltipView);
-        Assert.DoesNotContain("BppTooltipSections", tooltipView);
-        Assert.DoesNotContain("SecondaryCardTooltipController", tooltipView);
-        Assert.Contains("CombatImpactSource? source", tooltipView);
-        Assert.Contains("No attributable impact recorded this combat", tooltipView);
-        Assert.Contains("auxiliary.KeepTooltipWithinBounds()", tooltipView);
-        Assert.Contains("Addressables.LoadAssetAsync<Texture>", artProvider);
-        Assert.DoesNotContain("new GameObject(\"PostCombatImpactUiToolkitRoot", tooltipView);
+        Assert.Contains("INativeCardPreviewHost", tooltipView);
+        Assert.DoesNotContain("RawImage", tooltipView);
         Assert.False(
-            File.Exists(Path.Combine(sourceRoot, "GameInterop", "Recap", "NativeRecapControls.cs")),
-            "The retired full-screen overlay's native Back bridge must not return."
+            File.Exists(Path.Combine(featureRoot, "Ui", "PostCombatImpactCardArtProvider.cs"))
         );
     }
 

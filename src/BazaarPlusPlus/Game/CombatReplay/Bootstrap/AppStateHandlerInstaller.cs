@@ -82,8 +82,6 @@ internal static class AppStateHandlerInstaller
             timeout: TimeSpan.FromSeconds(5)
         );
 
-        // Let one more frame pass so ReplayState.OnEnter fire-and-forget spawn work can settle
-        // before combat sim playback starts.
-        await Task.Delay(100);
+        await ReplayItemPresentationReadiness.WaitForActiveSetupsAsync();
     }
 }

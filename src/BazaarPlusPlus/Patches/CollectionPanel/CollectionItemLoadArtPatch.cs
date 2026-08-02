@@ -20,6 +20,15 @@ internal static class CollectionItemLoadArtPatch
     [HarmonyPrefix]
     private static bool Prefix(CardPreviewItem __instance, bool isPremium, ref Task __result)
     {
+        // A scoped native preview can be released while CardPreviewBase.SetUp is still awaiting
+        // LoadArt. Unity then supplies a destroyed component to this global prefix; touching it
+        // before the ownership check throws instead of letting the cancelled preview disappear.
+        if (__instance == null)
+        {
+            __result = Task.CompletedTask;
+            return false;
+        }
+
         var marker = __instance.GetComponent<CollectionPanelOwnedMarker>();
         if (marker == null)
             return true;

@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
 using BazaarPlusPlus.Game.PostCombatImpact.Ui;
 using BazaarPlusPlus.Infrastructure;
@@ -7,31 +8,38 @@ using TheBazaar;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace BazaarPlusPlus.Game.PostCombatImpact;
 
 internal sealed class PostCombatImpactController : MonoBehaviour
 {
     private const int NativeTooltipWaitFrames = 60;
+    private const int NativePreviewWaitFrames = 120;
+    private const int PrimaryGeometrySettleMaxFrames = 90;
+    private const int PositionedGeometrySettleMaxFrames = 30;
+    private const int RequiredStableGeometrySamples = 3;
+    private const float GeometryEpsilon = 0.5f;
 
     private readonly WaitForEndOfFrame _waitForEndOfFrame = new();
     private PostCombatImpactModule? _module;
     private IPostCombatImpactTooltipView? _view;
     private Coroutine? _pendingShow;
+    private Coroutine? _settlePresentation;
+    private Coroutine? _pendingHoverExit;
     private CardTooltipController? _pendingPrimaryTooltip;
     private Transform? _pendingAuxiliaryAnchor;
     private string? _pendingAuxiliaryHeader;
     private AuxiliaryTooltipController? _pendingAuxiliaryController;
-    private RecapItemVisualController? _selectedRecapVisual;
+    private AuxiliaryTooltipController? _activeAuxiliaryTooltip;
+    private CardTooltipController? _activePrimaryTooltip;
+    private bool _auxiliaryRequestOutstanding;
+    private HoverRequest? _hoveredRequest;
     private string? _selectedSourceId;
-    private Component? _hoveredOwner;
-    private RecapItemVisualController? _hoveredRecapVisual;
-    private Card? _hoveredCard;
-    private Transform? _hoveredAnchor;
-    private CardTooltipData? _hoveredTooltipData;
-    private Vector3 _hoveredTooltipOffset;
-    private bool _mouseDeviceUnavailableLogged;
+    private int _hoverRevision;
+    private int _suppressedHoverRevision = -1;
+    private bool _nativeAuxiliaryTakeoverActive;
+    private CombatImpactPerspective _activePerspective = CombatImpactPerspective.Caused;
+    private CombatImpactPerspective _requestedPerspective = CombatImpactPerspective.Caused;
 
     internal void Initialize(PostCombatImpactModule module, IPostCombatImpactTooltipView view)
     {
@@ -46,37 +54,94 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         Card card,
         CardTooltipData? tooltipData,
         Vector3 tooltipOffset
-    ) =>
-        SetHoveredSource(
-            recapVisual,
-            recapVisual,
-            card,
-            recapVisual.transform,
-            tooltipData,
-            tooltipOffset
-        );
+    ) => SetHoveredSource(recapVisual, card, recapVisual.transform, tooltipData, tooltipOffset);
 
-    internal void ClearHoveredRecapCard(RecapItemVisualController recapVisual) =>
-        ClearHoveredSource(recapVisual);
+    internal void ClearHoveredRecapCard(
+        RecapItemVisualController recapVisual,
+        PostCombatImpactHoverExitOrigin origin,
+        bool nativeTooltipLocked
+    ) => ClearHoveredSource(recapVisual, origin, nativeTooltipLocked);
 
     internal void SetHoveredSkill(
         SkillProxyRenderer skill,
         Card card,
         CardTooltipData? tooltipData,
         Vector3 tooltipOffset
-    ) => SetHoveredSource(skill, null, card, skill.transform, tooltipData, tooltipOffset);
+    ) => SetHoveredSource(skill, card, skill.transform, tooltipData, tooltipOffset);
 
-    internal void ClearHoveredSkill(SkillProxyRenderer skill) => ClearHoveredSource(skill);
+    internal void ClearHoveredSkill(
+        SkillProxyRenderer skill,
+        PostCombatImpactHoverExitOrigin origin,
+        bool nativeTooltipLocked
+    ) => ClearHoveredSource(skill, origin, nativeTooltipLocked);
+
+    private void Update()
+    {
+        if (!BppHotkeyService.WasShiftPressedThisFrame())
+            return;
+
+        if (_view == null || _hoveredRequest == null)
+            return;
+
+        if (
+            _selectedSourceId == null
+            || _pendingShow != null
+            || _settlePresentation != null
+            || _activePrimaryTooltip == null
+            || _activeAuxiliaryTooltip == null
+            || !_view.IsContentActive
+        )
+            return;
+
+        var activeBefore = _requestedPerspective;
+        var perspective =
+            activeBefore == CombatImpactPerspective.Caused
+                ? CombatImpactPerspective.Received
+                : CombatImpactPerspective.Caused;
+
+        try
+        {
+            if (!_view.SetPerspective(perspective, _hoveredRequest.Anchor))
+                return;
+            _requestedPerspective = perspective;
+            _activePerspective = perspective;
+            LogInteraction(
+                perspective == CombatImpactPerspective.Received
+                    ? PostCombatImpactReasonCode.PerspectiveReceived
+                    : PostCombatImpactReasonCode.PerspectiveCaused
+            );
+        }
+        catch (Exception ex)
+        {
+            _requestedPerspective = activeBefore;
+            HideActiveSelection();
+            LogInteractionFailure(PostCombatImpactReasonCode.TooltipRenderException, ex);
+        }
+    }
 
     private void SetHoveredSource(
         Component owner,
-        RecapItemVisualController? recapVisual,
         Card card,
         Transform anchor,
         CardTooltipData? tooltipData,
         Vector3 tooltipOffset
     )
     {
+        CancelPendingHoverExit();
+        if (card.InstanceId.Value is not { Length: > 0 } sourceId)
+        {
+            LogInteraction(PostCombatImpactReasonCode.SourceIdUnavailable);
+            return;
+        }
+
+        RecoverDroppedAuxiliaryRequestIfInactive();
+        var sameHover =
+            _hoveredRequest != null
+            && ReferenceEquals(_hoveredRequest.Owner, owner)
+            && string.Equals(_hoveredRequest.SourceId, sourceId, StringComparison.Ordinal);
+        if (sameHover && HasWorkForCurrentHover(sourceId))
+            return;
+
         tooltipData ??= CardTooltipData.CreateCardTooltipData(card);
         if (tooltipData == null)
         {
@@ -84,174 +149,264 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             return;
         }
 
-        _hoveredOwner = owner;
-        _hoveredRecapVisual = recapVisual;
-        _hoveredCard = card;
-        _hoveredAnchor = anchor;
-        _hoveredTooltipData = tooltipData;
-        _hoveredTooltipOffset = tooltipOffset;
-        LogInteraction(PostCombatImpactReasonCode.RecapHoverObserved);
-    }
-
-    private void ClearHoveredSource(Component owner)
-    {
-        if (ReferenceEquals(_hoveredOwner, owner))
-            ClearHoveredSource();
-    }
-
-    private void Update()
-    {
-        var mouse = Mouse.current;
-        if (mouse == null)
+        if (!sameHover)
         {
-            if (
-                !_mouseDeviceUnavailableLogged
-                && (_hoveredOwner != null || _selectedSourceId != null)
-            )
-            {
-                _mouseDeviceUnavailableLogged = true;
-                LogInteraction(PostCombatImpactReasonCode.MouseDeviceUnavailable);
-            }
-            return;
+            _hoverRevision++;
+            _suppressedHoverRevision = -1;
         }
 
-        _mouseDeviceUnavailableLogged = false;
-        if (mouse.rightButton.wasPressedThisFrame)
-        {
-            if (_hoveredCard != null && _hoveredAnchor != null && _hoveredTooltipData != null)
-            {
-                LogInteraction(PostCombatImpactReasonCode.RecapRightButtonObserved);
-                ShowDetails(
-                    _hoveredCard,
-                    _hoveredAnchor,
-                    _hoveredTooltipOffset,
-                    _hoveredTooltipData,
-                    _hoveredRecapVisual
-                );
-            }
-            else if (_selectedSourceId != null || _pendingShow != null)
-            {
-                CancelAndClearSelection();
-                LogInteraction(PostCombatImpactReasonCode.Dismissed);
-            }
-            return;
-        }
-
-        if (
-            mouse.leftButton.wasPressedThisFrame
-            && (_selectedSourceId != null || _pendingShow != null)
-        )
-        {
-            CancelAndClearSelection();
-            LogInteraction(PostCombatImpactReasonCode.Dismissed);
-        }
+        _hoveredRequest = new HoverRequest(
+            owner,
+            card,
+            anchor,
+            tooltipData,
+            tooltipOffset,
+            sourceId
+        );
+        CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
+        if (!sameHover)
+            LogInteraction(PostCombatImpactReasonCode.RecapHoverObserved);
+        StartPendingShow();
+        TryPrepareCurrentPrimaryTooltip(card);
     }
 
-    private void ShowDetails(
-        Card card,
-        Transform anchor,
-        Vector3 offset,
-        CardTooltipData tooltipData,
-        RecapItemVisualController? recapVisual
+    private bool HasWorkForCurrentHover(string sourceId) =>
+        _suppressedHoverRevision == _hoverRevision
+        || _pendingShow != null
+        || _settlePresentation != null
+        || _auxiliaryRequestOutstanding
+        || _pendingAuxiliaryController != null
+        || string.Equals(_selectedSourceId, sourceId, StringComparison.Ordinal);
+
+    private void ClearHoveredSource(
+        Component owner,
+        PostCombatImpactHoverExitOrigin origin,
+        bool nativeTooltipLocked
     )
     {
-        if (!IsRecapOpen())
-        {
-            LogInteraction(PostCombatImpactReasonCode.RecapClosed);
+        if (_hoveredRequest == null || !ReferenceEquals(_hoveredRequest.Owner, owner))
             return;
+
+        var hadWork =
+            _selectedSourceId != null
+            || _pendingShow != null
+            || _settlePresentation != null
+            || _auxiliaryRequestOutstanding
+            || _pendingAuxiliaryController != null;
+        if (
+            nativeTooltipLocked
+            && origin
+                is PostCombatImpactHoverExitOrigin.RecapPointerExit
+                    or PostCombatImpactHoverExitOrigin.SkillPointerExit
+        )
+        {
+            _pendingHoverExit ??= StartCoroutine(
+                DismissAfterLockedPointerExit(owner, _hoverRevision, hadWork)
+            );
+            return;
+        }
+        ClearHoveredSource();
+        CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
+        if (hadWork)
+            LogInteraction(PostCombatImpactReasonCode.Dismissed);
+    }
+
+    private System.Collections.IEnumerator DismissAfterLockedPointerExit(
+        Component owner,
+        int revision,
+        bool hadWork
+    )
+    {
+        yield return new WaitForSecondsRealtime(0.18f);
+        _pendingHoverExit = null;
+        if (
+            _hoverRevision != revision
+            || _hoveredRequest == null
+            || !ReferenceEquals(_hoveredRequest.Owner, owner)
+        )
+            yield break;
+
+        ClearHoveredSource();
+        CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
+        if (hadWork)
+            LogInteraction(PostCombatImpactReasonCode.Dismissed);
+    }
+
+    private void CancelPendingHoverExit()
+    {
+        if (_pendingHoverExit == null)
+            return;
+        StopCoroutine(_pendingHoverExit);
+        _pendingHoverExit = null;
+    }
+
+    private void StartPendingShow()
+    {
+        if (
+            _pendingShow != null
+            || _settlePresentation != null
+            || _hoveredRequest == null
+            || _suppressedHoverRevision == _hoverRevision
+            || _auxiliaryRequestOutstanding
+        )
+            return;
+
+        _pendingShow = StartCoroutine(ShowWhenReady(_hoveredRequest, _hoverRevision));
+    }
+
+    private System.Collections.IEnumerator ShowWhenReady(HoverRequest request, int revision)
+    {
+        // StartCoroutine advances immediately to the first yield before its return value can be
+        // assigned to _pendingShow.
+        yield return null;
+
+        if (!IsCurrentHover(request, revision) || !IsRecapOpen())
+        {
+            _pendingShow = null;
+            yield break;
         }
 
         if (_module == null || _view == null)
         {
-            LogInteraction(PostCombatImpactReasonCode.RuntimeUnavailable);
-            return;
+            FailPendingShow(
+                revision,
+                PostCombatImpactReasonCode.RuntimeUnavailable,
+                suppressUntilExit: true
+            );
+            yield break;
         }
 
-        if (card.InstanceId.Value is not { Length: > 0 } sourceId)
-        {
-            LogInteraction(PostCombatImpactReasonCode.SourceIdUnavailable);
-            return;
-        }
-
-        CombatImpactSource? source = null;
-        if (_module.TryGetSource(sourceId, out var matchedSource))
-            source = matchedSource;
-
-        CancelAndClearSelection();
         var tooltipParent = TheBazaar.Data.TooltipParentComponent;
         if (tooltipParent == null)
         {
-            LogInteraction(PostCombatImpactReasonCode.RuntimeUnavailable);
-            return;
+            FailPendingShow(
+                revision,
+                PostCombatImpactReasonCode.RuntimeUnavailable,
+                suppressUntilExit: true
+            );
+            yield break;
         }
 
-        if (tooltipParent.GetCardTooltipController(card) == null)
-            tooltipParent.ShowCardTooltipController(anchor, offset, tooltipData);
+        if (tooltipParent.GetCardTooltipController(request.Card) == null)
+        {
+            tooltipParent.ShowCardTooltipController(
+                request.Anchor,
+                request.TooltipOffset,
+                request.TooltipData
+            );
+        }
 
-        _pendingShow = StartCoroutine(
-            ShowWhenReady(card, anchor, offset, sourceId, source, recapVisual)
-        );
-    }
-
-    private System.Collections.IEnumerator ShowWhenReady(
-        Card card,
-        Transform anchor,
-        Vector3 offset,
-        string sourceId,
-        CombatImpactSource? source,
-        RecapItemVisualController? recapVisual
-    )
-    {
-        // StartCoroutine advances immediately to the first yield before its return value can be
-        // assigned to _pendingShow. Defer native tooltip creation so synchronous reuse of an
-        // already-active auxiliary host can still identify this request.
-        yield return null;
-
-        var tooltipParent = TheBazaar.Data.TooltipParentComponent;
         CardTooltipController? primary = null;
         for (var frame = 0; frame < NativeTooltipWaitFrames; frame++)
         {
-            if (!IsRecapOpen())
+            if (!IsCurrentHover(request, revision) || !IsRecapOpen())
             {
-                FinishPendingShow();
-                LogInteraction(PostCombatImpactReasonCode.RecapClosed);
+                _pendingShow = null;
                 yield break;
             }
 
-            primary = tooltipParent?.GetCardTooltipController(card);
+            primary = tooltipParent.GetCardTooltipController(request.Card);
             if (primary != null)
+            {
+                _pendingPrimaryTooltip = primary;
+                _view.PrepareNativePrimary(primary);
+            }
+            if (primary != null && primary.HasShown)
                 break;
             yield return null;
         }
 
-        if (primary == null || tooltipParent == null || _view == null)
+        if (primary == null || !primary.HasShown)
         {
-            FinishPendingShow();
-            LogInteraction(PostCombatImpactReasonCode.PrimaryTooltipCreateTimedOut);
+            FailPendingShow(
+                revision,
+                PostCombatImpactReasonCode.PrimaryTooltipCreateTimedOut,
+                suppressUntilExit: true
+            );
             yield break;
         }
 
         _pendingPrimaryTooltip = primary;
+        // Native positioning clears the lock as it completes. Apply it only after HasShown so the
+        // Recap proxy's board CardController cannot tear the primary Tooltip down on the next tick.
         primary.SetLockedFlag(true);
-        _pendingAuxiliaryAnchor = anchor;
-        _pendingAuxiliaryHeader = _view.Header;
-        _pendingAuxiliaryController = null;
-        tooltipParent.ShowAuxiliaryTooltipController(
-            anchor,
-            offset,
-            _pendingAuxiliaryHeader,
-            itemTier: card.Tier
-        );
+
+        if (!IsCurrentHover(request, revision))
+        {
+            StopPendingShow(hidePrimary: true, preserveOutstandingAuxiliaryRequest: true);
+            yield break;
+        }
+
+        if (_pendingAuxiliaryController == null)
+        {
+            var requestSlotAvailable = false;
+            for (var frame = 0; frame < NativeTooltipWaitFrames; frame++)
+            {
+                if (!IsCurrentHover(request, revision) || !IsRecapOpen())
+                {
+                    StopPendingShow(hidePrimary: true, preserveOutstandingAuxiliaryRequest: true);
+                    yield break;
+                }
+
+                if (CanIssueNativeAuxiliaryRequest(tooltipParent))
+                {
+                    requestSlotAvailable = true;
+                    break;
+                }
+                yield return null;
+            }
+
+            if (!requestSlotAvailable)
+            {
+                FailPendingShow(
+                    revision,
+                    PostCombatImpactReasonCode.AuxiliaryTooltipCreateTimedOut,
+                    suppressUntilExit: true
+                );
+                yield break;
+            }
+
+            _pendingAuxiliaryAnchor = request.Anchor;
+            _pendingAuxiliaryHeader = _view.Header;
+            _auxiliaryRequestOutstanding = true;
+            tooltipParent.ShowAuxiliaryTooltipController(
+                request.Anchor,
+                request.TooltipOffset,
+                _pendingAuxiliaryHeader,
+                itemTier: request.Card.Tier
+            );
+            if (_auxiliaryRequestOutstanding && !IsAuxiliaryNodeActive(tooltipParent))
+            {
+                ClearResolvedAuxiliaryRequest();
+                FailPendingShow(
+                    revision,
+                    PostCombatImpactReasonCode.AuxiliaryTooltipCreateTimedOut,
+                    suppressUntilExit: true
+                );
+                yield break;
+            }
+        }
 
         AuxiliaryTooltipController? auxiliary = null;
         for (var frame = 0; frame < NativeTooltipWaitFrames; frame++)
         {
-            auxiliary = tooltipParent.AuxiliaryTooltipController;
+            if (!IsCurrentHover(request, revision) || !IsRecapOpen())
+            {
+                StopPendingShow(hidePrimary: true, preserveOutstandingAuxiliaryRequest: true);
+                yield break;
+            }
+
+            auxiliary = _pendingAuxiliaryController;
+            if (_auxiliaryRequestOutstanding && !IsAuxiliaryNodeActive(tooltipParent))
+            {
+                ClearResolvedAuxiliaryRequest();
+                break;
+            }
             if (
                 auxiliary != null
-                && ReferenceEquals(auxiliary, _pendingAuxiliaryController)
                 && tooltipParent.IsAuxiliaryTooltipDisplayed
-                && auxiliary!._coroutine == null
+                && auxiliary._coroutine == null
+                && auxiliary.HasShown
             )
                 break;
             yield return null;
@@ -260,60 +415,168 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         if (
             auxiliary == null
             || !tooltipParent.IsAuxiliaryTooltipDisplayed
-            || auxiliary!._coroutine != null
+            || auxiliary._coroutine != null
+            || !auxiliary.HasShown
         )
         {
-            FinishPendingShow();
-            tooltipParent.HideAuxiliaryTooltipController();
-            LogInteraction(PostCombatImpactReasonCode.AuxiliaryTooltipCreateTimedOut);
+            FailPendingShow(
+                revision,
+                PostCombatImpactReasonCode.AuxiliaryTooltipCreateTimedOut,
+                suppressUntilExit: true
+            );
             yield break;
         }
 
         if (
-            !IsRecapOpen()
-            || !ReferenceEquals(tooltipParent.GetCardTooltipController(card), primary)
+            !IsCurrentHover(request, revision)
+            || !ReferenceEquals(tooltipParent.GetCardTooltipController(request.Card), primary)
         )
         {
-            FinishPendingShow();
-            tooltipParent.HideAuxiliaryTooltipController();
-            LogInteraction(PostCombatImpactReasonCode.RecapClosed);
+            StopPendingShow(hidePrimary: true, preserveOutstandingAuxiliaryRequest: false);
             yield break;
         }
 
-        ClearPendingAuxiliaryRequest();
+        ClearResolvedAuxiliaryRequest();
+
+        CombatImpactSource? source = null;
+        if (_module.TryGetSource(request.SourceId, out var matchedSource))
+            source = matchedSource;
+        CombatImpactReceived? received = null;
+        if (_module.TryGetReceived(request.SourceId, out var matchedReceived))
+            received = matchedReceived;
+        var perspective = _requestedPerspective;
+        var entityName =
+            source?.Entity.Name
+            ?? received?.Entity.Name
+            ?? CombatImpactEntitySnapshotReader.ResolveDisplayName(
+                request.Card,
+                request.TooltipData.GetTitle()
+            );
+
         bool shown;
         try
         {
-            shown = _view.Show(auxiliary!, primary, source);
+            auxiliary.AssignTooltipFrame(request.Card.Tier);
+            shown = _view.Show(auxiliary, primary, entityName, source, received, perspective);
         }
         catch (Exception ex)
         {
-            _view.Hide();
-            FinishPendingShow();
-            LogInteractionFailure(PostCombatImpactReasonCode.TooltipRenderException, ex);
+            FailPendingShow(
+                revision,
+                PostCombatImpactReasonCode.TooltipRenderException,
+                suppressUntilExit: true,
+                ex
+            );
             yield break;
         }
 
         if (!shown)
         {
-            FinishPendingShow();
-            tooltipParent.HideAuxiliaryTooltipController();
-            LogInteraction(PostCombatImpactReasonCode.AuxiliaryTooltipContentUnavailable);
+            FailPendingShow(
+                revision,
+                PostCombatImpactReasonCode.AuxiliaryTooltipContentUnavailable,
+                suppressUntilExit: true
+            );
             yield break;
         }
 
+        _pendingAuxiliaryController = null;
         _pendingPrimaryTooltip = null;
-        _selectedRecapVisual = recapVisual;
-        _selectedSourceId = sourceId;
+        _selectedSourceId = request.SourceId;
+        _activePrimaryTooltip = primary;
+        _activeAuxiliaryTooltip = auxiliary;
+        _activePerspective = perspective;
+        _pendingShow = null;
+        _settlePresentation = StartCoroutine(
+            SettleAndPositionPresentation(
+                request,
+                revision,
+                auxiliary,
+                primary,
+                source != null || received != null
+            )
+        );
+    }
+
+    private System.Collections.IEnumerator SettleAndPositionPresentation(
+        HoverRequest request,
+        int revision,
+        AuxiliaryTooltipController auxiliary,
+        CardTooltipController primary,
+        bool hasAttributedImpact
+    )
+    {
+        // StartCoroutine advances immediately; yield before the controller stores the handle.
         yield return _waitForEndOfFrame;
+
+        GeometrySample? previous = null;
+        var stableSamples = 0;
+        var primaryConverged = false;
+        for (var frame = 0; frame < PrimaryGeometrySettleMaxFrames; frame++)
+        {
+            if (!IsCurrentPresentation(request, revision, auxiliary, primary))
+            {
+                _settlePresentation = null;
+                HideActiveSelection();
+                yield break;
+            }
+
+            if (TryCaptureGeometry(primary, auxiliary: null, out var current))
+            {
+                stableSamples =
+                    previous != null && current.IsNear(previous, GeometryEpsilon)
+                        ? stableSamples + 1
+                        : 1;
+                previous = current;
+                if (stableSamples >= RequiredStableGeometrySamples)
+                {
+                    primaryConverged = true;
+                    break;
+                }
+            }
+            else
+            {
+                previous = null;
+                stableSamples = 0;
+            }
+
+            yield return _waitForEndOfFrame;
+        }
+
+        if (!primaryConverged)
+        {
+            LogInteractionDegraded(PostCombatImpactReasonCode.PrimaryGeometrySettleTimedOut);
+        }
+
+        var previewsReady = false;
+        for (var frame = 0; frame < NativePreviewWaitFrames; frame++)
+        {
+            if (!IsCurrentPresentation(request, revision, auxiliary, primary))
+            {
+                _settlePresentation = null;
+                HideActiveSelection();
+                yield break;
+            }
+            if (_view?.IsReadyToReveal == true)
+            {
+                previewsReady = true;
+                break;
+            }
+            yield return _waitForEndOfFrame;
+        }
+        if (!previewsReady)
+            LogInteractionDegraded(PostCombatImpactReasonCode.EntityPreviewCreateTimedOut);
+        else
+            yield return _waitForEndOfFrame;
+
         bool positioned;
         try
         {
-            positioned = _view.Position(auxiliary!, primary);
+            positioned = _view?.Position(auxiliary, primary, request.Anchor) == true;
         }
         catch (Exception ex)
         {
-            _pendingShow = null;
+            _settlePresentation = null;
             HideActiveSelection();
             LogInteractionFailure(PostCombatImpactReasonCode.TooltipRenderException, ex);
             yield break;
@@ -321,34 +584,159 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
         if (!positioned)
         {
-            _pendingShow = null;
+            _settlePresentation = null;
             HideActiveSelection();
+            _suppressedHoverRevision = revision;
             LogInteraction(PostCombatImpactReasonCode.AuxiliaryTooltipPositionUnavailable);
             yield break;
         }
 
-        _pendingShow = null;
+        previous = null;
+        stableSamples = 0;
+        var pairConverged = false;
+        for (var frame = 0; frame < PositionedGeometrySettleMaxFrames; frame++)
+        {
+            yield return _waitForEndOfFrame;
+            if (!IsCurrentPresentation(request, revision, auxiliary, primary))
+            {
+                _settlePresentation = null;
+                HideActiveSelection();
+                yield break;
+            }
+
+            if (TryCaptureGeometry(primary, auxiliary, out var current))
+            {
+                stableSamples =
+                    previous != null && current.IsNear(previous, GeometryEpsilon)
+                        ? stableSamples + 1
+                        : 1;
+                previous = current;
+                if (stableSamples >= RequiredStableGeometrySamples)
+                {
+                    pairConverged = true;
+                    break;
+                }
+            }
+            else
+            {
+                previous = null;
+                stableSamples = 0;
+            }
+        }
+
+        if (!pairConverged)
+            LogInteractionDegraded(PostCombatImpactReasonCode.PairGeometrySettleTimedOut);
+
+        try
+        {
+            _view?.Reveal();
+        }
+        catch (Exception ex)
+        {
+            LogInteractionFailure(PostCombatImpactReasonCode.TooltipRenderException, ex);
+        }
+
+        _settlePresentation = null;
         LogInteraction(
-            source == null
+            !hasAttributedImpact
                 ? PostCombatImpactReasonCode.ShownWithoutAttributedImpact
                 : PostCombatImpactReasonCode.Shown
         );
+    }
+
+    private bool IsCurrentPresentation(
+        HoverRequest request,
+        int revision,
+        AuxiliaryTooltipController auxiliary,
+        CardTooltipController primary
+    )
+    {
+        if (
+            !IsCurrentHover(request, revision)
+            || !IsRecapOpen()
+            || auxiliary == null
+            || primary == null
+            || !primary.HasShown
+        )
+            return false;
+
+        return ReferenceEquals(
+            TheBazaar.Data.TooltipParentComponent?.GetCardTooltipController(request.Card),
+            primary
+        );
+    }
+
+    private static bool TryCaptureGeometry(
+        CardTooltipController primary,
+        AuxiliaryTooltipController? auxiliary,
+        out GeometrySample sample
+    )
+    {
+        var primaryRect = primary.PositioningRectTransform;
+        var contentRect = primary.CanvasContentRectTransform;
+        if (primaryRect == null || contentRect == null)
+        {
+            sample = null!;
+            return false;
+        }
+
+        var values = new Vector3[auxiliary == null ? 9 : 13];
+        CopyWorldCorners(primaryRect, values, 0);
+        CopyWorldCorners(contentRect, values, 4);
+        values[8] = primary.transform.localScale;
+        if (auxiliary != null)
+            CopyWorldCorners(auxiliary.PositioningRectTransform, values, 9);
+        sample = new GeometrySample(values);
+        return true;
+    }
+
+    private static void CopyWorldCorners(
+        RectTransform rect,
+        Vector3[] destination,
+        int destinationIndex
+    )
+    {
+        var corners = new Vector3[4];
+        rect.GetWorldCorners(corners);
+        Array.Copy(corners, 0, destination, destinationIndex, corners.Length);
     }
 
     internal void OnNativeTooltipChanging(CardTooltipController controller)
     {
         if (ReferenceEquals(_pendingPrimaryTooltip, controller))
         {
-            CancelPendingShow(hidePrimary: false);
+            StopPendingShow(hidePrimary: false, preserveOutstandingAuxiliaryRequest: true);
             return;
         }
 
         if (_view?.OnNativeTooltipChanging(controller) != true)
             return;
 
-        if (_pendingShow != null)
-            CancelPendingShow(hidePrimary: false, hideAuxiliary: false);
-        RestoreSelectedRecapVisual();
+        if (_pendingShow != null || _settlePresentation != null)
+            StopPendingShow(hidePrimary: false, preserveOutstandingAuxiliaryRequest: true);
+        _selectedSourceId = null;
+        _activePrimaryTooltip = null;
+        _activeAuxiliaryTooltip = null;
+        _activePerspective = CombatImpactPerspective.Caused;
+    }
+
+    internal void OnNativeTooltipPreparing(
+        CardTooltipController controller,
+        ITooltipData tooltipData
+    )
+    {
+        if (
+            _hoveredRequest == null
+            || _view == null
+            || (_pendingShow == null && _settlePresentation == null && _selectedSourceId == null)
+            || tooltipData is not CardTooltipData cardTooltipData
+            || cardTooltipData.CardInstance?.InstanceId.Value is not { Length: > 0 } sourceId
+            || !string.Equals(sourceId, _hoveredRequest.SourceId, StringComparison.Ordinal)
+        )
+            return;
+
+        _pendingPrimaryTooltip = controller;
+        _view.PrepareNativePrimary(controller);
     }
 
     internal void OnNativeAuxiliaryTooltipShowing(
@@ -357,68 +745,160 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         string header
     )
     {
+        var displacedActiveImpact = _view?.OnNativeAuxiliaryTooltipShowing(controller) == true;
         if (
-            _pendingShow != null
+            _auxiliaryRequestOutstanding
             && ReferenceEquals(_pendingAuxiliaryAnchor, anchor)
             && string.Equals(_pendingAuxiliaryHeader, header, StringComparison.Ordinal)
         )
         {
+            _nativeAuxiliaryTakeoverActive = false;
+            _auxiliaryRequestOutstanding = false;
             _pendingAuxiliaryController = controller;
+            _view?.PrepareNativeAuxiliary(controller);
+            if (_pendingShow == null)
+                _pendingShow = StartCoroutine(ResumeAfterNativeAuxiliaryShow(controller));
             return;
         }
 
-        if (_pendingShow != null)
-            CancelPendingShow(hidePrimary: true, hideAuxiliary: false);
-        HandleNativeAuxiliaryTakeover(
-            controller,
-            PostCombatImpactReasonCode.NativeAuxiliaryDisplaced
-        );
+        if (_pendingShow != null || _settlePresentation != null)
+        {
+            StopPendingShow(hidePrimary: true, preserveOutstandingAuxiliaryRequest: true);
+        }
+
+        if (displacedActiveImpact)
+        {
+            TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
+            _selectedSourceId = null;
+            _activePrimaryTooltip = null;
+            _activeAuxiliaryTooltip = null;
+            _activePerspective = CombatImpactPerspective.Caused;
+            LogInteraction(PostCombatImpactReasonCode.NativeAuxiliaryDisplaced);
+        }
+
+        _nativeAuxiliaryTakeoverActive = true;
     }
 
-    internal void OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller) =>
-        HandleNativeAuxiliaryTakeover(controller, PostCombatImpactReasonCode.NativeAuxiliaryHidden);
-
-    private void HandleNativeAuxiliaryTakeover(
-        AuxiliaryTooltipController controller,
-        PostCombatImpactReasonCode reasonCode
-    )
+    internal void OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller)
     {
-        if (_view?.OnNativeAuxiliaryTooltipChanging(controller) != true)
+        var shouldResumeStableHover =
+            _hoveredRequest != null
+            && _pendingHoverExit == null
+            && _suppressedHoverRevision != _hoverRevision
+            && Application.isFocused
+            && IsRecapOpen();
+        if (_view?.OnNativeAuxiliaryTooltipHiding(controller) == true)
+        {
+            if (_pendingShow != null || _settlePresentation != null)
+            {
+                StopPendingShow(hidePrimary: false, preserveOutstandingAuxiliaryRequest: true);
+            }
+            TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
+            _selectedSourceId = null;
+            _activePrimaryTooltip = null;
+            _activeAuxiliaryTooltip = null;
+            _activePerspective = CombatImpactPerspective.Caused;
+            LogInteraction(PostCombatImpactReasonCode.NativeAuxiliaryHidden);
+            if (shouldResumeStableHover)
+            {
+                StartPendingShow();
+                LogInteraction(PostCombatImpactReasonCode.NativeAuxiliaryRequeued);
+            }
+        }
+
+        if (!_nativeAuxiliaryTakeoverActive)
             return;
 
-        if (_pendingShow != null)
-            CancelPendingShow(hidePrimary: false, hideAuxiliary: false);
-        TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
-        RestoreSelectedRecapVisual();
-        LogInteraction(reasonCode);
+        _nativeAuxiliaryTakeoverActive = false;
+        if (_hoveredRequest != null && _suppressedHoverRevision != _hoverRevision)
+            StartPendingShow();
+    }
+
+    private System.Collections.IEnumerator ResumeAfterNativeAuxiliaryShow(
+        AuxiliaryTooltipController controller
+    )
+    {
+        // The Harmony prefix runs before the native body starts its positioning coroutine.
+        yield return null;
+
+        if (!ReferenceEquals(_pendingAuxiliaryController, controller))
+        {
+            _pendingShow = null;
+            yield break;
+        }
+
+        if (_hoveredRequest != null && _suppressedHoverRevision != _hoverRevision && IsRecapOpen())
+        {
+            _pendingShow = null;
+            StartPendingShow();
+            yield break;
+        }
+
+        for (var frame = 0; frame < NativeTooltipWaitFrames; frame++)
+        {
+            if (controller._coroutine == null)
+                break;
+            yield return null;
+        }
+
+        _view?.CancelPreparedNativeAuxiliary(controller);
+        _pendingAuxiliaryController = null;
+        ClearResolvedAuxiliaryRequest();
+        _pendingShow = null;
+        TheBazaar.Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
+        LogInteraction(PostCombatImpactReasonCode.StaleRequestDiscarded);
     }
 
     internal void HideDetails()
     {
         ClearHoveredSource();
-        CancelAndClearSelection();
+        CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
     }
 
     private void ClearHoveredSource()
     {
-        _hoveredOwner = null;
-        _hoveredRecapVisual = null;
-        _hoveredCard = null;
-        _hoveredAnchor = null;
-        _hoveredTooltipData = null;
-        _hoveredTooltipOffset = Vector3.zero;
+        CancelPendingHoverExit();
+        _hoveredRequest = null;
+        _hoverRevision++;
+        _suppressedHoverRevision = -1;
     }
 
-    private void CancelAndClearSelection()
+    private bool IsCurrentHover(HoverRequest request, int revision) =>
+        revision == _hoverRevision && ReferenceEquals(_hoveredRequest, request);
+
+    private void TryPrepareCurrentPrimaryTooltip(Card card)
     {
-        CancelPendingShow();
+        if (
+            _view == null
+            || (_pendingShow == null && _settlePresentation == null && _selectedSourceId == null)
+        )
+            return;
+        var primary = TheBazaar.Data.TooltipParentComponent?.GetCardTooltipController(card);
+        if (primary == null)
+            return;
+
+        _pendingPrimaryTooltip = primary;
+        _view.PrepareNativePrimary(primary);
+    }
+
+    private void CancelAndClearPresentation(bool preserveOutstandingAuxiliaryRequest)
+    {
+        StopPendingShow(
+            hidePrimary: true,
+            preserveOutstandingAuxiliaryRequest: preserveOutstandingAuxiliaryRequest
+        );
         HideActiveSelection();
     }
 
-    private void CancelPendingShow(bool hidePrimary = true, bool hideAuxiliary = true)
+    private void StopPendingShow(bool hidePrimary, bool preserveOutstandingAuxiliaryRequest)
     {
         var pendingPrimary = _pendingPrimaryTooltip;
         var pendingAuxiliary = _pendingAuxiliaryController;
+        if (_settlePresentation != null)
+        {
+            StopCoroutine(_settlePresentation);
+            _settlePresentation = null;
+        }
         if (_pendingShow != null)
         {
             StopCoroutine(_pendingShow);
@@ -426,32 +906,99 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         }
 
         if (pendingPrimary != null)
+        {
+            _view?.CancelPreparedNativePrimary(pendingPrimary);
             pendingPrimary.SetLockedFlag(false);
+        }
         _pendingPrimaryTooltip = null;
-        ClearPendingAuxiliaryRequest();
-        if (hideAuxiliary && pendingAuxiliary != null)
+
+        if (pendingAuxiliary != null)
+        {
+            _view?.CancelPreparedNativeAuxiliary(pendingAuxiliary);
+            _pendingAuxiliaryController = null;
             TheBazaar.Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
+        }
+
+        if (!preserveOutstandingAuxiliaryRequest || !_auxiliaryRequestOutstanding)
+            ClearResolvedAuxiliaryRequest();
+
         if (hidePrimary && pendingPrimary != null)
             TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
     }
 
-    private void FinishPendingShow()
+    private void FinishPendingShow(bool hidePrimary)
     {
         var pendingPrimary = _pendingPrimaryTooltip;
         _pendingShow = null;
         if (pendingPrimary != null)
+        {
+            _view?.CancelPreparedNativePrimary(pendingPrimary);
             pendingPrimary.SetLockedFlag(false);
+        }
         _pendingPrimaryTooltip = null;
-        ClearPendingAuxiliaryRequest();
-        if (pendingPrimary != null)
+        if (hidePrimary && pendingPrimary != null)
             TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
     }
 
-    private void ClearPendingAuxiliaryRequest()
+    private void FailPendingShow(
+        int revision,
+        PostCombatImpactReasonCode reasonCode,
+        bool suppressUntilExit,
+        Exception? exception = null
+    )
+    {
+        var pendingAuxiliary = _pendingAuxiliaryController;
+        if (pendingAuxiliary != null)
+        {
+            _view?.CancelPreparedNativeAuxiliary(pendingAuxiliary);
+            _pendingAuxiliaryController = null;
+            TheBazaar.Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
+        }
+
+        if (!_auxiliaryRequestOutstanding)
+            ClearResolvedAuxiliaryRequest();
+        FinishPendingShow(hidePrimary: true);
+        if (suppressUntilExit && revision == _hoverRevision)
+            _suppressedHoverRevision = revision;
+        if (exception == null)
+            LogInteraction(reasonCode);
+        else
+            LogInteractionFailure(reasonCode, exception);
+    }
+
+    private void ClearResolvedAuxiliaryRequest()
     {
         _pendingAuxiliaryAnchor = null;
         _pendingAuxiliaryHeader = null;
-        _pendingAuxiliaryController = null;
+        _auxiliaryRequestOutstanding = false;
+    }
+
+    private void RecoverDroppedAuxiliaryRequestIfInactive()
+    {
+        var tooltipParent = TheBazaar.Data.TooltipParentComponent;
+        if (
+            !_auxiliaryRequestOutstanding
+            || tooltipParent == null
+            || IsAuxiliaryNodeActive(tooltipParent)
+        )
+            return;
+
+        ClearResolvedAuxiliaryRequest();
+    }
+
+    private static bool CanIssueNativeAuxiliaryRequest(TooltipParentComponent tooltipParent)
+    {
+        var dataModel = tooltipParent._auxiliaryTooltipDataModel;
+        if (dataModel == null)
+            return false;
+        return !TheBazaar.Data.SequenceProcessor.IsNodeActive(dataModel)
+            || tooltipParent.AuxiliaryTooltipController != null;
+    }
+
+    private static bool IsAuxiliaryNodeActive(TooltipParentComponent tooltipParent)
+    {
+        var dataModel = tooltipParent._auxiliaryTooltipDataModel;
+        return dataModel != null && TheBazaar.Data.SequenceProcessor.IsNodeActive(dataModel);
     }
 
     private void HideActiveSelection()
@@ -460,15 +1007,10 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         _view?.Hide();
         if (hadSelection)
             TheBazaar.Data.TooltipParentComponent?.HideCardTooltipController();
-        RestoreSelectedRecapVisual();
-    }
-
-    private void RestoreSelectedRecapVisual()
-    {
-        if (_selectedRecapVisual != null)
-            _selectedRecapVisual.Move();
-        _selectedRecapVisual = null;
         _selectedSourceId = null;
+        _activePrimaryTooltip = null;
+        _activeAuxiliaryTooltip = null;
+        _activePerspective = CombatImpactPerspective.Caused;
     }
 
     private static bool IsRecapOpen()
@@ -477,12 +1019,16 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         return boardManager != null && boardManager.IsRecapViewOpen;
     }
 
-    private void OnRecapEnded() => HideDetails();
+    private void OnRecapEnded()
+    {
+        _requestedPerspective = CombatImpactPerspective.Caused;
+        HideDetails();
+    }
 
     private static void LogInteraction(PostCombatImpactReasonCode reasonCode) =>
-        BppLog.InfoEvent(
+        BppLog.DebugEvent(
             PostCombatImpactLogEvents.InteractionObserved,
-            PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode)
+            () => [PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode)]
         );
 
     private static void LogInteractionFailure(
@@ -495,6 +1041,12 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode)
         );
 
+    private static void LogInteractionDegraded(PostCombatImpactReasonCode reasonCode) =>
+        BppLog.WarnEvent(
+            PostCombatImpactLogEvents.InteractionDegraded,
+            PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode)
+        );
+
     private void OnDestroy()
     {
         Events.RecapEnded.RemoveListener(OnRecapEnded);
@@ -503,5 +1055,49 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         _view = null;
         _module?.DetachRuntime(this);
         _module = null;
+    }
+
+    private sealed record HoverRequest(
+        Component Owner,
+        Card Card,
+        Transform Anchor,
+        CardTooltipData TooltipData,
+        Vector3 TooltipOffset,
+        string SourceId
+    );
+
+    private sealed class GeometrySample
+    {
+        private readonly Vector3[] _values;
+
+        internal GeometrySample(Vector3[] values)
+        {
+            _values = values;
+        }
+
+        internal bool IsNear(GeometrySample other, float positionEpsilon)
+        {
+            if (_values.Length != other._values.Length)
+                return false;
+
+            var positionEpsilonSquared = positionEpsilon * positionEpsilon;
+            for (var index = 0; index < _values.Length; index++)
+            {
+                if (index == 8)
+                {
+                    if (
+                        Mathf.Abs(_values[index].x - other._values[index].x) > 0.001f
+                        || Mathf.Abs(_values[index].y - other._values[index].y) > 0.001f
+                        || Mathf.Abs(_values[index].z - other._values[index].z) > 0.001f
+                    )
+                        return false;
+                    continue;
+                }
+
+                if ((_values[index] - other._values[index]).sqrMagnitude > positionEpsilonSquared)
+                    return false;
+            }
+            return true;
+        }
     }
 }

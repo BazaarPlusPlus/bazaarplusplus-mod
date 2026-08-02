@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Effect;
 
 namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
 
@@ -14,9 +15,9 @@ internal enum CombatImpactKind
     Haste,
     Slow,
     Freeze,
+    Flying,
     AttributeChange,
     Destroy,
-    Critical,
 }
 
 internal enum CombatImpactValueUnit
@@ -24,6 +25,58 @@ internal enum CombatImpactValueUnit
     Amount,
     Milliseconds,
     PercentagePoints,
+    Applications,
+}
+
+internal enum CombatImpactSourceAttribution
+{
+    Unattributed,
+    Direct,
+    Trigger,
+}
+
+internal enum CombatImpactTargetKind
+{
+    Unknown,
+    Card,
+    Player,
+}
+
+internal enum CombatImpactEventSurface
+{
+    AppliedEffect,
+    CardAttribute,
+    PlayerAttribute,
+}
+
+internal enum CombatImpactValueBasis
+{
+    None,
+    ExactAdjustment,
+    NetFrameDelta,
+}
+
+internal enum CombatImpactCoverage
+{
+    None,
+    Exact,
+    LowerBound,
+    Partial,
+}
+
+[Flags]
+internal enum CombatImpactUnknownReason
+{
+    None = 0,
+    UnattributedSource = 1 << 0,
+    UnresolvedTarget = 1 << 1,
+    ValueNotQuantified = 1 << 2,
+}
+
+internal enum CombatImpactAuthoritativeBasis
+{
+    TotalAmount,
+    ApplicationCount,
 }
 
 internal sealed record CombatImpactEntity(
@@ -33,7 +86,28 @@ internal sealed record CombatImpactEntity(
     string? ArtKey,
     EHero? Hero,
     ECombatantId Owner,
-    int Order
+    int Order,
+    Guid TemplateId = default,
+    ETier Tier = ETier.Bronze,
+    int DisplaySpan = 1,
+    EEnchantmentType? EnchantmentType = null,
+    IReadOnlyDictionary<ECardAttributeType, int>? Attributes = null
+);
+
+internal sealed record CombatImpactFact(
+    int FrameIndex,
+    int FrameEventIndex,
+    EActionCommandType Action,
+    string? DirectSourceId,
+    string? TriggerSourceId,
+    string? AttributedSourceId,
+    CombatImpactSourceAttribution SourceAttribution,
+    CombatImpactTargetKind TargetKind,
+    string? TargetId,
+    long? Value,
+    CombatImpactValueUnit? Unit,
+    CombatImpactValueBasis ValueBasis,
+    CombatImpactUnknownReason UnknownReason
 );
 
 internal sealed record CombatImpactEvent(
@@ -42,26 +116,108 @@ internal sealed record CombatImpactEvent(
     string TargetId,
     int? Value = null,
     CombatImpactValueUnit Unit = CombatImpactValueUnit.Amount,
-    string? NativeAttributeKey = null
-);
+    string? NativeAttributeKey = null,
+    bool IsCritical = false,
+    CombatImpactValueBasis ValueBasis = CombatImpactValueBasis.ExactAdjustment
+)
+{
+    internal CombatImpactEventSurface Surface { get; init; } =
+        CombatImpactEventSurface.AppliedEffect;
+
+    internal int CriticalCount { get; init; }
+
+    internal int? CriticalValue { get; init; }
+
+    internal int? NonCriticalValue { get; init; }
+}
 
 internal sealed record CombatImpactTarget(
     CombatImpactEntity Entity,
     int Count,
-    int? AggregateValue,
+    int? ObservedValue,
     CombatImpactValueUnit Unit,
-    bool ValueIsPartial
-);
+    CombatImpactCoverage ObservedCoverage
+)
+{
+    internal CombatImpactValueUnit? ObservedUnit => ObservedValue.HasValue ? Unit : null;
+
+    internal bool ObservedValueIsPartial =>
+        ObservedCoverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
+}
+
+internal sealed record CombatImpactAuthoritativeMetric
+{
+    internal CombatImpactAuthoritativeMetric(
+        CombatImpactKind kind,
+        string nativeAttributeKey,
+        int value,
+        CombatImpactValueUnit unit,
+        CombatImpactAuthoritativeBasis basis
+    )
+    {
+        var valid = basis switch
+        {
+            CombatImpactAuthoritativeBasis.TotalAmount => unit == CombatImpactValueUnit.Amount,
+            CombatImpactAuthoritativeBasis.ApplicationCount => unit
+                == CombatImpactValueUnit.Applications,
+            _ => false,
+        };
+        if (!valid)
+            throw new ArgumentException(
+                $"Authoritative basis {basis} cannot use metric unit {unit}.",
+                nameof(unit)
+            );
+
+        Kind = kind;
+        NativeAttributeKey = nativeAttributeKey;
+        Value = value;
+        Unit = unit;
+        Basis = basis;
+    }
+
+    internal CombatImpactKind Kind { get; }
+
+    internal string NativeAttributeKey { get; }
+
+    internal int Value { get; }
+
+    internal CombatImpactValueUnit Unit { get; }
+
+    internal CombatImpactAuthoritativeBasis Basis { get; }
+}
 
 internal sealed record CombatImpactGroup(
     CombatImpactKind Kind,
     string NativeAttributeKey,
     int Count,
-    int? AggregateValue,
+    int? ObservedValue,
     CombatImpactValueUnit Unit,
-    bool ValueIsPartial,
+    CombatImpactCoverage ObservedCoverage,
+    CombatImpactAuthoritativeMetric? AuthoritativeMetric,
+    int UnresolvedTargetCount,
     IReadOnlyList<CombatImpactTarget> Targets
-);
+)
+{
+    internal CombatImpactEventSurface Surface { get; init; } =
+        CombatImpactEventSurface.AppliedEffect;
+
+    internal int CriticalCount { get; init; }
+
+    internal int? CriticalObservedValue { get; init; }
+
+    internal CombatImpactValueUnit? ObservedUnit => ObservedValue.HasValue ? Unit : null;
+
+    internal bool ObservedValueIsPartial =>
+        ObservedCoverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
+
+    internal bool HasDivergentTargetCoverage =>
+        UnresolvedTargetCount > 0
+        || AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
+            && (!ObservedValue.HasValue || Unit != total.Unit || ObservedValue.Value != total.Value)
+        || AuthoritativeMetric
+            is { Basis: CombatImpactAuthoritativeBasis.ApplicationCount } applications
+            && Count != applications.Value;
+}
 
 internal sealed record CombatImpactSource(
     CombatImpactEntity Entity,
@@ -74,9 +230,61 @@ internal sealed record CombatImpactSource(
     internal int TotalCount => EffectCount;
 }
 
-internal sealed record CombatImpactReport(IReadOnlyList<CombatImpactSource> Sources)
+internal sealed record CombatImpactIncomingSource(
+    CombatImpactEntity Entity,
+    int Count,
+    int? ObservedValue,
+    CombatImpactValueUnit Unit,
+    CombatImpactCoverage ObservedCoverage
+)
 {
-    internal static readonly CombatImpactReport Empty = new(Array.Empty<CombatImpactSource>());
+    internal CombatImpactValueUnit? ObservedUnit => ObservedValue.HasValue ? Unit : null;
+
+    internal bool ObservedValueIsPartial =>
+        ObservedCoverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
+}
+
+internal sealed record CombatImpactIncomingGroup(
+    CombatImpactKind Kind,
+    string NativeAttributeKey,
+    int Count,
+    int? ObservedValue,
+    CombatImpactValueUnit Unit,
+    CombatImpactCoverage ObservedCoverage,
+    IReadOnlyList<CombatImpactIncomingSource> Sources
+)
+{
+    internal CombatImpactEventSurface Surface { get; init; } =
+        CombatImpactEventSurface.AppliedEffect;
+
+    internal int CriticalCount { get; init; }
+
+    internal int? CriticalObservedValue { get; init; }
+
+    internal CombatImpactValueUnit? ObservedUnit => ObservedValue.HasValue ? Unit : null;
+
+    internal bool ObservedValueIsPartial =>
+        ObservedCoverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
+}
+
+internal sealed record CombatImpactReceived(
+    CombatImpactEntity Entity,
+    int EffectCount,
+    IReadOnlyList<CombatImpactIncomingGroup> Groups
+)
+{
+    internal int TotalCount => EffectCount;
+}
+
+internal sealed record CombatImpactReport(
+    IReadOnlyList<CombatImpactSource> Sources,
+    IReadOnlyList<CombatImpactReceived> Received
+)
+{
+    internal static readonly CombatImpactReport Empty = new(
+        Array.Empty<CombatImpactSource>(),
+        Array.Empty<CombatImpactReceived>()
+    );
 }
 
 internal sealed record CombatImpactProjectionInput(
@@ -84,5 +292,5 @@ internal sealed record CombatImpactProjectionInput(
     IReadOnlyList<CombatImpactEvent> Events,
     IReadOnlyDictionary<string, int> UseCounts,
     IReadOnlyDictionary<string, int> TriggerCounts,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<CombatImpactKind, int>> AuthoritativeTotals
+    IReadOnlyDictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>> AuthoritativeMetrics
 );

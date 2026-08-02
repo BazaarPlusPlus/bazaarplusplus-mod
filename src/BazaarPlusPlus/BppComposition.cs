@@ -231,7 +231,10 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(
             new ComponentMount<PostCombatImpactController>(
                 (c, _) =>
-                    c.Initialize(_postCombatImpactModule, new NativePostCombatImpactTooltipView())
+                    c.Initialize(
+                        _postCombatImpactModule,
+                        new NativePostCombatImpactTooltipView(_nativeCardPreviewHost)
+                    )
             )
         );
         _mountables.Register(

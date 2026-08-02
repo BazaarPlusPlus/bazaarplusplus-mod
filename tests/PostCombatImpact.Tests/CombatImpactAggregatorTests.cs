@@ -25,20 +25,20 @@ public sealed class CombatImpactAggregatorTests
             {
                 Assert.Equal(CombatImpactKind.Slow, slow.Kind);
                 Assert.Equal(3, slow.Count);
-                Assert.Equal(7800, slow.AggregateValue);
+                Assert.Equal(7800, slow.ObservedValue);
                 Assert.Collection(
                     slow.Targets,
                     eclipse =>
                     {
                         Assert.Equal("The Eclipse", eclipse.Entity.Name);
                         Assert.Equal(2, eclipse.Count);
-                        Assert.Equal(5850, eclipse.AggregateValue);
+                        Assert.Equal(5850, eclipse.ObservedValue);
                     },
                     bread =>
                     {
                         Assert.Equal("Bread Knife", bread.Entity.Name);
                         Assert.Equal(1, bread.Count);
-                        Assert.Equal(1950, bread.AggregateValue);
+                        Assert.Equal(1950, bread.ObservedValue);
                     }
                 );
             },
@@ -51,29 +51,37 @@ public sealed class CombatImpactAggregatorTests
     }
 
     [Fact]
-    public void Authoritative_total_wins_without_inventing_target_values()
+    public void Keeps_authoritative_total_separate_from_partial_observed_target_values()
     {
         var report = Aggregate(
             [
                 Event(CombatImpactKind.DirectDamage, "fairies", "opponent", 80),
                 Event(CombatImpactKind.DirectDamage, "fairies", "opponent"),
             ],
-            authoritative: new Dictionary<CombatImpactKind, int>
-            {
-                [CombatImpactKind.DirectDamage] = 240,
-            }
+            authoritative:
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.DirectDamage,
+                    CombatImpactAggregator.NativeKey(CombatImpactKind.DirectDamage),
+                    240,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAuthoritativeBasis.TotalAmount
+                ),
+            ]
         );
 
         var group = Assert.Single(Assert.Single(report.Sources).Groups);
-        Assert.Equal(240, group.AggregateValue);
-        Assert.False(group.ValueIsPartial);
+        Assert.Equal(80, group.ObservedValue);
+        Assert.True(group.ObservedValueIsPartial);
+        Assert.Equal(240, group.AuthoritativeMetric?.Value);
+        Assert.Equal(CombatImpactAuthoritativeBasis.TotalAmount, group.AuthoritativeMetric?.Basis);
         var target = Assert.Single(group.Targets);
-        Assert.Equal(80, target.AggregateValue);
-        Assert.True(target.ValueIsPartial);
+        Assert.Equal(80, target.ObservedValue);
+        Assert.True(target.ObservedValueIsPartial);
     }
 
     [Fact]
-    public void Keeps_attribute_changes_separate_by_native_attribute()
+    public void Aggregator_never_merges_typed_attribute_metrics_with_different_native_keys()
     {
         var report = Aggregate([
             Event(
@@ -89,27 +97,86 @@ public sealed class CombatImpactAggregatorTests
         var groups = Assert.Single(report.Sources).Groups;
         Assert.Equal(2, groups.Count);
         var damage = Assert.Single(groups, group => group.NativeAttributeKey == "DamageAmount");
-        Assert.Equal(-20, damage.AggregateValue);
-        Assert.Equal(-20, Assert.Single(damage.Targets).AggregateValue);
+        Assert.Equal(-20, damage.ObservedValue);
+        Assert.Equal(-20, Assert.Single(damage.Targets).ObservedValue);
         Assert.Contains(groups, group => group.NativeAttributeKey == "CritChance");
     }
 
     [Fact]
-    public void Critical_effect_is_a_real_effect_with_target_and_value()
+    public void Applied_regen_total_stays_separate_from_card_regen_gain_targets()
+    {
+        var report = Aggregate(
+            [
+                Event(
+                    CombatImpactKind.AttributeChange,
+                    "fairies",
+                    "opponent",
+                    338,
+                    nativeKey: "RegenApplyAmount"
+                ),
+                Event(
+                    CombatImpactKind.AttributeChange,
+                    "fairies",
+                    "bread",
+                    16,
+                    nativeKey: "RegenApplyAmount",
+                    surface: CombatImpactEventSurface.CardAttribute
+                ),
+            ],
+            authoritative:
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.AttributeChange,
+                    "RegenApplyAmount",
+                    338,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAuthoritativeBasis.TotalAmount
+                ),
+            ]
+        );
+
+        var groups = Assert.Single(report.Sources).Groups;
+        Assert.Equal(2, groups.Count);
+        var applied = Assert.Single(
+            groups,
+            group => group.Surface == CombatImpactEventSurface.AppliedEffect
+        );
+        Assert.Equal(338, applied.AuthoritativeMetric?.Value);
+        var cardGain = Assert.Single(
+            groups,
+            group => group.Surface == CombatImpactEventSurface.CardAttribute
+        );
+        Assert.Null(cardGain.AuthoritativeMetric);
+        Assert.Equal(16, cardGain.ObservedValue);
+        Assert.Equal("bread", Assert.Single(cardGain.Targets).Entity.Id);
+    }
+
+    [Fact]
+    public void Critical_metadata_remains_nested_in_its_effect_group()
     {
         var report = Aggregate([
-            Event(CombatImpactKind.DirectDamage, "fairies", "opponent", 160),
-            Event(CombatImpactKind.Critical, "fairies", "opponent", 160),
+            Event(CombatImpactKind.AttributeChange, "fairies", "bread", 160, isCritical: true),
         ]);
 
         var source = Assert.Single(report.Sources);
-        var critical = Assert.Single(
-            source.Groups,
-            group => group.Kind == CombatImpactKind.Critical
-        );
+        var group = Assert.Single(source.Groups);
         Assert.Equal(1, source.TotalCount);
-        Assert.Equal(160, critical.AggregateValue);
-        Assert.Equal("Opponent", Assert.Single(critical.Targets).Entity.Name);
+        Assert.Equal(1, group.CriticalCount);
+        Assert.Equal(160, group.CriticalObservedValue);
+        var target = Assert.Single(group.Targets);
+        Assert.Equal("Bread Knife", target.Entity.Name);
+        Assert.Equal(160, target.ObservedValue);
+
+        var received = Assert.Single(report.Received);
+        Assert.Equal(1, received.TotalCount);
+        var incoming = Assert.Single(received.Groups);
+        Assert.Equal(1, incoming.Count);
+        Assert.Equal(1, incoming.CriticalCount);
+        Assert.Equal(160, incoming.CriticalObservedValue);
+        var incomingSource = Assert.Single(incoming.Sources);
+        Assert.Equal("Fairies", incomingSource.Entity.Name);
+        Assert.Equal(1, incomingSource.Count);
+        Assert.Equal(160, incomingSource.ObservedValue);
     }
 
     [Fact]
@@ -129,6 +196,45 @@ public sealed class CombatImpactAggregatorTests
     }
 
     [Fact]
+    public void Entity_rows_are_stable_across_dictionary_and_event_insertion_order()
+    {
+        var forwardEntities = new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
+        {
+            ["beta"] = Entity("beta", "Same", "Item", 0),
+            ["target-b"] = Entity("target-b", "Same", "Item", 0),
+            ["alpha"] = Entity("alpha", "Same", "Item", 0),
+            ["target-a"] = Entity("target-a", "Same", "Item", 0),
+        };
+        var reverseEntities = forwardEntities
+            .Reverse()
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var forwardEvents = new[]
+        {
+            Event(CombatImpactKind.Haste, "beta", "target-b", 1000, milliseconds: true),
+            Event(CombatImpactKind.Haste, "alpha", "target-b", 1000, milliseconds: true),
+            Event(CombatImpactKind.Haste, "beta", "target-a", 1000, milliseconds: true),
+            Event(CombatImpactKind.Haste, "alpha", "target-a", 1000, milliseconds: true),
+        };
+
+        var forward = Aggregate(forwardEntities, forwardEvents);
+        var reverse = Aggregate(reverseEntities, forwardEvents.Reverse().ToArray());
+
+        Assert.Equal(["alpha", "beta"], forward.Sources.Select(source => source.Entity.Id));
+        Assert.Equal(
+            ["target-a", "target-b"],
+            Assert
+                .Single(forward.Sources, source => source.Entity.Id == "alpha")
+                .Groups.Single()
+                .Targets.Select(target => target.Entity.Id)
+        );
+        Assert.Equal(
+            ["target-a", "target-b"],
+            forward.Received.Select(received => received.Entity.Id)
+        );
+        Assert.Equal(SnapshotOrder(forward), SnapshotOrder(reverse));
+    }
+
+    [Fact]
     public void Collapses_large_event_volume_into_bounded_source_group_and_target_rows()
     {
         var events = Enumerable
@@ -145,9 +251,190 @@ public sealed class CombatImpactAggregatorTests
         Assert.Equal(10_000, target.Count);
     }
 
+    [Fact]
+    public void Preserves_authoritative_only_group_without_inventing_events_or_targets()
+    {
+        var report = Aggregate(
+            [],
+            authoritative:
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Burn,
+                    CombatImpactAggregator.NativeKey(CombatImpactKind.Burn),
+                    76,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAuthoritativeBasis.TotalAmount
+                ),
+            ]
+        );
+
+        var source = Assert.Single(report.Sources);
+        var group = Assert.Single(source.Groups);
+
+        Assert.Equal(0, source.EffectCount);
+        Assert.Equal(0, group.Count);
+        Assert.Null(group.ObservedValue);
+        Assert.Equal(76, group.AuthoritativeMetric?.Value);
+        Assert.Empty(group.Targets);
+        Assert.Empty(report.Received);
+    }
+
+    [Fact]
+    public void Projects_received_effects_by_exact_target_with_attributed_sources()
+    {
+        var report = Aggregate([
+            Event(CombatImpactKind.Slow, "fairies", "bread", 2900, milliseconds: true),
+            Event(CombatImpactKind.Slow, "fairies", "bread", milliseconds: true),
+            Event(CombatImpactKind.Burn, "eclipse", "bread", 8),
+        ]);
+
+        var received = Assert.Single(report.Received);
+        Assert.Equal("Bread Knife", received.Entity.Name);
+        Assert.Equal(3, received.EffectCount);
+        Assert.Collection(
+            received.Groups,
+            burn =>
+            {
+                Assert.Equal(CombatImpactKind.Burn, burn.Kind);
+                Assert.Equal(1, burn.Count);
+                var source = Assert.Single(burn.Sources);
+                Assert.Equal("The Eclipse", source.Entity.Name);
+                Assert.Equal(8, source.ObservedValue);
+            },
+            slow =>
+            {
+                Assert.Equal(CombatImpactKind.Slow, slow.Kind);
+                Assert.Equal(2, slow.Count);
+                Assert.Equal(2900, slow.ObservedValue);
+                Assert.True(slow.ObservedValueIsPartial);
+                var source = Assert.Single(slow.Sources);
+                Assert.Equal("Fairies", source.Entity.Name);
+                Assert.Equal(2, source.Count);
+                Assert.Equal(2900, source.ObservedValue);
+                Assert.True(source.ObservedValueIsPartial);
+            }
+        );
+    }
+
+    [Fact]
+    public void Self_targeted_effect_appears_in_both_perspectives_without_authoritative_leakage()
+    {
+        var report = Aggregate(
+            [Event(CombatImpactKind.Haste, "fairies", "fairies", 950, milliseconds: true)],
+            authoritative:
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Haste,
+                    CombatImpactAggregator.NativeKey(CombatImpactKind.Haste),
+                    1,
+                    CombatImpactValueUnit.Applications,
+                    CombatImpactAuthoritativeBasis.ApplicationCount
+                ),
+            ]
+        );
+
+        var caused = Assert.Single(report.Sources);
+        Assert.NotNull(Assert.Single(caused.Groups).AuthoritativeMetric);
+        var received = Assert.Single(report.Received);
+        var incoming = Assert.Single(received.Groups);
+        Assert.Equal(950, incoming.ObservedValue);
+        Assert.Equal("Fairies", Assert.Single(incoming.Sources).Entity.Name);
+    }
+
+    [Fact]
+    public void Discloses_unresolved_target_occurrences_instead_of_silently_dropping_them()
+    {
+        var report = Aggregate([Event(CombatImpactKind.Burn, "fairies", "missing-target", 5)]);
+
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+        Assert.Equal(1, group.Count);
+        Assert.Equal(1, group.UnresolvedTargetCount);
+        Assert.Empty(group.Targets);
+        Assert.Empty(report.Received);
+    }
+
+    [Fact]
+    public void Saturates_observed_sums_instead_of_discarding_the_report_on_overflow()
+    {
+        var report = Aggregate([
+            Event(CombatImpactKind.DirectDamage, "fairies", "opponent", int.MaxValue),
+            Event(CombatImpactKind.DirectDamage, "fairies", "opponent", 1),
+        ]);
+
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+
+        Assert.Equal(int.MaxValue, group.ObservedValue);
+        Assert.Equal(int.MaxValue, Assert.Single(group.Targets).ObservedValue);
+    }
+
+    [Fact]
+    public void Mixed_metric_units_never_sum_or_adopt_one_unit_for_the_other()
+    {
+        var report = Aggregate([
+            Event(CombatImpactKind.Haste, "fairies", "bread", 5),
+            Event(CombatImpactKind.Haste, "fairies", "bread", 1000, milliseconds: true),
+        ]);
+
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+        var target = Assert.Single(group.Targets);
+
+        Assert.Equal(2, group.Count);
+        Assert.Null(group.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Partial, group.ObservedCoverage);
+        Assert.Null(target.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Partial, target.ObservedCoverage);
+    }
+
+    [Fact]
+    public void Net_frame_delta_makes_observed_metric_a_lower_bound()
+    {
+        var report = Aggregate([
+            Event(
+                CombatImpactKind.Haste,
+                "fairies",
+                "bread",
+                950,
+                milliseconds: true,
+                valueBasis: CombatImpactValueBasis.NetFrameDelta
+            ),
+        ]);
+
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+        var target = Assert.Single(group.Targets);
+
+        Assert.Equal(950, group.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.LowerBound, group.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.LowerBound, target.ObservedCoverage);
+    }
+
+    [Fact]
+    public void Authoritative_total_divergence_marks_observed_coverage_partial()
+    {
+        var report = Aggregate(
+            [Event(CombatImpactKind.Burn, "fairies", "bread", 80)],
+            authoritative:
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Burn,
+                    CombatImpactAggregator.NativeKey(CombatImpactKind.Burn),
+                    240,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAuthoritativeBasis.TotalAmount
+                ),
+            ]
+        );
+
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+
+        Assert.Equal(80, group.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Partial, group.ObservedCoverage);
+        Assert.True(group.HasDivergentTargetCoverage);
+        Assert.Equal(CombatImpactCoverage.Exact, Assert.Single(group.Targets).ObservedCoverage);
+    }
+
     private static CombatImpactReport Aggregate(
         IReadOnlyList<CombatImpactEvent> events,
-        IReadOnlyDictionary<CombatImpactKind, int>? authoritative = null
+        IReadOnlyList<CombatImpactAuthoritativeMetric>? authoritative = null
     )
     {
         var entities = new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
@@ -157,12 +444,12 @@ public sealed class CombatImpactAggregatorTests
             ["eclipse"] = Entity("eclipse", "The Eclipse", "Item", 2),
             ["opponent"] = Entity("opponent", "Opponent", "Hero", 3),
         };
-        var totals =
+        var metrics =
             authoritative == null
-                ? new Dictionary<string, IReadOnlyDictionary<CombatImpactKind, int>>(
+                ? new Dictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>>(
                     StringComparer.Ordinal
                 )
-                : new Dictionary<string, IReadOnlyDictionary<CombatImpactKind, int>>(
+                : new Dictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>>(
                     StringComparer.Ordinal
                 )
                 {
@@ -174,10 +461,38 @@ public sealed class CombatImpactAggregatorTests
                 events,
                 new Dictionary<string, int>(),
                 new Dictionary<string, int>(),
-                totals
+                metrics
             )
         );
     }
+
+    private static CombatImpactReport Aggregate(
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyList<CombatImpactEvent> events
+    ) =>
+        CombatImpactAggregator.Aggregate(
+            new CombatImpactProjectionInput(
+                entities,
+                events,
+                new Dictionary<string, int>(),
+                new Dictionary<string, int>(),
+                new Dictionary<string, IReadOnlyList<CombatImpactAuthoritativeMetric>>()
+            )
+        );
+
+    private static string SnapshotOrder(CombatImpactReport report) =>
+        string.Join(
+            "|",
+            report
+                .Sources.Select(source =>
+                    $"S:{source.Entity.Id}:{string.Join(",", source.Groups.SelectMany(group => group.Targets).Select(target => target.Entity.Id))}"
+                )
+                .Concat(
+                    report.Received.Select(received =>
+                        $"R:{received.Entity.Id}:{string.Join(",", received.Groups.SelectMany(group => group.Sources).Select(source => source.Entity.Id))}"
+                    )
+                )
+        );
 
     private static CombatImpactEvent Event(
         CombatImpactKind kind,
@@ -185,7 +500,10 @@ public sealed class CombatImpactAggregatorTests
         string target,
         int? value = null,
         bool milliseconds = false,
-        string? nativeKey = null
+        string? nativeKey = null,
+        bool isCritical = false,
+        CombatImpactValueBasis valueBasis = CombatImpactValueBasis.ExactAdjustment,
+        CombatImpactEventSurface surface = CombatImpactEventSurface.AppliedEffect
     ) =>
         new(
             kind,
@@ -193,8 +511,13 @@ public sealed class CombatImpactAggregatorTests
             target,
             value,
             milliseconds ? CombatImpactValueUnit.Milliseconds : CombatImpactValueUnit.Amount,
-            nativeKey
-        );
+            nativeKey,
+            isCritical,
+            valueBasis
+        )
+        {
+            Surface = surface,
+        };
 
     private static CombatImpactEntity Entity(string id, string name, string type, int order) =>
         new(id, name, type, null, null, ECombatantId.Player, order);

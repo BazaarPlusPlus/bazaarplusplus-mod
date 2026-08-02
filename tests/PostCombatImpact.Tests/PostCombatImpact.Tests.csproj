@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="FixtureGenerator/**/*.cs" />
     <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactModels.cs"
       Link="CombatImpactModels.cs"
@@ -38,6 +39,22 @@
     <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactMetricFormatter.cs"
       Link="CombatImpactMetricFormatter.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityOwnerResolver.cs"
+      Link="CombatImpactEntityOwnerResolver.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/CombatImpactEntityName.cs"
+      Link="CombatImpactEntityName.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactAttributeLabel.cs"
+      Link="CombatImpactAttributeLabel.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactTargetDetailPolicy.cs"
+      Link="CombatImpactTargetDetailPolicy.cs"
     />
   </ItemGroup>
 </Project>

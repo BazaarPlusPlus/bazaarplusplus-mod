@@ -1,97 +1,155 @@
-# Recap right-click is not received
+# PR #190 Acceptance Checklist
 
-## Background
+This checklist is the sole completion standard for PR #190. A checkbox may be marked only from
+the evidence named in that item. Code inspection is not visual evidence, and a diagnostic smoke is
+not final acceptance.
 
-Issue #187 adds per-item and per-skill combat impact details beside the native post-combat Recap Tooltip. The first implementation attached an `IPointerClickHandler` to each `RecapItemVisualController`; the first runtime correction changed that handler to `IPointerDownHandler`, added a `CardTooltipData` fallback, and made missing impact data render an explicit empty state.
+## Scope
 
-## Current problem
+- Recap hover immediately presents the native card Tooltip and a separate adjacent Combat Impact
+  Tooltip. No click or right-click is required.
+- Pressing Shift toggles the Combat Impact perspective between effects caused and effects received;
+  the selected perspective persists across hover changes for the rest of the current Recap.
+- Combat Impact follows PR #132's replay facts and aggregation semantics; it does not infer effects
+  from card text.
+- Native Recap UI outside the paired Tooltip presentation is out of scope. In particular, this PR
+  must not patch the native use-count `Text_MultiplySign` glyph or the game's locale-wide font chain.
 
-After installing commit `7fe96c50`, right-clicking a Recap item still produces no visible response.
+## Interaction and lifecycle
 
-Verified on the 2026-07-30 23:14 run:
+- [ ] Hovering an item immediately shows both complete Tooltips; moving away dismisses both.
+  Evidence: user runtime acceptance with item screenshot and matching shown/dismissed log events.
+- [ ] Hovering a skill immediately shows both complete Tooltips; moving away dismisses both.
+  Evidence: user runtime acceptance with skill screenshot and matching shown/dismissed log events.
+- [ ] One Shift press toggles perspective exactly once. Repeated toggles never dismiss, recreate,
+  detach, or move either Tooltip, and never expose a header-only Auxiliary Tooltip.
+  Evidence: user performs at least ten deliberate press/release cycles on one stable hover; Debug
+  interaction logs show one perspective transition per press and no orphan native Auxiliary
+  transition.
+  Current code evidence: the controller consumes the native left/right Shift `wasPressedThisFrame`
+  edge and swaps the two already-built perspective roots in place; it no longer polls held state or
+  maintains a frame-reset latch. A toggle is accepted only after preview loading and pair placement
+  finish, then swaps content and repositions the already-active pair while concealed. The requested
+  perspective survives native-host requeues, real pointer exits, and subsequent card/skill hovers;
+  only `RecapEnded` resets it to caused. If the native Auxiliary node independently fades while the
+  same focused hover remains valid, the controller lets that native node close and requeues the
+  complete pair; pointer-exit, Recap-disable, and native application-focus dismissal never take that
+  recovery path. Runtime lifecycle/position evidence is still required.
+- [ ] Re-hovering and moving across cards never leaves multiple cards enlarged, causes card flicker,
+  or repositions the board/card layout.
+  Evidence: user runtime acceptance across at least five cards, including repeated hover on one card.
+- [ ] Both Tooltips share the native show/fade lifecycle and remain top-aligned, adjacent, fully
+  on-screen, and clear of the native cooldown ring.
+  Evidence: user screenshots from both left- and right-constrained placements.
 
-- The installed DLL timestamp is 23:02 and the plugin reports successful initialization from that DLL.
-- No aggregate Harmony degradation is logged.
-- No `post_combat_impact.interaction.observed` event appears:
-  - no `recap_card_bound`;
-  - no `recap_pointer_down_received`;
-  - no shown/empty/failure outcome.
-- The game process had exited by the time the log was inspected.
-- Debug events may be filtered by the current BepInEx log-level configuration, but the absence of every Info outcome still proves that `ShowDetails` was not reached.
+## Data semantics
 
-The visible symptom therefore occurs before source lookup and before native Tooltip construction.
+- [x] Effects are attributed from recorded replay commands/updates with exact source and target
+  identity; a self-targeted effect appears in both caused and received perspectives without target
+  fan-out. Evidence: `CombatImpactProjectorTests` exact-target/ambiguity cases and
+  `CombatImpactAggregatorTests.Self_targeted_effect_appears_in_both_perspectives_without_authoritative_leakage`.
+- [x] Destroy and Flying/state changes are represented when present in replay facts, and player/card
+  attribute changes use player-facing change labels rather than raw internal keys.
+  Evidence: focused projector coverage for action commands/attribute updates plus
+  `CombatImpactAttributeLabelTests`. The Aura attribute policy now preserves the modifier/economy
+  classes projected by PR #132, including Flying/Destroy/Force Use target modifiers, and retains PR
+  #132's duration/percentage units; final wording remains covered by visual acceptance below.
+- [ ] Crit is nested into the relevant effect's event count and target detail instead of appearing
+  as a standalone effect group. Damage, Heal, and Shield use the native health-adjustment `IsCrit`
+  marker. Burn, Poison, and Regen are Crit-capable actions whose client player-attribute DTO drops
+  that marker; their count is recovered only when the historical non-Crit application values and
+  the native `ECardStats` total have exactly one possible Crit count. Ambiguous/incomplete equations
+  remain unlabelled, and Crit Chance is never used as evidence. Ordinary Damage/Regen/Crit Chance
+  Gain rows never participate. Focused tests include the real Zarlic sequence
+  `5,5,6,7,7,8,9,9,10,10`: total 147 resolves to 10 applications with 9 Crits. Runtime evidence is
+  still required.
+- [x] Damage, Burn, Poison, Shield, Heal, duration effects, reload/charge, and attribute changes keep
+  authoritative totals separate from partial/lower-bound observed values.
+  Evidence: `CombatImpactAggregatorTests` coverage tests and `CombatImpactMetricFormatterTests`.
+  Presentation never turns incomplete reconstruction into a mathematical `≥`/`≈` claim: game totals
+  remain unqualified, reconstructed durations carry a trailing `*`, and a localized `*` footer
+  appears only for reconstructed or missing-target detail.
+- [ ] Runtime samples agree with PR #132 semantics, including Zarlic self-Haste, Orange Julian's
+  Damage increase, Destroy/Flying, and caused/received source attribution.
+  Evidence: user runtime screenshots/logs for every named regression sample.
 
-## Candidate mechanisms
+## Visual and content
 
-1. **Dynamic EventSystem handler is not on the effective pointer-down hierarchy.**
-   `RecapItemVisualController` receives hover callbacks, but Unity may resolve pointer-down on a child handler and stop walking before the dynamically attached parent component.
-2. **The Initialize prefix never leaves a usable click target.**
-   The async Recap initialization or pooling path may replace/disable the object after the prefix binds it.
-3. **Direct mouse state is required for this native proxy.**
-   The reliable existing signal is native hover enter/exit. Track the currently hovered Recap proxy from those native methods, then read the right-button edge once per frame from the mounted feature controller.
+- [ ] Typography follows native Tooltip rules: serif `Combat Impact` title (capital I), native body
+  family, weight, size, leading, and hierarchy; no leaked rich-text/style tags.
+  Evidence: user comparison against the adjacent native Tooltip.
+  Current code evidence: entity names discard both a separate native enchantment-prefix line and
+  same-line TMP rich-text wrappers before rendering. Metric strings no longer inject nested TMP
+  font/material tags; Chinese BPP-owned text uses the stable native owned-font preparation and fails
+  the complete presentation before construction if that typography is unavailable. Runtime
+  typography comparison is still missing.
+- [ ] Header is compact and contains perspective label, source name/summary, and concise
+  `Press Shift ...` hint without a footer instruction row.
+  The localized caused/received state and Shift key keep the donor's ordinary weight and are
+  distinguished only by color. Crit counts use the native Crit sprite rather than a text label.
+  The received perspective proceeds directly from its summary to effect groups without a redundant
+  `Sources that affected this card` context row. Evidence: user screenshot.
+- [ ] Effect groups, dividers, rows, and right-aligned metrics match the approved mockup hierarchy;
+  left/right outer padding is equal and there is no unexplained ellipsis row.
+  Evidence: user screenshots for compact and dense content.
+  Current code evidence: BPP no longer adds asymmetric horizontal root padding; the native
+  `Tooltip_Aux_Content` prefab's serialized `0 / 0` horizontal padding remains authoritative.
+- [ ] Effect headings without an icon start at the content edge; headings with an icon do not reserve
+  extra blank space. Item/skill target icons are left-aligned with no leading padding, and names start
+  immediately after the visible icon.
+  Evidence: user screenshots containing icon and iconless groups.
+  Current code evidence: iconless headings create no spacer; icon headings render the native sprite
+  and label in one TMP element so both share the native text baseline instead of aligning two
+  independent rectangles. Runtime evidence for item/skill rows and mixed card spans is still missing.
+- [ ] Target previews show icon/art only—no native red/green stat badges, cooldown ring, or other
+  card chrome—and remain sharp with correct aspect ratio.
+  Evidence: user screenshots for item and skill rows.
+  Current code evidence: the shared Tab/Collection `CardPreviewBase` path is used;
+  `ShowArtworkOnly` enables native art/frame while keeping `CardGemGroupBase` supplemental values
+  concealed. Runtime sharpness and skill rendering are still unverified.
+- [ ] Small, Medium, and Large item artwork uses native previews with adaptive visible-art bounds;
+  all visible left edges align and each following name begins at the same gap from the artwork's
+  visible right edge. No per-size hard-coded offsets.
+  Evidence: user screenshot containing all three sizes in one group.
+  Current code evidence: fitting measures the active native artwork quad, aligns its world-space
+  visible left edge, and derives the row column width from `CardPreviewBase._cardImage` rather than
+  guessing from the frame or another `RawImage`; a missing authoritative artwork rect hides that
+  row's preview instead of restoring the span-wide slot. Both perspective roots stay active but only
+  the selected root participates in layout, so received previews can finish measurement before the
+  first Shift. No span-specific offset table exists. Runtime mixed-span alignment is still
+  unverified.
+- [ ] Damage/Burn/Poison and equivalent player/opponent effects omit redundant target rows. Attribute
+  changes state the concrete change type. Crit details appear parenthetically with the native Crit
+  sprite within event/target metrics, never as text or a separate row.
+  Evidence: user screenshots for these effect types.
+- [ ] Every duration is shown in seconds. Fractional numbers show exactly two decimal places while
+  integers remain unpadded; no `ms`, `≥`, `≈`, `estimated`, or `估算` appears. Reconstructed values
+  carry a trailing `*`; the localized disclosure starts with `*` and appears only when applicable.
+  Evidence: focused formatter tests plus user screenshots in caused and received perspectives.
+- [ ] Empty caused/received states render a complete, correctly positioned Combat Impact Tooltip,
+  not only a detached native header.
+  Evidence: user screenshot from a zero-impact card in both perspectives.
 
-## Selected next approach
+## Replay readiness and release gates
 
-Stop depending on a dynamically attached `IPointerDownHandler`.
-
-- Patch the existing native `RecapItemVisualController.OnPointerEnter` and `OnPointerExit` lifecycle.
-- Resolve and store the hovered card, Tooltip data, offset, and proxy from the already initialized native fields.
-- In `PostCombatImpactController.Update`, consume a direct right-button-down edge only while Recap is open and a Recap proxy is hovered.
-- Track skills through their native `SkillProxyRenderer.OnPointerEnter` and `OnPointerExit` lifecycle and use the same polled right-button edge as items.
-- Log hover binding, right-button edge receipt, and final Tooltip outcome.
-
-## Requirement correction
-
-The impact data must not be appended to the original card Tooltip. Reusing native Tooltip UI means reusing a native container and visual language, not modifying the container that owns the card description.
-
-Selected rendering path:
-
-- Keep the original native card Tooltip unchanged and locked while the impact details are visible.
-- Open the game's independent `AuxiliaryTooltipController` for the combat-impact content.
-- Position that auxiliary Tooltip beside the primary card Tooltip with `UIPositioner.PositionRectRelativeToAnother`, preferring right then left and clamping vertically to the screen.
-- If another native feature takes over the singleton auxiliary Tooltip, remove the custom content and unlock/clean the primary Tooltip before the native caller renders.
-- Treat the native auxiliary show as an asynchronous request: readiness is proven only after the patched `AuxiliaryTooltipController.ShowAuxiliaryTooltipController` observes the expected anchor/header and its native positioning coroutine completes. `IsAuxiliaryTooltipDisplayed` alone can describe a stale or fading node.
-- Defer the native auxiliary request until the frame after `StartCoroutine`: Unity advances a new coroutine to its first `yield` before returning its handle, so synchronous reuse of an already-active auxiliary host can otherwise invoke the Harmony callback before `_pendingShow` is assigned.
-- Patch the auxiliary fade-out lifecycle as well as show takeover; native code can hide the auxiliary Tooltip without showing another one, and that hide must release the primary card Tooltip lock.
-- `AuxiliaryTooltipController.PositioningCanvas` is null in the live Recap prefab. Match the game's secondary-tooltip strategy and pass `CardTooltipController.RootCanvasComponent` to `UIPositioner.PositionRectRelativeToAnother`.
-- The live auxiliary prefab keeps both its positioning rect and `auxParent` at a narrow native default. Capture and restore their native width/height, explicitly size the custom content, and copy the rebuilt `auxParent` height back to the positioning rect before asking `UIPositioner` to place it.
-- Put the opaque fill on the custom content root itself. A separate backdrop child cannot assume a safe draw order inside the serialized auxiliary hierarchy and can cover later custom content.
-- Do not place a flexible TMP object directly under the auxiliary prefab's `HorizontalLayoutGroup`: its rect can be correct while its glyphs render behind the native surface. Give the horizontal row a flexible nested text column and place the TMP object inside that column, matching the source-summary layout.
-- Omit unresolved `Custom_*` attribute changes. They are internal card-state fields without player-facing semantics and otherwise inflate the effect count with labels such as `Custom_0`.
-- Right-clicking another Recap item or skill replaces both the primary source and the separate impact Tooltip; blank click or leaving Recap cleans both.
-- Do not retain the embedded `BppTooltipSections` implementation as a fallback.
-
-## Verification
-
-Automated:
-
-- focused PostCombatImpact tests;
-- architecture guard that the retired dynamic pointer handler is absent;
-- full repository tests;
-- format and diff checks;
-- installed DLL hash equals the built Debug DLL.
-
-Runtime:
-
-1. Restart the game.
-2. Replay or complete one battle and open Recap.
-3. Hover an item and right-click once.
-4. Expect the ordinary native card Tooltip plus a separate adjacent “Combat impact” Tooltip, or the explicit “no attributable impact” empty state in that second Tooltip.
-5. If not visible, inspect `post_combat_impact.interaction.observed`:
-   - hover signal absent → native hover patch/field resolution failed;
-   - hover present, right-button edge absent → mouse input adapter failed;
-   - edge present → use the final outcome reason to isolate Tooltip creation.
-
-Verified against the installed Debug DLL on 2026-07-31:
-
-- Day 9 vs Roodles: Food Truck rendered an adjacent impact Tooltip with source art,
-  multiple effect groups, target rows, and readable metrics.
-- Day 6 vs Crossa: Cruise Ship exercised the dense multi-group layout; Venom
-  exercised the compact single-group layout; changing sources replaced both
-  Tooltips, and a blank click dismissed them.
-- Day 6 vs Crossa: Quick Freeze rendered `1 use · 1 effect`,
-  `Freeze → Haladie ×1 · 2s`; the internal `Custom_0` state was omitted.
-- The auxiliary Tooltip positioned on either side of the native card Tooltip as
-  screen space allowed.
-- Runtime logs recorded hover, right-button, shown, replacement, and dismissed
-  outcomes with no Tooltip rendering exception or degraded outcome.
+- [ ] Replay never begins until every current board card front is fully rendered; no fixed delay is
+  used as the readiness definition.
+  Evidence: user starts several replays without any blank/partial card front; code inspection confirms
+  the replay gate awaits native setup completion and a stable render boundary.
+  Current code evidence: `ItemController.Setup(Card)`'s original returned task is wrapped and tracked;
+  once no active setup remains, the gate crosses Unity's `WaitForEndOfFrame` render boundary and
+  checks the active setup set again. It uses no fixed delay as readiness. Runtime evidence is still
+  missing.
+- [ ] No `post_combat_impact` render exception/degraded event occurs during the complete runtime matrix.
+  Evidence: final `BepInEx/LogOutput.log` inspection after user acceptance.
+  Normal hover, dismissal, and perspective lifecycle events are Debug-only; Release logs retain only
+  projection and interaction degradation warnings.
+- [x] `./run.sh format-check`, focused PostCombatImpact/native-preview tests, Architecture.Tests,
+  full `./run.sh test`, Debug build, and `git diff --check` all pass on the accepted revision.
+  Evidence: captured command results after the final code change.
+  Final evidence after diagnostic/test cleanup on 2026-08-02: `format-check` checked 1098 files;
+  PostCombatImpact passed 112/112, native preview passed 36/36, Architecture passed 127/127,
+  HistoryPanelPreview passed, the complete `./run.sh test` suite passed, and the Debug build completed
+  with zero warnings/errors. Installed Debug DLL `4.6.0.t20260802.172007.dev` matches the built
+  SHA-256 `810e3c437992e59a3bba8d45812da923d5a98d07e25682528f769c49e52f2503`.
+- [ ] User explicitly accepts the final in-game visuals and interaction. PR remains Draft until then.

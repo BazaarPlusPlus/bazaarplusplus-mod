@@ -8,21 +8,36 @@ internal enum PostCombatImpactReasonCode
     ProjectionException,
     Shown,
     ShownWithoutAttributedImpact,
-    RecapClosed,
     RuntimeUnavailable,
     TooltipDataUnavailable,
     SourceIdUnavailable,
-    MouseDeviceUnavailable,
     PrimaryTooltipCreateTimedOut,
     AuxiliaryTooltipCreateTimedOut,
     AuxiliaryTooltipContentUnavailable,
     AuxiliaryTooltipPositionUnavailable,
     NativeAuxiliaryDisplaced,
     NativeAuxiliaryHidden,
+    NativeAuxiliaryRequeued,
     TooltipRenderException,
     Dismissed,
     RecapHoverObserved,
-    RecapRightButtonObserved,
+    StaleRequestDiscarded,
+    PairPlacementOverflowed,
+    PairPlacementTooNarrow,
+    PairTopAlignmentAdjusted,
+    PrimaryGeometrySettleTimedOut,
+    PairGeometrySettleTimedOut,
+    PerspectiveReceived,
+    PerspectiveCaused,
+    EntityPreviewUnavailable,
+    EntityPreviewCreateTimedOut,
+}
+
+internal enum PostCombatImpactHoverExitOrigin
+{
+    RecapPointerExit,
+    RecapDisabled,
+    SkillPointerExit,
 }
 
 [BppLogEventSource]

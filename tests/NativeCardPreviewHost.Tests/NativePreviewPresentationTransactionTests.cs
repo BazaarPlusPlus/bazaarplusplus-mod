@@ -12,6 +12,7 @@ public sealed class NativePreviewPresentationTransactionTests
 
         var result = NativePreviewPresentationTransaction.Apply(
             show: true,
+            revealSupplementalVisualsOnSuccess: true,
             ApplyNative,
             () => calls.Add("reveal"),
             () => calls.Add("conceal")
@@ -28,6 +29,27 @@ public sealed class NativePreviewPresentationTransactionTests
     }
 
     [Fact]
+    public void Artwork_only_show_keeps_supplemental_visuals_concealed()
+    {
+        var calls = new List<string>();
+
+        var result = NativePreviewPresentationTransaction.Apply(
+            show: true,
+            revealSupplementalVisualsOnSuccess: false,
+            () =>
+            {
+                calls.Add("native");
+                return Applied();
+            },
+            () => calls.Add("reveal"),
+            () => calls.Add("conceal")
+        );
+
+        Assert.Equal(NativePreviewActionStatus.Applied, result.Status);
+        Assert.Equal(["conceal", "native"], calls);
+    }
+
+    [Fact]
     public void Failed_show_leaves_supplemental_visuals_concealed()
     {
         var calls = new List<string>();
@@ -39,6 +61,7 @@ public sealed class NativePreviewPresentationTransactionTests
 
         var result = NativePreviewPresentationTransaction.Apply(
             show: true,
+            revealSupplementalVisualsOnSuccess: true,
             () =>
             {
                 calls.Add("native");
@@ -64,6 +87,7 @@ public sealed class NativePreviewPresentationTransactionTests
 
         var result = NativePreviewPresentationTransaction.Apply(
             show: false,
+            revealSupplementalVisualsOnSuccess: true,
             () =>
             {
                 calls.Add("native");

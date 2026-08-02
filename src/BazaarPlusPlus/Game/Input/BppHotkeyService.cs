@@ -78,6 +78,9 @@ internal static class BppHotkeyService
         return action.WasPressedThisFrame();
     }
 
+    internal static bool WasShiftPressedThisFrame(Keyboard? keyboard = null) =>
+        KeyBindings.Modifiers.WasShiftPressedThisFrame(keyboard ?? Keyboard.current);
+
     // Toggle-style hotkeys fire on a plain press: while the user is capturing a rebind
     // no toggle may fire, and unless the binding itself is a modifier key, a held
     // Ctrl/Alt/Shift suppresses the press (preserves the legacy plain-Tab semantics).

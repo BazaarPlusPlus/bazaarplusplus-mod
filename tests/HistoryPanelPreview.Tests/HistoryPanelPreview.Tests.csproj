@@ -25,6 +25,10 @@
       Link="NativeCardPreviewContracts.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/GameInterop/CardPreview/NativeCardPreviewSlotFitMath.cs"
+      Link="NativeCardPreviewSlotFitMath.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/ItemBoardPreview/BppItemBoard.cs"
       Link="BppItemBoard.cs"
     />
