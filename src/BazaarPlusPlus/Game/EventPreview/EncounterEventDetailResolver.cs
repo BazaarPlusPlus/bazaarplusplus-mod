@@ -10,7 +10,8 @@ internal static class EncounterEventDetailResolver
         EncounterPreviewSnapshot snapshot,
         EHero? currentHero,
         EncounterInventory? inventory = null,
-        int? currentDay = null
+        int? currentDay = null,
+        LiveAbilityValueResolver? resolveLiveValue = null
     )
     {
         if (
@@ -21,14 +22,17 @@ internal static class EncounterEventDetailResolver
         )
             return null;
 
-        var resultText = EventPreviewLocalization.ResolveDescription(eventTemplate) ?? string.Empty;
+        var resultText =
+            EventPreviewLocalization.ResolveDescription(eventTemplate, resolveLiveValue)
+            ?? string.Empty;
         var rewardFilter = ResolveRewardFilter(eventTemplate, resultText);
         var outcomeGroups = ResolveOutcomeGroups(
             eventPlan,
             snapshot,
             currentHero,
             inventory,
-            currentDay
+            currentDay,
+            resolveLiveValue
         );
 
         // A suppressed random-selection event (shop stock generation) must not fall
@@ -36,7 +40,14 @@ internal static class EncounterEventDetailResolver
         var choiceDetails =
             outcomeGroups != null || eventPlan.IsRandomSelectionEvent
                 ? Array.Empty<EncounterChoiceDetail>()
-                : ResolveChoiceDetails(eventPlan, snapshot, currentHero, inventory, currentDay);
+                : ResolveChoiceDetails(
+                    eventPlan,
+                    snapshot,
+                    currentHero,
+                    inventory,
+                    currentDay,
+                    resolveLiveValue
+                );
         return new EncounterOption(
             eventTemplate.TemplateId,
             EventPreviewLocalization.ResolveTitle(eventTemplate) ?? eventTemplate.InternalName,
@@ -55,7 +66,8 @@ internal static class EncounterEventDetailResolver
         EncounterPreviewSnapshot snapshot,
         EHero? currentHero,
         EncounterInventory? inventory,
-        int? currentDay
+        int? currentDay,
+        LiveAbilityValueResolver? resolveLiveValue
     )
     {
         if (!eventPlan.IsRandomSelectionEvent || eventPlan.SuppressRandomOutcome)
@@ -113,7 +125,7 @@ internal static class EncounterEventDetailResolver
                     );
                     continue;
                 }
-                AddChoiceDetail(details, template, isEligible: true);
+                AddChoiceDetail(details, template, isEligible: true, resolveLiveValue);
             }
 
             // Dynamic pools roll a summary line; the reward filter drives the
@@ -402,13 +414,15 @@ internal static class EncounterEventDetailResolver
         EncounterPreviewSnapshot snapshot,
         EHero? currentHero,
         EncounterInventory? inventory,
-        int? currentDay
+        int? currentDay,
+        LiveAbilityValueResolver? resolveLiveValue
     )
     {
         var candidates = new List<(EncounterPreviewTemplatePlan Step, bool MeetsPrerequisites)>();
         var pools = new List<EncounterChoiceDetail>();
         var eventDescription = snapshot.TryGetTemplate(eventPlan.TemplateId, out var eventTemplate)
-            ? EventPreviewLocalization.ResolveDescription(eventTemplate) ?? string.Empty
+            ? EventPreviewLocalization.ResolveDescription(eventTemplate, resolveLiveValue)
+                ?? string.Empty
             : string.Empty;
         foreach (var group in eventPlan.ChoiceGroups)
         {
@@ -422,7 +436,14 @@ internal static class EncounterEventDetailResolver
             if (group.IsRandomPool)
             {
                 if (
-                    ResolveChoicePool(group, snapshot, currentHero, inventory, eventDescription) is
+                    ResolveChoicePool(
+                        group,
+                        snapshot,
+                        currentHero,
+                        inventory,
+                        eventDescription,
+                        resolveLiveValue
+                    ) is
                     { } pool
                 )
                     pools.Add(pool);
@@ -459,10 +480,20 @@ internal static class EncounterEventDetailResolver
             switch (dispositions[i])
             {
                 case ChoicePresentation.Presented:
-                    AddChoiceDetail(presented, candidates[i].Step, isEligible: true);
+                    AddChoiceDetail(
+                        presented,
+                        candidates[i].Step,
+                        isEligible: true,
+                        resolveLiveValue
+                    );
                     break;
                 case ChoicePresentation.Dimmed:
-                    AddChoiceDetail(dimmed, candidates[i].Step, isEligible: false);
+                    AddChoiceDetail(
+                        dimmed,
+                        candidates[i].Step,
+                        isEligible: false,
+                        resolveLiveValue
+                    );
                     break;
             }
         }
@@ -517,7 +548,8 @@ internal static class EncounterEventDetailResolver
         EncounterPreviewSnapshot snapshot,
         EHero? currentHero,
         EncounterInventory? inventory,
-        string eventDescription
+        string eventDescription,
+        LiveAbilityValueResolver? resolveLiveValue
     )
     {
         var entries = new List<EncounterChoiceDetail>();
@@ -551,7 +583,7 @@ internal static class EncounterEventDetailResolver
                 );
                 continue;
             }
-            AddChoiceDetail(entries, template, isEligible: true);
+            AddChoiceDetail(entries, template, isEligible: true, resolveLiveValue);
         }
 
         DedupeDetails(entries);
@@ -616,10 +648,12 @@ internal static class EncounterEventDetailResolver
     private static void AddChoiceDetail(
         List<EncounterChoiceDetail> result,
         EncounterPreviewTemplatePlan template,
-        bool isEligible
+        bool isEligible,
+        LiveAbilityValueResolver? resolveLiveValue
     )
     {
-        var resultText = EventPreviewLocalization.ResolveDescription(template) ?? string.Empty;
+        var resultText =
+            EventPreviewLocalization.ResolveDescription(template, resolveLiveValue) ?? string.Empty;
         result.Add(
             new EncounterChoiceDetail(
                 template.TemplateId,

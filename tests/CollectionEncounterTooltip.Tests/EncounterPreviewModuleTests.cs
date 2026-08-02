@@ -409,6 +409,8 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         {
             CurrentHero = EHero.Jules,
             Inventory = new EncounterInventory(Array.Empty<EncounterInventoryCard>()),
+            LiveValueResolver = (_, effectId, isAura) =>
+                effectId == "0" && !isAura ? (true, "6", null) : (false, string.Empty, null),
         };
         EventPreviewLocalization.AttributeUnitLocalizer = unit => unit == "Gold" ? "Coins" : null;
         using var module = Module(
@@ -420,7 +422,11 @@ public sealed class EncounterPreviewModuleTests : IDisposable
 
         Assert.Equal(EventPreviewAvailability.Available, result.Availability);
         Assert.Contains("Gain 10 Coins.", result.Content);
-        Assert.Contains("Gain 1 Gold for each Food", result.Content);
+        Assert.Contains("Gain 1 Gold for each Food [6]", result.Content);
+        Assert.Contains(
+            "Gain 2 Prestige for each Player fight you have lost this run [6]",
+            result.Content
+        );
         Assert.DoesNotContain("{ability.", result.Content);
         Assert.Contains("Gain 5 Income.", result.Content);
     }
@@ -555,6 +561,7 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         var fixedId = Guid.Parse("91000000-0000-0000-0000-000000000011");
         var modifierId = Guid.Parse("91000000-0000-0000-0000-000000000012");
         var fallbackId = Guid.Parse("91000000-0000-0000-0000-000000000013");
+        var playerAttributeId = Guid.Parse("91000000-0000-0000-0000-000000000014");
         var eventCard = new TCardEncounterEvent
         {
             Id = EventId,
@@ -565,7 +572,7 @@ public sealed class EncounterPreviewModuleTests : IDisposable
             {
                 SpawnContext = new TSpawnContextQuery
                 {
-                    Limit = new TFixedValue { Value = 3 },
+                    Limit = new TFixedValue { Value = 4 },
                     Groups = new List<TSpawnGroup>
                     {
                         new()
@@ -574,7 +581,13 @@ public sealed class EncounterPreviewModuleTests : IDisposable
                             {
                                 new TSpawnFilterIdList
                                 {
-                                    Ids = new List<Guid> { fixedId, modifierId, fallbackId },
+                                    Ids = new List<Guid>
+                                    {
+                                        fixedId,
+                                        modifierId,
+                                        fallbackId,
+                                        playerAttributeId,
+                                    },
                                 },
                             },
                         },
@@ -614,12 +627,32 @@ public sealed class EncounterPreviewModuleTests : IDisposable
                 Value = new TFixedValue { Value = 5f },
             }
         );
+        var playerAttributeStep = Step(
+            playerAttributeId,
+            "Player Attribute",
+            "Gain {ability.0.mod} Prestige for each Player fight you have lost this run [{ability.0}]",
+            new TActionPlayerModifyAttribute
+            {
+                AttributeType = EPlayerAttributeType.Prestige,
+                Value = new TReferenceValuePlayerAttribute
+                {
+                    AttributeType = EPlayerAttributeType.Custom_8,
+                    Modifier = new TValueModifier
+                    {
+                        ModifyMode = EValueModifierMode.Multiply,
+                        Value = new TFixedValue { Value = 2f },
+                        ShouldRound = true,
+                    },
+                },
+            }
+        );
         var map = new Dictionary<Guid, ITCard>
         {
             [EventId] = eventCard,
             [fixedId] = fixedStep,
             [modifierId] = modifierStep,
             [fallbackId] = fallbackStep,
+            [playerAttributeId] = playerAttributeStep,
         };
         var compiler = new EncounterPreviewPlanCompiler(source =>
         {
@@ -630,11 +663,11 @@ public sealed class EncounterPreviewModuleTests : IDisposable
                     {
                       "SelectionContext": {
                         "SpawnContext": {
-                          "Limit": { "Value": 3 },
+                          "Limit": { "Value": 4 },
                           "Groups": [
                             {
                               "Filters": [
-                                { "Ids": ["{{fixedId:D}}", "{{modifierId:D}}", "{{fallbackId:D}}"] }
+                                { "Ids": ["{{fixedId:D}}", "{{modifierId:D}}", "{{fallbackId:D}}", "{{playerAttributeId:D}}"] }
                               ]
                             }
                           ]
@@ -702,6 +735,12 @@ public sealed class EncounterPreviewModuleTests : IDisposable
 
         public object Source { get; set; } = source;
         public EHero? CurrentHero { get; set; }
+        public Func<
+            Guid,
+            string,
+            bool,
+            (bool Success, string ValueText, string? Unit)
+        >? LiveValueResolver { get; set; }
         public EncounterInventory? Inventory { get; set; }
         public Action? OnResolveDayTiers { get; set; }
         public bool ThrowOnDayTierRead { get; set; }
@@ -734,6 +773,21 @@ public sealed class EncounterPreviewModuleTests : IDisposable
         public Dictionary<int, TLevelUp>? SnapshotLevelUps(object source) => LevelUps;
 
         public TCardBase? GetCardTemplate(object source, Guid templateId) => null;
+
+        public bool TryEvaluateAbilityValue(
+            object source,
+            Guid templateId,
+            string effectId,
+            bool isAura,
+            out string valueText,
+            out string? unit
+        )
+        {
+            var result = LiveValueResolver?.Invoke(templateId, effectId, isAura) ?? default;
+            valueText = result.ValueText ?? string.Empty;
+            unit = result.Unit;
+            return result.Success;
+        }
 
         public EHero? ReadCurrentHero() => CurrentHero;
 

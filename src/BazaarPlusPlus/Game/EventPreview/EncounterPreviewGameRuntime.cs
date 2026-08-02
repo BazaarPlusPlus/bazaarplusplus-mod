@@ -3,7 +3,9 @@ using System.Collections;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Game;
+using BazaarGameShared.Domain.Values;
 using BazaarPlusPlus.Game.Tooltips;
+using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.StaticCards;
 using BazaarPlusPlus.Infrastructure;
@@ -19,6 +21,14 @@ internal interface IEncounterPreviewGameRuntime
     Task<Dictionary<Guid, ITCard>?> LoadCardMapAsync(object source);
     Dictionary<int, TLevelUp>? SnapshotLevelUps(object source);
     TCardBase? GetCardTemplate(object source, Guid templateId);
+    bool TryEvaluateAbilityValue(
+        object source,
+        Guid templateId,
+        string effectId,
+        bool isAura,
+        out string valueText,
+        out string? unit
+    );
     EHero? ReadCurrentHero();
     EncounterInventory? ReadInventory();
     GameDataDayTierResolution ResolveDayTiers(object source);
@@ -50,6 +60,43 @@ internal sealed class EncounterPreviewGameRuntime(
 
     public TCardBase? GetCardTemplate(object source, Guid templateId) =>
         BppStaticDataAccess.GetCardTemplate(source, templateId);
+
+    public bool TryEvaluateAbilityValue(
+        object source,
+        Guid templateId,
+        string effectId,
+        bool isAura,
+        out string valueText,
+        out string? unit
+    )
+    {
+        valueText = string.Empty;
+        unit = null;
+        var template = GetCardTemplate(source, templateId);
+        var run = Data.Run;
+        if (template == null || run == null)
+            return false;
+
+        try
+        {
+            var context = new ValueContext(run);
+            CardAbilityValue value;
+            var resolved = isAura
+                ? CardAbilityValueReader.TryEvaluateAura(template, effectId, context, out value)
+                : CardAbilityValueReader.TryEvaluate(template, effectId, context, out value);
+            if (!resolved)
+                return false;
+            valueText = value.ValueText;
+            unit = value.Unit;
+            return true;
+        }
+        catch (Exception)
+        {
+            // Unsupported live targets (for example, Self without a targeting card)
+            // degrade only this placeholder; the rest of the preview remains useful.
+            return false;
+        }
+    }
 
     public EHero? ReadCurrentHero()
     {

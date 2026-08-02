@@ -102,6 +102,52 @@ public sealed class LevelUpPreviewTextFormatterTests
     }
 
     [Fact]
+    public void Build_uses_live_values_for_dynamic_reward_totals()
+    {
+        var rewardId = Guid.Parse("30000000-0000-0000-0000-0000000000d1");
+        var levelUp = new TLevelUp
+        {
+            Level = 3,
+            Rewards = new TSpawnContextQuery { Groups = { Group(new[] { rewardId }, limit: 1) } },
+        };
+        var reward = new EncounterPreviewTemplatePlan(
+            rewardId,
+            EncounterPreviewTemplateKind.EncounterStep,
+            Array.Empty<EHero>(),
+            "Prosperous Estates",
+            new EncounterPreviewLocalizedText(null, "Prosperous Estates"),
+            new EncounterPreviewLocalizedText(
+                null,
+                "Gain {ability.0.mod} Gold for each Property you have (including Stash) [{ability.0}]"
+            ),
+            new Dictionary<string, EncounterPreviewAbilityValue> { ["0.mod"] = new("5") },
+            rewardFilter: null
+        );
+
+        var text = LevelUpPreviewTextFormatter.Build(
+            Plan(levelUp),
+            id => id == rewardId ? reward : null,
+            currentHero: null,
+            resolveLiveValue: ResolveLiveValue
+        );
+
+        Assert.Contains("Gain 5 Gold for each Property you have (including Stash) [15]", text);
+
+        bool ResolveLiveValue(
+            Guid templateId,
+            string effectId,
+            bool isAura,
+            out string valueText,
+            out string? unit
+        )
+        {
+            valueText = templateId == rewardId && effectId == "0" && !isAura ? "15" : string.Empty;
+            unit = null;
+            return valueText.Length > 0;
+        }
+    }
+
+    [Fact]
     public void Build_uses_chinese_colon_without_a_following_space()
     {
         L.Install(new TestLanguageProvider("zh-CN"), new TestLocaleModeProvider());
