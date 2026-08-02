@@ -13,6 +13,7 @@ using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.GameInterop.Files;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Infrastructure.Logging;
+using BazaarPlusPlus.Storage.Paths;
 using TheBazaar;
 using TheBazaar.AppFramework;
 using UnityEngine;
@@ -1479,7 +1480,9 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             }
             ReplayRunEconomyFallback.ApplyMissingRunEconomy(
                 manifest,
-                _services?.Paths.RunLogDatabasePath,
+                _services == null
+                    ? null
+                    : PathConstants.RunLogDatabase(_services.Paths.RequireDataRoot()),
                 operation
             );
             await ReplayBootstrap.InjectSavedReplayAsync(

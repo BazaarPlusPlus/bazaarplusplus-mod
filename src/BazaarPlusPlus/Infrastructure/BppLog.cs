@@ -126,7 +126,7 @@ internal static class BppLog
     private static BppLogRedactionRoots CreateRedactionRoots()
     {
         var gameRoot = SafePath(() => Paths.GameRootPath);
-        var dataRoot = SafeCombine(gameRoot, "BazaarPlusPlusV4");
+        var dataRoot = SafeCombine(gameRoot, "BazaarPlusPlusV5");
         var pluginRoot = SafePath(() => Paths.PluginPath);
         var homeRoot = SafePath(() =>
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)

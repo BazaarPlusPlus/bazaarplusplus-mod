@@ -2,15 +2,9 @@
 namespace BazaarPlusPlus.Game.Upload;
 
 /// <summary>
-/// Shared arm signal for a specific upload feed kind. Lives in Game/Upload because
-/// <see cref="UploadFeedKind"/> is a Game-layer type and must not enter Core/Events.
+/// Shared arm signal for the single bundle upload feed.
 /// </summary>
 internal sealed class UploadArmRequested
 {
-    public UploadArmRequested(UploadFeedKind kind)
-    {
-        Kind = kind;
-    }
-
-    public UploadFeedKind Kind { get; }
+    public UploadArmRequested() { }
 }

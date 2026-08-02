@@ -42,7 +42,7 @@ public sealed class BppLogPrivacyTests
         var rendered = Renderer(PosixRoots)
             .Render(
                 Define(dataPath, gamePath, homePath, nearPrefix, unknown),
-                dataPath.Bind("/Users/alice/Games/The Bazaar/BazaarPlusPlusV4/Screenshots/a.png"),
+                dataPath.Bind("/Users/alice/Games/The Bazaar/BazaarPlusPlusV5/Screenshots/a.png"),
                 gamePath.Bind("/Users/alice/Games/The Bazaar/cache/file.db"),
                 homePath.Bind("/Users/alice/Documents/log.txt"),
                 nearPrefix.Bind("/Users/bob/Games/The Bazaar-old/private.txt"),
@@ -65,7 +65,7 @@ public sealed class BppLogPrivacyTests
         var unknown = Field(1, "unknown", BppLogFieldPrivacy.LocalPath);
         var roots = new BppLogRedactionRoots(
             gameRoot: @"C:\Games\The Bazaar",
-            dataRoot: @"C:\Games\The Bazaar\BazaarPlusPlusV4",
+            dataRoot: @"C:\Games\The Bazaar\BazaarPlusPlusV5",
             pluginRoot: @"C:\Games\The Bazaar\BepInEx\plugins",
             homeRoot: @"C:\Users\alice"
         );
@@ -254,7 +254,7 @@ public sealed class BppLogPrivacyTests
         var external = Field(0, "external", BppLogFieldPrivacy.UntrustedText);
         var roots = new BppLogRedactionRoots(
             gameRoot: @"C:\Games\The Bazaar",
-            dataRoot: @"C:\Games\The Bazaar\BazaarPlusPlusV4",
+            dataRoot: @"C:\Games\The Bazaar\BazaarPlusPlusV5",
             pluginRoot: @"C:\Games\The Bazaar\BepInEx\plugins",
             homeRoot: @"C:\Users\alice"
         );
@@ -272,7 +272,7 @@ public sealed class BppLogPrivacyTests
 
     private static readonly BppLogRedactionRoots PosixRoots = new(
         gameRoot: "/Users/alice/Games/The Bazaar",
-        dataRoot: "/Users/alice/Games/The Bazaar/BazaarPlusPlusV4",
+        dataRoot: "/Users/alice/Games/The Bazaar/BazaarPlusPlusV5",
         pluginRoot: "/Users/alice/Games/The Bazaar/BepInEx/plugins",
         homeRoot: "/Users/alice"
     );

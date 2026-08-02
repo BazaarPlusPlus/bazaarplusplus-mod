@@ -20,9 +20,9 @@ internal static class TenWinBuildCatalogFactory
         timeout: TimeSpan.FromSeconds(10)
     );
 
-    internal static IRemoteEmbeddedCatalog<TenWinBuildCorpus> Create(string gameRootPath)
+    internal static IRemoteEmbeddedCatalog<TenWinBuildCorpus> Create(string dataRootPath)
     {
-        var cache = new FileCatalogCache(BuildCacheFilePath(gameRootPath));
+        var cache = new FileCatalogCache(BuildCacheFilePath(dataRootPath));
         return new RemoteEmbeddedCatalog<TenWinBuildCorpus>(
             new TenWinBuildCatalogParser(),
             new AssemblyResourceCatalogSource(
@@ -38,8 +38,8 @@ internal static class TenWinBuildCatalogFactory
         );
     }
 
-    internal static string BuildCacheFilePath(string gameRootPath) =>
-        Path.Combine(gameRootPath, "BazaarPlusPlusV4", CacheFileName);
+    internal static string BuildCacheFilePath(string dataRootPath) =>
+        Path.Combine(dataRootPath, CacheFileName);
 }
 
 internal sealed class TenWinBuildCatalogParser : ICatalogParser<TenWinBuildCorpus>

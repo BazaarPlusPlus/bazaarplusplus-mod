@@ -85,6 +85,7 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
     private readonly IEndOfRunCaptureClock _clock;
     private readonly IEndOfRunCaptureFileSystem _files;
     private readonly EndOfRunCapturePolicy _policy;
+    private readonly Action<ScreenshotCaptureTerminal>? _terminalObserver;
     private RunState _state = new(generation: 0);
     private IEndOfRunCaptureSurface<TScreen>? _surface;
 
@@ -92,13 +93,15 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         IEndOfRunArtifactPersistence persistence,
         IEndOfRunCaptureClock clock,
         IEndOfRunCaptureFileSystem files,
-        EndOfRunCapturePolicy policy
+        EndOfRunCapturePolicy policy,
+        Action<ScreenshotCaptureTerminal>? terminalObserver = null
     )
     {
         _persistence = persistence ?? throw new ArgumentNullException(nameof(persistence));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _policy = policy.MaxAttempts > 0 ? policy : EndOfRunCapturePolicy.Default;
+        _terminalObserver = terminalObserver;
     }
 
     internal void AttachSurface(IEndOfRunCaptureSurface<TScreen> surface)
@@ -796,6 +799,21 @@ internal sealed class EndOfRunCaptureWorkflowCore<TScreen>
         if (operation == null)
             return;
         ReportTerminal(operation, kind, reason, artifactStatus, filePath, exception);
+        try
+        {
+            _terminalObserver?.Invoke(
+                new ScreenshotCaptureTerminal
+                {
+                    RunId = operation.RunId,
+                    ArtifactStatus = artifactStatus,
+                    MetadataPersisted = artifactStatus == ScreenshotArtifactStatus.Complete,
+                }
+            );
+        }
+        catch
+        {
+            // Terminal observers only wake background work and cannot change capture outcome.
+        }
     }
 
     private void CancelOutstandingWork(bool cleanLateArtifact)

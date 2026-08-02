@@ -198,28 +198,27 @@ internal sealed class HistoryPanelReplayService
                 HistoryPanelReplayReasonCode.ReplayDirectoryUnavailable
             );
 
-        if (!battle.ReplayDownloaded)
-        {
-            if (_ghostSyncService == null)
-                return HistoryPanelReplayAttemptResult.Failure(
-                    HistoryPanelText.GhostReplayDownloadUnavailable(),
-                    HistoryPanelReplayReasonCode.GhostDownloadUnavailable
-                );
-
-            var downloadResult = await _ghostSyncService.DownloadReplayAsync(
-                battle.BattleId,
-                replayDirectoryPath,
-                cancellationToken
+        if (_ghostSyncService == null)
+            return HistoryPanelReplayAttemptResult.Failure(
+                HistoryPanelText.GhostReplayDownloadUnavailable(),
+                HistoryPanelReplayReasonCode.GhostDownloadUnavailable
             );
-            if (!downloadResult.Succeeded)
-                return HistoryPanelReplayAttemptResult.Failure(
-                    HistoryPanelText.FailedToDownloadGhostReplay(
-                        downloadResult.Error ?? HistoryPanelText.Unknown()
-                    ),
-                    downloadResult.ReasonCode,
-                    downloadResult.Exception
-                );
-        }
+
+        // Always pass through the sync service so a local_ready row with a missing or corrupt
+        // cache file can be validated and recovered instead of becoming a permanent dead row.
+        var downloadResult = await _ghostSyncService.DownloadReplayAsync(
+            battle.BattleId,
+            replayDirectoryPath,
+            cancellationToken
+        );
+        if (!downloadResult.Succeeded)
+            return HistoryPanelReplayAttemptResult.Failure(
+                HistoryPanelText.FailedToDownloadGhostReplay(
+                    downloadResult.Error ?? HistoryPanelText.Unknown()
+                ),
+                downloadResult.ReasonCode,
+                downloadResult.Exception
+            );
 
         var ghostPayloadStore = new GhostBattlePayloadStore(
             GhostBattlePayloadStore.ResolveDirectory(replayDirectoryPath)

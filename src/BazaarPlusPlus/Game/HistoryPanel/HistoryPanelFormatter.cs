@@ -181,6 +181,9 @@ internal static class HistoryPanelFormatter
 
     public static string FormatSnapshotSummary(HistoryBattleSnapshotCounts counts)
     {
+        if (!counts.Known)
+            return HistoryPanelText.SnapshotCountsUnknown();
+
         if (!counts.HasAnyRecordedCard)
             return string.Empty;
 

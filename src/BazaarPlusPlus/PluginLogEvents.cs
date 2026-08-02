@@ -59,7 +59,6 @@ internal enum PluginHandlerId
     CombatStatusBarModule,
     EndOfRunCaptureDriver,
     HistoryPanelMount,
-    RunBundleUploadFeed,
     RunLifecycleModule,
     RunLoggingModule,
 }

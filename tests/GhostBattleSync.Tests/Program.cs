@@ -1,1072 +1,293 @@
 #nullable enable
-using System.Collections;
-using System.Globalization;
 using System.Net;
-using System.Reflection;
-using BazaarPlusPlus.Localization;
-using Newtonsoft.Json.Linq;
+using System.Net.Http.Headers;
+using BazaarPlusPlus.Game.HistoryPanel;
+using BazaarPlusPlus.Game.HistoryPanel.Ghost;
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
+using BazaarPlusPlus.ModApi;
+using BazaarPlusPlus.ModApi.Clients;
+using BazaarPlusPlus.ModApi.Models;
 
-var syncServiceType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattleSyncService");
-var apiClientType = RequireModApiType("BazaarPlusPlus.ModApi.Clients.GhostBattleClient");
-var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelRepository");
-var dataServiceType = RequireType(
-    "BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelDataService"
-);
-var battleRecordType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Data.HistoryBattleRecord");
-var formatterType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelFormatter");
-var coordinatorType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator");
-var coordinatorStateType = RequireType("BazaarPlusPlus.Game.HistoryPanel.HistoryPanelState");
-var coordinatorDependenciesType = RequireType(
-    "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelDependencies"
-);
-var coordinatorOutcomeType = RequireType(
-    "BazaarPlusPlus.Game.HistoryPanel.HistoryPanelCoordinator+GhostBattleOutcome"
-);
-var importRecordType = RequireModApiType("BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord");
-var routesType = RequireModApiType("BazaarPlusPlus.ModApi.ModApiRoutes");
-var artifactCodecType = RequireModApiType("BazaarPlusPlus.ModApi.RunBundleArtifactCodec");
-var ghostPayloadStoreType = RequireType(
-    "BazaarPlusPlus.Game.HistoryPanel.Ghost.GhostBattlePayloadStore"
-);
-var runArtifactType = RequireModApiType("BazaarPlusPlus.ModApi.Models.RunArtifact");
-var runArtifactBattleType = RequireModApiType("BazaarPlusPlus.ModApi.Models.RunArtifactBattle");
-var battleManifestArtifactType = RequireModApiType(
-    "BazaarPlusPlus.ModApi.Models.BattleManifestArtifact"
-);
-var battleParticipantsArtifactType = RequireModApiType(
-    "BazaarPlusPlus.ModApi.Models.BattleParticipantsArtifact"
-);
-var battleSnapshotsArtifactType = RequireModApiType(
-    "BazaarPlusPlus.ModApi.Models.BattleSnapshotsArtifact"
-);
-var replayPayloadArtifactType = RequireModApiType(
-    "BazaarPlusPlus.ModApi.Models.ReplayPayloadArtifact"
-);
-var cardSetCaptureArtifactType = RequireModApiType(
-    "BazaarPlusPlus.ModApi.Models.CardSetCaptureArtifact"
-);
-var cardSetItemArtifactType = RequireModApiType("BazaarPlusPlus.ModApi.Models.CardSetItemArtifact");
-var cardSnapshotType = RequireType("BazaarPlusPlus.Game.PvpBattles.PvpBattleCardSnapshot");
+await DiscoveryUsesV5ShapeAndLimit();
+await RetryAfterStartsCooldown();
+await ExpiredUrlRefreshesOnceAndBecomesTerminal();
+await CorruptBundleBecomesPermanentWithoutRepeatedDownload();
+UnknownProjectionAndCountsStayUnknown();
 
-var shouldAdvanceCheckpoint = syncServiceType.GetMethod(
-    "ShouldAdvanceCheckpoint",
-    BindingFlags.NonPublic | BindingFlags.Static
-);
-var tryExtractPayloadFromArtifact = syncServiceType.GetMethod(
-    "TryExtractPayloadFromArtifact",
-    BindingFlags.NonPublic | BindingFlags.Static
-);
-var tryParseBattle = apiClientType.GetMethod(
-    "TryParseBattle",
-    BindingFlags.NonPublic | BindingFlags.Static
-);
-var tryParseUtcTimestamp = apiClientType.GetMethod(
-    "TryParseUtcTimestamp",
-    BindingFlags.NonPublic | BindingFlags.Static
-);
-var serializeArtifact = artifactCodecType.GetMethod(
-    "Serialize",
-    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static
-);
-var resolveGhostBattleOutcome = coordinatorType.GetMethod(
-    "ResolveGhostBattleOutcome",
-    BindingFlags.NonPublic | BindingFlags.Static
-);
-var isGhostOpponentEliminated = formatterType.GetMethod(
-    "IsGhostOpponentEliminated",
-    BindingFlags.Public | BindingFlags.Static
-);
-var formatTimestamp = formatterType.GetMethod(
-    "FormatTimestamp",
-    BindingFlags.Public | BindingFlags.Static
-);
-Assert(
-    shouldAdvanceCheckpoint != null,
-    "GhostBattleSyncService should expose checkpoint advancement logic."
-);
-Assert(
-    tryExtractPayloadFromArtifact != null,
-    "GhostBattleSyncService should expose artifact extraction logic for replay downloads."
-);
-Assert(serializeArtifact != null, "RunBundleArtifactCodec should expose a serialize helper.");
-Assert(tryParseBattle != null, "GhostBattleClient should expose battle parsing logic.");
-Assert(
-    tryParseUtcTimestamp != null,
-    "GhostBattleClient should expose UTC timestamp parsing logic."
-);
-Assert(
-    resolveGhostBattleOutcome != null,
-    "HistoryPanelCoordinator should expose ghost-outcome resolution logic."
-);
-Assert(
-    isGhostOpponentEliminated != null,
-    "HistoryPanelFormatter should expose ghost opponent elimination logic."
-);
-Assert(
-    formatTimestamp != null,
-    "HistoryPanelFormatter should expose localized timestamp formatting."
-);
+Console.WriteLine("Ghost battle V5 sync tests passed.");
 
+static async Task DiscoveryUsesV5ShapeAndLimit()
 {
-    var unspecifiedUtc = new DateTime(2026, 7, 20, 14, 21, 0, DateTimeKind.Unspecified);
-    var parseArguments = new object?[] { new JValue(unspecifiedUtc), default(DateTimeOffset) };
-    Assert(
-        (bool)tryParseUtcTimestamp!.Invoke(null, parseArguments)!,
-        "Ghost timestamps represented as Json.NET Date tokens should parse."
-    );
-    Assert(
-        (DateTimeOffset)parseArguments[1]!
-            == new DateTimeOffset(2026, 7, 20, 14, 21, 0, TimeSpan.Zero),
-        "A timezone-less recorded_at_utc Date token should be interpreted as UTC."
-    );
-
-    parseArguments = new object?[]
+    Uri? observed = null;
+    var handler = new RecordingHandler(request =>
     {
-        new JValue("2026-07-20T22:21:00+08:00"),
-        default(DateTimeOffset),
-    };
-    Assert(
-        (bool)tryParseUtcTimestamp.Invoke(null, parseArguments)!,
-        "Ghost timestamps with an explicit offset should parse."
-    );
-    Assert(
-        (DateTimeOffset)parseArguments[1]!
-            == new DateTimeOffset(2026, 7, 20, 14, 21, 0, TimeSpan.Zero),
-        "An explicit recorded_at_utc offset should be normalized to UTC."
-    );
-}
-
-{
-    var language = new MutableLanguageProvider { CurrentLanguageCode = "zh-CN" };
-    var localeMode = new MutableLocaleModeProvider { CurrentMode = BppChineseLocaleMode.Mainland };
-    L.Install(language, localeMode);
-    try
-    {
-        var timestamp = new DateTimeOffset(2026, 7, 20, 14, 21, 0, TimeSpan.Zero);
-        var localTimestamp = timestamp.ToLocalTime();
-        Assert(
-            (string)formatTimestamp!.Invoke(null, [timestamp])!
-                == localTimestamp.ToString("g", CultureInfo.GetCultureInfo("zh-CN")),
-            "History timestamps should use the mainland-Chinese date/time format."
-        );
-
-        language.CurrentLanguageCode = "de-DE";
-        Assert(
-            (string)formatTimestamp.Invoke(null, [timestamp])!
-                == localTimestamp.ToString("g", CultureInfo.GetCultureInfo("de-DE")),
-            "History timestamps should follow the active game language."
-        );
-
-        language.CurrentLanguageCode = "zh-CN";
-        localeMode.CurrentMode = BppChineseLocaleMode.Taiwan;
-        Assert(
-            (string)formatTimestamp.Invoke(null, [timestamp])!
-                == localTimestamp.ToString("g", CultureInfo.GetCultureInfo("zh-TW")),
-            "History timestamps should honor the selected Chinese locale mode."
-        );
-    }
-    finally
-    {
-        L.Install(new MutableLanguageProvider(), new MutableLocaleModeProvider());
-    }
-}
-
-{
-    var state =
-        Activator.CreateInstance(coordinatorStateType)
-        ?? throw new InvalidOperationException("HistoryPanelState should be constructible.");
-    coordinatorStateType.GetProperty("GhostSyncInProgress")!.SetValue(state, true);
-    coordinatorStateType.GetProperty("ReplayActionInProgress")!.SetValue(state, true);
-    coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.SetValue(state, true);
-
-    var dataService =
-        Activator.CreateInstance(dataServiceType, new object?[] { null, null })
-        ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
-    // Single 7-arg ctor: (runState, dataService, replayService, serverHealthProbe?,
-    // accountLinkClient?, isBazaarDbAccountLinkAvailable?, combatReplayDirectoryPath).
-    // No ArgumentNullException guards — null-by-position is the pinned behavior anchor.
-    var dependencies =
-        Activator.CreateInstance(
-            coordinatorDependenciesType,
-            new object?[] { null, dataService, null, null, null, null, null }
-        )
-        ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
-    var coordinator =
-        Activator.CreateInstance(
-            coordinatorType,
-            state,
-            dependencies,
-            (Action)(() => { }),
-            (Action)(() => { }),
-            (Action<bool>)(_ => { })
-        )
-        ?? throw new InvalidOperationException("HistoryPanelCoordinator should be constructible.");
-
-    InvokeVoid(coordinatorType, coordinator, "OnPanelHidden", []);
-
-    Assert(
-        coordinatorStateType.GetProperty("GhostSyncInProgress")!.GetValue(state) is false,
-        "Hiding the history panel should clear ghost sync in-progress state."
-    );
-    Assert(
-        coordinatorStateType.GetProperty("ReplayActionInProgress")!.GetValue(state) is false,
-        "Hiding the history panel should clear replay in-progress state."
-    );
-    Assert(
-        coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.GetValue(state) is false,
-        "Hiding the history panel should clear server health probe in-progress state."
-    );
-}
-
-{
-    var state =
-        Activator.CreateInstance(coordinatorStateType)
-        ?? throw new InvalidOperationException("HistoryPanelState should be constructible.");
-    coordinatorStateType.GetProperty("GhostSyncInProgress")!.SetValue(state, true);
-    coordinatorStateType.GetProperty("ReplayActionInProgress")!.SetValue(state, true);
-    coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.SetValue(state, true);
-
-    var dataService =
-        Activator.CreateInstance(dataServiceType, new object?[] { null, null })
-        ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
-    // Single 7-arg ctor: (runState, dataService, replayService, serverHealthProbe?,
-    // accountLinkClient?, isBazaarDbAccountLinkAvailable?, combatReplayDirectoryPath).
-    // No ArgumentNullException guards — null-by-position is the pinned behavior anchor.
-    var dependencies =
-        Activator.CreateInstance(
-            coordinatorDependenciesType,
-            new object?[] { null, dataService, null, null, null, null, null }
-        )
-        ?? throw new InvalidOperationException("HistoryPanelDependencies should be constructible.");
-    var coordinator =
-        Activator.CreateInstance(
-            coordinatorType,
-            state,
-            dependencies,
-            (Action)(() => { }),
-            (Action)(() => { }),
-            (Action<bool>)(_ => { })
-        )
-        ?? throw new InvalidOperationException("HistoryPanelCoordinator should be constructible.");
-
-    try
-    {
-        InvokeVoid(coordinatorType, coordinator, "OnPanelShown", []);
-    }
-    catch (TargetInvocationException ex)
-        when (ex.InnerException is System.IO.FileNotFoundException fileNotFound
-            && string.Equals(
-                fileNotFound.FileName,
-                "UnityEngine.CoreModule, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null",
-                StringComparison.Ordinal
+        observed = request.RequestUri;
+        return JsonResponse(
+            BattlePage(
+                "battle-1",
+                "01K1ABCDEF0123456789ABCDEF",
+                "https://r2.example/bundle",
+                DateTimeOffset.UtcNow.AddMinutes(5),
+                "account-uploader",
+                "account-local"
             )
-        )
-    {
-        // The exe-style test host does not load UnityEngine.CoreModule, but the reset happens
-        // before OnPanelShown enters the Unity-backed refresh path.
-    }
+        );
+    });
+    using var http = new HttpClient(handler);
+    var client = new GhostBattleClient(http, ModApiRoutes.TryCreate("https://api.example")!);
+    var result = await client.QueryAgainstMeAsync("account-local", 999, CancellationToken.None);
 
+    Assert(result.Succeeded && result.Battles.Count == 1, "V5 discovery page must parse.");
+    Assert(observed?.AbsolutePath == "/ghost-battles", "Discovery route must be /ghost-battles.");
     Assert(
-        coordinatorStateType.GetProperty("ReplayActionInProgress")!.GetValue(state) is false,
-        "Showing the history panel should clear stale replay in-progress state."
+        observed?.Query.Contains("limit=200", StringComparison.Ordinal) == true,
+        "Discovery limit must clamp to 200."
     );
     Assert(
-        coordinatorStateType.GetProperty("GhostSyncInProgress")!.GetValue(state) is true,
-        "Showing the history panel should preserve ghost sync in-progress state."
+        result.Battles[0].PlayerHandItemCount == null,
+        "Projection counts must remain unknown before download."
     );
     Assert(
-        coordinatorStateType.GetProperty("ServerHealthProbeInProgress")!.GetValue(state) is true,
-        "Showing the history panel should preserve server health probe in-progress state."
+        result.Battles[0].ReplayAvailable,
+        "A valid presigned URL must expose replay availability."
+    );
+
+    var overLimit = new RecordingHandler(_ =>
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent([1]),
+        };
+        response.Content.Headers.ContentLength = 8_388_608;
+        return response;
+    });
+    using var downloadHttp = new HttpClient(overLimit);
+    var downloadClient = new GhostBattleClient(
+        downloadHttp,
+        ModApiRoutes.TryCreate("https://api.example")!
+    );
+    var tooLarge = await downloadClient.DownloadBundleAsync(
+        "https://r2.example/large",
+        CancellationToken.None
+    );
+    Assert(
+        !tooLarge.Succeeded && tooLarge.Error == "bundle_too_large",
+        "Content-Length must be bounded before reading."
     );
 }
 
-Assert(
-    !(bool)shouldAdvanceCheckpoint!.Invoke(null, [200, 200])!,
-    "Ghost sync should not advance the checkpoint when the returned batch hits the limit."
-);
-Assert(
-    (bool)shouldAdvanceCheckpoint.Invoke(null, [12, 200])!,
-    "Ghost sync should advance the checkpoint after a non-truncated incremental fetch."
-);
-
-var artifact =
-    Activator.CreateInstance(runArtifactType)
-    ?? throw new InvalidOperationException("RunArtifactV3 should be constructible.");
-runArtifactType.GetProperty("RunId")!.SetValue(artifact, "run-001");
-
-var battleArtifact =
-    Activator.CreateInstance(runArtifactBattleType)
-    ?? throw new InvalidOperationException("RunArtifactBattleV3 should be constructible.");
-runArtifactBattleType.GetProperty("BattleId")!.SetValue(battleArtifact, "battle-001");
-
-var manifestArtifact =
-    Activator.CreateInstance(battleManifestArtifactType)
-    ?? throw new InvalidOperationException("BattleManifestArtifactV3 should be constructible.");
-battleManifestArtifactType.GetProperty("BattleId")!.SetValue(manifestArtifact, "battle-001");
-battleManifestArtifactType
-    .GetProperty("RecordedAtUtc")!
-    .SetValue(manifestArtifact, "2026-04-11T00:00:00.000Z");
-battleManifestArtifactType.GetProperty("Day")!.SetValue(manifestArtifact, 7);
-battleManifestArtifactType.GetProperty("Hour")!.SetValue(manifestArtifact, 2);
-battleManifestArtifactType.GetProperty("EncounterId")!.SetValue(manifestArtifact, "encounter-001");
-battleManifestArtifactType.GetProperty("CombatKind")!.SetValue(manifestArtifact, "PVPCombat");
-battleManifestArtifactType.GetProperty("Result")!.SetValue(manifestArtifact, "Won");
-battleManifestArtifactType.GetProperty("WinnerCombatantId")!.SetValue(manifestArtifact, "Player");
-battleManifestArtifactType.GetProperty("LoserCombatantId")!.SetValue(manifestArtifact, "Opponent");
-runArtifactBattleType.GetProperty("Manifest")!.SetValue(battleArtifact, manifestArtifact);
-
-var participantsArtifact =
-    Activator.CreateInstance(battleParticipantsArtifactType)
-    ?? throw new InvalidOperationException("BattleParticipantsArtifactV3 should be constructible.");
-battleParticipantsArtifactType
-    .GetProperty("PlayerName")!
-    .SetValue(participantsArtifact, "RemoteGhost");
-battleParticipantsArtifactType
-    .GetProperty("PlayerAccountId")!
-    .SetValue(participantsArtifact, "remote-account-001");
-battleParticipantsArtifactType.GetProperty("PlayerHero")!.SetValue(participantsArtifact, "Dooley");
-battleParticipantsArtifactType.GetProperty("PlayerRank")!.SetValue(participantsArtifact, "Bronze");
-battleParticipantsArtifactType.GetProperty("PlayerRating")!.SetValue(participantsArtifact, 1200);
-battleParticipantsArtifactType.GetProperty("PlayerLevel")!.SetValue(participantsArtifact, 9);
-battleParticipantsArtifactType.GetProperty("PlayerPrestige")!.SetValue(participantsArtifact, 18);
-battleParticipantsArtifactType.GetProperty("PlayerIncome")!.SetValue(participantsArtifact, 11);
-battleParticipantsArtifactType.GetProperty("PlayerGold")!.SetValue(participantsArtifact, 99);
-battleParticipantsArtifactType.GetProperty("PlayerVictories")!.SetValue(participantsArtifact, 3);
-battleParticipantsArtifactType
-    .GetProperty("OpponentName")!
-    .SetValue(participantsArtifact, "LocalPlayer");
-battleParticipantsArtifactType
-    .GetProperty("OpponentAccountId")!
-    .SetValue(participantsArtifact, "local-account-001");
-battleParticipantsArtifactType
-    .GetProperty("OpponentHero")!
-    .SetValue(participantsArtifact, "Vanessa");
-battleParticipantsArtifactType
-    .GetProperty("OpponentRank")!
-    .SetValue(participantsArtifact, "Legendary");
-battleParticipantsArtifactType.GetProperty("OpponentRating")!.SetValue(participantsArtifact, 1500);
-battleParticipantsArtifactType.GetProperty("OpponentLevel")!.SetValue(participantsArtifact, 12);
-battleParticipantsArtifactType.GetProperty("OpponentPrestige")!.SetValue(participantsArtifact, 12);
-battleParticipantsArtifactType.GetProperty("OpponentVictories")!.SetValue(participantsArtifact, 6);
-runArtifactBattleType.GetProperty("Participants")!.SetValue(battleArtifact, participantsArtifact);
-
-var snapshotsArtifact =
-    Activator.CreateInstance(battleSnapshotsArtifactType)
-    ?? throw new InvalidOperationException("BattleSnapshotsArtifactV3 should be constructible.");
-var cardSetListType = typeof(List<>).MakeGenericType(cardSetCaptureArtifactType);
-var cardSetList = (IList)(
-    Activator.CreateInstance(cardSetListType)
-    ?? throw new InvalidOperationException("Card set list should be constructible.")
-);
-var cardSetCapture =
-    Activator.CreateInstance(cardSetCaptureArtifactType)
-    ?? throw new InvalidOperationException("CardSetCaptureArtifactV3 should be constructible.");
-cardSetCaptureArtifactType.GetProperty("Label")!.SetValue(cardSetCapture, "player_hand");
-cardSetCaptureArtifactType.GetProperty("Status")!.SetValue(cardSetCapture, "Captured");
-cardSetCaptureArtifactType.GetProperty("Source")!.SetValue(cardSetCapture, "LiveRetry");
-var cardItemArtifact =
-    Activator.CreateInstance(cardSetItemArtifactType)
-    ?? throw new InvalidOperationException("CardSetItemArtifact should be constructible.");
-cardSetItemArtifactType.GetProperty("InstanceId")!.SetValue(cardItemArtifact, "card-instance-001");
-cardSetItemArtifactType.GetProperty("TemplateId")!.SetValue(cardItemArtifact, "card-template-001");
-cardSetItemArtifactType.GetProperty("Name")!.SetValue(cardItemArtifact, "Test Card");
-var cardItemArtifactListType = typeof(List<>).MakeGenericType(cardSetItemArtifactType);
-var cardItemArtifactList = (IList)(
-    Activator.CreateInstance(cardItemArtifactListType)
-    ?? throw new InvalidOperationException("CardSetItemArtifact list should be constructible.")
-);
-cardItemArtifactList.Add(cardItemArtifact);
-cardSetCaptureArtifactType.GetProperty("Items")!.SetValue(cardSetCapture, cardItemArtifactList);
-cardSetList.Add(cardSetCapture);
-battleSnapshotsArtifactType.GetProperty("CardSets")!.SetValue(snapshotsArtifact, cardSetList);
-runArtifactBattleType.GetProperty("Snapshots")!.SetValue(battleArtifact, snapshotsArtifact);
-
-var replayPayloadArtifact =
-    Activator.CreateInstance(replayPayloadArtifactType)
-    ?? throw new InvalidOperationException("ReplayPayloadArtifactV3 should be constructible.");
-replayPayloadArtifactType.GetProperty("BattleId")!.SetValue(replayPayloadArtifact, "battle-001");
-replayPayloadArtifactType.GetProperty("Version")!.SetValue(replayPayloadArtifact, 1);
-replayPayloadArtifactType
-    .GetProperty("SpawnMessageBytes")!
-    .SetValue(replayPayloadArtifact, new byte[] { 1 });
-replayPayloadArtifactType
-    .GetProperty("CombatMessageBytes")!
-    .SetValue(replayPayloadArtifact, new byte[] { 2 });
-replayPayloadArtifactType
-    .GetProperty("DespawnMessageBytes")!
-    .SetValue(replayPayloadArtifact, new byte[] { 3 });
-runArtifactBattleType.GetProperty("ReplayPayload")!.SetValue(battleArtifact, replayPayloadArtifact);
-
-var battlesListType = typeof(List<>).MakeGenericType(runArtifactBattleType);
-var battlesList = (IList)(
-    Activator.CreateInstance(battlesListType)
-    ?? throw new InvalidOperationException("Run artifact battle list should be constructible.")
-);
-battlesList.Add(battleArtifact);
-runArtifactType.GetProperty("Battles")!.SetValue(artifact, battlesList);
-
-var artifactBytes = (byte[])(
-    serializeArtifact!.Invoke(null, [artifact])
-    ?? throw new InvalidOperationException("Serialize should return artifact bytes.")
-);
-
-var extractedPayload =
-    tryExtractPayloadFromArtifact!.Invoke(null, ["battle-001", artifactBytes])
-    ?? throw new InvalidOperationException(
-        "TryExtractPayloadFromArtifact should return a payload for a matching battle."
-    );
-var extractedPayloadType = extractedPayload.GetType();
-Assert(
-    (string?)extractedPayloadType.GetProperty("BattleId")?.GetValue(extractedPayload)
-        == "battle-001",
-    "Artifact extraction should preserve the selected battle id."
-);
-var extractedReplayPayload =
-    extractedPayloadType.GetProperty("ReplayPayload")?.GetValue(extractedPayload)
-    ?? throw new InvalidOperationException("Extracted payload should include replay payload.");
-var replayPayloadType = extractedReplayPayload.GetType();
-Assert(
-    (string?)replayPayloadType.GetProperty("BattleId")?.GetValue(extractedReplayPayload)
-        == "battle-001",
-    "Artifact extraction should deserialize the replay payload for the selected battle."
-);
-var extractedManifest =
-    extractedPayloadType.GetProperty("BattleManifest")?.GetValue(extractedPayload)
-    ?? throw new InvalidOperationException("Extracted payload should include battle manifest.");
-var extractedManifestType = extractedManifest.GetType();
-var extractedParticipants =
-    extractedManifestType.GetProperty("Participants")?.GetValue(extractedManifest)
-    ?? throw new InvalidOperationException("Extracted manifest should include participants.");
-var extractedParticipantsType = extractedParticipants.GetType();
-Assert(
-    (string?)extractedParticipantsType.GetProperty("PlayerHero")?.GetValue(extractedParticipants)
-        == "Dooley",
-    "Artifact extraction should preserve the remote player hero."
-);
-Assert(
-    (string?)extractedParticipantsType.GetProperty("OpponentHero")?.GetValue(extractedParticipants)
-        == "Vanessa",
-    "Artifact extraction should preserve the local opponent hero."
-);
-Assert(
-    (string?)extractedParticipantsType.GetProperty("OpponentName")?.GetValue(extractedParticipants)
-        == "LocalPlayer",
-    "Artifact extraction should preserve the local opponent name."
-);
-Assert(
-    (string?)extractedParticipantsType.GetProperty("OpponentRank")?.GetValue(extractedParticipants)
-        == "Legendary",
-    "Artifact extraction should preserve the local opponent rank."
-);
-Assert(
-    (int?)extractedParticipantsType.GetProperty("OpponentRating")?.GetValue(extractedParticipants)
-        == 1500,
-    "Artifact extraction should preserve the local opponent rating."
-);
-Assert(
-    (int?)extractedParticipantsType.GetProperty("PlayerPrestige")?.GetValue(extractedParticipants)
-        == 18
-        && (int?)
-            extractedParticipantsType.GetProperty("PlayerIncome")?.GetValue(extractedParticipants)
-            == 11
-        && (int?)
-            extractedParticipantsType.GetProperty("PlayerGold")?.GetValue(extractedParticipants)
-            == 99
-        && (int?)
-            extractedParticipantsType
-                .GetProperty("PlayerVictories")
-                ?.GetValue(extractedParticipants) == 3
-        && (int?)
-            extractedParticipantsType
-                .GetProperty("OpponentPrestige")
-                ?.GetValue(extractedParticipants) == 12
-        && (int?)
-            extractedParticipantsType
-                .GetProperty("OpponentVictories")
-                ?.GetValue(extractedParticipants) == 6,
-    "Artifact extraction should preserve participant economy, prestige, and victories."
-);
-
-var ghostPayloadStorePath = Path.Combine(
-    Path.GetTempPath(),
-    "bpp-ghost-payload-tests",
-    Guid.NewGuid().ToString("N")
-);
-Directory.CreateDirectory(ghostPayloadStorePath);
-try
+static async Task RetryAfterStartsCooldown()
 {
-    var ghostPayloadStore =
-        Activator.CreateInstance(ghostPayloadStoreType, ghostPayloadStorePath)
-        ?? throw new InvalidOperationException("GhostBattlePayloadStore should be constructible.");
-    InvokeVoid(ghostPayloadStoreType, ghostPayloadStore, "Save", [extractedPayload]);
-    var ghostPayloadFiles = Directory
-        .EnumerateFiles(ghostPayloadStorePath, "battle-001.ghost.mpack.gz*")
-        .Select(Path.GetFileName)
-        .ToArray();
+    using var fixture = new GhostFixture(request =>
+    {
+        var response = new HttpResponseMessage((HttpStatusCode)429)
+        {
+            Content = new StringContent("{\"error\":\"rate_limited\",\"retryable\":true}"),
+        };
+        response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(60));
+        return response;
+    });
+    var first = await fixture.Service.SyncRecentBattlesAsync(CancellationToken.None);
+    var second = await fixture.Service.SyncRecentBattlesAsync(CancellationToken.None);
     Assert(
-        ghostPayloadFiles.SequenceEqual(["battle-001.ghost.mpack.gz"]),
-        "Ghost payload store should use the exact file name without leaving temp artifacts behind."
+        !first.Succeeded && !second.Succeeded,
+        "Rate-limited discovery must fail without throwing."
     );
-    var reloadedGhostPayload =
-        Invoke<object?>(ghostPayloadStoreType, ghostPayloadStore, "Load", ["battle-001"])
-        ?? throw new InvalidOperationException(
-            "GhostBattlePayloadStore should reload saved payloads."
-        );
-    var reloadedReplayPayload = reloadedPayloadType(reloadedGhostPayload);
-    var reloadedManifest =
-        reloadedGhostPayload.GetType().GetProperty("BattleManifest")?.GetValue(reloadedGhostPayload)
-        ?? throw new InvalidOperationException(
-            "Reloaded ghost payload should include battle manifest."
-        );
-    Assert(
-        (
-            (byte[]?)
-                replayPayloadType.GetProperty("CombatMessageBytes")?.GetValue(reloadedReplayPayload)
-        )?.SequenceEqual(new byte[] { 2 }) == true,
-        "Ghost payload store should preserve binary replay payload bytes."
-    );
-    Assert(
-        (string?)extractedManifestType.GetProperty("EncounterId")?.GetValue(reloadedManifest)
-            == "encounter-001",
-        "Ghost payload store should preserve manifest encounter metadata."
-    );
-    Assert(
-        (DateTimeOffset?)
-            extractedManifestType.GetProperty("RecordedAtUtc")?.GetValue(reloadedManifest)
-            == DateTimeOffset.Parse("2026-04-11T00:00:00.000Z"),
-        "Ghost payload store should preserve manifest timestamps."
-    );
-    var reloadedSnapshots =
-        extractedManifestType.GetProperty("Snapshots")?.GetValue(reloadedManifest)
-        ?? throw new InvalidOperationException("Reloaded ghost payload should include snapshots.");
-    var playerHandCapture =
-        reloadedSnapshots.GetType().GetProperty("PlayerHand")?.GetValue(reloadedSnapshots)
-        ?? throw new InvalidOperationException(
-            "Reloaded ghost snapshots should include player hand."
-        );
-    var playerHandItems = (IEnumerable?)
-        playerHandCapture.GetType().GetProperty("Items")?.GetValue(playerHandCapture);
-    var reloadedCardSnapshot =
-        playerHandItems?.Cast<object>().SingleOrDefault()
-        ?? throw new InvalidOperationException(
-            "Reloaded ghost player hand should preserve card snapshots."
-        );
-    Assert(
-        (string?)cardSnapshotType.GetProperty("InstanceId")?.GetValue(reloadedCardSnapshot)
-            == "card-instance-001",
-        "Ghost payload store should preserve snapshot card identities."
-    );
-}
-finally
-{
-    if (Directory.Exists(ghostPayloadStorePath))
-        Directory.Delete(ghostPayloadStorePath, recursive: true);
+    Assert(fixture.Handler.Count == 1, "Retry-After cooldown must suppress the second HTTP query.");
 }
 
-Assert(
-    importRecordType.GetProperty("PlayerName") != null,
-    "GhostBattleImportRecord should preserve the raw remote player_name field."
-);
-Assert(
-    importRecordType.GetProperty("PlayerAccountId") != null,
-    "GhostBattleImportRecord should preserve the raw remote player_account_id field."
-);
-
-var freshRecordedAtUtcValue = DateTimeOffset.UtcNow.AddMinutes(-5);
-var freshRecordedAtUtc = freshRecordedAtUtcValue.ToString("o");
-var rawBattlePayload = JObject.Parse(
-    $$"""
-    {
-      "battle_id": "ghost-battle-001",
-      "recorded_at_utc": "{{freshRecordedAtUtc}}",
-      "day": 7,
-      "hour": 2,
-      "encounter_id": "encounter-001",
-      "player_name": "RemoteGhost",
-      "player_account_id": "remote-account-001",
-      "player_hero": "Dooley",
-      "player_rank": "Bronze",
-      "player_rating": 1200,
-      "player_level": 9,
-      "player_prestige": 18,
-      "player_victories": 3,
-      "player_hand_item_count": 2,
-      "player_skill_count": 1,
-      "opponent_hero": "Vanessa",
-      "opponent_rank": "Legendary",
-      "opponent_rating": 1500,
-      "opponent_level": 12,
-      "opponent_prestige": 12,
-      "opponent_victories": 6,
-      "opponent_hand_item_count": 7,
-      "opponent_skill_count": 3,
-      "opponent_account_id": "local-account-001",
-      "combat_kind": "PVPCombat",
-      "result": "Won",
-      "winner_combatant_id": "Player",
-      "loser_combatant_id": "Opponent",
-      "is_final_battle": true
-    }
-    """
-);
-
-var importRecord =
-    tryParseBattle!.Invoke(null, [rawBattlePayload])
-    ?? throw new InvalidOperationException("TryParseBattle should return an import record.");
-Assert(
-    (DateTimeOffset)importRecordType.GetProperty("RecordedAtUtc")!.GetValue(importRecord)!
-        == freshRecordedAtUtcValue,
-    "Ghost import should preserve the UTC instant after Json.NET creates a Date token."
-);
-Assert(
-    (string?)importRecordType.GetProperty("PlayerName")?.GetValue(importRecord) == "RemoteGhost",
-    "Ghost import should preserve remote player_name without flipping."
-);
-Assert(
-    (string?)importRecordType.GetProperty("PlayerAccountId")?.GetValue(importRecord)
-        == "remote-account-001",
-    "Ghost import should preserve remote player_account_id without flipping."
-);
-Assert(
-    (string?)importRecordType.GetProperty("PlayerHero")?.GetValue(importRecord) == "Dooley",
-    "Ghost import should preserve the remote player hero without flipping."
-);
-Assert(
-    (string?)importRecordType.GetProperty("OpponentAccountId")?.GetValue(importRecord)
-        == "local-account-001",
-    "Ghost import should preserve the local opponent account id without flipping."
-);
-Assert(
-    (string?)importRecordType.GetProperty("Result")?.GetValue(importRecord) == "Won",
-    "Ghost import should preserve the remote result without flipping."
-);
-Assert(
-    (string?)importRecordType.GetProperty("WinnerCombatantId")?.GetValue(importRecord) == "Player",
-    "Ghost import should preserve winner_combatant_id without flipping."
-);
-Assert(
-    (bool)(importRecordType.GetProperty("IsFinalBattle")?.GetValue(importRecord) ?? false) is true,
-    "Ghost import should preserve is_final_battle from the V4 wire."
-);
-var missingFinalBattlePayload = JObject.Parse(
-    $$"""
-    {
-      "battle_id": "ghost-battle-missing-final",
-      "recorded_at_utc": "{{DateTimeOffset.UtcNow.ToString("o")}}"
-    }
-    """
-);
-var missingFinalBattleImportRecord =
-    tryParseBattle!.Invoke(null, [missingFinalBattlePayload])
-    ?? throw new InvalidOperationException(
-        "TryParseBattle should return an import record when is_final_battle is absent."
-    );
-Assert(
-    (bool)(
-        importRecordType.GetProperty("IsFinalBattle")?.GetValue(missingFinalBattleImportRecord)
-        ?? true
-    )
-        is false,
-    "Ghost import should default missing is_final_battle to false."
-);
-Assert(
-    (int?)importRecordType.GetProperty("PlayerPrestige")?.GetValue(importRecord) == 18
-        && (int?)importRecordType.GetProperty("PlayerVictories")?.GetValue(importRecord) == 3
-        && (int?)importRecordType.GetProperty("OpponentPrestige")?.GetValue(importRecord) == 12
-        && (int?)importRecordType.GetProperty("OpponentVictories")?.GetValue(importRecord) == 6,
-    "Ghost import should preserve participant prestige and victories."
-);
-Assert(
-    (int?)importRecordType.GetProperty("PlayerHandItemCount")?.GetValue(importRecord) == 2
-        && (int?)importRecordType.GetProperty("PlayerSkillCount")?.GetValue(importRecord) == 1
-        && (int?)importRecordType.GetProperty("OpponentHandItemCount")?.GetValue(importRecord) == 7
-        && (int?)importRecordType.GetProperty("OpponentSkillCount")?.GetValue(importRecord) == 3,
-    "Ghost import should preserve participant item and skill summary counts."
-);
-
-var localWinRecordedAtUtc = DateTimeOffset.UtcNow.AddMinutes(-4).ToString("o");
-var localWinBattlePayload = JObject.Parse(
-    $$"""
-    {
-      "battle_id": "ghost-battle-local-win",
-      "recorded_at_utc": "{{localWinRecordedAtUtc}}",
-      "day": 10,
-      "player_name": "RemoteFinal",
-      "player_account_id": "remote-account-002",
-      "player_hero": "Dooley",
-      "opponent_name": "LocalPlayer",
-      "opponent_account_id": "local-account-001",
-      "opponent_hero": "Vanessa",
-      "combat_kind": "PVPCombat",
-      "result": "Lost",
-      "winner_combatant_id": "Opponent",
-      "loser_combatant_id": "Player",
-      "is_final_battle": true
-    }
-    """
-);
-var localWinImportRecord =
-    tryParseBattle!.Invoke(null, [localWinBattlePayload])
-    ?? throw new InvalidOperationException("TryParseBattle should return the local-win record.");
-
-var tempRoot = Path.Combine(
-    Path.GetTempPath(),
-    "bpp-ghost-battle-sync-tests",
-    Guid.NewGuid().ToString("N")
-);
-Directory.CreateDirectory(tempRoot);
-
-try
+static async Task ExpiredUrlRefreshesOnceAndBecomesTerminal()
 {
-    var repository =
-        Activator.CreateInstance(repositoryType, Path.Combine(tempRoot, "history.db"))
-        ?? throw new InvalidOperationException("Failed to create HistoryPanelRepository.");
-    var importRecords = Array.CreateInstance(importRecordType, 2);
-    importRecords.SetValue(importRecord, 0);
-    importRecords.SetValue(localWinImportRecord, 1);
-    InvokeVoid(
-        repositoryType,
-        repository,
-        "UpsertGhostBattles",
-        ["local-account-001", importRecords]
+    var bundleId = "01K1ABCDEF0123456789ABCDEG";
+    var record = CreateImport(
+        "battle-expired",
+        bundleId,
+        "https://r2.example/expired",
+        DateTimeOffset.UtcNow.AddMinutes(-1)
     );
+    using var fixture = new GhostFixture(request =>
+    {
+        if (request.RequestUri?.AbsolutePath == "/ghost-battles")
+            return JsonResponse(
+                BattlePage(
+                    record.BattleId,
+                    bundleId,
+                    "https://r2.example/refreshed",
+                    DateTimeOffset.UtcNow.AddMinutes(5),
+                    "account-uploader",
+                    "account-local"
+                )
+            );
+        return new HttpResponseMessage(HttpStatusCode.NotFound)
+        {
+            Content = new StringContent("missing"),
+        };
+    });
+    fixture.Repository.UpsertGhostBattles("account-local", [record]);
+    var localId = fixture.Repository.ListRecentGhostBattles(10).Single().BattleId;
+    var replayRoot = Path.Combine(fixture.Root, "CombatReplays");
 
-    var ghostBattles = (System.Collections.IEnumerable)
-        Invoke<object>(repositoryType, repository, "ListRecentGhostBattles", [20]);
-    var projectedBattles = ghostBattles.Cast<object>().ToList();
-    var projectedBattle =
-        projectedBattles.SingleOrDefault(battle =>
-            (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
-            == "ghost-battle-001"
-        ) ?? throw new InvalidOperationException("Expected the projected remote-win ghost battle.");
-    var projectedLocalWinBattle =
-        projectedBattles.SingleOrDefault(battle =>
-            (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
-            == "ghost-battle-local-win"
-        ) ?? throw new InvalidOperationException("Expected the projected local-win ghost battle.");
+    var first = await fixture.Service.DownloadReplayAsync(
+        localId,
+        replayRoot,
+        CancellationToken.None
+    );
+    var callsAfterFirst = fixture.Handler.Count;
+    var second = await fixture.Service.DownloadReplayAsync(
+        localId,
+        replayRoot,
+        CancellationToken.None
+    );
+    Assert(!first.Succeeded && !second.Succeeded, "A refreshed 404 must become expired.");
+    Assert(
+        callsAfterFirst == 2,
+        "An expired URL must refresh discovery exactly once before download."
+    );
+    Assert(
+        fixture.Handler.Count == callsAfterFirst,
+        "An expired terminal row must not download again."
+    );
+    Assert(
+        fixture.Repository.TryGetGhostBundleReference(localId)?.ReplayState == "expired",
+        "Expired must persist."
+    );
+}
 
-    Assert(
-        (string?)battleRecordType.GetProperty("OpponentName")?.GetValue(projectedBattle)
-            == "RemoteGhost",
-        "Ghost repository reads should project the remote uploader into OpponentName."
+static async Task CorruptBundleBecomesPermanentWithoutRepeatedDownload()
+{
+    using var fixture = new GhostFixture(_ => new HttpResponseMessage(HttpStatusCode.OK)
+    {
+        Content = new ByteArrayContent([0, 1, 2, 3]),
+    });
+    fixture.Repository.UpsertGhostBattles(
+        "account-local",
+        [
+            CreateImport(
+                "battle-corrupt",
+                "01K1ABCDEF0123456789ABCDEH",
+                "https://r2.example/corrupt",
+                DateTimeOffset.UtcNow.AddMinutes(5)
+            ),
+        ]
     );
-    Assert(
-        (string?)battleRecordType.GetProperty("OpponentAccountId")?.GetValue(projectedBattle)
-            == "remote-account-001",
-        "Ghost repository reads should project the remote uploader account into OpponentAccountId."
-    );
-    Assert(
-        (string?)battleRecordType.GetProperty("PlayerHero")?.GetValue(projectedBattle) == "Vanessa",
-        "Ghost repository reads should project the local hero from the raw opponent_hero field."
-    );
-    Assert(
-        (string?)battleRecordType.GetProperty("Result")?.GetValue(projectedBattle) == "Lost",
-        "Ghost repository reads should project the result into local-player perspective."
-    );
-    Assert(
-        (bool)(battleRecordType.GetProperty("IsFinalBattle")?.GetValue(projectedBattle) ?? false)
-            is true,
-        "Ghost repository reads should preserve the final-battle marker."
-    );
-    Assert(
-        (int?)battleRecordType.GetProperty("PlayerPrestige")?.GetValue(projectedBattle) == 12
-            && (int?)battleRecordType.GetProperty("PlayerVictories")?.GetValue(projectedBattle) == 6
-            && (int?)battleRecordType.GetProperty("OpponentPrestige")?.GetValue(projectedBattle)
-                == 18
-            && (int?)battleRecordType.GetProperty("OpponentVictories")?.GetValue(projectedBattle)
-                == 3,
-        "Ghost repository reads should project participant prestige and victories into local-player perspective."
-    );
-    Assert(
-        (int)battleRecordType.GetProperty("PlayerHandItemCount")!.GetValue(projectedBattle)! == 7
-            && (int)battleRecordType.GetProperty("PlayerSkillCount")!.GetValue(projectedBattle)!
-                == 3
-            && (int)
-                battleRecordType.GetProperty("OpponentHandItemCount")!.GetValue(projectedBattle)!
-                == 2
-            && (int)battleRecordType.GetProperty("OpponentSkillCount")!.GetValue(projectedBattle)!
-                == 1,
-        "Ghost repository reads should project participant item and skill counts into local-player perspective."
-    );
-    Assert(
-        (bool)isGhostOpponentEliminated!.Invoke(null, [projectedBattle])! is false,
-        "A final ghost battle should not show elimination text when the local player lost."
-    );
-    Assert(
-        (string?)battleRecordType.GetProperty("Result")?.GetValue(projectedLocalWinBattle) == "Won",
-        "Ghost repository reads should project a remote loss into a local-player win."
-    );
-    Assert(
-        (bool)(
-            battleRecordType.GetProperty("IsFinalBattle")?.GetValue(projectedLocalWinBattle)
-            ?? false
-        )
-            is true,
-        "Ghost repository reads should preserve the final-battle marker for local wins."
-    );
-    Assert(
-        (bool)isGhostOpponentEliminated.Invoke(null, [projectedLocalWinBattle])! is true,
-        "A final ghost battle should show elimination text when the local player won."
-    );
+    var localId = fixture.Repository.ListRecentGhostBattles(10).Single().BattleId;
+    var replayRoot = Path.Combine(fixture.Root, "CombatReplays");
 
-    var resolvedOutcome = resolveGhostBattleOutcome!.Invoke(null, [projectedBattle]);
-    var lostOutcome = Enum.Parse(coordinatorOutcomeType, "Lost");
-    Assert(
-        Equals(resolvedOutcome, lostOutcome),
-        "Ghost battle filtering should use the projected local-player outcome."
+    var first = await fixture.Service.DownloadReplayAsync(
+        localId,
+        replayRoot,
+        CancellationToken.None
     );
+    var callsAfterFirst = fixture.Handler.Count;
+    var second = await fixture.Service.DownloadReplayAsync(
+        localId,
+        replayRoot,
+        CancellationToken.None
+    );
+    Assert(!first.Succeeded && !second.Succeeded, "Corrupt bundles must fail permanently.");
+    Assert(
+        fixture.Handler.Count == callsAfterFirst,
+        "unavailable_payload must not download twice."
+    );
+    Assert(
+        fixture.Repository.TryGetGhostBundleReference(localId)?.ReplayState
+            == "unavailable_payload",
+        "Corruption state must persist."
+    );
+}
 
-    var serviceScopedImportRecords = Array.CreateInstance(importRecordType, 1);
-    var serviceScopedImportRecord =
-        tryParseBattle!.Invoke(
-            null,
-            [
-                JObject.Parse(
-                    $$"""
+static void UnknownProjectionAndCountsStayUnknown()
+{
+    Assert(
+        GhostBattleLocalProjector.ProjectResultToLocal("unknown") == null,
+        "Unknown server result must map to the local unknown result."
+    );
+    var record = CreateImport(
+        "battle-unknown",
+        "01K1ABCDEF0123456789ABCDEJ",
+        "https://r2.example/unknown",
+        DateTimeOffset.UtcNow.AddMinutes(5)
+    );
+    using var fixture = new GhostFixture(_ => JsonResponse("{\"battles\":[]}"));
+    fixture.Repository.UpsertGhostBattles("account-local", [record]);
+    var local = fixture.Repository.ListRecentGhostBattles(10).Single();
+    Assert(
+        !local.SnapshotCounts.Known,
+        "Hand and skill counts must be unknown before replay download."
+    );
+    Assert(
+        HistoryPanelFormatter
+            .FormatSnapshotSummary(local.SnapshotCounts)
+            .Contains("unknown", StringComparison.OrdinalIgnoreCase),
+        "Unknown counts must not render as zero."
+    );
+}
+
+static GhostBattleImportRecord CreateImport(
+    string battleId,
+    string bundleId,
+    string url,
+    DateTimeOffset expiry
+) =>
+    new()
+    {
+        BattleId = battleId,
+        BundleId = bundleId,
+        DownloadUrl = url,
+        DownloadExpiresAtUtc = expiry,
+        RecordedAtUtc = DateTimeOffset.UtcNow,
+        Day = 1,
+        Hour = 2,
+        PlayerAccountId = "account-uploader",
+        PlayerName = "Uploader",
+        OpponentAccountId = "account-local",
+        OpponentName = "Local",
+        CombatKind = "PVPCombat",
+        Result = "unknown",
+    };
+
+static string BattlePage(
+    string battleId,
+    string bundleId,
+    string url,
+    DateTimeOffset expiry,
+    string uploader,
+    string opponent
+) =>
+    System.Text.Json.JsonSerializer.Serialize(
+        new Dictionary<string, object?>
+        {
+            ["battles"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["battle_id"] = battleId,
+                    ["bundle_id"] = bundleId,
+                    ["recorded_at_ms"] = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
+                    ["download_url"] = url,
+                    ["download_expires_at_ms"] = expiry.ToUnixTimeMilliseconds(),
+                    ["day"] = 1,
+                    ["hour"] = 2,
+                    ["combat_kind"] = "PVPCombat",
+                    ["result"] = "unknown",
+                    ["is_final_battle"] = false,
+                    ["player"] = new Dictionary<string, object?>
                     {
-                      "battle_id": "ghost-battle-bearer-scope",
-                      "recorded_at_utc": "{{DateTimeOffset.UtcNow.AddMinutes(-3).ToString("o")}}",
-                      "day": 11,
-                      "player_name": "RemoteBearerScope",
-                      "player_account_id": "remote-account-bearer-scope",
-                      "player_hero": "Mak",
-                      "opponent_name": "LocalBearerScope",
-                      "opponent_account_id": "bearer-account-001",
-                      "opponent_hero": "Pygmalien",
-                      "combat_kind": "PVPCombat",
-                      "result": "Lost",
-                      "winner_combatant_id": "Opponent",
-                      "loser_combatant_id": "Player"
-                    }
-                    """
-                ),
-            ]
-        )
-        ?? throw new InvalidOperationException("TryParseBattle should return bearer-scoped data.");
-    serviceScopedImportRecords.SetValue(serviceScopedImportRecord, 0);
-    InvokeVoid(
-        repositoryType,
-        repository,
-        "UpsertGhostBattles",
-        ["bearer-account-001", serviceScopedImportRecords]
-    );
-
-    var dataService =
-        Activator.CreateInstance(dataServiceType, repository, null)
-        ?? throw new InvalidOperationException("HistoryPanelDataService should be constructible.");
-    var loadGhostArgs = new object?[] { 100, null, null, null };
-    var loadGhostSucceeded = (bool)
-        dataServiceType.GetMethod("TryLoadGhostBattles")!.Invoke(dataService, loadGhostArgs)!;
-    var loadedServiceScopedBattles = ((IEnumerable)loadGhostArgs[1]!).Cast<object>().ToList();
-    Assert(loadGhostSucceeded, "Ghost battle load should not require a current account.");
-    Assert(
-        loadedServiceScopedBattles.Any(battle =>
-            (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
-            == "ghost-battle-bearer-scope"
-        )
-            && loadedServiceScopedBattles.Any(battle =>
-                (string?)battleRecordType.GetProperty("BattleId")?.GetValue(battle)
-                == "ghost-battle-001"
-            ),
-        "Ghost battle loads should include locally cached rows from every account scope."
-    );
-}
-finally
-{
-    if (Directory.Exists(tempRoot))
-    {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        try
-        {
-            Directory.Delete(tempRoot, recursive: true);
+                        ["account_id"] = uploader,
+                        ["display_name"] = "Uploader",
+                    },
+                    ["opponent"] = new Dictionary<string, object?>
+                    {
+                        ["account_id"] = opponent,
+                        ["display_name"] = "Local",
+                    },
+                },
+            },
         }
-        catch (IOException)
-        {
-            try
-            {
-                await Task.Delay(200);
-                Directory.Delete(tempRoot, recursive: true);
-            }
-            catch (IOException)
-            {
-                // Best-effort cleanup on Windows when SQLite releases the file handle late.
-            }
-        }
-    }
-}
-
-var tryCreateRoutes = routesType.GetMethod("TryCreate", BindingFlags.Public | BindingFlags.Static);
-Assert(tryCreateRoutes != null, "ModApiRoutes should expose a static TryCreate factory.");
-var routes =
-    tryCreateRoutes!.Invoke(null, ["https://mod-api-v4.bazaarplusplus.com"])
-    ?? throw new InvalidOperationException("Failed to create ModApiRoutes.");
-var queryGhostBattles = (string)(
-    routesType.GetProperty("QueryGhostBattles")!.GetValue(routes)
-    ?? throw new InvalidOperationException("QueryGhostBattles should be populated.")
-);
-var replayLink = (string)(
-    routesType.GetMethod("CreateReplayLink")!.Invoke(routes, ["battle-001"])
-    ?? throw new InvalidOperationException("CreateReplayLink should return a route.")
-);
-Assert(
-    queryGhostBattles == "https://mod-api-v4.bazaarplusplus.com/ghost-battles",
-    "ModApiRoutes should publish the /ghost-battles query route."
-);
-Assert(
-    replayLink == "https://mod-api-v4.bazaarplusplus.com/ghost-battles/battle-001/replay-link",
-    "ModApiRoutes should publish replay links under /ghost-battles/{battle_id}/replay-link."
-);
-
-{
-    HttpRequestMessage? replayLinkRequest = null;
-    var replayLinkHandler = new RecordingHttpMessageHandler(request =>
-    {
-        replayLinkRequest = request;
-        return new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(
-                """{"download_url":"https://r2-presigned.example.com/replays/token-public"}"""
-            ),
-        };
-    });
-    using var replayLinkHttpClient = new HttpClient(replayLinkHandler);
-    var replayLinkClient =
-        Activator.CreateInstance(apiClientType, replayLinkHttpClient, routes)
-        ?? throw new InvalidOperationException("GhostBattleClient should be constructible.");
-    var requestReplayDownloadLinkAsync = apiClientType.GetMethod(
-        "RequestReplayDownloadLinkAsync",
-        BindingFlags.Public | BindingFlags.Instance
-    );
-    Assert(
-        requestReplayDownloadLinkAsync != null,
-        "GhostBattleClient should expose replay-link downloads."
-    );
-    var replayLinkTask = (Task)(
-        requestReplayDownloadLinkAsync!.Invoke(
-            replayLinkClient,
-            ["battle-public", CancellationToken.None]
-        ) ?? throw new InvalidOperationException("Replay-link request should return a task.")
-    );
-    await replayLinkTask;
-    var replayLinkResult =
-        replayLinkTask.GetType().GetProperty("Result")?.GetValue(replayLinkTask)
-        ?? throw new InvalidOperationException("Replay-link request should produce a result.");
-    var replayLinkResultType = replayLinkResult.GetType();
-    Assert(
-        (bool)(replayLinkResultType.GetProperty("Succeeded")?.GetValue(replayLinkResult) ?? false),
-        "GhostBattleClient replay-link request should succeed on 200."
-    );
-    Assert(replayLinkRequest != null, "Replay-link request should reach the HTTP transport.");
-    Assert(
-        !replayLinkRequest!.Headers.Contains("X-BPP-Installation-Id"),
-        "Replay-link requests should not send installation headers."
-    );
-    Assert(
-        replayLinkRequest.Headers.Authorization == null,
-        "Replay-link requests should not send an Authorization header after auth removal."
     );
 
-    HttpRequestMessage? replayPayloadRequest = null;
-    var replayPayloadHandler = new RecordingHttpMessageHandler(request =>
-    {
-        replayPayloadRequest = request;
-        return new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new ByteArrayContent(artifactBytes),
-        };
-    });
-    using var replayPayloadHttpClient = new HttpClient(replayPayloadHandler);
-    var replayPayloadClient =
-        Activator.CreateInstance(apiClientType, replayPayloadHttpClient, routes)
-        ?? throw new InvalidOperationException("GhostBattleClient should be constructible.");
-    var downloadReplayBytesAsync = apiClientType.GetMethod(
-        "DownloadReplayBytesAsync",
-        BindingFlags.Public | BindingFlags.Instance
-    );
-    Assert(
-        downloadReplayBytesAsync != null,
-        "GhostBattleClient should expose replay-bytes downloads."
-    );
-    var replayPayloadTask = (Task)(
-        downloadReplayBytesAsync!.Invoke(
-            replayPayloadClient,
-            ["https://r2-presigned.example.com/replays/token-public", CancellationToken.None]
-        ) ?? throw new InvalidOperationException("Replay-bytes request should return a task.")
-    );
-    await replayPayloadTask;
-    var replayPayloadResult =
-        replayPayloadTask.GetType().GetProperty("Result")?.GetValue(replayPayloadTask)
-        ?? throw new InvalidOperationException("Replay-bytes request should produce a result.");
-    var replayPayloadResultType = replayPayloadResult.GetType();
-    Assert(
-        (bool)(
-            replayPayloadResultType.GetProperty("Succeeded")?.GetValue(replayPayloadResult) ?? false
-        ),
-        "GhostBattleClient replay-bytes request should succeed on 200."
-    );
-    Assert(replayPayloadRequest != null, "Replay-bytes request should reach the HTTP transport.");
-    Assert(
-        !replayPayloadRequest!.Headers.Contains("X-BPP-Installation-Id"),
-        "Replay-bytes requests should not send installation headers."
-    );
-    Assert(
-        replayPayloadRequest.Headers.Authorization == null,
-        "Replay-bytes requests should not send an Authorization header after auth removal."
-    );
-}
-
-Console.WriteLine("Ghost battle sync checks passed.");
-
-static Type RequireType(string fullName)
-{
-    return Type.GetType($"{fullName}, BazaarPlusPlus")
-        ?? throw new InvalidOperationException($"Type not found: {fullName}");
-}
-
-static Type RequireModApiType(string fullName)
-{
-    return Type.GetType($"{fullName}, BazaarPlusPlus.ModApi")
-        ?? throw new InvalidOperationException($"Type not found: {fullName}");
-}
-
-static T Invoke<T>(Type type, object instance, string name, object?[] args)
-{
-    var method = type.GetMethod(
-        name,
-        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
-    );
-    if (method == null)
-        throw new InvalidOperationException($"Method not found: {type.FullName}.{name}");
-
-    return (T)(
-        method.Invoke(instance, args)
-        ?? throw new InvalidOperationException($"Method returned null: {type.FullName}.{name}")
-    );
-}
-
-static object reloadedPayloadType(object reloadedGhostPayload)
-{
-    return reloadedGhostPayload
-            .GetType()
-            .GetProperty("ReplayPayload")
-            ?.GetValue(reloadedGhostPayload)
-        ?? throw new InvalidOperationException(
-            "Reloaded ghost payload should include replay payload."
-        );
-}
-
-static void InvokeVoid(Type type, object instance, string name, object?[] args)
-{
-    var method = type.GetMethod(
-        name,
-        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
-    );
-    if (method == null)
-        throw new InvalidOperationException($"Method not found: {type.FullName}.{name}");
-
-    method.Invoke(instance, args);
-}
+static HttpResponseMessage JsonResponse(string json) =>
+    new(HttpStatusCode.OK) { Content = new StringContent(json) };
 
 static void Assert(bool condition, string message)
 {
@@ -1074,30 +295,49 @@ static void Assert(bool condition, string message)
         throw new InvalidOperationException(message);
 }
 
-internal sealed class RecordingHttpMessageHandler : HttpMessageHandler
+internal sealed class RecordingHandler : HttpMessageHandler
 {
-    private readonly Func<HttpRequestMessage, HttpResponseMessage> _handler;
+    private readonly Func<HttpRequestMessage, HttpResponseMessage> _respond;
 
-    public RecordingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> handler)
-    {
-        _handler = handler ?? throw new ArgumentNullException(nameof(handler));
-    }
+    public RecordingHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) =>
+        _respond = respond;
+
+    public int Count { get; private set; }
 
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken
     )
     {
-        return Task.FromResult(_handler(request));
+        Count++;
+        return Task.FromResult(_respond(request));
     }
 }
 
-internal sealed class MutableLanguageProvider : ILanguageProvider
+internal sealed class GhostFixture : IDisposable
 {
-    public string CurrentLanguageCode { get; set; } = string.Empty;
-}
+    private readonly HttpClient _http;
 
-internal sealed class MutableLocaleModeProvider : ILocaleModeProvider
-{
-    public BppChineseLocaleMode CurrentMode { get; set; } = BppChineseLocaleMode.Mainland;
+    public GhostFixture(Func<HttpRequestMessage, HttpResponseMessage> respond)
+    {
+        Root = Path.Combine(Path.GetTempPath(), $"bpp-ghost-v5-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(Root);
+        Repository = new HistoryPanelRepository(Path.Combine(Root, "runs.sqlite3"));
+        Handler = new RecordingHandler(respond);
+        _http = new HttpClient(Handler);
+        var online = new ModOnlineClient(_http, ModApiRoutes.TryCreate("https://api.example")!);
+        Service = new GhostBattleSyncService(Repository, online, () => "account-local");
+    }
+
+    public string Root { get; }
+    public HistoryPanelRepository Repository { get; }
+    public RecordingHandler Handler { get; }
+    public GhostBattleSyncService Service { get; }
+
+    public void Dispose()
+    {
+        _http.Dispose();
+        if (Directory.Exists(Root))
+            Directory.Delete(Root, recursive: true);
+    }
 }

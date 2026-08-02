@@ -35,7 +35,19 @@ public sealed class ModApiHealthClient
                     $"http_{(int)response.StatusCode}"
                 );
 
-            var parsed = JsonConvert.DeserializeObject<ModApiHealthResponse>(body);
+            ModApiHealthResponse? parsed;
+            try
+            {
+                parsed = JsonConvert.DeserializeObject<ModApiHealthResponse>(body);
+            }
+            catch (JsonException)
+            {
+                return ModApiHealthProbeResult.Failure(
+                    startedAtUtc,
+                    stopwatch.ElapsedMilliseconds,
+                    "server_time_invalid"
+                );
+            }
             if (
                 parsed == null
                 || !string.Equals(parsed.Status, "ok", StringComparison.OrdinalIgnoreCase)
@@ -48,18 +60,33 @@ public sealed class ModApiHealthClient
                 );
             }
 
-            if (!DateTime.TryParse(parsed.ServerTimeUtc, out var serverTimeUtc))
+            DateTime serverTimeUtc;
+            if (!parsed.ServerTimeMs.HasValue)
                 return ModApiHealthProbeResult.Failure(
                     startedAtUtc,
                     stopwatch.ElapsedMilliseconds,
                     "server_time_invalid"
                 );
+            try
+            {
+                serverTimeUtc = DateTimeOffset
+                    .FromUnixTimeMilliseconds(parsed.ServerTimeMs.Value)
+                    .UtcDateTime;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                return ModApiHealthProbeResult.Failure(
+                    startedAtUtc,
+                    stopwatch.ElapsedMilliseconds,
+                    "server_time_invalid"
+                );
+            }
 
             return ModApiHealthProbeResult.Success(
                 startedAtUtc,
                 stopwatch.ElapsedMilliseconds,
                 parsed.Status,
-                serverTimeUtc.ToUniversalTime()
+                serverTimeUtc
             );
         }
         catch (OperationCanceledException)

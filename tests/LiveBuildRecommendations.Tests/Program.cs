@@ -94,12 +94,12 @@ internal static class TenWinBuildTests
 
     private static void TestDefaultCachePathUsesTenwinBuildsFileName()
     {
-        var gameRootPath = Path.Combine(Path.GetTempPath(), $"bpp-game-root-{Guid.NewGuid():N}");
-        var cachePath = TenWinBuildCatalogFactory.BuildCacheFilePath(gameRootPath);
+        var dataRootPath = Path.Combine(Path.GetTempPath(), $"bpp-data-root-{Guid.NewGuid():N}");
+        var cachePath = TenWinBuildCatalogFactory.BuildCacheFilePath(dataRootPath);
 
         Assert(
-            cachePath == Path.Combine(gameRootPath, "BazaarPlusPlusV4", "tenwin_builds.json"),
-            "Ten-win build cache should live under GameRoot/BazaarPlusPlusV4/tenwin_builds.json."
+            cachePath == Path.Combine(dataRootPath, "tenwin_builds.json"),
+            "Ten-win build cache should live under the V5 data root."
         );
     }
 

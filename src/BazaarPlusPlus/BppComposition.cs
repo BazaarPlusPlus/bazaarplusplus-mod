@@ -4,6 +4,7 @@ using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Paths;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.BilingualItemNames;
+using BazaarPlusPlus.Game.BundlePipeline;
 using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.CombatReplay.Video;
@@ -24,11 +25,9 @@ using BazaarPlusPlus.Game.QuestPreview;
 using BazaarPlusPlus.Game.RunLifecycle;
 using BazaarPlusPlus.Game.RunLogging;
 using BazaarPlusPlus.Game.Screenshots;
-using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.Tooltips;
-using BazaarPlusPlus.Game.Upload;
 using BazaarPlusPlus.Game.VoiceSubtitles;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.GameInterop.CardPreview;
@@ -42,6 +41,7 @@ using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Patches;
 using BazaarPlusPlus.Patches.PostCombatImpact;
 using BazaarPlusPlus.Patches.Tooltips;
+using BazaarPlusPlus.Storage.Paths;
 using BepInEx.Configuration;
 using BepInEx.Logging;
 
@@ -70,6 +70,7 @@ internal sealed class BppComposition : IDisposable
     private readonly CombatStatusBarModule _combatStatusBarModule;
     private readonly PostCombatImpactModule _postCombatImpactModule;
     private readonly RunLoggingModule _runLoggingModule;
+    private readonly BundleSealCoordinator _bundleSealCoordinator;
     private readonly EncounterPreviewModule _encounterPreviewModule;
     private readonly INativeCardPreviewHost _nativeCardPreviewHost;
     private readonly EndOfRunCaptureWorkflow _endOfRunCaptureWorkflow;
@@ -87,8 +88,7 @@ internal sealed class BppComposition : IDisposable
 
     public IPvpBattleCatalog PvpBattleCatalog =>
         _pvpBattleCatalog ??= new PvpBattleCatalog(
-            _paths.RunLogDatabasePath
-                ?? throw new InvalidOperationException("Run log database path is not initialized.")
+            PathConstants.RunLogDatabase(_paths.RequireDataRoot())
         );
 
     public BppMountableRegistry Mountables => _mountables;
@@ -127,20 +127,15 @@ internal sealed class BppComposition : IDisposable
         _bazaarAgentCombatSummaryModule = new BazaarAgentCombatSummaryModule(_eventBus);
         _combatStatusBarModule = new CombatStatusBarModule(_eventBus, _runContext);
         _postCombatImpactModule = new PostCombatImpactModule(_eventBus);
-        _voiceSubtitlesModule = new VoiceSubtitlesModule();
+        _voiceSubtitlesModule = new VoiceSubtitlesModule(_paths.RequireDataRoot());
         _voiceSubtitlesInteropModule = new VoiceSubtitlesInteropModule();
         _nativeCardPreviewHost = new NativeCardPreviewHost(new NativeTooltipDataFactoryAdapter());
-        _buildRecommendationCatalog = TenWinBuildCatalogFactory.Create(BepInEx.Paths.GameRootPath);
+        _buildRecommendationCatalog = TenWinBuildCatalogFactory.Create(_paths.RequireDataRoot());
         _buildRecommendationRepository = new BuildRecommendationRepository(
             _buildRecommendationCatalog
         );
         var encounterPreviewCachePath = System.IO.Path.Combine(
-            System.IO.Path.GetDirectoryName(
-                _paths.RunLogDatabasePath
-                    ?? throw new InvalidOperationException(
-                        "Run log database path is not initialized."
-                    )
-            )!,
+            _paths.RequireDataRoot(),
             "EncounterPreview",
             "preview-plans.json"
         );
@@ -161,6 +156,7 @@ internal sealed class BppComposition : IDisposable
             PvpBattleCatalog,
             () => _combatReplayModule.Runtime?.HasPendingPersistence == true
         );
+        _bundleSealCoordinator = new BundleSealCoordinator(_services);
 
         _featureRegistry.Register(_runLifecycle);
         _featureRegistry.Register(_combatReplayModule);
@@ -170,8 +166,9 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_voiceSubtitlesInteropModule);
         _featureRegistry.Register(_voiceSubtitlesModule);
         _featureRegistry.Register(_runLoggingModule);
+        _featureRegistry.Register(_bundleSealCoordinator);
 
-        _settingsDockRegistry.Register(BazaarDbSnapshotUploadSettingsDockEntry.Create(_eventBus));
+        _settingsDockRegistry.Register(BazaarDbBundleSettingsDockEntry.Create());
         _settingsDockRegistry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(_settingsDockRegistry);
         _settingsDockRegistry.Register(ChineseLocaleModeSettingsDockEntry.Create(_eventBus));
@@ -197,7 +194,7 @@ internal sealed class BppComposition : IDisposable
         )
             GraphicsUpscalingSettingsDockEntry.RegisterAll(_settingsDockRegistry);
 
-        _mountables.Register(new UploadPumpMount(PvpBattleCatalog));
+        _mountables.Register(new UploadPumpMount());
         if (
             UnityEngine.Application.platform
             is UnityEngine.RuntimePlatform.OSXPlayer

@@ -75,11 +75,11 @@ public sealed class VoiceSubtitlesTests
     [Fact]
     public void Default_cache_path_uses_game_root_data_directory()
     {
-        var gameRoot = Path.Combine(Path.GetTempPath(), $"bpp-game-root-{Guid.NewGuid():N}");
+        var dataRoot = Path.Combine(Path.GetTempPath(), $"bpp-data-root-{Guid.NewGuid():N}");
 
-        var cachePath = VoiceLinesCatalogFactory.BuildCacheFilePath(gameRoot);
+        var cachePath = VoiceLinesCatalogFactory.BuildCacheFilePath(dataRoot);
 
-        Assert.Equal(Path.Combine(gameRoot, "BazaarPlusPlusV4", "voice-lines.json"), cachePath);
+        Assert.Equal(Path.Combine(dataRoot, "voice-lines.json"), cachePath);
     }
 
     [Fact]

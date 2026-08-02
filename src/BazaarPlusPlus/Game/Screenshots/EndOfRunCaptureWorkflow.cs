@@ -47,7 +47,8 @@ internal sealed class EndOfRunCaptureWorkflow : IEndOfRunCaptureWorkflow, IDispo
             new EndOfRunArtifactPersistence(services),
             new UnityEndOfRunCaptureClock(),
             new SystemEndOfRunCaptureFileSystem(),
-            EndOfRunCapturePolicy.Default
+            EndOfRunCapturePolicy.Default,
+            terminal => services.EventBus.Publish(terminal)
         );
         RefreshBufferedRunContext();
     }

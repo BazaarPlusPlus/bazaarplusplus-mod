@@ -6,6 +6,7 @@ using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.ModApi.Clients;
+using BazaarPlusPlus.Storage.Paths;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.HistoryPanel;
@@ -68,9 +69,9 @@ internal sealed class HistoryPanelMount : IBppMountable
                 runState,
                 onlineClient,
                 () => combatReplayRuntime,
-                services.Paths.RunLogDatabasePath ?? string.Empty,
-                services.Paths.CombatReplayDirectoryPath ?? string.Empty,
-                services.Paths.CombatReplayVideoDirectoryPath ?? string.Empty,
+                PathConstants.RunLogDatabase(services.Paths.RequireDataRoot()),
+                PathConstants.CombatReplays(services.Paths.RequireDataRoot()),
+                PathConstants.CombatReplayVideos(services.Paths.RequireDataRoot()),
                 services.Paths.PluginsDirectoryPath ?? string.Empty,
                 _accountLinkClient(),
                 () =>

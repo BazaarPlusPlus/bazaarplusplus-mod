@@ -6,7 +6,7 @@ namespace BazaarPlusPlus.ModApi.Http;
 
 /// <summary>
 /// Shared plumbing for the "serialize JSON body -> POST route -> read failure body" shape
-/// used by the snapshot upload client. The success/failure result mapping stays with each client.
+/// used by the retained account-link client. The success/failure result mapping stays with each client.
 /// </summary>
 public static class ModApiJsonPost
 {

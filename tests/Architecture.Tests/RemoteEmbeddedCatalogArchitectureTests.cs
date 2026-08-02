@@ -149,8 +149,8 @@ public sealed class RemoteEmbeddedCatalogArchitectureTests
         foreach (var factory in factories)
         {
             var source = File.ReadAllText(factory);
-            Assert.Contains("gameRootPath", source);
-            Assert.Contains("BazaarPlusPlusV4", source);
+            Assert.Contains("dataRootPath", source);
+            Assert.DoesNotContain("BazaarPlusPlusV4", source);
             Assert.DoesNotContain("Application.dataPath", source);
         }
     }

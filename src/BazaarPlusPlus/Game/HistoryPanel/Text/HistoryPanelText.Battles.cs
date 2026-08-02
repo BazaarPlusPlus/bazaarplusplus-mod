@@ -40,9 +40,15 @@ internal static partial class HistoryPanelText
     );
 
     private static readonly LocalizedTextSet NoGhostBattlesText = new(
-        "No ghost battles synced yet.",
-        "还没有同步到幽灵战斗。",
-        "還沒有同步到幽靈戰鬥。"
+        "Ghost battles can appear only after both players have successfully uploaded at least one bundle. Earlier battles are not backfilled.",
+        "只有双方都至少成功上传过一个 Bundle 后，后续战斗才可能出现；此前的历史战斗不会回填。",
+        "只有雙方都至少成功上傳過一個 Bundle 後，後續戰鬥才可能出現；此前的歷史戰鬥不會回填。"
+    );
+
+    private static readonly LocalizedTextSet SnapshotCountsUnknownText = new(
+        "Items and skills: unknown until replay is downloaded",
+        "物品与技能数量：下载回放后可见",
+        "物品與技能數量：下載重播後可見"
     );
 
     private static readonly LocalizedTextSet WinText = new("Win", "胜利", "勝利");
@@ -74,6 +80,8 @@ internal static partial class HistoryPanelText
     internal static string PreviewSelectBattle() => Resolve(PreviewSelectBattleText);
 
     internal static string NoGhostBattles() => Resolve(NoGhostBattlesText);
+
+    internal static string SnapshotCountsUnknown() => Resolve(SnapshotCountsUnknownText);
 
     internal static string Win() => Resolve(WinText);
 

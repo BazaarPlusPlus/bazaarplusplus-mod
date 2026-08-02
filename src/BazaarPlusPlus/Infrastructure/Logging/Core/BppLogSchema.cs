@@ -12,6 +12,8 @@ internal sealed class BppLogFeatureScope
     internal static BppLogFeatureScope RunLifecycle { get; } = new("RunLifecycle", "run_lifecycle");
     internal static BppLogFeatureScope RunLogging { get; } = new("RunLogging", "run_logging");
     internal static BppLogFeatureScope Upload { get; } = new("Upload", "upload");
+    internal static BppLogFeatureScope BundlePipeline { get; } =
+        new("BundlePipeline", "bundle_pipeline");
     internal static BppLogFeatureScope PvpBattles { get; } = new("PvpBattles", "pvp_battles");
     internal static BppLogFeatureScope CombatReplay { get; } = new("CombatReplay", "combat_replay");
     internal static BppLogFeatureScope Screenshots { get; } = new("Screenshots", "screenshots");
@@ -48,6 +50,7 @@ internal sealed class BppLogFeatureScope
         RunLifecycle,
         RunLogging,
         Upload,
+        BundlePipeline,
         PvpBattles,
         CombatReplay,
         Screenshots,

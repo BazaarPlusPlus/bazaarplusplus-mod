@@ -224,7 +224,7 @@ public sealed class BppLogEventRendererTests
         new(
             new BppLogRedactionRoots(
                 gameRoot: "/Users/alice/Games/The Bazaar",
-                dataRoot: "/Users/alice/Games/The Bazaar/BazaarPlusPlusV4",
+                dataRoot: "/Users/alice/Games/The Bazaar/BazaarPlusPlusV5",
                 pluginRoot: "/Users/alice/Games/The Bazaar/BepInEx/plugins",
                 homeRoot: "/Users/alice"
             )

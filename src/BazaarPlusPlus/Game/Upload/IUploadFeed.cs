@@ -5,8 +5,7 @@ namespace BazaarPlusPlus.Game.Upload;
 
 internal enum UploadFeedKind
 {
-    RunBundle,
-    BazaarDbSnapshot,
+    Bundle,
 }
 
 internal enum UploadAttemptObservationKind
@@ -24,7 +23,7 @@ internal enum UploadLogReasonCode
     InitializationException,
     LiveRunActive,
     AccountUnavailable,
-    RunBundleNotReady,
+    BundleNotReady,
     AccountProbeException,
     AttemptException,
     RemoteUploadFailed,

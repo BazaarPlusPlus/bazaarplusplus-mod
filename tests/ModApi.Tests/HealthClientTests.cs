@@ -13,9 +13,7 @@ internal static class HealthClientTests
 
         var successHandler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
         {
-            Content = new StringContent(
-                "{\"status\":\"ok\",\"server_time_utc\":\"2026-06-03T00:00:00.000Z\"}"
-            ),
+            Content = new StringContent("{\"status\":\"ok\",\"server_time_ms\":1780444800000}"),
         });
         var successClient = new ModApiHealthClient(new HttpClient(successHandler), routes);
         var success = successClient.ProbeAsync(CancellationToken.None).GetAwaiter().GetResult();
@@ -36,7 +34,7 @@ internal static class HealthClientTests
                 new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
                 {
                     Content = new StringContent(
-                        "{\"status\":\"degraded\",\"server_time_utc\":\"2026-06-03T00:00:00.000Z\"}"
+                        "{\"status\":\"degraded\",\"server_time_ms\":1780444800000}"
                     ),
                 })
             ),
@@ -87,7 +85,7 @@ internal static class HealthClientTests
             new HttpClient(
                 new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent("{\"status\":\"ok\",\"server_time_utc\":\"bad\"}"),
+                    Content = new StringContent("{\"status\":\"ok\",\"server_time_ms\":\"bad\"}"),
                 })
             ),
             routes

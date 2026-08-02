@@ -5,6 +5,7 @@ using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.CombatReplay.Audio;
 using BazaarPlusPlus.Game.OverlayPanels;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Storage.Paths;
 using UnityEngine;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
@@ -54,7 +55,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         _services = services ?? throw new ArgumentNullException(nameof(services));
         ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out _);
 
-        var runLogDatabasePath = services.Paths.RunLogDatabasePath;
+        var runLogDatabasePath = PathConstants.RunLogDatabase(services.Paths.RequireDataRoot());
         if (!string.IsNullOrWhiteSpace(runLogDatabasePath))
         {
             try
@@ -104,7 +105,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             );
         }
 
-        var videoDirectory = services.Paths.CombatReplayVideoDirectoryPath;
+        var videoDirectory = VideoDirectory(services);
         if (string.IsNullOrWhiteSpace(videoDirectory))
         {
             return SetAvailability(
@@ -458,7 +459,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
             var gate = CombatReplayRecordingGate.Evaluate(
                 pluginsDirectoryPath,
-                services.Paths.CombatReplayVideoDirectoryPath
+                VideoDirectory(services)
             );
             if (!gate.CanRecord)
             {
@@ -596,7 +597,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             var tempVideoPath = _activeRecordingTempPath ?? session.Request.OutputFilePath;
             var finalPath = _activeRecordingFinalPath ?? session.Request.FinalOutputFilePath;
             var ffmpegExecutable = _activeFfmpegExecutable;
-            var videoDir = _services?.Paths.CombatReplayVideoDirectoryPath;
+            var videoDir = _services == null ? null : VideoDirectory(_services);
             var store = _metadataStore;
             var audioStatus = _activeAudioStatus;
             var metadataStatus = _activeMetadataStatus;
@@ -1027,7 +1028,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             BattleId = request.BattleId,
             Source = request.Source.ToString(),
             VideoRelativePath = ComputeRelativePath(
-                services.Paths.CombatReplayVideoDirectoryPath,
+                VideoDirectory(services),
                 request.FinalOutputFilePath
             ),
             Width = request.Width,
@@ -1184,7 +1185,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             _activeRecordingFinalPath
             ?? (session == null ? string.Empty : session.Request.FinalOutputFilePath);
         var store = _metadataStore;
-        var videoDir = _services?.Paths.CombatReplayVideoDirectoryPath;
+        var videoDir = _services == null ? null : VideoDirectory(_services);
         var audioStatus = _activeAudioStatus;
         var metadataStatus = _activeMetadataStatus;
         var operations = _operations;
@@ -1549,7 +1550,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 {
                     VideoId = prepared.Operation.RecordingId,
                     VideoRelativePath = ComputeRelativePath(
-                        _services?.Paths.CombatReplayVideoDirectoryPath,
+                        _services == null ? null : VideoDirectory(_services),
                         prepared.Request.FinalOutputFilePath
                     ),
                     EndedAtUtc = DateTimeOffset.UtcNow,
@@ -1567,6 +1568,9 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             // Best effort: the terminal observer still reports the reservation failure.
         }
     }
+
+    private static string VideoDirectory(IBppServices services) =>
+        PathConstants.CombatReplayVideos(services.Paths.RequireDataRoot());
 
     private void OnOperationCompleted(ReplayVideoRecordingTerminal terminal)
     {

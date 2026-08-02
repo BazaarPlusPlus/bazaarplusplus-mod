@@ -225,7 +225,7 @@ parse_build_options() {
         shift
     done
 
-    build "$bazaaragent" "$fast" "${msbuild_args[@]}"
+    build "$bazaaragent" "$fast" ${msbuild_args[@]+"${msbuild_args[@]}"}
 }
 
 parse_publish_options() {

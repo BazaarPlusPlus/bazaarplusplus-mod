@@ -1,654 +1,161 @@
 #nullable enable
+using BazaarPlusPlus.Game.HistoryPanel.Storage;
+using BazaarPlusPlus.ModApi.Models;
+using BazaarPlusPlus.Storage.Paths;
+using BazaarPlusPlus.Storage.RunLog;
 using Microsoft.Data.Sqlite;
 
-var schemaType = RequireStorageType("BazaarPlusPlus.Storage.RunLog.RunLogSchema");
-var repositoryType = RequireType("BazaarPlusPlus.Game.HistoryPanel.Storage.HistoryPanelRepository");
-var ctor = repositoryType.GetConstructor([typeof(string)]);
-Assert(
-    ctor != null,
-    "HistoryPanelRepository should expose a constructor taking the database path."
-);
-
-var tempRoot = Path.Combine(
-    Path.GetTempPath(),
-    "bpp-history-panel-repository-tests",
-    Guid.NewGuid().ToString("N")
-);
-Directory.CreateDirectory(tempRoot);
-var dbPath = Path.Combine(tempRoot, "history.db");
-
+var root = Path.Combine(Path.GetTempPath(), $"bpp-history-v5-{Guid.NewGuid():N}");
+Directory.CreateDirectory(root);
 try
 {
-    using (var connection = new SqliteConnection($"Data Source={dbPath}"))
-    {
-        connection.Open();
-
-        using var bootstrap = connection.CreateCommand();
-        bootstrap.CommandText = (string)(schemaType.GetProperty("BootstrapSql")!.GetValue(null)!);
-        bootstrap.ExecuteNonQuery();
-
-        InsertRun(connection, "run-1", "completed");
-        InsertRun(connection, "run-2", "completed");
-        InsertRunEvent(connection, "run-1", 1);
-        InsertRunEvent(connection, "run-2", 1);
-
-        InsertBattle(
-            connection,
-            battleId: "battle-bad",
-            runId: "run-1",
-            recordedAtUtc: "2026-03-15T12:01:00.0000000+00:00",
-            playerHandJson: "{bad-json",
-            playerSkillsJson: "{\"items\":[]}",
-            opponentHandJson: "{\"items\":[]}",
-            opponentSkillsJson: "{\"items\":[]}"
-        );
-        InsertBattle(
-            connection,
-            battleId: "battle-good",
-            runId: "run-1",
-            recordedAtUtc: "2026-03-15T12:00:00.0000000+00:00",
-            playerHandJson: "{\"items\":[]}",
-            playerSkillsJson: "{\"items\":[]}",
-            opponentHandJson: "{\"items\":[]}",
-            opponentSkillsJson: "{\"items\":[]}"
-        );
-        Assert(
-            ColumnExists(connection, "battles", "source")
-                && ColumnExists(connection, "battle_snapshots", "player_hand_json"),
-            "Unified battle storage should expose battle source and snapshot tables."
-        );
-    }
-
-    var repository = ctor!.Invoke([dbPath]);
-    var recentRuns = (
-        (System.Collections.IEnumerable)(
-            repositoryType.GetMethod("ListRecentRuns")!.Invoke(repository, [10])!
-        )
-    )
-        .Cast<object>()
-        .ToList();
-    Assert(recentRuns.Count == 2, "ListRecentRuns should return the inserted runs.");
-    var runOneRecord = recentRuns.Single(run =>
-        (string)run.GetType().GetProperty("RunId")!.GetValue(run)! == "run-1"
+    var paths = new TestPaths(root);
+    var store = new RunLogStore(paths);
+    store.CreateRun(
+        new RunLogCreateRequest
+        {
+            RunId = "run-delete",
+            StartedAtUtc = DateTimeOffset.UtcNow,
+            Hero = "Vanessa",
+            GameMode = "Ranked",
+            PlayerAccountId = "account-local",
+            BundleScreenshotRequested = true,
+            ModVersion = "5.0.0",
+        }
     );
-    var recentPlayerRank = (string?)(
-        runOneRecord.GetType().GetProperty("PlayerRank")!.GetValue(runOneRecord)
+    var databasePath = PathConstants.RunLogDatabase(root);
+    InsertPendingOutbox(databasePath, "run-delete");
+
+    var repository = new HistoryPanelRepository(databasePath);
+    Assert(
+        repository.ListRecentRuns(10).Single().RunId == "run-delete",
+        "Fresh V5 run must be visible."
     );
-    var recentPlayerRating = (int?)(
-        runOneRecord.GetType().GetProperty("PlayerRating")!.GetValue(runOneRecord)
-    );
-    var recentGameMode = (string?)(
-        runOneRecord.GetType().GetProperty("GameMode")!.GetValue(runOneRecord)
-    );
-    var recentBattleCount = (int)(
-        runOneRecord.GetType().GetProperty("BattleCount")!.GetValue(runOneRecord)!
+    repository.DeleteRun("run-delete");
+    Assert(
+        repository.ListRecentRuns(10).Count == 0,
+        "HistoryPanel DeleteRun must delete the source run."
     );
     Assert(
-        recentPlayerRank == "Gold 2" && recentPlayerRating == 1420,
-        "ListRecentRuns should surface the persisted player rank and rating snapshot."
+        ReadScalar(databasePath, "SELECT COUNT(*) FROM bundle_outbox;") == 1,
+        "Outbox audit rows must not block or follow DeleteRun."
     );
-    Assert(recentGameMode == "Ranked", "ListRecentRuns should surface the persisted game mode.");
+
+    var first = Ghost(
+        "battle-remote",
+        "bundle-a",
+        "https://r2.example/old",
+        DateTimeOffset.UtcNow.AddMinutes(1)
+    );
+    repository.UpsertGhostBattles("account-local", [first]);
+    var local = repository.ListRecentGhostBattles(10).Single();
+    Assert(!local.SnapshotCounts.Known, "Undownloaded Ghost counts must remain unknown.");
+    var localId = local.BattleId;
+
+    var newer = Ghost(
+        "battle-remote",
+        "bundle-b",
+        "https://r2.example/new",
+        DateTimeOffset.UtcNow.AddMinutes(10)
+    );
+    repository.UpsertGhostBattles("account-local", [newer]);
+    var reference = repository.TryGetGhostBundleReference(localId)!;
     Assert(
-        recentBattleCount == 1,
-        "ListRecentRuns should count only battles whose snapshots are readable by HistoryPanel."
+        reference.BundleId == "bundle-b"
+            && reference.DownloadUrl.EndsWith("/new", StringComparison.Ordinal),
+        "Discovery must overwrite the URL, expiry, and bundle identity."
     );
-
-    var records = (System.Collections.IEnumerable)(
-        repositoryType.GetMethod("ListBattlesByRun")!.Invoke(repository, ["run-1"])!
-    );
-    var recordList = records.Cast<object>().ToList();
-
+    repository.MarkGhostReplayUnavailable(localId, "unavailable_payload", "corrupt");
+    repository.UpsertGhostBattles("account-local", [newer]);
     Assert(
-        recordList.Count == 1,
-        "ListBattlesByRun should skip unreadable rows and return remaining valid battles."
-    );
-
-    var battleId = (string)(
-        recordList[0].GetType().GetProperty("BattleId")!.GetValue(recordList[0])!
-    );
-    var playerRank = (string?)(
-        recordList[0].GetType().GetProperty("PlayerRank")!.GetValue(recordList[0])
-    );
-    var playerRating = (int?)(
-        recordList[0].GetType().GetProperty("PlayerRating")!.GetValue(recordList[0])
-    );
-    var playerHandItemCount = (int)(
-        recordList[0].GetType().GetProperty("PlayerHandItemCount")!.GetValue(recordList[0])!
-    );
-    var playerSkillCount = (int)(
-        recordList[0].GetType().GetProperty("PlayerSkillCount")!.GetValue(recordList[0])!
-    );
-    var opponentHandItemCount = (int)(
-        recordList[0].GetType().GetProperty("OpponentHandItemCount")!.GetValue(recordList[0])!
-    );
-    var opponentSkillCount = (int)(
-        recordList[0].GetType().GetProperty("OpponentSkillCount")!.GetValue(recordList[0])!
+        repository.TryGetGhostBundleReference(localId)?.ReplayState == "unavailable_payload",
+        "Permanent payload failure must survive discovery refresh."
     );
 
     Assert(
-        battleId == "battle-good",
-        "ListBattlesByRun should preserve valid rows even when an earlier row is malformed."
+        RunLogSchema.LocalDatabaseSchemaVersion == 1 && RunLogSchema.RowSchemaVersion == 1,
+        "V5 is a fresh schema v1."
     );
     Assert(
-        playerRank == "Diamond 1" && playerRating == 1777,
-        "ListBattlesByRun should surface the persisted player rank and rating snapshot."
-    );
-    Assert(
-        playerHandItemCount == 0
-            && playerSkillCount == 0
-            && opponentHandItemCount == 0
-            && opponentSkillCount == 0,
-        "ListBattlesByRun should derive snapshot card counts from the parsed capture payloads."
-    );
-
-    var battleIds = (
-        (System.Collections.IEnumerable)(
-            repositoryType.GetMethod("ListBattleIdsByRun")!.Invoke(repository, ["run-1"])!
-        )
-    )
-        .Cast<string>()
-        .ToList();
-    Assert(
-        battleIds.SequenceEqual(["battle-bad", "battle-good"]),
-        "ListBattleIdsByRun should return all linked battles ordered from newest to oldest."
-    );
-
-    var ghostImportType = RequireModApiType("BazaarPlusPlus.ModApi.Models.GhostBattleImportRecord");
-    var replaceGhostBattles = repositoryType.GetMethod(
-        "ReplaceGhostBattles",
-        [typeof(string), typeof(IReadOnlyList<>).MakeGenericType(ghostImportType)]
-    )!;
-    var markGhostReplayDownloaded = repositoryType.GetMethod(
-        "MarkGhostReplayDownloaded",
-        [typeof(string)]
-    )!;
-    var listRecentGhostBattles = repositoryType.GetMethod("ListRecentGhostBattles", [typeof(int)])!;
-    var markOldUndownloadedGhostBattlesDeleted = repositoryType.GetMethod(
-        "MarkOldUndownloadedGhostBattlesDeleted",
-        [typeof(DateTimeOffset)]
-    )!;
-    var getGhostSyncCheckpoint = repositoryType.GetMethod(
-        "TryGetGhostSyncCheckpointUtc",
-        [typeof(string)]
-    )!;
-    var saveGhostSyncCheckpoint = repositoryType.GetMethod(
-        "SaveGhostSyncCheckpointUtc",
-        [typeof(string), typeof(DateTimeOffset)]
-    )!;
-    var nowUtc = DateTimeOffset.UtcNow;
-
-    Assert(
-        getGhostSyncCheckpoint.Invoke(repository, ["player-account-a"]) == null,
-        "Ghost sync checkpoint should be empty before the first successful sync."
-    );
-
-    var firstCheckpoint = new DateTimeOffset(2026, 3, 16, 9, 55, 0, TimeSpan.Zero);
-    saveGhostSyncCheckpoint.Invoke(repository, ["player-account-a", firstCheckpoint]);
-    Assert(
-        (DateTimeOffset?)getGhostSyncCheckpoint.Invoke(repository, ["player-account-a"])
-            == firstCheckpoint,
-        "Ghost sync checkpoint should persist the last successful sync timestamp."
-    );
-    Assert(
-        getGhostSyncCheckpoint.Invoke(repository, ["player-account-b"]) == null,
-        "Ghost sync checkpoint should be scoped per local player account."
-    );
-
-    replaceGhostBattles.Invoke(
-        repository,
-        [
-            "player-account-a",
-            CreateGhostImports(ghostImportType, "ghost-1", nowUtc.AddHours(-2).ToString("o")),
-        ]
-    );
-    markGhostReplayDownloaded.Invoke(repository, ["ghost-1"]);
-
-    replaceGhostBattles.Invoke(
-        repository,
-        [
-            "player-account-a",
-            CreateGhostImports(
-                ghostImportType,
-                "ghost-1",
-                nowUtc.AddHours(-1).ToString("o"),
-                "ghost-2",
-                nowUtc.AddMinutes(-30).ToString("o")
-            ),
-        ]
-    );
-
-    var ghostRecords = (
-        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!
-    )
-        .Cast<object>()
-        .ToList();
-    Assert(
-        ghostRecords.Count == 2,
-        "ReplaceGhostBattles should upsert current ghost rows without requiring a full table reset."
-    );
-    var downloadedGhost = ghostRecords.Single(record =>
-        (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
-    );
-    Assert(
-        (bool)downloadedGhost.GetType().GetProperty("ReplayDownloaded")!.GetValue(downloadedGhost)!,
-        "ReplaceGhostBattles should preserve replay_downloaded for ghost battles already fetched locally."
-    );
-    Assert(
-        (int)
-            downloadedGhost.GetType().GetProperty("PlayerHandItemCount")!.GetValue(downloadedGhost)!
-            == 7
-            && (int)
-                downloadedGhost
-                    .GetType()
-                    .GetProperty("PlayerSkillCount")!
-                    .GetValue(downloadedGhost)! == 3
-            && (int)
-                downloadedGhost
-                    .GetType()
-                    .GetProperty("OpponentHandItemCount")!
-                    .GetValue(downloadedGhost)! == 2
-            && (int)
-                downloadedGhost
-                    .GetType()
-                    .GetProperty("OpponentSkillCount")!
-                    .GetValue(downloadedGhost)! == 1,
-        "Ghost battle list rows should project remote summary counts into local-player perspective."
-    );
-    Assert(
-        downloadedGhost.GetType().GetProperty("Snapshots")!.GetValue(downloadedGhost) is null,
-        "Ghost battle list rows should not depend on remote snapshot payloads to display summary counts."
-    );
-
-    replaceGhostBattles.Invoke(
-        repository,
-        [
-            "player-account-a",
-            CreateGhostImportsWithoutCounts(
-                ghostImportType,
-                "ghost-1",
-                nowUtc.AddMinutes(-45).ToString("o")
-            ),
-        ]
-    );
-    downloadedGhost = (
-        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!
-    )
-        .Cast<object>()
-        .Single(record =>
-            (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
-        );
-    Assert(
-        (int)
-            downloadedGhost.GetType().GetProperty("PlayerHandItemCount")!.GetValue(downloadedGhost)!
-            == 7
-            && (int)
-                downloadedGhost
-                    .GetType()
-                    .GetProperty("PlayerSkillCount")!
-                    .GetValue(downloadedGhost)! == 3
-            && (int)
-                downloadedGhost
-                    .GetType()
-                    .GetProperty("OpponentHandItemCount")!
-                    .GetValue(downloadedGhost)! == 2
-            && (int)
-                downloadedGhost
-                    .GetType()
-                    .GetProperty("OpponentSkillCount")!
-                    .GetValue(downloadedGhost)! == 1,
-        "Ghost sync rows with missing summary counts should not clear counts already cached locally."
-    );
-
-    replaceGhostBattles.Invoke(
-        repository,
-        [
-            "player-account-a",
-            CreateGhostImports(ghostImportType, "ghost-2", nowUtc.AddMinutes(-30).ToString("o")),
-        ]
-    );
-    ghostRecords = (
-        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!
-    )
-        .Cast<object>()
-        .ToList();
-    Assert(
-        ghostRecords.Count == 2,
-        "ReplaceGhostBattles should preserve previously imported ghost rows when the server only returns a sync window."
-    );
-    Assert(
-        ghostRecords.Any(record =>
-            (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
-        )
-            && ghostRecords.Any(record =>
-                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-2"
-            ),
-        "ReplaceGhostBattles should keep both existing and newly imported ghost rows."
-    );
-
-    replaceGhostBattles.Invoke(
-        repository,
-        [
-            "player-account-b",
-            CreateGhostImports(ghostImportType, "ghost-3", nowUtc.AddMinutes(-15).ToString("o")),
-        ]
-    );
-    var crossAccountGhostRecords = (
-        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [10])!
-    )
-        .Cast<object>()
-        .ToList();
-    Assert(
-        crossAccountGhostRecords.Count == 3
-            && crossAccountGhostRecords.Any(record =>
-                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-1"
-            )
-            && crossAccountGhostRecords.Any(record =>
-                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-2"
-            )
-            && crossAccountGhostRecords.Any(record =>
-                (string)record.GetType().GetProperty("BattleId")!.GetValue(record)! == "ghost-3"
-            ),
-        "Ghost battle rows should be visible across local player account scopes."
-    );
-
-    replaceGhostBattles.Invoke(
-        repository,
-        [
-            "player-account-a",
-            CreateGhostImports(
-                ghostImportType,
-                "ghost-stale-undownloaded",
-                nowUtc.AddDays(-20).ToString("o"),
-                "ghost-stale-downloaded",
-                nowUtc.AddDays(-20).AddHours(1).ToString("o")
-            ),
-        ]
-    );
-    markGhostReplayDownloaded.Invoke(repository, ["ghost-stale-downloaded"]);
-    markOldUndownloadedGhostBattlesDeleted.Invoke(repository, [nowUtc]);
-    ghostRecords = (
-        (System.Collections.IEnumerable)listRecentGhostBattles.Invoke(repository, [20])!
-    )
-        .Cast<object>()
-        .ToList();
-    Assert(
-        !ghostRecords.Any(record =>
-            (string)record.GetType().GetProperty("BattleId")!.GetValue(record)!
-            == "ghost-stale-undownloaded"
-        ),
-        "Undownloaded ghost battles older than two weeks should be hidden after local deletion."
-    );
-    Assert(
-        ghostRecords.Any(record =>
-            (string)record.GetType().GetProperty("BattleId")!.GetValue(record)!
-            == "ghost-stale-downloaded"
-        ),
-        "Downloaded ghost battles should be retained even when older than two weeks."
-    );
-
-    var secondCheckpoint = new DateTimeOffset(2026, 3, 16, 10, 15, 0, TimeSpan.Zero);
-    saveGhostSyncCheckpoint.Invoke(repository, ["player-account-a", secondCheckpoint]);
-    Assert(
-        (DateTimeOffset?)getGhostSyncCheckpoint.Invoke(repository, ["player-account-a"])
-            == secondCheckpoint,
-        "Ghost sync checkpoint should overwrite the previous successful sync timestamp."
-    );
-
-    repositoryType.GetMethod("DeleteRun")!.Invoke(repository, ["run-1"]);
-
-    using var verificationConnection = new SqliteConnection($"Data Source={dbPath}");
-    verificationConnection.Open();
-    Assert(
-        CountRows(verificationConnection, "runs", "run_id = 'run-1'") == 0,
-        "DeleteRun should remove the selected run row."
-    );
-    Assert(
-        CountRows(verificationConnection, "run_events", "run_id = 'run-1'") == 0,
-        "DeleteRun should cascade run event rows."
-    );
-    Assert(
-        CountRows(verificationConnection, "battles", "run_id = 'run-1'") == 0,
-        "DeleteRun should cascade linked local battle rows."
-    );
-    Assert(
-        CountRows(
-            verificationConnection,
-            "battle_snapshots",
-            "battle_id IN ('battle-bad', 'battle-good')"
+        ReadScalar(
+            databasePath,
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('run_sync_state','battle_replay_sync_state','sync_cursors','sync_checkpoints');"
         ) == 0,
-        "DeleteRun should cascade linked local battle snapshots."
+        "V4 sync tables must not exist."
     );
-    Assert(
-        CountRows(verificationConnection, "runs", "run_id = 'run-2'") == 1,
-        "DeleteRun should not disturb unrelated runs."
-    );
+
+    Console.WriteLine("History panel V5 repository tests passed.");
 }
 finally
 {
-    SqliteConnection.ClearAllPools();
-    if (Directory.Exists(tempRoot))
-        Directory.Delete(tempRoot, recursive: true);
+    if (Directory.Exists(root))
+        Directory.Delete(root, recursive: true);
 }
 
-Console.WriteLine("HistoryPanelRepository checks passed.");
-
-static Type RequireType(string fullName)
-{
-    var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus");
-    return assembly.GetType(fullName, throwOnError: false)
-        ?? throw new InvalidOperationException($"Type not found: {fullName}");
-}
-
-static Type RequireStorageType(string fullName)
-{
-    var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus.Storage");
-    return assembly.GetType(fullName, throwOnError: false)
-        ?? throw new InvalidOperationException($"Type not found: {fullName}");
-}
-
-static Type RequireModApiType(string fullName)
-{
-    var assembly = System.Reflection.Assembly.Load("BazaarPlusPlus.ModApi");
-    return assembly.GetType(fullName, throwOnError: false)
-        ?? throw new InvalidOperationException($"Type not found: {fullName}");
-}
-
-static void InsertRun(SqliteConnection connection, string runId, string status)
-{
-    using var command = connection.CreateCommand();
-    command.CommandText = """
-        INSERT INTO runs (
-            run_id,
-            started_at_utc,
-            last_seen_at_utc,
-            hero,
-            game_mode,
-            player_rank,
-            player_rating,
-            completed,
-            ended_at_utc,
-            final_day,
-            final_hour,
-            status
-        ) VALUES (
-            $runId,
-            '2026-03-15T11:00:00.0000000+00:00',
-            '2026-03-15T11:10:00.0000000+00:00',
-            'Vanessa',
-            'Ranked',
-            'Gold 2',
-            1420,
-            1,
-            '2026-03-15T11:10:00.0000000+00:00',
-            3,
-            1,
-            $status
-        );
-        """;
-    command.Parameters.AddWithValue("$runId", runId);
-    command.Parameters.AddWithValue("$status", status);
-    command.ExecuteNonQuery();
-}
-
-static void InsertRunEvent(SqliteConnection connection, string runId, int seq)
-{
-    using var command = connection.CreateCommand();
-    command.CommandText = """
-        INSERT INTO run_events (
-            run_id,
-            seq,
-            ts_utc,
-            kind,
-            payload_json
-        ) VALUES (
-            $runId,
-            $seq,
-            '2026-03-15T11:01:00.0000000+00:00',
-            'run_started',
-            '{}'
-        );
-        """;
-    command.Parameters.AddWithValue("$runId", runId);
-    command.Parameters.AddWithValue("$seq", seq);
-    command.ExecuteNonQuery();
-}
-
-static void InsertBattle(
-    SqliteConnection connection,
+static GhostBattleImportRecord Ghost(
     string battleId,
-    string runId,
-    string recordedAtUtc,
-    string playerHandJson,
-    string playerSkillsJson,
-    string opponentHandJson,
-    string opponentSkillsJson
-)
+    string bundleId,
+    string url,
+    DateTimeOffset expiry
+) =>
+    new()
+    {
+        BattleId = battleId,
+        BundleId = bundleId,
+        DownloadUrl = url,
+        DownloadExpiresAtUtc = expiry,
+        RecordedAtUtc = DateTimeOffset.UtcNow,
+        Day = 3,
+        Hour = 4,
+        PlayerAccountId = "account-uploader",
+        PlayerName = "Uploader",
+        OpponentAccountId = "account-local",
+        OpponentName = "Local",
+        CombatKind = "PVPCombat",
+        Result = "unknown",
+    };
+
+static void InsertPendingOutbox(string databasePath, string runId)
 {
+    using var connection = new SqliteConnection($"Data Source={databasePath}");
+    connection.Open();
     using var command = connection.CreateCommand();
     command.CommandText = """
-        INSERT INTO battles (
-            battle_id,
-            source,
-            run_id,
-            recorded_at_utc,
-            combat_kind,
-            player_rank,
-            player_rating
+        INSERT INTO bundle_outbox (
+            bundle_id, run_id, file_name, content_sha256_hex, content_digest,
+            total_bytes, has_screenshot, sealed_at_utc, status
         ) VALUES (
-            $battleId,
-            'LOCAL',
-            $runId,
-            $recordedAtUtc,
-            'PVPCombat',
-            'Diamond 1',
-            1777
+            '01K1ABCDEF0123456789ABCDEF', $runId, 'bundle.bundle', $sha, $digest,
+            399, 0, $sealed, 'pending'
         );
         """;
-    command.Parameters.AddWithValue("$battleId", battleId);
     command.Parameters.AddWithValue("$runId", runId);
-    command.Parameters.AddWithValue("$recordedAtUtc", recordedAtUtc);
+    command.Parameters.AddWithValue("$sha", new string('a', 64));
+    command.Parameters.AddWithValue(
+        "$digest",
+        "sha-256=:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=:"
+    );
+    command.Parameters.AddWithValue("$sealed", DateTimeOffset.UtcNow.ToString("o"));
     command.ExecuteNonQuery();
-
-    using var snapshotCommand = connection.CreateCommand();
-    snapshotCommand.CommandText = """
-        INSERT INTO battle_snapshots (
-            battle_id,
-            player_hand_json,
-            player_skills_json,
-            opponent_hand_json,
-            opponent_skills_json
-        ) VALUES (
-            $battleId,
-            $playerHandJson,
-            $playerSkillsJson,
-            $opponentHandJson,
-            $opponentSkillsJson
-        );
-        """;
-    snapshotCommand.Parameters.AddWithValue("$battleId", battleId);
-    snapshotCommand.Parameters.AddWithValue("$playerHandJson", playerHandJson);
-    snapshotCommand.Parameters.AddWithValue("$playerSkillsJson", playerSkillsJson);
-    snapshotCommand.Parameters.AddWithValue("$opponentHandJson", opponentHandJson);
-    snapshotCommand.Parameters.AddWithValue("$opponentSkillsJson", opponentSkillsJson);
-    snapshotCommand.ExecuteNonQuery();
 }
 
-static object CreateGhostImports(Type ghostImportType, params string[] battlePairs)
+static long ReadScalar(string databasePath, string sql)
 {
-    return CreateGhostImportsCore(ghostImportType, includeCounts: true, battlePairs);
-}
-
-static object CreateGhostImportsWithoutCounts(Type ghostImportType, params string[] battlePairs)
-{
-    return CreateGhostImportsCore(ghostImportType, includeCounts: false, battlePairs);
-}
-
-static object CreateGhostImportsCore(
-    Type ghostImportType,
-    bool includeCounts,
-    params string[] battlePairs
-)
-{
-    var listType = typeof(List<>).MakeGenericType(ghostImportType);
-    var list = (System.Collections.IList)Activator.CreateInstance(listType)!;
-    for (var i = 0; i < battlePairs.Length; i += 2)
-    {
-        var battle = Activator.CreateInstance(ghostImportType)!;
-        ghostImportType.GetProperty("BattleId")!.SetValue(battle, battlePairs[i]);
-        ghostImportType
-            .GetProperty("RecordedAtUtc")!
-            .SetValue(battle, DateTimeOffset.Parse(battlePairs[i + 1]));
-        ghostImportType.GetProperty("CombatKind")!.SetValue(battle, "PVPCombat");
-        ghostImportType.GetProperty("PlayerHero")!.SetValue(battle, "Dooley");
-        if (includeCounts)
-        {
-            ghostImportType.GetProperty("PlayerHandItemCount")!.SetValue(battle, 2);
-            ghostImportType.GetProperty("PlayerSkillCount")!.SetValue(battle, 1);
-        }
-        ghostImportType.GetProperty("OpponentName")!.SetValue(battle, "Me");
-        if (includeCounts)
-        {
-            ghostImportType.GetProperty("OpponentHandItemCount")!.SetValue(battle, 7);
-            ghostImportType.GetProperty("OpponentSkillCount")!.SetValue(battle, 3);
-        }
-        ghostImportType.GetProperty("ReplayAvailable")!.SetValue(battle, true);
-        ghostImportType.GetProperty("ReplayDownloaded")!.SetValue(battle, false);
-        ghostImportType.GetProperty("LastSyncedAtUtc")!.SetValue(battle, DateTimeOffset.UtcNow);
-        list.Add(battle);
-    }
-
-    return list;
-}
-
-static long CountRows(SqliteConnection connection, string table, string whereClause)
-{
+    using var connection = new SqliteConnection($"Data Source={databasePath}");
+    connection.Open();
     using var command = connection.CreateCommand();
-    command.CommandText = $"SELECT COUNT(*) FROM {table} WHERE {whereClause};";
-    return (long)command.ExecuteScalar()!;
-}
-
-static bool ColumnExists(SqliteConnection connection, string tableName, string columnName)
-{
-    using var command = connection.CreateCommand();
-    command.CommandText = $"PRAGMA table_info({tableName});";
-    using var reader = command.ExecuteReader();
-    while (reader.Read())
-    {
-        if (
-            string.Equals(
-                reader.GetString(reader.GetOrdinal("name")),
-                columnName,
-                StringComparison.OrdinalIgnoreCase
-            )
-        )
-            return true;
-    }
-
-    return false;
+    command.CommandText = sql;
+    return Convert.ToInt64(command.ExecuteScalar());
 }
 
 static void Assert(bool condition, string message)
 {
     if (!condition)
         throw new InvalidOperationException(message);
+}
+
+file sealed class TestPaths(string dataRoot) : IPathProvider
+{
+    public string? DataRootDirectoryPath { get; } = dataRoot;
+    public string? PluginsDirectoryPath => null;
 }

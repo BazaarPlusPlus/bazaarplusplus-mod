@@ -35,7 +35,7 @@ public sealed class BppLogExceptionTests
     public void Render_aliases_known_roots_in_exception_messages_and_stacks()
     {
         var exception = new ProjectedException(
-            "failed at /Users/alice/Games/The Bazaar/BazaarPlusPlusV4/replays/a.json",
+            "failed at /Users/alice/Games/The Bazaar/BazaarPlusPlusV5/replays/a.json",
             "HEAD /Users/alice/Games/The Bazaar/BepInEx/plugins/BazaarPlusPlus.dll\n"
                 + "TAIL /Users/alice/private.txt"
         );
@@ -54,12 +54,12 @@ public sealed class BppLogExceptionTests
     {
         var roots = new BppLogRedactionRoots(
             gameRoot: @"C:\Games\The Bazaar",
-            dataRoot: @"C:\Games\The Bazaar\BazaarPlusPlusV4",
+            dataRoot: @"C:\Games\The Bazaar\BazaarPlusPlusV5",
             pluginRoot: @"C:\Games\The Bazaar\BepInEx\plugins",
             homeRoot: @"C:\Users\alice"
         );
         var exception = new ProjectedException(
-            @"failed at C:\Games\The Bazaar\BazaarPlusPlusV4\replays\a.json",
+            @"failed at C:\Games\The Bazaar\BazaarPlusPlusV5\replays\a.json",
             @"HEAD C:\Games\The Bazaar\BepInEx\plugins\BazaarPlusPlus.dll"
         );
 
@@ -223,7 +223,7 @@ public sealed class BppLogExceptionTests
         Renderer(
             new BppLogRedactionRoots(
                 gameRoot: "/Users/alice/Games/The Bazaar",
-                dataRoot: "/Users/alice/Games/The Bazaar/BazaarPlusPlusV4",
+                dataRoot: "/Users/alice/Games/The Bazaar/BazaarPlusPlusV5",
                 pluginRoot: "/Users/alice/Games/The Bazaar/BepInEx/plugins",
                 homeRoot: "/Users/alice"
             )

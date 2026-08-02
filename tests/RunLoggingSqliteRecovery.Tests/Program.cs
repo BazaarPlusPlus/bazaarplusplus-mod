@@ -14,14 +14,14 @@ var tempRoot = Path.Combine(
     Guid.NewGuid().ToString("N")
 );
 Directory.CreateDirectory(tempRoot);
-var dbPath = Path.Combine(tempRoot, "run-logs.db");
+var dbPath = PathConstants.RunLogDatabase(tempRoot);
 
 try
 {
     var startedAt = new DateTimeOffset(2026, 3, 15, 12, 15, 30, TimeSpan.Zero);
     const string runId = "run_20260315t121530z_vanessa_ranked_002a_deadbeef";
 
-    var paths = new TempPathProvider(dbPath);
+    var paths = new TempPathProvider(tempRoot);
     var firstStore = ctor!.Invoke([paths]);
     Invoke<RunLogSessionState>(
         storeType,
@@ -182,13 +182,8 @@ static void Assert(bool condition, string message)
 
 internal sealed class TempPathProvider : IPathProvider
 {
-    private readonly string _dbPath;
+    public TempPathProvider(string dataRoot) => DataRootDirectoryPath = dataRoot;
 
-    public TempPathProvider(string dbPath) => _dbPath = dbPath;
-
-    public string? RunLogDatabasePath => _dbPath;
-    public string? CombatReplayDirectoryPath => null;
-    public string? ScreenshotsDirectoryPath => null;
-    public string? CombatReplayVideoDirectoryPath => null;
+    public string? DataRootDirectoryPath { get; }
     public string? PluginsDirectoryPath => null;
 }

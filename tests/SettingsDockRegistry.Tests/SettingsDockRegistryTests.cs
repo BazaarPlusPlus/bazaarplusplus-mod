@@ -13,7 +13,6 @@ using BazaarPlusPlus.Game.LegendaryPosition;
 using BazaarPlusPlus.Game.NameOverride;
 using BazaarPlusPlus.Game.QuestPreview;
 using BazaarPlusPlus.Game.Screenshots;
-using BazaarPlusPlus.Game.Screenshots.Upload;
 using BazaarPlusPlus.Game.Settings;
 using BazaarPlusPlus.Game.Supporters;
 using BazaarPlusPlus.Game.VoiceSubtitles;
@@ -497,9 +496,7 @@ public class SettingsDockRegistryTests
             var config = new BppConfig();
             config.Initialize(new ConfigFile(configPath, saveOnInit: false));
             var registry = new SettingsDockEntryRegistry();
-            registry.Register(
-                BazaarDbSnapshotUploadSettingsDockEntry.Create(new InMemoryBppEventBus())
-            );
+            registry.Register(BazaarDbBundleSettingsDockEntry.Create());
             registry.Register(FixedSupporterListSettingsDockEntry.Create());
             VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
             registry.Register(ChineseLocaleModeSettingsDockEntry.Create(new InMemoryBppEventBus()));
@@ -785,9 +782,7 @@ public class SettingsDockRegistryTests
             var screenshotDefinition = new EndOfRunScreenshotSettingsDockEntry().Build(config);
             var dependencyDefinition =
                 dependencyKey == "BazaarDbUpload"
-                    ? BazaarDbSnapshotUploadSettingsDockEntry
-                        .Create(new InMemoryBppEventBus())
-                        .Build(config)
+                    ? BazaarDbBundleSettingsDockEntry.Create().Build(config)
                     : FixedSupporterListSettingsDockEntry.Create().Build(config);
 
             Assert.False(screenshotDefinition.IsActive());
@@ -1347,9 +1342,7 @@ public class SettingsDockRegistryTests
                 VoiceSubtitlesEnglishFontScaleSettingsDockEntry.Create(),
             "VoiceSubtitlesChineseFontScale" =>
                 VoiceSubtitlesChineseFontScaleSettingsDockEntry.Create(),
-            "BazaarDbUpload" => BazaarDbSnapshotUploadSettingsDockEntry.Create(
-                new InMemoryBppEventBus()
-            ),
+            "BazaarDbUpload" => BazaarDbBundleSettingsDockEntry.Create(),
             _ => throw new ArgumentOutOfRangeException(nameof(key), key, null),
         };
 
@@ -1358,9 +1351,7 @@ public class SettingsDockRegistryTests
     {
         L.Install(new TestLanguageProvider(), new TestLocaleModeProvider());
         var registry = new SettingsDockEntryRegistry();
-        registry.Register(
-            BazaarDbSnapshotUploadSettingsDockEntry.Create(new InMemoryBppEventBus())
-        );
+        registry.Register(BazaarDbBundleSettingsDockEntry.Create());
         registry.Register(FixedSupporterListSettingsDockEntry.Create());
         VoiceSubtitlesSettingsDockEntry.RegisterAll(registry);
         registry.Register(new EndOfRunScreenshotSettingsDockEntry());

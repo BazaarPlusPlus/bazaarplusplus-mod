@@ -118,6 +118,8 @@ public sealed class QueuedRunLogStoreDiagnosticTests
 
         public RunLogSessionState CreateRun(RunLogCreateRequest request) => new();
 
+        public void SetPlayerAccountIdOnce(string runId, string? playerAccountId) { }
+
         public void AppendEvent(string runId, RunLogEvent entry) => Append?.Invoke(runId, entry);
 
         public void SaveCheckpoint(string runId, RunLogCheckpoint checkpoint) { }

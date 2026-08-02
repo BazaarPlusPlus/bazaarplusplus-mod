@@ -13,24 +13,16 @@ internal static class TempDirPathProviderTests
             Guid.NewGuid().ToString("N")
         );
         Directory.CreateDirectory(tempRoot);
-        var dbPath = Path.Combine(tempRoot, "test.db");
+        var dbPath = PathConstants.RunLogDatabase(tempRoot);
 
         try
         {
             // IPathProvider is a pure Storage type — no BepInEx dependency.
-            IPathProvider paths = new TempDirPathProvider(dbPath);
-            Assert(paths.RunLogDatabasePath == dbPath, "RunLogDatabasePath should match.");
+            IPathProvider paths = new TempDirPathProvider(tempRoot);
+            Assert(paths.DataRootDirectoryPath == tempRoot, "DataRootDirectoryPath should match.");
             Assert(
-                paths.CombatReplayDirectoryPath == null,
-                "CombatReplayDirectoryPath should be null."
-            );
-            Assert(
-                paths.ScreenshotsDirectoryPath == null,
-                "ScreenshotsDirectoryPath should be null."
-            );
-            Assert(
-                paths.CombatReplayVideoDirectoryPath == null,
-                "CombatReplayVideoDirectoryPath should be null."
+                PathConstants.RunLogDatabase(paths.RequireDataRoot()) == dbPath,
+                "Run log path should derive from the data root."
             );
             Assert(paths.PluginsDirectoryPath == null, "PluginsDirectoryPath should be null.");
 
@@ -142,13 +134,8 @@ internal static class TempDirPathProviderTests
 
 internal sealed class TempDirPathProvider : IPathProvider
 {
-    private readonly string _dbPath;
+    public TempDirPathProvider(string dataRoot) => DataRootDirectoryPath = dataRoot;
 
-    public TempDirPathProvider(string dbPath) => _dbPath = dbPath;
-
-    public string? RunLogDatabasePath => _dbPath;
-    public string? CombatReplayDirectoryPath => null;
-    public string? ScreenshotsDirectoryPath => null;
-    public string? CombatReplayVideoDirectoryPath => null;
+    public string? DataRootDirectoryPath { get; }
     public string? PluginsDirectoryPath => null;
 }

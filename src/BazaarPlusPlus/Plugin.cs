@@ -214,7 +214,7 @@ public class Plugin : BaseUnityPlugin
     private void BuildOnlineServices()
     {
         // BazaarDB account linking targets a different host (bazaardb.gg) and is independent of the
-        // mod-api-v4 base URL, so build it regardless of mod-api routes validity. Its dedicated bare
+        // mod API base URL, so build it regardless of mod-api routes validity. Its dedicated bare
         // HttpClient carries no mod-api auth/base address; a 30s timeout keeps a hung redeem from
         // stalling the link card for the HttpClient default of ~100s.
         var linkHttpClient = BppHttpClientFactory.Create(

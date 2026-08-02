@@ -287,6 +287,8 @@ file sealed class FakeRunLogStore : IRunLogStore
         return ResumeState;
     }
 
+    public void SetPlayerAccountIdOnce(string runId, string? playerAccountId) { }
+
     public void AppendEvent(string runId, RunLogEvent entry)
     {
         AppendedEvents.Add(entry);

@@ -5,6 +5,7 @@ using BazaarPlusPlus.Game.CombatReplay.Video;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.GameInterop;
 using BazaarPlusPlus.Infrastructure;
+using BazaarPlusPlus.Storage.Paths;
 using TheBazaar;
 
 namespace BazaarPlusPlus;
@@ -132,7 +133,7 @@ internal static class BazaarAgentReplayRecorderWiring
 
         var gate = CombatReplayRecordingGate.Evaluate(
             services.Paths.PluginsDirectoryPath,
-            services.Paths.CombatReplayVideoDirectoryPath
+            PathConstants.CombatReplayVideos(services.Paths.RequireDataRoot())
         );
         if (!gate.CanRecord)
         {
@@ -194,7 +195,7 @@ internal static class BazaarAgentReplayRecorderWiring
             return;
 
         var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
-        var videoDirectoryPath = services.Paths.CombatReplayVideoDirectoryPath;
+        var videoDirectoryPath = PathConstants.CombatReplayVideos(services.Paths.RequireDataRoot());
         var hasSettings = ReplayVideoCaptureSettingsCache.TryGet(out var captureSettings);
         _ = Task.Run(() =>
         {

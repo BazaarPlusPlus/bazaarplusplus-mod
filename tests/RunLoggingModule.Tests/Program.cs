@@ -688,6 +688,8 @@ file sealed class FakeRunLogStore : IRunLogStore, IDisposable
         return ActiveState;
     }
 
+    public void SetPlayerAccountIdOnce(string runId, string? playerAccountId) { }
+
     public void AppendEvent(string runId, RunLogEvent entry)
     {
         if (ThrowOnAppendEvent)

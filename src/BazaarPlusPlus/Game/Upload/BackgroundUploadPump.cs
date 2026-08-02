@@ -21,6 +21,7 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
     private IDisposable? _runLifecycleSubscription;
     private IDisposable? _uploadArmSubscription;
     private IDisposable? _feedArmSubscription;
+    private int _armRequested;
 
     private void Awake() { }
 
@@ -69,6 +70,9 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
 
         if (!_session.IsEnabled)
             return;
+
+        if (Interlocked.Exchange(ref _armRequested, 0) == 1)
+            _startupGate.ArmImmediateAttempt(Time.unscaledTime);
 
         _startupRunner.Tick(
             _startupGate,
@@ -130,7 +134,7 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
 
     private void ArmImmediate()
     {
-        _startupGate?.ArmImmediateAttempt(Time.unscaledTime);
+        Interlocked.Exchange(ref _armRequested, 1);
     }
 
     private void OnRunLifecycleChanged(RunLifecycleChanged change)
@@ -143,7 +147,7 @@ internal sealed class BackgroundUploadPump : MonoBehaviour
 
     private void OnUploadArmRequested(UploadArmRequested request)
     {
-        if (_feed == null || !UploadPumpBootstrap.ShouldHonorArmRequest(_feed.Kind, request))
+        if (_feed == null || request == null)
             return;
 
         ArmImmediate();

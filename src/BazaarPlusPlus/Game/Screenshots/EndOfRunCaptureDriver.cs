@@ -4,6 +4,7 @@ using System.Reflection;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.OverlayPanels;
+using BazaarPlusPlus.Storage.Paths;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
 using UnityEngine;
@@ -37,10 +38,9 @@ internal sealed class EndOfRunCaptureDriver
     {
         _workflow = workflow ?? throw new ArgumentNullException(nameof(workflow));
         _services = services ?? throw new ArgumentNullException(nameof(services));
-        if (string.IsNullOrWhiteSpace(services.Paths.ScreenshotsDirectoryPath))
-            ScreenshotCaptureDiagnostics.ReportInitializationFailed();
-        else
-            _screenshotService = new ScreenshotService(services.Paths.ScreenshotsDirectoryPath);
+        _screenshotService = new ScreenshotService(
+            PathConstants.Screenshots(services.Paths.RequireDataRoot())
+        );
 
         _workflow.AttachDriver(this);
         SubscribeRunInitializedIfReady();

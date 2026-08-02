@@ -12,11 +12,6 @@ internal static class UploadPumpBootstrap
 {
     internal static bool CanActivate(GameBuildChannel channel) => channel != GameBuildChannel.Ptr;
 
-    internal static bool ShouldHonorArmRequest(
-        UploadFeedKind feedKind,
-        UploadArmRequested request
-    ) => request != null && request.Kind == feedKind;
-
     internal static IUploadFeedSession? ActivateIfAllowed(
         IBppServices services,
         IUploadFeed feed,
