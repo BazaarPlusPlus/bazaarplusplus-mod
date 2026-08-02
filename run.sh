@@ -77,6 +77,8 @@ repair_macos_trampoline() {
 build() {
     local bazaaragent="${1:-false}"
     local fast="${2:-false}"
+    shift 2 || true
+    local msbuild_args=("$@")
     local args=()
 
     if [[ "$fast" == "true" ]]; then
@@ -91,14 +93,16 @@ build() {
     # so building it builds and deploys all three. A default build builds only the main
     # plugin, whose build actively scrubs both host dlls from the plugins folder.
     if [[ "$bazaaragent" == "true" ]]; then
-        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj ${args[@]+"${args[@]}"} \
+        dotnet build src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj \
+            ${args[@]+"${args[@]}"} ${msbuild_args[@]+"${msbuild_args[@]}"} \
             -p:RequireBazaarAgentDashboard=true
         # The main plugin deliberately scrubs optional host DLLs in its own Debug target.
         # Re-run only the host copy target after the dependency graph has fully settled.
         dotnet msbuild src/BazaarPlusPlus.BazaarAgentHost/BazaarPlusPlus.BazaarAgentHost.csproj \
             -t:CopyHostToBepInExPlugins
     else
-        dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj ${args[@]+"${args[@]}"}
+        dotnet build src/BazaarPlusPlus/BazaarPlusPlus.csproj \
+            ${args[@]+"${args[@]}"} ${msbuild_args[@]+"${msbuild_args[@]}"}
     fi
 }
 
@@ -206,11 +210,13 @@ publish() {
 parse_build_options() {
     local bazaaragent=false
     local fast=false
+    local msbuild_args=()
 
     while (($# > 0)); do
         case "$1" in
             --with-bazaaragent) bazaaragent=true ;;
             --fast) fast=true ;;
+            -p:*|--property:*) msbuild_args+=("$1") ;;
             *)
                 usage
                 exit 1
@@ -219,7 +225,7 @@ parse_build_options() {
         shift
     done
 
-    build "$bazaaragent" "$fast"
+    build "$bazaaragent" "$fast" "${msbuild_args[@]}"
 }
 
 parse_publish_options() {
@@ -440,7 +446,7 @@ build_matrix() {
 usage() {
     cat <<EOF
 Usage:
-  $0 build [--with-bazaaragent] [--fast]
+  $0 build [--with-bazaaragent] [--fast] [-p:Name=Value ...]
   $0 publish [--with-bazaaragent] [-p:Name=Value ...]
   $0 fetch-data [-p:Name=Value ...]
   $0 restore-locks
@@ -458,7 +464,7 @@ Usage:
 Options:
   --with-bazaaragent  Build and copy the optional BazaarAgent assemblies.
   --fast              With build: skip NuGet restore (rerun without it after csproj edits or in a fresh worktree).
-  -p:Name=Value       Forward an MSBuild property to publish or fetch-data.
+  -p:Name=Value       Forward an MSBuild property to build, publish, or fetch-data.
 EOF
 }
 

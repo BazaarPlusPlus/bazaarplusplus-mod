@@ -2682,6 +2682,12 @@ public class CoreLayeringTests
             resources["tenwin_builds.json"]["LogicalName"]
         );
         Assert.Equal("51200", resources["tenwin_builds.json"]["MinBytes"]);
+
+        var targetsText = File.ReadAllText(targetsPath);
+        Assert.Contains("VoiceLinesSourcePath", targetsText);
+        Assert.Contains("PrepareLocalVoiceLinesSource", targetsText);
+        Assert.Contains("VoiceLinesValidatorProject", targetsText);
+        Assert.Contains("%(RemoteEmbeddedData.Identity)", targetsText);
     }
 
     [Fact]
