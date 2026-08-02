@@ -18,6 +18,8 @@ internal interface IPostCombatImpactTooltipView : IDisposable
 
     bool IsContentActive { get; }
 
+    bool CanSwitchPerspective { get; }
+
     void PrepareNativePrimary(CardTooltipController primary);
 
     void CancelPreparedNativePrimary(CardTooltipController primary);

@@ -21,7 +21,6 @@ internal static class CombatImpactMetricFormatter
             var value = Value(
                 authoritative.Value,
                 authoritative.Unit,
-                CombatImpactCoverage.Exact,
                 showSign: group.Kind == CombatImpactKind.AttributeChange,
                 chinese
             );
@@ -35,7 +34,6 @@ internal static class CombatImpactMetricFormatter
                     Value(
                         group.ObservedValue.Value,
                         group.Unit,
-                        group.ObservedCoverage,
                         group.Kind == CombatImpactKind.AttributeChange,
                         chinese
                     )
@@ -67,7 +65,6 @@ internal static class CombatImpactMetricFormatter
         var value = Value(
             target.ObservedValue.Value,
             target.Unit,
-            target.ObservedCoverage,
             group.Kind == CombatImpactKind.AttributeChange,
             chinese
         );
@@ -91,7 +88,6 @@ internal static class CombatImpactMetricFormatter
             var value = Value(
                 group.ObservedValue.Value,
                 group.Unit,
-                group.ObservedCoverage,
                 group.Kind == CombatImpactKind.AttributeChange,
                 chinese
             );
@@ -128,7 +124,6 @@ internal static class CombatImpactMetricFormatter
         var value = Value(
             source.ObservedValue.Value,
             source.Unit,
-            source.ObservedCoverage,
             group.Kind == CombatImpactKind.AttributeChange,
             chinese
         );
@@ -197,7 +192,6 @@ internal static class CombatImpactMetricFormatter
     internal static string Value(
         int value,
         CombatImpactValueUnit unit,
-        CombatImpactCoverage coverage,
         bool showSign,
         bool chinese = false
     )
@@ -205,18 +199,17 @@ internal static class CombatImpactMetricFormatter
         var sign = showSign && value >= 0 ? "+" : string.Empty;
         return unit switch
         {
-            CombatImpactValueUnit.Milliseconds => Duration(value, coverage, sign),
+            CombatImpactValueUnit.Milliseconds => Duration(value, sign),
             CombatImpactValueUnit.PercentagePoints => $"{sign}{Integer(value)}%",
             CombatImpactValueUnit.Applications => Integer(value),
             _ => $"{sign}{Integer(value)}",
         };
     }
 
-    private static string Duration(int milliseconds, CombatImpactCoverage coverage, string sign)
+    private static string Duration(int milliseconds, string sign)
     {
         var seconds = Number(milliseconds / 1000m);
-        var footnoteMarker = IsEstimated(coverage) ? "*" : string.Empty;
-        return $"{sign}{seconds}s{footnoteMarker}";
+        return $"{sign}{seconds}s";
     }
 
     private static string Number(decimal value) =>

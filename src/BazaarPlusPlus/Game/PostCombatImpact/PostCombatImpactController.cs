@@ -79,7 +79,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         if (!BppHotkeyService.WasShiftPressedThisFrame())
             return;
 
-        if (_view == null || _hoveredRequest == null)
+        if (_view == null || _hoveredRequest == null || !_view.CanSwitchPerspective)
             return;
 
         if (
@@ -443,7 +443,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         CombatImpactReceived? received = null;
         if (_module.TryGetReceived(request.SourceId, out var matchedReceived))
             received = matchedReceived;
-        var perspective = _requestedPerspective;
+        var perspective = received == null ? CombatImpactPerspective.Caused : _requestedPerspective;
         var entityName =
             source?.Entity.Name
             ?? received?.Entity.Name

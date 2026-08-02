@@ -10,66 +10,15 @@ public sealed class CombatImpactMetricFormatterTests
     private static readonly CombatImpactEntity Target = new("target", "Target", "Item", null, 0);
 
     [Theory]
-    [InlineData(
-        950,
-        (int)CombatImpactValueUnit.Milliseconds,
-        (int)CombatImpactCoverage.Exact,
-        false,
-        false,
-        "0.95s"
-    )]
-    [InlineData(
-        1000,
-        (int)CombatImpactValueUnit.Milliseconds,
-        (int)CombatImpactCoverage.Exact,
-        false,
-        false,
-        "1s"
-    )]
-    [InlineData(
-        1100,
-        (int)CombatImpactValueUnit.Milliseconds,
-        (int)CombatImpactCoverage.Exact,
-        false,
-        false,
-        "1.10s"
-    )]
-    [InlineData(
-        950,
-        (int)CombatImpactValueUnit.Milliseconds,
-        (int)CombatImpactCoverage.LowerBound,
-        false,
-        false,
-        "0.95s*"
-    )]
-    [InlineData(
-        950,
-        (int)CombatImpactValueUnit.Milliseconds,
-        (int)CombatImpactCoverage.Partial,
-        false,
-        true,
-        "0.95s*"
-    )]
-    [InlineData(
-        20,
-        (int)CombatImpactValueUnit.PercentagePoints,
-        (int)CombatImpactCoverage.Partial,
-        true,
-        false,
-        "+20%"
-    )]
-    [InlineData(
-        -10,
-        (int)CombatImpactValueUnit.Amount,
-        (int)CombatImpactCoverage.LowerBound,
-        true,
-        false,
-        "-10"
-    )]
+    [InlineData(950, (int)CombatImpactValueUnit.Milliseconds, false, false, "0.95s")]
+    [InlineData(1000, (int)CombatImpactValueUnit.Milliseconds, false, false, "1s")]
+    [InlineData(1100, (int)CombatImpactValueUnit.Milliseconds, false, false, "1.10s")]
+    [InlineData(950, (int)CombatImpactValueUnit.Milliseconds, false, true, "0.95s")]
+    [InlineData(20, (int)CombatImpactValueUnit.PercentagePoints, true, false, "+20%")]
+    [InlineData(-10, (int)CombatImpactValueUnit.Amount, true, false, "-10")]
     public void Values_use_product_sign_duration_and_precision_rules(
         int value,
         int unitValue,
-        int coverageValue,
         bool showSign,
         bool chinese,
         string expected
@@ -78,7 +27,6 @@ public sealed class CombatImpactMetricFormatterTests
         var formatted = CombatImpactMetricFormatter.Value(
             value,
             (CombatImpactValueUnit)unitValue,
-            (CombatImpactCoverage)coverageValue,
             showSign,
             chinese
         );
@@ -88,6 +36,7 @@ public sealed class CombatImpactMetricFormatterTests
         Assert.DoesNotContain("≈", formatted, StringComparison.Ordinal);
         Assert.DoesNotContain("estimated", formatted, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("估算", formatted, StringComparison.Ordinal);
+        Assert.DoesNotContain("*", formatted, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -238,9 +187,9 @@ public sealed class CombatImpactMetricFormatterTests
             []
         );
 
-        Assert.Equal("×10 · 9.50s*", CombatImpactMetricFormatter.Group(matching, chinese: false));
+        Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(matching, chinese: false));
         Assert.Equal(
-            "×7 · 9.50s* · 10 applications",
+            "×7 · 9.50s · 10 applications",
             CombatImpactMetricFormatter.Group(divergent, chinese: false)
         );
         Assert.Equal(

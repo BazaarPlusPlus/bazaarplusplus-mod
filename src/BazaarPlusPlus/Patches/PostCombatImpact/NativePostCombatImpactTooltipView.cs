@@ -77,6 +77,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private bool _widthDegradedLogged;
     private bool _topAlignmentDegradedLogged;
     private bool _hidePending;
+    private bool _receivedPerspectiveAvailable;
     private int _pendingPreviewCount;
     private int _renderGeneration;
     private CombatImpactPerspective _activePerspective = CombatImpactPerspective.Caused;
@@ -89,6 +90,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     public bool IsReadyToReveal => _pendingPreviewCount == 0;
 
     public bool IsContentActive => _contentRoot?.activeInHierarchy == true;
+
+    public bool CanSwitchPerspective => IsContentActive && _receivedPerspectiveAvailable;
 
     public void PrepareNativePrimary(CardTooltipController primary)
     {
@@ -207,9 +210,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         }
         var generation = ++_renderGeneration;
         _hidePending = false;
+        _receivedPerspectiveAvailable = received != null;
         _activeAuxiliary = auxiliary;
         _activePrimary = primary;
-        _activePerspective = perspective;
+        _activePerspective = _receivedPerspectiveAvailable
+            ? perspective
+            : CombatImpactPerspective.Caused;
         auxiliary.headerText.gameObject.SetActive(false);
         auxiliary.bodyText.gameObject.SetActive(false);
         auxiliary.dividerParent?.SetActive(false);
@@ -235,7 +241,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         var root = CreateVertical("BppPostCombatImpactContent", auxiliary.auxParent.transform, 8f);
         _contentRoot = root.gameObject;
         var rootLayout = root.GetComponent<VerticalLayoutGroup>();
-        rootLayout.padding = new RectOffset(0, 0, 14, 18);
+        rootLayout.padding = new RectOffset(0, 0, 14, 8);
         AddLayout(
             root.gameObject,
             preferredHeight: -1f,
@@ -256,6 +262,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             causedRoot,
             entityName,
             source,
+            _receivedPerspectiveAvailable,
             generation
         );
         BuildReceived(
@@ -264,9 +271,10 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             receivedRoot,
             entityName,
             received,
+            _receivedPerspectiveAvailable,
             generation
         );
-        ApplyPerspectiveVisibility(perspective);
+        ApplyPerspectiveVisibility(_activePerspective);
 
         ForceRebuildLayout(auxiliary);
         ApplyTooltipWidth(auxiliary, TooltipPreferredWidth);
@@ -277,6 +285,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
 
     public bool SetPerspective(CombatImpactPerspective perspective, Transform anchor)
     {
+        if (perspective == CombatImpactPerspective.Received && !_receivedPerspectiveAvailable)
+            return false;
+
         if (
             _activeAuxiliary == null
             || _activePrimary == null
@@ -657,6 +668,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         _widthDegradedLogged = false;
         _topAlignmentDegradedLogged = false;
         _hidePending = false;
+        _receivedPerspectiveAvailable = false;
         _activePerspective = CombatImpactPerspective.Caused;
         return true;
     }
@@ -1011,10 +1023,17 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         RectTransform root,
         string entityName,
         CombatImpactSource? source,
+        bool canSwitchPerspective,
         int generation
     )
     {
-        BuildPanelHeader(headingTemplate, bodyTemplate, root, CombatImpactPerspective.Caused);
+        BuildPanelHeader(
+            headingTemplate,
+            bodyTemplate,
+            root,
+            CombatImpactPerspective.Caused,
+            canSwitchPerspective
+        );
         BuildIdentitySummary(
             bodyTemplate,
             root,
@@ -1055,10 +1074,17 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         RectTransform root,
         string entityName,
         CombatImpactReceived? received,
+        bool canSwitchPerspective,
         int generation
     )
     {
-        BuildPanelHeader(headingTemplate, bodyTemplate, root, CombatImpactPerspective.Received);
+        BuildPanelHeader(
+            headingTemplate,
+            bodyTemplate,
+            root,
+            CombatImpactPerspective.Received,
+            canSwitchPerspective
+        );
         BuildIdentitySummary(
             bodyTemplate,
             root,
@@ -1107,7 +1133,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         TMP_Text headingTemplate,
         TMP_Text bodyTemplate,
         RectTransform parent,
-        CombatImpactPerspective perspective
+        CombatImpactPerspective perspective,
+        bool canSwitchPerspective
     )
     {
         var header = CreateVertical("ImpactPanelHeader", parent, 2f);
@@ -1133,6 +1160,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         mode.alignment = TextAlignmentOptions.MidlineLeft;
         mode.color =
             perspective == CombatImpactPerspective.Caused ? CausedAccentColor : ReceivedAccentColor;
+
+        if (!canSwitchPerspective)
+            return;
 
         var hintRoot = CreateHorizontal("ImpactShiftHint", metadata, 3f, preferredHeight: 32f);
         hintRoot.GetComponent<HorizontalLayoutGroup>().childAlignment = TextAnchor.MiddleRight;
