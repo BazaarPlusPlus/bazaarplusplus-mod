@@ -41,6 +41,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float GroupMetricFontScale = 1f;
     private const float TargetNameFontScale = 0.875f;
     private const float TargetMetricFontScale = 0.875f;
+    private const int ItemRowIconOpticalInset = 6;
     private const float MetricColumnMinWidth = 112f;
     private const float MetricColumnPreferredWidth = 190f;
     private static readonly Color32 CausedAccentColor = new(242, 176, 70, 255);
@@ -1399,6 +1400,17 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     )
     {
         var row = CreateHorizontal(rowName, parent, 10f, preferredHeight: EntityPreviewHeight + 2f);
+        if (string.Equals(entity.TypeLabel, "Item", StringComparison.OrdinalIgnoreCase))
+        {
+            // Item artwork is fitted to its visible card edge; native skill frames already align
+            // optically with the TMP effect sprites and must remain on the row origin.
+            row.GetComponent<HorizontalLayoutGroup>().padding = new RectOffset(
+                ItemRowIconOpticalInset,
+                0,
+                0,
+                0
+            );
+        }
         BuildEntityIcon(row, entity, EntityPreviewHeight, generation);
         var name = CloneText(
             textTemplate,
