@@ -2335,7 +2335,23 @@ public class CoreLayeringTests
             "CompleteRecordedReplayAfterRecapSettles(currentNativeRecording)",
             runtimeSource
         );
+        Assert.Contains("OpenRecordedReplayRecapAfterBoardSettles", runtimeSource);
+        Assert.Contains(
+            "CurrentReplayPresentationReadiness.AdvanceRecapStableFrameCount",
+            runtimeSource
+        );
+        Assert.Contains("ActiveSessionManifest", runtimeSource);
+        Assert.Contains("native-recap-board-readiness-timeout", runtimeSource);
+        Assert.Contains("capture.Items.Count(card => card?.Type == ECardType.Item)", runtimeSource);
+        Assert.Contains("so the recap could not open.", runtimeSource);
+        Assert.DoesNotContain("before the recap opened.", runtimeSource);
         Assert.Contains("invokeNativeRecap();", runtimeSource);
+        Assert.True(
+            runtimeSource.IndexOf(
+                "OpenRecordedReplayRecapAfterBoardSettles(",
+                StringComparison.Ordinal
+            ) < runtimeSource.IndexOf("invokeNativeRecap();", StringComparison.Ordinal)
+        );
         Assert.Contains("native-recap-not-started", runtimeSource);
         Assert.Contains("CurrentReplayTerminalHoldSeconds = 2f", runtimeSource);
         Assert.Contains("CurrentReplayRecapStableHoldSeconds = 1f", runtimeSource);
@@ -2379,6 +2395,8 @@ public class CoreLayeringTests
         Assert.Contains("RegisteredSkillCount", readinessSource);
         Assert.Contains("ReadySkillCount", readinessSource);
         Assert.Contains("SkillIconCurrentTextureField", readinessSource);
+        Assert.Contains("snapshot.ExpectedItemCount == requiredItemCount", readinessSource);
+        Assert.Contains("snapshot.SettledItemCount == requiredItemCount", readinessSource);
         Assert.Contains("ReplayRecordingHoverSuppression.Begin", videoRecorderSource);
         Assert.Contains("ShowCardTooltipController", hoverPatchSource);
         Assert.Contains("ShowSecondaryCardTooltipController", hoverPatchSource);

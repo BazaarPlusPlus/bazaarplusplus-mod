@@ -1044,30 +1044,158 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
         try
         {
-            invokeNativeRecap();
-            if (Singleton<BoardManager>.Instance?.IsRecapViewOpen != true)
-            {
-                CompleteRecordedReplay(
-                    currentNativeRecording,
-                    "native-recap-not-started",
-                    failed: true,
-                    "The native recap did not start."
-                );
-                return;
-            }
-
+            // ReplayState starts rebuilding both boards without awaiting SpawnCombatCards, then
+            // fires ReplayEnded. Recap skips any card whose controller is not registered yet, so
+            // gate the native click on the same presentation readiness used at recording start.
             _pendingCurrentReplayRecapHold = StartCoroutine(
-                CompleteRecordedReplayAfterRecapSettles(currentNativeRecording)
+                OpenRecordedReplayRecapAfterBoardSettles(
+                    currentNativeRecording,
+                    invokeNativeRecap,
+                    ResolveRecordedReplayRecapItemCount(_playbackPublisher?.ActiveSessionManifest)
+                )
             );
         }
         catch (Exception ex)
         {
+            try
+            {
+                CompleteRecordedReplay(
+                    currentNativeRecording,
+                    "native-recap-board-gate-start-failed",
+                    failed: true,
+                    ex.Message
+                );
+            }
+            finally
+            {
+                RestoreCurrentReplayRecapInput();
+            }
+        }
+    }
+
+    private IEnumerator OpenRecordedReplayRecapAfterBoardSettles(
+        bool currentNativeRecording,
+        Action invokeNativeRecap,
+        int? recordedItemCount
+    )
+    {
+        BlockCurrentReplayRecapInput();
+        var waitForRenderedFrame = new WaitForEndOfFrame();
+        var startedAt = Time.realtimeSinceStartup;
+        var stableFrameCount = 0;
+
+        while (stableFrameCount < CurrentReplayPresentationReadiness.RequiredStableFrames)
+        {
+            yield return waitForRenderedFrame;
+
+            if (AppState.CurrentState is not ReplayState)
+            {
+                FailRecordedReplayBeforeRecap(
+                    currentNativeRecording,
+                    "native-recap-state-exited-before-open",
+                    "Replay state exited before the recap could open."
+                );
+                yield break;
+            }
+
+            var snapshot = ObserveCurrentReplayPresentationReadiness();
+            stableFrameCount = CurrentReplayPresentationReadiness.AdvanceRecapStableFrameCount(
+                stableFrameCount,
+                snapshot,
+                recordedItemCount
+            );
+            if (stableFrameCount >= CurrentReplayPresentationReadiness.RequiredStableFrames)
+                break;
+
+            if (
+                Time.realtimeSinceStartup - startedAt
+                < CurrentReplayPresentationReadiness.TimeoutSeconds
+            )
+            {
+                continue;
+            }
+
+            FailRecordedReplayBeforeRecap(
+                currentNativeRecording,
+                "native-recap-board-readiness-timeout",
+                "The replay board did not finish rebuilding, so the recap could not open."
+            );
+            yield break;
+        }
+
+        // The native button rejects programmatic clicks while input is blocked. Release our
+        // short post-replay lease immediately before invoking it; Recap() then owns its native
+        // 0.5-second input block while the board flips.
+        RestoreCurrentReplayRecapInput();
+        try
+        {
+            invokeNativeRecap();
+        }
+        catch (Exception ex)
+        {
+            _pendingCurrentReplayRecapHold = null;
             CompleteRecordedReplay(
                 currentNativeRecording,
                 "native-recap-invoke-failed",
                 failed: true,
                 ex.Message
             );
+            yield break;
+        }
+
+        if (Singleton<BoardManager>.Instance?.IsRecapViewOpen != true)
+        {
+            _pendingCurrentReplayRecapHold = null;
+            CompleteRecordedReplay(
+                currentNativeRecording,
+                "native-recap-not-started",
+                failed: true,
+                "The native recap did not start."
+            );
+            yield break;
+        }
+
+        yield return CompleteRecordedReplayAfterRecapSettles(currentNativeRecording);
+    }
+
+    private static int? ResolveRecordedReplayRecapItemCount(PvpBattleManifest? manifest)
+    {
+        var playerItemCount = CapturedItemCount(manifest?.Snapshots?.PlayerHand);
+        var opponentItemCount = CapturedItemCount(manifest?.Snapshots?.OpponentHand);
+        return playerItemCount.HasValue && opponentItemCount.HasValue
+            ? playerItemCount.Value + opponentItemCount.Value
+            : null;
+    }
+
+    private static int? CapturedItemCount(PvpBattleCardSetCapture? capture) =>
+        capture?.Status is PvpBattleCaptureStatus.Captured or PvpBattleCaptureStatus.CapturedEmpty
+            ? capture.Items.Count(card => card?.Type == ECardType.Item)
+            : null;
+
+    private void BlockCurrentReplayRecapInput()
+    {
+        if (_currentReplayRecapOwnsInputBlock)
+            return;
+
+        _currentReplayRecapPreviousInputBlock = AppState.BlockInput;
+        AppState.BlockInput = true;
+        _currentReplayRecapOwnsInputBlock = true;
+    }
+
+    private void FailRecordedReplayBeforeRecap(
+        bool currentNativeRecording,
+        string endReason,
+        string reason
+    )
+    {
+        _pendingCurrentReplayRecapHold = null;
+        try
+        {
+            CompleteRecordedReplay(currentNativeRecording, endReason, failed: true, reason);
+        }
+        finally
+        {
+            RestoreCurrentReplayRecapInput();
         }
     }
 

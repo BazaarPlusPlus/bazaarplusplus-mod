@@ -97,4 +97,37 @@ internal static class CurrentReplayPresentationReadiness
         int previousStableFrameCount,
         CurrentReplayPresentationReadinessSnapshot snapshot
     ) => IsReady(snapshot) ? Math.Min(previousStableFrameCount + 1, RequiredStableFrames) : 0;
+
+    internal static int AdvanceRecapStableFrameCount(
+        int previousStableFrameCount,
+        CurrentReplayPresentationReadinessSnapshot snapshot,
+        int? recordedItemCount
+    ) =>
+        IsReadyForRecap(snapshot, recordedItemCount)
+            ? Math.Min(previousStableFrameCount + 1, RequiredStableFrames)
+            : 0;
+
+    private static bool IsReadyForRecap(
+        CurrentReplayPresentationReadinessSnapshot snapshot,
+        int? recordedItemCount
+    )
+    {
+        var requiredItemCount = recordedItemCount ?? snapshot.ExpectedItemCount;
+        return !snapshot.ReplayActive
+            && !snapshot.BoardUpdating
+            && !snapshot.StorageMoving
+            && !snapshot.BoardPresentationUpdating
+            && !snapshot.CarpetUnrolling
+            && !snapshot.BoardRevealing
+            && !snapshot.HasCardsToReveal
+            && !snapshot.PlayerSkillBoardUpdating
+            && !snapshot.OpponentSkillBoardUpdating
+            && snapshot.ExpectedItemCount == requiredItemCount
+            && snapshot.VisibleItemCount == requiredItemCount
+            && snapshot.FaceUpItemCount == requiredItemCount
+            && snapshot.SettledItemCount == requiredItemCount
+            && snapshot.ExpectedSkillCount >= 0
+            && snapshot.RegisteredSkillCount == snapshot.ExpectedSkillCount
+            && snapshot.ReadySkillCount == snapshot.ExpectedSkillCount;
+    }
 }
