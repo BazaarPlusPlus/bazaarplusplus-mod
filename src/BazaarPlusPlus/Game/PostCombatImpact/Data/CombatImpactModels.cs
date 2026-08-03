@@ -168,6 +168,8 @@ internal sealed record CombatImpactGroup(
 
     internal bool HasMixedValueDirections { get; init; }
 
+    internal IReadOnlyList<CombatImpactTriggerSource> TriggerSources { get; init; } = [];
+
     internal bool HasDivergentTargetCoverage =>
         UnresolvedTargetCount > 0
         || AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
@@ -177,6 +179,8 @@ internal sealed record CombatImpactGroup(
             && Count != applications.Value;
 }
 
+internal sealed record CombatImpactTriggerSource(CombatImpactEntity Entity, int Count);
+
 internal sealed record CombatImpactSource(
     CombatImpactEntity Entity,
     int UseCount,
@@ -185,6 +189,10 @@ internal sealed record CombatImpactSource(
 )
 {
     internal int TotalCount => EffectCount;
+
+    internal IReadOnlyList<CombatImpactTriggerSource> TriggerSources { get; init; } = [];
+
+    internal int TriggerCount => TriggerSources.Sum(source => source.Count);
 }
 
 internal sealed record CombatImpactIncomingSource(

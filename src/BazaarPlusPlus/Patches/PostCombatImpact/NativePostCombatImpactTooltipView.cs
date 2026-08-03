@@ -34,14 +34,13 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float PanelTitleFontScale = 0.84f;
     private const float ModeLabelFontScale = 0.66f;
     private const float HeaderHintFontScale = 0.6f;
-    private const float IdentityNameFontScale = 1f;
     private const float SummaryFontScale = 0.75f;
+    private const float TriggerSummaryFontScale = 0.64f;
     private const float DisclosureFontScale = 0.62f;
     private const float GroupLabelFontScale = 1f;
     private const float GroupMetricFontScale = 1f;
     private const float TargetNameFontScale = 0.875f;
     private const float TargetMetricFontScale = 0.875f;
-    private const int ItemRowIconOpticalInset = 3;
     private const float MetricColumnMinWidth = 112f;
     private const float MetricColumnPreferredWidth = 190f;
     private static readonly Color32 CausedAccentColor = new(242, 176, 70, 255);
@@ -264,7 +263,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             auxiliary.headerText,
             auxiliary.bodyText,
             causedRoot,
-            entityName,
             isSkill,
             source,
             _receivedPerspectiveAvailable,
@@ -274,7 +272,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             auxiliary.headerText,
             auxiliary.bodyText,
             receivedRoot,
-            entityName,
             isSkill,
             received,
             _receivedPerspectiveAvailable,
@@ -1039,7 +1036,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         TMP_Text headingTemplate,
         TMP_Text bodyTemplate,
         RectTransform root,
-        string entityName,
         bool isSkill,
         CombatImpactSource? source,
         bool canSwitchPerspective,
@@ -1054,11 +1050,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             isSkill,
             canSwitchPerspective
         );
-        BuildIdentitySummary(
+        BuildImpactSummary(
             bodyTemplate,
             root,
-            entityName,
-            source == null ? T("0 个效果", "0 effects") : CausedSummary(source)
+            source == null
+                ? string.Empty
+                : CombatImpactMetricFormatter.CausedSummary(source, IsChinese())
         );
         AddDivider(root);
 
@@ -1092,7 +1089,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         TMP_Text headingTemplate,
         TMP_Text bodyTemplate,
         RectTransform root,
-        string entityName,
         bool isSkill,
         CombatImpactReceived? received,
         bool canSwitchPerspective,
@@ -1106,17 +1102,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             CombatImpactPerspective.Received,
             isSkill,
             canSwitchPerspective
-        );
-        BuildIdentitySummary(
-            bodyTemplate,
-            root,
-            entityName,
-            received == null
-                ? T("0 个效果", "0 effects")
-                : T(
-                    $"受到 {received.EffectCount} 个效果",
-                    $"{received.EffectCount} effect{(received.EffectCount == 1 ? string.Empty : "s")} received"
-                )
         );
         AddDivider(root);
 
@@ -1208,42 +1193,13 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         hintTail.alpha = 0.72f;
     }
 
-    private static string CausedSummary(CombatImpactSource source)
+    private void BuildImpactSummary(TMP_Text bodyTemplate, RectTransform parent, string summary)
     {
-        var parts = new List<string>();
-        if (source.UseCount > 0)
-            parts.Add(
-                T(
-                    $"使用 {source.UseCount} 次",
-                    $"{source.UseCount} use{(source.UseCount == 1 ? string.Empty : "s")}"
-                )
-            );
-        parts.Add(
-            T(
-                $"{source.TotalCount} 个效果",
-                $"{source.TotalCount} effect{(source.TotalCount == 1 ? string.Empty : "s")}"
-            )
-        );
-        return string.Join(" · ", parts);
-    }
+        if (string.IsNullOrWhiteSpace(summary))
+            return;
 
-    private void BuildIdentitySummary(
-        TMP_Text bodyTemplate,
-        RectTransform parent,
-        string entityName,
-        string summary
-    )
-    {
-        var row = CreateVertical("ImpactIdentitySummary", parent, 2f);
+        var row = CreateVertical("ImpactSummary", parent, 2f);
         AddLayout(row.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
-        var name = CloneText(
-            bodyTemplate,
-            row,
-            entityName.Replace('\n', ' '),
-            IdentityNameFontScale,
-            flexibleWidth: 1f
-        );
-        name.alignment = TextAlignmentOptions.Left;
         var detail = CloneText(bodyTemplate, row, summary, SummaryFontScale, flexibleWidth: 1f);
         detail.alignment = TextAlignmentOptions.Left;
         detail.alpha = 0.72f;
@@ -1268,11 +1224,19 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         int generation
     )
     {
-        var groupRoot = CreateVertical("ImpactCausedGroup", parent, 4f);
+        var triggerSources = CombatImpactMetricFormatter.TriggerSourceValues(group);
+        var hasTriggerSummary = !string.IsNullOrWhiteSpace(triggerSources);
+        var groupRoot = CreateVertical("ImpactCausedGroup", parent, hasTriggerSummary ? 6f : 4f);
         AddLayout(groupRoot.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
+        var headingRoot = groupRoot;
+        if (hasTriggerSummary)
+        {
+            headingRoot = CreateVertical("ImpactGroupHeading", groupRoot, 0f);
+            AddLayout(headingRoot.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
+        }
         BuildGroupHeader(
             textTemplate,
-            groupRoot,
+            headingRoot,
             group.Kind,
             group.NativeAttributeKey,
             group.Surface,
@@ -1280,8 +1244,19 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 ? total.Value
                 : group.ObservedValue,
             group.HasMixedValueDirections,
-            CombatImpactMetricFormatter.Group(group, IsChinese(), CriticalMarker())
+            CombatImpactMetricFormatter.Group(group, IsChinese(), CriticalMarker()),
+            preferredHeight: hasTriggerSummary ? 44f : 48f
         );
+        if (hasTriggerSummary)
+        {
+            BuildTriggerSummary(
+                textTemplate,
+                headingRoot,
+                CombatImpactMetricFormatter.TriggerSourceLabel(IsChinese()),
+                triggerSources,
+                addLabelSpacing: !IsChinese()
+            );
+        }
         var detailRows = new List<GameObject>();
         if (ShouldRenderTargetDetails(group))
         {
@@ -1353,10 +1328,16 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         CombatImpactEventSurface surface,
         int? changeValue,
         bool hasMixedValueDirections,
-        string metricText
+        string metricText,
+        float preferredHeight = 48f
     )
     {
-        var header = CreateHorizontal("ImpactGroupHeader", parent, 10f, preferredHeight: 48f);
+        var header = CreateHorizontal(
+            "ImpactGroupHeader",
+            parent,
+            10f,
+            preferredHeight: preferredHeight
+        );
         var (label, iconKey) = ResolveEffect(
             kind,
             nativeAttributeKey,
@@ -1390,6 +1371,33 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         metric.alignment = TextAlignmentOptions.MidlineRight;
     }
 
+    private static void BuildTriggerSummary(
+        TMP_Text textTemplate,
+        RectTransform parent,
+        string label,
+        string sources,
+        bool addLabelSpacing
+    )
+    {
+        var row = CreateVertical("ImpactTriggerSummary", parent, 0f);
+        AddLayout(row.gameObject, preferredHeight: -1f, flexibleWidth: 1f);
+        var labelColor = ColorUtility.ToHtmlStringRGB(CausedAccentColor);
+        var labelSpacing = addLabelSpacing ? " " : string.Empty;
+        var summary = $"<color=#{labelColor}>{label}</color>{labelSpacing}{sources}";
+        var trigger = CloneText(
+            textTemplate,
+            row,
+            summary,
+            TriggerSummaryFontScale,
+            flexibleWidth: 1f
+        );
+        trigger.alignment = TextAlignmentOptions.Left;
+        trigger.color = DisclosureColor;
+        trigger.alpha = 0.82f;
+        trigger.textWrappingMode = TextWrappingModes.Normal;
+        trigger.overflowMode = TextOverflowModes.Overflow;
+    }
+
     private GameObject BuildEntityRow(
         TMP_Text textTemplate,
         RectTransform parent,
@@ -1400,17 +1408,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     )
     {
         var row = CreateHorizontal(rowName, parent, 10f, preferredHeight: EntityPreviewHeight + 2f);
-        if (string.Equals(entity.TypeLabel, "Item", StringComparison.OrdinalIgnoreCase))
-        {
-            // Item artwork is fitted to its visible card edge; native skill frames already align
-            // optically with the TMP effect sprites and must remain on the row origin.
-            row.GetComponent<HorizontalLayoutGroup>().padding = new RectOffset(
-                ItemRowIconOpticalInset,
-                0,
-                0,
-                0
-            );
-        }
         BuildEntityIcon(row, entity, EntityPreviewHeight, generation);
         var name = CloneText(
             textTemplate,
@@ -1780,7 +1777,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         text.textWrappingMode = TextWrappingModes.NoWrap;
         text.overflowMode = TextOverflowModes.Ellipsis;
         text.raycastTarget = false;
-        text.richText = content.Contains("<sprite", StringComparison.Ordinal);
+        text.richText =
+            content.Contains("<sprite", StringComparison.Ordinal)
+            || content.Contains("<color", StringComparison.Ordinal);
         if (UnicodeFontCoverage.ContainsCjk(content))
         {
             var role =
@@ -2020,17 +2019,18 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         bool hasMixedValueDirections
     )
     {
+        var (baseAttributeKey, variant) = SplitAttributeKey(nativeAttributeKey);
         var iconKey = kind switch
         {
             CombatImpactKind.Destroy => "Destroy",
-            CombatImpactKind.AttributeChange => AttributeIconKey(nativeAttributeKey),
+            CombatImpactKind.AttributeChange => AttributeIconKey(baseAttributeKey, variant),
             _ => nativeAttributeKey,
         };
         var label = kind switch
         {
             CombatImpactKind.Destroy => T("摧毁", "Destroy"),
             CombatImpactKind.AttributeChange => CombatImpactAttributeLabel.Resolve(
-                nativeAttributeKey,
+                baseAttributeKey,
                 surface,
                 changeValue,
                 IsChinese(),
@@ -2038,6 +2038,15 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             ),
             _ => NativeTagTypography.Resolve(nativeAttributeKey).Label,
         };
+        if (
+            kind == CombatImpactKind.AttributeChange
+            && baseAttributeKey == "EnchantTargets"
+            && !string.IsNullOrWhiteSpace(variant)
+        )
+        {
+            var enchantment = NativeTagTypography.Resolve(variant).Label;
+            label = T($"{enchantment}{label}", $"{enchantment} {label}");
+        }
         return (label, iconKey);
     }
 
@@ -2052,16 +2061,25 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         return string.IsNullOrWhiteSpace(marker) ? null : marker;
     }
 
-    private static string AttributeIconKey(string key) =>
+    private static (string BaseKey, string? Variant) SplitAttributeKey(string key)
+    {
+        var separator = key.IndexOf(':');
+        return separator < 0 ? (key, null) : (key[..separator], key[(separator + 1)..]);
+    }
+
+    private static string AttributeIconKey(string key, string? variant) =>
         key switch
         {
+            "EnchantTargets" when !string.IsNullOrWhiteSpace(variant) => variant,
             "Health" or "HealthMax" or "HealAmount" => "HealAmount",
-            "HealthRegen" => "RegenApplyAmount",
+            "HealthRegen" or "RegenRemoveAmount" => "RegenApplyAmount",
             "Rage" or "RageMax" => "RageApplyAmount",
             "Tempo" => "TempoApplyAmount",
-            "Burn" => "BurnApplyAmount",
-            "Poison" => "PoisonApplyAmount",
-            "Shield" => "ShieldApplyAmount",
+            "Burn" or "BurnRemoveAmount" => "BurnApplyAmount",
+            "Poison" or "PoisonRemoveAmount" => "PoisonApplyAmount",
+            "RageRemoveAmount" => "RageApplyAmount",
+            "Shield" or "ShieldRemoveAmount" => "ShieldApplyAmount",
+            "EnchantRemoveTargets" => "EnchantTargets",
             "DamageCrit" => "CritChance",
             _ => key,
         };

@@ -40,6 +40,65 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Fact]
+    public void Triggered_skill_summary_and_group_source_use_unique_triggers()
+    {
+        var skill = new CombatImpactEntity("skill", "Wax and Wane", "Skill", null, 0);
+        var trigger = new CombatImpactEntity("trigger", "Soul of the\nDistrict", "Item", null, 1);
+        var group = new CombatImpactGroup(
+            CombatImpactKind.Slow,
+            "Slow",
+            10,
+            10_000,
+            CombatImpactValueUnit.Milliseconds,
+            CombatImpactCoverage.Exact,
+            null,
+            0,
+            []
+        )
+        {
+            TriggerSources = [new CombatImpactTriggerSource(trigger, 1)],
+        };
+        var source = new CombatImpactSource(skill, 2, 10, [group])
+        {
+            TriggerSources = [new CombatImpactTriggerSource(trigger, 1)],
+        };
+
+        Assert.Equal(
+            "1 trigger",
+            CombatImpactMetricFormatter.CausedSummary(source, chinese: false)
+        );
+        Assert.Equal("触发 1 次", CombatImpactMetricFormatter.CausedSummary(source, chinese: true));
+        Assert.Equal(
+            "Triggered by: Soul of the District ×1",
+            CombatImpactMetricFormatter.TriggerSources(group, chinese: false)
+        );
+        Assert.Equal(
+            "触发来源：Soul of the District ×1",
+            CombatImpactMetricFormatter.TriggerSources(group, chinese: true)
+        );
+    }
+
+    [Fact]
+    public void Item_summary_keeps_authoritative_use_count_when_trigger_provenance_exists()
+    {
+        var source = new CombatImpactSource(Target, 3, 4, [])
+        {
+            TriggerSources = [new CombatImpactTriggerSource(Target, 2)],
+        };
+
+        Assert.Equal("3 uses", CombatImpactMetricFormatter.CausedSummary(source, chinese: false));
+    }
+
+    [Fact]
+    public void Skill_summary_omits_ambiguous_card_stat_use_count_without_executed_provenance()
+    {
+        var skill = new CombatImpactEntity("skill", "Quick Freeze", "Skill", null, 0);
+        var source = new CombatImpactSource(skill, 17, 1, []);
+
+        Assert.Empty(CombatImpactMetricFormatter.CausedSummary(source, chinese: false));
+    }
+
+    [Fact]
     public void Critical_counts_use_the_native_icon_inside_the_event_count()
     {
         var appliedRegen = new CombatImpactGroup(
@@ -115,6 +174,75 @@ public sealed class CombatImpactMetricFormatterTests
 
         Assert.Equal("×2 · 7 total", CombatImpactMetricFormatter.Group(spent, chinese: false));
         Assert.Equal("×2 · 总计 7", CombatImpactMetricFormatter.Group(spent, chinese: true));
+    }
+
+    [Fact]
+    public void Applied_attribute_actions_keep_counts_in_target_and_source_breakdowns()
+    {
+        var target = new CombatImpactTarget(
+            Target,
+            2,
+            null,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.None
+        );
+        var group = new CombatImpactGroup(
+            CombatImpactKind.AttributeChange,
+            "ForceUseTargets",
+            2,
+            null,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.None,
+            null,
+            0,
+            [target]
+        );
+        var incoming = new CombatImpactIncomingGroup(
+            CombatImpactKind.AttributeChange,
+            "ForceUseTargets",
+            2,
+            null,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.None,
+            [
+                new CombatImpactIncomingSource(
+                    Target,
+                    2,
+                    null,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactCoverage.None
+                ),
+            ]
+        );
+
+        Assert.Equal("×2", CombatImpactMetricFormatter.Target(group, target, chinese: false));
+        Assert.Equal(
+            "×2",
+            CombatImpactMetricFormatter.IncomingSource(
+                incoming,
+                Assert.Single(incoming.Sources),
+                chinese: false
+            )
+        );
+    }
+
+    [Fact]
+    public void Status_removal_amounts_are_unsigned()
+    {
+        var removed = new CombatImpactGroup(
+            CombatImpactKind.AttributeChange,
+            "BurnRemoveAmount",
+            1,
+            6,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.Exact,
+            null,
+            0,
+            []
+        );
+
+        Assert.Equal("×1 · 6", CombatImpactMetricFormatter.Group(removed, chinese: false));
+        Assert.Equal("×1 · 6", CombatImpactMetricFormatter.Group(removed, chinese: true));
     }
 
     [Fact]

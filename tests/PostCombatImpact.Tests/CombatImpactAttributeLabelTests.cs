@@ -50,9 +50,30 @@ public sealed class CombatImpactAttributeLabelTests
     [InlineData(
         "ForceUseTargets",
         (int)CombatImpactEventSurface.AppliedEffect,
-        "Use Targets",
-        "使用目标"
+        "Force Use",
+        "强制使用"
     )]
+    [InlineData("EnchantTargets", (int)CombatImpactEventSurface.AppliedEffect, "Enchant", "附魔")]
+    [InlineData(
+        "EnchantTargets:Fiery",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Enchant",
+        "附魔"
+    )]
+    [InlineData(
+        "EnchantRemoveTargets",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Enchant Removed",
+        "移除附魔"
+    )]
+    [InlineData(
+        "TransformTargets",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        "Transform",
+        "变形"
+    )]
+    [InlineData("UpgradeTargets", (int)CombatImpactEventSurface.AppliedEffect, "Upgrade", "升级")]
+    [InlineData("RepairTargets", (int)CombatImpactEventSurface.AppliedEffect, "Repair", "修复")]
     [InlineData(
         "PercentDamageReduction",
         (int)CombatImpactEventSurface.AppliedEffect,
@@ -104,8 +125,8 @@ public sealed class CombatImpactAttributeLabelTests
 
     [Theory]
     [InlineData("DamageAmount", -5, "Damage Loss", "伤害减少")]
-    [InlineData("BurnRemoveAmount", 5, "Burn Removal", "燃烧移除量")]
-    [InlineData("ShieldRemoveAmount", -5, "Shield Removal", "护盾移除量")]
+    [InlineData("BurnRemoveAmount", 5, "Burn Removed", "移除燃烧")]
+    [InlineData("ShieldRemoveAmount", -5, "Shield Removed", "移除护盾")]
     [InlineData("TempoApplyAmount", 5, "Tempo Gain", "节奏获取量")]
     [InlineData("TempoRemoveAmount", -5, "Tempo Removal", "节奏移除量")]
     public void Card_attribute_labels_distinguish_direction_without_redundant_removal_gain(
