@@ -23,7 +23,6 @@ EncoderDrainTests.Run();
 OutputFileNameTests.Run();
 ZeroDurationMuxGuardTests.Run();
 MuxerArgumentTests.Run();
-MuxerDebugStemTests.Run();
 AudioTapPlanTests.Run();
 BoundedTextTailTests.Run();
 RecordingOperationContractTests.Run();
@@ -1218,68 +1217,7 @@ file static class MuxerArgumentTests
 }
 
 // ---------------------------------------------------------------------------
-// 6) ReplayVideoAudioMuxer debug stem naming: successful runtime muxes delete
-//    temp WAVs, so debug builds preserve stable sibling copies for listening
-//    to each captured bus before amix.
-// ---------------------------------------------------------------------------
-file static class MuxerDebugStemTests
-{
-    private static readonly Type MuxerType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer"
-    );
-
-    public static void Run()
-    {
-        TwoCapturedStemsUseStableNames();
-    }
-
-    private static void TwoCapturedStemsUseStableNames()
-    {
-        var targets = BuildDebugStemCopyTargets(
-            @"C:\replays\battle.20260530-104759.mp4",
-            new[]
-            {
-                @"C:\replays\battle.20260530-104759.audio.wav",
-                @"C:\replays\battle.20260530-104759.sfx.audio.wav",
-            }
-        );
-
-        TestReflection.Assert(targets.Count == 2, "Two captured WAVs should have two debug stems.");
-        TestReflection.Assert(
-            targets[0] == @"C:\replays\battle.20260530-104759.debug.audio.wav",
-            $"Base-bus debug stem path was {targets[0]}."
-        );
-        TestReflection.Assert(
-            targets[1] == @"C:\replays\battle.20260530-104759.debug.sfx.wav",
-            $"SFX-bus debug stem path was {targets[1]}."
-        );
-    }
-
-    private static IReadOnlyList<string> BuildDebugStemCopyTargets(
-        string finalPath,
-        IReadOnlyList<string> wavPaths
-    )
-    {
-        var method =
-            MuxerType.GetMethod(
-                "BuildDebugStemCopyTargets",
-                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static,
-                binder: null,
-                types: new[] { typeof(string), typeof(IReadOnlyList<string>) },
-                modifiers: null
-            )
-            ?? throw new InvalidOperationException(
-                "ReplayVideoAudioMuxer.BuildDebugStemCopyTargets(string,IReadOnlyList<string>) not found."
-            );
-        return (IReadOnlyList<string>)(
-            method.Invoke(null, new object[] { finalPath, wavPaths })
-            ?? throw new InvalidOperationException("BuildDebugStemCopyTargets returned null.")
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 7) ReplayVideoAudioTapPlan: a SINGLE all-inclusive stem tapped at the FMOD
+// 6) ReplayVideoAudioTapPlan: a SINGLE all-inclusive stem tapped at the FMOD
 //    CORE master. One stem captures every audible class (music, settlement, VO,
 //    and the Resonance-decoded 3D SFX) and avoids the amix double-count that two
 //    overlapping parent/child taps produced.

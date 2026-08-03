@@ -280,9 +280,6 @@ internal sealed class ReplayVideoAudioMuxer
                     );
                 }
 
-#if DEBUG
-                PreserveDebugAudioStems(finalPath, wavPaths);
-#endif
                 TryDelete(silentVideoTempPath);
                 TryDelete(wavPaths);
                 BppLog.DebugEvent(
@@ -959,121 +956,6 @@ internal sealed class ReplayVideoAudioMuxer
 
         foreach (var path in paths)
             TryDelete(path);
-    }
-
-    private static void PreserveDebugAudioStems(string finalPath, IReadOnlyList<string> wavPaths)
-    {
-        var targetPaths = BuildDebugStemCopyTargets(finalPath, wavPaths);
-        for (var i = 0; i < wavPaths.Count; i++)
-        {
-            var sourcePath = wavPaths[i];
-            if (string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath))
-                continue;
-
-            var targetPath = targetPaths[i];
-            try
-            {
-                var directory = Path.GetDirectoryName(targetPath);
-                if (!string.IsNullOrEmpty(directory))
-                    Directory.CreateDirectory(directory);
-
-                File.Copy(sourcePath, targetPath, overwrite: true);
-                BppLog.DebugEvent(
-                    CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
-                    () =>
-                        [
-                            CombatReplayVideoLogEvents.MuxRecordingId.Bind(null),
-                            CombatReplayVideoLogEvents.MuxStage.Bind(ReplayVideoLogStage.DebugStem),
-                            CombatReplayVideoLogEvents.MuxReasonCode.Bind(
-                                ReplayVideoDiagnosticReasonCode.None
-                            ),
-                            CombatReplayVideoLogEvents.MuxPath.Bind(targetPath),
-                            CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
-                        ]
-                );
-            }
-            catch (Exception ex)
-            {
-                BppLog.DebugEvent(
-                    CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
-                    ex,
-                    () =>
-                        [
-                            CombatReplayVideoLogEvents.MuxRecordingId.Bind(null),
-                            CombatReplayVideoLogEvents.MuxStage.Bind(ReplayVideoLogStage.DebugStem),
-                            CombatReplayVideoLogEvents.MuxReasonCode.Bind(
-                                ReplayVideoDiagnosticReasonCode.StemPreserveFailed
-                            ),
-                            CombatReplayVideoLogEvents.MuxPath.Bind(targetPath),
-                            CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
-                        ]
-                );
-            }
-        }
-    }
-
-    private static IReadOnlyList<string> BuildDebugStemCopyTargets(
-        string finalPath,
-        IReadOnlyList<string> wavPaths
-    )
-    {
-        var targets = new List<string>(wavPaths.Count);
-        var directory = Path.GetDirectoryName(finalPath);
-        var finalStem = Path.GetFileNameWithoutExtension(finalPath);
-        if (string.IsNullOrEmpty(finalStem))
-            finalStem = "combat-replay";
-
-        for (var i = 0; i < wavPaths.Count; i++)
-        {
-            var label = BuildDebugStemLabel(finalStem, wavPaths[i], i);
-            var fileName = $"{finalStem}.debug.{label}.wav";
-            targets.Add(
-                string.IsNullOrEmpty(directory) ? fileName : Path.Combine(directory, fileName)
-            );
-        }
-
-        return targets;
-    }
-
-    private static string BuildDebugStemLabel(string finalStem, string wavPath, int index)
-    {
-        var wavStem = Path.GetFileNameWithoutExtension(wavPath);
-        if (!string.IsNullOrEmpty(wavStem))
-        {
-            var prefix = finalStem + ".";
-            if (wavStem.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            {
-                var suffix = wavStem.Substring(prefix.Length);
-                if (suffix.Equals("audio", StringComparison.OrdinalIgnoreCase))
-                    return "audio";
-                if (suffix.Equals("sfx.audio", StringComparison.OrdinalIgnoreCase))
-                    return "sfx";
-                if (suffix.EndsWith(".audio", StringComparison.OrdinalIgnoreCase))
-                    return SanitizeDebugStemLabel(suffix.Substring(0, suffix.Length - 6));
-                return SanitizeDebugStemLabel(suffix);
-            }
-        }
-
-        return index == 0 ? "audio" : $"audio{index + 1}";
-    }
-
-    private static string SanitizeDebugStemLabel(string label)
-    {
-        if (string.IsNullOrWhiteSpace(label))
-            return "audio";
-
-        var builder = new StringBuilder(label.Length);
-        foreach (var ch in label)
-        {
-            if ((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9'))
-                builder.Append(char.ToLowerInvariant(ch));
-            else if (ch == '-' || ch == '_' || ch == '.')
-                builder.Append(ch);
-            else
-                builder.Append('_');
-        }
-
-        return builder.Length == 0 ? "audio" : builder.ToString();
     }
 
     private static bool ForceKill(Process process)
