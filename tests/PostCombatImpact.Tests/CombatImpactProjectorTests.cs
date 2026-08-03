@@ -1047,7 +1047,7 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Keeps_control_duration_instead_of_treating_native_target_count_as_milliseconds()
+    public void Keeps_configured_control_duration_separate_from_native_target_count()
     {
         var simulation = new CombatSim();
         var target = InstanceId.TryParse("target");
@@ -1079,12 +1079,21 @@ public sealed class CombatImpactProjectorTests
         };
 
         var group = Assert.Single(
-            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
+            Assert
+                .Single(
+                    CombatImpactProjector
+                        .Project(
+                            simulation,
+                            EntitiesWithSourceAttribute(ECardAttributeType.SlowAmount, 2_000)
+                        )
+                        .Sources
+                )
+                .Groups
         );
 
         Assert.Equal(CombatImpactKind.Slow, group.Kind);
         Assert.Equal(CombatImpactValueUnit.Milliseconds, group.Unit);
-        Assert.Equal(1950, group.ObservedValue);
+        Assert.Equal(2_000, group.ObservedValue);
         Assert.Equal(1, group.AuthoritativeMetric?.Value);
         Assert.Equal(CombatImpactValueUnit.Applications, group.AuthoritativeMetric?.Unit);
     }
@@ -1311,7 +1320,17 @@ public sealed class CombatImpactProjectorTests
         };
         var entities = new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
         {
-            [zarlic] = new(zarlic, "Zarlic", "Item", null, 0),
+            [zarlic] = new(
+                zarlic,
+                "Zarlic",
+                "Item",
+                null,
+                0,
+                Attributes: new Dictionary<ECardAttributeType, int>
+                {
+                    [ECardAttributeType.HasteAmount] = 1_000,
+                }
+            ),
             [decoy] = new(decoy, "Other Food", "Item", null, 1),
         };
 
@@ -1322,7 +1341,7 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(10, source.UseCount);
         Assert.Equal(10, source.EffectCount);
         Assert.Equal(10, haste.Count);
-        Assert.Equal(9500, haste.ObservedValue);
+        Assert.Equal(10_000, haste.ObservedValue);
         Assert.Equal(CombatImpactValueUnit.Milliseconds, haste.Unit);
         Assert.Equal(10, haste.AuthoritativeMetric?.Value);
         Assert.Equal(
@@ -1332,13 +1351,13 @@ public sealed class CombatImpactProjectorTests
         var targetRow = Assert.Single(haste.Targets);
         Assert.Equal("Zarlic", targetRow.Entity.Name);
         Assert.Equal(10, targetRow.Count);
-        Assert.Equal(9500, targetRow.ObservedValue);
+        Assert.Equal(10_000, targetRow.ObservedValue);
 
         var received = Assert.Single(report.Received);
         var incoming = Assert.Single(received.Groups);
         Assert.Equal(CombatImpactKind.Haste, incoming.Kind);
         Assert.Equal(10, incoming.Count);
-        Assert.Equal(9500, incoming.ObservedValue);
+        Assert.Equal(10_000, incoming.ObservedValue);
         Assert.Equal(10, Assert.Single(incoming.Sources).Count);
     }
 
@@ -1357,7 +1376,23 @@ public sealed class CombatImpactProjectorTests
         simulation.Frames[0].CardUpdates[first] = HasteUpdate(first, 950);
         simulation.Frames[0].CardUpdates[second] = HasteUpdate(second, 1950);
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.HasteAmount] = 1_000,
+            },
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.HasteAmount] = 2_000,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
         var firstGroup = Assert.Single(
             Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
         );
@@ -1367,14 +1402,14 @@ public sealed class CombatImpactProjectorTests
 
         var firstTarget = Assert.Single(firstGroup.Targets);
         Assert.Equal("target", firstTarget.Entity.Id);
-        Assert.Equal(950, firstTarget.ObservedValue);
+        Assert.Equal(1_000, firstTarget.ObservedValue);
         var secondTarget = Assert.Single(secondGroup.Targets);
         Assert.Equal("target-2", secondTarget.Entity.Id);
-        Assert.Equal(1950, secondTarget.ObservedValue);
+        Assert.Equal(2_000, secondTarget.ObservedValue);
     }
 
     [Fact]
-    public void Mixed_frame_ambiguity_drops_only_the_duplicated_action_target_value()
+    public void Configured_duration_is_not_lost_when_actions_share_a_frame_and_target()
     {
         var simulation = new CombatSim();
         var first = InstanceId.TryParse("target");
@@ -1391,32 +1426,38 @@ public sealed class CombatImpactProjectorTests
         simulation.Frames[0].CardUpdates[first] = HasteUpdate(first, 950);
         simulation.Frames[0].CardUpdates[second] = HasteUpdate(second, 1950);
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.HasteAmount] = 1_000,
+            },
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.HasteAmount] = 2_000,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
         var fairies = Assert.Single(report.Sources, source => source.Entity.Id == "source");
         var trigger = Assert.Single(report.Sources, source => source.Entity.Id == "trigger");
         var fairiesGroup = Assert.Single(fairies.Groups);
         var triggerGroup = Assert.Single(trigger.Groups);
 
         Assert.Equal(2, fairiesGroup.Count);
-        Assert.Equal(1950, fairiesGroup.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Partial, fairiesGroup.ObservedCoverage);
-        Assert.Null(
-            Assert
-                .Single(fairiesGroup.Targets, target => target.Entity.Id == "target")
-                .ObservedValue
-        );
-        Assert.Equal(
-            1950,
-            Assert
-                .Single(fairiesGroup.Targets, target => target.Entity.Id == "target-2")
-                .ObservedValue
-        );
-        Assert.Null(triggerGroup.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.None, triggerGroup.ObservedCoverage);
+        Assert.Equal(2_000, fairiesGroup.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, fairiesGroup.ObservedCoverage);
+        Assert.All(fairiesGroup.Targets, target => Assert.Equal(1_000, target.ObservedValue));
+        Assert.Equal(2_000, triggerGroup.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, triggerGroup.ObservedCoverage);
     }
 
     [Fact]
-    public void Uses_observed_net_status_delta_when_decay_shares_the_frame()
+    public void Configured_duration_ignores_status_net_delta_when_decay_shares_the_frame()
     {
         var simulation = new CombatSim();
         var target = InstanceId.TryParse("target");
@@ -1437,37 +1478,157 @@ public sealed class CombatImpactProjectorTests
             },
         };
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
-        Assert.Equal(950, Assert.Single(Assert.Single(report.Sources).Groups).ObservedValue);
+        var report = CombatImpactProjector.Project(
+            simulation,
+            EntitiesWithSourceAttribute(ECardAttributeType.HasteAmount, 1_000)
+        );
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+        Assert.Equal(1_000, group.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, group.ObservedCoverage);
     }
 
     [Fact]
-    public void Charge_does_not_treat_ordinary_cooldown_decay_as_an_effect_amount()
+    public void Configured_duration_actions_do_not_fall_back_to_target_frame_deltas()
+    {
+        var cases = new[]
+        {
+            (EActionCommandType.CardCharge, ECardAttributeType.Cooldown, CombatImpactKind.Charge),
+            (EActionCommandType.CardHaste, ECardAttributeType.Haste, CombatImpactKind.Haste),
+            (EActionCommandType.CardSlow, ECardAttributeType.Slow, CombatImpactKind.Slow),
+            (EActionCommandType.CardFreeze, ECardAttributeType.Freeze, CombatImpactKind.Freeze),
+        };
+        foreach (var (action, targetAttribute, expectedKind) in cases)
+        {
+            var simulation = new CombatSim();
+            var target = InstanceId.TryParse("target");
+            simulation.Frames[0].Events.Add(Executed("source", action, CardTarget("target")));
+            simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+            {
+                CardInstanceId = target,
+                Attributes =
+                {
+                    [targetAttribute] = new CombatSimCardAttributeUpdate
+                    {
+                        AttributeType = targetAttribute,
+                        PreviousValue = action == EActionCommandType.CardCharge ? 5_000 : 1_000,
+                        CurrentValue = action == EActionCommandType.CardCharge ? 4_000 : 1_950,
+                    },
+                },
+            };
+
+            var report = CombatImpactProjector.Project(simulation, Entities());
+            var group = Assert.Single(Assert.Single(report.Sources).Groups);
+            var targetRow = Assert.Single(group.Targets);
+            var incoming = Assert.Single(Assert.Single(report.Received).Groups);
+            var incomingSource = Assert.Single(incoming.Sources);
+
+            Assert.Equal(expectedKind, group.Kind);
+            Assert.Equal(1, group.Count);
+            Assert.Null(group.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.None, group.ObservedCoverage);
+            Assert.Null(targetRow.ObservedValue);
+            Assert.Null(incoming.ObservedValue);
+            Assert.Null(incomingSource.ObservedValue);
+        }
+    }
+
+    [Fact]
+    public void Configured_duration_actions_use_one_source_value_in_both_perspectives()
+    {
+        var cases = new[]
+        {
+            (
+                EActionCommandType.CardCharge,
+                ECardAttributeType.ChargeAmount,
+                ECardAttributeType.Cooldown,
+                CombatImpactKind.Charge
+            ),
+            (
+                EActionCommandType.CardHaste,
+                ECardAttributeType.HasteAmount,
+                ECardAttributeType.Haste,
+                CombatImpactKind.Haste
+            ),
+            (
+                EActionCommandType.CardSlow,
+                ECardAttributeType.SlowAmount,
+                ECardAttributeType.Slow,
+                CombatImpactKind.Slow
+            ),
+            (
+                EActionCommandType.CardFreeze,
+                ECardAttributeType.FreezeAmount,
+                ECardAttributeType.Freeze,
+                CombatImpactKind.Freeze
+            ),
+        };
+        foreach (var (action, sourceAttribute, targetAttribute, expectedKind) in cases)
+        {
+            var simulation = new CombatSim();
+            var target = InstanceId.TryParse("target");
+            simulation.Frames[0].Events.Add(Executed("source", action, CardTarget("target")));
+            simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+            {
+                CardInstanceId = target,
+                Attributes =
+                {
+                    [targetAttribute] = new CombatSimCardAttributeUpdate
+                    {
+                        AttributeType = targetAttribute,
+                        PreviousValue = action == EActionCommandType.CardCharge ? 5_000 : 1_000,
+                        CurrentValue = action == EActionCommandType.CardCharge ? 4_000 : 1_950,
+                    },
+                },
+            };
+
+            var report = CombatImpactProjector.Project(
+                simulation,
+                EntitiesWithSourceAttribute(sourceAttribute, 2_000)
+            );
+            var caused = Assert.Single(Assert.Single(report.Sources).Groups);
+            var causedTarget = Assert.Single(caused.Targets);
+            var received = Assert.Single(Assert.Single(report.Received).Groups);
+            var receivedSource = Assert.Single(received.Sources);
+
+            Assert.Equal(expectedKind, caused.Kind);
+            Assert.Equal(CombatImpactAggregator.NativeKey(expectedKind), caused.NativeAttributeKey);
+            Assert.Equal(2_000, caused.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.Exact, caused.ObservedCoverage);
+            Assert.Equal(2_000, causedTarget.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.Exact, causedTarget.ObservedCoverage);
+            Assert.Equal(2_000, received.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.Exact, received.ObservedCoverage);
+            Assert.Equal(2_000, receivedSource.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.Exact, receivedSource.ObservedCoverage);
+        }
+    }
+
+    [Fact]
+    public void Configured_duration_uses_the_source_value_at_each_event_frame()
     {
         var simulation = new CombatSim();
-        var target = InstanceId.TryParse("target");
         simulation
             .Frames[0]
-            .Events.Add(Executed("source", EActionCommandType.CardCharge, CardTarget("target")));
-        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
-        {
-            CardInstanceId = target,
-            Attributes =
-            {
-                [ECardAttributeType.Cooldown] = new CombatSimCardAttributeUpdate
-                {
-                    AttributeType = ECardAttributeType.Cooldown,
-                    PreviousValue = 5000,
-                    CurrentValue = 4000,
-                },
-            },
-        };
+            .Events.Add(Executed("source", EActionCommandType.CardHaste, CardTarget("target")));
+        simulation.Frames.Add(SourceAttributeFrame(ECardAttributeType.HasteAmount, 1_000, 2_000));
+        var laterFrame = new CombatSimFrame();
+        laterFrame.Events.Add(
+            Executed("source", EActionCommandType.CardHaste, CardTarget("target"))
+        );
+        simulation.Frames.Add(laterFrame);
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
-        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+        var report = CombatImpactProjector.Project(
+            simulation,
+            EntitiesWithSourceAttribute(ECardAttributeType.HasteAmount, 1_000)
+        );
+        var caused = Assert.Single(Assert.Single(report.Sources).Groups);
+        var received = Assert.Single(Assert.Single(report.Received).Groups);
 
-        Assert.Equal(1, group.Count);
-        Assert.Null(group.ObservedValue);
+        Assert.Equal(2, caused.Count);
+        Assert.Equal(3_000, caused.ObservedValue);
+        Assert.Equal(3_000, Assert.Single(caused.Targets).ObservedValue);
+        Assert.Equal(3_000, received.ObservedValue);
+        Assert.Equal(3_000, Assert.Single(received.Sources).ObservedValue);
     }
 
     [Fact]
@@ -1738,10 +1899,13 @@ public sealed class CombatImpactProjectorTests
             );
         simulation.Frames[0].CardUpdates[target] = HasteUpdate(target, 950);
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
+        var report = CombatImpactProjector.Project(
+            simulation,
+            EntitiesWithSourceAttribute(ECardAttributeType.HasteAmount, 1_000)
+        );
 
         Assert.Equal(
-            950,
+            1_000,
             Assert
                 .Single(
                     Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups

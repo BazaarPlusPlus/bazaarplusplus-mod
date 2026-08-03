@@ -185,27 +185,28 @@ internal static class CombatImpactProjector
                 );
                 var targetId = ResolveTargetId(item.Target);
                 var hasKind = TryResolveKind(item.ActionType, out var kind);
-                var resolved = hasKind
-                    ? ResolveValue(
-                        frame,
-                        item,
-                        kind,
-                        IsTransitionUnique(frame, executed, item, entities),
-                        executed,
-                        entities
-                    )
-                    : default;
-                if (
+                var configuredActionValue = default(ResolvedImpactValue);
+                var hasConfiguredDuration =
                     hasKind
                     && attributedSourceId != null
-                    && TryResolveConfiguredActionValue(
+                    && TryResolveConfiguredDurationAction(
                         item.ActionType,
                         attributedSourceId,
                         cardAttributes,
-                        out var configuredActionValue
-                    )
-                )
-                    resolved = configuredActionValue;
+                        out configuredActionValue
+                    );
+                var resolved =
+                    hasConfiguredDuration ? configuredActionValue
+                    : hasKind
+                        ? ResolveValue(
+                            frame,
+                            item,
+                            kind,
+                            IsTransitionUnique(frame, executed, item, entities),
+                            executed,
+                            entities
+                        )
+                    : default;
                 if (
                     hasKind
                     && kind == CombatImpactKind.DirectDamage
@@ -324,34 +325,58 @@ internal static class CombatImpactProjector
         }
     }
 
-    private static bool TryResolveConfiguredActionValue(
+    private static bool TryResolveConfiguredDurationAction(
         EActionCommandType action,
         string sourceId,
         IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
         out ResolvedImpactValue resolved
     )
     {
-        // Target cooldown deltas also contain ordinary ticking, caps, resets, and concurrent
-        // charges. The source card's configured amount is the stable nominal action value.
+        (ECardAttributeType Attribute, CombatImpactKind Kind)? configuration = action switch
+        {
+            EActionCommandType.CardCharge => (
+                ECardAttributeType.ChargeAmount,
+                CombatImpactKind.Charge
+            ),
+            EActionCommandType.CardHaste => (
+                ECardAttributeType.HasteAmount,
+                CombatImpactKind.Haste
+            ),
+            EActionCommandType.CardSlow => (ECardAttributeType.SlowAmount, CombatImpactKind.Slow),
+            EActionCommandType.CardFreeze => (
+                ECardAttributeType.FreezeAmount,
+                CombatImpactKind.Freeze
+            ),
+            _ => null,
+        };
+        if (!configuration.HasValue)
+        {
+            resolved = default;
+            return false;
+        }
+
+        var (attribute, kind) = configuration.Value;
+        resolved = ResolvedImpactValue.Empty(kind, action);
+
+        // Target frame deltas include fixed ticking and cannot reliably split concurrent actions.
+        // The source value is the nominal outgoing duration, before target-side mitigation,
+        // immunity, overlap, or truncation.
         if (
-            action == EActionCommandType.CardCharge
-            && cardAttributes.TryGetValue(sourceId, out var attributes)
-            && attributes.TryGetValue(ECardAttributeType.ChargeAmount, out var chargeAmount)
-            && chargeAmount > 0
+            cardAttributes.TryGetValue(sourceId, out var attributes)
+            && attributes.TryGetValue(attribute, out var configuredAmount)
+            && configuredAmount > 0
         )
         {
             resolved = new ResolvedImpactValue(
-                chargeAmount,
+                configuredAmount,
                 CombatImpactValueUnit.Milliseconds,
-                CombatImpactAggregator.NativeKey(CombatImpactKind.Charge),
+                CombatImpactAggregator.NativeKey(kind),
                 false,
                 CombatImpactValueBasis.ConfiguredActionAmount
             );
-            return true;
         }
 
-        resolved = default;
-        return false;
+        return true;
     }
 
     private static bool TryResolveNonCriticalValue(
@@ -1355,28 +1380,6 @@ internal static class CombatImpactProjector
             }
 
             return ResolvedImpactValue.Empty(kind, item.ActionType);
-        }
-
-        var expected = kind switch
-        {
-            CombatImpactKind.Haste => ECardAttributeType.Haste,
-            CombatImpactKind.Slow => ECardAttributeType.Slow,
-            CombatImpactKind.Freeze => ECardAttributeType.Freeze,
-            _ => (ECardAttributeType?)null,
-        };
-        if (
-            expected.HasValue
-            && cardUpdate.Attributes.TryGetValue(expected.Value, out var updateValue)
-            && updateValue.Delta > 0
-        )
-        {
-            return new ResolvedImpactValue(
-                Math.Abs(updateValue.Delta),
-                CombatImpactValueUnit.Milliseconds,
-                CombatImpactAggregator.NativeKey(kind),
-                false,
-                CombatImpactValueBasis.NetFrameDelta
-            );
         }
 
         return ResolvedImpactValue.Empty(kind, item.ActionType);
