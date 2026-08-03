@@ -24,6 +24,11 @@ internal static class CombatImpactTargetDetailPolicy
             || nativeAttributeKey
                 is not (
                     "RegenApplyAmount"
+                    or "BurnRemoveAmount"
+                    or "PoisonRemoveAmount"
+                    or "RegenRemoveAmount"
+                    or "ShieldRemoveAmount"
+                    or "RageRemoveAmount"
                     or "HealthMax"
                     or "HealthRegen"
                     or "Rage"

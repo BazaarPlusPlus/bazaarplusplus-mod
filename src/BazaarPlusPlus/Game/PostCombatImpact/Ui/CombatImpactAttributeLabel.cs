@@ -13,6 +13,9 @@ internal static class CombatImpactAttributeLabel
         bool hasMixedValueDirections = false
     )
     {
+        var variantSeparator = key.IndexOf(':');
+        if (variantSeparator >= 0)
+            key = key[..variantSeparator];
         var normalized =
             key.EndsWith("Increase", StringComparison.Ordinal) ? key[..^"Increase".Length]
             : key.EndsWith("Decrease", StringComparison.Ordinal) ? key[..^"Decrease".Length]
@@ -33,13 +36,13 @@ internal static class CombatImpactAttributeLabel
             "FreezeAmount" => ("冻结", "Freeze"),
             "FreezeTargets" => ("冻结目标", "Freeze Targets"),
             "BurnApplyAmount" => ("燃烧", "Burn"),
-            "BurnRemoveAmount" => ("燃烧移除量", "Burn Removal"),
+            "BurnRemoveAmount" => ("移除燃烧", "Burn Removed"),
             "PoisonApplyAmount" => ("中毒", "Poison"),
-            "PoisonRemoveAmount" => ("中毒移除量", "Poison Removal"),
+            "PoisonRemoveAmount" => ("移除中毒", "Poison Removed"),
             "RegenApplyAmount" or "HealthRegen" => ("再生", "Regen"),
-            "RegenRemoveAmount" => ("再生移除量", "Regen Removal"),
+            "RegenRemoveAmount" => ("移除再生", "Regen Removed"),
             "RageApplyAmount" or "Rage" => ("怒气", "Rage"),
-            "RageRemoveAmount" => ("怒气移除量", "Rage Removal"),
+            "RageRemoveAmount" => ("移除怒气", "Rage Removed"),
             "RageMax" => ("最大怒气", "Max Rage"),
             "Tempo" => ("节奏", "Tempo"),
             "TempoApplyAmount" => surface == CombatImpactEventSurface.AppliedEffect
@@ -59,22 +62,22 @@ internal static class CombatImpactAttributeLabel
             "JoyRemoveAmount" => ("快乐移除量", "Joy Removal"),
             "JoyCrit" => ("快乐暴击", "Joy Crit"),
             "ShieldApplyAmount" => ("护盾", "Shield"),
-            "ShieldRemoveAmount" => ("护盾移除量", "Shield Removal"),
+            "ShieldRemoveAmount" => ("移除护盾", "Shield Removed"),
             "ShieldCrit" => ("护盾暴击", "Shield Crit"),
-            "ForceUseTargets" => ("使用目标", "Use Targets"),
-            "EnchantTargets" => ("附魔目标", "Enchant Targets"),
-            "UpgradeTargets" => ("升级目标", "Upgrade Targets"),
+            "ForceUseTargets" => ("强制使用", "Force Use"),
+            "EnchantTargets" => ("附魔", "Enchant"),
+            "UpgradeTargets" => ("升级", "Upgrade"),
             "DisableTargets" => ("禁用目标", "Disable Targets"),
-            "RepairTargets" => ("修复目标", "Repair Targets"),
+            "RepairTargets" => ("修复", "Repair"),
             "BurnCrit" => ("燃烧暴击", "Burn Crit"),
             "PoisonCrit" => ("中毒暴击", "Poison Crit"),
             "DestroyTargets" => ("摧毁目标", "Destroy Targets"),
             "RegenCrit" => ("再生暴击", "Regen Crit"),
-            "TransformTargets" => ("变形目标", "Transform Targets"),
+            "TransformTargets" => ("变形", "Transform"),
             "HealthMax" => ("最大生命值", "Max Health"),
             "FlatCooldownReduction" => ("固定冷却缩减", "Flat Cooldown Reduction"),
             "PercentCooldownReduction" => ("冷却缩减", "Cooldown Reduction"),
-            "EnchantRemoveTargets" => ("移除附魔目标", "Remove Enchant Targets"),
+            "EnchantRemoveTargets" => ("移除附魔", "Enchant Removed"),
             "FlyingTargets" => ("起飞目标", "Flying Targets"),
             "PercentChargeReduction" => ("充能缩减", "Charge Reduction"),
             "PercentHasteReduction" => ("加速缩减", "Haste Reduction"),

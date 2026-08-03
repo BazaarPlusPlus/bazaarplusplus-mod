@@ -5,6 +5,56 @@ namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
 
 internal static class CombatImpactMetricFormatter
 {
+    internal static string CausedSummary(CombatImpactSource source, bool chinese)
+    {
+        var parts = new List<string>();
+        var isSkill = string.Equals(
+            source.Entity.TypeLabel,
+            "Skill",
+            StringComparison.OrdinalIgnoreCase
+        );
+        if (isSkill && source.TriggerCount > 0)
+        {
+            parts.Add(
+                chinese
+                    ? $"触发 {source.TriggerCount} 次"
+                    : $"{source.TriggerCount} trigger{(source.TriggerCount == 1 ? string.Empty : "s")}"
+            );
+        }
+        else if (!isSkill && source.UseCount > 0)
+        {
+            parts.Add(
+                chinese
+                    ? $"使用 {source.UseCount} 次"
+                    : $"{source.UseCount} use{(source.UseCount == 1 ? string.Empty : "s")}"
+            );
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    internal static string TriggerSources(CombatImpactGroup group, bool chinese)
+    {
+        var sources = TriggerSourceValues(group);
+        if (string.IsNullOrWhiteSpace(sources))
+            return string.Empty;
+
+        return chinese
+            ? $"{TriggerSourceLabel(chinese)}{sources}"
+            : $"{TriggerSourceLabel(chinese)} {sources}";
+    }
+
+    internal static string TriggerSourceLabel(bool chinese) =>
+        chinese ? "触发来源：" : "Triggered by:";
+
+    internal static string TriggerSourceValues(CombatImpactGroup group) =>
+        string.Join(
+            " · ",
+            group.TriggerSources.Select(trigger =>
+                $"{trigger.Entity.Name.Replace('\n', ' ')} ×{trigger.Count}"
+            )
+        );
+
     internal static string Group(
         CombatImpactGroup group,
         bool chinese,
@@ -55,13 +105,13 @@ internal static class CombatImpactMetricFormatter
     {
         var count = $"×{target.Count}";
         if (!target.ObservedValue.HasValue)
-            return group.Kind == CombatImpactKind.AttributeChange ? string.Empty : count;
+            return ShouldShowCount(group.Kind, group.Surface) ? count : string.Empty;
 
         var value = Value(target.ObservedValue.Value, target.Unit, ShouldShowSign(group), chinese);
         var needsObservedBasis = group.HasDivergentTargetCoverage;
         if (needsObservedBasis)
             value = chinese ? $"已记录 {value}" : $"{value} recorded";
-        return group.Kind == CombatImpactKind.AttributeChange ? value : $"{count} · {value}";
+        return ShouldShowCount(group.Kind, group.Surface) ? $"{count} · {value}" : value;
     }
 
     internal static string IncomingGroup(
@@ -105,7 +155,13 @@ internal static class CombatImpactMetricFormatter
         kind == CombatImpactKind.AttributeChange
         && !(
             surface == CombatImpactEventSurface.AppliedEffect
-            && string.Equals(nativeAttributeKey, "TempoRemoveAmount", StringComparison.Ordinal)
+            && nativeAttributeKey
+                is "TempoRemoveAmount"
+                    or "BurnRemoveAmount"
+                    or "PoisonRemoveAmount"
+                    or "RegenRemoveAmount"
+                    or "ShieldRemoveAmount"
+                    or "RageRemoveAmount"
         );
 
     private static string Count(int count, int criticalCount, bool chinese, string? criticalMarker)
@@ -126,10 +182,10 @@ internal static class CombatImpactMetricFormatter
     {
         var count = $"×{source.Count}";
         if (!source.ObservedValue.HasValue)
-            return group.Kind == CombatImpactKind.AttributeChange ? string.Empty : count;
+            return ShouldShowCount(group.Kind, group.Surface) ? count : string.Empty;
 
         var value = Value(source.ObservedValue.Value, source.Unit, ShouldShowSign(group), chinese);
-        return group.Kind == CombatImpactKind.AttributeChange ? value : $"{count} · {value}";
+        return ShouldShowCount(group.Kind, group.Surface) ? $"{count} · {value}" : value;
     }
 
     internal static IReadOnlyList<string> CausedDisclosures(

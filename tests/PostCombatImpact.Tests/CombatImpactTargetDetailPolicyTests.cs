@@ -33,6 +33,18 @@ public sealed class CombatImpactTargetDetailPolicyTests
     )]
     [InlineData(
         (int)CombatImpactKind.AttributeChange,
+        "BurnRemoveAmount",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        false
+    )]
+    [InlineData(
+        (int)CombatImpactKind.AttributeChange,
+        "ForceUseTargets",
+        (int)CombatImpactEventSurface.AppliedEffect,
+        true
+    )]
+    [InlineData(
+        (int)CombatImpactKind.AttributeChange,
         "TempoApplyAmount",
         (int)CombatImpactEventSurface.CardAttribute,
         true

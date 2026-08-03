@@ -23,6 +23,255 @@ public sealed class CombatImpactProjectorTests
         );
     }
 
+    [Theory]
+    [InlineData(EActionCommandType.CardForceUse, "ForceUseTargets")]
+    [InlineData(EActionCommandType.CardEnchant, "EnchantTargets")]
+    [InlineData(EActionCommandType.CardEnchantRemove, "EnchantRemoveTargets")]
+    [InlineData(EActionCommandType.CardTransform, "TransformTargets")]
+    [InlineData(EActionCommandType.CardTransformDestroyed, "TransformTargets")]
+    [InlineData(EActionCommandType.CardUpgrade, "UpgradeTargets")]
+    [InlineData(EActionCommandType.CardRepair, "RepairTargets")]
+    public void Projects_player_visible_categorical_card_actions_as_counted_impacts(
+        EActionCommandType action,
+        string expectedKey
+    )
+    {
+        var simulation = new CombatSim();
+        simulation.Frames[0].Events.Add(Executed("source", action, CardTarget("target")));
+
+        var report = CombatImpactProjector.Project(simulation, Entities());
+        var caused = Assert.Single(Assert.Single(report.Sources).Groups);
+        var target = Assert.Single(caused.Targets);
+        var received = Assert.Single(Assert.Single(report.Received).Groups);
+        var incoming = Assert.Single(received.Sources);
+
+        Assert.Equal(CombatImpactKind.AttributeChange, caused.Kind);
+        Assert.Equal(CombatImpactEventSurface.AppliedEffect, caused.Surface);
+        Assert.Equal(expectedKey, caused.NativeAttributeKey);
+        Assert.Equal(1, caused.Count);
+        Assert.Null(caused.ObservedValue);
+        Assert.Equal("×1", CombatImpactMetricFormatter.Group(caused, chinese: false));
+        Assert.Equal("×1", CombatImpactMetricFormatter.Target(caused, target, chinese: false));
+        Assert.Equal("×1", CombatImpactMetricFormatter.IncomingGroup(received, chinese: false));
+        Assert.Equal(
+            "×1",
+            CombatImpactMetricFormatter.IncomingSource(received, incoming, chinese: false)
+        );
+    }
+
+    [Fact]
+    public void Enchant_actions_preserve_the_unique_applied_enchantment_type()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(Executed("source", EActionCommandType.CardEnchant, CardTarget("target")));
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventCardEnchanted
+                {
+                    InstanceId = "target",
+                    EnchantmentType = EEnchantmentType.Fiery,
+                }
+            );
+
+        var group = Assert.Single(
+            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
+        );
+
+        Assert.Equal("EnchantTargets:Fiery", group.NativeAttributeKey);
+        Assert.Equal(1, group.Count);
+    }
+
+    [Fact]
+    public void Experimental_chef_projects_both_enchantments_from_the_recorded_event_shape()
+    {
+        const string chef = "skl_RIsKVL3";
+        const string caviar = "itm_UCdcbhQ";
+        const string pizzaCutter = "itm_68Nys1j";
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(Executed(chef, EActionCommandType.CardEnchant, CardTarget(caviar)));
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventCardEnchanted
+                {
+                    InstanceId = caviar,
+                    EnchantmentType = EEnchantmentType.Fiery,
+                }
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(Executed(chef, EActionCommandType.CardEnchant, CardTarget(pizzaCutter)));
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventCardEnchanted
+                {
+                    InstanceId = pizzaCutter,
+                    EnchantmentType = EEnchantmentType.Shiny,
+                }
+            );
+        var entities = new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
+        {
+            [chef] = new(chef, "Experimental Chef", "Skill", null, 0),
+            [caviar] = new(caviar, "Caviar", "Item", null, 1),
+            [pizzaCutter] = new(pizzaCutter, "Pizza Cutter", "Item", null, 2),
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+        var source = Assert.Single(report.Sources);
+        var groups = source.Groups.ToDictionary(group => group.NativeAttributeKey);
+
+        Assert.Equal("Experimental Chef", source.Entity.Name);
+        Assert.Equal(2, source.EffectCount);
+        Assert.Equal("Caviar", Assert.Single(groups["EnchantTargets:Fiery"].Targets).Entity.Name);
+        Assert.Equal(
+            "Pizza Cutter",
+            Assert.Single(groups["EnchantTargets:Shiny"].Targets).Entity.Name
+        );
+        Assert.Collection(
+            report.Received.OrderBy(received => received.Entity.Order),
+            received =>
+            {
+                Assert.Equal("Caviar", received.Entity.Name);
+                Assert.Equal(1, received.EffectCount);
+            },
+            received =>
+            {
+                Assert.Equal("Pizza Cutter", received.Entity.Name);
+                Assert.Equal(1, received.EffectCount);
+            }
+        );
+    }
+
+    [Theory]
+    [InlineData(EActionCommandType.PlayerBurnRemove, EPlayerAttributeType.Burn, "BurnRemoveAmount")]
+    [InlineData(
+        EActionCommandType.PlayerPoisonRemove,
+        EPlayerAttributeType.Poison,
+        "PoisonRemoveAmount"
+    )]
+    [InlineData(
+        EActionCommandType.PlayerRegenRemove,
+        EPlayerAttributeType.HealthRegen,
+        "RegenRemoveAmount"
+    )]
+    [InlineData(EActionCommandType.PlayerRageRemove, EPlayerAttributeType.Rage, "RageRemoveAmount")]
+    public void Player_status_removals_use_positive_removed_amounts_when_uniquely_attributed(
+        EActionCommandType action,
+        EPlayerAttributeType attribute,
+        string expectedKey
+    )
+    {
+        var simulation = new CombatSim();
+        simulation.Frames[0].Events.Add(Executed("source", action, Player(ECombatantId.Player)));
+        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [attribute] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = attribute,
+                    PreviousValue = 10,
+                    CurrentValue = 4,
+                },
+            },
+        };
+
+        var group = Assert.Single(
+            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
+        );
+
+        Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
+        Assert.Equal(expectedKey, group.NativeAttributeKey);
+        Assert.Equal(1, group.Count);
+        Assert.Equal(6, group.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.LowerBound, group.ObservedCoverage);
+        Assert.Equal("×1 · 6", CombatImpactMetricFormatter.Group(group, chinese: false));
+    }
+
+    [Fact]
+    public void Shield_removal_uses_the_exact_negative_shield_adjustment_as_a_positive_amount()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.PlayerShieldRemove,
+                    Player(ECombatantId.Opponent)
+                )
+            );
+        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Shield,
+                    AttributeChanged = EPlayerHealthChangeType.Shield,
+                    Amount = -9,
+                },
+            },
+        };
+
+        var group = Assert.Single(
+            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
+        );
+
+        Assert.Equal("ShieldRemoveAmount", group.NativeAttributeKey);
+        Assert.Equal(9, group.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, group.ObservedCoverage);
+        Assert.Equal("×1 · 9", CombatImpactMetricFormatter.Group(group, chinese: false));
+    }
+
+    [Fact]
+    public void Ambiguous_same_frame_status_removals_keep_counts_and_omit_the_amount()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("source", EActionCommandType.PlayerBurnRemove, Player(ECombatantId.Player))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "trigger",
+                    EActionCommandType.PlayerBurnRemove,
+                    Player(ECombatantId.Player)
+                )
+            );
+        simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
+        {
+            Attributes =
+            {
+                [EPlayerAttributeType.Burn] = new CombatSimPlayerAttributeUpdate
+                {
+                    AttributeType = EPlayerAttributeType.Burn,
+                    PreviousValue = 10,
+                    CurrentValue = 4,
+                },
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, Entities());
+        var groups = report.Sources.SelectMany(source => source.Groups).ToArray();
+
+        Assert.Equal(2, groups.Length);
+        Assert.All(groups, group => Assert.Null(group.ObservedValue));
+        Assert.All(
+            groups,
+            group => Assert.Equal("×1", CombatImpactMetricFormatter.Group(group, chinese: false))
+        );
+    }
+
     [Fact]
     public void Projects_uniquely_attributed_damage_and_derived_critical_presentation()
     {
@@ -73,6 +322,35 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(60, damage.CriticalObservedValue);
         Assert.Equal("Opponent", Assert.Single(damage.Targets).Entity.Name);
         Assert.Equal(1, source.EffectCount);
+    }
+
+    [Fact]
+    public void Split_health_and_shield_adjustments_count_as_one_critical_damage_effect()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        simulation.Frames.Add(DamageFrame(-885, -639, isCritical: false));
+        simulation.Frames.Add(DamageFrame(-2_192, -856, isCritical: true));
+        simulation.Frames.Add(DamageFrame(-2_120, -928, isCritical: true));
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 7_620,
+            [ECardStats.UseCount] = 3,
+        };
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+        var damage = Assert.Single(
+            source.Groups,
+            group => group.Kind == CombatImpactKind.DirectDamage
+        );
+
+        Assert.Equal(3, source.UseCount);
+        Assert.Equal(3, source.EffectCount);
+        Assert.Equal(3, damage.Count);
+        Assert.Equal(7_620, damage.ObservedValue);
+        Assert.Equal(7_620, damage.AuthoritativeMetric?.Value);
+        Assert.Equal(2, damage.CriticalCount);
+        Assert.Equal(6_096, damage.CriticalObservedValue);
     }
 
     [Fact]
@@ -1191,6 +1469,225 @@ public sealed class CombatImpactProjectorTests
         var source = Assert.Single(sources);
         Assert.Equal(expectedSource, source.Entity.Id);
         Assert.Equal(40, Assert.Single(source.Groups).ObservedValue);
+    }
+
+    [Fact]
+    public void Trigger_sources_ignore_condition_observations_without_executed_effects()
+    {
+        var simulation = new CombatSim();
+        var observedTriggers = new[] { "trigger", "target", "target-2" };
+        for (var index = 0; index < 17; index++)
+        {
+            simulation
+                .Frames[0]
+                .Events.Add(
+                    new CombatSimEventEffectTriggered
+                    {
+                        ExecutionContextId = $"observed-context-{index}",
+                        EffectId = "freeze-effect",
+                        Source = InstanceId.TryParse("source"),
+                        TriggerSource = InstanceId.TryParse(
+                            observedTriggers[index % observedTriggers.Length]
+                        ),
+                        Targets = { CardTarget("target") },
+                    }
+                );
+        }
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardFreeze,
+                    CardTarget("target"),
+                    triggerSource: "trigger",
+                    executionContextId: "executed-context"
+                )
+            );
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 17,
+        };
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+
+        Assert.Equal(1, source.EffectCount);
+        Assert.Equal(17, source.UseCount);
+        Assert.Equal(1, source.TriggerCount);
+        var trigger = Assert.Single(source.TriggerSources);
+        Assert.Equal("Trigger Item", trigger.Entity.Name);
+        Assert.Equal(1, trigger.Count);
+    }
+
+    [Fact]
+    public void Executed_context_collapses_target_fan_out_to_one_trigger()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardSlow,
+                    CardTarget("target"),
+                    triggerSource: "trigger",
+                    executionContextId: "trigger-context"
+                )
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardSlow,
+                    CardTarget("target-2"),
+                    triggerSource: "trigger",
+                    executionContextId: "trigger-context"
+                )
+            );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+
+        Assert.Equal(1, source.TriggerCount);
+        Assert.Equal(1, Assert.Single(source.TriggerSources).Count);
+        Assert.Equal(1, Assert.Single(Assert.Single(source.Groups).TriggerSources).Count);
+    }
+
+    [Fact]
+    public void Same_frame_effect_partitions_collapse_to_one_trigger_without_losing_targets()
+    {
+        var simulation = new CombatSim();
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        for (var index = 0; index < 10; index++)
+        {
+            var targetId = $"split-target-{index}";
+            entities[targetId] = new CombatImpactEntity(
+                targetId,
+                $"Target {index}",
+                "Item",
+                null,
+                index + 10
+            );
+            var executed = Executed(
+                "source",
+                EActionCommandType.CardSlow,
+                CardTarget(targetId),
+                triggerSource: "trigger",
+                executionContextId: index < 5 ? "opponent-partition" : "player-partition"
+            );
+            executed.EffectId = index < 5 ? "0" : "2";
+            simulation.Frames[0].Events.Add(executed);
+        }
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, entities).Sources);
+        var slow = Assert.Single(source.Groups);
+
+        Assert.Equal(10, source.EffectCount);
+        Assert.Equal(10, slow.Count);
+        Assert.Equal(10, slow.Targets.Count);
+        Assert.Equal(1, source.TriggerCount);
+        Assert.Equal(1, Assert.Single(source.TriggerSources).Count);
+        Assert.Equal(1, Assert.Single(slow.TriggerSources).Count);
+    }
+
+    [Fact]
+    public void Trigger_sources_are_attached_to_the_group_they_caused()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardSlow,
+                    CardTarget("target"),
+                    triggerSource: "trigger"
+                )
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardHaste,
+                    CardTarget("target"),
+                    triggerSource: "target-2"
+                )
+            );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+        var slow = Assert.Single(source.Groups, group => group.Kind == CombatImpactKind.Slow);
+        var haste = Assert.Single(source.Groups, group => group.Kind == CombatImpactKind.Haste);
+
+        Assert.Equal("trigger", Assert.Single(slow.TriggerSources).Entity.Id);
+        Assert.Equal("target-2", Assert.Single(haste.TriggerSources).Entity.Id);
+    }
+
+    [Fact]
+    public void Same_trigger_source_in_separate_frames_counts_as_separate_activations()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardSlow,
+                    CardTarget("target"),
+                    triggerSource: "trigger"
+                )
+            );
+        simulation.Frames.Add(new CombatSimFrame());
+        simulation
+            .Frames[1]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardSlow,
+                    CardTarget("target-2"),
+                    triggerSource: "trigger"
+                )
+            );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+
+        Assert.Equal(2, source.TriggerCount);
+        Assert.Equal(2, Assert.Single(source.TriggerSources).Count);
+        Assert.Equal(2, Assert.Single(Assert.Single(source.Groups).TriggerSources).Count);
+    }
+
+    [Fact]
+    public void Unclassified_executions_do_not_create_trigger_provenance()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventEffectExecuted
+                {
+                    ExecutionContextId = "ignored-context",
+                    Source = InstanceId.TryParse("source"),
+                    TriggerSource = InstanceId.TryParse("target-2"),
+                    ActionType = EActionCommandType.GameModifyTime,
+                    Target = Player(ECombatantId.Opponent),
+                }
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardFreeze,
+                    CardTarget("target"),
+                    triggerSource: "trigger",
+                    executionContextId: "executed-context"
+                )
+            );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+
+        Assert.Equal(1, source.TriggerCount);
+        Assert.Equal("trigger", Assert.Single(source.TriggerSources).Entity.Id);
     }
 
     [Fact]
@@ -2381,10 +2878,12 @@ public sealed class CombatImpactProjectorTests
         string source,
         EActionCommandType action,
         IEffectTarget target,
-        string? triggerSource = null
+        string? triggerSource = null,
+        string executionContextId = ""
     ) =>
         new()
         {
+            ExecutionContextId = executionContextId,
             Source = InstanceId.TryParse(source),
             TriggerSource = triggerSource == null ? null : InstanceId.TryParse(triggerSource),
             ActionType = action,
@@ -2409,6 +2908,35 @@ public sealed class CombatImpactProjectorTests
                 },
             },
         };
+
+    private static CombatSimFrame DamageFrame(int healthAmount, int shieldAmount, bool isCritical)
+    {
+        var frame = new CombatSimFrame();
+        frame.Events.Add(
+            Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+        );
+        frame.OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = healthAmount,
+                    IsCrit = isCritical,
+                },
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Shield,
+                    Amount = shieldAmount,
+                    IsCrit = isCritical,
+                },
+            },
+        };
+        return frame;
+    }
 
     private static CombatSimCardUpdate HasteUpdate(InstanceId target, int amount) =>
         new()
