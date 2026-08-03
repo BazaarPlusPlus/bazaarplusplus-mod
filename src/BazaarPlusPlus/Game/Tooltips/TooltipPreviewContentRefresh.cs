@@ -94,16 +94,31 @@ internal static class TooltipPreviewContentRefresh
         TooltipPreviewMode nextMode
     )
     {
+        switch (ResolveUpgradePreviewTransition(card.CanCardUpgrade(), currentMode, nextMode))
+        {
+            case TooltipUpgradePreviewTransition.Enter:
+                controller.EnterUpgradePreview();
+                break;
+            case TooltipUpgradePreviewTransition.Exit:
+                controller.ExitUpgradePreview();
+                break;
+        }
+    }
+
+    internal static TooltipUpgradePreviewTransition ResolveUpgradePreviewTransition(
+        bool canUpgrade,
+        TooltipPreviewMode currentMode,
+        TooltipPreviewMode nextMode
+    )
+    {
         if (currentMode == nextMode)
-            return;
+            return TooltipUpgradePreviewTransition.None;
 
-        if (!card.CanCardUpgrade())
-            return;
-
-        if (nextMode == TooltipPreviewMode.Upgrade)
-            controller.EnterUpgradePreview();
-        else if (currentMode == TooltipPreviewMode.Upgrade)
-            controller.ExitUpgradePreview();
+        if (currentMode == TooltipPreviewMode.Upgrade)
+            return TooltipUpgradePreviewTransition.Exit;
+        if (nextMode == TooltipPreviewMode.Upgrade && canUpgrade)
+            return TooltipUpgradePreviewTransition.Enter;
+        return TooltipUpgradePreviewTransition.None;
     }
 
     private static TooltipPreviewRefreshMode ToRefreshMode(TooltipPreviewMode mode) =>
@@ -113,4 +128,11 @@ internal static class TooltipPreviewContentRefresh
             TooltipPreviewMode.Upgrade => TooltipPreviewRefreshMode.Upgrade,
             _ => TooltipPreviewRefreshMode.Normal,
         };
+}
+
+internal enum TooltipUpgradePreviewTransition
+{
+    None = 0,
+    Enter = 1,
+    Exit = 2,
 }

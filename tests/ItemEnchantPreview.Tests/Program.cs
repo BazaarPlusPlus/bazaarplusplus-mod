@@ -3,8 +3,42 @@ using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.ItemEnchantPreview;
 using BazaarPlusPlus.Game.ItemEnchantPreview.Preview;
+using BazaarPlusPlus.Game.Tooltips;
 using BazaarPlusPlus.Patches.Tooltips;
 using TheBazaar.Tooltips;
+
+Assert(
+    TooltipPreviewContentRefresh.ResolveUpgradePreviewTransition(
+        canUpgrade: false,
+        TooltipPreviewMode.Upgrade,
+        TooltipPreviewMode.Normal
+    ) == TooltipUpgradePreviewTransition.Exit,
+    "Leaving upgrade mode must clear the controller preview even if the card can no longer upgrade."
+);
+Assert(
+    TooltipPreviewContentRefresh.ResolveUpgradePreviewTransition(
+        canUpgrade: false,
+        TooltipPreviewMode.Normal,
+        TooltipPreviewMode.Upgrade
+    ) == TooltipUpgradePreviewTransition.None,
+    "A card that cannot upgrade must not enter upgrade preview."
+);
+Assert(
+    TooltipPreviewContentRefresh.ResolveUpgradePreviewTransition(
+        canUpgrade: true,
+        TooltipPreviewMode.Enchant,
+        TooltipPreviewMode.Upgrade
+    ) == TooltipUpgradePreviewTransition.Enter,
+    "An upgradeable card should enter upgrade preview when Shift takes priority."
+);
+Assert(
+    TooltipPreviewContentRefresh.ResolveUpgradePreviewTransition(
+        canUpgrade: true,
+        TooltipPreviewMode.Upgrade,
+        TooltipPreviewMode.Upgrade
+    ) == TooltipUpgradePreviewTransition.None,
+    "An unchanged mode must not replay the preview transition."
+);
 
 var candidates = ItemEnchantPreviewCandidateSelector.SelectCandidates(
     currentEnchantment: EEnchantmentType.Heavy,
