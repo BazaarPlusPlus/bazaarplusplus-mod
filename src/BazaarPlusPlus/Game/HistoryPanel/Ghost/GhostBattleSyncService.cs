@@ -14,19 +14,19 @@ internal sealed class GhostBattleSyncService
 {
     private const int MaxSyncBattleLimit = 200;
     private readonly HistoryPanelRepository _repository;
-    private readonly ModOnlineClient _onlineClient;
+    private readonly ModApiSession _modApiSession;
     private readonly Func<string?> _playerAccountIdResolver;
     private long _cooldownUntilUtcTicks;
     private int _syncInFlight;
 
     public GhostBattleSyncService(
         HistoryPanelRepository repository,
-        ModOnlineClient onlineClient,
+        ModApiSession modApiSession,
         Func<string?>? playerAccountIdResolver = null
     )
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
-        _onlineClient = onlineClient ?? throw new ArgumentNullException(nameof(onlineClient));
+        _modApiSession = modApiSession ?? throw new ArgumentNullException(nameof(modApiSession));
         _playerAccountIdResolver = playerAccountIdResolver ?? ResolvePlayerAccountId;
     }
 
@@ -114,9 +114,8 @@ internal sealed class GhostBattleSyncService
             }
         }
 
-        var client = new GhostBattleClient(_onlineClient.HttpClient, _onlineClient.Routes);
-        var download = await client
-            .DownloadBundleAsync(reference.DownloadUrl, cancellationToken)
+        var download = await _modApiSession
+            .DownloadGhostBundleAsync(reference.DownloadUrl, cancellationToken)
             .ConfigureAwait(false);
         if (!download.Succeeded && download.StatusCode is 403 or 404 && !refreshed)
         {
@@ -124,8 +123,8 @@ internal sealed class GhostBattleSyncService
                 .ConfigureAwait(false);
             refreshed = true;
             if (reference != null)
-                download = await client
-                    .DownloadBundleAsync(reference.DownloadUrl, cancellationToken)
+                download = await _modApiSession
+                    .DownloadGhostBundleAsync(reference.DownloadUrl, cancellationToken)
                     .ConfigureAwait(false);
         }
 
@@ -135,7 +134,8 @@ internal sealed class GhostBattleSyncService
                 _repository.MarkGhostReplayUnavailable(battleId, "expired", "object_unavailable");
             return Failure(
                 download.Error ?? "ghost_bundle_download_failed",
-                HistoryPanelReplayReasonCode.GhostDownloadFailed
+                HistoryPanelReplayReasonCode.GhostDownloadFailed,
+                download.DiagnosticException
             );
         }
 
@@ -172,9 +172,8 @@ internal sealed class GhostBattleSyncService
         CancellationToken cancellationToken
     )
     {
-        var client = new GhostBattleClient(_onlineClient.HttpClient, _onlineClient.Routes);
-        var result = await client
-            .QueryAgainstMeAsync(playerAccountId, MaxSyncBattleLimit, cancellationToken)
+        var result = await _modApiSession
+            .QueryGhostBattlesAgainstMeAsync(playerAccountId, MaxSyncBattleLimit, cancellationToken)
             .ConfigureAwait(false);
         if (!result.Succeeded)
         {
@@ -188,7 +187,8 @@ internal sealed class GhostBattleSyncService
             }
             return GhostBattleSyncResult.Failure(
                 result.Error ?? "ghost_sync_failed",
-                HistoryPanelGhostSyncReasonCode.QueryFailed
+                HistoryPanelGhostSyncReasonCode.QueryFailed,
+                result.DiagnosticException
             );
         }
 
@@ -227,15 +227,31 @@ internal sealed class GhostBattleSyncService
     {
         try
         {
-            var opened = BundleV5Codec.Open(bundleBytes);
+            var openResult = RunBundleV5Contract.Open(bundleBytes);
+            if (!openResult.Succeeded)
+            {
+                var runIdentityMismatch =
+                    openResult.FailureKind == RunBundleOpenFailureKind.RunIdentityMismatch;
+                return GhostPayloadExtraction.Failure(
+                    runIdentityMismatch
+                        ? "ghost_run_identity_mismatch"
+                        : openResult.Reason ?? "ghost_bundle_invalid",
+                    runIdentityMismatch
+                        ? HistoryPanelReplayReasonCode.GhostBattleMismatch
+                        : HistoryPanelReplayReasonCode.GhostArtifactInvalid,
+                    openResult.Exception
+                );
+            }
+
+            var opened = openResult.Value!;
             if (
                 !string.Equals(
-                    opened.Manifest.BundleId,
+                    opened.Bundle.Manifest.BundleId,
                     reference.BundleId,
                     StringComparison.Ordinal
                 )
                 || !string.Equals(
-                    opened.Manifest.Run.PlayerAccountId,
+                    opened.Bundle.Manifest.Run.PlayerAccountId,
                     reference.UploaderAccountId,
                     StringComparison.Ordinal
                 )
@@ -245,42 +261,7 @@ internal sealed class GhostBattleSyncService
                     HistoryPanelReplayReasonCode.GhostBattleMismatch
                 );
 
-            if (!RunPayloadV5Codec.TryDecode(opened.RunPayload, out var run, out var decodeReason))
-                return GhostPayloadExtraction.Failure(
-                    decodeReason ?? "run_payload_invalid",
-                    HistoryPanelReplayReasonCode.GhostArtifactInvalid
-                );
-            if (
-                run == null
-                || !string.Equals(run.RunId, opened.Manifest.Run.RunId, StringComparison.Ordinal)
-                || !string.Equals(
-                    run.PlayerAccountId,
-                    opened.Manifest.Run.PlayerAccountId,
-                    StringComparison.Ordinal
-                )
-            )
-                return GhostPayloadExtraction.Failure(
-                    "ghost_run_identity_mismatch",
-                    HistoryPanelReplayReasonCode.GhostBattleMismatch
-                );
-
-            var battle = run.Battles.FirstOrDefault(candidate =>
-                string.Equals(
-                    candidate.BattleId,
-                    reference.RemoteBattleId,
-                    StringComparison.Ordinal
-                )
-            );
-            if (
-                battle == null
-                || battle.Snapshots == null
-                || battle.Replay == null
-                || !run.ReplayableBattleIds.Contains(reference.RemoteBattleId)
-                || !HasCompleteSnapshots(battle.Snapshots)
-                || battle.Replay.SpawnMessageBytes.Length == 0
-                || battle.Replay.CombatMessageBytes.Length == 0
-                || battle.Replay.DespawnMessageBytes.Length == 0
-            )
+            if (!opened.TryGetReplayableBattle(reference.RemoteBattleId, out var battle))
                 return GhostPayloadExtraction.Failure(
                     "ghost_battle_replay_incomplete",
                     HistoryPanelReplayReasonCode.GhostArtifactInvalid
@@ -289,13 +270,13 @@ internal sealed class GhostBattleSyncService
             var replay = new PvpReplayPayload
             {
                 BattleId = reference.LocalBattleId,
-                Version = battle.Replay.Version,
+                Version = battle!.Replay!.Version,
                 SpawnMessageBytes = battle.Replay.SpawnMessageBytes.ToArray(),
                 CombatMessageBytes = battle.Replay.CombatMessageBytes.ToArray(),
                 DespawnMessageBytes = battle.Replay.DespawnMessageBytes.ToArray(),
             };
             _ = new CombatReplayLoader().Load(replay);
-            var manifest = BuildLocalPerspectiveManifest(reference, run.RunId, battle);
+            var manifest = BuildLocalPerspectiveManifest(reference, opened.Payload.RunId, battle);
             return GhostPayloadExtraction.Success(
                 new GhostBattlePayload
                 {
@@ -368,17 +349,6 @@ internal sealed class GhostBattleSyncService
                 OpponentSkills = BuildCapture(battle.Snapshots!, "player_skills"),
             },
         };
-
-    private static bool HasCompleteSnapshots(BattleCardSnapshotsV5 snapshots)
-    {
-        var labels = new[] { "player_hand", "player_skills", "opponent_hand", "opponent_skills" };
-        return labels.All(label =>
-            snapshots.CardSets.Any(set =>
-                string.Equals(set.Label, label, StringComparison.Ordinal)
-                && !string.Equals(set.Status, "Missing", StringComparison.OrdinalIgnoreCase)
-            )
-        );
-    }
 
     private static PvpBattleCardSetCapture BuildCapture(
         BattleCardSnapshotsV5 snapshots,

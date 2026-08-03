@@ -673,7 +673,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
                 logOperation.TryComplete(
                     HistoryPanelServerHealthTerminalStatus.Failed,
                     HistoryPanelServerHealthReasonClassifier.Classify(result.Error),
-                    exception: null,
+                    result.DiagnosticException,
                     out var terminal
                 )
             )
@@ -829,7 +829,7 @@ internal sealed class HistoryPanelCoordinator : IDisposable
             logRequest.Succeeded();
         }
         else
-            logRequest.Failed(result.Outcome);
+            logRequest.Failed(result.Outcome, result.DiagnosticException);
 
         SetAccountLinkBanner(
             RedeemBannerMessage(result.Outcome),

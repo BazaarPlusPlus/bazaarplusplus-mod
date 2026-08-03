@@ -42,7 +42,10 @@ The JSON is retained as text and is not reinterpreted by the Bundle pipeline.
 
 `RunBattleV5` uses keys `0..4` for Battle ID, `BattleFactsV5`, `BattleParticipantsV5`, nullable
 `BattleCardSnapshotsV5`, and nullable `BattleReplayV5`. A Battle is replayable only when both
-nullable fields exist and Spawn, Combat, and Despawn replay byte arrays are non-empty.
+nullable fields exist, Spawn, Combat, and Despawn replay byte arrays are non-empty, and snapshots
+contain exactly one non-`Missing` set for each of `player_hand`, `player_skills`, `opponent_hand`,
+and `opponent_skills`, with no duplicate or extra set. `RunBundleV5Contract` owns this predicate on
+both composition and ghost-import paths.
 
 `BattleParticipantV5` carries account/display/hero/rank/rating/level/prestige/victories plus
 payload-only income, gold, hand-item count, and skill count. Manifest projection normalization is a

@@ -1,5 +1,4 @@
 #nullable enable
-using System.IO.Compression;
 using MessagePack;
 using MessagePack.Resolvers;
 
@@ -20,11 +19,7 @@ public static class RunPayloadV5Codec
         if (payload.PayloadFormatVersion != BundleLimitsV5.RunFormatVersion)
             throw new ArgumentException("Run payload format version must be 5.", nameof(payload));
 
-        var packed = MessagePackSerializer.Serialize(payload, Options);
-        using var output = new MemoryStream();
-        using (var gzip = new GZipStream(output, CompressionLevel.Optimal, leaveOpen: true))
-            gzip.Write(packed, 0, packed.Length);
-        return output.ToArray();
+        return MessagePackGzipFraming.Encode(payload, Options);
     }
 
     public static RunPayloadV5 Decode(ReadOnlyMemory<byte> bytes)
@@ -54,47 +49,32 @@ public static class RunPayloadV5Codec
             return false;
         }
 
-        try
+        var result = MessagePackGzipFraming.TryDecode<RunPayloadV5>(
+            bytes,
+            Options,
+            MaxDecompressedBytes
+        );
+        if (!result.Succeeded)
         {
-            using var input = new MemoryStream(bytes.ToArray(), writable: false);
-            using var gzip = new GZipStream(input, CompressionMode.Decompress);
-            using var decompressed = new MemoryStream();
-            var buffer = new byte[64 * 1024];
-            while (true)
+            reason = result.FailureKind switch
             {
-                var read = gzip.Read(buffer, 0, buffer.Length);
-                if (read == 0)
-                    break;
-                if (decompressed.Length + read > MaxDecompressedBytes)
-                {
-                    reason = "run_payload_decompressed_too_large";
-                    return false;
-                }
-                decompressed.Write(buffer, 0, read);
-            }
-
-            payload = MessagePackSerializer.Deserialize<RunPayloadV5>(
-                decompressed.ToArray(),
-                Options
-            );
-            if (payload == null)
-            {
-                reason = "run_payload_deserialized_null";
-                return false;
-            }
-            if (payload.PayloadFormatVersion != BundleLimitsV5.RunFormatVersion)
-            {
-                payload = null;
-                reason = "unsupported_run_payload_version";
-                return false;
-            }
-            return true;
-        }
-        catch (Exception)
-        {
-            payload = null;
-            reason = "run_payload_decode_failed";
+                MessagePackGzipFailureKind.Empty => "run_payload_empty",
+                MessagePackGzipFailureKind.NotGzip => "run_payload_not_gzip",
+                MessagePackGzipFailureKind.DecompressedTooLarge =>
+                    "run_payload_decompressed_too_large",
+                MessagePackGzipFailureKind.DeserializedNull => "run_payload_deserialized_null",
+                _ => "run_payload_decode_failed",
+            };
             return false;
         }
+
+        payload = result.Value;
+        if (payload!.PayloadFormatVersion != BundleLimitsV5.RunFormatVersion)
+        {
+            payload = null;
+            reason = "unsupported_run_payload_version";
+            return false;
+        }
+        return true;
     }
 }

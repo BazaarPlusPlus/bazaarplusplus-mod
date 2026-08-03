@@ -2,7 +2,8 @@
 
 RoutesTests.Run();
 CodecTests.Run();
-ErrorFormatterTests.Run();
+await ModApiResponseTests.RunAsync();
+await SessionTests.RunAsync();
 HealthClientTests.Run();
 BazaarDbLinkClientTests.Run();
 Console.WriteLine("All ModApi tests passed.");

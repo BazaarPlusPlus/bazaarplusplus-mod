@@ -10,10 +10,11 @@ public static class BppHttpClientFactory
     public static HttpClient Create(
         string productVersion,
         string? userAgentSuffix = null,
-        TimeSpan? timeout = null
+        TimeSpan? timeout = null,
+        HttpMessageHandler? handler = null
     )
     {
-        var client = new HttpClient();
+        var client = handler == null ? new HttpClient() : new HttpClient(handler);
         if (timeout.HasValue)
             client.Timeout = timeout.Value;
 

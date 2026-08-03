@@ -14,7 +14,7 @@ namespace BazaarPlusPlus.Game.HistoryPanel;
 internal sealed class HistoryPanelMount : IBppMountable
 {
     private readonly Func<CombatReplayRuntime?> _combatReplayRuntime;
-    private readonly Func<ModOnlineClient?> _onlineClient;
+    private readonly Func<ModApiSession?> _modApiSession;
     private readonly Func<BazaarDbLinkClient?> _accountLinkClient;
     private readonly Func<OverlayPanelHost?> _overlayHost;
     private readonly INativeCardPreviewHost _nativeCardPreviewHost;
@@ -22,14 +22,14 @@ internal sealed class HistoryPanelMount : IBppMountable
 
     public HistoryPanelMount(
         Func<CombatReplayRuntime?> combatReplayRuntime,
-        Func<ModOnlineClient?> onlineClient,
+        Func<ModApiSession?> modApiSession,
         Func<BazaarDbLinkClient?> accountLinkClient,
         Func<OverlayPanelHost?> overlayHost,
         INativeCardPreviewHost nativeCardPreviewHost
     )
     {
         _combatReplayRuntime = combatReplayRuntime;
-        _onlineClient = onlineClient;
+        _modApiSession = modApiSession;
         _accountLinkClient = accountLinkClient;
         _overlayHost = overlayHost;
         _nativeCardPreviewHost =
@@ -39,23 +39,22 @@ internal sealed class HistoryPanelMount : IBppMountable
     public void Mount(GameObject host, IBppServices services)
     {
         var combatReplayRuntime = _combatReplayRuntime();
-        if (combatReplayRuntime == null)
+        var overlayHost = _overlayHost();
+        var modApiSession = _modApiSession();
+        var plan = HistoryPanelMountPlan.Resolve(
+            combatReplayRuntime != null,
+            overlayHost != null,
+            modApiSession != null
+        );
+        if (plan == HistoryPanelMountMode.DoNotMount && combatReplayRuntime == null)
         {
             LogMissingDependency(HistoryPanelMountDependency.CombatReplayRuntime);
             return;
         }
 
-        var overlayHost = _overlayHost();
-        if (overlayHost == null)
+        if (plan == HistoryPanelMountMode.DoNotMount)
         {
             LogMissingDependency(HistoryPanelMountDependency.OverlayPanelHost);
-            return;
-        }
-
-        var onlineClient = _onlineClient();
-        if (onlineClient == null)
-        {
-            LogMissingDependency(HistoryPanelMountDependency.OnlineClient);
             return;
         }
 
@@ -67,7 +66,7 @@ internal sealed class HistoryPanelMount : IBppMountable
         panel.Configure(
             HistoryPanelFactory.Create(
                 runState,
-                onlineClient,
+                modApiSession,
                 () => combatReplayRuntime,
                 PathConstants.RunLogDatabase(services.Paths.RequireDataRoot()),
                 PathConstants.CombatReplays(services.Paths.RequireDataRoot()),
@@ -84,7 +83,7 @@ internal sealed class HistoryPanelMount : IBppMountable
         );
         // Register with the host only once fully configured; an unconfigured panel (skip paths
         // above) must stay invisible to overlay lifecycle routing.
-        panel.AttachToOverlayHost(overlayHost);
+        panel.AttachToOverlayHost(overlayHost!);
 
         _localeChangedSubscription = services.EventBus.Subscribe<ChineseLocaleModeChanged>(_ =>
             HistoryPanel.RefreshLocalization()

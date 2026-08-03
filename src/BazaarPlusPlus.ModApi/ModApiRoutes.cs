@@ -1,7 +1,7 @@
 #nullable enable
 namespace BazaarPlusPlus.ModApi;
 
-public sealed class ModApiRoutes
+internal sealed class ModApiRoutes
 {
     private ModApiRoutes(Uri apiBaseUri)
     {

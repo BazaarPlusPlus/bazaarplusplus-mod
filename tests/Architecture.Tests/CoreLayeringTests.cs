@@ -2687,7 +2687,11 @@ public class CoreLayeringTests
         Assert.Contains("VoiceLinesSourcePath", targetsText);
         Assert.Contains("PrepareLocalVoiceLinesSource", targetsText);
         Assert.Contains("VoiceLinesValidatorProject", targetsText);
+        Assert.Contains("RemoteEmbeddedDataFetcherProject", targetsText);
         Assert.Contains("%(RemoteEmbeddedData.Identity)", targetsText);
+        Assert.Contains("<Exec", targetsText);
+        Assert.DoesNotContain("RoslynCodeTaskFactory", targetsText);
+        Assert.DoesNotContain("<Code", targetsText);
     }
 
     [Fact]

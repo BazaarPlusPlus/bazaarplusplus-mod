@@ -31,7 +31,7 @@ public class Plugin : BaseUnityPlugin
 {
     private readonly Harmony _harmony = new Harmony(MyPluginInfo.PLUGIN_GUID);
     private BppComposition? _composition;
-    private ModOnlineClient? _onlineClient;
+    private ModApiSession? _modApiSession;
     private BazaarDbLinkClient? _bazaarDbLinkClient;
     private bool _patchesApplied;
     private bool _teardownStarted;
@@ -91,7 +91,7 @@ public class Plugin : BaseUnityPlugin
 
             phase = PluginInitializationPhase.OnlineServices;
             BuildOnlineServices();
-            _composition.AttachOnlineClient(_onlineClient);
+            _composition.AttachModApiSession(_modApiSession);
             _composition.AttachAccountLinkClient(_bazaarDbLinkClient);
 
             phase = PluginInitializationPhase.Mountables;
@@ -227,8 +227,13 @@ public class Plugin : BaseUnityPlugin
             new Uri(BazaarDbLinkClient.DefaultRedeemEndpoint)
         );
 
-        var routes = ModApiRoutes.TryCreate(ModApiUploadDefaults.ApiBaseUrl);
-        if (routes == null)
+        _modApiSession = ModApiSession.TryCreate(
+            ModApiUploadDefaults.ApiBaseUrl,
+            BppPluginVersion.Current,
+            "OnlineClient",
+            TimeSpan.FromSeconds(Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds))
+        );
+        if (_modApiSession == null)
         {
             BppLog.WarnEvent(
                 PluginLogEvents.OnlineServicesDegraded,
@@ -239,13 +244,6 @@ public class Plugin : BaseUnityPlugin
             );
             return;
         }
-
-        var httpClient = BppHttpClientFactory.Create(
-            productVersion: BppPluginVersion.Current,
-            userAgentSuffix: "OnlineClient",
-            timeout: TimeSpan.FromSeconds(Math.Max(10, ModApiUploadDefaults.RequestTimeoutSeconds))
-        );
-        _onlineClient = new ModOnlineClient(httpClient, routes);
     }
 
     private void ApplyHarmonyPatches()
@@ -304,8 +302,8 @@ public class Plugin : BaseUnityPlugin
     {
         _bazaarDbLinkClient?.Dispose();
         _bazaarDbLinkClient = null;
-        _onlineClient?.Dispose();
-        _onlineClient = null;
+        _modApiSession?.Dispose();
+        _modApiSession = null;
     }
 
     private void UnpatchHarmony()

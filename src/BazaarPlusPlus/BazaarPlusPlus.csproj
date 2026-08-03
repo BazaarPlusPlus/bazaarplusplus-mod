@@ -24,6 +24,10 @@
   <ItemGroup>
     <EmbeddedResource Include="Data\CollectionSources\collection-sources.json" />
     <EmbeddedResource
+      Include="Game\Supporters\supporter-list.json"
+      LogicalName="BazaarPlusPlus.Game.Supporters.supporter-list.json"
+    />
+    <EmbeddedResource
       Include="Resources\DockButtons\collection-panel-icon.png"
       LogicalName="BazaarPlusPlus.Resources.DockButtons.collection-panel-icon.png"
     />

@@ -14,6 +14,7 @@ TestDependenciesSingleConstructorArityAndNullAssignment();
 TestRunStateAdapterIsReadOnlyTwoMembers();
 TestEmptyDbPathDegradesRepositoryAndGhostSync();
 TestWhitespaceDbPathDegradesRepositoryAndGhostSync();
+TestMountPlanPreservesLocalHistoryWithoutSession();
 TestFactorySourceWiresEmptyDbDegradeChain();
 
 Console.WriteLine("HistoryPanelFactory checks passed.");
@@ -124,6 +125,23 @@ void TestWhitespaceDbPathDegradesRepositoryAndGhostSync()
     AssertDegradedChain(BuildDataServiceForDbPath("   "), "whitespace");
 }
 
+void TestMountPlanPreservesLocalHistoryWithoutSession()
+{
+    Assert(
+        HistoryPanelMountPlan.Resolve(true, true, false) == HistoryPanelMountMode.MountLocalOnly,
+        "Replay + overlay without a Mod API session should preserve local HistoryPanel."
+    );
+    Assert(
+        HistoryPanelMountPlan.Resolve(true, true, true) == HistoryPanelMountMode.MountWithOnline,
+        "A complete dependency set should mount HistoryPanel with online capabilities."
+    );
+    Assert(
+        HistoryPanelMountPlan.Resolve(false, true, true) == HistoryPanelMountMode.DoNotMount
+            && HistoryPanelMountPlan.Resolve(true, false, true) == HistoryPanelMountMode.DoNotMount,
+        "Replay runtime and overlay host remain required mount dependencies."
+    );
+}
+
 // Mirror HistoryPanelFactory's empty-path degrade chain without invoking Create (Unity-typed
 // signature). Source assertion below proves Factory still owns this wiring.
 HistoryPanelDataService BuildDataServiceForDbPath(string runLogDatabasePath)
@@ -200,14 +218,16 @@ void TestFactorySourceWiresEmptyDbDegradeChain()
     );
     Assert(
         source.Contains(
-            "CreateGhostSyncService(repository, onlineClient)",
+            "CreateGhostSyncService(repository, modApiSession)",
             StringComparison.Ordinal
         ),
-        "Factory must feed the repository into the ghost-sync degrade helper."
+        "Factory must feed repository and session into the ghost-sync degrade helper."
     );
     Assert(
-        source.Contains("if (repository == null)", StringComparison.Ordinal)
-            && source.Contains("return null;", StringComparison.Ordinal),
+        source.Contains(
+            "if (repository == null || modApiSession == null)",
+            StringComparison.Ordinal
+        ) && source.Contains("return null;", StringComparison.Ordinal),
         "CreateGhostSyncService must return null when repository is null."
     );
     Assert(

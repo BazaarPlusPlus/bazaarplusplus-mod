@@ -1,13 +1,13 @@
 #nullable enable
 using System.Globalization;
-using System.Text;
 using BazaarPlusPlus.ModApi.Bundle;
+using BazaarPlusPlus.ModApi.Http;
 using BazaarPlusPlus.ModApi.Models;
 using Newtonsoft.Json.Linq;
 
 namespace BazaarPlusPlus.ModApi.Clients;
 
-public sealed class GhostBattleClient
+internal sealed class GhostBattleClient
 {
     private readonly HttpClient _httpClient;
     private readonly ModApiRoutes _routes;
@@ -38,17 +38,19 @@ public sealed class GhostBattleClient
             using var response = await _httpClient
                 .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);
-            var responseBody = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
+            var parsed = await ModApiResponse
+                .ReadAsync(response, ModApiBodyReadPolicy.Json, cancellationToken)
+                .ConfigureAwait(false);
+            if (!parsed.IsSuccess)
             {
                 return GhostBattleQueryResult.Failure(
-                    ModApiErrorFormatter.FormatHttpFailure((int)response.StatusCode, responseBody),
-                    (int)response.StatusCode,
-                    ReadRetryAfterSeconds(response)
+                    new ModApiFailure(parsed.UserCode, response: parsed),
+                    parsed.StatusCode,
+                    parsed.RetryAfterSeconds
                 );
             }
 
-            var battlesToken = JObject.Parse(responseBody)["battles"] as JArray;
+            var battlesToken = JObject.Parse(parsed.Body)["battles"] as JArray;
             var records = new List<GhostBattleImportRecord>();
             if (battlesToken != null)
             {
@@ -67,7 +69,9 @@ public sealed class GhostBattleClient
         }
         catch (Exception ex)
         {
-            return GhostBattleQueryResult.Failure(ModApiErrorFormatter.Truncate(ex.Message));
+            return GhostBattleQueryResult.Failure(
+                new ModApiFailure("transport_error", diagnosticException: ex)
+            );
         }
     }
 
@@ -87,18 +91,16 @@ public sealed class GhostBattleClient
                 .ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
-                var errorBytes = await ReadBoundedAsync(
-                        response.Content,
-                        16 * 1024,
+                var parsed = await ModApiResponse
+                    .ReadAsync(
+                        response,
+                        new ModApiBodyReadPolicy(16 * 1024, "bundle_too_large"),
                         cancellationToken
                     )
                     .ConfigureAwait(false);
                 return GhostBundleDownloadResult.Failure(
-                    ModApiErrorFormatter.FormatHttpFailure(
-                        (int)response.StatusCode,
-                        Encoding.UTF8.GetString(errorBytes)
-                    ),
-                    (int)response.StatusCode
+                    new ModApiFailure(parsed.UserCode, response: parsed),
+                    parsed.StatusCode
                 );
             }
 
@@ -124,7 +126,9 @@ public sealed class GhostBattleClient
         }
         catch (Exception ex)
         {
-            return GhostBundleDownloadResult.Failure(ModApiErrorFormatter.Truncate(ex.Message));
+            return GhostBundleDownloadResult.Failure(
+                new ModApiFailure("transport_error", diagnosticException: ex)
+            );
         }
     }
 
@@ -269,16 +273,6 @@ public sealed class GhostBattleClient
         }
     }
 
-    private static int? ReadRetryAfterSeconds(HttpResponseMessage response)
-    {
-        var retryAfter = response.Headers.RetryAfter;
-        if (retryAfter?.Delta is { } delta)
-            return Math.Max(0, (int)Math.Ceiling(delta.TotalSeconds));
-        if (retryAfter?.Date is { } date)
-            return Math.Max(0, (int)Math.Ceiling((date - DateTimeOffset.UtcNow).TotalSeconds));
-        return null;
-    }
-
     private sealed class GhostDownloadLimitException : Exception { }
 }
 
@@ -287,21 +281,23 @@ public readonly struct GhostBattleQueryResult
     private GhostBattleQueryResult(
         bool succeeded,
         IReadOnlyList<GhostBattleImportRecord>? battles,
-        string? error,
+        ModApiFailure? failure,
         int? statusCode,
         int? retryAfterSeconds
     )
     {
         Succeeded = succeeded;
         Battles = battles ?? Array.Empty<GhostBattleImportRecord>();
-        Error = error;
+        FailureInfo = failure;
         StatusCode = statusCode;
         RetryAfterSeconds = retryAfterSeconds;
     }
 
     public bool Succeeded { get; }
     public IReadOnlyList<GhostBattleImportRecord> Battles { get; }
-    public string? Error { get; }
+    public ModApiFailure? FailureInfo { get; }
+    public string? Error => FailureInfo?.UserCode;
+    public Exception? DiagnosticException => FailureInfo?.DiagnosticException;
     public int? StatusCode { get; }
     public int? RetryAfterSeconds { get; }
 
@@ -309,29 +305,47 @@ public readonly struct GhostBattleQueryResult
         new(true, battles, null, null, null);
 
     public static GhostBattleQueryResult Failure(
+        ModApiFailure failure,
+        int? statusCode = null,
+        int? retryAfterSeconds = null
+    ) => new(false, null, failure, statusCode, retryAfterSeconds);
+
+    public static GhostBattleQueryResult Failure(
         string error,
         int? statusCode = null,
         int? retryAfterSeconds = null
-    ) => new(false, null, error, statusCode, retryAfterSeconds);
+    ) => Failure(new ModApiFailure(error), statusCode, retryAfterSeconds);
 }
 
 public readonly struct GhostBundleDownloadResult
 {
-    private GhostBundleDownloadResult(bool succeeded, byte[]? bytes, string? error, int? statusCode)
+    private GhostBundleDownloadResult(
+        bool succeeded,
+        byte[]? bytes,
+        ModApiFailure? failure,
+        int? statusCode
+    )
     {
         Succeeded = succeeded;
         Bytes = bytes;
-        Error = error;
+        FailureInfo = failure;
         StatusCode = statusCode;
     }
 
     public bool Succeeded { get; }
     public byte[]? Bytes { get; }
-    public string? Error { get; }
+    public ModApiFailure? FailureInfo { get; }
+    public string? Error => FailureInfo?.UserCode;
+    public Exception? DiagnosticException => FailureInfo?.DiagnosticException;
     public int? StatusCode { get; }
 
     public static GhostBundleDownloadResult Success(byte[] bytes) => new(true, bytes, null, null);
 
+    public static GhostBundleDownloadResult Failure(
+        ModApiFailure failure,
+        int? statusCode = null
+    ) => new(false, null, failure, statusCode);
+
     public static GhostBundleDownloadResult Failure(string error, int? statusCode = null) =>
-        new(false, null, error, statusCode);
+        Failure(new ModApiFailure(error), statusCode);
 }

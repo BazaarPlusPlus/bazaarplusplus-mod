@@ -7,6 +7,40 @@ namespace Architecture.Tests;
 public sealed class RemoteEmbeddedCatalogArchitectureTests
 {
     [Fact]
+    public void Supporters_are_a_third_shared_catalog_consumer_owned_by_composition()
+    {
+        var root = RepoRoot();
+        var supporterRoot = Path.Combine(root, "src", "BazaarPlusPlus", "Game", "Supporters");
+        var facade = File.ReadAllText(Path.Combine(supporterRoot, "BPPSupporterCatalog.cs"));
+        var module = File.ReadAllText(Path.Combine(supporterRoot, "SupporterCatalogModule.cs"));
+        var factory = File.ReadAllText(Path.Combine(supporterRoot, "SupporterCatalogFactory.cs"));
+        var composition = File.ReadAllText(
+            Path.Combine(root, "src", "BazaarPlusPlus", "BppComposition.cs")
+        );
+
+        Assert.Contains("IRemoteEmbeddedCatalog<IReadOnlyList<BPPSupporterEntry>>", module);
+        Assert.Contains("RemoteEmbeddedCatalog<IReadOnlyList<BPPSupporterEntry>>", factory);
+        Assert.Contains("new SupporterCatalogModule", composition);
+        Assert.Contains("_featureRegistry.Register(_supporterCatalogModule)", composition);
+        Assert.DoesNotContain("HttpClient", facade, StringComparison.Ordinal);
+        Assert.DoesNotContain("Path.GetTempPath", facade, StringComparison.Ordinal);
+        Assert.DoesNotContain("Task", facade, StringComparison.Ordinal);
+        Assert.DoesNotContain("IDisposable", facade, StringComparison.Ordinal);
+        Assert.Contains("SupporterLogEvents.CatalogDegraded", module);
+        Assert.Contains("SupporterLogEvents.CatalogRecovered", module);
+        Assert.Contains("SupporterLogEvents.CacheWriteDegraded", module);
+        Assert.Contains("SupporterLogEvents.CacheWriteRecovered", module);
+        Assert.True(
+            module.IndexOf("catalog?.Dispose()", StringComparison.Ordinal)
+                < module.IndexOf(
+                    "BPPSupporterCatalog.DetachAndResetProjection()",
+                    StringComparison.Ordinal
+                ),
+            "The catalog must be disposed before its synchronous projection is reset."
+        );
+    }
+
+    [Fact]
     public void Shared_catalog_contract_and_state_machine_live_in_Infrastructure()
     {
         var sourceRoot = MainSourceRoot();

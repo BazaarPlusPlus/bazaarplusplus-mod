@@ -10,7 +10,7 @@ internal static class HistoryPanelFactory
 {
     public static HistoryPanelDependencies Create(
         IHistoryPanelRunState runState,
-        ModOnlineClient onlineClient,
+        ModApiSession? modApiSession,
         Func<CombatReplayRuntime?> combatReplayRuntimeAccessor,
         string runLogDatabasePath,
         string combatReplayDirectoryPath,
@@ -22,8 +22,6 @@ internal static class HistoryPanelFactory
     {
         if (runState == null)
             throw new ArgumentNullException(nameof(runState));
-        if (onlineClient == null)
-            throw new ArgumentNullException(nameof(onlineClient));
         if (combatReplayRuntimeAccessor == null)
             throw new ArgumentNullException(nameof(combatReplayRuntimeAccessor));
 
@@ -38,7 +36,7 @@ internal static class HistoryPanelFactory
         if (!string.IsNullOrWhiteSpace(databasePath))
             repository = new HistoryPanelRepository(databasePath);
 
-        var ghostSyncService = CreateGhostSyncService(repository, onlineClient);
+        var ghostSyncService = CreateGhostSyncService(repository, modApiSession);
         var dataService = new HistoryPanelDataService(
             repository,
             ghostSyncService,
@@ -51,7 +49,8 @@ internal static class HistoryPanelFactory
             videoDirectoryPath,
             ghostSyncService
         );
-        var serverHealthProbe = new HistoryPanelServerHealthProbe(onlineClient);
+        var serverHealthProbe =
+            modApiSession == null ? null : new HistoryPanelServerHealthProbe(modApiSession);
         return new HistoryPanelDependencies(
             runState,
             dataService,
@@ -65,12 +64,12 @@ internal static class HistoryPanelFactory
 
     private static GhostBattleSyncService? CreateGhostSyncService(
         HistoryPanelRepository? repository,
-        ModOnlineClient onlineClient
+        ModApiSession? modApiSession
     )
     {
-        if (repository == null)
+        if (repository == null || modApiSession == null)
             return null;
 
-        return new GhostBattleSyncService(repository, onlineClient);
+        return new GhostBattleSyncService(repository, modApiSession);
     }
 }

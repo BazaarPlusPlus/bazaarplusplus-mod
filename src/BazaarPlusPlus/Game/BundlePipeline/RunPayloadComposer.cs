@@ -71,7 +71,7 @@ internal sealed class RunPayloadComposer
         {
             var battle = MapBattle(manifest, finalBattleId);
             payload.Battles.Add(battle);
-            if (IsReplayable(battle))
+            if (RunBundleV5Contract.IsReplayable(battle))
                 payload.ReplayableBattleIds.Add(battle.BattleId);
             else
                 payload.Degradation.ReplayOmittedBattleIds.Add(battle.BattleId);
@@ -269,7 +269,7 @@ internal sealed class RunPayloadComposer
         string playerAccountId
     ) =>
         payload
-            .Battles.Where(IsReplayable)
+            .Battles.Where(RunBundleV5Contract.IsReplayable)
             .Where(battle => IsValidProjectionCandidate(battle, playerAccountId))
             .OrderByDescending(battle => ParseTimestamp(battle.Facts.RecordedAtUtc))
             .ThenByDescending(battle => battle.BattleId, StringComparer.Ordinal)
@@ -391,18 +391,6 @@ internal sealed class RunPayloadComposer
         if (!payload.Degradation.ReplayOmittedBattleIds.Contains(battleId))
             payload.Degradation.ReplayOmittedBattleIds.Add(battleId);
     }
-
-    private static bool IsReplayable(RunBattleV5 battle) =>
-        battle.Replay
-            is {
-                SpawnMessageBytes.Length: > 0,
-                CombatMessageBytes.Length: > 0,
-                DespawnMessageBytes.Length: > 0,
-            }
-        && battle.Snapshots?.CardSets.Count == 4
-        && battle.Snapshots.CardSets.All(set =>
-            !string.Equals(set.Status, "Missing", StringComparison.OrdinalIgnoreCase)
-        );
 
     private static bool IsTerminalEvent(string kind) =>
         kind is "run_started" or "run_completed" or "run_abandoned";
