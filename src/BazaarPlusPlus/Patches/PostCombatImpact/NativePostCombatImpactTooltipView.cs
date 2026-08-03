@@ -41,7 +41,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float GroupMetricFontScale = 1f;
     private const float TargetNameFontScale = 0.875f;
     private const float TargetMetricFontScale = 0.875f;
-    private const int ItemRowIconOpticalInset = 6;
+    private const int ItemRowIconOpticalInset = 3;
     private const float MetricColumnMinWidth = 112f;
     private const float MetricColumnPreferredWidth = 190f;
     private static readonly Color32 CausedAccentColor = new(242, 176, 70, 255);
