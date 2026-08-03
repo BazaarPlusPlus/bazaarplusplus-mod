@@ -755,6 +755,123 @@ public sealed class CombatImpactProjectorTests
         Assert.Empty(report.Sources);
     }
 
+    [Fact]
+    public void Known_effect_attribute_does_not_fall_back_to_an_unrelated_transition()
+    {
+        var simulation = new CombatSim();
+        var target = InstanceId.TryParse("target");
+        var executed = Executed(
+            "source",
+            EActionCommandType.CardModifyAttribute,
+            CardTarget("target")
+        );
+        executed.EffectId = "0";
+        simulation.Frames[0].Events.Add(executed);
+        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    PreviousValue = 40,
+                    CurrentValue = 50,
+                },
+            },
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            AbilityAttributeTypesByEffectId = new Dictionary<string, ECardAttributeType>
+            {
+                ["0"] = ECardAttributeType.SellPrice,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.Empty(report.Sources);
+    }
+
+    [Fact]
+    public void Effect_ids_preserve_concurrent_value_and_crit_gains_from_the_same_replay_frames()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        for (var frameIndex = 0; frameIndex < 3; frameIndex++)
+            simulation.Frames.Add(ValueAndCritGainFrame(frameIndex));
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["pen"] = new CombatImpactEntity(
+            "pen",
+            "PenFT",
+            "Item",
+            null,
+            5,
+            AbilityAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                ["0"] = ECardAttributeType.SellPrice,
+            }
+        );
+        entities["caviar"] = new CombatImpactEntity(
+            "caviar",
+            "Caviar",
+            "Item",
+            null,
+            6,
+            AuraAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                ["1"] = ECardAttributeType.CritChance,
+            }
+        );
+        entities["soul"] = new CombatImpactEntity("soul", "Soul of the District", "Item", null, 7);
+        entities["crit-target"] = new CombatImpactEntity(
+            "crit-target",
+            "Crit Target",
+            "Item",
+            null,
+            8
+        );
+        entities["value-target"] = new CombatImpactEntity(
+            "value-target",
+            "Value Target",
+            "Item",
+            null,
+            9
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        var value = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "pen").Groups
+        );
+        Assert.Equal("SellPrice", value.NativeAttributeKey);
+        Assert.Equal(9, value.Count);
+        Assert.Equal(27, value.ObservedValue);
+
+        var crit = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "caviar").Groups
+        );
+        Assert.Equal("CritChance", crit.NativeAttributeKey);
+        Assert.Equal(6, crit.Count);
+        Assert.Equal(36, crit.ObservedValue);
+
+        var soul = Assert.Single(report.Received, received => received.Entity.Id == "soul");
+        Assert.Equal(
+            9,
+            Assert
+                .Single(soul.Groups, group => group.NativeAttributeKey == "SellPrice")
+                .ObservedValue
+        );
+        Assert.Equal(
+            18,
+            Assert
+                .Single(soul.Groups, group => group.NativeAttributeKey == "CritChance")
+                .ObservedValue
+        );
+    }
+
     [Theory]
     [InlineData(EActionCommandType.FlyingStart)]
     [InlineData(EActionCommandType.FlyingStop)]
@@ -1870,6 +1987,62 @@ public sealed class CombatImpactProjectorTests
     {
         var frame = new CombatSimFrame();
         SetSourceAttributeUpdate(frame, attribute, previous, current);
+        return frame;
+    }
+
+    private static CombatSimFrame ValueAndCritGainFrame(int frameIndex)
+    {
+        var frame = new CombatSimFrame();
+        foreach (var targetId in new[] { "soul", "crit-target", "value-target" })
+        {
+            var executed = Executed(
+                "pen",
+                EActionCommandType.CardModifyAttribute,
+                CardTarget(targetId)
+            );
+            executed.ExecutionContextId = $"pen-context-{frameIndex}";
+            executed.EffectId = "0";
+            frame.Events.Add(executed);
+        }
+
+        frame.Events.Add(
+            new CombatSimEventEffectAuraExecuted
+            {
+                ExecutionContextId = $"caviar-context-{frameIndex}",
+                EffectId = "1",
+                Source = InstanceId.TryParse("caviar"),
+                AppliedTo = { CardTarget("soul"), CardTarget("crit-target") },
+            }
+        );
+
+        foreach (var targetId in new[] { "soul", "crit-target", "value-target" })
+        {
+            var target = InstanceId.TryParse(targetId);
+            var update = new CombatSimCardUpdate
+            {
+                CardInstanceId = target,
+                Attributes =
+                {
+                    [ECardAttributeType.SellPrice] = new CombatSimCardAttributeUpdate
+                    {
+                        AttributeType = ECardAttributeType.SellPrice,
+                        PreviousValue = frameIndex * 3,
+                        CurrentValue = (frameIndex + 1) * 3,
+                    },
+                },
+            };
+            if (targetId != "value-target")
+            {
+                update.Attributes[ECardAttributeType.CritChance] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.CritChance,
+                    PreviousValue = frameIndex * 6,
+                    CurrentValue = (frameIndex + 1) * 6,
+                };
+            }
+            frame.CardUpdates[target] = update;
+        }
+
         return frame;
     }
 

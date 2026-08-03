@@ -189,7 +189,8 @@ internal static class CombatImpactProjector
                         item,
                         kind,
                         IsTransitionUnique(frame, executed, item, entities),
-                        executed
+                        executed,
+                        entities
                     )
                     : default;
                 if (
@@ -475,6 +476,89 @@ internal static class CombatImpactProjector
         return null;
     }
 
+    private static bool TryResolveAbilityAttributeType(
+        CombatSimEventEffectExecuted effect,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        out ECardAttributeType attributeType
+    ) =>
+        TryResolveEffectAttributeType(
+            effect.Source?.Value,
+            effect.TriggerSource?.Value,
+            effect.EffectId,
+            entities,
+            static entity => entity.AbilityAttributeTypesByEffectId,
+            out attributeType
+        );
+
+    private static bool TryResolveAuraAttributeType(
+        CombatSimEventEffectAuraExecuted effect,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        out ECardAttributeType attributeType
+    ) =>
+        TryResolveEffectAttributeType(
+            effect.Source?.Value,
+            effect.TriggerSource?.Value,
+            effect.EffectId,
+            entities,
+            static entity => entity.AuraAttributeTypesByEffectId,
+            out attributeType
+        );
+
+    private static bool TryResolveEffectAttributeType(
+        string? directSourceId,
+        string? triggerSourceId,
+        string? effectId,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        Func<CombatImpactEntity, IReadOnlyDictionary<string, ECardAttributeType>?> selectMappings,
+        out ECardAttributeType attributeType
+    )
+    {
+        if (
+            TryResolveEffectAttributeType(
+                directSourceId,
+                effectId,
+                entities,
+                selectMappings,
+                out attributeType
+            )
+        )
+            return true;
+        if (
+            !string.Equals(directSourceId, triggerSourceId, StringComparison.Ordinal)
+            && TryResolveEffectAttributeType(
+                triggerSourceId,
+                effectId,
+                entities,
+                selectMappings,
+                out attributeType
+            )
+        )
+            return true;
+
+        attributeType = default;
+        return false;
+    }
+
+    private static bool TryResolveEffectAttributeType(
+        string? sourceId,
+        string? effectId,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        Func<CombatImpactEntity, IReadOnlyDictionary<string, ECardAttributeType>?> selectMappings,
+        out ECardAttributeType attributeType
+    )
+    {
+        if (
+            !string.IsNullOrWhiteSpace(sourceId)
+            && !string.IsNullOrWhiteSpace(effectId)
+            && entities.TryGetValue(sourceId!, out var source)
+            && selectMappings(source)?.TryGetValue(effectId!, out attributeType) == true
+        )
+            return true;
+
+        attributeType = default;
+        return false;
+    }
+
     private static bool IsActivityEntity(
         string? entityId,
         IReadOnlyDictionary<string, CombatImpactEntity> entities
@@ -506,6 +590,11 @@ internal static class CombatImpactProjector
                 );
                 if (sourceId == null)
                     continue;
+                var hasExpectedCardAttribute = TryResolveAuraAttributeType(
+                    aura,
+                    entities,
+                    out var expectedCardAttribute
+                );
 
                 foreach (var target in aura.AppliedTo.Concat(aura.RemovedFrom))
                 {
@@ -542,23 +631,44 @@ internal static class CombatImpactProjector
                     )
                         continue;
 
-                    var cardChanges = cardUpdate
-                        .Attributes.Values.Where(change =>
-                            change.Delta != 0 && IsDisplayableAuraAttribute(change.AttributeType)
+                    CombatSimCardAttributeUpdate cardChange;
+                    if (hasExpectedCardAttribute)
+                    {
+                        if (
+                            !IsDisplayableAuraAttribute(expectedCardAttribute)
+                            || !cardUpdate.Attributes.TryGetValue(
+                                expectedCardAttribute,
+                                out var expectedChange
+                            )
+                            || expectedChange.Delta == 0
+                            || HasExplicitModifierClaim(
+                                frame,
+                                cardTarget.Target,
+                                expectedCardAttribute,
+                                entities
+                            )
                         )
-                        .ToArray();
-                    if (
-                        cardChanges.Length != 1
-                        || HasExplicitModifierClaim(frame, cardTarget.Target)
-                    )
-                        continue;
+                            continue;
+                        cardChange = expectedChange;
+                    }
+                    else
+                    {
+                        var cardChanges = cardUpdate
+                            .Attributes.Values.Where(change =>
+                                change.Delta != 0
+                                && IsDisplayableAuraAttribute(change.AttributeType)
+                            )
+                            .ToArray();
+                        if (
+                            cardChanges.Length != 1
+                            || HasExplicitModifierClaim(frame, cardTarget.Target)
+                        )
+                            continue;
+                        cardChange = cardChanges[0];
+                    }
 
                     candidates.Add(
-                        new AuraAttributeCandidate(
-                            sourceId,
-                            cardTarget.Target.Value,
-                            cardChanges[0]
-                        )
+                        new AuraAttributeCandidate(sourceId, cardTarget.Target.Value, cardChange)
                     );
                 }
             }
@@ -619,6 +729,28 @@ internal static class CombatImpactProjector
                 && item.Target is EffectTargetCard cardTarget
                 && cardTarget.Target == target
             );
+
+    private static bool HasExplicitModifierClaim(
+        CombatSimFrame frame,
+        InstanceId target,
+        ECardAttributeType attributeType,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        frame
+            .Events.OfType<CombatSimEventEffectExecuted>()
+            .Any(item =>
+                item.ActionType == EActionCommandType.CardModifyAttribute
+                && item.Target is EffectTargetCard cardTarget
+                && cardTarget.Target == target
+                && (
+                    !TryResolveAbilityAttributeType(item, entities, out var claimedAttribute)
+                    || claimedAttribute == attributeType
+                )
+            );
+
+    private static bool IsAttributableCardAttribute(ECardAttributeType attribute) =>
+        IsDisplayableAuraAttribute(attribute)
+        || attribute.ToString().StartsWith("Custom_", StringComparison.Ordinal);
 
     private static bool IsDisplayableAuraAttribute(ECardAttributeType attribute) =>
         OptionalCombatTempoTypes.IsAmountAttribute(attribute)
@@ -954,7 +1086,8 @@ internal static class CombatImpactProjector
         CombatSimEventEffectExecuted item,
         CombatImpactKind kind,
         bool transitionIsUnique,
-        IReadOnlyList<CombatSimEventEffectExecuted> executed
+        IReadOnlyList<CombatSimEventEffectExecuted> executed,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
         if (
@@ -963,7 +1096,7 @@ internal static class CombatImpactProjector
                 is EActionCommandType.CardModifyAttribute
                     or EActionCommandType.PlayerModifyAttribute
         )
-            return ResolveConcreteAttributeTransition(frame, item, kind, executed);
+            return ResolveConcreteAttributeTransition(frame, item, kind, executed, entities);
 
         if (!transitionIsUnique)
             return ResolvedImpactValue.Empty(kind, item.ActionType);
@@ -1079,7 +1212,8 @@ internal static class CombatImpactProjector
         CombatSimFrame frame,
         CombatSimEventEffectExecuted item,
         CombatImpactKind kind,
-        IReadOnlyList<CombatSimEventEffectExecuted> executed
+        IReadOnlyList<CombatSimEventEffectExecuted> executed,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
         if (item.ActionType == EActionCommandType.PlayerModifyAttribute)
@@ -1129,21 +1263,28 @@ internal static class CombatImpactProjector
         )
             return ResolvedImpactValue.Empty(kind, item.ActionType);
 
-        var cardChanges = cardUpdate
-            .Attributes.Values.Where(update =>
-                update.Delta != 0
-                && (
-                    IsDisplayableAuraAttribute(update.AttributeType)
-                    || update
-                        .AttributeType.ToString()
-                        .StartsWith("Custom_", StringComparison.Ordinal)
-                )
+        CombatSimCardAttributeUpdate cardChange;
+        if (TryResolveAbilityAttributeType(item, entities, out var expectedAttribute))
+        {
+            if (
+                !IsAttributableCardAttribute(expectedAttribute)
+                || !cardUpdate.Attributes.TryGetValue(expectedAttribute, out var expectedChange)
+                || expectedChange.Delta == 0
             )
-            .ToArray();
-        if (cardChanges.Length != 1)
-            return ResolvedImpactValue.Empty(kind, item.ActionType);
-
-        var cardChange = cardChanges[0];
+                return ResolvedImpactValue.Empty(kind, item.ActionType);
+            cardChange = expectedChange;
+        }
+        else
+        {
+            var cardChanges = cardUpdate
+                .Attributes.Values.Where(update =>
+                    update.Delta != 0 && IsAttributableCardAttribute(update.AttributeType)
+                )
+                .ToArray();
+            if (cardChanges.Length != 1)
+                return ResolvedImpactValue.Empty(kind, item.ActionType);
+            cardChange = cardChanges[0];
+        }
         if (
             IsClaimedByAnotherExecution(
                 executed,
@@ -1151,7 +1292,8 @@ internal static class CombatImpactProjector
                 new ImpactTransitionClaim(
                     ImpactTransitionDomain.CardAttribute,
                     (int)cardChange.AttributeType
-                )
+                ),
+                entities
             )
         )
             return ResolvedImpactValue.Empty(kind, item.ActionType);
@@ -1171,15 +1313,33 @@ internal static class CombatImpactProjector
     private static bool IsClaimedByAnotherExecution(
         IReadOnlyList<CombatSimEventEffectExecuted> executed,
         CombatSimEventEffectExecuted item,
-        ImpactTransitionClaim transition
+        ImpactTransitionClaim transition,
+        IReadOnlyDictionary<string, CombatImpactEntity>? entities = null
     )
     {
         var targetId = ResolveTargetId(item.Target);
         return executed.Any(candidate =>
             !ReferenceEquals(candidate, item)
             && string.Equals(ResolveTargetId(candidate.Target), targetId, StringComparison.Ordinal)
-            && ClaimsTransition(candidate.ActionType, transition)
+            && ClaimsTransition(candidate, transition, entities)
         );
+    }
+
+    private static bool ClaimsTransition(
+        CombatSimEventEffectExecuted effect,
+        ImpactTransitionClaim transition,
+        IReadOnlyDictionary<string, CombatImpactEntity>? entities
+    )
+    {
+        if (
+            entities != null
+            && effect.ActionType == EActionCommandType.CardModifyAttribute
+            && transition.Domain == ImpactTransitionDomain.CardAttribute
+            && TryResolveAbilityAttributeType(effect, entities, out var attributeType)
+        )
+            return (int)attributeType == transition.Attribute;
+
+        return ClaimsTransition(effect.ActionType, transition);
     }
 
     private static ResolvedImpactValue? ResolveHealthAdjustment(

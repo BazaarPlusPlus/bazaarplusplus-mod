@@ -66,7 +66,9 @@ internal sealed record CombatImpactEntity(
     int DisplaySpan = 1,
     EEnchantmentType? EnchantmentType = null,
     IReadOnlyDictionary<ECardAttributeType, int>? Attributes = null,
-    ECombatantId? CombatantId = null
+    ECombatantId? CombatantId = null,
+    IReadOnlyDictionary<string, ECardAttributeType>? AbilityAttributeTypesByEffectId = null,
+    IReadOnlyDictionary<string, ECardAttributeType>? AuraAttributeTypesByEffectId = null
 );
 
 internal sealed record CombatImpactEvent(

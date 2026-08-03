@@ -1,6 +1,9 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Effect;
+using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Effect.AuraActions;
 using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Localization;
@@ -47,6 +50,7 @@ internal static class CombatImpactEntitySnapshotReader
                 name = card.Type == ECardType.Skill ? T("技能", "Skill") : T("物品", "Item");
 
             var item = card as ItemCard;
+            var effectAttributes = ReadEffectAttributeTypes(card, item);
             entities[instanceId] = new CombatImpactEntity(
                 instanceId,
                 name!,
@@ -60,7 +64,9 @@ internal static class CombatImpactEntitySnapshotReader
                 card.Attributes == null
                     ? null
                     : new Dictionary<ECardAttributeType, int>(card.Attributes),
-                card.Owner?.CombatantId
+                card.Owner?.CombatantId,
+                effectAttributes.Abilities,
+                effectAttributes.Auras
             );
         }
 
@@ -72,6 +78,115 @@ internal static class CombatImpactEntitySnapshotReader
             opponentName = ResolveOpponentName(opponentHero);
         AddPlayer(entities, ECombatantId.Opponent, opponentHero, opponentName, order);
         return entities;
+    }
+
+    private static EffectAttributeTypes ReadEffectAttributeTypes(Card card, ItemCard? item)
+    {
+        try
+        {
+            var abilities = new Dictionary<string, ECardAttributeType>(StringComparer.Ordinal);
+            var auras = new Dictionary<string, ECardAttributeType>(StringComparer.Ordinal);
+            var ambiguousAbilities = new HashSet<string>(StringComparer.Ordinal);
+            var ambiguousAuras = new HashSet<string>(StringComparer.Ordinal);
+
+            AddAbilityAttributeTypes(
+                card.Template?.Abilities?.Values,
+                abilities,
+                ambiguousAbilities
+            );
+            AddAuraAttributeTypes(card.Template?.Auras?.Values, auras, ambiguousAuras);
+
+            if (
+                item?.Enchantment is { } enchantmentType
+                && item.GetEnchantments() is { } enchantments
+                && enchantments.TryGetValue(enchantmentType, out var enchantment)
+            )
+            {
+                AddAbilityAttributeTypes(
+                    enchantment.Abilities?.Values,
+                    abilities,
+                    ambiguousAbilities
+                );
+                AddAuraAttributeTypes(enchantment.Auras?.Values, auras, ambiguousAuras);
+            }
+
+            return new EffectAttributeTypes(
+                abilities.Count == 0 ? null : abilities,
+                auras.Count == 0 ? null : auras
+            );
+        }
+        catch
+        {
+            return default;
+        }
+    }
+
+    private static void AddAbilityAttributeTypes(
+        IEnumerable<TCardAbility>? abilities,
+        IDictionary<string, ECardAttributeType> destination,
+        ISet<string> ambiguousEffectIds
+    )
+    {
+        if (abilities == null)
+            return;
+
+        foreach (var ability in abilities)
+        {
+            // A compound action can modify multiple attributes under one effect id, so only
+            // direct modifiers provide an exact effect-to-attribute mapping.
+            if (ability?.Action is not TActionCardModifyAttribute modifier)
+                continue;
+            AddUniqueEffectAttribute(
+                ability.Id,
+                modifier.AttributeType,
+                destination,
+                ambiguousEffectIds
+            );
+        }
+    }
+
+    private static void AddAuraAttributeTypes(
+        IEnumerable<TCardAura>? auras,
+        IDictionary<string, ECardAttributeType> destination,
+        ISet<string> ambiguousEffectIds
+    )
+    {
+        if (auras == null)
+            return;
+
+        foreach (var aura in auras)
+        {
+            // Keep the same direct-only rule as abilities; nested aura actions are not unique.
+            if (aura?.Action is not TAuraActionCardModifyAttribute modifier)
+                continue;
+            AddUniqueEffectAttribute(
+                aura.Id,
+                modifier.AttributeType,
+                destination,
+                ambiguousEffectIds
+            );
+        }
+    }
+
+    private static void AddUniqueEffectAttribute(
+        string? effectId,
+        ECardAttributeType attributeType,
+        IDictionary<string, ECardAttributeType> destination,
+        ISet<string> ambiguousEffectIds
+    )
+    {
+        if (string.IsNullOrWhiteSpace(effectId) || ambiguousEffectIds.Contains(effectId!))
+            return;
+        if (!destination.TryGetValue(effectId!, out var existing))
+        {
+            destination[effectId!] = attributeType;
+            return;
+        }
+        if (existing == attributeType)
+            return;
+
+        destination.Remove(effectId!);
+        ambiguousEffectIds.Add(effectId!);
     }
 
     private static void AddPlayer(
@@ -130,4 +245,9 @@ internal static class CombatImpactEntitySnapshotReader
 
         return !string.IsNullOrWhiteSpace(localizable.Text) ? localizable.Text : localizable.Key;
     }
+
+    private readonly record struct EffectAttributeTypes(
+        IReadOnlyDictionary<string, ECardAttributeType>? Abilities,
+        IReadOnlyDictionary<string, ECardAttributeType>? Auras
+    );
 }
