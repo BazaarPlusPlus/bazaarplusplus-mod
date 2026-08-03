@@ -95,6 +95,15 @@ Assert(
     "Combat state should suppress enchant previews."
 );
 
+Assert(
+    !BppTooltipSectionRenderPatch.CanRenderEnchantPreview(isInCombat: false, isRecapViewOpen: true),
+    "Recap tooltips should suppress the appended enchant preview section."
+);
+Assert(
+    BppTooltipSectionRenderPatch.CanRenderEnchantPreview(isInCombat: false, isRecapViewOpen: false),
+    "Ordinary out-of-combat tooltips should retain enchant previews."
+);
+
 var opponentBoardItem = new ItemCard { Type = ECardType.Item, Section = null };
 
 Assert(
