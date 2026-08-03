@@ -62,8 +62,9 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
             if (mode == _lastMode)
                 return;
 
+            var previousMode = _lastMode;
             _lastMode = mode;
-            TryRefreshCurrentItemTooltip(_config, _encounterState, ToLogMode(_lastMode));
+            TryRefreshCurrentItemTooltip(mode, previousMode);
         }
         catch (Exception ex)
         {
@@ -107,9 +108,8 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
     );
 
     private void TryRefreshCurrentItemTooltip(
-        IBppConfig? config,
-        IEncounterStateProbe? encounterState,
-        TooltipPreviewRefreshMode mode
+        TooltipPreviewMode mode,
+        TooltipPreviewMode previousMode
     )
     {
         var tooltipParent = Data.TooltipParentComponent;
@@ -125,29 +125,23 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
         if (!TryResolveRefreshTarget(tooltipParent, out var target))
             return;
 
-        var refreshedTooltipData = CardTooltipDataFactory.Create(
+        var tooltipController = tooltipParent.GetCardTooltipController(target.Card);
+        if (tooltipController == null)
+            return;
+
+        TooltipPreviewContentRefresh.TryApply(
+            target.Controller,
+            tooltipController,
             target.Card,
             target.TooltipData,
-            mode
-        );
-
-        tooltipParent.HideCardTooltipController();
-        tooltipParent.ShowCardTooltipController(
-            target.Controller.transform,
-            target.Controller.TooltipOffset,
-            refreshedTooltipData
-        );
-        UpgradeTooltipScheduler.TryScheduleUpgradeTooltip(
-            target.Controller,
-            config,
-            encounterState,
-            refreshedTooltipData
+            mode,
+            previousMode
         );
     }
 
     private bool TryRefreshHoveredPreviewTooltip(
         TooltipParentComponent tooltipParent,
-        TooltipPreviewRefreshMode mode
+        TooltipPreviewMode mode
     )
     {
         if (_nativeCardPreviewHost == null)
@@ -158,8 +152,8 @@ internal sealed class TooltipModifierRefreshController : MonoBehaviour
                 tooltipParent,
                 mode switch
                 {
-                    TooltipPreviewRefreshMode.Enchant => NativeTooltipRefreshMode.Enchant,
-                    TooltipPreviewRefreshMode.Upgrade => NativeTooltipRefreshMode.Upgrade,
+                    TooltipPreviewMode.Enchant => NativeTooltipRefreshMode.Enchant,
+                    TooltipPreviewMode.Upgrade => NativeTooltipRefreshMode.Upgrade,
                     _ => NativeTooltipRefreshMode.Normal,
                 }
             )

@@ -6,7 +6,7 @@ namespace NativeCardPreviewHost.Tests;
 public sealed class NativeTooltipRefreshTransactionTests
 {
     [Fact]
-    public void Success_commits_replacement_before_rehover()
+    public void Success_commits_replacement_before_in_place_apply()
     {
         var current = new Value("old");
         var replacement = new Value("new");
@@ -26,25 +26,24 @@ public sealed class NativeTooltipRefreshTransactionTests
                 calls.Add($"write:{value.Name}");
                 return true;
             },
-            () => calls.Add("hide"),
-            () =>
+            value =>
             {
-                calls.Add("hover");
+                calls.Add($"apply:{value.Name}");
                 return true;
             }
         );
 
         Assert.Equal(NativeTooltipRefreshTransactionStatus.Refreshed, result.Status);
         Assert.Same(replacement, stored);
-        Assert.Equal(new[] { "create", "write:new", "hide", "hover" }, calls);
+        Assert.Equal(new[] { "create", "write:new", "apply:new" }, calls);
     }
 
     [Fact]
-    public void Failed_rehover_restores_old_value_and_tooltip()
+    public void Failed_apply_restores_old_value_and_tooltip()
     {
         var current = new Value("old");
         var stored = current;
-        var hoverCount = 0;
+        var applied = new List<Value>();
 
         var result = NativeTooltipRefreshTransaction.Execute(
             current,
@@ -54,13 +53,16 @@ public sealed class NativeTooltipRefreshTransactionTests
                 stored = value;
                 return true;
             },
-            () => { },
-            () => ++hoverCount > 1
+            value =>
+            {
+                applied.Add(value);
+                return ReferenceEquals(value, current);
+            }
         );
 
-        Assert.Equal(NativeTooltipRefreshTransactionStatus.RehoverFailed, result.Status);
+        Assert.Equal(NativeTooltipRefreshTransactionStatus.ApplyFailed, result.Status);
         Assert.Same(current, stored);
-        Assert.Equal(2, hoverCount);
+        Assert.Equal(new[] { new Value("new"), current }, applied);
     }
 
     [Fact]
@@ -79,8 +81,7 @@ public sealed class NativeTooltipRefreshTransactionTests
                 writeCount++;
                 return writeCount > 1;
             },
-            () => throw new InvalidOperationException("must not rehover"),
-            () => throw new InvalidOperationException("must not rehover")
+            _ => throw new InvalidOperationException("must not apply")
         );
 
         Assert.Equal(NativeTooltipRefreshTransactionStatus.WriteFailed, result.Status);
@@ -89,13 +90,13 @@ public sealed class NativeTooltipRefreshTransactionTests
     }
 
     [Fact]
-    public void Failed_rollback_does_not_rehover_unrestored_replacement()
+    public void Failed_rollback_does_not_apply_unrestored_current_value()
     {
         var current = new Value("old");
         var replacement = new Value("new");
         var stored = current;
         var writeCount = 0;
-        var rehoverCount = 0;
+        var applied = new List<Value>();
 
         var result = NativeTooltipRefreshTransaction.Execute(
             current,
@@ -111,10 +112,9 @@ public sealed class NativeTooltipRefreshTransactionTests
 
                 return false;
             },
-            () => { },
-            () =>
+            value =>
             {
-                rehoverCount++;
+                applied.Add(value);
                 return false;
             }
         );
@@ -122,7 +122,7 @@ public sealed class NativeTooltipRefreshTransactionTests
         Assert.Equal(NativeTooltipRefreshTransactionStatus.RollbackFailed, result.Status);
         Assert.Same(replacement, stored);
         Assert.Equal(2, writeCount);
-        Assert.Equal(1, rehoverCount);
+        Assert.Equal(new[] { replacement }, applied);
     }
 
     private sealed record Value(string Name);

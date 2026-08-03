@@ -91,17 +91,22 @@ internal static class UpgradeTooltipScheduler
                 }
 
                 var tooltipParent = Data.TooltipParentComponent;
-                if (tooltipParent != null && tooltipParent.GetCardTooltipController(card) != null)
+                var tooltipController = tooltipParent?.GetCardTooltipController(card);
+                if (tooltipParent != null && tooltipController != null)
                 {
-                    RefreshPrimaryTooltipForUpgradePreview(
-                        controller,
-                        card,
-                        tooltipData,
-                        tooltipParent,
-                        config,
-                        encounterState
-                    );
-                    yield break;
+                    if (
+                        RefreshPrimaryTooltipForUpgradePreview(
+                            controller,
+                            card,
+                            tooltipData,
+                            tooltipController,
+                            config,
+                            encounterState
+                        )
+                    )
+                    {
+                        yield break;
+                    }
                 }
 
                 yield return null;
@@ -113,27 +118,17 @@ internal static class UpgradeTooltipScheduler
         }
     }
 
-    private static void RefreshPrimaryTooltipForUpgradePreview(
+    private static bool RefreshPrimaryTooltipForUpgradePreview(
         CardController controller,
         Card card,
         CardTooltipData tooltipData,
-        TooltipParentComponent tooltipParent,
+        CardTooltipController tooltipController,
         IBppConfig? config,
         IEncounterStateProbe? encounterState
     )
     {
-        if (controller == null || tooltipParent == null)
-            return;
-
-        if (tooltipParent.GetCardTooltipController(card) == null)
-            return;
-
-        var refreshedTooltipData = CardTooltipDataFactory.Create(
-            card,
-            tooltipData,
-            TooltipPreviewRefreshMode.Upgrade
-        );
-        tooltipParent.HideCardTooltipController();
+        if (controller == null || tooltipController == null || card is not ItemCard itemCard)
+            return false;
 
         if (
             controller == null
@@ -141,14 +136,18 @@ internal static class UpgradeTooltipScheduler
             || !IsUpgradePreviewActive(config, encounterState)
         )
         {
-            return;
+            return false;
         }
 
-        controller.EnterUpgradePreview();
-        tooltipParent.ShowCardTooltipController(
-            controller.transform,
-            controller.TooltipOffset,
-            refreshedTooltipData
+        var currentTooltipData =
+            tooltipController.CurrentTooltipData as CardTooltipData ?? tooltipData;
+        return TooltipPreviewContentRefresh.TryApply(
+            controller,
+            tooltipController,
+            itemCard,
+            currentTooltipData,
+            TooltipPreviewMode.Upgrade,
+            TooltipPreviewMode.Normal
         );
     }
 }
