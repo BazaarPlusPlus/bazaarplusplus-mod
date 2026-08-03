@@ -114,8 +114,8 @@ internal static class CombatImpactMetricFormatter
         if (criticalCount <= 0 || string.IsNullOrWhiteSpace(criticalMarker))
             return baseCount;
         return chinese
-            ? $"{baseCount}（{criticalCount} {criticalMarker}）"
-            : $"{baseCount} ({criticalCount} {criticalMarker})";
+            ? $"{baseCount}（{criticalCount}{criticalMarker}）"
+            : $"{baseCount} ({criticalCount}{criticalMarker})";
     }
 
     internal static string IncomingSource(
