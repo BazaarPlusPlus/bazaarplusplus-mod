@@ -2327,6 +2327,9 @@ public class CoreLayeringTests
         );
         Assert.Contains("ActiveSessionManifest", runtimeSource);
         Assert.Contains("native-recap-board-readiness-timeout", runtimeSource);
+        Assert.Contains("capture.Items.Count(card => card?.Type == ECardType.Item)", runtimeSource);
+        Assert.Contains("so the recap could not open.", runtimeSource);
+        Assert.DoesNotContain("before the recap opened.", runtimeSource);
         Assert.Contains("invokeNativeRecap();", runtimeSource);
         Assert.True(
             runtimeSource.IndexOf(

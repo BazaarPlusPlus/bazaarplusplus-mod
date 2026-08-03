@@ -1118,7 +1118,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             FailRecordedReplayBeforeRecap(
                 currentNativeRecording,
                 "native-recap-board-readiness-timeout",
-                "The replay board did not finish rebuilding before the recap opened."
+                "The replay board did not finish rebuilding, so the recap could not open."
             );
             yield break;
         }
@@ -1169,7 +1169,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
 
     private static int? CapturedItemCount(PvpBattleCardSetCapture? capture) =>
         capture?.Status is PvpBattleCaptureStatus.Captured or PvpBattleCaptureStatus.CapturedEmpty
-            ? capture.Items.Count(card => card.Type == ECardType.Item)
+            ? capture.Items.Count(card => card?.Type == ECardType.Item)
             : null;
 
     private void BlockCurrentReplayRecapInput()
