@@ -45,7 +45,6 @@ internal enum ReplayVideoLogStage
     MuxCallback,
     MuxProbe,
     MuxDrain,
-    DebugStem,
     TempDelete,
     WavDelete,
     UiSuppression,
@@ -64,5 +63,4 @@ internal enum ReplayVideoDiagnosticReasonCode
     CleanupException,
     ProbeFailed,
     DrainFailed,
-    StemPreserveFailed,
 }
