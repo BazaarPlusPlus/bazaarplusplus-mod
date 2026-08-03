@@ -32,3 +32,34 @@ Deleted and absorbed with the batch — do not resurrect:
 - `UploadFeedActivation`, `UploadArmHook`, and the static `CurrentByFeed` registry (replaced by `IUploadFeedSession` + the `UploadArmRequested` bus event).
 - `HistoryPanelRuntime` and the telescoping `HistoryPanelDependencies` constructors; `IHistoryPanelRuntime` narrowed to the read-only two-member [`IHistoryPanelRunState`](../../src/BazaarPlusPlus/Game/HistoryPanel/IHistoryPanelRunState.cs#L10).
 - `EncounterOption`'s dead source-attribution members and the three same-shape preview result records, merged into the single `EventPreviewResult` ([`EncounterPreviewModule.cs:27`](../../src/BazaarPlusPlus/Game/EventPreview/EncounterPreviewModule.cs#L27)).
+
+## Bundle seal extension
+
+`BundleSealConvergence` applies the same decision-core pattern to V5 Bundle sealing. Storage parses
+the persisted absolute SQLite instant as UTC
+([`SqliteUtcInstant.cs:6`](../../src/BazaarPlusPlus.Storage/Sqlite/SqliteUtcInstant.cs#L6),
+[`BundleQueueStore.cs:305`](../../src/BazaarPlusPlus.Storage/BundleQueue/BundleQueueStore.cs#L305));
+the coordinator translates it once into `secondsUntilInputDeadline`
+([`BundleSealCoordinator.cs:146`](../../src/BazaarPlusPlus/Game/BundlePipeline/BundleSealCoordinator.cs#L146));
+the core receives only relative time and input facts and returns `Continue`, `Wait`, a screenshot
+degradation, or a terminal decision
+([`BundleSealConvergence.cs:65`](../../src/BazaarPlusPlus/Game/BundlePipeline/BundleSealConvergence.cs#L65)).
+Do not move a clock, SQLite text, files, codecs, or runtime objects into this core.
+
+## Testability clarification
+
+“Pure decision core” means that runtime effects are absent from the decision object; it does not
+imply that every such source file can compile without domain dependencies or game assemblies.
+`SavedReplayLifecycle` is the zero-dependency Compile-Include precedent: its source has no `using`
+directives beyond the nullable directive and namespace
+([`SavedReplayLifecycle.cs:1`](../../src/BazaarPlusPlus/Game/CombatReplay/SavedReplayLifecycle.cs#L1)),
+and its test project includes the source without a ManagedPath reference
+([`CombatReplayPlaybackLogging.Tests.csproj:19`](../../tests/CombatReplayPlaybackLogging.Tests/CombatReplayPlaybackLogging.Tests.csproj#L19)).
+By contrast, `CollectionViewState` consumes game-domain types
+([`CollectionViewState.cs:2`](../../src/BazaarPlusPlus/Game/CollectionPanel/CollectionViewState.cs#L2)),
+and its test project references both `BazaarGameShared.dll` and `TheBazaarRuntime.dll`
+([`CollectionViewState.Tests.csproj:253`](../../tests/CollectionViewState.Tests/CollectionViewState.Tests.csproj#L253));
+Collection grid tests also reference `BazaarGameShared.dll`
+([`CollectionGridLayout.Tests.csproj:66`](../../tests/CollectionGridLayout.Tests/CollectionGridLayout.Tests.csproj#L66)).
+Use the `SavedReplayLifecycle` shape when a new zero-ManagedPath core is required; otherwise keep the
+smallest real domain dependency instead of inventing mirror enums solely for test isolation.

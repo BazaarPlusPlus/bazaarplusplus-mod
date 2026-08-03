@@ -4,7 +4,6 @@ using BazaarPlusPlus.Core.GameState;
 using BazaarPlusPlus.Core.Runtime;
 using BazaarPlusPlus.Game.BundlePipeline;
 using BazaarPlusPlus.GameInterop;
-using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Bundle;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.Storage.Paths;
@@ -14,18 +13,21 @@ using Microsoft.Data.Sqlite;
 
 var baseUrl = ReadOption(args, "--base-url")
     ?? throw new ArgumentException("--base-url is required");
-var routes = ModApiRoutes.TryCreate(baseUrl)
-    ?? throw new ArgumentException("--base-url must be an absolute HTTP(S) URL");
-using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(125) };
-var client = new BundleUploadClient(http, routes);
+using var session =
+    ModApiSession.TryCreate(
+        baseUrl,
+        "e2e",
+        "BundleV5E2E",
+        TimeSpan.FromSeconds(125)
+    ) ?? throw new ArgumentException("--base-url must be an absolute HTTP(S) URL");
 
 var golden = Convert.FromBase64String(
     File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "run-only.bundle.b64")).Trim()
 );
 var openedGolden = BundleV5Codec.Open(golden);
-var first = await Upload(client, golden, openedGolden);
+var first = await Upload(session, golden, openedGolden);
 Require(first.Disposition == BundleUploadDisposition.Uploaded && first.Outcome == "stored", "golden Bundle must return 201 stored");
-var duplicate = await Upload(client, golden, openedGolden);
+var duplicate = await Upload(session, golden, openedGolden);
 Require(duplicate.Disposition == BundleUploadDisposition.Uploaded && duplicate.Outcome == "duplicate", "golden retransmit must return 200 duplicate");
 
 var conflictingPayload = RunPayloadV5Codec.Encode(
@@ -46,7 +48,7 @@ var conflicting = BundleV5Codec.Build(
         RunPayload = conflictingPayload,
     }
 );
-var conflict = await Upload(client, conflicting.Bytes, BundleV5Codec.Open(conflicting.Bytes));
+var conflict = await Upload(session, conflicting.Bytes, BundleV5Codec.Open(conflicting.Bytes));
 Require(conflict.Disposition == BundleUploadDisposition.Permanent && conflict.Code == "bundle_id_conflict", "same Bundle ID with valid different bytes must conflict");
 
 var root = Path.Combine(Path.GetTempPath(), "bpp-v5-e2e-" + Guid.NewGuid().ToString("N"));
@@ -80,7 +82,7 @@ try
         ?? throw new InvalidOperationException("production sealer did not publish an outbox file");
     var sealedBytes = File.ReadAllBytes(Path.Combine(PathConstants.BundleOutbox(root), fileName));
     var sealedBundle = BundleV5Codec.Open(sealedBytes);
-    var sealedResponse = await Upload(client, sealedBytes, sealedBundle);
+    var sealedResponse = await Upload(session, sealedBytes, sealedBundle);
     Require(sealedResponse.Disposition == BundleUploadDisposition.Uploaded && sealedResponse.Outcome == "stored", "real sealer Bundle must return 201 stored");
 }
 finally
@@ -91,13 +93,13 @@ finally
 Console.WriteLine("Bundle V5 local ingest E2E passed: stored, duplicate, conflict, production sealer stored.");
 
 static async Task<BundleUploadResponse> Upload(
-    BundleUploadClient client,
+    ModApiSession session,
     byte[] bytes,
     OpenedBundleV5 opened
 )
 {
     using var stream = new MemoryStream(bytes, writable: false);
-    return await client.UploadAsync(
+    return await session.UploadBundleAsync(
         stream,
         bytes.Length,
         opened.ContentDigest,

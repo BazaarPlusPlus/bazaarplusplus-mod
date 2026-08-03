@@ -194,8 +194,12 @@ internal static class BazaarDbLinkClientTests
         );
         Assert(result.StatusCode == null, "Transport exception should not have an HTTP status.");
         Assert(
-            result.Error == "DNS exploded",
-            "Transport exception should preserve truncated message."
+            result.Error == "transport_error",
+            "Transport exception should expose only the closed user code."
+        );
+        Assert(
+            result.DiagnosticException?.Message == "DNS exploded",
+            "Transport exception should remain available to diagnostics."
         );
     }
 

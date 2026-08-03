@@ -140,23 +140,62 @@ resolve_installer_source() {
 }
 
 fetch_remote_data() {
-    local args=("$@")
-    dotnet msbuild src/BazaarPlusPlus/BazaarPlusPlus.csproj \
+    local canonical_directory="$SCRIPT_DIR/src/BazaarPlusPlus/obj/remote-data"
+    local arg
+    for arg in "$@"; do
+        case "$arg" in
+            -p:RemoteEmbeddedDataDirectory=*|--property:RemoteEmbeddedDataDirectory=*)
+                canonical_directory="${arg#*=}"
+                ;;
+        esac
+    done
+
+    local canonical_parent
+    canonical_parent="$(dirname "$canonical_directory")"
+    mkdir -p "$canonical_parent"
+    local staging_directory
+    staging_directory="$(mktemp -d "$canonical_parent/.remote-data-stage.XXXXXX")"
+    local status=0
+
+    if dotnet msbuild src/BazaarPlusPlus/BazaarPlusPlus.csproj \
         -t:FetchRemoteEmbeddedData \
-        ${args[@]+"${args[@]}"} \
-        -p:ForceRemoteEmbeddedDataRefresh=true
+        "$@" \
+        -p:RemoteEmbeddedDataDirectory="$staging_directory" \
+        -p:ForceRemoteEmbeddedDataRefresh=true; then
+        if run_seed_gates \
+            "$@" \
+            -p:RemoteEmbeddedDataDirectory="$staging_directory" \
+            -p:RemoteEmbeddedDataPrepared=true; then
+            if dotnet run \
+                --project build/RemoteEmbeddedDataFetcher/RemoteEmbeddedDataFetcher.csproj \
+                --no-launch-profile -- \
+                promote "$staging_directory" "$canonical_directory" \
+                voice-lines.json tenwin_builds.json; then
+                :
+            else
+                status=$?
+            fi
+        else
+            status=$?
+        fi
+    else
+        status=$?
+    fi
+
+    rm -rf -- "$staging_directory"
+    return "$status"
 }
 
 run_seed_gates() {
-    local args=("$@")
     echo -e "${CYAN}== Validating ${GREEN}voice subtitle embedded seed${CYAN} ==${RESET}"
     dotnet test tests/VoiceSubtitles.Tests/VoiceSubtitles.Tests.csproj \
         -c Release \
-        ${args[@]+"${args[@]}"}
+        --filter "FullyQualifiedName~Embedded_seed" \
+        "$@" || return $?
     echo -e "${CYAN}== Validating ${GREEN}live build recommendation embedded seed${CYAN} ==${RESET}"
     dotnet run --project tests/LiveBuildRecommendations.Tests/LiveBuildRecommendations.Tests.csproj \
         -c Release \
-        ${args[@]+"${args[@]}"}
+        "$@" || return $?
 }
 
 publish() {
@@ -190,7 +229,6 @@ publish() {
     repair_macos_trampoline "$installer_source"
 
     fetch_remote_data "${common_args[@]}"
-    run_seed_gates "${common_args[@]}" -p:RemoteEmbeddedDataPrepared=true
 
     local build_args=(
         -t:BuildAll

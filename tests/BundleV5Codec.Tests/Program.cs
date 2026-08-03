@@ -1,8 +1,11 @@
 #nullable enable
+using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using BazaarPlusPlus.ModApi.Bundle;
+using MessagePack;
+using MessagePack.Resolvers;
 
 var fixtures = Path.Combine(AppContext.BaseDirectory, "fixtures");
 
@@ -13,6 +16,8 @@ InvalidInputs();
 ReaderBoundsAndUnknownFields();
 Ulids();
 RunPayloadRoundTrip();
+RunPayloadFailureBoundaries();
+RunBundleContract();
 MessagePackDtoGraphIsPublic();
 
 Console.WriteLine("All Bundle V5 codec tests passed.");
@@ -297,6 +302,134 @@ void RunPayloadRoundTrip()
         "stable Run payload fixture"
     );
 }
+
+void RunPayloadFailureBoundaries()
+{
+    True(
+        !RunPayloadV5Codec.TryDecode(new byte[] { 0x1F }, out _, out var shortReason)
+            && shortReason == "run_payload_empty",
+        "short payload keeps its closed empty reason"
+    );
+
+    var versionFour = SamplePayload(Array.Empty<string>());
+    versionFour.PayloadFormatVersion = 4;
+    var options = MessagePackSerializerOptions
+        .Standard.WithResolver(ContractlessStandardResolverAllowPrivate.Instance)
+        .WithSecurity(MessagePackSecurity.UntrustedData);
+    var versionFourBytes = Gzip(MessagePackSerializer.Serialize(versionFour, options));
+    True(
+        !RunPayloadV5Codec.TryDecode(versionFourBytes, out _, out var versionReason)
+            && versionReason == "unsupported_run_payload_version",
+        "wrong Run payload version keeps its closed reason"
+    );
+
+    var oversizedBytes = Gzip(new byte[RunPayloadV5Codec.MaxDecompressedBytes + 1]);
+    True(
+        !RunPayloadV5Codec.TryDecode(oversizedBytes, out _, out var sizeReason)
+            && sizeReason == "run_payload_decompressed_too_large",
+        "decompressed Run payload limit is enforced before MessagePack decoding"
+    );
+}
+
+byte[] Gzip(byte[] bytes)
+{
+    using var output = new MemoryStream();
+    using (var gzip = new GZipStream(output, CompressionLevel.Optimal, leaveOpen: true))
+        gzip.Write(bytes, 0, bytes.Length);
+    return output.ToArray();
+}
+
+void RunBundleContract()
+{
+    var battle = ReplayBattle("battle-contract");
+    var payload = SamplePayload(new[] { battle.BattleId });
+    payload.Battles.Add(battle);
+    var built = BundleV5Codec.Build(
+        new BundleBuildInputV5
+        {
+            BundleId = "01J00000000000000000000905",
+            CreatedAtMs = 1_785_628_800_000,
+            RunId = payload.RunId,
+            PlayerAccountId = payload.PlayerAccountId,
+            RunPayload = RunPayloadV5Codec.Encode(payload),
+        }
+    );
+
+    var opened = RunBundleV5Contract.Open(built.Bytes);
+    True(opened.Succeeded, "Run Bundle contract opens a self-consistent bundle");
+    True(
+        opened.Value!.TryGetReplayableBattle(battle.BattleId, out var replayable),
+        "Run Bundle contract resolves a replayable battle"
+    );
+    Equal(battle.BattleId, replayable!.BattleId, "resolved replayable battle ID");
+
+    var identityMismatch = BundleV5Codec.Build(
+        new BundleBuildInputV5
+        {
+            BundleId = "01J00000000000000000000906",
+            CreatedAtMs = 1_785_628_800_000,
+            RunId = "different-run",
+            PlayerAccountId = payload.PlayerAccountId,
+            RunPayload = RunPayloadV5Codec.Encode(payload),
+        }
+    );
+    Equal(
+        RunBundleOpenFailureKind.RunIdentityMismatch,
+        RunBundleV5Contract.Open(identityMismatch.Bytes).FailureKind,
+        "manifest/payload identity mismatch classification"
+    );
+
+    var missingLabel = ReplayBattle("missing-label");
+    missingLabel.Snapshots!.CardSets.RemoveAt(0);
+    True(!RunBundleV5Contract.IsReplayable(missingLabel), "missing card-set label rejected");
+
+    var duplicateLabel = ReplayBattle("duplicate-label");
+    duplicateLabel.Snapshots!.CardSets[3].Label = "player_hand";
+    True(!RunBundleV5Contract.IsReplayable(duplicateLabel), "duplicate card-set label rejected");
+
+    var extraLabel = ReplayBattle("extra-label");
+    extraLabel.Snapshots!.CardSets.Add(new BattleCardSetV5 { Label = "future" });
+    True(!RunBundleV5Contract.IsReplayable(extraLabel), "extra card set rejected");
+
+    var emptyPhase = ReplayBattle("empty-phase");
+    emptyPhase.Replay!.CombatMessageBytes = Array.Empty<byte>();
+    True(!RunBundleV5Contract.IsReplayable(emptyPhase), "empty replay phase rejected");
+
+    var nilCardSets = ReplayBattle("nil-card-sets");
+    nilCardSets.Snapshots!.CardSets = null!;
+    True(!RunBundleV5Contract.IsReplayable(nilCardSets), "nil card sets rejected");
+
+    opened.Value.Payload.ReplayableBattleIds = null!;
+    True(
+        !opened.Value.TryGetReplayableBattle(battle.BattleId, out _),
+        "nil replayable-battle IDs rejected"
+    );
+    opened.Value.Payload.ReplayableBattleIds = [battle.BattleId];
+    opened.Value.Payload.Battles = null!;
+    True(!opened.Value.TryGetReplayableBattle(battle.BattleId, out _), "nil battles rejected");
+}
+
+RunBattleV5 ReplayBattle(string battleId) =>
+    new()
+    {
+        BattleId = battleId,
+        Snapshots = new BattleCardSnapshotsV5
+        {
+            CardSets =
+            [
+                new BattleCardSetV5 { Label = "player_hand", Status = "Captured" },
+                new BattleCardSetV5 { Label = "player_skills", Status = "Captured" },
+                new BattleCardSetV5 { Label = "opponent_hand", Status = "Captured" },
+                new BattleCardSetV5 { Label = "opponent_skills", Status = "Captured" },
+            ],
+        },
+        Replay = new BattleReplayV5
+        {
+            SpawnMessageBytes = new byte[] { 1 },
+            CombatMessageBytes = new byte[] { 2 },
+            DespawnMessageBytes = new byte[] { 3 },
+        },
+    };
 
 BundleBuildResultV5 BuildWith(
     IReadOnlyList<BundleBattleProjectionV5> battles,

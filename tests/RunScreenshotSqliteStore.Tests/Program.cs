@@ -109,6 +109,31 @@ try
         ) == "Vanessa",
         "run_screenshots should persist hero_name."
     );
+    var latestMethod = storeType.GetMethod(
+        "TryGetLatestPrimaryForRun",
+        BindingFlags.Public | BindingFlags.Instance
+    );
+    Assert(
+        latestMethod != null,
+        "RunScreenshotSqliteStore should expose the primary screenshot query."
+    );
+    var artifact = latestMethod!.Invoke(store, ["run-001"]);
+    Assert(artifact != null, "The latest primary screenshot should be returned.");
+    var artifactType = artifact!.GetType();
+    Assert(
+        (string?)artifactType.GetProperty("ImageRelativePath")?.GetValue(artifact)
+            == Path.Combine("2026-04-08", "2026-04-08_21-30-25-000_final_run-run-001.png"),
+        "The screenshot query should preserve the stored relative path."
+    );
+    Assert(
+        (DateTimeOffset?)artifactType.GetProperty("CapturedAtUtc")?.GetValue(artifact)
+            == utcCapturedAt.AddSeconds(10),
+        "The screenshot query should return the stored UTC instant."
+    );
+    Assert(
+        latestMethod.Invoke(store, ["missing-run"]) == null,
+        "A run without a primary screenshot should return null."
+    );
     ExpectSqliteConstraint(
         () =>
             saveMethod.Invoke(

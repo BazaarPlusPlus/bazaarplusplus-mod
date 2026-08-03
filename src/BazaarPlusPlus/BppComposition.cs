@@ -77,9 +77,10 @@ internal sealed class BppComposition : IDisposable
     private readonly BppPatchFeatures _patchFeatures;
     private readonly VoiceSubtitlesModule _voiceSubtitlesModule;
     private readonly VoiceSubtitlesInteropModule _voiceSubtitlesInteropModule;
+    private readonly SupporterCatalogModule _supporterCatalogModule;
     private readonly IRemoteEmbeddedCatalog<TenWinBuildCorpus> _buildRecommendationCatalog;
     private readonly BuildRecommendationRepository _buildRecommendationRepository;
-    private ModOnlineClient? _onlineClientRef;
+    private ModApiSession? _modApiSessionRef;
     private BazaarDbLinkClient? _accountLinkClientRef;
     private PvpBattleCatalog? _pvpBattleCatalog;
 
@@ -94,7 +95,7 @@ internal sealed class BppComposition : IDisposable
     public BppMountableRegistry Mountables => _mountables;
     public SettingsDockEntryRegistry SettingsDockRegistry => _settingsDockRegistry;
     public BppPatchFeatures PatchFeatures => _patchFeatures;
-    public ModOnlineClient? OnlineClient => _onlineClientRef;
+    public ModApiSession? ModApiSession => _modApiSessionRef;
     public BazaarDbLinkClient? AccountLinkClient => _accountLinkClientRef;
 
     public BppComposition(ManualLogSource logger, ConfigFile configFile, IGameBuildInfo gameBuild)
@@ -129,6 +130,10 @@ internal sealed class BppComposition : IDisposable
         _postCombatImpactModule = new PostCombatImpactModule(_eventBus);
         _voiceSubtitlesModule = new VoiceSubtitlesModule(_paths.RequireDataRoot());
         _voiceSubtitlesInteropModule = new VoiceSubtitlesInteropModule();
+        _supporterCatalogModule = new SupporterCatalogModule(
+            () => _config.UseFixedSupporterListConfig?.Value ?? false,
+            _paths.RequireDataRoot()
+        );
         _nativeCardPreviewHost = new NativeCardPreviewHost(new NativeTooltipDataFactoryAdapter());
         _buildRecommendationCatalog = TenWinBuildCatalogFactory.Create(_paths.RequireDataRoot());
         _buildRecommendationRepository = new BuildRecommendationRepository(
@@ -165,6 +170,7 @@ internal sealed class BppComposition : IDisposable
         _featureRegistry.Register(_postCombatImpactModule);
         _featureRegistry.Register(_voiceSubtitlesInteropModule);
         _featureRegistry.Register(_voiceSubtitlesModule);
+        _featureRegistry.Register(_supporterCatalogModule);
         _featureRegistry.Register(_runLoggingModule);
         _featureRegistry.Register(_bundleSealCoordinator);
 
@@ -248,7 +254,7 @@ internal sealed class BppComposition : IDisposable
         _mountables.Register(
             new HistoryPanelMount(
                 combatReplayRuntime: () => _combatReplayModule.Runtime,
-                onlineClient: () => _onlineClientRef,
+                modApiSession: () => _modApiSessionRef,
                 accountLinkClient: () => _accountLinkClientRef,
                 overlayHost: () => overlayPanelHostMount.Host,
                 nativeCardPreviewHost: _nativeCardPreviewHost
@@ -291,7 +297,7 @@ internal sealed class BppComposition : IDisposable
     public void AttachCombatReplayRuntime(CombatReplayRuntime runtime) =>
         _combatReplayModule.AttachRuntime(runtime);
 
-    public void AttachOnlineClient(ModOnlineClient? client) => _onlineClientRef = client;
+    public void AttachModApiSession(ModApiSession? session) => _modApiSessionRef = session;
 
     public void AttachAccountLinkClient(BazaarDbLinkClient? client) =>
         _accountLinkClientRef = client;

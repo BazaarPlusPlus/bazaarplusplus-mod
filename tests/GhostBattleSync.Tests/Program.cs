@@ -4,12 +4,12 @@ using System.Net.Http.Headers;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
-using BazaarPlusPlus.ModApi;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Models;
 
 await DiscoveryUsesV5ShapeAndLimit();
 await RetryAfterStartsCooldown();
+await DownloadLimitsAndTransportErrorsStayClosed();
 await ExpiredUrlRefreshesOnceAndBecomesTerminal();
 await CorruptBundleBecomesPermanentWithoutRepeatedDownload();
 UnknownProjectionAndCountsStayUnknown();
@@ -33,9 +33,12 @@ static async Task DiscoveryUsesV5ShapeAndLimit()
             )
         );
     });
-    using var http = new HttpClient(handler);
-    var client = new GhostBattleClient(http, ModApiRoutes.TryCreate("https://api.example")!);
-    var result = await client.QueryAgainstMeAsync("account-local", 999, CancellationToken.None);
+    using var session = TestModApiSessionFactory.Create(handler);
+    var result = await session.QueryGhostBattlesAgainstMeAsync(
+        "account-local",
+        999,
+        CancellationToken.None
+    );
 
     Assert(result.Succeeded && result.Battles.Count == 1, "V5 discovery page must parse.");
     Assert(observed?.AbsolutePath == "/ghost-battles", "Discovery route must be /ghost-battles.");
@@ -61,12 +64,8 @@ static async Task DiscoveryUsesV5ShapeAndLimit()
         response.Content.Headers.ContentLength = 8_388_608;
         return response;
     });
-    using var downloadHttp = new HttpClient(overLimit);
-    var downloadClient = new GhostBattleClient(
-        downloadHttp,
-        ModApiRoutes.TryCreate("https://api.example")!
-    );
-    var tooLarge = await downloadClient.DownloadBundleAsync(
+    using var downloadSession = TestModApiSessionFactory.Create(overLimit);
+    var tooLarge = await downloadSession.DownloadGhostBundleAsync(
         "https://r2.example/large",
         CancellationToken.None
     );
@@ -82,7 +81,9 @@ static async Task RetryAfterStartsCooldown()
     {
         var response = new HttpResponseMessage((HttpStatusCode)429)
         {
-            Content = new StringContent("{\"error\":\"rate_limited\",\"retryable\":true}"),
+            Content = new StringContent(
+                "{\"error\":{\"code\":\"rate_limited\",\"message\":\"private\",\"retryable\":true}}"
+            ),
         };
         response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(60));
         return response;
@@ -94,6 +95,52 @@ static async Task RetryAfterStartsCooldown()
         "Rate-limited discovery must fail without throwing."
     );
     Assert(fixture.Handler.Count == 1, "Retry-After cooldown must suppress the second HTTP query.");
+}
+
+static async Task DownloadLimitsAndTransportErrorsStayClosed()
+{
+    var streamed = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+    {
+        Content = new ChunkedContent(new byte[8 * 1024 * 1024 + 1]),
+    });
+    using (var session = TestModApiSessionFactory.Create(streamed))
+    {
+        var result = await session.DownloadGhostBundleAsync(
+            "https://r2.example/streamed-large",
+            CancellationToken.None
+        );
+        Assert(!result.Succeeded && result.Error == "bundle_too_large", "stream cap");
+    }
+
+    var oversizedError = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden)
+    {
+        Content = new StringContent(new string('x', 16 * 1024 + 1)),
+    });
+    using (var session = TestModApiSessionFactory.Create(oversizedError))
+    {
+        var result = await session.DownloadGhostBundleAsync(
+            "https://r2.example/error-large",
+            CancellationToken.None
+        );
+        Assert(!result.Succeeded && result.Error == "bundle_too_large", "error body cap");
+    }
+
+    const string sentinel = "private-transport-sentinel";
+    var transport = new RecordingHandler(_ => throw new HttpRequestException(sentinel));
+    using (var session = TestModApiSessionFactory.Create(transport))
+    {
+        var result = await session.QueryGhostBattlesAgainstMeAsync(
+            "account",
+            10,
+            CancellationToken.None
+        );
+        Assert(!result.Succeeded && result.Error == "transport_error", "closed transport code");
+        Assert(
+            result.DiagnosticException?.Message == sentinel,
+            "transport exception remains diagnostic"
+        );
+        Assert(!result.Error!.Contains(sentinel, StringComparison.Ordinal), "no raw UI error");
+    }
 }
 
 static async Task ExpiredUrlRefreshesOnceAndBecomesTerminal()
@@ -314,9 +361,33 @@ internal sealed class RecordingHandler : HttpMessageHandler
     }
 }
 
+internal sealed class ChunkedContent(byte[] bytes) : HttpContent
+{
+    protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
+        stream.WriteAsync(bytes, 0, bytes.Length);
+
+    protected override bool TryComputeLength(out long length)
+    {
+        length = 0;
+        return false;
+    }
+}
+
+internal static class TestModApiSessionFactory
+{
+    public static ModApiSession Create(HttpMessageHandler handler) =>
+        ModApiSession.TryCreate(
+            "https://api.example",
+            "test",
+            "OnlineClient",
+            TimeSpan.FromSeconds(120),
+            handler
+        ) ?? throw new InvalidOperationException("test Mod API session");
+}
+
 internal sealed class GhostFixture : IDisposable
 {
-    private readonly HttpClient _http;
+    private readonly ModApiSession _session;
 
     public GhostFixture(Func<HttpRequestMessage, HttpResponseMessage> respond)
     {
@@ -324,9 +395,8 @@ internal sealed class GhostFixture : IDisposable
         Directory.CreateDirectory(Root);
         Repository = new HistoryPanelRepository(Path.Combine(Root, "runs.sqlite3"));
         Handler = new RecordingHandler(respond);
-        _http = new HttpClient(Handler);
-        var online = new ModOnlineClient(_http, ModApiRoutes.TryCreate("https://api.example")!);
-        Service = new GhostBattleSyncService(Repository, online, () => "account-local");
+        _session = TestModApiSessionFactory.Create(Handler);
+        Service = new GhostBattleSyncService(Repository, _session, () => "account-local");
     }
 
     public string Root { get; }
@@ -336,7 +406,7 @@ internal sealed class GhostFixture : IDisposable
 
     public void Dispose()
     {
-        _http.Dispose();
+        _session.Dispose();
         if (Directory.Exists(Root))
             Directory.Delete(Root, recursive: true);
     }

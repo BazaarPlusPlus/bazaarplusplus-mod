@@ -76,6 +76,43 @@ The unified settings-dock concept for entries that cycle through an ordered valu
 
 ## Uploads
 
+**Run Bundle Contract**:
+The shared V5 reader/writer boundary that opens a Bundle, verifies manifest-to-payload Run identity,
+and decides whether a Battle has the exact snapshot and replay inputs required for import. Bundle
+composition and Ghost Battle import use the same contract.
+_Avoid_: ghost replay validator, composer-only replayability check
+
+**Mod API Response**:
+The bounded HTTP response boundary for mod-backend JSON: nested and legacy error-envelope shape,
+request ID precedence, `Retry-After`, and the separation between a closed user code and diagnostic
+exception. Endpoint-specific disposition and retry policy stay with each client.
+_Avoid_: generic endpoint result, raw response error text
+
+**Mod API Session**:
+One owned transport lifetime for one mod-backend consumer. It combines normalized routes, standard
+headers and timeout with typed Bundle, Ghost Battle, and health operations, without exposing its
+`HttpClient` or endpoint adapters. Plugin History, each Upload Feed activation, and tools own
+separate sessions.
+_Avoid_: online client bag, shared global HttpClient, public endpoint-client chain
+
+**Bundle Seal Convergence**:
+The pure decision core for one Bundle seal pass. It receives the remaining relative deadline and
+observed input facts, then decides whether to continue, wait, degrade the screenshot, or terminate;
+it owns no clock, SQLite connection, file, codec, or Unity object.
+_Avoid_: seal policy bag, SQLite state machine
+
+**Bundle Queue Store**:
+The concrete Storage owner of `bundle_seal_jobs` and `bundle_outbox` rows, SQL, and multi-row
+transactions. Game workflows translate its storage records into composition and upload behavior;
+there is deliberately no same-shape single-implementation repository interface.
+_Avoid_: outbox repository interface, Game SQL helper
+
+**Bundle Outbox Files**:
+The Game-owned file port for sealed Bundle artifacts. It exposes root-confined open, existence,
+length, enumeration, and deletion so upload ordering and retention can be tested without moving
+filesystem policy into Storage.
+_Avoid_: bundle file repository, Storage file service
+
 **Upload Feed Session**:
 The behavior object (`IUploadFeedSession`) a feed returns from activation: feature enablement, one upload attempt, feed-private arm signals, and resource disposal. The background pump owns only the Unity cadence, the shutdown drain, and the shared gates (PTR channel precondition, run-lifecycle and `UploadArmRequested` arm signals); it never rewires feed internals.
 _Avoid_: upload activation bag, per-feed upload controller, pump static registry
@@ -109,3 +146,20 @@ _Avoid_: DayTierSchedule, hardcoded tier table
 **Remote Embedded Catalog**:
 The shared runtime lifecycle for data shipped as an embedded seed, cached under `<GameRoot>/BazaarPlusPlusV5/`, and refreshed from a remote source (`IRemoteEmbeddedCatalog<T>`). The interface exposes only current-snapshot lookup, warm-up, explicit refresh, and disposal; feature modules keep their own parser, logging, and user-facing refresh policy.
 _Avoid_: feature repository loader, dual catalog state machine
+
+**Supporter Catalog Module**:
+The composition-owned Remote Embedded Catalog consumer for supporter data. It preserves fixed-list
+bypass, publishes session-stable snapshots through the supporter facade, owns retry/disposal, and
+translates catalog issues into supporter log events.
+_Avoid_: static supporter refresh task, temporary-directory supporter cache
+
+**Release Manifest**:
+The installer-published `{ "version": ... }` document used only for the main-menu update check. Its
+HTTP/JSON adapter and request-generation lifecycle are separate from Mod API health and installer
+runtime state.
+_Avoid_: Mod API health, installer state
+
+**Build Seed Fetch**:
+The build-time transport operation that stages remote embedded seeds, checks coarse transfer
+integrity, runs feature-owned semantic gates, and promotes the complete seed set transactionally.
+_Avoid_: runtime catalog refresh, generic schema validator

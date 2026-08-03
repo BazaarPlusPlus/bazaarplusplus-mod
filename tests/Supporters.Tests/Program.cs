@@ -11,11 +11,42 @@ TestSampleManyDispersesLongNamesAcrossAttributionWindows();
 TestSampleManyLongNameDispersalKeepsFullRotation();
 TestFixedSupporterListSourceIgnoresRemoteEntries();
 TestDefaultSupporterListSourceUsesRemoteEntriesBeforeFallback();
+TestCatalogDocumentFiltersInvalidEntries();
+TestCatalogDocumentRejectsEmptyPayload();
+TestEmbeddedCatalogSeedHasAtLeastFiveEntries();
 TestSupportedByPrefixAndSuffix();
 TestSponsorActionText();
 TestSponsorLinks();
 
 Console.WriteLine("Supporters checks passed.");
+
+static void TestCatalogDocumentFiltersInvalidEntries()
+{
+    var result = SupporterCatalogDocument.Parse(
+        """[{"name":" Alice ","tier":4},{"name":" ","tier":3},{"name":"Bob","tier":0}]"""
+    );
+
+    AssertTrue(result.Succeeded, "A document with one renderable supporter should parse.");
+    AssertEqual(1, result.Value!.Count, "Invalid supporter entries should be removed.");
+    AssertEqual("Alice", result.Value[0].Name, "Parsed supporter names should be trimmed.");
+}
+
+static void TestCatalogDocumentRejectsEmptyPayload()
+{
+    var result = SupporterCatalogDocument.Parse("[]");
+
+    AssertFalse(result.Succeeded, "An empty supporter payload must not replace a snapshot.");
+    AssertEqual("empty_payload", result.Error, "Empty payloads should have a closed reason.");
+}
+
+static void TestEmbeddedCatalogSeedHasAtLeastFiveEntries()
+{
+    var document = File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "supporter-list.json"));
+    var result = SupporterCatalogDocument.Parse(document);
+
+    AssertTrue(result.Succeeded, "The embedded supporter seed must parse.");
+    AssertTrue(result.Value!.Count >= 5, "The embedded supporter seed must contain five entries.");
+}
 
 static void TestAttributionText()
 {

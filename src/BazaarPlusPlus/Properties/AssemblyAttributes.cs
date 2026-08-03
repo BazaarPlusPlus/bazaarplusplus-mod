@@ -17,3 +17,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("CombatReplayRecording.Tests")]
 [assembly: InternalsVisibleTo("GhostBattleSync.Tests")]
 [assembly: InternalsVisibleTo("HistoryPanelRepository.Tests")]
+[assembly: InternalsVisibleTo("SupporterCatalogModule.Tests")]

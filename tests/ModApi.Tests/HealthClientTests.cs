@@ -127,8 +127,12 @@ internal static class HealthClientTests
             .GetResult();
         Assert(!exceptionFailure.Succeeded, "Transport exceptions should fail availability.");
         Assert(
-            !string.IsNullOrWhiteSpace(exceptionFailure.Error),
-            "Transport exception failures should expose an error."
+            exceptionFailure.Error == "transport_error",
+            "Transport exceptions should expose only the closed user code."
+        );
+        Assert(
+            exceptionFailure.DiagnosticException?.Message == "network down",
+            "Transport exceptions should remain available to diagnostics."
         );
     }
 
