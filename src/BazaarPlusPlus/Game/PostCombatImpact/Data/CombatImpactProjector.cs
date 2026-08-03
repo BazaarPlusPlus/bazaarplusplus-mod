@@ -1562,14 +1562,16 @@ internal static class CombatImpactProjector
         var targetId = cardTarget.Target.Value;
         var matchingExecutions = frame
             .Events.OfType<CombatSimEventEffectExecuted>()
-            .Count(candidate =>
+            .Where(candidate =>
                 candidate.ActionType == EActionCommandType.CardEnchant
                 && string.Equals(
                     ResolveTargetId(candidate.Target),
                     targetId,
                     StringComparison.Ordinal
                 )
-            );
+            )
+            .Take(2)
+            .Count();
         var enchantments = frame
             .Events.OfType<CombatSimEventCardEnchanted>()
             .Where(candidate =>
@@ -1579,6 +1581,7 @@ internal static class CombatImpactProjector
             )
             .Select(candidate => candidate.EnchantmentType!.Value)
             .Distinct()
+            .Take(2)
             .ToArray();
         return matchingExecutions == 1 && enchantments.Length == 1
             ? $"EnchantTargets:{enchantments[0]}"
