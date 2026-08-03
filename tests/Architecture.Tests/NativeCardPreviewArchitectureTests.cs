@@ -134,6 +134,48 @@ public sealed class NativeCardPreviewArchitectureTests
         Assert.Contains("NativeCardPreviewPoolSettlement.Prepare", pool);
     }
 
+    [Fact]
+    public void Same_card_modifier_refresh_keeps_the_native_tooltip_host_alive()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var tooltipRoot = Path.Combine(sourceRoot, "Game", "Tooltips");
+        var refreshPaths = new[]
+        {
+            Path.Combine(tooltipRoot, "TooltipModifierRefreshController.cs"),
+            Path.Combine(tooltipRoot, "UpgradeTooltipScheduler.cs"),
+        };
+
+        foreach (var path in refreshPaths)
+        {
+            var source = File.ReadAllText(path);
+            Assert.Contains("TooltipPreviewContentRefresh.TryApply", source);
+            Assert.DoesNotContain("HideCardTooltipController", source);
+            Assert.DoesNotContain("ShowCardTooltipController", source);
+        }
+
+        var contentRefresh = File.ReadAllText(
+            Path.Combine(tooltipRoot, "TooltipPreviewContentRefresh.cs")
+        );
+        Assert.Contains("NativeCardTooltipContentRefresher.TryApply", contentRefresh);
+
+        var nativeHost = File.ReadAllText(
+            Path.Combine(sourceRoot, "GameInterop", "CardPreview", "NativeCardPreviewHost.cs")
+        );
+        Assert.Contains("NativeCardTooltipContentRefresher.TryApply", nativeHost);
+        Assert.DoesNotContain("HideCardTooltipController", nativeHost);
+        Assert.DoesNotContain("ShowCardTooltipController", nativeHost);
+
+        var nativeContentRefresh = File.ReadAllText(
+            Path.Combine(
+                sourceRoot,
+                "GameInterop",
+                "Tooltips",
+                "NativeCardTooltipContentRefresher.cs"
+            )
+        );
+        Assert.Contains("ApplyPreviewTooltip", nativeContentRefresh);
+    }
+
     private static string RepoRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

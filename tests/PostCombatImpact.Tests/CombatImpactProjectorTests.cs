@@ -76,6 +76,163 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Recovers_damage_crits_when_multiple_same_frame_attacks_hide_native_adjustments()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("trigger", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -37_454,
+                    IsCrit = true,
+                },
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -86,
+                    IsCrit = true,
+                },
+            },
+        };
+        var sourceInstance = InstanceId.TryParse("source");
+        simulation.Frames[0].CardUpdates[sourceInstance] = new CombatSimCardUpdate
+        {
+            CardInstanceId = sourceInstance,
+            Attributes =
+            {
+                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    PreviousValue = 359,
+                    CurrentValue = 18_727,
+                },
+            },
+        };
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 37_454,
+        };
+        simulation.CardStats["trigger"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 86,
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 359,
+            },
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 43,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        var sourceDamage = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
+        );
+        Assert.Null(sourceDamage.ObservedValue);
+        Assert.Equal(37_454, sourceDamage.AuthoritativeMetric?.Value);
+        Assert.Equal(1, sourceDamage.CriticalCount);
+        Assert.Equal(37_454, sourceDamage.CriticalObservedValue);
+
+        var triggerDamage = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "trigger").Groups
+        );
+        Assert.Null(triggerDamage.ObservedValue);
+        Assert.Equal(86, triggerDamage.AuthoritativeMetric?.Value);
+        Assert.Equal(1, triggerDamage.CriticalCount);
+        Assert.Equal(86, triggerDamage.CriticalObservedValue);
+    }
+
+    [Fact]
+    public void Does_not_infer_damage_crits_without_a_native_critical_adjustment()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("trigger", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -20,
+                    IsCrit = false,
+                },
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -10,
+                    IsCrit = false,
+                },
+            },
+        };
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 20,
+        };
+        simulation.CardStats["trigger"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 10,
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 10,
+            },
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 5,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.All(
+            report.Sources,
+            source => Assert.Equal(0, Assert.Single(source.Groups).CriticalCount)
+        );
+    }
+
+    [Fact]
     public void Merges_observed_burn_and_poison_with_authoritative_totals()
     {
         var cases = new[]
@@ -293,12 +450,19 @@ public sealed class CombatImpactProjectorTests
     [Fact]
     public void Generic_player_attribute_changes_use_the_unique_same_frame_transition()
     {
-        var cases = new[]
+        var cases = new List<(
+            EPlayerAttributeType Attribute,
+            ECardStats Statistic,
+            string CanonicalKey
+        )>
         {
             (EPlayerAttributeType.HealthRegen, ECardStats.RegenAdded, "RegenApplyAmount"),
             (EPlayerAttributeType.Rage, ECardStats.RageAdded, "RageApplyAmount"),
-            (EPlayerAttributeType.Tempo, ECardStats.TempoAdded, "TempoApplyAmount"),
         };
+        if (OptionalCombatTempoTestValues.TryResolve(out var tempo))
+        {
+            cases.Add((EPlayerAttributeType.Tempo, tempo.AddedStatistic, "TempoApplyAmount"));
+        }
         foreach (var (attribute, statistic, canonicalKey) in cases)
         {
             var simulation = new CombatSim();
@@ -349,7 +513,7 @@ public sealed class CombatImpactProjectorTests
     public void Card_stats_map_to_explicit_authoritative_metric_domains()
     {
         var simulation = new CombatSim();
-        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        var statistics = new Dictionary<ECardStats, int>
         {
             [ECardStats.DamageDone] = 1,
             [ECardStats.ShieldAdded] = 2,
@@ -361,10 +525,15 @@ public sealed class CombatImpactProjectorTests
             [ECardStats.FrozenCardsCount] = 8,
             [ECardStats.RegenAdded] = 9,
             [ECardStats.RageAdded] = 10,
-            [ECardStats.TempoAdded] = 11,
-            [ECardStats.TempoSpent] = 12,
             [ECardStats.UseCount] = 13,
         };
+        var hasTempo = OptionalCombatTempoTestValues.TryResolve(out var tempo);
+        if (hasTempo)
+        {
+            statistics[tempo.AddedStatistic] = 11;
+            statistics[tempo.SpentStatistic] = 12;
+        }
+        simulation.CardStats["source"] = statistics;
 
         var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
         var metrics = source
@@ -374,9 +543,9 @@ public sealed class CombatImpactProjectorTests
             .ToArray();
 
         Assert.Equal(13, source.UseCount);
-        Assert.Equal(12, metrics.Length);
+        Assert.Equal(hasTempo ? 12 : 10, metrics.Length);
         Assert.Equal(
-            9,
+            hasTempo ? 9 : 7,
             metrics.Count(metric =>
                 metric.Basis == CombatImpactAuthoritativeBasis.TotalAmount
                 && metric.Unit == CombatImpactValueUnit.Amount
@@ -389,31 +558,64 @@ public sealed class CombatImpactProjectorTests
                 && metric.Unit == CombatImpactValueUnit.Applications
             )
         );
-        Assert.Contains(
-            metrics,
-            metric =>
-                metric.NativeAttributeKey == "TempoApplyAmount"
-                && metric.Value == 11
-                && metric.Basis == CombatImpactAuthoritativeBasis.TotalAmount
+        if (hasTempo)
+        {
+            Assert.Contains(
+                metrics,
+                metric =>
+                    metric.NativeAttributeKey == "TempoApplyAmount"
+                    && metric.Value == 11
+                    && metric.Basis == CombatImpactAuthoritativeBasis.TotalAmount
+            );
+            Assert.Contains(
+                metrics,
+                metric =>
+                    metric.NativeAttributeKey == "TempoRemoveAmount"
+                    && metric.Value == 12
+                    && metric.Basis == CombatImpactAuthoritativeBasis.TotalAmount
+            );
+        }
+    }
+
+    [Fact]
+    public void Card_action_cost_event_is_projected_without_a_compile_time_runtime_type_dependency()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                OptionalCombatSimEventFactory.CardActionCostSpent(
+                    "source",
+                    EPlayerAttributeType.Tempo,
+                    ECardAttributeType.TempoCost
+                )
+            );
+
+        var group = Assert.Single(
+            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
         );
-        Assert.Contains(
-            metrics,
-            metric =>
-                metric.NativeAttributeKey == "TempoRemoveAmount"
-                && metric.Value == 12
-                && metric.Basis == CombatImpactAuthoritativeBasis.TotalAmount
+
+        Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
+        Assert.Equal("TempoRemoveAmount", group.NativeAttributeKey);
+        Assert.Equal(1, group.Count);
+        Assert.Null(group.ObservedValue);
+        Assert.Null(group.AuthoritativeMetric);
+        Assert.Equal(
+            CombatImpactProjector.PlayerId(ECombatantId.Player),
+            Assert.Single(group.Targets).Entity.Id
         );
     }
 
     [Fact]
     public void Projects_tempo_gain_and_card_action_cost_spend_with_authoritative_totals()
     {
+        if (!OptionalCombatTempoTestValues.TryResolve(out var tempo))
+            return;
+
         var simulation = new CombatSim();
         simulation.Frames.Clear();
         var gainFrame = new CombatSimFrame();
-        gainFrame.Events.Add(
-            Executed("source", EActionCommandType.PlayerTempoApply, Player(ECombatantId.Player))
-        );
+        gainFrame.Events.Add(Executed("source", tempo.ApplyAction, Player(ECombatantId.Player)));
         gainFrame.PlayerUpdates = new CombatSimPlayerUpdate
         {
             Attributes =
@@ -429,18 +631,17 @@ public sealed class CombatImpactProjectorTests
         simulation.Frames.Add(gainFrame);
         var spendFrame = new CombatSimFrame();
         spendFrame.Events.Add(
-            new CombatSimEventCardActionCostSpent
-            {
-                ExecutingCard = InstanceId.TryParse("source"),
-                PlayerAttributeSpent = EPlayerAttributeType.Tempo,
-                CardAttributeSpent = ECardAttributeType.TempoCost,
-            }
+            OptionalCombatSimEventFactory.CardActionCostSpent(
+                "source",
+                EPlayerAttributeType.Tempo,
+                ECardAttributeType.TempoCost
+            )
         );
         simulation.Frames.Add(spendFrame);
         simulation.CardStats["source"] = new Dictionary<ECardStats, int>
         {
-            [ECardStats.TempoAdded] = 6,
-            [ECardStats.TempoSpent] = 4,
+            [tempo.AddedStatistic] = 6,
+            [tempo.SpentStatistic] = 4,
         };
 
         var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
@@ -474,21 +675,21 @@ public sealed class CombatImpactProjectorTests
     [Fact]
     public void Tempo_gain_does_not_claim_a_same_frame_delta_that_also_includes_cost_spend()
     {
+        if (!OptionalCombatTempoTestValues.TryResolve(out var tempo))
+            return;
+
         var simulation = new CombatSim();
         simulation
             .Frames[0]
-            .Events.Add(
-                Executed("source", EActionCommandType.PlayerTempoApply, Player(ECombatantId.Player))
-            );
+            .Events.Add(Executed("source", tempo.ApplyAction, Player(ECombatantId.Player)));
         simulation
             .Frames[0]
             .Events.Add(
-                new CombatSimEventCardActionCostSpent
-                {
-                    ExecutingCard = InstanceId.TryParse("source"),
-                    PlayerAttributeSpent = EPlayerAttributeType.Tempo,
-                    CardAttributeSpent = ECardAttributeType.TempoCost,
-                }
+                OptionalCombatSimEventFactory.CardActionCostSpent(
+                    "source",
+                    EPlayerAttributeType.Tempo,
+                    ECardAttributeType.TempoCost
+                )
             );
         simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
         {
@@ -504,8 +705,8 @@ public sealed class CombatImpactProjectorTests
         };
         simulation.CardStats["source"] = new Dictionary<ECardStats, int>
         {
-            [ECardStats.TempoAdded] = 6,
-            [ECardStats.TempoSpent] = 4,
+            [tempo.AddedStatistic] = 6,
+            [tempo.SpentStatistic] = 4,
         };
 
         var groups = Assert
@@ -523,16 +724,13 @@ public sealed class CombatImpactProjectorTests
     [Fact]
     public void Explicit_tempo_remove_reports_the_positive_amount_spent()
     {
+        if (!OptionalCombatTempoTestValues.TryResolve(out var tempo))
+            return;
+
         var simulation = new CombatSim();
         simulation
             .Frames[0]
-            .Events.Add(
-                Executed(
-                    "source",
-                    EActionCommandType.PlayerTempoRemove,
-                    Player(ECombatantId.Player)
-                )
-            );
+            .Events.Add(Executed("source", tempo.RemoveAction, Player(ECombatantId.Player)));
         simulation.Frames[0].PlayerUpdates = new CombatSimPlayerUpdate
         {
             Attributes =
@@ -547,7 +745,7 @@ public sealed class CombatImpactProjectorTests
         };
         simulation.CardStats["source"] = new Dictionary<ECardStats, int>
         {
-            [ECardStats.TempoSpent] = 4,
+            [tempo.SpentStatistic] = 4,
         };
 
         var group = Assert.Single(
@@ -714,6 +912,123 @@ public sealed class CombatImpactProjectorTests
         Assert.Empty(report.Sources);
     }
 
+    [Fact]
+    public void Known_effect_attribute_does_not_fall_back_to_an_unrelated_transition()
+    {
+        var simulation = new CombatSim();
+        var target = InstanceId.TryParse("target");
+        var executed = Executed(
+            "source",
+            EActionCommandType.CardModifyAttribute,
+            CardTarget("target")
+        );
+        executed.EffectId = "0";
+        simulation.Frames[0].Events.Add(executed);
+        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    PreviousValue = 40,
+                    CurrentValue = 50,
+                },
+            },
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            AbilityAttributeTypesByEffectId = new Dictionary<string, ECardAttributeType>
+            {
+                ["0"] = ECardAttributeType.SellPrice,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.Empty(report.Sources);
+    }
+
+    [Fact]
+    public void Effect_ids_preserve_concurrent_value_and_crit_gains_from_the_same_replay_frames()
+    {
+        var simulation = new CombatSim();
+        simulation.Frames.Clear();
+        for (var frameIndex = 0; frameIndex < 3; frameIndex++)
+            simulation.Frames.Add(ValueAndCritGainFrame(frameIndex));
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["pen"] = new CombatImpactEntity(
+            "pen",
+            "PenFT",
+            "Item",
+            null,
+            5,
+            AbilityAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                ["0"] = ECardAttributeType.SellPrice,
+            }
+        );
+        entities["caviar"] = new CombatImpactEntity(
+            "caviar",
+            "Caviar",
+            "Item",
+            null,
+            6,
+            AuraAttributeTypesByEffectId: new Dictionary<string, ECardAttributeType>
+            {
+                ["1"] = ECardAttributeType.CritChance,
+            }
+        );
+        entities["soul"] = new CombatImpactEntity("soul", "Soul of the District", "Item", null, 7);
+        entities["crit-target"] = new CombatImpactEntity(
+            "crit-target",
+            "Crit Target",
+            "Item",
+            null,
+            8
+        );
+        entities["value-target"] = new CombatImpactEntity(
+            "value-target",
+            "Value Target",
+            "Item",
+            null,
+            9
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        var value = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "pen").Groups
+        );
+        Assert.Equal("SellPrice", value.NativeAttributeKey);
+        Assert.Equal(9, value.Count);
+        Assert.Equal(27, value.ObservedValue);
+
+        var crit = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "caviar").Groups
+        );
+        Assert.Equal("CritChance", crit.NativeAttributeKey);
+        Assert.Equal(6, crit.Count);
+        Assert.Equal(36, crit.ObservedValue);
+
+        var soul = Assert.Single(report.Received, received => received.Entity.Id == "soul");
+        Assert.Equal(
+            9,
+            Assert
+                .Single(soul.Groups, group => group.NativeAttributeKey == "SellPrice")
+                .ObservedValue
+        );
+        Assert.Equal(
+            18,
+            Assert
+                .Single(soul.Groups, group => group.NativeAttributeKey == "CritChance")
+                .ObservedValue
+        );
+    }
+
     [Theory]
     [InlineData(EActionCommandType.FlyingStart)]
     [InlineData(EActionCommandType.FlyingStop)]
@@ -732,7 +1047,7 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
-    public void Keeps_control_duration_instead_of_treating_native_target_count_as_milliseconds()
+    public void Keeps_configured_control_duration_separate_from_native_target_count()
     {
         var simulation = new CombatSim();
         var target = InstanceId.TryParse("target");
@@ -764,12 +1079,21 @@ public sealed class CombatImpactProjectorTests
         };
 
         var group = Assert.Single(
-            Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources).Groups
+            Assert
+                .Single(
+                    CombatImpactProjector
+                        .Project(
+                            simulation,
+                            EntitiesWithSourceAttribute(ECardAttributeType.SlowAmount, 2_000)
+                        )
+                        .Sources
+                )
+                .Groups
         );
 
         Assert.Equal(CombatImpactKind.Slow, group.Kind);
         Assert.Equal(CombatImpactValueUnit.Milliseconds, group.Unit);
-        Assert.Equal(1950, group.ObservedValue);
+        Assert.Equal(2_000, group.ObservedValue);
         Assert.Equal(1, group.AuthoritativeMetric?.Value);
         Assert.Equal(CombatImpactValueUnit.Applications, group.AuthoritativeMetric?.Unit);
     }
@@ -996,7 +1320,17 @@ public sealed class CombatImpactProjectorTests
         };
         var entities = new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
         {
-            [zarlic] = new(zarlic, "Zarlic", "Item", null, 0),
+            [zarlic] = new(
+                zarlic,
+                "Zarlic",
+                "Item",
+                null,
+                0,
+                Attributes: new Dictionary<ECardAttributeType, int>
+                {
+                    [ECardAttributeType.HasteAmount] = 1_000,
+                }
+            ),
             [decoy] = new(decoy, "Other Food", "Item", null, 1),
         };
 
@@ -1007,7 +1341,7 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(10, source.UseCount);
         Assert.Equal(10, source.EffectCount);
         Assert.Equal(10, haste.Count);
-        Assert.Equal(9500, haste.ObservedValue);
+        Assert.Equal(10_000, haste.ObservedValue);
         Assert.Equal(CombatImpactValueUnit.Milliseconds, haste.Unit);
         Assert.Equal(10, haste.AuthoritativeMetric?.Value);
         Assert.Equal(
@@ -1017,13 +1351,13 @@ public sealed class CombatImpactProjectorTests
         var targetRow = Assert.Single(haste.Targets);
         Assert.Equal("Zarlic", targetRow.Entity.Name);
         Assert.Equal(10, targetRow.Count);
-        Assert.Equal(9500, targetRow.ObservedValue);
+        Assert.Equal(10_000, targetRow.ObservedValue);
 
         var received = Assert.Single(report.Received);
         var incoming = Assert.Single(received.Groups);
         Assert.Equal(CombatImpactKind.Haste, incoming.Kind);
         Assert.Equal(10, incoming.Count);
-        Assert.Equal(9500, incoming.ObservedValue);
+        Assert.Equal(10_000, incoming.ObservedValue);
         Assert.Equal(10, Assert.Single(incoming.Sources).Count);
     }
 
@@ -1042,7 +1376,23 @@ public sealed class CombatImpactProjectorTests
         simulation.Frames[0].CardUpdates[first] = HasteUpdate(first, 950);
         simulation.Frames[0].CardUpdates[second] = HasteUpdate(second, 1950);
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.HasteAmount] = 1_000,
+            },
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.HasteAmount] = 2_000,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
         var firstGroup = Assert.Single(
             Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
         );
@@ -1052,14 +1402,14 @@ public sealed class CombatImpactProjectorTests
 
         var firstTarget = Assert.Single(firstGroup.Targets);
         Assert.Equal("target", firstTarget.Entity.Id);
-        Assert.Equal(950, firstTarget.ObservedValue);
+        Assert.Equal(1_000, firstTarget.ObservedValue);
         var secondTarget = Assert.Single(secondGroup.Targets);
         Assert.Equal("target-2", secondTarget.Entity.Id);
-        Assert.Equal(1950, secondTarget.ObservedValue);
+        Assert.Equal(2_000, secondTarget.ObservedValue);
     }
 
     [Fact]
-    public void Mixed_frame_ambiguity_drops_only_the_duplicated_action_target_value()
+    public void Configured_duration_is_not_lost_when_actions_share_a_frame_and_target()
     {
         var simulation = new CombatSim();
         var first = InstanceId.TryParse("target");
@@ -1076,32 +1426,38 @@ public sealed class CombatImpactProjectorTests
         simulation.Frames[0].CardUpdates[first] = HasteUpdate(first, 950);
         simulation.Frames[0].CardUpdates[second] = HasteUpdate(second, 1950);
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.HasteAmount] = 1_000,
+            },
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.HasteAmount] = 2_000,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
         var fairies = Assert.Single(report.Sources, source => source.Entity.Id == "source");
         var trigger = Assert.Single(report.Sources, source => source.Entity.Id == "trigger");
         var fairiesGroup = Assert.Single(fairies.Groups);
         var triggerGroup = Assert.Single(trigger.Groups);
 
         Assert.Equal(2, fairiesGroup.Count);
-        Assert.Equal(1950, fairiesGroup.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Partial, fairiesGroup.ObservedCoverage);
-        Assert.Null(
-            Assert
-                .Single(fairiesGroup.Targets, target => target.Entity.Id == "target")
-                .ObservedValue
-        );
-        Assert.Equal(
-            1950,
-            Assert
-                .Single(fairiesGroup.Targets, target => target.Entity.Id == "target-2")
-                .ObservedValue
-        );
-        Assert.Null(triggerGroup.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.None, triggerGroup.ObservedCoverage);
+        Assert.Equal(2_000, fairiesGroup.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, fairiesGroup.ObservedCoverage);
+        Assert.All(fairiesGroup.Targets, target => Assert.Equal(1_000, target.ObservedValue));
+        Assert.Equal(2_000, triggerGroup.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, triggerGroup.ObservedCoverage);
     }
 
     [Fact]
-    public void Uses_observed_net_status_delta_when_decay_shares_the_frame()
+    public void Configured_duration_ignores_status_net_delta_when_decay_shares_the_frame()
     {
         var simulation = new CombatSim();
         var target = InstanceId.TryParse("target");
@@ -1122,37 +1478,228 @@ public sealed class CombatImpactProjectorTests
             },
         };
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
-        Assert.Equal(950, Assert.Single(Assert.Single(report.Sources).Groups).ObservedValue);
+        var report = CombatImpactProjector.Project(
+            simulation,
+            EntitiesWithSourceAttribute(ECardAttributeType.HasteAmount, 1_000)
+        );
+        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+        Assert.Equal(1_000, group.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, group.ObservedCoverage);
     }
 
     [Fact]
-    public void Charge_does_not_treat_ordinary_cooldown_decay_as_an_effect_amount()
+    public void Configured_duration_actions_do_not_fall_back_to_target_frame_deltas()
+    {
+        var cases = new[]
+        {
+            (EActionCommandType.CardCharge, ECardAttributeType.Cooldown, CombatImpactKind.Charge),
+            (EActionCommandType.CardHaste, ECardAttributeType.Haste, CombatImpactKind.Haste),
+            (EActionCommandType.CardSlow, ECardAttributeType.Slow, CombatImpactKind.Slow),
+            (EActionCommandType.CardFreeze, ECardAttributeType.Freeze, CombatImpactKind.Freeze),
+        };
+        foreach (var (action, targetAttribute, expectedKind) in cases)
+        {
+            var simulation = new CombatSim();
+            var target = InstanceId.TryParse("target");
+            simulation.Frames[0].Events.Add(Executed("source", action, CardTarget("target")));
+            simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+            {
+                CardInstanceId = target,
+                Attributes =
+                {
+                    [targetAttribute] = new CombatSimCardAttributeUpdate
+                    {
+                        AttributeType = targetAttribute,
+                        PreviousValue = action == EActionCommandType.CardCharge ? 5_000 : 1_000,
+                        CurrentValue = action == EActionCommandType.CardCharge ? 4_000 : 1_950,
+                    },
+                },
+            };
+
+            var report = CombatImpactProjector.Project(simulation, Entities());
+            var group = Assert.Single(Assert.Single(report.Sources).Groups);
+            var targetRow = Assert.Single(group.Targets);
+            var incoming = Assert.Single(Assert.Single(report.Received).Groups);
+            var incomingSource = Assert.Single(incoming.Sources);
+
+            Assert.Equal(expectedKind, group.Kind);
+            Assert.Equal(1, group.Count);
+            Assert.Null(group.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.None, group.ObservedCoverage);
+            Assert.Null(targetRow.ObservedValue);
+            Assert.Null(incoming.ObservedValue);
+            Assert.Null(incomingSource.ObservedValue);
+        }
+    }
+
+    [Fact]
+    public void Configured_duration_actions_use_one_source_value_in_both_perspectives()
+    {
+        var cases = new[]
+        {
+            (
+                EActionCommandType.CardCharge,
+                ECardAttributeType.ChargeAmount,
+                ECardAttributeType.Cooldown,
+                CombatImpactKind.Charge
+            ),
+            (
+                EActionCommandType.CardHaste,
+                ECardAttributeType.HasteAmount,
+                ECardAttributeType.Haste,
+                CombatImpactKind.Haste
+            ),
+            (
+                EActionCommandType.CardSlow,
+                ECardAttributeType.SlowAmount,
+                ECardAttributeType.Slow,
+                CombatImpactKind.Slow
+            ),
+            (
+                EActionCommandType.CardFreeze,
+                ECardAttributeType.FreezeAmount,
+                ECardAttributeType.Freeze,
+                CombatImpactKind.Freeze
+            ),
+        };
+        foreach (var (action, sourceAttribute, targetAttribute, expectedKind) in cases)
+        {
+            var simulation = new CombatSim();
+            var target = InstanceId.TryParse("target");
+            simulation.Frames[0].Events.Add(Executed("source", action, CardTarget("target")));
+            simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+            {
+                CardInstanceId = target,
+                Attributes =
+                {
+                    [targetAttribute] = new CombatSimCardAttributeUpdate
+                    {
+                        AttributeType = targetAttribute,
+                        PreviousValue = action == EActionCommandType.CardCharge ? 5_000 : 1_000,
+                        CurrentValue = action == EActionCommandType.CardCharge ? 4_000 : 1_950,
+                    },
+                },
+            };
+
+            var report = CombatImpactProjector.Project(
+                simulation,
+                EntitiesWithSourceAttribute(sourceAttribute, 2_000)
+            );
+            var caused = Assert.Single(Assert.Single(report.Sources).Groups);
+            var causedTarget = Assert.Single(caused.Targets);
+            var received = Assert.Single(Assert.Single(report.Received).Groups);
+            var receivedSource = Assert.Single(received.Sources);
+
+            Assert.Equal(expectedKind, caused.Kind);
+            Assert.Equal(CombatImpactAggregator.NativeKey(expectedKind), caused.NativeAttributeKey);
+            Assert.Equal(2_000, caused.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.Exact, caused.ObservedCoverage);
+            Assert.Equal(2_000, causedTarget.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.Exact, causedTarget.ObservedCoverage);
+            Assert.Equal(2_000, received.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.Exact, received.ObservedCoverage);
+            Assert.Equal(2_000, receivedSource.ObservedValue);
+            Assert.Equal(CombatImpactCoverage.Exact, receivedSource.ObservedCoverage);
+        }
+    }
+
+    [Fact]
+    public void Configured_duration_uses_the_source_value_at_each_event_frame()
     {
         var simulation = new CombatSim();
-        var target = InstanceId.TryParse("target");
         simulation
             .Frames[0]
-            .Events.Add(Executed("source", EActionCommandType.CardCharge, CardTarget("target")));
-        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
-        {
-            CardInstanceId = target,
-            Attributes =
+            .Events.Add(Executed("source", EActionCommandType.CardHaste, CardTarget("target")));
+        simulation.Frames.Add(SourceAttributeFrame(ECardAttributeType.HasteAmount, 1_000, 2_000));
+        var laterFrame = new CombatSimFrame();
+        laterFrame.Events.Add(
+            Executed("source", EActionCommandType.CardHaste, CardTarget("target"))
+        );
+        simulation.Frames.Add(laterFrame);
+
+        var report = CombatImpactProjector.Project(
+            simulation,
+            EntitiesWithSourceAttribute(ECardAttributeType.HasteAmount, 1_000)
+        );
+        var caused = Assert.Single(Assert.Single(report.Sources).Groups);
+        var received = Assert.Single(Assert.Single(report.Received).Groups);
+
+        Assert.Equal(2, caused.Count);
+        Assert.Equal(3_000, caused.ObservedValue);
+        Assert.Equal(3_000, Assert.Single(caused.Targets).ObservedValue);
+        Assert.Equal(3_000, received.ObservedValue);
+        Assert.Equal(3_000, Assert.Single(received.Sources).ObservedValue);
+    }
+
+    [Fact]
+    public void Charge_uses_each_source_cards_configured_amount()
+    {
+        var simulation = new CombatSim();
+        for (var index = 0; index < 4; index++)
+            simulation
+                .Frames[0]
+                .Events.Add(
+                    Executed("finesse", EActionCommandType.CardCharge, CardTarget("target"))
+                );
+        for (var index = 0; index < 3; index++)
+            simulation
+                .Frames[0]
+                .Events.Add(Executed("wok", EActionCommandType.CardCharge, CardTarget("target")));
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["finesse"] = new CombatImpactEntity(
+            "finesse",
+            "Finesse Shield",
+            "Skill",
+            null,
+            5,
+            Attributes: new Dictionary<ECardAttributeType, int>
             {
-                [ECardAttributeType.Cooldown] = new CombatSimCardAttributeUpdate
-                {
-                    AttributeType = ECardAttributeType.Cooldown,
-                    PreviousValue = 5000,
-                    CurrentValue = 4000,
-                },
-            },
-        };
+                [ECardAttributeType.ChargeAmount] = 1_000,
+            }
+        );
+        entities["wok"] = new CombatImpactEntity(
+            "wok",
+            "Jumbo Wok",
+            "Item",
+            null,
+            6,
+            Attributes: new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.ChargeAmount] = 2_000,
+            }
+        );
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
-        var group = Assert.Single(Assert.Single(report.Sources).Groups);
+        var report = CombatImpactProjector.Project(simulation, entities);
 
-        Assert.Equal(1, group.Count);
-        Assert.Null(group.ObservedValue);
+        var finesse = Assert.Single(report.Sources, source => source.Entity.Id == "finesse");
+        var finesseCharge = Assert.Single(finesse.Groups);
+        Assert.Equal(4, finesseCharge.Count);
+        Assert.Equal(4_000, finesseCharge.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, finesseCharge.ObservedCoverage);
+
+        var wok = Assert.Single(report.Sources, source => source.Entity.Id == "wok");
+        var wokCharge = Assert.Single(wok.Groups);
+        Assert.Equal(3, wokCharge.Count);
+        Assert.Equal(6_000, wokCharge.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, wokCharge.ObservedCoverage);
+
+        var incoming = Assert.Single(Assert.Single(report.Received).Groups);
+        Assert.Equal(7, incoming.Count);
+        Assert.Equal(10_000, incoming.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, incoming.ObservedCoverage);
+        Assert.Equal(
+            "×7 · 10s",
+            CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
+        );
+        Assert.Equal(
+            4_000,
+            Assert.Single(incoming.Sources, source => source.Entity.Id == "finesse").ObservedValue
+        );
+        Assert.Equal(
+            6_000,
+            Assert.Single(incoming.Sources, source => source.Entity.Id == "wok").ObservedValue
+        );
     }
 
     [Fact]
@@ -1352,10 +1899,13 @@ public sealed class CombatImpactProjectorTests
             );
         simulation.Frames[0].CardUpdates[target] = HasteUpdate(target, 950);
 
-        var report = CombatImpactProjector.Project(simulation, Entities());
+        var report = CombatImpactProjector.Project(
+            simulation,
+            EntitiesWithSourceAttribute(ECardAttributeType.HasteAmount, 1_000)
+        );
 
         Assert.Equal(
-            950,
+            1_000,
             Assert
                 .Single(
                     Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
@@ -1535,8 +2085,6 @@ public sealed class CombatImpactProjectorTests
     [InlineData(ECardAttributeType.FreezeAmount, 1500, "Milliseconds")]
     [InlineData(ECardAttributeType.FlatCooldownReduction, 1500, "Milliseconds")]
     [InlineData(ECardAttributeType.Lifesteal, 12, "PercentagePoints")]
-    [InlineData(ECardAttributeType.TempoApplyAmount, 3, "Amount")]
-    [InlineData(ECardAttributeType.TempoRemoveAmount, 2, "Amount")]
     [InlineData(ECardAttributeType.TempoCost, 2, "Amount")]
     [InlineData(ECardAttributeType.FlatTempoCostReduction, 1, "Amount")]
     [InlineData(ECardAttributeType.PercentTempoCostReduction, 20, "PercentagePoints")]
@@ -1554,6 +2102,30 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(expectedUnit, group.Unit.ToString());
         Assert.Equal(value, group.ObservedValue);
         Assert.Equal("target", Assert.Single(group.Targets).Entity.Id);
+    }
+
+    [Fact]
+    public void Newer_tempo_amount_attributes_and_units_are_preserved_when_available()
+    {
+        if (!OptionalCombatTempoTestValues.TryResolve(out var tempo))
+            return;
+
+        var cases = new[]
+        {
+            (Attribute: tempo.ApplyAmountAttribute, Value: 3),
+            (Attribute: tempo.RemoveAmountAttribute, Value: 2),
+        };
+        foreach (var (attribute, value) in cases)
+        {
+            var group = ProjectSingleAuraAttribute(attribute, value);
+
+            Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
+            Assert.Equal(CombatImpactEventSurface.CardAttribute, group.Surface);
+            Assert.Equal(attribute.ToString(), group.NativeAttributeKey);
+            Assert.Equal(CombatImpactValueUnit.Amount, group.Unit);
+            Assert.Equal(value, group.ObservedValue);
+            Assert.Equal("target", Assert.Single(group.Targets).Entity.Id);
+        }
     }
 
     [Fact]
@@ -1594,6 +2166,84 @@ public sealed class CombatImpactProjectorTests
         };
 
         Assert.Empty(CombatImpactProjector.Project(simulation, Entities()).Sources);
+    }
+
+    [Fact]
+    public void Self_reference_aura_recalculations_are_not_counted_as_combat_impact()
+    {
+        var simulation = new CombatSim();
+        var self = InstanceId.TryParse("source");
+        var target = InstanceId.TryParse("target");
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventEffectAuraExecuted
+                {
+                    EffectId = "health-formula",
+                    Source = self,
+                    AppliedTo = { CardTarget("source") },
+                }
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventEffectAuraExecuted
+                {
+                    EffectId = "value-formula",
+                    Source = InstanceId.TryParse("trigger"),
+                    AppliedTo = { CardTarget("target") },
+                }
+            );
+        simulation.Frames[0].CardUpdates[self] = new CombatSimCardUpdate
+        {
+            CardInstanceId = self,
+            Attributes =
+            {
+                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    PreviousValue = 6,
+                    CurrentValue = 7_018,
+                },
+            },
+        };
+        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.CritChance] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.CritChance,
+                    PreviousValue = 64,
+                    CurrentValue = 82,
+                },
+            },
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            ReferenceValuedAuraEffectIds = ["health-formula"],
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            AuraAttributeTypesByEffectId = new Dictionary<string, ECardAttributeType>
+            {
+                ["value-formula"] = ECardAttributeType.CritChance,
+            },
+            ReferenceValuedAuraEffectIds = ["value-formula"],
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.DoesNotContain(report.Sources, source => source.Entity.Id == "source");
+        Assert.DoesNotContain(report.Received, received => received.Entity.Id == "source");
+        var crit = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "trigger").Groups
+        );
+        Assert.Equal("CritChance", crit.NativeAttributeKey);
+        Assert.Equal(18, crit.ObservedValue);
+        Assert.Equal("target", Assert.Single(crit.Targets).Entity.Id);
     }
 
     [Theory]
@@ -1807,6 +2457,62 @@ public sealed class CombatImpactProjectorTests
     {
         var frame = new CombatSimFrame();
         SetSourceAttributeUpdate(frame, attribute, previous, current);
+        return frame;
+    }
+
+    private static CombatSimFrame ValueAndCritGainFrame(int frameIndex)
+    {
+        var frame = new CombatSimFrame();
+        foreach (var targetId in new[] { "soul", "crit-target", "value-target" })
+        {
+            var executed = Executed(
+                "pen",
+                EActionCommandType.CardModifyAttribute,
+                CardTarget(targetId)
+            );
+            executed.ExecutionContextId = $"pen-context-{frameIndex}";
+            executed.EffectId = "0";
+            frame.Events.Add(executed);
+        }
+
+        frame.Events.Add(
+            new CombatSimEventEffectAuraExecuted
+            {
+                ExecutionContextId = $"caviar-context-{frameIndex}",
+                EffectId = "1",
+                Source = InstanceId.TryParse("caviar"),
+                AppliedTo = { CardTarget("soul"), CardTarget("crit-target") },
+            }
+        );
+
+        foreach (var targetId in new[] { "soul", "crit-target", "value-target" })
+        {
+            var target = InstanceId.TryParse(targetId);
+            var update = new CombatSimCardUpdate
+            {
+                CardInstanceId = target,
+                Attributes =
+                {
+                    [ECardAttributeType.SellPrice] = new CombatSimCardAttributeUpdate
+                    {
+                        AttributeType = ECardAttributeType.SellPrice,
+                        PreviousValue = frameIndex * 3,
+                        CurrentValue = (frameIndex + 1) * 3,
+                    },
+                },
+            };
+            if (targetId != "value-target")
+            {
+                update.Attributes[ECardAttributeType.CritChance] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.CritChance,
+                    PreviousValue = frameIndex * 6,
+                    CurrentValue = (frameIndex + 1) * 6,
+                };
+            }
+            frame.CardUpdates[target] = update;
+        }
+
         return frame;
     }
 

@@ -4,6 +4,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Infra.Messages.CombatSimEvents;
 using BazaarGameShared.Infra.Messages.Shared;
+using BazaarPlusPlus.GameInterop.CombatSimulation;
 
 namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
 
@@ -47,6 +48,8 @@ internal static class CombatImpactProjector
                     CriticalCount = resolved.CriticalCount,
                     CriticalValue = resolved.CriticalValue,
                     NonCriticalValue = resolved.NonCriticalValue,
+                    AlternateNonCriticalValue = resolved.AlternateNonCriticalValue,
+                    HasCriticalAdjustmentCandidate = resolved.HasCriticalAdjustmentCandidate,
                 }
             );
         }
@@ -131,20 +134,26 @@ internal static class CombatImpactProjector
                 "RageApplyAmount",
                 metrics
             );
-            AddAmountMetric(
-                stats,
-                ECardStats.TempoAdded,
-                CombatImpactKind.AttributeChange,
-                "TempoApplyAmount",
-                metrics
-            );
-            AddAmountMetric(
-                stats,
-                ECardStats.TempoSpent,
-                CombatImpactKind.AttributeChange,
-                "TempoRemoveAmount",
-                metrics
-            );
+            if (OptionalCombatTempoTypes.TryGetAddedStat(out var tempoAdded))
+            {
+                AddAmountMetric(
+                    stats,
+                    tempoAdded,
+                    CombatImpactKind.AttributeChange,
+                    "TempoApplyAmount",
+                    metrics
+                );
+            }
+            if (OptionalCombatTempoTypes.TryGetSpentStat(out var tempoSpent))
+            {
+                AddAmountMetric(
+                    stats,
+                    tempoSpent,
+                    CombatImpactKind.AttributeChange,
+                    "TempoRemoveAmount",
+                    metrics
+                );
+            }
             if (metrics.Count > 0)
                 authoritative[sourceId] = metrics;
         }
@@ -176,25 +185,50 @@ internal static class CombatImpactProjector
                 );
                 var targetId = ResolveTargetId(item.Target);
                 var hasKind = TryResolveKind(item.ActionType, out var kind);
-                var resolved = hasKind
-                    ? ResolveValue(
-                        frame,
-                        item,
-                        kind,
-                        IsTransitionUnique(frame, executed, item, entities),
-                        executed
-                    )
+                var configuredActionValue = default(ResolvedImpactValue);
+                var hasConfiguredDuration =
+                    hasKind
+                    && attributedSourceId != null
+                    && TryResolveConfiguredDurationAction(
+                        item.ActionType,
+                        attributedSourceId,
+                        cardAttributes,
+                        out configuredActionValue
+                    );
+                var resolved =
+                    hasConfiguredDuration ? configuredActionValue
+                    : hasKind
+                        ? ResolveValue(
+                            frame,
+                            item,
+                            kind,
+                            IsTransitionUnique(frame, executed, item, entities),
+                            executed,
+                            entities
+                        )
                     : default;
+                if (
+                    hasKind
+                    && kind == CombatImpactKind.DirectDamage
+                    && HasCriticalHealthAdjustment(frame, item, kind)
+                )
+                    resolved = resolved with { HasCriticalAdjustmentCandidate = true };
                 if (
                     attributedSourceId != null
                     && TryResolveNonCriticalValue(
                         item.ActionType,
                         attributedSourceId,
                         cardAttributes,
-                        out var nonCriticalValue
+                        frame,
+                        out var nonCriticalValue,
+                        out var alternateNonCriticalValue
                     )
                 )
-                    resolved = resolved with { NonCriticalValue = nonCriticalValue };
+                    resolved = resolved with
+                    {
+                        NonCriticalValue = nonCriticalValue,
+                        AlternateNonCriticalValue = alternateNonCriticalValue,
+                    };
                 projections.Add(
                     new ProjectedExecution(
                         attributedSourceId,
@@ -215,35 +249,37 @@ internal static class CombatImpactProjector
         ICollection<CombatImpactEvent> events
     )
     {
-        foreach (
-            var costSpent in simulation.Frames.SelectMany(frame =>
-                frame.Events.OfType<CombatSimEventCardActionCostSpent>()
-            )
-        )
+        foreach (var frame in simulation.Frames)
         {
-            if (costSpent.PlayerAttributeSpent != EPlayerAttributeType.Tempo)
-                continue;
-
-            var sourceId = costSpent.ExecutingCard.Value;
-            var targetId = ResolveCardActionCostTargetId(costSpent, entities);
-            if (
-                !entities.TryGetValue(sourceId, out var source)
-                || source.TypeLabel is not ("Item" or "Skill")
-                || targetId == null
-            )
-                continue;
-
-            events.Add(
-                new CombatImpactEvent(
-                    CombatImpactKind.AttributeChange,
-                    sourceId,
-                    targetId,
-                    null,
-                    CombatImpactValueUnit.Amount,
-                    "TempoRemoveAmount",
-                    ValueBasis: CombatImpactValueBasis.None
+            foreach (var candidate in frame.Events)
+            {
+                if (
+                    !CardActionCostSpentEventReader.TryRead(candidate, out var costSpent)
+                    || costSpent.PlayerAttributeSpent != EPlayerAttributeType.Tempo
                 )
-            );
+                    continue;
+
+                var sourceId = costSpent.ExecutingCard.Value;
+                var targetId = ResolveCardActionCostTargetId(costSpent, entities);
+                if (
+                    !entities.TryGetValue(sourceId, out var source)
+                    || source.TypeLabel is not ("Item" or "Skill")
+                    || targetId == null
+                )
+                    continue;
+
+                events.Add(
+                    new CombatImpactEvent(
+                        CombatImpactKind.AttributeChange,
+                        sourceId,
+                        targetId,
+                        null,
+                        CombatImpactValueUnit.Amount,
+                        "TempoRemoveAmount",
+                        ValueBasis: CombatImpactValueBasis.None
+                    )
+                );
+            }
         }
     }
 
@@ -289,31 +325,104 @@ internal static class CombatImpactProjector
         }
     }
 
+    private static bool TryResolveConfiguredDurationAction(
+        EActionCommandType action,
+        string sourceId,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
+        out ResolvedImpactValue resolved
+    )
+    {
+        (ECardAttributeType Attribute, CombatImpactKind Kind)? configuration = action switch
+        {
+            EActionCommandType.CardCharge => (
+                ECardAttributeType.ChargeAmount,
+                CombatImpactKind.Charge
+            ),
+            EActionCommandType.CardHaste => (
+                ECardAttributeType.HasteAmount,
+                CombatImpactKind.Haste
+            ),
+            EActionCommandType.CardSlow => (ECardAttributeType.SlowAmount, CombatImpactKind.Slow),
+            EActionCommandType.CardFreeze => (
+                ECardAttributeType.FreezeAmount,
+                CombatImpactKind.Freeze
+            ),
+            _ => null,
+        };
+        if (!configuration.HasValue)
+        {
+            resolved = default;
+            return false;
+        }
+
+        var (attribute, kind) = configuration.Value;
+        resolved = ResolvedImpactValue.Empty(kind, action);
+
+        // Target frame deltas include fixed ticking and cannot reliably split concurrent actions.
+        // The source value is the nominal outgoing duration, before target-side mitigation,
+        // immunity, overlap, or truncation.
+        if (
+            cardAttributes.TryGetValue(sourceId, out var attributes)
+            && attributes.TryGetValue(attribute, out var configuredAmount)
+            && configuredAmount > 0
+        )
+        {
+            resolved = new ResolvedImpactValue(
+                configuredAmount,
+                CombatImpactValueUnit.Milliseconds,
+                CombatImpactAggregator.NativeKey(kind),
+                false,
+                CombatImpactValueBasis.ConfiguredActionAmount
+            );
+        }
+
+        return true;
+    }
+
     private static bool TryResolveNonCriticalValue(
         EActionCommandType action,
         string sourceId,
         IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
-        out int value
+        CombatSimFrame frame,
+        out int value,
+        out int? alternateValue
     )
     {
         var attribute = action switch
         {
+            EActionCommandType.PlayerDamage => ECardAttributeType.DamageAmount,
             EActionCommandType.PlayerBurnApply => ECardAttributeType.BurnApplyAmount,
             EActionCommandType.PlayerPoisonApply => ECardAttributeType.PoisonApplyAmount,
             EActionCommandType.PlayerRegenApply => ECardAttributeType.RegenApplyAmount,
-            EActionCommandType.PlayerTempoApply => ECardAttributeType.TempoApplyAmount,
-            EActionCommandType.PlayerTempoRemove => ECardAttributeType.TempoRemoveAmount,
             _ => (ECardAttributeType?)null,
         };
+        if (
+            !attribute.HasValue
+            && OptionalCombatTempoTypes.TryGetCardAttribute(action, out var tempoAttribute)
+        )
+            attribute = tempoAttribute;
         if (
             attribute.HasValue
             && cardAttributes.TryGetValue(sourceId, out var attributes)
             && attributes.TryGetValue(attribute.Value, out value)
             && value > 0
         )
+        {
+            alternateValue = null;
+            var sourceInstance = InstanceId.TryParse(sourceId);
+            if (
+                action == EActionCommandType.PlayerDamage
+                && frame.CardUpdates.TryGetValue(sourceInstance, out var update)
+                && update.Attributes.TryGetValue(attribute.Value, out var attributeUpdate)
+                && attributeUpdate.CurrentValue > 0
+                && attributeUpdate.CurrentValue != value
+            )
+                alternateValue = attributeUpdate.CurrentValue;
             return true;
+        }
 
         value = 0;
+        alternateValue = null;
         return false;
     }
 
@@ -335,6 +444,11 @@ internal static class CombatImpactProjector
         {
             var indexedEvents = group.ToArray();
             if (
+                group.Key.Kind == CombatImpactKind.DirectDamage
+                && !indexedEvents.Any(item => item.Event.HasCriticalAdjustmentCandidate)
+            )
+                continue;
+            if (
                 indexedEvents.Any(item =>
                     item.Event.IsCritical
                     || item.Event.CriticalCount > 0
@@ -355,23 +469,18 @@ internal static class CombatImpactProjector
             if (metric == null)
                 continue;
 
-            var baselines = indexedEvents
-                .Select(item => item.Event.NonCriticalValue!.Value)
-                .ToArray();
-            var baselineTotal = baselines.Sum(value => (long)value);
-            var criticalExtra = (long)metric.Value - baselineTotal;
-            if (criticalExtra <= 0 || criticalExtra > baselineTotal)
-                continue;
-
-            var criticalCount = ResolveUniqueCriticalCount(baselines, criticalExtra);
-            if (criticalCount is not > 0)
+            var recovery = ResolveUniqueCriticalRecovery(
+                indexedEvents.Select(item => item.Event).ToArray(),
+                metric.Value
+            );
+            if (recovery is not { CriticalCount: > 0 })
                 continue;
 
             var first = indexedEvents[0];
             events[first.Index] = first.Event with
             {
-                CriticalCount = criticalCount.Value,
-                CriticalValue = SaturatingInt(criticalExtra * 2),
+                CriticalCount = recovery.Value.CriticalCount,
+                CriticalValue = recovery.Value.CriticalValue,
             };
         }
     }
@@ -379,7 +488,13 @@ internal static class CombatImpactProjector
     private static bool IsRecoverableAppliedEffect(CombatImpactEvent item) =>
         item.Surface == CombatImpactEventSurface.AppliedEffect
         && (
-            item.Kind == CombatImpactKind.Burn
+            item.Kind == CombatImpactKind.DirectDamage
+                && string.Equals(
+                    item.NativeAttributeKey,
+                    CombatImpactAggregator.NativeKey(CombatImpactKind.DirectDamage),
+                    StringComparison.Ordinal
+                )
+            || item.Kind == CombatImpactKind.Burn
                 && string.Equals(
                     item.NativeAttributeKey,
                     CombatImpactAggregator.NativeKey(CombatImpactKind.Burn),
@@ -399,54 +514,124 @@ internal static class CombatImpactProjector
                 )
         );
 
-    private static int? ResolveUniqueCriticalCount(
-        IReadOnlyList<int> nonCriticalValues,
-        long criticalExtra
+    private static bool HasCriticalHealthAdjustment(
+        CombatSimFrame frame,
+        CombatSimEventEffectExecuted item,
+        CombatImpactKind kind
+    )
+    {
+        if (item.Target is not EffectTargetPlayer playerTarget)
+            return false;
+
+        var update =
+            playerTarget.Target == ECombatantId.Player
+                ? frame.PlayerUpdates
+                : frame.OpponentUpdates;
+        return update?.HealthAdjustments.Any(adjustment =>
+                adjustment.IsCrit && Matches(kind, adjustment)
+            ) == true;
+    }
+
+    private static CriticalRecoveryResult? ResolveUniqueCriticalRecovery(
+        IReadOnlyList<CombatImpactEvent> events,
+        long authoritativeTotal
     )
     {
         const int maximumStates = 50_000;
         const int maximumTransitions = 2_000_000;
-        var transitions = 0;
-        var states = new Dictionary<long, CriticalCountRange>
+        long transitions = 0;
+        if (authoritativeTotal <= 0)
+            return null;
+
+        var states = new Dictionary<long, CriticalRecoveryRange>
         {
-            [0] = new CriticalCountRange(0, 0),
+            [0] = new CriticalRecoveryRange(0, 0, 0, 0),
         };
-        foreach (var value in nonCriticalValues)
+        foreach (var item in events)
         {
-            var snapshot = states.ToArray();
-            transitions += snapshot.Length;
+            var baselineValues = new[] { item.NonCriticalValue, item.AlternateNonCriticalValue }
+                .Where(value => value is > 0)
+                .Select(value => value!.Value)
+                .Distinct()
+                .ToArray();
+            if (baselineValues.Length == 0)
+                return null;
+
+            transitions += (long)states.Count * baselineValues.Length * 2;
             if (transitions > maximumTransitions)
                 return null;
 
-            foreach (var (sum, countRange) in snapshot)
+            var next = new Dictionary<long, CriticalRecoveryRange>();
+            foreach (var (sum, range) in states)
             {
-                var nextSum = sum + value;
-                if (nextSum > criticalExtra)
-                    continue;
-
-                var candidate = new CriticalCountRange(
-                    countRange.Minimum + 1,
-                    countRange.Maximum + 1
-                );
-                if (states.TryGetValue(nextSum, out var existing))
+                foreach (var baseline in baselineValues)
                 {
-                    states[nextSum] = new CriticalCountRange(
-                        Math.Min(existing.Minimum, candidate.Minimum),
-                        Math.Max(existing.Maximum, candidate.Maximum)
-                    );
-                }
-                else
-                {
-                    states[nextSum] = candidate;
-                    if (states.Count > maximumStates)
+                    if (
+                        !AddCriticalRecoveryState(
+                            next,
+                            sum + baseline,
+                            range,
+                            authoritativeTotal,
+                            maximumStates
+                        )
+                        || !AddCriticalRecoveryState(
+                            next,
+                            sum + (long)baseline * 2,
+                            new CriticalRecoveryRange(
+                                range.MinimumCriticalCount + 1,
+                                range.MaximumCriticalCount + 1,
+                                range.MinimumCriticalValue + (long)baseline * 2,
+                                range.MaximumCriticalValue + (long)baseline * 2
+                            ),
+                            authoritativeTotal,
+                            maximumStates
+                        )
+                    )
                         return null;
                 }
             }
+            states = next;
         }
 
-        return states.TryGetValue(criticalExtra, out var result) && result.Minimum == result.Maximum
-            ? result.Minimum
-            : null;
+        if (
+            !states.TryGetValue(authoritativeTotal, out var result)
+            || result.MinimumCriticalCount != result.MaximumCriticalCount
+            || result.MinimumCriticalCount <= 0
+        )
+            return null;
+
+        return new CriticalRecoveryResult(
+            result.MinimumCriticalCount,
+            result.MinimumCriticalValue == result.MaximumCriticalValue
+                ? SaturatingInt(result.MinimumCriticalValue)
+                : null
+        );
+    }
+
+    private static bool AddCriticalRecoveryState(
+        IDictionary<long, CriticalRecoveryRange> states,
+        long total,
+        CriticalRecoveryRange candidate,
+        long authoritativeTotal,
+        int maximumStates
+    )
+    {
+        if (total > authoritativeTotal)
+            return true;
+
+        if (states.TryGetValue(total, out var existing))
+        {
+            states[total] = new CriticalRecoveryRange(
+                Math.Min(existing.MinimumCriticalCount, candidate.MinimumCriticalCount),
+                Math.Max(existing.MaximumCriticalCount, candidate.MaximumCriticalCount),
+                Math.Min(existing.MinimumCriticalValue, candidate.MinimumCriticalValue),
+                Math.Max(existing.MaximumCriticalValue, candidate.MaximumCriticalValue)
+            );
+            return true;
+        }
+
+        states[total] = candidate;
+        return states.Count <= maximumStates;
     }
 
     private static string? ResolveActivitySource(
@@ -461,6 +646,89 @@ internal static class CombatImpactProjector
             return triggerSourceId;
 
         return null;
+    }
+
+    private static bool TryResolveAbilityAttributeType(
+        CombatSimEventEffectExecuted effect,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        out ECardAttributeType attributeType
+    ) =>
+        TryResolveEffectAttributeType(
+            effect.Source?.Value,
+            effect.TriggerSource?.Value,
+            effect.EffectId,
+            entities,
+            static entity => entity.AbilityAttributeTypesByEffectId,
+            out attributeType
+        );
+
+    private static bool TryResolveAuraAttributeType(
+        CombatSimEventEffectAuraExecuted effect,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        out ECardAttributeType attributeType
+    ) =>
+        TryResolveEffectAttributeType(
+            effect.Source?.Value,
+            effect.TriggerSource?.Value,
+            effect.EffectId,
+            entities,
+            static entity => entity.AuraAttributeTypesByEffectId,
+            out attributeType
+        );
+
+    private static bool TryResolveEffectAttributeType(
+        string? directSourceId,
+        string? triggerSourceId,
+        string? effectId,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        Func<CombatImpactEntity, IReadOnlyDictionary<string, ECardAttributeType>?> selectMappings,
+        out ECardAttributeType attributeType
+    )
+    {
+        if (
+            TryResolveEffectAttributeType(
+                directSourceId,
+                effectId,
+                entities,
+                selectMappings,
+                out attributeType
+            )
+        )
+            return true;
+        if (
+            !string.Equals(directSourceId, triggerSourceId, StringComparison.Ordinal)
+            && TryResolveEffectAttributeType(
+                triggerSourceId,
+                effectId,
+                entities,
+                selectMappings,
+                out attributeType
+            )
+        )
+            return true;
+
+        attributeType = default;
+        return false;
+    }
+
+    private static bool TryResolveEffectAttributeType(
+        string? sourceId,
+        string? effectId,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        Func<CombatImpactEntity, IReadOnlyDictionary<string, ECardAttributeType>?> selectMappings,
+        out ECardAttributeType attributeType
+    )
+    {
+        if (
+            !string.IsNullOrWhiteSpace(sourceId)
+            && !string.IsNullOrWhiteSpace(effectId)
+            && entities.TryGetValue(sourceId!, out var source)
+            && selectMappings(source)?.TryGetValue(effectId!, out attributeType) == true
+        )
+            return true;
+
+        attributeType = default;
+        return false;
     }
 
     private static bool IsActivityEntity(
@@ -494,6 +762,12 @@ internal static class CombatImpactProjector
                 );
                 if (sourceId == null)
                     continue;
+                var hasExpectedCardAttribute = TryResolveAuraAttributeType(
+                    aura,
+                    entities,
+                    out var expectedCardAttribute
+                );
+                var isReferenceValuedAura = IsReferenceValuedAuraEffect(aura, entities);
 
                 foreach (var target in aura.AppliedTo.Concat(aura.RemovedFrom))
                 {
@@ -529,24 +803,54 @@ internal static class CombatImpactProjector
                         || !frame.CardUpdates.TryGetValue(cardTarget.Target, out var cardUpdate)
                     )
                         continue;
-
-                    var cardChanges = cardUpdate
-                        .Attributes.Values.Where(change =>
-                            change.Delta != 0 && IsDisplayableAuraAttribute(change.AttributeType)
-                        )
-                        .ToArray();
                     if (
-                        cardChanges.Length != 1
-                        || HasExplicitModifierClaim(frame, cardTarget.Target)
+                        isReferenceValuedAura
+                        && string.Equals(
+                            sourceId,
+                            cardTarget.Target.Value,
+                            StringComparison.Ordinal
+                        )
                     )
                         continue;
 
-                    candidates.Add(
-                        new AuraAttributeCandidate(
-                            sourceId,
-                            cardTarget.Target.Value,
-                            cardChanges[0]
+                    CombatSimCardAttributeUpdate cardChange;
+                    if (hasExpectedCardAttribute)
+                    {
+                        if (
+                            !IsDisplayableAuraAttribute(expectedCardAttribute)
+                            || !cardUpdate.Attributes.TryGetValue(
+                                expectedCardAttribute,
+                                out var expectedChange
+                            )
+                            || expectedChange.Delta == 0
+                            || HasExplicitModifierClaim(
+                                frame,
+                                cardTarget.Target,
+                                expectedCardAttribute,
+                                entities
+                            )
                         )
+                            continue;
+                        cardChange = expectedChange;
+                    }
+                    else
+                    {
+                        var cardChanges = cardUpdate
+                            .Attributes.Values.Where(change =>
+                                change.Delta != 0
+                                && IsDisplayableAuraAttribute(change.AttributeType)
+                            )
+                            .ToArray();
+                        if (
+                            cardChanges.Length != 1
+                            || HasExplicitModifierClaim(frame, cardTarget.Target)
+                        )
+                            continue;
+                        cardChange = cardChanges[0];
+                    }
+
+                    candidates.Add(
+                        new AuraAttributeCandidate(sourceId, cardTarget.Target.Value, cardChange)
                     );
                 }
             }
@@ -599,6 +903,23 @@ internal static class CombatImpactProjector
         }
     }
 
+    private static bool IsReferenceValuedAuraEffect(
+        CombatSimEventEffectAuraExecuted effect,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        HasReferenceValuedAuraEffect(effect.Source?.Value, effect.EffectId, entities)
+        || HasReferenceValuedAuraEffect(effect.TriggerSource?.Value, effect.EffectId, entities);
+
+    private static bool HasReferenceValuedAuraEffect(
+        string? sourceId,
+        string? effectId,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        !string.IsNullOrWhiteSpace(sourceId)
+        && !string.IsNullOrWhiteSpace(effectId)
+        && entities.TryGetValue(sourceId!, out var source)
+        && source.ReferenceValuedAuraEffectIds?.Contains(effectId!) == true;
+
     private static bool HasExplicitModifierClaim(CombatSimFrame frame, InstanceId target) =>
         frame
             .Events.OfType<CombatSimEventEffectExecuted>()
@@ -608,8 +929,31 @@ internal static class CombatImpactProjector
                 && cardTarget.Target == target
             );
 
+    private static bool HasExplicitModifierClaim(
+        CombatSimFrame frame,
+        InstanceId target,
+        ECardAttributeType attributeType,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        frame
+            .Events.OfType<CombatSimEventEffectExecuted>()
+            .Any(item =>
+                item.ActionType == EActionCommandType.CardModifyAttribute
+                && item.Target is EffectTargetCard cardTarget
+                && cardTarget.Target == target
+                && (
+                    !TryResolveAbilityAttributeType(item, entities, out var claimedAttribute)
+                    || claimedAttribute == attributeType
+                )
+            );
+
+    private static bool IsAttributableCardAttribute(ECardAttributeType attribute) =>
+        IsDisplayableAuraAttribute(attribute)
+        || attribute.ToString().StartsWith("Custom_", StringComparison.Ordinal);
+
     private static bool IsDisplayableAuraAttribute(ECardAttributeType attribute) =>
-        attribute
+        OptionalCombatTempoTypes.IsAmountAttribute(attribute)
+        || attribute
             is ECardAttributeType.AmmoMax
                 or ECardAttributeType.ReloadAmount
                 or ECardAttributeType.ReloadTargets
@@ -662,8 +1006,6 @@ internal static class CombatImpactProjector
                 or ECardAttributeType.DestroyImmunity
                 or ECardAttributeType.RageApplyAmount
                 or ECardAttributeType.RageRemoveAmount
-                or ECardAttributeType.TempoApplyAmount
-                or ECardAttributeType.TempoRemoveAmount
                 or ECardAttributeType.TempoCost
                 or ECardAttributeType.FlatTempoCostReduction
                 or ECardAttributeType.PercentTempoCostReduction
@@ -725,23 +1067,22 @@ internal static class CombatImpactProjector
             && transition.Attribute == (int)EPlayerAttributeType.Tempo
         )
         {
-            claimCount += frame
-                .Events.OfType<CombatSimEventCardActionCostSpent>()
-                .Count(costSpent =>
-                    costSpent.PlayerAttributeSpent == EPlayerAttributeType.Tempo
-                    && string.Equals(
-                        ResolveCardActionCostTargetId(costSpent, entities),
-                        targetId,
-                        StringComparison.Ordinal
-                    )
-                );
+            claimCount += frame.Events.Count(candidate =>
+                CardActionCostSpentEventReader.TryRead(candidate, out var costSpent)
+                && costSpent.PlayerAttributeSpent == EPlayerAttributeType.Tempo
+                && string.Equals(
+                    ResolveCardActionCostTargetId(costSpent, entities),
+                    targetId,
+                    StringComparison.Ordinal
+                )
+            );
         }
 
         return claimCount == 1;
     }
 
     private static string? ResolveCardActionCostTargetId(
-        CombatSimEventCardActionCostSpent costSpent,
+        CardActionCostSpentEvent costSpent,
         IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
@@ -765,6 +1106,15 @@ internal static class CombatImpactProjector
         out ImpactTransitionClaim transition
     )
     {
+        if (OptionalCombatTempoTypes.IsAction(action))
+        {
+            transition = new ImpactTransitionClaim(
+                ImpactTransitionDomain.PlayerAttribute,
+                (int)EPlayerAttributeType.Tempo
+            );
+            return true;
+        }
+
         transition = action switch
         {
             EActionCommandType.PlayerDamage => new(
@@ -794,10 +1144,6 @@ internal static class CombatImpactProjector
             EActionCommandType.PlayerRageApply or EActionCommandType.PlayerRageRemove => new(
                 ImpactTransitionDomain.PlayerAttribute,
                 (int)EPlayerAttributeType.Rage
-            ),
-            EActionCommandType.PlayerTempoApply or EActionCommandType.PlayerTempoRemove => new(
-                ImpactTransitionDomain.PlayerAttribute,
-                (int)EPlayerAttributeType.Tempo
             ),
             EActionCommandType.PlayerMaxHealthIncrease
             or EActionCommandType.PlayerMaxHealthDecrease => new(
@@ -835,8 +1181,6 @@ internal static class CombatImpactProjector
                 or EActionCommandType.PlayerRegenRemove
                 or EActionCommandType.PlayerRageApply
                 or EActionCommandType.PlayerRageRemove
-                or EActionCommandType.PlayerTempoApply
-                or EActionCommandType.PlayerTempoRemove
                 or EActionCommandType.PlayerMaxHealthIncrease
                 or EActionCommandType.PlayerMaxHealthDecrease
                 or EActionCommandType.CardHaste
@@ -850,6 +1194,12 @@ internal static class CombatImpactProjector
 
     internal static bool TryResolveKind(EActionCommandType action, out CombatImpactKind kind)
     {
+        if (OptionalCombatTempoTypes.IsAction(action))
+        {
+            kind = CombatImpactKind.AttributeChange;
+            return true;
+        }
+
         kind = action switch
         {
             EActionCommandType.PlayerDamage => CombatImpactKind.DirectDamage,
@@ -870,8 +1220,6 @@ internal static class CombatImpactProjector
             EActionCommandType.PlayerMaxHealthDecrease => CombatImpactKind.AttributeChange,
             EActionCommandType.PlayerRegenApply => CombatImpactKind.AttributeChange,
             EActionCommandType.PlayerRageApply => CombatImpactKind.AttributeChange,
-            EActionCommandType.PlayerTempoApply => CombatImpactKind.AttributeChange,
-            EActionCommandType.PlayerTempoRemove => CombatImpactKind.AttributeChange,
             EActionCommandType.CardDisable or EActionCommandType.CardDestroy =>
                 CombatImpactKind.Destroy,
             _ => default,
@@ -895,8 +1243,6 @@ internal static class CombatImpactProjector
                 or EActionCommandType.PlayerMaxHealthDecrease
                 or EActionCommandType.PlayerRegenApply
                 or EActionCommandType.PlayerRageApply
-                or EActionCommandType.PlayerTempoApply
-                or EActionCommandType.PlayerTempoRemove
                 or EActionCommandType.CardDisable
                 or EActionCommandType.CardDestroy;
     }
@@ -939,7 +1285,8 @@ internal static class CombatImpactProjector
         CombatSimEventEffectExecuted item,
         CombatImpactKind kind,
         bool transitionIsUnique,
-        IReadOnlyList<CombatSimEventEffectExecuted> executed
+        IReadOnlyList<CombatSimEventEffectExecuted> executed,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
         if (
@@ -948,7 +1295,7 @@ internal static class CombatImpactProjector
                 is EActionCommandType.CardModifyAttribute
                     or EActionCommandType.PlayerModifyAttribute
         )
-            return ResolveConcreteAttributeTransition(frame, item, kind, executed);
+            return ResolveConcreteAttributeTransition(frame, item, kind, executed, entities);
 
         if (!transitionIsUnique)
             return ResolvedImpactValue.Empty(kind, item.ActionType);
@@ -973,18 +1320,20 @@ internal static class CombatImpactProjector
                     ?? ResolvedImpactValue.Empty(kind, item.ActionType);
             }
 
-            var expectedAttribute = item.ActionType switch
-            {
-                EActionCommandType.PlayerBurnApply => EPlayerAttributeType.Burn,
-                EActionCommandType.PlayerPoisonApply => EPlayerAttributeType.Poison,
-                EActionCommandType.PlayerRegenApply => EPlayerAttributeType.HealthRegen,
-                EActionCommandType.PlayerRageApply => EPlayerAttributeType.Rage,
-                EActionCommandType.PlayerTempoApply => EPlayerAttributeType.Tempo,
-                EActionCommandType.PlayerTempoRemove => EPlayerAttributeType.Tempo,
-                EActionCommandType.PlayerMaxHealthIncrease => EPlayerAttributeType.HealthMax,
-                EActionCommandType.PlayerMaxHealthDecrease => EPlayerAttributeType.HealthMax,
-                _ => (EPlayerAttributeType?)null,
-            };
+            EPlayerAttributeType? expectedAttribute = OptionalCombatTempoTypes.IsAction(
+                item.ActionType
+            )
+                ? EPlayerAttributeType.Tempo
+                : item.ActionType switch
+                {
+                    EActionCommandType.PlayerBurnApply => EPlayerAttributeType.Burn,
+                    EActionCommandType.PlayerPoisonApply => EPlayerAttributeType.Poison,
+                    EActionCommandType.PlayerRegenApply => EPlayerAttributeType.HealthRegen,
+                    EActionCommandType.PlayerRageApply => EPlayerAttributeType.Rage,
+                    EActionCommandType.PlayerMaxHealthIncrease => EPlayerAttributeType.HealthMax,
+                    EActionCommandType.PlayerMaxHealthDecrease => EPlayerAttributeType.HealthMax,
+                    _ => (EPlayerAttributeType?)null,
+                };
             if (
                 expectedAttribute.HasValue
                 && update.Attributes.TryGetValue(expectedAttribute.Value, out var attribute)
@@ -992,7 +1341,7 @@ internal static class CombatImpactProjector
             )
             {
                 return new ResolvedImpactValue(
-                    item.ActionType == EActionCommandType.PlayerTempoRemove
+                    OptionalCombatTempoTypes.IsRemoveAction(item.ActionType)
                         ? Math.Abs(attribute.Delta)
                         : attribute.Delta,
                     UnitFor(expectedAttribute.Value.ToString()),
@@ -1033,28 +1382,6 @@ internal static class CombatImpactProjector
             return ResolvedImpactValue.Empty(kind, item.ActionType);
         }
 
-        var expected = kind switch
-        {
-            CombatImpactKind.Haste => ECardAttributeType.Haste,
-            CombatImpactKind.Slow => ECardAttributeType.Slow,
-            CombatImpactKind.Freeze => ECardAttributeType.Freeze,
-            _ => (ECardAttributeType?)null,
-        };
-        if (
-            expected.HasValue
-            && cardUpdate.Attributes.TryGetValue(expected.Value, out var updateValue)
-            && updateValue.Delta > 0
-        )
-        {
-            return new ResolvedImpactValue(
-                Math.Abs(updateValue.Delta),
-                CombatImpactValueUnit.Milliseconds,
-                CombatImpactAggregator.NativeKey(kind),
-                false,
-                CombatImpactValueBasis.NetFrameDelta
-            );
-        }
-
         return ResolvedImpactValue.Empty(kind, item.ActionType);
     }
 
@@ -1062,7 +1389,8 @@ internal static class CombatImpactProjector
         CombatSimFrame frame,
         CombatSimEventEffectExecuted item,
         CombatImpactKind kind,
-        IReadOnlyList<CombatSimEventEffectExecuted> executed
+        IReadOnlyList<CombatSimEventEffectExecuted> executed,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
         if (item.ActionType == EActionCommandType.PlayerModifyAttribute)
@@ -1112,21 +1440,28 @@ internal static class CombatImpactProjector
         )
             return ResolvedImpactValue.Empty(kind, item.ActionType);
 
-        var cardChanges = cardUpdate
-            .Attributes.Values.Where(update =>
-                update.Delta != 0
-                && (
-                    IsDisplayableAuraAttribute(update.AttributeType)
-                    || update
-                        .AttributeType.ToString()
-                        .StartsWith("Custom_", StringComparison.Ordinal)
-                )
+        CombatSimCardAttributeUpdate cardChange;
+        if (TryResolveAbilityAttributeType(item, entities, out var expectedAttribute))
+        {
+            if (
+                !IsAttributableCardAttribute(expectedAttribute)
+                || !cardUpdate.Attributes.TryGetValue(expectedAttribute, out var expectedChange)
+                || expectedChange.Delta == 0
             )
-            .ToArray();
-        if (cardChanges.Length != 1)
-            return ResolvedImpactValue.Empty(kind, item.ActionType);
-
-        var cardChange = cardChanges[0];
+                return ResolvedImpactValue.Empty(kind, item.ActionType);
+            cardChange = expectedChange;
+        }
+        else
+        {
+            var cardChanges = cardUpdate
+                .Attributes.Values.Where(update =>
+                    update.Delta != 0 && IsAttributableCardAttribute(update.AttributeType)
+                )
+                .ToArray();
+            if (cardChanges.Length != 1)
+                return ResolvedImpactValue.Empty(kind, item.ActionType);
+            cardChange = cardChanges[0];
+        }
         if (
             IsClaimedByAnotherExecution(
                 executed,
@@ -1134,7 +1469,8 @@ internal static class CombatImpactProjector
                 new ImpactTransitionClaim(
                     ImpactTransitionDomain.CardAttribute,
                     (int)cardChange.AttributeType
-                )
+                ),
+                entities
             )
         )
             return ResolvedImpactValue.Empty(kind, item.ActionType);
@@ -1154,15 +1490,33 @@ internal static class CombatImpactProjector
     private static bool IsClaimedByAnotherExecution(
         IReadOnlyList<CombatSimEventEffectExecuted> executed,
         CombatSimEventEffectExecuted item,
-        ImpactTransitionClaim transition
+        ImpactTransitionClaim transition,
+        IReadOnlyDictionary<string, CombatImpactEntity>? entities = null
     )
     {
         var targetId = ResolveTargetId(item.Target);
         return executed.Any(candidate =>
             !ReferenceEquals(candidate, item)
             && string.Equals(ResolveTargetId(candidate.Target), targetId, StringComparison.Ordinal)
-            && ClaimsTransition(candidate.ActionType, transition)
+            && ClaimsTransition(candidate, transition, entities)
         );
+    }
+
+    private static bool ClaimsTransition(
+        CombatSimEventEffectExecuted effect,
+        ImpactTransitionClaim transition,
+        IReadOnlyDictionary<string, CombatImpactEntity>? entities
+    )
+    {
+        if (
+            entities != null
+            && effect.ActionType == EActionCommandType.CardModifyAttribute
+            && transition.Domain == ImpactTransitionDomain.CardAttribute
+            && TryResolveAbilityAttributeType(effect, entities, out var attributeType)
+        )
+            return (int)attributeType == transition.Attribute;
+
+        return ClaimsTransition(effect.ActionType, transition);
     }
 
     private static ResolvedImpactValue? ResolveHealthAdjustment(
@@ -1209,10 +1563,13 @@ internal static class CombatImpactProjector
         };
     }
 
-    private static bool MatchesExpectedPlayerDelta(EActionCommandType action, int delta) =>
-        action is EActionCommandType.PlayerMaxHealthDecrease or EActionCommandType.PlayerTempoRemove
-            ? delta < 0
-            : delta > 0;
+    private static bool MatchesExpectedPlayerDelta(EActionCommandType action, int delta)
+    {
+        var isDecrease =
+            action == EActionCommandType.PlayerMaxHealthDecrease
+            || OptionalCombatTempoTypes.IsRemoveAction(action);
+        return isDecrease ? delta < 0 : delta > 0;
+    }
 
     private static int SaturatingInt(long value) =>
         value > int.MaxValue ? int.MaxValue
@@ -1236,8 +1593,14 @@ internal static class CombatImpactProjector
             _ => false,
         };
 
-    private static string NativeKeyForAction(EActionCommandType action, string fallback) =>
-        action switch
+    private static string NativeKeyForAction(EActionCommandType action, string fallback)
+    {
+        if (OptionalCombatTempoTypes.IsApplyAction(action))
+            return "TempoApplyAmount";
+        if (OptionalCombatTempoTypes.IsRemoveAction(action))
+            return "TempoRemoveAmount";
+
+        return action switch
         {
             EActionCommandType.CardReload => "ReloadAmount",
             EActionCommandType.CardModifyAttribute => "CardModifyAttribute",
@@ -1250,12 +1613,11 @@ internal static class CombatImpactProjector
             ),
             EActionCommandType.PlayerRegenApply => "RegenApplyAmount",
             EActionCommandType.PlayerRageApply => "RageApplyAmount",
-            EActionCommandType.PlayerTempoApply => "TempoApplyAmount",
-            EActionCommandType.PlayerTempoRemove => "TempoRemoveAmount",
             EActionCommandType.PlayerMaxHealthIncrease => "HealthMaxIncrease",
             EActionCommandType.PlayerMaxHealthDecrease => "HealthMaxDecrease",
             _ => fallback,
         };
+    }
 
     private static CombatImpactValueUnit UnitFor(string nativeAttributeKey) =>
         nativeAttributeKey == "Lifesteal"
@@ -1336,6 +1698,10 @@ internal static class CombatImpactProjector
 
         internal int? NonCriticalValue { get; init; }
 
+        internal int? AlternateNonCriticalValue { get; init; }
+
+        internal bool HasCriticalAdjustmentCandidate { get; init; }
+
         internal static ResolvedImpactValue Empty(
             CombatImpactKind kind,
             EActionCommandType action
@@ -1382,7 +1748,14 @@ internal static class CombatImpactProjector
         string NativeAttributeKey
     );
 
-    private readonly record struct CriticalCountRange(int Minimum, int Maximum);
+    private readonly record struct CriticalRecoveryResult(int CriticalCount, int? CriticalValue);
+
+    private readonly record struct CriticalRecoveryRange(
+        int MinimumCriticalCount,
+        int MaximumCriticalCount,
+        long MinimumCriticalValue,
+        long MaximumCriticalValue
+    );
 
     private enum ImpactTransitionDomain
     {

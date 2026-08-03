@@ -152,6 +152,7 @@ internal static class CombatImpactAggregator
             Surface = key.Surface,
             CriticalCount = critical.Count,
             CriticalObservedValue = critical.Observed.Value,
+            HasMixedValueDirections = HasMixedValueDirections(events),
         };
     }
 
@@ -216,8 +217,12 @@ internal static class CombatImpactAggregator
             Surface = key.Surface,
             CriticalCount = critical.Count,
             CriticalObservedValue = critical.Observed.Value,
+            HasMixedValueDirections = HasMixedValueDirections(events),
         };
     }
+
+    private static bool HasMixedValueDirections(IReadOnlyList<CombatImpactEvent> events) =>
+        events.Any(item => item.Value is > 0) && events.Any(item => item.Value is < 0);
 
     private static CriticalAggregate BuildCritical(IReadOnlyList<CombatImpactEvent> events)
     {

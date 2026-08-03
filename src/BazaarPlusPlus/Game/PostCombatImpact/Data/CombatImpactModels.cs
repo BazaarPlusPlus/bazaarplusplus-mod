@@ -38,6 +38,7 @@ internal enum CombatImpactValueBasis
 {
     None,
     ExactAdjustment,
+    ConfiguredActionAmount,
     NetFrameDelta,
 }
 
@@ -66,7 +67,10 @@ internal sealed record CombatImpactEntity(
     int DisplaySpan = 1,
     EEnchantmentType? EnchantmentType = null,
     IReadOnlyDictionary<ECardAttributeType, int>? Attributes = null,
-    ECombatantId? CombatantId = null
+    ECombatantId? CombatantId = null,
+    IReadOnlyDictionary<string, ECardAttributeType>? AbilityAttributeTypesByEffectId = null,
+    IReadOnlyDictionary<string, ECardAttributeType>? AuraAttributeTypesByEffectId = null,
+    IReadOnlyCollection<string>? ReferenceValuedAuraEffectIds = null
 );
 
 internal sealed record CombatImpactEvent(
@@ -88,6 +92,10 @@ internal sealed record CombatImpactEvent(
     internal int? CriticalValue { get; init; }
 
     internal int? NonCriticalValue { get; init; }
+
+    internal int? AlternateNonCriticalValue { get; init; }
+
+    internal bool HasCriticalAdjustmentCandidate { get; init; }
 }
 
 internal sealed record CombatImpactTarget(
@@ -158,6 +166,8 @@ internal sealed record CombatImpactGroup(
 
     internal int? CriticalObservedValue { get; init; }
 
+    internal bool HasMixedValueDirections { get; init; }
+
     internal bool HasDivergentTargetCoverage =>
         UnresolvedTargetCount > 0
         || AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
@@ -201,6 +211,8 @@ internal sealed record CombatImpactIncomingGroup(
     internal int CriticalCount { get; init; }
 
     internal int? CriticalObservedValue { get; init; }
+
+    internal bool HasMixedValueDirections { get; init; }
 }
 
 internal sealed record CombatImpactReceived(
