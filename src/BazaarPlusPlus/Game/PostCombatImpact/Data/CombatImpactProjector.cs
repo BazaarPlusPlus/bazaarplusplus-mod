@@ -48,6 +48,8 @@ internal static class CombatImpactProjector
                     CriticalCount = resolved.CriticalCount,
                     CriticalValue = resolved.CriticalValue,
                     NonCriticalValue = resolved.NonCriticalValue,
+                    AlternateNonCriticalValue = resolved.AlternateNonCriticalValue,
+                    HasCriticalAdjustmentCandidate = resolved.HasCriticalAdjustmentCandidate,
                 }
             );
         }
@@ -194,15 +196,38 @@ internal static class CombatImpactProjector
                     )
                     : default;
                 if (
+                    hasKind
+                    && attributedSourceId != null
+                    && TryResolveConfiguredActionValue(
+                        item.ActionType,
+                        attributedSourceId,
+                        cardAttributes,
+                        out var configuredActionValue
+                    )
+                )
+                    resolved = configuredActionValue;
+                if (
+                    hasKind
+                    && kind == CombatImpactKind.DirectDamage
+                    && HasCriticalHealthAdjustment(frame, item, kind)
+                )
+                    resolved = resolved with { HasCriticalAdjustmentCandidate = true };
+                if (
                     attributedSourceId != null
                     && TryResolveNonCriticalValue(
                         item.ActionType,
                         attributedSourceId,
                         cardAttributes,
-                        out var nonCriticalValue
+                        frame,
+                        out var nonCriticalValue,
+                        out var alternateNonCriticalValue
                     )
                 )
-                    resolved = resolved with { NonCriticalValue = nonCriticalValue };
+                    resolved = resolved with
+                    {
+                        NonCriticalValue = nonCriticalValue,
+                        AlternateNonCriticalValue = alternateNonCriticalValue,
+                    };
                 projections.Add(
                     new ProjectedExecution(
                         attributedSourceId,
@@ -299,15 +324,48 @@ internal static class CombatImpactProjector
         }
     }
 
+    private static bool TryResolveConfiguredActionValue(
+        EActionCommandType action,
+        string sourceId,
+        IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
+        out ResolvedImpactValue resolved
+    )
+    {
+        // Target cooldown deltas also contain ordinary ticking, caps, resets, and concurrent
+        // charges. The source card's configured amount is the stable nominal action value.
+        if (
+            action == EActionCommandType.CardCharge
+            && cardAttributes.TryGetValue(sourceId, out var attributes)
+            && attributes.TryGetValue(ECardAttributeType.ChargeAmount, out var chargeAmount)
+            && chargeAmount > 0
+        )
+        {
+            resolved = new ResolvedImpactValue(
+                chargeAmount,
+                CombatImpactValueUnit.Milliseconds,
+                CombatImpactAggregator.NativeKey(CombatImpactKind.Charge),
+                false,
+                CombatImpactValueBasis.ConfiguredActionAmount
+            );
+            return true;
+        }
+
+        resolved = default;
+        return false;
+    }
+
     private static bool TryResolveNonCriticalValue(
         EActionCommandType action,
         string sourceId,
         IReadOnlyDictionary<string, Dictionary<ECardAttributeType, int>> cardAttributes,
-        out int value
+        CombatSimFrame frame,
+        out int value,
+        out int? alternateValue
     )
     {
         var attribute = action switch
         {
+            EActionCommandType.PlayerDamage => ECardAttributeType.DamageAmount,
             EActionCommandType.PlayerBurnApply => ECardAttributeType.BurnApplyAmount,
             EActionCommandType.PlayerPoisonApply => ECardAttributeType.PoisonApplyAmount,
             EActionCommandType.PlayerRegenApply => ECardAttributeType.RegenApplyAmount,
@@ -324,9 +382,22 @@ internal static class CombatImpactProjector
             && attributes.TryGetValue(attribute.Value, out value)
             && value > 0
         )
+        {
+            alternateValue = null;
+            var sourceInstance = InstanceId.TryParse(sourceId);
+            if (
+                action == EActionCommandType.PlayerDamage
+                && frame.CardUpdates.TryGetValue(sourceInstance, out var update)
+                && update.Attributes.TryGetValue(attribute.Value, out var attributeUpdate)
+                && attributeUpdate.CurrentValue > 0
+                && attributeUpdate.CurrentValue != value
+            )
+                alternateValue = attributeUpdate.CurrentValue;
             return true;
+        }
 
         value = 0;
+        alternateValue = null;
         return false;
     }
 
@@ -348,6 +419,11 @@ internal static class CombatImpactProjector
         {
             var indexedEvents = group.ToArray();
             if (
+                group.Key.Kind == CombatImpactKind.DirectDamage
+                && !indexedEvents.Any(item => item.Event.HasCriticalAdjustmentCandidate)
+            )
+                continue;
+            if (
                 indexedEvents.Any(item =>
                     item.Event.IsCritical
                     || item.Event.CriticalCount > 0
@@ -368,23 +444,18 @@ internal static class CombatImpactProjector
             if (metric == null)
                 continue;
 
-            var baselines = indexedEvents
-                .Select(item => item.Event.NonCriticalValue!.Value)
-                .ToArray();
-            var baselineTotal = baselines.Sum(value => (long)value);
-            var criticalExtra = (long)metric.Value - baselineTotal;
-            if (criticalExtra <= 0 || criticalExtra > baselineTotal)
-                continue;
-
-            var criticalCount = ResolveUniqueCriticalCount(baselines, criticalExtra);
-            if (criticalCount is not > 0)
+            var recovery = ResolveUniqueCriticalRecovery(
+                indexedEvents.Select(item => item.Event).ToArray(),
+                metric.Value
+            );
+            if (recovery is not { CriticalCount: > 0 })
                 continue;
 
             var first = indexedEvents[0];
             events[first.Index] = first.Event with
             {
-                CriticalCount = criticalCount.Value,
-                CriticalValue = SaturatingInt(criticalExtra * 2),
+                CriticalCount = recovery.Value.CriticalCount,
+                CriticalValue = recovery.Value.CriticalValue,
             };
         }
     }
@@ -392,7 +463,13 @@ internal static class CombatImpactProjector
     private static bool IsRecoverableAppliedEffect(CombatImpactEvent item) =>
         item.Surface == CombatImpactEventSurface.AppliedEffect
         && (
-            item.Kind == CombatImpactKind.Burn
+            item.Kind == CombatImpactKind.DirectDamage
+                && string.Equals(
+                    item.NativeAttributeKey,
+                    CombatImpactAggregator.NativeKey(CombatImpactKind.DirectDamage),
+                    StringComparison.Ordinal
+                )
+            || item.Kind == CombatImpactKind.Burn
                 && string.Equals(
                     item.NativeAttributeKey,
                     CombatImpactAggregator.NativeKey(CombatImpactKind.Burn),
@@ -412,54 +489,124 @@ internal static class CombatImpactProjector
                 )
         );
 
-    private static int? ResolveUniqueCriticalCount(
-        IReadOnlyList<int> nonCriticalValues,
-        long criticalExtra
+    private static bool HasCriticalHealthAdjustment(
+        CombatSimFrame frame,
+        CombatSimEventEffectExecuted item,
+        CombatImpactKind kind
+    )
+    {
+        if (item.Target is not EffectTargetPlayer playerTarget)
+            return false;
+
+        var update =
+            playerTarget.Target == ECombatantId.Player
+                ? frame.PlayerUpdates
+                : frame.OpponentUpdates;
+        return update?.HealthAdjustments.Any(adjustment =>
+                adjustment.IsCrit && Matches(kind, adjustment)
+            ) == true;
+    }
+
+    private static CriticalRecoveryResult? ResolveUniqueCriticalRecovery(
+        IReadOnlyList<CombatImpactEvent> events,
+        long authoritativeTotal
     )
     {
         const int maximumStates = 50_000;
         const int maximumTransitions = 2_000_000;
-        var transitions = 0;
-        var states = new Dictionary<long, CriticalCountRange>
+        long transitions = 0;
+        if (authoritativeTotal <= 0)
+            return null;
+
+        var states = new Dictionary<long, CriticalRecoveryRange>
         {
-            [0] = new CriticalCountRange(0, 0),
+            [0] = new CriticalRecoveryRange(0, 0, 0, 0),
         };
-        foreach (var value in nonCriticalValues)
+        foreach (var item in events)
         {
-            var snapshot = states.ToArray();
-            transitions += snapshot.Length;
+            var baselineValues = new[] { item.NonCriticalValue, item.AlternateNonCriticalValue }
+                .Where(value => value is > 0)
+                .Select(value => value!.Value)
+                .Distinct()
+                .ToArray();
+            if (baselineValues.Length == 0)
+                return null;
+
+            transitions += (long)states.Count * baselineValues.Length * 2;
             if (transitions > maximumTransitions)
                 return null;
 
-            foreach (var (sum, countRange) in snapshot)
+            var next = new Dictionary<long, CriticalRecoveryRange>();
+            foreach (var (sum, range) in states)
             {
-                var nextSum = sum + value;
-                if (nextSum > criticalExtra)
-                    continue;
-
-                var candidate = new CriticalCountRange(
-                    countRange.Minimum + 1,
-                    countRange.Maximum + 1
-                );
-                if (states.TryGetValue(nextSum, out var existing))
+                foreach (var baseline in baselineValues)
                 {
-                    states[nextSum] = new CriticalCountRange(
-                        Math.Min(existing.Minimum, candidate.Minimum),
-                        Math.Max(existing.Maximum, candidate.Maximum)
-                    );
-                }
-                else
-                {
-                    states[nextSum] = candidate;
-                    if (states.Count > maximumStates)
+                    if (
+                        !AddCriticalRecoveryState(
+                            next,
+                            sum + baseline,
+                            range,
+                            authoritativeTotal,
+                            maximumStates
+                        )
+                        || !AddCriticalRecoveryState(
+                            next,
+                            sum + (long)baseline * 2,
+                            new CriticalRecoveryRange(
+                                range.MinimumCriticalCount + 1,
+                                range.MaximumCriticalCount + 1,
+                                range.MinimumCriticalValue + (long)baseline * 2,
+                                range.MaximumCriticalValue + (long)baseline * 2
+                            ),
+                            authoritativeTotal,
+                            maximumStates
+                        )
+                    )
                         return null;
                 }
             }
+            states = next;
         }
 
-        return states.TryGetValue(criticalExtra, out var result) && result.Minimum == result.Maximum
-            ? result.Minimum
-            : null;
+        if (
+            !states.TryGetValue(authoritativeTotal, out var result)
+            || result.MinimumCriticalCount != result.MaximumCriticalCount
+            || result.MinimumCriticalCount <= 0
+        )
+            return null;
+
+        return new CriticalRecoveryResult(
+            result.MinimumCriticalCount,
+            result.MinimumCriticalValue == result.MaximumCriticalValue
+                ? SaturatingInt(result.MinimumCriticalValue)
+                : null
+        );
+    }
+
+    private static bool AddCriticalRecoveryState(
+        IDictionary<long, CriticalRecoveryRange> states,
+        long total,
+        CriticalRecoveryRange candidate,
+        long authoritativeTotal,
+        int maximumStates
+    )
+    {
+        if (total > authoritativeTotal)
+            return true;
+
+        if (states.TryGetValue(total, out var existing))
+        {
+            states[total] = new CriticalRecoveryRange(
+                Math.Min(existing.MinimumCriticalCount, candidate.MinimumCriticalCount),
+                Math.Max(existing.MaximumCriticalCount, candidate.MaximumCriticalCount),
+                Math.Min(existing.MinimumCriticalValue, candidate.MinimumCriticalValue),
+                Math.Max(existing.MaximumCriticalValue, candidate.MaximumCriticalValue)
+            );
+            return true;
+        }
+
+        states[total] = candidate;
+        return states.Count <= maximumStates;
     }
 
     private static string? ResolveActivitySource(
@@ -595,6 +742,7 @@ internal static class CombatImpactProjector
                     entities,
                     out var expectedCardAttribute
                 );
+                var isReferenceValuedAura = IsReferenceValuedAuraEffect(aura, entities);
 
                 foreach (var target in aura.AppliedTo.Concat(aura.RemovedFrom))
                 {
@@ -628,6 +776,15 @@ internal static class CombatImpactProjector
                         target is not EffectTargetCard cardTarget
                         || !entities.ContainsKey(cardTarget.Target.Value)
                         || !frame.CardUpdates.TryGetValue(cardTarget.Target, out var cardUpdate)
+                    )
+                        continue;
+                    if (
+                        isReferenceValuedAura
+                        && string.Equals(
+                            sourceId,
+                            cardTarget.Target.Value,
+                            StringComparison.Ordinal
+                        )
                     )
                         continue;
 
@@ -720,6 +877,23 @@ internal static class CombatImpactProjector
             }
         }
     }
+
+    private static bool IsReferenceValuedAuraEffect(
+        CombatSimEventEffectAuraExecuted effect,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        HasReferenceValuedAuraEffect(effect.Source?.Value, effect.EffectId, entities)
+        || HasReferenceValuedAuraEffect(effect.TriggerSource?.Value, effect.EffectId, entities);
+
+    private static bool HasReferenceValuedAuraEffect(
+        string? sourceId,
+        string? effectId,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    ) =>
+        !string.IsNullOrWhiteSpace(sourceId)
+        && !string.IsNullOrWhiteSpace(effectId)
+        && entities.TryGetValue(sourceId!, out var source)
+        && source.ReferenceValuedAuraEffectIds?.Contains(effectId!) == true;
 
     private static bool HasExplicitModifierClaim(CombatSimFrame frame, InstanceId target) =>
         frame
@@ -1521,6 +1695,10 @@ internal static class CombatImpactProjector
 
         internal int? NonCriticalValue { get; init; }
 
+        internal int? AlternateNonCriticalValue { get; init; }
+
+        internal bool HasCriticalAdjustmentCandidate { get; init; }
+
         internal static ResolvedImpactValue Empty(
             CombatImpactKind kind,
             EActionCommandType action
@@ -1567,7 +1745,14 @@ internal static class CombatImpactProjector
         string NativeAttributeKey
     );
 
-    private readonly record struct CriticalCountRange(int Minimum, int Maximum);
+    private readonly record struct CriticalRecoveryResult(int CriticalCount, int? CriticalValue);
+
+    private readonly record struct CriticalRecoveryRange(
+        int MinimumCriticalCount,
+        int MaximumCriticalCount,
+        long MinimumCriticalValue,
+        long MaximumCriticalValue
+    );
 
     private enum ImpactTransitionDomain
     {

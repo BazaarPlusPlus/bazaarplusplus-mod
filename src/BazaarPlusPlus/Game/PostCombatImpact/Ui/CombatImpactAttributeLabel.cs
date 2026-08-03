@@ -9,7 +9,8 @@ internal static class CombatImpactAttributeLabel
         string key,
         CombatImpactEventSurface surface,
         int? changeValue,
-        bool chinese
+        bool chinese,
+        bool hasMixedValueDirections = false
     )
     {
         var normalized =
@@ -107,6 +108,8 @@ internal static class CombatImpactAttributeLabel
         };
         if (surface == CombatImpactEventSurface.CardAttribute && UsesDirectionalWording(normalized))
         {
+            if (hasMixedValueDirections)
+                return chinese ? $"{labels.Item1}变化" : $"{labels.Item2} Change";
             if (changeValue > 0)
                 return chinese ? $"{labels.Item1}增加" : $"{labels.Item2} Gain";
             if (changeValue < 0)

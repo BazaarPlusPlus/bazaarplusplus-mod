@@ -76,6 +76,163 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Recovers_damage_crits_when_multiple_same_frame_attacks_hide_native_adjustments()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("trigger", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -37_454,
+                    IsCrit = true,
+                },
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -86,
+                    IsCrit = true,
+                },
+            },
+        };
+        var sourceInstance = InstanceId.TryParse("source");
+        simulation.Frames[0].CardUpdates[sourceInstance] = new CombatSimCardUpdate
+        {
+            CardInstanceId = sourceInstance,
+            Attributes =
+            {
+                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    PreviousValue = 359,
+                    CurrentValue = 18_727,
+                },
+            },
+        };
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 37_454,
+        };
+        simulation.CardStats["trigger"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 86,
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 359,
+            },
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 43,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        var sourceDamage = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "source").Groups
+        );
+        Assert.Null(sourceDamage.ObservedValue);
+        Assert.Equal(37_454, sourceDamage.AuthoritativeMetric?.Value);
+        Assert.Equal(1, sourceDamage.CriticalCount);
+        Assert.Equal(37_454, sourceDamage.CriticalObservedValue);
+
+        var triggerDamage = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "trigger").Groups
+        );
+        Assert.Null(triggerDamage.ObservedValue);
+        Assert.Equal(86, triggerDamage.AuthoritativeMetric?.Value);
+        Assert.Equal(1, triggerDamage.CriticalCount);
+        Assert.Equal(86, triggerDamage.CriticalObservedValue);
+    }
+
+    [Fact]
+    public void Does_not_infer_damage_crits_without_a_native_critical_adjustment()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("source", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed("trigger", EActionCommandType.PlayerDamage, Player(ECombatantId.Opponent))
+            );
+        simulation.Frames[0].OpponentUpdates = new CombatSimPlayerUpdate
+        {
+            HealthAdjustments =
+            {
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -20,
+                    IsCrit = false,
+                },
+                new CombatSimPlayerHealthAdjustment
+                {
+                    DamageType = EDamageType.Damage,
+                    AttributeChanged = EPlayerHealthChangeType.Health,
+                    Amount = -10,
+                    IsCrit = false,
+                },
+            },
+        };
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 20,
+        };
+        simulation.CardStats["trigger"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.DamageDone] = 10,
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 10,
+            },
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 5,
+            },
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.All(
+            report.Sources,
+            source => Assert.Equal(0, Assert.Single(source.Groups).CriticalCount)
+        );
+    }
+
+    [Fact]
     public void Merges_observed_burn_and_poison_with_authoritative_totals()
     {
         var cases = new[]
@@ -1314,6 +1471,77 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Charge_uses_each_source_cards_configured_amount()
+    {
+        var simulation = new CombatSim();
+        for (var index = 0; index < 4; index++)
+            simulation
+                .Frames[0]
+                .Events.Add(
+                    Executed("finesse", EActionCommandType.CardCharge, CardTarget("target"))
+                );
+        for (var index = 0; index < 3; index++)
+            simulation
+                .Frames[0]
+                .Events.Add(Executed("wok", EActionCommandType.CardCharge, CardTarget("target")));
+
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["finesse"] = new CombatImpactEntity(
+            "finesse",
+            "Finesse Shield",
+            "Skill",
+            null,
+            5,
+            Attributes: new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.ChargeAmount] = 1_000,
+            }
+        );
+        entities["wok"] = new CombatImpactEntity(
+            "wok",
+            "Jumbo Wok",
+            "Item",
+            null,
+            6,
+            Attributes: new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.ChargeAmount] = 2_000,
+            }
+        );
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        var finesse = Assert.Single(report.Sources, source => source.Entity.Id == "finesse");
+        var finesseCharge = Assert.Single(finesse.Groups);
+        Assert.Equal(4, finesseCharge.Count);
+        Assert.Equal(4_000, finesseCharge.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, finesseCharge.ObservedCoverage);
+
+        var wok = Assert.Single(report.Sources, source => source.Entity.Id == "wok");
+        var wokCharge = Assert.Single(wok.Groups);
+        Assert.Equal(3, wokCharge.Count);
+        Assert.Equal(6_000, wokCharge.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, wokCharge.ObservedCoverage);
+
+        var incoming = Assert.Single(Assert.Single(report.Received).Groups);
+        Assert.Equal(7, incoming.Count);
+        Assert.Equal(10_000, incoming.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Exact, incoming.ObservedCoverage);
+        Assert.Equal(
+            "×7 · 10s",
+            CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
+        );
+        Assert.Equal(
+            4_000,
+            Assert.Single(incoming.Sources, source => source.Entity.Id == "finesse").ObservedValue
+        );
+        Assert.Equal(
+            6_000,
+            Assert.Single(incoming.Sources, source => source.Entity.Id == "wok").ObservedValue
+        );
+    }
+
+    [Fact]
     public void Explicit_player_attribute_actions_preserve_signed_net_delta()
     {
         var cases = new[]
@@ -1774,6 +2002,84 @@ public sealed class CombatImpactProjectorTests
         };
 
         Assert.Empty(CombatImpactProjector.Project(simulation, Entities()).Sources);
+    }
+
+    [Fact]
+    public void Self_reference_aura_recalculations_are_not_counted_as_combat_impact()
+    {
+        var simulation = new CombatSim();
+        var self = InstanceId.TryParse("source");
+        var target = InstanceId.TryParse("target");
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventEffectAuraExecuted
+                {
+                    EffectId = "health-formula",
+                    Source = self,
+                    AppliedTo = { CardTarget("source") },
+                }
+            );
+        simulation
+            .Frames[0]
+            .Events.Add(
+                new CombatSimEventEffectAuraExecuted
+                {
+                    EffectId = "value-formula",
+                    Source = InstanceId.TryParse("trigger"),
+                    AppliedTo = { CardTarget("target") },
+                }
+            );
+        simulation.Frames[0].CardUpdates[self] = new CombatSimCardUpdate
+        {
+            CardInstanceId = self,
+            Attributes =
+            {
+                [ECardAttributeType.DamageAmount] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.DamageAmount,
+                    PreviousValue = 6,
+                    CurrentValue = 7_018,
+                },
+            },
+        };
+        simulation.Frames[0].CardUpdates[target] = new CombatSimCardUpdate
+        {
+            CardInstanceId = target,
+            Attributes =
+            {
+                [ECardAttributeType.CritChance] = new CombatSimCardAttributeUpdate
+                {
+                    AttributeType = ECardAttributeType.CritChance,
+                    PreviousValue = 64,
+                    CurrentValue = 82,
+                },
+            },
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["source"] = entities["source"] with
+        {
+            ReferenceValuedAuraEffectIds = ["health-formula"],
+        };
+        entities["trigger"] = entities["trigger"] with
+        {
+            AuraAttributeTypesByEffectId = new Dictionary<string, ECardAttributeType>
+            {
+                ["value-formula"] = ECardAttributeType.CritChance,
+            },
+            ReferenceValuedAuraEffectIds = ["value-formula"],
+        };
+
+        var report = CombatImpactProjector.Project(simulation, entities);
+
+        Assert.DoesNotContain(report.Sources, source => source.Entity.Id == "source");
+        Assert.DoesNotContain(report.Received, received => received.Entity.Id == "source");
+        var crit = Assert.Single(
+            Assert.Single(report.Sources, source => source.Entity.Id == "trigger").Groups
+        );
+        Assert.Equal("CritChance", crit.NativeAttributeKey);
+        Assert.Equal(18, crit.ObservedValue);
+        Assert.Equal("target", Assert.Single(crit.Targets).Entity.Id);
     }
 
     [Theory]

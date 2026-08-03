@@ -4,6 +4,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Domain.Effect.Actions;
 using BazaarGameShared.Domain.Effect.AuraActions;
+using BazaarGameShared.Domain.Values.ReferenceValues;
 using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.Heroes;
 using BazaarPlusPlus.Localization;
@@ -66,7 +67,8 @@ internal static class CombatImpactEntitySnapshotReader
                     : new Dictionary<ECardAttributeType, int>(card.Attributes),
                 card.Owner?.CombatantId,
                 effectAttributes.Abilities,
-                effectAttributes.Auras
+                effectAttributes.Auras,
+                effectAttributes.ReferenceValuedAuraEffectIds
             );
         }
 
@@ -88,13 +90,21 @@ internal static class CombatImpactEntitySnapshotReader
             var auras = new Dictionary<string, ECardAttributeType>(StringComparer.Ordinal);
             var ambiguousAbilities = new HashSet<string>(StringComparer.Ordinal);
             var ambiguousAuras = new HashSet<string>(StringComparer.Ordinal);
+            var referenceValuedAuras = new Dictionary<string, bool>(StringComparer.Ordinal);
+            var ambiguousReferenceValuedAuras = new HashSet<string>(StringComparer.Ordinal);
 
             AddAbilityAttributeTypes(
                 card.Template?.Abilities?.Values,
                 abilities,
                 ambiguousAbilities
             );
-            AddAuraAttributeTypes(card.Template?.Auras?.Values, auras, ambiguousAuras);
+            AddAuraAttributeTypes(
+                card.Template?.Auras?.Values,
+                auras,
+                ambiguousAuras,
+                referenceValuedAuras,
+                ambiguousReferenceValuedAuras
+            );
 
             if (
                 item?.Enchantment is { } enchantmentType
@@ -107,12 +117,27 @@ internal static class CombatImpactEntitySnapshotReader
                     abilities,
                     ambiguousAbilities
                 );
-                AddAuraAttributeTypes(enchantment.Auras?.Values, auras, ambiguousAuras);
+                AddAuraAttributeTypes(
+                    enchantment.Auras?.Values,
+                    auras,
+                    ambiguousAuras,
+                    referenceValuedAuras,
+                    ambiguousReferenceValuedAuras
+                );
             }
+
+            var referenceValuedAuraEffectIds = referenceValuedAuras
+                // Base and enchantment auras can reuse an effect id for different attributes.
+                // The attribute mapping is then ambiguous, but the formula classification is
+                // still exact when every direct aura action under that id is reference-valued.
+                .Where(item => item.Value)
+                .Select(item => item.Key)
+                .ToArray();
 
             return new EffectAttributeTypes(
                 abilities.Count == 0 ? null : abilities,
-                auras.Count == 0 ? null : auras
+                auras.Count == 0 ? null : auras,
+                referenceValuedAuraEffectIds.Length == 0 ? null : referenceValuedAuraEffectIds
             );
         }
         catch
@@ -148,7 +173,9 @@ internal static class CombatImpactEntitySnapshotReader
     private static void AddAuraAttributeTypes(
         IEnumerable<TCardAura>? auras,
         IDictionary<string, ECardAttributeType> destination,
-        ISet<string> ambiguousEffectIds
+        ISet<string> ambiguousEffectIds,
+        IDictionary<string, bool> referenceValuedEffects,
+        ISet<string> ambiguousReferenceValuedEffects
     )
     {
         if (auras == null)
@@ -165,7 +192,34 @@ internal static class CombatImpactEntitySnapshotReader
                 destination,
                 ambiguousEffectIds
             );
+            AddUniqueEffectFlag(
+                aura.Id,
+                modifier.Value is ITReferenceValue,
+                referenceValuedEffects,
+                ambiguousReferenceValuedEffects
+            );
         }
+    }
+
+    private static void AddUniqueEffectFlag(
+        string? effectId,
+        bool value,
+        IDictionary<string, bool> destination,
+        ISet<string> ambiguousEffectIds
+    )
+    {
+        if (string.IsNullOrWhiteSpace(effectId) || ambiguousEffectIds.Contains(effectId!))
+            return;
+        if (!destination.TryGetValue(effectId!, out var existing))
+        {
+            destination[effectId!] = value;
+            return;
+        }
+        if (existing == value)
+            return;
+
+        destination.Remove(effectId!);
+        ambiguousEffectIds.Add(effectId!);
     }
 
     private static void AddUniqueEffectAttribute(
@@ -248,6 +302,7 @@ internal static class CombatImpactEntitySnapshotReader
 
     private readonly record struct EffectAttributeTypes(
         IReadOnlyDictionary<string, ECardAttributeType>? Abilities,
-        IReadOnlyDictionary<string, ECardAttributeType>? Auras
+        IReadOnlyDictionary<string, ECardAttributeType>? Auras,
+        IReadOnlyCollection<string>? ReferenceValuedAuraEffectIds
     );
 }

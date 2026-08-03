@@ -1278,6 +1278,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             group.AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
                 ? total.Value
                 : group.ObservedValue,
+            group.HasMixedValueDirections,
             CombatImpactMetricFormatter.Group(group, IsChinese(), CriticalMarker())
         );
         var detailRows = new List<GameObject>();
@@ -1323,6 +1324,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             group.NativeAttributeKey,
             group.Surface,
             group.ObservedValue,
+            group.HasMixedValueDirections,
             CombatImpactMetricFormatter.IncomingGroup(group, IsChinese(), CriticalMarker())
         );
         var detailRows = new List<GameObject>();
@@ -1349,11 +1351,18 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         string nativeAttributeKey,
         CombatImpactEventSurface surface,
         int? changeValue,
+        bool hasMixedValueDirections,
         string metricText
     )
     {
         var header = CreateHorizontal("ImpactGroupHeader", parent, 10f, preferredHeight: 48f);
-        var (label, iconKey) = ResolveEffect(kind, nativeAttributeKey, surface, changeValue);
+        var (label, iconKey) = ResolveEffect(
+            kind,
+            nativeAttributeKey,
+            surface,
+            changeValue,
+            hasMixedValueDirections
+        );
         var effectIcon =
             Data.TooltipTypography?.GetKeywordStringWithIconNoScale(
                 iconKey,
@@ -1995,7 +2004,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         CombatImpactKind kind,
         string nativeAttributeKey,
         CombatImpactEventSurface surface,
-        int? changeValue
+        int? changeValue,
+        bool hasMixedValueDirections
     )
     {
         var iconKey = kind switch
@@ -2011,7 +2021,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 nativeAttributeKey,
                 surface,
                 changeValue,
-                IsChinese()
+                IsChinese(),
+                hasMixedValueDirections
             ),
             _ => NativeTagTypography.Resolve(nativeAttributeKey).Label,
         };

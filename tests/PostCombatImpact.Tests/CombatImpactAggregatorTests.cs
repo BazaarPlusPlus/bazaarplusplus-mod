@@ -329,6 +329,37 @@ public sealed class CombatImpactAggregatorTests
         Assert.Equal(CombatImpactCoverage.LowerBound, reconstructedTarget.ObservedCoverage);
     }
 
+    [Fact]
+    public void Attribute_groups_expose_when_their_values_move_in_both_directions()
+    {
+        var report = Aggregate([
+            Event(
+                CombatImpactKind.AttributeChange,
+                "fairies",
+                "bread",
+                18,
+                nativeKey: "ShieldApplyAmount",
+                surface: CombatImpactEventSurface.CardAttribute
+            ),
+            Event(
+                CombatImpactKind.AttributeChange,
+                "fairies",
+                "bread",
+                -100,
+                nativeKey: "ShieldApplyAmount",
+                surface: CombatImpactEventSurface.CardAttribute
+            ),
+        ]);
+
+        var caused = Assert.Single(Assert.Single(report.Sources).Groups);
+        var received = Assert.Single(Assert.Single(report.Received).Groups);
+
+        Assert.Equal(-82, caused.ObservedValue);
+        Assert.True(caused.HasMixedValueDirections);
+        Assert.Equal(-82, received.ObservedValue);
+        Assert.True(received.HasMixedValueDirections);
+    }
+
     private static CombatImpactReport Aggregate(
         IReadOnlyList<CombatImpactEvent> events,
         IReadOnlyList<CombatImpactAuthoritativeMetric>? authoritative = null

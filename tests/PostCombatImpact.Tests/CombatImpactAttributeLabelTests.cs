@@ -134,4 +134,29 @@ public sealed class CombatImpactAttributeLabelTests
             )
         );
     }
+
+    [Fact]
+    public void Mixed_card_attribute_directions_use_a_neutral_change_label()
+    {
+        Assert.Equal(
+            "Shield Change",
+            CombatImpactAttributeLabel.Resolve(
+                "ShieldApplyAmount",
+                CombatImpactEventSurface.CardAttribute,
+                changeValue: -82,
+                chinese: false,
+                hasMixedValueDirections: true
+            )
+        );
+        Assert.Equal(
+            "护盾变化",
+            CombatImpactAttributeLabel.Resolve(
+                "ShieldApplyAmount",
+                CombatImpactEventSurface.CardAttribute,
+                changeValue: -82,
+                chinese: true,
+                hasMixedValueDirections: true
+            )
+        );
+    }
 }
