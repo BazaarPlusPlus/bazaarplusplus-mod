@@ -67,45 +67,40 @@ static void TestNativeGameFontSelection()
 static void TestBilingualItemNamePresentation()
 {
     Assert(
-        BilingualItemNamePresentation.TryBuild(
+        BilingualItemNamePresentation.TryBuildSubtitle(
             "Lighter",
             "打火机",
             enabled: true,
-            isSupportedCard: true,
-            alignEnglishSubtitle: false
-        ) == "Lighter\n<size=42%><voffset=-7px><noparse>打火机</noparse></voffset></size>",
-        "Enabled item tooltips should append a 42%-sized Chinese title with a 7px offset."
+            isSupportedCard: true
+        ) == "打火机",
+        "Enabled item tooltips should expose the trimmed translated title."
     );
     Assert(
-        BilingualItemNamePresentation.TryBuild(
+        BilingualItemNamePresentation.TryBuildSubtitle(
             "Lighter",
             "打火机",
             enabled: false,
-            isSupportedCard: true,
-            alignEnglishSubtitle: false
+            isSupportedCard: true
         ) == null,
         "Disabled bilingual names should preserve the native title."
     );
     Assert(
-        BilingualItemNamePresentation.TryBuild(
+        BilingualItemNamePresentation.TryBuildSubtitle(
             "Lighter",
             "打火机",
             enabled: true,
-            isSupportedCard: false,
-            alignEnglishSubtitle: false
+            isSupportedCard: false
         ) == null,
         "Skill and encounter tooltips should not receive item subtitles."
     );
     Assert(
-        BilingualItemNamePresentation.TryBuild(
+        BilingualItemNamePresentation.TryBuildSubtitle(
             "打火机",
             "Lighter",
             enabled: true,
-            isSupportedCard: true,
-            alignEnglishSubtitle: true
-        )
-            == "打火机\n<size=42%><voffset=-7px><space=2px><noparse>Lighter</noparse></voffset></size>",
-        "Chinese clients should append the authored English title."
+            isSupportedCard: true
+        ) == "Lighter",
+        "Chinese clients should expose the authored English title."
     );
 }
 

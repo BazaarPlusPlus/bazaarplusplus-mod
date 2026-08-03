@@ -1,11 +1,9 @@
 #nullable enable
 using BazaarPlusPlus.Game.BilingualItemNames;
-using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.Localization;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 using HarmonyLib;
-using TheBazaar.Extensions;
 using TheBazaar.Tooltips;
 using TheBazaar.UI.Tooltips;
 
@@ -28,35 +26,32 @@ internal static class BilingualItemNamePatch
             var currentLanguageIsChinese = LanguageCodeMatcher.IsChinese(L.CurrentLanguageCode);
             var supportedCard = card != null && BilingualNameCardEligibility.IsSupported(card.Type);
             if (!enabled || !supportedCard)
+            {
+                BilingualItemNameSubtitle.Hide(controller);
                 return;
+            }
 
             var titleToken = tooltipData.CardTemplate.Localization?.Title;
             var secondaryTitle = currentLanguageIsChinese
                 ? titleToken?.Text
                 : ChineseTranslationCatalog.TryResolve(titleToken);
-            var title = BilingualItemNamePresentation.TryBuild(
+            var subtitle = BilingualItemNamePresentation.TryBuildSubtitle(
                 controller.headerText?.text,
                 secondaryTitle,
                 enabled,
-                isSupportedCard: true,
-                alignEnglishSubtitle: currentLanguageIsChinese
+                isSupportedCard: true
             );
-            if (title == null || controller.headerText == null)
+            if (subtitle == null)
+            {
+                BilingualItemNameSubtitle.Hide(controller);
                 return;
+            }
 
-            if (
-                !currentLanguageIsChinese
-                && NativeGameTypography.EnsureNativeTextCoverage(
-                    controller.headerText,
-                    secondaryTitle
-                )
-                    is not (
-                        NativeGameTypography.Outcome.Applied
-                        or NativeGameTypography.Outcome.NotNeeded
-                    )
-            )
+            if (!BilingualItemNameSubtitle.TryShow(controller, subtitle, currentLanguageIsChinese))
+            {
+                BilingualItemNameSubtitle.Hide(controller);
                 return;
-            controller.headerText.TrySetText(title);
+            }
         }
         catch (Exception ex)
         {
