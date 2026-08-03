@@ -21,6 +21,9 @@ internal sealed class ReplayPlaybackPublisher
     /// <summary>Battle id of the session currently between BeginSession and PublishEnded.</summary>
     public string? ActiveSessionBattleId => _activeBattleId;
 
+    /// <summary>Captured battle metadata for the active session, when available.</summary>
+    internal PvpBattleManifest? ActiveSessionManifest => _activeManifest;
+
     public void BeginSession(
         string battleId,
         PvpBattleManifest? manifest,
