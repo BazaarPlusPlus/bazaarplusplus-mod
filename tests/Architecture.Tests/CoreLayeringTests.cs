@@ -1983,11 +1983,14 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Bilingual_item_names_use_the_games_native_chinese_serif_fallback()
+    public void Bilingual_item_names_use_native_body_typography_and_zero_gap_layout()
     {
         var mainSource = MainSourceRoot(RepoRoot());
         var patchSource = File.ReadAllText(
             Path.Combine(mainSource, "Patches", "Tooltips", "BilingualItemNamePatch.cs")
+        );
+        var subtitleSource = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "BilingualItemNames", "BilingualItemNameSubtitle.cs")
         );
         var eligibilitySource = File.ReadAllText(
             Path.Combine(
@@ -2001,8 +2004,20 @@ public class CoreLayeringTests
             Path.Combine(mainSource, "GameInterop", "Fonts", "NativeGameTypography.cs")
         );
 
-        Assert.Contains("NativeGameTypography.EnsureNativeTextCoverage", patchSource);
-        Assert.DoesNotContain("NativeGameFonts.TryInstallFallback", patchSource);
+        Assert.Contains("BilingualItemNameSubtitle.TryShow", patchSource);
+        Assert.Contains("BilingualItemNamePresentation.TryBuildSubtitle", patchSource);
+        Assert.Contains("NativeGameTypography.PrepareOwnedText", subtitleSource);
+        Assert.Contains("NativeGameTypography.OwnedTextRole.Body", subtitleSource);
+        Assert.Contains("typography.Apply(label)", subtitleSource);
+        Assert.Contains("VerticalLayoutGroup", subtitleSource);
+        Assert.Contains("private const float SubtitleGapScale = 0.6f", subtitleSource);
+        Assert.Contains(
+            "layout.spacing = -label.fontSize * (1f - SubtitleGapScale)",
+            subtitleSource
+        );
+        Assert.Contains("layout.padding = new RectOffset(0, 0, 0, 0)", subtitleSource);
+        Assert.Contains("label.margin = new Vector4", subtitleSource);
+        Assert.Contains("label.fontStyle = FontStyles.Normal", subtitleSource);
         Assert.Contains("BilingualNameCardEligibility.IsSupported", patchSource);
         Assert.Contains("ECardType.Item", eligibilitySource);
         Assert.Contains("ECardType.Skill", eligibilitySource);
