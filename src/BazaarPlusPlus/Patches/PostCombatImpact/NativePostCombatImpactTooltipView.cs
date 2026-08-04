@@ -8,11 +8,11 @@ using BazaarPlusPlus.GameInterop.CardPreview;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.HeroPortraits;
 using BazaarPlusPlus.GameInterop.TagTypography;
+using BazaarPlusPlus.GameInterop.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using BazaarPlusPlus.Localization;
 using TheBazaar;
 using TheBazaar.UI.Tooltips;
-using TheBazaar.Utilities;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -47,125 +47,68 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private static readonly Color32 ReceivedAccentColor = new(83, 197, 222, 255);
     private static readonly Color32 ShiftAccentColor = new(250, 211, 105, 255);
     private static readonly Color32 DisclosureColor = new(211, 190, 157, 255);
+    private static readonly NativePairedTooltipOptions PairedOptions = new(
+        preferredContentWidth: TooltipPreferredWidth,
+        readableContentWidth: TooltipReadableWidth,
+        gap: TooltipGap,
+        canvasMargin: CanvasMargin,
+        fadeDuration: VisibilityFadeDuration,
+        nativeBottomPaddingReduction: NativeBottomPaddingReduction
+    );
+
     private readonly INativeCardPreviewHost _previewHost;
-    private readonly Vector3[] _worldCorners = new Vector3[4];
+    private readonly NativePairedTooltipSession _session;
     private readonly List<LayoutElement> _metricColumns = [];
     private readonly List<INativeCardPreviewSession> _previewSessions = [];
     private readonly List<ImpactContentBlock> _causedBlocks = [];
     private readonly List<ImpactContentBlock> _receivedBlocks = [];
-    private AuxiliaryTooltipController? _activeAuxiliary;
-    private CardTooltipController? _activePrimary;
     private GameObject? _contentRoot;
     private GameObject? _causedRoot;
     private GameObject? _receivedRoot;
-    private GameObject? _nativeBackgroundRoot;
     private TMP_Text? _causedMoreText;
     private TMP_Text? _receivedMoreText;
     private NativePreviewOwner? _previewOwner;
     private INativeCardPreviewScope? _previewScope;
     private CancellationTokenSource? _previewCancellation;
-    private NativeAuxiliaryHostState? _preparedNativeHost;
-    private CanvasGroupGate? _preparedPrimaryGate;
-    private CanvasGroupGate? _preparedAuxiliaryGate;
-    private RectTransform? _nativeAuxParentRect;
-    private Coroutine? _visibilityFade;
-    private float _currentTooltipWidth = TooltipPreferredWidth;
-    private float _frameHorizontalBleed;
-    private PairSide _pairSide;
-    private bool _pairOverflowed;
-    private bool _widthBelowReadable;
-    private bool _topAlignmentAdjusted;
     private bool _overflowDegradedLogged;
     private bool _widthDegradedLogged;
     private bool _topAlignmentDegradedLogged;
-    private bool _hidePending;
     private bool _receivedPerspectiveAvailable;
     private int _pendingPreviewCount;
-    private int _renderGeneration;
     private CombatImpactPerspective _activePerspective = CombatImpactPerspective.Caused;
 
-    internal NativePostCombatImpactTooltipView(INativeCardPreviewHost previewHost) =>
+    internal NativePostCombatImpactTooltipView(
+        INativeCardPreviewHost previewHost,
+        NativePairedTooltipHost tooltipHost
+    )
+    {
         _previewHost = previewHost ?? throw new ArgumentNullException(nameof(previewHost));
+        if (tooltipHost == null)
+            throw new ArgumentNullException(nameof(tooltipHost));
+        // The session's generation is bumped before this callback runs, so an async preview
+        // continuation that races cleanup can no longer pass its own identity check.
+        _session = tooltipHost.Acquire(this, ReleaseOwnerResources);
+    }
 
     public string Header => T("本场影响", "Combat Impact");
 
     public bool IsReadyToReveal => _pendingPreviewCount == 0;
 
-    public bool IsContentActive => _contentRoot?.activeInHierarchy == true;
+    public bool IsContentActive => _session.IsContentActive;
 
     public bool CanSwitchPerspective => IsContentActive && _receivedPerspectiveAvailable;
 
-    public void PrepareNativePrimary(CardTooltipController primary)
-    {
-        if (primary == null)
-            return;
-        if (
-            _preparedPrimaryGate != null
-            && ReferenceEquals(_preparedPrimaryGate.Controller, primary)
-        )
-            return;
+    public void PrepareNativePrimary(CardTooltipController primary) =>
+        _session.PreparePrimary(primary);
 
-        if (_activePrimary != null || _hidePending)
-        {
-            var displacedAuxiliary = _activeAuxiliary;
-            ConcealNativeAuxiliary(displacedAuxiliary);
-            CleanupCustomContent(restoreNativeContentVisibility: false);
-            if (displacedAuxiliary != null)
-                Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
-        }
-        RestorePreparedPrimaryGate();
-        var target = FindDescendant(primary.CanvasContentRectTransform, "Tooltip_Main");
-        if (target != null)
-            _preparedPrimaryGate = CanvasGroupGate.Create(primary, target.gameObject);
-    }
+    public void CancelPreparedNativePrimary(CardTooltipController primary) =>
+        _session.CancelPreparedPrimary(primary);
 
-    public void CancelPreparedNativePrimary(CardTooltipController primary)
-    {
-        if (
-            _preparedPrimaryGate == null
-            || !ReferenceEquals(_preparedPrimaryGate.Controller, primary)
-        )
-            return;
+    public void PrepareNativeAuxiliary(AuxiliaryTooltipController auxiliary) =>
+        _session.PrepareAuxiliary(auxiliary);
 
-        if (ReferenceEquals(_activePrimary, primary))
-            CleanupCustomContent(restoreNativeContentVisibility: false);
-        else
-            RestorePreparedPrimaryGate();
-    }
-
-    public void PrepareNativeAuxiliary(AuxiliaryTooltipController auxiliary)
-    {
-        if (_activeAuxiliary != null || _contentRoot != null)
-            CleanupCustomContent(restoreNativeContentVisibility: false);
-        RestorePreparedNativeHost();
-        RestorePreparedAuxiliaryGate();
-        _preparedNativeHost = NativeAuxiliaryHostState.Capture(auxiliary);
-        if (auxiliary.auxParent != null)
-        {
-            _preparedAuxiliaryGate = CanvasGroupGate.Create(
-                auxiliary,
-                auxiliary.auxParent.gameObject,
-                forceNonInteractive: true
-            );
-        }
-    }
-
-    public void CancelPreparedNativeAuxiliary(AuxiliaryTooltipController auxiliary)
-    {
-        if (
-            _preparedNativeHost == null
-            || !ReferenceEquals(_preparedNativeHost.Controller, auxiliary)
-        )
-            return;
-
-        if (ReferenceEquals(_activeAuxiliary, auxiliary))
-            CleanupCustomContent(restoreNativeContentVisibility: false);
-        else
-        {
-            RestorePreparedNativeHost();
-            RestorePreparedAuxiliaryGate();
-        }
-    }
+    public void CancelPreparedNativeAuxiliary(AuxiliaryTooltipController auxiliary) =>
+        _session.CancelPreparedAuxiliary(auxiliary);
 
     public bool Show(
         AuxiliaryTooltipController auxiliary,
@@ -177,69 +120,20 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         CombatImpactPerspective perspective
     )
     {
-        if (
-            auxiliary.auxParent == null
-            || auxiliary.headerText == null
-            || auxiliary.bodyText == null
-            || !IsTypographyReadyForCurrentLocale()
-        )
+        if (!IsTypographyReadyForCurrentLocale())
             return false;
 
-        if (_activeAuxiliary != null || _contentRoot != null)
-            CleanupCustomContent(restoreNativeContentVisibility: false);
-        if (
-            _preparedNativeHost == null
-            || !ReferenceEquals(_preparedNativeHost.Controller, auxiliary)
-        )
-        {
-            _preparedNativeHost = NativeAuxiliaryHostState.Capture(auxiliary);
-        }
+        // The host owns taking over the native pair; it self-cleans and returns false (never
+        // throws) so the caller keeps reporting AuxiliaryTooltipContentUnavailable rather than
+        // TooltipRenderException.
+        if (!_session.TryOpen(auxiliary, primary, PairedOptions))
+            return false;
 
-        if (
-            _preparedPrimaryGate == null
-            || !ReferenceEquals(_preparedPrimaryGate.Controller, primary)
-        )
-            PrepareNativePrimary(primary);
-        if (
-            _preparedAuxiliaryGate == null
-            || !ReferenceEquals(_preparedAuxiliaryGate.Controller, auxiliary)
-        )
-        {
-            _preparedAuxiliaryGate = CanvasGroupGate.Create(
-                auxiliary,
-                auxiliary.auxParent.gameObject,
-                forceNonInteractive: true
-            );
-        }
-        var generation = ++_renderGeneration;
-        _hidePending = false;
+        var generation = _session.Generation;
         _receivedPerspectiveAvailable = received != null;
-        _activeAuxiliary = auxiliary;
-        _activePrimary = primary;
         _activePerspective = _receivedPerspectiveAvailable
             ? perspective
             : CombatImpactPerspective.Caused;
-        auxiliary.headerText.gameObject.SetActive(false);
-        auxiliary.bodyText.gameObject.SetActive(false);
-        auxiliary.dividerParent?.SetActive(false);
-        if (
-            auxiliary.backgroundImage == null
-            || primary.backgroundImage == null
-            || primary.backgroundImage.sprite == null
-        )
-        {
-            CleanupCustomContent(restoreNativeContentVisibility: false);
-            return false;
-        }
-        auxiliary.backgroundImage.sprite = primary.backgroundImage.sprite;
-        auxiliary.backgroundImage.enabled = primary.backgroundImage.enabled;
-        PrepareNativePresentation(auxiliary);
-        ApplyTooltipWidth(auxiliary, TooltipPreferredWidth);
-        if (!TryCreateNativeBackground(auxiliary, primary))
-        {
-            CleanupCustomContent(restoreNativeContentVisibility: false);
-            return false;
-        }
 
         var root = CreateVertical("BppPostCombatImpactContent", auxiliary.auxParent.transform, 8f);
         _contentRoot = root.gameObject;
@@ -248,10 +142,10 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         AddLayout(
             root.gameObject,
             preferredHeight: -1f,
-            preferredWidth: _currentTooltipWidth,
-            minWidth: _currentTooltipWidth
+            preferredWidth: TooltipPreferredWidth,
+            minWidth: TooltipPreferredWidth
         );
-        root.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, _currentTooltipWidth);
+        root.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, TooltipPreferredWidth);
         var causedRoot = CreateVertical("ImpactCausedPerspective", root, 8f);
         var receivedRoot = CreateVertical("ImpactReceivedPerspective", root, 8f);
         _causedRoot = causedRoot.gameObject;
@@ -278,12 +172,25 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             generation
         );
         ApplyPerspectiveVisibility(_activePerspective);
+        return _session.AttachContent(_contentRoot, ApplyMetricColumnWidth);
+    }
 
-        ForceRebuildLayout(auxiliary);
-        ApplyTooltipWidth(auxiliary, TooltipPreferredWidth);
-        ForceRebuildLayout(auxiliary);
-        ApplyNativeHeight(auxiliary);
-        return true;
+    /// <summary>
+    /// Retunes the metric columns whenever the host resizes the panel.
+    /// </summary>
+    /// <remarks>
+    /// The column ratio and its clamps are Combat Impact design parameters, so they stay here
+    /// instead of becoming defaults inside the shared host. Only a float crosses the boundary.
+    /// </remarks>
+    private void ApplyMetricColumnWidth(float contentWidth)
+    {
+        var metricWidth = Mathf.Clamp(
+            contentWidth * 0.3f,
+            MetricColumnMinWidth,
+            MetricColumnPreferredWidth
+        );
+        foreach (var metricColumn in _metricColumns)
+            metricColumn.minWidth = metricWidth;
     }
 
     public bool SetPerspective(CombatImpactPerspective perspective, Transform anchor)
@@ -291,41 +198,32 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         if (perspective == CombatImpactPerspective.Received && !_receivedPerspectiveAvailable)
             return false;
 
-        if (
-            _activeAuxiliary == null
-            || _activePrimary == null
-            || _contentRoot == null
-            || _causedRoot == null
-            || _receivedRoot == null
-        )
+        if (_contentRoot == null || _causedRoot == null || _receivedRoot == null)
             return false;
 
-        var auxiliary = _activeAuxiliary;
-        var primary = _activePrimary;
         var previousPerspective = _activePerspective;
-        var visibleAlpha = _preparedAuxiliaryGate?.Alpha ?? 1f;
-        _preparedAuxiliaryGate?.SetAlpha(0f);
-        try
+        // The host only masks and rebuilds; choosing the perspective, deciding the swap failed,
+        // and rolling it back are Combat Impact decisions and stay here.
+        using (_session.BeginMaskedLayout())
         {
             _activePerspective = perspective;
             ApplyPerspectiveVisibility(perspective);
-            ForceRebuildLayout(auxiliary);
-            ApplyNativeHeight(auxiliary);
-            if (Position(auxiliary, primary, anchor))
+            _session.RebuildLayout();
+            var result = _session.Position(anchor, ResolveContentBudget());
+            if (result.Positioned)
+            {
+                LogPlacementDegradations(result);
                 return true;
+            }
 
             _activePerspective = previousPerspective;
             ApplyPerspectiveVisibility(previousPerspective);
-            ForceRebuildLayout(auxiliary);
-            ApplyNativeHeight(auxiliary);
-            Position(auxiliary, primary, anchor);
+            _session.RebuildLayout();
+            // The rollback pass must reach the same reason-code logic as the forward pass:
+            // LogPlacementDegradationOnce clears its latch whenever a dimension stops being
+            // degraded, so discarding this result changes how many records later passes emit.
+            LogPlacementDegradations(_session.Position(anchor, ResolveContentBudget()));
             return false;
-        }
-        finally
-        {
-            // Perspective changes are an atomic content swap. Do not expose the intermediate
-            // ContentSizeFitter passes that otherwise make the paired tooltips jump for a frame.
-            _preparedAuxiliaryGate?.SetAlpha(visibleAlpha);
         }
     }
 
@@ -335,469 +233,120 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         Transform anchor
     )
     {
-        if (
-            !ReferenceEquals(_activeAuxiliary, auxiliary)
-            || !ReferenceEquals(_activePrimary, primary)
-            || _contentRoot == null
-            || primary.RootCanvasComponent == null
-        )
+        if (!_session.OwnsAuxiliary(auxiliary) || !_session.OwnsPrimary(primary))
             return false;
 
-        Canvas.ForceUpdateCanvases();
-        TempoUIUtility.ForceRebuildRecursive(primary.PositioningRectTransform);
-        TempoUIUtility.ForceRebuildRecursive(auxiliary.PositioningRectTransform);
-        LayoutRebuilder.ForceRebuildLayoutImmediate(primary.PositioningRectTransform);
-        LayoutRebuilder.ForceRebuildLayoutImmediate(auxiliary.PositioningRectTransform);
-        ApplyNativeHeight(auxiliary);
+        var result = _session.Position(anchor, ResolveContentBudget());
+        LogPlacementDegradations(result);
+        return result.Positioned;
+    }
 
-        if (primary.RootCanvasComponent.transform is not RectTransform canvasRect)
-            return false;
+    /// <summary>
+    /// Turns a placement outcome into this feature's reason codes.
+    /// </summary>
+    /// <remarks>
+    /// Kept here rather than in the host: the once-only latches and their reset-on-recovery
+    /// behavior decide how many records reach the log, and that is Combat Impact's contract.
+    /// A pass that never positioned logs nothing and leaves the latches untouched.
+    /// </remarks>
+    private void LogPlacementDegradations(PlacementResult result)
+    {
+        if (!result.Positioned)
+            return;
 
-        var canvasBounds = Inset(canvasRect.rect, CanvasMargin);
-        var primaryBounds = GetPrimaryVisibleBounds(primary, canvasRect);
-        var availableRight = Mathf.Max(0f, canvasBounds.xMax - (primaryBounds.xMax + TooltipGap));
-        var availableLeft = Mathf.Max(0f, primaryBounds.xMin - TooltipGap - canvasBounds.xMin);
-        var canvasUnitsPerImpactUnit = CanvasUnitsPerLocalUnit(
-            auxiliary.PositioningRectTransform,
-            canvasRect
-        );
-        var preferredFrameWidth =
-            (TooltipPreferredWidth + _frameHorizontalBleed) * canvasUnitsPerImpactUnit;
-        if (availableRight + PlacementEpsilon >= preferredFrameWidth)
-        {
-            _pairSide = PairSide.ImpactRight;
-        }
-        else if (availableLeft + PlacementEpsilon >= preferredFrameWidth)
-        {
-            _pairSide = PairSide.ImpactLeft;
-        }
-        else if (availableRight >= availableLeft)
-        {
-            _pairSide = PairSide.ImpactRight;
-        }
-        else
-        {
-            _pairSide = PairSide.ImpactLeft;
-        }
-
-        var available = _pairSide == PairSide.ImpactRight ? availableRight : availableLeft;
-        var availableContentWidth = available / canvasUnitsPerImpactUnit - _frameHorizontalBleed;
-        ApplyTooltipWidth(
-            auxiliary,
-            Mathf.Min(TooltipPreferredWidth, Mathf.Max(1f, availableContentWidth))
-        );
-        Canvas.ForceUpdateCanvases();
-        TempoUIUtility.ForceRebuildRecursive(auxiliary.PositioningRectTransform);
-        LayoutRebuilder.ForceRebuildLayoutImmediate(auxiliary.PositioningRectTransform);
-        ApplyNativeHeight(auxiliary);
-        FitActiveContentToCanvas(auxiliary, canvasRect);
-
-        var impactRect = auxiliary.backgroundImage.rectTransform;
-        var impactBounds = GetCanvasLocalBounds(impactRect, canvasRect);
-        var impactDelta =
-            _pairSide == PairSide.ImpactRight
-                ? new Vector2(
-                    primaryBounds.xMax + TooltipGap - impactBounds.xMin,
-                    primaryBounds.yMax - impactBounds.yMax
-                )
-                : new Vector2(
-                    primaryBounds.xMin - TooltipGap - impactBounds.xMax,
-                    primaryBounds.yMax - impactBounds.yMax
-                );
-        TranslateRect(auxiliary.PositioningRectTransform, canvasRect, impactDelta);
-
-        impactBounds = GetCanvasLocalBounds(impactRect, canvasRect);
-        var verticalAdjustment = ResolveVerticalAdjustment(impactBounds, canvasBounds);
-        _topAlignmentAdjusted = Mathf.Abs(verticalAdjustment) > PlacementEpsilon;
-        if (!Mathf.Approximately(verticalAdjustment, 0f))
-        {
-            var verticalDelta = new Vector2(0f, verticalAdjustment);
-            TranslateRect(auxiliary.PositioningRectTransform, canvasRect, verticalDelta);
-            impactDelta += verticalDelta;
-            impactBounds = GetCanvasLocalBounds(impactRect, canvasRect);
-        }
-
-        var pairBounds = Union(primaryBounds, impactBounds);
-        var screenBounds = canvasRect.rect;
-        var collides =
-            _pairSide == PairSide.ImpactRight
-                ? impactBounds.xMin < primaryBounds.xMax + TooltipGap - PlacementEpsilon
-                : impactBounds.xMax > primaryBounds.xMin - TooltipGap + PlacementEpsilon;
-        _pairOverflowed =
-            pairBounds.width > screenBounds.width
-            || pairBounds.height > screenBounds.height
-            || pairBounds.xMin < screenBounds.xMin - PlacementEpsilon
-            || pairBounds.xMax > screenBounds.xMax + PlacementEpsilon
-            || pairBounds.yMin < screenBounds.yMin - PlacementEpsilon
-            || pairBounds.yMax > screenBounds.yMax + PlacementEpsilon
-            || collides;
-        _widthBelowReadable = _currentTooltipWidth < TooltipReadableWidth;
         LogPlacementDegradationOnce(
-            _pairOverflowed,
+            result.Overflowed,
             ref _overflowDegradedLogged,
             PostCombatImpactReasonCode.PairPlacementOverflowed
         );
         LogPlacementDegradationOnce(
-            _widthBelowReadable,
+            result.WidthBelowReadable,
             ref _widthDegradedLogged,
             PostCombatImpactReasonCode.PairPlacementTooNarrow
         );
         LogPlacementDegradationOnce(
-            _topAlignmentAdjusted,
+            result.TopAlignmentAdjusted,
             ref _topAlignmentDegradedLogged,
             PostCombatImpactReasonCode.PairTopAlignmentAdjusted
         );
-        return true;
     }
 
-    public void Reveal()
-    {
-        if (_activeAuxiliary == null || _activePrimary == null || _contentRoot == null)
-            return;
+    public void Reveal() => _session.Reveal();
 
-        _hidePending = false;
-        StartVisibilityFade(targetAlpha: 1f, cleanupOnComplete: false);
-    }
-
-    public void Hide()
-    {
-        if (
-            _activeAuxiliary == null
-            && _contentRoot == null
-            && _preparedPrimaryGate == null
-            && _preparedAuxiliaryGate == null
-        )
-            return;
-
-        if (_hidePending)
-            return;
-        _hidePending = true;
-        if (_activePrimary != null)
-            _activePrimary.SetLockedFlag(false);
-
-        var visibleAlpha = Mathf.Max(
-            _preparedPrimaryGate?.Alpha ?? 0f,
-            _preparedAuxiliaryGate?.Alpha ?? 0f
-        );
-        if (visibleAlpha <= PlacementEpsilon || _activeAuxiliary == null)
-        {
-            CompleteAnimatedHide(_renderGeneration);
-            return;
-        }
-
-        StartVisibilityFade(targetAlpha: 0f, cleanupOnComplete: true);
-    }
+    public void Hide() => _session.Hide();
 
     public bool OnNativeTooltipChanging(CardTooltipController controller)
     {
-        if (!ReferenceEquals(_activePrimary, controller))
+        if (!_session.OwnsPrimary(controller))
             return false;
 
-        Hide();
+        _session.Hide();
         return true;
     }
 
     public bool OnNativeAuxiliaryTooltipShowing(AuxiliaryTooltipController controller)
     {
-        if (!ReferenceEquals(_activeAuxiliary, controller))
+        if (!_session.OwnsAuxiliary(controller))
         {
-            RestorePreparedNativeHost(controller);
+            // Someone else is about to show the native auxiliary tooltip this session had only
+            // prepared. Handing the snapshot back here is what keeps the native layout's padding
+            // and anchors from staying permanently rewritten.
+            _session.ReleasePrepared(controller);
             return false;
         }
 
-        CleanupCustomContent();
+        _session.Release(restoreNativeContent: true);
         return true;
     }
 
     public bool OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller)
     {
-        if (!ReferenceEquals(_activeAuxiliary, controller))
+        if (!_session.OwnsAuxiliary(controller))
             return false;
 
         // Restore the reusable host geometry for native fade-out, but keep its original content
         // inactive until the next real native show. Reactivating the header here lets a later
         // native fade/tween expose a detached title at this host's old paired position.
-        ConcealNativeAuxiliary(controller);
-        CleanupCustomContent(restoreNativeContentVisibility: false);
+        //
+        // This is also the recovery path for a fade coroutine that never completes: it is hosted
+        // on the native controller, so deactivating that MonoBehaviour kills it silently and no
+        // generation check can rescue a callback that never fires.
+        _session.ForceSettle();
         return true;
     }
 
-    private void StartVisibilityFade(float targetAlpha, bool cleanupOnComplete)
+    /// <summary>
+    /// Releases this feature's own resources during <see cref="NativePairedTooltipSession.Release"/>.
+    /// </summary>
+    /// <remarks>
+    /// Invoked by the host after it has stopped the fade and bumped the generation, but before it
+    /// destroys UI or restores native state. Relying on that ordering is what keeps a cancelled
+    /// preview continuation from re-attaching to a presentation that is being torn down.
+    /// </remarks>
+    private void ReleaseOwnerResources()
     {
-        StopVisibilityFade();
-        var auxiliary = _activeAuxiliary;
-        if (auxiliary == null || !auxiliary.isActiveAndEnabled)
-        {
-            SetVisibilityAlpha(targetAlpha);
-            if (cleanupOnComplete)
-                CompleteAnimatedHide(_renderGeneration);
-            return;
-        }
-
-        var generation = _renderGeneration;
-        _visibilityFade = auxiliary.StartCoroutine(
-            FadeVisibility(targetAlpha, cleanupOnComplete, generation)
-        );
-    }
-
-    private System.Collections.IEnumerator FadeVisibility(
-        float targetAlpha,
-        bool cleanupOnComplete,
-        int generation
-    )
-    {
-        var primaryStart = _preparedPrimaryGate?.Alpha ?? targetAlpha;
-        var auxiliaryStart = _preparedAuxiliaryGate?.Alpha ?? targetAlpha;
-        var elapsed = 0f;
-        while (elapsed < VisibilityFadeDuration)
-        {
-            if (generation != _renderGeneration)
-            {
-                _visibilityFade = null;
-                yield break;
-            }
-
-            elapsed += Time.unscaledDeltaTime;
-            var progress = Mathf.Clamp01(elapsed / VisibilityFadeDuration);
-            if (!cleanupOnComplete)
-            {
-                _preparedPrimaryGate?.SetAlpha(Mathf.Lerp(primaryStart, targetAlpha, progress));
-            }
-            _preparedAuxiliaryGate?.SetAlpha(Mathf.Lerp(auxiliaryStart, targetAlpha, progress));
-            yield return null;
-        }
-
-        if (cleanupOnComplete)
-        {
-            _preparedPrimaryGate?.SetAlpha(0f);
-            _preparedAuxiliaryGate?.SetAlpha(0f);
-        }
-        else
-        {
-            SetVisibilityAlpha(targetAlpha);
-        }
-        _visibilityFade = null;
-        if (cleanupOnComplete)
-            CompleteAnimatedHide(generation);
-    }
-
-    private void SetVisibilityAlpha(float alpha)
-    {
-        _preparedPrimaryGate?.SetAlpha(alpha);
-        _preparedAuxiliaryGate?.SetAlpha(alpha);
-    }
-
-    private void StopVisibilityFade()
-    {
-        if (_visibilityFade == null)
-            return;
-
-        if (_activeAuxiliary != null)
-            _activeAuxiliary.StopCoroutine(_visibilityFade);
-        _visibilityFade = null;
-    }
-
-    private void CompleteAnimatedHide(int generation)
-    {
-        if (generation != _renderGeneration)
-            return;
-
-        ConcealNativeAuxiliary(_activeAuxiliary);
-        _visibilityFade = null;
-        if (!CleanupCustomContent(restoreNativeContentVisibility: false))
-            return;
-        Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
-    }
-
-    private static void ConcealNativeAuxiliary(AuxiliaryTooltipController? auxiliary)
-    {
-        if (auxiliary?.tooltipCanvasGroup != null)
-            auxiliary.tooltipCanvasGroup.alpha = 0f;
-    }
-
-    private bool CleanupCustomContent(bool restoreNativeContentVisibility = true)
-    {
-        var hadActiveContent =
-            _activeAuxiliary != null
-            || _contentRoot != null
-            || _nativeBackgroundRoot != null
-            || _previewScope != null
-            || _preparedNativeHost != null
-            || _preparedPrimaryGate != null
-            || _preparedAuxiliaryGate != null;
-        if (!hadActiveContent)
-            return false;
-
-        StopVisibilityFade();
-        _renderGeneration++;
         DisposeNativePreviews();
-        if (_contentRoot != null)
-        {
-            _contentRoot.SetActive(false);
-            Object.Destroy(_contentRoot);
-        }
-        if (_nativeBackgroundRoot != null)
-        {
-            _nativeBackgroundRoot.SetActive(false);
-            Object.Destroy(_nativeBackgroundRoot);
-        }
-        RestorePreparedNativeHost(restoreNativeContentVisibility);
-        RestorePreparedAuxiliaryGate();
-        RestorePreparedPrimaryGate();
-        if (_activePrimary != null)
-            _activePrimary.SetLockedFlag(false);
-
-        _activeAuxiliary = null;
-        _activePrimary = null;
         _contentRoot = null;
         _causedRoot = null;
         _receivedRoot = null;
-        _nativeBackgroundRoot = null;
         _causedMoreText = null;
         _receivedMoreText = null;
         _previewOwner = null;
-        _nativeAuxParentRect = null;
         _metricColumns.Clear();
         _causedBlocks.Clear();
         _receivedBlocks.Clear();
         _pendingPreviewCount = 0;
-        _currentTooltipWidth = TooltipPreferredWidth;
-        _frameHorizontalBleed = 0f;
-        _pairSide = PairSide.None;
-        _pairOverflowed = false;
-        _widthBelowReadable = false;
-        _topAlignmentAdjusted = false;
         _overflowDegradedLogged = false;
         _widthDegradedLogged = false;
         _topAlignmentDegradedLogged = false;
-        _hidePending = false;
         _receivedPerspectiveAvailable = false;
         _activePerspective = CombatImpactPerspective.Caused;
-        return true;
     }
 
-    private void PrepareNativePresentation(AuxiliaryTooltipController auxiliary)
-    {
-        _nativeAuxParentRect = auxiliary.auxParent.transform as RectTransform;
-        if (_nativeAuxParentRect == null)
-            return;
-
-        var frameRect = auxiliary.backgroundImage.rectTransform;
-        _frameHorizontalBleed = Mathf.Max(
-            0f,
-            frameRect.rect.width - _nativeAuxParentRect.rect.width
-        );
-        _nativeAuxParentRect.anchorMin = new Vector2(0.5f, 0.5f);
-        _nativeAuxParentRect.anchorMax = new Vector2(0.5f, 0.5f);
-        _nativeAuxParentRect.pivot = new Vector2(0.5f, 0.5f);
-        // auxParent and the frame are sibling rects in the native Auxiliary Tooltip prefab.
-        // Match the frame's center instead of mirroring its serialized offset; mirroring doubles
-        // any inset and makes the left/right content padding visibly asymmetric.
-        _nativeAuxParentRect.anchoredPosition = frameRect.anchoredPosition;
-
-        var nativeLayout = auxiliary.auxParent.GetComponent<VerticalLayoutGroup>();
-        if (nativeLayout != null)
-        {
-            var padding = nativeLayout.padding;
-            nativeLayout.padding = new RectOffset(
-                padding.left,
-                padding.right,
-                padding.top,
-                Mathf.Max(0, padding.bottom - NativeBottomPaddingReduction)
-            );
-        }
-    }
-
-    private void ApplyTooltipWidth(AuxiliaryTooltipController auxiliary, float contentWidth)
-    {
-        _currentTooltipWidth = Mathf.Max(1f, contentWidth);
-        if (_contentRoot != null)
-        {
-            var contentRect = (RectTransform)_contentRoot.transform;
-            var contentLayout = _contentRoot.GetComponent<LayoutElement>();
-            contentLayout.preferredWidth = _currentTooltipWidth;
-            contentLayout.minWidth = _currentTooltipWidth;
-            contentRect.SetSizeWithCurrentAnchors(
-                RectTransform.Axis.Horizontal,
-                _currentTooltipWidth
-            );
-        }
-
-        var metricWidth = Mathf.Clamp(
-            _currentTooltipWidth * 0.3f,
-            MetricColumnMinWidth,
-            MetricColumnPreferredWidth
-        );
-        foreach (var metricColumn in _metricColumns)
-            metricColumn.minWidth = metricWidth;
-
-        _nativeAuxParentRect?.SetSizeWithCurrentAnchors(
-            RectTransform.Axis.Horizontal,
-            _currentTooltipWidth
-        );
-        auxiliary.PositioningRectTransform.SetSizeWithCurrentAnchors(
-            RectTransform.Axis.Horizontal,
-            _currentTooltipWidth + _frameHorizontalBleed
-        );
-    }
-
-    private void ApplyNativeHeight(AuxiliaryTooltipController auxiliary)
-    {
-        var contentHeight = _nativeAuxParentRect?.rect.height ?? 0f;
-        if (contentHeight <= 0f)
-            return;
-
-        auxiliary.PositioningRectTransform.SetSizeWithCurrentAnchors(
-            RectTransform.Axis.Vertical,
-            contentHeight
-        );
-    }
-
-    private void FitActiveContentToCanvas(
-        AuxiliaryTooltipController auxiliary,
-        RectTransform canvasRect
-    )
-    {
-        var blocks =
-            _activePerspective == CombatImpactPerspective.Caused ? _causedBlocks : _receivedBlocks;
-        var moreText =
-            _activePerspective == CombatImpactPerspective.Caused
-                ? _causedMoreText
-                : _receivedMoreText;
-        if (moreText == null)
-            return;
-
-        foreach (var block in blocks)
-            block.Restore();
-        moreText.transform.parent.gameObject.SetActive(false);
-        RebuildAfterHeightBudgetChange(auxiliary);
-
-        var canvasBounds = Inset(canvasRect.rect, CanvasMargin);
-        var hiddenCount = 0;
-        for (var blockIndex = blocks.Count - 1; blockIndex >= 0; blockIndex--)
-        {
-            var block = blocks[blockIndex];
-            for (var rowIndex = block.DetailRows.Count - 1; rowIndex >= 0; rowIndex--)
-            {
-                if (FitsCanvasHeight(auxiliary, canvasRect, canvasBounds))
-                    return;
-
-                block.DetailRows[rowIndex].SetActive(false);
-                hiddenCount++;
-                ShowMoreRow(moreText, hiddenCount);
-                RebuildAfterHeightBudgetChange(auxiliary);
-            }
-
-            if (FitsCanvasHeight(auxiliary, canvasRect, canvasBounds))
-                return;
-
-            block.Root.SetActive(false);
-            block.LeadingDivider?.SetActive(false);
-            hiddenCount++;
-            ShowMoreRow(moreText, hiddenCount);
-            RebuildAfterHeightBudgetChange(auxiliary);
-        }
-    }
+    private IPairedContentBudget ResolveContentBudget() =>
+        _activePerspective == CombatImpactPerspective.Caused
+            ? new ImpactContentBudget(_causedBlocks, _causedMoreText)
+            : new ImpactContentBudget(_receivedBlocks, _receivedMoreText);
 
     private static void ShowMoreRow(TMP_Text moreText, int hiddenCount)
     {
@@ -805,158 +354,65 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         moreText.transform.parent.gameObject.SetActive(true);
     }
 
-    private bool FitsCanvasHeight(
-        AuxiliaryTooltipController auxiliary,
-        RectTransform canvasRect,
-        Rect canvasBounds
-    ) =>
-        GetCanvasLocalBounds(auxiliary.backgroundImage.rectTransform, canvasRect).height
-        <= canvasBounds.height + PlacementEpsilon;
-
-    private void RebuildAfterHeightBudgetChange(AuxiliaryTooltipController auxiliary)
+    /// <summary>
+    /// Combat Impact's trim order, driven by the host while it fits the panel to the canvas.
+    /// </summary>
+    /// <remarks>
+    /// Reproduces the original nested loop exactly: walk the blocks from last to first, dropping
+    /// each block's detail rows from last to first, then the block itself (with its leading
+    /// divider). The host decides <i>whether</i> to keep trimming; this type only decides
+    /// <i>what</i> goes next, so no measurement crosses back over the boundary.
+    /// </remarks>
+    private sealed class ImpactContentBudget : IPairedContentBudget
     {
-        ForceRebuildLayout(auxiliary);
-        ApplyNativeHeight(auxiliary);
-    }
+        private readonly List<ImpactContentBlock> _blocks;
+        private readonly TMP_Text? _moreText;
+        private int _blockIndex = -1;
+        private int _rowIndex = -1;
+        private int _hiddenCount;
+        private bool _started;
 
-    private static void ForceRebuildLayout(AuxiliaryTooltipController auxiliary)
-    {
-        // A newly activated nested ContentSizeFitter can expose its previous preferred height on
-        // the first pass. Two bounded passes resolve the child and parent sizes in this frame.
-        for (var pass = 0; pass < 2; pass++)
+        internal ImpactContentBudget(List<ImpactContentBlock> blocks, TMP_Text? moreText)
         {
-            Canvas.ForceUpdateCanvases();
-            TempoUIUtility.ForceRebuildRecursive(auxiliary.PositioningRectTransform);
-            LayoutRebuilder.ForceRebuildLayoutImmediate(auxiliary.PositioningRectTransform);
-        }
-    }
-
-    private bool TryCreateNativeBackground(
-        AuxiliaryTooltipController auxiliary,
-        CardTooltipController primary
-    )
-    {
-        var sourceContainer = primary.gradientImage?.transform.parent as RectTransform;
-        var sourceMaskImage = sourceContainer?.GetComponent<Image>();
-        var sourceMask = sourceContainer?.GetComponent<Mask>();
-        var frameRect = auxiliary.backgroundImage?.rectTransform;
-        if (
-            sourceContainer == null
-            || sourceMaskImage == null
-            || sourceMask == null
-            || frameRect == null
-            || frameRect.parent == null
-        )
-            return false;
-
-        var background = new GameObject(
-            "BppPostCombatImpactNativeBackground",
-            typeof(RectTransform),
-            typeof(CanvasRenderer),
-            typeof(Image),
-            typeof(Mask),
-            typeof(LayoutElement)
-        );
-        var backgroundRect = (RectTransform)background.transform;
-        backgroundRect.SetParent(frameRect.parent, worldPositionStays: false);
-        CopyRectTransform(frameRect, backgroundRect);
-        backgroundRect.SetSiblingIndex(frameRect.GetSiblingIndex());
-        background.GetComponent<LayoutElement>().ignoreLayout = true;
-        CopyImage(sourceMaskImage, background.GetComponent<Image>());
-        background.GetComponent<Image>().enabled = true;
-        var mask = background.GetComponent<Mask>();
-        mask.enabled = sourceMask.enabled;
-        mask.showMaskGraphic = sourceMask.showMaskGraphic;
-
-        for (var childIndex = 0; childIndex < sourceContainer.childCount; childIndex++)
-        {
-            if (
-                sourceContainer.GetChild(childIndex) is not RectTransform sourceRect
-                || !sourceRect.TryGetComponent<Image>(out var sourceImage)
-            )
-                continue;
-
-            var layer = new GameObject(
-                $"BppPostCombatImpactNativeLayer_{childIndex}",
-                typeof(RectTransform),
-                typeof(CanvasRenderer),
-                typeof(Image)
-            );
-            var layerRect = (RectTransform)layer.transform;
-            layerRect.SetParent(backgroundRect, worldPositionStays: false);
-            CopyRectTransform(sourceRect, layerRect);
-            CopyImage(sourceImage, layer.GetComponent<Image>());
-            layer.SetActive(sourceRect.gameObject.activeSelf);
+            _blocks = blocks;
+            _moreText = moreText;
         }
 
-        _nativeBackgroundRoot = background;
-        return true;
-    }
+        public void RestoreAll()
+        {
+            if (_moreText == null)
+                return;
 
-    private static void CopyRectTransform(RectTransform source, RectTransform destination)
-    {
-        destination.anchorMin = source.anchorMin;
-        destination.anchorMax = source.anchorMax;
-        destination.pivot = source.pivot;
-        destination.sizeDelta = source.sizeDelta;
-        destination.anchoredPosition3D = source.anchoredPosition3D;
-        destination.localRotation = source.localRotation;
-        destination.localScale = source.localScale;
-    }
+            foreach (var block in _blocks)
+                block.Restore();
+            _moreText.transform.parent.gameObject.SetActive(false);
+            _blockIndex = _blocks.Count - 1;
+            _rowIndex = _blockIndex >= 0 ? _blocks[_blockIndex].DetailRows.Count - 1 : -1;
+            _hiddenCount = 0;
+            _started = true;
+        }
 
-    private static void CopyImage(Image source, Image destination)
-    {
-        destination.sprite = source.sprite;
-        destination.material = source.material;
-        destination.color = source.color;
-        destination.type = source.type;
-        destination.fillCenter = source.fillCenter;
-        destination.fillMethod = source.fillMethod;
-        destination.fillAmount = source.fillAmount;
-        destination.fillClockwise = source.fillClockwise;
-        destination.fillOrigin = source.fillOrigin;
-        destination.pixelsPerUnitMultiplier = source.pixelsPerUnitMultiplier;
-        destination.preserveAspect = source.preserveAspect;
-        destination.useSpriteMesh = source.useSpriteMesh;
-        destination.maskable = source.maskable;
-        destination.raycastTarget = false;
-        destination.enabled = source.enabled;
-    }
+        public bool TryShrinkOneStep()
+        {
+            if (_moreText == null || !_started || _blockIndex < 0)
+                return false;
 
-    private void RestorePreparedNativeHost(
-        bool restoreContentVisibility = true,
-        AuxiliaryTooltipController? expectedController = null
-    )
-    {
-        if (_preparedNativeHost == null)
-            return;
-        if (
-            expectedController != null
-            && !ReferenceEquals(_preparedNativeHost.Controller, expectedController)
-        )
-            return;
+            var block = _blocks[_blockIndex];
+            if (_rowIndex >= 0)
+            {
+                block.DetailRows[_rowIndex].SetActive(false);
+                _rowIndex--;
+                ShowMoreRow(_moreText, ++_hiddenCount);
+                return true;
+            }
 
-        _preparedNativeHost.Restore(restoreContentVisibility);
-        if (restoreContentVisibility)
-            _preparedNativeHost = null;
-    }
-
-    private void RestorePreparedNativeHost(AuxiliaryTooltipController expectedController) =>
-        RestorePreparedNativeHost(
-            restoreContentVisibility: true,
-            expectedController: expectedController
-        );
-
-    private void RestorePreparedPrimaryGate()
-    {
-        _preparedPrimaryGate?.Restore();
-        _preparedPrimaryGate = null;
-    }
-
-    private void RestorePreparedAuxiliaryGate()
-    {
-        _preparedAuxiliaryGate?.Restore();
-        _preparedAuxiliaryGate = null;
+            block.Root.SetActive(false);
+            block.LeadingDivider?.SetActive(false);
+            _blockIndex--;
+            _rowIndex = _blockIndex >= 0 ? _blocks[_blockIndex].DetailRows.Count - 1 : -1;
+            ShowMoreRow(_moreText, ++_hiddenCount);
+            return true;
+        }
     }
 
     private void DisposeNativePreviews()
@@ -1602,7 +1058,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             var outcome = await scope.AcquireAsync(subject, cancellationToken);
             var session = outcome.Session;
             if (
-                generation != _renderGeneration
+                generation != _session.Generation
                 || slot == null
                 || cancellationToken.IsCancellationRequested
             )
@@ -1678,7 +1134,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         }
         finally
         {
-            if (generation == _renderGeneration)
+            if (generation == _session.Generation)
                 _pendingPreviewCount = Mathf.Max(0, _pendingPreviewCount - 1);
         }
     }
@@ -1688,19 +1144,19 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         try
         {
             var outcome = await HeroPortraitSpriteProvider.LoadDefaultPortraitAsync(hero);
-            if (generation == _renderGeneration && image != null && outcome?.Sprite != null)
+            if (generation == _session.Generation && image != null && outcome?.Sprite != null)
             {
                 image.sprite = outcome.Sprite;
                 image.enabled = true;
             }
-            else if (generation == _renderGeneration)
+            else if (generation == _session.Generation)
             {
                 HidePreviewSlot(slot);
             }
         }
         catch (Exception ex)
         {
-            if (generation == _renderGeneration)
+            if (generation == _session.Generation)
                 HidePreviewSlot(slot);
             BppLog.WarnEvent(
                 PostCombatImpactLogEvents.InteractionDegraded,
@@ -1712,7 +1168,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         }
         finally
         {
-            if (generation == _renderGeneration)
+            if (generation == _session.Generation)
                 _pendingPreviewCount = Mathf.Max(0, _pendingPreviewCount - 1);
         }
     }
@@ -1867,95 +1323,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         return layout;
     }
 
-    private Rect GetCanvasLocalBounds(RectTransform rect, RectTransform canvasRect)
-    {
-        rect.GetWorldCorners(_worldCorners);
-        var minX = float.PositiveInfinity;
-        var minY = float.PositiveInfinity;
-        var maxX = float.NegativeInfinity;
-        var maxY = float.NegativeInfinity;
-        foreach (var corner in _worldCorners)
-        {
-            var local = canvasRect.InverseTransformPoint(corner);
-            minX = Mathf.Min(minX, local.x);
-            minY = Mathf.Min(minY, local.y);
-            maxX = Mathf.Max(maxX, local.x);
-            maxY = Mathf.Max(maxY, local.y);
-        }
-
-        return Rect.MinMaxRect(minX, minY, maxX, maxY);
-    }
-
-    private Rect GetPrimaryVisibleBounds(CardTooltipController primary, RectTransform canvasRect)
-    {
-        var bounds = GetPrimaryFrameBounds(primary, canvasRect);
-        if (
-            primary.cooldownClock != null
-            && primary.cooldownClock.gameObject.activeInHierarchy
-            && primary.cooldownClock.transform is RectTransform cooldownRect
-        )
-        {
-            bounds = Union(bounds, GetCanvasLocalBounds(cooldownRect, canvasRect));
-        }
-        return bounds;
-    }
-
-    private Rect GetPrimaryFrameBounds(CardTooltipController primary, RectTransform canvasRect)
-    {
-        var bounds = GetCanvasLocalBounds(primary.PositioningRectTransform, canvasRect);
-        if (primary.CanvasContentRectTransform != null)
-        {
-            bounds = Union(
-                bounds,
-                GetCanvasLocalBounds(primary.CanvasContentRectTransform, canvasRect)
-            );
-        }
-        return bounds;
-    }
-
-    private static RectTransform? FindDescendant(Transform? root, string childName)
-    {
-        if (root == null)
-            return null;
-        for (var index = 0; index < root.childCount; index++)
-        {
-            var child = root.GetChild(index);
-            if (
-                string.Equals(child.name, childName, StringComparison.Ordinal)
-                && child is RectTransform matching
-            )
-                return matching;
-            var nested = FindDescendant(child, childName);
-            if (nested != null)
-                return nested;
-        }
-        return null;
-    }
-
-    private static float CanvasUnitsPerLocalUnit(RectTransform rect, RectTransform canvasRect)
-    {
-        var origin = canvasRect.InverseTransformPoint(rect.TransformPoint(Vector3.zero));
-        var horizontalUnit = canvasRect.InverseTransformPoint(rect.TransformPoint(Vector3.right));
-        return Mathf.Max(
-            0.0001f,
-            Vector2.Distance(
-                new Vector2(origin.x, origin.y),
-                new Vector2(horizontalUnit.x, horizontalUnit.y)
-            )
-        );
-    }
-
-    private static float ResolveVerticalAdjustment(Rect rect, Rect bounds)
-    {
-        if (rect.height > bounds.height + PlacementEpsilon)
-            return bounds.yMax - rect.yMax;
-
-        var adjustment = rect.yMax > bounds.yMax ? bounds.yMax - rect.yMax : 0f;
-        if (rect.yMin + adjustment < bounds.yMin)
-            adjustment += bounds.yMin - (rect.yMin + adjustment);
-        return adjustment;
-    }
-
     private static void LogPlacementDegradationOnce(
         bool degraded,
         ref bool wasLogged,
@@ -1974,40 +1341,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         BppLog.WarnEvent(
             PostCombatImpactLogEvents.InteractionDegraded,
             PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode)
-        );
-    }
-
-    private static void TranslateRect(
-        RectTransform rect,
-        RectTransform canvasRect,
-        Vector2 canvasLocalDelta
-    )
-    {
-        if (canvasLocalDelta == Vector2.zero)
-            return;
-
-        rect.position += canvasRect.TransformVector(
-            new Vector3(canvasLocalDelta.x, canvasLocalDelta.y)
-        );
-    }
-
-    private static Rect Union(Rect first, Rect second) =>
-        Rect.MinMaxRect(
-            Mathf.Min(first.xMin, second.xMin),
-            Mathf.Min(first.yMin, second.yMin),
-            Mathf.Max(first.xMax, second.xMax),
-            Mathf.Max(first.yMax, second.yMax)
-        );
-
-    private static Rect Inset(Rect rect, float inset)
-    {
-        var horizontalInset = Mathf.Min(inset, rect.width * 0.5f);
-        var verticalInset = Mathf.Min(inset, rect.height * 0.5f);
-        return Rect.MinMaxRect(
-            rect.xMin + horizontalInset,
-            rect.yMin + verticalInset,
-            rect.xMax - horizontalInset,
-            rect.yMax - verticalInset
         );
     }
 
@@ -2123,13 +1456,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         }
     }
 
-    private enum PairSide
-    {
-        None,
-        ImpactRight,
-        ImpactLeft,
-    }
-
     private sealed class NativePreviewOwner : INativeCardPreviewOwner
     {
         private readonly Dictionary<NativeCardPreviewSubject, RectTransform> _parents = new();
@@ -2194,169 +1520,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         }
     }
 
-    private sealed class CanvasGroupGate
-    {
-        private readonly CanvasGroup _group;
-        private readonly bool _ownedGroup;
-        private readonly float _originalAlpha;
-        private readonly bool _originalInteractable;
-        private readonly bool _originalBlocksRaycasts;
-        private readonly bool _originalIgnoreParentGroups;
-        private readonly bool _forceNonInteractive;
-        private bool _restored;
-
-        private CanvasGroupGate(object controller, GameObject target, bool forceNonInteractive)
-        {
-            Controller = controller;
-            _forceNonInteractive = forceNonInteractive;
-            _group = target.GetComponent<CanvasGroup>();
-            if (_group == null)
-            {
-                _group = target.AddComponent<CanvasGroup>();
-                _ownedGroup = true;
-            }
-            _originalAlpha = _group.alpha;
-            _originalInteractable = _group.interactable;
-            _originalBlocksRaycasts = _group.blocksRaycasts;
-            _originalIgnoreParentGroups = _group.ignoreParentGroups;
-            SetAlpha(0f);
-        }
-
-        internal object Controller { get; }
-
-        internal float Alpha => _group == null ? 0f : _group.alpha;
-
-        internal static CanvasGroupGate Create(
-            object controller,
-            GameObject target,
-            bool forceNonInteractive = false
-        ) => new(controller, target, forceNonInteractive);
-
-        internal void SetAlpha(float alpha)
-        {
-            if (_group == null || _restored)
-                return;
-
-            _group.alpha = Mathf.Clamp01(alpha);
-            var interactive = _group.alpha >= 1f - PlacementEpsilon;
-            _group.interactable = !_forceNonInteractive && interactive && _originalInteractable;
-            _group.blocksRaycasts = !_forceNonInteractive && interactive && _originalBlocksRaycasts;
-        }
-
-        internal void Restore()
-        {
-            if (_restored || _group == null)
-                return;
-
-            _restored = true;
-            _group.alpha = _originalAlpha;
-            _group.interactable = _originalInteractable;
-            _group.blocksRaycasts = _originalBlocksRaycasts;
-            _group.ignoreParentGroups = _originalIgnoreParentGroups;
-            if (_ownedGroup)
-                Object.Destroy(_group);
-        }
-    }
-
-    private sealed class NativeAuxiliaryHostState
-    {
-        private readonly RectTransform? _auxParentRect;
-        private readonly Vector2 _auxParentSizeDelta;
-        private readonly Vector2 _auxParentAnchorMin;
-        private readonly Vector2 _auxParentAnchorMax;
-        private readonly Vector2 _auxParentPivot;
-        private readonly Vector3 _auxParentAnchoredPosition;
-        private readonly Vector2 _positioningSizeDelta;
-        private readonly VerticalLayoutGroup? _layout;
-        private readonly RectOffset? _padding;
-        private readonly float _spacing;
-        private readonly bool _headerWasActive;
-        private readonly bool _bodyWasActive;
-        private readonly bool _dividerWasActive;
-        private readonly Sprite? _backgroundSprite;
-        private readonly bool _backgroundImageWasEnabled;
-
-        private NativeAuxiliaryHostState(AuxiliaryTooltipController controller)
-        {
-            Controller = controller;
-            _auxParentRect = controller.auxParent?.transform as RectTransform;
-            _auxParentSizeDelta = _auxParentRect?.sizeDelta ?? Vector2.zero;
-            _auxParentAnchorMin = _auxParentRect?.anchorMin ?? Vector2.zero;
-            _auxParentAnchorMax = _auxParentRect?.anchorMax ?? Vector2.zero;
-            _auxParentPivot = _auxParentRect?.pivot ?? Vector2.zero;
-            _auxParentAnchoredPosition = _auxParentRect?.anchoredPosition3D ?? Vector3.zero;
-            _positioningSizeDelta = controller.PositioningRectTransform.sizeDelta;
-            _layout = controller.auxParent?.GetComponent<VerticalLayoutGroup>();
-            _padding =
-                _layout == null
-                    ? null
-                    : new RectOffset(
-                        _layout.padding.left,
-                        _layout.padding.right,
-                        _layout.padding.top,
-                        _layout.padding.bottom
-                    );
-            _spacing = _layout?.spacing ?? 0f;
-            _headerWasActive =
-                controller.headerText != null && controller.headerText.gameObject.activeSelf;
-            _bodyWasActive =
-                controller.bodyText != null && controller.bodyText.gameObject.activeSelf;
-            _dividerWasActive =
-                controller.dividerParent != null && controller.dividerParent.activeSelf;
-            _backgroundSprite = controller.backgroundImage?.sprite;
-            _backgroundImageWasEnabled =
-                controller.backgroundImage != null && controller.backgroundImage.enabled;
-        }
-
-        internal AuxiliaryTooltipController Controller { get; }
-
-        internal static NativeAuxiliaryHostState Capture(AuxiliaryTooltipController controller) =>
-            new(controller);
-
-        internal void Restore(bool restoreContentVisibility)
-        {
-            if (Controller == null)
-                return;
-
-            Controller.PositioningRectTransform.sizeDelta = _positioningSizeDelta;
-            if (_auxParentRect != null)
-            {
-                _auxParentRect.anchorMin = _auxParentAnchorMin;
-                _auxParentRect.anchorMax = _auxParentAnchorMax;
-                _auxParentRect.pivot = _auxParentPivot;
-                _auxParentRect.anchoredPosition3D = _auxParentAnchoredPosition;
-                _auxParentRect.sizeDelta = _auxParentSizeDelta;
-            }
-            if (_layout != null && _padding != null)
-            {
-                _layout.padding = new RectOffset(
-                    _padding.left,
-                    _padding.right,
-                    _padding.top,
-                    _padding.bottom
-                );
-                _layout.spacing = _spacing;
-            }
-            if (restoreContentVisibility)
-            {
-                if (Controller.headerText != null)
-                    Controller.headerText.gameObject.SetActive(_headerWasActive);
-                if (Controller.bodyText != null)
-                    Controller.bodyText.gameObject.SetActive(_bodyWasActive);
-                if (Controller.dividerParent != null)
-                    Controller.dividerParent.SetActive(_dividerWasActive);
-            }
-            if (Controller.backgroundImage != null)
-            {
-                Controller.backgroundImage.sprite = _backgroundSprite;
-                Controller.backgroundImage.enabled = _backgroundImageWasEnabled;
-            }
-        }
-    }
-
     public void Dispose()
     {
         Hide();
-        CleanupCustomContent();
+        _session.Release(restoreNativeContent: true);
     }
 }

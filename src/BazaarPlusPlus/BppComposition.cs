@@ -35,6 +35,7 @@ using BazaarPlusPlus.GameInterop.DayTiers;
 using BazaarPlusPlus.GameInterop.Encounter;
 using BazaarPlusPlus.GameInterop.RunSnapshot;
 using BazaarPlusPlus.GameInterop.StaticCards;
+using BazaarPlusPlus.GameInterop.Tooltips;
 using BazaarPlusPlus.GameInterop.VoiceSubtitles;
 using BazaarPlusPlus.Infrastructure.RemoteEmbeddedCatalog;
 using BazaarPlusPlus.ModApi.Clients;
@@ -234,12 +235,18 @@ internal sealed class BppComposition : IDisposable
             new ComponentMount<CombatReplayVideoRecorder>((c, s) => c.Initialize(s))
         );
         _mountables.Register(new ComponentMount<CombatStatusBar>((c, s) => c.Initialize(s)));
+        // Plugin-lifetime, like _nativeCardPreviewHost: composition does not dispose GameInterop
+        // hosts, and the releasable unit is the session the view acquires from it.
+        var pairedTooltipHost = new NativePairedTooltipHost();
         _mountables.Register(
             new ComponentMount<PostCombatImpactController>(
                 (c, _) =>
                     c.Initialize(
                         _postCombatImpactModule,
-                        new NativePostCombatImpactTooltipView(_nativeCardPreviewHost)
+                        new NativePostCombatImpactTooltipView(
+                            _nativeCardPreviewHost,
+                            pairedTooltipHost
+                        )
                     )
             )
         );
