@@ -1,6 +1,7 @@
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Item;
+using BazaarGameShared.Domain.Cards.Quests;
 using BazaarGameShared.Domain.Cards.Skill;
 using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
@@ -1212,6 +1213,38 @@ AssertValues(
         .ToArray(),
     new[] { nameof(EHiddenTag.Lifesteal) },
     "Available item keywords should include Lifesteal derived from item attributes."
+);
+var questTemplate = new TCardItem
+{
+    Id = Guid.NewGuid(),
+    Type = ECardType.Item,
+    StartingTier = ETier.Bronze,
+    Size = ECardSize.Medium,
+    InternalName = "Quest Item Without Quest HiddenTag",
+    ArtKey = "Assets/Cards/QuestItemWithoutQuestHiddenTag.png",
+    Heroes = new HashSet<EHero> { EHero.Common },
+    HiddenTags = new HashSet<EHiddenTag> { EHiddenTag.Charge },
+    Quests = new List<TQuestGroup> { new() { Entries = new List<TQuestEntry> { new() } } },
+};
+var questVm = CollectionCardVm.From(questTemplate);
+AssertTrue(
+    questVm.HiddenTags.Contains(EHiddenTag.Quest),
+    "CollectionCardVm.From should derive Quest from a non-empty item Quests graph."
+);
+AssertTrue(
+    questVm.HiddenTags.Contains(EHiddenTag.Charge),
+    "Quest projection should preserve the item's native hidden tags."
+);
+AssertFalse(
+    questTemplate.HiddenTags.Contains(EHiddenTag.Quest),
+    "Quest projection should not mutate the source game template HiddenTags."
+);
+var questFilter = new CollectionFilterState();
+questFilter.Keywords.Add(EHiddenTag.Quest);
+AssertSequence(
+    CollectionFilterEngine.Apply(new[] { questVm, derivedLifestealVm }, questFilter),
+    new[] { questVm.Id },
+    "Quest keyword filtering should include items whose Quests graph lacks a native Quest hidden tag."
 );
 var noLifestealTemplate = new TCardItem
 {
