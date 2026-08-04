@@ -2006,6 +2006,8 @@ public class CoreLayeringTests
 
         Assert.Contains("BilingualItemNameSubtitle.TryShow", patchSource);
         Assert.Contains("BilingualItemNamePresentation.TryBuildSubtitle", patchSource);
+        Assert.Contains("internal static class BilingualItemNameResetPatch", patchSource);
+        Assert.Contains("nameof(CardTooltipController.ResetValues)", patchSource);
         Assert.Contains("NativeGameTypography.PrepareOwnedText", subtitleSource);
         Assert.Contains("NativeGameTypography.OwnedTextRole.Body", subtitleSource);
         Assert.Contains("typography.Apply(label)", subtitleSource);

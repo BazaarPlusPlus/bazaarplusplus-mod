@@ -65,3 +65,14 @@ internal static class BilingualItemNamePatch
         }
     }
 }
+
+// Hero-level and PVP-opponent tooltips reuse the same pooled CardTooltipController but bypass
+// CardTooltipTypeHandler.RenderCardUI. Clear the BPP-owned subtitle at their shared native reset
+// seam so the previous card's translated name cannot leak beneath a non-card header.
+[HarmonyPatch(typeof(CardTooltipController), nameof(CardTooltipController.ResetValues))]
+internal static class BilingualItemNameResetPatch
+{
+    [HarmonyPrefix]
+    private static void Prefix(CardTooltipController __instance) =>
+        BilingualItemNameSubtitle.Hide(__instance);
+}
