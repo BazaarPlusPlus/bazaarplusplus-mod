@@ -62,6 +62,29 @@ internal enum CombatImpactAuthoritativeBasis
     ApplicationCount,
 }
 
+internal enum CombatImpactPeriodicKind
+{
+    Burn,
+    Poison,
+    Regen,
+}
+
+internal enum CombatImpactPeriodicProof
+{
+    Exact,
+    Constrained,
+    Proportional,
+}
+
+internal readonly record struct PeriodicImpactKey(string SourceId, CombatImpactPeriodicKind Kind);
+
+internal sealed record CombatImpactPeriodicImpact(
+    int HealthAmount,
+    int ShieldAmount,
+    CombatImpactPeriodicProof Proof,
+    string ModelVersion
+);
+
 internal sealed record CombatImpactEntity(
     string Id,
     string Name,
@@ -181,6 +204,8 @@ internal sealed record CombatImpactGroup(
     internal bool HasMixedValueDirections { get; init; }
 
     internal IReadOnlyList<CombatImpactTriggerSource> TriggerSources { get; init; } = [];
+
+    internal CombatImpactPeriodicImpact? PeriodicImpact { get; init; }
 
     internal bool HasDivergentTargetCoverage =>
         UnresolvedTargetCount > 0
