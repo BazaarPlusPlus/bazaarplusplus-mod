@@ -93,7 +93,8 @@ internal sealed record CombatImpactEvent(
     internal CombatImpactEventSurface Surface { get; init; } =
         CombatImpactEventSurface.AppliedEffect;
 
-    internal CombatImpactOccurrenceBasis OccurrenceBasis { get; init; }
+    internal CombatImpactOccurrenceBasis OccurrenceBasis { get; init; } =
+        CombatImpactOccurrenceBasis.ReconstructedTransition;
 
     internal int CriticalCount { get; init; }
 
@@ -170,7 +171,8 @@ internal sealed record CombatImpactGroup(
     internal CombatImpactEventSurface Surface { get; init; } =
         CombatImpactEventSurface.AppliedEffect;
 
-    internal CombatImpactOccurrenceBasis OccurrenceBasis { get; init; }
+    internal CombatImpactOccurrenceBasis OccurrenceBasis { get; init; } =
+        CombatImpactOccurrenceBasis.ReconstructedTransition;
 
     internal int CriticalCount { get; init; }
 
@@ -226,7 +228,8 @@ internal sealed record CombatImpactIncomingGroup(
     internal CombatImpactEventSurface Surface { get; init; } =
         CombatImpactEventSurface.AppliedEffect;
 
-    internal CombatImpactOccurrenceBasis OccurrenceBasis { get; init; }
+    internal CombatImpactOccurrenceBasis OccurrenceBasis { get; init; } =
+        CombatImpactOccurrenceBasis.ReconstructedTransition;
 
     internal int CriticalCount { get; init; }
 

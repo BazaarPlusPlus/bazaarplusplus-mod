@@ -584,11 +584,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 _receivedBlocks.Add(block);
             }
         }
-        BuildDisclosures(
-            bodyTemplate,
-            root,
-            CombatImpactMetricFormatter.ReceivedDisclosures(received, IsChinese())
-        );
         _receivedMoreText = BuildMoreRow(bodyTemplate, root);
     }
 
@@ -816,6 +811,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             flexibleWidth: 1f
         );
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
+        // Group titles are controlled product labels and must stay literal even when the row is
+        // constrained; unlike generic cloned text, they never opt into ellipsis.
+        labelText.overflowMode = TextOverflowModes.Overflow;
         var metric = CloneText(
             textTemplate,
             header,

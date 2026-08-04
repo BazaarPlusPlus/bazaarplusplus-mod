@@ -220,45 +220,8 @@ internal static class CombatImpactMetricFormatter
             );
         }
 
-        if (source.Groups.Any(HasReconstructedDetail))
-            disclosures.Add(ReconstructionDisclosure(chinese));
         return disclosures;
     }
-
-    internal static IReadOnlyList<string> ReceivedDisclosures(
-        CombatImpactReceived? received,
-        bool chinese
-    )
-    {
-        if (received == null || !received.Groups.Any(HasReconstructedDetail))
-            return [];
-        return [ReconstructionDisclosure(chinese)];
-    }
-
-    private static bool HasReconstructedDetail(CombatImpactGroup group) =>
-        IsEstimated(group.ObservedCoverage)
-        || group.Targets.Any(target => IsEstimated(target.ObservedCoverage))
-        || group.AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
-            && (
-                !group.ObservedValue.HasValue
-                || group.Unit != total.Unit
-                || group.ObservedValue.Value != total.Value
-            )
-        || group.AuthoritativeMetric
-            is { Basis: CombatImpactAuthoritativeBasis.ApplicationCount } applications
-            && group.Count != applications.Value;
-
-    private static bool HasReconstructedDetail(CombatImpactIncomingGroup group) =>
-        IsEstimated(group.ObservedCoverage)
-        || group.Sources.Any(source => IsEstimated(source.ObservedCoverage));
-
-    private static bool IsEstimated(CombatImpactCoverage coverage) =>
-        coverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
-
-    private static string ReconstructionDisclosure(bool chinese) =>
-        chinese
-            ? "* 部分明细及持续时间由战斗事件推算，可能与游戏总计不完全一致。"
-            : "* Some details and durations are reconstructed from combat events and may not match the game totals exactly.";
 
     internal static string Value(
         int value,

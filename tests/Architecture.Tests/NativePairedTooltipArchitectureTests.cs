@@ -119,6 +119,31 @@ public sealed class NativePairedTooltipArchitectureTests
     }
 
     /// <summary>
+    /// Group titles use the generic text clone, whose safe default is Ellipsis. These controlled
+    /// product labels must override that default so vertical pressure cannot replace them with an
+    /// ellipsis in CJK locales.
+    /// </summary>
+    [Fact]
+    public void Combat_impact_group_titles_never_use_ellipsis()
+    {
+        var sourceRoot = MainSourceRoot(RepoRoot());
+        var view = File.ReadAllText(
+            Path.Combine(
+                sourceRoot,
+                "Patches",
+                "PostCombatImpact",
+                "NativePostCombatImpactTooltipView.cs"
+            )
+        );
+
+        Assert.Contains(
+            "labelText.overflowMode = TextOverflowModes.Overflow;",
+            view,
+            StringComparison.Ordinal
+        );
+    }
+
+    /// <summary>
     /// The pre-existing native card-tooltip content refresher is a different concern and must not
     /// be folded into the paired host.
     /// </summary>
