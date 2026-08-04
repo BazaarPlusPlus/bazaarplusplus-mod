@@ -214,6 +214,19 @@ internal static class TooltipLogEvents
         [CardPreviewHoverFailedOperation, CardPreviewHoverFailedReasonCode]
     );
 
+    internal static readonly BppLogFieldDefinition PackageMerchantSummaryReasonCode = PublicLow(
+        0,
+        "reason_code"
+    );
+    internal static readonly BppLogFieldDefinition PackageMerchantSummaryMerchantTemplateId =
+        PublicHigh(1, "merchant_template_id");
+    internal static readonly BppLogEventDefinition PackageMerchantSummaryDegraded = new(
+        BppLogFeatureScope.Tooltips,
+        "tooltips.package_merchant_summary.degraded",
+        [PackageMerchantSummaryReasonCode, PackageMerchantSummaryMerchantTemplateId],
+        new BppLogStormPolicy([PackageMerchantSummaryReasonCode])
+    );
+
     private static BppLogFieldDefinition PublicLow(int order, string name) =>
         new(
             order,

@@ -37,6 +37,8 @@ public sealed class RemainingLogEventCatalogTests
                 ["tooltips.encounter_probe.recovered"] = "probe:Public:Low:None",
                 ["tooltips.card_preview.hover_failed"] =
                     "operation:Public:Low:None|reason_code:Public:Low:None",
+                ["tooltips.package_merchant_summary.degraded"] =
+                    "reason_code:Public:Low:None|merchant_template_id:Public:High:None",
             }
         );
     }
