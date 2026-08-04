@@ -211,7 +211,8 @@ internal static class CombatImpactMetricFormatter
         && !(
             surface == CombatImpactEventSurface.AppliedEffect
             && nativeAttributeKey
-                is "TempoRemoveAmount"
+                is "RegenApplyAmount"
+                    or "TempoRemoveAmount"
                     or "BurnRemoveAmount"
                     or "PoisonRemoveAmount"
                     or "RegenRemoveAmount"
