@@ -118,6 +118,41 @@ public sealed class NativePairedTooltipArchitectureTests
         Assert.DoesNotContain("CleanupCustomContent", view, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Cancelling_a_prepared_auxiliary_keeps_it_concealed_until_native_teardown()
+    {
+        var host = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "GameInterop",
+                "Tooltips",
+                "NativePairedTooltipHost.cs"
+            )
+        );
+        var methodStart = host.IndexOf(
+            "internal void CancelPreparedAuxiliary",
+            StringComparison.Ordinal
+        );
+        var methodEnd = host.IndexOf(
+            "internal void ReleasePrepared",
+            methodStart,
+            StringComparison.Ordinal
+        );
+
+        Assert.True(methodStart >= 0 && methodEnd > methodStart);
+        var method = host[methodStart..methodEnd];
+        Assert.Contains("ConcealNativeAuxiliary(auxiliary);", method, StringComparison.Ordinal);
+        Assert.Contains(
+            "RestorePreparedNativeHost(restoreContentVisibility: false);",
+            method,
+            StringComparison.Ordinal
+        );
+        Assert.True(
+            method.IndexOf("ConcealNativeAuxiliary(auxiliary);", StringComparison.Ordinal)
+                < method.IndexOf("RestorePreparedAuxiliaryGate();", StringComparison.Ordinal)
+        );
+    }
+
     /// <summary>
     /// Group titles use the generic text clone, whose safe default is Ellipsis. These controlled
     /// product labels must override that default so vertical pressure cannot replace them with an

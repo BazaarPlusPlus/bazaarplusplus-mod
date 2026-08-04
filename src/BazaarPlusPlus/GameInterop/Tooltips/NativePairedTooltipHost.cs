@@ -176,11 +176,16 @@ internal sealed class NativePairedTooltipSession
         )
             return;
 
+        // Every current caller hands this BPP-owned request straight back to the native hide
+        // sequence. Keep the whole controller concealed while restoring reusable geometry: if the
+        // header/gate is restored first, the asynchronously spawned "Combat Impact" request can
+        // expose a detached title for a frame (or indefinitely when its native fade is interrupted).
+        ConcealNativeAuxiliary(auxiliary);
         if (ReferenceEquals(_activeAuxiliary, auxiliary))
             Release(restoreNativeContent: false);
         else
         {
-            RestorePreparedNativeHost();
+            RestorePreparedNativeHost(restoreContentVisibility: false);
             RestorePreparedAuxiliaryGate();
         }
     }

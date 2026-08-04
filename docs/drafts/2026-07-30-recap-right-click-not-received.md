@@ -153,3 +153,51 @@ not final acceptance.
   with zero warnings/errors. Installed Debug DLL `4.6.0.t20260802.172007.dev` matches the built
   SHA-256 `810e3c437992e59a3bba8d45812da923d5a98d07e25682528f769c49e52f2503`.
 - [ ] User explicitly accepts the final in-game visuals and interaction. PR remains Draft until then.
+
+## 2026-08-04 intermittent header-only orphan
+
+### Background
+
+Combat Impact requests the game's singleton Auxiliary Tooltip, conceals it while custom content is
+built, and then reveals the complete paired presentation. The native request is asynchronous: the
+controller writes the header before its end-of-frame positioning/fade coroutine completes.
+
+### Current problem
+
+Peng captured an intermittent white Auxiliary Tooltip containing only `Combat Impact` while the
+native card Tooltip remained visible. This is the same header-only state prohibited by the
+interaction acceptance criteria above.
+
+### Evidence and root cause
+
+- The screenshot is a header-only native Auxiliary Tooltip, not a partially rendered Combat Impact
+  content tree: no custom summary, groups, rows, frame, or background clone are present.
+- `AuxiliaryTooltipController.ShowAuxiliaryTooltipController` assigns the header synchronously and
+  finishes positioning/fade after `WaitForEndOfFrame`.
+- When a BPP-owned request becomes stale before takeover, `ResumeAfterNativeAuxiliaryShow` calls
+  `CancelPreparedNativeAuxiliary` and then asks the native parent to hide it.
+- The current cancel path restores the prepared host's header visibility and CanvasGroup alpha
+  before that native hide begins. This creates a real frame window where the detached title is
+  visible; if the native fade coroutine is interrupted, the window can persist.
+- The current Debug log contains no `post_combat_impact` shown/degraded event for this screenshot,
+  which is consistent with cancellation before the complete presentation reaches its reveal/log
+  stage.
+
+### Candidate approaches
+
+1. **Retune layout/background creation** — rejected: the screenshot predates content attachment and
+   contains none of those nodes.
+2. **Hide only the header text** — rejected: the native frame/background could still flash, and it
+   leaves the cancellation lifecycle split across individual children.
+3. **Keep the complete prepared Auxiliary Tooltip concealed until native teardown** — selected:
+   cancel restores reusable geometry but does not restore native content visibility; it sets the
+   controller-level CanvasGroup to zero before handing teardown back to the game.
+
+### Verification
+
+- Add a lifecycle regression that locks `CancelPreparedAuxiliary` to conceal-before-restore
+  behavior.
+- Run the focused PostCombatImpact/architecture tests, format check, Debug and Release builds.
+- Manual acceptance: rapidly enter/exit several Recap items and skills, including leaving before
+  the auxiliary tooltip settles; no standalone `Combat Impact` title may appear. Confirm ordinary
+  native auxiliary tooltips still render after the stale request is dismissed.
