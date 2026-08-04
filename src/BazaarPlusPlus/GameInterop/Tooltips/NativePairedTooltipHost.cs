@@ -71,6 +71,8 @@ internal sealed class NativePairedTooltipSession
     private CanvasGroupGate? _preparedPrimaryGate;
     private CanvasGroupGate? _preparedAuxiliaryGate;
     private RectTransform? _nativeAuxParentRect;
+    private VerticalLayoutGroup? _nativeAuxLayout;
+    private int _nativeNormalBottomPadding;
     private GameObject? _contentRoot;
     private GameObject? _nativeBackgroundRoot;
     private Coroutine? _visibilityFade;
@@ -643,6 +645,8 @@ internal sealed class NativePairedTooltipSession
         _contentRoot = null;
         _nativeBackgroundRoot = null;
         _nativeAuxParentRect = null;
+        _nativeAuxLayout = null;
+        _nativeNormalBottomPadding = 0;
         _onContentWidthChanged = null;
         _currentContentWidth = _options.PreferredContentWidth;
         _frameHorizontalBleed = 0f;
@@ -701,15 +705,19 @@ internal sealed class NativePairedTooltipSession
         // any inset and makes the left/right content padding visibly asymmetric.
         _nativeAuxParentRect.anchoredPosition = frameRect.anchoredPosition;
 
-        var nativeLayout = auxiliary.auxParent.GetComponent<VerticalLayoutGroup>();
-        if (nativeLayout != null)
+        _nativeAuxLayout = auxiliary.auxParent.GetComponent<VerticalLayoutGroup>();
+        if (_nativeAuxLayout != null)
         {
-            var padding = nativeLayout.padding;
-            nativeLayout.padding = new RectOffset(
+            var padding = _nativeAuxLayout.padding;
+            _nativeNormalBottomPadding = Mathf.Max(
+                0,
+                padding.bottom - _options.NativeBottomPaddingReduction
+            );
+            _nativeAuxLayout.padding = new RectOffset(
                 padding.left,
                 padding.right,
                 padding.top,
-                Mathf.Max(0, padding.bottom - _options.NativeBottomPaddingReduction)
+                _nativeNormalBottomPadding
             );
         }
     }
@@ -767,8 +775,10 @@ internal sealed class NativePairedTooltipSession
         IPairedContentBudget content
     )
     {
+        SetNativeBottomPadding(_nativeNormalBottomPadding);
         content.RestoreAll();
         RebuildAfterHeightBudgetChange(auxiliary);
+        CompactNativeBottomPaddingIfDense(auxiliary, canvasRect, canvasBounds);
 
         while (!FitsCanvasHeight(auxiliary, canvasRect, canvasBounds))
         {
@@ -776,6 +786,50 @@ internal sealed class NativePairedTooltipSession
                 return;
             RebuildAfterHeightBudgetChange(auxiliary);
         }
+    }
+
+    private void CompactNativeBottomPaddingIfDense(
+        AuxiliaryTooltipController auxiliary,
+        RectTransform canvasRect,
+        Rect canvasBounds
+    )
+    {
+        var denseBottomPadding = Mathf.Min(
+            _nativeNormalBottomPadding,
+            _options.NativeDenseBottomPaddingMaximum
+        );
+        var canvasUnitsPerLocalUnit = CanvasUnitsPerLocalUnit(
+            auxiliary.PositioningRectTransform,
+            canvasRect
+        );
+        if (
+            !NativePairedTooltipPlacementMath.ShouldUseDenseBottomPadding(
+                GetCanvasLocalBounds(auxiliary.backgroundImage.rectTransform, canvasRect).height,
+                canvasBounds.height,
+                _nativeNormalBottomPadding * canvasUnitsPerLocalUnit,
+                denseBottomPadding * canvasUnitsPerLocalUnit
+            )
+        )
+            return;
+
+        SetNativeBottomPadding(denseBottomPadding);
+        RebuildAfterHeightBudgetChange(auxiliary);
+    }
+
+    private void SetNativeBottomPadding(int bottomPadding)
+    {
+        if (_nativeAuxLayout == null)
+            return;
+
+        var padding = _nativeAuxLayout.padding;
+        if (padding.bottom == bottomPadding)
+            return;
+        _nativeAuxLayout.padding = new RectOffset(
+            padding.left,
+            padding.right,
+            padding.top,
+            bottomPadding
+        );
     }
 
     private bool FitsCanvasHeight(

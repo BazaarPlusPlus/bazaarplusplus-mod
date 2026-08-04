@@ -29,6 +29,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float TooltipGap = 18f;
     private const float CanvasMargin = 16f;
     private const int NativeBottomPaddingReduction = 4;
+    private const int NativeDenseBottomPaddingMaximum = 24;
     private const float PlacementEpsilon = 0.5f;
     private const float VisibilityFadeDuration = 0.1f;
     private const float PanelTitleFontScale = 0.84f;
@@ -53,7 +54,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         gap: TooltipGap,
         canvasMargin: CanvasMargin,
         fadeDuration: VisibilityFadeDuration,
-        nativeBottomPaddingReduction: NativeBottomPaddingReduction
+        nativeBottomPaddingReduction: NativeBottomPaddingReduction,
+        nativeDenseBottomPaddingMaximum: NativeDenseBottomPaddingMaximum
     );
 
     private readonly INativeCardPreviewHost _previewHost;

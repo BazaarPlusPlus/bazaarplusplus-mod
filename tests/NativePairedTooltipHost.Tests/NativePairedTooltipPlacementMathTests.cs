@@ -15,6 +15,30 @@ public class NativePairedTooltipPlacementMathTests
 {
     private const float Epsilon = NativePairedTooltipMetrics.Epsilon;
 
+    [Theory]
+    [InlineData(600f, 1000f, 40f, 24f, false)]
+    [InlineData(985f, 1000f, 40f, 24f, true)]
+    [InlineData(1001f, 1000f, 40f, 24f, true)]
+    [InlineData(999f, 1000f, 20f, 24f, false)]
+    public void Dense_bottom_padding_is_used_only_when_its_reclaimable_space_matters(
+        float panelHeight,
+        float availableHeight,
+        float normalBottomPadding,
+        float denseBottomPadding,
+        bool expected
+    )
+    {
+        Assert.Equal(
+            expected,
+            NativePairedTooltipPlacementMath.ShouldUseDenseBottomPadding(
+                panelHeight,
+                availableHeight,
+                normalBottomPadding,
+                denseBottomPadding
+            )
+        );
+    }
+
     // ── Side selection ─────────────────────────────────────────────────────────────────────
 
     [Fact]
