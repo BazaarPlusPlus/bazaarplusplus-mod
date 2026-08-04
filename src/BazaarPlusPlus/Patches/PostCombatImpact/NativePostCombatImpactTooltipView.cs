@@ -40,6 +40,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float DisclosureFontScale = 0.62f;
     private const float GroupLabelFontScale = 1f;
     private const float GroupMetricFontScale = 1f;
+    private const float GroupSecondaryMetricFontScale = 0.62f;
+    private const float GroupStackedMetricMinFontScale = 0.68f;
+    private const float GroupStackedMetricOpticalOffset = 2f;
     private const float TargetNameFontScale = 0.875f;
     private const float TargetMetricFontScale = 0.875f;
     private const float MetricColumnMinWidth = 112f;
@@ -698,6 +701,12 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 : group.ObservedValue,
             group.HasMixedValueDirections,
             CombatImpactMetricFormatter.Group(group, IsChinese(), CriticalMarker()),
+            CombatImpactMetricFormatter.PeriodicImpact(
+                group,
+                IsChinese(),
+                DamageMarker(),
+                ShieldMarker()
+            ),
             preferredHeight: hasTriggerSummary ? 44f : 48f
         );
         if (hasTriggerSummary)
@@ -782,6 +791,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         int? changeValue,
         bool hasMixedValueDirections,
         string metricText,
+        string secondaryMetricText = "",
         float preferredHeight = 48f
     )
     {
@@ -816,15 +826,47 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         // Group titles are controlled product labels and must stay literal even when the row is
         // constrained; unlike generic cloned text, they never opt into ellipsis.
         labelText.overflowMode = TextOverflowModes.Overflow;
-        var metric = CloneText(
+        if (string.IsNullOrWhiteSpace(secondaryMetricText))
+        {
+            var metric = CloneText(
+                textTemplate,
+                header,
+                metricText,
+                GroupMetricFontScale,
+                minWidth: MetricColumnPreferredWidth
+            );
+            _metricColumns.Add(metric.GetComponent<LayoutElement>());
+            metric.alignment = TextAlignmentOptions.MidlineRight;
+            return;
+        }
+
+        // Render the authoritative total and its ruby-like realized metric as one TMP block. Its
+        // preferred width can consume the header's unused space, while auto-sizing fits both lines
+        // together inside the fixed row height. Overflow remains literal; this Tooltip never
+        // replaces constrained text with ellipsis.
+        var secondaryColor = ColorUtility.ToHtmlStringRGB(DisclosureColor);
+        var stackedMetric = CloneText(
             textTemplate,
             header,
-            metricText,
+            $"{metricText}\n<size={GroupSecondaryMetricFontScale * 100f:0}%>"
+                + $"<color=#{secondaryColor}>{secondaryMetricText}</color></size>",
             GroupMetricFontScale,
+            flexibleWidth: 1f,
             minWidth: MetricColumnPreferredWidth
         );
-        _metricColumns.Add(metric.GetComponent<LayoutElement>());
-        metric.alignment = TextAlignmentOptions.MidlineRight;
+        _metricColumns.Add(stackedMetric.GetComponent<LayoutElement>());
+        stackedMetric.alignment = TextAlignmentOptions.MidlineRight;
+        stackedMetric.margin = new Vector4(
+            0f,
+            GroupStackedMetricOpticalOffset,
+            0f,
+            -GroupStackedMetricOpticalOffset
+        );
+        stackedMetric.enableAutoSizing = true;
+        stackedMetric.fontSizeMin = Mathf.Max(
+            1f,
+            stackedMetric.fontSizeMax * GroupStackedMetricMinFontScale
+        );
     }
 
     private static void BuildTriggerSummary(
@@ -1231,7 +1273,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         text.alpha = 1f;
         text.margin = Vector4.zero;
         text.textWrappingMode = TextWrappingModes.NoWrap;
-        text.overflowMode = TextOverflowModes.Ellipsis;
+        text.overflowMode = TextOverflowModes.Overflow;
         text.raycastTarget = false;
         text.richText =
             content.Contains("<sprite", StringComparison.Ordinal)
@@ -1383,11 +1425,17 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         return (label, iconKey);
     }
 
-    private static string? CriticalMarker()
+    private static string? CriticalMarker() => KeywordMarker("CritChance");
+
+    private static string? DamageMarker() => KeywordMarker("DamageAmount");
+
+    private static string? ShieldMarker() => KeywordMarker("ShieldApplyAmount");
+
+    private static string? KeywordMarker(string key)
     {
         var marker =
             Data.TooltipTypography?.GetKeywordStringWithIconNoScale(
-                "CritChance",
+                key,
                 string.Empty,
                 useNumberFont: false
             ) ?? string.Empty;

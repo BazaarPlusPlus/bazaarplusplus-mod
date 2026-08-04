@@ -101,6 +101,52 @@ internal static class CombatImpactMetricFormatter
         return string.Join(" · ", parts);
     }
 
+    internal static string PeriodicImpact(
+        CombatImpactGroup group,
+        bool chinese,
+        string? damageMarker = null,
+        string? shieldMarker = null
+    )
+    {
+        var impact = group.PeriodicImpact;
+        if (impact == null)
+            return string.Empty;
+
+        var parts = new List<string>();
+        if (impact.HealthAmount > 0)
+        {
+            var amount = Integer(impact.HealthAmount);
+            var isRegen =
+                group.Kind == CombatImpactKind.AttributeChange
+                && group.NativeAttributeKey == "RegenApplyAmount";
+            parts.Add(
+                isRegen
+                    ? chinese
+                        ? $"治疗 {amount}"
+                        : $"{amount} healed"
+                    : string.IsNullOrWhiteSpace(damageMarker)
+                        ? chinese
+                            ? $"伤害 {amount}"
+                            : $"{amount} dmg"
+                        : $"{amount} {damageMarker}"
+            );
+        }
+
+        if (impact.ShieldAmount > 0)
+        {
+            var amount = Integer(impact.ShieldAmount);
+            parts.Add(
+                string.IsNullOrWhiteSpace(shieldMarker)
+                    ? chinese
+                        ? $"耗盾 {amount}"
+                        : $"{amount} shield consumed"
+                    : $"{amount} {shieldMarker}"
+            );
+        }
+
+        return string.Join(" · ", parts);
+    }
+
     internal static string Target(CombatImpactGroup group, CombatImpactTarget target, bool chinese)
     {
         var count = $"×{target.Count}";

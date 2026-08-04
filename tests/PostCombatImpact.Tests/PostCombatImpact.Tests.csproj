@@ -37,6 +37,10 @@
       Link="CombatImpactProjector.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Data/PeriodicEffectAttribution.cs"
+      Link="PeriodicEffectAttribution.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/GameInterop/CombatSimulation/CardActionCostSpentEventReader.cs"
       Link="CardActionCostSpentEventReader.cs"
     />

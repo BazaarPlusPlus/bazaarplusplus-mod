@@ -167,8 +167,68 @@ internal static class CombatImpactProjector
         var report = CombatImpactAggregator.Aggregate(
             new CombatImpactProjectionInput(entities, events, useCounts, authoritative)
         );
+        report = AttachPeriodicImpacts(
+            report,
+            PeriodicEffectAttribution.Project(simulation, entities)
+        );
         return AttachTriggerSources(report, triggerOccurrences, entities);
     }
+
+    private static CombatImpactReport AttachPeriodicImpacts(
+        CombatImpactReport report,
+        IReadOnlyDictionary<PeriodicImpactKey, CombatImpactPeriodicImpact> impacts
+    )
+    {
+        if (impacts.Count == 0)
+            return report;
+
+        return report with
+        {
+            Sources = report
+                .Sources.Select(source =>
+                    source with
+                    {
+                        Groups = source
+                            .Groups.Select(group =>
+                            {
+                                var kind = PeriodicKind(group);
+                                return
+                                    kind.HasValue
+                                    && impacts.TryGetValue(
+                                        new PeriodicImpactKey(source.Entity.Id, kind.Value),
+                                        out var impact
+                                    )
+                                    ? group with
+                                    {
+                                        PeriodicImpact = impact,
+                                    }
+                                    : group;
+                            })
+                            .ToArray(),
+                    }
+                )
+                .ToArray(),
+        };
+    }
+
+    private static CombatImpactPeriodicKind? PeriodicKind(CombatImpactGroup group) =>
+        group.Surface != CombatImpactEventSurface.AppliedEffect
+            ? null
+            : group.Kind switch
+            {
+                CombatImpactKind.Burn
+                    when group.NativeAttributeKey
+                        == CombatImpactAggregator.NativeKey(CombatImpactKind.Burn) =>
+                    CombatImpactPeriodicKind.Burn,
+                CombatImpactKind.Poison
+                    when group.NativeAttributeKey
+                        == CombatImpactAggregator.NativeKey(CombatImpactKind.Poison) =>
+                    CombatImpactPeriodicKind.Poison,
+                CombatImpactKind.AttributeChange
+                    when group.NativeAttributeKey == "RegenApplyAmount" =>
+                    CombatImpactPeriodicKind.Regen,
+                _ => null,
+            };
 
     private static CombatImpactReport AttachTriggerSources(
         CombatImpactReport report,
