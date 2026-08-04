@@ -62,7 +62,7 @@ internal static class CombatImpactMetricFormatter
     )
     {
         var parts = new List<string>();
-        if (group.Count > 0 && ShouldShowCount(group.Kind, group.Surface))
+        if (group.Count > 0 && ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis))
             parts.Add(Count(group.Count, group.CriticalCount, chinese, criticalMarker));
 
         var authoritative = group.AuthoritativeMetric;
@@ -105,13 +105,17 @@ internal static class CombatImpactMetricFormatter
     {
         var count = $"×{target.Count}";
         if (!target.ObservedValue.HasValue)
-            return ShouldShowCount(group.Kind, group.Surface) ? count : string.Empty;
+            return ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis)
+                ? count
+                : string.Empty;
 
         var value = Value(target.ObservedValue.Value, target.Unit, ShouldShowSign(group), chinese);
         var needsObservedBasis = group.HasDivergentTargetCoverage;
         if (needsObservedBasis)
             value = chinese ? $"已记录 {value}" : $"{value} recorded";
-        return ShouldShowCount(group.Kind, group.Surface) ? $"{count} · {value}" : value;
+        return ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis)
+            ? $"{count} · {value}"
+            : value;
     }
 
     internal static string IncomingGroup(
@@ -121,7 +125,7 @@ internal static class CombatImpactMetricFormatter
     )
     {
         var parts = new List<string>();
-        if (group.Count > 0 && ShouldShowCount(group.Kind, group.Surface))
+        if (group.Count > 0 && ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis))
             parts.Add(Count(group.Count, group.CriticalCount, chinese, criticalMarker));
         if (group.ObservedValue.HasValue)
         {
@@ -137,9 +141,14 @@ internal static class CombatImpactMetricFormatter
         return string.Join(" · ", parts);
     }
 
-    private static bool ShouldShowCount(CombatImpactKind kind, CombatImpactEventSurface surface) =>
+    private static bool ShouldShowCount(
+        CombatImpactKind kind,
+        CombatImpactEventSurface surface,
+        CombatImpactOccurrenceBasis occurrenceBasis
+    ) =>
         kind != CombatImpactKind.AttributeChange
-        || surface == CombatImpactEventSurface.AppliedEffect;
+        || surface == CombatImpactEventSurface.AppliedEffect
+        || occurrenceBasis == CombatImpactOccurrenceBasis.ExplicitExecution;
 
     private static bool ShouldShowSign(CombatImpactGroup group) =>
         ShouldShowSign(group.Kind, group.Surface, group.NativeAttributeKey);
@@ -182,10 +191,14 @@ internal static class CombatImpactMetricFormatter
     {
         var count = $"×{source.Count}";
         if (!source.ObservedValue.HasValue)
-            return ShouldShowCount(group.Kind, group.Surface) ? count : string.Empty;
+            return ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis)
+                ? count
+                : string.Empty;
 
         var value = Value(source.ObservedValue.Value, source.Unit, ShouldShowSign(group), chinese);
-        return ShouldShowCount(group.Kind, group.Surface) ? $"{count} · {value}" : value;
+        return ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis)
+            ? $"{count} · {value}"
+            : value;
     }
 
     internal static IReadOnlyList<string> CausedDisclosures(
@@ -207,45 +220,8 @@ internal static class CombatImpactMetricFormatter
             );
         }
 
-        if (source.Groups.Any(HasReconstructedDetail))
-            disclosures.Add(ReconstructionDisclosure(chinese));
         return disclosures;
     }
-
-    internal static IReadOnlyList<string> ReceivedDisclosures(
-        CombatImpactReceived? received,
-        bool chinese
-    )
-    {
-        if (received == null || !received.Groups.Any(HasReconstructedDetail))
-            return [];
-        return [ReconstructionDisclosure(chinese)];
-    }
-
-    private static bool HasReconstructedDetail(CombatImpactGroup group) =>
-        IsEstimated(group.ObservedCoverage)
-        || group.Targets.Any(target => IsEstimated(target.ObservedCoverage))
-        || group.AuthoritativeMetric is { Basis: CombatImpactAuthoritativeBasis.TotalAmount } total
-            && (
-                !group.ObservedValue.HasValue
-                || group.Unit != total.Unit
-                || group.ObservedValue.Value != total.Value
-            )
-        || group.AuthoritativeMetric
-            is { Basis: CombatImpactAuthoritativeBasis.ApplicationCount } applications
-            && group.Count != applications.Value;
-
-    private static bool HasReconstructedDetail(CombatImpactIncomingGroup group) =>
-        IsEstimated(group.ObservedCoverage)
-        || group.Sources.Any(source => IsEstimated(source.ObservedCoverage));
-
-    private static bool IsEstimated(CombatImpactCoverage coverage) =>
-        coverage is CombatImpactCoverage.LowerBound or CombatImpactCoverage.Partial;
-
-    private static string ReconstructionDisclosure(bool chinese) =>
-        chinese
-            ? "* 部分明细及持续时间由战斗事件推算，可能与游戏总计不完全一致。"
-            : "* Some details and durations are reconstructed from combat events and may not match the game totals exactly.";
 
     internal static string Value(
         int value,

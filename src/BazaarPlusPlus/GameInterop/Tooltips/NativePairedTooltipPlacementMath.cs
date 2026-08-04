@@ -146,4 +146,21 @@ internal static class NativePairedTooltipPlacementMath
             rect.yMax - verticalInset
         );
     }
+
+    /// <summary>
+    /// Whether reclaiming the optional bottom inset would materially help a panel near the canvas
+    /// height limit. All inputs use the same coordinate space.
+    /// </summary>
+    internal static bool ShouldUseDenseBottomPadding(
+        float panelHeight,
+        float availableHeight,
+        float normalBottomPadding,
+        float denseBottomPadding
+    )
+    {
+        var reclaimablePadding = Mathf.Max(0f, normalBottomPadding - denseBottomPadding);
+        return reclaimablePadding > NativePairedTooltipMetrics.Epsilon
+            && panelHeight
+                > availableHeight - reclaimablePadding + NativePairedTooltipMetrics.Epsilon;
+    }
 }

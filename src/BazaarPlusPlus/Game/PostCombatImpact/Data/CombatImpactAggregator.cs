@@ -150,6 +150,7 @@ internal static class CombatImpactAggregator
         )
         {
             Surface = key.Surface,
+            OccurrenceBasis = BuildOccurrenceBasis(events),
             CriticalCount = critical.Count,
             CriticalObservedValue = critical.Observed.Value,
             HasMixedValueDirections = HasMixedValueDirections(events),
@@ -215,6 +216,7 @@ internal static class CombatImpactAggregator
         )
         {
             Surface = key.Surface,
+            OccurrenceBasis = BuildOccurrenceBasis(events),
             CriticalCount = critical.Count,
             CriticalObservedValue = critical.Observed.Value,
             HasMixedValueDirections = HasMixedValueDirections(events),
@@ -299,6 +301,14 @@ internal static class CombatImpactAggregator
             observed.Coverage
         );
     }
+
+    private static CombatImpactOccurrenceBasis BuildOccurrenceBasis(
+        IReadOnlyList<CombatImpactEvent> events
+    ) =>
+        events.Count > 0
+        && events.All(item => item.OccurrenceBasis == CombatImpactOccurrenceBasis.ExplicitExecution)
+            ? CombatImpactOccurrenceBasis.ExplicitExecution
+            : CombatImpactOccurrenceBasis.ReconstructedTransition;
 
     private static ObservedAggregate BuildObserved(IReadOnlyList<CombatImpactEvent> events)
     {

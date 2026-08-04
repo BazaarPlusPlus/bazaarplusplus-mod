@@ -148,6 +148,45 @@ public sealed class CombatImpactAggregatorTests
         Assert.Equal("bread", Assert.Single(cardGain.Targets).Entity.Id);
     }
 
+    [Theory]
+    [InlineData(true, (int)CombatImpactOccurrenceBasis.ExplicitExecution)]
+    [InlineData(false, (int)CombatImpactOccurrenceBasis.ReconstructedTransition)]
+    public void Occurrence_basis_is_explicit_only_when_every_aggregated_event_is_explicit(
+        bool secondEventIsExplicit,
+        int expectedValue
+    )
+    {
+        var expected = (CombatImpactOccurrenceBasis)expectedValue;
+        var report = Aggregate([
+            Event(
+                CombatImpactKind.AttributeChange,
+                "fairies",
+                "bread",
+                40,
+                nativeKey: "BurnApplyAmount",
+                surface: CombatImpactEventSurface.CardAttribute,
+                occurrenceBasis: CombatImpactOccurrenceBasis.ExplicitExecution
+            ),
+            Event(
+                CombatImpactKind.AttributeChange,
+                "fairies",
+                "bread",
+                50,
+                nativeKey: "BurnApplyAmount",
+                surface: CombatImpactEventSurface.CardAttribute,
+                occurrenceBasis: secondEventIsExplicit
+                    ? CombatImpactOccurrenceBasis.ExplicitExecution
+                    : CombatImpactOccurrenceBasis.ReconstructedTransition
+            ),
+        ]);
+
+        Assert.Equal(expected, Assert.Single(Assert.Single(report.Sources).Groups).OccurrenceBasis);
+        Assert.Equal(
+            expected,
+            Assert.Single(Assert.Single(report.Received).Groups).OccurrenceBasis
+        );
+    }
+
     [Fact]
     public void Critical_metadata_remains_nested_in_its_effect_group()
     {
@@ -429,7 +468,9 @@ public sealed class CombatImpactAggregatorTests
         string? nativeKey = null,
         bool isCritical = false,
         CombatImpactValueBasis valueBasis = CombatImpactValueBasis.ExactAdjustment,
-        CombatImpactEventSurface surface = CombatImpactEventSurface.AppliedEffect
+        CombatImpactEventSurface surface = CombatImpactEventSurface.AppliedEffect,
+        CombatImpactOccurrenceBasis occurrenceBasis =
+            CombatImpactOccurrenceBasis.ReconstructedTransition
     ) =>
         new(
             kind,
@@ -443,6 +484,7 @@ public sealed class CombatImpactAggregatorTests
         )
         {
             Surface = surface,
+            OccurrenceBasis = occurrenceBasis,
         };
 
     private static CombatImpactEntity Entity(string id, string name, string type, int order) =>

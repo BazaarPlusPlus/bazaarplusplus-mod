@@ -29,6 +29,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float TooltipGap = 18f;
     private const float CanvasMargin = 16f;
     private const int NativeBottomPaddingReduction = 4;
+    private const int NativeDenseBottomPaddingMaximum = 24;
     private const float PlacementEpsilon = 0.5f;
     private const float VisibilityFadeDuration = 0.1f;
     private const float PanelTitleFontScale = 0.84f;
@@ -53,7 +54,8 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         gap: TooltipGap,
         canvasMargin: CanvasMargin,
         fadeDuration: VisibilityFadeDuration,
-        nativeBottomPaddingReduction: NativeBottomPaddingReduction
+        nativeBottomPaddingReduction: NativeBottomPaddingReduction,
+        nativeDenseBottomPaddingMaximum: NativeDenseBottomPaddingMaximum
     );
 
     private readonly INativeCardPreviewHost _previewHost;
@@ -584,11 +586,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 _receivedBlocks.Add(block);
             }
         }
-        BuildDisclosures(
-            bodyTemplate,
-            root,
-            CombatImpactMetricFormatter.ReceivedDisclosures(received, IsChinese())
-        );
         _receivedMoreText = BuildMoreRow(bodyTemplate, root);
     }
 
@@ -816,6 +813,9 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             flexibleWidth: 1f
         );
         labelText.alignment = TextAlignmentOptions.MidlineLeft;
+        // Group titles are controlled product labels and must stay literal even when the row is
+        // constrained; unlike generic cloned text, they never opt into ellipsis.
+        labelText.overflowMode = TextOverflowModes.Overflow;
         var metric = CloneText(
             textTemplate,
             header,

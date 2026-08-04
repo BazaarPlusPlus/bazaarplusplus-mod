@@ -226,6 +226,74 @@ public sealed class CombatImpactMetricFormatterTests
         );
     }
 
+    [Theory]
+    [InlineData((int)CombatImpactOccurrenceBasis.ExplicitExecution, "×3 · +90", "×2 · +60")]
+    [InlineData((int)CombatImpactOccurrenceBasis.ReconstructedTransition, "+90", "+60")]
+    public void Attribute_transition_counts_require_explicit_execution_evidence(
+        int occurrenceBasisValue,
+        string expectedGroup,
+        string expectedDetail
+    )
+    {
+        var occurrenceBasis = (CombatImpactOccurrenceBasis)occurrenceBasisValue;
+        var target = new CombatImpactTarget(
+            Target,
+            2,
+            60,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.LowerBound
+        );
+        var group = new CombatImpactGroup(
+            CombatImpactKind.AttributeChange,
+            "BurnApplyAmount",
+            3,
+            90,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.LowerBound,
+            null,
+            0,
+            [target]
+        )
+        {
+            Surface = CombatImpactEventSurface.CardAttribute,
+            OccurrenceBasis = occurrenceBasis,
+        };
+        var source = new CombatImpactIncomingSource(
+            Target,
+            2,
+            60,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.LowerBound
+        );
+        var incoming = new CombatImpactIncomingGroup(
+            CombatImpactKind.AttributeChange,
+            "BurnApplyAmount",
+            3,
+            90,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.LowerBound,
+            [source]
+        )
+        {
+            Surface = CombatImpactEventSurface.CardAttribute,
+            OccurrenceBasis = occurrenceBasis,
+        };
+
+        Assert.Equal(expectedGroup, CombatImpactMetricFormatter.Group(group, chinese: false));
+        Assert.Equal(
+            expectedDetail,
+            CombatImpactMetricFormatter.Target(group, target, chinese: false)
+        );
+        Assert.Equal(
+            expectedGroup,
+            CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
+        );
+        Assert.Equal(
+            expectedDetail,
+            CombatImpactMetricFormatter.IncomingSource(incoming, source, chinese: false)
+        );
+    }
+
     [Fact]
     public void Status_removal_amounts_are_unsigned()
     {
@@ -371,9 +439,9 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Fact]
-    public void Disclosures_are_conditional_and_localized_for_both_perspectives()
+    public void Partial_breakdown_disclosure_is_conditional_and_localized()
     {
-        var reconstructed = new CombatImpactGroup(
+        var partial = new CombatImpactGroup(
             CombatImpactKind.Haste,
             "HasteAmount",
             3,
@@ -390,39 +458,17 @@ public sealed class CombatImpactMetricFormatterTests
             observedValue: 4,
             CombatImpactValueUnit.Amount
         );
-        var received = new CombatImpactReceived(
-            Target,
-            1,
-            [
-                new CombatImpactIncomingGroup(
-                    CombatImpactKind.Haste,
-                    "HasteAmount",
-                    1,
-                    950,
-                    CombatImpactValueUnit.Milliseconds,
-                    CombatImpactCoverage.LowerBound,
-                    []
-                ),
-            ]
-        );
-
         Assert.Equal(
-            [
-                "* Partial breakdown: 2 effects had no target data.",
-                "* Some details and durations are reconstructed from combat events and may not match the game totals exactly.",
-            ],
+            ["* Partial breakdown: 2 effects had no target data."],
             CombatImpactMetricFormatter.CausedDisclosures(
-                new CombatImpactSource(Target, 1, 3, [reconstructed]),
+                new CombatImpactSource(Target, 1, 3, [partial]),
                 chinese: false
             )
         );
         Assert.Equal(
-            [
-                "* 明细不完整：2 个效果缺少目标数据。",
-                "* 部分明细及持续时间由战斗事件推算，可能与游戏总计不完全一致。",
-            ],
+            ["* 明细不完整：2 个效果缺少目标数据。"],
             CombatImpactMetricFormatter.CausedDisclosures(
-                new CombatImpactSource(Target, 1, 3, [reconstructed]),
+                new CombatImpactSource(Target, 1, 3, [partial]),
                 chinese: true
             )
         );
@@ -431,10 +477,6 @@ public sealed class CombatImpactMetricFormatterTests
                 new CombatImpactSource(Target, 1, 1, [exact]),
                 chinese: false
             )
-        );
-        Assert.Equal(
-            ["* 部分明细及持续时间由战斗事件推算，可能与游戏总计不完全一致。"],
-            CombatImpactMetricFormatter.ReceivedDisclosures(received, chinese: true)
         );
     }
 

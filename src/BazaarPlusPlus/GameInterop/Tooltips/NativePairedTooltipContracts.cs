@@ -48,7 +48,8 @@ internal readonly struct NativePairedTooltipOptions
         float gap,
         float canvasMargin,
         float fadeDuration,
-        int nativeBottomPaddingReduction
+        int nativeBottomPaddingReduction,
+        int nativeDenseBottomPaddingMaximum
     )
     {
         PreferredContentWidth = preferredContentWidth;
@@ -57,6 +58,7 @@ internal readonly struct NativePairedTooltipOptions
         CanvasMargin = canvasMargin;
         FadeDuration = fadeDuration;
         NativeBottomPaddingReduction = nativeBottomPaddingReduction;
+        NativeDenseBottomPaddingMaximum = Mathf.Max(0, nativeDenseBottomPaddingMaximum);
     }
 
     /// <summary>Content width the panel is laid out at when space allows.</summary>
@@ -74,8 +76,11 @@ internal readonly struct NativePairedTooltipOptions
     /// <summary>Duration of the paired reveal/hide fade, in unscaled seconds.</summary>
     internal float FadeDuration { get; }
 
-    /// <summary>Rows trimmed from the native auxiliary layout's bottom padding.</summary>
+    /// <summary>Inset removed from the native auxiliary layout's normal bottom padding.</summary>
     internal int NativeBottomPaddingReduction { get; }
+
+    /// <summary>Bottom inset retained when a dense panel is near the canvas height limit.</summary>
+    internal int NativeDenseBottomPaddingMaximum { get; }
 }
 
 /// <summary>
