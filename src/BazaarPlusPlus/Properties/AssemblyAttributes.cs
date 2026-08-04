@@ -18,3 +18,4 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("GhostBattleSync.Tests")]
 [assembly: InternalsVisibleTo("HistoryPanelRepository.Tests")]
 [assembly: InternalsVisibleTo("SupporterCatalogModule.Tests")]
+[assembly: InternalsVisibleTo("NativePairedTooltipHost.Tests")]
