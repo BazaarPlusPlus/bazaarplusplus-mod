@@ -14,7 +14,13 @@ internal enum PostCombatImpactReasonCode
     PrimaryTooltipCreateTimedOut,
     AuxiliaryTooltipCreateTimedOut,
     AuxiliaryTooltipContentUnavailable,
+    AuxiliaryTooltipShowRetried,
     AuxiliaryTooltipPositionUnavailable,
+    TypographyUnavailable,
+    PairOpenMissingAuxiliaryFields,
+    PairOpenDyingController,
+    PairOpenMissingBackground,
+    PairOpenBackgroundCloneRejected,
     NativeAuxiliaryDisplaced,
     NativeAuxiliaryHidden,
     NativeAuxiliaryRequeued,
@@ -22,6 +28,9 @@ internal enum PostCombatImpactReasonCode
     Dismissed,
     RecapHoverObserved,
     StaleRequestDiscarded,
+    PendingShowBlocked,
+    PendingShowAborted,
+    NativeAuxiliaryUnmatched,
     PairPlacementOverflowed,
     PairPlacementTooNarrow,
     PairTopAlignmentAdjusted,
@@ -62,6 +71,33 @@ internal static class PostCombatImpactLogEvents
         BppLogFeatureScope.PostCombatImpact,
         "post_combat_impact.interaction.observed",
         [ReasonCode]
+    );
+
+    internal static readonly BppLogFieldDefinition Card = new(
+        1,
+        "card",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.High
+    );
+
+    internal static readonly BppLogFieldDefinition Detail = new(
+        2,
+        "detail",
+        BppLogFieldPrivacy.Public,
+        BppLogCorrelationPolicy.None,
+        BppLogCardinality.Low
+    );
+
+    /// <summary>
+    /// Card-identified interaction trail. Exists because the plain observed trail proved unable
+    /// to attribute silent per-card failures: it shows a hover with no outcome but not which card
+    /// or which silent gate swallowed it.
+    /// </summary>
+    internal static readonly BppLogEventDefinition InteractionTraced = new(
+        BppLogFeatureScope.PostCombatImpact,
+        "post_combat_impact.interaction.traced",
+        [ReasonCode, Card, Detail]
     );
 
     internal static readonly BppLogEventDefinition InteractionDegraded = new(

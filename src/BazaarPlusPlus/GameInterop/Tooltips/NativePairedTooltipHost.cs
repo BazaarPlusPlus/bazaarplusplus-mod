@@ -156,15 +156,35 @@ internal sealed class NativePairedTooltipSession
         if (_activeAuxiliary != null || _contentRoot != null)
             Release(restoreNativeContent: false);
         RestorePreparedNativeHost();
-        RestorePreparedAuxiliaryGate();
         _preparedNativeHost = NativeAuxiliaryHostState.Capture(auxiliary);
-        if (auxiliary.auxParent != null)
+        // auxParent (Tooltip_Aux_Content in the Tooltip_Aux_P prefab) owns the COMPLETE visual
+        // tree — Background, TitleText, BodyText and Divider are its children — so this gate is
+        // the one effective concealment. Do not gate the controller root instead: the root is a
+        // world-space Transform above the prefab's own nested Canvas (Tooltip_Aux_Canvas), and a
+        // CanvasGroup there does not propagate into the canvas at all.
+        //
+        // When the native controller is reused for a rapid re-request, the previous cancellation
+        // deliberately left this gate closed. Reuse it as-is: restore-then-recreate briefly puts
+        // the restored group (alpha 1) back on the object during the same frame — Destroy is
+        // deferred to frame end — which renders the shell for one frame.
+        if (
+            _preparedAuxiliaryGate != null
+            && ReferenceEquals(_preparedAuxiliaryGate.Controller, auxiliary)
+        )
         {
-            _preparedAuxiliaryGate = CanvasGroupGate.Create(
-                auxiliary,
-                auxiliary.auxParent.gameObject,
-                forceNonInteractive: true
-            );
+            _preparedAuxiliaryGate.SetAlpha(0f);
+        }
+        else
+        {
+            RestorePreparedAuxiliaryGate();
+            if (auxiliary.auxParent != null)
+            {
+                _preparedAuxiliaryGate = CanvasGroupGate.Create(
+                    auxiliary,
+                    auxiliary.auxParent.gameObject,
+                    forceNonInteractive: true
+                );
+            }
         }
     }
 
@@ -177,17 +197,17 @@ internal sealed class NativePairedTooltipSession
             return;
 
         // Every current caller hands this BPP-owned request straight back to the native hide
-        // sequence. Keep the whole controller concealed while restoring reusable geometry: if the
-        // header/gate is restored first, the asynchronously spawned "Combat Impact" request can
-        // expose a detached title for a frame (or indefinitely when its native fade is interrupted).
+        // sequence. Keep the auxParent gate CLOSED through that teardown: it is the only
+        // concealment the native fade cannot rewrite (the serialized CanvasGroup set to zero here
+        // is re-raised whenever the native fade-in is still in flight), and every visual child —
+        // Background, TitleText, BodyText, Divider — lives under auxParent. The gate is handed
+        // back by the next PrepareAuxiliary reuse, by ReleasePrepared when a foreign show takes
+        // the controller, or it dies with the despawned controller.
         ConcealNativeAuxiliary(auxiliary);
         if (ReferenceEquals(_activeAuxiliary, auxiliary))
             Release(restoreNativeContent: false);
         else
-        {
             RestorePreparedNativeHost(restoreContentVisibility: false);
-            RestorePreparedAuxiliaryGate();
-        }
     }
 
     /// <summary>
@@ -198,8 +218,11 @@ internal sealed class NativePairedTooltipSession
     /// only prepared. Skipping this leaves the native layout's padding and anchors permanently
     /// rewritten.
     /// </remarks>
-    internal void ReleasePrepared(AuxiliaryTooltipController controller) =>
+    internal void ReleasePrepared(AuxiliaryTooltipController controller)
+    {
         RestorePreparedNativeHost(restoreContentVisibility: true, expectedController: controller);
+        RestorePreparedAuxiliaryGate(expectedController: controller);
+    }
 
     // ── Open / content ─────────────────────────────────────────────────────────────────────
 
@@ -211,15 +234,20 @@ internal sealed class NativePairedTooltipSession
     internal bool TryOpen(
         AuxiliaryTooltipController auxiliary,
         CardTooltipController primary,
-        NativePairedTooltipOptions options
+        NativePairedTooltipOptions options,
+        out NativePairedTooltipOpenFailure failure
     )
     {
+        failure = NativePairedTooltipOpenFailure.None;
         if (
             auxiliary.auxParent == null
             || auxiliary.headerText == null
             || auxiliary.bodyText == null
         )
+        {
+            failure = NativePairedTooltipOpenFailure.MissingAuxiliaryFields;
             return false;
+        }
 
         if (_activeAuxiliary != null || _contentRoot != null)
             Release(restoreNativeContent: false);
@@ -249,6 +277,18 @@ internal sealed class NativePairedTooltipSession
                 forceNonInteractive: true
             );
         }
+        if (_preparedAuxiliaryGate == null)
+        {
+            // Gate creation only fails on a controller whose Destroy is already pending; this
+            // takeover cannot be concealed, so report an unusable native shape and let the caller
+            // re-request a live controller. Conceal before Release: Release restores the gates to
+            // their visible originals while the native header is still active, which is exactly
+            // the header-only orphan this presentation must never expose.
+            ConcealNativeAuxiliary(auxiliary);
+            Release(restoreNativeContent: false);
+            failure = NativePairedTooltipOpenFailure.DyingController;
+            return false;
+        }
 
         _generation++;
         _hidePending = false;
@@ -263,7 +303,9 @@ internal sealed class NativePairedTooltipSession
             || primary.backgroundImage.sprite == null
         )
         {
+            ConcealNativeAuxiliary(auxiliary);
             Release(restoreNativeContent: false);
+            failure = NativePairedTooltipOpenFailure.MissingBackground;
             return false;
         }
 
@@ -273,7 +315,9 @@ internal sealed class NativePairedTooltipSession
         ApplyContentWidth(auxiliary, options.PreferredContentWidth);
         if (!TryCreateNativeBackground(auxiliary, primary))
         {
+            ConcealNativeAuxiliary(auxiliary);
             Release(restoreNativeContent: false);
+            failure = NativePairedTooltipOpenFailure.BackgroundCloneRejected;
             return false;
         }
 
@@ -677,8 +721,14 @@ internal sealed class NativePairedTooltipSession
             _preparedNativeHost = null;
     }
 
-    private void RestorePreparedAuxiliaryGate()
+    private void RestorePreparedAuxiliaryGate(AuxiliaryTooltipController? expectedController = null)
     {
+        if (
+            expectedController != null
+            && _preparedAuxiliaryGate != null
+            && !ReferenceEquals(_preparedAuxiliaryGate.Controller, expectedController)
+        )
+            return;
         _preparedAuxiliaryGate?.Restore();
         _preparedAuxiliaryGate = null;
     }
@@ -1091,16 +1141,17 @@ internal sealed class NativePairedTooltipSession
         private readonly bool _forceNonInteractive;
         private bool _restored;
 
-        private CanvasGroupGate(object controller, GameObject target, bool forceNonInteractive)
+        private CanvasGroupGate(
+            object controller,
+            CanvasGroup group,
+            bool forceNonInteractive,
+            bool ownedGroup
+        )
         {
             Controller = controller;
             _forceNonInteractive = forceNonInteractive;
-            _group = target.GetComponent<CanvasGroup>();
-            if (_group == null)
-            {
-                _group = target.AddComponent<CanvasGroup>();
-                _ownedGroup = true;
-            }
+            _ownedGroup = ownedGroup;
+            _group = group;
             _originalAlpha = _group.alpha;
             _originalInteractable = _group.interactable;
             _originalBlocksRaycasts = _group.blocksRaycasts;
@@ -1112,11 +1163,27 @@ internal sealed class NativePairedTooltipSession
 
         internal float Alpha => _group == null ? 0f : _group.alpha;
 
-        internal static CanvasGroupGate Create(
+        internal static CanvasGroupGate? Create(
             object controller,
             GameObject target,
             bool forceNonInteractive = false
-        ) => new(controller, target, forceNonInteractive);
+        )
+        {
+            var ownedGroup = false;
+            var group = target.GetComponent<CanvasGroup>();
+            if (group == null)
+            {
+                group = target.AddComponent<CanvasGroup>();
+                ownedGroup = true;
+            }
+            // AddComponent refuses a target whose Destroy is pending and hands back a dead
+            // reference, while every other liveness check on the same object still passes until
+            // frame end. A dead gate cannot conceal anything, so fail creation instead of letting
+            // the first property read throw.
+            if (group == null)
+                return null;
+            return new CanvasGroupGate(controller, group, forceNonInteractive, ownedGroup);
+        }
 
         internal void SetAlpha(float alpha)
         {
@@ -1139,8 +1206,13 @@ internal sealed class NativePairedTooltipSession
             _group.interactable = _originalInteractable;
             _group.blocksRaycasts = _originalBlocksRaycasts;
             _group.ignoreParentGroups = _originalIgnoreParentGroups;
+            // DestroyImmediate, not Destroy: a deferred destroy leaves the corpse attached until
+            // frame end, so a same-frame re-prepare adopts it via GetComponent and loses its gate
+            // when the corpse dies — the ungated native fade-in then flashes the tooltip shell.
+            // The restore-to-original alpha above is also only safe when the component leaves the
+            // hierarchy within the same frame.
             if (_ownedGroup)
-                Object.Destroy(_group);
+                Object.DestroyImmediate(_group);
         }
     }
 

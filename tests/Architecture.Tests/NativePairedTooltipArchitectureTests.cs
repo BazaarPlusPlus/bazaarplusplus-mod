@@ -147,9 +147,182 @@ public sealed class NativePairedTooltipArchitectureTests
             method,
             StringComparison.Ordinal
         );
+        // The auxParent gate is the only concealment the native fade cannot rewrite; the stale
+        // cancel path must hand it back via reuse/ReleasePrepared/despawn, never restore it here.
+        Assert.DoesNotContain("RestorePreparedAuxiliaryGate", method, StringComparison.Ordinal);
         Assert.True(
             method.IndexOf("ConcealNativeAuxiliary(auxiliary);", StringComparison.Ordinal)
-                < method.IndexOf("RestorePreparedAuxiliaryGate();", StringComparison.Ordinal)
+                < method.IndexOf(
+                    "RestorePreparedNativeHost(restoreContentVisibility: false);",
+                    StringComparison.Ordinal
+                )
+        );
+    }
+
+    /// <summary>
+    /// In the Tooltip_Aux_P prefab, auxParent (Tooltip_Aux_Content) owns the complete visual tree
+    /// (Background, TitleText, BodyText, Divider), while the controller root is a world-space
+    /// Transform ABOVE the prefab's nested Canvas — a CanvasGroup there does not propagate into
+    /// the canvas. The prepare gate must therefore target auxParent, never the controller root,
+    /// and a matching still-held gate must be reused closed instead of restore-then-recreate
+    /// (Destroy is deferred to frame end, so restoring first renders the shell for one frame).
+    /// </summary>
+    [Fact]
+    public void Preparing_an_auxiliary_gates_auxparent_and_reuses_a_held_gate()
+    {
+        var host = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "GameInterop",
+                "Tooltips",
+                "NativePairedTooltipHost.cs"
+            )
+        );
+        var methodStart = host.IndexOf("internal void PrepareAuxiliary", StringComparison.Ordinal);
+        var methodEnd = host.IndexOf(
+            "internal void CancelPreparedAuxiliary",
+            methodStart,
+            StringComparison.Ordinal
+        );
+
+        Assert.True(methodStart >= 0 && methodEnd > methodStart);
+        var method = host[methodStart..methodEnd];
+        Assert.Contains("auxiliary.auxParent.gameObject", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("auxiliary.gameObject,", method, StringComparison.Ordinal);
+        var reuseCheck = method.IndexOf(
+            "ReferenceEquals(_preparedAuxiliaryGate.Controller, auxiliary)",
+            StringComparison.Ordinal
+        );
+        var reuseClose = method.IndexOf(
+            "_preparedAuxiliaryGate.SetAlpha(0f);",
+            StringComparison.Ordinal
+        );
+        var recreate = method.IndexOf("RestorePreparedAuxiliaryGate();", StringComparison.Ordinal);
+        Assert.True(
+            reuseCheck >= 0 && reuseClose > reuseCheck && recreate > reuseClose,
+            "a matching held gate must be reused closed before the restore-then-recreate fallback"
+        );
+    }
+
+    /// <summary>
+    /// AddComponent on a controller whose Destroy is already pending hands back a dead reference
+    /// while every other liveness check still passes that frame. Gate creation must fail soft and
+    /// TryOpen must report an unusable shape instead of throwing into the feature's catch-all.
+    /// </summary>
+    [Fact]
+    public void Gate_creation_fails_soft_and_open_reports_a_dying_controller_as_unusable()
+    {
+        var host = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "GameInterop",
+                "Tooltips",
+                "NativePairedTooltipHost.cs"
+            )
+        );
+
+        var createStart = host.IndexOf(
+            "internal static CanvasGroupGate? Create(",
+            StringComparison.Ordinal
+        );
+        Assert.True(createStart >= 0, "gate creation must be able to report failure as null");
+
+        // Owned gates must die immediately on restore: a deferred Destroy leaves the corpse
+        // attached until frame end, a same-frame re-prepare adopts it via GetComponent, and the
+        // gate silently disappears with the corpse — the ungated native fade then flashes the
+        // tooltip shell.
+        Assert.Contains("Object.DestroyImmediate(_group);", host, StringComparison.Ordinal);
+        Assert.DoesNotContain("Object.Destroy(_group);", host, StringComparison.Ordinal);
+        var addComponent = host.IndexOf(
+            "target.AddComponent<CanvasGroup>();",
+            createStart,
+            StringComparison.Ordinal
+        );
+        var failSoft = host.IndexOf("return null;", addComponent, StringComparison.Ordinal);
+        Assert.True(addComponent > createStart && failSoft > addComponent);
+
+        var openStart = host.IndexOf("internal bool TryOpen(", StringComparison.Ordinal);
+        var openEnd = host.IndexOf(
+            "internal bool AttachContent(",
+            openStart,
+            StringComparison.Ordinal
+        );
+        Assert.True(openStart >= 0 && openEnd > openStart);
+        var open = host[openStart..openEnd];
+        var nullGateCheck = open.IndexOf(
+            "if (_preparedAuxiliaryGate == null)",
+            StringComparison.Ordinal
+        );
+        Assert.True(nullGateCheck >= 0, "TryOpen must check the auxiliary gate for dead targets");
+        var conceal = open.IndexOf(
+            "ConcealNativeAuxiliary(auxiliary);",
+            nullGateCheck,
+            StringComparison.Ordinal
+        );
+        var rollback = open.IndexOf(
+            "Release(restoreNativeContent: false);",
+            nullGateCheck,
+            StringComparison.Ordinal
+        );
+        var reportUnusable = open.IndexOf("return false;", nullGateCheck, StringComparison.Ordinal);
+        Assert.True(
+            conceal > nullGateCheck && rollback > conceal && reportUnusable > rollback,
+            "a failed open must conceal the native auxiliary before Release restores the gates"
+        );
+
+        // Every rollback branch in TryOpen (gate death, missing background, background clone)
+        // must conceal immediately before Release: Release restores the gates to their visible
+        // originals, which would otherwise expose the header-only native shell.
+        var concealThenRelease =
+            "ConcealNativeAuxiliary(auxiliary);\n            Release(restoreNativeContent: false);";
+        var pairCount = 0;
+        for (
+            var index = open.IndexOf(concealThenRelease, StringComparison.Ordinal);
+            index >= 0;
+            index = open.IndexOf(concealThenRelease, index + 1, StringComparison.Ordinal)
+        )
+            pairCount++;
+        Assert.True(
+            pairCount >= 3,
+            "each TryOpen rollback must conceal the native auxiliary before Release"
+        );
+    }
+
+    /// <summary>
+    /// A transient open failure (dying native controller) must re-request the auxiliary tooltip
+    /// while the hover is still valid; suppressing until pointer exit is reserved for the retry
+    /// budget running out.
+    /// </summary>
+    [Fact]
+    public void Transient_show_failure_retries_before_suppressing_the_hover()
+    {
+        var controller = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "PostCombatImpact",
+                "PostCombatImpactController.cs"
+            )
+        );
+
+        var notShown = controller.IndexOf("if (!shown)", StringComparison.Ordinal);
+        Assert.True(notShown >= 0);
+        var retry = controller.IndexOf(
+            "TryConsumeTransientShowRetry(revision)",
+            notShown,
+            StringComparison.Ordinal
+        );
+        var requeue = controller.IndexOf("StartPendingShow();", notShown, StringComparison.Ordinal);
+        var suppress = controller.IndexOf(
+            "PostCombatImpactReasonCode.AuxiliaryTooltipContentUnavailable",
+            notShown,
+            StringComparison.Ordinal
+        );
+        Assert.True(retry > notShown, "the not-shown path must consult the transient retry budget");
+        Assert.True(requeue > retry, "a granted retry must requeue the pending show");
+        Assert.True(
+            suppress > requeue,
+            "suppression must remain the fallback after the retry budget"
         );
     }
 

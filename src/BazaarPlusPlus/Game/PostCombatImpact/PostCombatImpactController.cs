@@ -20,6 +20,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     private const int PositionedGeometrySettleMaxFrames = 30;
     private const int RequiredStableGeometrySamples = 3;
     private const float GeometryEpsilon = 0.5f;
+    private const int MaxTransientShowRetries = 2;
 
     private readonly WaitForEndOfFrame _waitForEndOfFrame = new();
     private PostCombatImpactModule? _module;
@@ -38,6 +39,8 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     private string? _selectedSourceId;
     private int _hoverRevision;
     private int _suppressedHoverRevision = -1;
+    private int _transientShowRetryRevision = -1;
+    private int _transientShowRetries;
     private bool _nativeAuxiliaryTakeoverActive;
     private CombatImpactPerspective _requestedPerspective = CombatImpactPerspective.Caused;
 
@@ -165,8 +168,18 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         );
         CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
         if (!sameHover)
-            LogInteraction(PostCombatImpactReasonCode.RecapHoverObserved);
+            LogInteractionTrace(
+                PostCombatImpactReasonCode.RecapHoverObserved,
+                card.TemplateId,
+                detail: "hover"
+            );
         StartPendingShow();
+        if (_pendingShow == null && _settlePresentation == null)
+            LogInteractionTrace(
+                PostCombatImpactReasonCode.PendingShowBlocked,
+                card.TemplateId,
+                DescribePendingShowBlock()
+            );
         TryPrepareCurrentPrimaryTooltip(card);
     }
 
@@ -205,10 +218,15 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             );
             return;
         }
+        var dismissedTemplateId = _hoveredRequest.Card.TemplateId;
         ClearHoveredSource();
         CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
         if (hadWork)
-            LogInteraction(PostCombatImpactReasonCode.Dismissed);
+            LogInteractionTrace(
+                PostCombatImpactReasonCode.Dismissed,
+                dismissedTemplateId,
+                detail: "pointer_exit"
+            );
     }
 
     private System.Collections.IEnumerator DismissAfterLockedPointerExit(
@@ -226,10 +244,15 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         )
             yield break;
 
+        var dismissedTemplateId = _hoveredRequest.Card.TemplateId;
         ClearHoveredSource();
         CancelAndClearPresentation(preserveOutstandingAuxiliaryRequest: true);
         if (hadWork)
-            LogInteraction(PostCombatImpactReasonCode.Dismissed);
+            LogInteractionTrace(
+                PostCombatImpactReasonCode.Dismissed,
+                dismissedTemplateId,
+                detail: "locked_pointer_exit"
+            );
     }
 
     private void CancelPendingHoverExit()
@@ -262,6 +285,11 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
         if (!IsCurrentHover(request, revision) || !IsRecapOpen())
         {
+            LogInteractionTrace(
+                PostCombatImpactReasonCode.PendingShowAborted,
+                request.Card.TemplateId,
+                IsRecapOpen() ? "hover_changed" : "recap_closed"
+            );
             _pendingShow = null;
             yield break;
         }
@@ -481,6 +509,28 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
         if (!shown)
         {
+            if (
+                IsCurrentHover(request, revision)
+                && IsRecapOpen()
+                && TryConsumeTransientShowRetry(revision)
+            )
+            {
+                // TryOpen fails soft when the native controller's Destroy is already pending — a
+                // state no managed liveness check can see before frame end. Discard the dying
+                // auxiliary and re-request a fresh one instead of suppressing the still-valid
+                // hover.
+                var deadAuxiliary = _pendingAuxiliaryController;
+                if (deadAuxiliary != null)
+                {
+                    _view.CancelPreparedNativeAuxiliary(deadAuxiliary);
+                    _pendingAuxiliaryController = null;
+                    tooltipParent.HideAuxiliaryTooltipController();
+                }
+                _pendingShow = null;
+                LogInteraction(PostCombatImpactReasonCode.AuxiliaryTooltipShowRetried);
+                StartPendingShow();
+                yield break;
+            }
             FailPendingShow(
                 revision,
                 PostCombatImpactReasonCode.AuxiliaryTooltipContentUnavailable,
@@ -646,10 +696,12 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         }
 
         _settlePresentation = null;
-        LogInteraction(
+        LogInteractionTrace(
             !hasAttributedImpact
                 ? PostCombatImpactReasonCode.ShownWithoutAttributedImpact
-                : PostCombatImpactReasonCode.Shown
+                : PostCombatImpactReasonCode.Shown,
+            request.Card.TemplateId,
+            detail: "settled"
         );
     }
 
@@ -769,6 +821,17 @@ internal sealed class PostCombatImpactController : MonoBehaviour
             return;
         }
 
+        // A show carrying this feature's own header that fails the request match is the orphan
+        // hazard: the prepared concealment was just handed back and nothing re-conceals it.
+        if (_view != null && string.Equals(header, _view.Header, StringComparison.Ordinal))
+            LogInteractionTrace(
+                PostCombatImpactReasonCode.NativeAuxiliaryUnmatched,
+                _hoveredRequest?.Card.TemplateId ?? Guid.Empty,
+                !_auxiliaryRequestOutstanding ? "no_outstanding_request"
+                    : !ReferenceEquals(_pendingAuxiliaryAnchor, anchor) ? "anchor_mismatch"
+                    : "header_mismatch"
+            );
+
         if (_pendingShow != null || _settlePresentation != null)
         {
             StopPendingShow(hidePrimary: true, preserveOutstandingAuxiliaryRequest: true);
@@ -871,6 +934,29 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
     private bool IsCurrentHover(HoverRequest request, int revision) =>
         revision == _hoverRevision && ReferenceEquals(_hoveredRequest, request);
+
+    private string DescribePendingShowBlock() =>
+        _hoveredRequest == null ? "no_hover"
+        : _suppressedHoverRevision == _hoverRevision ? "suppressed"
+        : _auxiliaryRequestOutstanding ? "outstanding_request"
+        : "unknown";
+
+    /// <summary>
+    /// Grants a bounded number of same-hover re-requests after a transient show failure, so a
+    /// persistent failure still ends in suppression instead of a hide/show loop.
+    /// </summary>
+    private bool TryConsumeTransientShowRetry(int revision)
+    {
+        if (_transientShowRetryRevision != revision)
+        {
+            _transientShowRetryRevision = revision;
+            _transientShowRetries = 0;
+        }
+        if (_transientShowRetries >= MaxTransientShowRetries)
+            return false;
+        _transientShowRetries++;
+        return true;
+    }
 
     private void TryPrepareCurrentPrimaryTooltip(Card card)
     {
@@ -1034,6 +1120,21 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         BppLog.DebugEvent(
             PostCombatImpactLogEvents.InteractionObserved,
             () => [PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode)]
+        );
+
+    private static void LogInteractionTrace(
+        PostCombatImpactReasonCode reasonCode,
+        Guid cardTemplateId,
+        string detail
+    ) =>
+        BppLog.DebugEvent(
+            PostCombatImpactLogEvents.InteractionTraced,
+            () =>
+                [
+                    PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode),
+                    PostCombatImpactLogEvents.Card.Bind(cardTemplateId),
+                    PostCombatImpactLogEvents.Detail.Bind(detail),
+                ]
         );
 
     private static void LogInteractionFailure(

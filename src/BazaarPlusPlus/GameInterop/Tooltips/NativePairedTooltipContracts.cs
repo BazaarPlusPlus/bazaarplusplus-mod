@@ -14,6 +14,27 @@ internal enum PairSide
 }
 
 /// <summary>
+/// Why the session's TryOpen reported the native pair as unusable. The host stays log-free; the
+/// consuming feature owns turning these into its own reason codes.
+/// </summary>
+internal enum NativePairedTooltipOpenFailure
+{
+    None,
+
+    /// <summary>The auxiliary controller is missing auxParent/header/body fields.</summary>
+    MissingAuxiliaryFields,
+
+    /// <summary>Gate creation failed — the controller's Destroy is already pending.</summary>
+    DyingController,
+
+    /// <summary>The auxiliary or primary background image/sprite is unavailable.</summary>
+    MissingBackground,
+
+    /// <summary>The native background clone could not be built from the primary.</summary>
+    BackgroundCloneRejected,
+}
+
+/// <summary>
 /// Shared tolerance for the paired-tooltip host.
 /// </summary>
 /// <remarks>
