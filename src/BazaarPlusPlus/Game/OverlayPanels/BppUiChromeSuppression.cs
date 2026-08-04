@@ -17,7 +17,7 @@ internal static class BppUiChromeSuppression
                 CombatStatusBarFeature.BeginScreenshotSuppression
             ),
             BppUiChromeSuppressionMode.ReplayRecording => UiSuppressionScope.Begin(
-                CollectionPanelDockButtonController.BeginScreenshotSuppression
+                CollectionPanelDockButtonController.BeginReplayRecordingSuppression
             ),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(mode),

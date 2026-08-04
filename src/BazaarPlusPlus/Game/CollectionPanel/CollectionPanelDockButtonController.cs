@@ -24,6 +24,8 @@ internal sealed class CollectionPanelDockButtonController
     private readonly CollectionPanelDockLayoutLogState _layoutLogState = new();
     private bool _hasAvailableDockLayout;
     private int _screenshotSuppressionCount;
+    private int _replayRecordingSuppressionCount;
+    private bool _dockButtonInteractableBeforeReplayRecordingSuppression = true;
 
     internal RectTransform? DockButtonRect => _dockButtonRect;
 
@@ -31,6 +33,7 @@ internal sealed class CollectionPanelDockButtonController
     {
         _hasAvailableDockLayout = available;
         ApplyScreenshotSuppressionVisibility();
+        ApplyReplayRecordingSuppressionInteraction();
     }
 
     internal static void Attach(Button anchorButton, BppSettingsDockPlacement placement)
@@ -66,6 +69,21 @@ internal sealed class CollectionPanelDockButtonController
         var suppressionActions = new Func<IDisposable?>[controllers.Length];
         for (var index = 0; index < controllers.Length; index++)
             suppressionActions[index] = controllers[index].BeginInstanceScreenshotSuppression;
+
+        return UiSuppressionScope.Begin(suppressionActions);
+    }
+
+    internal static IDisposable? BeginReplayRecordingSuppression()
+    {
+        var controllers = FindObjectsOfType<CollectionPanelDockButtonController>(
+            includeInactive: true
+        );
+        if (controllers.Length == 0)
+            return null;
+
+        var suppressionActions = new Func<IDisposable?>[controllers.Length];
+        for (var index = 0; index < controllers.Length; index++)
+            suppressionActions[index] = controllers[index].BeginInstanceReplayRecordingSuppression;
 
         return UiSuppressionScope.Begin(suppressionActions);
     }
@@ -179,11 +197,44 @@ internal sealed class CollectionPanelDockButtonController
         ApplyScreenshotSuppressionVisibility();
     }
 
+    private IDisposable BeginInstanceReplayRecordingSuppression()
+    {
+        if (_replayRecordingSuppressionCount == 0 && _dockButton != null)
+            _dockButtonInteractableBeforeReplayRecordingSuppression = _dockButton.interactable;
+
+        _replayRecordingSuppressionCount++;
+        ApplyReplayRecordingSuppressionInteraction();
+        return new ReplayRecordingSuppressionLease(this);
+    }
+
+    private void EndInstanceReplayRecordingSuppression()
+    {
+        if (_replayRecordingSuppressionCount > 0)
+            _replayRecordingSuppressionCount--;
+
+        ApplyReplayRecordingSuppressionInteraction();
+    }
+
     private void ApplyScreenshotSuppressionVisibility()
     {
         var shouldBeVisible = _screenshotSuppressionCount == 0 && _hasAvailableDockLayout;
         if (_dockButtonRect != null && _dockButtonRect.gameObject.activeSelf != shouldBeVisible)
             _dockButtonRect.gameObject.SetActive(shouldBeVisible);
+    }
+
+    private void ApplyReplayRecordingSuppressionInteraction()
+    {
+        if (_dockButton == null)
+            return;
+
+        if (_replayRecordingSuppressionCount > 0)
+        {
+            _dockButton.interactable = false;
+        }
+        else
+        {
+            _dockButton.interactable = _dockButtonInteractableBeforeReplayRecordingSuppression;
+        }
     }
 
     private void OnDockButtonClicked()
@@ -203,6 +254,22 @@ internal sealed class CollectionPanelDockButtonController
 
             _disposed = true;
             controller.EndInstanceScreenshotSuppression();
+        }
+    }
+
+    private sealed class ReplayRecordingSuppressionLease(
+        CollectionPanelDockButtonController controller
+    ) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            controller.EndInstanceReplayRecordingSuppression();
         }
     }
 }
