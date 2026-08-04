@@ -226,6 +226,74 @@ public sealed class CombatImpactMetricFormatterTests
         );
     }
 
+    [Theory]
+    [InlineData((int)CombatImpactOccurrenceBasis.ExplicitExecution, "×3 · +90", "×2 · +60")]
+    [InlineData((int)CombatImpactOccurrenceBasis.ReconstructedTransition, "+90", "+60")]
+    public void Attribute_transition_counts_require_explicit_execution_evidence(
+        int occurrenceBasisValue,
+        string expectedGroup,
+        string expectedDetail
+    )
+    {
+        var occurrenceBasis = (CombatImpactOccurrenceBasis)occurrenceBasisValue;
+        var target = new CombatImpactTarget(
+            Target,
+            2,
+            60,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.LowerBound
+        );
+        var group = new CombatImpactGroup(
+            CombatImpactKind.AttributeChange,
+            "BurnApplyAmount",
+            3,
+            90,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.LowerBound,
+            null,
+            0,
+            [target]
+        )
+        {
+            Surface = CombatImpactEventSurface.CardAttribute,
+            OccurrenceBasis = occurrenceBasis,
+        };
+        var source = new CombatImpactIncomingSource(
+            Target,
+            2,
+            60,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.LowerBound
+        );
+        var incoming = new CombatImpactIncomingGroup(
+            CombatImpactKind.AttributeChange,
+            "BurnApplyAmount",
+            3,
+            90,
+            CombatImpactValueUnit.Amount,
+            CombatImpactCoverage.LowerBound,
+            [source]
+        )
+        {
+            Surface = CombatImpactEventSurface.CardAttribute,
+            OccurrenceBasis = occurrenceBasis,
+        };
+
+        Assert.Equal(expectedGroup, CombatImpactMetricFormatter.Group(group, chinese: false));
+        Assert.Equal(
+            expectedDetail,
+            CombatImpactMetricFormatter.Target(group, target, chinese: false)
+        );
+        Assert.Equal(
+            expectedGroup,
+            CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
+        );
+        Assert.Equal(
+            expectedDetail,
+            CombatImpactMetricFormatter.IncomingSource(incoming, source, chinese: false)
+        );
+    }
+
     [Fact]
     public void Status_removal_amounts_are_unsigned()
     {

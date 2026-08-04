@@ -1117,6 +1117,7 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal("DamageAmount", group.NativeAttributeKey);
         Assert.Equal(187, group.ObservedValue);
+        Assert.Equal(CombatImpactOccurrenceBasis.ExplicitExecution, group.OccurrenceBasis);
     }
 
     [Fact]
@@ -2595,6 +2596,7 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(CombatImpactKind.AttributeChange, group.Kind);
         Assert.Equal(CombatImpactEventSurface.CardAttribute, group.Surface);
+        Assert.Equal(CombatImpactOccurrenceBasis.ReconstructedTransition, group.OccurrenceBasis);
         Assert.Equal(attributeType.ToString(), group.NativeAttributeKey);
         Assert.Equal(expectedUnit, group.Unit.ToString());
         Assert.Equal(value, group.ObservedValue);

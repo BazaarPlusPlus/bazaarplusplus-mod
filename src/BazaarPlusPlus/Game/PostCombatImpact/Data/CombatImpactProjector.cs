@@ -46,6 +46,7 @@ internal static class CombatImpactProjector
                 )
                 {
                     Surface = resolved.Surface,
+                    OccurrenceBasis = CombatImpactOccurrenceBasis.ExplicitExecution,
                     CriticalCount = resolved.CriticalCount,
                     CriticalValue = resolved.CriticalValue,
                     NonCriticalValue = resolved.NonCriticalValue,
@@ -388,6 +389,9 @@ internal static class CombatImpactProjector
                         "TempoRemoveAmount",
                         ValueBasis: CombatImpactValueBasis.None
                     )
+                    {
+                        OccurrenceBasis = CombatImpactOccurrenceBasis.ExplicitExecution,
+                    }
                 );
             }
         }
@@ -984,6 +988,7 @@ internal static class CombatImpactProjector
                     )
                     {
                         Surface = CombatImpactEventSurface.CardAttribute,
+                        OccurrenceBasis = CombatImpactOccurrenceBasis.ReconstructedTransition,
                     }
                 );
             }
@@ -1007,6 +1012,7 @@ internal static class CombatImpactProjector
                     )
                     {
                         Surface = CombatImpactEventSurface.PlayerAttribute,
+                        OccurrenceBasis = CombatImpactOccurrenceBasis.ReconstructedTransition,
                     }
                 );
             }

@@ -42,6 +42,12 @@ internal enum CombatImpactValueBasis
     NetFrameDelta,
 }
 
+internal enum CombatImpactOccurrenceBasis
+{
+    ReconstructedTransition,
+    ExplicitExecution,
+}
+
 internal enum CombatImpactCoverage
 {
     None,
@@ -86,6 +92,8 @@ internal sealed record CombatImpactEvent(
 {
     internal CombatImpactEventSurface Surface { get; init; } =
         CombatImpactEventSurface.AppliedEffect;
+
+    internal CombatImpactOccurrenceBasis OccurrenceBasis { get; init; }
 
     internal int CriticalCount { get; init; }
 
@@ -162,6 +170,8 @@ internal sealed record CombatImpactGroup(
     internal CombatImpactEventSurface Surface { get; init; } =
         CombatImpactEventSurface.AppliedEffect;
 
+    internal CombatImpactOccurrenceBasis OccurrenceBasis { get; init; }
+
     internal int CriticalCount { get; init; }
 
     internal int? CriticalObservedValue { get; init; }
@@ -215,6 +225,8 @@ internal sealed record CombatImpactIncomingGroup(
 {
     internal CombatImpactEventSurface Surface { get; init; } =
         CombatImpactEventSurface.AppliedEffect;
+
+    internal CombatImpactOccurrenceBasis OccurrenceBasis { get; init; }
 
     internal int CriticalCount { get; init; }
 
