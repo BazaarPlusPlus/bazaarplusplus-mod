@@ -12,6 +12,10 @@
       Link="UpgradePreviewValueProjection.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/Tooltips/UpgradePreviewAttributeMultiplierResolver.cs"
+      Link="UpgradePreviewAttributeMultiplierResolver.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/Tooltips/UpgradePreviewValueRegistry.cs"
       Link="UpgradePreviewValueRegistry.cs"
     />

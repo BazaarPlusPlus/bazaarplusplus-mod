@@ -61,8 +61,6 @@ internal sealed class UpgradePreviewValueProjection
             if (source.Attributes.TryGetValue(attribute, out var currentValue))
             {
                 attributes[attribute] = ProjectAttributeValue(
-                    source,
-                    attribute,
                     currentValue,
                     currentBase,
                     nextBase.Value
@@ -92,6 +90,8 @@ internal sealed class UpgradePreviewValueProjection
             Template = template,
             Enchantment = source.Enchantment,
         };
+
+        ApplyRuntimeMultipliers(source, projectedCard, itemTemplate, nextTier, sourceValueContext);
 
         projection = new UpgradePreviewValueProjection(
             projectedCard,
@@ -160,31 +160,82 @@ internal sealed class UpgradePreviewValueProjection
         return true;
     }
 
-    private static int ProjectAttributeValue(
-        ItemCard source,
-        ECardAttributeType attribute,
-        int currentValue,
-        int? currentBase,
-        int nextBase
-    )
+    private static int ProjectAttributeValue(int currentValue, int? currentBase, int nextBase)
     {
         if (!currentBase.HasValue)
             return nextBase;
 
-        if (attribute != ECardAttributeType.CooldownMax)
-            return nextBase + currentValue - currentBase.Value;
+        return nextBase + currentValue - currentBase.Value;
+    }
 
-        var reduction = source.Attributes.GetValueOrDefault(
+    private static void ApplyRuntimeMultipliers(
+        ItemCard source,
+        ItemCard projected,
+        TCardItem template,
+        ETier nextTier,
+        ValueContext sourceValueContext
+    )
+    {
+        var auraMultipliers = UpgradePreviewAttributeMultiplierResolver.Resolve(
+            source,
+            projected,
+            sourceValueContext
+        );
+        foreach (var attribute in projected.Attributes.Keys.ToArray())
+        {
+            var currentBase = template.GetAttributeBaseValueAtTier(attribute, source.Tier);
+            var nextBase = template.GetAttributeBaseValueAtTier(attribute, nextTier);
+            if (!nextBase.HasValue)
+                continue;
+
+            var currentMultiplier = 1f;
+            var projectedMultiplier = 1f;
+            if (attribute == ECardAttributeType.CooldownMax)
+            {
+                currentMultiplier *= ResolveCooldownMultiplier(source);
+                projectedMultiplier *= ResolveCooldownMultiplier(projected);
+            }
+
+            if (auraMultipliers.TryGetValue(attribute, out var multipliers))
+            {
+                currentMultiplier *= multipliers.Current;
+                projectedMultiplier *= multipliers.Projected;
+            }
+
+            if (
+                MathF.Abs(currentMultiplier - 1f) < 0.0001f
+                && MathF.Abs(projectedMultiplier - 1f) < 0.0001f
+            )
+                continue;
+
+            if (currentMultiplier <= 0f || projectedMultiplier < 0f)
+                continue;
+
+            var runtimeDelta = 0f;
+            if (
+                currentBase.HasValue
+                && source.Attributes.TryGetValue(attribute, out var currentValue)
+            )
+            {
+                runtimeDelta = currentValue / currentMultiplier - currentBase.Value;
+            }
+
+            projected.Attributes[attribute] = Math.Max(
+                0,
+                (int)
+                    Math.Round(
+                        (nextBase.Value + runtimeDelta) * projectedMultiplier,
+                        MidpointRounding.AwayFromZero
+                    )
+            );
+        }
+    }
+
+    private static float ResolveCooldownMultiplier(ItemCard card)
+    {
+        var reduction = card.Attributes.GetValueOrDefault(
             ECardAttributeType.PercentCooldownReduction
         );
-        var multiplier = Math.Max(0, 100 - reduction) / 100f;
-        if (multiplier <= 0f || currentBase.Value <= 0)
-            return currentValue;
-
-        // Recover the pre-percent runtime value so additive/flat runtime changes remain
-        // additive while the percentage reduction scales the next tier's base correctly.
-        var prePercentCurrent = currentValue / multiplier;
-        var runtimeDelta = prePercentCurrent - currentBase.Value;
-        return Math.Max(0, (int)MathF.Round((nextBase + runtimeDelta) * multiplier));
+        return Math.Max(0, 100 - reduction) / 100f;
     }
 }

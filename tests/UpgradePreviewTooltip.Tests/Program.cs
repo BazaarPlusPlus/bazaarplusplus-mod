@@ -1,11 +1,15 @@
+using BazaarGameClient.Domain.Cards;
+using BazaarGameClient.Domain.Models;
 using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameClient.Domain.Tooltips;
 using BazaarGameShared.Domain.Cards;
 using BazaarGameShared.Domain.Cards.Enchantments;
 using BazaarGameShared.Domain.Cards.Item;
+using BazaarGameShared.Domain.Core;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Domain.Effect.Actions;
+using BazaarGameShared.Domain.Effect.AuraActions;
 using BazaarGameShared.Domain.Targeting;
 using BazaarGameShared.Domain.Values;
 using BazaarGameShared.Domain.Values.ReferenceValues;
@@ -114,6 +118,166 @@ AssertEqual(
     17,
     buffedProjection.Card.Attributes[ECardAttributeType.Custom_1],
     "Runtime buffs should be preserved over the next-tier base."
+);
+
+var doubleDamageAura = new TCardAura
+{
+    Id = "double-damage",
+    ActiveIn = EEffectActiveIn.HandAndStash,
+    WorksIn = EEffectWorksIn.Anywhere,
+    Action = new TAuraActionCardModifyAttribute
+    {
+        AttributeType = ECardAttributeType.DamageAmount,
+        Operation = EAttributeModifierOperation.Multiply,
+        Target = new TTargetCardSelf(),
+        Value = new TFixedValue { Value = 2f },
+    },
+};
+var doubleAmmoAura = doubleDamageAura with
+{
+    Id = "double-ammo",
+    Action = new TAuraActionCardModifyAttribute
+    {
+        AttributeType = ECardAttributeType.AmmoMax,
+        Operation = EAttributeModifierOperation.Multiply,
+        Target = new TTargetCardSelf(),
+        Value = new TFixedValue { Value = 2f },
+    },
+};
+var multipliedTemplate = new TCardItem
+{
+    Type = ECardType.Item,
+    StartingTier = ETier.Silver,
+    Enchantments = new Dictionary<EEnchantmentType, TEnchantment>
+    {
+        [EEnchantmentType.Obsidian] = new TEnchantment
+        {
+            Auras = new Dictionary<string, TCardAura>
+            {
+                [doubleDamageAura.Id] = doubleDamageAura,
+                [doubleAmmoAura.Id] = doubleAmmoAura,
+            },
+        },
+    },
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Silver] = new TCardTier
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 10,
+                [ECardAttributeType.AmmoMax] = 4,
+            },
+        },
+        [ETier.Gold] = new TCardTier
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.DamageAmount] = 15,
+                [ECardAttributeType.AmmoMax] = 5,
+            },
+        },
+    },
+};
+var multipliedCard = new ItemCard
+{
+    Template = multipliedTemplate,
+    Type = ECardType.Item,
+    Tier = ETier.Silver,
+    Section = EInventorySection.Hand,
+    Enchantment = EEnchantmentType.Obsidian,
+    // (10 base + 2 additive runtime buff) * 2 Obsidian multiplier.
+    Attributes = new Dictionary<ECardAttributeType, int>
+    {
+        [ECardAttributeType.DamageAmount] = 24,
+        [ECardAttributeType.AmmoMax] = 8,
+    },
+};
+AssertTrue(
+    UpgradePreviewValueProjection.TryCreate(
+        multipliedCard,
+        multipliedTemplate,
+        new ValueContext(null!, multipliedCard),
+        out var multipliedProjection
+    ),
+    "Multiplied upgrade projection should be created."
+);
+AssertEqual(
+    34,
+    multipliedProjection.Card.Attributes[ECardAttributeType.DamageAmount],
+    "Multipliers should scale the next-tier base after preserving additive runtime buffs."
+);
+AssertEqual(
+    10,
+    multipliedProjection.Card.Attributes[ECardAttributeType.AmmoMax],
+    "Ammo multipliers should scale the next-tier base instead of being treated as additive."
+);
+
+var externalDoubleAura = doubleDamageAura with
+{
+    Id = "external-double-damage",
+    Action = new TAuraActionCardModifyAttribute
+    {
+        AttributeType = ECardAttributeType.DamageAmount,
+        Operation = EAttributeModifierOperation.Multiply,
+        Target = new TTargetCardSection
+        {
+            TargetSection = ETargetCardSectionTargetSection.SelfHand,
+        },
+        Value = new TFixedValue { Value = 2f },
+    },
+};
+var externalAuraTemplate = new TCardItem
+{
+    Type = ECardType.Item,
+    StartingTier = ETier.Silver,
+    Auras = new Dictionary<string, TCardAura> { [externalDoubleAura.Id] = externalDoubleAura },
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Silver] = new TCardTier { AuraIds = [externalDoubleAura.Id] },
+    },
+};
+var externalTargetTemplate = multipliedTemplate with { Enchantments = null };
+var player = new Player { CombatantId = ECombatantId.Player };
+var run = new Run { Player = player };
+var externalTarget = new ItemCard
+{
+    InstanceId = new InstanceId("external-target"),
+    Template = externalTargetTemplate,
+    Type = ECardType.Item,
+    Size = ECardSize.Small,
+    Tier = ETier.Silver,
+    Section = EInventorySection.Hand,
+    LeftSocketId = EContainerSocketId.Socket_0,
+    Owner = player,
+    Attributes = new Dictionary<ECardAttributeType, int> { [ECardAttributeType.DamageAmount] = 24 },
+};
+var externalAuraSource = new ItemCard
+{
+    InstanceId = new InstanceId("external-aura-source"),
+    Template = externalAuraTemplate,
+    Type = ECardType.Item,
+    Size = ECardSize.Small,
+    Tier = ETier.Silver,
+    Section = EInventorySection.Hand,
+    LeftSocketId = EContainerSocketId.Socket_1,
+    Owner = player,
+};
+((CardContainer)player.Hand).Container.Sockets[0] = externalTarget;
+((CardContainer)player.Hand).Container.Sockets[1] = externalAuraSource;
+AssertTrue(
+    UpgradePreviewValueProjection.TryCreate(
+        externalTarget,
+        externalTargetTemplate,
+        new ValueContext(run, externalTarget),
+        out var externalMultiplierProjection
+    ),
+    "External multiplier projection should be created."
+);
+AssertEqual(
+    34,
+    externalMultiplierProjection.Card.Attributes[ECardAttributeType.DamageAmount],
+    "Multipliers from other active cards should be preserved during projection."
 );
 
 var cooldownTemplate = new TCardItem
