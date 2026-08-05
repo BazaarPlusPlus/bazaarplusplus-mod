@@ -48,6 +48,9 @@ internal static class KeywordIconSpriteProvider
         }
         catch
         {
+            // Callers run per frame; record the miss so a throwing icon name is not
+            // re-attempted (and re-thrown) every frame within the same pass.
+            MissesThisPass.Add(iconName);
             return null;
         }
     }

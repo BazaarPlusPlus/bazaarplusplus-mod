@@ -15,8 +15,12 @@ namespace BazaarPlusPlus.Game.MusicNotes;
 /// </summary>
 internal static class MusicNoteTemplateCatalog
 {
+    // Guards every field below: the main thread swaps generations while a worker may be
+    // publishing, and the worker's generation guard must be atomic with its publish —
+    // otherwise a load for an old manager can slip its stale map in after a swap.
+    private static readonly object Gate = new();
     private static object? _managerRef;
-    private static volatile Dictionary<int, IReadOnlyList<MusicNoteTag>>? _tagsByLetter;
+    private static Dictionary<int, IReadOnlyList<MusicNoteTag>>? _tagsByLetter;
     private static bool _loadInFlight;
     private static bool _loadFailed;
 
@@ -26,22 +30,33 @@ internal static class MusicNoteTemplateCatalog
         if (manager == null)
             return null;
 
-        if (!ReferenceEquals(manager, _managerRef))
+        Dictionary<int, IReadOnlyList<MusicNoteTag>>? map;
+        var startLoad = false;
+        lock (Gate)
         {
-            // The game swaps the manager reference after a GameData download; drop the old map.
-            _managerRef = manager;
-            _tagsByLetter = null;
-            _loadInFlight = false;
-            _loadFailed = false;
+            if (!ReferenceEquals(manager, _managerRef))
+            {
+                // The game swaps the manager reference after a GameData download; drop the
+                // old map. An in-flight load for the old manager fails its generation guard.
+                _managerRef = manager;
+                _tagsByLetter = null;
+                _loadInFlight = false;
+                _loadFailed = false;
+            }
+
+            map = _tagsByLetter;
+            if (map == null && !_loadInFlight && !_loadFailed)
+            {
+                _loadInFlight = true;
+                startLoad = true;
+            }
         }
 
-        var map = _tagsByLetter;
         if (map != null)
             return map.TryGetValue((int)letter, out var tags) ? tags : null;
 
-        if (!_loadInFlight && !_loadFailed)
+        if (startLoad)
         {
-            _loadInFlight = true;
             var capturedManager = manager;
             Task.Run(() => LoadOnWorker(capturedManager));
         }
@@ -84,13 +99,16 @@ internal static class MusicNoteTemplateCatalog
             failed = true;
         }
 
-        // Publish only if the generation did not change while loading.
-        if (!ReferenceEquals(_managerRef, capturedManager))
-            return;
-        if (failed)
-            _loadFailed = true;
-        else
-            _tagsByLetter = built;
-        _loadInFlight = false;
+        lock (Gate)
+        {
+            // Publish only if the generation did not change while loading.
+            if (!ReferenceEquals(_managerRef, capturedManager))
+                return;
+            if (failed)
+                _loadFailed = true;
+            else
+                _tagsByLetter = built;
+            _loadInFlight = false;
+        }
     }
 }
