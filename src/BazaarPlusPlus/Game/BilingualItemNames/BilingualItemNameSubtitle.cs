@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace BazaarPlusPlus.Game.BilingualItemNames;
 
 // The native title is a serif TMP label. Keep it intact and add the translated title as a
-// separate body-text label so the subtitle can use the same sans font as BPP tooltip sections.
+// separate heading label so both language rows share the native title typography.
 // The wrapper owns both rows and has no padding or spacing, avoiding the extra line box that the
 // old rich-text newline/voffset markup left between the item name and its translation.
 internal static class BilingualItemNameSubtitle
@@ -33,7 +33,7 @@ internal static class BilingualItemNameSubtitle
         if (
             stack == null
             || NativeGameTypography.PrepareOwnedText(
-                NativeGameTypography.OwnedTextRole.Body,
+                NativeGameTypography.OwnedTextRole.Heading,
                 out var typography
             ) != NativeGameTypography.Outcome.Ready
             || typography == null
