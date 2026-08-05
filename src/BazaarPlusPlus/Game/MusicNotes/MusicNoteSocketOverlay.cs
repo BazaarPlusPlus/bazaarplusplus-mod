@@ -14,10 +14,11 @@ namespace BazaarPlusPlus.Game.MusicNotes;
 /// Hold-to-peek badge overlay for the music-note board mechanic: while the shared preview
 /// modifier (HoldUpgradePreview, default Shift) is held outside combat/recap/replay, every
 /// unlocked player socket shows the note letter it holds — or, via the anchor rule, the letter
-/// it would become — under the socket. Placed notes render emphasized; implied letters render
-/// dimmed. When the note's granted attribute is resolvable, the badge reuses the game's own
-/// keyword icon and accent color; otherwise it degrades to the letter alone. Purely visual:
-/// the canvas has no raycaster and every graphic is raycast-transparent.
+/// it would become — under the socket. Placed notes render emphasized (bold, accent outline);
+/// implied letters render dimmed. Each letter's item-category tags (Burn, Heal, Weapon, ...)
+/// come from the note templates' condition graphs and reuse the game's own keyword icons and
+/// accent colors; unresolvable tags degrade to the letter alone. Purely visual: the canvas has
+/// no raycaster and every graphic is raycast-transparent.
 /// </summary>
 internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 {
@@ -25,33 +26,45 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 
     // Canvas-space (1080p reference) distance from the socket center down to the badge top.
     private const float BadgeVerticalOffset = 52f;
-    private const float IconSize = 22f;
-    private const float LetterFontSize = 21f;
+    private const float IconSize = 24f;
+    private const int MaxIconsPerBadge = 2;
+    private const float ActiveLetterFontSize = 24f;
+    private const float ImpliedLetterFontSize = 19f;
 
-    private static readonly Color ActiveBackColor = new(0.05f, 0.06f, 0.08f, 0.78f);
-    private static readonly Color ImpliedBackColor = new(0.05f, 0.06f, 0.08f, 0.42f);
-    private static readonly Color ActiveLetterFallbackColor = new(1f, 0.96f, 0.88f, 1f);
-    private static readonly Color ImpliedLetterColor = new(0.72f, 0.75f, 0.80f, 0.92f);
+    private static readonly Color ActiveBackColor = new(0.05f, 0.06f, 0.08f, 0.88f);
+    private static readonly Color ImpliedBackColor = new(0.05f, 0.06f, 0.08f, 0.30f);
+    private static readonly Color ActiveLetterFallbackColor = new(1f, 0.85f, 0.45f, 1f);
+    private static readonly Color ImpliedLetterColor = new(0.78f, 0.81f, 0.85f, 0.66f);
     private static readonly Color ActiveIconColor = Color.white;
-    private static readonly Color ImpliedIconColor = new(1f, 1f, 1f, 0.5f);
+    private static readonly Color ImpliedIconColor = new(1f, 1f, 1f, 0.42f);
+    private static readonly Color ActiveOutlineFallbackColor = new(1f, 0.85f, 0.45f, 0.85f);
 
     private static readonly string[] LetterNames = BuildLetterNames();
 
     private sealed class BadgeSlot
     {
-        internal BadgeSlot(RectTransform root, Image back, Image icon, TextMeshProUGUI letter)
+        internal BadgeSlot(
+            RectTransform root,
+            Image back,
+            Outline outline,
+            Image[] icons,
+            TextMeshProUGUI letter
+        )
         {
             Root = root;
             Back = back;
-            Icon = icon;
+            BackOutline = outline;
+            Icons = icons;
             Letter = letter;
         }
 
         internal RectTransform Root { get; }
         internal Image Back { get; }
-        internal Image Icon { get; }
+        internal Outline BackOutline { get; }
+        internal Image[] Icons { get; }
         internal TextMeshProUGUI Letter { get; }
         internal string? RenderedLetter { get; set; }
+        internal bool? RenderedActive { get; set; }
     }
 
     private GameObject? _canvasObject;
@@ -223,18 +236,45 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     private static void StyleSlot(BadgeSlot slot, in MusicNoteSocketBadge badge)
     {
         var isActive = badge.Kind == MusicNoteSocketBadgeKind.Active;
-        var attribute = isActive
-            ? MusicNoteEffectClassifier.TryGetAttribute(badge.PlacedTemplate)
-            : MusicNoteTemplateCatalog.TryGetAttributeForLetter(badge.Letter);
 
-        Sprite? iconSprite = null;
+        // The letter identity (which tags a letter keys on) is per-letter game data, so the
+        // catalog answers for placed and implied badges alike; the placed template is only a
+        // fallback while the catalog is still loading.
+        var tags = MusicNoteTemplateCatalog.TryGetTagsForLetter(badge.Letter);
+        if (tags == null && isActive)
+            tags = MusicNoteEffectClassifier.GetTags(badge.PlacedTemplate);
+
         Color? accentColor = null;
-        if (attribute is ECardAttributeType attributeType)
+        var iconCount = 0;
+        if (tags != null)
         {
-            var display = NativeTagTypography.Resolve(attributeType);
-            accentColor = display.AccentColor;
-            if (!string.IsNullOrEmpty(display.IconName))
-                iconSprite = KeywordIconSpriteProvider.Resolve(display.IconName).Sprite;
+            for (var i = 0; i < tags.Count && iconCount < MaxIconsPerBadge; i++)
+            {
+                var display = tags[i].HiddenTag is EHiddenTag hiddenTag
+                    ? NativeTagTypography.Resolve(hiddenTag)
+                    : NativeTagTypography.Resolve(tags[i].CardTag!.Value);
+                accentColor ??= display.AccentColor;
+
+                if (string.IsNullOrEmpty(display.IconName))
+                    continue;
+                var sprite = KeywordIconSpriteProvider.Resolve(display.IconName).Sprite;
+                if (sprite == null)
+                    continue;
+
+                var icon = slot.Icons[iconCount];
+                if (icon.sprite != sprite)
+                    icon.sprite = sprite;
+                icon.color = isActive ? ActiveIconColor : ImpliedIconColor;
+                if (!icon.gameObject.activeSelf)
+                    icon.gameObject.SetActive(true);
+                iconCount++;
+            }
+        }
+
+        for (var i = iconCount; i < slot.Icons.Length; i++)
+        {
+            if (slot.Icons[i].gameObject.activeSelf)
+                slot.Icons[i].gameObject.SetActive(false);
         }
 
         var letterText = LetterNames[(int)badge.Letter % LetterNames.Length];
@@ -244,23 +284,23 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             slot.RenderedLetter = letterText;
         }
 
-        slot.Letter.fontStyle = isActive ? FontStyles.Bold : FontStyles.Normal;
+        if (slot.RenderedActive != isActive)
+        {
+            slot.Letter.fontSize = isActive ? ActiveLetterFontSize : ImpliedLetterFontSize;
+            slot.Letter.fontStyle = isActive ? FontStyles.Bold : FontStyles.Normal;
+            slot.RenderedActive = isActive;
+        }
+
         slot.Letter.color = isActive
             ? (accentColor ?? ActiveLetterFallbackColor)
             : ImpliedLetterColor;
         slot.Back.color = isActive ? ActiveBackColor : ImpliedBackColor;
-
-        if (iconSprite != null)
+        slot.BackOutline.enabled = isActive;
+        if (isActive)
         {
-            if (slot.Icon.sprite != iconSprite)
-                slot.Icon.sprite = iconSprite;
-            slot.Icon.color = isActive ? ActiveIconColor : ImpliedIconColor;
-            if (!slot.Icon.gameObject.activeSelf)
-                slot.Icon.gameObject.SetActive(true);
-        }
-        else if (slot.Icon.gameObject.activeSelf)
-        {
-            slot.Icon.gameObject.SetActive(false);
+            var outlineColor = accentColor ?? ActiveOutlineFallbackColor;
+            outlineColor.a = 0.85f;
+            slot.BackOutline.effectColor = outlineColor;
         }
     }
 
@@ -285,6 +325,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             $"NoteBadge{index}",
             typeof(RectTransform),
             typeof(Image),
+            typeof(Outline),
             typeof(HorizontalLayoutGroup),
             typeof(ContentSizeFitter)
         );
@@ -298,9 +339,14 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         var back = rootObject.GetComponent<Image>();
         back.raycastTarget = false;
 
+        var outline = rootObject.GetComponent<Outline>();
+        outline.effectDistance = new Vector2(1.5f, -1.5f);
+        outline.useGraphicAlpha = false;
+        outline.enabled = false;
+
         var layout = rootObject.GetComponent<HorizontalLayoutGroup>();
-        layout.padding = new RectOffset(7, 8, 3, 3);
-        layout.spacing = 3f;
+        layout.padding = new RectOffset(8, 9, 3, 3);
+        layout.spacing = 4f;
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
@@ -311,30 +357,35 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
         fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-        var iconObject = new GameObject(
-            "Icon",
-            typeof(RectTransform),
-            typeof(Image),
-            typeof(LayoutElement)
-        );
-        iconObject.transform.SetParent(rootObject.transform, false);
-        var icon = iconObject.GetComponent<Image>();
-        icon.raycastTarget = false;
-        icon.preserveAspect = true;
-        var iconLayout = iconObject.GetComponent<LayoutElement>();
-        iconLayout.preferredWidth = IconSize;
-        iconLayout.preferredHeight = IconSize;
-        iconObject.SetActive(false);
+        var icons = new Image[MaxIconsPerBadge];
+        for (var i = 0; i < icons.Length; i++)
+        {
+            var iconObject = new GameObject(
+                $"Icon{i}",
+                typeof(RectTransform),
+                typeof(Image),
+                typeof(LayoutElement)
+            );
+            iconObject.transform.SetParent(rootObject.transform, false);
+            var icon = iconObject.GetComponent<Image>();
+            icon.raycastTarget = false;
+            icon.preserveAspect = true;
+            var iconLayout = iconObject.GetComponent<LayoutElement>();
+            iconLayout.preferredWidth = IconSize;
+            iconLayout.preferredHeight = IconSize;
+            iconObject.SetActive(false);
+            icons[i] = icon;
+        }
 
         var letterObject = new GameObject("Letter", typeof(RectTransform));
         letterObject.transform.SetParent(rootObject.transform, false);
         var letter = letterObject.AddComponent<TextMeshProUGUI>();
         _typography.Apply(letter);
-        letter.fontSize = LetterFontSize;
+        letter.fontSize = ImpliedLetterFontSize;
         letter.alignment = TextAlignmentOptions.Center;
         letter.raycastTarget = false;
 
-        return new BadgeSlot(root, back, icon, letter);
+        return new BadgeSlot(root, back, outline, icons, letter);
     }
 
     private void SetVisible(bool visible)
