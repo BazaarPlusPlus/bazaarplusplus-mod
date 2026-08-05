@@ -1,10 +1,15 @@
 #nullable enable
 using BazaarPlusPlus.Game.CombatReplay;
 using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.Game.PvpBattles.Persistence;
 using BazaarPlusPlus.Infrastructure;
 
 ReplayPersistenceStateIsScopedPerRun();
 ReplayPayloadStoreRoundTripsAndRejectsCorruption();
+CapturedReplayRoutesSeparatePveFromPvpPersistence();
+CurrentNativeReplayBecomesReadyWithoutPersistence();
+PvpBattleStoreRejectsPveManifests();
+ReplayRecordingTooltipBalancesVerticalPadding();
 
 Console.WriteLine("Combat replay recording tests passed.");
 
@@ -61,6 +66,65 @@ static void ReplayPayloadStoreRoundTripsAndRejectsCorruption()
         if (Directory.Exists(root))
             Directory.Delete(root, recursive: true);
     }
+}
+
+static void CapturedReplayRoutesSeparatePveFromPvpPersistence()
+{
+    Assert(
+        CapturedReplayRouter.Resolve(
+            new PvpBattleManifest { BattleId = "pve", CombatKind = "Combat" }
+        ) == CapturedReplayRoute.CurrentNative,
+        "PvE captures must stay on the in-memory current-native route."
+    );
+    Assert(
+        CapturedReplayRouter.Resolve(
+            new PvpBattleManifest { BattleId = "pvp", CombatKind = "PVPCombat" }
+        ) == CapturedReplayRoute.PersistedPvp,
+        "PvP captures must use the persisted catalog route."
+    );
+}
+
+static void CurrentNativeReplayBecomesReadyWithoutPersistence()
+{
+    var state = new CurrentReplayRecordingState();
+    state.LatchBattle("pve");
+    state.EnterReplayState();
+    state.SetAvailability(ready: true, reason: null);
+    Assert(!state.Snapshot().CanStart, "An unrouted capture must not be recordable.");
+
+    state.MarkCurrentNativeReady("pve");
+    var snapshot = state.Snapshot();
+    Assert(snapshot.CanStart, "A routed current-native capture should be recordable.");
+    Assert(
+        snapshot.Phase == CurrentReplayRecordingPhase.Ready,
+        "The current-native route should transition directly to ready."
+    );
+}
+
+static void PvpBattleStoreRejectsPveManifests()
+{
+    var path = Path.Combine(Path.GetTempPath(), $"bpp-pvp-route-{Guid.NewGuid():N}.db");
+    var store = new PvpBattleSqliteStore(path);
+    try
+    {
+        store.Save(new PvpBattleManifest { BattleId = "pve", CombatKind = "Combat" });
+        throw new InvalidOperationException("The PvP store accepted a PvE manifest.");
+    }
+    catch (ArgumentException)
+    {
+        // Expected: routing regressions must fail instead of reporting false persistence success.
+    }
+}
+
+static void ReplayRecordingTooltipBalancesVerticalPadding()
+{
+    var balanced = CurrentReplayRecordingTooltipPadding.Balance(18, 48);
+    Assert(balanced.Top == 33, "Tooltip top padding should be vertically balanced.");
+    Assert(balanced.Bottom == 33, "Tooltip bottom padding should be vertically balanced.");
+    Assert(
+        balanced.Top + balanced.Bottom == 66,
+        "Balancing must preserve the native tooltip's total vertical padding."
+    );
 }
 
 static void Assert(bool condition, string message)

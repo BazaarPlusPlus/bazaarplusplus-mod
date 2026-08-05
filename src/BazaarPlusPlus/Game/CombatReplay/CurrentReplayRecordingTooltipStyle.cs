@@ -22,6 +22,8 @@ internal sealed class CurrentReplayRecordingTooltipStyle
     private TextAlignmentOptions _styledTooltipOriginalBodyAlignment;
     private VerticalLayoutGroup? _styledTooltipLayout;
     private TextAnchor _styledTooltipOriginalChildAlignment;
+    private int _styledTooltipOriginalPaddingTop;
+    private int _styledTooltipOriginalPaddingBottom;
 
     internal void Apply(AuxiliaryTooltipController tooltip)
     {
@@ -48,7 +50,11 @@ internal sealed class CurrentReplayRecordingTooltipStyle
 
             _styledTooltipLayout = tooltip.auxParent?.GetComponent<VerticalLayoutGroup>();
             if (_styledTooltipLayout != null)
+            {
                 _styledTooltipOriginalChildAlignment = _styledTooltipLayout.childAlignment;
+                _styledTooltipOriginalPaddingTop = _styledTooltipLayout.padding.top;
+                _styledTooltipOriginalPaddingBottom = _styledTooltipLayout.padding.bottom;
+            }
         }
 
         ApplyTextStyle(tooltip.headerText, _styledTooltipOriginalHeaderFontSize);
@@ -59,7 +65,18 @@ internal sealed class CurrentReplayRecordingTooltipStyle
             tooltip.transform.localScale = _styledTooltipOriginalLocalScale * TooltipScale;
 
         if (_styledTooltipLayout != null)
-            _styledTooltipLayout.childAlignment = TextAnchor.MiddleCenter;
+        {
+            _styledTooltipLayout.childAlignment = TextAnchor.MiddleLeft;
+            var balancedPadding = CurrentReplayRecordingTooltipPadding.Balance(
+                _styledTooltipOriginalPaddingTop,
+                _styledTooltipOriginalPaddingBottom
+            );
+            _styledTooltipLayout.padding.top = balancedPadding.Top;
+            _styledTooltipLayout.padding.bottom = balancedPadding.Bottom;
+            LayoutRebuilder.ForceRebuildLayoutImmediate(
+                (RectTransform)_styledTooltipLayout.transform
+            );
+        }
 
         LayoutRebuilder.ForceRebuildLayoutImmediate(tooltip.PositioningRectTransform);
     }
@@ -98,7 +115,11 @@ internal sealed class CurrentReplayRecordingTooltipStyle
             tooltip.bodyText.alignment = _styledTooltipOriginalBodyAlignment;
         }
         if (_styledTooltipLayout != null)
+        {
             _styledTooltipLayout.childAlignment = _styledTooltipOriginalChildAlignment;
+            _styledTooltipLayout.padding.top = _styledTooltipOriginalPaddingTop;
+            _styledTooltipLayout.padding.bottom = _styledTooltipOriginalPaddingBottom;
+        }
 
         _styledTooltip = null;
         _styledTooltipLayout = null;
