@@ -134,11 +134,11 @@ public sealed class CombatImpactMetricFormatterTests
         };
 
         Assert.Equal(
-            "×2 (1<sprite name=Crit>) · +12 total",
+            "×2 (1<sprite name=Crit>) · 12 total",
             CombatImpactMetricFormatter.Group(appliedRegen, chinese: false, CritIcon)
         );
         Assert.Equal(
-            "×2（1<sprite name=Crit>） · 总计 +12",
+            "×2（1<sprite name=Crit>） · 总计 12",
             CombatImpactMetricFormatter.Group(appliedRegen, chinese: true, CritIcon)
         );
         Assert.Equal(

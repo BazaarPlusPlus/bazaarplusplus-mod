@@ -126,13 +126,20 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     )
     {
         if (!IsTypographyReadyForCurrentLocale())
+        {
+            LogShowRejected(PostCombatImpactReasonCode.TypographyUnavailable);
             return false;
+        }
 
         // The host owns taking over the native pair; it self-cleans and returns false (never
         // throws) so the caller keeps reporting AuxiliaryTooltipContentUnavailable rather than
-        // TooltipRenderException.
-        if (!_session.TryOpen(auxiliary, primary, PairedOptions))
+        // TooltipRenderException. The failure detail is logged here because these were the only
+        // silent dismissal paths in the whole presentation.
+        if (!_session.TryOpen(auxiliary, primary, PairedOptions, out var openFailure))
+        {
+            LogShowRejected(MapOpenFailure(openFailure));
             return false;
+        }
 
         var generation = _session.Generation;
         _receivedPerspectiveAvailable = received != null;
@@ -1364,6 +1371,28 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         layout.flexibleWidth = flexibleWidth;
         return layout;
     }
+
+    private static void LogShowRejected(PostCombatImpactReasonCode reasonCode) =>
+        BppLog.WarnEvent(
+            PostCombatImpactLogEvents.InteractionDegraded,
+            PostCombatImpactLogEvents.ReasonCode.Bind(reasonCode)
+        );
+
+    private static PostCombatImpactReasonCode MapOpenFailure(
+        NativePairedTooltipOpenFailure failure
+    ) =>
+        failure switch
+        {
+            NativePairedTooltipOpenFailure.MissingAuxiliaryFields =>
+                PostCombatImpactReasonCode.PairOpenMissingAuxiliaryFields,
+            NativePairedTooltipOpenFailure.DyingController =>
+                PostCombatImpactReasonCode.PairOpenDyingController,
+            NativePairedTooltipOpenFailure.MissingBackground =>
+                PostCombatImpactReasonCode.PairOpenMissingBackground,
+            NativePairedTooltipOpenFailure.BackgroundCloneRejected =>
+                PostCombatImpactReasonCode.PairOpenBackgroundCloneRejected,
+            _ => PostCombatImpactReasonCode.AuxiliaryTooltipContentUnavailable,
+        };
 
     private static void LogPlacementDegradationOnce(
         bool degraded,
