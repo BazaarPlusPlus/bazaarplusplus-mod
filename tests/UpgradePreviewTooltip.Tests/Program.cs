@@ -79,7 +79,7 @@ var currentContext = new TooltipContext(card, template, new ValueContext(null!, 
 var currentToken = TooltipComponentAbility.Create(currentContext, fieryAbility.Id, null, 0);
 
 AssertNotNull(currentToken, "Current Fiery token should be created.");
-AssertEqual(2f, currentToken!.Resolve()!.Value, "Current derived Burn value should be 2.");
+AssertFloatEqual(2f, currentToken!.Resolve()!.Value, "Current derived Burn value should be 2.");
 AssertTrue(
     UpgradePreviewValueProjection.TryCreate(
         card,
@@ -98,7 +98,7 @@ AssertTrue(
     projection.TryResolve(currentToken, out var upgradedBurn),
     "Projected Fiery token should resolve."
 );
-AssertEqual(3f, upgradedBurn, "Derived Burn should be recomputed as 20% of 15, not 2 + 5.");
+AssertFloatEqual(3f, upgradedBurn, "Derived Burn should be recomputed as 20% of 15, not 2 + 5.");
 
 card.Attributes[ECardAttributeType.Custom_1] = 12;
 AssertTrue(
@@ -145,7 +145,9 @@ var cooldownCard = new ItemCard
     Tier = ETier.Silver,
     Attributes = new Dictionary<ECardAttributeType, int>
     {
-        [ECardAttributeType.CooldownMax] = 7000,
+        // Runtime materializes the active 50% reduction into CooldownMax while retaining
+        // PercentCooldownReduction as the source modifier.
+        [ECardAttributeType.CooldownMax] = 3500,
         [ECardAttributeType.PercentCooldownReduction] = 50,
     },
 };
@@ -158,6 +160,11 @@ AssertTrue(
     ),
     "Cooldown upgrade projection should be created."
 );
+AssertEqual(
+    3000,
+    cooldownProjection.Card.Attributes[ECardAttributeType.CooldownMax],
+    "Projected cooldown should apply the active percentage once to the next-tier base."
+);
 AssertTrue(
     cooldownProjection.TryResolveEffectiveCooldowns(
         out var currentCooldown,
@@ -165,8 +172,73 @@ AssertTrue(
     ),
     "Effective cooldowns should resolve."
 );
-AssertEqual(3.5f, currentCooldown, "50% reduction should halve the current cooldown.");
-AssertEqual(3f, upgradedCooldown, "50% reduction should halve the upgraded cooldown.");
+AssertFloatEqual(3.5f, currentCooldown, "50% reduction should halve the current cooldown.");
+AssertFloatEqual(3f, upgradedCooldown, "50% reduction should halve the upgraded cooldown.");
+
+cooldownCard.Attributes[ECardAttributeType.CooldownMax] = 4000;
+AssertTrue(
+    UpgradePreviewValueProjection.TryCreate(
+        cooldownCard,
+        cooldownTemplate,
+        new ValueContext(null!, cooldownCard),
+        out var buffedCooldownProjection
+    ),
+    "Buffed cooldown projection should be created."
+);
+AssertEqual(
+    3500,
+    buffedCooldownProjection.Card.Attributes[ECardAttributeType.CooldownMax],
+    "Additive cooldown changes should be preserved before applying the active percentage."
+);
+
+cooldownCard.Attributes[ECardAttributeType.CooldownMax] = 8000;
+cooldownCard.Attributes[ECardAttributeType.PercentCooldownReduction] = 0;
+AssertTrue(
+    UpgradePreviewValueProjection.TryCreate(
+        cooldownCard,
+        cooldownTemplate,
+        new ValueContext(null!, cooldownCard),
+        out var additiveCooldownProjection
+    ),
+    "Additive-only cooldown projection should be created."
+);
+AssertEqual(
+    7000,
+    additiveCooldownProjection.Card.Attributes[ECardAttributeType.CooldownMax],
+    "Additive cooldown changes should remain additive when no percentage is active."
+);
+
+AssertFloatEqual(
+    2f,
+    UpgradePreviewValueRegistry.ConvertProjectedValueToRenderedUnits(
+        ECardAttributeType.HasteAmount,
+        null,
+        2000f
+    ),
+    "Projected duration values should convert from milliseconds exactly once."
+);
+AssertFloatEqual(
+    2f,
+    UpgradePreviewValueRegistry.ConvertProjectedValueToRenderedUnits(
+        ECardAttributeType.Custom_1,
+        ECardAttributeType.HasteAmount,
+        2000f
+    ),
+    "A duration style override should control projected-value conversion."
+);
+AssertFloatEqual(
+    15f,
+    UpgradePreviewValueRegistry.ConvertProjectedValueToRenderedUnits(
+        ECardAttributeType.Custom_1,
+        null,
+        15f
+    ),
+    "Non-duration projected values should keep their raw units."
+);
+AssertTrue(
+    UpgradePreviewValueRegistry.HaveSameFormattedValue(3.01f, 3.02f),
+    "Values that render identically should not show a redundant upgrade arrow."
+);
 
 Console.WriteLine("Upgrade preview tooltip projection tests passed.");
 
@@ -186,5 +258,12 @@ static void AssertEqual<T>(T expected, T actual, string message)
     where T : IEquatable<T>
 {
     if (!expected.Equals(actual))
+        throw new InvalidOperationException($"{message} Expected={expected}, Actual={actual}");
+}
+
+static void AssertFloatEqual(float expected, float actual, string message)
+{
+    const float tolerance = 0.0001f;
+    if (MathF.Abs(expected - actual) > tolerance)
         throw new InvalidOperationException($"{message} Expected={expected}, Actual={actual}");
 }

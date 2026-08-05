@@ -11,6 +11,10 @@
       Include="../../src/BazaarPlusPlus/Game/Tooltips/UpgradePreviewValueProjection.cs"
       Link="UpgradePreviewValueProjection.cs"
     />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/Tooltips/UpgradePreviewValueRegistry.cs"
+      Link="UpgradePreviewValueRegistry.cs"
+    />
     <Reference Include="BazaarGameClient">
       <HintPath>$(ManagedPath)/BazaarGameClient.dll</HintPath>
     </Reference>

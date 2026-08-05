@@ -21,6 +21,12 @@ internal static class UpgradePreviewCooldownPatch
         )
             return;
 
-        __instance.SetCooldown($"{currentSeconds:F1}", canFuse: true, $"{upgradedSeconds:F1}");
+        var currentText = $"{currentSeconds:F1}";
+        var upgradedText = $"{upgradedSeconds:F1}";
+        __instance.SetCooldown(
+            currentText,
+            canFuse: !string.Equals(currentText, upgradedText, StringComparison.Ordinal),
+            upgradedText
+        );
     }
 }

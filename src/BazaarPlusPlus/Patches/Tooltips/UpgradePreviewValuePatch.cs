@@ -43,18 +43,17 @@ internal static class UpgradePreviewValuePatch
         )
             return;
 
-        var convertToSeconds =
-            styleAsAttribute?.RequiresConversionToSeconds()
-            ?? attributeType.RequiresConversionToSeconds();
+        // The native method mutates its value parameter into display units before this
+        // postfix runs. Only the independently projected value is still in raw units.
         var currentValue = value;
-        if (convertToSeconds)
-        {
-            currentValue = TooltipExtensions.MillisecondsToSeconds(currentValue);
-            nextValue = TooltipExtensions.MillisecondsToSeconds(nextValue);
-        }
+        nextValue = UpgradePreviewValueRegistry.ConvertProjectedValueToRenderedUnits(
+            attributeType,
+            styleAsAttribute,
+            nextValue
+        );
 
         var currentText = UpgradePreviewValueRegistry.Format(currentValue);
-        if (currentValue == nextValue)
+        if (UpgradePreviewValueRegistry.HaveSameFormattedValue(currentValue, nextValue))
         {
             __result = styleAsAttribute.HasValue
                 ? Data.TooltipTypography.GetAttributeStringWithIcon(

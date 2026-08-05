@@ -60,8 +60,13 @@ internal sealed class UpgradePreviewValueProjection
 
             if (source.Attributes.TryGetValue(attribute, out var currentValue))
             {
-                attributes[attribute] =
-                    nextBase.Value + (currentBase.HasValue ? currentValue - currentBase.Value : 0);
+                attributes[attribute] = ProjectAttributeValue(
+                    source,
+                    attribute,
+                    currentValue,
+                    currentBase,
+                    nextBase.Value
+                );
             }
             else
             {
@@ -147,17 +152,39 @@ internal sealed class UpgradePreviewValueProjection
         )
             return false;
 
-        currentSeconds = ApplyCooldownReduction(SourceCard, currentMs) / 1000f;
-        upgradedSeconds = ApplyCooldownReduction(Card, upgradedMs) / 1000f;
+        // CooldownMax is already the effective runtime cooldown. Applying the separate
+        // PercentCooldownReduction attribute again would double-count conditional auras
+        // such as Kitchen Scale's "Cooldown is halved" effect.
+        currentSeconds = currentMs / 1000f;
+        upgradedSeconds = upgradedMs / 1000f;
         return true;
     }
 
-    private static float ApplyCooldownReduction(ItemCard card, int cooldownMs)
+    private static int ProjectAttributeValue(
+        ItemCard source,
+        ECardAttributeType attribute,
+        int currentValue,
+        int? currentBase,
+        int nextBase
+    )
     {
-        var reduction = card.Attributes.GetValueOrDefault(
+        if (!currentBase.HasValue)
+            return nextBase;
+
+        if (attribute != ECardAttributeType.CooldownMax)
+            return nextBase + currentValue - currentBase.Value;
+
+        var reduction = source.Attributes.GetValueOrDefault(
             ECardAttributeType.PercentCooldownReduction
         );
         var multiplier = Math.Max(0, 100 - reduction) / 100f;
-        return cooldownMs * multiplier;
+        if (multiplier <= 0f || currentBase.Value <= 0)
+            return currentValue;
+
+        // Recover the pre-percent runtime value so additive/flat runtime changes remain
+        // additive while the percentage reduction scales the next tier's base correctly.
+        var prePercentCurrent = currentValue / multiplier;
+        var runtimeDelta = prePercentCurrent - currentBase.Value;
+        return Math.Max(0, (int)MathF.Round((nextBase + runtimeDelta) * multiplier));
     }
 }
