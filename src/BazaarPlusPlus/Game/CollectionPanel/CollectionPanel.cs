@@ -25,6 +25,7 @@ namespace BazaarPlusPlus.Game.CollectionPanel;
 internal sealed class CollectionPanel : MonoBehaviour
 {
     private const float CatalogBuildFrameBudgetMs = 4f;
+    private const float CatalogWarmupFrameBudgetMs = 1f;
     private const string OverlayPanelId = "CollectionPanel";
 
     private static CollectionPanel? _instance;
@@ -66,6 +67,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     // else would re-render them without user interaction. Update polls for the typography
     // instance and re-renders once, so the startup window self-heals.
     private bool _viewMissedNativeTypography;
+    private bool _sourceCatalogWarmed;
 
     public void Initialize(
         IBppServices services,
@@ -385,12 +387,19 @@ internal sealed class CollectionPanel : MonoBehaviour
     // (fade-out completion, catalog warmup, deferred native cleanup).
     private void Tick(float dt, bool isVisible)
     {
-        // Opportunistically warm the card catalog off-thread once static data is ready, so the
-        // first panel open does not pay the full-table card read (JsonGameDataManager.GetCardMap
-        // -> ReadAllCards) on the main thread. The catalog kicks a single shared Task per
-        // static-data source; the first open then awaits it instead of blocking.
-        if (!_catalog.HasCardMapLoadStarted)
-            _catalog.BeginCardMapLoad(out _);
+        // Warm the shared card map and catalog while the panel is closed. Card-map acquisition
+        // runs on the provider's worker task; catalog projection stays on the main thread but is
+        // capped to a small closed-state budget. An open panel raises the budget and consumes the
+        // same build session, so the first click never starts a duplicate full-table walk.
+        _catalog.AdvanceBuild(
+            isVisible ? CatalogBuildFrameBudgetMs : CatalogWarmupFrameBudgetMs,
+            out _
+        );
+        if (!_sourceCatalogWarmed)
+        {
+            _ = CollectionSourceCatalog.Entries;
+            _sourceCatalogWarmed = true;
+        }
 
         // Drive the panel fade every frame regardless of _isVisible so a Close mid-frame
         // can finish its fade-out animation before we tear runtime down.
@@ -712,56 +721,25 @@ internal sealed class CollectionPanel : MonoBehaviour
         CollectionCatalogBuildResult? catalogResult = null;
         CollectionPanelLogReasonCode? unavailableReason = null;
         CollectionRenderOutcome? acceptOutcome = null;
-        if (_catalog.TryGetCached(out var cached))
+        while (true)
         {
-            catalogResult = cached;
-            acceptOutcome = _viewState.AcceptCatalog(cached.Cards);
-        }
-        else
-        {
-            // First open (cache miss): acquire the full card map OFF the main thread. The heavy
-            // cost is JsonGameDataManager.GetCardMap() -> ReadAllCards (~22 MB full-table SQLite
-            // read + polymorphic deserialize); running it synchronously here froze the click path
-            // because it sits before the time-sliced Step loop and cannot be preempted. Await the
-            // shared prewarm Task (kicked from Update / reused here) while the loading shell +
-            // spinner keep animating, then build the catalog from the materialised map.
-            var acquireStarted = diagnostics.Now();
-            var loadTask = _catalog.BeginCardMapLoad(out var source);
-            if (loadTask != null)
+            if (_catalog.TryGetCached(out var cached))
             {
-                while (!loadTask.IsCompleted)
-                {
-                    if (!IsLoadGenerationCurrent(generation))
-                        yield break;
-                    yield return null;
-                }
+                catalogResult = cached;
+                acceptOutcome = _viewState.AcceptCatalog(cached.Cards);
+                break;
             }
-            diagnostics.AddSegment(CollectionPanelLoadSegment.CatalogAcquire, acquireStarted);
-            var mapOutcome = CollectionCardMapLoadOutcome.From(source, loadTask);
 
-            if (_catalog.TryCreateBuildSession(mapOutcome, out var session, out unavailableReason))
+            if (_catalog.WarmupStatus == CollectionCatalogWarmupStatus.Unavailable)
             {
-                var buildSession = session!;
-                using (buildSession)
-                {
-                    while (true)
-                    {
-                        var frameStartedAt = System.Diagnostics.Stopwatch.GetTimestamp();
-                        if (buildSession.Step(() => ShouldPauseCatalogBuild(frameStartedAt)))
-                            break;
-                        if (!IsLoadGenerationCurrent(generation))
-                            yield break;
-                        yield return null;
-                    }
-
-                    catalogResult = _catalog.Commit(buildSession);
-                    acceptOutcome = _viewState.AcceptCatalog(catalogResult.Cards);
-                }
-            }
-            else
-            {
+                unavailableReason = _catalog.WarmupFailureReason;
                 acceptOutcome = _viewState.CatalogUnavailable();
+                break;
             }
+
+            if (!IsLoadGenerationCurrent(generation))
+                yield break;
+            yield return null;
         }
         diagnostics.AddSegment(CollectionPanelLoadSegment.Catalog, started);
         if (catalogResult != null)
@@ -796,15 +774,6 @@ internal sealed class CollectionPanel : MonoBehaviour
 
     private bool IsLoadGenerationCurrent(int generation) =>
         generation == _loadGeneration && _isVisible;
-
-    private static bool ShouldPauseCatalogBuild(long startedAt)
-    {
-        var elapsedMs =
-            (System.Diagnostics.Stopwatch.GetTimestamp() - startedAt)
-            * 1000.0
-            / System.Diagnostics.Stopwatch.Frequency;
-        return elapsedMs >= CatalogBuildFrameBudgetMs;
-    }
 
     private void InvalidateCatalog(CollectionPanelLogReasonCode reasonCode)
     {
