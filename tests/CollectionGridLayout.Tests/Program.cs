@@ -1,7 +1,24 @@
 using BazaarGameShared.Domain.Core.Types;
+using BazaarPlusPlus.Game.CollectionPanel;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.CollectionPanel.Tooltips;
+
+AssertEqual(
+    true,
+    CollectionStagingTools.IsEnabled("1.0.11884-staging-windows-x64-0fff95cf"),
+    "Staging builds should expose the collection template-ID copy tool."
+);
+AssertEqual(
+    false,
+    CollectionStagingTools.IsEnabled("1.0.11884-windows-x64-0fff95cf"),
+    "Online builds must not expose the collection template-ID copy tool."
+);
+AssertEqual(
+    false,
+    CollectionStagingTools.IsEnabled("1.0.11884-ptr-windows-x64-0fff95cf"),
+    "PTR builds must not expose the collection template-ID copy tool."
+);
 
 var mergedTierText = CollectionTierTooltipTextMerger.Merge(
     new[]

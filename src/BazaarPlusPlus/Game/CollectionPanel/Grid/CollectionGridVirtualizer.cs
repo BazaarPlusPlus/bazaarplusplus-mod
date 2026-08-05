@@ -351,6 +351,22 @@ internal sealed class CollectionGridVirtualizer
         }
     }
 
+    internal bool TryGetHoveredCard(out CollectionCardVm card)
+    {
+        if (
+            _hoverDispatched
+            && _hoverPollIndex >= 0
+            && _realized.TryGetValue(_hoverPollIndex, out var cell)
+        )
+        {
+            card = cell.Vm;
+            return true;
+        }
+
+        card = null!;
+        return false;
+    }
+
     private void DispatchHoverOut()
     {
         // Hide the display-case highlight on every hover-out path (outside the viewport, in a

@@ -14,12 +14,14 @@ namespace BazaarPlusPlus.Game.CollectionPanel.Ui;
 
 internal sealed partial class CollectionPanelView : IDisposable
 {
+    private const string StagingIdCopyHint = "STAGING · 悬停卡牌后按 Ctrl+C 复制 template ID";
     private const string SourceChipInitialsName = "bpp-source-chip-initials";
     private const string TagChipIconName = "bpp-tag-chip-icon";
     private const string TagChipLabelName = "bpp-tag-chip-label";
 
     private readonly Transform _parent;
     private readonly ICollectionPanelCommands _commands;
+    private readonly bool _stagingItemIdCopyEnabled;
 
     private GameObject? _rootObject;
     private UIDocument? _document;
@@ -29,6 +31,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private VisualElement? _root;
     private Label? _title;
     private VisualElement? _subtitle;
+    private Label? _stagingIdCopyLabel;
     private Label? _countLabel;
     private Label? _statusLabel;
     private Label? _disclaimerLabel;
@@ -85,6 +88,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private bool _searchToggleHovered;
     private bool _searchTogglePressed;
     private bool _searchToggleFocused;
+    private int _stagingIdCopyFeedbackGeneration;
 
     private readonly Dictionary<EHero, Button> _heroChips = new();
     private readonly Dictionary<EHero, VisualElement> _heroChipIcons = new();
@@ -114,10 +118,31 @@ internal sealed partial class CollectionPanelView : IDisposable
 
     public event Action<Rect>? GridViewportBoundsChanged;
 
-    public CollectionPanelView(Transform parent, ICollectionPanelCommands commands)
+    public CollectionPanelView(
+        Transform parent,
+        ICollectionPanelCommands commands,
+        bool stagingItemIdCopyEnabled = false
+    )
     {
         _parent = parent ?? throw new ArgumentNullException(nameof(parent));
         _commands = commands ?? throw new ArgumentNullException(nameof(commands));
+        _stagingItemIdCopyEnabled = stagingItemIdCopyEnabled;
+    }
+
+    internal void ShowStagingTemplateIdCopied(string displayName, string templateId)
+    {
+        if (_stagingIdCopyLabel == null)
+            return;
+
+        var generation = ++_stagingIdCopyFeedbackGeneration;
+        _stagingIdCopyLabel.text = $"已复制 {displayName}: {templateId}";
+        _stagingIdCopyLabel
+            .schedule.Execute(() =>
+            {
+                if (generation == _stagingIdCopyFeedbackGeneration && _stagingIdCopyLabel != null)
+                    _stagingIdCopyLabel.text = StagingIdCopyHint;
+            })
+            .StartingIn(2500);
     }
 
     public void EnsureCreated()
@@ -598,6 +623,7 @@ internal sealed partial class CollectionPanelView : IDisposable
 
     public void Dispose()
     {
+        _stagingIdCopyFeedbackGeneration++;
         _controlsDragScroller?.Dispose();
         _gridDragScroller?.Dispose();
         if (_rootObject != null)
@@ -612,6 +638,7 @@ internal sealed partial class CollectionPanelView : IDisposable
         _typography = null;
         _titleOverlay = null;
         _root = null;
+        _stagingIdCopyLabel = null;
         _controlsScrollView = null;
         _controlsDragScroller = null;
         _gridDragScroller = null;

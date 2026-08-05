@@ -71,6 +71,20 @@ internal sealed partial class CollectionPanelView
         _subtitle = BPPSupporterAttributionRow.Create();
         rail.Add(_subtitle);
 
+        if (_stagingItemIdCopyEnabled)
+        {
+            _stagingIdCopyLabel = CreateLabel(
+                Sizes.FontCorner,
+                FontStyle.Normal,
+                Colors.HistoryStatusText
+            );
+            _stagingIdCopyLabel.text = StagingIdCopyHint;
+            _stagingIdCopyLabel.style.marginTop = UiSpacing.Xs;
+            _stagingIdCopyLabel.style.whiteSpace = WhiteSpace.NoWrap;
+            _stagingIdCopyLabel.style.overflow = Overflow.Hidden;
+            rail.Add(_stagingIdCopyLabel);
+        }
+
         var primaryControlsRow = CreateOperationRow(UiSpacing.Md);
         rail.Add(primaryControlsRow);
 

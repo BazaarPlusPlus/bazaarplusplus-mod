@@ -12,6 +12,10 @@
 
   <ItemGroup>
     <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\CollectionStagingTools.cs"
+      Link="CollectionStagingTools.cs"
+    />
+    <Compile
       Include="..\..\src\BazaarPlusPlus\Game\CollectionPanel\Data\CollectionCardVm.cs"
       Link="CollectionCardVm.cs"
     />
