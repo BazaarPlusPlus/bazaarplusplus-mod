@@ -44,6 +44,10 @@ try
         </plist>
         """
     );
+    var nestedApp = Path.Combine(gameRoot, "TheBazaar.app", "TheBazaar_ARM64.app");
+    Directory.CreateDirectory(Path.Combine(nestedApp, "Contents", "MacOS"));
+    File.WriteAllText(Path.Combine(nestedApp, "Contents", "MacOS", "The Bazaar"), "UNITY arm64");
+
     File.WriteAllText(exe, "UNITY current executable");
     File.WriteAllText(orig, "UNITY stale backup");
     File.WriteAllText(script, "#!/bin/sh\n");
@@ -75,7 +79,33 @@ try
         fi
         """
     );
-    WriteTool(fakeBin, "codesign", "#!/bin/sh\nexit 0\n");
+    // Real codesign refuses to sign or verify a bundle whose root holds anything
+    // besides Contents/ ("unsealed contents present in the bundle root"). The
+    // Bazaar ships TheBazaar_ARM64.app exactly there, so model that rejection.
+    WriteTool(
+        fakeBin,
+        "codesign",
+        """
+        #!/bin/sh
+        for arg in "$@"; do
+          case "$arg" in
+            *.app)
+              for entry in "$arg"/* "$arg"/.[!.]*; do
+                [ -e "$entry" ] || continue
+                case "${entry##*/}" in
+                  Contents) ;;
+                  *)
+                    echo "$arg: unsealed contents present in the bundle root" >&2
+                    exit 1
+                    ;;
+                esac
+              done
+              ;;
+          esac
+        done
+        exit 0
+        """
+    );
     WriteTool(fakeBin, "xattr", "#!/bin/sh\nexit 0\n");
 
     var result = RunProcess(
@@ -108,6 +138,15 @@ try
     AssertTrue(
         File.Exists(dotnetRecord),
         "run.sh build should still invoke dotnet build after repair."
+    );
+    AssertEqual(
+        "UNITY arm64",
+        File.ReadAllText(Path.Combine(nestedApp, "Contents", "MacOS", "The Bazaar")),
+        "Repair must put the bundle-root entries it stashed for codesign back in place."
+    );
+    AssertFalse(
+        Directory.Exists(Path.Combine(gameRoot, ".bpp-bundle-root-stash")),
+        "Repair should not leave a bundle-root stash behind."
     );
 }
 finally

@@ -30,6 +30,7 @@ EXE_PATH="$APP_PATH/Contents/MacOS/$EXE_NAME"
 ORIG_PATH="$EXE_PATH.orig"
 STAGED_STUB="$EXE_PATH.bpp-stub"
 PREFIX_SCRIPT="$GAME_ROOT/run_bepinex.sh"
+BUNDLE_ROOT_STASH="$GAME_ROOT/.bpp-bundle-root-stash"
 
 links_unity() {
     local path="$1"
@@ -65,14 +66,45 @@ write_entitlements() {
 EOF
 }
 
+# codesign refuses to sign *or* verify an app bundle that holds anything other
+# than Contents/ at its root ("unsealed contents present in the bundle root").
+# The Bazaar ships TheBazaar_ARM64.app there, so every codesign call has to run
+# with the bundle root emptied out. Stash outside the .app: writing into the
+# bundle is what breaks re-signing in the first place.
+stash_bundle_root_extras() {
+    local entry name
+    for entry in "$APP_PATH"/* "$APP_PATH"/.[!.]*; do
+        [[ -e "$entry" ]] || continue
+        name="$(basename "$entry")"
+        [[ "$name" == "Contents" ]] && continue
+        mkdir -p "$BUNDLE_ROOT_STASH"
+        rm -rf "${BUNDLE_ROOT_STASH:?}/$name"
+        mv "$entry" "$BUNDLE_ROOT_STASH/$name"
+    done
+}
+
+restore_bundle_root_extras() {
+    [[ -d "$BUNDLE_ROOT_STASH" ]] || return 0
+    local entry name
+    for entry in "$BUNDLE_ROOT_STASH"/* "$BUNDLE_ROOT_STASH"/.[!.]*; do
+        [[ -e "$entry" ]] || continue
+        name="$(basename "$entry")"
+        rm -rf "${APP_PATH:?}/$name"
+        mv "$entry" "$APP_PATH/$name"
+    done
+    rmdir "$BUNDLE_ROOT_STASH" 2>/dev/null || true
+}
+
 sign_and_verify_bundle() {
     local entitlements
     entitlements="$(mktemp -t bpp-ents)"
     write_entitlements "$entitlements"
+    stash_bundle_root_extras
     codesign --force --sign - --entitlements "$entitlements" "$ORIG_PATH" \
         && codesign --force --sign - "$APP_PATH" \
         && codesign --verify --deep --strict "$APP_PATH"
     local status=$?
+    restore_bundle_root_extras
     rm -f "$entitlements"
     return "$status"
 }
@@ -81,14 +113,20 @@ restore_vanilla_layout() {
     if [[ -f "$ORIG_PATH" ]]; then
         rm -f "$EXE_PATH"
         mv "$ORIG_PATH" "$EXE_PATH"
+        stash_bundle_root_extras
         codesign --force --sign - "$APP_PATH" >/dev/null 2>&1 || true
+        restore_bundle_root_extras
     fi
 }
 
 cleanup_failed_repair() {
+    restore_bundle_root_extras
     rm -f "$STAGED_STUB"
     restore_vanilla_layout
 }
+
+# An earlier run killed mid-signing leaves the bundle-root entries stashed.
+restore_bundle_root_extras
 
 if links_unity "$EXE_PATH"; then
     if game_running; then
