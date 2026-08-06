@@ -424,7 +424,7 @@ static void UnknownProjectionAndCountsStayUnknown()
     );
     Assert(
         HistoryPanelFormatter
-            .FormatSnapshotSummary(local.SnapshotCounts)
+            .FormatSnapshotSummary(local.SnapshotCounts, local.Source)
             .Contains("unknown", StringComparison.OrdinalIgnoreCase),
         "Unknown counts must not render as zero."
     );

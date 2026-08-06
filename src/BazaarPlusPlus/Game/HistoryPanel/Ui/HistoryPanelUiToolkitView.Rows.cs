@@ -370,7 +370,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         BindBattleRankPill(refs.OpponentRankPill, battle.OpponentRank, battle.OpponentRating);
         ConfigureInfoChip(
             refs.PlayerSummaryChip,
-            HistoryPanelText.PlayerSideShort(),
+            battle.Source == HistoryBattleSource.Ghost
+                ? HistoryPanelText.GhostDefenderSideShort()
+                : HistoryPanelText.PlayerSideShort(),
             HistoryPanelText.BoardSummary(battle.PlayerHandItemCount, battle.PlayerSkillCount),
             Colors.HistoryPlayerAccent
         );
@@ -378,7 +380,9 @@ internal sealed partial class HistoryPanelUiToolkitView
         BindHeroPill(refs.OpponentHeroPill, battle.OpponentHero);
         ConfigureInfoChip(
             refs.OpponentSummaryChip,
-            HistoryPanelText.OpponentSideShort(),
+            battle.Source == HistoryBattleSource.Ghost
+                ? HistoryPanelText.GhostChallengerSideShort()
+                : HistoryPanelText.OpponentSideShort(),
             HistoryPanelText.BoardSummary(battle.OpponentHandItemCount, battle.OpponentSkillCount),
             Colors.HistoryOpponentAccent
         );

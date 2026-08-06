@@ -129,13 +129,20 @@ internal sealed partial class HistoryPanel
             ? HistoryPanelFormatter.FormatDayOnly(selectedBattle!.Day)
             : string.Empty;
         var detailOpponentName = hasSelectedBattle
-            ? (selectedBattle!.OpponentName ?? HistoryPanelText.UnknownOpponent())
+            ? selectedBattle!.Source == HistoryBattleSource.Ghost
+                ? HistoryPanelText.GhostChallengedYou(
+                    selectedBattle.OpponentName ?? HistoryPanelText.UnknownOpponent()
+                )
+                : (selectedBattle.OpponentName ?? HistoryPanelText.UnknownOpponent())
             : string.Empty;
         var detailMetaText = hasSelectedBattle
             ? HistoryPanelFormatter.FormatTimestamp(selectedBattle!.RecordedAtUtc)
             : string.Empty;
         var detailSnapshotText = hasSelectedBattle
-            ? HistoryPanelFormatter.FormatSnapshotSummary(selectedBattle!.SnapshotCounts)
+            ? HistoryPanelFormatter.FormatSnapshotSummary(
+                selectedBattle!.SnapshotCounts,
+                selectedBattle.Source
+            )
             : string.Empty;
         var detailPlaceholderText = hasSelectedBattle
             ? string.Empty
