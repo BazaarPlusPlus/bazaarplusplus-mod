@@ -73,15 +73,7 @@
       "group": "all-hero",
       "order": 2,
       "name": "Aimbot",
-      "availableHeroes": [
-        "Dooley",
-        "Jules",
-        "Karnok",
-        "Mak",
-        "Stelle",
-        "Vanessa",
-        "TheDragons"
-      ],
+      "availableHeroes": [],
       "description": "Sells Crit items from any Hero",
       "portraitTemplateId": "f22fd14f-7e00-40cb-9e44-a46f34d64764",
       "sourceTemplateIds": [
@@ -525,8 +517,7 @@
         "Jules",
         "Karnok",
         "Mak",
-        "Pygmalien",
-        "TheDragons"
+        "Pygmalien"
       ],
       "description": "Sells Heal and Regen items",
       "portraitTemplateId": "2708055d-a8be-4c2f-a8d6-574e884a254e",
@@ -1042,11 +1033,20 @@
       "group": "size-specialist",
       "order": 5,
       "name": "Pol",
-      "availableHeroes": [],
+      "availableHeroes": [
+        "Dooley",
+        "Jules",
+        "Karnok",
+        "Mak",
+        "Pygmalien",
+        "Stelle",
+        "Vanessa"
+      ],
       "description": "Sells Large items",
       "portraitTemplateId": "065f6793-8607-4f02-abfe-db6afb221ab2",
       "sourceTemplateIds": [
-        "065f6793-8607-4f02-abfe-db6afb221ab2"
+        "065f6793-8607-4f02-abfe-db6afb221ab2",
+        "bdf0a9ab-8bc2-4f1b-8f7d-614293ac2db2"
       ],
       "offerSegments": [
         {
@@ -1177,7 +1177,8 @@
       "name": "Shelter Shelby",
       "availableHeroes": [
         "Karnok",
-        "Vanessa"
+        "Vanessa",
+        "TheDragons"
       ],
       "description": "Sells Friend items",
       "portraitTemplateId": "9459a01b-edf5-432b-81cd-1fd2cacfadad",
@@ -1282,7 +1283,13 @@
       "group": "all-hero",
       "order": 3,
       "name": "The Antiquarian",
-      "availableHeroes": [],
+      "availableHeroes": [
+        "Dooley",
+        "Karnok",
+        "Mak",
+        "Pygmalien",
+        "Vanessa"
+      ],
       "description": "Sells Relics from any Hero",
       "portraitTemplateId": "e840f7a3-0a04-455d-852c-286dc5011efc",
       "sourceTemplateIds": [
@@ -1384,6 +1391,32 @@
               "Haste",
               "Slow",
               "Cooldown"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "kind": "Merchant",
+      "group": "tag-type-specialist",
+      "order": 19,
+      "name": "Uitar Center",
+      "availableHeroes": [
+        "TheDragons"
+      ],
+      "description": "Sells Instruments",
+      "portraitTemplateId": "c5a68a92-9932-40bd-a45f-e1c902807814",
+      "sourceTemplateIds": [
+        "c5a68a92-9932-40bd-a45f-e1c902807814"
+      ],
+      "offerSegments": [
+        {
+          "key": "normal",
+          "kind": "Normal",
+          "rule": {
+            "heroMode": "SelectedHero",
+            "tagsAny": [
+              "Instrument"
             ]
           }
         }

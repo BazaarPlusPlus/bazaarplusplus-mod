@@ -513,14 +513,14 @@ var currentCatalogPath = Path.Combine(
 var currentCatalogJson = File.ReadAllText(currentCatalogPath);
 var currentCatalog = CollectionSourceCatalog.Build(currentCatalogJson);
 AssertEqual(
-    73,
+    74,
     currentCatalog.Count,
-    "Current source catalog should include the 73 verified sources after adding The Dragons and Mama Bear."
+    "Current source catalog should include the 74 verified sources."
 );
 AssertEqual(
-    50,
+    51,
     currentCatalog.Count(entry => entry.Kind == CollectionSourceKind.Merchant),
-    "Current source catalog should include the 50 verified merchants."
+    "Current source catalog should include the 51 verified merchants."
 );
 AssertEqual(
     23,
@@ -542,15 +542,15 @@ var aimbot = currentCatalog.Single(entry =>
     && string.Equals(entry.Name, "Aimbot", StringComparison.Ordinal)
 );
 AssertEqual(
-    7,
+    0,
     aimbot.AvailableHeroes.Count,
-    "Aimbot's package-return schedule should keep its six existing heroes plus The Dragons."
+    "Aimbot is a neutral merchant, so it carries no hero restriction."
 );
 AssertTrue(
     aimbot.AppliesToHero(catalogDragonsHero)
-        && !aimbot.AppliesToHero(EHero.Common)
-        && !aimbot.AppliesToHero(EHero.Pygmalien),
-    "Aimbot should be available for The Dragons while remaining hidden in neutral and Pygmalien contexts."
+        && aimbot.AppliesToHero(EHero.Common)
+        && aimbot.AppliesToHero(EHero.Pygmalien),
+    "Aimbot should be available for every hero, including neutral and Pygmalien contexts."
 );
 var auditedDragonsSources = new[]
 {
@@ -558,7 +558,8 @@ var auditedDragonsSources = new[]
     "Jules",
     "Karnok",
     "Kev's Armory",
-    "Herma",
+    "Shelter Shelby",
+    "Uitar Center",
     "Mak",
     "Pygmalien",
     "Stelle",
@@ -579,6 +580,17 @@ foreach (var sourceName in auditedDragonsSources)
             && entry.AppliesToHero(catalogDragonsHero)
         ),
         $"{sourceName} should be visible for The Dragons after the static-source audit."
+    );
+}
+var dragonsExcludedSources = new[] { "Herma", "Pol", "The Antiquarian" };
+foreach (var sourceName in dragonsExcludedSources)
+{
+    AssertTrue(
+        currentCatalog.All(entry =>
+            !string.Equals(entry.Name, sourceName, StringComparison.Ordinal)
+            || !entry.AppliesToHero(catalogDragonsHero)
+        ),
+        $"{sourceName} does not schedule The Dragons and should stay hidden for that hero."
     );
 }
 var dragonsMerchant = currentCatalog.Single(entry =>
