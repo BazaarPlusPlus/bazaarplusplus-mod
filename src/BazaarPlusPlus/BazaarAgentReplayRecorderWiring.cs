@@ -65,6 +65,7 @@ internal static class BazaarAgentReplayRecorderWiring
         if (!GhostBattlePayloadCodec.TryDeserialize(payloadBytes, out var ghost, out var error))
             return BppReplayControlResult.Invalid($"Payload decode failed: {error}");
 
+        ghost = GhostBattlePayloadReader.Normalize(ghost);
         var manifest = ghost!.BattleManifest;
         var payload = ghost.ReplayPayload;
         if (manifest == null || string.IsNullOrWhiteSpace(manifest.BattleId))

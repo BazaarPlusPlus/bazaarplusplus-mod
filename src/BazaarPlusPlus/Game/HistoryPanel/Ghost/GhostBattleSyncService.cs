@@ -155,6 +155,7 @@ internal sealed class GhostBattleSyncService
         }
 
         payloadStore.Save(extraction.Payload);
+        // Ghost table player_*/opponent_* columns retain the recorder perspective.
         _repository.MarkGhostReplayDownloaded(
             battleId,
             HistoryBattlePreviewProjection.CountSnapshots(
@@ -276,11 +277,16 @@ internal sealed class GhostBattleSyncService
                 DespawnMessageBytes = battle.Replay.DespawnMessageBytes.ToArray(),
             };
             _ = new CombatReplayLoader().Load(replay);
-            var manifest = BuildLocalPerspectiveManifest(reference, opened.Payload.RunId, battle);
+            var manifest = GhostManifestProjection.BuildRecorderPerspectiveManifest(
+                reference,
+                opened.Payload.RunId,
+                battle
+            );
             return GhostPayloadExtraction.Success(
                 new GhostBattlePayload
                 {
                     BattleId = reference.LocalBattleId,
+                    PerspectiveVersion = 1,
                     BattleManifest = manifest,
                     ReplayPayload = replay,
                 }
@@ -295,103 +301,6 @@ internal sealed class GhostBattleSyncService
             );
         }
     }
-
-    private static PvpBattleManifest BuildLocalPerspectiveManifest(
-        GhostBundleReference reference,
-        string runId,
-        RunBattleV5 battle
-    ) =>
-        new()
-        {
-            BattleId = reference.LocalBattleId,
-            RunId = runId,
-            RecordedAtUtc = DateTimeOffset.Parse(battle.Facts.RecordedAtUtc),
-            CombatKind = battle.Facts.CombatKind,
-            Day = battle.Facts.Day,
-            Hour = battle.Facts.Hour,
-            EncounterId = battle.Facts.EncounterId,
-            Participants = new PvpBattleParticipants
-            {
-                PlayerName = battle.Participants.Opponent.DisplayName,
-                PlayerAccountId = battle.Participants.Opponent.AccountId,
-                PlayerHero = battle.Participants.Opponent.HeroName,
-                PlayerRank = battle.Participants.Opponent.Rank,
-                PlayerRating = battle.Participants.Opponent.Rating,
-                PlayerLevel = battle.Participants.Opponent.Level,
-                PlayerPrestige = battle.Participants.Opponent.Prestige,
-                PlayerIncome = battle.Participants.Opponent.Income,
-                PlayerGold = battle.Participants.Opponent.Gold,
-                PlayerVictories = battle.Participants.Opponent.Victories,
-                OpponentName = battle.Participants.Player.DisplayName,
-                OpponentAccountId = battle.Participants.Player.AccountId,
-                OpponentHero = battle.Participants.Player.HeroName,
-                OpponentRank = battle.Participants.Player.Rank,
-                OpponentRating = battle.Participants.Player.Rating,
-                OpponentLevel = battle.Participants.Player.Level,
-                OpponentPrestige = battle.Participants.Player.Prestige,
-                OpponentVictories = battle.Participants.Player.Victories,
-            },
-            Outcome = new PvpBattleOutcome
-            {
-                Result = GhostBattleLocalProjector.ProjectResultToLocal(battle.Facts.Result),
-                WinnerCombatantId = GhostBattleLocalProjector.ProjectCombatantIdToLocal(
-                    battle.Facts.WinnerCombatantId
-                ),
-                LoserCombatantId = GhostBattleLocalProjector.ProjectCombatantIdToLocal(
-                    battle.Facts.LoserCombatantId
-                ),
-            },
-            Snapshots = new PvpBattleSnapshots
-            {
-                PlayerHand = BuildCapture(battle.Snapshots!, "opponent_hand"),
-                PlayerSkills = BuildCapture(battle.Snapshots!, "opponent_skills"),
-                OpponentHand = BuildCapture(battle.Snapshots!, "player_hand"),
-                OpponentSkills = BuildCapture(battle.Snapshots!, "player_skills"),
-            },
-        };
-
-    private static PvpBattleCardSetCapture BuildCapture(
-        BattleCardSnapshotsV5 snapshots,
-        string label
-    )
-    {
-        var source = snapshots.CardSets.First(set =>
-            string.Equals(set.Label, label, StringComparison.Ordinal)
-        );
-        return new PvpBattleCardSetCapture
-        {
-            Status = ParseEnum(source.Status, PvpBattleCaptureStatus.Missing),
-            Source = ParseEnum(source.Source, PvpBattleCaptureSource.Unknown),
-            Items = source.Items.Select(MapCard).ToList(),
-        };
-    }
-
-    private static PvpBattleCardSnapshot MapCard(BattleCardV5 item) =>
-        new()
-        {
-            InstanceId = item.InstanceId,
-            TemplateId = item.TemplateId,
-            Type = (BazaarGameShared.Domain.Core.Types.ECardType)item.Type,
-            Size = (BazaarGameShared.Domain.Core.Types.ECardSize)item.Size,
-            Section = item.Section.HasValue
-                ? (BazaarGameShared.Domain.Core.Types.EInventorySection?)item.Section.Value
-                : null,
-            Socket = item.Socket.HasValue
-                ? (BazaarGameShared.Domain.Core.Types.EContainerSocketId?)item.Socket.Value
-                : null,
-            Name = item.Name,
-            Tier = item.Tier,
-            Enchant = item.Enchant,
-            Tags = item.Tags.ToList(),
-            Attributes = new Dictionary<string, int>(item.Attributes),
-        };
-
-    private static TEnum ParseEnum<TEnum>(string? value, TEnum fallback)
-        where TEnum : struct =>
-        !string.IsNullOrWhiteSpace(value)
-        && Enum.TryParse<TEnum>(value.Trim(), true, out var parsed)
-            ? parsed
-            : fallback;
 
     private static string? ResolvePlayerAccountId()
     {

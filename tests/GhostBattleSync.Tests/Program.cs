@@ -4,6 +4,8 @@ using System.Net.Http.Headers;
 using BazaarPlusPlus.Game.HistoryPanel;
 using BazaarPlusPlus.Game.HistoryPanel.Ghost;
 using BazaarPlusPlus.Game.HistoryPanel.Storage;
+using BazaarPlusPlus.Game.PvpBattles;
+using BazaarPlusPlus.ModApi.Bundle;
 using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Models;
 
@@ -12,6 +14,8 @@ await RetryAfterStartsCooldown();
 await DownloadLimitsAndTransportErrorsStayClosed();
 await ExpiredUrlRefreshesOnceAndBecomesTerminal();
 await CorruptBundleBecomesPermanentWithoutRepeatedDownload();
+RecorderPerspectiveManifestKeepsSides();
+LegacyPayloadNormalizesOnceAndIsIdempotent();
 UnknownProjectionAndCountsStayUnknown();
 
 Console.WriteLine("Ghost battle V5 sync tests passed.");
@@ -242,6 +246,162 @@ static async Task CorruptBundleBecomesPermanentWithoutRepeatedDownload()
         "Corruption state must persist."
     );
 }
+
+static void RecorderPerspectiveManifestKeepsSides()
+{
+    var battle = new RunBattleV5
+    {
+        Facts = new BattleFactsV5
+        {
+            RecordedAtUtc = "2026-08-06T00:00:00+00:00",
+            CombatKind = "PVPCombat",
+            Result = "Win",
+            WinnerCombatantId = "Player",
+            LoserCombatantId = "Opponent",
+        },
+        Participants = new BattleParticipantsV5
+        {
+            Player = new BattleParticipantV5
+            {
+                AccountId = "U",
+                DisplayName = "Uploader",
+                Income = 7,
+                Gold = 11,
+            },
+            Opponent = new BattleParticipantV5 { AccountId = "L", DisplayName = "Local" },
+        },
+        Snapshots = new BattleCardSnapshotsV5
+        {
+            CardSets =
+            [
+                SnapshotSet("player_hand", "A"),
+                SnapshotSet("player_skills", "player-skill"),
+                SnapshotSet("opponent_hand", "B"),
+                SnapshotSet("opponent_skills", "opponent-skill"),
+            ],
+        },
+    };
+    var reference = new GhostBundleReference(
+        "local-battle",
+        "remote-battle",
+        "U",
+        "bundle",
+        "https://r2.example/bundle",
+        DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeMilliseconds(),
+        "available",
+        "L"
+    );
+
+    var manifest = GhostManifestProjection.BuildRecorderPerspectiveManifest(
+        reference,
+        "run-1",
+        battle
+    );
+
+    Assert(
+        manifest.Snapshots.PlayerHand.Items.Single().TemplateId == "A",
+        "Recorder player_hand must remain on the manifest player side."
+    );
+    Assert(
+        manifest.Snapshots.OpponentHand.Items.Single().TemplateId == "B",
+        "Recorder opponent_hand must remain on the manifest opponent side."
+    );
+    Assert(
+        manifest.Participants.PlayerAccountId == "U",
+        "The uploader must remain the manifest player."
+    );
+    Assert(
+        manifest.Outcome.WinnerCombatantId == battle.Facts.WinnerCombatantId,
+        "The manifest winner must keep the recorder combatant id."
+    );
+    Assert(
+        manifest.Participants.PlayerIncome == 7 && manifest.Participants.PlayerGold == 11,
+        "Recorder income and gold must be projected onto the manifest player."
+    );
+}
+
+static void LegacyPayloadNormalizesOnceAndIsIdempotent()
+{
+    var payload = new GhostBattlePayload
+    {
+        PerspectiveVersion = 0,
+        BattleManifest = new PvpBattleManifest
+        {
+            Participants = new PvpBattleParticipants
+            {
+                PlayerAccountId = "L",
+                PlayerName = "Local",
+                PlayerIncome = 7,
+                PlayerGold = 11,
+                OpponentAccountId = "U",
+                OpponentName = "Uploader",
+            },
+            Outcome = new PvpBattleOutcome
+            {
+                Result = "Lost",
+                WinnerCombatantId = "Opponent",
+                LoserCombatantId = "Player",
+            },
+            Snapshots = new PvpBattleSnapshots
+            {
+                PlayerHand = Capture("B"),
+                PlayerSkills = Capture("local-skill"),
+                OpponentHand = Capture("A"),
+                OpponentSkills = Capture("uploader-skill"),
+            },
+        },
+    };
+
+    var normalized = GhostBattlePayloadReader.Normalize(payload)!;
+
+    Assert(normalized.PerspectiveVersion == 1, "Legacy payloads must be marked normalized.");
+    Assert(
+        normalized.BattleManifest.Participants.PlayerAccountId == "U"
+            && normalized.BattleManifest.Participants.OpponentAccountId == "L",
+        "Legacy participants must normalize to recorder perspective."
+    );
+    Assert(
+        normalized.BattleManifest.Snapshots.PlayerHand.Items.Single().TemplateId == "A"
+            && normalized.BattleManifest.Snapshots.OpponentHand.Items.Single().TemplateId == "B",
+        "Legacy snapshots must normalize to recorder perspective."
+    );
+    Assert(
+        normalized.BattleManifest.Outcome.Result == "Won"
+            && normalized.BattleManifest.Outcome.WinnerCombatantId == "Player"
+            && normalized.BattleManifest.Outcome.LoserCombatantId == "Opponent",
+        "Legacy outcome must normalize to recorder perspective."
+    );
+    Assert(
+        normalized.BattleManifest.Participants.PlayerIncome == null
+            && normalized.BattleManifest.Participants.PlayerGold == null,
+        "Legacy player income and gold must be missing when no opponent fields existed."
+    );
+
+    var playerHand = normalized.BattleManifest.Snapshots.PlayerHand;
+    var second = GhostBattlePayloadReader.Normalize(normalized)!;
+    Assert(ReferenceEquals(normalized, second), "Normalization must return the same payload.");
+    Assert(
+        ReferenceEquals(second.BattleManifest.Snapshots.PlayerHand, playerHand)
+            && second.BattleManifest.Participants.PlayerAccountId == "U"
+            && second.BattleManifest.Outcome.WinnerCombatantId == "Player",
+        "A normalized payload must not be swapped again."
+    );
+}
+
+static BattleCardSetV5 SnapshotSet(string label, string templateId) =>
+    new()
+    {
+        Label = label,
+        Status = "Captured",
+        Source = "Runtime",
+        Items = [new BattleCardV5 { InstanceId = templateId, TemplateId = templateId }],
+    };
+
+static PvpBattleCardSetCapture Capture(string templateId) =>
+    new()
+    {
+        Items = [new PvpBattleCardSnapshot { InstanceId = templateId, TemplateId = templateId }],
+    };
 
 static void UnknownProjectionAndCountsStayUnknown()
 {
