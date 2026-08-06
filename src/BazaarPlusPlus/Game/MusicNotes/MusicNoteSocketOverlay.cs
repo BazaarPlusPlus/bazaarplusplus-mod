@@ -256,10 +256,15 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             accentColor = display.AccentColor;
 
             iconName = display.IconName;
-            // The Weapon keyword config has a color but no icon (the game's own note
-            // tooltips render it icon-less); borrow the damage attribute icon instead.
+            // The Weapon keyword config has no icon and only a pale blue accent that darkens
+            // into the same navy as the ghost state (the game's own note tooltips render it
+            // icon-less); borrow the damage attribute's icon and accent instead.
             if (string.IsNullOrEmpty(iconName) && tags[0].CardTag == ECardTag.Weapon)
-                iconName = NativeTagTypography.Resolve(ECardAttributeType.DamageAmount).IconName;
+            {
+                var damageDisplay = NativeTagTypography.Resolve(ECardAttributeType.DamageAmount);
+                iconName = damageDisplay.IconName;
+                accentColor = damageDisplay.AccentColor ?? accentColor;
+            }
 
             if (!string.IsNullOrEmpty(iconName))
                 iconAsset = KeywordIconSpriteProvider.ResolveAsset(iconName);
