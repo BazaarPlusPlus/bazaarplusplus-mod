@@ -846,7 +846,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void TheDragons_canonicalization_stays_out_of_runtime_capture_contracts()
+    public void TheDragons_canonicalization_happens_at_the_capture_write_boundary()
     {
         var mainSource = MainSourceRoot(RepoRoot());
         var runProbe = File.ReadAllText(
@@ -854,6 +854,9 @@ public class CoreLayeringTests
         );
         var pvpCollector = File.ReadAllText(
             Path.Combine(mainSource, "Game", "PvpBattles", "PvpBattleSnapshotCollector.cs")
+        );
+        var endOfRunCapture = File.ReadAllText(
+            Path.Combine(mainSource, "Game", "Screenshots", "EndOfRunCaptureWorkflow.cs")
         );
         var heroPoolPrefs = File.ReadAllText(
             Path.Combine(
@@ -876,11 +879,18 @@ public class CoreLayeringTests
 
         Assert.Contains("RandomHeroPoolHeroIdentity.Normalize", heroPoolPrefs);
         Assert.Contains("CombatReplayHeroIdentity.TryParse", replayPortrait);
-        Assert.DoesNotContain("TheDragonsHeroIdentity", runProbe);
-        Assert.DoesNotContain("TheDragonsHeroIdentity", pvpCollector);
-        Assert.Contains("Hero = run.Player?.Hero.ToString()", runProbe);
-        Assert.Contains("Data.Run?.Player?.Hero.ToString()", pvpCollector);
-        Assert.Contains("opponent?.Hero.ToString()", pvpCollector);
+
+        // Every hero id that leaves the process — runs.hero, run_screenshots.hero_name,
+        // pvp_battles.player_hero/opponent_hero, and the uploaded payload built from them — is
+        // canonicalized at capture time so the legacy alias stops spreading into new rows. Read
+        // sides still accept both spellings: rows written before this keep the legacy id forever.
+        Assert.Contains("TheDragonsHeroIdentity.ToCanonicalId(player.Hero)", runProbe);
+        Assert.Contains("TheDragonsHeroIdentity.ToCanonicalId(player.Hero)", pvpCollector);
+        Assert.Contains("TheDragonsHeroIdentity.ToCanonicalId(resolvedHero)", pvpCollector);
+        Assert.Contains("TheDragonsHeroIdentity.ToCanonicalId(player.Hero)", endOfRunCapture);
+        Assert.DoesNotContain("Hero.ToString()", runProbe);
+        Assert.DoesNotContain("Hero.ToString()", pvpCollector);
+        Assert.DoesNotContain("Hero.ToString()", endOfRunCapture);
     }
 
     [Fact]

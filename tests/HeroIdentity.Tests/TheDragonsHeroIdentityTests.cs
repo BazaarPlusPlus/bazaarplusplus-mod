@@ -56,6 +56,26 @@ public sealed class TheDragonsHeroIdentityTests
     }
 
     [Fact]
+    public void Write_path_stores_the_canonical_id_under_either_runtime_enum_name()
+    {
+        Assert.True(TheDragonsHeroIdentity.TryResolve("Hero8", out var dragons));
+
+        // A build that only exposes the legacy member name must still write "TheDragons".
+        Assert.Equal("TheDragons", TheDragonsHeroIdentity.ToCanonicalId(dragons, _ => "Hero8"));
+        Assert.Equal(
+            "TheDragons",
+            TheDragonsHeroIdentity.ToCanonicalId(dragons, _ => "TheDragons")
+        );
+        Assert.Equal(
+            "Vanessa",
+            TheDragonsHeroIdentity.ToCanonicalId(EHero.Vanessa, _ => "Vanessa")
+        );
+        Assert.Throws<ArgumentNullException>(() =>
+            TheDragonsHeroIdentity.ToCanonicalId(dragons, null!)
+        );
+    }
+
+    [Fact]
     public void Legacy_only_runtime_shape_resolves_both_aliases()
     {
         Assert.True(TheDragonsHeroIdentity.TryResolve("Hero8", out var currentDragons));
