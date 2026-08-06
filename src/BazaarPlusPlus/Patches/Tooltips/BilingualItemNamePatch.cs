@@ -47,6 +47,7 @@ internal static class BilingualItemNamePatch
                 return;
             }
 
+            // The secondary title is English only when the active game locale is Chinese.
             if (!BilingualItemNameSubtitle.TryShow(controller, subtitle, currentLanguageIsChinese))
             {
                 BilingualItemNameSubtitle.Hide(controller);

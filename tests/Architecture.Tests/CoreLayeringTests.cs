@@ -1983,7 +1983,7 @@ public class CoreLayeringTests
     }
 
     [Fact]
-    public void Bilingual_item_names_use_native_heading_typography_and_zero_gap_layout()
+    public void Bilingual_item_names_use_native_language_appropriate_typography_and_zero_gap_layout()
     {
         var mainSource = MainSourceRoot(RepoRoot());
         var patchSource = File.ReadAllText(
@@ -2009,6 +2009,8 @@ public class CoreLayeringTests
         Assert.Contains("internal static class BilingualItemNameResetPatch", patchSource);
         Assert.Contains("nameof(CardTooltipController.ResetValues)", patchSource);
         Assert.Contains("NativeGameTypography.PrepareOwnedText", subtitleSource);
+        Assert.Contains("isEnglishSubtitle", subtitleSource);
+        Assert.Contains("NativeGameTypography.OwnedTextRole.Body", subtitleSource);
         Assert.Contains("NativeGameTypography.OwnedTextRole.Heading", subtitleSource);
         Assert.Contains("typography.Apply(label)", subtitleSource);
         Assert.Contains("VerticalLayoutGroup", subtitleSource);
