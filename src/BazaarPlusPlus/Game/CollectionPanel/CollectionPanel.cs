@@ -68,6 +68,7 @@ internal sealed class CollectionPanel : MonoBehaviour
     // instance and re-renders once, so the startup window self-heals.
     private bool _viewMissedNativeTypography;
     private bool _sourceCatalogWarmed;
+    private bool _stagingItemIdCopyEnabled;
 
     public void Initialize(
         IBppServices services,
@@ -91,6 +92,7 @@ internal sealed class CollectionPanel : MonoBehaviour
         _instance = this;
         _services = services;
         _config = services.Config;
+        _stagingItemIdCopyEnabled = CollectionStagingTools.IsEnabled(services.GameBuild.RawVersion);
         _nativeCardPreviewHost = nativeCardPreviewHost;
         _dayTierResolver = dayTierResolver;
         _catalog = new CollectionCatalog(cardMapProvider);
@@ -458,8 +460,31 @@ internal sealed class CollectionPanel : MonoBehaviour
             {
                 var pos = mouse.position.ReadValue();
                 _virtualizer.PollHover(pos, _viewportBoundsPx);
+                TryCopyHoveredCardId();
             }
         }
+    }
+
+    private void TryCopyHoveredCardId()
+    {
+        if (
+            !_stagingItemIdCopyEnabled
+            || IsTextInputFocused()
+            || _virtualizer == null
+            || !_virtualizer.TryGetHoveredCard(out var card)
+        )
+            return;
+
+        var keyboard = Keyboard.current;
+        if (
+            keyboard?.cKey.wasPressedThisFrame != true
+            || (keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed) != true
+        )
+            return;
+
+        var templateId = card.Id.ToString("D");
+        GUIUtility.systemCopyBuffer = templateId;
+        _view?.ShowStagingTemplateIdCopied(card.DisplayName, templateId);
     }
 
     private void HideNativeCardLayerImmediately()
@@ -603,7 +628,11 @@ internal sealed class CollectionPanel : MonoBehaviour
             return;
         }
 
-        _view = new CollectionPanelView(transform, new PanelCommands(this));
+        _view = new CollectionPanelView(
+            transform,
+            new PanelCommands(this),
+            _stagingItemIdCopyEnabled
+        );
 
         _view.GridViewportBoundsChanged += bounds =>
         {
