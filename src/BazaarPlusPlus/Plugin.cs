@@ -19,6 +19,8 @@ using BazaarPlusPlus.ModApi.Clients;
 using BazaarPlusPlus.ModApi.Http;
 using BazaarPlusPlus.Patches;
 using BazaarPlusPlus.Patches.Tooltips;
+using BazaarPlusPlus.Storage.Paths;
+using BazaarPlusPlus.Storage.Sqlite;
 using BepInEx;
 using BepInEx.Configuration;
 using HarmonyLib;
@@ -36,6 +38,10 @@ public class Plugin : BaseUnityPlugin
     private bool _patchesApplied;
     private bool _teardownStarted;
 
+    // Captured at startup because teardown releases the database after the
+    // composition that owns the path provider is already disposed.
+    private string? _runLogDatabasePath;
+
     protected virtual void Awake()
     {
         BppLog.Install(Logger);
@@ -52,6 +58,10 @@ public class Plugin : BaseUnityPlugin
             _composition = new BppComposition(Logger, configFile, gameBuild);
 
             var services = _composition.Services;
+            var dataRoot = services.Paths.DataRootDirectoryPath;
+            _runLogDatabasePath = string.IsNullOrWhiteSpace(dataRoot)
+                ? null
+                : PathConstants.RunLogDatabase(dataRoot!);
             BppPatchHost.Install(services, _composition.PatchFeatures);
 
             if (gameBuild.DetectionWarning != null)
@@ -172,6 +182,11 @@ public class Plugin : BaseUnityPlugin
             DestroyComponentIfPresent<CombatReplayRuntime>
         );
         failures.Run(PluginTeardownStep.DisposeOnlineServices, DisposeOnlineServices);
+        // After every writer is gone, so the checkpoint can reclaim the whole WAL.
+        failures.Run(
+            PluginTeardownStep.ReleaseRunLogDatabase,
+            () => SqliteShutdown.ReleaseRunLogDatabase(_runLogDatabasePath)
+        );
         failures.Run(PluginTeardownStep.UninstallStaticUtilities, UninstallStaticUtilities);
     }
 
