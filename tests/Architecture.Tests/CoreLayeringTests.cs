@@ -2180,6 +2180,13 @@ public class CoreLayeringTests
             "CollectionPanelDockButtonController.BeginScreenshotSuppression",
             chromeSuppressionSource
         );
+        Assert.Equal(
+            2,
+            chromeSuppressionSource
+                .Split("CollectionPanelDockButtonController.BeginScreenshotSuppression")
+                .Length - 1
+        );
+        Assert.DoesNotContain("BeginReplayRecordingSuppression", chromeSuppressionSource);
         Assert.DoesNotContain("BppSettingsDockController", chromeSuppressionSource);
         Assert.Contains(
             "CombatStatusBarFeature.BeginScreenshotSuppression",

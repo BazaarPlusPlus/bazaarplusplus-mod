@@ -255,10 +255,21 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
             if (artifact == null)
                 return;
 
+            var route = CapturedReplayRouter.Resolve(artifact.Manifest);
             _currentRecordingManifest = artifact.Manifest;
             _currentRecording.LatchBattle(artifact.Manifest.BattleId);
             PrepareCurrentReplayRecordingAvailability();
-            _persistence.Enqueue(artifact.Payload, artifact.Manifest);
+            switch (route)
+            {
+                case CapturedReplayRoute.CurrentNative:
+                    _currentRecording.MarkCurrentNativeReady(artifact.Manifest.BattleId);
+                    break;
+                case CapturedReplayRoute.PersistedPvp:
+                    _persistence.Enqueue(artifact.Payload, artifact.Manifest);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
         }
         catch (Exception ex)
         {

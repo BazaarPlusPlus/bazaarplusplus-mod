@@ -441,12 +441,12 @@ file static class VideoEncoderProfileTests
 
     public static void Run()
     {
-        FrameRateUsesGamePreferenceWithSixtyFpsCap();
+        FrameRateUsesGamePreferenceWithThirtyFpsCap();
         CandidateOrderAndCache();
         RateControlAndArguments();
     }
 
-    private static void FrameRateUsesGamePreferenceWithSixtyFpsCap()
+    private static void FrameRateUsesGamePreferenceWithThirtyFpsCap()
     {
         var resolver = TestReflection.RequireType(
             "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoFrameRateResolver"
@@ -459,8 +459,8 @@ file static class VideoEncoderProfileTests
 
         TestReflection.Assert(Resolve(15) == 15, "A user-selected 15 fps must be preserved.");
         TestReflection.Assert(Resolve(30) == 30, "A user-selected 30 fps must be preserved.");
-        TestReflection.Assert(Resolve(60) == 60, "The supported cap must preserve 60 fps.");
-        TestReflection.Assert(Resolve(120) == 60, "Recording FPS must cap the game setting at 60.");
+        TestReflection.Assert(Resolve(60) == 30, "Recording FPS must cap 60 fps at 30.");
+        TestReflection.Assert(Resolve(120) == 30, "Recording FPS must cap 120 fps at 30.");
         TestReflection.Assert(Resolve(-1) == 30, "An unset Unity FPS must fall back to 30.");
     }
 

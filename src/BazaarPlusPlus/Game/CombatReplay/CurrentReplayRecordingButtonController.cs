@@ -29,6 +29,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
     private readonly Vector3[] _tooltipWorldCorners = new Vector3[4];
     private readonly BppDockButtonScreenLayout _screenLayout = new();
     private readonly CurrentReplayRecordingUiLogState _uiLogState = new();
+    private readonly CurrentReplayRecordingTooltipStyle _tooltipStyle = new();
     private bool _layoutAvailable;
     private CurrentReplayRecordingUiLayoutReasonCode _layoutReasonCode;
 
@@ -273,6 +274,7 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
             StopCoroutine(_tooltipPositionCoroutine);
             _tooltipPositionCoroutine = null;
         }
+        _tooltipStyle.Restore();
         Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
     }
 
@@ -290,8 +292,11 @@ internal sealed class CurrentReplayRecordingButtonController : MonoBehaviour
                 tooltip == null
                 || tooltipParent == null
                 || !tooltipParent.IsAuxiliaryTooltipDisplayed
-                || tooltip._coroutine != null
             )
+                continue;
+
+            _tooltipStyle.Apply(tooltip);
+            if (tooltip._coroutine != null)
                 continue;
 
             tooltip.PositionOverUI(_cloneRect);
