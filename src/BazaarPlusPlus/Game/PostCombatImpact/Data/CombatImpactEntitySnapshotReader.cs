@@ -68,7 +68,9 @@ internal static class CombatImpactEntitySnapshotReader
                 card.Owner?.CombatantId,
                 effectAttributes.Abilities,
                 effectAttributes.Auras,
-                effectAttributes.ReferenceValuedAuraEffectIds
+                effectAttributes.ReferenceValuedAuraEffectIds,
+                card.LeftSocketId,
+                card.HiddenTags == null ? null : card.HiddenTags.ToArray()
             );
         }
 
