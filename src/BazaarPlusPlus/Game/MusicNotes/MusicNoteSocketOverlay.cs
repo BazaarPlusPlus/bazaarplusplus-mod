@@ -220,7 +220,9 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             used++;
 
             var hoverFit = MusicNoteHoverFit.None;
-            if (hoveredItem != null && badge.OccupancyGate is { Count: > 0 } gate)
+            // No run means the gate cannot be evaluated — degrade to "no comparison", never
+            // to "miss": Satisfies() returns false on a null run and would dim the chip.
+            if (hoveredItem != null && run != null && badge.OccupancyGate is { Count: > 0 } gate)
             {
                 hoverFit = MusicNoteFitEvaluator.Satisfies(gate, hoveredItem, run, badge.PlacedNote)
                     ? MusicNoteHoverFit.Fits
