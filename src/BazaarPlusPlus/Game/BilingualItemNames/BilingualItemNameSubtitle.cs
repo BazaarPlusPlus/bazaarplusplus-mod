@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace BazaarPlusPlus.Game.BilingualItemNames;
 
 // The native title is a serif TMP label. Keep it intact and add the translated title as a
-// separate heading label so both language rows share the native title typography.
+// separate label: Chinese uses the game's serif face, while English uses its sans face.
 // The wrapper owns both rows and has no padding or spacing, avoiding the extra line box that the
 // old rich-text newline/voffset markup left between the item name and its translation.
 internal static class BilingualItemNameSubtitle
@@ -22,7 +22,7 @@ internal static class BilingualItemNameSubtitle
     internal static bool TryShow(
         CardTooltipController controller,
         string subtitleText,
-        bool alignEnglishSubtitle
+        bool isEnglishSubtitle
     )
     {
         var header = controller?.headerText;
@@ -33,7 +33,9 @@ internal static class BilingualItemNameSubtitle
         if (
             stack == null
             || NativeGameTypography.PrepareOwnedText(
-                NativeGameTypography.OwnedTextRole.Heading,
+                isEnglishSubtitle
+                    ? NativeGameTypography.OwnedTextRole.Body
+                    : NativeGameTypography.OwnedTextRole.Heading,
                 out var typography
             ) != NativeGameTypography.Outcome.Ready
             || typography == null
@@ -49,12 +51,7 @@ internal static class BilingualItemNameSubtitle
         label.fontStyle = FontStyles.Normal;
         label.alignment = header.alignment;
         label.color = header.color;
-        label.margin = new Vector4(
-            alignEnglishSubtitle ? ChineseLocaleEnglishOffset : 0f,
-            0f,
-            0f,
-            0f
-        );
+        label.margin = new Vector4(isEnglishSubtitle ? ChineseLocaleEnglishOffset : 0f, 0f, 0f, 0f);
         label.textWrappingMode = TextWrappingModes.NoWrap;
         label.overflowMode = TextOverflowModes.Overflow;
         label.richText = false;
