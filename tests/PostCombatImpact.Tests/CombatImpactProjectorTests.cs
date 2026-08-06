@@ -11,6 +11,92 @@ namespace PostCombatImpact.Tests;
 public sealed class CombatImpactProjectorTests
 {
     [Fact]
+    public void F_minor_reconstructs_tempo_from_haste_item_uses_on_the_f_note()
+    {
+        var simulation = new CombatSim();
+        simulation.CardStats["turner"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 7,
+        };
+        simulation.CardStats["non-haste-on-note"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 20,
+        };
+        simulation.CardStats["haste-off-note"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = 30,
+        };
+        var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
+        entities["f-minor"] = new CombatImpactEntity(
+            "f-minor",
+            "F Minor",
+            "Skill",
+            null,
+            5,
+            Guid.Parse("37251594-5ff0-4604-804e-7259ee666f60"),
+            ETier.Gold,
+            Attributes: new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Custom_0] = 2,
+            },
+            CombatantId: ECombatantId.Player
+        );
+        entities["f-note"] = new CombatImpactEntity(
+            "f-note",
+            "[F Note] Socket Effect",
+            "SocketEffect",
+            null,
+            6,
+            Guid.Parse("04eca54a-69bf-4874-8b6d-56d284bb58be"),
+            CombatantId: ECombatantId.Player,
+            SocketId: EContainerSocketId.Socket_6
+        );
+        entities["turner"] = new CombatImpactEntity(
+            "turner",
+            "Turner",
+            "Item",
+            null,
+            7,
+            DisplaySpan: 2,
+            CombatantId: ECombatantId.Player,
+            SocketId: EContainerSocketId.Socket_5,
+            HiddenTags: new[] { EHiddenTag.Haste }
+        );
+        entities["non-haste-on-note"] = new CombatImpactEntity(
+            "non-haste-on-note",
+            "Non-Haste Item",
+            "Item",
+            null,
+            8,
+            CombatantId: ECombatantId.Player,
+            SocketId: EContainerSocketId.Socket_6
+        );
+        entities["haste-off-note"] = new CombatImpactEntity(
+            "haste-off-note",
+            "Off-Note Haste Item",
+            "Item",
+            null,
+            9,
+            CombatantId: ECombatantId.Player,
+            SocketId: EContainerSocketId.Socket_7,
+            HiddenTags: new[] { EHiddenTag.Haste }
+        );
+
+        var source = Assert.Single(
+            CombatImpactProjector.Project(simulation, entities).Sources,
+            candidate => candidate.Entity.Id == "f-minor"
+        );
+        var tempo = Assert.Single(source.Groups);
+
+        Assert.Equal(7, source.EffectCount);
+        Assert.Equal(7, tempo.Count);
+        Assert.Equal(14, tempo.ObservedValue);
+        Assert.Equal("TempoApplyAmount", tempo.NativeAttributeKey);
+        Assert.Equal(CombatImpactEventSurface.PlayerAttribute, tempo.Surface);
+        Assert.Equal(CombatImpactOccurrenceBasis.ReconstructedTransition, tempo.OccurrenceBasis);
+    }
+
+    [Fact]
     public void Every_native_action_has_an_explicit_display_or_ignore_classification()
     {
         Assert.All(

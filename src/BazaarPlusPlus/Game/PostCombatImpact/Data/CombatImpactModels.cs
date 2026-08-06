@@ -99,7 +99,9 @@ internal sealed record CombatImpactEntity(
     ECombatantId? CombatantId = null,
     IReadOnlyDictionary<string, ECardAttributeType>? AbilityAttributeTypesByEffectId = null,
     IReadOnlyDictionary<string, ECardAttributeType>? AuraAttributeTypesByEffectId = null,
-    IReadOnlyCollection<string>? ReferenceValuedAuraEffectIds = null
+    IReadOnlyCollection<string>? ReferenceValuedAuraEffectIds = null,
+    EContainerSocketId? SocketId = null,
+    IReadOnlyCollection<EHiddenTag>? HiddenTags = null
 );
 
 internal sealed record CombatImpactEvent(

@@ -10,6 +10,13 @@ namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
 
 internal static class CombatImpactProjector
 {
+    private static readonly Guid FMinorTemplateId = Guid.Parse(
+        "37251594-5ff0-4604-804e-7259ee666f60"
+    );
+    private static readonly Guid FNoteSocketEffectTemplateId = Guid.Parse(
+        "04eca54a-69bf-4874-8b6d-56d284bb58be"
+    );
+
     internal static CombatImpactReport Project(
         CombatSim simulation,
         IReadOnlyDictionary<string, CombatImpactEntity> entities
@@ -162,6 +169,7 @@ internal static class CombatImpactProjector
                 authoritative[sourceId] = metrics;
         }
 
+        AddFMinorTempoEvents(entities, useCounts, events);
         RecoverDroppedAppliedEffectCriticals(events, authoritative);
 
         var report = CombatImpactAggregator.Aggregate(
@@ -172,6 +180,81 @@ internal static class CombatImpactProjector
             PeriodicEffectAttribution.Project(simulation, entities)
         );
         return AttachTriggerSources(report, triggerOccurrences, entities);
+    }
+
+    private static void AddFMinorTempoEvents(
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyDictionary<string, int> useCounts,
+        ICollection<CombatImpactEvent> events
+    )
+    {
+        foreach (
+            var skill in entities.Values.Where(entity =>
+                entity.TemplateId == FMinorTemplateId
+                && entity.TypeLabel == "Skill"
+                && entity.CombatantId.HasValue
+                && entity.Attributes?.TryGetValue(ECardAttributeType.Custom_0, out var amount)
+                    == true
+                && amount > 0
+            )
+        )
+        {
+            var combatantId = skill.CombatantId!.Value;
+            var noteSockets = entities
+                .Values.Where(entity =>
+                    entity.TemplateId == FNoteSocketEffectTemplateId
+                    && entity.CombatantId == combatantId
+                    && entity.SocketId.HasValue
+                )
+                .Select(entity => entity.SocketId!.Value)
+                .ToHashSet();
+            if (noteSockets.Count == 0)
+                continue;
+
+            foreach (
+                var item in entities.Values.Where(entity =>
+                    entity.TypeLabel == "Item"
+                    && entity.CombatantId == combatantId
+                    && entity.SocketId.HasValue
+                    && entity.HiddenTags?.Contains(EHiddenTag.Haste) == true
+                    && OccupiesAnySocket(entity, noteSockets)
+                    && useCounts.TryGetValue(entity.Id, out var uses)
+                    && uses > 0
+                )
+            )
+            {
+                var amount = skill.Attributes![ECardAttributeType.Custom_0];
+                var uses = useCounts[item.Id];
+                for (var index = 0; index < uses; index++)
+                {
+                    events.Add(
+                        new CombatImpactEvent(
+                            CombatImpactKind.AttributeChange,
+                            skill.Id,
+                            PlayerId(combatantId),
+                            amount,
+                            CombatImpactValueUnit.Amount,
+                            "TempoApplyAmount",
+                            ValueBasis: CombatImpactValueBasis.ConfiguredActionAmount
+                        )
+                        {
+                            Surface = CombatImpactEventSurface.PlayerAttribute,
+                            OccurrenceBasis = CombatImpactOccurrenceBasis.ReconstructedTransition,
+                        }
+                    );
+                }
+            }
+        }
+    }
+
+    private static bool OccupiesAnySocket(
+        CombatImpactEntity item,
+        IReadOnlyCollection<EContainerSocketId> sockets
+    )
+    {
+        var start = (int)item.SocketId!.Value;
+        var end = start + Math.Max(1, item.DisplaySpan);
+        return sockets.Any(socket => (int)socket >= start && (int)socket < end);
     }
 
     private static CombatImpactReport AttachPeriodicImpacts(
