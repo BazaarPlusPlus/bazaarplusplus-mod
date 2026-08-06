@@ -18,10 +18,12 @@ namespace BazaarPlusPlus.Game.MusicNotes;
 /// unlocked player socket shows the note letter it holds — or, via the anchor rule, the letter
 /// it would become — under the socket. Placed notes render as a chip tinted with the letter's
 /// category accent color; implied letters render as dim neutral chips; a note whose occupying
-/// item passes its occupancy gate escalates to the boosted plate (brighter accent + match
-/// ring). While an item card is hovered, chips split into fits (match ring) and misses (faded)
-/// against that card's gate verdict — boosted chips stay boosted, live state outranks the
-/// what-if layer. Each letter's item-category identity (Burn, Heal, Weapon, ...) comes from
+/// item passes its occupancy gate glows in its category color over a more saturated plate.
+/// While an item card is hovered, chips split into fits (gold outer glow) and misses
+/// (desaturated to grey at unchanged opacity) against that card's gate verdict — boosted
+/// chips stay boosted, live state outranks the what-if layer. States differ only through
+/// glow, hue/saturation, or markers — never font weight, footprint, or opacity shifts.
+/// Each letter's item-category identity (Burn, Heal, Weapon, ...) comes from
 /// the note templates' condition graphs and reuses the game's own keyword icon and accent
 /// color; unresolvable tags degrade to the letter alone. Purely visual: the canvas has no
 /// raycaster and every graphic is raycast-transparent.
@@ -37,12 +39,16 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     // badge row reads as a single aligned strip.
     private const float LetterFontSize = 20f;
 
+    // State language (user-set constraint): states differ only through glow, hue/saturation,
+    // or added markers — never font weight, footprint, or opacity shifts. Every state keeps
+    // its base kind's alpha values; negative states desaturate, positive states glow.
+
     // TMP sprite tint for implied badges: multiplied toward grey so inactive icons read as
     // ghosted, while active sprites render untinted full-color.
     private const string ImpliedIconTint = "#7A7C82A8";
 
-    // Deeper multiply for chips faded out of a hover comparison.
-    private const string DimmedIconTint = "#5A5C6255";
+    // Hover-miss icons: same multiply alpha as the implied tint, colder and darker grey.
+    private const string MissIconTint = "#63656CA8";
 
     private static readonly Color ImpliedBackColor = new(0.05f, 0.06f, 0.08f, 0.52f);
     private static readonly Color ActiveLetterColor = Color.white;
@@ -54,32 +60,48 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     private static readonly Color ActiveEdgeColor = new(0.88f, 0.71f, 0.38f, 0.62f);
     private static readonly Color ImpliedEdgeColor = new(0.55f, 0.52f, 0.46f, 0.16f);
 
-    // Match ring shared by the boosted plate and hover-fit chips: clearly brighter than the
-    // bronze trim so "this works here" pops without changing the chip's footprint.
-    private static readonly Color MatchEdgeColor = new(1f, 0.90f, 0.55f, 0.95f);
+    // Boosted plates trade the bronze trim for gold at the same trim alpha.
+    private static readonly Color BoostedEdgeColor = new(1f, 0.90f, 0.55f, 0.62f);
 
-    // Hover-miss fade: the whole chip drops toward the background so fitting sockets carry
-    // the strip while a comparison is active.
-    private static readonly Color DimmedLetterColor = new(0.55f, 0.57f, 0.62f, 0.38f);
-    private static readonly Color DimmedEdgeColor = new(0.55f, 0.52f, 0.46f, 0.06f);
-    private static readonly Color DimmedBackColor = new(0.05f, 0.06f, 0.08f, 0.26f);
+    // Outer glow colors: gold marks "the hovered card works here"; boosted glows in the
+    // letter's own category color (computed from the accent) so a live note reads as lit.
+    private static readonly Color MatchGlowColor = new(1f, 0.88f, 0.52f, 0.90f);
+
+    // Hover-miss desaturation: same alphas as the base kind, chroma stripped.
+    private static readonly Color PlateMissBackColor = new(0.16f, 0.17f, 0.19f, 0.94f);
+    private static readonly Color PlateMissEdgeColor = new(0.52f, 0.51f, 0.49f, 0.62f);
+    private static readonly Color PlateMissLetterColor = new(0.62f, 0.64f, 0.68f, 1f);
+    private static readonly Color GhostMissLetterColor = new(0.42f, 0.44f, 0.48f, 0.88f);
+    private static readonly Color GhostHighlightLetterColor = new(1f, 1f, 1f, 0.88f);
 
     private static readonly string[] LetterNames = BuildLetterNames();
 
+    // Canvas-space bleed of the halo sprite beyond the chip rect.
+    private const float HaloMargin = 8f;
+
     private static Sprite? _roundedSprite;
     private static Sprite? _roundedEdgeSprite;
+    private static Sprite? _haloSprite;
 
     private sealed class BadgeSlot
     {
-        internal BadgeSlot(RectTransform root, Image back, Image edge, TextMeshProUGUI letter)
+        internal BadgeSlot(
+            RectTransform root,
+            Image halo,
+            Image back,
+            Image edge,
+            TextMeshProUGUI letter
+        )
         {
             Root = root;
+            Halo = halo;
             Back = back;
             Edge = edge;
             Letter = letter;
         }
 
         internal RectTransform Root { get; }
+        internal Image Halo { get; }
         internal Image Back { get; }
         internal Image Edge { get; }
         internal TextMeshProUGUI Letter { get; }
@@ -319,7 +341,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         var iconTint = visual switch
         {
             MusicNoteBadgeVisual.Ghost => ImpliedIconTint,
-            MusicNoteBadgeVisual.GhostDimmed or MusicNoteBadgeVisual.PlateDimmed => DimmedIconTint,
+            MusicNoteBadgeVisual.GhostDimmed or MusicNoteBadgeVisual.PlateDimmed => MissIconTint,
             _ => null,
         };
         var letterName = LetterNames[(int)badge.Letter % LetterNames.Length];
@@ -335,42 +357,63 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             slot.RenderedText = text;
         }
 
+        var accent = accentColor ?? ActiveAccentFallbackColor;
+
+        // Positive states glow: gold for "the hovered card works here", the category color
+        // for a note that is live right now. The halo toggles via Image.enabled, never alpha.
+        Color? glow = visual switch
+        {
+            MusicNoteBadgeVisual.Boosted => BoostedGlowColor(accent),
+            MusicNoteBadgeVisual.GhostHighlighted or MusicNoteBadgeVisual.PlateHighlighted =>
+                MatchGlowColor,
+            _ => null,
+        };
+        if (glow is Color glowColor)
+        {
+            if (!slot.Halo.enabled)
+                slot.Halo.enabled = true;
+            slot.Halo.color = glowColor;
+        }
+        else if (slot.Halo.enabled)
+        {
+            slot.Halo.enabled = false;
+        }
+
         slot.Letter.color = visual switch
         {
             MusicNoteBadgeVisual.Ghost => ImpliedLetterColor,
-            MusicNoteBadgeVisual.GhostDimmed or MusicNoteBadgeVisual.PlateDimmed =>
-                DimmedLetterColor,
-            _ => ActiveLetterColor,
+            MusicNoteBadgeVisual.GhostHighlighted => GhostHighlightLetterColor,
+            MusicNoteBadgeVisual.GhostDimmed => GhostMissLetterColor,
+            MusicNoteBadgeVisual.PlateDimmed => PlateMissLetterColor,
+            _ => ActiveLetterColor, // Plate, PlateHighlighted, Boosted
         };
         slot.Edge.color = visual switch
         {
-            MusicNoteBadgeVisual.Ghost => ImpliedEdgeColor,
-            MusicNoteBadgeVisual.Plate => ActiveEdgeColor,
-            MusicNoteBadgeVisual.GhostDimmed or MusicNoteBadgeVisual.PlateDimmed => DimmedEdgeColor,
-            // Boosted and both highlighted states share the match ring.
-            _ => MatchEdgeColor,
+            MusicNoteBadgeVisual.Ghost
+            or MusicNoteBadgeVisual.GhostHighlighted
+            or MusicNoteBadgeVisual.GhostDimmed => ImpliedEdgeColor,
+            MusicNoteBadgeVisual.PlateDimmed => PlateMissEdgeColor,
+            MusicNoteBadgeVisual.Boosted => BoostedEdgeColor,
+            _ => ActiveEdgeColor, // Plate, PlateHighlighted
         };
 
         // Plates tint toward the category color, matching how the game colors keywords; the
-        // boosted plate pulls further toward the accent so a working note reads brightest.
-        var accent = accentColor ?? ActiveAccentFallbackColor;
+        // boosted plate pulls further toward the accent, and hover-miss plates lose their
+        // chroma instead of their opacity.
         Color back;
         switch (visual)
         {
             case MusicNoteBadgeVisual.Ghost:
             case MusicNoteBadgeVisual.GhostHighlighted:
-                back = ImpliedBackColor;
-                break;
             case MusicNoteBadgeVisual.GhostDimmed:
-                back = DimmedBackColor;
+                back = ImpliedBackColor;
                 break;
             case MusicNoteBadgeVisual.Boosted:
                 back = Color.Lerp(accent, Color.black, 0.40f);
-                back.a = 0.96f;
+                back.a = 0.94f;
                 break;
             case MusicNoteBadgeVisual.PlateDimmed:
-                back = Color.Lerp(accent, Color.black, 0.58f);
-                back.a = 0.40f;
+                back = PlateMissBackColor;
                 break;
             default: // Plate, PlateHighlighted
                 back = Color.Lerp(accent, Color.black, 0.58f);
@@ -378,6 +421,14 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
                 break;
         }
         slot.Back.color = back;
+    }
+
+    // Lift the accent toward white so the glow reads as light, not as a colored slab.
+    private static Color BoostedGlowColor(Color accent)
+    {
+        var glow = Color.Lerp(accent, Color.white, 0.30f);
+        glow.a = 0.85f;
+        return glow;
     }
 
     private BadgeSlot? GetSlot(int index)
@@ -409,6 +460,27 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         root.anchorMin = new Vector2(0.5f, 0.5f);
         root.anchorMax = new Vector2(0.5f, 0.5f);
         root.pivot = new Vector2(0.5f, 1f);
+
+        // Outer glow layer, behind the back plate and bleeding HaloMargin past the chip rect;
+        // starts disabled and is toggled per state. ignoreLayout keeps it out of the fitter.
+        var haloObject = new GameObject(
+            "Halo",
+            typeof(RectTransform),
+            typeof(Image),
+            typeof(LayoutElement)
+        );
+        haloObject.transform.SetParent(rootObject.transform, false);
+        var haloRect = (RectTransform)haloObject.transform;
+        haloRect.anchorMin = Vector2.zero;
+        haloRect.anchorMax = Vector2.one;
+        haloRect.offsetMin = new Vector2(-HaloMargin, -HaloMargin);
+        haloRect.offsetMax = new Vector2(HaloMargin, HaloMargin);
+        haloObject.GetComponent<LayoutElement>().ignoreLayout = true;
+        var halo = haloObject.GetComponent<Image>();
+        halo.sprite = GetHaloSprite();
+        halo.type = Image.Type.Sliced;
+        halo.raycastTarget = false;
+        halo.enabled = false;
 
         // The background lives on an ignoreLayout child stretched to the root: an Image on
         // the layout root itself would feed its sprite's native size into the size fitter
@@ -471,7 +543,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         letter.alignment = TextAlignmentOptions.Center;
         letter.raycastTarget = false;
 
-        return new BadgeSlot(root, back, edge, letter);
+        return new BadgeSlot(root, halo, back, edge, letter);
     }
 
     private void SetVisible(bool visible)
@@ -549,10 +621,58 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         return _roundedEdgeSprite;
     }
 
-    private static float RoundedSignedDistance(int x, int y, int size, float radius)
+    // Soft outer glow hugging the chip silhouette: peaks at the boundary of the inner
+    // chip-sized rounded rect and falls off quadratically across the margin. A short inner
+    // feather keeps translucent ghost backs from showing a hard halo line underneath.
+    private static Sprite GetHaloSprite()
+    {
+        if (_haloSprite != null)
+            return _haloSprite;
+
+        const int size = 52;
+        const float radius = 11f;
+        const float margin = HaloMargin;
+        const float innerFeather = 2.5f;
+        var texture = new Texture2D(size, size, TextureFormat.ARGB32, false)
+        {
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+        };
+
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var distance = RoundedSignedDistance(x, y, size, radius, margin);
+                float alpha;
+                if (distance <= 0f)
+                {
+                    alpha = Mathf.Clamp01(1f + distance / innerFeather);
+                }
+                else
+                {
+                    var falloff = 1f - Mathf.Clamp01(distance / margin);
+                    alpha = falloff * falloff;
+                }
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha * 0.9f));
+            }
+        }
+
+        texture.Apply();
+        _haloSprite = CreateSlicedSprite(texture, size, radius + margin);
+        return _haloSprite;
+    }
+
+    private static float RoundedSignedDistance(
+        int x,
+        int y,
+        int size,
+        float radius,
+        float inset = 0f
+    )
     {
         var halfSize = size * 0.5f;
-        var innerHalfExtent = halfSize - radius;
+        var innerHalfExtent = halfSize - inset - radius;
         var distanceX = Mathf.Abs(x + 0.5f - halfSize) - innerHalfExtent;
         var distanceY = Mathf.Abs(y + 0.5f - halfSize) - innerHalfExtent;
         var outsideX = Mathf.Max(distanceX, 0f);
