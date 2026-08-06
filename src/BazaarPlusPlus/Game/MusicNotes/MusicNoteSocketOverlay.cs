@@ -43,7 +43,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 
     // Bronze-trim hairline along the chip edge, echoing the board's metal plate borders.
     // Implied chips keep it near-invisible so only placed notes read as framed plates.
-    private static readonly Color ActiveEdgeColor = new(0.92f, 0.74f, 0.40f, 0.80f);
+    private static readonly Color ActiveEdgeColor = new(0.88f, 0.71f, 0.38f, 0.62f);
     private static readonly Color ImpliedEdgeColor = new(0.55f, 0.52f, 0.46f, 0.16f);
 
     private static readonly string[] LetterNames = BuildLetterNames();
@@ -288,8 +288,8 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         {
             // Chip tinted toward the category color, matching how the game colors keywords.
             var accent = accentColor ?? ActiveAccentFallbackColor;
-            var back = Color.Lerp(accent, Color.black, 0.46f);
-            back.a = 0.97f;
+            var back = Color.Lerp(accent, Color.black, 0.58f);
+            back.a = 0.94f;
             slot.Back.color = back;
         }
         else
