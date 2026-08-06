@@ -104,6 +104,25 @@ internal sealed record CombatImpactEntity(
     IReadOnlyCollection<EHiddenTag>? HiddenTags = null
 );
 
+internal static class CombatImpactHiddenTags
+{
+    internal static IReadOnlyCollection<EHiddenTag>? Merge(
+        IReadOnlyCollection<EHiddenTag>? runtime,
+        IReadOnlyCollection<EHiddenTag>? template,
+        IReadOnlyCollection<EHiddenTag>? enchantment
+    )
+    {
+        var hiddenTags = new HashSet<EHiddenTag>();
+        if (runtime != null)
+            hiddenTags.UnionWith(runtime);
+        if (template != null)
+            hiddenTags.UnionWith(template);
+        if (enchantment != null)
+            hiddenTags.UnionWith(enchantment);
+        return hiddenTags.Count == 0 ? null : hiddenTags.ToArray();
+    }
+}
+
 internal sealed record CombatImpactEvent(
     CombatImpactKind Kind,
     string SourceId,
