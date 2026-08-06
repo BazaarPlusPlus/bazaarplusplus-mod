@@ -1678,6 +1678,68 @@ public sealed class CombatImpactProjectorTests
     }
 
     [Fact]
+    public void Repair_destroy_transform_battles_can_create_wide_unique_target_groups()
+    {
+        const int useCount = 45;
+        var simulation = new CombatSim();
+        simulation.CardStats["source"] = new Dictionary<ECardStats, int>
+        {
+            [ECardStats.UseCount] = useCount,
+        };
+        var entities = EntitiesWithSourceAttribute(ECardAttributeType.HasteAmount, 1_000)
+            .ToDictionary(item => item.Key, item => item.Value);
+
+        for (var index = 0; index < useCount; index++)
+        {
+            var targetId = $"drone-{index}";
+            entities[targetId] = new CombatImpactEntity(
+                targetId,
+                $"Small Drone {index}",
+                "Item",
+                null,
+                index + 10
+            );
+            simulation
+                .Frames[0]
+                .Events.Add(
+                    Executed("source", EActionCommandType.CardDestroy, CardTarget(targetId))
+                );
+            simulation
+                .Frames[0]
+                .Events.Add(
+                    Executed(
+                        "source",
+                        EActionCommandType.CardTransformDestroyed,
+                        CardTarget(targetId)
+                    )
+                );
+            simulation
+                .Frames[0]
+                .Events.Add(
+                    Executed("source", EActionCommandType.CardRepair, CardTarget(targetId))
+                );
+            simulation
+                .Frames[0]
+                .Events.Add(Executed("source", EActionCommandType.CardHaste, CardTarget(targetId)));
+        }
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, entities).Sources);
+        var groups = source.Groups.ToDictionary(group => group.NativeAttributeKey);
+
+        Assert.Equal(useCount, source.UseCount);
+        Assert.Equal(
+            useCount,
+            groups[CombatImpactAggregator.NativeKey(CombatImpactKind.Destroy)].Targets.Count
+        );
+        Assert.Equal(useCount, groups["TransformTargets"].Targets.Count);
+        Assert.Equal(useCount, groups["RepairTargets"].Targets.Count);
+        Assert.Equal(
+            useCount,
+            groups[CombatImpactAggregator.NativeKey(CombatImpactKind.Haste)].Targets.Count
+        );
+    }
+
+    [Fact]
     public void Trigger_sources_are_attached_to_the_group_they_caused()
     {
         var simulation = new CombatSim();

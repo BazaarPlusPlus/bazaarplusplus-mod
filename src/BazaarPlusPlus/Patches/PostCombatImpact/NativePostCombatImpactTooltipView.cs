@@ -43,6 +43,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
     private const float GroupSecondaryMetricFontScale = 0.62f;
     private const float GroupStackedMetricMinFontScale = 0.68f;
     private const float GroupStackedMetricOpticalOffset = 2f;
+    private const float GroupIconColumnPreferredWidth = 34f;
     private const float TargetNameFontScale = 0.875f;
     private const float TargetMetricFontScale = 0.875f;
     private const float MetricColumnMinWidth = 112f;
@@ -727,7 +728,10 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             );
         }
         var detailRows = new List<GameObject>();
-        if (ShouldRenderTargetDetails(group))
+        if (
+            ShouldRenderTargetDetails(group)
+            && CombatImpactDetailPresentationPolicy.ShouldRenderEntityRows(group.Targets.Count)
+        )
         {
             foreach (var target in group.Targets)
             {
@@ -773,18 +777,21 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             CombatImpactMetricFormatter.IncomingGroup(group, IsChinese(), CriticalMarker())
         );
         var detailRows = new List<GameObject>();
-        foreach (var source in group.Sources)
+        if (CombatImpactDetailPresentationPolicy.ShouldRenderEntityRows(group.Sources.Count))
         {
-            detailRows.Add(
-                BuildEntityRow(
-                    textTemplate,
-                    groupRoot,
-                    "ImpactSourceRow",
-                    source.Entity,
-                    CombatImpactMetricFormatter.IncomingSource(group, source, IsChinese()),
-                    generation
-                )
-            );
+            foreach (var source in group.Sources)
+            {
+                detailRows.Add(
+                    BuildEntityRow(
+                        textTemplate,
+                        groupRoot,
+                        "ImpactSourceRow",
+                        source.Entity,
+                        CombatImpactMetricFormatter.IncomingSource(group, source, IsChinese()),
+                        generation
+                    )
+                );
+            }
         }
         return new ImpactContentBlock(groupRoot.gameObject, detailRows);
     }
@@ -821,11 +828,20 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 string.Empty,
                 useNumberFont: false
             ) ?? string.Empty;
-        var labelContent = string.IsNullOrWhiteSpace(effectIcon) ? label : $"{effectIcon} {label}";
+        var iconText = CloneText(
+            textTemplate,
+            header,
+            effectIcon,
+            GroupLabelFontScale,
+            preferredWidth: GroupIconColumnPreferredWidth,
+            minWidth: GroupIconColumnPreferredWidth
+        );
+        iconText.alignment = TextAlignmentOptions.MidlineLeft;
+
         var labelText = CloneText(
             textTemplate,
             header,
-            labelContent,
+            label,
             GroupLabelFontScale,
             flexibleWidth: 1f
         );
@@ -1266,6 +1282,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         string content,
         float fontScale,
         float flexibleWidth = 0f,
+        float preferredWidth = -1f,
         float minWidth = -1f
     )
     {
@@ -1302,7 +1319,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 );
         }
         text.text = content;
-        AddLayout(text.gameObject, preferredHeight: -1f, flexibleWidth, minWidth: minWidth);
+        AddLayout(text.gameObject, preferredHeight: -1f, flexibleWidth, preferredWidth, minWidth);
         return text;
     }
 
@@ -1423,12 +1440,16 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         bool hasMixedValueDirections
     )
     {
-        var (baseAttributeKey, variant) = SplitAttributeKey(nativeAttributeKey);
+        var (baseAttributeKey, variant) = CombatImpactEffectIconKey.SplitAttributeKey(
+            nativeAttributeKey
+        );
         var iconKey = kind switch
         {
-            CombatImpactKind.Destroy => "Destroy",
-            CombatImpactKind.AttributeChange => AttributeIconKey(baseAttributeKey, variant),
-            _ => nativeAttributeKey,
+            CombatImpactKind.AttributeChange => CombatImpactEffectIconKey.ResolveAttribute(
+                baseAttributeKey,
+                variant
+            ),
+            _ => CombatImpactEffectIconKey.Resolve(kind, nativeAttributeKey),
         };
         var label = kind switch
         {
@@ -1470,29 +1491,6 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             ) ?? string.Empty;
         return string.IsNullOrWhiteSpace(marker) ? null : marker;
     }
-
-    private static (string BaseKey, string? Variant) SplitAttributeKey(string key)
-    {
-        var separator = key.IndexOf(':');
-        return separator < 0 ? (key, null) : (key[..separator], key[(separator + 1)..]);
-    }
-
-    private static string AttributeIconKey(string key, string? variant) =>
-        key switch
-        {
-            "EnchantTargets" when !string.IsNullOrWhiteSpace(variant) => variant,
-            "Health" or "HealthMax" or "HealAmount" => "HealAmount",
-            "HealthRegen" or "RegenRemoveAmount" => "RegenApplyAmount",
-            "Rage" or "RageMax" => "RageApplyAmount",
-            "Tempo" => "TempoApplyAmount",
-            "Burn" or "BurnRemoveAmount" => "BurnApplyAmount",
-            "Poison" or "PoisonRemoveAmount" => "PoisonApplyAmount",
-            "RageRemoveAmount" => "RageApplyAmount",
-            "Shield" or "ShieldRemoveAmount" => "ShieldApplyAmount",
-            "EnchantRemoveTargets" => "EnchantTargets",
-            "DamageCrit" => "CritChance",
-            _ => key,
-        };
 
     private static bool IsChinese() =>
         L.CurrentLanguageCode.StartsWith("zh", StringComparison.OrdinalIgnoreCase);
