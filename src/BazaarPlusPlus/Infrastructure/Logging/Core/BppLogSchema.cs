@@ -42,7 +42,6 @@ internal sealed class BppLogFeatureScope
     internal static BppLogFeatureScope Supporters { get; } = new("Supporters", "supporters");
     internal static BppLogFeatureScope GraphicsUpscaling { get; } =
         new("GraphicsUpscaling", "graphics_upscaling");
-    internal static BppLogFeatureScope MusicNotes { get; } = new("MusicNotes", "music_notes");
 
     private static readonly BppLogFeatureScope[] DeclaredScopes =
     [
@@ -71,7 +70,6 @@ internal sealed class BppLogFeatureScope
         Settings,
         Supporters,
         GraphicsUpscaling,
-        MusicNotes,
     ];
 
     private BppLogFeatureScope(string prefixName, string eventIdPrefix)

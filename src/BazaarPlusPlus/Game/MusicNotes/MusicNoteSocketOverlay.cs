@@ -5,7 +5,6 @@ using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.TagTypography;
-using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TMPro;
 using UnityEngine;
@@ -67,12 +66,8 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 
     private static readonly string[] LetterNames = BuildLetterNames();
 
-    // Boosted chips grow slightly so a working note also reads at board-scan distance.
-    private const float BoostedScale = 1.12f;
-
     private static Sprite? _roundedSprite;
     private static Sprite? _roundedEdgeSprite;
-    private static Sprite? _roundedThickEdgeSprite;
 
     private sealed class BadgeSlot
     {
@@ -95,7 +90,6 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     private RectTransform? _canvasRect;
     private NativeGameTypography.OwnedTextPreparation? _typography;
     private readonly List<BadgeSlot> _slots = new();
-    private readonly Dictionary<int, MusicNoteBadgeVisual> _loggedVisuals = new();
     private bool _visible;
 
     private void Update()
@@ -239,7 +233,6 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
                 badge.IsBoosted,
                 hoverFit
             );
-            LogVisualTransition(badge, visual, hoverFit);
 
             PositionSlot(slot, screen);
             StyleSlot(slot, badge, visual);
@@ -250,28 +243,6 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             if (_slots[i].Root.gameObject.activeSelf)
                 _slots[i].Root.gameObject.SetActive(false);
         }
-    }
-
-    // Transition-gated state log: fires only when a socket's resolved visual differs from the
-    // last one rendered this session, so boost/fit verdicts are verifiable from LogOutput.log
-    // without per-frame noise.
-    private void LogVisualTransition(
-        in MusicNoteSocketBadge badge,
-        MusicNoteBadgeVisual visual,
-        MusicNoteHoverFit hoverFit
-    )
-    {
-        if (_loggedVisuals.TryGetValue(badge.SocketIndex, out var previous) && previous == visual)
-            return;
-        _loggedVisuals[badge.SocketIndex] = visual;
-        BppLog.InfoEvent(
-            MusicNoteLogEvents.BadgeVisualChanged,
-            MusicNoteLogEvents.BadgeVisualChangedSocket.Bind(badge.SocketIndex),
-            MusicNoteLogEvents.BadgeVisualChangedLetter.Bind(badge.Letter),
-            MusicNoteLogEvents.BadgeVisualChangedVisual.Bind(visual),
-            MusicNoteLogEvents.BadgeVisualChangedBoosted.Bind(badge.IsBoosted),
-            MusicNoteLogEvents.BadgeVisualChangedHoverFit.Bind(hoverFit)
-        );
     }
 
     private static ItemSocketController? FindSocket(ItemSocketController[]? sockets, int index)
@@ -371,24 +342,6 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
                 DimmedLetterColor,
             _ => ActiveLetterColor,
         };
-
-        // Boosted and both highlighted states carry the match affordance: thick gold ring +
-        // bold letter, versus the hairline trim on resting chips.
-        var isMatchState =
-            visual
-            is MusicNoteBadgeVisual.Boosted
-                or MusicNoteBadgeVisual.GhostHighlighted
-                or MusicNoteBadgeVisual.PlateHighlighted;
-        var edgeSprite = isMatchState ? GetRoundedThickEdgeSprite() : GetRoundedEdgeSprite();
-        if (slot.Edge.sprite != edgeSprite)
-            slot.Edge.sprite = edgeSprite;
-        slot.Letter.fontStyle = isMatchState ? FontStyles.Bold : FontStyles.Normal;
-
-        var scale = visual == MusicNoteBadgeVisual.Boosted ? BoostedScale : 1f;
-        var scaleVector = new Vector3(scale, scale, 1f);
-        if (slot.Root.localScale != scaleVector)
-            slot.Root.localScale = scaleVector;
-
         slot.Edge.color = visual switch
         {
             MusicNoteBadgeVisual.Ghost => ImpliedEdgeColor,
@@ -412,10 +365,8 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
                 back = DimmedBackColor;
                 break;
             case MusicNoteBadgeVisual.Boosted:
-                // Near-full accent: the jump from the soft plate must be readable without
-                // comparing chips side by side.
-                back = Color.Lerp(accent, Color.black, 0.22f);
-                back.a = 1f;
+                back = Color.Lerp(accent, Color.black, 0.40f);
+                back.a = 0.96f;
                 break;
             case MusicNoteBadgeVisual.PlateDimmed:
                 back = Color.Lerp(accent, Color.black, 0.58f);
@@ -568,17 +519,15 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     }
 
     // Hairline ring along the chip boundary, tinted per state as a metal-trim edge.
-    private static Sprite GetRoundedEdgeSprite() =>
-        _roundedEdgeSprite ??= BuildRingSprite(ringInset: 1.1f, ringWidth: 1.2f);
-
-    // Match-state ring: wide enough to read as a frame, not a trim line.
-    private static Sprite GetRoundedThickEdgeSprite() =>
-        _roundedThickEdgeSprite ??= BuildRingSprite(ringInset: 1.8f, ringWidth: 2.8f);
-
-    private static Sprite BuildRingSprite(float ringInset, float ringWidth)
+    private static Sprite GetRoundedEdgeSprite()
     {
+        if (_roundedEdgeSprite != null)
+            return _roundedEdgeSprite;
+
         const int size = 32;
         const float radius = 11f;
+        const float ringInset = 1.1f;
+        const float ringWidth = 1.2f;
         var texture = new Texture2D(size, size, TextureFormat.ARGB32, false)
         {
             filterMode = FilterMode.Bilinear,
@@ -596,7 +545,8 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         }
 
         texture.Apply();
-        return CreateSlicedSprite(texture, size, radius);
+        _roundedEdgeSprite = CreateSlicedSprite(texture, size, radius);
+        return _roundedEdgeSprite;
     }
 
     private static float RoundedSignedDistance(int x, int y, int size, float radius)
