@@ -56,15 +56,15 @@ internal static partial class HistoryPanelText
     private static readonly LocalizedTextSet LossText = new("Loss", "失败", "失敗");
 
     private static readonly LocalizedTextSet GhostOpponentEliminatedNoticeText = new(
-        "After this battle, the opponent is eliminated.",
-        "打完这场战斗后，对手直接出局。",
-        "打完這場戰鬥後，對手直接出局。"
+        "After this battle, the challenger is eliminated.",
+        "打完这场战斗后，挑战者直接出局。",
+        "打完這場戰鬥後，挑戰者直接出局。"
     );
 
     private static readonly LocalizedTextSet GhostOpponentEliminatedShortText = new(
-        "Knocked Out",
-        "对手出局",
-        "對手出局"
+        "Challenger Out",
+        "挑战者出局",
+        "挑戰者出局"
     );
 
     internal static string NoBattleSelected() => Resolve(NoBattleSelectedText);
@@ -96,6 +96,13 @@ internal static partial class HistoryPanelText
     internal static string PlayerSideShort() => FormatSimple("YOU", "我方", "我方");
 
     internal static string OpponentSideShort() => FormatSimple("OPP", "对手", "對手");
+
+    internal static string GhostChallengerSideShort() => FormatSimple("CHA", "挑战者", "挑戰者");
+
+    internal static string GhostDefenderSideShort() => FormatSimple("YOU", "你", "你");
+
+    internal static string GhostChallengedYou(string name) =>
+        FormatSimple($"{name} challenged you", $"{name} 挑战了你", $"{name} 挑戰了你");
 
     internal static string PlayerHeroPill(string shortCode)
     {
@@ -142,6 +149,25 @@ internal static partial class HistoryPanelText
         }
 
         return $"YOU {playerItems} {Pluralize(playerItems, "item", "items")} · {playerSkills} {Pluralize(playerSkills, "skill", "skills")}  |  OPP {opponentItems} {Pluralize(opponentItems, "item", "items")} · {opponentSkills} {Pluralize(opponentSkills, "skill", "skills")}";
+    }
+
+    internal static string GhostSnapshotSummary(
+        int defenderItems,
+        int defenderSkills,
+        int challengerItems,
+        int challengerSkills
+    )
+    {
+        var languageCode = L.CurrentLanguageCode;
+        if (LanguageCodeMatcher.IsChinese(languageCode))
+        {
+            return ResolveChinese(
+                $"你 {defenderItems} 件物品 · {defenderSkills} 个技能  |  挑战者 {challengerItems} 件物品 · {challengerSkills} 个技能",
+                $"你 {defenderItems} 件物品 · {defenderSkills} 個技能  |  挑戰者 {challengerItems} 件物品 · {challengerSkills} 個技能"
+            );
+        }
+
+        return $"YOU {defenderItems} {Pluralize(defenderItems, "item", "items")} · {defenderSkills} {Pluralize(defenderSkills, "skill", "skills")}  |  CHA {challengerItems} {Pluralize(challengerItems, "item", "items")} · {challengerSkills} {Pluralize(challengerSkills, "skill", "skills")}";
     }
 
     internal static string LoadedGhostBattles(int count)

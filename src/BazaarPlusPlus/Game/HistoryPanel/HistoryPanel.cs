@@ -278,7 +278,7 @@ internal sealed partial class HistoryPanel : MonoBehaviour
     }
 
     // Ghost replay payload snapshots stay in the uploader's original perspective.
-    // For the local "against me" view, our board is stored on the opponent side.
+    // The preview shows the uploader's board, which is stored on the player side.
     private HistoryBattlePreviewData ResolveGhostPreviewData(
         HistoryBattleRecord battle,
         string signature
@@ -321,12 +321,12 @@ internal sealed partial class HistoryPanel : MonoBehaviour
             || ghostPayloadResult.Status == FileBackedPayloadLoadStatus.Loaded
         )
             _payloadFailureLogGate.Clear(battle.BattleId);
-        var ghostPayload = ghostPayloadResult.Payload;
+        var ghostPayload = GhostBattlePayloadReader.Normalize(ghostPayloadResult.Payload);
         var snapshots = ghostPayload?.BattleManifest?.Snapshots;
         if (snapshots == null)
             return HistoryBattlePreviewProjection.BuildEmpty(signature);
 
-        return HistoryBattlePreviewProjection.BuildOpponent(snapshots, signature);
+        return HistoryBattlePreviewProjection.BuildPlayer(snapshots, signature);
     }
 
     private static HistoryBattleRecord? PickRunPreviewBattle(

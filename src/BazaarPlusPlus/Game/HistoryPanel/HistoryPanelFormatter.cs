@@ -179,7 +179,10 @@ internal static class HistoryPanelFormatter
         }
     }
 
-    public static string FormatSnapshotSummary(HistoryBattleSnapshotCounts counts)
+    public static string FormatSnapshotSummary(
+        HistoryBattleSnapshotCounts counts,
+        HistoryBattleSource source
+    )
     {
         if (!counts.Known)
             return HistoryPanelText.SnapshotCountsUnknown();
@@ -187,12 +190,19 @@ internal static class HistoryPanelFormatter
         if (!counts.HasAnyRecordedCard)
             return string.Empty;
 
-        return HistoryPanelText.SnapshotSummary(
-            counts.PlayerHandItemCount,
-            counts.PlayerSkillCount,
-            counts.OpponentHandItemCount,
-            counts.OpponentSkillCount
-        );
+        return source == HistoryBattleSource.Ghost
+            ? HistoryPanelText.GhostSnapshotSummary(
+                counts.PlayerHandItemCount,
+                counts.PlayerSkillCount,
+                counts.OpponentHandItemCount,
+                counts.OpponentSkillCount
+            )
+            : HistoryPanelText.SnapshotSummary(
+                counts.PlayerHandItemCount,
+                counts.PlayerSkillCount,
+                counts.OpponentHandItemCount,
+                counts.OpponentSkillCount
+            );
     }
 
     public static string? NormalizeRank(string? rawRank)

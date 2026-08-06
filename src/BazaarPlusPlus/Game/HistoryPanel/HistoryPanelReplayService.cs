@@ -240,7 +240,7 @@ internal sealed class HistoryPanelReplayService
             );
         }
 
-        var ghostPayload = ghostPayloadResult.Payload;
+        var ghostPayload = GhostBattlePayloadReader.Normalize(ghostPayloadResult.Payload);
         var manifest = ghostPayload?.BattleManifest;
         if (manifest == null)
             return HistoryPanelReplayAttemptResult.Failure(

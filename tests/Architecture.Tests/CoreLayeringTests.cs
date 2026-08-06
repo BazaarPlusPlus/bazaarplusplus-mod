@@ -148,6 +148,67 @@ public class CoreLayeringTests
     }
 
     [Fact]
+    public void CombatReplay_does_not_depend_on_HistoryPanel_Ghost_types()
+    {
+        var mainSource = MainSourceRoot(RepoRoot());
+        var combatReplayDir = Path.Combine(mainSource, "Game", "CombatReplay");
+        var ghostDir = Path.Combine(mainSource, "Game", "HistoryPanel", "Ghost");
+        Assert.True(
+            Directory.Exists(combatReplayDir),
+            $"Could not locate CombatReplay directory at '{combatReplayDir}'."
+        );
+        Assert.True(
+            Directory.Exists(ghostDir),
+            $"Could not locate HistoryPanel/Ghost directory at '{ghostDir}'."
+        );
+
+        var typeDeclaration = new System.Text.RegularExpressions.Regex(
+            @"\b(?:class|struct|interface|enum|record(?:\s+(?:class|struct))?)\s+([A-Za-z_][A-Za-z0-9_]*)"
+        );
+        var ghostTypes = Directory
+            .EnumerateFiles(ghostDir, "*.cs", SearchOption.AllDirectories)
+            .SelectMany(file =>
+                typeDeclaration
+                    .Matches(File.ReadAllText(file))
+                    .Select(match => match.Groups[1].Value)
+            )
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.NotEmpty(ghostTypes);
+
+        var violations = new List<string>();
+        foreach (
+            var file in Directory.EnumerateFiles(
+                combatReplayDir,
+                "*.cs",
+                SearchOption.AllDirectories
+            )
+        )
+        {
+            var source = File.ReadAllText(file);
+            var relative = Path.GetRelativePath(mainSource, file).Replace('\\', '/');
+            if (source.Contains("BazaarPlusPlus.Game.HistoryPanel.Ghost", StringComparison.Ordinal))
+                violations.Add($"{relative}: namespace import");
+
+            foreach (var type in ghostTypes)
+            {
+                if (
+                    System.Text.RegularExpressions.Regex.IsMatch(
+                        source,
+                        $@"\b{System.Text.RegularExpressions.Regex.Escape(type)}\b"
+                    )
+                )
+                    violations.Add($"{relative}: {type}");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "CombatReplay must not depend on HistoryPanel/Ghost types. Offending references:\n"
+                + string.Join("\n", violations)
+        );
+    }
+
+    [Fact]
     public void Day_tiers_have_one_shared_GameInterop_owner_and_no_hardcoded_schedule()
     {
         var repoRoot = RepoRoot();

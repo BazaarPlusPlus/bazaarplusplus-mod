@@ -19,3 +19,7 @@ Once automatic replay exit was removed, the ordinary action loop had no legal wa
 - Emit `Continue` only at `FinishedAwaitingContinue` ([context reader](../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameContextReader.cs#L582-L595)); route it through `BazaarAgentGameBridge.CurrentRecorder.TryContinueReplay`; never add another exit path ([dispatcher](../../src/BazaarPlusPlus.BazaarAgentHost/BazaarAgentGameActionDispatcher.cs#L168-L177)).
 - The additive `Continue` action kind is part of schema `2.2.0` ([contract](../../src/BazaarPlusPlus.BazaarAgent/Contract/BazaarAgentDecision.cs#L9-L29)); validator tests pin availability/staleness behavior ([tests](../../tests/BazaarAgent.Tests/BazaarAgentActionValidatorTests.cs#L503-L522)).
 - Keep replay transport primitive and policy-free: one recording per battle; batching and concatenation stay external. Mid-playback skipping remains out of scope; phase races fail safely and retry on a later snapshot.
+
+## Ghost payload perspective contract
+
+The manifest inside a ghost replay payload always uses the recorder perspective: the challenger occupies the `Player` side. `GhostBattlePayload.PerspectiveVersion` identifies the stored convention: `0` is the legacy local perspective and is migrated automatically when loaded; `1` is the recorder perspective. External delivery must send ghost payloads with `PerspectiveVersion = 1`.
