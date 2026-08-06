@@ -13,6 +13,7 @@ public class MusicNoteBadgeStylingTests
             {
                 MusicNoteHoverFit.None,
                 MusicNoteHoverFit.Fits,
+                MusicNoteHoverFit.FitsBlocked,
                 MusicNoteHoverFit.Misses,
             }
         )
@@ -47,6 +48,19 @@ public class MusicNoteBadgeStylingTests
         Assert.Equal(
             MusicNoteBadgeVisual.GhostHighlighted,
             MusicNoteBadgeStyling.Resolve(false, false, MusicNoteHoverFit.Fits)
+        );
+    }
+
+    [Fact]
+    public void HoveredCardFitsButBlocked_ChipMarksWithoutGlow()
+    {
+        Assert.Equal(
+            MusicNoteBadgeVisual.PlateMatchBlocked,
+            MusicNoteBadgeStyling.Resolve(true, false, MusicNoteHoverFit.FitsBlocked)
+        );
+        Assert.Equal(
+            MusicNoteBadgeVisual.GhostMatchBlocked,
+            MusicNoteBadgeStyling.Resolve(false, false, MusicNoteHoverFit.FitsBlocked)
         );
     }
 

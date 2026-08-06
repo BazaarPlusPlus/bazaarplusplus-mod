@@ -64,9 +64,34 @@ internal readonly struct MusicNoteSocketBadge
 /// the board is not readable or no anchor note exists — this is a per-frame path, so failures
 /// stay silent and render as "nothing to show".
 /// </summary>
+/// <summary>
+/// One frame's board read: the socket badges plus the items layer the hover comparison needs
+/// to judge placeability (who covers each hand socket, and which hand sockets are locked).
+/// </summary>
+internal sealed class MusicNoteBoardView
+{
+    internal MusicNoteBoardView(
+        List<MusicNoteSocketBadge> badges,
+        ICard?[] handOccupants,
+        bool[] handLocked
+    )
+    {
+        Badges = badges;
+        HandOccupants = handOccupants;
+        HandLocked = handLocked;
+    }
+
+    internal List<MusicNoteSocketBadge> Badges { get; }
+
+    /// <summary>The item covering each hand socket (repeated across a multi-slot span).</summary>
+    internal ICard?[] HandOccupants { get; }
+
+    internal bool[] HandLocked { get; }
+}
+
 internal static class MusicNoteBoardReader
 {
-    internal static List<MusicNoteSocketBadge>? Read()
+    internal static MusicNoteBoardView? Read()
     {
         try
         {
@@ -79,7 +104,7 @@ internal static class MusicNoteBoardReader
         }
     }
 
-    private static List<MusicNoteSocketBadge>? ReadCore()
+    private static MusicNoteBoardView? ReadCore()
     {
         var run = Data.Run;
         var player = run?.Player;
@@ -122,7 +147,16 @@ internal static class MusicNoteBoardReader
         // The items layer: the card covering socket i is the note's occupying card, exactly
         // as the game's TTargetCardOccupying resolves it (Hand.Container.Sockets repeats a
         // multi-slot item across its whole span).
-        var handSockets = player.Hand?.Container?.Sockets;
+        var handContainer = player.Hand?.Container;
+        var handSockets = handContainer?.Sockets;
+        var handOccupants = new ICard?[socketCount];
+        var handLocked = new bool[socketCount];
+        for (var i = 0; i < socketCount; i++)
+        {
+            if (handSockets != null && i < handSockets.Length)
+                handOccupants[i] = handSockets[i] as ICard;
+            handLocked[i] = handContainer == null || handContainer.IsSocketLocked(i);
+        }
 
         List<MusicNoteSocketBadge>? badges = null;
         for (var i = 0; i < socketCount; i++)
@@ -138,9 +172,7 @@ internal static class MusicNoteBoardReader
                     : MusicNoteTemplateCatalog.TryGetOccupancyGateForLetter((EMusicNote)letter);
             var isBoosted =
                 placed != null
-                && handSockets != null
-                && i < handSockets.Length
-                && handSockets[i] is ICard occupying
+                && handOccupants[i] is ICard occupying
                 && MusicNoteFitEvaluator.Satisfies(occupancyGate, occupying, run, placedNotes[i]);
             badges.Add(
                 new MusicNoteSocketBadge(
@@ -157,6 +189,6 @@ internal static class MusicNoteBoardReader
             );
         }
 
-        return badges;
+        return badges != null ? new MusicNoteBoardView(badges, handOccupants, handLocked) : null;
     }
 }

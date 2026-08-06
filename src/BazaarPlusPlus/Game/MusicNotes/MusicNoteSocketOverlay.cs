@@ -19,8 +19,10 @@ namespace BazaarPlusPlus.Game.MusicNotes;
 /// it would become — under the socket. Placed notes render as a chip tinted with the letter's
 /// category accent color; implied letters render as dim neutral chips; a note whose occupying
 /// item passes its occupancy gate glows in its category color over a more saturated plate.
-/// While an item card is hovered, chips split into fits (gold outer glow) and misses
-/// (desaturated to grey at unchanged opacity) against that card's gate verdict — boosted
+/// While an item card is hovered, chips split three ways against that card: gold outer glow
+/// when it fits and enough contiguous room exists for its size (its own span counts as
+/// free), gold letter without glow when the letter matches but other items block every
+/// covering placement, and desaturated grey at unchanged opacity when it misses — boosted
 /// chips stay boosted, live state outranks the what-if layer. States differ only through
 /// glow, hue/saturation, or markers — never font weight, footprint, or opacity shifts.
 /// Each letter's item-category identity (Burn, Heal, Weapon, ...) comes from
@@ -74,6 +76,11 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     private static readonly Color GhostMissLetterColor = new(0.42f, 0.44f, 0.48f, 0.88f);
     private static readonly Color GhostHighlightLetterColor = new(1f, 1f, 1f, 0.88f);
 
+    // Match-but-blocked: the letter goes gold without a glow — "this letter works for the
+    // hovered card, but other items block every placement covering it".
+    private static readonly Color PlateMatchBlockedLetterColor = new(1f, 0.83f, 0.50f, 1f);
+    private static readonly Color GhostMatchBlockedLetterColor = new(1f, 0.83f, 0.50f, 0.88f);
+
     private static readonly string[] LetterNames = BuildLetterNames();
 
     // Canvas-space bleed of the halo sprite beyond the chip rect.
@@ -122,10 +129,10 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             return;
         }
 
-        var badges = MusicNoteBoardReader.Read();
+        var view = MusicNoteBoardReader.Read();
         var board = Singleton<BoardManager>.Instance;
         var mainCamera = Camera.main;
-        if (badges == null || badges.Count == 0 || board == null || mainCamera == null)
+        if (view == null || view.Badges.Count == 0 || board == null || mainCamera == null)
         {
             SetVisible(false);
             return;
@@ -140,7 +147,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         if (!_visible)
             KeywordIconSpriteProvider.BeginResolvePass();
         SetVisible(true);
-        Render(badges, board, mainCamera);
+        Render(view, board, mainCamera);
     }
 
     private void OnDisable()
@@ -217,16 +224,31 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         return true;
     }
 
-    private void Render(List<MusicNoteSocketBadge> badges, BoardManager board, Camera mainCamera)
+    private void Render(MusicNoteBoardView view, BoardManager board, Camera mainCamera)
     {
         // Skills and socket-effect cards never occupy an item socket, so only a hovered item
         // card switches the strip into fits-vs-misses comparison mode.
         var hoveredItem = HoveredCardTracker.TryGetHoveredCard() as ItemCard;
         var run = Data.Run;
 
+        // A socket is blocked for the hovered item when another item covers it or the hand
+        // socket is locked; the hovered item's own span counts as free (it can move there).
+        bool[]? blockedForHovered = null;
+        if (hoveredItem != null)
+        {
+            blockedForHovered = new bool[view.HandOccupants.Length];
+            for (var i = 0; i < blockedForHovered.Length; i++)
+            {
+                var occupant = view.HandOccupants[i];
+                blockedForHovered[i] =
+                    view.HandLocked[i]
+                    || (occupant != null && !ReferenceEquals(occupant, hoveredItem));
+            }
+        }
+
         var sockets = board.playerItemSockets;
         var used = 0;
-        foreach (var badge in badges)
+        foreach (var badge in view.Badges)
         {
             var socket = FindSocket(sockets, badge.SocketIndex);
             if (socket == null)
@@ -244,11 +266,23 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             var hoverFit = MusicNoteHoverFit.None;
             // No run means the gate cannot be evaluated — degrade to "no comparison", never
             // to "miss": Satisfies() returns false on a null run and would dim the chip.
-            if (hoveredItem != null && run != null && badge.OccupancyGate is { Count: > 0 } gate)
+            if (
+                hoveredItem != null
+                && run != null
+                && blockedForHovered != null
+                && badge.OccupancyGate is { Count: > 0 } gate
+            )
             {
-                hoverFit = MusicNoteFitEvaluator.Satisfies(gate, hoveredItem, run, badge.PlacedNote)
-                    ? MusicNoteHoverFit.Fits
-                    : MusicNoteHoverFit.Misses;
+                if (!MusicNoteFitEvaluator.Satisfies(gate, hoveredItem, run, badge.PlacedNote))
+                    hoverFit = MusicNoteHoverFit.Misses;
+                else
+                    hoverFit = MusicNoteBoardPlacement.CanCoverSocket(
+                        blockedForHovered,
+                        badge.SocketIndex,
+                        (int)hoveredItem.Size
+                    )
+                        ? MusicNoteHoverFit.Fits
+                        : MusicNoteHoverFit.FitsBlocked;
             }
             var visual = MusicNoteBadgeStyling.Resolve(
                 badge.Kind == MusicNoteSocketBadgeKind.Active,
@@ -383,6 +417,8 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         {
             MusicNoteBadgeVisual.Ghost => ImpliedLetterColor,
             MusicNoteBadgeVisual.GhostHighlighted => GhostHighlightLetterColor,
+            MusicNoteBadgeVisual.GhostMatchBlocked => GhostMatchBlockedLetterColor,
+            MusicNoteBadgeVisual.PlateMatchBlocked => PlateMatchBlockedLetterColor,
             MusicNoteBadgeVisual.GhostDimmed => GhostMissLetterColor,
             MusicNoteBadgeVisual.PlateDimmed => PlateMissLetterColor,
             _ => ActiveLetterColor, // Plate, PlateHighlighted, Boosted
@@ -391,9 +427,11 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         {
             MusicNoteBadgeVisual.Ghost
             or MusicNoteBadgeVisual.GhostHighlighted
+            or MusicNoteBadgeVisual.GhostMatchBlocked
             or MusicNoteBadgeVisual.GhostDimmed => ImpliedEdgeColor,
             MusicNoteBadgeVisual.PlateDimmed => PlateMissEdgeColor,
-            MusicNoteBadgeVisual.Boosted => BoostedEdgeColor,
+            MusicNoteBadgeVisual.Boosted or MusicNoteBadgeVisual.PlateMatchBlocked =>
+                BoostedEdgeColor,
             _ => ActiveEdgeColor, // Plate, PlateHighlighted
         };
 
@@ -405,6 +443,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         {
             case MusicNoteBadgeVisual.Ghost:
             case MusicNoteBadgeVisual.GhostHighlighted:
+            case MusicNoteBadgeVisual.GhostMatchBlocked:
             case MusicNoteBadgeVisual.GhostDimmed:
                 back = ImpliedBackColor;
                 break;
