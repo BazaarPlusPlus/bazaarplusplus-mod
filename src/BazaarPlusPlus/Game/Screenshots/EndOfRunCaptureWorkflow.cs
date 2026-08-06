@@ -2,6 +2,7 @@
 using System.Reflection;
 using BazaarPlusPlus.Core.Events;
 using BazaarPlusPlus.Core.Runtime;
+using BazaarPlusPlus.GameInterop.Heroes;
 using TheBazaar;
 using TheBazaar.UI.EndOfRun;
 
@@ -233,7 +234,9 @@ internal sealed class EndOfRunCaptureWorkflow : IEndOfRunCaptureWorkflow, IDispo
         if (!string.IsNullOrWhiteSpace(runId))
             _bufferedRunId = runId;
 
-        var heroName = Data.Run?.Player?.Hero.ToString();
+        var heroName = Data.Run?.Player is { } player
+            ? TheDragonsHeroIdentity.ToCanonicalId(player.Hero)
+            : null;
         if (!string.IsNullOrWhiteSpace(heroName))
             _bufferedHeroName = heroName;
     }

@@ -26,8 +26,20 @@ internal static class TheDragonsHeroIdentity
 
     internal static bool IsTheDragons(EHero hero) => IsAlias(hero.ToString());
 
-    internal static string ToCanonicalId(EHero hero) =>
-        IsTheDragons(hero) ? CanonicalId : hero.ToString();
+    internal static string ToCanonicalId(EHero hero) => ToCanonicalId(hero, RuntimeEnumName);
+
+    /// <summary>
+    /// Canonical id for anything that leaves the process (SQLite rows, uploaded payloads). The
+    /// runtime enum name is injectable so tests can pin the result under either transitional build.
+    /// </summary>
+    internal static string ToCanonicalId(EHero hero, Func<EHero, string> getEnumName)
+    {
+        if (getEnumName == null)
+            throw new ArgumentNullException(nameof(getEnumName));
+
+        var name = getEnumName(hero);
+        return IsAlias(name) ? CanonicalId : name;
+    }
 
     internal static string CanonicalizeForStorage(string? heroId)
     {
@@ -156,6 +168,8 @@ internal static class TheDragonsHeroIdentity
 
         return hero;
     }
+
+    private static string RuntimeEnumName(EHero hero) => hero.ToString();
 
     private static string FallbackFor(EHero hero) =>
         IsTheDragons(hero) ? FallbackDisplayName : hero.ToString();
