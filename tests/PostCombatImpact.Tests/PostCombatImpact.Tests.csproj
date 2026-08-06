@@ -61,8 +61,16 @@
       Link="CombatImpactAttributeLabel.cs"
     />
     <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactEffectIconKey.cs"
+      Link="CombatImpactEffectIconKey.cs"
+    />
+    <Compile
       Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactTargetDetailPolicy.cs"
       Link="CombatImpactTargetDetailPolicy.cs"
+    />
+    <Compile
+      Include="../../src/BazaarPlusPlus/Game/PostCombatImpact/Ui/CombatImpactDetailPresentationPolicy.cs"
+      Link="CombatImpactDetailPresentationPolicy.cs"
     />
   </ItemGroup>
 </Project>
