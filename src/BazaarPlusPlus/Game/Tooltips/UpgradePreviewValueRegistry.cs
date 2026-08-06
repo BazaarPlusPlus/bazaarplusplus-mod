@@ -8,6 +8,12 @@ namespace BazaarPlusPlus.Game.Tooltips;
 
 internal static class UpgradePreviewValueRegistry
 {
+    [ThreadStatic]
+    private static int _tooltipRenderDepth;
+
+    [ThreadStatic]
+    private static ITooltipComponent? _fallbackComponent;
+
     private static readonly ConditionalWeakTable<
         CardTooltipData,
         UpgradePreviewValueProjection
@@ -25,9 +31,37 @@ internal static class UpgradePreviewValueRegistry
     )
     {
         value = default;
+        component ??= TakeFallbackComponent();
         return tooltipData != null
             && Projections.TryGetValue(tooltipData, out var projection)
             && projection.TryResolve(component, out value);
+    }
+
+    internal static void BeginTooltipRender() => _tooltipRenderDepth++;
+
+    internal static void EndTooltipRender()
+    {
+        if (_tooltipRenderDepth > 0)
+            _tooltipRenderDepth--;
+
+        if (_tooltipRenderDepth == 0)
+            _fallbackComponent = null;
+    }
+
+    internal static void CaptureFallbackComponent(ITooltipComponent component)
+    {
+        // Native RenderTooltip omits the component argument for styled tokens whose
+        // ReferencedAttribute is null. Resolve() runs immediately before that formatter,
+        // so retain the token only for the duration of this synchronous render scope.
+        if (_tooltipRenderDepth > 0)
+            _fallbackComponent = component;
+    }
+
+    private static ITooltipComponent? TakeFallbackComponent()
+    {
+        var component = _fallbackComponent;
+        _fallbackComponent = null;
+        return component;
     }
 
     internal static bool TryResolveEffectiveCooldowns(
