@@ -1,6 +1,8 @@
 #nullable enable
+using BazaarGameClient.Domain.Models.Cards;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Input;
+using BazaarPlusPlus.GameInterop.Cards;
 using BazaarPlusPlus.GameInterop.Fonts;
 using BazaarPlusPlus.GameInterop.TagTypography;
 using TheBazaar;
@@ -15,11 +17,14 @@ namespace BazaarPlusPlus.Game.MusicNotes;
 /// modifier (HoldUpgradePreview, default Shift) is held outside combat/recap/replay, every
 /// unlocked player socket shows the note letter it holds — or, via the anchor rule, the letter
 /// it would become — under the socket. Placed notes render as a chip tinted with the letter's
-/// category accent color; implied letters render as dim neutral chips. Each letter's
-/// item-category identity (Burn, Heal, Weapon, ...) comes from the note templates' condition
-/// graphs and reuses the game's own keyword icon and accent color; unresolvable tags degrade
-/// to the letter alone. Purely visual: the canvas has no raycaster and every graphic is
-/// raycast-transparent.
+/// category accent color; implied letters render as dim neutral chips; a note whose occupying
+/// item passes its occupancy gate escalates to the boosted plate (brighter accent + match
+/// ring). While an item card is hovered, chips split into fits (match ring) and misses (faded)
+/// against that card's gate verdict — boosted chips stay boosted, live state outranks the
+/// what-if layer. Each letter's item-category identity (Burn, Heal, Weapon, ...) comes from
+/// the note templates' condition graphs and reuses the game's own keyword icon and accent
+/// color; unresolvable tags degrade to the letter alone. Purely visual: the canvas has no
+/// raycaster and every graphic is raycast-transparent.
 /// </summary>
 internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 {
@@ -36,6 +41,9 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     // ghosted, while active sprites render untinted full-color.
     private const string ImpliedIconTint = "#7A7C82A8";
 
+    // Deeper multiply for chips faded out of a hover comparison.
+    private const string DimmedIconTint = "#5A5C6255";
+
     private static readonly Color ImpliedBackColor = new(0.05f, 0.06f, 0.08f, 0.52f);
     private static readonly Color ActiveLetterColor = Color.white;
     private static readonly Color ImpliedLetterColor = new(0.64f, 0.67f, 0.72f, 0.88f);
@@ -45,6 +53,16 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     // Implied chips keep it near-invisible so only placed notes read as framed plates.
     private static readonly Color ActiveEdgeColor = new(0.88f, 0.71f, 0.38f, 0.62f);
     private static readonly Color ImpliedEdgeColor = new(0.55f, 0.52f, 0.46f, 0.16f);
+
+    // Match ring shared by the boosted plate and hover-fit chips: clearly brighter than the
+    // bronze trim so "this works here" pops without changing the chip's footprint.
+    private static readonly Color MatchEdgeColor = new(1f, 0.90f, 0.55f, 0.95f);
+
+    // Hover-miss fade: the whole chip drops toward the background so fitting sockets carry
+    // the strip while a comparison is active.
+    private static readonly Color DimmedLetterColor = new(0.55f, 0.57f, 0.62f, 0.38f);
+    private static readonly Color DimmedEdgeColor = new(0.55f, 0.52f, 0.46f, 0.06f);
+    private static readonly Color DimmedBackColor = new(0.05f, 0.06f, 0.08f, 0.26f);
 
     private static readonly string[] LetterNames = BuildLetterNames();
 
@@ -179,6 +197,11 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 
     private void Render(List<MusicNoteSocketBadge> badges, BoardManager board, Camera mainCamera)
     {
+        // Skills and socket-effect cards never occupy an item socket, so only a hovered item
+        // card switches the strip into fits-vs-misses comparison mode.
+        var hoveredItem = HoveredCardTracker.TryGetHoveredCard() as ItemCard;
+        var run = Data.Run;
+
         var sockets = board.playerItemSockets;
         var used = 0;
         foreach (var badge in badges)
@@ -196,8 +219,21 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
                 break;
             used++;
 
+            var hoverFit = MusicNoteHoverFit.None;
+            if (hoveredItem != null && badge.OccupancyGate is { Count: > 0 } gate)
+            {
+                hoverFit = MusicNoteFitEvaluator.Satisfies(gate, hoveredItem, run, badge.PlacedNote)
+                    ? MusicNoteHoverFit.Fits
+                    : MusicNoteHoverFit.Misses;
+            }
+            var visual = MusicNoteBadgeStyling.Resolve(
+                badge.Kind == MusicNoteSocketBadgeKind.Active,
+                badge.IsBoosted,
+                hoverFit
+            );
+
             PositionSlot(slot, screen);
-            StyleSlot(slot, badge);
+            StyleSlot(slot, badge, visual);
         }
 
         for (var i = used; i < _slots.Count; i++)
@@ -234,7 +270,11 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             slot.Root.gameObject.SetActive(true);
     }
 
-    private static void StyleSlot(BadgeSlot slot, in MusicNoteSocketBadge badge)
+    private static void StyleSlot(
+        BadgeSlot slot,
+        in MusicNoteSocketBadge badge,
+        MusicNoteBadgeVisual visual
+    )
     {
         var isActive = badge.Kind == MusicNoteSocketBadgeKind.Active;
 
@@ -274,11 +314,17 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         // glyph metrics — a standalone Image loses the baseline and each icon sits at its own
         // vertical offset. The asset is assigned explicitly so resolution never depends on the
         // global TMP fallback chain.
+        var iconTint = visual switch
+        {
+            MusicNoteBadgeVisual.Ghost => ImpliedIconTint,
+            MusicNoteBadgeVisual.GhostDimmed or MusicNoteBadgeVisual.PlateDimmed => DimmedIconTint,
+            _ => null,
+        };
         var letterName = LetterNames[(int)badge.Letter % LetterNames.Length];
         var text =
             iconAsset == null ? letterName
-            : isActive ? $"<sprite name=\"{iconName}\"> {letterName}"
-            : $"<sprite name=\"{iconName}\" color={ImpliedIconTint}> {letterName}";
+            : iconTint == null ? $"<sprite name=\"{iconName}\"> {letterName}"
+            : $"<sprite name=\"{iconName}\" color={iconTint}> {letterName}";
         if (slot.Letter.spriteAsset != iconAsset)
             slot.Letter.spriteAsset = iconAsset;
         if (!string.Equals(slot.RenderedText, text, StringComparison.Ordinal))
@@ -287,20 +333,49 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             slot.RenderedText = text;
         }
 
-        slot.Letter.color = isActive ? ActiveLetterColor : ImpliedLetterColor;
-        slot.Edge.color = isActive ? ActiveEdgeColor : ImpliedEdgeColor;
-        if (isActive)
+        slot.Letter.color = visual switch
         {
-            // Chip tinted toward the category color, matching how the game colors keywords.
-            var accent = accentColor ?? ActiveAccentFallbackColor;
-            var back = Color.Lerp(accent, Color.black, 0.58f);
-            back.a = 0.94f;
-            slot.Back.color = back;
-        }
-        else
+            MusicNoteBadgeVisual.Ghost => ImpliedLetterColor,
+            MusicNoteBadgeVisual.GhostDimmed or MusicNoteBadgeVisual.PlateDimmed =>
+                DimmedLetterColor,
+            _ => ActiveLetterColor,
+        };
+        slot.Edge.color = visual switch
         {
-            slot.Back.color = ImpliedBackColor;
+            MusicNoteBadgeVisual.Ghost => ImpliedEdgeColor,
+            MusicNoteBadgeVisual.Plate => ActiveEdgeColor,
+            MusicNoteBadgeVisual.GhostDimmed or MusicNoteBadgeVisual.PlateDimmed => DimmedEdgeColor,
+            // Boosted and both highlighted states share the match ring.
+            _ => MatchEdgeColor,
+        };
+
+        // Plates tint toward the category color, matching how the game colors keywords; the
+        // boosted plate pulls further toward the accent so a working note reads brightest.
+        var accent = accentColor ?? ActiveAccentFallbackColor;
+        Color back;
+        switch (visual)
+        {
+            case MusicNoteBadgeVisual.Ghost:
+            case MusicNoteBadgeVisual.GhostHighlighted:
+                back = ImpliedBackColor;
+                break;
+            case MusicNoteBadgeVisual.GhostDimmed:
+                back = DimmedBackColor;
+                break;
+            case MusicNoteBadgeVisual.Boosted:
+                back = Color.Lerp(accent, Color.black, 0.40f);
+                back.a = 0.96f;
+                break;
+            case MusicNoteBadgeVisual.PlateDimmed:
+                back = Color.Lerp(accent, Color.black, 0.58f);
+                back.a = 0.40f;
+                break;
+            default: // Plate, PlateHighlighted
+                back = Color.Lerp(accent, Color.black, 0.58f);
+                back.a = 0.94f;
+                break;
         }
+        slot.Back.color = back;
     }
 
     private BadgeSlot? GetSlot(int index)
