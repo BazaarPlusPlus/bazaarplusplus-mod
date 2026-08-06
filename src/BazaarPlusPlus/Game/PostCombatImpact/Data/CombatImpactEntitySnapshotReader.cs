@@ -1,5 +1,6 @@
 #nullable enable
 using BazaarGameClient.Domain.Models.Cards;
+using BazaarGameShared.Domain.Cards.Item;
 using BazaarGameShared.Domain.Core.Types;
 using BazaarGameShared.Domain.Effect;
 using BazaarGameShared.Domain.Effect.Actions;
@@ -70,7 +71,7 @@ internal static class CombatImpactEntitySnapshotReader
                 effectAttributes.Auras,
                 effectAttributes.ReferenceValuedAuraEffectIds,
                 card.LeftSocketId,
-                card.HiddenTags == null ? null : card.HiddenTags.ToArray()
+                ResolveHiddenTags(card)
             );
         }
 
@@ -82,6 +83,23 @@ internal static class CombatImpactEntitySnapshotReader
             opponentName = ResolveOpponentName(opponentHero);
         AddPlayer(entities, ECombatantId.Opponent, opponentHero, opponentName, order);
         return entities;
+    }
+
+    internal static IReadOnlyCollection<EHiddenTag>? ResolveHiddenTags(Card card)
+    {
+        IReadOnlyCollection<EHiddenTag>? enchantmentHiddenTags = null;
+        if (
+            card is ItemCard { Enchantment: { } enchantment }
+            && card.Template is TCardItem { Enchantments: not null } itemTemplate
+            && itemTemplate.Enchantments.TryGetValue(enchantment, out var enchantmentTemplate)
+        )
+            enchantmentHiddenTags = enchantmentTemplate?.HiddenTags;
+
+        return CombatImpactHiddenTags.Merge(
+            card.HiddenTags,
+            card.Template?.HiddenTags,
+            enchantmentHiddenTags
+        );
     }
 
     private static EffectAttributeTypes ReadEffectAttributeTypes(Card card, ItemCard? item)
