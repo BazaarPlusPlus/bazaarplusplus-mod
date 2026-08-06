@@ -2,7 +2,7 @@
   <Import Project="$(MSBuildThisFileDirectory)build/ManagedPath.props" />
 
   <PropertyGroup>
-    <BppVersion>5.0.0</BppVersion>
+    <BppVersion>5.1.0</BppVersion>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
