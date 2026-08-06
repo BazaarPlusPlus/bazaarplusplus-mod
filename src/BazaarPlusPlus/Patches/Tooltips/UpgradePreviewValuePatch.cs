@@ -2,12 +2,39 @@
 using System.Reflection;
 using BazaarGameClient.Domain.Tooltips;
 using BazaarGameShared.Domain.Core.Types;
+using BazaarGameShared.Domain.Effect.AuraActions;
 using BazaarPlusPlus.Game.Tooltips;
 using HarmonyLib;
 using TheBazaar;
 using TheBazaar.Tooltips;
 
 namespace BazaarPlusPlus.Patches.Tooltips;
+
+[HarmonyPatch(typeof(CardTooltipData), "RenderTooltip", [typeof(TooltipBuilder)])]
+internal static class UpgradePreviewTooltipRenderScopePatch
+{
+    [HarmonyPrefix]
+    private static void Prefix() => UpgradePreviewValueRegistry.BeginTooltipRender();
+
+    [HarmonyFinalizer]
+    private static void Finalizer() => UpgradePreviewValueRegistry.EndTooltipRender();
+}
+
+[HarmonyPatch(typeof(TooltipComponentAura), nameof(TooltipComponentAura.Resolve))]
+internal static class UpgradePreviewAuraValueContextPatch
+{
+    [HarmonyPostfix]
+    private static void Postfix(TooltipComponentAura __instance)
+    {
+        if (
+            !__instance.ReferencedAttribute.HasValue
+            && __instance.Aura.Action
+                is TAuraActionCardModifyAttribute
+                    or TAuraActionPlayerModifyAttribute
+        )
+            UpgradePreviewValueRegistry.CaptureFallbackComponent(__instance);
+    }
+}
 
 [HarmonyPatch]
 internal static class UpgradePreviewValuePatch

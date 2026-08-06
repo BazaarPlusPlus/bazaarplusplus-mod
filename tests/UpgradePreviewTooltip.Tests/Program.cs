@@ -104,6 +104,101 @@ AssertTrue(
 );
 AssertFloatEqual(3f, upgradedBurn, "Derived Burn should be recomputed as 20% of 15, not 2 + 5.");
 
+var guzhengAura = new TCardAura
+{
+    Id = "guzheng-damage-per-tempo",
+    Action = new TAuraActionCardModifyAttribute
+    {
+        AttributeType = ECardAttributeType.DamageAmount,
+        Operation = EAttributeModifierOperation.Add,
+        Target = new TTargetCardSelf(),
+        Value = new TReferenceValuePlayerAttribute
+        {
+            AttributeType = EPlayerAttributeType.Tempo,
+            Modifier = new TValueModifier
+            {
+                ModifyMode = EValueModifierMode.Multiply,
+                Value = new TReferenceValueCardAttribute
+                {
+                    AttributeType = ECardAttributeType.Custom_0,
+                    Target = new TTargetCardSelf(),
+                    Modifier = new TValueModifier
+                    {
+                        ModifyMode = EValueModifierMode.Multiply,
+                        Value = new TFixedValue { Value = 1f },
+                    },
+                },
+            },
+        },
+    },
+};
+var guzhengTemplate = new TCardItem
+{
+    Type = ECardType.Item,
+    StartingTier = ETier.Gold,
+    Auras = new Dictionary<string, TCardAura> { [guzhengAura.Id] = guzhengAura },
+    Tiers = new Dictionary<ETier, TCardTier>
+    {
+        [ETier.Gold] = new TCardTier
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Custom_0] = 15,
+            },
+        },
+        [ETier.Diamond] = new TCardTier
+        {
+            Attributes = new Dictionary<ECardAttributeType, int>
+            {
+                [ECardAttributeType.Custom_0] = 30,
+            },
+        },
+    },
+};
+var guzhengCard = new ItemCard
+{
+    Template = guzhengTemplate,
+    Type = ECardType.Item,
+    Tier = ETier.Gold,
+    Attributes = new Dictionary<ECardAttributeType, int> { [ECardAttributeType.Custom_0] = 15 },
+};
+var guzhengContext = new TooltipContext(
+    guzhengCard,
+    guzhengTemplate,
+    new ValueContext(null!, guzhengCard)
+);
+var guzhengToken = TooltipComponentAura.Create(
+    guzhengContext,
+    guzhengAura.Id,
+    ETooltipAccessorType.Mod,
+    0
+);
+
+AssertNotNull(guzhengToken, "Guzheng aura token should be created.");
+AssertTrue(
+    !guzhengToken!.ReferencedAttribute.HasValue,
+    "Guzheng's player-attribute aura intentionally has no native referenced card attribute."
+);
+AssertFloatEqual(15f, guzhengToken.Resolve()!.Value, "Current Guzheng multiplier should be 15.");
+AssertTrue(
+    UpgradePreviewValueProjection.TryCreate(
+        guzhengCard,
+        guzhengTemplate,
+        guzhengContext.ValueContext,
+        out var guzhengProjection
+    ),
+    "Guzheng upgrade projection should be created."
+);
+AssertTrue(
+    guzhengProjection.TryResolve(guzhengToken, out var upgradedGuzhengMultiplier),
+    "Projected Guzheng aura token should resolve."
+);
+AssertFloatEqual(
+    30f,
+    upgradedGuzhengMultiplier,
+    "Guzheng Damage and Shield per Tempo should upgrade from 15 to 30."
+);
+
 card.Attributes[ECardAttributeType.Custom_1] = 12;
 AssertTrue(
     UpgradePreviewValueProjection.TryCreate(
