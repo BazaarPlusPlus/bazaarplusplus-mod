@@ -32,32 +32,40 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
     // badge row reads as a single aligned strip.
     private const float LetterFontSize = 20f;
 
-    // TMP sprite tint for implied badges (active sprites render untinted full-color).
-    private const string ImpliedIconTint = "#FFFFFFBF";
+    // TMP sprite tint for implied badges: multiplied toward grey so inactive icons read as
+    // ghosted, while active sprites render untinted full-color.
+    private const string ImpliedIconTint = "#7A7C82A8";
 
-    private static readonly Color ImpliedBackColor = new(0.05f, 0.06f, 0.08f, 0.62f);
+    private static readonly Color ImpliedBackColor = new(0.05f, 0.06f, 0.08f, 0.52f);
     private static readonly Color ActiveLetterColor = Color.white;
-    private static readonly Color ImpliedLetterColor = new(0.85f, 0.87f, 0.90f, 0.92f);
+    private static readonly Color ImpliedLetterColor = new(0.64f, 0.67f, 0.72f, 0.88f);
     private static readonly Color ActiveAccentFallbackColor = new(0.82f, 0.66f, 0.30f, 1f);
+
+    // Bronze-trim hairline along the chip edge, echoing the board's metal plate borders.
+    // Implied chips keep it near-invisible so only placed notes read as framed plates.
+    private static readonly Color ActiveEdgeColor = new(0.92f, 0.74f, 0.40f, 0.80f);
+    private static readonly Color ImpliedEdgeColor = new(0.55f, 0.52f, 0.46f, 0.16f);
 
     private static readonly string[] LetterNames = BuildLetterNames();
 
     private static Sprite? _roundedSprite;
+    private static Sprite? _roundedEdgeSprite;
 
     private sealed class BadgeSlot
     {
-        internal BadgeSlot(RectTransform root, Image back, TextMeshProUGUI letter)
+        internal BadgeSlot(RectTransform root, Image back, Image edge, TextMeshProUGUI letter)
         {
             Root = root;
             Back = back;
+            Edge = edge;
             Letter = letter;
         }
 
         internal RectTransform Root { get; }
         internal Image Back { get; }
+        internal Image Edge { get; }
         internal TextMeshProUGUI Letter { get; }
         internal string? RenderedText { get; set; }
-        internal bool? RenderedActive { get; set; }
     }
 
     private GameObject? _canvasObject;
@@ -274,19 +282,14 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             slot.RenderedText = text;
         }
 
-        if (slot.RenderedActive != isActive)
-        {
-            slot.Letter.fontStyle = isActive ? FontStyles.Bold : FontStyles.Normal;
-            slot.RenderedActive = isActive;
-        }
-
         slot.Letter.color = isActive ? ActiveLetterColor : ImpliedLetterColor;
+        slot.Edge.color = isActive ? ActiveEdgeColor : ImpliedEdgeColor;
         if (isActive)
         {
             // Chip tinted toward the category color, matching how the game colors keywords.
             var accent = accentColor ?? ActiveAccentFallbackColor;
-            var back = Color.Lerp(accent, Color.black, 0.58f);
-            back.a = 0.94f;
+            var back = Color.Lerp(accent, Color.black, 0.46f);
+            back.a = 0.97f;
             slot.Back.color = back;
         }
         else
@@ -315,7 +318,6 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         var rootObject = new GameObject(
             $"NoteBadge{index}",
             typeof(RectTransform),
-            typeof(Image),
             typeof(HorizontalLayoutGroup),
             typeof(ContentSizeFitter)
         );
@@ -326,10 +328,45 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         root.anchorMax = new Vector2(0.5f, 0.5f);
         root.pivot = new Vector2(0.5f, 1f);
 
-        var back = rootObject.GetComponent<Image>();
+        // The background lives on an ignoreLayout child stretched to the root: an Image on
+        // the layout root itself would feed its sprite's native size into the size fitter
+        // (max over co-located layout elements) and a large atlas sprite would blow the
+        // badge up to that size.
+        var backObject = new GameObject(
+            "Back",
+            typeof(RectTransform),
+            typeof(Image),
+            typeof(LayoutElement)
+        );
+        backObject.transform.SetParent(rootObject.transform, false);
+        var backRect = (RectTransform)backObject.transform;
+        backRect.anchorMin = Vector2.zero;
+        backRect.anchorMax = Vector2.one;
+        backRect.offsetMin = Vector2.zero;
+        backRect.offsetMax = Vector2.zero;
+        backObject.GetComponent<LayoutElement>().ignoreLayout = true;
+        var back = backObject.GetComponent<Image>();
         back.sprite = GetRoundedSprite();
         back.type = Image.Type.Sliced;
         back.raycastTarget = false;
+
+        var edgeObject = new GameObject(
+            "Edge",
+            typeof(RectTransform),
+            typeof(Image),
+            typeof(LayoutElement)
+        );
+        edgeObject.transform.SetParent(rootObject.transform, false);
+        var edgeRect = (RectTransform)edgeObject.transform;
+        edgeRect.anchorMin = Vector2.zero;
+        edgeRect.anchorMax = Vector2.one;
+        edgeRect.offsetMin = Vector2.zero;
+        edgeRect.offsetMax = Vector2.zero;
+        edgeObject.GetComponent<LayoutElement>().ignoreLayout = true;
+        var edge = edgeObject.GetComponent<Image>();
+        edge.sprite = GetRoundedEdgeSprite();
+        edge.type = Image.Type.Sliced;
+        edge.raycastTarget = false;
 
         var layout = rootObject.GetComponent<HorizontalLayoutGroup>();
         layout.padding = new RectOffset(8, 9, 3, 3);
@@ -352,7 +389,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
         letter.alignment = TextAlignmentOptions.Center;
         letter.raycastTarget = false;
 
-        return new BadgeSlot(root, back, letter);
+        return new BadgeSlot(root, back, edge, letter);
     }
 
     private void SetVisible(bool visible)
@@ -380,27 +417,72 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             wrapMode = TextureWrapMode.Clamp,
         };
 
-        var halfSize = size * 0.5f;
-        var innerHalfExtent = halfSize - radius;
+        for (var y = 0; y < size; y++)
+        {
+            // Subtle top-lit vertical gradient baked into the white fill (texture row 0 is
+            // the bottom); Image.color multiplies on top, so the shade survives tinting.
+            var shade = Mathf.Lerp(0.78f, 1f, (y + 0.5f) / size);
+            for (var x = 0; x < size; x++)
+            {
+                var alpha = Mathf.Clamp01(
+                    0.5f - RoundedSignedDistance(x, y, size, radius) / edgeSoftness
+                );
+                texture.SetPixel(x, y, new Color(shade, shade, shade, alpha));
+            }
+        }
+
+        texture.Apply();
+        _roundedSprite = CreateSlicedSprite(texture, size, radius);
+        return _roundedSprite;
+    }
+
+    // Hairline ring along the chip boundary, tinted per state as a metal-trim edge.
+    private static Sprite GetRoundedEdgeSprite()
+    {
+        if (_roundedEdgeSprite != null)
+            return _roundedEdgeSprite;
+
+        const int size = 32;
+        const float radius = 11f;
+        const float ringInset = 1.1f;
+        const float ringWidth = 1.2f;
+        var texture = new Texture2D(size, size, TextureFormat.ARGB32, false)
+        {
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+        };
+
         for (var y = 0; y < size; y++)
         {
             for (var x = 0; x < size; x++)
             {
-                var distanceX = Mathf.Abs(x + 0.5f - halfSize) - innerHalfExtent;
-                var distanceY = Mathf.Abs(y + 0.5f - halfSize) - innerHalfExtent;
-                var outsideX = Mathf.Max(distanceX, 0f);
-                var outsideY = Mathf.Max(distanceY, 0f);
-                var signedDistance =
-                    Mathf.Sqrt(outsideX * outsideX + outsideY * outsideY)
-                    + Mathf.Min(Mathf.Max(distanceX, distanceY), 0f)
-                    - radius;
-                var alpha = Mathf.Clamp01(0.5f - signedDistance / edgeSoftness);
+                var distance = RoundedSignedDistance(x, y, size, radius);
+                var alpha = Mathf.Clamp01(1f - Mathf.Abs(distance + ringInset) / ringWidth);
                 texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
             }
         }
 
         texture.Apply();
-        _roundedSprite = Sprite.Create(
+        _roundedEdgeSprite = CreateSlicedSprite(texture, size, radius);
+        return _roundedEdgeSprite;
+    }
+
+    private static float RoundedSignedDistance(int x, int y, int size, float radius)
+    {
+        var halfSize = size * 0.5f;
+        var innerHalfExtent = halfSize - radius;
+        var distanceX = Mathf.Abs(x + 0.5f - halfSize) - innerHalfExtent;
+        var distanceY = Mathf.Abs(y + 0.5f - halfSize) - innerHalfExtent;
+        var outsideX = Mathf.Max(distanceX, 0f);
+        var outsideY = Mathf.Max(distanceY, 0f);
+        return Mathf.Sqrt(outsideX * outsideX + outsideY * outsideY)
+            + Mathf.Min(Mathf.Max(distanceX, distanceY), 0f)
+            - radius;
+    }
+
+    private static Sprite CreateSlicedSprite(Texture2D texture, int size, float radius)
+    {
+        return Sprite.Create(
             texture,
             new Rect(0f, 0f, size, size),
             new Vector2(0.5f, 0.5f),
@@ -409,7 +491,6 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
             SpriteMeshType.FullRect,
             new Vector4(radius, radius, radius, radius)
         );
-        return _roundedSprite;
     }
 
     private static string[] BuildLetterNames()
