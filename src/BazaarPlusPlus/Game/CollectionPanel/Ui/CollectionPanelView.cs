@@ -50,6 +50,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _heroFilterLabel;
     private Label? _tierFilterLabel;
     private Label? _keywordFilterLabel;
+    private Label? _keywordRelatedSectionLabel;
     private VisualElement? _keywordMatchModeButton;
     private VisualElement? _heroChipRow;
     private VisualElement? _tierChipRow;
@@ -442,6 +443,8 @@ internal sealed partial class CollectionPanelView : IDisposable
                 : CollectionPanelText.TierHeader();
         if (_keywordFilterLabel != null)
             _keywordFilterLabel.text = CollectionPanelText.KeywordHeader();
+        if (_keywordRelatedSectionLabel != null)
+            _keywordRelatedSectionLabel.text = CollectionPanelText.KeywordRelatedSection();
 
         UpdateContentSpacerHeight(model.ContentHeight);
 

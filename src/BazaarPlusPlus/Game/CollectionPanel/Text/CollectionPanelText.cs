@@ -57,7 +57,13 @@ internal static class CollectionPanelText
         "尺寸 / 品質"
     );
     private static readonly LocalizedTextSet TierHeaderText = new("Quality", "品质", "品質");
+    private static readonly LocalizedTextSet TagHeaderText = new("Types", "类型", "類型");
     private static readonly LocalizedTextSet KeywordHeaderText = new("Tags", "标签", "標籤");
+    private static readonly LocalizedTextSet KeywordRelatedSectionText = new(
+        "Related",
+        "相关",
+        "相關"
+    );
     private static readonly LocalizedTextSet FacetMatchAnyText = new("Any", "任一", "任一");
     private static readonly LocalizedTextSet FacetMatchAllText = new("All", "全部", "全部");
     private static readonly LocalizedTextSet KeywordMatchAnyTooltipText = new(
@@ -125,7 +131,11 @@ internal static class CollectionPanelText
 
     internal static string TierHeader() => Resolve(TierHeaderText);
 
+    internal static string TagHeader() => Resolve(TagHeaderText);
+
     internal static string KeywordHeader() => Resolve(KeywordHeaderText);
+
+    internal static string KeywordRelatedSection() => Resolve(KeywordRelatedSectionText);
 
     internal static string FacetMatchMode(CollectionFacetMatchMode mode) =>
         mode == CollectionFacetMatchMode.All

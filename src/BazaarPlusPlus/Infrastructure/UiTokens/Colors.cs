@@ -51,6 +51,9 @@ internal static class Colors
     // Collection Panel filter chrome follows the compact, near-black tag treatment used by the
     // native catalog reference: a solid #101113 canvas, restrained fills, and a one-pixel edge.
     public static Color CollectionPanelBackground => FromRgb(16, 17, 19, 1f);
+    public static Color CollectionFilterCardBackground => FromRgb(22, 24, 28, 1f);
+    public static Color CollectionFilterCardBorder => FromRgb(51, 56, 63, 1f);
+    public static Color CollectionFilterTitleText => FromRgb(232, 236, 242, 1f);
     public static Color CollectionChipBackground => FromRgb(28, 30, 34, 1f);
     public static Color CollectionChipBorder => FromRgb(63, 68, 73, 1f);
     public static Color CollectionChipText => FromRgb(252, 252, 252, 1f);

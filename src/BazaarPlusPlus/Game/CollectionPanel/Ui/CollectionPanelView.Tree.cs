@@ -171,12 +171,20 @@ internal sealed partial class CollectionPanelView
         _keywordMatchModeButton = CreateFacetMatchModeControl(mode =>
             _commands.SetKeywordMatchMode(mode)
         );
+        // Keep the match-mode implementation available for a later UX pass while hiding the
+        // compact control during the grouped-filter redesign.
+        _keywordMatchModeButton.style.display = DisplayStyle.None;
         keywordHeaderRow.Add(_keywordMatchModeButton);
         _keywordChipRow.style.flexWrap = Wrap.Wrap;
         _keywordChipRow.style.justifyContent = Justify.FlexStart;
 
-        // Player-facing type chips continue directly below gameplay tags without a second title.
-        _tagFilterSection = CreateFilterChipSection(controlsScroll, UiSpacing.Sm, out _tagChipRow);
+        // Player-facing type chips get their own titled card; the chip flow itself is unchanged.
+        _tagFilterSection = CreateFilterChipSection(
+            controlsScroll,
+            CollectionPanelText.TagHeader(),
+            UiSpacing.Lg,
+            out _tagChipRow
+        );
         _tagChipRow.style.flexWrap = Wrap.Wrap;
         _tagChipRow.style.justifyContent = Justify.FlexStart;
 
@@ -531,6 +539,10 @@ internal sealed partial class CollectionPanelView
         section.style.flexDirection = FlexDirection.Column;
         section.style.flexShrink = 0f;
         section.style.marginTop = marginTop;
+        section.style.backgroundColor = Colors.CollectionFilterCardBackground;
+        UiStyle.Border(section.style, Borders.Thin, Colors.CollectionFilterCardBorder);
+        UiStyle.Radius(section.style, Radii.Md);
+        UiStyle.Padding(section.style, UiSpacing.Md);
         parent.Add(section);
 
         headerRow = new VisualElement();
@@ -540,7 +552,11 @@ internal sealed partial class CollectionPanelView
         headerRow.style.marginBottom = UiSpacing.Sm;
         section.Add(headerRow);
 
-        label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        label = CreateLabel(
+            Sizes.CollectionFilterTitleFontSize,
+            FontStyle.Bold,
+            Colors.CollectionFilterTitleText
+        );
         label.text = title;
         label.style.flexGrow = 1f;
         label.style.flexShrink = 1f;
@@ -702,6 +718,7 @@ internal sealed partial class CollectionPanelView
 
     private static VisualElement CreateFilterChipSection(
         VisualElement parent,
+        string title,
         float marginTop,
         out VisualElement chipRow
     )
@@ -710,7 +727,26 @@ internal sealed partial class CollectionPanelView
         section.style.flexDirection = FlexDirection.Column;
         section.style.flexShrink = 0f;
         section.style.marginTop = marginTop;
+        section.style.backgroundColor = Colors.CollectionFilterCardBackground;
+        UiStyle.Border(section.style, Borders.Thin, Colors.CollectionFilterCardBorder);
+        UiStyle.Radius(section.style, Radii.Md);
+        UiStyle.Padding(section.style, UiSpacing.Md);
         parent.Add(section);
+
+        var header = new VisualElement();
+        header.style.flexDirection = FlexDirection.Row;
+        header.style.alignItems = Align.Center;
+        header.style.marginBottom = UiSpacing.Sm;
+        section.Add(header);
+
+        var label = CreateLabel(
+            Sizes.CollectionFilterTitleFontSize,
+            FontStyle.Bold,
+            Colors.CollectionFilterTitleText
+        );
+        label.text = title;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        header.Add(label);
 
         chipRow = CreateFilterChipRow();
         section.Add(chipRow);

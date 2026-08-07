@@ -182,7 +182,8 @@ internal sealed partial class CollectionPanelView
             {
                 if (option.IsRelated && addedOption && !addedRelatedGroup)
                 {
-                    _keywordChipRow.Add(CreateFacetGroupSpacer());
+                    _keywordRelatedSectionLabel = CreateKeywordRelatedSectionLabel();
+                    _keywordChipRow.Add(_keywordRelatedSectionLabel);
                     addedRelatedGroup = true;
                 }
 
@@ -238,7 +239,22 @@ internal sealed partial class CollectionPanelView
         }
         _keywordChips.Clear();
         _keywordChipOrder.Clear();
+        _keywordRelatedSectionLabel = null;
         _keywordChipRow?.Clear();
+    }
+
+    private static Label CreateKeywordRelatedSectionLabel()
+    {
+        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        label.text = CollectionPanelText.KeywordRelatedSection();
+        label.style.width = Length.Percent(100f);
+        label.style.flexBasis = Length.Percent(100f);
+        label.style.marginTop = UiSpacing.Xs;
+        label.style.marginBottom = UiSpacing.Xs;
+        label.style.whiteSpace = WhiteSpace.NoWrap;
+        label.style.overflow = Overflow.Hidden;
+        label.style.opacity = 0.72f;
+        return label;
     }
 
     private static VisualElement CreateFacetGroupSpacer()

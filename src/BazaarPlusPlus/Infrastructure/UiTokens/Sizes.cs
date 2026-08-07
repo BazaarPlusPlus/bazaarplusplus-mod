@@ -30,6 +30,7 @@ internal static class Sizes
     public const int HeroChipsPerRow = 8;
     public const float TagChipIconSize = 16f;
     public const int CollectionTagFontSize = 14;
+    public const int CollectionFilterTitleFontSize = 18;
     public const int SourceChipsPerRow = 8;
     public const float SourceChipIconRatio = 48f / 56f;
     public const float SourceChipMinSize = 40f;
