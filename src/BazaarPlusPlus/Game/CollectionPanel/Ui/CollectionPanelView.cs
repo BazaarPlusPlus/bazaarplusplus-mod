@@ -18,6 +18,7 @@ internal sealed partial class CollectionPanelView : IDisposable
     private const string SourceChipInitialsName = "bpp-source-chip-initials";
     private const string TagChipIconName = "bpp-tag-chip-icon";
     private const string TagChipLabelName = "bpp-tag-chip-label";
+    private const string SizeChipLabelName = "bpp-size-chip-label";
     private const string FacetMatchAnyName = "bpp-facet-match-any";
     private const string FacetMatchAllName = "bpp-facet-match-all";
     private const string FacetMatchLabelName = "bpp-facet-match-label";
@@ -359,7 +360,10 @@ internal sealed partial class CollectionPanelView : IDisposable
         }
         foreach (var pair in _sizeChips)
         {
-            pair.Value.text = CollectionPanelText.Size(pair.Key);
+            pair.Value.text = string.Empty;
+            var label = pair.Value.Q<Label>(SizeChipLabelName);
+            if (label != null)
+                label.text = CollectionPanelText.Size(pair.Key);
             RefreshSizeChip(pair.Value, model.SelectedSizes.Contains(pair.Key));
         }
         foreach (var pair in _tagChips)

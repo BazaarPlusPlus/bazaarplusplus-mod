@@ -145,7 +145,11 @@ internal sealed partial class CollectionPanelView
         UiStyle.FixedSize(icon.style, 18f, 14f);
         icon.style.marginRight = UiSpacing.Xs;
         icon.generateVisualContent += context => DrawSizeIcon(context, icon, size);
-        var label = new Label(CollectionPanelText.Size(size)) { pickingMode = PickingMode.Ignore };
+        var label = new Label(CollectionPanelText.Size(size))
+        {
+            name = SizeChipLabelName,
+            pickingMode = PickingMode.Ignore,
+        };
         label.style.fontSize = Sizes.CollectionTagFontSize;
         label.style.whiteSpace = WhiteSpace.NoWrap;
         label.style.flexShrink = 0f;

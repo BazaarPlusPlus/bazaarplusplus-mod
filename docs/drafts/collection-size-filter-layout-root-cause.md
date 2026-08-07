@@ -26,6 +26,11 @@ button)`; the Size-chip customization omitted that guard.
 The outer-width change made the failure clearer: the empty segment now has the intended width while
 all three hidden children remain absent.
 
+After the buttons became visible, a second lifecycle owner surfaced: `CollectionPanelView.Refresh`
+still assigned localized Size text to `Button.text` on every render. That recreated the native text
+layer beside the custom label, producing duplicated/overlapping labels. Size localization refresh
+must target the named custom label and keep `Button.text` empty.
+
 ## Candidate approaches
 
 1. **Do not hide the queried `TextElement` (chosen).** The Button text is already empty; custom icon
