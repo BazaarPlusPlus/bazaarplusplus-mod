@@ -24,7 +24,6 @@ internal static class CombatImpactProjector
     {
         var executions = ProjectExecutions(simulation, entities);
         var events = new List<CombatImpactEvent>();
-        var triggerOccurrences = new HashSet<TriggerOccurrence>();
 
         foreach (var execution in executions)
         {
@@ -39,6 +38,7 @@ internal static class CombatImpactProjector
             var resolved = execution.Resolved;
             if (kind == CombatImpactKind.AttributeChange && !IsDisplayableAttributeChange(resolved))
                 continue;
+            var triggerProvenance = ResolveTriggerProvenance(execution, entities);
 
             events.Add(
                 new CombatImpactEvent(
@@ -59,10 +59,13 @@ internal static class CombatImpactProjector
                     NonCriticalValue = resolved.NonCriticalValue,
                     AlternateNonCriticalValue = resolved.AlternateNonCriticalValue,
                     HasCriticalAdjustmentCandidate = resolved.HasCriticalAdjustmentCandidate,
+                    RawDirectSourceId = execution.DirectSourceId,
+                    TriggerSourceId = execution.TriggerSourceId,
+                    TriggerFrameIndex = execution.FrameIndex,
+                    ActivitySourceResolution = triggerProvenance.SourceResolution,
+                    TriggerScope = triggerProvenance.Scope,
                 }
             );
-            if (TryCreateTriggerOccurrence(execution, entities, out var triggerOccurrence))
-                triggerOccurrences.Add(triggerOccurrence);
         }
 
         AddCardActionCostEvents(simulation, entities, events);
@@ -179,7 +182,7 @@ internal static class CombatImpactProjector
             report,
             PeriodicEffectAttribution.Project(simulation, entities)
         );
-        return AttachTriggerSources(report, triggerOccurrences, entities);
+        return report;
     }
 
     private static void AddFMinorTempoEvents(
@@ -238,7 +241,7 @@ internal static class CombatImpactProjector
                             ValueBasis: CombatImpactValueBasis.ConfiguredActionAmount
                         )
                         {
-                            Surface = CombatImpactEventSurface.PlayerAttribute,
+                            Surface = CombatImpactEventSurface.AppliedEffect,
                             OccurrenceBasis = CombatImpactOccurrenceBasis.ReconstructedTransition,
                         }
                     );
@@ -259,14 +262,12 @@ internal static class CombatImpactProjector
 
     private static CombatImpactReport AttachPeriodicImpacts(
         CombatImpactReport report,
-        IReadOnlyDictionary<PeriodicImpactKey, CombatImpactPeriodicImpact> impacts
+        PeriodicAttributionReport periodic
     )
     {
-        if (impacts.Count == 0)
-            return report;
-
         return report with
         {
+            PeriodicResiduals = periodic.Residuals,
             Sources = report
                 .Sources.Select(source =>
                     source with
@@ -275,12 +276,18 @@ internal static class CombatImpactProjector
                             .Groups.Select(group =>
                             {
                                 var kind = PeriodicKind(group);
-                                return
-                                    kind.HasValue
-                                    && impacts.TryGetValue(
-                                        new PeriodicImpactKey(source.Entity.Id, kind.Value),
-                                        out var impact
+                                var impact = kind.HasValue
+                                    ? RollUpPeriodicImpact(
+                                        periodic.SourceImpacts,
+                                        source.Entity.Id,
+                                        kind.Value,
+                                        group
+                                            .Targets.Select(target => target.Entity.CombatantId)
+                                            .OfType<ECombatantId>()
+                                            .ToHashSet()
                                     )
+                                    : null;
+                                return impact != null
                                     ? group with
                                     {
                                         PeriodicImpact = impact,
@@ -292,6 +299,34 @@ internal static class CombatImpactProjector
                 )
                 .ToArray(),
         };
+    }
+
+    private static CombatImpactPeriodicImpact? RollUpPeriodicImpact(
+        IReadOnlyDictionary<PeriodicImpactKey, CombatImpactPeriodicImpact> sourceImpacts,
+        string sourceId,
+        CombatImpactPeriodicKind kind,
+        IReadOnlyCollection<ECombatantId> targetCombatants
+    )
+    {
+        var matches = sourceImpacts
+            .Where(pair =>
+                string.Equals(pair.Key.SourceId, sourceId, StringComparison.Ordinal)
+                && pair.Key.Kind == kind
+                && (targetCombatants.Count == 0 || targetCombatants.Contains(pair.Key.Combatant))
+            )
+            .Select(pair => pair.Value)
+            .ToArray();
+        if (matches.Length == 0)
+            return null;
+
+        return new CombatImpactPeriodicImpact(
+            SaturatingInt(matches.Sum(impact => (long)impact.HealthAmount)),
+            SaturatingInt(matches.Sum(impact => (long)impact.ShieldAmount)),
+            matches.Any(impact => impact.Proof == CombatImpactPeriodicProof.Proportional)
+                ? CombatImpactPeriodicProof.Proportional
+                : CombatImpactPeriodicProof.Exact,
+            PeriodicEffectAttribution.ModelVersion
+        );
     }
 
     private static CombatImpactPeriodicKind? PeriodicKind(CombatImpactGroup group) =>
@@ -312,121 +347,6 @@ internal static class CombatImpactProjector
                     CombatImpactPeriodicKind.Regen,
                 _ => null,
             };
-
-    private static CombatImpactReport AttachTriggerSources(
-        CombatImpactReport report,
-        IReadOnlyCollection<TriggerOccurrence> occurrences,
-        IReadOnlyDictionary<string, CombatImpactEntity> entities
-    )
-    {
-        var sourceOccurrences = occurrences
-            .GroupBy(occurrence => occurrence.SourceId, StringComparer.Ordinal)
-            .ToDictionary(source => source.Key, source => source.ToArray(), StringComparer.Ordinal);
-        if (sourceOccurrences.Count == 0)
-            return report;
-
-        return report with
-        {
-            Sources = report
-                .Sources.Select(source =>
-                    sourceOccurrences.TryGetValue(source.Entity.Id, out var occurrencesForSource)
-                        ? source with
-                        {
-                            TriggerSources = BuildTriggerSources(
-                                occurrencesForSource,
-                                entities,
-                                source.Entity.Id
-                            ),
-                            Groups = source
-                                .Groups.Select(group =>
-                                {
-                                    var triggers = BuildTriggerSources(
-                                        occurrencesForSource.Where(occurrence =>
-                                            occurrence.Kind == group.Kind
-                                            && occurrence.Surface == group.Surface
-                                            && string.Equals(
-                                                occurrence.NativeAttributeKey,
-                                                group.NativeAttributeKey,
-                                                StringComparison.Ordinal
-                                            )
-                                        ),
-                                        entities,
-                                        source.Entity.Id
-                                    );
-                                    return triggers.Count == 0
-                                        ? group
-                                        : group with
-                                        {
-                                            TriggerSources = triggers,
-                                        };
-                                })
-                                .ToArray(),
-                        }
-                        : source
-                )
-                .ToArray(),
-        };
-    }
-
-    private static IReadOnlyList<CombatImpactTriggerSource> BuildTriggerSources(
-        IEnumerable<TriggerOccurrence> occurrences,
-        IReadOnlyDictionary<string, CombatImpactEntity> entities,
-        string sourceId
-    )
-    {
-        var items = occurrences.ToArray();
-        if (
-            items.Length == 0
-            || items.All(occurrence =>
-                string.Equals(occurrence.TriggerSourceId, sourceId, StringComparison.Ordinal)
-            )
-        )
-            return [];
-
-        return items
-            .GroupBy(occurrence => occurrence.TriggerSourceId, StringComparer.Ordinal)
-            .Select(trigger => new CombatImpactTriggerSource(
-                entities[trigger.Key],
-                // One activation can be split across multiple execution-context IDs for friendly
-                // and opponent target partitions. The replay's stable shared boundary is the frame.
-                trigger.Select(occurrence => occurrence.FrameIndex).Distinct().Count()
-            ))
-            .OrderByDescending(trigger => trigger.Count)
-            .ThenBy(trigger => trigger.Entity.Order)
-            .ThenBy(trigger => trigger.Entity.Name, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(trigger => trigger.Entity.Id, StringComparer.Ordinal)
-            .ToArray();
-    }
-
-    private static bool TryCreateTriggerOccurrence(
-        ProjectedExecution execution,
-        IReadOnlyDictionary<string, CombatImpactEntity> entities,
-        out TriggerOccurrence occurrence
-    )
-    {
-        occurrence = default;
-        if (
-            string.IsNullOrWhiteSpace(execution.DirectSourceId)
-            || string.IsNullOrWhiteSpace(execution.TriggerSourceId)
-            || !execution.Kind.HasValue
-        )
-            return false;
-
-        var sourceId = execution.DirectSourceId;
-        var triggerSourceId = execution.TriggerSourceId;
-        if (!IsActivityEntity(sourceId, entities) || !IsActivityEntity(triggerSourceId, entities))
-            return false;
-
-        occurrence = new TriggerOccurrence(
-            sourceId,
-            triggerSourceId,
-            execution.FrameIndex,
-            execution.Kind.Value,
-            execution.Resolved.NativeAttributeKey,
-            execution.Resolved.Surface
-        );
-        return true;
-    }
 
     private static IReadOnlyList<ProjectedExecution> ProjectExecutions(
         CombatSim simulation,
@@ -916,6 +836,51 @@ internal static class CombatImpactProjector
             return triggerSourceId;
 
         return null;
+    }
+
+    private static TriggerProvenance ResolveTriggerProvenance(
+        ProjectedExecution execution,
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
+    )
+    {
+        var directIsActivity = IsActivityEntity(execution.DirectSourceId, entities);
+        var triggerIsActivity = IsActivityEntity(execution.TriggerSourceId, entities);
+        if (!directIsActivity && triggerIsActivity)
+        {
+            return new TriggerProvenance(
+                CombatImpactActivitySourceResolution.TriggerFallback,
+                CombatImpactTriggerScope.AttributedViaTriggerFallback
+            );
+        }
+
+        if (directIsActivity && triggerIsActivity)
+        {
+            return new TriggerProvenance(
+                CombatImpactActivitySourceResolution.Direct,
+                string.Equals(
+                    execution.DirectSourceId,
+                    execution.TriggerSourceId,
+                    StringComparison.Ordinal
+                )
+                    ? CombatImpactTriggerScope.AttributedSelf
+                    : CombatImpactTriggerScope.AttributedExternal
+            );
+        }
+
+        if (directIsActivity && !string.IsNullOrWhiteSpace(execution.TriggerSourceId))
+        {
+            return new TriggerProvenance(
+                CombatImpactActivitySourceResolution.Direct,
+                CombatImpactTriggerScope.Unattributed
+            );
+        }
+
+        return new TriggerProvenance(
+            CombatImpactActivitySourceResolution.Direct,
+            directIsActivity
+                ? CombatImpactTriggerScope.NoTriggerEvidence
+                : CombatImpactTriggerScope.NotApplicable
+        );
     }
 
     private static bool TryResolveAbilityAttributeType(
@@ -2152,13 +2117,9 @@ internal static class CombatImpactProjector
         int FrameIndex
     );
 
-    private readonly record struct TriggerOccurrence(
-        string SourceId,
-        string TriggerSourceId,
-        int FrameIndex,
-        CombatImpactKind Kind,
-        string NativeAttributeKey,
-        CombatImpactEventSurface Surface
+    private readonly record struct TriggerProvenance(
+        CombatImpactActivitySourceResolution SourceResolution,
+        CombatImpactTriggerScope Scope
     );
 
     private readonly record struct IndexedImpactEvent(int Index, CombatImpactEvent Event);

@@ -1,3 +1,4 @@
+using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
 using Xunit;
 
@@ -56,24 +57,28 @@ public sealed class CombatImpactMetricFormatterTests
             []
         )
         {
-            TriggerSources = [new CombatImpactTriggerSource(trigger, 1)],
+            TriggerSources = [new CombatImpactTriggerSource(trigger, 10, 1)],
+            TriggerPresentationState = CombatImpactTriggerPresentationState.Complete,
         };
         var source = new CombatImpactSource(skill, 2, 10, [group])
         {
-            TriggerSources = [new CombatImpactTriggerSource(trigger, 1)],
+            ObservedActivationBatchCount = 1,
         };
 
         Assert.Equal(
-            "1 trigger",
+            "1 observed trigger batch",
             CombatImpactMetricFormatter.CausedSummary(source, chinese: false)
         );
-        Assert.Equal("触发 1 次", CombatImpactMetricFormatter.CausedSummary(source, chinese: true));
         Assert.Equal(
-            "Triggered by: Soul of the District ×1",
+            "观测触发 1 批",
+            CombatImpactMetricFormatter.CausedSummary(source, chinese: true)
+        );
+        Assert.Equal(
+            "Triggered by: 10/10 attributed · Soul of the District ×10",
             CombatImpactMetricFormatter.TriggerSources(group, chinese: false)
         );
         Assert.Equal(
-            "触发来源：Soul of the District ×1",
+            "触发来源：已归因 10/10 · Soul of the District ×10",
             CombatImpactMetricFormatter.TriggerSources(group, chinese: true)
         );
     }
@@ -81,12 +86,36 @@ public sealed class CombatImpactMetricFormatterTests
     [Fact]
     public void Item_summary_keeps_authoritative_use_count_when_trigger_provenance_exists()
     {
-        var source = new CombatImpactSource(Target, 3, 4, [])
-        {
-            TriggerSources = [new CombatImpactTriggerSource(Target, 2)],
-        };
+        var source = new CombatImpactSource(Target, 3, 4, []) { ObservedActivationBatchCount = 2 };
 
         Assert.Equal("3 uses", CombatImpactMetricFormatter.CausedSummary(source, chinese: false));
+    }
+
+    [Fact]
+    public void Trigger_breakdown_exposes_application_coverage_and_remainders()
+    {
+        var trigger = new CombatImpactEntity("trigger", "Trigger", "Item", null, 1);
+        var group = Group(
+            CombatImpactKind.Charge,
+            count: 5,
+            observedValue: 5,
+            unit: CombatImpactValueUnit.Amount
+        ) with
+        {
+            TriggerSources = [new CombatImpactTriggerSource(trigger, 3, 1)],
+            NoTriggerEvidenceApplicationCount = 1,
+            TriggerFallbackApplicationCount = 1,
+            TriggerPresentationState = CombatImpactTriggerPresentationState.PartialBreakdown,
+        };
+
+        Assert.Equal(
+            "Triggered by: 3/5 attributed · Trigger ×3 · source fallback ×1 · no trigger evidence ×1",
+            CombatImpactMetricFormatter.TriggerSources(group, chinese: false)
+        );
+        Assert.Equal(
+            "触发来源：已归因 3/5 · Trigger ×3 · 来源回退 ×1 · 无触发记录 ×1",
+            CombatImpactMetricFormatter.TriggerSources(group, chinese: true)
+        );
     }
 
     [Fact]
@@ -227,8 +256,16 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Theory]
-    [InlineData((int)CombatImpactOccurrenceBasis.ExplicitExecution, "×3 · +90", "×2 · +60")]
-    [InlineData((int)CombatImpactOccurrenceBasis.ReconstructedTransition, "+90", "+60")]
+    [InlineData(
+        (int)CombatImpactOccurrenceBasis.ExplicitExecution,
+        "×3 · at least +90",
+        "×2 · at least +60"
+    )]
+    [InlineData(
+        (int)CombatImpactOccurrenceBasis.ReconstructedTransition,
+        "at least +90",
+        "at least +60"
+    )]
     public void Attribute_transition_counts_require_explicit_execution_evidence(
         int occurrenceBasisValue,
         string expectedGroup,
@@ -363,7 +400,7 @@ public sealed class CombatImpactMetricFormatterTests
             CombatImpactMetricFormatter.Group(divergentGroup, chinese: false)
         );
         Assert.Equal(
-            "×10 · 69 recorded",
+            "×10 · 69",
             CombatImpactMetricFormatter.Target(divergentGroup, observed, chinese: false)
         );
     }
@@ -376,7 +413,8 @@ public sealed class CombatImpactMetricFormatterTests
             "HasteAmount",
             10,
             CombatImpactValueUnit.Applications,
-            CombatImpactAuthoritativeBasis.ApplicationCount
+            CombatImpactAuthoritativeBasis.ApplicationCount,
+            canReconcileApplicationCount: true
         );
         var matching = new CombatImpactGroup(
             CombatImpactKind.Haste,
@@ -390,6 +428,11 @@ public sealed class CombatImpactMetricFormatterTests
             []
         );
         var divergent = matching with { Count = 7 };
+        var estimated = matching with
+        {
+            ObservedCoverage = CombatImpactCoverage.Estimated,
+            AuthoritativeMetric = null,
+        };
         var singularApplication = matching with
         {
             Count = 0,
@@ -397,6 +440,18 @@ public sealed class CombatImpactMetricFormatterTests
                 CombatImpactKind.Haste,
                 "HasteAmount",
                 1,
+                CombatImpactValueUnit.Applications,
+                CombatImpactAuthoritativeBasis.ApplicationCount,
+                canReconcileApplicationCount: true
+            ),
+        };
+        var affectedCards = matching with
+        {
+            Count = 7,
+            AuthoritativeMetric = new CombatImpactAuthoritativeMetric(
+                CombatImpactKind.Haste,
+                "HasteAmount",
+                10,
                 CombatImpactValueUnit.Applications,
                 CombatImpactAuthoritativeBasis.ApplicationCount
             ),
@@ -417,24 +472,56 @@ public sealed class CombatImpactMetricFormatterTests
             ),
             0,
             []
-        );
+        )
+        {
+            AmountLedger = new CombatImpactAmountLedger(
+                76,
+                null,
+                CombatImpactCoverage.None,
+                0,
+                0,
+                CombatImpactValueUnit.Amount,
+                CombatImpactValueBasis.None,
+                false,
+                null,
+                CombatImpactResidualCoverage.Unknown,
+                CombatImpactControlStatus.NotComparable
+            ),
+        };
 
-        Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(matching, chinese: false));
         Assert.Equal(
-            "×7 · 9.50s · 10 applications",
+            "×10 · at least 9.50s",
+            CombatImpactMetricFormatter.Group(matching, chinese: false)
+        );
+        Assert.Equal(
+            "×7 · at least 9.50s · 10 applications",
             CombatImpactMetricFormatter.Group(divergent, chinese: false)
         );
         Assert.Equal(
-            "×7 · 9.50s · 生效 10 次",
+            "×7 · 至少 9.50s · 生效 10 次",
             CombatImpactMetricFormatter.Group(divergent, chinese: true)
         );
+        Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(estimated, chinese: false));
+        Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(estimated, chinese: true));
         Assert.Equal(
-            "9.50s · 1 application",
+            "at least 9.50s · 1 application",
             CombatImpactMetricFormatter.Group(singularApplication, chinese: false)
         );
         Assert.Equal(
-            "76 total",
+            "×7 · at least 9.50s · 10 cards affected",
+            CombatImpactMetricFormatter.Group(affectedCards, chinese: false)
+        );
+        Assert.Equal(
+            "×7 · 至少 9.50s · 影响 10 张卡牌",
+            CombatImpactMetricFormatter.Group(affectedCards, chinese: true)
+        );
+        Assert.Equal(
+            "76 total · breakdown unavailable",
             CombatImpactMetricFormatter.Group(authoritativeOnly, chinese: false)
+        );
+        Assert.Equal(
+            "总计 76 · 明细不可用",
+            CombatImpactMetricFormatter.Group(authoritativeOnly, chinese: true)
         );
     }
 
@@ -458,6 +545,22 @@ public sealed class CombatImpactMetricFormatterTests
             observedValue: 4,
             CombatImpactValueUnit.Amount
         );
+        var overObserved = exact with
+        {
+            AmountLedger = new CombatImpactAmountLedger(
+                3,
+                4,
+                CombatImpactCoverage.Exact,
+                1,
+                1,
+                CombatImpactValueUnit.Amount,
+                CombatImpactValueBasis.ExactAdjustment,
+                true,
+                null,
+                CombatImpactResidualCoverage.Unknown,
+                CombatImpactControlStatus.OverObserved
+            ),
+        };
         Assert.Equal(
             ["* Partial breakdown: 2 effects had no target data."],
             CombatImpactMetricFormatter.CausedDisclosures(
@@ -478,6 +581,50 @@ public sealed class CombatImpactMetricFormatterTests
                 chinese: false
             )
         );
+        Assert.Equal(
+            ["* Accounting mismatch: 1 metric exceeded the authoritative total."],
+            CombatImpactMetricFormatter.CausedDisclosures(
+                new CombatImpactSource(Target, 1, 1, [overObserved]),
+                chinese: false
+            )
+        );
+    }
+
+    [Fact]
+    public void Periodic_residual_disclosure_is_combat_wide_and_not_assigned_to_the_hovered_source()
+    {
+        var residuals = new[]
+        {
+            new PeriodicAttributionGap(
+                1,
+                ECombatantId.Opponent,
+                CombatImpactPeriodicKind.Burn,
+                7,
+                3,
+                PeriodicUnknownOrigin.InitialState
+            ),
+            new PeriodicAttributionGap(
+                2,
+                ECombatantId.Player,
+                CombatImpactPeriodicKind.Regen,
+                5,
+                0,
+                PeriodicUnknownOrigin.MissingApplySource
+            ),
+        };
+
+        Assert.Equal(
+            [
+                "* Combat-wide unattributed: Player Regen, 5 health.",
+                "* Combat-wide unattributed: Opponent Burn, 7 health and 3 shield.",
+            ],
+            CombatImpactMetricFormatter.PeriodicResidualDisclosures(residuals, chinese: false)
+        );
+        Assert.Equal(
+            ["* 本场未归因：我方·恢复 5 生命值。", "* 本场未归因：对手·灼烧 7 生命值、3 护盾。"],
+            CombatImpactMetricFormatter.PeriodicResidualDisclosures(residuals, chinese: true)
+        );
+        Assert.Empty(CombatImpactMetricFormatter.PeriodicResidualDisclosures([], chinese: false));
     }
 
     [Fact]

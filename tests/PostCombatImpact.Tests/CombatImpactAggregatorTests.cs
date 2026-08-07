@@ -50,7 +50,7 @@ public sealed class CombatImpactAggregatorTests
     }
 
     [Fact]
-    public void Keeps_authoritative_total_separate_from_partial_observed_target_values()
+    public void Keeps_authoritative_total_separate_from_exact_observed_target_values()
     {
         var report = Aggregate(
             [Event(CombatImpactKind.DirectDamage, "fairies", "opponent", 80)],
@@ -68,13 +68,15 @@ public sealed class CombatImpactAggregatorTests
 
         var group = Assert.Single(Assert.Single(report.Sources).Groups);
         Assert.Equal(80, group.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Partial, group.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Exact, group.ObservedCoverage);
         Assert.Equal(240, group.AuthoritativeMetric?.Value);
         Assert.Equal(CombatImpactAuthoritativeBasis.TotalAmount, group.AuthoritativeMetric?.Basis);
         Assert.True(group.HasDivergentTargetCoverage);
         var target = Assert.Single(group.Targets);
         Assert.Equal(80, target.ObservedValue);
         Assert.Equal(CombatImpactCoverage.Exact, target.ObservedCoverage);
+        Assert.Equal(160, group.AmountLedger.ResidualAmount);
+        Assert.Equal(CombatImpactResidualCoverage.Exact, group.AmountLedger.ResidualCoverage);
     }
 
     [Fact]
@@ -139,6 +141,59 @@ public sealed class CombatImpactAggregatorTests
             group => group.Surface == CombatImpactEventSurface.AppliedEffect
         );
         Assert.Equal(338, applied.AuthoritativeMetric?.Value);
+        var cardGain = Assert.Single(
+            groups,
+            group => group.Surface == CombatImpactEventSurface.CardAttribute
+        );
+        Assert.Null(cardGain.AuthoritativeMetric);
+        Assert.Equal(16, cardGain.ObservedValue);
+        Assert.Equal("bread", Assert.Single(cardGain.Targets).Entity.Id);
+    }
+
+    [Fact]
+    public void Applied_regen_total_reports_unavailable_breakdown_when_only_card_regen_gain_exists()
+    {
+        var report = Aggregate(
+            [
+                Event(
+                    CombatImpactKind.AttributeChange,
+                    "fairies",
+                    "bread",
+                    16,
+                    nativeKey: "RegenApplyAmount",
+                    surface: CombatImpactEventSurface.CardAttribute
+                ),
+            ],
+            authoritative:
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.AttributeChange,
+                    "RegenApplyAmount",
+                    338,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAuthoritativeBasis.TotalAmount
+                ),
+            ]
+        );
+
+        var groups = Assert.Single(report.Sources).Groups;
+        Assert.Equal(2, groups.Count);
+        var applied = Assert.Single(
+            groups,
+            group => group.Surface == CombatImpactEventSurface.AppliedEffect
+        );
+        Assert.Equal(0, applied.Count);
+        Assert.Null(applied.ObservedValue);
+        Assert.Equal(338, applied.AuthoritativeMetric?.Value);
+        Assert.Equal(
+            "338 total · breakdown unavailable",
+            CombatImpactMetricFormatter.Group(applied, chinese: false)
+        );
+        Assert.Equal(
+            "总计 338 · 明细不可用",
+            CombatImpactMetricFormatter.Group(applied, chinese: true)
+        );
+
         var cardGain = Assert.Single(
             groups,
             group => group.Surface == CombatImpactEventSurface.CardAttribute
@@ -397,6 +452,311 @@ public sealed class CombatImpactAggregatorTests
         Assert.True(caused.HasMixedValueDirections);
         Assert.Equal(-82, received.ObservedValue);
         Assert.True(received.HasMixedValueDirections);
+    }
+
+    [Fact]
+    public void Trigger_ledger_conserves_applications_without_reusing_activation_batches()
+    {
+        var events = new[]
+        {
+            Event(CombatImpactKind.Charge, "fairies", "bread") with
+            {
+                RawDirectSourceId = "fairies",
+                TriggerSourceId = "bread",
+                TriggerFrameIndex = 0,
+                TriggerScope = CombatImpactTriggerScope.AttributedExternal,
+            },
+            Event(CombatImpactKind.Charge, "fairies", "eclipse") with
+            {
+                RawDirectSourceId = "fairies",
+                TriggerSourceId = "bread",
+                TriggerFrameIndex = 0,
+                TriggerScope = CombatImpactTriggerScope.AttributedExternal,
+            },
+            Event(CombatImpactKind.Charge, "fairies", "bread") with
+            {
+                RawDirectSourceId = "fairies",
+                TriggerSourceId = "fairies",
+                TriggerFrameIndex = 1,
+                TriggerScope = CombatImpactTriggerScope.AttributedSelf,
+            },
+            Event(CombatImpactKind.Charge, "fairies", "bread") with
+            {
+                TriggerScope = CombatImpactTriggerScope.NoTriggerEvidence,
+            },
+        };
+
+        var source = Assert.Single(Aggregate(events).Sources);
+        var group = Assert.Single(source.Groups);
+        var classified =
+            group.TriggerSources.Sum(item => item.ApplicationCount)
+            + group.UnattributedTriggerApplicationCount
+            + group.TriggerFallbackApplicationCount
+            + group.NoTriggerEvidenceApplicationCount
+            + group.NotApplicableTriggerApplicationCount;
+
+        Assert.Equal(group.Count, classified);
+        Assert.Equal(2, source.ObservedActivationBatchCount);
+        Assert.Equal(3, group.TriggerSources.Sum(item => item.ApplicationCount));
+        Assert.Equal(2, group.TriggerSources.Sum(item => item.ObservedActivationBatchCount));
+        Assert.Equal(1, group.NoTriggerEvidenceApplicationCount);
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.PartialBreakdown,
+            group.TriggerPresentationState
+        );
+    }
+
+    [Fact]
+    public void Trigger_presentation_states_distinguish_complete_hidden_failed_and_unscoped_groups()
+    {
+        CombatImpactGroup GroupFor(CombatImpactEvent item) =>
+            Assert.Single(Assert.Single(Aggregate([item]).Sources).Groups);
+
+        var self = GroupFor(
+            Event(CombatImpactKind.Charge, "fairies", "bread") with
+            {
+                TriggerSourceId = "fairies",
+                TriggerFrameIndex = 0,
+                TriggerScope = CombatImpactTriggerScope.AttributedSelf,
+            }
+        );
+        var external = GroupFor(
+            Event(CombatImpactKind.Charge, "fairies", "bread") with
+            {
+                TriggerSourceId = "bread",
+                TriggerFrameIndex = 0,
+                TriggerScope = CombatImpactTriggerScope.AttributedExternal,
+            }
+        );
+        var unresolved = GroupFor(
+            Event(CombatImpactKind.Charge, "fairies", "bread") with
+            {
+                TriggerScope = CombatImpactTriggerScope.Unattributed,
+            }
+        );
+        var fallback = GroupFor(
+            Event(CombatImpactKind.Charge, "fairies", "bread") with
+            {
+                TriggerSourceId = "bread",
+                TriggerFrameIndex = 0,
+                TriggerScope = CombatImpactTriggerScope.AttributedViaTriggerFallback,
+            }
+        );
+        var noEvidence = GroupFor(
+            Event(CombatImpactKind.Charge, "fairies", "bread") with
+            {
+                TriggerScope = CombatImpactTriggerScope.NoTriggerEvidence,
+            }
+        );
+        var notApplicable = GroupFor(Event(CombatImpactKind.Charge, "fairies", "bread"));
+
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.HiddenSelfOnly,
+            self.TriggerPresentationState
+        );
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.Complete,
+            external.TriggerPresentationState
+        );
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.BreakdownUnavailable,
+            unresolved.TriggerPresentationState
+        );
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.BreakdownUnavailable,
+            fallback.TriggerPresentationState
+        );
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.None,
+            noEvidence.TriggerPresentationState
+        );
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.None,
+            notApplicable.TriggerPresentationState
+        );
+        Assert.Equal(1, noEvidence.NoTriggerEvidenceApplicationCount);
+        Assert.Equal(1, notApplicable.NotApplicableTriggerApplicationCount);
+    }
+
+    [Fact]
+    public void Incoming_groups_balance_missing_source_entities_explicitly()
+    {
+        var entities = new Dictionary<string, CombatImpactEntity>(StringComparer.Ordinal)
+        {
+            ["bread"] = Entity("bread", "Bread Knife", "Item", 0),
+        };
+
+        var report = Aggregate(
+            entities,
+            [Event(CombatImpactKind.Burn, "missing-source", "bread", 5)]
+        );
+        var received = Assert.Single(report.Received);
+        var group = Assert.Single(received.Groups);
+
+        Assert.Empty(report.Sources);
+        Assert.Empty(group.Sources);
+        Assert.Equal(1, group.UnresolvedSourceCount);
+        Assert.Equal(
+            group.Count,
+            group.Sources.Sum(item => item.Count) + group.UnresolvedSourceCount
+        );
+    }
+
+    [Fact]
+    public void Control_ledgers_distinguish_exact_upper_bound_and_application_residuals()
+    {
+        var exact = Aggregate(
+            [
+                Event(CombatImpactKind.Burn, "fairies", "bread", 30),
+                Event(CombatImpactKind.Burn, "fairies", "eclipse"),
+            ],
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Burn,
+                    "BurnApplyAmount",
+                    50,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAuthoritativeBasis.TotalAmount
+                ),
+            ]
+        );
+        var exactLedger = Assert.Single(Assert.Single(exact.Sources).Groups).AmountLedger;
+        Assert.Equal(20, exactLedger.ResidualAmount);
+        Assert.Equal(CombatImpactResidualCoverage.Exact, exactLedger.ResidualCoverage);
+
+        var lowerBound = Aggregate(
+            [
+                Event(
+                    CombatImpactKind.Burn,
+                    "fairies",
+                    "bread",
+                    30,
+                    valueBasis: CombatImpactValueBasis.NetFrameDelta
+                ),
+            ],
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Burn,
+                    "BurnApplyAmount",
+                    50,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAuthoritativeBasis.TotalAmount
+                ),
+            ]
+        );
+        var lowerBoundLedger = Assert.Single(Assert.Single(lowerBound.Sources).Groups).AmountLedger;
+        Assert.Equal(20, lowerBoundLedger.ResidualAmount);
+        Assert.Equal(CombatImpactResidualCoverage.UpperBound, lowerBoundLedger.ResidualCoverage);
+
+        var estimated = Aggregate(
+            [
+                Event(
+                    CombatImpactKind.Haste,
+                    "fairies",
+                    "bread",
+                    30,
+                    valueBasis: CombatImpactValueBasis.ConfiguredActionAmount
+                ),
+            ],
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Haste,
+                    "HasteAmount",
+                    50,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAuthoritativeBasis.TotalAmount
+                ),
+            ]
+        );
+        var estimatedLedger = Assert.Single(Assert.Single(estimated.Sources).Groups).AmountLedger;
+        Assert.Equal(CombatImpactCoverage.Estimated, estimatedLedger.ObservedCoverage);
+        Assert.False(estimatedLedger.ComparableToAuthoritativeTotal);
+        Assert.Null(estimatedLedger.ResidualAmount);
+        Assert.Equal(CombatImpactResidualCoverage.Unknown, estimatedLedger.ResidualCoverage);
+        Assert.Equal(CombatImpactControlStatus.NotComparable, estimatedLedger.ControlStatus);
+
+        var applications = Aggregate(
+            [
+                Event(CombatImpactKind.Haste, "fairies", "bread", nativeKey: "HasteAmount"),
+                Event(CombatImpactKind.Haste, "fairies", "eclipse", nativeKey: "HasteAmount"),
+            ],
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Haste,
+                    "HasteAmount",
+                    3,
+                    CombatImpactValueUnit.Applications,
+                    CombatImpactAuthoritativeBasis.ApplicationCount,
+                    canReconcileApplicationCount: true
+                ),
+            ]
+        );
+        var applicationLedger = Assert
+            .Single(Assert.Single(applications.Sources).Groups)
+            .ApplicationLedger;
+        Assert.Equal(1, applicationLedger.ApplicationResidual);
+        Assert.Equal(CombatImpactControlStatus.PositiveResidual, applicationLedger.ControlStatus);
+
+        var affectedCards = Aggregate(
+            [Event(CombatImpactKind.Haste, "fairies", "bread", nativeKey: "HasteAmount")],
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Haste,
+                    "HasteAmount",
+                    2,
+                    CombatImpactValueUnit.Applications,
+                    CombatImpactAuthoritativeBasis.ApplicationCount
+                ),
+            ]
+        );
+        var affectedCardsLedger = Assert
+            .Single(Assert.Single(affectedCards.Sources).Groups)
+            .ApplicationLedger;
+        Assert.False(affectedCardsLedger.ComparableToAuthoritativeCount);
+        Assert.Null(affectedCardsLedger.ApplicationResidual);
+        Assert.Equal(CombatImpactControlStatus.NotComparable, affectedCardsLedger.ControlStatus);
+    }
+
+    [Fact]
+    public void Control_ledgers_reject_negative_residuals_as_over_observed()
+    {
+        var amount = Aggregate(
+            [Event(CombatImpactKind.Burn, "fairies", "bread", 60)],
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Burn,
+                    "BurnApplyAmount",
+                    50,
+                    CombatImpactValueUnit.Amount,
+                    CombatImpactAuthoritativeBasis.TotalAmount
+                ),
+            ]
+        );
+        var amountLedger = Assert.Single(Assert.Single(amount.Sources).Groups).AmountLedger;
+        Assert.Equal(CombatImpactControlStatus.OverObserved, amountLedger.ControlStatus);
+        Assert.Null(amountLedger.ResidualAmount);
+
+        var applications = Aggregate(
+            [
+                Event(CombatImpactKind.Haste, "fairies", "bread", nativeKey: "HasteAmount"),
+                Event(CombatImpactKind.Haste, "fairies", "eclipse", nativeKey: "HasteAmount"),
+            ],
+            [
+                new CombatImpactAuthoritativeMetric(
+                    CombatImpactKind.Haste,
+                    "HasteAmount",
+                    1,
+                    CombatImpactValueUnit.Applications,
+                    CombatImpactAuthoritativeBasis.ApplicationCount,
+                    canReconcileApplicationCount: true
+                ),
+            ]
+        );
+        var applicationLedger = Assert
+            .Single(Assert.Single(applications.Sources).Groups)
+            .ApplicationLedger;
+        Assert.Equal(CombatImpactControlStatus.OverObserved, applicationLedger.ControlStatus);
+        Assert.Null(applicationLedger.ApplicationResidual);
     }
 
     private static CombatImpactReport Aggregate(

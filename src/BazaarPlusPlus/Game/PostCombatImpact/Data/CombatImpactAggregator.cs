@@ -98,7 +98,10 @@ internal static class CombatImpactAggregator
             input.UseCounts.GetValueOrDefault(sourceId),
             events.Length,
             orderedGroups
-        );
+        )
+        {
+            ObservedActivationBatchCount = BuildObservedActivationBatchCount(events),
+        };
     }
 
     private static CombatImpactGroup BuildGroup(
@@ -121,18 +124,9 @@ internal static class CombatImpactAggregator
         var unresolvedTargetCount = Math.Max(0, events.Count - targets.Sum(target => target.Count));
 
         var observed = BuildObserved(events);
-        var coverage = observed.Coverage;
-        if (
-            authoritativeMetric?.Basis == CombatImpactAuthoritativeBasis.TotalAmount
-            && observed.Value.HasValue
-            && (
-                observed.Unit != authoritativeMetric.Unit
-                || observed.Value.Value != authoritativeMetric.Value
-            )
-        )
-            coverage = CombatImpactCoverage.Partial;
-
         var critical = BuildCritical(events);
+        var hasMixedValueDirections = HasMixedValueDirections(events);
+        var triggerLedger = BuildTriggerLedger(entities, events);
         return new CombatImpactGroup(
             key.Kind,
             key.NativeAttributeKey,
@@ -143,7 +137,7 @@ internal static class CombatImpactAggregator
                 : events.FirstOrDefault()?.Unit
                     ?? authoritativeMetric?.Unit
                     ?? CombatImpactValueUnit.Amount,
-            coverage,
+            observed.Coverage,
             authoritativeMetric,
             unresolvedTargetCount,
             targets
@@ -153,7 +147,20 @@ internal static class CombatImpactAggregator
             OccurrenceBasis = BuildOccurrenceBasis(events),
             CriticalCount = critical.Count,
             CriticalObservedValue = critical.Observed.Value,
-            HasMixedValueDirections = HasMixedValueDirections(events),
+            HasMixedValueDirections = hasMixedValueDirections,
+            TriggerSources = triggerLedger.Sources,
+            UnattributedTriggerApplicationCount = triggerLedger.UnattributedCount,
+            TriggerFallbackApplicationCount = triggerLedger.FallbackCount,
+            NoTriggerEvidenceApplicationCount = triggerLedger.NoEvidenceCount,
+            NotApplicableTriggerApplicationCount = triggerLedger.NotApplicableCount,
+            TriggerPresentationState = triggerLedger.PresentationState,
+            ApplicationLedger = BuildApplicationLedger(events.Count, authoritativeMetric),
+            AmountLedger = BuildAmountLedger(
+                events,
+                observed,
+                authoritativeMetric,
+                hasMixedValueDirections
+            ),
         };
     }
 
@@ -202,6 +209,7 @@ internal static class CombatImpactAggregator
             .ThenBy(source => source.Entity.Name, StringComparer.OrdinalIgnoreCase)
             .ThenBy(source => source.Entity.Id, StringComparer.Ordinal)
             .ToArray();
+        var unresolvedSourceCount = Math.Max(0, events.Count - sources.Sum(source => source.Count));
         var observed = BuildObserved(events);
 
         var critical = BuildCritical(events);
@@ -220,6 +228,8 @@ internal static class CombatImpactAggregator
             CriticalCount = critical.Count,
             CriticalObservedValue = critical.Observed.Value,
             HasMixedValueDirections = HasMixedValueDirections(events),
+            UnresolvedSourceCount = unresolvedSourceCount,
+            ValuedApplicationCount = observed.ValuedApplicationCount,
         };
     }
 
@@ -281,7 +291,10 @@ internal static class CombatImpactAggregator
             observed.Value,
             observed.Unit,
             observed.Coverage
-        );
+        )
+        {
+            ValuedApplicationCount = observed.ValuedApplicationCount,
+        };
     }
 
     private static CombatImpactTarget? BuildTarget(
@@ -299,7 +312,10 @@ internal static class CombatImpactAggregator
             observed.Value,
             observed.Unit,
             observed.Coverage
-        );
+        )
+        {
+            ValuedApplicationCount = observed.ValuedApplicationCount,
+        };
     }
 
     private static CombatImpactOccurrenceBasis BuildOccurrenceBasis(
@@ -319,7 +335,14 @@ internal static class CombatImpactAggregator
 
         var units = knownValues.Select(item => item.Unit).Distinct().ToArray();
         if (units.Length != 1)
-            return new ObservedAggregate(null, fallbackUnit, CombatImpactCoverage.Partial);
+            return new ObservedAggregate(
+                null,
+                fallbackUnit,
+                CombatImpactCoverage.Partial,
+                knownValues.Length,
+                WeakestValueBasis(knownValues),
+                AllKnownValuesExact(knownValues)
+            );
 
         var coverage =
             knownValues.Length != events.Count ? CombatImpactCoverage.Partial
@@ -327,9 +350,230 @@ internal static class CombatImpactAggregator
                 ? CombatImpactCoverage.Partial
             : knownValues.Any(item => item.ValueBasis == CombatImpactValueBasis.NetFrameDelta)
                 ? CombatImpactCoverage.LowerBound
+            : knownValues.Any(item =>
+                item.ValueBasis == CombatImpactValueBasis.ConfiguredActionAmount
+            )
+                ? CombatImpactCoverage.Estimated
             : CombatImpactCoverage.Exact;
-        return new ObservedAggregate(SumValues(knownValues), units[0], coverage);
+        return new ObservedAggregate(
+            SumValues(knownValues),
+            units[0],
+            coverage,
+            knownValues.Length,
+            WeakestValueBasis(knownValues),
+            AllKnownValuesExact(knownValues)
+        );
     }
+
+    private static int BuildObservedActivationBatchCount(IReadOnlyList<CombatImpactEvent> events) =>
+        events
+            .Where(item =>
+                item.TriggerScope
+                    is CombatImpactTriggerScope.AttributedExternal
+                        or CombatImpactTriggerScope.AttributedSelf
+                        or CombatImpactTriggerScope.AttributedViaTriggerFallback
+                && !string.IsNullOrWhiteSpace(item.TriggerSourceId)
+                && item.TriggerFrameIndex.HasValue
+            )
+            .Select(item => (item.TriggerSourceId, item.TriggerFrameIndex!.Value))
+            .Distinct()
+            .Count();
+
+    private static TriggerLedger BuildTriggerLedger(
+        IReadOnlyDictionary<string, CombatImpactEntity> entities,
+        IReadOnlyList<CombatImpactEvent> events
+    )
+    {
+        var attributable = events
+            .Where(item =>
+                item.TriggerScope
+                    is CombatImpactTriggerScope.AttributedExternal
+                        or CombatImpactTriggerScope.AttributedSelf
+            )
+            .ToArray();
+        var sources = attributable
+            .Where(item =>
+                !string.IsNullOrWhiteSpace(item.TriggerSourceId)
+                && entities.ContainsKey(item.TriggerSourceId)
+            )
+            .GroupBy(item => item.TriggerSourceId!, StringComparer.Ordinal)
+            .Select(group => new CombatImpactTriggerSource(
+                entities[group.Key],
+                group.Count(),
+                group
+                    .Where(item => item.TriggerFrameIndex.HasValue)
+                    .Select(item => item.TriggerFrameIndex!.Value)
+                    .Distinct()
+                    .Count()
+            ))
+            .OrderByDescending(source => source.ApplicationCount)
+            .ThenBy(source => source.Entity.Order)
+            .ThenBy(source => source.Entity.Name, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(source => source.Entity.Id, StringComparer.Ordinal)
+            .ToArray();
+        var representedCount = sources.Sum(source => source.ApplicationCount);
+        var unattributedCount =
+            events.Count(item => item.TriggerScope == CombatImpactTriggerScope.Unattributed)
+            + Math.Max(0, attributable.Length - representedCount);
+        var fallbackCount = events.Count(item =>
+            item.TriggerScope == CombatImpactTriggerScope.AttributedViaTriggerFallback
+        );
+        var noEvidenceCount = events.Count(item =>
+            item.TriggerScope == CombatImpactTriggerScope.NoTriggerEvidence
+        );
+        var notApplicableCount = events.Count(item =>
+            item.TriggerScope == CombatImpactTriggerScope.NotApplicable
+        );
+        var remainderCount =
+            unattributedCount + fallbackCount + noEvidenceCount + notApplicableCount;
+        var hasExternal = events.Any(item =>
+            item.TriggerScope == CombatImpactTriggerScope.AttributedExternal
+        );
+        var presentationState =
+            representedCount == 0
+                ? unattributedCount > 0 || fallbackCount > 0
+                    ? CombatImpactTriggerPresentationState.BreakdownUnavailable
+                    : CombatImpactTriggerPresentationState.None
+                : !hasExternal && remainderCount == 0
+                    ? CombatImpactTriggerPresentationState.HiddenSelfOnly
+                    : remainderCount > 0
+                        ? CombatImpactTriggerPresentationState.PartialBreakdown
+                        : CombatImpactTriggerPresentationState.Complete;
+
+        return new TriggerLedger(
+            sources,
+            unattributedCount,
+            fallbackCount,
+            noEvidenceCount,
+            notApplicableCount,
+            presentationState
+        );
+    }
+
+    private static CombatImpactApplicationLedger BuildApplicationLedger(
+        int projectedCount,
+        CombatImpactAuthoritativeMetric? authoritative
+    )
+    {
+        if (authoritative?.Basis != CombatImpactAuthoritativeBasis.ApplicationCount)
+            return new CombatImpactApplicationLedger(
+                projectedCount,
+                null,
+                false,
+                null,
+                CombatImpactControlStatus.NotComparable
+            );
+
+        if (!authoritative.CanReconcileApplicationCount)
+            return new CombatImpactApplicationLedger(
+                projectedCount,
+                authoritative.Value,
+                false,
+                null,
+                CombatImpactControlStatus.NotComparable
+            );
+
+        var residual = authoritative.Value - projectedCount;
+        return residual < 0
+            ? new CombatImpactApplicationLedger(
+                projectedCount,
+                authoritative.Value,
+                true,
+                null,
+                CombatImpactControlStatus.OverObserved
+            )
+            : new CombatImpactApplicationLedger(
+                projectedCount,
+                authoritative.Value,
+                true,
+                residual,
+                residual == 0
+                    ? CombatImpactControlStatus.Exact
+                    : CombatImpactControlStatus.PositiveResidual
+            );
+    }
+
+    private static CombatImpactAmountLedger BuildAmountLedger(
+        IReadOnlyList<CombatImpactEvent> events,
+        ObservedAggregate observed,
+        CombatImpactAuthoritativeMetric? authoritative,
+        bool hasMixedValueDirections
+    )
+    {
+        int? authoritativeTotal =
+            authoritative?.Basis == CombatImpactAuthoritativeBasis.TotalAmount
+                ? authoritative.Value
+                : null;
+        var hasComparableObservedBasis =
+            observed.Coverage is CombatImpactCoverage.Exact or CombatImpactCoverage.LowerBound
+            || observed.Coverage == CombatImpactCoverage.Partial && observed.AllKnownValuesExact;
+        var comparable =
+            authoritativeTotal.HasValue
+            && observed.Value.HasValue
+            && authoritative!.Unit == observed.Unit
+            && !hasMixedValueDirections
+            && observed.Value.GetValueOrDefault() >= 0
+            && hasComparableObservedBasis;
+        long? residual = null;
+        var residualCoverage = CombatImpactResidualCoverage.Unknown;
+        var status = CombatImpactControlStatus.NotComparable;
+        if (comparable)
+        {
+            var difference = (long)authoritativeTotal!.Value - observed.Value!.Value;
+            if (difference < 0)
+            {
+                status = CombatImpactControlStatus.OverObserved;
+            }
+            else
+            {
+                residual = difference;
+                residualCoverage = observed.Coverage switch
+                {
+                    CombatImpactCoverage.Exact => CombatImpactResidualCoverage.Exact,
+                    CombatImpactCoverage.Partial
+                        when observed.AllKnownValuesExact
+                            && observed.ValuedApplicationCount < events.Count =>
+                        CombatImpactResidualCoverage.Exact,
+                    CombatImpactCoverage.LowerBound => CombatImpactResidualCoverage.UpperBound,
+                    _ => CombatImpactResidualCoverage.Unknown,
+                };
+                status =
+                    difference == 0
+                        ? CombatImpactControlStatus.Exact
+                        : CombatImpactControlStatus.PositiveResidual;
+                if (residualCoverage == CombatImpactResidualCoverage.Unknown)
+                    residual = null;
+            }
+        }
+
+        return new CombatImpactAmountLedger(
+            authoritativeTotal,
+            observed.Value,
+            observed.Coverage,
+            observed.ValuedApplicationCount,
+            events.Count,
+            observed.Unit,
+            observed.WeakestValueBasis,
+            comparable,
+            residual,
+            residualCoverage,
+            status
+        );
+    }
+
+    private static CombatImpactValueBasis WeakestValueBasis(
+        IReadOnlyList<CombatImpactEvent> events
+    ) =>
+        events.Any(item => item.ValueBasis == CombatImpactValueBasis.None)
+            ? CombatImpactValueBasis.None
+        : events.Any(item => item.ValueBasis == CombatImpactValueBasis.NetFrameDelta)
+            ? CombatImpactValueBasis.NetFrameDelta
+        : events.Any(item => item.ValueBasis == CombatImpactValueBasis.ConfiguredActionAmount)
+            ? CombatImpactValueBasis.ConfiguredActionAmount
+        : CombatImpactValueBasis.ExactAdjustment;
+
+    private static bool AllKnownValuesExact(IReadOnlyList<CombatImpactEvent> events) =>
+        events.All(item => item.ValueBasis == CombatImpactValueBasis.ExactAdjustment);
 
     private static GroupKey Key(
         CombatImpactKind kind,
@@ -401,8 +645,20 @@ internal static class CombatImpactAggregator
     private readonly record struct ObservedAggregate(
         int? Value,
         CombatImpactValueUnit Unit,
-        CombatImpactCoverage Coverage
+        CombatImpactCoverage Coverage,
+        int ValuedApplicationCount = 0,
+        CombatImpactValueBasis WeakestValueBasis = CombatImpactValueBasis.None,
+        bool AllKnownValuesExact = false
     );
 
     private readonly record struct CriticalAggregate(int Count, ObservedAggregate Observed);
+
+    private readonly record struct TriggerLedger(
+        IReadOnlyList<CombatImpactTriggerSource> Sources,
+        int UnattributedCount,
+        int FallbackCount,
+        int NoEvidenceCount,
+        int NotApplicableCount,
+        CombatImpactTriggerPresentationState PresentationState
+    );
 }

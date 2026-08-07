@@ -493,6 +493,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
                 isSkill,
                 source,
                 received,
+                _module.LatestReport.PeriodicResiduals,
                 perspective
             );
         }

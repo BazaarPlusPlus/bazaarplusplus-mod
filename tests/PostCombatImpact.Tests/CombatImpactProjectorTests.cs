@@ -26,6 +26,13 @@ public sealed class CombatImpactProjectorTests
         {
             [ECardStats.UseCount] = 30,
         };
+        if (OptionalCombatTempoTestValues.TryResolve(out var tempoTypes))
+        {
+            simulation.CardStats["f-minor"] = new Dictionary<ECardStats, int>
+            {
+                [tempoTypes.AddedStatistic] = 14,
+            };
+        }
         var entities = Entities().ToDictionary(item => item.Key, item => item.Value);
         entities["f-minor"] = new CombatImpactEntity(
             "f-minor",
@@ -92,8 +99,10 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(7, tempo.Count);
         Assert.Equal(14, tempo.ObservedValue);
         Assert.Equal("TempoApplyAmount", tempo.NativeAttributeKey);
-        Assert.Equal(CombatImpactEventSurface.PlayerAttribute, tempo.Surface);
+        Assert.Equal(CombatImpactEventSurface.AppliedEffect, tempo.Surface);
         Assert.Equal(CombatImpactOccurrenceBasis.ReconstructedTransition, tempo.OccurrenceBasis);
+        if (OptionalCombatTempoTestValues.TryResolve(out _))
+            Assert.Equal(14, tempo.AuthoritativeMetric?.Value);
     }
 
     [Fact]
@@ -1600,10 +1609,11 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(1, source.EffectCount);
         Assert.Equal(17, source.UseCount);
-        Assert.Equal(1, source.TriggerCount);
-        var trigger = Assert.Single(source.TriggerSources);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        var trigger = Assert.Single(Assert.Single(source.Groups).TriggerSources);
         Assert.Equal("Trigger Item", trigger.Entity.Name);
-        Assert.Equal(1, trigger.Count);
+        Assert.Equal(1, trigger.ApplicationCount);
+        Assert.Equal(1, trigger.ObservedActivationBatchCount);
     }
 
     [Fact]
@@ -1635,9 +1645,10 @@ public sealed class CombatImpactProjectorTests
 
         var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
 
-        Assert.Equal(1, source.TriggerCount);
-        Assert.Equal(1, Assert.Single(source.TriggerSources).Count);
-        Assert.Equal(1, Assert.Single(Assert.Single(source.Groups).TriggerSources).Count);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        var trigger = Assert.Single(Assert.Single(source.Groups).TriggerSources);
+        Assert.Equal(2, trigger.ApplicationCount);
+        Assert.Equal(1, trigger.ObservedActivationBatchCount);
     }
 
     [Fact]
@@ -1672,9 +1683,10 @@ public sealed class CombatImpactProjectorTests
         Assert.Equal(10, source.EffectCount);
         Assert.Equal(10, slow.Count);
         Assert.Equal(10, slow.Targets.Count);
-        Assert.Equal(1, source.TriggerCount);
-        Assert.Equal(1, Assert.Single(source.TriggerSources).Count);
-        Assert.Equal(1, Assert.Single(slow.TriggerSources).Count);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        var trigger = Assert.Single(slow.TriggerSources);
+        Assert.Equal(10, trigger.ApplicationCount);
+        Assert.Equal(1, trigger.ObservedActivationBatchCount);
     }
 
     [Fact]
@@ -1820,19 +1832,21 @@ public sealed class CombatImpactProjectorTests
         var charge = Assert.Single(source.Groups);
 
         Assert.Equal(3, charge.Count);
-        Assert.Equal(3, source.TriggerCount);
-        Assert.Equal(3, charge.TriggerSources.Sum(trigger => trigger.Count));
+        Assert.Equal(3, source.ObservedActivationBatchCount);
+        Assert.Equal(3, charge.TriggerSources.Sum(trigger => trigger.ApplicationCount));
         Assert.Collection(
             charge.TriggerSources,
             trigger =>
             {
                 Assert.Equal("Trigger Item", trigger.Entity.Name);
-                Assert.Equal(2, trigger.Count);
+                Assert.Equal(2, trigger.ApplicationCount);
+                Assert.Equal(2, trigger.ObservedActivationBatchCount);
             },
             self =>
             {
                 Assert.Equal("Fairies", self.Entity.Name);
-                Assert.Equal(1, self.Count);
+                Assert.Equal(1, self.ApplicationCount);
+                Assert.Equal(1, self.ObservedActivationBatchCount);
             }
         );
     }
@@ -1865,9 +1879,10 @@ public sealed class CombatImpactProjectorTests
 
         var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
 
-        Assert.Equal(2, source.TriggerCount);
-        Assert.Equal(2, Assert.Single(source.TriggerSources).Count);
-        Assert.Equal(2, Assert.Single(Assert.Single(source.Groups).TriggerSources).Count);
+        Assert.Equal(2, source.ObservedActivationBatchCount);
+        var trigger = Assert.Single(Assert.Single(source.Groups).TriggerSources);
+        Assert.Equal(2, trigger.ApplicationCount);
+        Assert.Equal(2, trigger.ObservedActivationBatchCount);
     }
 
     [Fact]
@@ -1900,8 +1915,66 @@ public sealed class CombatImpactProjectorTests
 
         var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
 
-        Assert.Equal(1, source.TriggerCount);
-        Assert.Equal("trigger", Assert.Single(source.TriggerSources).Entity.Id);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        Assert.Equal(
+            "trigger",
+            Assert.Single(Assert.Single(source.Groups).TriggerSources).Entity.Id
+        );
+    }
+
+    [Fact]
+    public void Trigger_source_fallback_is_not_mislabeled_as_self_trigger()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "effect",
+                    EActionCommandType.CardSlow,
+                    CardTarget("target"),
+                    triggerSource: "source"
+                )
+            );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+        var group = Assert.Single(source.Groups);
+
+        Assert.Equal("source", source.Entity.Id);
+        Assert.Empty(group.TriggerSources);
+        Assert.Equal(1, group.TriggerFallbackApplicationCount);
+        Assert.Equal(1, source.ObservedActivationBatchCount);
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.BreakdownUnavailable,
+            group.TriggerPresentationState
+        );
+    }
+
+    [Fact]
+    public void Unsupported_trigger_reference_is_an_explicit_unattributed_application()
+    {
+        var simulation = new CombatSim();
+        simulation
+            .Frames[0]
+            .Events.Add(
+                Executed(
+                    "source",
+                    EActionCommandType.CardSlow,
+                    CardTarget("target"),
+                    triggerSource: "effect"
+                )
+            );
+
+        var source = Assert.Single(CombatImpactProjector.Project(simulation, Entities()).Sources);
+        var group = Assert.Single(source.Groups);
+
+        Assert.Empty(group.TriggerSources);
+        Assert.Equal(1, group.UnattributedTriggerApplicationCount);
+        Assert.Equal(0, source.ObservedActivationBatchCount);
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.BreakdownUnavailable,
+            group.TriggerPresentationState
+        );
     }
 
     [Fact]
@@ -2051,15 +2124,27 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(10, source.UseCount);
         Assert.Equal(10, source.EffectCount);
-        Assert.Empty(source.TriggerSources);
+        Assert.Equal(10, source.ObservedActivationBatchCount);
         Assert.Equal(10, haste.Count);
-        Assert.Empty(haste.TriggerSources);
+        var selfTrigger = Assert.Single(haste.TriggerSources);
+        Assert.Equal(zarlic, selfTrigger.Entity.Id);
+        Assert.Equal(10, selfTrigger.ApplicationCount);
+        Assert.Equal(
+            CombatImpactTriggerPresentationState.HiddenSelfOnly,
+            haste.TriggerPresentationState
+        );
         Assert.Equal(10_000, haste.ObservedValue);
+        Assert.Equal(CombatImpactCoverage.Estimated, haste.ObservedCoverage);
         Assert.Equal(CombatImpactValueUnit.Milliseconds, haste.Unit);
         Assert.Equal(10, haste.AuthoritativeMetric?.Value);
         Assert.Equal(
             CombatImpactAuthoritativeBasis.ApplicationCount,
             haste.AuthoritativeMetric?.Basis
+        );
+        Assert.False(haste.ApplicationLedger.ComparableToAuthoritativeCount);
+        Assert.Equal(
+            CombatImpactControlStatus.NotComparable,
+            haste.ApplicationLedger.ControlStatus
         );
         var targetRow = Assert.Single(haste.Targets);
         Assert.Equal("Zarlic", targetRow.Entity.Name);
@@ -2163,10 +2248,10 @@ public sealed class CombatImpactProjectorTests
 
         Assert.Equal(2, fairiesGroup.Count);
         Assert.Equal(2_000, fairiesGroup.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, fairiesGroup.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, fairiesGroup.ObservedCoverage);
         Assert.All(fairiesGroup.Targets, target => Assert.Equal(1_000, target.ObservedValue));
         Assert.Equal(2_000, triggerGroup.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, triggerGroup.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, triggerGroup.ObservedCoverage);
     }
 
     [Fact]
@@ -2197,7 +2282,7 @@ public sealed class CombatImpactProjectorTests
         );
         var group = Assert.Single(Assert.Single(report.Sources).Groups);
         Assert.Equal(1_000, group.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, group.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, group.ObservedCoverage);
     }
 
     [Fact]
@@ -2306,13 +2391,13 @@ public sealed class CombatImpactProjectorTests
             Assert.Equal(expectedKind, caused.Kind);
             Assert.Equal(CombatImpactAggregator.NativeKey(expectedKind), caused.NativeAttributeKey);
             Assert.Equal(2_000, caused.ObservedValue);
-            Assert.Equal(CombatImpactCoverage.Exact, caused.ObservedCoverage);
+            Assert.Equal(CombatImpactCoverage.Estimated, caused.ObservedCoverage);
             Assert.Equal(2_000, causedTarget.ObservedValue);
-            Assert.Equal(CombatImpactCoverage.Exact, causedTarget.ObservedCoverage);
+            Assert.Equal(CombatImpactCoverage.Estimated, causedTarget.ObservedCoverage);
             Assert.Equal(2_000, received.ObservedValue);
-            Assert.Equal(CombatImpactCoverage.Exact, received.ObservedCoverage);
+            Assert.Equal(CombatImpactCoverage.Estimated, received.ObservedCoverage);
             Assert.Equal(2_000, receivedSource.ObservedValue);
-            Assert.Equal(CombatImpactCoverage.Exact, receivedSource.ObservedCoverage);
+            Assert.Equal(CombatImpactCoverage.Estimated, receivedSource.ObservedCoverage);
         }
     }
 
@@ -2389,18 +2474,18 @@ public sealed class CombatImpactProjectorTests
         var finesseCharge = Assert.Single(finesse.Groups);
         Assert.Equal(4, finesseCharge.Count);
         Assert.Equal(4_000, finesseCharge.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, finesseCharge.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, finesseCharge.ObservedCoverage);
 
         var wok = Assert.Single(report.Sources, source => source.Entity.Id == "wok");
         var wokCharge = Assert.Single(wok.Groups);
         Assert.Equal(3, wokCharge.Count);
         Assert.Equal(6_000, wokCharge.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, wokCharge.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, wokCharge.ObservedCoverage);
 
         var incoming = Assert.Single(Assert.Single(report.Received).Groups);
         Assert.Equal(7, incoming.Count);
         Assert.Equal(10_000, incoming.ObservedValue);
-        Assert.Equal(CombatImpactCoverage.Exact, incoming.ObservedCoverage);
+        Assert.Equal(CombatImpactCoverage.Estimated, incoming.ObservedCoverage);
         Assert.Equal(
             "×7 · 10s",
             CombatImpactMetricFormatter.IncomingGroup(incoming, chinese: false)
