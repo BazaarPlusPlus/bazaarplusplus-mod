@@ -36,6 +36,8 @@ internal interface IBppConfig
 
     ConfigEntry<string>? UpgradePreviewHotkeyPathConfig { get; }
 
+    ConfigEntry<HotkeyActivationMode>? UpgradePreviewActivationModeConfig { get; }
+
     ConfigEntry<string>? ToggleCollectionPanelHotkeyPathConfig { get; }
 
     ConfigEntry<string>? ToggleLiveBuildPanelHotkeyPathConfig { get; }

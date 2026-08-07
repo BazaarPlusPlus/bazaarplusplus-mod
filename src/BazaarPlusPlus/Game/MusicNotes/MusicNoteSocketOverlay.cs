@@ -13,8 +13,8 @@ using UnityEngine.UI;
 namespace BazaarPlusPlus.Game.MusicNotes;
 
 /// <summary>
-/// Hold-to-peek badge overlay for the music-note board mechanic: while the shared preview
-/// modifier (HoldUpgradePreview, default Shift) is held outside combat/recap/replay, every
+/// Key-activated badge overlay for the music-note board mechanic: while the shared preview
+/// action (HoldUpgradePreview, default Shift) is active outside combat/recap/replay, every
 /// unlocked player socket shows the note letter it holds — or, via the anchor rule, the letter
 /// it would become — under the socket. Placed notes render as a chip tinted with the letter's
 /// category accent color; implied letters render as dim neutral chips; a note whose occupying
@@ -168,7 +168,7 @@ internal sealed class MusicNoteSocketOverlay : MonoBehaviour
 
     private static bool ShouldShow()
     {
-        if (!BppHotkeyService.IsHeld(BppHotkeyActionId.HoldUpgradePreview))
+        if (!BppHotkeyService.IsActive(BppHotkeyActionId.HoldUpgradePreview))
             return false;
 
         try

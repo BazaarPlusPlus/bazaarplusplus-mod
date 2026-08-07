@@ -10,6 +10,7 @@ namespace BazaarPlusPlus.Game.Input;
 internal static class BppHotkeyService
 {
     private static IBppConfig? _config;
+    private static readonly HotkeyActivationState UpgradePreviewActivation = new();
 
     public static void Install(IBppConfig config)
     {
@@ -29,6 +30,7 @@ internal static class BppHotkeyService
         CachedActions.Clear();
         BindingFailureGate.Clear();
         LoggedModifierDisagreements.Clear();
+        UpgradePreviewActivation.Reset();
     }
 
     private static void ResetBindingPathCache()
@@ -68,6 +70,35 @@ internal static class BppHotkeyService
         var path = GetBindingPath(actionId);
         ReportUnresolvedControls(actionId, path);
         return IsPressed(path, keyboard, mouse);
+    }
+
+    internal static bool IsActive(
+        BppHotkeyActionId actionId,
+        Keyboard? keyboard = null,
+        Mouse? mouse = null
+    )
+    {
+        if (actionId != BppHotkeyActionId.HoldUpgradePreview)
+            return IsHeld(actionId, keyboard, mouse);
+
+        keyboard ??= Keyboard.current;
+        mouse ??= Mouse.current;
+        var path = GetBindingPath(actionId);
+        ReportUnresolvedControls(actionId, path);
+        var isHeld = IsPressed(path, keyboard, mouse);
+        var mode =
+            Config.UpgradePreviewActivationModeConfig?.Value
+            ?? BppConfig.DefaultUpgradePreviewActivationMode;
+        var wasPressed =
+            !BppKeyBindRowController.IsRebindCaptureActive
+            && GetOrCreateAction(path).WasPressedThisFrame();
+        return UpgradePreviewActivation.Resolve(
+            mode,
+            path,
+            isHeld,
+            wasPressed,
+            UnityEngine.Time.frameCount
+        );
     }
 
     internal static bool WasPressedThisFrame(BppHotkeyActionId actionId)
