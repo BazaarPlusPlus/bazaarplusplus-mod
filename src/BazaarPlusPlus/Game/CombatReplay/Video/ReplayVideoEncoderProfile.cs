@@ -31,12 +31,11 @@ internal sealed class ReplayVideoEncoderProfile
     internal string PixelFormat { get; }
     internal bool HardwareAccelerated => true;
     internal int? Crf => null;
-    internal string Preset => "realtime-vbr";
+    internal string Preset => "realtime-average-bitrate";
     internal int TargetBitrateKbps { get; }
     internal int MaxBitrateKbps { get; }
     internal int BufferSizeKbps { get; }
-    internal string RateControlSummary =>
-        $"vbr={TargetBitrateKbps}k,maxrate={MaxBitrateKbps}k,bufsize={BufferSizeKbps}k";
+    internal string RateControlSummary => $"avg_bitrate={TargetBitrateKbps}k";
 
     internal static ReplayVideoEncoderProfile NativeForCurrentPlatform(int width, int height, int fps) =>
         DetectPlatform() switch

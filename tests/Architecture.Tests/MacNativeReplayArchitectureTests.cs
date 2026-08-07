@@ -23,6 +23,7 @@ public sealed class MacNativeReplayArchitectureTests
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "WindowsFfmpegZip");
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "WindowsFfmpegLicense");
         Assert.Contains(elements, element => element.Name.LocalName == "WindowsReplayPlugin");
+        Assert.Contains(elements, element => element.Name.LocalName == "IsWindowsHost");
         Assert.Contains(
             elements,
             element =>
@@ -77,6 +78,13 @@ public sealed class MacNativeReplayArchitectureTests
             staleWindowsFiles,
             path => path.EndsWith("ffmpeg-LICENSE.txt", StringComparison.Ordinal)
         );
+
+        var packageErrors = elements
+            .Where(element => element.Name.LocalName == "Error")
+            .Select(element => element.Attribute("Condition")?.Value ?? string.Empty)
+            .ToList();
+        Assert.Contains(packageErrors, condition => condition.Contains("InstallerMacReplayPluginBundle", StringComparison.Ordinal));
+        Assert.Contains(packageErrors, condition => condition.Contains("InstallerWindowsReplayPlugin", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -88,6 +96,7 @@ public sealed class MacNativeReplayArchitectureTests
 
         Assert.Contains("BppVtPrepareRenderEvent", header, StringComparison.Ordinal);
         Assert.Contains("BppVtCommitRenderEvent", header, StringComparison.Ordinal);
+        Assert.Contains("BppVtDiscardRenderEvent", header, StringComparison.Ordinal);
         Assert.Contains("BppVtMuxAudio", header, StringComparison.Ordinal);
         Assert.Contains("-framework VideoToolbox", build, StringComparison.Ordinal);
         Assert.Contains("-framework AVFoundation", build, StringComparison.Ordinal);
@@ -105,14 +114,34 @@ public sealed class MacNativeReplayArchitectureTests
         var build = File.ReadAllText(Path.Combine(nativeRoot, "build.ps1"));
 
         Assert.Contains("BppMfPrepareRenderEvent", header, StringComparison.Ordinal);
+        Assert.Contains("BppMfDiscardRenderEvent", header, StringComparison.Ordinal);
         Assert.Contains("BppMfMuxAudio", header, StringComparison.Ordinal);
         Assert.Contains("MFCreateDXGISurfaceBuffer", source, StringComparison.Ordinal);
         Assert.Contains("IMFTrackedSample", source, StringComparison.Ordinal);
         Assert.Contains("MFT_ENUM_FLAG_HARDWARE", source, StringComparison.Ordinal);
         Assert.Contains("MFT_ENUM_HARDWARE_URL_Attribute", source, StringComparison.Ordinal);
+        Assert.Contains("category != MFT_CATEGORY_VIDEO_ENCODER", source, StringComparison.Ordinal);
+        Assert.Contains("TransformOutputsH264", source, StringComparison.Ordinal);
+        Assert.Contains("firstFrameIndex + index", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("nextFrameIndex", source, StringComparison.Ordinal);
+        Assert.Contains("previousMultithreadProtection", source, StringComparison.Ordinal);
+        Assert.Contains("destroyRequested", source, StringComparison.Ordinal);
         Assert.Contains("MF_READWRITE_D3D_OPTIONAL, FALSE", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ffmpeg", source, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("/W4 /WX", build, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Mac_native_writer_shutdown_and_metal_pipeline_are_serialized()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(RepoRoot(), "native", "macos", "BppReplayVideoToolbox.mm")
+        );
+
+        Assert.Contains("CancelWriterOnQueue", source, StringComparison.Ordinal);
+        Assert.Contains("writerClosed", source, StringComparison.Ordinal);
+        Assert.Contains("gConversionPipelines", source, StringComparison.Ordinal);
+        Assert.Contains("objectForKey:device", source, StringComparison.Ordinal);
     }
 
     [Fact]

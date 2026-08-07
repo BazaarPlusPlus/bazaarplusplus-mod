@@ -101,10 +101,13 @@ struct Encoder
     bool failed = false;
     bool acceptingFrames = true;
     bool finished = false;
+    bool mfStarted = false;
+    bool destroyRequested = false;
+    bool destroyScheduled = false;
+    BOOL previousMultithreadProtection = FALSE;
     int fps = 60;
     int inFlight = 0;
     int renderEventsPending = 0;
-    int64_t nextFrameIndex = 0;
     BppMfNativeStats stats{};
 
     ComPtr<ID3D11Device> device;
@@ -129,10 +132,13 @@ struct RenderEventPacket
 {
     Encoder *encoder;
     int slotIndex;
+    int64_t firstFrameIndex;
     int frameCount;
     std::atomic<uint8_t> state{0};
     std::atomic<int> references{2};
 };
+
+void MaybeScheduleDestroy(Encoder *encoder);
 
 class SlotReleaseCallback final : public IMFAsyncCallback
 {
@@ -179,11 +185,14 @@ class SlotReleaseCallback final : public IMFAsyncCallback
         if (remaining_.fetch_sub(1) != 1)
             return S_OK;
 
-        std::lock_guard<std::mutex> guard(encoder_->mutex);
-        if (slotIndex_ >= 0 && slotIndex_ < static_cast<int>(encoder_->slots.size()))
-            encoder_->slots[static_cast<size_t>(slotIndex_)].state = SlotState::Free;
-        encoder_->inFlight = std::max(0, encoder_->inFlight - 1);
-        encoder_->condition.notify_all();
+        {
+            std::lock_guard<std::mutex> guard(encoder_->mutex);
+            if (slotIndex_ >= 0 && slotIndex_ < static_cast<int>(encoder_->slots.size()))
+                encoder_->slots[static_cast<size_t>(slotIndex_)].state = SlotState::Free;
+            encoder_->inFlight = std::max(0, encoder_->inFlight - 1);
+            encoder_->condition.notify_all();
+        }
+        MaybeScheduleDestroy(encoder_);
         return S_OK;
     }
 
@@ -271,6 +280,39 @@ void StopMediaFoundation()
         MFShutdown();
 }
 
+DWORD WINAPI DestroyEncoderWorker(void *context)
+{
+    auto *encoder = static_cast<Encoder *>(context);
+    if (encoder->multithread != nullptr)
+        encoder->multithread->SetMultithreadProtected(
+            encoder->previousMultithreadProtection);
+    encoder->sinkWriter.Reset();
+    const bool stopMediaFoundation = encoder->mfStarted;
+    encoder->mfStarted = false;
+    delete encoder;
+    if (stopMediaFoundation)
+        StopMediaFoundation();
+    return 0;
+}
+
+void MaybeScheduleDestroy(Encoder *encoder)
+{
+    bool schedule = false;
+    {
+        std::lock_guard<std::mutex> guard(encoder->mutex);
+        if (encoder->destroyRequested && !encoder->destroyScheduled &&
+            encoder->renderEventsPending == 0 && encoder->inFlight == 0)
+        {
+            encoder->destroyScheduled = true;
+            schedule = true;
+        }
+    }
+    if (!schedule)
+        return;
+    if (!QueueUserWorkItem(&DestroyEncoderWorker, encoder, WT_EXECUTEDEFAULT))
+        DestroyEncoderWorker(encoder);
+}
+
 bool SetMediaTypeSize(IMFMediaType *type, REFGUID key, UINT32 width, UINT32 height)
 {
     return SUCCEEDED(MFSetAttributeSize(type, key, width, height));
@@ -326,6 +368,58 @@ std::unordered_map<std::string, std::string> EnumerateHardwareEncoders()
     return encoders;
 }
 
+bool TransformOutputsH264(IMFTransform *transform)
+{
+    DWORD inputCount = 0;
+    DWORD outputCount = 0;
+    if (FAILED(transform->GetStreamCount(&inputCount, &outputCount)) || outputCount == 0)
+        return false;
+
+    std::vector<DWORD> inputIds(inputCount);
+    std::vector<DWORD> outputIds(outputCount);
+    const HRESULT idsResult = transform->GetStreamIDs(
+        inputCount,
+        inputIds.data(),
+        outputCount,
+        outputIds.data());
+    if (idsResult == E_NOTIMPL)
+    {
+        for (DWORD index = 0; index < outputCount; ++index)
+            outputIds[index] = index;
+    }
+    else if (FAILED(idsResult))
+    {
+        return false;
+    }
+
+    for (const DWORD outputId : outputIds)
+    {
+        ComPtr<IMFMediaType> type;
+        if (SUCCEEDED(transform->GetOutputCurrentType(outputId, &type)))
+        {
+            GUID major{};
+            GUID subtype{};
+            if (SUCCEEDED(type->GetGUID(MF_MT_MAJOR_TYPE, &major)) &&
+                SUCCEEDED(type->GetGUID(MF_MT_SUBTYPE, &subtype)) &&
+                major == MFMediaType_Video && subtype == MFVideoFormat_H264)
+                return true;
+        }
+        for (DWORD typeIndex = 0;; ++typeIndex)
+        {
+            type.Reset();
+            if (FAILED(transform->GetOutputAvailableType(outputId, typeIndex, &type)))
+                break;
+            GUID major{};
+            GUID subtype{};
+            if (SUCCEEDED(type->GetGUID(MF_MT_MAJOR_TYPE, &major)) &&
+                SUCCEEDED(type->GetGUID(MF_MT_SUBTYPE, &subtype)) &&
+                major == MFMediaType_Video && subtype == MFVideoFormat_H264)
+                return true;
+        }
+    }
+    return false;
+}
+
 bool VerifyHardwareEncoder(Encoder *encoder)
 {
     const auto hardware = EnumerateHardwareEncoders();
@@ -355,9 +449,27 @@ bool VerifyHardwareEncoder(Encoder *encoder)
         if (FAILED(result))
             break;
 
+        if (category != MFT_CATEGORY_VIDEO_ENCODER)
+            continue;
+
         ComPtr<IMFAttributes> attributes;
         GUID clsid{};
         if (FAILED(transform->GetAttributes(&attributes)))
+            continue;
+
+        if (SUCCEEDED(attributes->GetGUID(MFT_TRANSFORM_CLSID_Attribute, &clsid)))
+        {
+            wchar_t clsidText[64]{};
+            StringFromGUID2(clsid, clsidText, static_cast<int>(std::size(clsidText)));
+            const auto found = hardware.find(WideToUtf8(clsidText));
+            if (found != hardware.end())
+            {
+                encoder->encoderName = found->second;
+                return true;
+            }
+        }
+
+        if (!TransformOutputsH264(transform.Get()))
             continue;
 
         wchar_t *hardwareUrl = nullptr;
@@ -368,34 +480,8 @@ bool VerifyHardwareEncoder(Encoder *encoder)
                 &hardwareUrlLength)) &&
             hardwareUrl != nullptr && hardwareUrlLength > 0)
         {
-            wchar_t *friendlyName = nullptr;
-            UINT32 friendlyNameLength = 0;
-            if (SUCCEEDED(attributes->GetAllocatedString(
-                    MFT_FRIENDLY_NAME_Attribute,
-                    &friendlyName,
-                    &friendlyNameLength)) &&
-                friendlyName != nullptr && friendlyNameLength > 0)
-            {
-                encoder->encoderName = WideToUtf8(friendlyName);
-                CoTaskMemFree(friendlyName);
-            }
-            else
-            {
-                encoder->encoderName = WideToUtf8(hardwareUrl);
-            }
+            encoder->encoderName = WideToUtf8(hardwareUrl);
             CoTaskMemFree(hardwareUrl);
-            return true;
-        }
-
-        if (FAILED(attributes->GetGUID(MFT_TRANSFORM_CLSID_Attribute, &clsid)))
-            continue;
-
-        wchar_t clsidText[64]{};
-        StringFromGUID2(clsid, clsidText, static_cast<int>(std::size(clsidText)));
-        const auto found = hardware.find(WideToUtf8(clsidText));
-        if (found != hardware.end())
-        {
-            encoder->encoderName = found->second;
             return true;
         }
     }
@@ -565,11 +651,12 @@ bool InitializeVideoProcessor(Encoder *encoder, int width, int height)
     encoder->videoContext->VideoProcessorSetOutputTargetRect(
         encoder->videoProcessor.Get(), TRUE, &targetRect);
     D3D11_VIDEO_PROCESSOR_COLOR_SPACE inputColor{};
-    inputColor.RGB_Range = 1;
+    inputColor.RGB_Range = 0;
     inputColor.YCbCr_Matrix = 1;
     encoder->videoContext->VideoProcessorSetStreamColorSpace(
         encoder->videoProcessor.Get(), 0, &inputColor);
     D3D11_VIDEO_PROCESSOR_COLOR_SPACE outputColor{};
+    outputColor.RGB_Range = 1;
     outputColor.YCbCr_Matrix = 1;
     encoder->videoContext->VideoProcessorSetOutputColorSpace(
         encoder->videoProcessor.Get(), &outputColor);
@@ -631,6 +718,14 @@ bool InitializeSinkWriter(
         result = outputType->SetUINT32(MF_MT_AVG_BITRATE, static_cast<UINT32>(bitrateBitsPerSecond));
     if (SUCCEEDED(result))
         result = outputType->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+    if (SUCCEEDED(result))
+        result = outputType->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_16_235);
+    if (SUCCEEDED(result))
+        result = outputType->SetUINT32(MF_MT_YUV_MATRIX, MFVideoTransferMatrix_BT709);
+    if (SUCCEEDED(result))
+        result = outputType->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT709);
+    if (SUCCEEDED(result))
+        result = outputType->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_709);
     if (SUCCEEDED(result) && !SetMediaTypeSize(outputType.Get(), MF_MT_FRAME_SIZE, width, height))
         result = E_FAIL;
     if (SUCCEEDED(result) && !SetMediaTypeRatio(outputType.Get(), MF_MT_FRAME_RATE, encoder->fps, 1))
@@ -651,6 +746,14 @@ bool InitializeSinkWriter(
         result = inputType->SetGUID(MF_MT_SUBTYPE, MFVideoFormat_NV12);
     if (SUCCEEDED(result))
         result = inputType->SetUINT32(MF_MT_INTERLACE_MODE, MFVideoInterlace_Progressive);
+    if (SUCCEEDED(result))
+        result = inputType->SetUINT32(MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_16_235);
+    if (SUCCEEDED(result))
+        result = inputType->SetUINT32(MF_MT_YUV_MATRIX, MFVideoTransferMatrix_BT709);
+    if (SUCCEEDED(result))
+        result = inputType->SetUINT32(MF_MT_VIDEO_PRIMARIES, MFVideoPrimaries_BT709);
+    if (SUCCEEDED(result))
+        result = inputType->SetUINT32(MF_MT_TRANSFER_FUNCTION, MFVideoTransFunc_709);
     if (SUCCEEDED(result))
         result = inputType->SetUINT32(
             MF_MT_SAMPLE_SIZE,
@@ -679,9 +782,12 @@ bool InitializeSinkWriter(
 
 void CompleteRenderEvent(Encoder *encoder)
 {
-    std::lock_guard<std::mutex> guard(encoder->mutex);
-    encoder->renderEventsPending = std::max(0, encoder->renderEventsPending - 1);
-    encoder->condition.notify_all();
+    {
+        std::lock_guard<std::mutex> guard(encoder->mutex);
+        encoder->renderEventsPending = std::max(0, encoder->renderEventsPending - 1);
+        encoder->condition.notify_all();
+    }
+    MaybeScheduleDestroy(encoder);
 }
 
 void ReleasePacket(RenderEventPacket *packet)
@@ -699,7 +805,7 @@ void ReleasePendingSlot(Encoder *encoder, int slotIndex)
     encoder->condition.notify_all();
 }
 
-bool SubmitSlot(Encoder *encoder, int slotIndex, int frameCount)
+bool SubmitSlot(Encoder *encoder, int slotIndex, int64_t firstFrameIndex, int frameCount)
 {
     auto *callback = new SlotReleaseCallback(encoder, slotIndex, frameCount);
     const LONGLONG fps = std::max(1, encoder->fps);
@@ -741,11 +847,7 @@ bool SubmitSlot(Encoder *encoder, int slotIndex, int frameCount)
             allocatorSet = true;
         if (SUCCEEDED(result))
         {
-            LONGLONG frameIndex = 0;
-            {
-                std::lock_guard<std::mutex> guard(encoder->mutex);
-                frameIndex = encoder->nextFrameIndex;
-            }
+            const LONGLONG frameIndex = firstFrameIndex + index;
             const LONGLONG sampleStart = frameIndex * kTicksPerSecond / fps;
             const LONGLONG sampleEnd = (frameIndex + 1) * kTicksPerSecond / fps;
             result = sample->SetSampleTime(sampleStart);
@@ -765,7 +867,6 @@ bool SubmitSlot(Encoder *encoder, int slotIndex, int frameCount)
         }
 
         std::lock_guard<std::mutex> guard(encoder->mutex);
-        ++encoder->nextFrameIndex;
         ++encoder->stats.submittedFrames;
         ++encoder->stats.writtenFrames;
     }
@@ -787,6 +888,7 @@ void UNITY_INTERFACE_API RenderEventCallback(int eventId, void *data)
 
     Encoder *encoder = packet->encoder;
     const int slotIndex = packet->slotIndex;
+    const int64_t firstFrameIndex = packet->firstFrameIndex;
     const int frameCount = packet->frameCount;
     bool canSubmit = false;
     {
@@ -829,7 +931,7 @@ void UNITY_INTERFACE_API RenderEventCallback(int eventId, void *data)
         ReleasePendingSlot(encoder, slotIndex);
         SetFailure(encoder, HResultMessage("ID3D11VideoContext::VideoProcessorBlt", result));
     }
-    else if (!SubmitSlot(encoder, slotIndex, frameCount))
+    else if (!SubmitSlot(encoder, slotIndex, firstFrameIndex, frameCount))
     {
         std::lock_guard<std::mutex> guard(encoder->mutex);
         ++encoder->stats.encodeErrors;
@@ -920,12 +1022,14 @@ extern "C" int __cdecl BppMfCreate(
         SetFailure(encoder, startupError);
         return -5;
     }
+    encoder->mfStarted = true;
 
     encoder->device = g_unityD3D11->GetDevice();
     encoder->device->GetImmediateContext(&encoder->context);
     encoder->context.As(&encoder->multithread);
     if (encoder->multithread != nullptr)
-        encoder->multithread->SetMultithreadProtected(TRUE);
+        encoder->previousMultithreadProtection =
+            encoder->multithread->SetMultithreadProtected(TRUE);
     static_cast<ID3D11Texture2D *>(sourceTexture)->QueryInterface(
         IID_PPV_ARGS(&encoder->sourceTexture));
     if (encoder->sourceTexture == nullptr)
@@ -969,7 +1073,7 @@ extern "C" int __cdecl BppMfAcquireSlot(void *handle, int *slotIndex)
 extern "C" void *__cdecl BppMfPrepareRenderEvent(
     void *handle,
     int slotIndex,
-    int64_t,
+    int64_t firstFrameIndex,
     int frameCount)
 {
     auto *encoder = static_cast<Encoder *>(handle);
@@ -983,7 +1087,7 @@ extern "C" void *__cdecl BppMfPrepareRenderEvent(
             return nullptr;
         ++encoder->renderEventsPending;
     }
-    return new RenderEventPacket{encoder, slotIndex, frameCount};
+    return new RenderEventPacket{encoder, slotIndex, firstFrameIndex, frameCount};
 }
 
 extern "C" void __cdecl BppMfCommitRenderEvent(void *eventData)
@@ -1001,6 +1105,21 @@ extern "C" void __cdecl BppMfCancelRenderEvent(void *eventData)
     {
         ReleasePendingSlot(packet->encoder, packet->slotIndex);
         CompleteRenderEvent(packet->encoder);
+    }
+    ReleasePacket(packet);
+}
+
+extern "C" void __cdecl BppMfDiscardRenderEvent(void *eventData)
+{
+    auto *packet = static_cast<RenderEventPacket *>(eventData);
+    if (packet == nullptr)
+        return;
+    uint8_t expected = 0;
+    if (packet->state.compare_exchange_strong(expected, 2))
+    {
+        ReleasePendingSlot(packet->encoder, packet->slotIndex);
+        CompleteRenderEvent(packet->encoder);
+        ReleasePacket(packet);
     }
     ReleasePacket(packet);
 }
@@ -1028,8 +1147,10 @@ extern "C" int __cdecl BppMfFinish(void *handle, int timeoutMs)
                 [encoder] { return encoder->renderEventsPending == 0; }))
         {
             encoder->failed = true;
+            encoder->finished = true;
             if (encoder->error.empty())
                 encoder->error = "Timed out waiting for Unity D3D11 render events.";
+            return 0;
         }
     }
 
@@ -1061,16 +1182,19 @@ extern "C" void __cdecl BppMfDestroy(void *handle)
     auto *encoder = static_cast<Encoder *>(handle);
     if (encoder == nullptr)
         return;
+    bool canFinish = false;
     {
         std::lock_guard<std::mutex> guard(encoder->mutex);
         encoder->acceptingFrames = false;
-        if (encoder->renderEventsPending > 0 || encoder->inFlight > 0)
-            return;
+        canFinish = encoder->renderEventsPending == 0;
     }
-    if (!encoder->finished && encoder->sinkWriter != nullptr)
+    if (canFinish && !encoder->finished && encoder->sinkWriter != nullptr)
         BppMfFinish(encoder, 2000);
-    delete encoder;
-    StopMediaFoundation();
+    {
+        std::lock_guard<std::mutex> guard(encoder->mutex);
+        encoder->destroyRequested = true;
+    }
+    MaybeScheduleDestroy(encoder);
 }
 
 extern "C" int __cdecl BppMfIsFailed(void *handle)

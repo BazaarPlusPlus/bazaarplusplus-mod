@@ -37,6 +37,7 @@ void *BppVtPrepareRenderEvent(
     int frameCount);
 void BppVtCommitRenderEvent(void *eventData);
 void BppVtCancelRenderEvent(void *eventData);
+void BppVtDiscardRenderEvent(void *eventData);
 void BppVtReleaseSlot(void *handle, int slotIndex);
 int BppVtFinish(void *handle, int timeoutMs);
 void BppVtDestroy(void *handle);

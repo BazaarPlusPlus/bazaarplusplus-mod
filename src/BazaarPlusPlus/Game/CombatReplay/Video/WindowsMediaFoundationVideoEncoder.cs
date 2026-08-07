@@ -238,6 +238,12 @@ internal sealed class WindowsMediaFoundationVideoEncoder : IReplayVideoEncoder
             BppMfCancelRenderEvent(eventData);
     }
 
+    internal void DiscardRenderEvent(IntPtr eventData)
+    {
+        if (eventData != IntPtr.Zero)
+            BppMfDiscardRenderEvent(eventData);
+    }
+
     internal void ReleaseFrame(FrameLease lease)
     {
         lock (_nativeSync)
@@ -372,6 +378,9 @@ internal sealed class WindowsMediaFoundationVideoEncoder : IReplayVideoEncoder
 
     [DllImport(NativeLibrary, CallingConvention = CallingConvention.Cdecl)]
     private static extern void BppMfCancelRenderEvent(IntPtr eventData);
+
+    [DllImport(NativeLibrary, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void BppMfDiscardRenderEvent(IntPtr eventData);
 
     [DllImport(NativeLibrary, CallingConvention = CallingConvention.Cdecl)]
     private static extern void BppMfReleaseSlot(IntPtr handle, int slotIndex);

@@ -37,6 +37,7 @@ __declspec(dllexport) void *__cdecl BppMfPrepareRenderEvent(
     int frameCount);
 __declspec(dllexport) void __cdecl BppMfCommitRenderEvent(void *eventData);
 __declspec(dllexport) void __cdecl BppMfCancelRenderEvent(void *eventData);
+__declspec(dllexport) void __cdecl BppMfDiscardRenderEvent(void *eventData);
 __declspec(dllexport) void __cdecl BppMfReleaseSlot(void *handle, int slotIndex);
 __declspec(dllexport) int __cdecl BppMfFinish(void *handle, int timeoutMs);
 __declspec(dllexport) void __cdecl BppMfDestroy(void *handle);

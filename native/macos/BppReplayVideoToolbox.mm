@@ -187,6 +187,7 @@ struct Encoder
     dispatch_queue_t encodeQueue = nullptr;
     dispatch_queue_t writerQueue = nullptr;
     bool writerStarted = false;
+    bool writerClosed = false;
 };
 
 struct RenderEventPacket
@@ -215,6 +216,9 @@ struct FrameSubmission
 };
 
 IUnityGraphicsMetal *gUnityMetal = nullptr;
+std::mutex gConversionPipelineMutex;
+NSMapTable<id<MTLDevice>, id<MTLComputePipelineState>> *__strong
+    gConversionPipelines = nil;
 
 void ReleaseRenderEventPacket(RenderEventPacket *packet)
 {
@@ -278,6 +282,8 @@ void CompleteSubmissionFrame(FrameSubmission *submission)
 
 bool StartWriterIfNeeded(Encoder *encoder, CMSampleBufferRef sampleBuffer)
 {
+    if (encoder->writerClosed)
+        return false;
     if (encoder->writerStarted)
         return true;
 
@@ -349,7 +355,7 @@ void CompressionOutputCallback(
       @autoreleasepool
       {
           bool appended = false;
-          if (StartWriterIfNeeded(encoder, sampleBuffer))
+          if (!encoder->writerClosed && StartWriterIfNeeded(encoder, sampleBuffer))
           {
               if (encoder->writerInput.readyForMoreMediaData)
               {
@@ -648,6 +654,22 @@ bool SetCompressionProperty(
 
 bool InitializeConversionPipeline(Encoder *encoder, id<MTLDevice> device)
 {
+    std::lock_guard<std::mutex> cacheGuard(gConversionPipelineMutex);
+    if (gConversionPipelines == nil)
+    {
+        gConversionPipelines = [NSMapTable
+            mapTableWithKeyOptions:NSPointerFunctionsWeakMemory |
+                NSPointerFunctionsObjectPointerPersonality
+            valueOptions:NSPointerFunctionsStrongMemory];
+    }
+    id<MTLComputePipelineState> cachedPipeline =
+        [gConversionPipelines objectForKey:device];
+    if (cachedPipeline != nil)
+    {
+        encoder->conversionPipeline = cachedPipeline;
+        return true;
+    }
+
     NSError *libraryError = nil;
     NSString *source = [NSString stringWithUTF8String:kBgraToNv12MetalSource];
     id<MTLLibrary> library = [device newLibraryWithSource:source options:nil error:&libraryError];
@@ -681,7 +703,33 @@ bool InitializeConversionPipeline(Encoder *encoder, id<MTLDevice> device)
                            : std::string(message.UTF8String));
         return false;
     }
+    [gConversionPipelines setObject:encoder->conversionPipeline forKey:device];
     return true;
+}
+
+void CancelWriterOnQueue(Encoder *encoder)
+{
+    if (encoder == nullptr || encoder->writerQueue == nullptr)
+        return;
+    dispatch_sync(encoder->writerQueue, ^{
+      @autoreleasepool
+      {
+          encoder->writerClosed = true;
+          @try
+          {
+              if (encoder->writer.status == AVAssetWriterStatusWriting)
+                  [encoder->writer cancelWriting];
+          }
+          @catch (NSException *exception)
+          {
+              SetFailure(
+                  encoder,
+                  exception.reason == nil
+                      ? "AVAssetWriter threw while cancelling."
+                      : std::string(exception.reason.UTF8String));
+          }
+      }
+    });
 }
 
 void DestroyEncoder(Encoder *encoder)
@@ -1096,6 +1144,25 @@ __attribute__((visibility("default"))) void BppVtCancelRenderEvent(void *data)
     ReleaseRenderEventPacket(packet);
 }
 
+__attribute__((visibility("default"))) void BppVtDiscardRenderEvent(void *data)
+{
+    auto *packet = static_cast<RenderEventPacket *>(data);
+    if (packet == nullptr)
+        return;
+
+    uint8_t expectedState = 0;
+    if (packet->state.compare_exchange_strong(
+            expectedState,
+            2,
+            std::memory_order_acq_rel))
+    {
+        ReleaseGpuPendingSlot(packet->encoder, packet->slotIndex);
+        CompleteRenderEvent(packet->encoder);
+        ReleaseRenderEventPacket(packet);
+    }
+    ReleaseRenderEventPacket(packet);
+}
+
 __attribute__((visibility("default"))) void BppVtReleaseSlot(void *handle, int slotIndex)
 {
     auto *encoder = static_cast<Encoder *>(handle);
@@ -1134,8 +1201,7 @@ __attribute__((visibility("default"))) int BppVtFinish(void *handle, int timeout
     if (!renderEventsDrained)
     {
         SetFailure(encoder, "Timed out waiting for Unity Metal render events to finish.");
-        if (encoder->writer.status == AVAssetWriterStatusWriting)
-            [encoder->writer cancelWriting];
+        CancelWriterOnQueue(encoder);
         std::lock_guard<std::mutex> guard(encoder->mutex);
         encoder->finished = true;
         return 0;
@@ -1169,11 +1235,29 @@ __attribute__((visibility("default"))) int BppVtFinish(void *handle, int timeout
     }
     else
     {
-        [encoder->writerInput markAsFinished];
         dispatch_semaphore_t completion = dispatch_semaphore_create(0);
-        [encoder->writer finishWritingWithCompletionHandler:^{
-          dispatch_semaphore_signal(completion);
-        }];
+        dispatch_sync(encoder->writerQueue, ^{
+          @autoreleasepool
+          {
+              encoder->writerClosed = true;
+              @try
+              {
+                  [encoder->writerInput markAsFinished];
+                  [encoder->writer finishWritingWithCompletionHandler:^{
+                    dispatch_semaphore_signal(completion);
+                  }];
+              }
+              @catch (NSException *exception)
+              {
+                  SetFailure(
+                      encoder,
+                      exception.reason == nil
+                          ? "AVAssetWriter threw while finishing."
+                          : std::string(exception.reason.UTF8String));
+                  dispatch_semaphore_signal(completion);
+              }
+          }
+        });
 
         const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
             deadline - std::chrono::steady_clock::now()).count();
@@ -1184,7 +1268,7 @@ __attribute__((visibility("default"))) int BppVtFinish(void *handle, int timeout
                 dispatch_time(DISPATCH_TIME_NOW, remaining * NSEC_PER_MSEC)) != 0)
         {
             SetFailure(encoder, "AVAssetWriter timed out while finishing the MP4.");
-            [encoder->writer cancelWriting];
+            CancelWriterOnQueue(encoder);
         }
         else if (encoder->writer.status != AVAssetWriterStatusCompleted)
         {

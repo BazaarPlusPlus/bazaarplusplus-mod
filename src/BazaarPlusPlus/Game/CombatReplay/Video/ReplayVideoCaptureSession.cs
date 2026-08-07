@@ -304,6 +304,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
 
         _nativeOutputFrameIndex += plan.TimelineFrameCount;
 
+        var eventQueued = false;
         try
         {
             commandBuffer.IssuePluginEventAndData(
@@ -311,6 +312,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                 eventID: 1,
                 eventData
             );
+            eventQueued = true;
             Graphics.ExecuteCommandBuffer(commandBuffer);
             encoder.CommitRenderEvent(eventData);
             _capturedFrames += plan.CapturedFrameCount;
@@ -319,7 +321,10 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
         catch (Exception ex)
         {
-            encoder.CancelRenderEvent(eventData);
+            if (eventQueued)
+                encoder.CancelRenderEvent(eventData);
+            else
+                encoder.DiscardRenderEvent(eventData);
             _droppedFrames += plan.DroppedFrameCountOnSubmissionFailure;
             _failureReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
             _failureException ??= ex;
@@ -395,6 +400,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
         _nativeOutputFrameIndex += plan.TimelineFrameCount;
 
+        var eventQueued = false;
         try
         {
             ScreenCapture.CaptureScreenshotIntoRenderTexture(renderTexture);
@@ -403,6 +409,7 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
                 eventID: 1,
                 eventData
             );
+            eventQueued = true;
             Graphics.ExecuteCommandBuffer(commandBuffer);
             encoder.CommitRenderEvent(eventData);
             _capturedFrames += plan.CapturedFrameCount;
@@ -411,7 +418,10 @@ internal sealed class ReplayVideoCaptureSession : IDisposable
         }
         catch (Exception ex)
         {
-            encoder.CancelRenderEvent(eventData);
+            if (eventQueued)
+                encoder.CancelRenderEvent(eventData);
+            else
+                encoder.DiscardRenderEvent(eventData);
             _droppedFrames += plan.DroppedFrameCountOnSubmissionFailure;
             _failureReasonCode ??= ReplayVideoRecordingReasonCode.CaptureFailed;
             _failureException ??= ex;

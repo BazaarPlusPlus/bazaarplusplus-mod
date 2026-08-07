@@ -244,6 +244,12 @@ internal sealed class MacMetalVideoEncoder : IReplayVideoEncoder
             BppVtCancelRenderEvent(eventData);
     }
 
+    internal void DiscardRenderEvent(IntPtr eventData)
+    {
+        if (eventData != IntPtr.Zero)
+            BppVtDiscardRenderEvent(eventData);
+    }
+
     internal void ReleaseFrame(FrameLease lease)
     {
         lock (_nativeSync)
@@ -383,6 +389,9 @@ internal sealed class MacMetalVideoEncoder : IReplayVideoEncoder
 
     [DllImport(NativeLibrary, CallingConvention = CallingConvention.Cdecl)]
     private static extern void BppVtCancelRenderEvent(IntPtr eventData);
+
+    [DllImport(NativeLibrary, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void BppVtDiscardRenderEvent(IntPtr eventData);
 
     [DllImport(NativeLibrary, CallingConvention = CallingConvention.Cdecl)]
     private static extern void BppVtReleaseSlot(IntPtr handle, int slotIndex);
