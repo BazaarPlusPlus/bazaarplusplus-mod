@@ -712,7 +712,7 @@ internal sealed partial class CollectionPanelView
         segment.style.minWidth = 0f;
         segment.style.overflow = Overflow.Hidden;
         UiStyle.Radius(segment.style, Radii.CollectionChip);
-        UiStyle.Border(segment.style, Borders.Thin, Colors.CollectionChipBorder);
+        UiStyle.Border(segment.style, Borders.Thin, Color.black);
         return segment;
     }
 

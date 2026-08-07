@@ -1388,22 +1388,23 @@ internal sealed partial class CollectionPanelView
             active ? Colors.CollectionChipSelectedText : Colors.CollectionChipText,
             active
         );
+        UiStyle.BorderColor(_dayToggleButton.style, Color.black);
     }
 
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)
     {
-        StyleHeroChip(chip);
+        StyleHeroChip(chip, selected);
         RefreshHeroChipInteraction(chip, selected);
     }
 
-    private static void StyleHeroChip(Button chip)
+    private static void StyleHeroChip(Button chip, bool selected = false)
     {
         UiHover.ApplyButtonPalette(
             chip,
             Colors.CollectionChipBackground,
             Colors.CollectionChipText,
-            Colors.CollectionChipBorder,
-            Colors.CollectionChipBorder,
+            selected ? Color.white : Colors.CollectionChipBorder,
+            selected ? Color.white : Colors.CollectionChipBorder,
             Colors.CollectionChipBackground,
             Colors.CollectionChipBackground
         );
