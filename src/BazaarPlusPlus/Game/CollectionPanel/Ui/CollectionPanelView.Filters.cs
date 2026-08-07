@@ -128,7 +128,7 @@ internal sealed partial class CollectionPanelView
             contentWidth: true
         );
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-        UiStyle.FixedSize(icon.style, 16f, 16f);
+        UiStyle.FixedSize(icon.style, 22f, 16f);
         icon.style.marginRight = UiSpacing.Xs;
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
@@ -147,8 +147,8 @@ internal sealed partial class CollectionPanelView
         var rect = icon.contentRect;
         var (width, height) = size switch
         {
-            ECardSize.Small => (7f, 14f),
-            ECardSize.Large => (14f, 9f),
+            ECardSize.Small => (8f, 14f),
+            ECardSize.Large => (21f, 14f),
             _ => (14f, 14f),
         };
         var x = rect.center.x - width / 2f;
