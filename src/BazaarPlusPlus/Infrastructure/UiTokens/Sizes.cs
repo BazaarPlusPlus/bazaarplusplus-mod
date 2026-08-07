@@ -68,7 +68,7 @@ internal static class Sizes
     public const float FacetModeToggleWidth = 52f;
     public const float FacetModeToggleHeight = 20f;
     public const int FacetModeFontSize = 13;
-    public const float CollectionTabToggleWidth = 72f;
+    public const float CollectionTabToggleWidth = 96f;
     public const float CollectionTabToggleHeight = 28f;
     public const float RowAccentWidth = 6f;
     public const float RowSideHostWidth = 62f;

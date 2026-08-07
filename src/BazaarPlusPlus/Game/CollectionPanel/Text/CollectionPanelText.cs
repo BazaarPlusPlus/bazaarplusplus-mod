@@ -218,18 +218,6 @@ internal static class CollectionPanelText
         };
     }
 
-    internal static string MatchCount(int count)
-    {
-        var languageCode = L.CurrentLanguageCode;
-        if (LanguageCodeMatcher.IsChinese(languageCode))
-            return ChineseScriptConverter.Convert(
-                $"共 {count} 张",
-                $"共 {count} 張",
-                L.CurrentMode
-            );
-        return $"{count} cards";
-    }
-
     private static string Resolve(LocalizedTextSet set) => LocalizedTextHelpers.Resolve(set);
 
     private static string FormatSimple(

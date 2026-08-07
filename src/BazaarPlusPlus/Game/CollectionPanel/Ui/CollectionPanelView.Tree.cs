@@ -52,7 +52,7 @@ internal sealed partial class CollectionPanelView
         UiStyle.Padding(controlDeck.style, UiSpacing.Lg);
         rail.Add(controlDeck);
 
-        // Title + count + Close (Close lives here in the operation area, not a top bar).
+        // Title + tabs + Close (Close lives here in the operation area, not a top bar).
         var titleRow = new VisualElement();
         titleRow.style.flexDirection = FlexDirection.Row;
         titleRow.style.alignItems = Align.Center;
@@ -80,10 +80,6 @@ internal sealed partial class CollectionPanelView
         _tabModeControl.style.marginLeft = UiSpacing.Md;
         _tabModeControl.style.marginRight = UiSpacing.Md;
         titleRow.Add(_tabModeControl);
-
-        _countLabel = CreateCountLabel();
-        _countLabel.style.marginRight = UiSpacing.Sm;
-        titleRow.Add(_countLabel);
 
         _closeButton = CreateCloseButton(_commands.Close);
         titleRow.Add(_closeButton);
@@ -279,7 +275,7 @@ internal sealed partial class CollectionPanelView
             Sizes.ButtonStandardHeight
         );
         button.tooltip = CollectionPanelText.Close();
-        StyleButton(button, Colors.CloseBackground, Colors.CloseText);
+        StyleButton(button, Colors.HistoryButtonBackground, Colors.CloseText);
         UiStyle.Radius(button.style, Sizes.ButtonStandardHeight / 2f);
         UiStyle.Border(button.style, Borders.Thin, Colors.CollectionChipBorder);
 
@@ -336,7 +332,7 @@ internal sealed partial class CollectionPanelView
         frame.style.minWidth = 0f;
         frame.style.height = Sizes.CollectionSearchRowHeight;
         frame.style.backgroundColor = Colors.CollectionChipBackground;
-        UiStyle.Border(frame.style, Borders.Thin, Color.black);
+        UiStyle.Border(frame.style, Borders.Thin, Colors.CollectionChipBorder);
         UiStyle.Radius(frame.style, Radii.CollectionChip);
         UiStyle.HorizontalPadding(frame.style, UiSpacing.Md);
         container.Add(frame);
@@ -387,16 +383,16 @@ internal sealed partial class CollectionPanelView
         void RefreshFrame()
         {
             var background = Colors.CollectionChipBackground;
-            var border = Color.black;
+            var border = Colors.CollectionChipBorder;
             if (focused)
             {
                 background = Colors.CollectionChipSelectedBackground;
-                border = Color.black;
+                border = Colors.CollectionChipSelectedBorder;
             }
             else if (hovered)
             {
                 background = Colors.CollectionChipHoverBackground;
-                border = Color.black;
+                border = Colors.CollectionChipHoverBorder;
             }
 
             frame.style.backgroundColor = background;
@@ -497,23 +493,6 @@ internal sealed partial class CollectionPanelView
             text.style.fontSize = Sizes.CollectionTagFontSize;
             text.style.unityTextAlign = TextAnchor.MiddleLeft;
         }
-    }
-
-    private static Label CreateCountLabel()
-    {
-        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
-        label.style.backgroundColor = Colors.CollectionChipBackground;
-        label.style.height = Sizes.CollectionTabToggleHeight;
-        UiStyle.FixedWidth(label.style, Sizes.CollectionMatchCountWidth);
-        label.style.flexShrink = 0f;
-        label.style.whiteSpace = WhiteSpace.NoWrap;
-        label.style.overflow = Overflow.Hidden;
-        label.style.unityTextAlign = TextAnchor.MiddleCenter;
-        label.style.alignSelf = Align.Center;
-        UiStyle.HorizontalPadding(label.style, UiSpacing.Md);
-        UiStyle.Radius(label.style, Radii.Md);
-        UiStyle.Border(label.style, Borders.Thin, Colors.CollectionChipBorder);
-        return label;
     }
 
     private static Button CreateInlineSortButton(string text, Action onClick)

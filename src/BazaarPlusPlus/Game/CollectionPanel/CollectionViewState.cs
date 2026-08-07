@@ -401,7 +401,7 @@ internal sealed class CollectionViewState
             Title = CollectionPanelText.Title(),
             Subtitle = CollectionPanelText.Subtitle(),
             Supporters = _supporters,
-            CountText = CollectionPanelText.MatchCount(projection.VisibleCount),
+            VisibleCount = projection.VisibleCount,
             StatusMessage = _statusVisible ? _statusMessage : null,
             IsLoading = _isLoadingCatalog,
             ActiveTab = _filter.ActiveTab,

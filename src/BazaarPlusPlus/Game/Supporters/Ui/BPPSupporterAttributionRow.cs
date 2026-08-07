@@ -157,7 +157,8 @@ internal static class BPPSupporterAttributionRow
         button.style.flexGrow = 0f;
         button.style.flexShrink = 0f;
         button.style.marginLeft = UiSpacing.Sm;
-        button.style.marginBottom = UiSpacing.Xs;
+        button.style.marginTop = 2f;
+        button.style.marginBottom = 2f;
         button.style.fontSize = Sizes.FontSmall;
         button.style.unityFontStyleAndWeight = FontStyle.Bold;
         button.style.unityTextAlign = TextAnchor.MiddleCenter;

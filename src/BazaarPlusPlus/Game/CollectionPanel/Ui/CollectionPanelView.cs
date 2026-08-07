@@ -36,7 +36,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private Label? _title;
     private VisualElement? _subtitle;
     private Label? _stagingIdCopyLabel;
-    private Label? _countLabel;
     private Label? _statusLabel;
     private Label? _disclaimerLabel;
     private VisualElement? _tabModeControl;
@@ -306,7 +305,6 @@ internal sealed partial class CollectionPanelView : IDisposable
         _title!.text = model.Title;
         _titleOverlay?.SetText(model.Title);
         BPPSupporterAttributionRow.Bind(_subtitle!, model.Supporters, model.Subtitle, _typography!);
-        _countLabel!.text = model.CountText;
         _statusLabel!.text = StablePanelText.Compact(model.StatusMessage, 150);
         _statusLabel.tooltip = model.StatusMessage ?? string.Empty;
         _statusLabel.style.display = string.IsNullOrWhiteSpace(model.StatusMessage)
@@ -328,8 +326,8 @@ internal sealed partial class CollectionPanelView : IDisposable
         RefreshFacetChoiceControl(
             _tabModeControl,
             model.ActiveTab == CollectionTabKind.Items,
-            CollectionPanelText.ItemsTab(),
-            CollectionPanelText.SkillsTab(),
+            TabLabel(CollectionTabKind.Items, model.ActiveTab, model.VisibleCount),
+            TabLabel(CollectionTabKind.Skills, model.ActiveTab, model.VisibleCount),
             fontSize: Sizes.FontBody,
             slanted: false
         );
@@ -459,6 +457,18 @@ internal sealed partial class CollectionPanelView : IDisposable
                 && !model.IsLoading;
             _emptyLabel.style.display = showEmpty ? DisplayStyle.Flex : DisplayStyle.None;
         }
+    }
+
+    private static string TabLabel(
+        CollectionTabKind tab,
+        CollectionTabKind activeTab,
+        int visibleCount
+    )
+    {
+        var label = tab == CollectionTabKind.Items
+            ? CollectionPanelText.ItemsTab()
+            : CollectionPanelText.SkillsTab();
+        return tab == activeTab ? $"{label}({visibleCount})" : label;
     }
 
     // P4 fix: these chrome strings used to be set only at construction, so a locale change

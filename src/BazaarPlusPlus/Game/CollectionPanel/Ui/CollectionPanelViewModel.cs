@@ -11,7 +11,7 @@ internal sealed class CollectionPanelViewModel
     public string Subtitle { get; set; } = string.Empty;
     public IReadOnlyList<BPPSupporterSample> Supporters { get; set; } =
         Array.Empty<BPPSupporterSample>();
-    public string CountText { get; set; } = string.Empty;
+    public int VisibleCount { get; set; }
     public string? StatusMessage { get; set; }
     public bool IsLoading { get; set; }
     public CollectionTabKind ActiveTab { get; set; } = CollectionTabKind.Items;
