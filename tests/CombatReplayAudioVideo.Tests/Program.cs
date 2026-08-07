@@ -2,7 +2,7 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using BepInEx.Logging;
 
-// Behavioral unit tests for the two design-mandated pure-logic units of the
+// Behavioral unit tests for the design-mandated pure-logic units of the
 // combat-replay audio/video pipeline, reached as internal types via reflection
 // (Type.GetType("Full.Name, BazaarPlusPlus")):
 //   1) WavStreamWriter    -- byte-exact WAV header
@@ -13,6 +13,7 @@ using BepInEx.Logging;
 
 WavHeaderTests.Run();
 CfrPacerTests.Run();
+MacMetalFrameSubmissionPlanTests.Run();
 FramePoolTests.Run();
 VideoEncoderProfileTests.Run();
 VideoBackendPolicyTests.Run();
@@ -344,7 +345,79 @@ file static class CfrPacerTests
 }
 
 // ---------------------------------------------------------------------------
-// 3) ReplayVideoFramePool: optional Rent/Return + cap micro-check.
+// 3) MacMetalFrameSubmissionPlan: never repay missed wall-clock slots with one
+//    newer Metal texture.
+// ---------------------------------------------------------------------------
+file static class MacMetalFrameSubmissionPlanTests
+{
+    private static readonly Type PlanType = TestReflection.RequireType(
+        "BazaarPlusPlus.Game.CombatReplay.Video.MacMetalFrameSubmissionPlan"
+    );
+
+    public static void Run()
+    {
+        PacerResyncDoesNotCreatePtsGap();
+        ConsecutiveMissesDoNotAccumulateDebt();
+        AccountingCloses();
+    }
+
+    private static void PacerResyncDoesNotCreatePtsGap()
+    {
+        var plan = Create(emit: 3, repeat: 2, dropped: 120);
+        TestReflection.Assert(
+            Read(plan, "EncodeFrameCount") == 3,
+            "A large pacer resync must not expand the native encode batch."
+        );
+        TestReflection.Assert(
+            Read(plan, "TimelineFrameCount") == 3,
+            "Pacer resync slots must not create a visible gap in the output timeline."
+        );
+    }
+
+    private static void ConsecutiveMissesDoNotAccumulateDebt()
+    {
+        var first = Create(emit: 1, repeat: 0, dropped: 0);
+        var second = Create(emit: 1, repeat: 0, dropped: 0);
+        TestReflection.Assert(
+            Read(first, "EncodeFrameCount") == 1 && Read(second, "EncodeFrameCount") == 1,
+            "Independent ticks must never carry a deferred encode batch forward."
+        );
+    }
+
+    private static void AccountingCloses()
+    {
+        var plan = Create(emit: 3, repeat: 2, dropped: 7);
+        var accounted = Read(plan, "CapturedFrameCount") + Read(plan, "RepeatedFrameCount");
+        TestReflection.Assert(
+            accounted == Read(plan, "TimelineFrameCount"),
+            "Captured and repeated frames must exactly cover the packed output timeline."
+        );
+        TestReflection.Assert(
+            Read(plan, "DroppedFrameCountOnSubmissionFailure") == 10,
+            "A failed native submission must count both its encode candidates and pacer drops."
+        );
+    }
+
+    private static object Create(int emit, int repeat, int dropped)
+    {
+        var method =
+            PlanType.GetMethod(
+                "Create",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            )
+            ?? throw new InvalidOperationException("MacMetalFrameSubmissionPlan.Create not found.");
+        return method.Invoke(null, new object[] { emit, repeat, dropped })
+            ?? throw new InvalidOperationException(
+                "MacMetalFrameSubmissionPlan.Create returned null."
+            );
+    }
+
+    private static int Read(object plan, string propertyName) =>
+        (int)(TestReflection.GetProp(PlanType, plan, propertyName) ?? -1);
+}
+
+// ---------------------------------------------------------------------------
+// 4) ReplayVideoFramePool: optional Rent/Return + cap micro-check.
 // ---------------------------------------------------------------------------
 file static class FramePoolTests
 {
@@ -2203,7 +2276,7 @@ file static class MediaEventCatalogTests
         ["combat_replay.video_capture.stats_observed"] =
             "recording_id:Public:High:Short|stage:Public:Low:None|width:Public:High:None|height:Public:High:None|fps:Public:Low:None|captured_frames:Public:High:None|repeated_frames:Public:High:None|dropped_frames:Public:High:None|duration_ms:Public:High:None|size_bytes:Public:High:None|output_path:LocalPath:High:None|codec:Public:Low:None|rate_control:Public:Low:None|frame_bytes:Public:High:None|pool_capacity:Public:Low:None|queue_capacity:Public:Low:None|pool_payload_bytes:Public:High:None|pool_budget_exceeded:Public:Low:None|readback_backpressure_skips:Public:High:None|max_outstanding_readbacks:Public:Low:None|readback_copy_p95_us:Public:High:None|cfr_copy_p95_us:Public:High:None|staging_buffer_bytes:Public:High:None|max_readback_payload_bytes:Public:High:None|render_texture_estimated_bytes:Public:High:None",
         ["combat_replay.video_capture.native_pipeline_observed"] =
-            "recording_id:Public:High:Short|stage:Public:Low:None|deferred_frames:Public:High:None|dropped_frames:Public:High:None|lease_misses:Public:High:None|enqueue_rejects:Public:High:None|pacer_resync_repeats:Public:High:None|max_in_flight:Public:Low:None|native_frames_written:Public:High:None|render_frame_p50_us:Public:High:None|render_frame_p95_us:Public:High:None|render_frame_p99_us:Public:High:None|texture_copy_p50_us:Public:High:None|texture_copy_p95_us:Public:High:None|texture_copy_p99_us:Public:High:None|battle_id:Public:High:Short",
+            "recording_id:Public:High:Short|stage:Public:Low:None|backpressure_dropped_frames:Public:High:None|dropped_frames:Public:High:None|lease_misses:Public:High:None|enqueue_rejects:Public:High:None|pacer_resync_dropped_frames:Public:High:None|max_in_flight:Public:Low:None|native_frames_written:Public:High:None|render_frame_p50_us:Public:High:None|render_frame_p95_us:Public:High:None|render_frame_p99_us:Public:High:None|texture_copy_p50_us:Public:High:None|texture_copy_p95_us:Public:High:None|texture_copy_p99_us:Public:High:None|battle_id:Public:High:Short",
         ["combat_replay.video_capture.frame_degraded"] =
             "recording_id:Public:High:Short|stage:Public:Low:None|reason_code:Public:Low:None|sequence:Public:High:None",
         ["combat_replay.video_recording.cleanup_failed"] =

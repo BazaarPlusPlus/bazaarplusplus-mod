@@ -942,10 +942,13 @@ __attribute__((visibility("default"))) int BppVtCreate(
         }
 
         int expectedFrameRate = fps;
+        int maxFrameDelayCount = 2;
         int keyFrameInterval = fps * 2;
         int averageBitrate = bitrateBitsPerSecond;
         CFNumberRef expectedFrameRateNumber = CFNumberCreate(
             kCFAllocatorDefault, kCFNumberIntType, &expectedFrameRate);
+        CFNumberRef maxFrameDelayCountNumber = CFNumberCreate(
+            kCFAllocatorDefault, kCFNumberIntType, &maxFrameDelayCount);
         CFNumberRef keyFrameIntervalNumber = CFNumberCreate(
             kCFAllocatorDefault, kCFNumberIntType, &keyFrameInterval);
         CFNumberRef bitrateNumber = CFNumberCreate(
@@ -967,6 +970,13 @@ __attribute__((visibility("default"))) int BppVtCreate(
 
         if (configured)
         {
+            // Bounding VideoToolbox's compression window is what guarantees that the
+            // IOSurface slots return to Unity. This is best-effort because the managed
+            // path still degrades honestly on encoders that reject the optional key.
+            VTSessionSetProperty(
+                encoder->compressionSession,
+                kVTCompressionPropertyKey_MaxFrameDelayCount,
+                maxFrameDelayCountNumber);
             configured =
                 SetCompressionProperty(
                     encoder,
@@ -986,6 +996,7 @@ __attribute__((visibility("default"))) int BppVtCreate(
         }
 
         CFRelease(expectedFrameRateNumber);
+        CFRelease(maxFrameDelayCountNumber);
         CFRelease(keyFrameIntervalNumber);
         CFRelease(bitrateNumber);
 
