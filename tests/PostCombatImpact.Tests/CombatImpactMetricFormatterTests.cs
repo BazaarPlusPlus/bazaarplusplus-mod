@@ -41,7 +41,7 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Fact]
-    public void Triggered_skill_summary_and_group_source_use_unique_triggers()
+    public void Triggered_skill_hides_internal_batch_count_and_keeps_source_breakdown()
     {
         var skill = new CombatImpactEntity("skill", "Wax and Wane", "Skill", null, 0);
         var trigger = new CombatImpactEntity("trigger", "Soul of the\nDistrict", "Item", null, 1);
@@ -65,14 +65,8 @@ public sealed class CombatImpactMetricFormatterTests
             ObservedActivationBatchCount = 1,
         };
 
-        Assert.Equal(
-            "1 observed trigger batch",
-            CombatImpactMetricFormatter.CausedSummary(source, chinese: false)
-        );
-        Assert.Equal(
-            "观测触发 1 批",
-            CombatImpactMetricFormatter.CausedSummary(source, chinese: true)
-        );
+        Assert.Empty(CombatImpactMetricFormatter.CausedSummary(source, chinese: false));
+        Assert.Empty(CombatImpactMetricFormatter.CausedSummary(source, chinese: true));
         Assert.Equal(
             "Triggered by: 10/10 attributed · Soul of the District ×10",
             CombatImpactMetricFormatter.TriggerSources(group, chinese: false)

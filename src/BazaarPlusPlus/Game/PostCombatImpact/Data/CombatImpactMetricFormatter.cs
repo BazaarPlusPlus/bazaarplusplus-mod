@@ -8,30 +8,17 @@ internal static class CombatImpactMetricFormatter
 {
     internal static string CausedSummary(CombatImpactSource source, bool chinese)
     {
-        var parts = new List<string>();
         var isSkill = string.Equals(
             source.Entity.TypeLabel,
             "Skill",
             StringComparison.OrdinalIgnoreCase
         );
-        if (isSkill && source.ObservedActivationBatchCount > 0)
-        {
-            parts.Add(
-                chinese
-                    ? $"观测触发 {source.ObservedActivationBatchCount} 批"
-                    : $"{source.ObservedActivationBatchCount} observed trigger batch{(source.ObservedActivationBatchCount == 1 ? string.Empty : "es")}"
-            );
-        }
-        else if (!isSkill && source.UseCount > 0)
-        {
-            parts.Add(
-                chinese
-                    ? $"使用 {source.UseCount} 次"
-                    : $"{source.UseCount} use{(source.UseCount == 1 ? string.Empty : "s")}"
-            );
-        }
+        if (isSkill || source.UseCount <= 0)
+            return string.Empty;
 
-        return string.Join(" · ", parts);
+        return chinese
+            ? $"使用 {source.UseCount} 次"
+            : $"{source.UseCount} use{(source.UseCount == 1 ? string.Empty : "s")}";
     }
 
     internal static string TriggerSources(CombatImpactGroup group, bool chinese)
