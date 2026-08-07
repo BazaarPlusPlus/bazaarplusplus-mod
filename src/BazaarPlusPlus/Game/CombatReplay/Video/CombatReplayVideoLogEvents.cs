@@ -407,9 +407,9 @@ internal static class CombatReplayVideoLogEvents
         BppLogCorrelationPolicy.Short
     );
     internal static readonly BppLogFieldDefinition NativeStatsStage = Field(1, "stage");
-    internal static readonly BppLogFieldDefinition NativeStatsDeferredFrames = Field(
+    internal static readonly BppLogFieldDefinition NativeStatsBackpressureDroppedFrames = Field(
         2,
-        "deferred_frames",
+        "backpressure_dropped_frames",
         BppLogCardinality.High
     );
     internal static readonly BppLogFieldDefinition NativeStatsDroppedFrames = Field(
@@ -427,9 +427,9 @@ internal static class CombatReplayVideoLogEvents
         "enqueue_rejects",
         BppLogCardinality.High
     );
-    internal static readonly BppLogFieldDefinition NativeStatsPacerResyncRepeats = Field(
+    internal static readonly BppLogFieldDefinition NativeStatsPacerResyncDroppedFrames = Field(
         6,
-        "pacer_resync_repeats",
+        "pacer_resync_dropped_frames",
         BppLogCardinality.High
     );
     internal static readonly BppLogFieldDefinition NativeStatsMaxInFlight = Field(
@@ -483,11 +483,11 @@ internal static class CombatReplayVideoLogEvents
         [
             NativeStatsRecordingId,
             NativeStatsStage,
-            NativeStatsDeferredFrames,
+            NativeStatsBackpressureDroppedFrames,
             NativeStatsDroppedFrames,
             NativeStatsLeaseMisses,
             NativeStatsEnqueueRejects,
-            NativeStatsPacerResyncRepeats,
+            NativeStatsPacerResyncDroppedFrames,
             NativeStatsMaxInFlight,
             NativeStatsFramesWritten,
             NativeStatsRenderFrameP50Us,

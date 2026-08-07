@@ -104,6 +104,26 @@ public sealed class MacNativeReplayArchitectureTests
         );
     }
 
+    [Fact]
+    public void Native_encoder_bounds_videotoolbox_delay_without_making_it_a_hard_requirement()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(RepoRoot(), "native", "macos", "BppReplayVideoToolbox.mm")
+        );
+
+        Assert.Contains("int maxFrameDelayCount = 2;", source, StringComparison.Ordinal);
+        Assert.Contains(
+            "kVTCompressionPropertyKey_MaxFrameDelayCount,\n                maxFrameDelayCountNumber",
+            source,
+            StringComparison.Ordinal
+        );
+        Assert.DoesNotContain(
+            "SetCompressionProperty(\n                encoder,\n                kVTCompressionPropertyKey_MaxFrameDelayCount",
+            source,
+            StringComparison.Ordinal
+        );
+    }
+
     private static void AssertNativeProbePrecedesTaskRun(string sourcePath, string taskMarker)
     {
         var source = File.ReadAllText(sourcePath);
