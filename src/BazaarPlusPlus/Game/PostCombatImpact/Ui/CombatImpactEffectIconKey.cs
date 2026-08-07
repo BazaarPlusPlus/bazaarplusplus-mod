@@ -20,7 +20,9 @@ internal static class CombatImpactEffectIconKey
     internal static string ResolveAttribute(string key, string? variant) =>
         key switch
         {
-            "EnchantTargets" when !string.IsNullOrWhiteSpace(variant) => variant,
+            "EnchantTargets" when !string.IsNullOrWhiteSpace(variant) => ResolveEnchantment(
+                variant
+            ),
             "EnchantTargets" or "EnchantRemoveTargets" => "Enchant",
             "ChargeAmount" or "ChargeTargets" or "PercentChargeReduction" => "Charge",
             "Haste" or "HasteAmount" or "HasteTargets" or "PercentHasteReduction" => "Haste",
@@ -55,6 +57,22 @@ internal static class CombatImpactEffectIconKey
             "AmmoMax" => "Ammo",
             "DestroyTargets" or "DestroyImmunity" => "Destroy",
             _ => key,
+        };
+
+    private static string ResolveEnchantment(string enchantment) =>
+        enchantment switch
+        {
+            "Deadly" => "CritChance",
+            "Fiery" => "Burn",
+            "Heavy" => "Slow",
+            "Icy" => "Freeze",
+            "Mossy" => "Regen",
+            "Obsidian" => "Damage",
+            "Restorative" => "Healing",
+            "Shielded" => "Shield",
+            "Toxic" => "Poison",
+            "Turbo" => "Haste",
+            _ => "Enchant",
         };
 
     internal static (string BaseKey, string? Variant) SplitAttributeKey(string key)

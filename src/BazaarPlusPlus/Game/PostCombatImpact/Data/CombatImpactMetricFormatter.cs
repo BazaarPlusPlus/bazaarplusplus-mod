@@ -78,15 +78,7 @@ internal static class CombatImpactMetricFormatter
             if (group.ObservedValue.HasValue)
             {
                 parts.Add(
-                    ObservedValue(
-                        group.ObservedValue.Value,
-                        group.Unit,
-                        group.ObservedCoverage,
-                        ShouldShowSign(group),
-                        chinese,
-                        group.AmountLedger.ValuedApplicationCount,
-                        group.AmountLedger.TotalApplicationCount
-                    )
+                    Value(group.ObservedValue.Value, group.Unit, ShouldShowSign(group), chinese)
                 );
             }
 
@@ -164,15 +156,7 @@ internal static class CombatImpactMetricFormatter
                 ? count
                 : string.Empty;
 
-        var value = ObservedValue(
-            target.ObservedValue.Value,
-            target.Unit,
-            target.ObservedCoverage,
-            ShouldShowSign(group),
-            chinese,
-            target.ValuedApplicationCount,
-            target.Count
-        );
+        var value = Value(target.ObservedValue.Value, target.Unit, ShouldShowSign(group), chinese);
         return ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis)
             ? $"{count} · {value}"
             : value;
@@ -189,14 +173,11 @@ internal static class CombatImpactMetricFormatter
             parts.Add(Count(group.Count, group.CriticalCount, chinese, criticalMarker));
         if (group.ObservedValue.HasValue)
         {
-            var value = ObservedValue(
+            var value = Value(
                 group.ObservedValue.Value,
                 group.Unit,
-                group.ObservedCoverage,
                 ShouldShowSign(group),
-                chinese,
-                group.ValuedApplicationCount,
-                group.Count
+                chinese
             );
             parts.Add(value);
         }
@@ -260,15 +241,7 @@ internal static class CombatImpactMetricFormatter
                 ? count
                 : string.Empty;
 
-        var value = ObservedValue(
-            source.ObservedValue.Value,
-            source.Unit,
-            source.ObservedCoverage,
-            ShouldShowSign(group),
-            chinese,
-            source.ValuedApplicationCount,
-            source.Count
-        );
+        var value = Value(source.ObservedValue.Value, source.Unit, ShouldShowSign(group), chinese);
         return ShouldShowCount(group.Kind, group.Surface, group.OccurrenceBasis)
             ? $"{count} · {value}"
             : value;
@@ -288,34 +261,6 @@ internal static class CombatImpactMetricFormatter
             CombatImpactValueUnit.PercentagePoints => $"{sign}{Integer(value)}%",
             CombatImpactValueUnit.Applications => Integer(value),
             _ => $"{sign}{Integer(value)}",
-        };
-    }
-
-    private static string ObservedValue(
-        int value,
-        CombatImpactValueUnit unit,
-        CombatImpactCoverage coverage,
-        bool showSign,
-        bool chinese,
-        int valuedApplicationCount = 0,
-        int totalApplicationCount = 0
-    )
-    {
-        var formatted = Value(value, unit, showSign, chinese);
-        return coverage switch
-        {
-            CombatImpactCoverage.LowerBound => chinese
-                ? $"至少 {formatted}"
-                : $"at least {formatted}",
-            CombatImpactCoverage.Partial
-                when valuedApplicationCount > 0
-                    && totalApplicationCount >= valuedApplicationCount => chinese
-                ? $"已记录 {formatted}（{valuedApplicationCount}/{totalApplicationCount}）"
-                : $"{formatted} recorded ({valuedApplicationCount}/{totalApplicationCount})",
-            CombatImpactCoverage.Partial => chinese
-                ? $"已记录 {formatted}"
-                : $"{formatted} recorded",
-            _ => formatted,
         };
     }
 

@@ -310,16 +310,8 @@ public sealed class CombatImpactMetricFormatterTests
     }
 
     [Theory]
-    [InlineData(
-        (int)CombatImpactOccurrenceBasis.ExplicitExecution,
-        "×3 · at least +90",
-        "×2 · at least +60"
-    )]
-    [InlineData(
-        (int)CombatImpactOccurrenceBasis.ReconstructedTransition,
-        "at least +90",
-        "at least +60"
-    )]
+    [InlineData((int)CombatImpactOccurrenceBasis.ExplicitExecution, "×3 · +90", "×2 · +60")]
+    [InlineData((int)CombatImpactOccurrenceBasis.ReconstructedTransition, "+90", "+60")]
     public void Attribute_transition_counts_require_explicit_execution_evidence(
         int occurrenceBasisValue,
         string expectedGroup,
@@ -383,6 +375,29 @@ public sealed class CombatImpactMetricFormatterTests
             expectedDetail,
             CombatImpactMetricFormatter.IncomingSource(incoming, source, chinese: false)
         );
+    }
+
+    [Theory]
+    [InlineData((int)CombatImpactCoverage.Exact)]
+    [InlineData((int)CombatImpactCoverage.Estimated)]
+    [InlineData((int)CombatImpactCoverage.LowerBound)]
+    [InlineData((int)CombatImpactCoverage.Partial)]
+    public void Coverage_confidence_stays_internal(int coverageValue)
+    {
+        var group = new CombatImpactGroup(
+            CombatImpactKind.AttributeChange,
+            "DamageAmount",
+            4,
+            3514,
+            CombatImpactValueUnit.Amount,
+            (CombatImpactCoverage)coverageValue,
+            null,
+            0,
+            []
+        );
+
+        Assert.Equal("×4 · +3,514", CombatImpactMetricFormatter.Group(group, chinese: false));
+        Assert.Equal("×4 · +3,514", CombatImpactMetricFormatter.Group(group, chinese: true));
     }
 
     [Fact]
@@ -543,30 +558,27 @@ public sealed class CombatImpactMetricFormatterTests
             ),
         };
 
+        Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(matching, chinese: false));
         Assert.Equal(
-            "×10 · at least 9.50s",
-            CombatImpactMetricFormatter.Group(matching, chinese: false)
-        );
-        Assert.Equal(
-            "×7 · at least 9.50s · 10 applications",
+            "×7 · 9.50s · 10 applications",
             CombatImpactMetricFormatter.Group(divergent, chinese: false)
         );
         Assert.Equal(
-            "×7 · 至少 9.50s · 生效 10 次",
+            "×7 · 9.50s · 生效 10 次",
             CombatImpactMetricFormatter.Group(divergent, chinese: true)
         );
         Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(estimated, chinese: false));
         Assert.Equal("×10 · 9.50s", CombatImpactMetricFormatter.Group(estimated, chinese: true));
         Assert.Equal(
-            "at least 9.50s · 1 application",
+            "9.50s · 1 application",
             CombatImpactMetricFormatter.Group(singularApplication, chinese: false)
         );
         Assert.Equal(
-            "×7 · at least 9.50s · 10 cards affected",
+            "×7 · 9.50s · 10 cards affected",
             CombatImpactMetricFormatter.Group(affectedCards, chinese: false)
         );
         Assert.Equal(
-            "×7 · 至少 9.50s · 影响 10 张卡牌",
+            "×7 · 9.50s · 影响 10 张卡牌",
             CombatImpactMetricFormatter.Group(affectedCards, chinese: true)
         );
         Assert.Equal(
