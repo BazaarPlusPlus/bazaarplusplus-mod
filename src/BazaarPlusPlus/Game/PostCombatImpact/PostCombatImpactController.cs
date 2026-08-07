@@ -4,6 +4,7 @@ using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.Input;
 using BazaarPlusPlus.Game.PostCombatImpact.Data;
 using BazaarPlusPlus.Game.PostCombatImpact.Ui;
+using BazaarPlusPlus.GameInterop.Tooltips;
 using BazaarPlusPlus.Infrastructure;
 using TheBazaar;
 using TheBazaar.Tooltips;
@@ -42,6 +43,7 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     private int _transientShowRetryRevision = -1;
     private int _transientShowRetries;
     private bool _nativeAuxiliaryTakeoverActive;
+    private bool _visibleEmptyAuxiliaryLogged;
     private CombatImpactPerspective _requestedPerspective = CombatImpactPerspective.Caused;
 
     internal void Initialize(PostCombatImpactModule module, IPostCombatImpactTooltipView view)
@@ -80,6 +82,8 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
     private void Update()
     {
+        AuditVisibleNativeAuxiliaryTooltip();
+
         if (!BppHotkeyService.WasShiftPressedThisFrame())
             return;
 
@@ -802,10 +806,34 @@ internal sealed class PostCombatImpactController : MonoBehaviour
     internal void OnNativeAuxiliaryTooltipShowing(
         AuxiliaryTooltipController controller,
         Transform anchor,
-        string header
+        string header,
+        string body
     )
     {
+        var beforeHandoff = CaptureNativeAuxiliaryState(controller);
+        var headerRequested = !string.IsNullOrWhiteSpace(header);
+        var bodyRequested = !string.IsNullOrWhiteSpace(body);
         var displacedActiveImpact = _view?.OnNativeAuxiliaryTooltipShowing(controller) == true;
+        if (
+            NativeAuxiliaryTooltipAnomalyRules.RequestedTextNeedsRecovery(
+                headerRequested,
+                bodyRequested,
+                beforeHandoff.HeaderActive,
+                beforeHandoff.BodyActive
+            )
+        )
+        {
+            var afterHandoff = CaptureNativeAuxiliaryState(controller);
+            var recovered =
+                (!headerRequested || afterHandoff.HeaderActive)
+                && (!bodyRequested || afterHandoff.BodyActive);
+            LogNativeAuxiliaryAnomaly(
+                NativeAuxiliaryTooltipAnomalyCategory.RequestedTextInactive,
+                NativeAuxiliaryTooltipAnomalyPhase.ShowHandoff,
+                beforeHandoff,
+                recovered
+            );
+        }
         if (
             _auxiliaryRequestOutstanding
             && ReferenceEquals(_pendingAuxiliaryAnchor, anchor)
@@ -848,6 +876,104 @@ internal sealed class PostCombatImpactController : MonoBehaviour
 
         _nativeAuxiliaryTakeoverActive = true;
     }
+
+    private void AuditVisibleNativeAuxiliaryTooltip()
+    {
+        var tooltipParent = TheBazaar.Data.TooltipParentComponent;
+        var controller = tooltipParent?.AuxiliaryTooltipController;
+        if (
+            tooltipParent?.IsAuxiliaryTooltipDisplayed != true
+            || controller == null
+            || !controller.isActiveAndEnabled
+        )
+        {
+            _visibleEmptyAuxiliaryLogged = false;
+            return;
+        }
+
+        var state = CaptureNativeAuxiliaryState(controller);
+        var pairedContentActive = _view?.IsContentActive == true;
+        var visibleWithoutText = NativeAuxiliaryTooltipAnomalyRules.IsVisibleWithoutText(
+            state.FrameVisible,
+            pairedContentActive,
+            state.HeaderRenderable,
+            state.BodyRenderable
+        );
+        if (!visibleWithoutText)
+        {
+            _visibleEmptyAuxiliaryLogged = false;
+            return;
+        }
+        if (_visibleEmptyAuxiliaryLogged)
+            return;
+
+        _visibleEmptyAuxiliaryLogged = true;
+        LogNativeAuxiliaryAnomaly(
+            NativeAuxiliaryTooltipAnomalyCategory.VisibleWithoutText,
+            NativeAuxiliaryTooltipAnomalyPhase.FrameAudit,
+            state,
+            recovered: false
+        );
+    }
+
+    private static NativeAuxiliaryTooltipState CaptureNativeAuxiliaryState(
+        AuxiliaryTooltipController controller
+    )
+    {
+        var header = controller.headerText;
+        var body = controller.bodyText;
+        var background = controller.backgroundImage;
+        var nativeCanvas = controller.tooltipCanvasGroup;
+        var contentGate = controller.auxParent?.GetComponent<CanvasGroup>();
+        var headerEmpty = header == null || string.IsNullOrWhiteSpace(header.text);
+        var bodyEmpty = body == null || string.IsNullOrWhiteSpace(body.text);
+        var headerActive = header != null && header.gameObject.activeSelf;
+        var bodyActive = body != null && body.gameObject.activeSelf;
+        var frameVisible =
+            controller.gameObject.activeInHierarchy
+            && nativeCanvas != null
+            && nativeCanvas.alpha > NativePairedTooltipMetrics.Epsilon
+            && (contentGate == null || contentGate.alpha > NativePairedTooltipMetrics.Epsilon)
+            && background != null
+            && background.enabled
+            && background.gameObject.activeInHierarchy
+            && background.color.a > NativePairedTooltipMetrics.Epsilon;
+        return new NativeAuxiliaryTooltipState(
+            HeaderActive: headerActive,
+            BodyActive: bodyActive,
+            HeaderEmpty: headerEmpty,
+            BodyEmpty: bodyEmpty,
+            HeaderRenderable: headerActive
+                && header!.enabled
+                && header.gameObject.activeInHierarchy
+                && header.color.a > NativePairedTooltipMetrics.Epsilon
+                && !headerEmpty,
+            BodyRenderable: bodyActive
+                && body!.enabled
+                && body.gameObject.activeInHierarchy
+                && body.color.a > NativePairedTooltipMetrics.Epsilon
+                && !bodyEmpty,
+            FrameVisible: frameVisible
+        );
+    }
+
+    private void LogNativeAuxiliaryAnomaly(
+        NativeAuxiliaryTooltipAnomalyCategory category,
+        NativeAuxiliaryTooltipAnomalyPhase phase,
+        NativeAuxiliaryTooltipState state,
+        bool recovered
+    ) =>
+        BppLog.WarnEvent(
+            PostCombatImpactLogEvents.NativeAuxiliaryAnomaly,
+            PostCombatImpactLogEvents.AnomalyCategory.Bind(category),
+            PostCombatImpactLogEvents.AnomalyPhase.Bind(phase),
+            PostCombatImpactLogEvents.HeaderActive.Bind(state.HeaderActive),
+            PostCombatImpactLogEvents.BodyActive.Bind(state.BodyActive),
+            PostCombatImpactLogEvents.HeaderEmpty.Bind(state.HeaderEmpty),
+            PostCombatImpactLogEvents.BodyEmpty.Bind(state.BodyEmpty),
+            PostCombatImpactLogEvents.PairedContentActive.Bind(_view?.IsContentActive == true),
+            PostCombatImpactLogEvents.Recovered.Bind(recovered)
+        );
 
     internal void OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller)
     {
@@ -1170,6 +1296,16 @@ internal sealed class PostCombatImpactController : MonoBehaviour
         CardTooltipData TooltipData,
         Vector3 TooltipOffset,
         string SourceId
+    );
+
+    private readonly record struct NativeAuxiliaryTooltipState(
+        bool HeaderActive,
+        bool BodyActive,
+        bool HeaderEmpty,
+        bool BodyEmpty,
+        bool HeaderRenderable,
+        bool BodyRenderable,
+        bool FrameVisible
     );
 
     private sealed class GeometrySample

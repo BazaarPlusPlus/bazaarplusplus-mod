@@ -49,6 +49,18 @@ internal enum PostCombatImpactHoverExitOrigin
     SkillPointerExit,
 }
 
+internal enum NativeAuxiliaryTooltipAnomalyCategory
+{
+    RequestedTextInactive,
+    VisibleWithoutText,
+}
+
+internal enum NativeAuxiliaryTooltipAnomalyPhase
+{
+    ShowHandoff,
+    FrameAudit,
+}
+
 [BppLogEventSource]
 internal static class PostCombatImpactLogEvents
 {
@@ -106,4 +118,41 @@ internal static class PostCombatImpactLogEvents
         [ReasonCode],
         new BppLogStormPolicy([ReasonCode])
     );
+
+    internal static readonly BppLogFieldDefinition AnomalyCategory = PublicLow(0, "category");
+    internal static readonly BppLogFieldDefinition AnomalyPhase = PublicLow(1, "phase");
+    internal static readonly BppLogFieldDefinition HeaderActive = PublicLow(2, "header_active");
+    internal static readonly BppLogFieldDefinition BodyActive = PublicLow(3, "body_active");
+    internal static readonly BppLogFieldDefinition HeaderEmpty = PublicLow(4, "header_empty");
+    internal static readonly BppLogFieldDefinition BodyEmpty = PublicLow(5, "body_empty");
+    internal static readonly BppLogFieldDefinition PairedContentActive = PublicLow(
+        6,
+        "paired_content_active"
+    );
+    internal static readonly BppLogFieldDefinition Recovered = PublicLow(7, "recovered");
+
+    internal static readonly BppLogEventDefinition NativeAuxiliaryAnomaly = new(
+        BppLogFeatureScope.PostCombatImpact,
+        "post_combat_impact.native_auxiliary.anomaly",
+        [
+            AnomalyCategory,
+            AnomalyPhase,
+            HeaderActive,
+            BodyActive,
+            HeaderEmpty,
+            BodyEmpty,
+            PairedContentActive,
+            Recovered,
+        ],
+        new BppLogStormPolicy([AnomalyCategory, AnomalyPhase])
+    );
+
+    private static BppLogFieldDefinition PublicLow(int order, string name) =>
+        new(
+            order,
+            name,
+            BppLogFieldPrivacy.Public,
+            BppLogCorrelationPolicy.None,
+            BppLogCardinality.Low
+        );
 }

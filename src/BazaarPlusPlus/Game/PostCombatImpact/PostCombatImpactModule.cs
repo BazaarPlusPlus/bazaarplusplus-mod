@@ -51,7 +51,8 @@ internal interface IPostCombatImpactModule
     void OnNativeAuxiliaryTooltipShowing(
         AuxiliaryTooltipController controller,
         Transform anchor,
-        string header
+        string header,
+        string body
     );
 
     void OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller);
@@ -148,8 +149,9 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
     public void OnNativeAuxiliaryTooltipShowing(
         AuxiliaryTooltipController controller,
         Transform anchor,
-        string header
-    ) => _runtime?.OnNativeAuxiliaryTooltipShowing(controller, anchor, header);
+        string header,
+        string body
+    ) => _runtime?.OnNativeAuxiliaryTooltipShowing(controller, anchor, header, body);
 
     public void OnNativeAuxiliaryTooltipHiding(AuxiliaryTooltipController controller) =>
         _runtime?.OnNativeAuxiliaryTooltipHiding(controller);

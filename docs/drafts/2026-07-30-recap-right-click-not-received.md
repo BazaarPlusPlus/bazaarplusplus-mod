@@ -472,3 +472,20 @@ Asset-level cross-check (`BoardVanessa_0.prefab`): `Button_Recap` and `Button_Re
 `Button_Continue` has no such component at all. Therefore the frame shown beneath Continue cannot
 be a legitimate empty Continue tooltip; it is the shared auxiliary controller left visible after
 one of the neighboring hover requests.
+
+#### Low-noise runtime evidence
+
+Because the artifact is intermittent, absence in a manual smoke is not acceptance. The runtime now
+emits `post_combat_impact.native_auxiliary.anomaly` only for two invariant violations:
+
+- `category=requested_text_inactive phase=show_handoff`: a native Show requested non-empty header
+  or body text while the corresponding pooled node was inactive. `recovered` records whether the
+  paired-host handoff reactivated every requested node.
+- `category=visible_without_text phase=frame_audit`: the native frame is actually renderable
+  (controller, CanvasGroup, auxParent gate, background Image and alpha all visible), neither native
+  text node is renderable, and no BPP paired content is active.
+
+The event records booleans only—no tooltip copy—and uses `(category, phase)` as its storm key. A
+per-visible-episode latch also prevents the frame audit from logging every Update. The pure anomaly
+rules are covered separately from Unity state capture so hidden frames, paired custom content and
+either renderable text node remain non-anomalous.

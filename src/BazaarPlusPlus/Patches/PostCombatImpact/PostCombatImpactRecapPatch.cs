@@ -130,12 +130,14 @@ internal static class PostCombatImpactAuxiliaryTooltipShowPatch
     private static void Prefix(
         AuxiliaryTooltipController __instance,
         Transform worldSpaceTransform,
-        string newHeader
+        string newHeader,
+        string newBodyText
     ) =>
         BppPatchHost.Features.PostCombatImpact.OnNativeAuxiliaryTooltipShowing(
             __instance,
             worldSpaceTransform,
-            newHeader
+            newHeader,
+            newBodyText
         );
 }
 

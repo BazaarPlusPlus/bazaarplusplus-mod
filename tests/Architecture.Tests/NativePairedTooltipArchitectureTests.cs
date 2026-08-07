@@ -240,6 +240,25 @@ public sealed class NativePairedTooltipArchitectureTests
         Assert.DoesNotContain("Controller.dividerParent.SetActive", restore);
     }
 
+    [Fact]
+    public void Native_auxiliary_anomaly_storms_are_partitioned_by_category_and_phase()
+    {
+        var events = File.ReadAllText(
+            Path.Combine(
+                MainSourceRoot(RepoRoot()),
+                "Game",
+                "PostCombatImpact",
+                "PostCombatImpactLogEvents.cs"
+            )
+        );
+
+        Assert.Contains(
+            "new BppLogStormPolicy([AnomalyCategory, AnomalyPhase])",
+            events,
+            StringComparison.Ordinal
+        );
+    }
+
     /// <summary>
     /// AddComponent on a controller whose Destroy is already pending hands back a dead reference
     /// while every other liveness check still passes that frame. Gate creation must fail soft and
