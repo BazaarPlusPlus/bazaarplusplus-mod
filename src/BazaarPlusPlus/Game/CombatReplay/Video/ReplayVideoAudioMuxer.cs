@@ -7,7 +7,7 @@ namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
 /// <summary>
 /// Second-pass muxer: combines the silent first-pass video with the captured audio WAV into the
-/// final MP4. macOS uses the native AVFoundation bridge; Windows and other platforms retain
+/// final MP4. macOS uses AVFoundation and Windows uses Media Foundation; other platforms retain
 /// <c>ffmpeg -c:v copy -c:a aac</c>. It runs entirely off the main thread. Any mux failure falls
 /// back to promoting the silent video so the first-pass product is never lost.
 /// </summary>
@@ -113,8 +113,14 @@ internal sealed class ReplayVideoAudioMuxer
                 return synchronous;
             }
 
-            if (backend == ReplayVideoBackend.MacNative)
-                return MuxNative(recordingId, tempVideoPath, existingWavPaths, finalPath);
+            if (backend is ReplayVideoBackend.MacNative or ReplayVideoBackend.WindowsNative)
+                return MuxNative(
+                    backend,
+                    recordingId,
+                    tempVideoPath,
+                    existingWavPaths,
+                    finalPath
+                );
 
             return Mux(recordingId, ffmpegExecutable!, tempVideoPath, existingWavPaths, finalPath);
         }
@@ -191,10 +197,11 @@ internal sealed class ReplayVideoAudioMuxer
     }
 
     /// <summary>
-    /// Runs the native AVFoundation mux pass on macOS. The native side copies H.264 samples and
-    /// encodes only the audio, preserving the same silent-video fallback contract as FFmpeg.
+    /// Runs the platform-native mux pass. H.264 samples are copied and only audio is encoded,
+    /// preserving the same silent-video fallback contract as the legacy process path.
     /// </summary>
     private MuxResult MuxNative(
+        ReplayVideoBackend backend,
         string recordingId,
         string silentVideoTempPath,
         IReadOnlyList<string> wavPaths,
@@ -204,14 +211,40 @@ internal sealed class ReplayVideoAudioMuxer
     {
         try
         {
-            var native = MacNativeReplayAudioMuxer.Mux(
-                silentVideoTempPath,
-                wavPaths,
-                finalPath,
-                audioBitrateKbps,
-                TimeSpan.FromMilliseconds(MuxTimeoutMs)
-            );
-            if (native.Succeeded && File.Exists(finalPath))
+            var timeout = TimeSpan.FromMilliseconds(MuxTimeoutMs);
+            var resultCode = 0;
+            var error = string.Empty;
+            var succeeded = false;
+            var timedOut = false;
+            if (backend == ReplayVideoBackend.WindowsNative)
+            {
+                var native = WindowsNativeReplayAudioMuxer.Mux(
+                    silentVideoTempPath,
+                    wavPaths,
+                    finalPath,
+                    audioBitrateKbps,
+                    timeout
+                );
+                resultCode = native.ResultCode;
+                error = native.Error;
+                succeeded = native.Succeeded;
+                timedOut = native.TimedOut;
+            }
+            else
+            {
+                var native = MacNativeReplayAudioMuxer.Mux(
+                    silentVideoTempPath,
+                    wavPaths,
+                    finalPath,
+                    audioBitrateKbps,
+                    timeout
+                );
+                resultCode = native.ResultCode;
+                error = native.Error;
+                succeeded = native.Succeeded;
+                timedOut = native.TimedOut;
+            }
+            if (succeeded && File.Exists(finalPath))
             {
                 var mixedSize = FfmpegRawVideoEncoder.TryGetFileSize(finalPath);
                 var silentSize = FfmpegRawVideoEncoder.TryGetFileSize(silentVideoTempPath);
@@ -222,8 +255,8 @@ internal sealed class ReplayVideoAudioMuxer
                         wavPaths,
                         finalPath,
                         MuxReasonCode.ZeroDurationOutput,
-                        exitCode: native.ResultCode,
-                        stderrTail: native.Error
+                        exitCode: resultCode,
+                        stderrTail: error
                     );
                 }
 
@@ -247,15 +280,15 @@ internal sealed class ReplayVideoAudioMuxer
                     finalPath,
                     mixedSize,
                     MuxReasonCode.Muxed,
-                    native.ResultCode,
-                    native.Error
+                    resultCode,
+                    error
                 );
             }
 
-            var reason = native.TimedOut
+            var reason = timedOut
                 ? MuxReasonCode.NativeMuxTimeout
                 : (
-                    native.ResultCode == -10
+                    resultCode == -10
                         ? MuxReasonCode.NativeMuxUnavailable
                         : MuxReasonCode.NativeMuxFailed
                 );
@@ -264,8 +297,8 @@ internal sealed class ReplayVideoAudioMuxer
                 wavPaths,
                 finalPath,
                 reason,
-                native.ResultCode,
-                native.Error
+                resultCode,
+                error
             );
         }
         catch (Exception ex)

@@ -11,6 +11,8 @@ internal static class ReplayVideoFrameRateResolver
         // repeats the latest GPU surface when Unity does not render a distinct frame in time.
         if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.MacNative)
             return ReplayVideoCaptureDefaults.MacNativeFps;
+        if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.WindowsNative)
+            return ReplayVideoCaptureDefaults.WindowsNativeFps;
 
         try
         {

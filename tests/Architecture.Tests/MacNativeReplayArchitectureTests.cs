@@ -7,7 +7,7 @@ namespace Architecture.Tests;
 public sealed class MacNativeReplayArchitectureTests
 {
     [Fact]
-    public void Mac_payload_has_no_ffmpeg_while_windows_payload_keeps_it()
+    public void Desktop_payloads_have_no_ffmpeg_and_ship_native_render_plugins()
     {
         var projectPath = Path.Combine(
             RepoRoot(),
@@ -20,8 +20,18 @@ public sealed class MacNativeReplayArchitectureTests
 
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "MacFfmpegZip");
         Assert.DoesNotContain(elements, element => element.Name.LocalName == "MacFfmpegLicense");
-        Assert.Contains(elements, element => element.Name.LocalName == "WindowsFfmpegZip");
-        Assert.Contains(elements, element => element.Name.LocalName == "WindowsFfmpegLicense");
+        Assert.DoesNotContain(elements, element => element.Name.LocalName == "WindowsFfmpegZip");
+        Assert.DoesNotContain(elements, element => element.Name.LocalName == "WindowsFfmpegLicense");
+        Assert.Contains(elements, element => element.Name.LocalName == "WindowsReplayPlugin");
+        Assert.Contains(
+            elements,
+            element =>
+                element.Name.LocalName == "Copy"
+                && (element.Attribute("DestinationFiles")?.Value ?? string.Empty).Contains(
+                    "TheBazaar_Data\\Plugins\\x86_64\\GfxPluginBppReplayMediaFoundation.dll",
+                    StringComparison.Ordinal
+                )
+        );
 
         var unzips = elements.Where(element => element.Name.LocalName == "Unzip").ToList();
         Assert.DoesNotContain(
@@ -32,7 +42,7 @@ public sealed class MacNativeReplayArchitectureTests
                     StringComparison.Ordinal
                 )
         );
-        Assert.Contains(
+        Assert.DoesNotContain(
             unzips,
             element =>
                 (element.Attribute("DestinationFolder")?.Value ?? string.Empty).Contains(
@@ -53,6 +63,20 @@ public sealed class MacNativeReplayArchitectureTests
             "$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/ffmpeg-LICENSE.txt",
             staleFiles
         );
+
+        var staleWindowsFiles = elements
+            .Where(element => element.Name.LocalName == "StaleWindowsFfmpegFile")
+            .Select(element => element.Attribute("Include")?.Value ?? string.Empty)
+            .ToList();
+        Assert.Contains(
+            staleWindowsFiles,
+            path => path.EndsWith("BepInEx/plugins/ffmpeg.exe", StringComparison.Ordinal)
+                || path.EndsWith("BepInEx\\plugins\\ffmpeg.exe", StringComparison.Ordinal)
+        );
+        Assert.Contains(
+            staleWindowsFiles,
+            path => path.EndsWith("ffmpeg-LICENSE.txt", StringComparison.Ordinal)
+        );
     }
 
     [Fact]
@@ -70,6 +94,25 @@ public sealed class MacNativeReplayArchitectureTests
         Assert.Contains("codesign --force --sign -", build, StringComparison.Ordinal);
         Assert.DoesNotContain("Developer ID", build, StringComparison.Ordinal);
         Assert.DoesNotContain("notary", build, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Windows_native_source_requires_d3d11_hardware_mft_and_tracked_surfaces()
+    {
+        var nativeRoot = Path.Combine(RepoRoot(), "native", "windows");
+        var header = File.ReadAllText(Path.Combine(nativeRoot, "BppReplayMediaFoundation.h"));
+        var source = File.ReadAllText(Path.Combine(nativeRoot, "BppReplayMediaFoundation.cpp"));
+        var build = File.ReadAllText(Path.Combine(nativeRoot, "build.ps1"));
+
+        Assert.Contains("BppMfPrepareRenderEvent", header, StringComparison.Ordinal);
+        Assert.Contains("BppMfMuxAudio", header, StringComparison.Ordinal);
+        Assert.Contains("MFCreateDXGISurfaceBuffer", source, StringComparison.Ordinal);
+        Assert.Contains("IMFTrackedSample", source, StringComparison.Ordinal);
+        Assert.Contains("MFT_ENUM_FLAG_HARDWARE", source, StringComparison.Ordinal);
+        Assert.Contains("MFT_ENUM_HARDWARE_URL_Attribute", source, StringComparison.Ordinal);
+        Assert.Contains("MF_READWRITE_D3D_OPTIONAL, FALSE", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ffmpeg", source, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("/W4 /WX", build, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -131,16 +174,33 @@ public sealed class MacNativeReplayArchitectureTests
             "MacMetalVideoEncoder.TryGetAvailability",
             StringComparison.Ordinal
         );
+        var windowsNativeProbe = source.IndexOf(
+            "WindowsMediaFoundationVideoEncoder.TryGetAvailability",
+            StringComparison.Ordinal
+        );
         var backgroundTask = source.IndexOf(taskMarker, StringComparison.Ordinal);
 
         Assert.True(nativeProbe >= 0, $"Missing native availability probe in {sourcePath}.");
+        Assert.True(
+            windowsNativeProbe >= 0,
+            $"Missing Windows native availability probe in {sourcePath}."
+        );
         Assert.True(backgroundTask >= 0, $"Missing background task boundary in {sourcePath}.");
         Assert.True(
             nativeProbe < backgroundTask,
             $"Native plugin availability must be probed before Task.Run in {sourcePath}."
         );
+        Assert.True(
+            windowsNativeProbe < backgroundTask,
+            $"Windows native plugin availability must be probed before Task.Run in {sourcePath}."
+        );
         Assert.DoesNotContain(
             "MacMetalVideoEncoder.TryGetAvailability",
+            source[backgroundTask..],
+            StringComparison.Ordinal
+        );
+        Assert.DoesNotContain(
+            "WindowsMediaFoundationVideoEncoder.TryGetAvailability",
             source[backgroundTask..],
             StringComparison.Ordinal
         );

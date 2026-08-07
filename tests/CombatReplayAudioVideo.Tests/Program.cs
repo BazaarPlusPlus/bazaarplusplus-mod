@@ -13,7 +13,7 @@ using BepInEx.Logging;
 
 WavHeaderTests.Run();
 CfrPacerTests.Run();
-MacMetalFrameSubmissionPlanTests.Run();
+NativeFrameSubmissionPlanTests.Run();
 FramePoolTests.Run();
 VideoEncoderProfileTests.Run();
 VideoBackendPolicyTests.Run();
@@ -345,13 +345,13 @@ file static class CfrPacerTests
 }
 
 // ---------------------------------------------------------------------------
-// 3) MacMetalFrameSubmissionPlan: never repay missed wall-clock slots with one
+// 3) NativeFrameSubmissionPlan: never repay missed wall-clock slots with one
 //    newer Metal texture.
 // ---------------------------------------------------------------------------
-file static class MacMetalFrameSubmissionPlanTests
+file static class NativeFrameSubmissionPlanTests
 {
     private static readonly Type PlanType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.MacMetalFrameSubmissionPlan"
+        "BazaarPlusPlus.Game.CombatReplay.Video.NativeFrameSubmissionPlan"
     );
 
     public static void Run()
@@ -405,10 +405,10 @@ file static class MacMetalFrameSubmissionPlanTests
                 "Create",
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
             )
-            ?? throw new InvalidOperationException("MacMetalFrameSubmissionPlan.Create not found.");
+            ?? throw new InvalidOperationException("NativeFrameSubmissionPlan.Create not found.");
         return method.Invoke(null, new object[] { emit, repeat, dropped })
             ?? throw new InvalidOperationException(
-                "MacMetalFrameSubmissionPlan.Create returned null."
+                "NativeFrameSubmissionPlan.Create returned null."
             );
     }
 
@@ -517,6 +517,7 @@ file static class VideoEncoderProfileTests
     {
         NonMacFrameRateKeepsThirtyFpsCap();
         MacNativeFrameRateIsSixtyFps();
+        WindowsNativeFrameRateIsSixtyFps();
         CandidateOrderAndCache();
         RateControlAndArguments();
     }
@@ -556,6 +557,26 @@ file static class VideoEncoderProfileTests
         TestReflection.Assert(
             nativeFps == 60,
             "macOS native recording must remain fixed at 60 fps."
+        );
+    }
+
+    private static void WindowsNativeFrameRateIsSixtyFps()
+    {
+        var defaults = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureDefaults"
+        );
+        var nativeFps = (int)(
+            defaults
+                .GetField(
+                    "WindowsNativeFps",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+                )
+                ?.GetRawConstantValue()
+            ?? throw new InvalidOperationException("WindowsNativeFps constant not found.")
+        );
+        TestReflection.Assert(
+            nativeFps == 60,
+            "Windows native recording must remain fixed at 60 fps."
         );
     }
 
@@ -715,8 +736,8 @@ file static class VideoEncoderProfileTests
 }
 
 // ---------------------------------------------------------------------------
-// 4b) Platform backend contract: macOS must never require FFmpeg while Windows
-//     and unknown platforms retain the existing FFmpeg path.
+// 4b) Platform backend contract: macOS and Windows are native while unknown
+//     platforms retain the existing FFmpeg path.
 // ---------------------------------------------------------------------------
 file static class VideoBackendPolicyTests
 {
@@ -753,17 +774,22 @@ file static class VideoBackendPolicyTests
             "macOS must use the native replay backend without FFmpeg."
         );
 
-        foreach (var platform in new[] { "Windows", "Other" })
-        {
-            var backend = Backend(platform);
-            TestReflection.Assert(
-                backend.Equals(Enum.Parse(backendType, "Ffmpeg")) && Requires(backend),
-                $"{platform} must retain the FFmpeg replay backend."
-            );
-        }
+        var windows = Backend("Windows");
+        TestReflection.Assert(
+            windows.Equals(Enum.Parse(backendType, "WindowsNative")) && !Requires(windows),
+            "Windows must use the native Media Foundation backend without FFmpeg."
+        );
+        var other = Backend("Other");
+        TestReflection.Assert(
+            other.Equals(Enum.Parse(backendType, "Ffmpeg")) && Requires(other),
+            "Unknown platforms retain the FFmpeg replay backend."
+        );
 
         TestReflection.RequireType(
             "BazaarPlusPlus.Game.CombatReplay.Video.MacNativeReplayAudioMuxer"
+        );
+        TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.WindowsNativeReplayAudioMuxer"
         );
     }
 }
@@ -2276,7 +2302,7 @@ file static class MediaEventCatalogTests
         ["combat_replay.video_capture.stats_observed"] =
             "recording_id:Public:High:Short|stage:Public:Low:None|width:Public:High:None|height:Public:High:None|fps:Public:Low:None|captured_frames:Public:High:None|repeated_frames:Public:High:None|dropped_frames:Public:High:None|duration_ms:Public:High:None|size_bytes:Public:High:None|output_path:LocalPath:High:None|codec:Public:Low:None|rate_control:Public:Low:None|frame_bytes:Public:High:None|pool_capacity:Public:Low:None|queue_capacity:Public:Low:None|pool_payload_bytes:Public:High:None|pool_budget_exceeded:Public:Low:None|readback_backpressure_skips:Public:High:None|max_outstanding_readbacks:Public:Low:None|readback_copy_p95_us:Public:High:None|cfr_copy_p95_us:Public:High:None|staging_buffer_bytes:Public:High:None|max_readback_payload_bytes:Public:High:None|render_texture_estimated_bytes:Public:High:None",
         ["combat_replay.video_capture.native_pipeline_observed"] =
-            "recording_id:Public:High:Short|stage:Public:Low:None|backpressure_dropped_frames:Public:High:None|dropped_frames:Public:High:None|lease_misses:Public:High:None|enqueue_rejects:Public:High:None|pacer_resync_dropped_frames:Public:High:None|max_in_flight:Public:Low:None|native_frames_written:Public:High:None|render_frame_p50_us:Public:High:None|render_frame_p95_us:Public:High:None|render_frame_p99_us:Public:High:None|texture_copy_p50_us:Public:High:None|texture_copy_p95_us:Public:High:None|texture_copy_p99_us:Public:High:None|battle_id:Public:High:Short",
+            "recording_id:Public:High:Short|stage:Public:Low:None|backpressure_dropped_frames:Public:High:None|dropped_frames:Public:High:None|lease_misses:Public:High:None|enqueue_rejects:Public:High:None|pacer_resync_dropped_frames:Public:High:None|max_in_flight:Public:Low:None|native_frames_written:Public:High:None|render_frame_p50_us:Public:High:None|render_frame_p95_us:Public:High:None|render_frame_p99_us:Public:High:None|texture_copy_p50_us:Public:High:None|texture_copy_p95_us:Public:High:None|texture_copy_p99_us:Public:High:None|battle_id:Public:High:Short|encoder_name:Public:Low:None",
         ["combat_replay.video_capture.frame_degraded"] =
             "recording_id:Public:High:Short|stage:Public:Low:None|reason_code:Public:Low:None|sequence:Public:High:None",
         ["combat_replay.video_recording.cleanup_failed"] =

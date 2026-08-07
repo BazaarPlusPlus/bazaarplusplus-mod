@@ -5,6 +5,10 @@ dist/
 !src/BazaarPlusPlus.BazaarAgent/Dashboard/dist/**
 bin/
 obj/
+native/windows/build/
+*.obj
+*.lib
+*.exp
 exports/
 
 # Dependencies
