@@ -32,7 +32,7 @@ internal static class Sizes
     public const int CollectionTagFontSize = 14;
     // 16px is a restrained nested-card heading: clearly above 14px chips without competing with
     // the page title.
-    public const int CollectionFilterTitleFontSize = 16;
+    public const int CollectionFilterTitleFontSize = 15;
     public const float CollectionSearchRowHeight = 36f;
     public const int SourceChipsPerRow = 8;
     public const float SourceChipIconRatio = 48f / 56f;

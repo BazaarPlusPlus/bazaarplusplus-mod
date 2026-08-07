@@ -130,7 +130,7 @@ internal sealed partial class CollectionPanelView
         // chip row, without introducing a nested card or a second heading.
         _tierFilterSection = CreateFilterSection(
             _heroFilterSection,
-            CollectionPanelText.TierSizeHeader(),
+            string.Empty,
             UiSpacing.Lg,
             out var tierSizeChipRow,
             out _tierFilterLabel,
@@ -557,6 +557,8 @@ internal sealed partial class CollectionPanelView
         headerRow.style.alignItems = Align.Center;
         headerRow.style.alignSelf = Align.Stretch;
         headerRow.style.marginBottom = UiSpacing.Sm;
+        if (string.IsNullOrEmpty(title))
+            headerRow.style.display = DisplayStyle.None;
         section.Add(headerRow);
 
         label = CreateLabel(
@@ -568,6 +570,7 @@ internal sealed partial class CollectionPanelView
         label.style.flexGrow = 1f;
         label.style.flexShrink = 1f;
         label.style.minWidth = 0f;
+        label.style.marginLeft = UiSpacing.Xs;
         label.style.whiteSpace = WhiteSpace.NoWrap;
         label.style.overflow = Overflow.Hidden;
         headerRow.Add(label);
@@ -781,6 +784,18 @@ internal sealed partial class CollectionPanelView
             Sizes.CollectionSearchRowHeight
         );
         button.tooltip = CollectionPanelText.DayHeader();
+        var defaultText = button.Q<TextElement>();
+        if (defaultText != null)
+            defaultText.style.display = DisplayStyle.None;
+        var label = new Label();
+        _dayToggleLabel = label;
+        label.style.flexGrow = 1f;
+        label.style.whiteSpace = WhiteSpace.Normal;
+        label.style.unityTextAlign = TextAnchor.MiddleCenter;
+        label.style.fontSize = Sizes.FontCorner;
+        label.style.color = Colors.CollectionChipText;
+        label.pickingMode = PickingMode.Ignore;
+        button.Add(label);
         StyleCollectionChip(button, Colors.CollectionChipBackground, Colors.CollectionChipText);
         return button;
     }

@@ -108,11 +108,7 @@ internal sealed partial class CollectionPanelView
             if (index > 0)
                 _sizeChipRow.Add(CreateChipGroupDivider());
 
-            var chip = CreateChipButton(
-                CollectionPanelText.Size(size),
-                () => _commands.ToggleSize(size),
-                contentWidth: true
-            );
+            var chip = CreateSizeChipButton(size, () => _commands.ToggleSize(size));
             StyleCollectionGroupChip(
                 chip,
                 Colors.CollectionChipBackground,
@@ -122,6 +118,47 @@ internal sealed partial class CollectionPanelView
             _sizeChipRow.Add(chip);
             index++;
         }
+    }
+
+    private Button CreateSizeChipButton(ECardSize size, Action onClick)
+    {
+        var chip = CreateChipButton(
+            CollectionPanelText.Size(size),
+            onClick,
+            contentWidth: true
+        );
+        var icon = new VisualElement { pickingMode = PickingMode.Ignore };
+        UiStyle.FixedSize(icon.style, 16f, 16f);
+        icon.style.marginRight = UiSpacing.Xs;
+        icon.generateVisualContent += context => DrawSizeIcon(context, icon, size);
+        chip.Insert(0, icon);
+        return chip;
+    }
+
+    private static void DrawSizeIcon(
+        MeshGenerationContext context,
+        VisualElement icon,
+        ECardSize size
+    )
+    {
+        var rect = icon.contentRect;
+        var (width, height) = size switch
+        {
+            ECardSize.Small => (7f, 14f),
+            ECardSize.Large => (14f, 9f),
+            _ => (14f, 14f),
+        };
+        var x = rect.center.x - width / 2f;
+        var y = rect.center.y - height / 2f;
+        var painter = context.painter2D;
+        painter.fillColor = Colors.CollectionChipText;
+        painter.BeginPath();
+        painter.MoveTo(new Vector2(x, y));
+        painter.LineTo(new Vector2(x + width, y));
+        painter.LineTo(new Vector2(x + width, y + height));
+        painter.LineTo(new Vector2(x, y + height));
+        painter.ClosePath();
+        painter.Fill();
     }
 
     private bool SizeChipsMatch(IReadOnlyList<ECardSize> sizes)
@@ -1310,8 +1347,11 @@ internal sealed partial class CollectionPanelView
         if (_dayToggleButton == null)
             return;
 
-        _dayToggleButton.text =
-            day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—";
+        if (_dayToggleLabel != null)
+        {
+            _dayToggleLabel.text =
+                $"DAY\n{day?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "—"}";
+        }
         StyleCollectionChip(
             _dayToggleButton,
             active ? Colors.CollectionChipSelectedBackground : Colors.CollectionChipBackground,
