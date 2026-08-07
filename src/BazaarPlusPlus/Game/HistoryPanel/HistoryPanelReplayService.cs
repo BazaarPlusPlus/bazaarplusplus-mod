@@ -33,9 +33,9 @@ internal sealed class HistoryPanelReplayService
         _ghostSyncService = ghostSyncService;
     }
 
-    // Capture Unity-owned dimensions/FPS on the UI thread, then warm the platform backend in the
-    // background. macOS loads the native plugin; other platforms resolve FFmpeg and probe the
-    // actual-settings encoder profile. Per-refresh gates only read warm state.
+    // Capture Unity-owned dimensions/FPS on the UI thread. macOS must also load its native plugin
+    // on that thread; other platforms resolve FFmpeg and probe the actual-settings encoder profile
+    // in the background. Per-refresh gates only read warm state.
     public void PrewarmRecordingAvailability()
     {
         var pluginsDirectoryPath = _pluginsDirectoryPath;
@@ -43,14 +43,14 @@ internal sealed class HistoryPanelReplayService
         var hasSettings = ReplayVideoCaptureSettingsCache.TryCaptureCurrent(
             out var captureSettings
         );
+        if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.MacNative)
+        {
+            MacMetalVideoEncoder.TryGetAvailability(out _);
+            return;
+        }
+
         _ = Task.Run(() =>
         {
-            if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.MacNative)
-            {
-                MacMetalVideoEncoder.TryGetAvailability(out _);
-                return;
-            }
-
             var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
             if (
                 hasSettings

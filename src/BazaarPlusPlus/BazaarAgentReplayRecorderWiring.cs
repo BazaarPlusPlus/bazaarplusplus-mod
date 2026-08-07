@@ -123,9 +123,9 @@ internal static class BazaarAgentReplayRecorderWiring
         if (!runtime.CanReplaySavedCombats(out reason))
             return false;
 
-        // Backend probing may load the native macOS plugin or run FFmpeg (~2s) on other
-        // platforms. Never pay that on the Unity main thread: until the off-thread prewarm has
-        // finished, answer with a retryable rejection instead of freezing the game.
+        // macOS's native plugin is loaded synchronously on this Unity main-thread facade. Other
+        // platforms may still be resolving FFmpeg (~2s) in the background; until that finishes,
+        // answer with a retryable rejection instead of freezing the game.
         if (!_recordingPrewarmCompleted)
         {
             reason = "Recording availability probe is still warming up; retry shortly.";
@@ -190,13 +190,20 @@ internal static class BazaarAgentReplayRecorderWiring
         return new BppReplayPhaseSnapshot(BppReplayPhase.None, null);
     }
 
-    // Probe the platform backend off-thread the first time the host touches the facade. macOS
-    // loads the native Metal/VideoToolbox plugin; other platforms resolve FFmpeg and probe the
-    // actual-dimensions encoder profile.
+    // Probe the platform backend the first time the host touches the facade. This facade is called
+    // on Unity's main thread, which is mandatory for the first macOS native-plugin load. Other
+    // platforms resolve FFmpeg and probe the actual-dimensions encoder profile off-thread.
     private static void PrewarmRecordingOnce(IBppServices services)
     {
         if (Interlocked.Exchange(ref _recordingPrewarmKicked, 1) != 0)
             return;
+
+        if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.MacNative)
+        {
+            MacMetalVideoEncoder.TryGetAvailability(out _);
+            _recordingPrewarmCompleted = true;
+            return;
+        }
 
         var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
         var videoDirectoryPath = PathConstants.CombatReplayVideos(services.Paths.RequireDataRoot());
@@ -205,12 +212,6 @@ internal static class BazaarAgentReplayRecorderWiring
         {
             try
             {
-                if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.MacNative)
-                {
-                    MacMetalVideoEncoder.TryGetAvailability(out _);
-                    return;
-                }
-
                 var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
                 if (
                     hasSettings

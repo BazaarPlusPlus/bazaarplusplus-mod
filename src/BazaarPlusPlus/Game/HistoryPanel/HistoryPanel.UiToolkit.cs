@@ -36,8 +36,8 @@ internal sealed partial class HistoryPanel
             );
             _uiView.PreviewContainerBoundsChanged += OnPreviewContainerBoundsChanged;
 
-            // First panel open: warm the FFmpeg locator cache off the UI thread so the record
-            // button's per-refresh availability gate never incurs the ~2s liveness probe.
+            // First panel open: load the macOS native plugin on the UI thread, or warm the
+            // FFmpeg locator cache off-thread on other platforms, before per-refresh gating.
             _coordinator?.PrewarmRecordingAvailability();
         }
         _uiView.EnsureCreated();

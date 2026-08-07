@@ -132,6 +132,33 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             );
         }
 
+        // Unity only permits the first native-plugin load on its main thread. This method is
+        // called from the replay UI/runtime main-thread path, so macOS must probe synchronously;
+        // only the slower FFmpeg discovery used by other platforms belongs in Task.Run.
+        if (backend == ReplayVideoBackend.MacNative)
+        {
+            if (!MacMetalVideoEncoder.TryGetAvailability(out var nativeReason))
+            {
+                return SetAvailability(
+                    CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                    nativeReason ?? "The native video recorder is unavailable."
+                );
+            }
+
+            lock (_availabilitySync)
+            {
+                _availabilitySettings = settings;
+                _availabilityVideoDirectory = videoDirectory;
+                _availabilityFfmpegExecutable = null;
+                _availabilityTask = null;
+                _currentReplayAvailability = new CurrentReplayRecorderAvailability(
+                    CurrentReplayRecorderAvailabilityPhase.Ready,
+                    null
+                );
+                return _currentReplayAvailability;
+            }
+        }
+
         lock (_availabilitySync)
         {
             if (
@@ -163,40 +190,24 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             {
                 try
                 {
-                    string? ffmpeg = null;
-                    if (backend == ReplayVideoBackend.MacNative)
+                    var ffmpeg = FfmpegLocator.Resolve(pluginsDirectory);
+                    if (string.IsNullOrWhiteSpace(ffmpeg))
                     {
-                        if (!MacMetalVideoEncoder.TryGetAvailability(out var nativeReason))
-                        {
-                            SetAvailabilityIfCurrent(
-                                generation,
-                                CurrentReplayRecorderAvailabilityPhase.Unavailable,
-                                nativeReason ?? "The native video recorder is unavailable."
-                            );
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        ffmpeg = FfmpegLocator.Resolve(pluginsDirectory);
-                        if (string.IsNullOrWhiteSpace(ffmpeg))
-                        {
-                            SetAvailabilityIfCurrent(
-                                generation,
-                                CurrentReplayRecorderAvailabilityPhase.Unavailable,
-                                "FFmpeg is unavailable."
-                            );
-                            return;
-                        }
-
-                        FfmpegVideoEncoderSelector.Prewarm(
-                            ffmpeg,
-                            videoDirectory,
-                            settings.Width,
-                            settings.Height,
-                            settings.Fps
+                        SetAvailabilityIfCurrent(
+                            generation,
+                            CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                            "FFmpeg is unavailable."
                         );
+                        return;
                     }
+
+                    FfmpegVideoEncoderSelector.Prewarm(
+                        ffmpeg,
+                        videoDirectory,
+                        settings.Width,
+                        settings.Height,
+                        settings.Fps
+                    );
                     lock (_availabilitySync)
                     {
                         if (
