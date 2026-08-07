@@ -102,6 +102,12 @@ internal sealed partial class CollectionPanelView
         if (SizeChipsMatch(sizes))
             return;
         ClearChipRow(_sizeChips, _sizeChipRow, keepFirst: false);
+        var segmentWidth =
+            sizes.Count * Sizes.CollectionSizeChipWidth
+            + Mathf.Max(0, sizes.Count - 1) * Borders.Thin
+            + Borders.Thin * 2f;
+        UiStyle.FixedWidth(_sizeChipRow.style, segmentWidth);
+        _sizeChipRow.style.flexBasis = segmentWidth;
         var index = 0;
         foreach (var size in sizes)
         {
@@ -135,7 +141,7 @@ internal sealed partial class CollectionPanelView
         chip.style.paddingRight = UiSpacing.Md;
         // The native Button text element used to provide intrinsic width. Once it is hidden in
         // favor of the custom icon/label pair, reserve the chip width explicitly.
-        UiStyle.FixedWidth(chip.style, 72f);
+        UiStyle.FixedWidth(chip.style, Sizes.CollectionSizeChipWidth);
         chip.style.flexDirection = FlexDirection.Row;
         chip.style.alignItems = Align.Center;
         chip.style.justifyContent = Justify.Center;
@@ -627,7 +633,7 @@ internal sealed partial class CollectionPanelView
         chip.style.justifyContent = Justify.Center;
         chip.style.alignItems = Align.Center;
         chip.style.marginBottom = UiSpacing.Xs;
-        StyleHeroChip(chip);
+        StyleHeroChip(chip, hero);
 
         var icon = CreateHeroChipIcon(hero);
         chip.Add(icon);
@@ -1396,18 +1402,21 @@ internal sealed partial class CollectionPanelView
 
     private void RefreshHeroChip(EHero hero, Button chip, bool selected)
     {
-        StyleHeroChip(chip, selected);
+        StyleHeroChip(chip, hero, selected);
         RefreshHeroChipInteraction(chip, selected);
     }
 
-    private static void StyleHeroChip(Button chip, bool selected = false)
+    private static void StyleHeroChip(Button chip, EHero hero, bool selected = false)
     {
+        var border = selected
+            ? HeroVisual.Resolve(hero.ToString()).Background
+            : Colors.CollectionChipBorder;
         UiHover.ApplyButtonPalette(
             chip,
             Colors.CollectionChipBackground,
             Colors.CollectionChipText,
-            selected ? Color.white : Colors.CollectionChipBorder,
-            selected ? Color.white : Colors.CollectionChipBorder,
+            border,
+            border,
             Colors.CollectionChipBackground,
             Colors.CollectionChipBackground
         );
