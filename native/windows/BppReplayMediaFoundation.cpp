@@ -115,6 +115,7 @@ struct Encoder
     ComPtr<ID3D11VideoProcessorEnumerator> videoEnumerator;
     ComPtr<ID3D11VideoProcessor> videoProcessor;
     ComPtr<ID3D11Texture2D> sourceTexture;
+    ComPtr<ID3D11Texture2D> processorSourceTexture;
     ComPtr<ID3D11VideoProcessorInputView> sourceView;
     std::vector<FrameSlot> slots;
 
@@ -414,10 +415,18 @@ bool InitializeVideoProcessor(Encoder *encoder, int width, int height)
         SetFailure(encoder, "The persistent Unity capture texture must not be multisampled.");
         return false;
     }
+    DXGI_FORMAT processorSourceFormat = sourceDescription.Format;
     switch (sourceDescription.Format)
     {
+    case DXGI_FORMAT_B8G8R8A8_TYPELESS:
+        processorSourceFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+        break;
     case DXGI_FORMAT_B8G8R8A8_UNORM:
     case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB:
+        break;
+    case DXGI_FORMAT_R8G8B8A8_TYPELESS:
+        processorSourceFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+        break;
     case DXGI_FORMAT_R8G8B8A8_UNORM:
     case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB:
         break;
@@ -432,6 +441,30 @@ bool InitializeVideoProcessor(Encoder *encoder, int width, int height)
         SetFailure(encoder, message);
         return false;
     }
+    }
+
+    if (processorSourceFormat != sourceDescription.Format)
+    {
+        D3D11_TEXTURE2D_DESC processorSourceDescription = sourceDescription;
+        processorSourceDescription.MipLevels = 1;
+        processorSourceDescription.ArraySize = 1;
+        processorSourceDescription.Format = processorSourceFormat;
+        processorSourceDescription.Usage = D3D11_USAGE_DEFAULT;
+        processorSourceDescription.CPUAccessFlags = 0;
+        processorSourceDescription.MiscFlags = 0;
+        HRESULT result = encoder->device->CreateTexture2D(
+            &processorSourceDescription,
+            nullptr,
+            &encoder->processorSourceTexture);
+        if (FAILED(result))
+        {
+            SetFailure(encoder, HResultMessage("CreateTexture2D(typed RGB capture alias)", result));
+            return false;
+        }
+    }
+    else
+    {
+        encoder->processorSourceTexture = encoder->sourceTexture;
     }
 
     HRESULT result = encoder->device.As(&encoder->videoDevice);
@@ -479,7 +512,7 @@ bool InitializeVideoProcessor(Encoder *encoder, int width, int height)
     inputDescription.Texture2D.MipSlice = 0;
     inputDescription.Texture2D.ArraySlice = 0;
     result = encoder->videoDevice->CreateVideoProcessorInputView(
-        encoder->sourceTexture.Get(),
+        encoder->processorSourceTexture.Get(),
         encoder->videoEnumerator.Get(),
         &inputDescription,
         &encoder->sourceView);
@@ -669,7 +702,7 @@ void ReleasePendingSlot(Encoder *encoder, int slotIndex)
 bool SubmitSlot(Encoder *encoder, int slotIndex, int frameCount)
 {
     auto *callback = new SlotReleaseCallback(encoder, slotIndex, frameCount);
-    const LONGLONG duration = kTicksPerSecond / std::max(1, encoder->fps);
+    const LONGLONG fps = std::max(1, encoder->fps);
 
     {
         std::lock_guard<std::mutex> guard(encoder->mutex);
@@ -713,9 +746,11 @@ bool SubmitSlot(Encoder *encoder, int slotIndex, int frameCount)
                 std::lock_guard<std::mutex> guard(encoder->mutex);
                 frameIndex = encoder->nextFrameIndex;
             }
-            result = sample->SetSampleTime(frameIndex * duration);
+            const LONGLONG sampleStart = frameIndex * kTicksPerSecond / fps;
+            const LONGLONG sampleEnd = (frameIndex + 1) * kTicksPerSecond / fps;
+            result = sample->SetSampleTime(sampleStart);
             if (SUCCEEDED(result))
-                result = sample->SetSampleDuration(duration);
+                result = sample->SetSampleDuration(sampleEnd - sampleStart);
         }
         if (SUCCEEDED(result))
             result = encoder->sinkWriter->WriteSample(encoder->streamIndex, sample.Get());
@@ -771,6 +806,18 @@ void UNITY_INTERFACE_API RenderEventCallback(int eventId, void *data)
     D3D11_VIDEO_PROCESSOR_STREAM stream{};
     stream.Enable = TRUE;
     stream.pInputSurface = encoder->sourceView.Get();
+    if (encoder->processorSourceTexture.Get() != encoder->sourceTexture.Get())
+    {
+        encoder->context->CopySubresourceRegion(
+            encoder->processorSourceTexture.Get(),
+            0,
+            0,
+            0,
+            0,
+            encoder->sourceTexture.Get(),
+            0,
+            nullptr);
+    }
     const HRESULT result = encoder->videoContext->VideoProcessorBlt(
         encoder->videoProcessor.Get(),
         encoder->slots[static_cast<size_t>(slotIndex)].outputView.Get(),
@@ -1146,7 +1193,14 @@ bool ConfigureMuxWriter(
     DWORD &audioStream,
     std::string &error)
 {
-    HRESULT result = MFCreateSinkWriterFromURL(path.c_str(), nullptr, nullptr, &writer);
+    ComPtr<IMFAttributes> attributes;
+    HRESULT result = MFCreateAttributes(&attributes, 2);
+    if (SUCCEEDED(result))
+        result = attributes->SetUINT32(MF_SINK_WRITER_DISABLE_THROTTLING, TRUE);
+    if (SUCCEEDED(result))
+        result = attributes->SetUINT32(MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS, TRUE);
+    if (SUCCEEDED(result))
+        result = MFCreateSinkWriterFromURL(path.c_str(), nullptr, attributes.Get(), &writer);
     if (SUCCEEDED(result))
         result = writer->AddStream(videoType, &videoStream);
     if (SUCCEEDED(result))
