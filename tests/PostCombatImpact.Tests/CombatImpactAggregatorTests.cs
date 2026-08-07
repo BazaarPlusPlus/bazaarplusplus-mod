@@ -151,7 +151,7 @@ public sealed class CombatImpactAggregatorTests
     }
 
     [Fact]
-    public void Applied_regen_total_reports_unavailable_breakdown_when_only_card_regen_gain_exists()
+    public void Applied_regen_total_hides_internal_breakdown_state_when_only_card_regen_gain_exists()
     {
         var report = Aggregate(
             [
@@ -185,14 +185,8 @@ public sealed class CombatImpactAggregatorTests
         Assert.Equal(0, applied.Count);
         Assert.Null(applied.ObservedValue);
         Assert.Equal(338, applied.AuthoritativeMetric?.Value);
-        Assert.Equal(
-            "338 total · breakdown unavailable",
-            CombatImpactMetricFormatter.Group(applied, chinese: false)
-        );
-        Assert.Equal(
-            "总计 338 · 明细不可用",
-            CombatImpactMetricFormatter.Group(applied, chinese: true)
-        );
+        Assert.Equal("338 total", CombatImpactMetricFormatter.Group(applied, chinese: false));
+        Assert.Equal("总计 338", CombatImpactMetricFormatter.Group(applied, chinese: true));
 
         var cardGain = Assert.Single(
             groups,

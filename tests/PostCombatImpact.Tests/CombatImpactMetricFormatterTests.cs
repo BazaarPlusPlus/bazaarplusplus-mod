@@ -110,6 +110,14 @@ public sealed class CombatImpactMetricFormatterTests
             "触发来源：已归因 3/5 · Trigger ×3 · 来源回退 ×1 · 无触发记录 ×1",
             CombatImpactMetricFormatter.TriggerSources(group, chinese: true)
         );
+
+        var unavailable = group with
+        {
+            TriggerSources = [],
+            TriggerPresentationState = CombatImpactTriggerPresentationState.BreakdownUnavailable,
+        };
+        Assert.Empty(CombatImpactMetricFormatter.TriggerSources(unavailable, chinese: false));
+        Assert.Empty(CombatImpactMetricFormatter.TriggerSources(unavailable, chinese: true));
     }
 
     [Fact]
@@ -510,11 +518,11 @@ public sealed class CombatImpactMetricFormatterTests
             CombatImpactMetricFormatter.Group(affectedCards, chinese: true)
         );
         Assert.Equal(
-            "76 total · breakdown unavailable",
+            "76 total",
             CombatImpactMetricFormatter.Group(authoritativeOnly, chinese: false)
         );
         Assert.Equal(
-            "总计 76 · 明细不可用",
+            "总计 76",
             CombatImpactMetricFormatter.Group(authoritativeOnly, chinese: true)
         );
     }

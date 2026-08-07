@@ -47,7 +47,7 @@ internal static class CombatImpactMetricFormatter
             group.TriggerPresentationState
             == CombatImpactTriggerPresentationState.BreakdownUnavailable
         )
-            return chinese ? "明细不可用" : "breakdown unavailable";
+            return string.Empty;
 
         var attributed = group.TriggerSources.Sum(source => source.ApplicationCount);
         var parts = new List<string>
@@ -460,10 +460,7 @@ internal static class CombatImpactMetricFormatter
     )
     {
         if (ledger.AuthoritativeTotal.HasValue && !ledger.ObservedAmount.HasValue)
-        {
-            parts.Add(chinese ? "明细不可用" : "breakdown unavailable");
             return;
-        }
 
         if (ledger.ResidualAmount is not > 0)
             return;
