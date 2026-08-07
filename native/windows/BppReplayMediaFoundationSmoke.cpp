@@ -157,7 +157,9 @@ int main()
     description.Height = height;
     description.MipLevels = 1;
     description.ArraySize = 1;
-    description.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+    // Unity commonly exposes an sRGB RenderTexture through its typeless resource. Keep the
+    // smoke path representative so the native bridge must create a typed GPU alias.
+    description.Format = DXGI_FORMAT_R8G8B8A8_TYPELESS;
     description.SampleDesc.Count = 1;
     description.Usage = D3D11_USAGE_DEFAULT;
     description.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
@@ -167,7 +169,10 @@ int main()
         return 2;
 
     ComPtr<ID3D11RenderTargetView> target;
-    result = g_device->CreateRenderTargetView(source.Get(), nullptr, &target);
+    D3D11_RENDER_TARGET_VIEW_DESC targetDescription{};
+    targetDescription.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    targetDescription.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    result = g_device->CreateRenderTargetView(source.Get(), &targetDescription, &target);
     if (FAILED(result))
         return 3;
     const float color[4]{0.15F, 0.35F, 0.75F, 1.0F};
@@ -242,6 +247,7 @@ int main()
     const std::string wavUtf8 = wavPath.u8string();
     const std::string finalUtf8 = finalPath.u8string();
     const char *wavPaths[]{wavUtf8.c_str()};
+    const auto muxStarted = std::chrono::steady_clock::now();
     const int muxResult = BppMfMuxAudio(
         silentUtf8.c_str(),
         wavPaths,
@@ -251,12 +257,26 @@ int main()
         30'000,
         error,
         static_cast<int>(sizeof(error)));
+    const auto muxElapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - muxStarted);
     if (muxResult != 1)
     {
         std::fprintf(stderr, "BppMfMuxAudio failed (%d): %s\n", muxResult, error);
         return 9;
     }
-    std::printf("silent=%s\nfinal=%s\n", silentUtf8.c_str(), finalUtf8.c_str());
+    if (muxElapsed > std::chrono::seconds(3))
+    {
+        std::fprintf(
+            stderr,
+            "BppMfMuxAudio was throttled (%lld ms).\n",
+            static_cast<long long>(muxElapsed.count()));
+        return 10;
+    }
+    std::printf(
+        "mux_ms=%lld\nsilent=%s\nfinal=%s\n",
+        static_cast<long long>(muxElapsed.count()),
+        silentUtf8.c_str(),
+        finalUtf8.c_str());
     UnityPluginUnload();
     return 0;
 }
