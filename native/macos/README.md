@@ -1,0 +1,63 @@
+# BppReplayVideoToolbox
+
+Native macOS backend for Combat Replay video recording. It keeps the real-time path inside the
+Unity process and does not use ScreenCaptureKit or FFmpeg.
+
+## Data path
+
+1. `CommandBuffer.IssuePluginEventAndData` places a native callback after Unity's final render
+   commands.
+2. The callback converts the final Metal texture to an IOSurface-backed NV12 `CVPixelBuffer` on
+   the GPU.
+3. VideoToolbox encodes H.264 asynchronously and AVAssetWriter writes the silent first-pass MP4.
+4. The existing CoreAudio process tap closes its PCM WAV at replay end.
+5. `BppVtMuxAudio` copies the H.264 samples and uses AVFoundation to mix/resample the WAV input to
+   stereo 48 kHz AAC in the final MP4.
+
+No full-frame GPU readback, raw-video pipe, Screen Recording permission, or macOS FFmpeg binary is
+involved. Windows retains its existing AsyncGPUReadback + FFmpeg implementation.
+
+## Build
+
+```bash
+./build.sh
+```
+
+The script requires macOS, Apple Silicon, and Xcode Command Line Tools. It emits an ad-hoc signed
+bundle at:
+
+```text
+build/GfxPluginBppReplayVideoToolbox.bundle
+```
+
+Ordinary C# contributors do not need the native toolchain. The installer repository consumes a
+reviewed prebuilt generated from these sources. Only contributors changing this directory need to
+rebuild it.
+
+To copy the development bundle to an explicit staging directory after building:
+
+```bash
+BPP_REPLAY_PLUGIN_DESTINATION=/absolute/staging/path ./build.sh
+```
+
+The bundle must be present under `TheBazaar.app/Contents/Plugins` before Unity starts so Unity calls
+`UnityPluginLoad` and provides `IUnityGraphicsMetal`. Release installation and app re-signing belong
+to the companion installer PR; this repository never accepts a Developer ID or notarization
+credential.
+
+## ABI
+
+[`BppReplayVideoToolbox.h`](./BppReplayVideoToolbox.h) is the stable C boundary consumed by
+`MacMetalVideoEncoder` and `MacNativeReplayAudioMuxer`. The render callback packet and encoder
+handles are opaque across that boundary.
+
+## Acceptance
+
+- output reports `avg_frame_rate=60/1`;
+- `dropped_frames=0` and repeated frames are at most 3%;
+- recorded replay p95 frame time is within 1 ms or 5% of the same replay without recording;
+- audio finishes as `full`;
+- the final MP4 has valid H.264 and AAC tracks and plays normally;
+- the same checks pass when no `ffmpeg` executable is available to the mod.
+
+p99 remains diagnostic telemetry, not a release gate.

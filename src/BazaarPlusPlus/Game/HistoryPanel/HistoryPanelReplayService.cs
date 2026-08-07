@@ -33,8 +33,9 @@ internal sealed class HistoryPanelReplayService
         _ghostSyncService = ghostSyncService;
     }
 
-    // Capture the Unity-owned dimensions/FPS on the UI thread, then resolve FFmpeg and its
-    // actual-settings encoder profile in the background. Per-refresh gates only read warm state.
+    // Capture Unity-owned dimensions/FPS on the UI thread, then warm the platform backend in the
+    // background. macOS loads the native plugin; other platforms resolve FFmpeg and probe the
+    // actual-settings encoder profile. Per-refresh gates only read warm state.
     public void PrewarmRecordingAvailability()
     {
         var pluginsDirectoryPath = _pluginsDirectoryPath;
@@ -44,6 +45,12 @@ internal sealed class HistoryPanelReplayService
         );
         _ = Task.Run(() =>
         {
+            if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.MacNative)
+            {
+                MacMetalVideoEncoder.TryGetAvailability(out _);
+                return;
+            }
+
             var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
             if (
                 hasSettings
@@ -63,9 +70,8 @@ internal sealed class HistoryPanelReplayService
     }
 
     // Recording is feasible only when the replay itself can run AND the shared recording gate
-    // passes (async GPU readback + ffmpeg + video directory — the same gate the recorder
-    // enforces at capture time). FfmpegLocator.Resolve hits the prewarmed cache here (no probe
-    // on the UI thread).
+    // passes (native Metal/VideoToolbox on macOS; async GPU readback + FFmpeg elsewhere; plus a
+    // video directory on every platform). The backend probe is already warm here.
     public bool CanRecordReplay(HistoryBattleRecord? battle, out string reason)
     {
         return CanRecordReplay(battle, out reason, out _);

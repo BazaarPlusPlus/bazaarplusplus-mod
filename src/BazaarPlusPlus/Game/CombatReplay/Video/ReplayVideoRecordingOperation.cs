@@ -36,6 +36,7 @@ internal enum ReplayVideoRecordingReasonCode
     Aborted,
     ShutdownTimeout,
     FfmpegUnavailable,
+    NativeRecorderUnavailable,
     AsyncGpuReadbackUnavailable,
     OutputPathUnavailable,
     InvalidDimensions,

@@ -7,6 +7,11 @@ internal static class ReplayVideoFrameRateResolver
 {
     internal static int Resolve()
     {
+        // The native macOS recorder has a fixed 60 fps output contract. The wall-clock pacer
+        // repeats the latest GPU surface when Unity does not render a distinct frame in time.
+        if (ReplayVideoBackendPolicy.Current == ReplayVideoBackend.MacNative)
+            return ReplayVideoCaptureDefaults.MacNativeFps;
+
         try
         {
             var preferences = PlayerPreferences.Data;

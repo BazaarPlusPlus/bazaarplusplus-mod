@@ -400,6 +400,106 @@ internal static class CombatReplayVideoLogEvents
         ]
     );
 
+    internal static readonly BppLogFieldDefinition NativeStatsRecordingId = Field(
+        0,
+        "recording_id",
+        BppLogCardinality.High,
+        BppLogCorrelationPolicy.Short
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsStage = Field(1, "stage");
+    internal static readonly BppLogFieldDefinition NativeStatsDeferredFrames = Field(
+        2,
+        "deferred_frames",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsDroppedFrames = Field(
+        3,
+        "dropped_frames",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsLeaseMisses = Field(
+        4,
+        "lease_misses",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsEnqueueRejects = Field(
+        5,
+        "enqueue_rejects",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsPacerResyncRepeats = Field(
+        6,
+        "pacer_resync_repeats",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsMaxInFlight = Field(
+        7,
+        "max_in_flight"
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsFramesWritten = Field(
+        8,
+        "native_frames_written",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsRenderFrameP50Us = Field(
+        9,
+        "render_frame_p50_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsRenderFrameP95Us = Field(
+        10,
+        "render_frame_p95_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsRenderFrameP99Us = Field(
+        11,
+        "render_frame_p99_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsTextureCopyP50Us = Field(
+        12,
+        "texture_copy_p50_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsTextureCopyP95Us = Field(
+        13,
+        "texture_copy_p95_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsTextureCopyP99Us = Field(
+        14,
+        "texture_copy_p99_us",
+        BppLogCardinality.High
+    );
+    internal static readonly BppLogFieldDefinition NativeStatsBattleId = Field(
+        15,
+        "battle_id",
+        BppLogCardinality.High,
+        BppLogCorrelationPolicy.Short
+    );
+    internal static readonly BppLogEventDefinition VideoCaptureNativePipelineObserved = new(
+        BppLogFeatureScope.CombatReplay,
+        "combat_replay.video_capture.native_pipeline_observed",
+        [
+            NativeStatsRecordingId,
+            NativeStatsStage,
+            NativeStatsDeferredFrames,
+            NativeStatsDroppedFrames,
+            NativeStatsLeaseMisses,
+            NativeStatsEnqueueRejects,
+            NativeStatsPacerResyncRepeats,
+            NativeStatsMaxInFlight,
+            NativeStatsFramesWritten,
+            NativeStatsRenderFrameP50Us,
+            NativeStatsRenderFrameP95Us,
+            NativeStatsRenderFrameP99Us,
+            NativeStatsTextureCopyP50Us,
+            NativeStatsTextureCopyP95Us,
+            NativeStatsTextureCopyP99Us,
+            NativeStatsBattleId,
+        ]
+    );
+
     internal static readonly BppLogFieldDefinition FrameRecordingId = Field(
         0,
         "recording_id",

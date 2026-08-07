@@ -9,7 +9,7 @@ internal sealed class ReplayVideoCaptureRequest
 
     public CombatReplayPlaybackSource Source { get; init; }
 
-    public string FfmpegExecutable { get; init; } = string.Empty;
+    public string? FfmpegExecutable { get; init; }
 
     public string OutputFilePath { get; init; } = string.Empty;
 

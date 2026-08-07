@@ -5,7 +5,7 @@ using BazaarPlusPlus.Infrastructure;
 
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
-internal sealed class FfmpegRawVideoEncoder : IDisposable
+internal sealed class FfmpegRawVideoEncoder : IReplayVideoEncoder
 {
     private readonly string _executable;
     private readonly string _recordingId;
