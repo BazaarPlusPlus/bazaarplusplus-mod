@@ -7,10 +7,9 @@ namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
 /// <summary>
 /// Second-pass muxer: combines the silent first-pass video with the captured audio WAV into the
-/// final MP4 using <c>ffmpeg -c:v copy -c:a aac</c>. Runs entirely off the main thread and never
-/// touches Unity types so it stays headless-testable. Any failure (no AAC encoder, ffmpeg error,
-/// timeout, missing WAV) falls back to promoting the silent video to the final path so the
-/// first-pass product is never lost.
+/// final MP4. macOS uses the native AVFoundation bridge; Windows and other platforms retain
+/// <c>ffmpeg -c:v copy -c:a aac</c>. It runs entirely off the main thread. Any mux failure falls
+/// back to promoting the silent video so the first-pass product is never lost.
 /// </summary>
 internal sealed class ReplayVideoAudioMuxer
 {
@@ -39,6 +38,9 @@ internal sealed class ReplayVideoAudioMuxer
         NoAudio,
         FfmpegUnavailable,
         AacUnavailable,
+        NativeMuxUnavailable,
+        NativeMuxTimeout,
+        NativeMuxFailed,
         ProcessStartFailed,
         ProcessTimeout,
         NonZeroExit,
@@ -92,6 +94,8 @@ internal sealed class ReplayVideoAudioMuxer
     {
         try
         {
+            var backend = ReplayVideoBackendPolicy.Current;
+            var requiresFfmpeg = ReplayVideoBackendPolicy.RequiresFfmpeg(backend);
             if (
                 TryResolveWithoutMux(
                     recordingId,
@@ -100,6 +104,7 @@ internal sealed class ReplayVideoAudioMuxer
                     finalPath,
                     usableWavPaths,
                     ffmpegExecutable,
+                    requiresFfmpeg,
                     out var existingWavPaths,
                     out var synchronous
                 )
@@ -107,6 +112,9 @@ internal sealed class ReplayVideoAudioMuxer
             {
                 return synchronous;
             }
+
+            if (backend == ReplayVideoBackend.MacNative)
+                return MuxNative(recordingId, tempVideoPath, existingWavPaths, finalPath);
 
             return Mux(recordingId, ffmpegExecutable!, tempVideoPath, existingWavPaths, finalPath);
         }
@@ -129,6 +137,7 @@ internal sealed class ReplayVideoAudioMuxer
         string finalPath,
         IReadOnlyList<string> usableWavPaths,
         string? ffmpegExecutable,
+        bool requiresFfmpeg,
         out IReadOnlyList<string> existingWavPaths,
         out MuxResult result
     )
@@ -153,7 +162,7 @@ internal sealed class ReplayVideoAudioMuxer
             return true;
         }
 
-        if (string.IsNullOrWhiteSpace(ffmpegExecutable))
+        if (requiresFfmpeg && string.IsNullOrWhiteSpace(ffmpegExecutable))
         {
             result = PromoteAndReport(
                 tempVideoPath,
@@ -165,7 +174,7 @@ internal sealed class ReplayVideoAudioMuxer
             return true;
         }
 
-        if (!HasAacEncoder(ffmpegExecutable))
+        if (requiresFfmpeg && !HasAacEncoder(ffmpegExecutable!))
         {
             result = PromoteAndReport(
                 tempVideoPath,
@@ -179,6 +188,96 @@ internal sealed class ReplayVideoAudioMuxer
 
         result = default;
         return false;
+    }
+
+    /// <summary>
+    /// Runs the native AVFoundation mux pass on macOS. The native side copies H.264 samples and
+    /// encodes only the audio, preserving the same silent-video fallback contract as FFmpeg.
+    /// </summary>
+    private MuxResult MuxNative(
+        string recordingId,
+        string silentVideoTempPath,
+        IReadOnlyList<string> wavPaths,
+        string finalPath,
+        int audioBitrateKbps = 192
+    )
+    {
+        try
+        {
+            var native = MacNativeReplayAudioMuxer.Mux(
+                silentVideoTempPath,
+                wavPaths,
+                finalPath,
+                audioBitrateKbps,
+                TimeSpan.FromMilliseconds(MuxTimeoutMs)
+            );
+            if (native.Succeeded && File.Exists(finalPath))
+            {
+                var mixedSize = FfmpegRawVideoEncoder.TryGetFileSize(finalPath);
+                var silentSize = FfmpegRawVideoEncoder.TryGetFileSize(silentVideoTempPath);
+                if (IsLikelyZeroDurationOutput(mixedSize, silentSize))
+                {
+                    return FallBack(
+                        silentVideoTempPath,
+                        wavPaths,
+                        finalPath,
+                        MuxReasonCode.ZeroDurationOutput,
+                        exitCode: native.ResultCode,
+                        stderrTail: native.Error
+                    );
+                }
+
+                TryDelete(silentVideoTempPath);
+                TryDelete(wavPaths);
+                BppLog.DebugEvent(
+                    CombatReplayVideoLogEvents.VideoMuxDiagnosticObserved,
+                    () =>
+                        [
+                            CombatReplayVideoLogEvents.MuxRecordingId.Bind(recordingId),
+                            CombatReplayVideoLogEvents.MuxStage.Bind(
+                                ReplayVideoLogStage.MuxCallback
+                            ),
+                            CombatReplayVideoLogEvents.MuxReasonCode.Bind(MuxReasonCode.Muxed),
+                            CombatReplayVideoLogEvents.MuxPath.Bind(finalPath),
+                            CombatReplayVideoLogEvents.MuxPendingCount.Bind(PendingTaskCount),
+                        ]
+                );
+                return new MuxResult(
+                    MuxStatus.Muxed,
+                    finalPath,
+                    mixedSize,
+                    MuxReasonCode.Muxed,
+                    native.ResultCode,
+                    native.Error
+                );
+            }
+
+            var reason = native.TimedOut
+                ? MuxReasonCode.NativeMuxTimeout
+                : (
+                    native.ResultCode == -10
+                        ? MuxReasonCode.NativeMuxUnavailable
+                        : MuxReasonCode.NativeMuxFailed
+                );
+            return FallBack(
+                silentVideoTempPath,
+                wavPaths,
+                finalPath,
+                reason,
+                native.ResultCode,
+                native.Error
+            );
+        }
+        catch (Exception ex)
+        {
+            return FallBack(
+                silentVideoTempPath,
+                wavPaths,
+                finalPath,
+                MuxReasonCode.UnexpectedException,
+                exception: ex
+            );
+        }
     }
 
     /// <summary>

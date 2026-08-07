@@ -166,6 +166,10 @@ fi
 
 if [[ -f "$ORIG_PATH" ]] && links_unity "$ORIG_PATH"; then
     disable_prefix_launcher
+    # Native Unity plugins live inside the app bundle. A Debug build may refresh one after the
+    # trampoline was installed, invalidating the outer resource seal; re-sign the real binary
+    # with its required entitlements and reseal the app before returning.
+    sign_and_verify_bundle
     exit 0
 fi
 

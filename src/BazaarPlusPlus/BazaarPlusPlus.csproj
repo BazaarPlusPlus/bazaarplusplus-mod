@@ -62,21 +62,27 @@
     <ProjectRoot>$(MSBuildThisFileDirectory)</ProjectRoot>
     <BPPInstallerSourcePath>$(ProjectRoot)/../../../bazaarplusplus-installer/src-tauri/resources</BPPInstallerSourcePath>
     <HostArchitecture>$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString().ToLowerInvariant())</HostArchitecture>
+    <IsMacHost>$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))</IsMacHost>
     <MacSqliteRuntimeRid>osx-arm64</MacSqliteRuntimeRid>
     <WindowsSqliteRuntimeRid>win-x64</WindowsSqliteRuntimeRid>
     <FixedMacSqliteNativeFile>$(PkgSourceGear_sqlite3)/runtimes/$(MacSqliteRuntimeRid)/native/libe_sqlite3.dylib</FixedMacSqliteNativeFile>
     <FixedMacAudioTapNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/libBppMacAudio.dylib</FixedMacAudioTapNativeFile>
     <FixedWindowsSqliteNativeFile>$(PkgSourceGear_sqlite3)/runtimes/$(WindowsSqliteRuntimeRid)/native/e_sqlite3.dll</FixedWindowsSqliteNativeFile>
-    <!-- FFmpeg binary source (repackaged zips: a single ffmpeg(.exe) at the zip root) -->
+    <LocalMacReplayPluginBundle>$(ProjectRoot)/../../native/macos/build/GfxPluginBppReplayVideoToolbox.bundle</LocalMacReplayPluginBundle>
+    <InstallerMacReplayPluginBundle>$(BPPInstallerSourcePath)/SourceForBuild/macos/UnityPlugins/GfxPluginBppReplayVideoToolbox.bundle</InstallerMacReplayPluginBundle>
+    <MacReplayPluginBundle
+      Condition="'$(IsMacHost)' == 'true' and '$(MacReplayPluginBundle)' == '' and Exists('$(LocalMacReplayPluginBundle)')"
+      >$(LocalMacReplayPluginBundle)</MacReplayPluginBundle>
+    <MacReplayPluginBundle
+      Condition="'$(IsMacHost)' == 'true' and '$(MacReplayPluginBundle)' == '' and Exists('$(InstallerMacReplayPluginBundle)')"
+      >$(InstallerMacReplayPluginBundle)</MacReplayPluginBundle>
+    <!-- Windows retains FFmpeg. macOS records and muxes through Metal/VideoToolbox/AVFoundation. -->
     <WindowsFfmpegZip>$(BPPInstallerSourcePath)/FfmpegSource/windows/ffmpeg.zip</WindowsFfmpegZip>
-    <MacFfmpegZip>$(BPPInstallerSourcePath)/FfmpegSource/macos/ffmpeg.zip</MacFfmpegZip>
     <WindowsFfmpegLicense>$(BPPInstallerSourcePath)/FfmpegSource/windows/LICENSE.txt</WindowsFfmpegLicense>
-    <MacFfmpegLicense>$(BPPInstallerSourcePath)/FfmpegSource/macos/LICENSE.txt</MacFfmpegLicense>
-    <!-- Host platform's FFmpeg zip, used by the Debug copy-to-game step -->
+    <!-- Windows host FFmpeg zip, used by the Debug copy-to-game step. Empty on macOS. -->
     <HostFfmpegZip
       Condition="$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))"
       >$(WindowsFfmpegZip)</HostFfmpegZip>
-    <HostFfmpegZip Condition="'$(HostFfmpegZip)' == ''">$(MacFfmpegZip)</HostFfmpegZip>
   </PropertyGroup>
   <!-- Package references -->
   <ItemGroup>
@@ -211,6 +217,15 @@
       />
     </ItemGroup>
     <Delete Files="@(FilesToDelete)" />
+    <ItemGroup Condition="'$(IsMacHost)' == 'true'">
+      <StaleMacRecordingFile Include="$(GamePath)/BepInEx/plugins/ffmpeg" />
+      <StaleMacRecordingFile Include="$(GamePath)/BepInEx/plugins/ffmpeg-LICENSE.txt" />
+    </ItemGroup>
+    <Delete Files="@(StaleMacRecordingFile)" Condition="'$(IsMacHost)' == 'true'" />
+    <RemoveDir
+      Directories="$(GamePath)/BepInEx/plugins/BppReplayRecorder.app"
+      Condition="'$(IsMacHost)' == 'true'"
+    />
     <Copy
       SourceFiles="$(TargetDir)$(TargetName).dll"
       DestinationFiles="$(GamePath)\BepInEx\plugins\$(TargetName).dll"
@@ -240,7 +255,22 @@
       SkipUnchangedFiles="true"
       Condition="'@(WindowsSqliteNativeFile)' != ''"
     />
-    <!-- Unzip the host platform's bundled FFmpeg next to the mod for local recording tests -->
+    <!-- Unity must load the rendering bundle before managed plugins start so UnityPluginLoad can
+         provide IUnityGraphicsMetal. Copy only when a reviewed prebuilt or local native build is
+         available; ordinary C# builds remain toolchain-independent. -->
+    <RemoveDir
+      Directories="$(GamePath)/TheBazaar.app/Contents/Plugins/GfxPluginBppReplayVideoToolbox.bundle"
+      Condition="'$(MacReplayPluginBundle)' != ''"
+    />
+    <Exec
+      Command="/usr/bin/ditto &quot;$(MacReplayPluginBundle)&quot; &quot;$(GamePath)/TheBazaar.app/Contents/Plugins/GfxPluginBppReplayVideoToolbox.bundle&quot;"
+      Condition="'$(MacReplayPluginBundle)' != ''"
+    />
+    <Exec
+      Command="BPP_GAME_ROOT=&quot;$(GamePath)&quot; BPP_TRAMPOLINE_STUB=&quot;$(BPPInstallerSourcePath)/Trampoline/macos/bpp_launcher&quot; /bin/bash &quot;$(ProjectRoot)/../../scripts/repair-macos-trampoline.sh&quot;"
+      Condition="'$(MacReplayPluginBundle)' != ''"
+    />
+    <!-- Windows only: unzip bundled FFmpeg next to the mod for local recording tests. -->
     <Unzip
       SourceFiles="$(HostFfmpegZip)"
       DestinationFolder="$(GamePath)\BepInEx\plugins"
@@ -364,23 +394,19 @@
     Condition="'$(Configuration)' == 'Release' and Exists('$(BPPInstallerSourcePath)') and '$(BuildProductionPackage)' == 'true'"
   >
     <Message Text="[BazaarPlusPlus] Building production installer package" Importance="high" />
-    <!-- Unzip the per-platform bundled FFmpeg into each payload tree's plugins dir -->
-    <Unzip
-      SourceFiles="$(MacFfmpegZip)"
-      DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins"
-      OverwriteReadOnlyFiles="true"
-      Condition="Exists('$(MacFfmpegZip)')"
-    />
+    <!-- Remove stale macOS FFmpeg files left by older payload staging, then package Windows
+         FFmpeg unchanged. This deletion is scoped to the two historical payload files. -->
+    <ItemGroup>
+      <StaleMacFfmpegFile Include="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/ffmpeg" />
+      <StaleMacFfmpegFile Include="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/ffmpeg-LICENSE.txt" />
+    </ItemGroup>
+    <Delete Files="@(StaleMacFfmpegFile)" />
+    <RemoveDir Directories="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/BppReplayRecorder.app" />
     <Unzip
       SourceFiles="$(WindowsFfmpegZip)"
       DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
       OverwriteReadOnlyFiles="true"
       Condition="Exists('$(WindowsFfmpegZip)')"
-    />
-    <Copy
-      SourceFiles="$(MacFfmpegLicense)"
-      DestinationFiles="$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/ffmpeg-LICENSE.txt"
-      Condition="Exists('$(MacFfmpegLicense)')"
     />
     <Copy
       SourceFiles="$(WindowsFfmpegLicense)"

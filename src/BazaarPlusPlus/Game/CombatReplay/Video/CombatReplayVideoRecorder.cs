@@ -44,6 +44,9 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     private ReplayVideoRecordingReasonCode? _activeDegradationReason;
     private Exception? _activeDegradationException;
     private Exception? _metadataInitializationException;
+    private ReplayVideoCopyTimingAccumulator? _playbackFrameTiming;
+    private string? _playbackTimingBattleId;
+    private bool _playbackTimingRecorded;
 
     private void Awake()
     {
@@ -78,6 +81,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
 
     private void Update()
     {
+        _playbackFrameTiming?.ObserveMicroseconds(
+            (long)Math.Round(Math.Max(0, Time.unscaledDeltaTime) * 1_000_000d)
+        );
+
         var eventBus = _services?.EventBus;
         if (eventBus == null)
             return;
@@ -97,7 +104,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             );
         }
 
-        if (!SystemInfo.supportsAsyncGPUReadback)
+        var backend = ReplayVideoBackendPolicy.Current;
+        if (
+            ReplayVideoBackendPolicy.RequiresFfmpeg(backend) && !SystemInfo.supportsAsyncGPUReadback
+        )
         {
             return SetAvailability(
                 CurrentReplayRecorderAvailabilityPhase.Unavailable,
@@ -153,24 +163,40 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             {
                 try
                 {
-                    var ffmpeg = FfmpegLocator.Resolve(pluginsDirectory);
-                    if (string.IsNullOrWhiteSpace(ffmpeg))
+                    string? ffmpeg = null;
+                    if (backend == ReplayVideoBackend.MacNative)
                     {
-                        SetAvailabilityIfCurrent(
-                            generation,
-                            CurrentReplayRecorderAvailabilityPhase.Unavailable,
-                            "FFmpeg is unavailable."
-                        );
-                        return;
+                        if (!MacMetalVideoEncoder.TryGetAvailability(out var nativeReason))
+                        {
+                            SetAvailabilityIfCurrent(
+                                generation,
+                                CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                                nativeReason ?? "The native video recorder is unavailable."
+                            );
+                            return;
+                        }
                     }
+                    else
+                    {
+                        ffmpeg = FfmpegLocator.Resolve(pluginsDirectory);
+                        if (string.IsNullOrWhiteSpace(ffmpeg))
+                        {
+                            SetAvailabilityIfCurrent(
+                                generation,
+                                CurrentReplayRecorderAvailabilityPhase.Unavailable,
+                                "FFmpeg is unavailable."
+                            );
+                            return;
+                        }
 
-                    FfmpegVideoEncoderSelector.Prewarm(
-                        ffmpeg,
-                        videoDirectory,
-                        settings.Width,
-                        settings.Height,
-                        settings.Fps
-                    );
+                        FfmpegVideoEncoderSelector.Prewarm(
+                            ffmpeg,
+                            videoDirectory,
+                            settings.Width,
+                            settings.Height,
+                            settings.Fps
+                        );
+                    }
                     lock (_availabilitySync)
                     {
                         if (
@@ -235,9 +261,12 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             videoDirectory = _availabilityVideoDirectory;
         }
 
+        var requiresFfmpeg = ReplayVideoBackendPolicy.RequiresFfmpeg(
+            ReplayVideoBackendPolicy.Current
+        );
         if (
             !availability.IsReady
-            || string.IsNullOrWhiteSpace(ffmpeg)
+            || (requiresFfmpeg && string.IsNullOrWhiteSpace(ffmpeg))
             || string.IsNullOrWhiteSpace(videoDirectory)
         )
         {
@@ -430,6 +459,10 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         if (evt == null || string.IsNullOrWhiteSpace(evt.BattleId))
             return;
 
+        _playbackFrameTiming = new ReplayVideoCopyTimingAccumulator();
+        _playbackTimingBattleId = evt.BattleId;
+        _playbackTimingRecorded = false;
+
         if (evt.Source == CombatReplayPlaybackSource.CurrentNative)
         {
             BeginPreparedCurrentReplay(evt);
@@ -470,7 +503,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             var request = BuildCaptureRequest(
                 operation.RecordingId,
                 evt,
-                gate.FfmpegExecutable!,
+                gate.FfmpegExecutable,
                 gate.VideoDirectoryPath!
             );
             if (request == null)
@@ -570,6 +603,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
 
     private void OnPlaybackEnded(CombatReplayPlaybackEnded evt)
     {
+        LogPlaybackFrameTiming();
         if (evt == null || _activeSession == null || _activeOperation == null)
             return;
 
@@ -677,6 +711,36 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 }
             );
         }
+    }
+
+    private void LogPlaybackFrameTiming()
+    {
+        var timing = _playbackFrameTiming;
+        if (timing == null)
+            return;
+
+        BppLog.DebugEvent(
+            CombatReplayVideoLogEvents.VideoCaptureNativePipelineObserved,
+            () =>
+                [
+                    CombatReplayVideoLogEvents.NativeStatsBattleId.Bind(_playbackTimingBattleId),
+                    CombatReplayVideoLogEvents.NativeStatsStage.Bind(
+                        _playbackTimingRecorded ? "playback_recorded" : "playback_unrecorded"
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsRenderFrameP50Us.Bind(
+                        timing.P50Microseconds
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsRenderFrameP95Us.Bind(
+                        timing.P95Microseconds
+                    ),
+                    CombatReplayVideoLogEvents.NativeStatsRenderFrameP99Us.Bind(
+                        timing.P99Microseconds
+                    ),
+                ]
+        );
+        _playbackFrameTiming = null;
+        _playbackTimingBattleId = null;
+        _playbackTimingRecorded = false;
     }
 
     private static void CompleteEndedRecording(EndedRecordingFinalizeContext context)
@@ -823,6 +887,8 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
                 ReplayVideoRecordingReasonCode.AsyncGpuReadbackUnavailable,
             CombatReplayRecordingBlocker.FfmpegUnavailable =>
                 ReplayVideoRecordingReasonCode.FfmpegUnavailable,
+            CombatReplayRecordingBlocker.NativeRecorderUnavailable =>
+                ReplayVideoRecordingReasonCode.NativeRecorderUnavailable,
             CombatReplayRecordingBlocker.VideoDirectoryUnset =>
                 ReplayVideoRecordingReasonCode.OutputPathUnavailable,
             _ => ReplayVideoRecordingReasonCode.CaptureFailed,
@@ -892,6 +958,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
         try
         {
             session.Start();
+            _playbackTimingRecorded = true;
         }
         catch
         {
@@ -1385,7 +1452,7 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
     private ReplayVideoCaptureRequest? BuildCaptureRequest(
         string recordingId,
         CombatReplayPlaybackStarting evt,
-        string ffmpegExecutable,
+        string? ffmpegExecutable,
         string videoDirectoryPath,
         ReplayVideoCaptureSettings? preparedSettings = null
     )
@@ -1413,13 +1480,24 @@ internal sealed class CombatReplayVideoRecorder : MonoBehaviour
             return null;
         }
 
-        var encoderProfile = FfmpegVideoEncoderSelector.SelectOrPrewarm(
-            ffmpegExecutable,
-            videoDirectoryPath,
-            width,
-            height,
-            fps
-        );
+        var backend = ReplayVideoBackendPolicy.Current;
+        FfmpegVideoEncoderProfile encoderProfile;
+        if (backend == ReplayVideoBackend.MacNative)
+        {
+            encoderProfile = FfmpegVideoEncoderProfile.NativeVideoToolbox(width, height, fps);
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(ffmpegExecutable))
+                return null;
+            encoderProfile = FfmpegVideoEncoderSelector.SelectOrPrewarm(
+                ffmpegExecutable,
+                videoDirectoryPath,
+                width,
+                height,
+                fps
+            );
+        }
 
         var nowLocal = DateTimeOffset.Now;
         var datePart = nowLocal.ToString("yyyy-MM-dd");

@@ -15,6 +15,7 @@ WavHeaderTests.Run();
 CfrPacerTests.Run();
 FramePoolTests.Run();
 VideoEncoderProfileTests.Run();
+VideoBackendPolicyTests.Run();
 VideoBufferPlanTests.Run();
 ReadbackLimiterTests.Run();
 CopyTimingTests.Run();
@@ -441,12 +442,13 @@ file static class VideoEncoderProfileTests
 
     public static void Run()
     {
-        FrameRateUsesGamePreferenceWithThirtyFpsCap();
+        NonMacFrameRateKeepsThirtyFpsCap();
+        MacNativeFrameRateIsSixtyFps();
         CandidateOrderAndCache();
         RateControlAndArguments();
     }
 
-    private static void FrameRateUsesGamePreferenceWithThirtyFpsCap()
+    private static void NonMacFrameRateKeepsThirtyFpsCap()
     {
         var resolver = TestReflection.RequireType(
             "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoFrameRateResolver"
@@ -459,9 +461,29 @@ file static class VideoEncoderProfileTests
 
         TestReflection.Assert(Resolve(15) == 15, "A user-selected 15 fps must be preserved.");
         TestReflection.Assert(Resolve(30) == 30, "A user-selected 30 fps must be preserved.");
-        TestReflection.Assert(Resolve(60) == 30, "Recording FPS must cap 60 fps at 30.");
-        TestReflection.Assert(Resolve(120) == 30, "Recording FPS must cap 120 fps at 30.");
+        TestReflection.Assert(Resolve(60) == 30, "FFmpeg recording must cap 60 fps at 30.");
+        TestReflection.Assert(Resolve(120) == 30, "FFmpeg recording must cap 120 fps at 30.");
         TestReflection.Assert(Resolve(-1) == 30, "An unset Unity FPS must fall back to 30.");
+    }
+
+    private static void MacNativeFrameRateIsSixtyFps()
+    {
+        var defaults = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureDefaults"
+        );
+        var nativeFps = (int)(
+            defaults
+                .GetField(
+                    "MacNativeFps",
+                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+                )
+                ?.GetRawConstantValue()
+            ?? throw new InvalidOperationException("MacNativeFps constant not found.")
+        );
+        TestReflection.Assert(
+            nativeFps == 60,
+            "macOS native recording must remain fixed at 60 fps."
+        );
     }
 
     private static void CandidateOrderAndCache()
@@ -616,6 +638,60 @@ file static class VideoEncoderProfileTests
                 $"Hardware/probe arguments are missing {token}."
             );
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// 4b) Platform backend contract: macOS must never require FFmpeg while Windows
+//     and unknown platforms retain the existing FFmpeg path.
+// ---------------------------------------------------------------------------
+file static class VideoBackendPolicyTests
+{
+    public static void Run()
+    {
+        var policyType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoBackendPolicy"
+        );
+        var platformType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.VideoEncoderPlatform"
+        );
+        var backendType = TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoBackend"
+        );
+        var forPlatform =
+            policyType.GetMethod(
+                "ForPlatform",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException("Replay backend platform selector not found.");
+        var requiresFfmpeg =
+            policyType.GetMethod(
+                "RequiresFfmpeg",
+                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+            ) ?? throw new InvalidOperationException("Replay FFmpeg policy seam not found.");
+
+        object Backend(string platform) =>
+            forPlatform.Invoke(null, new[] { Enum.Parse(platformType, platform) })!;
+        bool Requires(object backend) =>
+            (bool)(requiresFfmpeg.Invoke(null, new[] { backend }) ?? true);
+
+        var mac = Backend("MacOS");
+        TestReflection.Assert(
+            mac.Equals(Enum.Parse(backendType, "MacNative")) && !Requires(mac),
+            "macOS must use the native replay backend without FFmpeg."
+        );
+
+        foreach (var platform in new[] { "Windows", "Other" })
+        {
+            var backend = Backend(platform);
+            TestReflection.Assert(
+                backend.Equals(Enum.Parse(backendType, "Ffmpeg")) && Requires(backend),
+                $"{platform} must retain the FFmpeg replay backend."
+            );
+        }
+
+        TestReflection.RequireType(
+            "BazaarPlusPlus.Game.CombatReplay.Video.MacNativeReplayAudioMuxer"
+        );
     }
 }
 
@@ -961,6 +1037,7 @@ file static class EncoderDrainTests
                     null,
                     null,
                     16,
+                    0,
                     0,
                     0,
                     0L,
@@ -2125,6 +2202,8 @@ file static class MediaEventCatalogTests
             "stage:Public:Low:None|recording_id:Public:High:Short|battle_id:Public:High:Short|pending_count:Public:High:None",
         ["combat_replay.video_capture.stats_observed"] =
             "recording_id:Public:High:Short|stage:Public:Low:None|width:Public:High:None|height:Public:High:None|fps:Public:Low:None|captured_frames:Public:High:None|repeated_frames:Public:High:None|dropped_frames:Public:High:None|duration_ms:Public:High:None|size_bytes:Public:High:None|output_path:LocalPath:High:None|codec:Public:Low:None|rate_control:Public:Low:None|frame_bytes:Public:High:None|pool_capacity:Public:Low:None|queue_capacity:Public:Low:None|pool_payload_bytes:Public:High:None|pool_budget_exceeded:Public:Low:None|readback_backpressure_skips:Public:High:None|max_outstanding_readbacks:Public:Low:None|readback_copy_p95_us:Public:High:None|cfr_copy_p95_us:Public:High:None|staging_buffer_bytes:Public:High:None|max_readback_payload_bytes:Public:High:None|render_texture_estimated_bytes:Public:High:None",
+        ["combat_replay.video_capture.native_pipeline_observed"] =
+            "recording_id:Public:High:Short|stage:Public:Low:None|deferred_frames:Public:High:None|dropped_frames:Public:High:None|lease_misses:Public:High:None|enqueue_rejects:Public:High:None|pacer_resync_repeats:Public:High:None|max_in_flight:Public:Low:None|native_frames_written:Public:High:None|render_frame_p50_us:Public:High:None|render_frame_p95_us:Public:High:None|render_frame_p99_us:Public:High:None|texture_copy_p50_us:Public:High:None|texture_copy_p95_us:Public:High:None|texture_copy_p99_us:Public:High:None|battle_id:Public:High:Short",
         ["combat_replay.video_capture.frame_degraded"] =
             "recording_id:Public:High:Short|stage:Public:Low:None|reason_code:Public:Low:None|sequence:Public:High:None",
         ["combat_replay.video_recording.cleanup_failed"] =
@@ -2155,8 +2234,8 @@ file static class MediaEventCatalogTests
             .Select(field => field.GetValue(null)!)
             .ToArray();
         TestReflection.Assert(
-            direct.Length == 11,
-            $"Expected 11 media events, got {direct.Length}."
+            direct.Length == 12,
+            $"Expected 12 media events, got {direct.Length}."
         );
 
         var actual = direct.ToDictionary(EventId, Schema, StringComparer.Ordinal);

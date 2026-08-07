@@ -1834,7 +1834,7 @@ internal sealed class CombatReplayRuntime : MonoBehaviour
         // Bootstrapped saved replays exit through this manual path (the state-exit patch
         // intercepts the normal transition), so OnStateChanged's PublishEnded never fires for
         // them. Emit it here too, otherwise the video recorder never gets the "ended" signal and
-        // leaves ffmpeg running on a never-finalized file (no moov atom -> unplayable MP4).
+        // leaves its platform encoder on a never-finalized file (no moov atom -> unplayable MP4).
         // Cleanup order is explicit on this path (ADR-0009) — not shared with start-failure.
         var operation = _activePlaybackOperation;
         var ended = ReplayPlaybackCleanup.PublishThenCleanup(
