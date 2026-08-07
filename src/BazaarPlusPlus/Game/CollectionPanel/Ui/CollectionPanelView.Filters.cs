@@ -144,7 +144,7 @@ internal sealed partial class CollectionPanelView
         var icon = new VisualElement { pickingMode = PickingMode.Ignore };
         UiStyle.FixedSize(icon.style, 18f, 14f);
         icon.style.marginRight = UiSpacing.Xs;
-        icon.generateVisualContent += context => DrawSizeIcon(context, icon, size);
+        icon.Add(CreateSizeGlyph(size));
         var label = new Label(CollectionPanelText.Size(size))
         {
             name = SizeChipLabelName,
@@ -159,30 +159,22 @@ internal sealed partial class CollectionPanelView
         return chip;
     }
 
-    private static void DrawSizeIcon(
-        MeshGenerationContext context,
-        VisualElement icon,
-        ECardSize size
-    )
+    private static VisualElement CreateSizeGlyph(ECardSize size)
     {
-        var rect = icon.contentRect;
         var (width, height) = size switch
         {
             ECardSize.Small => (6f, 10f),
             ECardSize.Large => (15f, 10f),
             _ => (10f, 10f),
         };
-        var x = rect.center.x - width / 2f;
-        var y = rect.center.y - height / 2f;
-        var painter = context.painter2D;
-        painter.fillColor = Colors.HistorySubtitleText;
-        painter.BeginPath();
-        painter.MoveTo(new Vector2(x, y));
-        painter.LineTo(new Vector2(x + width, y));
-        painter.LineTo(new Vector2(x + width, y + height));
-        painter.LineTo(new Vector2(x, y + height));
-        painter.ClosePath();
-        painter.Fill();
+        var glyph = new VisualElement { pickingMode = PickingMode.Ignore };
+        glyph.style.position = Position.Absolute;
+        glyph.style.left = (18f - width) / 2f;
+        glyph.style.top = (14f - height) / 2f;
+        UiStyle.FixedSize(glyph.style, width, height);
+        glyph.style.backgroundColor = Colors.HistorySubtitleText;
+        UiStyle.Radius(glyph.style, 1.5f);
+        return glyph;
     }
 
     private bool SizeChipsMatch(IReadOnlyList<ECardSize> sizes)

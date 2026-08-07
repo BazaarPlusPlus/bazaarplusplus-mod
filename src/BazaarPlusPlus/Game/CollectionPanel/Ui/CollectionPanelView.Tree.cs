@@ -41,11 +41,23 @@ internal sealed partial class CollectionPanelView
         rail.style.marginLeft = UiSpacing.ColumnGap;
         parent.Add(rail);
 
+        // The top controls read as one control deck: navigation and context first, followed by
+        // the search tools. This keeps the catalog's controls from looking like separate rows.
+        var controlDeck = new VisualElement();
+        controlDeck.style.flexDirection = FlexDirection.Column;
+        controlDeck.style.flexShrink = 0f;
+        controlDeck.style.backgroundColor = Colors.CollectionFilterCardBackground;
+        UiStyle.Border(controlDeck.style, Borders.Thin, Colors.CollectionFilterCardBorder);
+        UiStyle.Radius(controlDeck.style, Radii.Md);
+        UiStyle.Padding(controlDeck.style, UiSpacing.Lg);
+        rail.Add(controlDeck);
+
         // Title + count + Close (Close lives here in the operation area, not a top bar).
         var titleRow = new VisualElement();
         titleRow.style.flexDirection = FlexDirection.Row;
         titleRow.style.alignItems = Align.Center;
-        rail.Add(titleRow);
+        titleRow.style.minHeight = Sizes.CollectionTabToggleHeight;
+        controlDeck.Add(titleRow);
 
         _title = CreateLabel(Sizes.FontTitle, FontStyle.Normal, Colors.White);
         _title.style.flexGrow = 1f;
@@ -77,7 +89,10 @@ internal sealed partial class CollectionPanelView
         titleRow.Add(_closeButton);
 
         _subtitle = BPPSupporterAttributionRow.Create();
-        rail.Add(_subtitle);
+        _subtitle.style.flexWrap = Wrap.NoWrap;
+        _subtitle.style.overflow = Overflow.Hidden;
+        UiStyle.FixedHeight(_subtitle.style, Sizes.SupporterAttributionHeight);
+        controlDeck.Add(_subtitle);
 
         if (_stagingItemIdCopyEnabled)
         {
@@ -90,11 +105,11 @@ internal sealed partial class CollectionPanelView
             _stagingIdCopyLabel.style.marginTop = UiSpacing.Xs;
             _stagingIdCopyLabel.style.whiteSpace = WhiteSpace.NoWrap;
             _stagingIdCopyLabel.style.overflow = Overflow.Hidden;
-            rail.Add(_stagingIdCopyLabel);
+            controlDeck.Add(_stagingIdCopyLabel);
         }
 
-        var primaryControlsRow = CreateOperationRow(UiSpacing.Md);
-        rail.Add(primaryControlsRow);
+        var primaryControlsRow = CreateOperationRow(UiSpacing.Lg);
+        controlDeck.Add(primaryControlsRow);
 
         // The search field is deliberately persistent. Sorting is attached to its right edge so
         // the entire operation row reads as one compact search-and-sort control.

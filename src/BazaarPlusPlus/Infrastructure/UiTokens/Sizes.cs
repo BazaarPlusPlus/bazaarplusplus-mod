@@ -21,8 +21,8 @@ internal static class Sizes
     public const float DayIconWidth = 40f;
     public const float SupporterAttributionHeight = 24f;
     public const float SupporterAttributionReservedHeight = 48f;
-    public const int SupporterAttributionNameFont = 14;
-    public const float SupporterAttributionNameMaxWidth = 118f;
+    public const int SupporterAttributionNameFont = 12;
+    public const float SupporterAttributionNameMaxWidth = 96f;
     public const float SupporterActionMinWidth = 74f;
     public const float CollectionMatchCountWidth = 96f;
     public const float HeroChipIconSize = 48f;
