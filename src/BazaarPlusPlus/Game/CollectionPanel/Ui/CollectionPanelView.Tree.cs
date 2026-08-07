@@ -1,4 +1,5 @@
 #nullable enable
+using BazaarGameShared.Domain.Core.Types;
 using BazaarPlusPlus.Game.CollectionPanel.Data;
 using BazaarPlusPlus.Game.CollectionPanel.Grid;
 using BazaarPlusPlus.Game.Supporters.Ui;
@@ -116,7 +117,7 @@ internal sealed partial class CollectionPanelView
         // Hero context stays visible while the remaining filters scroll.
         _heroFilterSection = CreateFilterSection(
             rail,
-            string.Empty,
+            CollectionPanelText.HeroHeader(),
             UiSpacing.Xl,
             out _heroChipRow,
             out _heroFilterLabel
@@ -129,7 +130,7 @@ internal sealed partial class CollectionPanelView
         // chip row, without introducing a nested card or a second heading.
         _tierFilterSection = CreateFilterSection(
             _heroFilterSection,
-            string.Empty,
+            CollectionPanelText.TierSizeHeader(),
             UiSpacing.Lg,
             out var tierSizeChipRow,
             out _tierFilterLabel,
@@ -163,7 +164,7 @@ internal sealed partial class CollectionPanelView
         // Items and Skills, so keep it directly below Quality.
         _keywordFilterSection = CreateFilterSection(
             controlsScroll,
-            string.Empty,
+            CollectionPanelText.KeywordHeader(),
             UiSpacing.Lg,
             out _keywordChipRow,
             out _keywordFilterLabel,
@@ -182,7 +183,7 @@ internal sealed partial class CollectionPanelView
         // Player-facing type chips get their own titled card; the chip flow itself is unchanged.
         _tagFilterSection = CreateFilterChipSection(
             controlsScroll,
-            string.Empty,
+            CollectionPanelText.TagHeader(),
             UiSpacing.Lg,
             out _tagChipRow
         );
@@ -192,7 +193,7 @@ internal sealed partial class CollectionPanelView
         // Source filter (merchant portraits on Items, trainer portraits on Skills).
         _sourceFilterSection = CreateFilterSection(
             controlsScroll,
-            string.Empty,
+            CollectionPanelText.SourceHeader(ECardType.Item),
             UiSpacing.Lg,
             out _sourceChipRow,
             out _sourceFilterLabel
@@ -556,7 +557,6 @@ internal sealed partial class CollectionPanelView
         headerRow.style.alignItems = Align.Center;
         headerRow.style.alignSelf = Align.Stretch;
         headerRow.style.marginBottom = UiSpacing.Sm;
-        headerRow.style.display = DisplayStyle.None;
         section.Add(headerRow);
 
         label = CreateLabel(
@@ -744,7 +744,6 @@ internal sealed partial class CollectionPanelView
         header.style.flexDirection = FlexDirection.Row;
         header.style.alignItems = Align.Center;
         header.style.marginBottom = UiSpacing.Sm;
-        header.style.display = DisplayStyle.None;
         section.Add(header);
 
         var label = CreateLabel(

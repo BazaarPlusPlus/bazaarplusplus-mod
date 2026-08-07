@@ -85,8 +85,6 @@ internal sealed partial class CollectionPanelView : IDisposable
     private readonly List<ECardTag> _tagChipOrder = new();
     private readonly Dictionary<CollectionKeywordFacetOption, Button> _keywordChips = new();
     private readonly List<CollectionKeywordFacetOption> _keywordChipOrder = new();
-    private bool _showRelatedKeywordChips;
-    private bool _keywordChipsBuiltWithRelated;
 
     private readonly Dictionary<string, Button> _sourceChips = new(StringComparer.Ordinal);
     private readonly Dictionary<string, VisualElement> _sourceChipIcons = new(

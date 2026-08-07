@@ -173,32 +173,11 @@ internal sealed partial class CollectionPanelView
     {
         if (_keywordChipRow == null)
             return;
-        if (
-            _keywordChipsBuiltWithRelated != _showRelatedKeywordChips
-            || !KeywordChipsMatch(options)
-        )
+        if (!KeywordChipsMatch(options))
         {
             ClearKeywordFacetRow();
-            _keywordChipsBuiltWithRelated = _showRelatedKeywordChips;
             foreach (var option in options)
             {
-                if (option.IsRelated && !_showRelatedKeywordChips)
-                {
-                    var ellipsis = CreateTagFacetChipButton(() =>
-                    {
-                        _showRelatedKeywordChips = true;
-                        _keywordChipsBuiltWithRelated = false;
-                        ClearKeywordFacetRow();
-                        EnsureKeywordChips(options);
-                    });
-                    var ellipsisLabel = ellipsis.Q<Label>(TagChipLabelName);
-                    if (ellipsisLabel != null)
-                        ellipsisLabel.text = "…";
-                    ellipsis.tooltip = CollectionPanelText.KeywordRelatedSection();
-                    _keywordChipRow.Add(ellipsis);
-                    break;
-                }
-
                 var captured = option;
                 var chip = CreateTagFacetChipButton(() => _commands.ToggleKeyword(captured));
                 ApplyTagChipContent(chip, ResolveTagDisplay(captured));
@@ -221,19 +200,9 @@ internal sealed partial class CollectionPanelView
 
     private bool KeywordChipsMatch(IReadOnlyList<CollectionKeywordFacetOption> visible)
     {
-        var expectedCount = _showRelatedKeywordChips ? visible.Count : 0;
-        if (!_showRelatedKeywordChips)
-        {
-            foreach (var option in visible)
-            {
-                if (option.IsRelated)
-                    break;
-                expectedCount++;
-            }
-        }
-        if (expectedCount != _keywordChipOrder.Count)
+        if (visible.Count != _keywordChipOrder.Count)
             return false;
-        for (var i = 0; i < expectedCount; i++)
+        for (var i = 0; i < visible.Count; i++)
             if (visible[i] != _keywordChipOrder[i])
                 return false;
         return true;
