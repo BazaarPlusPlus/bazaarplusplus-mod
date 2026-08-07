@@ -1,7 +1,7 @@
 #nullable enable
 namespace BazaarPlusPlus.Game.CombatReplay.Video;
 
-internal enum FfmpegEncoderFailureReasonCode
+internal enum ReplayVideoEncoderFailureReasonCode
 {
     None,
     WriterTimeout,
@@ -13,23 +13,23 @@ internal enum FfmpegEncoderFailureReasonCode
     WriterCrashed,
 }
 
-internal readonly record struct FfmpegEncoderCompletionOutcome(
+internal readonly record struct ReplayVideoEncoderCompletionOutcome(
     bool Succeeded,
-    FfmpegEncoderFailureReasonCode ReasonCode,
+    ReplayVideoEncoderFailureReasonCode ReasonCode,
     int? ExitCode,
     string StderrTail,
     Exception? Exception
 )
 {
-    internal static FfmpegEncoderCompletionOutcome Success(string stderrTail) =>
-        new(true, FfmpegEncoderFailureReasonCode.None, 0, stderrTail, null);
+    internal static ReplayVideoEncoderCompletionOutcome Success(string diagnosticTail) =>
+        new(true, ReplayVideoEncoderFailureReasonCode.None, 0, diagnosticTail, null);
 
-    internal static FfmpegEncoderCompletionOutcome Failure(
-        FfmpegEncoderFailureReasonCode reasonCode,
+    internal static ReplayVideoEncoderCompletionOutcome Failure(
+        ReplayVideoEncoderFailureReasonCode reasonCode,
         int? exitCode,
-        string stderrTail,
+        string diagnosticTail,
         Exception? exception = null
-    ) => new(false, reasonCode, exitCode, stderrTail, exception);
+    ) => new(false, reasonCode, exitCode, diagnosticTail, exception);
 }
 
 internal enum ReplayVideoLogStage

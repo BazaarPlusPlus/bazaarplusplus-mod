@@ -96,7 +96,7 @@ LiveBuildPanel reads live shop, board, and stash cards through `LiveCardSnapshot
 
 ## Combat Replay And Video
 
-Combat replay records local PvP battle replay payloads and lets HistoryPanel start playback when a local or downloaded ghost replay payload is available. Video recording is optional and gated by async GPU readback support, a resolvable FFmpeg binary, and output directory configuration (`src/BazaarPlusPlus/Game/CombatReplay/Video/CombatReplayRecordingGate.cs:33-60`).
+Combat replay records local PvP battle replay payloads and lets HistoryPanel start playback when a local or downloaded ghost replay payload is available. Video recording is optional and supported on macOS and Windows through platform-native render plugins: Metal/VideoToolbox/AVFoundation on macOS and D3D11/Media Foundation on Windows. Availability is gated by the native plugin and output directory (`src/BazaarPlusPlus/Game/CombatReplay/Video/CombatReplayRecordingGate.cs`).
 
 Saved-replay playback state algebra lives in the pure `SavedReplayLifecycle` core: staged start commits, the 15-second exit-suppression latch shared by the continue/bootstrapped-exit/native-exit paths, the two-phase exit decision around the ended-publish, pending menu-return polling (a state parallel to start progress), and startup-interruption relay. `CombatReplayRuntime` is its translation layer — it executes publishes, portrait cleanup, and menu dispatch but holds no transition logic (`src/BazaarPlusPlus/Game/CombatReplay/SavedReplayLifecycle.cs`; behavior tests in `tests/CombatReplayPlaybackLogging.Tests/SavedReplayLifecycleTests.cs`; contract points in ADR-0011).
 

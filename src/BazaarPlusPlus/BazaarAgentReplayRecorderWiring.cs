@@ -20,8 +20,8 @@ namespace BazaarPlusPlus;
 /// </summary>
 internal static class BazaarAgentReplayRecorderWiring
 {
-    private static int _ffmpegPrewarmKicked;
-    private static volatile bool _ffmpegPrewarmCompleted;
+    private static int _recordingPrewarmKicked;
+    private static volatile bool _recordingPrewarmCompleted;
 
     public static IBazaarAgentReplayRecorder Create(
         Func<CombatReplayRuntime?> runtimeAccessor,
@@ -50,7 +50,7 @@ internal static class BazaarAgentReplayRecorderWiring
         string? expectedBattleId
     )
     {
-        PrewarmFfmpegOnce(services);
+        PrewarmRecordingOnce(services);
 
         if (runtime == null)
             return BppReplayControlResult.Unavailable("Combat replay runtime is unavailable.");
@@ -123,10 +123,8 @@ internal static class BazaarAgentReplayRecorderWiring
         if (!runtime.CanReplaySavedCombats(out reason))
             return false;
 
-        // FfmpegLocator.Resolve probes (~2s, with WaitForExit calls) on its first process-wide
-        // call. Never pay that on the Unity main thread: until the off-thread prewarm has
-        // finished, answer with a retryable rejection instead of freezing the game.
-        if (!_ffmpegPrewarmCompleted)
+        // Native plugins are loaded synchronously on this Unity main-thread facade.
+        if (!_recordingPrewarmCompleted)
         {
             reason = "Recording availability probe is still warming up; retry shortly.";
             return false;
@@ -140,10 +138,10 @@ internal static class BazaarAgentReplayRecorderWiring
         {
             reason = gate.Blocker switch
             {
-                CombatReplayRecordingBlocker.NoAsyncGpuReadback =>
-                    "Video recording is unavailable on this device (no async GPU readback).",
-                CombatReplayRecordingBlocker.FfmpegUnavailable =>
-                    "Video recording is unavailable (FFmpeg could not be resolved).",
+                CombatReplayRecordingBlocker.UnsupportedPlatform =>
+                    "Video recording is supported on macOS and Windows.",
+                CombatReplayRecordingBlocker.NativeRecorderUnavailable =>
+                    "Video recording is unavailable (the platform-native recorder could not be loaded).",
                 _ => "Video recording is unavailable (video directory is not configured).",
             };
             return false;
@@ -169,7 +167,7 @@ internal static class BazaarAgentReplayRecorderWiring
         IBppServices services
     )
     {
-        PrewarmFfmpegOnce(services);
+        PrewarmRecordingOnce(services);
 
         if (runtime == null)
             return new BppReplayPhaseSnapshot(BppReplayPhase.None, null);
@@ -188,40 +186,23 @@ internal static class BazaarAgentReplayRecorderWiring
         return new BppReplayPhaseSnapshot(BppReplayPhase.None, null);
     }
 
-    // Resolve FFmpeg and the actual-dimensions encoder profile off-thread the first time the host
-    // touches the facade, so CanRecordNow and the first accepted recording only read warm caches.
-    private static void PrewarmFfmpegOnce(IBppServices services)
+    // Probe the platform backend the first time the host touches the facade. This facade is called
+    // on Unity's main thread, which is mandatory for the first native-plugin load.
+    private static void PrewarmRecordingOnce(IBppServices services)
     {
-        if (Interlocked.Exchange(ref _ffmpegPrewarmKicked, 1) != 0)
+        if (Interlocked.Exchange(ref _recordingPrewarmKicked, 1) != 0)
             return;
 
-        var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
-        var videoDirectoryPath = PathConstants.CombatReplayVideos(services.Paths.RequireDataRoot());
-        var hasSettings = ReplayVideoCaptureSettingsCache.TryGet(out var captureSettings);
-        _ = Task.Run(() =>
+        _ = services;
+        switch (ReplayVideoBackendPolicy.Current)
         {
-            try
-            {
-                var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
-                if (
-                    hasSettings
-                    && !string.IsNullOrWhiteSpace(ffmpegExecutable)
-                    && !string.IsNullOrWhiteSpace(videoDirectoryPath)
-                )
-                {
-                    FfmpegVideoEncoderSelector.Prewarm(
-                        ffmpegExecutable,
-                        videoDirectoryPath,
-                        captureSettings.Width,
-                        captureSettings.Height,
-                        captureSettings.Fps
-                    );
-                }
-            }
-            finally
-            {
-                _ffmpegPrewarmCompleted = true;
-            }
-        });
+            case ReplayVideoBackend.MacNative:
+                MacMetalVideoEncoder.TryGetAvailability(out _);
+                break;
+            case ReplayVideoBackend.WindowsNative:
+                WindowsMediaFoundationVideoEncoder.TryGetAvailability(out _);
+                break;
+        }
+        _recordingPrewarmCompleted = true;
     }
 }
