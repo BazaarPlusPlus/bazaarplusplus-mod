@@ -69,7 +69,7 @@
     <FixedMacAudioTapNativeFile>$(BPPInstallerSourcePath)/SourceForBuild/macos/BepInEx/plugins/libBppMacAudio.dylib</FixedMacAudioTapNativeFile>
     <FixedWindowsSqliteNativeFile>$(PkgSourceGear_sqlite3)/runtimes/$(WindowsSqliteRuntimeRid)/native/e_sqlite3.dll</FixedWindowsSqliteNativeFile>
     <LocalMacReplayPluginBundle>$(ProjectRoot)/../../native/macos/build/GfxPluginBppReplayVideoToolbox.bundle</LocalMacReplayPluginBundle>
-    <InstallerMacReplayPluginBundle>$(BPPInstallerSourcePath)/SourceForBuild/macos/UnityPlugins/GfxPluginBppReplayVideoToolbox.bundle</InstallerMacReplayPluginBundle>
+    <InstallerMacReplayPluginBundle>$(BPPInstallerSourcePath)/SourceForBuild/macos/TheBazaar.app/Contents/Plugins/GfxPluginBppReplayVideoToolbox.bundle</InstallerMacReplayPluginBundle>
     <MacReplayPluginBundle
       Condition="'$(IsMacHost)' == 'true' and '$(MacReplayPluginBundle)' == '' and Exists('$(LocalMacReplayPluginBundle)')"
       >$(LocalMacReplayPluginBundle)</MacReplayPluginBundle>
@@ -391,6 +391,14 @@
       DestinationFolder="$(BPPInstallerSourcePath)/SourceForBuild/windows/BepInEx/plugins"
       SkipUnchangedFiles="true"
       Condition="'@(WindowsSqliteNativeFile)' != ''"
+    />
+    <RemoveDir
+      Directories="$(InstallerMacReplayPluginBundle)"
+      Condition="Exists('$(LocalMacReplayPluginBundle)')"
+    />
+    <Exec
+      Command="/usr/bin/ditto &quot;$(LocalMacReplayPluginBundle)&quot; &quot;$(InstallerMacReplayPluginBundle)&quot;"
+      Condition="Exists('$(LocalMacReplayPluginBundle)')"
     />
     <MakeDir
       Directories="$(BPPInstallerSourcePath)/SourceForBuild/windows/TheBazaar_Data/Plugins/x86_64"
