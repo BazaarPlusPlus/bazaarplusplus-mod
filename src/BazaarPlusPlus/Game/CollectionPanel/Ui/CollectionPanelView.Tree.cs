@@ -91,7 +91,12 @@ internal sealed partial class CollectionPanelView
         _subtitle = BPPSupporterAttributionRow.Create();
         _subtitle.style.flexWrap = Wrap.NoWrap;
         _subtitle.style.overflow = Overflow.Hidden;
-        UiStyle.FixedHeight(_subtitle.style, Sizes.SupporterAttributionHeight);
+        _subtitle.style.marginTop = UiSpacing.Md;
+        _subtitle.style.backgroundColor = Colors.CollectionPanelBackground;
+        UiStyle.FixedHeight(_subtitle.style, Sizes.CollectionTabToggleHeight);
+        UiStyle.HorizontalPadding(_subtitle.style, UiSpacing.Md);
+        UiStyle.Border(_subtitle.style, Borders.Thin, Color.black);
+        UiStyle.Radius(_subtitle.style, Radii.CollectionChip);
         controlDeck.Add(_subtitle);
 
         if (_stagingItemIdCopyEnabled)
@@ -108,7 +113,7 @@ internal sealed partial class CollectionPanelView
             controlDeck.Add(_stagingIdCopyLabel);
         }
 
-        var primaryControlsRow = CreateOperationRow(UiSpacing.Lg);
+        var primaryControlsRow = CreateOperationRow(UiSpacing.Md);
         controlDeck.Add(primaryControlsRow);
 
         // The search field is deliberately persistent. Sorting is attached to its right edge so
@@ -496,9 +501,9 @@ internal sealed partial class CollectionPanelView
 
     private static Label CreateCountLabel()
     {
-        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistoryStatusText);
-        label.style.backgroundColor = Colors.HistoryStatusBackground;
-        label.style.height = Sizes.ButtonCompactHeight;
+        var label = CreateLabel(Sizes.FontSmall, FontStyle.Bold, Colors.HistorySubtitleText);
+        label.style.backgroundColor = Colors.CollectionChipBackground;
+        label.style.height = Sizes.CollectionTabToggleHeight;
         UiStyle.FixedWidth(label.style, Sizes.CollectionMatchCountWidth);
         label.style.flexShrink = 0f;
         label.style.whiteSpace = WhiteSpace.NoWrap;
@@ -507,7 +512,7 @@ internal sealed partial class CollectionPanelView
         label.style.alignSelf = Align.Center;
         UiStyle.HorizontalPadding(label.style, UiSpacing.Md);
         UiStyle.Radius(label.style, Radii.Md);
-        UiStyle.Border(label.style, Borders.Thin, Colors.HistoryStatusBorder);
+        UiStyle.Border(label.style, Borders.Thin, Colors.CollectionChipBorder);
         return label;
     }
 
