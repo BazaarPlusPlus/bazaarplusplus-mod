@@ -8,7 +8,7 @@ namespace BazaarPlusPlus.Game.PostCombatImpact.Data;
 
 internal static class PeriodicEffectAttribution
 {
-    internal const string ModelVersion = "periodic-impact-v6";
+    internal const string ModelVersion = "periodic-impact-v7";
 
     // The shipped model is deliberately a small accounting pass:
     // 1. book typed Burn/Poison Health and Burn Shield adjustments as actual pool movement;
@@ -24,18 +24,18 @@ internal static class PeriodicEffectAttribution
     // CardStats. A static RegenApplyAmount describes capability, not observed contribution. The
     // retrospective fallback and every mixed stack retain Proportional proof internally.
 
-    internal static IReadOnlyDictionary<PeriodicImpactKey, CombatImpactPeriodicImpact> Project(
+    internal static PeriodicAttributionReport Project(
         CombatSim simulation,
-        IReadOnlyDictionary<string, CombatImpactEntity> entities,
-        PeriodicEffectAttributionDiagnostics? diagnostics = null
+        IReadOnlyDictionary<string, CombatImpactEntity> entities
     )
     {
+        var diagnostics = new PeriodicEffectAttributionDiagnostics();
         var ledgers = new Dictionary<ECombatantId, CombatantLedger>
         {
             [ECombatantId.Player] = BuildLedger(simulation, ECombatantId.Player),
             [ECombatantId.Opponent] = BuildLedger(simulation, ECombatantId.Opponent),
         };
-        var impacts = new Dictionary<PeriodicImpactKey, ImpactAccumulator>();
+        var measuredTotals = new Dictionary<PeriodicMeasurementKey, PeriodicMeasuredAmounts>();
         var regenFallbackSources = BuildRegenFallbackSources(simulation, entities);
 
         for (var frameIndex = 0; frameIndex < simulation.Frames.Count; frameIndex++)
@@ -53,6 +53,7 @@ internal static class PeriodicEffectAttribution
                         .Events.OfType<CombatSimEventCombatantDied>()
                         .Any(death => death.CombatantId == combatant)
                 );
+                ObserveMeasuredTotals(measuredTotals, combatant, pools);
 
                 var reconciledBeforeImpact = new HashSet<PeriodicStatus>();
                 foreach (
@@ -73,7 +74,6 @@ internal static class PeriodicEffectAttribution
                 AttributeFrameImpact(
                     pools,
                     ledger,
-                    impacts,
                     diagnostics,
                     frameIndex,
                     combatant,
@@ -99,10 +99,78 @@ internal static class PeriodicEffectAttribution
             }
         }
 
-        return impacts.ToDictionary(
-            pair => pair.Key,
-            pair => pair.Value.Build(),
-            EqualityComparer<PeriodicImpactKey>.Default
+        return new PeriodicAttributionReport(
+            BuildSourceImpacts(diagnostics.Allocations),
+            diagnostics.Allocations.ToArray(),
+            diagnostics.Gaps.ToArray(),
+            measuredTotals
+        );
+    }
+
+    private static IReadOnlyDictionary<
+        PeriodicImpactKey,
+        CombatImpactPeriodicImpact
+    > BuildSourceImpacts(IReadOnlyList<PeriodicAttributionAllocation> allocations) =>
+        allocations
+            .GroupBy(allocation => new PeriodicImpactKey(
+                allocation.SourceId,
+                allocation.Combatant,
+                allocation.Kind
+            ))
+            .ToDictionary(
+                group => group.Key,
+                group => new CombatImpactPeriodicImpact(
+                    SaturatingInt(group.Sum(allocation => allocation.HealthAmount)),
+                    SaturatingInt(group.Sum(allocation => allocation.ShieldAmount)),
+                    group.Any(allocation =>
+                        allocation.Proof == CombatImpactPeriodicProof.Proportional
+                    )
+                        ? CombatImpactPeriodicProof.Proportional
+                        : CombatImpactPeriodicProof.Exact,
+                    ModelVersion
+                )
+            );
+
+    private static void ObserveMeasuredTotals(
+        IDictionary<PeriodicMeasurementKey, PeriodicMeasuredAmounts> totals,
+        ECombatantId combatant,
+        PoolResult pools
+    )
+    {
+        AddMeasuredTotal(
+            totals,
+            new PeriodicMeasurementKey(combatant, CombatImpactPeriodicKind.Burn),
+            pools.BurnHealthDamage,
+            pools.BurnShieldConsumed
+        );
+        AddMeasuredTotal(
+            totals,
+            new PeriodicMeasurementKey(combatant, CombatImpactPeriodicKind.Poison),
+            pools.PoisonHealthDamage,
+            0
+        );
+        AddMeasuredTotal(
+            totals,
+            new PeriodicMeasurementKey(combatant, CombatImpactPeriodicKind.Regen),
+            pools.RegenRealized,
+            0
+        );
+    }
+
+    private static void AddMeasuredTotal(
+        IDictionary<PeriodicMeasurementKey, PeriodicMeasuredAmounts> totals,
+        PeriodicMeasurementKey key,
+        long health,
+        long shield
+    )
+    {
+        if (health == 0 && shield == 0)
+            return;
+
+        totals.TryGetValue(key, out var current);
+        totals[key] = new PeriodicMeasuredAmounts(
+            current.HealthAmount + health,
+            current.ShieldAmount + shield
         );
     }
 
@@ -309,8 +377,7 @@ internal static class PeriodicEffectAttribution
     private static void AttributeFrameImpact(
         PoolResult pools,
         CombatantLedger ledger,
-        IDictionary<PeriodicImpactKey, ImpactAccumulator> impacts,
-        PeriodicEffectAttributionDiagnostics? diagnostics,
+        PeriodicEffectAttributionDiagnostics diagnostics,
         int frameIndex,
         ECombatantId combatant,
         CombatSim simulation,
@@ -324,7 +391,6 @@ internal static class PeriodicEffectAttribution
                 PeriodicStatus.Burn,
                 pools.BurnHealthDamage,
                 pools.BurnShieldConsumed,
-                impacts,
                 diagnostics,
                 frameIndex,
                 combatant,
@@ -340,7 +406,6 @@ internal static class PeriodicEffectAttribution
                 PeriodicStatus.Poison,
                 pools.PoisonHealthDamage,
                 0,
-                impacts,
                 diagnostics,
                 frameIndex,
                 combatant,
@@ -354,7 +419,7 @@ internal static class PeriodicEffectAttribution
             return;
         if (!pools.HealthReconciled)
         {
-            diagnostics?.ObserveGap(
+            diagnostics.ObserveGap(
                 frameIndex,
                 combatant,
                 CombatImpactPeriodicKind.Regen,
@@ -368,7 +433,7 @@ internal static class PeriodicEffectAttribution
         {
             if (regenFallbackSources.Count == 0)
             {
-                diagnostics?.ObserveGap(
+                diagnostics.ObserveGap(
                     frameIndex,
                     combatant,
                     CombatImpactPeriodicKind.Regen,
@@ -384,7 +449,6 @@ internal static class PeriodicEffectAttribution
             PeriodicStatus.Regen,
             pools.RegenRealized,
             0,
-            impacts,
             diagnostics,
             frameIndex,
             combatant,
@@ -431,8 +495,7 @@ internal static class PeriodicEffectAttribution
         PeriodicStatus status,
         long health,
         long shield,
-        IDictionary<PeriodicImpactKey, ImpactAccumulator> impacts,
-        PeriodicEffectAttributionDiagnostics? diagnostics,
+        PeriodicEffectAttributionDiagnostics diagnostics,
         int frameIndex,
         ECombatantId combatant,
         CombatSim simulation,
@@ -479,7 +542,7 @@ internal static class PeriodicEffectAttribution
         }
         if (unknownHealth > 0 || unknownShield > 0)
         {
-            diagnostics?.ObserveGap(
+            diagnostics.ObserveGap(
                 frameIndex,
                 combatant,
                 Kind(status),
@@ -497,14 +560,8 @@ internal static class PeriodicEffectAttribution
             if (healthShare.Amount == 0 && shieldShare.Amount == 0)
                 continue;
 
-            var key = new PeriodicImpactKey(sourceId, Kind(status));
-            if (!impacts.TryGetValue(key, out var accumulator))
-            {
-                accumulator = new ImpactAccumulator();
-                impacts[key] = accumulator;
-            }
             var approximate = healthShare.IsApproximate || shieldShare.IsApproximate;
-            diagnostics?.ObserveAllocation(
+            diagnostics.ObserveAllocation(
                 frameIndex,
                 combatant,
                 Kind(status),
@@ -515,7 +572,6 @@ internal static class PeriodicEffectAttribution
                     ? CombatImpactPeriodicProof.Proportional
                     : CombatImpactPeriodicProof.Exact
             );
-            accumulator.Add(healthShare.Amount, shieldShare.Amount, approximate);
         }
     }
 
@@ -1010,30 +1066,6 @@ internal static class PeriodicEffectAttribution
         private sealed record OwnerBalance(long Amount, bool IsApproximate);
     }
 
-    private sealed class ImpactAccumulator
-    {
-        private long _health;
-        private long _shield;
-        private bool _approximate;
-
-        internal void Add(long health, long shield, bool approximate)
-        {
-            _health += health;
-            _shield += shield;
-            _approximate |= approximate;
-        }
-
-        internal CombatImpactPeriodicImpact Build() =>
-            new(
-                SaturatingInt(_health),
-                SaturatingInt(_shield),
-                _approximate
-                    ? CombatImpactPeriodicProof.Proportional
-                    : CombatImpactPeriodicProof.Exact,
-                ModelVersion
-            );
-    }
-
     private readonly record struct PoolResult(
         bool HealthReconciled,
         long BurnHealthDamage,
@@ -1110,4 +1142,41 @@ internal sealed class PeriodicEffectAttributionDiagnostics
         _allocations.Add(
             new(frameIndex, combatant, kind, sourceId, healthAmount, shieldAmount, proof)
         );
+}
+
+internal readonly record struct PeriodicMeasurementKey(
+    ECombatantId Combatant,
+    CombatImpactPeriodicKind Kind
+);
+
+internal readonly record struct PeriodicMeasuredAmounts(long HealthAmount, long ShieldAmount);
+
+internal sealed class PeriodicAttributionReport
+{
+    internal PeriodicAttributionReport(
+        IReadOnlyDictionary<PeriodicImpactKey, CombatImpactPeriodicImpact> sourceImpacts,
+        IReadOnlyList<PeriodicAttributionAllocation> allocations,
+        IReadOnlyList<PeriodicAttributionGap> residuals,
+        IReadOnlyDictionary<PeriodicMeasurementKey, PeriodicMeasuredAmounts> measuredTotals
+    )
+    {
+        SourceImpacts = sourceImpacts;
+        Allocations = allocations;
+        Residuals = residuals;
+        MeasuredTotals = measuredTotals;
+    }
+
+    internal IReadOnlyDictionary<
+        PeriodicImpactKey,
+        CombatImpactPeriodicImpact
+    > SourceImpacts { get; }
+
+    internal IReadOnlyList<PeriodicAttributionAllocation> Allocations { get; }
+
+    internal IReadOnlyList<PeriodicAttributionGap> Residuals { get; }
+
+    internal IReadOnlyDictionary<
+        PeriodicMeasurementKey,
+        PeriodicMeasuredAmounts
+    > MeasuredTotals { get; }
 }

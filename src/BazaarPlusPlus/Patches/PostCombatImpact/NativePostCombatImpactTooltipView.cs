@@ -123,6 +123,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         bool isSkill,
         CombatImpactSource? source,
         CombatImpactReceived? received,
+        IReadOnlyList<PeriodicAttributionGap> periodicResiduals,
         CombatImpactPerspective perspective
     )
     {
@@ -172,6 +173,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
             causedRoot,
             isSkill,
             source,
+            periodicResiduals,
             _receivedPerspectiveAvailable,
             generation
         );
@@ -507,6 +509,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         RectTransform root,
         bool isSkill,
         CombatImpactSource? source,
+        IReadOnlyList<PeriodicAttributionGap> periodicResiduals,
         bool canSwitchPerspective,
         int generation
     )
@@ -549,7 +552,15 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         BuildDisclosures(
             bodyTemplate,
             root,
-            CombatImpactMetricFormatter.CausedDisclosures(source, IsChinese())
+            CombatImpactMetricFormatter
+                .CausedDisclosures(source, IsChinese())
+                .Concat(
+                    CombatImpactMetricFormatter.PeriodicResidualDisclosures(
+                        periodicResiduals,
+                        IsChinese()
+                    )
+                )
+                .ToArray()
         );
         _causedMoreText = BuildMoreRow(bodyTemplate, root);
     }
@@ -597,6 +608,11 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
                 _receivedBlocks.Add(block);
             }
         }
+        BuildDisclosures(
+            bodyTemplate,
+            root,
+            CombatImpactMetricFormatter.ReceivedDisclosures(received, IsChinese())
+        );
         _receivedMoreText = BuildMoreRow(bodyTemplate, root);
     }
 
@@ -688,7 +704,7 @@ internal sealed class NativePostCombatImpactTooltipView : IPostCombatImpactToolt
         int generation
     )
     {
-        var triggerSources = CombatImpactMetricFormatter.TriggerSourceValues(group);
+        var triggerSources = CombatImpactMetricFormatter.TriggerSourceValues(group, IsChinese());
         var hasTriggerSummary = !string.IsNullOrWhiteSpace(triggerSources);
         var groupRoot = CreateVertical("ImpactCausedGroup", parent, hasTriggerSummary ? 6f : 4f);
         AddLayout(groupRoot.gameObject, preferredHeight: -1f, flexibleWidth: 1f);

@@ -179,6 +179,18 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
                         simulation,
                         CombatImpactEntitySnapshotReader.Read()
                     );
+            foreach (
+                var kind in LatestReport.ProjectionDiagnostics.Select(item => item.Kind).Distinct()
+            )
+            {
+                BppLog.WarnEvent(
+                    PostCombatImpactLogEvents.ProjectionDegraded,
+                    PostCombatImpactLogEvents.ReasonCode.Bind(
+                        PostCombatImpactReasonCode.ProjectionAttributionGap
+                    ),
+                    PostCombatImpactLogEvents.ProjectionCategory.Bind(kind)
+                );
+            }
         }
         catch (Exception ex)
         {
@@ -187,6 +199,9 @@ internal sealed class PostCombatImpactModule : IBppFeature, IPostCombatImpactMod
                 PostCombatImpactLogEvents.ProjectionDegraded,
                 ex,
                 PostCombatImpactLogEvents.ReasonCode.Bind(
+                    PostCombatImpactReasonCode.ProjectionException
+                ),
+                PostCombatImpactLogEvents.ProjectionCategory.Bind(
                     PostCombatImpactReasonCode.ProjectionException
                 )
             );

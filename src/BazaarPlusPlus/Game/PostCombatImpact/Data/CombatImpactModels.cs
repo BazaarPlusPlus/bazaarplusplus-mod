@@ -48,10 +48,37 @@ internal enum CombatImpactOccurrenceBasis
     ExplicitExecution,
 }
 
+internal enum CombatImpactActivitySourceResolution
+{
+    Direct,
+    TriggerFallback,
+    PrerequisiteSkill,
+}
+
+internal enum CombatImpactTriggerScope
+{
+    AttributedExternal,
+    AttributedSelf,
+    AttributedViaTriggerFallback,
+    NoTriggerEvidence,
+    Unattributed,
+    NotApplicable,
+}
+
+internal enum CombatImpactTriggerPresentationState
+{
+    None,
+    Complete,
+    PartialBreakdown,
+    HiddenSelfOnly,
+    BreakdownUnavailable,
+}
+
 internal enum CombatImpactCoverage
 {
     None,
     Exact,
+    Estimated,
     LowerBound,
     Partial,
 }
@@ -72,17 +99,99 @@ internal enum CombatImpactPeriodicKind
 internal enum CombatImpactPeriodicProof
 {
     Exact,
-    Constrained,
     Proportional,
 }
 
-internal readonly record struct PeriodicImpactKey(string SourceId, CombatImpactPeriodicKind Kind);
+internal enum CombatImpactControlStatus
+{
+    Exact,
+    PositiveResidual,
+    OverObserved,
+    NotComparable,
+}
+
+internal enum CombatImpactResidualCoverage
+{
+    Unknown,
+    Exact,
+    UpperBound,
+}
+
+internal readonly record struct PeriodicImpactKey(
+    string SourceId,
+    ECombatantId Combatant,
+    CombatImpactPeriodicKind Kind
+);
 
 internal sealed record CombatImpactPeriodicImpact(
     int HealthAmount,
     int ShieldAmount,
     CombatImpactPeriodicProof Proof,
     string ModelVersion
+);
+
+internal sealed record CombatImpactPrerequisiteSkillSourceRule(
+    string EffectId,
+    Guid SkillTemplateId,
+    IReadOnlyCollection<ETier> SkillTiers
+)
+{
+    internal bool Matches(CombatImpactEntity entity) =>
+        entity.TypeLabel == "Skill"
+        && entity.TemplateId == SkillTemplateId
+        && (SkillTiers.Count == 0 || SkillTiers.Contains(entity.Tier));
+}
+
+internal sealed record CombatImpactItemTagCondition(
+    EListComparisonOperator Operator,
+    IReadOnlyCollection<ECardTag>? PublicTags = null,
+    IReadOnlyCollection<EHiddenTag>? HiddenTags = null
+)
+{
+    internal bool Matches(CombatImpactEntity entity)
+    {
+        if (PublicTags is { Count: > 0 })
+            return Matches(PublicTags, entity.Tags);
+        if (HiddenTags is { Count: > 0 })
+            return Matches(HiddenTags, entity.HiddenTags);
+        return false;
+    }
+
+    private bool Matches<T>(IReadOnlyCollection<T> required, IReadOnlyCollection<T>? actual)
+        where T : struct, Enum
+    {
+        var present = actual == null ? new HashSet<T>() : new HashSet<T>(actual);
+        return Operator switch
+        {
+            EListComparisonOperator.All => required.All(present.Contains),
+            EListComparisonOperator.Any => required.Any(present.Contains),
+            EListComparisonOperator.None => required.All(tag => !present.Contains(tag)),
+            _ => false,
+        };
+    }
+}
+
+internal sealed record CombatImpactUseAttributionRule(
+    CombatImpactPrerequisiteSkillSourceRule SourceRule,
+    CombatImpactItemTagCondition ItemCondition,
+    int FixedTempoAmount
+);
+
+internal enum CombatImpactProjectionDiagnosticKind
+{
+    MissingPrerequisiteSkill,
+    AmbiguousPrerequisiteSkill,
+    MissingUseCount,
+    ExplicitApplicationsExceedUseCount,
+    RuleExecutionMismatch,
+    NonDisplayableAuthoritativeMetric,
+}
+
+internal sealed record CombatImpactProjectionDiagnostic(
+    CombatImpactProjectionDiagnosticKind Kind,
+    string SourceId,
+    string EffectId,
+    string? TriggerSourceId = null
 );
 
 internal sealed record CombatImpactEntity(
@@ -101,8 +210,34 @@ internal sealed record CombatImpactEntity(
     IReadOnlyDictionary<string, ECardAttributeType>? AuraAttributeTypesByEffectId = null,
     IReadOnlyCollection<string>? ReferenceValuedAuraEffectIds = null,
     EContainerSocketId? SocketId = null,
-    IReadOnlyCollection<EHiddenTag>? HiddenTags = null
+    IReadOnlyCollection<EHiddenTag>? HiddenTags = null,
+    EInventorySection? Section = null,
+    IReadOnlyCollection<ECardTag>? Tags = null,
+    IReadOnlyDictionary<
+        string,
+        CombatImpactPrerequisiteSkillSourceRule
+    >? PrerequisiteSkillSourceRulesByEffectId = null,
+    IReadOnlyCollection<CombatImpactUseAttributionRule>? UseAttributionRules = null
 );
+
+internal static class CombatImpactTags
+{
+    internal static IReadOnlyCollection<ECardTag>? Merge(
+        IReadOnlyCollection<ECardTag>? runtime,
+        IReadOnlyCollection<ECardTag>? template,
+        IReadOnlyCollection<ECardTag>? enchantment
+    )
+    {
+        var tags = new HashSet<ECardTag>();
+        if (runtime != null)
+            tags.UnionWith(runtime);
+        if (template != null)
+            tags.UnionWith(template);
+        if (enchantment != null)
+            tags.UnionWith(enchantment);
+        return tags.Count == 0 ? null : tags.ToArray();
+    }
+}
 
 internal static class CombatImpactHiddenTags
 {
@@ -149,7 +284,41 @@ internal sealed record CombatImpactEvent(
     internal int? AlternateNonCriticalValue { get; init; }
 
     internal bool HasCriticalAdjustmentCandidate { get; init; }
+
+    internal string? RawDirectSourceId { get; init; }
+
+    internal string? TriggerSourceId { get; init; }
+
+    internal int? TriggerFrameIndex { get; init; }
+
+    internal CombatImpactActivitySourceResolution ActivitySourceResolution { get; init; } =
+        CombatImpactActivitySourceResolution.Direct;
+
+    internal CombatImpactTriggerScope TriggerScope { get; init; } =
+        CombatImpactTriggerScope.NotApplicable;
 }
+
+internal sealed record CombatImpactApplicationLedger(
+    int ProjectedApplicationCount,
+    int? AuthoritativeApplicationCount,
+    bool ComparableToAuthoritativeCount,
+    int? ApplicationResidual,
+    CombatImpactControlStatus ControlStatus
+);
+
+internal sealed record CombatImpactAmountLedger(
+    int? AuthoritativeTotal,
+    int? ObservedAmount,
+    CombatImpactCoverage ObservedCoverage,
+    int ValuedApplicationCount,
+    int TotalApplicationCount,
+    CombatImpactValueUnit Unit,
+    CombatImpactValueBasis WeakestValueBasis,
+    bool ComparableToAuthoritativeTotal,
+    long? ResidualAmount,
+    CombatImpactResidualCoverage ResidualCoverage,
+    CombatImpactControlStatus ControlStatus
+);
 
 internal sealed record CombatImpactTarget(
     CombatImpactEntity Entity,
@@ -157,7 +326,10 @@ internal sealed record CombatImpactTarget(
     int? ObservedValue,
     CombatImpactValueUnit Unit,
     CombatImpactCoverage ObservedCoverage
-);
+)
+{
+    internal int ValuedApplicationCount { get; init; }
+}
 
 internal sealed record CombatImpactAuthoritativeMetric
 {
@@ -166,7 +338,8 @@ internal sealed record CombatImpactAuthoritativeMetric
         string nativeAttributeKey,
         int value,
         CombatImpactValueUnit unit,
-        CombatImpactAuthoritativeBasis basis
+        CombatImpactAuthoritativeBasis basis,
+        bool canReconcileApplicationCount = false
     )
     {
         var valid = basis switch
@@ -187,6 +360,7 @@ internal sealed record CombatImpactAuthoritativeMetric
         Value = value;
         Unit = unit;
         Basis = basis;
+        CanReconcileApplicationCount = canReconcileApplicationCount;
     }
 
     internal CombatImpactKind Kind { get; }
@@ -198,6 +372,8 @@ internal sealed record CombatImpactAuthoritativeMetric
     internal CombatImpactValueUnit Unit { get; }
 
     internal CombatImpactAuthoritativeBasis Basis { get; }
+
+    internal bool CanReconcileApplicationCount { get; }
 }
 
 internal sealed record CombatImpactGroup(
@@ -226,6 +402,34 @@ internal sealed record CombatImpactGroup(
 
     internal IReadOnlyList<CombatImpactTriggerSource> TriggerSources { get; init; } = [];
 
+    internal int UnattributedTriggerApplicationCount { get; init; }
+
+    internal int TriggerFallbackApplicationCount { get; init; }
+
+    internal int NoTriggerEvidenceApplicationCount { get; init; }
+
+    internal int NotApplicableTriggerApplicationCount { get; init; }
+
+    internal CombatImpactTriggerPresentationState TriggerPresentationState { get; init; }
+
+    internal CombatImpactApplicationLedger ApplicationLedger { get; init; } =
+        new(0, null, false, null, CombatImpactControlStatus.NotComparable);
+
+    internal CombatImpactAmountLedger AmountLedger { get; init; } =
+        new(
+            null,
+            null,
+            CombatImpactCoverage.None,
+            0,
+            0,
+            CombatImpactValueUnit.Amount,
+            CombatImpactValueBasis.None,
+            false,
+            null,
+            CombatImpactResidualCoverage.Unknown,
+            CombatImpactControlStatus.NotComparable
+        );
+
     internal CombatImpactPeriodicImpact? PeriodicImpact { get; init; }
 
     internal bool HasDivergentTargetCoverage =>
@@ -237,7 +441,11 @@ internal sealed record CombatImpactGroup(
             && Count != applications.Value;
 }
 
-internal sealed record CombatImpactTriggerSource(CombatImpactEntity Entity, int Count);
+internal sealed record CombatImpactTriggerSource(
+    CombatImpactEntity Entity,
+    int ApplicationCount,
+    int ObservedActivationBatchCount
+);
 
 internal sealed record CombatImpactSource(
     CombatImpactEntity Entity,
@@ -248,9 +456,7 @@ internal sealed record CombatImpactSource(
 {
     internal int TotalCount => EffectCount;
 
-    internal IReadOnlyList<CombatImpactTriggerSource> TriggerSources { get; init; } = [];
-
-    internal int TriggerCount => TriggerSources.Sum(source => source.Count);
+    internal int ObservedActivationBatchCount { get; init; }
 }
 
 internal sealed record CombatImpactIncomingSource(
@@ -259,7 +465,10 @@ internal sealed record CombatImpactIncomingSource(
     int? ObservedValue,
     CombatImpactValueUnit Unit,
     CombatImpactCoverage ObservedCoverage
-);
+)
+{
+    internal int ValuedApplicationCount { get; init; }
+}
 
 internal sealed record CombatImpactIncomingGroup(
     CombatImpactKind Kind,
@@ -282,6 +491,10 @@ internal sealed record CombatImpactIncomingGroup(
     internal int? CriticalObservedValue { get; init; }
 
     internal bool HasMixedValueDirections { get; init; }
+
+    internal int UnresolvedSourceCount { get; init; }
+
+    internal int ValuedApplicationCount { get; init; }
 }
 
 internal sealed record CombatImpactReceived(
@@ -298,6 +511,11 @@ internal sealed record CombatImpactReport(
     IReadOnlyList<CombatImpactReceived> Received
 )
 {
+    internal IReadOnlyList<PeriodicAttributionGap> PeriodicResiduals { get; init; } = [];
+
+    internal IReadOnlyList<CombatImpactProjectionDiagnostic> ProjectionDiagnostics { get; init; } =
+    [];
+
     internal static readonly CombatImpactReport Empty = new(
         Array.Empty<CombatImpactSource>(),
         Array.Empty<CombatImpactReceived>()

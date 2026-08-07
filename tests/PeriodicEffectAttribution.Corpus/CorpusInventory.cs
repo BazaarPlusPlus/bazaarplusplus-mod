@@ -55,18 +55,11 @@ internal static class CorpusInventory
             totalFrames += replay.Combat.Frames.Count;
             var identities = BuildIdentityMap(replay);
             ReadOpeningActions(replay, identities, openingActions, openingActionSources);
-            var attributionDiagnostics = new PeriodicEffectAttributionDiagnostics();
-            attribution.Observe(
-                PeriodicEffectAttribution.Project(
-                    replay.Combat,
-                    BuildAttributionEntities(replay, identities),
-                    attributionDiagnostics
-                ),
-                attributionDiagnostics,
+            var attributionReport = PeriodicEffectAttribution.Project(
                 replay.Combat,
-                identities,
-                replay.Spawn
+                BuildAttributionEntities(replay, identities)
             );
+            attribution.Observe(attributionReport, replay.Combat, identities, replay.Spawn);
             terminalImpact.Observe(replay.Combat, replay.Spawn);
             var statSources = CountStatSources(replay.Combat);
             var statAmounts = SumStatAmounts(replay.Combat);
@@ -1473,7 +1466,6 @@ internal sealed class AttributionCoverage
     public int BattlesWithResults { get; private set; }
     public int Results { get; private set; }
     public int ExactResults { get; private set; }
-    public int ConstrainedResults { get; private set; }
     public int ProportionalResults { get; private set; }
     public SortedDictionary<string, int> ResultsByKindAndProof { get; } =
         new(StringComparer.Ordinal);
@@ -1485,13 +1477,24 @@ internal sealed class AttributionCoverage
         new(StringComparer.Ordinal);
     public int AllocationDecisions { get; private set; }
     public int ExactAllocationDecisions { get; private set; }
-    public int ConstrainedAllocationDecisions { get; private set; }
     public int ProportionalAllocationDecisions { get; private set; }
     public SortedDictionary<string, int> AllocationDecisionsByKindAndProof { get; } =
         new(StringComparer.Ordinal);
     public SortedDictionary<string, long> AllocatedHealthByKindAndProof { get; } =
         new(StringComparer.Ordinal);
     public SortedDictionary<string, long> AllocatedShieldByKindAndProof { get; } =
+        new(StringComparer.Ordinal);
+    public SortedDictionary<string, long> MeasuredHealthByCombatantAndKind { get; } =
+        new(StringComparer.Ordinal);
+    public SortedDictionary<string, long> MeasuredShieldByCombatantAndKind { get; } =
+        new(StringComparer.Ordinal);
+    public SortedDictionary<string, long> AllocatedHealthByCombatantAndKind { get; } =
+        new(StringComparer.Ordinal);
+    public SortedDictionary<string, long> AllocatedShieldByCombatantAndKind { get; } =
+        new(StringComparer.Ordinal);
+    public SortedDictionary<string, long> ResidualHealthByCombatantAndKind { get; } =
+        new(StringComparer.Ordinal);
+    public SortedDictionary<string, long> ResidualShieldByCombatantAndKind { get; } =
         new(StringComparer.Ordinal);
     public int GapFrames { get; private set; }
     public int UnknownFrames { get; private set; }
@@ -1521,10 +1524,8 @@ internal sealed class AttributionCoverage
     public SortedDictionary<string, long> RegenUnknownBySpawnBaseline { get; } =
         new(StringComparer.Ordinal);
     public long ExactHealthAmount { get; private set; }
-    public long ConstrainedHealthAmount { get; private set; }
     public long ProportionalHealthAmount { get; private set; }
     public long ExactShieldAmount { get; private set; }
-    public long ConstrainedShieldAmount { get; private set; }
     public long ProportionalShieldAmount { get; private set; }
     public long ExcludedStatusAbsentRegenHealth { get; private set; }
     public int RegenFramesWithAttempt { get; private set; }
@@ -1569,13 +1570,24 @@ internal sealed class AttributionCoverage
     }
 
     internal void Observe(
-        IReadOnlyDictionary<PeriodicImpactKey, CombatImpactPeriodicImpact> impacts,
-        PeriodicEffectAttributionDiagnostics diagnostics,
+        PeriodicAttributionReport report,
         CombatSim combat,
         IReadOnlyDictionary<string, CardIdentity> identities,
         GameSim spawn
     )
     {
+        var impacts = report.SourceImpacts;
+        ValidateLedger(report);
+        foreach (var (key, measured) in report.MeasuredTotals)
+        {
+            var ledgerKey = $"{key.Combatant}/{key.Kind}";
+            MeasuredHealthByCombatantAndKind[ledgerKey] =
+                MeasuredHealthByCombatantAndKind.GetValueOrDefault(ledgerKey)
+                + measured.HealthAmount;
+            MeasuredShieldByCombatantAndKind[ledgerKey] =
+                MeasuredShieldByCombatantAndKind.GetValueOrDefault(ledgerKey)
+                + measured.ShieldAmount;
+        }
         var regenMeasurements = BuildRegenMeasurements(combat, spawn);
         foreach (var pair in regenMeasurements)
         {
@@ -1611,7 +1623,10 @@ internal sealed class AttributionCoverage
         if (impacts.Count > 0)
             BattlesWithResults++;
         foreach (
-            var (key, impact) in impacts.OrderBy(pair => pair.Key.SourceId, StringComparer.Ordinal)
+            var (key, impact) in impacts
+                .OrderBy(pair => pair.Key.SourceId, StringComparer.Ordinal)
+                .ThenBy(pair => pair.Key.Combatant)
+                .ThenBy(pair => pair.Key.Kind)
         )
         {
             Results++;
@@ -1630,11 +1645,6 @@ internal sealed class AttributionCoverage
                     ExactHealthAmount += impact.HealthAmount;
                     ExactShieldAmount += impact.ShieldAmount;
                     break;
-                case CombatImpactPeriodicProof.Constrained:
-                    ConstrainedResults++;
-                    ConstrainedHealthAmount += impact.HealthAmount;
-                    ConstrainedShieldAmount += impact.ShieldAmount;
-                    break;
                 case CombatImpactPeriodicProof.Proportional:
                     ProportionalResults++;
                     ProportionalHealthAmount += impact.HealthAmount;
@@ -1643,13 +1653,20 @@ internal sealed class AttributionCoverage
             }
         }
 
-        foreach (var allocation in diagnostics.Allocations)
+        foreach (var allocation in report.Allocations)
         {
             AllocationDecisions++;
             var allocationKey = $"{allocation.Kind}/{allocation.Proof}";
             AllocationDecisionsByKindAndProof[allocationKey]++;
             AllocatedHealthByKindAndProof[allocationKey] += allocation.HealthAmount;
             AllocatedShieldByKindAndProof[allocationKey] += allocation.ShieldAmount;
+            var ledgerKey = $"{allocation.Combatant}/{allocation.Kind}";
+            AllocatedHealthByCombatantAndKind[ledgerKey] =
+                AllocatedHealthByCombatantAndKind.GetValueOrDefault(ledgerKey)
+                + allocation.HealthAmount;
+            AllocatedShieldByCombatantAndKind[ledgerKey] =
+                AllocatedShieldByCombatantAndKind.GetValueOrDefault(ledgerKey)
+                + allocation.ShieldAmount;
             if (
                 allocation.Kind == CombatImpactPeriodicKind.Regen
                 && regenMeasurements.TryGetValue(
@@ -1706,20 +1723,22 @@ internal sealed class AttributionCoverage
                 case CombatImpactPeriodicProof.Exact:
                     ExactAllocationDecisions++;
                     break;
-                case CombatImpactPeriodicProof.Constrained:
-                    ConstrainedAllocationDecisions++;
-                    break;
                 case CombatImpactPeriodicProof.Proportional:
                     ProportionalAllocationDecisions++;
                     break;
             }
         }
 
-        foreach (var gap in diagnostics.Gaps)
+        foreach (var gap in report.Residuals)
         {
             GapFrames++;
             var kind = gap.Kind.ToString();
             var origin = gap.Origin.ToString();
+            var ledgerKey = $"{gap.Combatant}/{gap.Kind}";
+            ResidualHealthByCombatantAndKind[ledgerKey] =
+                ResidualHealthByCombatantAndKind.GetValueOrDefault(ledgerKey) + gap.HealthAmount;
+            ResidualShieldByCombatantAndKind[ledgerKey] =
+                ResidualShieldByCombatantAndKind.GetValueOrDefault(ledgerKey) + gap.ShieldAmount;
             var isMeasuredSourceImpact = gap.Kind != CombatImpactPeriodicKind.Regen;
             var bookedGapHealth = gap.HealthAmount;
             if (
@@ -1898,6 +1917,91 @@ internal sealed class AttributionCoverage
                     + gap.HealthAmount;
             }
         }
+    }
+
+    private static void ValidateLedger(PeriodicAttributionReport report)
+    {
+        var booked = new Dictionary<PeriodicMeasurementKey, PeriodicMeasuredAmounts>();
+        foreach (var allocation in report.Allocations)
+        {
+            AddBooked(
+                booked,
+                new PeriodicMeasurementKey(allocation.Combatant, allocation.Kind),
+                allocation.HealthAmount,
+                allocation.ShieldAmount
+            );
+        }
+        foreach (var residual in report.Residuals)
+        {
+            AddBooked(
+                booked,
+                new PeriodicMeasurementKey(residual.Combatant, residual.Kind),
+                residual.HealthAmount,
+                residual.ShieldAmount
+            );
+        }
+
+        foreach (var key in report.MeasuredTotals.Keys.Union(booked.Keys))
+        {
+            report.MeasuredTotals.TryGetValue(key, out var measured);
+            booked.TryGetValue(key, out var accounted);
+            if (measured != accounted)
+            {
+                throw new InvalidOperationException(
+                    $"Periodic attribution ledger did not reconcile for {key.Combatant}/{key.Kind}: "
+                        + $"measured health={measured.HealthAmount}, shield={measured.ShieldAmount}; "
+                        + $"accounted health={accounted.HealthAmount}, shield={accounted.ShieldAmount}."
+                );
+            }
+        }
+
+        var sourceRollups = report.Allocations.GroupBy(allocation => new PeriodicImpactKey(
+            allocation.SourceId,
+            allocation.Combatant,
+            allocation.Kind
+        ));
+        foreach (var rollup in sourceRollups)
+        {
+            if (!report.SourceImpacts.TryGetValue(rollup.Key, out var impact))
+                throw new InvalidOperationException(
+                    $"Missing periodic source rollup for {rollup.Key}."
+                );
+            var health = rollup.Sum(allocation => allocation.HealthAmount);
+            var shield = rollup.Sum(allocation => allocation.ShieldAmount);
+            var proof = rollup.Any(allocation =>
+                allocation.Proof == CombatImpactPeriodicProof.Proportional
+            )
+                ? CombatImpactPeriodicProof.Proportional
+                : CombatImpactPeriodicProof.Exact;
+            if (
+                impact.HealthAmount != health
+                || impact.ShieldAmount != shield
+                || impact.Proof != proof
+            )
+            {
+                throw new InvalidOperationException(
+                    $"Periodic source rollup did not reconcile for {rollup.Key}."
+                );
+            }
+        }
+        if (report.SourceImpacts.Count != sourceRollups.Count())
+            throw new InvalidOperationException(
+                "Periodic source rollup contains unbooked entries."
+            );
+    }
+
+    private static void AddBooked(
+        IDictionary<PeriodicMeasurementKey, PeriodicMeasuredAmounts> totals,
+        PeriodicMeasurementKey key,
+        long health,
+        long shield
+    )
+    {
+        totals.TryGetValue(key, out var current);
+        totals[key] = new PeriodicMeasuredAmounts(
+            current.HealthAmount + health,
+            current.ShieldAmount + shield
+        );
     }
 
     private static Dictionary<
