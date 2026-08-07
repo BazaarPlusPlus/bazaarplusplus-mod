@@ -24,5 +24,13 @@
       Include="..\..\src\BazaarPlusPlus\Game\MusicNotes\MusicNoteLetterMath.cs"
       Link="MusicNoteLetterMath.cs"
     />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\MusicNotes\MusicNoteBadgeStyling.cs"
+      Link="MusicNoteBadgeStyling.cs"
+    />
+    <Compile
+      Include="..\..\src\BazaarPlusPlus\Game\MusicNotes\MusicNoteBoardPlacement.cs"
+      Link="MusicNoteBoardPlacement.cs"
+    />
   </ItemGroup>
 </Project>
