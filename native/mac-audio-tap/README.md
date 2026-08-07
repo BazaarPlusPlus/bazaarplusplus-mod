@@ -91,4 +91,4 @@ nm -gU libBppMacAudio.dylib | grep BppMacAudio   # expect the four _BppMacAudio_
 
 A bare-process `Start`/`Read`/`Stop` smoke test exercises the tap / aggregate-device / IOProc /
 FIFO plumbing (it captures silence — a CLI process emits no audio). The real acceptance check
-is `ffmpeg volumedetect` on an in-game recording.
+is a sample-bearing AAC track with audible in-game audio in the final recording.

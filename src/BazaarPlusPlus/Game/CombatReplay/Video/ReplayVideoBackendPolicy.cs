@@ -5,26 +5,22 @@ internal enum ReplayVideoBackend
 {
     MacNative,
     WindowsNative,
-    Ffmpeg,
+    Unsupported,
 }
 
 /// <summary>
 /// Central platform split for capture, availability and finalize. Keeping this decision in one
-/// place prevents a macOS preflight or mux path from accidentally reintroducing FFmpeg while the
-/// frame encoder remains native.
+/// place keeps capture, availability and mux behavior aligned.
 /// </summary>
 internal static class ReplayVideoBackendPolicy
 {
     internal static ReplayVideoBackend Current =>
-        ForPlatform(FfmpegVideoEncoderProfile.DetectPlatform());
+        ForPlatform(ReplayVideoEncoderProfile.DetectPlatform());
 
     internal static ReplayVideoBackend ForPlatform(VideoEncoderPlatform platform) => platform switch
     {
         VideoEncoderPlatform.MacOS => ReplayVideoBackend.MacNative,
         VideoEncoderPlatform.Windows => ReplayVideoBackend.WindowsNative,
-        _ => ReplayVideoBackend.Ffmpeg,
+        _ => ReplayVideoBackend.Unsupported,
     };
-
-    internal static bool RequiresFfmpeg(ReplayVideoBackend backend) =>
-        backend == ReplayVideoBackend.Ffmpeg;
 }

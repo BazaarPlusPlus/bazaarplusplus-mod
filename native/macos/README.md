@@ -1,7 +1,7 @@
 # BppReplayVideoToolbox
 
 Native macOS backend for Combat Replay video recording. It keeps the real-time path inside the
-Unity process and does not use ScreenCaptureKit or FFmpeg.
+Unity process and does not use ScreenCaptureKit or an external encoder process.
 
 ## Data path
 
@@ -14,8 +14,8 @@ Unity process and does not use ScreenCaptureKit or FFmpeg.
 5. `BppVtMuxAudio` copies the H.264 samples and uses AVFoundation to mix/resample the WAV input to
    stereo 48 kHz AAC in the final MP4.
 
-No full-frame GPU readback, raw-video pipe, Screen Recording permission, or macOS FFmpeg binary is
-involved. Windows retains its existing AsyncGPUReadback + FFmpeg implementation.
+No full-frame GPU readback, raw-video pipe, or Screen Recording permission is involved. Windows
+uses the matching D3D11/Media Foundation native backend in `native/windows`.
 
 ## Build
 
@@ -58,6 +58,6 @@ handles are opaque across that boundary.
 - recorded replay p95 frame time is within 1 ms or 5% of the same replay without recording;
 - audio finishes as `full`;
 - the final MP4 has valid H.264 and AAC tracks and plays normally;
-- the same checks pass when no `ffmpeg` executable is available to the mod.
+- the packaged mod contains only the platform-native recorder plugin.
 
 p99 remains diagnostic telemetry, not a release gate.

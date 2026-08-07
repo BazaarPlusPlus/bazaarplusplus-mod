@@ -191,57 +191,6 @@ internal static class CombatReplayVideoLogEvents
         ]
     );
 
-    internal static readonly BppLogFieldDefinition FfmpegProbeAvailable = Field(0, "available");
-    internal static readonly BppLogFieldDefinition FfmpegProbeSource = Field(1, "source");
-    internal static readonly BppLogFieldDefinition FfmpegProbeExecutable = new(
-        2,
-        "executable",
-        BppLogFieldPrivacy.LocalPath,
-        BppLogCorrelationPolicy.None,
-        BppLogCardinality.High
-    );
-    internal static readonly BppLogFieldDefinition FfmpegProbeReasonCode = Field(3, "reason_code");
-    internal static readonly BppLogFieldDefinition FfmpegProbeDurationMs = Field(
-        4,
-        "duration_ms",
-        BppLogCardinality.High
-    );
-    internal static readonly BppLogFieldDefinition FfmpegProbeCodec = Field(5, "codec");
-    internal static readonly BppLogFieldDefinition FfmpegProbeWidth = Field(
-        6,
-        "width",
-        BppLogCardinality.High
-    );
-    internal static readonly BppLogFieldDefinition FfmpegProbeHeight = Field(
-        7,
-        "height",
-        BppLogCardinality.High
-    );
-    internal static readonly BppLogFieldDefinition FfmpegProbeFps = Field(8, "fps");
-    internal static readonly BppLogFieldDefinition FfmpegProbeStderrTail = new(
-        9,
-        "stderr_tail",
-        BppLogFieldPrivacy.UntrustedText,
-        BppLogCorrelationPolicy.None,
-        BppLogCardinality.High
-    );
-    internal static readonly BppLogEventDefinition FfmpegProbeCompleted = new(
-        BppLogFeatureScope.CombatReplay,
-        "combat_replay.ffmpeg.probe_completed",
-        [
-            FfmpegProbeAvailable,
-            FfmpegProbeSource,
-            FfmpegProbeExecutable,
-            FfmpegProbeReasonCode,
-            FfmpegProbeDurationMs,
-            FfmpegProbeCodec,
-            FfmpegProbeWidth,
-            FfmpegProbeHeight,
-            FfmpegProbeFps,
-            FfmpegProbeStderrTail,
-        ]
-    );
-
     internal static readonly BppLogFieldDefinition LifecycleStage = Field(0, "stage");
     internal static readonly BppLogFieldDefinition LifecycleRecordingId = Field(
         1,

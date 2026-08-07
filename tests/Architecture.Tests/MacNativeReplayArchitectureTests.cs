@@ -116,9 +116,9 @@ public sealed class MacNativeReplayArchitectureTests
     }
 
     [Fact]
-    public void Native_plugin_availability_is_probed_before_background_work()
+    public void Native_plugin_availability_is_probed_synchronously()
     {
-        AssertNativeProbePrecedesTaskRun(
+        AssertNativeProbeIsSynchronous(
             Path.Combine(
                 RepoRoot(),
                 "src",
@@ -127,10 +127,9 @@ public sealed class MacNativeReplayArchitectureTests
                 "CombatReplay",
                 "Video",
                 "CombatReplayVideoRecorder.cs"
-            ),
-            "_availabilityTask = Task.Run"
+            )
         );
-        AssertNativeProbePrecedesTaskRun(
+        AssertNativeProbeIsSynchronous(
             Path.Combine(
                 RepoRoot(),
                 "src",
@@ -138,12 +137,10 @@ public sealed class MacNativeReplayArchitectureTests
                 "Game",
                 "HistoryPanel",
                 "HistoryPanelReplayService.cs"
-            ),
-            "_ = Task.Run"
+            )
         );
-        AssertNativeProbePrecedesTaskRun(
-            Path.Combine(RepoRoot(), "src", "BazaarPlusPlus", "BazaarAgentReplayRecorderWiring.cs"),
-            "_ = Task.Run"
+        AssertNativeProbeIsSynchronous(
+            Path.Combine(RepoRoot(), "src", "BazaarPlusPlus", "BazaarAgentReplayRecorderWiring.cs")
         );
     }
 
@@ -167,7 +164,7 @@ public sealed class MacNativeReplayArchitectureTests
         );
     }
 
-    private static void AssertNativeProbePrecedesTaskRun(string sourcePath, string taskMarker)
+    private static void AssertNativeProbeIsSynchronous(string sourcePath)
     {
         var source = File.ReadAllText(sourcePath);
         var nativeProbe = source.IndexOf(
@@ -178,30 +175,14 @@ public sealed class MacNativeReplayArchitectureTests
             "WindowsMediaFoundationVideoEncoder.TryGetAvailability",
             StringComparison.Ordinal
         );
-        var backgroundTask = source.IndexOf(taskMarker, StringComparison.Ordinal);
-
         Assert.True(nativeProbe >= 0, $"Missing native availability probe in {sourcePath}.");
         Assert.True(
             windowsNativeProbe >= 0,
             $"Missing Windows native availability probe in {sourcePath}."
         );
-        Assert.True(backgroundTask >= 0, $"Missing background task boundary in {sourcePath}.");
-        Assert.True(
-            nativeProbe < backgroundTask,
-            $"Native plugin availability must be probed before Task.Run in {sourcePath}."
-        );
-        Assert.True(
-            windowsNativeProbe < backgroundTask,
-            $"Windows native plugin availability must be probed before Task.Run in {sourcePath}."
-        );
         Assert.DoesNotContain(
-            "MacMetalVideoEncoder.TryGetAvailability",
-            source[backgroundTask..],
-            StringComparison.Ordinal
-        );
-        Assert.DoesNotContain(
-            "WindowsMediaFoundationVideoEncoder.TryGetAvailability",
-            source[backgroundTask..],
+            "Task.Run",
+            source,
             StringComparison.Ordinal
         );
     }

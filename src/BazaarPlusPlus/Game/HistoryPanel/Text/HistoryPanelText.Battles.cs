@@ -254,12 +254,11 @@ internal static partial class HistoryPanelText
     internal static string RecordingUnavailable()
     {
         return FormatSimple(
-            "FFmpeg not detected; recording is unavailable.",
-            "未检测到 FFmpeg，无法录制。",
-            "未偵測到 FFmpeg，無法錄製。"
+            "Native video recorder is unavailable.",
+            "原生视频录制器不可用。",
+            "原生影片錄製器不可用。"
         );
     }
-
     internal static string GhostReplayPayloadUnavailable()
     {
         return FormatSimple(

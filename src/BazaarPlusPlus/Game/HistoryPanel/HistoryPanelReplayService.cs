@@ -33,16 +33,10 @@ internal sealed class HistoryPanelReplayService
         _ghostSyncService = ghostSyncService;
     }
 
-    // Capture Unity-owned dimensions/FPS on the UI thread. Desktop platforms also load their native plugin
-    // on that thread; other platforms resolve FFmpeg and probe the actual-settings encoder profile
-    // in the background. Per-refresh gates only read warm state.
+    // Capture Unity-owned dimensions/FPS and load the desktop native plugin on the UI thread.
     public void PrewarmRecordingAvailability()
     {
-        var pluginsDirectoryPath = _pluginsDirectoryPath;
-        var videoDirectoryPath = _videoDirectoryPath;
-        var hasSettings = ReplayVideoCaptureSettingsCache.TryCaptureCurrent(
-            out var captureSettings
-        );
+        ReplayVideoCaptureSettingsCache.TryCaptureCurrent(out _);
         var backend = ReplayVideoBackendPolicy.Current;
         if (backend == ReplayVideoBackend.MacNative)
         {
@@ -50,34 +44,11 @@ internal sealed class HistoryPanelReplayService
             return;
         }
         if (backend == ReplayVideoBackend.WindowsNative)
-        {
             WindowsMediaFoundationVideoEncoder.TryGetAvailability(out _);
-            return;
-        }
-
-        _ = Task.Run(() =>
-        {
-            var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
-            if (
-                hasSettings
-                && !string.IsNullOrWhiteSpace(ffmpegExecutable)
-                && !string.IsNullOrWhiteSpace(videoDirectoryPath)
-            )
-            {
-                FfmpegVideoEncoderSelector.Prewarm(
-                    ffmpegExecutable,
-                    videoDirectoryPath,
-                    captureSettings.Width,
-                    captureSettings.Height,
-                    captureSettings.Fps
-                );
-            }
-        });
     }
 
     // Recording is feasible only when the replay itself can run AND the shared recording gate
-    // passes (native desktop encoders; async GPU readback + FFmpeg elsewhere; plus a
-    // video directory on every platform). The backend probe is already warm here.
+    // passes (a native desktop encoder plus a video directory). The backend probe is warm here.
     public bool CanRecordReplay(HistoryBattleRecord? battle, out string reason)
     {
         return CanRecordReplay(battle, out reason, out _);

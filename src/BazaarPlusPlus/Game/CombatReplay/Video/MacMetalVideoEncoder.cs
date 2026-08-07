@@ -48,7 +48,7 @@ internal sealed class MacMetalVideoEncoder : IReplayVideoEncoder
     private bool _sealed;
     private bool _finished;
     private bool _disposed;
-    private FfmpegEncoderFailureReasonCode _failureReasonCode;
+    private ReplayVideoEncoderFailureReasonCode _failureReasonCode;
     private IntPtr _renderEventFunction;
 
     internal MacMetalVideoEncoder(
@@ -74,15 +74,15 @@ internal sealed class MacMetalVideoEncoder : IReplayVideoEncoder
         {
             lock (_nativeSync)
             {
-                return _failureReasonCode != FfmpegEncoderFailureReasonCode.None
+                return _failureReasonCode != ReplayVideoEncoderFailureReasonCode.None
                     || (_handle != IntPtr.Zero && BppVtIsFailed(_handle) != 0);
             }
         }
     }
 
-    public FfmpegEncoderFailureReasonCode FailureReasonCode =>
-        _failureReasonCode == FfmpegEncoderFailureReasonCode.None
-            ? FfmpegEncoderFailureReasonCode.WriterCrashed
+    public ReplayVideoEncoderFailureReasonCode FailureReasonCode =>
+        _failureReasonCode == ReplayVideoEncoderFailureReasonCode.None
+            ? ReplayVideoEncoderFailureReasonCode.WriterCrashed
             : _failureReasonCode;
 
     internal int SlotCount => _slotCount;
@@ -91,7 +91,7 @@ internal sealed class MacMetalVideoEncoder : IReplayVideoEncoder
 
     internal static bool TryGetAvailability(out string? reason)
     {
-        if (FfmpegVideoEncoderProfile.DetectPlatform() != VideoEncoderPlatform.MacOS)
+        if (ReplayVideoEncoderProfile.DetectPlatform() != VideoEncoderPlatform.MacOS)
         {
             reason = "The native replay recorder is only available on macOS.";
             return false;
@@ -265,14 +265,14 @@ internal sealed class MacMetalVideoEncoder : IReplayVideoEncoder
         // VideoToolbox is drained by WaitForCompletion after Unity has sealed all GPU requests.
     }
 
-    public FfmpegEncoderCompletionOutcome WaitForCompletion(TimeSpan timeout)
+    public ReplayVideoEncoderCompletionOutcome WaitForCompletion(TimeSpan timeout)
     {
         lock (_nativeSync)
         {
             if (_handle == IntPtr.Zero)
             {
-                return FfmpegEncoderCompletionOutcome.Failure(
-                    FfmpegEncoderFailureReasonCode.WriterCrashed,
+                return ReplayVideoEncoderCompletionOutcome.Failure(
+                    ReplayVideoEncoderFailureReasonCode.WriterCrashed,
                     null,
                     "Metal VideoToolbox encoder handle is unavailable."
                 );
@@ -280,16 +280,16 @@ internal sealed class MacMetalVideoEncoder : IReplayVideoEncoder
             if (_finished)
                 return WriterFailed
                     ? NativeFailureOutcome()
-                    : FfmpegEncoderCompletionOutcome.Success(ReadNativeError());
+                    : ReplayVideoEncoderCompletionOutcome.Success(ReadNativeError());
 
             var timeoutMs = (int)Math.Max(1, Math.Min(int.MaxValue, timeout.TotalMilliseconds));
             var succeeded = BppVtFinish(_handle, timeoutMs) != 0;
             _finished = true;
             LogStats();
             if (succeeded && !WriterFailed)
-                return FfmpegEncoderCompletionOutcome.Success(ReadNativeError());
+                return ReplayVideoEncoderCompletionOutcome.Success(ReadNativeError());
 
-            _failureReasonCode = FfmpegEncoderFailureReasonCode.WriterCrashed;
+            _failureReasonCode = ReplayVideoEncoderFailureReasonCode.WriterCrashed;
             return NativeFailureOutcome();
         }
     }
@@ -310,8 +310,8 @@ internal sealed class MacMetalVideoEncoder : IReplayVideoEncoder
         }
     }
 
-    private FfmpegEncoderCompletionOutcome NativeFailureOutcome() =>
-        FfmpegEncoderCompletionOutcome.Failure(FailureReasonCode, null, ReadNativeError());
+    private ReplayVideoEncoderCompletionOutcome NativeFailureOutcome() =>
+        ReplayVideoEncoderCompletionOutcome.Failure(FailureReasonCode, null, ReadNativeError());
 
     private string ReadNativeError()
     {

@@ -123,9 +123,7 @@ internal static class BazaarAgentReplayRecorderWiring
         if (!runtime.CanReplaySavedCombats(out reason))
             return false;
 
-        // macOS's native plugin is loaded synchronously on this Unity main-thread facade. Other
-        // platforms may still be resolving FFmpeg (~2s) in the background; until that finishes,
-        // answer with a retryable rejection instead of freezing the game.
+        // Native plugins are loaded synchronously on this Unity main-thread facade.
         if (!_recordingPrewarmCompleted)
         {
             reason = "Recording availability probe is still warming up; retry shortly.";
@@ -140,10 +138,8 @@ internal static class BazaarAgentReplayRecorderWiring
         {
             reason = gate.Blocker switch
             {
-                CombatReplayRecordingBlocker.NoAsyncGpuReadback =>
-                    "Video recording is unavailable on this device (no async GPU readback).",
-                CombatReplayRecordingBlocker.FfmpegUnavailable =>
-                    "Video recording is unavailable (FFmpeg could not be resolved).",
+                CombatReplayRecordingBlocker.UnsupportedPlatform =>
+                    "Video recording is supported on macOS and Windows.",
                 CombatReplayRecordingBlocker.NativeRecorderUnavailable =>
                     "Video recording is unavailable (the platform-native recorder could not be loaded).",
                 _ => "Video recording is unavailable (video directory is not configured).",
@@ -191,54 +187,22 @@ internal static class BazaarAgentReplayRecorderWiring
     }
 
     // Probe the platform backend the first time the host touches the facade. This facade is called
-    // on Unity's main thread, which is mandatory for the first native-plugin load. Other
-    // platforms resolve FFmpeg and probe the actual-dimensions encoder profile off-thread.
+    // on Unity's main thread, which is mandatory for the first native-plugin load.
     private static void PrewarmRecordingOnce(IBppServices services)
     {
         if (Interlocked.Exchange(ref _recordingPrewarmKicked, 1) != 0)
             return;
 
-        var backend = ReplayVideoBackendPolicy.Current;
-        if (backend == ReplayVideoBackend.MacNative)
+        _ = services;
+        switch (ReplayVideoBackendPolicy.Current)
         {
-            MacMetalVideoEncoder.TryGetAvailability(out _);
-            _recordingPrewarmCompleted = true;
-            return;
+            case ReplayVideoBackend.MacNative:
+                MacMetalVideoEncoder.TryGetAvailability(out _);
+                break;
+            case ReplayVideoBackend.WindowsNative:
+                WindowsMediaFoundationVideoEncoder.TryGetAvailability(out _);
+                break;
         }
-        if (backend == ReplayVideoBackend.WindowsNative)
-        {
-            WindowsMediaFoundationVideoEncoder.TryGetAvailability(out _);
-            _recordingPrewarmCompleted = true;
-            return;
-        }
-
-        var pluginsDirectoryPath = services.Paths.PluginsDirectoryPath;
-        var videoDirectoryPath = PathConstants.CombatReplayVideos(services.Paths.RequireDataRoot());
-        var hasSettings = ReplayVideoCaptureSettingsCache.TryGet(out var captureSettings);
-        _ = Task.Run(() =>
-        {
-            try
-            {
-                var ffmpegExecutable = FfmpegLocator.Resolve(pluginsDirectoryPath);
-                if (
-                    hasSettings
-                    && !string.IsNullOrWhiteSpace(ffmpegExecutable)
-                    && !string.IsNullOrWhiteSpace(videoDirectoryPath)
-                )
-                {
-                    FfmpegVideoEncoderSelector.Prewarm(
-                        ffmpegExecutable,
-                        videoDirectoryPath,
-                        captureSettings.Width,
-                        captureSettings.Height,
-                        captureSettings.Fps
-                    );
-                }
-            }
-            finally
-            {
-                _recordingPrewarmCompleted = true;
-            }
-        });
+        _recordingPrewarmCompleted = true;
     }
 }

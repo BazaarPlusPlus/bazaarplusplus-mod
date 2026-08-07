@@ -49,7 +49,6 @@ internal sealed class ReplayVideoEncoderDrain
         var failureException = _input.FailureException;
         var exitCode = (int?)null;
         var stderrTail = (string?)null;
-        var encoderFailed = false;
         var encoder = _input.Encoder;
 
         if (encoder != null)
@@ -61,14 +60,12 @@ internal sealed class ReplayVideoEncoderDrain
                 stderrTail = outcome.StderrTail;
                 if (!outcome.Succeeded)
                 {
-                    encoderFailed = true;
                     failureReasonCode ??= MapReason(outcome.ReasonCode);
                     failureException ??= outcome.Exception;
                 }
             }
             catch (Exception ex)
             {
-                encoderFailed = true;
                 failureReasonCode ??= ReplayVideoRecordingReasonCode.EncoderWriterFailed;
                 failureException ??= ex;
             }
@@ -77,25 +74,11 @@ internal sealed class ReplayVideoEncoderDrain
                 encoder.Dispose();
             }
 
-            if (
-                encoderFailed
-                && encoder is FfmpegRawVideoEncoder
-                && request.EncoderProfile.HardwareAccelerated
-            )
-            {
-                FfmpegVideoEncoderSelector.Invalidate(
-                    request.FfmpegExecutable!,
-                    request.Width,
-                    request.Height,
-                    request.Fps,
-                    request.EncoderProfile.Codec
-                );
-            }
         }
 
         var endedAt = DateTimeOffset.UtcNow;
         var durationMs = (long)Math.Max(0, (endedAt - _input.StartedAtUtc).TotalMilliseconds);
-        var fileSize = FfmpegRawVideoEncoder.TryGetFileSize(request.OutputFilePath);
+        var fileSize = ReplayVideoFileHelpers.TryGetFileSize(request.OutputFilePath);
         var status =
             failureReasonCode.HasValue || fileSize <= 0
                 ? ReplayVideoCaptureStatus.Failed
@@ -211,14 +194,14 @@ internal sealed class ReplayVideoEncoderDrain
     }
 
     internal static ReplayVideoRecordingReasonCode MapReason(
-        FfmpegEncoderFailureReasonCode reasonCode
+        ReplayVideoEncoderFailureReasonCode reasonCode
     ) =>
         reasonCode switch
         {
-            FfmpegEncoderFailureReasonCode.NonZeroExit =>
+            ReplayVideoEncoderFailureReasonCode.NonZeroExit =>
                 ReplayVideoRecordingReasonCode.EncoderNonZeroExit,
-            FfmpegEncoderFailureReasonCode.WriterTimeout
-            or FfmpegEncoderFailureReasonCode.ProcessTimeout =>
+            ReplayVideoEncoderFailureReasonCode.WriterTimeout
+            or ReplayVideoEncoderFailureReasonCode.ProcessTimeout =>
                 ReplayVideoRecordingReasonCode.EncoderTimeout,
             _ => ReplayVideoRecordingReasonCode.EncoderWriterFailed,
         };

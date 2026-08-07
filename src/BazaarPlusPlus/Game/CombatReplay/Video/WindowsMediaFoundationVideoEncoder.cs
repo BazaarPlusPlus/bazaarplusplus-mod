@@ -41,7 +41,7 @@ internal sealed class WindowsMediaFoundationVideoEncoder : IReplayVideoEncoder
     private bool _sealed;
     private bool _finished;
     private bool _disposed;
-    private FfmpegEncoderFailureReasonCode _failureReasonCode;
+    private ReplayVideoEncoderFailureReasonCode _failureReasonCode;
 
     internal WindowsMediaFoundationVideoEncoder(
         string recordingId,
@@ -66,15 +66,15 @@ internal sealed class WindowsMediaFoundationVideoEncoder : IReplayVideoEncoder
         {
             lock (_nativeSync)
             {
-                return _failureReasonCode != FfmpegEncoderFailureReasonCode.None
+                return _failureReasonCode != ReplayVideoEncoderFailureReasonCode.None
                     || (_handle != IntPtr.Zero && BppMfIsFailed(_handle) != 0);
             }
         }
     }
 
-    public FfmpegEncoderFailureReasonCode FailureReasonCode =>
-        _failureReasonCode == FfmpegEncoderFailureReasonCode.None
-            ? FfmpegEncoderFailureReasonCode.WriterCrashed
+    public ReplayVideoEncoderFailureReasonCode FailureReasonCode =>
+        _failureReasonCode == ReplayVideoEncoderFailureReasonCode.None
+            ? ReplayVideoEncoderFailureReasonCode.WriterCrashed
             : _failureReasonCode;
 
     internal int SlotCount => _slotCount;
@@ -83,7 +83,7 @@ internal sealed class WindowsMediaFoundationVideoEncoder : IReplayVideoEncoder
 
     internal static bool TryGetAvailability(out string? reason)
     {
-        if (FfmpegVideoEncoderProfile.DetectPlatform() != VideoEncoderPlatform.Windows)
+        if (ReplayVideoEncoderProfile.DetectPlatform() != VideoEncoderPlatform.Windows)
         {
             reason = "The Media Foundation replay recorder is only available on Windows.";
             return false;
@@ -251,14 +251,14 @@ internal sealed class WindowsMediaFoundationVideoEncoder : IReplayVideoEncoder
 
     public void SignalEndOfStream() { }
 
-    public FfmpegEncoderCompletionOutcome WaitForCompletion(TimeSpan timeout)
+    public ReplayVideoEncoderCompletionOutcome WaitForCompletion(TimeSpan timeout)
     {
         lock (_nativeSync)
         {
             if (_handle == IntPtr.Zero)
             {
-                return FfmpegEncoderCompletionOutcome.Failure(
-                    FfmpegEncoderFailureReasonCode.WriterCrashed,
+                return ReplayVideoEncoderCompletionOutcome.Failure(
+                    ReplayVideoEncoderFailureReasonCode.WriterCrashed,
                     null,
                     "Media Foundation encoder handle is unavailable."
                 );
@@ -266,15 +266,15 @@ internal sealed class WindowsMediaFoundationVideoEncoder : IReplayVideoEncoder
             if (_finished)
                 return WriterFailed
                     ? NativeFailureOutcome()
-                    : FfmpegEncoderCompletionOutcome.Success(ReadNativeError());
+                    : ReplayVideoEncoderCompletionOutcome.Success(ReadNativeError());
 
             var timeoutMs = (int)Math.Max(1, Math.Min(int.MaxValue, timeout.TotalMilliseconds));
             var succeeded = BppMfFinish(_handle, timeoutMs) != 0;
             _finished = true;
             LogStats();
             if (succeeded && !WriterFailed)
-                return FfmpegEncoderCompletionOutcome.Success(ReadNativeError());
-            _failureReasonCode = FfmpegEncoderFailureReasonCode.WriterCrashed;
+                return ReplayVideoEncoderCompletionOutcome.Success(ReadNativeError());
+            _failureReasonCode = ReplayVideoEncoderFailureReasonCode.WriterCrashed;
             return NativeFailureOutcome();
         }
     }
@@ -294,8 +294,8 @@ internal sealed class WindowsMediaFoundationVideoEncoder : IReplayVideoEncoder
         }
     }
 
-    private FfmpegEncoderCompletionOutcome NativeFailureOutcome() =>
-        FfmpegEncoderCompletionOutcome.Failure(FailureReasonCode, null, ReadNativeError());
+    private ReplayVideoEncoderCompletionOutcome NativeFailureOutcome() =>
+        ReplayVideoEncoderCompletionOutcome.Failure(FailureReasonCode, null, ReadNativeError());
 
     private string ReadNativeError()
     {

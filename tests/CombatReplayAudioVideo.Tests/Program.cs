@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection;
 using BepInEx.Logging;
 
@@ -7,26 +6,19 @@ using BepInEx.Logging;
 // (Type.GetType("Full.Name, BazaarPlusPlus")):
 //   1) WavStreamWriter    -- byte-exact WAV header
 //   2) WallClockCfrPacer  -- wall-clock repeat/drop counting
-// Plus an optional ReplayVideoFramePool Rent/Return + cap micro-check, and the
-// ReplayVideoAudioMuxer zero-duration-output guard that protects the silent video
-// when a -shortest mux of an empty WAV exits 0 with an empty output.
+// Plus native encoder policy, timing, mux fallback and lifecycle contracts.
 
 WavHeaderTests.Run();
 CfrPacerTests.Run();
 NativeFrameSubmissionPlanTests.Run();
-FramePoolTests.Run();
 VideoEncoderProfileTests.Run();
 VideoBackendPolicyTests.Run();
 VideoBufferPlanTests.Run();
-ReadbackLimiterTests.Run();
 CopyTimingTests.Run();
-EncoderDisposeTests.Run();
 EncoderDrainTests.Run();
 OutputFileNameTests.Run();
 ZeroDurationMuxGuardTests.Run();
-MuxerArgumentTests.Run();
 AudioTapPlanTests.Run();
-BoundedTextTailTests.Run();
 RecordingOperationContractTests.Run();
 MediaEventCatalogTests.Run();
 AudioStopTimeoutTests.Run();
@@ -419,244 +411,13 @@ file static class NativeFrameSubmissionPlanTests
 // ---------------------------------------------------------------------------
 // 4) ReplayVideoFramePool: optional Rent/Return + cap micro-check.
 // ---------------------------------------------------------------------------
-file static class FramePoolTests
-{
-    private static readonly Type PoolType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoFramePool"
-    );
-
-    public static void Run()
-    {
-        const int frameLen = 64;
-        const int maxBuffers = 3;
-        var pool =
-            Activator.CreateInstance(PoolType, frameLen, maxBuffers)
-            ?? throw new InvalidOperationException("ReplayVideoFramePool should be constructible.");
-
-        TestReflection.Assert(
-            (int)TestReflection.GetProp(PoolType, pool, "FrameByteLength")! == frameLen,
-            "FrameByteLength should round-trip the ctor value."
-        );
-
-        // Rent up to the cap: every buffer is exactly frameLen bytes.
-        var rented = new List<byte[]>();
-        for (var i = 0; i < maxBuffers; i++)
-        {
-            var buf = Rent(pool);
-            TestReflection.Assert(buf != null, $"Rent #{i} under cap should allocate a buffer.");
-            TestReflection.Assert(
-                buf!.Length == frameLen,
-                "Rented buffers must be exactly FrameByteLength."
-            );
-            rented.Add(buf);
-        }
-
-        // Past the cap -> null (caller drops the frame), never throws.
-        TestReflection.Assert(
-            Rent(pool) == null,
-            "Renting past the live cap should return null, not throw."
-        );
-
-        // Return a correctly-sized buffer, then Rent reuses it (no new allocation, still under cap).
-        Return(pool, rented[0]);
-        var reused = Rent(pool);
-        TestReflection.Assert(
-            reused != null && reused!.Length == frameLen,
-            "Returned buffer should be reusable."
-        );
-        TestReflection.Assert(
-            ReferenceEquals(reused, rented[0]),
-            "Rent after Return should hand back the freed buffer."
-        );
-
-        // Returning a wrong-sized buffer is dropped (never requeued) and frees a cap slot.
-        Return(pool, new byte[frameLen + 1]); // wrong size: must be dropped, decrements live count
-        // Because a live slot was freed by dropping the oversized buffer, a fresh Rent
-        // can allocate again rather than hitting the cap.
-        var afterDrop = Rent(pool);
-        TestReflection.Assert(
-            afterDrop != null && afterDrop!.Length == frameLen,
-            "Dropping a wrong-sized buffer must free a live slot so a new exact-size buffer can be rented."
-        );
-
-        // Null return is ignored (no throw).
-        Return(pool, null!);
-    }
-
-    private static byte[]? Rent(object pool) =>
-        (byte[]?)
-            TestReflection.Invoke(PoolType, pool, "Rent", Type.EmptyTypes, Array.Empty<object>());
-
-    private static void Return(object pool, byte[] buffer) =>
-        TestReflection.Invoke(
-            PoolType,
-            pool,
-            "Return",
-            new[] { typeof(byte[]) },
-            new object[] { buffer }
-        );
-}
-
-// ---------------------------------------------------------------------------
-// 4) Video encoder profiles: platform order, non-blocking selection cache,
-//    dynamic FPS cap, bitrate bounds, and exact production/probe arguments.
-// ---------------------------------------------------------------------------
 file static class VideoEncoderProfileTests
 {
     private static readonly Type ProfileType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderProfile"
-    );
-    private static readonly Type PlatformType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.VideoEncoderPlatform"
-    );
-    private static readonly Type SelectorType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderSelector"
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoEncoderProfile"
     );
 
     public static void Run()
-    {
-        NonMacFrameRateKeepsThirtyFpsCap();
-        MacNativeFrameRateIsSixtyFps();
-        WindowsNativeFrameRateIsSixtyFps();
-        CandidateOrderAndCache();
-        RateControlAndArguments();
-    }
-
-    private static void NonMacFrameRateKeepsThirtyFpsCap()
-    {
-        var resolver = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoFrameRateResolver"
-        );
-        var normalize = resolver.GetMethod(
-            "Normalize",
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-        )!;
-        int Resolve(int value) => (int)normalize.Invoke(null, new object[] { value })!;
-
-        TestReflection.Assert(Resolve(15) == 15, "A user-selected 15 fps must be preserved.");
-        TestReflection.Assert(Resolve(30) == 30, "A user-selected 30 fps must be preserved.");
-        TestReflection.Assert(Resolve(60) == 30, "FFmpeg recording must cap 60 fps at 30.");
-        TestReflection.Assert(Resolve(120) == 30, "FFmpeg recording must cap 120 fps at 30.");
-        TestReflection.Assert(Resolve(-1) == 30, "An unset Unity FPS must fall back to 30.");
-    }
-
-    private static void MacNativeFrameRateIsSixtyFps()
-    {
-        var defaults = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureDefaults"
-        );
-        var nativeFps = (int)(
-            defaults
-                .GetField(
-                    "MacNativeFps",
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-                )
-                ?.GetRawConstantValue()
-            ?? throw new InvalidOperationException("MacNativeFps constant not found.")
-        );
-        TestReflection.Assert(
-            nativeFps == 60,
-            "macOS native recording must remain fixed at 60 fps."
-        );
-    }
-
-    private static void WindowsNativeFrameRateIsSixtyFps()
-    {
-        var defaults = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureDefaults"
-        );
-        var nativeFps = (int)(
-            defaults
-                .GetField(
-                    "WindowsNativeFps",
-                    BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-                )
-                ?.GetRawConstantValue()
-            ?? throw new InvalidOperationException("WindowsNativeFps constant not found.")
-        );
-        TestReflection.Assert(
-            nativeFps == 60,
-            "Windows native recording must remain fixed at 60 fps."
-        );
-    }
-
-    private static void CandidateOrderAndCache()
-    {
-        // Assert the REAL production candidate order via FfmpegVideoEncoderProfile.Candidates()
-        // (hardware profiles only; libx264 is the separate fallback appended by Resolve, so it
-        // is never a Candidates() element). This is what SelectOrPrewarm/Resolve actually consume.
-        var candidatesMethod = ProfileType.GetMethod(
-            "Candidates",
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-        )!;
-        var codecProperty = ProfileType.GetProperty(
-            "Codec",
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-        )!;
-        string[] ProductionCodecs(string platform) =>
-            (
-                (System.Collections.IEnumerable)
-                    candidatesMethod.Invoke(
-                        null,
-                        new object[] { Enum.Parse(PlatformType, platform), 1280, 720, 30 }
-                    )!
-            )
-                .Cast<object>()
-                .Select(profile => (string)codecProperty.GetValue(profile)!)
-                .ToArray();
-
-        TestReflection.Assert(
-            ProductionCodecs("MacOS").SequenceEqual(new[] { "h264_videotoolbox" }),
-            "macOS hardware candidates must be VideoToolbox only."
-        );
-        TestReflection.Assert(
-            ProductionCodecs("Windows")
-                .SequenceEqual(new[] { "h264_nvenc", "h264_qsv", "h264_amf" }),
-            "Windows hardware candidate order must be NVENC, QSV, AMF."
-        );
-        TestReflection.Assert(
-            ProductionCodecs("Other").Length == 0,
-            "Unknown platforms must expose no hardware candidates (libx264 fallback only)."
-        );
-
-        var reset = SelectorType.GetMethod(
-            "ResetForTests",
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-        )!;
-        var resolve = SelectorType.GetMethod(
-            "ResolveCodecForTests",
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-        )!;
-        reset.Invoke(null, null);
-        var probes = 0;
-        Func<string, bool> qsvOnly = codec =>
-        {
-            probes++;
-            return codec == "h264_qsv";
-        };
-        var windows = Enum.Parse(PlatformType, "Windows");
-        var first = (string)resolve.Invoke(null, new object[] { "same", windows, qsvOnly })!;
-        var second = (string)resolve.Invoke(null, new object[] { "same", windows, qsvOnly })!;
-        TestReflection.Assert(
-            first == "h264_qsv" && second == first,
-            "QSV must win after NVENC fails."
-        );
-        TestReflection.Assert(probes == 2, "A completed selection must be cached by key.");
-
-        Func<string, bool> none = _ => false;
-        var mac = (string)
-            resolve.Invoke(
-                null,
-                new object[] { "fallback", Enum.Parse(PlatformType, "MacOS"), none }
-            )!;
-        TestReflection.Assert(
-            mac == "libx264",
-            "Failed hardware probes must fall back to libx264."
-        );
-        reset.Invoke(null, null);
-    }
-
-    private static void RateControlAndArguments()
     {
         var bitrate = ProfileType.GetMethod(
             "CalculateTargetBitrateKbps",
@@ -664,80 +425,26 @@ file static class VideoEncoderProfileTests
         )!;
         int Target(int width, int height, int fps) =>
             (int)bitrate.Invoke(null, new object[] { width, height, fps })!;
-        TestReflection.Assert(
-            Target(640, 360, 15) == 6000,
-            "Hardware VBR must enforce 6 Mbps minimum."
-        );
-        TestReflection.Assert(
-            Target(2742, 1624, 30) == 20039,
-            "Native 30fps bitrate must follow the BPP formula."
-        );
-        TestReflection.Assert(
-            Target(2742, 1624, 60) == 24000,
-            "60fps bitrate must enforce 24 Mbps maximum."
-        );
+        TestReflection.Assert(Target(640, 360, 15) == 6000, "Native VBR must enforce 6 Mbps minimum.");
+        TestReflection.Assert(Target(2742, 1624, 60) == 24000, "Native VBR must enforce 24 Mbps maximum.");
 
-        var software = ProfileType
-            .GetMethod(
-                "Libx264",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-            )!
-            .Invoke(null, null)!;
-        var build = TestReflection
-            .RequireType("BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderArguments")
-            .GetMethod(
-                "Build",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-            )!;
-        string Build(object profile, int fps, int? limit = null) =>
-            (string)
-                build.Invoke(null, new object?[] { profile, 2742, 1624, fps, "out.mp4", limit })!;
-        var softwareArgs = Build(software, 30);
-        TestReflection.Assert(
-            softwareArgs
-                == "-hide_banner -loglevel warning -nostdin -y -f rawvideo -pixel_format rgba -video_size 2742x1624 -framerate 30 -i pipe:0 -c:v libx264 -pix_fmt yuv420p -preset veryfast -crf 23 -movflags +faststart out.mp4",
-            "The libx264 fallback must preserve the existing argument contract exactly."
-        );
-
-        var candidateMethod = ProfileType.GetMethod(
-            "Candidates",
+        var mac = ProfileType.GetMethod(
+            "NativeVideoToolbox",
             BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-        )!;
-        var macCandidates = (
-            (System.Collections.IEnumerable)
-                candidateMethod.Invoke(
-                    null,
-                    new object[] { Enum.Parse(PlatformType, "MacOS"), 2742, 1624, 60 }
-                )!
-        )
-            .Cast<object>()
-            .ToArray();
-        var hardwareArgs = Build(macCandidates[0], 60, limit: 1);
-        foreach (
-            var token in new[]
-            {
-                "-c:v h264_videotoolbox",
-                "-pix_fmt yuv420p",
-                "-realtime 1",
-                "-b:v 24000k",
-                "-maxrate 30000k",
-                "-bufsize 48000k",
-                "-frames:v 1",
-                "-movflags +faststart",
-            }
-        )
-        {
-            TestReflection.Assert(
-                hardwareArgs.Contains(token, StringComparison.Ordinal),
-                $"Hardware/probe arguments are missing {token}."
-            );
-        }
+        )!.Invoke(null, new object[] { 1920, 1080, 60 })!;
+        var windows = ProfileType.GetMethod(
+            "NativeMediaFoundation",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
+        )!.Invoke(null, new object[] { 1920, 1080, 60 })!;
+        TestReflection.Assert((string)TestReflection.GetProp(ProfileType, mac, "Codec")! == "h264_videotoolbox", "macOS must select VideoToolbox.");
+        TestReflection.Assert((string)TestReflection.GetProp(ProfileType, windows, "Codec")! == "h264_media_foundation", "Windows must select Media Foundation.");
+        TestReflection.Assert((string)TestReflection.GetProp(ProfileType, mac, "PixelFormat")! == "nv12", "Native video input must be NV12.");
     }
 }
 
 // ---------------------------------------------------------------------------
-// 4b) Platform backend contract: macOS and Windows are native while unknown
-//     platforms retain the existing FFmpeg path.
+// 4b) Platform backend contract: supported desktop platforms are native and
+//     unknown platforms are rejected.
 // ---------------------------------------------------------------------------
 file static class VideoBackendPolicyTests
 {
@@ -757,32 +464,24 @@ file static class VideoBackendPolicyTests
                 "ForPlatform",
                 BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
             ) ?? throw new InvalidOperationException("Replay backend platform selector not found.");
-        var requiresFfmpeg =
-            policyType.GetMethod(
-                "RequiresFfmpeg",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-            ) ?? throw new InvalidOperationException("Replay FFmpeg policy seam not found.");
-
         object Backend(string platform) =>
             forPlatform.Invoke(null, new[] { Enum.Parse(platformType, platform) })!;
-        bool Requires(object backend) =>
-            (bool)(requiresFfmpeg.Invoke(null, new[] { backend }) ?? true);
 
         var mac = Backend("MacOS");
         TestReflection.Assert(
-            mac.Equals(Enum.Parse(backendType, "MacNative")) && !Requires(mac),
-            "macOS must use the native replay backend without FFmpeg."
+            mac.Equals(Enum.Parse(backendType, "MacNative")),
+            "macOS must use the native replay backend."
         );
 
         var windows = Backend("Windows");
         TestReflection.Assert(
-            windows.Equals(Enum.Parse(backendType, "WindowsNative")) && !Requires(windows),
-            "Windows must use the native Media Foundation backend without FFmpeg."
+            windows.Equals(Enum.Parse(backendType, "WindowsNative")),
+            "Windows must use the native Media Foundation backend."
         );
         var other = Backend("Other");
         TestReflection.Assert(
-            other.Equals(Enum.Parse(backendType, "Ffmpeg")) && Requires(other),
-            "Unknown platforms retain the FFmpeg replay backend."
+            other.Equals(Enum.Parse(backendType, "Unsupported")),
+            "Unknown platforms must be rejected."
         );
 
         TestReflection.RequireType(
@@ -887,62 +586,6 @@ file static class VideoBufferPlanTests
 // 6) Readback limiter: reservations never exceed two and a released slot can be
 //    reused without blocking the Unity main thread.
 // ---------------------------------------------------------------------------
-file static class ReadbackLimiterTests
-{
-    private static readonly Type LimiterType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoReadbackLimiter"
-    );
-
-    public static void Run()
-    {
-        var limiter = Activator.CreateInstance(
-            LimiterType,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            binder: null,
-            args: new object[] { 2 },
-            culture: null
-        )!;
-        bool Reserve() =>
-            (bool)
-                TestReflection.Invoke(
-                    LimiterType,
-                    limiter,
-                    "TryReserve",
-                    Type.EmptyTypes,
-                    Array.Empty<object>()
-                )!;
-        void Release() =>
-            TestReflection.Invoke(
-                LimiterType,
-                limiter,
-                "Release",
-                Type.EmptyTypes,
-                Array.Empty<object>()
-            );
-
-        TestReflection.Assert(
-            Reserve() && Reserve(),
-            "The first two readbacks must reserve slots."
-        );
-        TestReflection.Assert(!Reserve(), "A third in-flight readback must be rejected.");
-        TestReflection.Assert(
-            (int)TestReflection.GetProp(LimiterType, limiter, "Outstanding")! == 2,
-            "Outstanding must cap at two."
-        );
-        Release();
-        TestReflection.Assert(Reserve(), "A completed readback must free a reusable slot.");
-        TestReflection.Assert(
-            (int)TestReflection.GetProp(LimiterType, limiter, "MaxObserved")! == 2,
-            "Observed maximum must never exceed two."
-        );
-        Release();
-        Release();
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 7) Copy timing: bounded samples produce a stable p95 for the NativeArray gate.
-// ---------------------------------------------------------------------------
 file static class CopyTimingTests
 {
     public static void Run()
@@ -981,48 +624,13 @@ file static class CopyTimingTests
 // ---------------------------------------------------------------------------
 // 8) Encoder cleanup: concurrent Dispose calls execute cleanup once.
 // ---------------------------------------------------------------------------
-file static class EncoderDisposeTests
-{
-    public static void Run()
-    {
-        var profileType = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderProfile"
-        );
-        var profile = profileType
-            .GetMethod(
-                "Libx264",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-            )!
-            .Invoke(null, null)!;
-        var encoderType = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegRawVideoEncoder"
-        );
-        var encoder = Activator.CreateInstance(
-            encoderType,
-            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-            binder: null,
-            args: new object?[] { "dispose-test", "ffmpeg", "out.mp4", 2, 2, 30, profile, 2, null },
-            culture: null
-        )!;
-        Parallel.For(0, 64, _ => ((IDisposable)encoder).Dispose());
-        TestReflection.Assert(
-            (int)TestReflection.GetProp(encoderType, encoder, "DisposeExecutionCount")! == 1,
-            "Encoder cleanup must execute exactly once under concurrent Dispose calls."
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 9) ReplayVideoEncoderDrain: encoder failures retain the recorder's terminal
-//    reason-code contract when finalization moves to a background task.
-// ---------------------------------------------------------------------------
 file static class EncoderDrainTests
 {
     private static readonly Type DrainType = TestReflection.RequireType(
         "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoEncoderDrain"
     );
     private static readonly Type EncoderReasonType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegEncoderFailureReasonCode"
+        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoEncoderFailureReasonCode"
     );
     private static readonly Type RecordingReasonType = TestReflection.RequireType(
         "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoRecordingReasonCode"
@@ -1030,8 +638,6 @@ file static class EncoderDrainTests
 
     public static void Run()
     {
-        ConcurrentCompletionDisposesOwnedEncoderOnce();
-
         var mapReason =
             DrainType.GetMethod(
                 "MapReason",
@@ -1060,126 +666,6 @@ file static class EncoderDrainTests
                 Equals(actual, Enum.Parse(RecordingReasonType, pair.Value)),
                 $"Encoder reason {pair.Key} must map to {pair.Value}."
             );
-        }
-    }
-
-    private static void ConcurrentCompletionDisposesOwnedEncoderOnce()
-    {
-        var profileType = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegVideoEncoderProfile"
-        );
-        var profile = profileType
-            .GetMethod(
-                "Libx264",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-            )!
-            .Invoke(null, null)!;
-        var encoderType = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegRawVideoEncoder"
-        );
-        var requestType = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoCaptureRequest"
-        );
-        var inputType = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoEncoderDrainInput"
-        );
-        var outputRoot = Path.Combine(
-            Path.GetTempPath(),
-            "bpp-encoder-drain-tests",
-            Guid.NewGuid().ToString("N")
-        );
-        Directory.CreateDirectory(outputRoot);
-        try
-        {
-            var outputPath = Path.Combine(outputRoot, "drained.recording.mp4");
-            File.WriteAllBytes(outputPath, new byte[] { 1, 2, 3, 4 });
-            var encoder = Activator.CreateInstance(
-                encoderType,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                binder: null,
-                args: new object?[]
-                {
-                    "drain-test",
-                    "ffmpeg",
-                    outputPath,
-                    2,
-                    2,
-                    30,
-                    profile,
-                    2,
-                    null,
-                },
-                culture: null
-            )!;
-            var request = Activator.CreateInstance(requestType, nonPublic: true)!;
-            SetProperty(requestType, request, "VideoId", "drain-test");
-            SetProperty(requestType, request, "BattleId", "battle-test");
-            SetProperty(requestType, request, "OutputFilePath", outputPath);
-            SetProperty(requestType, request, "Width", 2);
-            SetProperty(requestType, request, "Height", 2);
-            SetProperty(requestType, request, "Fps", 30);
-            SetProperty(requestType, request, "EncoderProfile", profile);
-
-            var input = Activator.CreateInstance(
-                inputType,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                binder: null,
-                args: new object?[]
-                {
-                    encoder,
-                    request,
-                    DateTimeOffset.UtcNow.AddSeconds(-1),
-                    1,
-                    0,
-                    0,
-                    null,
-                    null,
-                    null,
-                    16,
-                    0,
-                    0,
-                    0,
-                    0L,
-                    0L,
-                },
-                culture: null
-            )!;
-            var drain = Activator.CreateInstance(
-                DrainType,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                binder: null,
-                args: new[] { input },
-                culture: null
-            )!;
-            var complete =
-                DrainType.GetMethod(
-                    "Complete",
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                )
-                ?? throw new InvalidOperationException(
-                    "ReplayVideoEncoderDrain.Complete not found."
-                );
-            var results = new ConcurrentBag<object>();
-
-            Parallel.For(0, 64, _ => results.Add(complete.Invoke(drain, null)!));
-
-            var first = results.First();
-            TestReflection.Assert(
-                results.All(result => ReferenceEquals(first, result)),
-                "Concurrent drain completion must return the single built capture result."
-            );
-            TestReflection.Assert(
-                (int)TestReflection.GetProp(encoderType, encoder, "DisposeExecutionCount")! == 1,
-                "The drain must dispose its owned encoder exactly once."
-            );
-            TestReflection.Assert(
-                TestReflection.GetProp(first.GetType(), first, "Status")!.ToString() == "Completed",
-                "A drained non-empty capture with frames must remain completed."
-            );
-        }
-        finally
-        {
-            Directory.Delete(outputRoot, recursive: true);
         }
     }
 
@@ -1317,87 +803,6 @@ file static class ZeroDurationMuxGuardTests
 // 5) ReplayVideoAudioMuxer.BuildArguments: multi-WAV capture must mix the base
 //    bus audio and SFX bus audio into one AAC input via amix.
 // ---------------------------------------------------------------------------
-file static class MuxerArgumentTests
-{
-    private static readonly Type MuxerType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer"
-    );
-
-    public static void Run()
-    {
-        MultiWavArgumentsUseAmix();
-    }
-
-    private static void MultiWavArgumentsUseAmix()
-    {
-        var args = BuildArguments(
-            "silent recording.mp4",
-            new[] { "base audio.wav", "sfx audio.wav" },
-            "final output.mp4",
-            192
-        );
-
-        TestReflection.Assert(
-            args.Contains("-i \"silent recording.mp4\""),
-            "Mux arguments should include the quoted video input."
-        );
-        TestReflection.Assert(
-            args.Contains("-i \"base audio.wav\"") && args.Contains("-i \"sfx audio.wav\""),
-            "Mux arguments should include both quoted WAV inputs."
-        );
-        TestReflection.Assert(
-            args.Contains("[1:a][2:a]amix=inputs=2:normalize=0[aout]"),
-            "Multi-WAV mux should mix audio inputs with amix normalize=0."
-        );
-        TestReflection.Assert(
-            args.Contains("-map 0:v:0 -map \"[aout]\""),
-            "Multi-WAV mux should map the amix output as the audio stream."
-        );
-        TestReflection.Assert(
-            args.Contains("-c:v copy -c:a aac") && args.Contains("-b:a 192k"),
-            "Mux arguments should keep video copy and AAC bitrate settings."
-        );
-    }
-
-    private static string BuildArguments(
-        string silentVideoTempPath,
-        IReadOnlyList<string> wavPaths,
-        string finalPath,
-        int audioBitrateKbps
-    )
-    {
-        var method =
-            MuxerType.GetMethod(
-                "BuildArguments",
-                BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static,
-                binder: null,
-                types: new[]
-                {
-                    typeof(string),
-                    typeof(IReadOnlyList<string>),
-                    typeof(string),
-                    typeof(int),
-                },
-                modifiers: null
-            )
-            ?? throw new InvalidOperationException(
-                "ReplayVideoAudioMuxer.BuildArguments(string,IReadOnlyList<string>,string,int) not found."
-            );
-        return (string)(
-            method.Invoke(
-                null,
-                new object[] { silentVideoTempPath, wavPaths, finalPath, audioBitrateKbps }
-            ) ?? throw new InvalidOperationException("BuildArguments returned null.")
-        );
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 6) ReplayVideoAudioTapPlan: a SINGLE all-inclusive stem tapped at the FMOD
-//    CORE master. One stem captures every audible class (music, settlement, VO,
-//    and the Resonance-decoded 3D SFX) and avoids the amix double-count that two
-//    overlapping parent/child taps produced.
-// ---------------------------------------------------------------------------
 file static class AudioTapPlanTests
 {
     private static readonly Type TapPlanType = TestReflection.RequireType(
@@ -1449,97 +854,8 @@ file static class AudioTapPlanTests
 }
 
 // ---------------------------------------------------------------------------
-// 8) FFmpeg stderr collection: both process readers share a fixed-capacity,
+// 8) Native encoder diagnostics remain bounded in terminal records.
 //    chunk-fed tail. A single hostile line must never expand retained memory.
-// ---------------------------------------------------------------------------
-file static class BoundedTextTailTests
-{
-    private static readonly Type TailType = TestReflection.RequireType(
-        "BazaarPlusPlus.Game.CombatReplay.Video.BoundedTextTail"
-    );
-
-    public static void Run()
-    {
-        const int capacity = 4096;
-        var hostile = "prefix\r\n\t" + new string('x', 100_000) + "\r\nTAIL";
-        var tail =
-            Activator.CreateInstance(
-                TailType,
-                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
-                binder: null,
-                args: new object[] { capacity },
-                culture: null
-            ) ?? throw new InvalidOperationException("BoundedTextTail should be constructible.");
-        using var reader = new StringReader(hostile);
-        TestReflection.Invoke(
-            TailType,
-            tail,
-            "ReadFrom",
-            new[] { typeof(TextReader) },
-            new object[] { reader }
-        );
-
-        var value = (string)TestReflection.GetProp(TailType, tail, "Value")!;
-        TestReflection.Assert(value.Length <= capacity, "Retained stderr must respect its cap.");
-        TestReflection.Assert(
-            (int)TestReflection.GetProp(TailType, tail, "Length")! <= capacity,
-            "Observable collector length must stay bounded."
-        );
-        TestReflection.Assert(
-            (bool)TestReflection.GetProp(TailType, tail, "WasTruncated")!,
-            "A 100k stderr line must mark the tail truncated."
-        );
-        TestReflection.Assert(
-            value.EndsWith("\r\nTAIL", StringComparison.Ordinal),
-            "The collector must preserve the newest stderr content."
-        );
-
-        var rawTail = CollectThrough(
-            "BazaarPlusPlus.Game.CombatReplay.Video.FfmpegRawVideoEncoder",
-            hostile
-        );
-        var muxTail = CollectThrough(
-            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer",
-            hostile
-        );
-        TestReflection.Assert(
-            rawTail == muxTail && rawTail.Length <= capacity,
-            "Both production stderr readers must retain the same bounded tail."
-        );
-
-        var muxerType = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer"
-        );
-        var probeReader =
-            muxerType.GetMethod(
-                "ReadAacEncoderProbe",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-            ) ?? throw new InvalidOperationException("Bounded AAC probe reader not found.");
-        using var noisyProbe = new StringReader(
-            new string('z', 100_000) + "\n A..... aac AAC encoder\n"
-        );
-        TestReflection.Assert(
-            (bool)(probeReader.Invoke(null, new object[] { noisyProbe }) ?? false),
-            "A hostile overlong probe line must be discarded without hiding a later AAC row."
-        );
-    }
-
-    private static string CollectThrough(string typeName, string stderr)
-    {
-        var type = TestReflection.RequireType(typeName);
-        var method =
-            type.GetMethod(
-                "CollectStderrTailForTests",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-            ) ?? throw new InvalidOperationException($"{typeName} collector seam not found.");
-        using var reader = new StringReader(stderr);
-        return (string)(method.Invoke(null, new object[] { reader }) ?? string.Empty);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// 9) Recorder-owned terminal: preallocated identity, result-based severity,
-//    verified artifact, and an atomic one-shot under late/shutdown races.
 // ---------------------------------------------------------------------------
 file static class RecordingOperationContractTests
 {
@@ -1635,7 +951,6 @@ file static class RecordingOperationContractTests
                 "Rendered output paths must not expose the absolute temp root."
             );
 
-            HostileStderrRendersAsOneBoundedTerminal(root, logs);
             ShutdownSweepClosesOrphanOnce(root, logs);
             TrackedShutdownSweepRejectsLateCompletion(root, logs);
             LifecycleScenarioMatrix(root, logs);
@@ -1651,8 +966,7 @@ file static class RecordingOperationContractTests
         foreach (
             var reason in new[]
             {
-                "FfmpegUnavailable",
-                "AsyncGpuReadbackUnavailable",
+                "UnsupportedPlatform",
                 "OutputPathUnavailable",
                 "InvalidDimensions",
             }
@@ -1751,7 +1065,7 @@ file static class RecordingOperationContractTests
                 fallbackLifecycle,
                 fallbackOperation,
                 Capture("Completed", "Completed"),
-                Mux("FellBackToSilent", "NonZeroExit", fallbackPath, 1),
+                Mux("FellBackToSilent", "NativeMuxFailed", fallbackPath, 1),
                 "Silent",
                 "Complete",
                 null
@@ -1986,57 +1300,6 @@ file static class RecordingOperationContractTests
         );
         TestReflection.Assert(lateWon == 0, "Late completion must lose after the shutdown sweep.");
         logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
-    }
-
-    private static void HostileStderrRendersAsOneBoundedTerminal(
-        string root,
-        StructuredLogCapture logs
-    )
-    {
-        logs.Clear();
-        var hostile =
-            new string('x', 100_000) + "\r\ninjected=true\t" + new string('y', 4000) + "TAIL";
-        var muxType = TestReflection.RequireType(
-            "BazaarPlusPlus.Game.CombatReplay.Video.ReplayVideoAudioMuxer"
-        );
-        var collector =
-            muxType.GetMethod(
-                "CollectStderrTailForTests",
-                BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic
-            ) ?? throw new InvalidOperationException("Mux stderr collector seam not found.");
-        using var reader = new StringReader(hostile);
-        var retained = (string)(collector.Invoke(null, new object[] { reader }) ?? string.Empty);
-
-        var operation = CreateOperation("recording-hostile-stderr-00000005");
-        var completion = Completion(
-            Path.Combine(root, "hostile-missing.mp4"),
-            "Failed",
-            "Failed",
-            "EncoderNonZeroExit"
-        );
-        Set(completion, "StderrTail", retained);
-        Set(completion, "ExitCode", 19);
-        TestReflection.Assert(Complete(operation, completion), "Hostile terminal should close.");
-        logs.AssertSingle(LogLevel.Error, "event=combat_replay.video_recording.failed");
-
-        var rendered = logs.Joined;
-        TestReflection.Assert(rendered.Length <= 2048, "Terminal record must respect its budget.");
-        TestReflection.Assert(
-            rendered.Contains("field_truncated=true", StringComparison.Ordinal),
-            "Hostile stderr truncation must be explicit."
-        );
-        TestReflection.Assert(
-            !rendered.Contains('\r') && !rendered.Contains('\n') && !rendered.Contains('\t'),
-            "Hostile stderr must not inject literal record controls."
-        );
-        TestReflection.Assert(
-            rendered.Contains("\\r\\ninjected=true\\t", StringComparison.Ordinal),
-            "Hostile controls must be escaped inside the terminal field."
-        );
-        TestReflection.Assert(
-            !rendered.Contains("ffmpeg:", StringComparison.Ordinal),
-            "FFmpeg stderr must not create legacy per-line records."
-        );
     }
 
     private static (object Lifecycle, object Operation) StartLifecycle(string recordingId)
@@ -2295,8 +1558,6 @@ file static class MediaEventCatalogTests
             "recording_id:Public:High:Short|backend:Public:Low:None|sample_rate_hz:Public:High:None|channels:Public:Low:None|sample_format:Public:Low:None",
         ["combat_replay.audio_capture.completed"] =
             "recording_id:Public:High:Short|backend:Public:Low:None|usable:Public:Low:None|sample_float_count:Public:High:None|rms_db:Public:High:None|peak_db:Public:High:None|size_bytes:Public:High:None|wav_path:LocalPath:High:None",
-        ["combat_replay.ffmpeg.probe_completed"] =
-            "available:Public:Low:None|source:Public:Low:None|executable:LocalPath:High:None|reason_code:Public:Low:None|duration_ms:Public:High:None|codec:Public:Low:None|width:Public:High:None|height:Public:High:None|fps:Public:Low:None|stderr_tail:UntrustedText:High:None",
         ["combat_replay.video_recording.lifecycle_observed"] =
             "stage:Public:Low:None|recording_id:Public:High:Short|battle_id:Public:High:Short|pending_count:Public:High:None",
         ["combat_replay.video_capture.stats_observed"] =
@@ -2333,8 +1594,8 @@ file static class MediaEventCatalogTests
             .Select(field => field.GetValue(null)!)
             .ToArray();
         TestReflection.Assert(
-            direct.Length == 12,
-            $"Expected 12 media events, got {direct.Length}."
+            direct.Length == 11,
+            $"Expected 11 media events, got {direct.Length}."
         );
 
         var actual = direct.ToDictionary(EventId, Schema, StringComparer.Ordinal);
