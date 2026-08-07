@@ -126,8 +126,7 @@ internal sealed class NativePairedTooltipSession
         if (_activePrimary != null || _hidePending)
         {
             var displacedAuxiliary = _activeAuxiliary;
-            ConcealNativeAuxiliary(displacedAuxiliary);
-            Release(restoreNativeContent: false);
+            ReleaseConcealed(displacedAuxiliary);
             if (displacedAuxiliary != null)
                 Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
         }
@@ -146,7 +145,7 @@ internal sealed class NativePairedTooltipSession
             return;
 
         if (ReferenceEquals(_activePrimary, primary))
-            Release(restoreNativeContent: false);
+            ReleaseConcealed();
         else
             RestorePreparedPrimaryGate();
     }
@@ -154,7 +153,7 @@ internal sealed class NativePairedTooltipSession
     internal void PrepareAuxiliary(AuxiliaryTooltipController auxiliary)
     {
         if (_activeAuxiliary != null || _contentRoot != null)
-            Release(restoreNativeContent: false);
+            ReleaseConcealed();
         RestorePreparedNativeHost();
         _preparedNativeHost = NativeAuxiliaryHostState.Capture(auxiliary);
         // auxParent (Tooltip_Aux_Content in the Tooltip_Aux_P prefab) owns the COMPLETE visual
@@ -203,11 +202,13 @@ internal sealed class NativePairedTooltipSession
         // Background, TitleText, BodyText, Divider — lives under auxParent. The gate is handed
         // back by the next PrepareAuxiliary reuse, by ReleasePrepared when a foreign show takes
         // the controller, or it dies with the despawned controller.
-        ConcealNativeAuxiliary(auxiliary);
         if (ReferenceEquals(_activeAuxiliary, auxiliary))
-            Release(restoreNativeContent: false);
+            ReleaseConcealed(auxiliary);
         else
+        {
+            ConcealPreparedAuxiliary(auxiliary);
             RestorePreparedNativeHost(restoreContentVisibility: false);
+        }
     }
 
     /// <summary>
@@ -255,7 +256,7 @@ internal sealed class NativePairedTooltipSession
         }
 
         if (_activeAuxiliary != null || _contentRoot != null)
-            Release(restoreNativeContent: false);
+            ReleaseConcealed();
 
         _options = options;
         if (
@@ -286,11 +287,9 @@ internal sealed class NativePairedTooltipSession
         {
             // Gate creation only fails on a controller whose Destroy is already pending; this
             // takeover cannot be concealed, so report an unusable native shape and let the caller
-            // re-request a live controller. Conceal before Release: Release restores the gates to
-            // their visible originals while the native header is still active, which is exactly
-            // the header-only orphan this presentation must never expose.
-            ConcealNativeAuxiliary(auxiliary);
-            Release(restoreNativeContent: false);
+            // re-request a live controller. The concealed rollback keeps any surviving auxParent
+            // gate closed while the native node tears down.
+            ReleaseConcealed(auxiliary);
             failure = NativePairedTooltipOpenFailure.DyingController;
             return false;
         }
@@ -308,8 +307,7 @@ internal sealed class NativePairedTooltipSession
             || primary.backgroundImage.sprite == null
         )
         {
-            ConcealNativeAuxiliary(auxiliary);
-            Release(restoreNativeContent: false);
+            ReleaseConcealed(auxiliary);
             failure = NativePairedTooltipOpenFailure.MissingBackground;
             return false;
         }
@@ -320,8 +318,7 @@ internal sealed class NativePairedTooltipSession
         ApplyContentWidth(auxiliary, options.PreferredContentWidth);
         if (!TryCreateNativeBackground(auxiliary, primary))
         {
-            ConcealNativeAuxiliary(auxiliary);
-            Release(restoreNativeContent: false);
+            ReleaseConcealed(auxiliary);
             failure = NativePairedTooltipOpenFailure.BackgroundCloneRejected;
             return false;
         }
@@ -546,8 +543,7 @@ internal sealed class NativePairedTooltipSession
         // native auxiliary controller, which is right when *we* decided to hide but wrong here —
         // the native side is already tearing itself down and re-entering it changes behavior.
         // Release() stops any in-flight fade on its own.
-        ConcealNativeAuxiliary(_activeAuxiliary);
-        Release(restoreNativeContent: false);
+        ReleaseConcealed();
     }
 
     private void StartVisibilityFade(float targetAlpha, bool cleanupOnComplete)
@@ -630,9 +626,8 @@ internal sealed class NativePairedTooltipSession
         if (generation != _generation)
             return;
 
-        ConcealNativeAuxiliary(_activeAuxiliary);
         _visibilityFade = null;
-        if (!Release(restoreNativeContent: false))
+        if (!ReleaseConcealed())
             return;
         Data.TooltipParentComponent?.HideAuxiliaryTooltipController();
     }
@@ -641,6 +636,22 @@ internal sealed class NativePairedTooltipSession
     {
         if (auxiliary?.tooltipCanvasGroup != null)
             auxiliary.tooltipCanvasGroup.alpha = 0f;
+    }
+
+    private void ConcealPreparedAuxiliary(AuxiliaryTooltipController? auxiliary)
+    {
+        ConcealNativeAuxiliary(auxiliary);
+        if (
+            _preparedAuxiliaryGate != null
+            && (auxiliary == null || ReferenceEquals(_preparedAuxiliaryGate.Controller, auxiliary))
+        )
+            _preparedAuxiliaryGate.SetAlpha(0f);
+    }
+
+    private bool ReleaseConcealed(AuxiliaryTooltipController? auxiliary = null)
+    {
+        ConcealPreparedAuxiliary(auxiliary ?? _activeAuxiliary);
+        return ReleaseCore(restoreNativeContent: false, restoreAuxiliaryGate: false);
     }
 
     // ── Release ────────────────────────────────────────────────────────────────────────────
@@ -663,7 +674,10 @@ internal sealed class NativePairedTooltipSession
     /// through its own identity check and re-attach to a presentation that is being destroyed.
     /// </para>
     /// </remarks>
-    internal bool Release(bool restoreNativeContent)
+    internal bool Release(bool restoreNativeContent) =>
+        ReleaseCore(restoreNativeContent, restoreAuxiliaryGate: true);
+
+    private bool ReleaseCore(bool restoreNativeContent, bool restoreAuxiliaryGate)
     {
         var hadActiveContent =
             _activeAuxiliary != null
@@ -689,7 +703,8 @@ internal sealed class NativePairedTooltipSession
             Object.Destroy(_nativeBackgroundRoot);
         }
         RestorePreparedNativeHost(restoreNativeContent);
-        RestorePreparedAuxiliaryGate();
+        if (restoreAuxiliaryGate)
+            RestorePreparedAuxiliaryGate();
         RestorePreparedPrimaryGate();
         if (_activePrimary != null)
             _activePrimary.SetLockedFlag(false);
